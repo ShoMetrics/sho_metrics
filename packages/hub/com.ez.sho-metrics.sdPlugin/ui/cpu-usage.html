@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html>
+
+<head lang="en">
+    <title>Metric Settings</title>
+    <meta charset="utf-8" />
+    <script src="https://sdpi-components.dev/releases/v4/sdpi-components.js"></script>
+    <style>
+        body {
+            background-color: #2d2d2d;
+            color: #efefef;
+            font-family: sans-serif;
+        }
+
+        .settings-section[hidden] {
+            display: none;
+        }
+
+        .usage-range {
+            align-items: center;
+            border-radius: 4px;
+            color: #111827;
+            cursor: pointer;
+            display: flex;
+            font-size: 11px;
+            font-weight: 700;
+            justify-content: center;
+            min-height: 24px;
+            overflow: hidden;
+            padding: 5px 8px;
+            position: relative;
+            text-align: center;
+            user-select: none;
+            width: 100%;
+        }
+
+        .usage-range span {
+            line-height: 1;
+            pointer-events: none;
+            position: relative;
+            z-index: 1;
+        }
+
+        .usage-range input[type="color"] {
+            cursor: pointer;
+            inset: 0;
+            opacity: 0;
+            position: absolute;
+            width: 100%;
+        }
+
+        .range-control {
+            align-items: center;
+            display: grid;
+            gap: 8px;
+            grid-template-columns: 1fr 40px;
+            width: 100%;
+        }
+
+        .range-control input[type="range"] {
+            width: 100%;
+        }
+
+        .range-value {
+            color: #efefef;
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+        }
+
+        .color-band-control {
+            width: 100%;
+        }
+
+        .section-note {
+            color: #b8b8b8;
+            font-size: 12px;
+            line-height: 1.35;
+            margin: 6px 0 0;
+        }
+
+        .circle-options {
+            margin-top: 6px;
+        }
+    </style>
+</head>
+
+<body>
+    <sdpi-item label="Graphic Type">
+        <sdpi-select id="graphicType" setting="graphicType" default="circular">
+            <option value="circular">Circular</option>
+            <option value="linear">Linear</option>
+            <option value="dashed-line">Dashed Line</option>
+        </sdpi-select>
+    </sdpi-item>
+
+    <section class="settings-section circle-options" data-graphic-section="circular">
+        <sdpi-item label="Center Content">
+            <sdpi-select id="circularCenterContent" setting="circularCenterContent" default="value">
+                <option value="value">Value</option>
+                <option value="icon">Minimal Icon</option>
+            </sdpi-select>
+        </sdpi-item>
+    </section>
+
+    <section class="settings-section" data-action-section="net-speed" hidden>
+        <sdpi-item label="Network Metric">
+            <sdpi-select id="networkDirection" setting="networkDirection" default="">
+                <option value="">Choose Upload or Download</option>
+                <option value="download">Download</option>
+                <option value="upload">Upload</option>
+            </sdpi-select>
+        </sdpi-item>
+
+        <sdpi-item>
+            <p class="section-note">A circle can show one direction at a time.</p>
+        </sdpi-item>
+    </section>
+
+    <sdpi-item label="Graphic Style">
+        <sdpi-select setting="graphicStyle" default="flat">
+            <option value="flat">Default</option>
+            <option value="cupertino-glass">Cupertino Glass Style</option>
+        </sdpi-select>
+    </sdpi-item>
+
+    <sdpi-item label="Color Mode">
+        <sdpi-select id="colorMode" setting="colorMode" default="threshold">
+            <option value="threshold">Dynamic (By Percentage)</option>
+            <option value="solid">Solid Color</option>
+        </sdpi-select>
+    </sdpi-item>
+
+    <section class="settings-section" data-color-section="solid" hidden>
+        <sdpi-item label="Solid Color">
+            <sdpi-color setting="solidColor" default="#3b82f6"></sdpi-color>
+        </sdpi-item>
+    </section>
+
+    <section class="settings-section" data-color-section="threshold">
+        <sdpi-heading>Dynamic Usage Colors</sdpi-heading>
+
+        <sdpi-item>
+            <p class="section-note">Set the usage ranges that choose low, medium, or high color.</p>
+        </sdpi-item>
+
+        <sdpi-item label="Low Ends At">
+            <div class="range-control">
+                <input id="lowThreshold" type="range" min="0" max="100" step="1" value="30" />
+                <span id="lowThresholdValue" class="range-value">30%</span>
+            </div>
+        </sdpi-item>
+
+        <sdpi-item label="High Starts At">
+            <div class="range-control">
+                <input id="highThreshold" type="range" min="0" max="100" step="1" value="70" />
+                <span id="highThresholdValue" class="range-value">70%</span>
+            </div>
+        </sdpi-item>
+
+        <sdpi-item label="Low Usage Color">
+            <div class="color-band-control">
+                <label id="lowRangeLabel" class="usage-range">
+                    <span id="lowRangeText">0-30%</span>
+                    <input id="colorLow" type="color" value="#22c55e" />
+                </label>
+            </div>
+        </sdpi-item>
+
+        <sdpi-item label="Medium Usage Color">
+            <div class="color-band-control">
+                <label id="mediumRangeLabel" class="usage-range">
+                    <span id="mediumRangeText">30-70%</span>
+                    <input id="colorMedium" type="color" value="#eab308" />
+                </label>
+            </div>
+        </sdpi-item>
+
+        <sdpi-item label="High Usage Color">
+            <div class="color-band-control">
+                <label id="highRangeLabel" class="usage-range">
+                    <span id="highRangeText">70-100%</span>
+                    <input id="colorHigh" type="color" value="#ef4444" />
+                </label>
+            </div>
+        </sdpi-item>
+    </section>
+
+    <script>
+        const { streamDeckClient } = SDPIComponents;
+
+        const defaultSettings = {
+            colorMode: "threshold",
+            graphicType: "circular",
+            circularCenterContent: "value",
+            networkDirection: "",
+            lowThreshold: 30,
+            highThreshold: 70,
+            colorLow: "#22c55e",
+            colorMedium: "#eab308",
+            colorHigh: "#ef4444",
+        };
+
+        const graphicTypeControl = document.getElementById("graphicType");
+        const networkDirectionControl = document.getElementById("networkDirection");
+        const colorModeControl = document.getElementById("colorMode");
+        const lowThresholdInput = document.getElementById("lowThreshold");
+        const highThresholdInput = document.getElementById("highThreshold");
+        const lowThresholdValueLabel = document.getElementById("lowThresholdValue");
+        const highThresholdValueLabel = document.getElementById("highThresholdValue");
+        const lowColorControl = document.getElementById("colorLow");
+        const mediumColorControl = document.getElementById("colorMedium");
+        const highColorControl = document.getElementById("colorHigh");
+        const lowRangeLabel = document.getElementById("lowRangeLabel");
+        const mediumRangeLabel = document.getElementById("mediumRangeLabel");
+        const highRangeLabel = document.getElementById("highRangeLabel");
+        const lowRangeText = document.getElementById("lowRangeText");
+        const mediumRangeText = document.getElementById("mediumRangeText");
+        const highRangeText = document.getElementById("highRangeText");
+
+        let currentSettings = { ...defaultSettings };
+        let currentActionUuid = "";
+
+        streamDeckClient.didReceiveSettings.subscribe((event) => {
+            currentSettings = normalizeSettings(event.payload.settings);
+            applySettingsToControls();
+        });
+
+        document.addEventListener("input", syncSettingsFromControls, true);
+        document.addEventListener("change", syncSettingsFromControls, true);
+        graphicTypeControl.addEventListener("input", syncSettingsFromControls);
+        graphicTypeControl.addEventListener("change", syncSettingsFromControls);
+        networkDirectionControl.addEventListener("input", syncSettingsFromControls);
+        networkDirectionControl.addEventListener("change", syncSettingsFromControls);
+        colorModeControl.addEventListener("input", syncSettingsFromControls);
+        colorModeControl.addEventListener("change", syncSettingsFromControls);
+
+        lowThresholdInput.addEventListener("input", () => updateThresholds("low"));
+        highThresholdInput.addEventListener("input", () => updateThresholds("high"));
+        lowColorControl.addEventListener("input", () => updateUsageColor("colorLow", lowColorControl.value));
+        mediumColorControl.addEventListener("input", () => updateUsageColor("colorMedium", mediumColorControl.value));
+        highColorControl.addEventListener("input", () => updateUsageColor("colorHigh", highColorControl.value));
+        loadSettings();
+
+        async function loadSettings() {
+            const connectionInfo = await streamDeckClient.getConnectionInfo();
+            const payload = await streamDeckClient.getSettings();
+            currentActionUuid = readActionUuid(connectionInfo);
+            currentSettings = normalizeSettings(payload.settings);
+            applySettingsToControls();
+        }
+
+        function applySettingsToControls() {
+            lowThresholdInput.value = normalizeThreshold(currentSettings.lowThreshold, defaultSettings.lowThreshold);
+            highThresholdInput.value = normalizeThreshold(currentSettings.highThreshold, defaultSettings.highThreshold);
+            lowColorControl.value = currentSettings.colorLow;
+            mediumColorControl.value = currentSettings.colorMedium;
+            highColorControl.value = currentSettings.colorHigh;
+            enforceThresholdOrder("low");
+            setVisibleActionOptions(currentActionUuid);
+            setVisibleGraphicOptions(currentSettings.graphicType);
+            setVisibleColorMode(currentSettings.colorMode);
+            renderUsageColorBands();
+        }
+
+        function updateThresholds(changedThreshold) {
+            enforceThresholdOrder(changedThreshold);
+
+            currentSettings = {
+                ...currentSettings,
+                lowThreshold: Number(lowThresholdInput.value),
+                highThreshold: Number(highThresholdInput.value),
+            };
+
+            renderUsageColorBands();
+            streamDeckClient.setSettings(currentSettings);
+        }
+
+        function updateUsageColor(settingName, colorValue) {
+            currentSettings = {
+                ...currentSettings,
+                [settingName]: colorValue,
+            };
+
+            renderUsageColorBands();
+            streamDeckClient.setSettings(currentSettings);
+        }
+
+        function enforceThresholdOrder(changedThreshold) {
+            const lowThreshold = Number(lowThresholdInput.value);
+            const highThreshold = Number(highThresholdInput.value);
+
+            if (lowThreshold <= highThreshold) {
+                return;
+            }
+
+            if (changedThreshold === "low") {
+                highThresholdInput.value = lowThreshold;
+                return;
+            }
+
+            lowThresholdInput.value = highThreshold;
+        }
+
+        function syncSettingsFromControls(event) {
+            window.requestAnimationFrame(() => {
+                const eventSetting = readEventSetting(event);
+                const eventValue = readEventValue(event);
+
+                currentSettings = {
+                    ...currentSettings,
+                    graphicType: eventSetting === "graphicType"
+                        ? eventValue
+                        : readControlValue(graphicTypeControl, currentSettings.graphicType),
+                    networkDirection: eventSetting === "networkDirection"
+                        ? eventValue
+                        : readControlValue(networkDirectionControl, currentSettings.networkDirection),
+                    colorMode: eventSetting === "colorMode"
+                        ? eventValue
+                        : readControlValue(colorModeControl, currentSettings.colorMode),
+                    colorLow: readControlValue(lowColorControl, currentSettings.colorLow),
+                    colorMedium: readControlValue(mediumColorControl, currentSettings.colorMedium),
+                    colorHigh: readControlValue(highColorControl, currentSettings.colorHigh),
+                };
+
+                setVisibleGraphicOptions(currentSettings.graphicType);
+                setVisibleColorMode(currentSettings.colorMode);
+                renderUsageColorBands();
+            });
+        }
+
+        function renderUsageColorBands() {
+            const lowThreshold = Number(lowThresholdInput.value);
+            const highThreshold = Number(highThresholdInput.value);
+
+            lowThresholdValueLabel.textContent = `${lowThreshold}%`;
+            highThresholdValueLabel.textContent = `${highThreshold}%`;
+            lowRangeText.textContent = `0-${lowThreshold}%`;
+            mediumRangeText.textContent = `${lowThreshold}-${highThreshold}%`;
+            highRangeText.textContent = `${highThreshold}-100%`;
+
+            lowRangeLabel.style.backgroundColor = currentSettings.colorLow;
+            mediumRangeLabel.style.backgroundColor = currentSettings.colorMedium;
+            highRangeLabel.style.backgroundColor = currentSettings.colorHigh;
+        }
+
+        function setVisibleColorMode(colorMode) {
+            const visibleColorMode = colorMode === "solid" ? "solid" : "threshold";
+
+            document.querySelectorAll("[data-color-section]").forEach((section) => {
+                section.hidden = section.dataset.colorSection !== visibleColorMode;
+            });
+        }
+
+        function setVisibleGraphicOptions(graphicType) {
+            const visibleGraphicType = graphicType === "circular" ? "circular" : "";
+
+            document.querySelectorAll("[data-graphic-section]").forEach((section) => {
+                section.hidden = section.dataset.graphicSection !== visibleGraphicType;
+            });
+        }
+
+        function setVisibleActionOptions(actionUuid) {
+            document.querySelectorAll("[data-action-section]").forEach((section) => {
+                section.hidden = !actionUuid.endsWith(section.dataset.actionSection);
+            });
+        }
+
+        function readControlValue(control, fallbackValue) {
+            if (!control) {
+                return fallbackValue;
+            }
+
+            if (typeof control.value === "string" && control.value.length > 0) {
+                return control.value;
+            }
+
+            const shadowInput = control.shadowRoot?.querySelector("input, select");
+
+            if (typeof shadowInput?.value === "string" && shadowInput.value.length > 0) {
+                return shadowInput.value;
+            }
+
+            return control.getAttribute("value") ?? fallbackValue;
+        }
+
+        function readEventSetting(event) {
+            return event.composedPath()
+                .find((element) => element?.getAttribute?.("setting"))
+                ?.getAttribute("setting");
+        }
+
+        function readEventValue(event) {
+            const eventPathValue = event.composedPath()
+                .find((element) => typeof element?.value === "string" && element.value.length > 0)
+                ?.value;
+
+            return eventPathValue ?? event.target?.value ?? currentSettings.colorMode;
+        }
+
+        function normalizeThreshold(value, fallbackValue) {
+            const numericValue = Number(value);
+
+            if (!Number.isFinite(numericValue)) {
+                return fallbackValue;
+            }
+
+            return Math.min(Math.max(Math.round(numericValue), 0), 100);
+        }
+
+        function normalizeSettings(settings) {
+            return {
+                ...defaultSettings,
+                ...settings,
+                graphicType: settings.graphicType ?? defaultSettings.graphicType,
+                circularCenterContent: settings.circularCenterContent ?? defaultSettings.circularCenterContent,
+                networkDirection: settings.networkDirection ?? defaultSettings.networkDirection,
+                colorMedium: settings.colorMedium ?? settings.colorMid ?? defaultSettings.colorMedium,
+            };
+        }
+
+        function readActionUuid(connectionInfo) {
+            return connectionInfo.actionInfo?.action
+                ?? connectionInfo.actionInfo?.uuid
+                ?? connectionInfo.action
+                ?? "";
+        }
+    </script>
+</body>
+
+</html>

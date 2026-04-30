@@ -1,0 +1,172 @@
+{
+	"Name": "Sho Metrics",
+	"Version": "0.1.0.0",
+	"Author": "ez",
+	"Actions": [
+		{
+			"Name": "Counter",
+			"UUID": "com.ez.sho-metrics.increment",
+			"Icon": "imgs/actions/counter/icon",
+			"Tooltip": "Displays a count, which increments by one on press.",
+			"PropertyInspectorPath": "ui/increment-counter.html",
+			"Controllers": [
+				"Keypad",
+				"Encoder"
+			],
+			"States": [
+				{
+					"Image": "imgs/actions/counter/key",
+					"TitleAlignment": "middle"
+				}
+			]
+		},
+		{
+			"Name": "CPU Usage",
+			"UUID": "com.ez.sho-metrics.cpu-usage",
+			"Icon": "imgs/actions/counter/icon",
+			"Tooltip": "Displays the current CPU usage percentage.",
+			"PropertyInspectorPath": "ui/cpu-usage.html",
+			"Controllers": [
+				"Keypad",
+				"Encoder"
+			],
+			"Encoder": {
+				"layout": "$B1"
+			},
+			"UserTitleEnabled": false,
+			"States": [
+				{
+					"Image": "imgs/actions/counter/key",
+					"ShowTitle": false,
+					"TitleAlignment": "middle"
+				}
+			]
+		},
+		{
+			"Name": "Net Speed",
+			"UUID": "com.ez.sho-metrics.net-speed",
+			"Icon": "imgs/actions/counter/icon",
+			"Tooltip": "Displays Down/Up network speed (MB/s).",
+			"PropertyInspectorPath": "ui/cpu-usage.html",
+			"Controllers": [
+				"Keypad",
+				"Encoder"
+			],
+			"Encoder": {
+				"layout": "$B1"
+			},
+			"States": [
+				{
+					"Image": "imgs/actions/counter/key",
+					"TitleAlignment": "middle"
+				}
+			]
+		},
+		{
+			"Name": "GPU Usage",
+			"UUID": "com.ez.sho-metrics.gpu-usage",
+			"Icon": "imgs/actions/counter/icon",
+			"Tooltip": "Displays NVIDIA GPU usage percentage.",
+			"PropertyInspectorPath": "ui/cpu-usage.html",
+			"Controllers": [
+				"Keypad",
+				"Encoder"
+			],
+			"Encoder": {
+				"layout": "$B1"
+			},
+			"UserTitleEnabled": false,
+			"States": [
+				{
+					"Image": "imgs/actions/counter/key",
+					"ShowTitle": false,
+					"TitleAlignment": "middle"
+				}
+			]
+		},
+		{
+			"Name": "GPU Temp",
+			"UUID": "com.ez.sho-metrics.gpu-temp",
+			"Icon": "imgs/actions/counter/icon",
+			"Tooltip": "Displays NVIDIA GPU temperature.",
+			"Controllers": [
+				"Keypad",
+				"Encoder"
+			],
+			"Encoder": {
+				"layout": "$B1"
+			},
+			"States": [
+				{
+					"Image": "imgs/actions/counter/key",
+					"TitleAlignment": "middle"
+				}
+			]
+		},
+		{
+			"Name": "GPU VRAM",
+			"UUID": "com.ez.sho-metrics.gpu-vram",
+			"Icon": "imgs/actions/counter/icon",
+			"Tooltip": "Displays NVIDIA GPU VRAM usage.",
+			"PropertyInspectorPath": "ui/cpu-usage.html",
+			"Controllers": [
+				"Keypad",
+				"Encoder"
+			],
+			"Encoder": {
+				"layout": "$B1"
+			},
+			"UserTitleEnabled": false,
+			"States": [
+				{
+					"Image": "imgs/actions/counter/key",
+					"ShowTitle": false,
+					"TitleAlignment": "middle"
+				}
+			]
+		},
+		{
+			"Name": "GPU Power",
+			"UUID": "com.ez.sho-metrics.gpu-power",
+			"Icon": "imgs/actions/counter/icon",
+			"Tooltip": "Displays NVIDIA GPU power draw.",
+			"Controllers": [
+				"Keypad",
+				"Encoder"
+			],
+			"Encoder": {
+				"layout": "$B1"
+			},
+			"States": [
+				{
+					"Image": "imgs/actions/counter/key",
+					"TitleAlignment": "middle"
+				}
+			]
+		}
+	],
+	"Category": "Sho Metrics",
+	"CategoryIcon": "imgs/plugin/category-icon",
+	"CodePath": "bin/plugin.js",
+	"Description": "system monitor plugin",
+	"Icon": "imgs/plugin/marketplace",
+	"SDKVersion": 3,
+	"Software": {
+		"MinimumVersion": "7.1"
+	},
+	"OS": [
+		{
+			"Platform": "mac",
+			"MinimumVersion": "12"
+		},
+		{
+			"Platform": "windows",
+			"MinimumVersion": "10"
+		}
+	],
+	"Nodejs": {
+		"Version": "24",
+		"Debug": "enabled"
+	},
+	"UUID": "com.ez.sho-metrics"
+}
