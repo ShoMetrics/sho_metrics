@@ -1,10 +1,11 @@
 {
     "scripts": {
-        "build": "rollup -c",
+        "build": "npm run vendor:sdpi-components && rollup -c",
         "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart com.ez.sho-metrics\"",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
-        "generate:proto": "pbjs -t static-module -w es6 -o src/generated/snapshot.js ../../contracts/proto/shometrics/v1/snapshot.proto && pbts -o src/generated/snapshot.d.ts src/generated/snapshot.js"
+        "generate:proto": "pbjs -t static-module -w es6 -o src/generated/snapshot.js ../../contracts/proto/shometrics/v1/snapshot.proto && pbts -o src/generated/snapshot.d.ts src/generated/snapshot.js",
+        "vendor:sdpi-components": "node scripts/vendor-sdpi-components.mjs"
     },
     "type": "module",
     "devDependencies": {
@@ -29,6 +30,7 @@
         "@elgato/streamdeck": "^2.0.0",
         "@resvg/resvg-js": "^2.6.2",
         "protobufjs": "^8.0.1",
+        "sdpi-components": "github:GeekyEggo/sdpi-components#v4.0.1",
         "systeminformation": "^5.31.5"
     }
 }

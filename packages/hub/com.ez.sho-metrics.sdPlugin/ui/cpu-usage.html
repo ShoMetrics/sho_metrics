@@ -4,7 +4,12 @@
 <head lang="en">
     <title>Metric Settings</title>
     <meta charset="utf-8" />
-    <script src="https://sdpi-components.dev/releases/v4/sdpi-components.js"></script>
+    <script src="./vendor/sdpi-components/sdpi-components.js"></script>
+    <script>
+        if (!window.SDPIComponents) {
+            document.write('<script src="https://sdpi-components.dev/releases/v4/sdpi-components.js"><\/script>');
+        }
+    </script>
     <style>
         body {
             background-color: #2d2d2d;
