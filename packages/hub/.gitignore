@@ -5,6 +5,9 @@ node_modules/
 *.sdPlugin/bin
 *.sdPlugin/logs
 
+# Generated runtime artifacts
+src/generated/
+
 # Logs
 logs
 *.log
