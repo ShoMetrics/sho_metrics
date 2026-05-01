@@ -167,6 +167,44 @@
         </section>
     </section>
 
+    <section class="settings-section" data-action-section="disk" hidden>
+        <sdpi-item label="Disk Metric">
+            <select id="diskMetricKind" class="native-select">
+                <option value="usage">Usage</option>
+                <option value="throughput" data-mac-only>Throughput</option>
+            </select>
+        </sdpi-item>
+
+        <section class="settings-section" data-disk-section="usage">
+            <sdpi-item label="Volume">
+                <select id="diskVolumeId" class="native-select">
+                    <option value="">Automatic</option>
+                </select>
+            </sdpi-item>
+
+            <sdpi-item label="Usage Display">
+                <select id="diskUsageDisplayMode" class="native-select">
+                    <option value="percentage">Percentage</option>
+                    <option value="space">Free Space</option>
+                </select>
+            </sdpi-item>
+        </section>
+
+        <section class="settings-section" data-disk-section="throughput" hidden>
+            <sdpi-item label="Direction">
+                <select id="diskThroughputDirection" class="native-select">
+                    <option value="total">Total</option>
+                    <option value="read">Read</option>
+                    <option value="write">Write</option>
+                </select>
+            </sdpi-item>
+
+            <sdpi-item label="Max Speed (MiB/s)">
+                <input id="maximumDiskThroughputMebibytesPerSecond" class="native-input" type="number" min="1" step="1" placeholder="1000" />
+            </sdpi-item>
+        </section>
+    </section>
+
     <section class="settings-section" data-action-section="gpu-temp" hidden>
         <sdpi-item label="Unit">
             <select id="temperatureUnit" class="native-select">
@@ -267,6 +305,13 @@
             downloadIconColor: "#3b82f6",
             uploadIconColor: "#ef4444",
             netSpeedDefaultsApplied: false,
+            diskMetricKind: "usage",
+            diskUsageDisplayMode: "percentage",
+            diskThroughputDirection: "total",
+            diskVolumeId: "",
+            availableDiskVolumes: "[]",
+            maximumDiskThroughputMebibytesPerSecond: 1000,
+            diskDefaultsApplied: false,
             maximumTemperatureCelsius: 100,
             temperatureUnit: "celsius",
             lowThreshold: 30,
@@ -285,6 +330,11 @@
         const networkUnitBaseControl = document.getElementById("networkUnitBase");
         const downloadIconColorControl = document.getElementById("downloadIconColor");
         const uploadIconColorControl = document.getElementById("uploadIconColor");
+        const diskMetricKindControl = document.getElementById("diskMetricKind");
+        const diskUsageDisplayModeControl = document.getElementById("diskUsageDisplayMode");
+        const diskThroughputDirectionControl = document.getElementById("diskThroughputDirection");
+        const diskVolumeControl = document.getElementById("diskVolumeId");
+        const maximumDiskThroughputInput = document.getElementById("maximumDiskThroughputMebibytesPerSecond");
         const maximumTemperatureCelsiusInput = document.getElementById("maximumTemperatureCelsius");
         const temperatureUnitControl = document.getElementById("temperatureUnit");
         const colorModeControl = document.getElementById("colorMode");
@@ -304,6 +354,7 @@
 
         let currentSettings = { ...defaultSettings };
         let currentActionUuid = "";
+        let isWindowsPropertyInspector = false;
 
         streamDeckClient.didReceiveSettings.subscribe((event) => {
             currentSettings = normalizeSettings(event.payload.settings);
@@ -326,6 +377,16 @@
         maximumNetworkSpeedInput.addEventListener("change", syncSettingsFromControls);
         networkUnitBaseControl.addEventListener("input", syncSettingsFromControls);
         networkUnitBaseControl.addEventListener("change", syncSettingsFromControls);
+        diskMetricKindControl.addEventListener("input", syncSettingsFromControls);
+        diskMetricKindControl.addEventListener("change", syncSettingsFromControls);
+        diskUsageDisplayModeControl.addEventListener("input", syncSettingsFromControls);
+        diskUsageDisplayModeControl.addEventListener("change", syncSettingsFromControls);
+        diskThroughputDirectionControl.addEventListener("input", syncSettingsFromControls);
+        diskThroughputDirectionControl.addEventListener("change", syncSettingsFromControls);
+        diskVolumeControl.addEventListener("input", syncSettingsFromControls);
+        diskVolumeControl.addEventListener("change", syncSettingsFromControls);
+        maximumDiskThroughputInput.addEventListener("input", syncSettingsFromControls);
+        maximumDiskThroughputInput.addEventListener("change", syncSettingsFromControls);
         maximumTemperatureCelsiusInput.addEventListener("input", syncSettingsFromControls);
         maximumTemperatureCelsiusInput.addEventListener("change", syncSettingsFromControls);
         temperatureUnitControl.addEventListener("input", syncSettingsFromControls);
@@ -344,6 +405,7 @@
             const connectionInfo = await streamDeckClient.getConnectionInfo();
             const payload = await streamDeckClient.getSettings();
             currentActionUuid = readActionUuid(connectionInfo);
+            isWindowsPropertyInspector = resolveIsWindowsPropertyInspector(connectionInfo);
             currentSettings = normalizeSettings(payload.settings);
             applySettingsToControls();
         }
@@ -358,6 +420,16 @@
             networkInterfaceControl.value = currentSettings.networkInterfaceId;
             maximumNetworkSpeedInput.value = normalizeOptionalPositiveNumber(currentSettings.maximumNetworkSpeedMbps);
             networkUnitBaseControl.value = currentSettings.networkUnitBase;
+            configurePlatformSpecificOptions();
+            diskMetricKindControl.value = currentSettings.diskMetricKind;
+            diskUsageDisplayModeControl.value = currentSettings.diskUsageDisplayMode;
+            diskThroughputDirectionControl.value = currentSettings.diskThroughputDirection;
+            renderDiskVolumeOptions();
+            diskVolumeControl.value = currentSettings.diskVolumeId;
+            maximumDiskThroughputInput.value = normalizePositiveNumber(
+                currentSettings.maximumDiskThroughputMebibytesPerSecond,
+                defaultSettings.maximumDiskThroughputMebibytesPerSecond,
+            );
             maximumTemperatureCelsiusInput.value = normalizePositiveNumber(
                 currentSettings.maximumTemperatureCelsius,
                 defaultSettings.maximumTemperatureCelsius,
@@ -372,6 +444,7 @@
             setVisibleActionOptions(currentActionUuid);
             setVisibleGraphicOptions(currentSettings.graphicType);
             setVisibleNetworkCircularOptions();
+            setVisibleDiskOptions();
             setVisibleTemperatureScaleOptions();
             setVisibleColorMode(currentSettings.colorMode);
             renderUsageColorBands();
@@ -420,11 +493,16 @@
             window.requestAnimationFrame(() => {
                 const eventSetting = readEventSetting(event);
                 const eventValue = readEventValue(event);
+                const nextDiskMetricKind = normalizeDiskMetricKind(
+                    eventSetting === "diskMetricKind" ? eventValue : diskMetricKindControl.value,
+                );
 
                 currentSettings = {
                     ...currentSettings,
                     pollingFrequencySeconds: eventSetting === "pollingFrequencySeconds"
                         ? normalizePollingFrequency(eventValue)
+                        : eventSetting === "diskMetricKind"
+                            ? resolveDefaultDiskPollingFrequency(nextDiskMetricKind)
                         : normalizePollingFrequency(readControlValue(
                             pollingFrequencyControl,
                             currentSettings.pollingFrequencySeconds,
@@ -443,6 +521,14 @@
                         : networkInterfaceControl.value,
                     maximumNetworkSpeedMbps: normalizeOptionalPositiveNumber(maximumNetworkSpeedInput.value),
                     networkUnitBase: networkUnitBaseControl.value === "bit" ? "bit" : "byte",
+                    diskMetricKind: nextDiskMetricKind,
+                    diskUsageDisplayMode: normalizeDiskUsageDisplayMode(diskUsageDisplayModeControl.value),
+                    diskThroughputDirection: normalizeDiskThroughputDirection(diskThroughputDirectionControl.value),
+                    diskVolumeId: eventSetting === "diskVolumeId" ? eventValue : diskVolumeControl.value,
+                    maximumDiskThroughputMebibytesPerSecond: normalizePositiveNumber(
+                        maximumDiskThroughputInput.value,
+                        defaultSettings.maximumDiskThroughputMebibytesPerSecond,
+                    ),
                     maximumTemperatureCelsius: normalizePositiveNumber(
                         maximumTemperatureCelsiusInput.value,
                         defaultSettings.maximumTemperatureCelsius,
@@ -457,6 +543,9 @@
                     netSpeedDefaultsApplied: currentActionUuid.endsWith("net-speed")
                         ? true
                         : currentSettings.netSpeedDefaultsApplied,
+                    diskDefaultsApplied: currentActionUuid.endsWith("disk")
+                        ? true
+                        : currentSettings.diskDefaultsApplied,
                     colorLow: readControlValue(lowColorControl, currentSettings.colorLow),
                     colorMedium: readControlValue(mediumColorControl, currentSettings.colorMedium),
                     colorHigh: readControlValue(highColorControl, currentSettings.colorHigh),
@@ -464,8 +553,10 @@
 
                 setVisibleGraphicOptions(currentSettings.graphicType);
                 setVisibleNetworkCircularOptions();
+                setVisibleDiskOptions();
                 setVisibleTemperatureScaleOptions();
                 setVisibleColorMode(currentSettings.colorMode);
+                pollingFrequencyControl.value = String(currentSettings.pollingFrequencySeconds);
                 renderUsageColorBands();
                 streamDeckClient.setSettings(currentSettings);
             });
@@ -512,6 +603,14 @@
             });
         }
 
+        function setVisibleDiskOptions() {
+            const visibleDiskSection = currentSettings.diskMetricKind === "throughput" ? "throughput" : "usage";
+
+            document.querySelectorAll("[data-disk-section]").forEach((section) => {
+                section.hidden = section.dataset.diskSection !== visibleDiskSection;
+            });
+        }
+
         function setVisibleTemperatureScaleOptions() {
             const shouldShow = currentActionUuid.endsWith("gpu-temp")
                 && (currentSettings.graphicType === "circular" || currentSettings.graphicType === "linear");
@@ -547,6 +646,68 @@
             });
 
             networkInterfaceControl.value = selectedValue;
+        }
+
+        function renderDiskVolumeOptions() {
+            const diskVolumes = parseDiskVolumeOptions(currentSettings.availableDiskVolumes);
+            const selectedValue = currentSettings.diskVolumeId;
+
+            diskVolumeControl.replaceChildren(new Option("Automatic", ""));
+
+            diskVolumes.forEach((diskVolume) => {
+                const option = new Option(
+                    `${diskVolume.mount || diskVolume.fs} (${formatByteCount(diskVolume.sizeBytes)})`,
+                    diskVolume.id,
+                );
+                diskVolumeControl.add(option);
+            });
+
+            diskVolumeControl.value = selectedValue;
+        }
+
+        function parseDiskVolumeOptions(value) {
+            if (typeof value !== "string") {
+                return [];
+            }
+
+            try {
+                const parsedValue = JSON.parse(value);
+
+                if (!Array.isArray(parsedValue)) {
+                    return [];
+                }
+
+                return parsedValue.filter((diskVolume) => (
+                    typeof diskVolume.id === "string"
+                    && typeof diskVolume.fs === "string"
+                    && typeof diskVolume.mount === "string"
+                    && typeof diskVolume.storageKind === "string"
+                    && typeof diskVolume.diskName === "string"
+                    && typeof diskVolume.sizeBytes === "number"
+                ));
+            } catch {
+                return [];
+            }
+        }
+
+        function formatByteCount(bytes) {
+            const units = ["B", "KB", "MB", "GB", "TB", "PB"];
+            let value = Math.max(0, Number(bytes));
+            let unitIndex = 0;
+
+            while (value >= 1024 && unitIndex < units.length - 1) {
+                value /= 1024;
+                unitIndex += 1;
+            }
+
+            return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
+        }
+
+        function configurePlatformSpecificOptions() {
+            document.querySelectorAll("[data-mac-only]").forEach((option) => {
+                option.hidden = isWindowsPropertyInspector;
+                option.disabled = isWindowsPropertyInspector;
+            });
         }
 
         function parseNetworkInterfaceOptions(value) {
@@ -640,12 +801,18 @@
         function normalizeSettings(settings) {
             const shouldApplyNetSpeedDefaults = currentActionUuid.endsWith("net-speed")
                 && settings.netSpeedDefaultsApplied !== true;
+            const shouldApplyDiskDefaults = currentActionUuid.endsWith("disk")
+                && settings.diskDefaultsApplied !== true;
             const normalizedNetworkDirection = normalizeNetworkDirection(settings.networkDirection);
+            const normalizedDiskMetricKind = normalizeDiskMetricKind(settings.diskMetricKind);
 
             return {
                 ...defaultSettings,
                 ...settings,
-                pollingFrequencySeconds: normalizePollingFrequency(settings.pollingFrequencySeconds),
+                pollingFrequencySeconds: shouldApplyDiskDefaults
+                    || (currentActionUuid.endsWith("disk") && settings.pollingFrequencySeconds == null)
+                    ? resolveDefaultDiskPollingFrequency(normalizedDiskMetricKind)
+                    : normalizePollingFrequency(settings.pollingFrequencySeconds),
                 graphicType: settings.graphicType ?? defaultSettings.graphicType,
                 circularCenterContent: settings.circularCenterContent ?? defaultSettings.circularCenterContent,
                 networkDirection: normalizedNetworkDirection,
@@ -658,6 +825,15 @@
                     defaultSettings.maximumTemperatureCelsius,
                 ),
                 temperatureUnit: normalizeTemperatureUnit(settings.temperatureUnit),
+                diskMetricKind: normalizedDiskMetricKind,
+                diskUsageDisplayMode: normalizeDiskUsageDisplayMode(settings.diskUsageDisplayMode),
+                diskThroughputDirection: normalizeDiskThroughputDirection(settings.diskThroughputDirection),
+                diskVolumeId: settings.diskVolumeId ?? defaultSettings.diskVolumeId,
+                availableDiskVolumes: settings.availableDiskVolumes ?? defaultSettings.availableDiskVolumes,
+                maximumDiskThroughputMebibytesPerSecond: normalizePositiveNumber(
+                    settings.maximumDiskThroughputMebibytesPerSecond ?? settings.maximumDiskThroughputMbps,
+                    defaultSettings.maximumDiskThroughputMebibytesPerSecond,
+                ),
                 downloadIconColor: settings.downloadIconColor ?? defaultSettings.downloadIconColor,
                 uploadIconColor: settings.uploadIconColor ?? defaultSettings.uploadIconColor,
                 colorMode: shouldApplyNetSpeedDefaults ? "solid" : (settings.colorMode ?? resolveDefaultColorMode()),
@@ -667,6 +843,9 @@
                 netSpeedDefaultsApplied: currentActionUuid.endsWith("net-speed")
                     ? true
                     : settings.netSpeedDefaultsApplied,
+                diskDefaultsApplied: currentActionUuid.endsWith("disk")
+                    ? true
+                    : settings.diskDefaultsApplied,
                 colorMedium: settings.colorMedium ?? settings.colorMid ?? defaultSettings.colorMedium,
             };
         }
@@ -677,6 +856,30 @@
 
         function normalizeTemperatureUnit(value) {
             return value === "fahrenheit" ? "fahrenheit" : "celsius";
+        }
+
+        function normalizeDiskMetricKind(value) {
+            if (isWindowsPropertyInspector && value === "throughput") {
+                return "usage";
+            }
+
+            return value === "throughput" ? "throughput" : "usage";
+        }
+
+        function normalizeDiskUsageDisplayMode(value) {
+            return value === "space" ? "space" : "percentage";
+        }
+
+        function normalizeDiskThroughputDirection(value) {
+            if (value === "read" || value === "write") {
+                return value;
+            }
+
+            return "total";
+        }
+
+        function resolveDefaultDiskPollingFrequency(diskMetricKind) {
+            return diskMetricKind === "throughput" ? 1 : 60;
         }
 
         function normalizePollingFrequency(value) {
@@ -717,6 +920,17 @@
                 ?? connectionInfo.actionInfo?.uuid
                 ?? connectionInfo.action
                 ?? "";
+        }
+
+        function resolveIsWindowsPropertyInspector(connectionInfo) {
+            const platformValue = String(
+                connectionInfo.application?.platform
+                    ?? connectionInfo.info?.application?.platform
+                    ?? navigator.platform
+                    ?? "",
+            ).toLowerCase();
+
+            return platformValue.includes("win");
         }
     </script>
 </body>

@@ -85,7 +85,7 @@ export class GpuVram extends GpuBaseAction {
             event,
             metricKey: GPU_VRAM_USED_METRIC_KEY,
             widgetData: buildGpuVramWidgetData(used, total.current),
-            ...buildMetricDisplayIcons({ hardware: "gpu", status: "memory" }),
+            ...buildMetricDisplayIcons({ hardware: "gpu", status: "percentage" }),
         });
     }
 }

@@ -52,8 +52,16 @@ export abstract class MetricAction extends SingletonAction {
         return [];
     }
 
+    protected getDefaultPollingFrequencySeconds(event: WillAppearEvent): number {
+        void event;
+        return DEFAULT_POLLING_FREQUENCY_SECONDS;
+    }
+
     private subscribeAction(event: WillAppearEvent): void {
-        const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(event.payload.settings as MetricActionSettings);
+        const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
+            event.payload.settings as MetricActionSettings,
+            this.getDefaultPollingFrequencySeconds(event),
+        );
         const metricKeys = normalizeMetricKeys(this.getMetricKeys(event));
         const metricKeySignature = metricKeys.join(",");
         const cleanup = scheduler.subscribe(() => {
@@ -78,6 +86,7 @@ export abstract class MetricAction extends SingletonAction {
         const activeMetricAction = this.activeMetricActions.get(event.action.id);
         const nextPollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
             event.payload.settings as MetricActionSettings,
+            this.getDefaultPollingFrequencySeconds(event),
         );
         const nextMetricKeys = normalizeMetricKeys(this.getMetricKeys(event));
         const nextMetricKeySignature = nextMetricKeys.join(",");
@@ -94,14 +103,17 @@ export abstract class MetricAction extends SingletonAction {
     }
 }
 
-function resolvePollingIntervalMilliseconds(settings: MetricActionSettings): number {
+function resolvePollingIntervalMilliseconds(settings: MetricActionSettings, defaultPollingFrequencySeconds: number): number {
     const pollingFrequencySeconds = Number(settings.pollingFrequencySeconds);
+    const resolvedDefaultPollingFrequencySeconds = ALLOWED_POLLING_FREQUENCY_SECONDS.has(defaultPollingFrequencySeconds)
+        ? defaultPollingFrequencySeconds
+        : DEFAULT_POLLING_FREQUENCY_SECONDS;
 
     if (ALLOWED_POLLING_FREQUENCY_SECONDS.has(pollingFrequencySeconds)) {
         return pollingFrequencySeconds * 1000;
     }
 
-    return DEFAULT_POLLING_FREQUENCY_SECONDS * 1000;
+    return resolvedDefaultPollingFrequencySeconds * 1000;
 }
 
 const DEFAULT_POLLING_FREQUENCY_SECONDS = 1;

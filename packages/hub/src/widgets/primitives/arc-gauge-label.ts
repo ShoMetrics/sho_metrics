@@ -1,7 +1,9 @@
 export const ARC_GAUGE_LABELS = {
     cpu: "CPU",
     gpu: "GPU",
+    ram: "RAM",
     vram: "VRAM",
+    disk: "DISK",
     download: "DOWN",
     upload: "UP",
 } as const;

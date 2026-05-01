@@ -3,6 +3,12 @@ import si, { type Systeminformation } from "systeminformation";
 import type { IMetricSource, IMetricSnapshot, IMetricValue } from "./source.interface";
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../network-interfaces";
 import { getNetworkAggregateMetricKey, getNetworkInterfaceMetricKey, type NetworkDirection } from "../network-metric-keys";
+import { diskVolumeRegistry, type DiskStorageKind, type DiskVolumeOption } from "../disk-volumes";
+import {
+    getDefaultDiskUsageMetricKey,
+    getDiskThroughputMetricKey,
+    getDiskVolumeMetricKey,
+} from "../disk-metric-keys";
 
 /**
  * Built-in metric source using the `systeminformation` npm package.
@@ -28,13 +34,15 @@ export class BuiltinSource implements IMetricSource {
         const metricGroups = resolveMetricGroups(metricKeys);
         const pollStartTimestampMilliseconds = Date.now();
 
-        const [cpuMetrics, networkMetrics, gpu] = await Promise.all([
+        const [cpuMetrics, memoryMetrics, diskMetrics, networkMetrics, gpu] = await Promise.all([
             metricGroups.has("cpu") ? this.pollCpu() : Promise.resolve({}),
+            metricGroups.has("memory") ? this.pollMemory() : Promise.resolve({}),
+            metricGroups.has("disk") ? this.pollDiskSafely(metricKeys) : Promise.resolve({}),
             metricGroups.has("network") ? this.pollNetworkSafely() : Promise.resolve({}),
             metricGroups.has("gpu") ? this.pollGpuWithTimeout() : Promise.resolve(null),
         ]);
 
-        Object.assign(metrics, cpuMetrics, networkMetrics);
+        Object.assign(metrics, cpuMetrics, memoryMetrics, diskMetrics, networkMetrics);
 
         if (gpu) {
             metrics["gpu.usage_percent"] = {
@@ -64,6 +72,117 @@ export class BuiltinSource implements IMetricSource {
             sourceId: this.sourceId,
             timestampMs: pollStartTimestampMilliseconds,
             metrics,
+        };
+    }
+
+    private async pollMemory(): Promise<Record<string, IMetricValue>> {
+        try {
+            const memoryData = await si.mem();
+
+            return {
+                "ram.used": {
+                    scalar: memoryData.used,
+                    unit: "B",
+                },
+                "ram.total": {
+                    scalar: memoryData.total,
+                    unit: "B",
+                },
+            };
+        } catch (error) {
+            streamDeck.logger.error(`[BuiltinSource] Memory poll error: ${String(error)}`);
+            return {};
+        }
+    }
+
+    private async pollDiskSafely(metricKeys: readonly string[]): Promise<Record<string, IMetricValue>> {
+        try {
+            return await this.pollDisk(metricKeys);
+        } catch (error) {
+            streamDeck.logger.error(`[BuiltinSource] Disk poll error: ${String(error)}`);
+            return {};
+        }
+    }
+
+    private async pollDisk(metricKeys: readonly string[]): Promise<Record<string, IMetricValue>> {
+        const metrics: Record<string, IMetricValue> = {};
+        const shouldPollUsage = metricKeys.length === 0 || metricKeys.some(metricKey =>
+            metricKey.startsWith("disk.usage.") || metricKey.startsWith("disk.volume."),
+        );
+        const shouldPollThroughput = metricKeys.length === 0 || metricKeys.some(metricKey =>
+            metricKey.startsWith("disk.throughput."),
+        );
+
+        if (shouldPollUsage) {
+            Object.assign(metrics, await this.pollDiskUsage());
+        }
+
+        if (shouldPollThroughput && process.platform === "darwin") {
+            Object.assign(metrics, await this.pollDiskThroughput());
+        }
+
+        return metrics;
+    }
+
+    private async pollDiskUsage(): Promise<Record<string, IMetricValue>> {
+        const metrics: Record<string, IMetricValue> = {};
+        const [fileSystems, blockDevices, diskLayout] = await Promise.all([
+            si.fsSize(),
+            si.blockDevices().catch(error => {
+                streamDeck.logger.warn(`[BuiltinSource] Block device poll error: ${String(error)}`);
+                return [] as Systeminformation.BlockDevicesData[];
+            }),
+            si.diskLayout().catch(error => {
+                streamDeck.logger.warn(`[BuiltinSource] Disk layout poll error: ${String(error)}`);
+                return [] as Systeminformation.DiskLayoutData[];
+            }),
+        ]);
+        const diskVolumes = fileSystems
+            .filter(isUsableFileSystem)
+            .map(fileSystem => toDiskVolumeOption(fileSystem, blockDevices, diskLayout));
+        const defaultDiskVolume = resolveDefaultDiskVolume(diskVolumes);
+
+        diskVolumeRegistry.update(diskVolumes);
+
+        for (const diskVolume of diskVolumes) {
+            metrics[getDiskVolumeMetricKey("used", diskVolume.id)] = { scalar: diskVolume.usedBytes, unit: "B" };
+            metrics[getDiskVolumeMetricKey("total", diskVolume.id)] = { scalar: diskVolume.sizeBytes, unit: "B" };
+            metrics[getDiskVolumeMetricKey("available", diskVolume.id)] = { scalar: diskVolume.availableBytes, unit: "B" };
+            metrics[getDiskVolumeMetricKey("percent", diskVolume.id)] = {
+                scalar: calculatePercent(diskVolume.usedBytes, diskVolume.sizeBytes),
+                unit: "%",
+            };
+        }
+
+        if (defaultDiskVolume) {
+            metrics[getDefaultDiskUsageMetricKey("used")] = { scalar: defaultDiskVolume.usedBytes, unit: "B" };
+            metrics[getDefaultDiskUsageMetricKey("total")] = { scalar: defaultDiskVolume.sizeBytes, unit: "B" };
+            metrics[getDefaultDiskUsageMetricKey("available")] = { scalar: defaultDiskVolume.availableBytes, unit: "B" };
+            metrics[getDefaultDiskUsageMetricKey("percent")] = {
+                scalar: calculatePercent(defaultDiskVolume.usedBytes, defaultDiskVolume.sizeBytes),
+                unit: "%",
+            };
+        }
+
+        return metrics;
+    }
+
+    private async pollDiskThroughput(): Promise<Record<string, IMetricValue>> {
+        const fileSystemStats = await si.fsStats();
+
+        return {
+            [getDiskThroughputMetricKey("read")]: {
+                scalar: normalizeNullableRate(fileSystemStats.rx_sec),
+                unit: "B/s",
+            },
+            [getDiskThroughputMetricKey("write")]: {
+                scalar: normalizeNullableRate(fileSystemStats.wx_sec),
+                unit: "B/s",
+            },
+            [getDiskThroughputMetricKey("total")]: {
+                scalar: normalizeNullableRate(fileSystemStats.tx_sec),
+                unit: "B/s",
+            },
         };
     }
 
@@ -250,7 +369,7 @@ function normalizeNetworkInterfaceType(type: string): NetworkInterfaceOption["ty
 
 function resolveMetricGroups(metricKeys: readonly string[]): Set<MetricGroup> {
     if (metricKeys.length === 0) {
-        return new Set(["cpu", "network", "gpu"]);
+        return new Set(["cpu", "memory", "disk", "network", "gpu"]);
     }
 
     const metricGroups = new Set<MetricGroup>();
@@ -266,6 +385,16 @@ function resolveMetricGroups(metricKeys: readonly string[]): Set<MetricGroup> {
             continue;
         }
 
+        if (metricKey.startsWith("ram.")) {
+            metricGroups.add("memory");
+            continue;
+        }
+
+        if (metricKey.startsWith("disk.")) {
+            metricGroups.add("disk");
+            continue;
+        }
+
         if (metricKey.startsWith("gpu.")) {
             metricGroups.add("gpu");
         }
@@ -274,4 +403,94 @@ function resolveMetricGroups(metricKeys: readonly string[]): Set<MetricGroup> {
     return metricGroups;
 }
 
-type MetricGroup = "cpu" | "network" | "gpu";
+function isUsableFileSystem(fileSystem: Systeminformation.FsSizeData): boolean {
+    return fileSystem.size > 0
+        && fileSystem.mount.length > 0
+        && fileSystem.available >= 0
+        && fileSystem.used >= 0;
+}
+
+function toDiskVolumeOption(
+    fileSystem: Systeminformation.FsSizeData,
+    blockDevices: readonly Systeminformation.BlockDevicesData[],
+    diskLayout: readonly Systeminformation.DiskLayoutData[],
+): DiskVolumeOption {
+    const blockDevice = blockDevices.find(device => device.mount === fileSystem.mount || device.name === fileSystem.fs);
+    const physicalDisk = resolvePhysicalDisk(fileSystem, blockDevice, diskLayout);
+
+    return {
+        id: fileSystem.mount || fileSystem.fs,
+        fs: fileSystem.fs,
+        mount: fileSystem.mount,
+        sizeBytes: fileSystem.size,
+        usedBytes: fileSystem.used,
+        availableBytes: fileSystem.available,
+        storageKind: resolveDiskStorageKind(physicalDisk),
+        diskName: physicalDisk?.name ?? fileSystem.fs,
+    };
+}
+
+function resolvePhysicalDisk(
+    fileSystem: Systeminformation.FsSizeData,
+    blockDevice: Systeminformation.BlockDevicesData | undefined,
+    diskLayout: readonly Systeminformation.DiskLayoutData[],
+): Systeminformation.DiskLayoutData | undefined {
+    if (diskLayout.length === 0) {
+        return undefined;
+    }
+
+    const normalizedBlockDeviceText = blockDevice
+        ? `${blockDevice.device ?? ""} ${blockDevice.name} ${blockDevice.model}`.toLowerCase()
+        : "";
+    const matchingDisk = diskLayout.find(disk => {
+        const normalizedDiskText = `${disk.device ?? ""} ${disk.name}`.toLowerCase();
+        return normalizedDiskText.length > 0 && normalizedBlockDeviceText.includes(normalizedDiskText);
+    });
+
+    if (matchingDisk) {
+        return matchingDisk;
+    }
+
+    if (diskLayout.length === 1) {
+        return diskLayout[0];
+    }
+
+    return diskLayout
+        .filter(disk => disk.size >= fileSystem.size)
+        .sort((leftDisk, rightDisk) => leftDisk.size - rightDisk.size)[0]
+        ?? diskLayout[0];
+}
+
+function resolveDiskStorageKind(diskLayout: Systeminformation.DiskLayoutData | undefined): DiskStorageKind {
+    if (!diskLayout) {
+        return "unknown";
+    }
+
+    const diskType = diskLayout.type.toLowerCase();
+
+    if (diskType === "ssd" || diskType === "nvme" || diskType === "scm") {
+        return "ssd";
+    }
+
+    if (diskType === "hd") {
+        return "hdd";
+    }
+
+    return "unknown";
+}
+
+function resolveDefaultDiskVolume(diskVolumes: readonly DiskVolumeOption[]): DiskVolumeOption | null {
+    return diskVolumes.find(diskVolume => diskVolume.mount === "/" || /^[A-Z]:\\?$/i.test(diskVolume.mount))
+        ?? diskVolumes[0]
+        ?? null;
+}
+
+function calculatePercent(value: number, total: number): number {
+    return total > 0 ? (value / total) * 100 : 0;
+}
+
+function normalizeNullableRate(value: number | null): number {
+    return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+type MetricGroup = "cpu" | "memory" | "disk" | "network" | "gpu";
