@@ -89,6 +89,7 @@
 			"UUID": "com.ez.sho-metrics.gpu-temp",
 			"Icon": "imgs/actions/counter/icon",
 			"Tooltip": "Displays NVIDIA GPU temperature.",
+			"PropertyInspectorPath": "ui/cpu-usage.html",
 			"Controllers": [
 				"Keypad",
 				"Encoder"
@@ -96,9 +97,11 @@
 			"Encoder": {
 				"layout": "$B1"
 			},
+			"UserTitleEnabled": false,
 			"States": [
 				{
 					"Image": "imgs/actions/counter/key",
+					"ShowTitle": false,
 					"TitleAlignment": "middle"
 				}
 			]

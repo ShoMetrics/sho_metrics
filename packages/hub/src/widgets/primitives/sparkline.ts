@@ -36,35 +36,36 @@ export const sparkline: Widget<SparklineConfig> = {
         const chartHeight = keySize.height - padding.top - padding.bottom;
 
         const values = data.history.length > 0 ? data.history : [0];
-        const maxVal = Math.max(...values, 1);
+        const maximumValue = Math.max(...values, 1);
 
         // Map data points to SVG coordinates
         const points = values.map((value, index) => {
             const pointX = padding.left + (index / Math.max(values.length - 1, 1)) * chartWidth;
-            const pointY = padding.top + chartHeight - (value / maxVal) * chartHeight;
+            const pointY = padding.top + chartHeight - (value / maximumValue) * chartHeight;
             return { x: pointX, y: pointY };
         });
 
-        const polylinePoints = points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+        const polylinePoints = points.map(point => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
         const gradientId = `sparkline-grad-${Date.now()}`;
 
         // Build gradient stops for threshold coloring
         const stops = buildGradientStops(values, config.colorConfig);
         const gradientStops = stops
-            .map(s => `<stop offset="${(s.offset * 100).toFixed(1)}%" stop-color="${s.color}" />`)
+            .map(stop => `<stop offset="${(stop.offset * 100).toFixed(1)}%" stop-color="${stop.color}" />`)
             .join("\n            ");
 
         // Area fill path (close at bottom)
         const lastPoint = points[points.length - 1];
         const firstPoint = points[0];
         const areaPath = `M ${firstPoint.x},${firstPoint.y} ` +
-            points.slice(1).map(p => `L ${p.x},${p.y}`).join(" ") +
+            points.slice(1).map(point => `L ${point.x},${point.y}`).join(" ") +
             ` L ${lastPoint.x},${padding.top + chartHeight} L ${firstPoint.x},${padding.top + chartHeight} Z`;
 
         const areaFillId = `sparkline-area-${Date.now()}`;
 
         // Current value color
         const currentColor = resolveColor(data.current, config.colorConfig);
+        const valueText = data.displayValue ?? data.current.toFixed(1);
 
         // Latest value dot
         const dotSvg = config.showDots && lastPoint
@@ -87,7 +88,7 @@ export const sparkline: Widget<SparklineConfig> = {
             <!-- Sparkline: current value -->
             <text x="${keySize.width / 2}" y="28" text-anchor="middle"
                 font-family="'Inter','SF Pro Display','Segoe UI',sans-serif"
-                font-size="13" font-weight="600" fill="${currentColor}">${escapeSvgText(data.current.toFixed(1))}${escapeSvgText(data.unit)}</text>
+                font-size="13" font-weight="600" fill="${currentColor}">${escapeSvgText(valueText)}${escapeSvgText(data.unit)}</text>
             <!-- Sparkline: area fill -->
             <path d="${areaPath}" fill="url(#${areaFillId})" opacity="${config.fillOpacity}" />
             <!-- Sparkline: line -->

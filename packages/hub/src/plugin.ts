@@ -6,7 +6,7 @@ import { NetSpeed } from "./actions/net-speed";
 import { GpuUsage, GpuTemp, GpuVram, GpuPower } from "./actions/gpu-usage";
 
 // We can enable "trace" logging so that all messages between the Stream Deck, and the plugin are recorded. When storing sensitive information
-streamDeck.logger.setLevel("trace");
+streamDeck.logger.setLevel("debug");
 
 // Register the increment action.
 streamDeck.actions.registerAction(new IncrementCounter());

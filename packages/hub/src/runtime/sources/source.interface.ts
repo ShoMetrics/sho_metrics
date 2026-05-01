@@ -15,6 +15,9 @@ export interface IMetricSource {
     /** Fetch the latest metrics snapshot in the universal protobuf-defined format. */
     poll(): Promise<IMetricSnapshot>;
 
+    /** Fetch a subset of metrics when the source can avoid unrelated slow probes. */
+    pollMetrics?(metricKeys: readonly string[]): Promise<IMetricSnapshot>;
+
     /** Optional cleanup on shutdown. */
     dispose?(): void;
 }

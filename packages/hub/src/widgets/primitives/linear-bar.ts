@@ -36,6 +36,7 @@ export const linearBar: Widget<LinearBarConfig> = {
         const barColor = resolveColor(data.current, config.colorConfig);
         const barHeadColor = adjustHexColorBrightness(barColor, config.gradientHeadAdjustmentPercent ?? -15);
         const gradientId = `linear-progress-${Math.round(data.current * 10)}-${keySize.width}-${keySize.height}`;
+        const valueText = data.displayValue ?? data.current.toFixed(0);
 
         return `
             <defs>
@@ -51,7 +52,7 @@ export const linearBar: Widget<LinearBarConfig> = {
             <!-- Linear Bar: value -->
             <text x="${keySize.width / 2}" y="${barY - config.barHeight - 2}" text-anchor="middle"
                 font-family="'Inter','SF Pro Display','Segoe UI',sans-serif"
-                font-size="28" font-weight="700" fill="white">${escapeSvgText(data.current.toFixed(0))}${escapeSvgText(data.unit)}</text>
+                font-size="28" font-weight="700" fill="white">${escapeSvgText(valueText)}${escapeSvgText(data.unit)}</text>
             <!-- Linear Bar: track -->
             <rect x="${padding}" y="${barY}" width="${barWidth}" height="${config.barHeight}"
                 rx="${config.borderRadius}" fill="${config.trackColor}" />

@@ -36,51 +36,51 @@ export function renderMirroredTraffic(
         channelId: string,
     ): string => {
         if (values.length === 0) return "";
-        const maxVal = Math.max(...values, 0.01);
+        const maximumValue = Math.max(...values, 0.01);
         const sign = direction === "up" ? -1 : 1;
 
         const points = values.map((value, index) => {
             const pointX = padding.left + (index / Math.max(values.length - 1, 1)) * chartWidth;
-            const pointY = centerY + sign * (value / maxVal) * (halfHeight - 4);
+            const pointY = centerY + sign * (value / maximumValue) * (halfHeight - 4);
             return { x: pointX, y: pointY };
         });
 
-        const polyline = points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-        const gradId = `mirrored-${channelId}-${Date.now()}`;
+        const polyline = points.map(point => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+        const gradientId = `mirrored-${channelId}-${Date.now()}`;
         const stops = buildGradientStops(values, colorConfig);
         const gradientStops = stops
-            .map(s => `<stop offset="${(s.offset * 100).toFixed(1)}%" stop-color="${s.color}" />`)
+            .map(stop => `<stop offset="${(stop.offset * 100).toFixed(1)}%" stop-color="${stop.color}" />`)
             .join("\n            ");
 
         const lastPoint = points[points.length - 1];
         const firstPoint = points[0];
         const areaPath = `M ${firstPoint.x},${centerY} ` +
-            points.map(p => `L ${p.x},${p.y}`).join(" ") +
+            points.map(point => `L ${point.x},${point.y}`).join(" ") +
             ` L ${lastPoint.x},${centerY} Z`;
 
         return `
             <defs>
-                <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">
+                <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="0%">
                     ${gradientStops}
                 </linearGradient>
             </defs>
-            <path d="${areaPath}" fill="url(#${gradId})" opacity="${config.fillOpacity}" />
+            <path d="${areaPath}" fill="url(#${gradientId})" opacity="${config.fillOpacity}" />
             <polyline points="${polyline}" fill="none"
-                stroke="url(#${gradId})" stroke-width="${config.lineWidth}"
+                stroke="url(#${gradientId})" stroke-width="${config.lineWidth}"
                 stroke-linejoin="round" stroke-linecap="round" />
         `;
     };
 
-    const posLabel = `${data.positive.current.toFixed(1)} ${data.positive.unit}`;
-    const negLabel = `${data.negative.current.toFixed(1)} ${data.negative.unit}`;
+    const positiveLabel = `${data.positive.current.toFixed(1)} ${data.positive.unit}`;
+    const negativeLabel = `${data.negative.current.toFixed(1)} ${data.negative.unit}`;
 
     return `
         <!-- Mirrored Traffic: labels -->
         <text x="10" y="14" font-family="'Inter',sans-serif" font-size="11" fill="rgba(255,255,255,0.5)">
-            ▼ ${posLabel}</text>
+            ▼ ${positiveLabel}</text>
         <text x="${keySize.width - 10}" y="14" text-anchor="end"
             font-family="'Inter',sans-serif" font-size="11" fill="rgba(255,255,255,0.5)">
-            ▲ ${negLabel}</text>
+            ▲ ${negativeLabel}</text>
         <!-- Mirrored Traffic: center line -->
         <line x1="${padding.left}" y1="${centerY}" x2="${keySize.width - padding.right}" y2="${centerY}"
             stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-dasharray="4,3" />

@@ -1,17 +1,19 @@
 import type { ColorConfig, ColorThreshold } from "../rendering/color-resolver";
 import type { GraphicStyleName, GraphicType } from "../widgets/widget.interface";
 
+export type SettingValue = string | number | boolean | null | undefined;
+
 export interface MetricVisualSettings {
-    graphicType?: unknown;
-    graphicStyle?: unknown;
-    colorMode?: unknown;
-    solidColor?: unknown;
-    lowThreshold?: unknown;
-    highThreshold?: unknown;
-    colorLow?: unknown;
-    colorMedium?: unknown;
-    colorMid?: unknown;
-    colorHigh?: unknown;
+    graphicType?: SettingValue;
+    graphicStyle?: SettingValue;
+    colorMode?: SettingValue;
+    solidColor?: SettingValue;
+    lowThreshold?: SettingValue;
+    highThreshold?: SettingValue;
+    colorLow?: SettingValue;
+    colorMedium?: SettingValue;
+    colorMid?: SettingValue;
+    colorHigh?: SettingValue;
 }
 
 export interface ResolvedMetricVisualSettings {
@@ -52,7 +54,7 @@ export function resolveMetricVisualSettings(settings: MetricVisualSettings): Res
     };
 }
 
-function resolveGraphicType(value: unknown): GraphicType {
+function resolveGraphicType(value: SettingValue): GraphicType {
     if (typeof value !== "string") {
         return "circular";
     }
@@ -60,7 +62,7 @@ function resolveGraphicType(value: unknown): GraphicType {
     return GRAPHIC_TYPE_ALIASES[value] ?? "circular";
 }
 
-function resolveGraphicStyle(value: unknown): GraphicStyleName {
+function resolveGraphicStyle(value: SettingValue): GraphicStyleName {
     if (GRAPHIC_STYLES.includes(value as GraphicStyleName)) {
         return value as GraphicStyleName;
     }
@@ -86,8 +88,8 @@ function buildColorConfig(settings: MetricVisualSettings): ColorConfig {
 }
 
 function resolveThresholdPair(
-    lowThresholdValue: unknown,
-    highThresholdValue: unknown,
+    lowThresholdValue: SettingValue,
+    highThresholdValue: SettingValue,
 ): { lowThreshold: number; highThreshold: number } {
     const lowThreshold = resolveThresholdValue(lowThresholdValue, DEFAULT_LOW_THRESHOLD);
     const highThreshold = resolveThresholdValue(highThresholdValue, DEFAULT_HIGH_THRESHOLD);
@@ -102,7 +104,7 @@ function resolveThresholdPair(
     };
 }
 
-function resolveThresholdValue(value: unknown, fallbackValue: number): number {
+function resolveThresholdValue(value: SettingValue, fallbackValue: number): number {
     const numericValue = Number(value);
 
     if (!Number.isFinite(numericValue)) {
@@ -112,7 +114,7 @@ function resolveThresholdValue(value: unknown, fallbackValue: number): number {
     return Math.round(Math.min(Math.max(numericValue, MINIMUM_THRESHOLD), MAXIMUM_THRESHOLD));
 }
 
-function resolveColorSetting(value: unknown, fallbackColor: string): string {
+function resolveColorSetting(value: SettingValue, fallbackColor: string): string {
     if (typeof value !== "string") {
         return fallbackColor;
     }

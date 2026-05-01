@@ -8,7 +8,7 @@ import type { IMetricSnapshot } from "./sources/source.interface";
  * Actions query this for WidgetData.
  */
 export class MetricStore {
-    private store = new Map<string, RingBuffer<number>>();
+    private store = new Map<string, MetricRecord>();
 
     private static readonly HISTORY_SIZE = 60;
 
@@ -18,32 +18,43 @@ export class MetricStore {
 
         for (const [key, value] of Object.entries(snapshot.metrics)) {
             if (value.scalar != null) {
-                this.record(key, value.scalar);
+                this.record(key, value.scalar, Number(snapshot.timestampMs ?? Date.now()));
             }
         }
     }
 
-    private record(key: string, value: number): void {
-        let buffer = this.store.get(key);
-        if (!buffer) {
-            buffer = new RingBuffer<number>(MetricStore.HISTORY_SIZE);
-            this.store.set(key, buffer);
+    private record(key: string, value: number, timestampMilliseconds: number): void {
+        let metricRecord = this.store.get(key);
+        if (!metricRecord) {
+            metricRecord = {
+                buffer: new RingBuffer<number>(MetricStore.HISTORY_SIZE),
+                timestampMilliseconds,
+            };
+            this.store.set(key, metricRecord);
         }
-        buffer.push(value);
+
+        metricRecord.buffer.push(value);
+        metricRecord.timestampMilliseconds = timestampMilliseconds;
     }
 
     /** Build a WidgetData for a specific metric key. */
     getWidgetData(key: string, label: string, unit: string, maxValue = 100): WidgetData {
-        const buffer = this.store.get(key);
-        const current = buffer?.latest ?? 0;
+        const metricRecord = this.store.get(key);
+        const current = metricRecord?.buffer.latest ?? 0;
         return {
             current,
             progress: Math.min(Math.max(current / maxValue, 0), 1),
-            history: buffer?.toArray() ?? [],
+            history: metricRecord?.buffer.toArray() ?? [],
             unit,
             label,
+            sampleTimestampMilliseconds: metricRecord?.timestampMilliseconds,
         };
     }
+}
+
+interface MetricRecord {
+    buffer: RingBuffer<number>;
+    timestampMilliseconds: number;
 }
 
 /** Singleton MetricStore instance. */

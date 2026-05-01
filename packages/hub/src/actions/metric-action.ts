@@ -1,6 +1,14 @@
 import { SingletonAction, WillAppearEvent, WillDisappearEvent, DidReceiveSettingsEvent } from "@elgato/streamdeck";
 import { scheduler } from "../runtime/scheduler";
 
+type MetricActionSettings = Record<string, unknown>;
+
+interface ActiveMetricAction {
+    cleanup: () => void;
+    metricKeySignature: string;
+    pollingIntervalMilliseconds: number;
+}
+
 /**
  * Base class for all metric-display actions.
  * Handles scheduler subscription lifecycle and real-time settings updates.
@@ -9,18 +17,11 @@ import { scheduler } from "../runtime/scheduler";
 export abstract class MetricAction extends SingletonAction {
     /** Track active events per action instance ID to ensure settings are always current. */
     private activeEvents = new Map<string, WillAppearEvent>();
-    private cleanupMap = new Map<string, () => void>();
+    private activeMetricActions = new Map<string, ActiveMetricAction>();
 
     override onWillAppear(event: WillAppearEvent): void {
         this.activeEvents.set(event.action.id, event);
-
-        const cleanup = scheduler.subscribe(() => {
-            const currentEvent = this.activeEvents.get(event.action.id);
-            if (currentEvent) {
-                this.onMetricsUpdate(currentEvent);
-            }
-        });
-        this.cleanupMap.set(event.action.id, cleanup);
+        this.subscribeAction(event);
     }
 
     override onDidReceiveSettings(event: DidReceiveSettingsEvent): void {
@@ -28,14 +29,15 @@ export abstract class MetricAction extends SingletonAction {
         if (activeEvent) {
             // Update the settings in the active event so the polling loop sees them.
             activeEvent.payload.settings = event.payload.settings;
+            this.resubscribeActionIfFrequencyChanged(activeEvent);
             // Force an immediate update for snappy UI feedback.
             this.onMetricsUpdate(activeEvent);
         }
     }
 
     override onWillDisappear(event: WillDisappearEvent): void {
-        this.cleanupMap.get(event.action.id)?.();
-        this.cleanupMap.delete(event.action.id);
+        this.activeMetricActions.get(event.action.id)?.cleanup();
+        this.activeMetricActions.delete(event.action.id);
         this.activeEvents.delete(event.action.id);
     }
 
@@ -44,4 +46,67 @@ export abstract class MetricAction extends SingletonAction {
      * for the specific WidgetData they need.
      */
     protected abstract onMetricsUpdate(event: WillAppearEvent): void;
+
+    protected getMetricKeys(event: WillAppearEvent): readonly string[] {
+        void event;
+        return [];
+    }
+
+    private subscribeAction(event: WillAppearEvent): void {
+        const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(event.payload.settings as MetricActionSettings);
+        const metricKeys = normalizeMetricKeys(this.getMetricKeys(event));
+        const metricKeySignature = metricKeys.join(",");
+        const cleanup = scheduler.subscribe(() => {
+            const currentEvent = this.activeEvents.get(event.action.id);
+
+            if (currentEvent) {
+                this.onMetricsUpdate(currentEvent);
+            }
+        }, {
+            metricKeys,
+            pollingIntervalMilliseconds,
+        });
+
+        this.activeMetricActions.set(event.action.id, {
+            cleanup,
+            metricKeySignature,
+            pollingIntervalMilliseconds,
+        });
+    }
+
+    private resubscribeActionIfFrequencyChanged(event: WillAppearEvent): void {
+        const activeMetricAction = this.activeMetricActions.get(event.action.id);
+        const nextPollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
+            event.payload.settings as MetricActionSettings,
+        );
+        const nextMetricKeys = normalizeMetricKeys(this.getMetricKeys(event));
+        const nextMetricKeySignature = nextMetricKeys.join(",");
+
+        if (
+            activeMetricAction?.pollingIntervalMilliseconds === nextPollingIntervalMilliseconds
+            && activeMetricAction.metricKeySignature === nextMetricKeySignature
+        ) {
+            return;
+        }
+
+        activeMetricAction?.cleanup();
+        this.subscribeAction(event);
+    }
+}
+
+function resolvePollingIntervalMilliseconds(settings: MetricActionSettings): number {
+    const pollingFrequencySeconds = Number(settings.pollingFrequencySeconds);
+
+    if (ALLOWED_POLLING_FREQUENCY_SECONDS.has(pollingFrequencySeconds)) {
+        return pollingFrequencySeconds * 1000;
+    }
+
+    return DEFAULT_POLLING_FREQUENCY_SECONDS * 1000;
+}
+
+const DEFAULT_POLLING_FREQUENCY_SECONDS = 1;
+const ALLOWED_POLLING_FREQUENCY_SECONDS = new Set([1, 2, 3, 5, 10, 15, 30, 60]);
+
+function normalizeMetricKeys(metricKeys: readonly string[]): readonly string[] {
+    return Array.from(new Set(metricKeys)).sort();
 }
