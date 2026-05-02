@@ -12,7 +12,7 @@ export interface SingleMetricDisplayOptions {
     metricKey: string;
     widgetData: WidgetData;
     centerIconFragment: string;
-    statusIcon?: ArcGaugeStatusIcon;
+    statusIcon: ArcGaugeStatusIcon;
     circularCenterContentOverride?: "value" | "icon" | "icon-value-unit";
     visualSettingsOverride?: Partial<MetricVisualSettings>;
 }
@@ -31,6 +31,20 @@ export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): voi
         ...settings,
         ...options.visualSettingsOverride,
     });
+    const centerContent = resolveCircularCenterContent({
+        settings,
+        graphicType: visualSettings.graphicType,
+        circularCenterContentOverride: options.circularCenterContentOverride,
+    });
+    const hasData = options.widgetData.sampleTimestampMilliseconds != null;
+    const shouldRenderMutedIconPlaceholder = !hasData
+        && visualSettings.graphicType === "circular"
+        && centerContent === "icon";
+    const renderWidgetData = buildRenderWidgetData({
+        widgetData: options.widgetData,
+        hasData,
+        shouldRenderMutedIconPlaceholder,
+    });
     const pngSize = options.event.action.isDial() ? TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE : KEYPAD_PNG_SIZE;
 
     if (options.event.action.isKey()) {
@@ -39,14 +53,13 @@ export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): voi
         });
     }
 
-    const svg = composeSvg(options.widgetData, {
+    const svg = composeSvg(renderWidgetData, {
         ...visualSettings,
+        muted: shouldRenderMutedIconPlaceholder,
         configOverrides: buildSingleMetricConfigOverrides({
-            settings,
-            graphicType: visualSettings.graphicType,
             centerIconFragment: options.centerIconFragment,
             statusIcon: options.statusIcon,
-            circularCenterContentOverride: options.circularCenterContentOverride,
+            centerContent,
         }),
     }, WIDGET_LOGICAL_SIZE);
     const composeEndTimestampMilliseconds = Date.now();
@@ -61,8 +74,8 @@ export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): voi
         actionId: options.event.action.id,
         metricKey: options.metricKey,
         phase: "rendered",
-        value: options.widgetData.current,
-        sampleTimestampMilliseconds: options.widgetData.sampleTimestampMilliseconds,
+        value: renderWidgetData.current,
+        sampleTimestampMilliseconds: renderWidgetData.sampleTimestampMilliseconds,
         renderStartTimestampMilliseconds,
         composeDurationMilliseconds: composeEndTimestampMilliseconds - renderStartTimestampMilliseconds,
         rasterizeDurationMilliseconds: rasterizeEndTimestampMilliseconds - composeEndTimestampMilliseconds,
@@ -78,7 +91,7 @@ export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): voi
                             actionId: options.event.action.id,
                             metricKey: options.metricKey,
                             phase: "setFeedbackDone",
-                            sampleTimestampMilliseconds: options.widgetData.sampleTimestampMilliseconds,
+                            sampleTimestampMilliseconds: renderWidgetData.sampleTimestampMilliseconds,
                             updateStartTimestampMilliseconds,
                         });
                     })
@@ -102,7 +115,7 @@ export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): voi
                     actionId: options.event.action.id,
                     metricKey: options.metricKey,
                     phase: "setImageDone",
-                    sampleTimestampMilliseconds: options.widgetData.sampleTimestampMilliseconds,
+                    sampleTimestampMilliseconds: renderWidgetData.sampleTimestampMilliseconds,
                     updateStartTimestampMilliseconds,
                 });
             })
@@ -113,21 +126,46 @@ export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): voi
 }
 
 function buildSingleMetricConfigOverrides(options: {
+    centerIconFragment: string;
+    statusIcon: ArcGaugeStatusIcon;
+    centerContent: "value" | "icon" | "icon-value-unit";
+}): { centerContent?: "value" | "icon" | "icon-value-unit"; centerIconFragment?: string; statusIcon?: ArcGaugeStatusIcon } {
+    return {
+        centerContent: options.centerContent,
+        centerIconFragment: options.centerIconFragment,
+        statusIcon: options.statusIcon,
+    };
+}
+
+function resolveCircularCenterContent(options: {
     settings: SingleMetricDisplaySettings;
     graphicType: string;
-    centerIconFragment: string;
-    statusIcon: ArcGaugeStatusIcon | undefined;
     circularCenterContentOverride: "value" | "icon" | "icon-value-unit" | undefined;
-}): { centerContent?: "value" | "icon" | "icon-value-unit"; centerIconFragment?: string; statusIcon?: ArcGaugeStatusIcon } {
+}): "value" | "icon" | "icon-value-unit" {
     if (options.graphicType !== "circular") {
-        return {};
+        return "value";
+    }
+
+    return options.circularCenterContentOverride
+        ?? (options.settings.circularCenterContent === "icon" ? "icon" : "value");
+}
+
+function buildRenderWidgetData(options: {
+    widgetData: WidgetData;
+    hasData: boolean;
+    shouldRenderMutedIconPlaceholder: boolean;
+}): WidgetData {
+    if (options.hasData || options.shouldRenderMutedIconPlaceholder) {
+        return options.widgetData;
     }
 
     return {
-        centerContent: options.circularCenterContentOverride
-            ?? (options.settings.circularCenterContent === "icon" ? "icon" : "value"),
-        centerIconFragment: options.centerIconFragment,
-        statusIcon: options.statusIcon,
+        ...options.widgetData,
+        current: 0,
+        progress: 0,
+        history: [],
+        unit: "",
+        displayValue: "N/A",
     };
 }
 

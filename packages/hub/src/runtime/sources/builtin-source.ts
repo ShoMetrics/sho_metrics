@@ -62,10 +62,18 @@ export class BuiltinSource implements IMetricSource {
                 scalar: gpu.memoryTotal ?? 0,
                 unit: "MB",
             };
-            metrics["gpu.power"] = {
-                scalar: gpu.powerDraw ?? 0,
-                unit: "W",
-            };
+            if (typeof gpu.powerDraw === "number" && Number.isFinite(gpu.powerDraw)) {
+                metrics["gpu.power"] = {
+                    scalar: gpu.powerDraw,
+                    unit: "W",
+                };
+            }
+            if (typeof gpu.powerLimit === "number" && Number.isFinite(gpu.powerLimit)) {
+                metrics["gpu.power_limit"] = {
+                    scalar: gpu.powerLimit,
+                    unit: "W",
+                };
+            }
         }
 
         return {

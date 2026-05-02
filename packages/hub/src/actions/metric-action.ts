@@ -22,6 +22,7 @@ export abstract class MetricAction extends SingletonAction {
     override onWillAppear(event: WillAppearEvent): void {
         this.activeEvents.set(event.action.id, event);
         this.subscribeAction(event);
+        this.onMetricsUpdate(event);
     }
 
     override onDidReceiveSettings(event: DidReceiveSettingsEvent): void {

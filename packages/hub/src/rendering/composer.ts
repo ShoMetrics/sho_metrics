@@ -56,6 +56,7 @@ export interface ComposeOptions {
     graphicStyle: GraphicStyleName;
     colorConfig?: ColorConfig;
     configOverrides?: WidgetConfigOverrides;
+    muted?: boolean;
 }
 
 export function composeSvg(
@@ -74,13 +75,27 @@ export function composeSvg(
     }
 
     const widgetSvgFragment = widgetEntry.render(data, configOverrides, keySize);
+    const filterId = `muted-widget-${keySize.width}-${keySize.height}`;
+    const mutedDefs = options.muted
+        ? `
+            <filter id="${filterId}" color-interpolation-filters="sRGB">
+                <feColorMatrix type="saturate" values="0" />
+                <feComponentTransfer>
+                    <feFuncA type="linear" slope="0.38" />
+                </feComponentTransfer>
+            </filter>
+        `
+        : "";
+    const renderedWidgetFragment = options.muted
+        ? `<g filter="url(#${filterId})">${widgetSvgFragment}</g>`
+        : widgetSvgFragment;
 
     return `<svg xmlns="http://www.w3.org/2000/svg"
         width="${keySize.width}" height="${keySize.height}"
         viewBox="0 0 ${keySize.width} ${keySize.height}">
-        <defs>${style.renderDefs(keySize)}</defs>
+        <defs>${style.renderDefs(keySize)}${mutedDefs}</defs>
         ${style.renderBackground(keySize)}
-        ${widgetSvgFragment}
+        ${renderedWidgetFragment}
         ${style.renderOverlay(keySize)}
     </svg>`;
 }

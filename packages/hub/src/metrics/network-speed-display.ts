@@ -10,6 +10,7 @@ export interface NetworkSpeedDisplayOptions {
     label: string;
     unitBase: NetworkSpeedUnitBase;
     maximumDisplayDigits: number;
+    sampleTimestampMilliseconds?: number;
 }
 
 const SI_BASE = 1000;
@@ -36,6 +37,7 @@ export function buildNetworkSpeedWidgetData(options: NetworkSpeedDisplayOptions)
         unit: formattedSpeed.unit,
         label: options.label,
         displayValue: formattedSpeed.value,
+        sampleTimestampMilliseconds: options.sampleTimestampMilliseconds,
     };
 }
 

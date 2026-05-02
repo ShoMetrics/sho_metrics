@@ -110,6 +110,7 @@ web_modules/
 
 # TypeScript cache
 *.tsbuildinfo
+*.js.map
 
 # Optional npm cache directory
 .npm
@@ -205,3 +206,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+packages/hub/com.ez.sho-metrics.sdPlugin/bin/
+packages/hub/com.ez.sho-metrics.sdPlugin/ui/property-inspector.js
+packages/hub/com.ez.sho-metrics.sdPlugin/ui/property-inspector.js.map

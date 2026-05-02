@@ -276,13 +276,19 @@ function renderRing(options: {
     const progressLength = options.statusNotchGeometry
         ? options.statusNotchGeometry.visibleLength * progress
         : options.geometry.circumference;
-    const progressDashArray = options.statusNotchGeometry
-        ? `${progressLength} ${options.geometry.circumference - progressLength}`
-        : `${options.geometry.circumference}`;
-    const progressDashOffset = options.statusNotchGeometry
-        ? 0
-        : options.geometry.circumference * (1 - progress);
     const rotationDegrees = options.statusNotchGeometry?.startRotationDegrees ?? -90;
+    const progressRing = progress > 0
+        ? renderRingCircle({
+            geometry: options.geometry,
+            stroke: options.progressStroke,
+            strokeWidth: options.strokeWidth,
+            dashArray: options.statusNotchGeometry
+                ? `${progressLength} ${options.geometry.circumference - progressLength}`
+                : `${options.geometry.circumference}`,
+            dashOffset: options.statusNotchGeometry ? 0 : options.geometry.circumference * (1 - progress),
+            rotationDegrees,
+        })
+        : "";
 
     return `
         <!-- Arc Gauge: track -->
@@ -295,14 +301,7 @@ function renderRing(options: {
             rotationDegrees,
         })}
         <!-- Arc Gauge: progress arc -->
-        ${renderRingCircle({
-            geometry: options.geometry,
-            stroke: options.progressStroke,
-            strokeWidth: options.strokeWidth,
-            dashArray: progressDashArray,
-            dashOffset: progressDashOffset,
-            rotationDegrees,
-        })}
+        ${progressRing}
     `;
 }
 

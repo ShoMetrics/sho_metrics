@@ -8,7 +8,7 @@
 			"UUID": "com.ez.sho-metrics.cpu-usage",
 			"Icon": "imgs/actions/counter/icon",
 			"Tooltip": "Displays the current CPU usage percentage.",
-			"PropertyInspectorPath": "ui/cpu-usage.html",
+			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
 				"Keypad",
 				"Encoder"
@@ -30,7 +30,7 @@
 			"UUID": "com.ez.sho-metrics.net-speed",
 			"Icon": "imgs/actions/counter/icon",
 			"Tooltip": "Displays Down/Up network speed (MB/s).",
-			"PropertyInspectorPath": "ui/cpu-usage.html",
+			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
 				"Keypad",
 				"Encoder"
@@ -50,7 +50,7 @@
 			"UUID": "com.ez.sho-metrics.ram",
 			"Icon": "imgs/actions/counter/icon",
 			"Tooltip": "Displays current RAM usage.",
-			"PropertyInspectorPath": "ui/cpu-usage.html",
+			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
 				"Keypad",
 				"Encoder"
@@ -72,7 +72,7 @@
 			"UUID": "com.ez.sho-metrics.disk",
 			"Icon": "imgs/actions/counter/icon",
 			"Tooltip": "Displays disk usage or macOS disk throughput.",
-			"PropertyInspectorPath": "ui/cpu-usage.html",
+			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
 				"Keypad",
 				"Encoder"
@@ -94,7 +94,7 @@
 			"UUID": "com.ez.sho-metrics.gpu-usage",
 			"Icon": "imgs/actions/counter/icon",
 			"Tooltip": "Displays NVIDIA GPU usage percentage.",
-			"PropertyInspectorPath": "ui/cpu-usage.html",
+			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
 				"Keypad",
 				"Encoder"
@@ -116,7 +116,7 @@
 			"UUID": "com.ez.sho-metrics.gpu-temp",
 			"Icon": "imgs/actions/counter/icon",
 			"Tooltip": "Displays NVIDIA GPU temperature.",
-			"PropertyInspectorPath": "ui/cpu-usage.html",
+			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
 				"Keypad",
 				"Encoder"
@@ -138,7 +138,7 @@
 			"UUID": "com.ez.sho-metrics.gpu-vram",
 			"Icon": "imgs/actions/counter/icon",
 			"Tooltip": "Displays NVIDIA GPU VRAM usage.",
-			"PropertyInspectorPath": "ui/cpu-usage.html",
+			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
 				"Keypad",
 				"Encoder"
@@ -160,6 +160,7 @@
 			"UUID": "com.ez.sho-metrics.gpu-power",
 			"Icon": "imgs/actions/counter/icon",
 			"Tooltip": "Displays NVIDIA GPU power draw.",
+			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
 				"Keypad",
 				"Encoder"

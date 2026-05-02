@@ -4,12 +4,18 @@
 		"customConditions": [
 			"node"
 		],
+		"jsx": "react-jsx",
+		"lib": [
+			"ES2022",
+			"DOM"
+		],
 		"module": "ES2022",
 		"moduleResolution": "Bundler",
 		"noImplicitOverride": true
 	},
 	"include": [
-		"src/**/*.ts"
+		"src/**/*.ts",
+		"src/**/*.tsx"
 	],
 	"exclude": [
 		"node_modules"

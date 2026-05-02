@@ -13,6 +13,11 @@ import {
     type NetworkSpeedUnitBase,
 } from "../metrics/network-speed-display";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
+import {
+    getNetworkDirectionStatusIcon,
+    renderNetworkDirectionIconFragment,
+    renderNetworkInterfaceIconFragment,
+} from "../widgets/icons/catalog/network";
 
 /**
  * Network Speed action.
@@ -25,7 +30,7 @@ export class NetSpeed extends MetricAction {
 
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
         const settings = event.payload.settings as NetworkSpeedSettings;
-        const direction = normalizeNetworkDirection(settings.networkDirection) ?? "download";
+        const direction = normalizeNetworkDirection(settings.networkDirection);
         const selectedNetworkInterface = resolveNetworkInterface(settings.networkInterfaceId);
 
         return [
@@ -41,15 +46,10 @@ export class NetSpeed extends MetricAction {
         const isAutomaticNetworkInterface = !isNonEmptyString(settings.networkInterfaceId);
         const selectedNetworkInterface = resolveNetworkInterface(settings.networkInterfaceId);
         const networkMetricKey = selectedNetworkInterface
-            ? getNetworkInterfaceMetricKey(direction ?? "download", selectedNetworkInterface.id)
-            : getNetworkAggregateMetricKey(direction ?? "download");
+            ? getNetworkInterfaceMetricKey(direction, selectedNetworkInterface.id)
+            : getNetworkAggregateMetricKey(direction);
 
         publishNetworkInterfaceOptions(event, settings);
-
-        if (!direction) {
-            showDirectionSelectionPrompt(event);
-            return;
-        }
 
         const rawWidgetData = metricStore.getWidgetData(networkMetricKey, getNetworkDirectionLabel(direction), "B/s");
         const widgetData = buildNetworkWidgetData({
@@ -69,15 +69,22 @@ export class NetSpeed extends MetricAction {
             widgetData,
         });
 
+        const circularCenterContent = settings.circularCenterContent === "icon" ? "icon" : "icon-value-unit";
+
         setSingleMetricDisplay({
             event,
             metricKey: networkMetricKey,
             widgetData,
-            centerIconFragment: renderNetworkIconFragment({
+            centerIconFragment: buildNetworkCenterIconFragment({
+                circularCenterContent,
                 direction,
-                color: resolveNetworkIconColor(direction, rawWidgetData.current, settings),
+                selectedNetworkInterface,
             }),
-            circularCenterContentOverride: settings.circularCenterContent === "icon" ? "icon" : "icon-value-unit",
+            statusIcon: getNetworkDirectionStatusIcon({
+                direction,
+                color: NETWORK_DIRECTION_ICON_COLOR,
+            }),
+            circularCenterContentOverride: circularCenterContent,
             visualSettingsOverride: {
                 colorMode: settings.colorMode ?? "solid",
                 solidColor: settings.solidColor ?? resolveDirectionSolidColor(direction, settings),
@@ -137,18 +144,15 @@ interface NetworkSpeedSettings {
 
 const ACTIVE_DOWNLOAD_ICON_COLOR = "#3b82f6";
 const ACTIVE_UPLOAD_ICON_COLOR = "#ef4444";
-const INACTIVE_ICON_COLOR = "rgba(255,255,255,0.88)";
-const ACTIVE_ICON_THRESHOLD_BYTES_PER_SECOND = 1000;
+const NETWORK_DIRECTION_ICON_COLOR = "rgba(255,255,255,0.88)";
 const FALLBACK_MAXIMUM_SPEED_MEGABITS_PER_SECOND = 1000;
 const NETWORK_SPEED_MAXIMUM_DISPLAY_DIGITS = 3;
+const NETWORK_CENTER_ICON_SIZE = 58;
+const NETWORK_TOP_ICON_SIZE = 30;
 const DEBUG_LOG_INTERVAL_MILLISECONDS = 5000;
 
-function normalizeNetworkDirection(value: SettingValue): NetworkDirection | null {
-    if (value === "download" || value === "upload") {
-        return value;
-    }
-
-    return null;
+function normalizeNetworkDirection(value: SettingValue): NetworkDirection {
+    return value === "upload" ? "upload" : "download";
 }
 
 function resolveNetworkInterface(value: SettingValue): NetworkInterfaceOption | null {
@@ -177,6 +181,7 @@ function buildNetworkWidgetData(options: {
         label: getNetworkDirectionLabel(options.direction),
         unitBase: resolveUnitBase(options.settings.networkUnitBase),
         maximumDisplayDigits: NETWORK_SPEED_MAXIMUM_DISPLAY_DIGITS,
+        sampleTimestampMilliseconds: options.rawWidgetData.sampleTimestampMilliseconds,
     });
 }
 
@@ -217,20 +222,23 @@ function getNetworkDirectionLabel(direction: NetworkDirection): string {
     return direction === "download" ? ARC_GAUGE_LABELS.download : ARC_GAUGE_LABELS.upload;
 }
 
-function resolveNetworkIconColor(
-    direction: NetworkDirection,
-    bytesPerSecond: number,
-    settings: NetworkSpeedSettings,
-): string {
-    if (bytesPerSecond < ACTIVE_ICON_THRESHOLD_BYTES_PER_SECOND) {
-        return INACTIVE_ICON_COLOR;
+function buildNetworkCenterIconFragment(options: {
+    circularCenterContent: "icon" | "icon-value-unit";
+    direction: NetworkDirection;
+    selectedNetworkInterface: NetworkInterfaceOption | null;
+}): string {
+    if (options.circularCenterContent === "icon") {
+        return renderNetworkInterfaceIconFragment({
+            networkInterface: options.selectedNetworkInterface,
+            size: NETWORK_CENTER_ICON_SIZE,
+        });
     }
 
-    if (direction === "download") {
-        return resolveHexColor(settings.downloadIconColor, ACTIVE_DOWNLOAD_ICON_COLOR);
-    }
-
-    return resolveHexColor(settings.uploadIconColor, ACTIVE_UPLOAD_ICON_COLOR);
+    return renderNetworkDirectionIconFragment({
+        direction: options.direction,
+        color: NETWORK_DIRECTION_ICON_COLOR,
+        size: NETWORK_TOP_ICON_SIZE,
+    });
 }
 
 function resolveDirectionSolidColor(direction: NetworkDirection, settings: NetworkSpeedSettings): string {
@@ -280,39 +288,4 @@ function publishNetworkInterfaceOptions(event: WillAppearEvent, settings: Networ
     }).catch(error => {
         streamDeck.logger.error(`[NetSpeed] Failed to publish network interfaces: ${String(error)}`);
     });
-}
-
-function showDirectionSelectionPrompt(event: WillAppearEvent): void {
-    const download = metricStore.getWidgetData(getNetworkAggregateMetricKey("download"), "DOWN", "B/s");
-    const upload = metricStore.getWidgetData(getNetworkAggregateMetricKey("upload"), "UP", "B/s");
-
-    if (event.action.isDial()) {
-        event.action.setFeedback({
-            title: "Net Speed",
-            value: `D:${download.current.toFixed(0)} U:${upload.current.toFixed(0)}`,
-        });
-        return;
-    }
-
-    event.action.setTitle("Choose\nUpload/Download");
-}
-
-function renderNetworkIconFragment(options: { direction: NetworkDirection; color: string }): string {
-    if (options.direction === "download") {
-        return `
-            <g transform="scale(0.72)" fill="none" stroke="${options.color}" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M 0 -13 L 0 5" stroke-width="5" />
-                <path d="M -9 -3 L 0 7 L 9 -3" stroke-width="5" />
-                <path d="M -13 14 L 13 14" stroke-width="4" opacity="0.86" />
-            </g>
-        `;
-    }
-
-    return `
-        <g transform="scale(0.72)" fill="none" stroke="${options.color}" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M 0 13 L 0 -5" stroke-width="5" />
-            <path d="M -9 3 L 0 -7 L 9 3" stroke-width="5" />
-            <path d="M -13 -14 L 13 -14" stroke-width="4" opacity="0.86" />
-        </g>
-    `;
 }
