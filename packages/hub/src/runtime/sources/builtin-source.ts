@@ -18,12 +18,14 @@ export class BuiltinSource implements IMetricSource {
     readonly sourceId = "builtin-node";
 
     private lastNetworkStatsByInterface = new Map<string, NetworkCounterSample>();
+    private lastNetworkPollDebugLogTimestampMilliseconds = 0;
     private cachedGpuData: Systeminformation.GraphicsControllerData | null = null;
     private cachedGpuTimestampMilliseconds = 0;
     private pendingGpuPromise: Promise<Systeminformation.GraphicsControllerData | null> | null = null;
 
     private static readonly GPU_CACHE_MS = 1000;
     private static readonly GPU_POLL_TIMEOUT_MS = 750;
+    private static readonly NETWORK_DEBUG_LOG_INTERVAL_MS = 5000;
 
     async poll(): Promise<IMetricSnapshot> {
         return this.pollMetrics([]);
@@ -232,6 +234,7 @@ export class BuiltinSource implements IMetricSource {
         const currentTimestampMilliseconds = Date.now();
         let aggregateDownloadBytesPerSecond = 0;
         let aggregateUploadBytesPerSecond = 0;
+        const rateCalculations: NetworkRateCalculation[] = [];
 
         networkInterfaceRegistry.update(interfaceOptions);
 
@@ -240,18 +243,22 @@ export class BuiltinSource implements IMetricSource {
                 continue;
             }
 
-            const downloadBytesPerSecond = this.calculateNetworkRate({
+            const downloadRate = this.calculateNetworkRate({
                 interfaceId: networkStat.iface,
                 direction: "download",
                 currentBytes: networkStat.rx_bytes,
                 currentTimestampMilliseconds,
             });
-            const uploadBytesPerSecond = this.calculateNetworkRate({
+            const uploadRate = this.calculateNetworkRate({
                 interfaceId: networkStat.iface,
                 direction: "upload",
                 currentBytes: networkStat.tx_bytes,
                 currentTimestampMilliseconds,
             });
+            const downloadBytesPerSecond = downloadRate.bytesPerSecond;
+            const uploadBytesPerSecond = uploadRate.bytesPerSecond;
+
+            rateCalculations.push(downloadRate, uploadRate);
 
             metrics[getNetworkInterfaceMetricKey("download", networkStat.iface)] = {
                 scalar: downloadBytesPerSecond,
@@ -269,6 +276,16 @@ export class BuiltinSource implements IMetricSource {
         metrics[getNetworkAggregateMetricKey("download")] = { scalar: aggregateDownloadBytesPerSecond, unit: "B/s" };
         metrics[getNetworkAggregateMetricKey("upload")] = { scalar: aggregateUploadBytesPerSecond, unit: "B/s" };
 
+        this.logNetworkPollDebug({
+            networkInterfaces: usableNetworkInterfaces,
+            interfaceOptions,
+            networkStats,
+            rateCalculations,
+            aggregateDownloadBytesPerSecond,
+            aggregateUploadBytesPerSecond,
+            currentTimestampMilliseconds,
+        });
+
         return metrics;
     }
 
@@ -277,7 +294,7 @@ export class BuiltinSource implements IMetricSource {
         direction: NetworkDirection;
         currentBytes: number;
         currentTimestampMilliseconds: number;
-    }): number {
+    }): NetworkRateCalculation {
         const sampleKey = `${options.interfaceId}:${options.direction}`;
         const previousSample = this.lastNetworkStatsByInterface.get(sampleKey);
         this.lastNetworkStatsByInterface.set(sampleKey, {
@@ -286,13 +303,68 @@ export class BuiltinSource implements IMetricSource {
         });
 
         if (!previousSample || options.currentTimestampMilliseconds <= previousSample.timestampMilliseconds) {
-            return 0;
+            return {
+                interfaceId: options.interfaceId,
+                direction: options.direction,
+                currentBytes: options.currentBytes,
+                previousBytes: previousSample?.bytes ?? null,
+                bytesDelta: null,
+                elapsedMilliseconds: previousSample
+                    ? options.currentTimestampMilliseconds - previousSample.timestampMilliseconds
+                    : null,
+                bytesPerSecond: 0,
+                hadPreviousSample: previousSample != null,
+            };
         }
 
         const elapsedSeconds = (options.currentTimestampMilliseconds - previousSample.timestampMilliseconds) / 1000;
         const bytesDelta = options.currentBytes - previousSample.bytes;
 
-        return Math.max(0, bytesDelta / elapsedSeconds);
+        return {
+            interfaceId: options.interfaceId,
+            direction: options.direction,
+            currentBytes: options.currentBytes,
+            previousBytes: previousSample.bytes,
+            bytesDelta,
+            elapsedMilliseconds: options.currentTimestampMilliseconds - previousSample.timestampMilliseconds,
+            bytesPerSecond: Math.max(0, bytesDelta / elapsedSeconds),
+            hadPreviousSample: true,
+        };
+    }
+
+    private logNetworkPollDebug(options: {
+        networkInterfaces: readonly Systeminformation.NetworkInterfacesData[];
+        interfaceOptions: readonly NetworkInterfaceOption[];
+        networkStats: readonly Systeminformation.NetworkStatsData[];
+        rateCalculations: readonly NetworkRateCalculation[];
+        aggregateDownloadBytesPerSecond: number;
+        aggregateUploadBytesPerSecond: number;
+        currentTimestampMilliseconds: number;
+    }): void {
+        const hasPreviousSample = options.rateCalculations.some(rateCalculation => rateCalculation.hadPreviousSample);
+        const hasUsableInterfaces = options.interfaceOptions.length > 0;
+        const hasStats = options.networkStats.length > 0;
+        const isAggregateZero = options.aggregateDownloadBytesPerSecond === 0 && options.aggregateUploadBytesPerSecond === 0;
+        const shouldLogPeriodic = options.currentTimestampMilliseconds - this.lastNetworkPollDebugLogTimestampMilliseconds
+            >= BuiltinSource.NETWORK_DEBUG_LOG_INTERVAL_MS;
+        const shouldLogSuspiciousZero = hasUsableInterfaces && hasStats && hasPreviousSample && isAggregateZero;
+
+        if (!shouldLogPeriodic && !shouldLogSuspiciousZero) {
+            return;
+        }
+
+        this.lastNetworkPollDebugLogTimestampMilliseconds = options.currentTimestampMilliseconds;
+
+        streamDeck.logger.debug([
+            "[BuiltinSource][NetworkPoll]",
+            `reason=${shouldLogSuspiciousZero ? "suspicious-zero" : "periodic"}`,
+            `usable=${JSON.stringify(options.interfaceOptions.map(formatNetworkInterfaceOptionDebug))}`,
+            `stats=${JSON.stringify(options.networkStats.map(formatNetworkStatDebug))}`,
+            `rates=${JSON.stringify(options.rateCalculations.map(formatNetworkRateCalculationDebug))}`,
+            `aggregateDown=${options.aggregateDownloadBytesPerSecond.toFixed(0)}`,
+            `aggregateUp=${options.aggregateUploadBytesPerSecond.toFixed(0)}`,
+            `rawInterfaces=${JSON.stringify(options.networkInterfaces.map(formatRawNetworkInterfaceDebug))}`,
+        ].join(" "));
     }
 
     private async pollGpu(): Promise<Systeminformation.GraphicsControllerData | null> {
@@ -348,6 +420,61 @@ interface NetworkCounterSample {
     timestampMilliseconds: number;
 }
 
+interface NetworkRateCalculation {
+    interfaceId: string;
+    direction: NetworkDirection;
+    currentBytes: number;
+    previousBytes: number | null;
+    bytesDelta: number | null;
+    elapsedMilliseconds: number | null;
+    bytesPerSecond: number;
+    hadPreviousSample: boolean;
+}
+
+interface NetworkInterfaceOptionDebug {
+    id: string;
+    name: string;
+    type: NetworkInterfaceOption["type"];
+    isDefault: boolean;
+    speedMegabitsPerSecond: number | null;
+}
+
+interface NetworkStatDebug {
+    interfaceId: string;
+    operstate: string;
+    receiveBytes: number;
+    receiveBytesPerSecond: number;
+    receiveErrors: number;
+    receiveDropped: number;
+    transmitBytes: number;
+    transmitBytesPerSecond: number;
+    transmitErrors: number;
+    transmitDropped: number;
+    sampleMilliseconds: number;
+}
+
+interface NetworkRateCalculationDebug {
+    interfaceId: string;
+    direction: NetworkDirection;
+    currentBytes: number;
+    previousBytes: number | null;
+    bytesDelta: number | null;
+    elapsedMilliseconds: number | null;
+    computedBytesPerSecond: number;
+    hadPreviousSample: boolean;
+}
+
+interface RawNetworkInterfaceDebug {
+    interfaceId: string;
+    name: string;
+    type: string;
+    operstate: string;
+    isDefault: boolean;
+    isInternal: boolean;
+    isVirtual: boolean;
+    speedMegabitsPerSecond: number | null;
+}
+
 function isUsableNetworkInterface(networkInterface: Systeminformation.NetworkInterfacesData): boolean {
     return !networkInterface.internal
         && !networkInterface.virtual
@@ -373,6 +500,60 @@ function normalizeNetworkInterfaceType(type: string): NetworkInterfaceOption["ty
     }
 
     return "unknown";
+}
+
+function formatNetworkInterfaceOptionDebug(networkInterface: NetworkInterfaceOption): NetworkInterfaceOptionDebug {
+    return {
+        id: networkInterface.id,
+        name: networkInterface.name,
+        type: networkInterface.type,
+        isDefault: networkInterface.isDefault,
+        speedMegabitsPerSecond: networkInterface.speedMegabitsPerSecond,
+    };
+}
+
+function formatNetworkStatDebug(networkStat: Systeminformation.NetworkStatsData): NetworkStatDebug {
+    return {
+        interfaceId: networkStat.iface,
+        operstate: networkStat.operstate,
+        receiveBytes: networkStat.rx_bytes,
+        receiveBytesPerSecond: networkStat.rx_sec,
+        receiveErrors: networkStat.rx_errors,
+        receiveDropped: networkStat.rx_dropped,
+        transmitBytes: networkStat.tx_bytes,
+        transmitBytesPerSecond: networkStat.tx_sec,
+        transmitErrors: networkStat.tx_errors,
+        transmitDropped: networkStat.tx_dropped,
+        sampleMilliseconds: networkStat.ms,
+    };
+}
+
+function formatNetworkRateCalculationDebug(rateCalculation: NetworkRateCalculation): NetworkRateCalculationDebug {
+    return {
+        interfaceId: rateCalculation.interfaceId,
+        direction: rateCalculation.direction,
+        currentBytes: rateCalculation.currentBytes,
+        previousBytes: rateCalculation.previousBytes,
+        bytesDelta: rateCalculation.bytesDelta,
+        elapsedMilliseconds: rateCalculation.elapsedMilliseconds,
+        computedBytesPerSecond: Math.round(rateCalculation.bytesPerSecond),
+        hadPreviousSample: rateCalculation.hadPreviousSample,
+    };
+}
+
+function formatRawNetworkInterfaceDebug(networkInterface: Systeminformation.NetworkInterfacesData): RawNetworkInterfaceDebug {
+    return {
+        interfaceId: networkInterface.iface,
+        name: networkInterface.ifaceName || networkInterface.iface,
+        type: networkInterface.type,
+        operstate: networkInterface.operstate,
+        isDefault: networkInterface.default,
+        isInternal: networkInterface.internal,
+        isVirtual: networkInterface.virtual,
+        speedMegabitsPerSecond: typeof networkInterface.speed === "number" && Number.isFinite(networkInterface.speed)
+            ? networkInterface.speed
+            : null,
+    };
 }
 
 function resolveMetricGroups(metricKeys: readonly string[]): Set<MetricGroup> {

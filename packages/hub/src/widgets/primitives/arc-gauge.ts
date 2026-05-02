@@ -61,6 +61,7 @@ const ARC_LAYOUT = {
     statusIconDefaultSizeRatio: 2.35,
     statusIconDefaultOpticalYOffsetRatio: 0.24,
     networkValueScale: 0.9,
+    placeholderValueScale: 0.68,
     singleDigitValueOpticalYOffset: -4,
     value: {
         fontSize: 48,
@@ -126,10 +127,11 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
         const labelFontSize = ARC_LAYOUT.label.fontSize * innerTextScale;
         const isIconValueUnit = config.centerContent === "icon-value-unit";
         const metricTextScale = isIconValueUnit ? ARC_LAYOUT.networkValueScale : 1;
-        const valueFontSize = ARC_LAYOUT.value.fontSize * innerTextScale * metricTextScale;
+        const valueText = data.displayValue ?? `${data.current.toFixed(0)}`;
+        const placeholderTextScale = valueText === "N/A" ? ARC_LAYOUT.placeholderValueScale : 1;
+        const valueFontSize = ARC_LAYOUT.value.fontSize * innerTextScale * metricTextScale * placeholderTextScale;
         const unitFontSize = ARC_LAYOUT.unit.fontSize * innerTextScale * metricTextScale;
         const labelYCoordinate = centerYCoordinate + ARC_LAYOUT.label.yOffset;
-        const valueText = data.displayValue ?? `${data.current.toFixed(0)}`;
         const valueOpticalYOffset = isIconValueUnit && valueText.length === 1
             ? ARC_LAYOUT.singleDigitValueOpticalYOffset
             : 0;
