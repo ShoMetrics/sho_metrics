@@ -164,7 +164,7 @@ class Scheduler {
         this.activePolls.add(group.groupKey);
 
         try {
-            log.trace(() => [
+            log.debug(() => [
                 "pollStart",
                 `intervalMs=${group.pollingIntervalMilliseconds}`,
                 `metrics=${formatMetricKeys(group.metricKeys)}`,
@@ -175,7 +175,7 @@ class Scheduler {
             metricStore.ingest(snapshot);
             const ingestTimestampMilliseconds = Date.now();
 
-            log.trace(() => [
+            log.debug(() => [
                 "pollDone",
                 `intervalMs=${group.pollingIntervalMilliseconds}`,
                 `metrics=${formatMetricKeys(group.metricKeys)}`,
