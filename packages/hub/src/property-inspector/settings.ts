@@ -46,6 +46,7 @@ export interface PropertyInspectorSettings {
     diskThroughputDirection: DiskThroughputDirection;
     diskVolumeId: string;
     availableDiskVolumes: string;
+    diskLinearLabel: string;
     maximumDiskThroughputMebibytesPerSecond: number;
     diskDefaultsApplied: boolean;
     maximumTemperatureCelsius: number;
@@ -79,6 +80,7 @@ export const basePropertyInspectorSettings: PropertyInspectorSettings = {
     diskThroughputDirection: "total",
     diskVolumeId: "",
     availableDiskVolumes: "[]",
+    diskLinearLabel: "",
     maximumDiskThroughputMebibytesPerSecond: 1000,
     diskDefaultsApplied: false,
     maximumTemperatureCelsius: 100,
@@ -136,6 +138,7 @@ export function normalizeSettings(
             rawSettings.availableDiskVolumes,
             basePropertyInspectorSettings.availableDiskVolumes,
         ),
+        diskLinearLabel: normalizeString(rawSettings.diskLinearLabel, basePropertyInspectorSettings.diskLinearLabel),
         maximumDiskThroughputMebibytesPerSecond: normalizePositiveNumber(
             rawSettings.maximumDiskThroughputMebibytesPerSecond ?? rawSettings.maximumDiskThroughputMbps,
             basePropertyInspectorSettings.maximumDiskThroughputMebibytesPerSecond,

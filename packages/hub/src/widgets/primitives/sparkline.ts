@@ -1,6 +1,6 @@
 import type { WidgetData, KeySize } from "../../rendering/widget-data";
 import { buildGradientStops, resolveColor } from "../../rendering/color-resolver";
-import { escapeSvgText } from "../../rendering/svg-utils";
+import { renderConstrainedSvgText } from "../../rendering/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget.interface";
 
 export interface SparklineConfig extends WidgetBaseConfig {
@@ -21,6 +21,8 @@ export const DEFAULT_SPARKLINE_CONFIG: SparklineConfig = {
     showDots: false,
     dashPattern: "4 4",
 };
+
+const SPARKLINE_TEXT_FONT_FAMILY = "'Inter','SF Pro Display','Segoe UI',sans-serif";
 
 /**
  * Sparkline (mini line chart) showing metric values over time.
@@ -82,13 +84,31 @@ export const sparkline: Widget<SparklineConfig> = {
                 </linearGradient>
             </defs>
             <!-- Sparkline: label -->
-            <text x="${keySize.width / 2}" y="16" text-anchor="middle"
-                font-family="'Inter','SF Pro Display','Segoe UI',sans-serif"
-                font-size="12" fill="rgba(255,255,255,0.4)">${escapeSvgText(data.label)}</text>
+            ${renderConstrainedSvgText({
+                id: "sparkline-label",
+                text: data.label,
+                xCoordinate: keySize.width / 2,
+                yCoordinate: 16,
+                maxWidth: keySize.width - 16,
+                fontSize: 12,
+                fontFamily: SPARKLINE_TEXT_FONT_FAMILY,
+                fontWeight: 500,
+                fill: "rgba(255,255,255,0.4)",
+                textAnchor: "middle",
+            })}
             <!-- Sparkline: current value -->
-            <text x="${keySize.width / 2}" y="28" text-anchor="middle"
-                font-family="'Inter','SF Pro Display','Segoe UI',sans-serif"
-                font-size="13" font-weight="600" fill="${currentColor}">${escapeSvgText(valueText)}${escapeSvgText(data.unit)}</text>
+            ${renderConstrainedSvgText({
+                id: "sparkline-current-value",
+                text: `${valueText}${data.unit}`,
+                xCoordinate: keySize.width / 2,
+                yCoordinate: 28,
+                maxWidth: keySize.width - 16,
+                fontSize: 13,
+                fontFamily: SPARKLINE_TEXT_FONT_FAMILY,
+                fontWeight: 600,
+                fill: currentColor,
+                textAnchor: "middle",
+            })}
             <!-- Sparkline: area fill -->
             <path d="${areaPath}" fill="url(#${areaFillId})" opacity="${config.fillOpacity}" />
             <!-- Sparkline: line -->

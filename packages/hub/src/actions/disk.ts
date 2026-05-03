@@ -88,7 +88,7 @@ export class Disk extends MetricAction {
                 availableBytes: availableBytesWidgetData.current,
                 displayMode: normalizeDiskUsageDisplayMode(settings.diskUsageDisplayMode),
                 label,
-                linearLabel: buildDiskLinearLabel(selectedVolume, label),
+                linearLabel: resolveDiskLinearLabel(settings.diskLinearLabel, selectedVolume, label),
             }),
             centerIconFragment: buildDiskCenterIconFragment(selectedVolume),
             linearIconFragment: getDiskIconFragment(selectedVolume?.storageKind ?? "unknown"),
@@ -143,14 +143,42 @@ function buildDiskLinearLabel(diskVolume: DiskVolumeOption | null, fallbackLabel
         return fallbackLabel;
     }
 
-    const storageKind = diskVolume.storageKind === "ssd"
-        ? "SSD"
-        : diskVolume.storageKind === "hdd"
-            ? "HDD"
-            : "Disk";
+    const storageKind = resolveCompactDiskStorageLabel(diskVolume);
     const volumeLabel = formatDiskVolumeDisplayLabel(diskVolume);
 
     return `${storageKind} (${volumeLabel})`;
+}
+
+function resolveDiskLinearLabel(
+    customLinearLabel: SettingValue,
+    diskVolume: DiskVolumeOption | null,
+    fallbackLabel: string,
+): string {
+    if (typeof customLinearLabel === "string") {
+        const normalizedLinearLabel = customLinearLabel.trim();
+
+        if (normalizedLinearLabel.length > 0) {
+            return normalizedLinearLabel;
+        }
+    }
+
+    return buildDiskLinearLabel(diskVolume, fallbackLabel);
+}
+
+function resolveCompactDiskStorageLabel(diskVolume: DiskVolumeOption): string {
+    if (diskVolume.storageKind === "ssd") {
+        return "SSD";
+    }
+
+    if (diskVolume.storageKind === "hdd") {
+        return "HDD";
+    }
+
+    if (diskVolume.storageKind === "network") {
+        return "NET";
+    }
+
+    return "DSK";
 }
 
 function buildDiskCenterIconFragment(diskVolume: DiskVolumeOption | null): string {
@@ -174,6 +202,7 @@ interface DiskSettings {
     diskThroughputDirection?: SettingValue;
     diskVolumeId?: SettingValue;
     availableDiskVolumes?: SettingValue;
+    diskLinearLabel?: SettingValue;
     maximumDiskThroughputMebibytesPerSecond?: SettingValue;
     pollingFrequencySeconds?: SettingValue;
     circularCenterContent?: SettingValue;

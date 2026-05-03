@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FieldRenderer } from "./components/FieldRenderer";
 import { readControlValue } from "./control-events";
-import { isFieldVisible, propertyInspectorSchema } from "./schema";
+import { resolveInspectorFieldList } from "./scenarios";
 import {
     basePropertyInspectorSettings,
     normalizeDiskMetricKind,
@@ -148,8 +148,7 @@ export function App({ client }: AppProps): React.JSX.Element {
 
     return (
         <div ref={rootRef}>
-            {propertyInspectorSchema
-                .filter((field) => isFieldVisible(field, visibilityContext))
+            {resolveInspectorFieldList(visibilityContext)
                 .map((field) => (
                     <FieldRenderer key={field.id} field={field} context={visibilityContext} />
                 ))}

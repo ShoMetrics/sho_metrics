@@ -2,7 +2,9 @@ import { ColorBandField } from "./ColorBandField";
 import { ColorField } from "./ColorField";
 import { NumberField } from "./NumberField";
 import { RangeField } from "./RangeField";
+import { ReadonlyField } from "./ReadonlyField";
 import { SelectField } from "./SelectField";
+import { TextField } from "./TextField";
 import type { FieldSchema, PropertyInspectorSettingKey, VisibilityContext } from "../schema";
 
 interface FieldRendererProps {
@@ -19,6 +21,14 @@ export function FieldRenderer({ field, context }: FieldRendererProps): React.JSX
         return (
             <sdpi-item>
                 <p className="section-note">{field.text ?? ""}</p>
+            </sdpi-item>
+        );
+    }
+
+    if (field.kind === "readonly") {
+        return (
+            <sdpi-item label={field.label ?? ""}>
+                <ReadonlyField field={field} context={context} />
             </sdpi-item>
         );
     }
@@ -45,12 +55,15 @@ function renderFieldControl(
             return <ColorField field={field} context={context} />;
         case "number":
             return <NumberField field={field} context={context} />;
+        case "text":
+            return <TextField field={field} context={context} />;
         case "range":
             return <RangeField field={field} context={context} />;
         case "color-band":
             return <ColorBandField field={field} context={context} />;
         case "heading":
         case "note":
+        case "readonly":
             return <span />;
     }
 }

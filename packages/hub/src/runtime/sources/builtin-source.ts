@@ -951,8 +951,9 @@ function toDiskVolumeOption(
         sizeBytes: fileSystem.size,
         usedBytes: fileSystem.used,
         availableBytes: fileSystem.available,
-        storageKind: resolveDiskStorageKind(physicalDisk),
+        storageKind: resolveDiskStorageKind(physicalDisk, blockDevice),
         diskName: physicalDisk?.name ?? fileSystem.fs,
+        volumeLabel: blockDevice?.label ?? "",
     };
 }
 
@@ -961,6 +962,10 @@ function resolvePhysicalDisk(
     blockDevice: Systeminformation.BlockDevicesData | undefined,
     diskLayout: readonly Systeminformation.DiskLayoutData[],
 ): Systeminformation.DiskLayoutData | undefined {
+    if (blockDevice && !isLocalBlockDevice(blockDevice)) {
+        return undefined;
+    }
+
     if (diskLayout.length === 0) {
         return undefined;
     }
@@ -987,7 +992,14 @@ function resolvePhysicalDisk(
         ?? diskLayout[0];
 }
 
-function resolveDiskStorageKind(diskLayout: Systeminformation.DiskLayoutData | undefined): DiskStorageKind {
+function resolveDiskStorageKind(
+    diskLayout: Systeminformation.DiskLayoutData | undefined,
+    blockDevice: Systeminformation.BlockDevicesData | undefined,
+): DiskStorageKind {
+    if (blockDevice && !isLocalBlockDevice(blockDevice)) {
+        return "network";
+    }
+
     if (!diskLayout) {
         return "unknown";
     }
@@ -1003,6 +1015,16 @@ function resolveDiskStorageKind(diskLayout: Systeminformation.DiskLayoutData | u
     }
 
     return "unknown";
+}
+
+function isLocalBlockDevice(blockDevice: Systeminformation.BlockDevicesData): boolean {
+    const physicalKind = blockDevice.physical.toLowerCase();
+
+    if (physicalKind === "network") {
+        return false;
+    }
+
+    return true;
 }
 
 function resolveDefaultDiskVolume(diskVolumes: readonly DiskVolumeOption[]): DiskVolumeOption | null {
