@@ -1,0 +1,24 @@
+{
+    "extends": "@tsconfig/node20/tsconfig.json",
+    "compilerOptions": {
+        "lib": [
+            "ES2022",
+            "DOM"
+        ],
+        "module": "CommonJS",
+        "moduleResolution": "Node",
+        "jsx": "react-jsx",
+        "noImplicitOverride": true,
+        "outDir": ".test-dist",
+        "rootDir": ".",
+        "sourceMap": false
+    },
+    "include": [
+        "src/property-inspector/**/*.ts",
+        "tests/**/*.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        "src/property-inspector/**/*.tsx"
+    ]
+}

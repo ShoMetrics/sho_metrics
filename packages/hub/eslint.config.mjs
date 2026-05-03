@@ -7,6 +7,7 @@ export default tseslint.config(
     ignores: [
       '**/node_modules/**',
       '**/dist/**',
+      '**/.test-dist/**',
       '**/package-lock.json',
       'src/generated/**',
       '**/*.sdPlugin/**', // Exclude the Stream Deck plugin output folder
