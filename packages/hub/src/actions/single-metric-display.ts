@@ -1,17 +1,25 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
-import streamDeck from "@elgato/streamdeck";
 import { composeSvg } from "../rendering/composer";
 import { rasterizeSvgToPngDataUrl } from "../rendering/rasterizer";
-import { KEYPAD_PNG_SIZE, TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE, WIDGET_LOGICAL_SIZE } from "../rendering/widget-data";
+import {
+    KEYPAD_PNG_SIZE,
+    TOUCH_STRIP_LOGICAL_SIZE,
+    TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE,
+    WIDGET_LOGICAL_SIZE,
+} from "../rendering/widget-data";
 import type { WidgetData } from "../rendering/widget-data";
 import { resolveMetricVisualSettings, type MetricVisualSettings, type SettingValue } from "./metric-visual-settings";
 import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
+import { logger } from "../logging/logger";
+
+const log = logger.for("SingleMetricDisplay");
 
 export interface SingleMetricDisplayOptions {
     event: WillAppearEvent;
     metricKey: string;
     widgetData: WidgetData;
     centerIconFragment: string;
+    linearIconFragment?: string;
     statusIcon: ArcGaugeStatusIcon;
     circularCenterContentOverride?: "value" | "icon" | "icon-value-unit";
     visualSettingsOverride?: Partial<MetricVisualSettings>;
@@ -22,9 +30,52 @@ interface SingleMetricDisplaySettings extends MetricVisualSettings {
 }
 
 const TOUCH_STRIP_SINGLE_METRIC_LAYOUT = "layouts/single-metric-touchstrip.json";
-const touchStripLayoutPromises = new Map<string, Promise<void>>();
+const MAX_CONCURRENT_DISPLAY_UPDATES = 1;
+
+const displayActionStates = new Map<string, DisplayActionState>();
+const displayActionQueue: string[] = [];
+let activeDisplayUpdateCount = 0;
+let isDisplayQueueDrainScheduled = false;
+
+interface DisplayActionState {
+    actionId: string;
+    isRenderInFlight: boolean;
+    isQueued: boolean;
+    active: boolean;
+    pendingOptions: SingleMetricDisplayOptions | null;
+    touchStripLayoutPromise: Promise<void> | null;
+    lastRenderedSvg: string | null;
+}
 
 export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): void {
+    const displayActionState = getOrCreateDisplayActionState(options.event.action.id);
+
+    displayActionState.pendingOptions = options;
+    enqueueDisplayAction(displayActionState);
+}
+
+export function clearSingleMetricDisplayState(actionId: string): void {
+    const displayActionState = displayActionStates.get(actionId);
+
+    if (!displayActionState) {
+        return;
+    }
+
+    displayActionState.active = false;
+    displayActionState.isQueued = false;
+    displayActionState.pendingOptions = null;
+    displayActionState.touchStripLayoutPromise = null;
+    displayActionStates.delete(actionId);
+}
+
+function renderAndSendSingleMetricDisplay(
+    displayActionState: DisplayActionState,
+    options: SingleMetricDisplayOptions,
+): void {
+    displayActionState.isRenderInFlight = true;
+    displayActionState.pendingOptions = null;
+    activeDisplayUpdateCount += 1;
+
     const renderStartTimestampMilliseconds = Date.now();
     const settings = options.event.payload.settings as SingleMetricDisplaySettings;
     const visualSettings = resolveMetricVisualSettings({
@@ -45,11 +96,12 @@ export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): voi
         hasData,
         shouldRenderMutedIconPlaceholder,
     });
+    const renderSize = options.event.action.isDial() ? TOUCH_STRIP_LOGICAL_SIZE : WIDGET_LOGICAL_SIZE;
     const pngSize = options.event.action.isDial() ? TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE : KEYPAD_PNG_SIZE;
 
     if (options.event.action.isKey()) {
         options.event.action.setTitle("").catch(error => {
-            streamDeck.logger.error(`[SingleMetricDisplay] Failed to clear key title: ${error}`);
+            log.error(() => `Failed to clear key title: ${error}`);
         });
     }
 
@@ -58,15 +110,29 @@ export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): voi
         muted: shouldRenderMutedIconPlaceholder,
         configOverrides: buildSingleMetricConfigOverrides({
             centerIconFragment: options.centerIconFragment,
+            linearIconFragment: options.linearIconFragment,
             statusIcon: options.statusIcon,
             centerContent,
         }),
-    }, WIDGET_LOGICAL_SIZE);
+    }, renderSize);
     const composeEndTimestampMilliseconds = Date.now();
+
+    if (svg === displayActionState.lastRenderedSvg) {
+        logDisplaySkippedDebug({
+            actionId: options.event.action.id,
+            metricKey: options.metricKey,
+            renderStartTimestampMilliseconds,
+            composeDurationMilliseconds: composeEndTimestampMilliseconds - renderStartTimestampMilliseconds,
+        });
+        finishDisplayUpdate(displayActionState);
+        return;
+    }
+
     const pngDataUrl = rasterizeSvgToPngDataUrl(svg, pngSize);
     const rasterizeEndTimestampMilliseconds = Date.now();
 
     if (!pngDataUrl) {
+        finishDisplayUpdate(displayActionState);
         return;
     }
 
@@ -83,27 +149,37 @@ export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): voi
 
     if (options.event.action.isDial()) {
         const setFeedback = (): void => {
-            if (options.event.action.isDial()) {
-                const updateStartTimestampMilliseconds = Date.now();
-                options.event.action.setFeedback({ metricImage: pngDataUrl })
-                    .then(() => {
-                        logUpdateDoneDebug({
-                            actionId: options.event.action.id,
-                            metricKey: options.metricKey,
-                            phase: "setFeedbackDone",
-                            sampleTimestampMilliseconds: renderWidgetData.sampleTimestampMilliseconds,
-                            updateStartTimestampMilliseconds,
-                        });
-                    })
-                    .catch(error => {
-                        streamDeck.logger.error(`[SingleMetricDisplay] Failed to set touch strip feedback: ${error}`);
-                    });
+            if (!displayActionState.active || !options.event.action.isDial()) {
+                finishDisplayUpdate(displayActionState);
+                return;
             }
+
+            const updateStartTimestampMilliseconds = Date.now();
+            options.event.action.setFeedback({ metricImage: pngDataUrl })
+                .then(() => {
+                    displayActionState.lastRenderedSvg = svg;
+                    logUpdateDoneDebug({
+                        actionId: options.event.action.id,
+                        metricKey: options.metricKey,
+                        phase: "setFeedbackDone",
+                        sampleTimestampMilliseconds: renderWidgetData.sampleTimestampMilliseconds,
+                        updateStartTimestampMilliseconds,
+                    });
+                })
+                .catch(error => {
+                    log.error(() => `Failed to set touch strip feedback: ${error}`);
+                })
+                .finally(() => {
+                    finishDisplayUpdate(displayActionState);
+                });
         };
 
-        ensureTouchStripSingleMetricLayout(options.event).then(setFeedback).catch(error => {
-            streamDeck.logger.error(`[SingleMetricDisplay] Failed to update touch strip metric image: ${error}`);
-        });
+        ensureTouchStripSingleMetricLayout(displayActionState, options.event)
+            .then(setFeedback)
+            .catch(error => {
+                log.error(() => `Failed to update touch strip metric image: ${error}`);
+                finishDisplayUpdate(displayActionState);
+            });
         return;
     }
 
@@ -111,6 +187,7 @@ export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): voi
         const updateStartTimestampMilliseconds = Date.now();
         options.event.action.setImage(pngDataUrl)
             .then(() => {
+                displayActionState.lastRenderedSvg = svg;
                 logUpdateDoneDebug({
                     actionId: options.event.action.id,
                     metricKey: options.metricKey,
@@ -120,19 +197,32 @@ export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): voi
                 });
             })
             .catch(error => {
-                streamDeck.logger.error(`[SingleMetricDisplay] Failed to set key image: ${error}`);
+                log.error(() => `Failed to set key image: ${error}`);
+            })
+            .finally(() => {
+                finishDisplayUpdate(displayActionState);
             });
+        return;
     }
+
+    finishDisplayUpdate(displayActionState);
 }
 
 function buildSingleMetricConfigOverrides(options: {
     centerIconFragment: string;
+    linearIconFragment: string | undefined;
     statusIcon: ArcGaugeStatusIcon;
     centerContent: "value" | "icon" | "icon-value-unit";
-}): { centerContent?: "value" | "icon" | "icon-value-unit"; centerIconFragment?: string; statusIcon?: ArcGaugeStatusIcon } {
+}): {
+    centerContent?: "value" | "icon" | "icon-value-unit";
+    centerIconFragment?: string;
+    topIconFragment?: string;
+    statusIcon?: ArcGaugeStatusIcon;
+} {
     return {
         centerContent: options.centerContent,
         centerIconFragment: options.centerIconFragment,
+        topIconFragment: options.linearIconFragment ?? options.centerIconFragment,
         statusIcon: options.statusIcon,
     };
 }
@@ -169,21 +259,122 @@ function buildRenderWidgetData(options: {
     };
 }
 
-function ensureTouchStripSingleMetricLayout(event: WillAppearEvent): Promise<void> {
+function getOrCreateDisplayActionState(actionId: string): DisplayActionState {
+    const existingDisplayActionState = displayActionStates.get(actionId);
+
+    if (existingDisplayActionState) {
+        return existingDisplayActionState;
+    }
+
+    const displayActionState: DisplayActionState = {
+        actionId,
+        isRenderInFlight: false,
+        isQueued: false,
+        active: true,
+        pendingOptions: null,
+        touchStripLayoutPromise: null,
+        lastRenderedSvg: null,
+    };
+    displayActionStates.set(actionId, displayActionState);
+    return displayActionState;
+}
+
+function enqueueDisplayAction(displayActionState: DisplayActionState): void {
+    if (
+        !displayActionState.active
+        || displayActionState.isQueued
+        || displayActionState.isRenderInFlight
+    ) {
+        return;
+    }
+
+    displayActionState.isQueued = true;
+    displayActionQueue.push(displayActionState.actionId);
+    scheduleDisplayQueueDrain();
+}
+
+function scheduleDisplayQueueDrain(): void {
+    if (isDisplayQueueDrainScheduled) {
+        return;
+    }
+
+    isDisplayQueueDrainScheduled = true;
+    setImmediate(drainDisplayQueue);
+}
+
+function drainDisplayQueue(): void {
+    isDisplayQueueDrainScheduled = false;
+
+    while (
+        activeDisplayUpdateCount < MAX_CONCURRENT_DISPLAY_UPDATES
+        && displayActionQueue.length > 0
+    ) {
+        const actionId = displayActionQueue.shift();
+        if (!actionId) {
+            continue;
+        }
+
+        const displayActionState = displayActionStates.get(actionId);
+        if (!displayActionState) {
+            continue;
+        }
+
+        displayActionState.isQueued = false;
+
+        if (
+            !displayActionState.active
+            || displayActionState.isRenderInFlight
+            || !displayActionState.pendingOptions
+        ) {
+            continue;
+        }
+
+        try {
+            renderAndSendSingleMetricDisplay(displayActionState, displayActionState.pendingOptions);
+        } catch (error) {
+            log.error(() => `Render/update error: ${String(error)}`);
+            finishDisplayUpdate(displayActionState);
+        }
+    }
+
+    if (displayActionQueue.length > 0 && activeDisplayUpdateCount < MAX_CONCURRENT_DISPLAY_UPDATES) {
+        scheduleDisplayQueueDrain();
+    }
+}
+
+function finishDisplayUpdate(displayActionState: DisplayActionState): void {
+    displayActionState.isRenderInFlight = false;
+    activeDisplayUpdateCount = Math.max(0, activeDisplayUpdateCount - 1);
+
+    if (!displayActionState.active) {
+        scheduleDisplayQueueDrain();
+        return;
+    }
+
+    if (displayActionState.pendingOptions) {
+        enqueueDisplayAction(displayActionState);
+    }
+
+    scheduleDisplayQueueDrain();
+}
+
+function ensureTouchStripSingleMetricLayout(
+    displayActionState: DisplayActionState,
+    event: WillAppearEvent,
+): Promise<void> {
     if (!event.action.isDial()) {
         return Promise.resolve();
     }
 
-    const existingPromise = touchStripLayoutPromises.get(event.action.id);
-    if (existingPromise) {
-        return existingPromise;
+    if (displayActionState.touchStripLayoutPromise) {
+        return displayActionState.touchStripLayoutPromise;
     }
 
     const layoutPromise = event.action.setFeedbackLayout(TOUCH_STRIP_SINGLE_METRIC_LAYOUT).catch(error => {
-        touchStripLayoutPromises.delete(event.action.id);
+        displayActionState.touchStripLayoutPromise = null;
         throw error;
     });
-    touchStripLayoutPromises.set(event.action.id, layoutPromise);
+    displayActionState.touchStripLayoutPromise = layoutPromise;
     return layoutPromise;
 }
 
@@ -198,8 +389,7 @@ function logDisplayDebug(options: {
     rasterizeDurationMilliseconds: number;
 }): void {
     const currentTimestampMilliseconds = Date.now();
-    streamDeck.logger.debug([
-        "[SingleMetricDisplay]",
+    log.trace(() => [
         options.phase,
         `actionId=${options.actionId}`,
         `metricKey=${options.metricKey}`,
@@ -219,13 +409,28 @@ function logUpdateDoneDebug(options: {
     updateStartTimestampMilliseconds: number;
 }): void {
     const currentTimestampMilliseconds = Date.now();
-    streamDeck.logger.debug([
-        "[SingleMetricDisplay]",
+    log.trace(() => [
         options.phase,
         `actionId=${options.actionId}`,
         `metricKey=${options.metricKey}`,
         `sampleAgeMs=${formatAgeMilliseconds(options.sampleTimestampMilliseconds, currentTimestampMilliseconds)}`,
         `sdkPromiseMs=${currentTimestampMilliseconds - options.updateStartTimestampMilliseconds}`,
+    ].join(" "));
+}
+
+function logDisplaySkippedDebug(options: {
+    actionId: string;
+    metricKey: string;
+    renderStartTimestampMilliseconds: number;
+    composeDurationMilliseconds: number;
+}): void {
+    const currentTimestampMilliseconds = Date.now();
+    log.trace(() => [
+        "skippedUnchanged",
+        `actionId=${options.actionId}`,
+        `metricKey=${options.metricKey}`,
+        `composeMs=${options.composeDurationMilliseconds}`,
+        `renderToSkipMs=${currentTimestampMilliseconds - options.renderStartTimestampMilliseconds}`,
     ].join(" "));
 }
 

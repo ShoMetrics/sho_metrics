@@ -5,9 +5,9 @@ import { NetSpeed } from "./actions/net-speed";
 import { GpuUsage, GpuTemp, GpuVram, GpuPower } from "./actions/gpu-usage";
 import { RamUsage } from "./actions/ram-usage";
 import { Disk } from "./actions/disk";
+import { logger } from "./logging/logger";
 
-// We can enable "trace" logging so that all messages between the Stream Deck, and the plugin are recorded. When storing sensitive information
-streamDeck.logger.setLevel("debug");
+logger.setLevel(__LOG_LEVEL__);
 
 streamDeck.actions.registerAction(new CpuUsage());
 streamDeck.actions.registerAction(new NetSpeed());

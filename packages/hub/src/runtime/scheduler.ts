@@ -1,7 +1,9 @@
-import streamDeck from "@elgato/streamdeck";
 import type { IMetricSource, IMetricSnapshot } from "./sources/source.interface";
 import { BuiltinSource } from "./sources/builtin-source";
 import { metricStore } from "./metric-store";
+import { logger } from "../logging/logger";
+
+const log = logger.for("Scheduler");
 
 export type MetricsSnapshot = IMetricSnapshot;
 
@@ -45,7 +47,7 @@ class Scheduler {
     }
 
     setSource(source: IMetricSource): void {
-        streamDeck.logger.info(`[Scheduler] Switching source: ${this.source.sourceId} -> ${source.sourceId}`);
+        log.info(() => `Switching source: ${this.source.sourceId} -> ${source.sourceId}`);
         this.source.dispose?.();
         this.source = source;
     }
@@ -79,20 +81,20 @@ class Scheduler {
             return;
         }
 
-        streamDeck.logger.info(`[Scheduler] Starting with source: ${this.source.sourceId}`);
+        log.info(() => `Starting with source: ${this.source.sourceId}`);
         this.intervalId = setInterval(() => {
             this.pollDueSubscriberGroups().catch(error => {
-                streamDeck.logger.error(`[Scheduler] Poll error: ${String(error)}`);
+                log.error(() => `Poll error: ${String(error)}`);
             });
         }, Scheduler.TICK_INTERVAL_MS);
         this.pollDueSubscriberGroups().catch(error => {
-            streamDeck.logger.error(`[Scheduler] Initial poll error: ${String(error)}`);
+            log.error(() => `Initial poll error: ${String(error)}`);
         });
     }
 
     private stop(): void {
         if (this.intervalId) {
-            streamDeck.logger.info("[Scheduler] Stopping (no subscribers)");
+            log.info("Stopping (no subscribers)");
             clearInterval(this.intervalId);
             this.intervalId = undefined;
         }
@@ -162,8 +164,7 @@ class Scheduler {
         this.activePolls.add(group.groupKey);
 
         try {
-            streamDeck.logger.debug([
-                "[Scheduler]",
+            log.trace(() => [
                 "pollStart",
                 `intervalMs=${group.pollingIntervalMilliseconds}`,
                 `metrics=${formatMetricKeys(group.metricKeys)}`,
@@ -174,8 +175,7 @@ class Scheduler {
             metricStore.ingest(snapshot);
             const ingestTimestampMilliseconds = Date.now();
 
-            streamDeck.logger.debug([
-                "[Scheduler]",
+            log.trace(() => [
                 "pollDone",
                 `intervalMs=${group.pollingIntervalMilliseconds}`,
                 `metrics=${formatMetricKeys(group.metricKeys)}`,
@@ -188,7 +188,7 @@ class Scheduler {
                 subscriber.callback(snapshot);
             }
         } catch (error) {
-            streamDeck.logger.error(`[Scheduler] Poll error for metrics=${formatMetricKeys(group.metricKeys)}: ${String(error)}`);
+            log.error(() => `Poll error for metrics=${formatMetricKeys(group.metricKeys)}: ${String(error)}`);
         } finally {
             this.activePolls.delete(group.groupKey);
         }

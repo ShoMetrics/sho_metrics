@@ -1,8 +1,8 @@
 import { action, WillAppearEvent } from "@elgato/streamdeck";
-import streamDeck from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import { metricStore } from "../runtime/metric-store";
 import { setSingleMetricDisplay } from "./single-metric-display";
+import { logger } from "../logging/logger";
 import type { SettingValue } from "./metric-visual-settings";
 import { buildDiskThroughputWidgetData, buildDiskUsageWidgetData, type DiskUsageDisplayMode } from "../metrics/storage-display";
 import { diskVolumeRegistry, type DiskVolumeOption } from "../runtime/disk-volumes";
@@ -16,6 +16,8 @@ import { getDiskIcon, getDiskIconFragment, renderCenteredHardwareIconFragment } 
 import { getMetricStatusIcon } from "../widgets/icons/metric-status-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import { escapeSvgText } from "../rendering/svg-utils";
+
+const log = logger.for("Action:Disk");
 
 @action({ UUID: "com.ez.sho-metrics.disk" })
 export class Disk extends MetricAction {
@@ -86,8 +88,10 @@ export class Disk extends MetricAction {
                 availableBytes: availableBytesWidgetData.current,
                 displayMode: normalizeDiskUsageDisplayMode(settings.diskUsageDisplayMode),
                 label,
+                linearLabel: buildDiskLinearLabel(selectedVolume, label),
             }),
             centerIconFragment: buildDiskCenterIconFragment(selectedVolume),
+            linearIconFragment: getDiskIconFragment(selectedVolume?.storageKind ?? "unknown"),
             statusIcon: getMetricStatusIcon("percentage"),
         });
     }
@@ -132,6 +136,21 @@ function formatDiskVolumeDisplayLabel(diskVolume: DiskVolumeOption): string {
     }
 
     return mountLabel.slice(0, 4).toUpperCase();
+}
+
+function buildDiskLinearLabel(diskVolume: DiskVolumeOption | null, fallbackLabel: string): string {
+    if (!diskVolume) {
+        return fallbackLabel;
+    }
+
+    const storageKind = diskVolume.storageKind === "ssd"
+        ? "SSD"
+        : diskVolume.storageKind === "hdd"
+            ? "HDD"
+            : "Disk";
+    const volumeLabel = formatDiskVolumeDisplayLabel(diskVolume);
+
+    return `${storageKind} (${volumeLabel})`;
 }
 
 function buildDiskCenterIconFragment(diskVolume: DiskVolumeOption | null): string {
@@ -222,7 +241,7 @@ function publishDiskVolumeOptions(event: WillAppearEvent, settings: DiskSettings
         ...settings,
         availableDiskVolumes,
     }).catch(error => {
-        streamDeck.logger.error(`[Disk] Failed to publish disk volumes: ${String(error)}`);
+        log.error(() => `Failed to publish disk volumes: ${String(error)}`);
     });
 }
 

@@ -9,7 +9,21 @@ export interface WidgetData {
     unit: string;                  // "%", "°C", "MB/s"
     label: string;                 // "CPU Usage", "GPU Temp"
     displayValue?: string;         // Optional preformatted value for compact metric-specific displays.
+    secondaryDisplayValue?: string;
+    linearLabel?: string;
+    linearDisplayValue?: string;
+    linearUnit?: string;
+    linearChannels?: readonly LinearChannelWidgetData[];
     sampleTimestampMilliseconds?: number;
+}
+
+export interface LinearChannelWidgetData {
+    label: string;
+    displayValue: string;
+    unit: string;
+    progress: number;
+    color: string;
+    iconFragment: string;
 }
 
 /**
@@ -29,8 +43,11 @@ export interface KeySize {
 /** Logical SVG coordinate system. Visual proportions are authored against this size. */
 export const WIDGET_LOGICAL_SIZE: KeySize = { width: 144, height: 144 };
 
+/** Stream Deck+ gives each dial action one 200x100 px touch strip quarter. */
+export const TOUCH_STRIP_LOGICAL_SIZE: KeySize = { width: 200, height: 100 };
+
 /** High-resolution keypad PNG target. Stream Deck downsamples for hardware and keeps virtual keys sharper. */
 export const KEYPAD_PNG_SIZE: KeySize = { width: 288, height: 288 };
 
-/** One Stream Deck+ touch strip action region is 200x100; the metric image is centered in that region. */
-export const TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE: KeySize = { width: 100, height: 100 };
+/** One Stream Deck+ touch strip action region is 200x100 px. */
+export const TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE: KeySize = { width: 200, height: 100 };
