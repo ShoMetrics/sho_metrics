@@ -20,6 +20,7 @@ export function buildTemperatureWidgetData(options: TemperatureDisplayOptions): 
         progress: Math.min(Math.max(options.celsiusWidgetData.current / options.maximumCelsius, 0), 1),
         unit: options.unit === "fahrenheit" ? "F" : "C",
         displayValue: displayTemperature.toFixed(0),
+        secondaryDisplayValue: `max: ${formatMaximumTemperature(options.maximumCelsius, options.unit)}`,
     };
 }
 
@@ -39,4 +40,13 @@ export function resolveTemperatureUnit(value: unknown): TemperatureUnit {
 
 function convertCelsiusToFahrenheit(celsius: number): number {
     return celsius * 9 / 5 + 32;
+}
+
+function formatMaximumTemperature(maximumCelsius: number, unit: TemperatureUnit): string {
+    const maximumTemperature = unit === "fahrenheit"
+        ? convertCelsiusToFahrenheit(maximumCelsius)
+        : maximumCelsius;
+    const unitText = unit === "fahrenheit" ? "°F" : "°C";
+
+    return `${maximumTemperature.toFixed(0)} ${unitText}`;
 }

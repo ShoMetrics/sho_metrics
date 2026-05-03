@@ -1,6 +1,7 @@
-import streamDeck from "@elgato/streamdeck";
+import { execFile, type ExecFileException } from "node:child_process";
 import si, { type Systeminformation } from "systeminformation";
 import type { IMetricSource, IMetricSnapshot, IMetricValue } from "./source.interface";
+import { logger } from "../../logging/logger";
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../network-interfaces";
 import { getNetworkAggregateMetricKey, getNetworkInterfaceMetricKey, type NetworkDirection } from "../network-metric-keys";
 import { diskVolumeRegistry, type DiskStorageKind, type DiskVolumeOption } from "../disk-volumes";
@@ -9,6 +10,45 @@ import {
     getDiskThroughputMetricKey,
     getDiskVolumeMetricKey,
 } from "../disk-metric-keys";
+
+const log = logger.for("Source:Builtin");
+const networkLog = logger.for("Source:Builtin:Network");
+const gpuLog = logger.for("Source:Builtin:GPU");
+
+type BuiltinSystemInformationClient = Omit<typeof si, "cpuCurrentSpeed">;
+
+const {
+    // Do not use. systeminformation v5 documents this as unreliable on Windows
+    // and macOS, and it caused multi-second polling stalls here. Use one-shot
+    // cpu().speed for static base frequency, or display no frequency.
+    cpuCurrentSpeed: blockedCpuCurrentSpeed,
+    ...rawSystemInformation
+}: typeof si = si;
+
+void blockedCpuCurrentSpeed;
+
+const systemInformation: BuiltinSystemInformationClient = rawSystemInformation;
+let lastNvidiaSmiFailureLogTimestampMilliseconds = 0;
+let nextGpuPollDebugSequence = 1;
+let nextNvidiaSmiQueryDebugSequence = 1;
+let activeNvidiaSmiQueryCount = 0;
+
+const NVIDIA_SMI_QUERY_FIELDS = [
+    "utilization.gpu",
+    "temperature.gpu",
+    "memory.used",
+    "memory.total",
+    "power.draw",
+    "power.limit",
+] as const;
+
+const NVIDIA_SMI_ARGUMENTS = [
+    `--query-gpu=${NVIDIA_SMI_QUERY_FIELDS.join(",")}`,
+    "--format=csv,noheader,nounits",
+] as const;
+
+const NVIDIA_SMI_TIMEOUT_MS = 1500;
+const NVIDIA_SMI_FAILURE_LOG_INTERVAL_MS = 30000;
 
 /**
  * Built-in metric source using the `systeminformation` npm package.
@@ -19,13 +59,21 @@ export class BuiltinSource implements IMetricSource {
 
     private lastNetworkStatsByInterface = new Map<string, NetworkCounterSample>();
     private lastNetworkPollDebugLogTimestampMilliseconds = 0;
-    private cachedGpuData: Systeminformation.GraphicsControllerData | null = null;
+    private cachedGpuData: GpuTelemetryData | null = null;
     private cachedGpuTimestampMilliseconds = 0;
-    private pendingGpuPromise: Promise<Systeminformation.GraphicsControllerData | null> | null = null;
+    private pendingGpuPromise: Promise<GpuTelemetryData | null> | null = null;
+    private cachedCpuBaseFrequencyGigahertz: number | null = null;
+    private pendingCpuBaseFrequencyPromise: Promise<void> | null = null;
+    private hasAttemptedCpuBaseFrequencyPoll = false;
+    private gpuConsecutiveTimeouts = 0;
+    private nextGpuPollAllowedTimestampMilliseconds = 0;
+    private lastGpuTimeoutWarningTimestampMilliseconds = 0;
 
     private static readonly GPU_CACHE_MS = 1000;
-    private static readonly GPU_POLL_TIMEOUT_MS = 750;
+    private static readonly GPU_POLL_TIMEOUT_MS = 1800;
     private static readonly NETWORK_DEBUG_LOG_INTERVAL_MS = 5000;
+    private static readonly GPU_TIMEOUT_WARNING_INTERVAL_MS = 10000;
+    private static readonly GPU_BACKOFF_STEPS_MS = [2000, 5000, 10000, 30000] as const;
 
     async poll(): Promise<IMetricSnapshot> {
         return this.pollMetrics([]);
@@ -87,7 +135,7 @@ export class BuiltinSource implements IMetricSource {
 
     private async pollMemory(): Promise<Record<string, IMetricValue>> {
         try {
-            const memoryData = await si.mem();
+            const memoryData = await systemInformation.mem();
 
             return {
                 "ram.used": {
@@ -100,7 +148,7 @@ export class BuiltinSource implements IMetricSource {
                 },
             };
         } catch (error) {
-            streamDeck.logger.error(`[BuiltinSource] Memory poll error: ${String(error)}`);
+            log.error(() => `Memory poll error: ${String(error)}`);
             return {};
         }
     }
@@ -109,7 +157,7 @@ export class BuiltinSource implements IMetricSource {
         try {
             return await this.pollDisk(metricKeys);
         } catch (error) {
-            streamDeck.logger.error(`[BuiltinSource] Disk poll error: ${String(error)}`);
+            log.error(() => `Disk poll error: ${String(error)}`);
             return {};
         }
     }
@@ -137,13 +185,13 @@ export class BuiltinSource implements IMetricSource {
     private async pollDiskUsage(): Promise<Record<string, IMetricValue>> {
         const metrics: Record<string, IMetricValue> = {};
         const [fileSystems, blockDevices, diskLayout] = await Promise.all([
-            si.fsSize(),
-            si.blockDevices().catch(error => {
-                streamDeck.logger.warn(`[BuiltinSource] Block device poll error: ${String(error)}`);
+            systemInformation.fsSize(),
+            systemInformation.blockDevices().catch(error => {
+                log.warn(() => `Block device poll error: ${String(error)}`);
                 return [] as Systeminformation.BlockDevicesData[];
             }),
-            si.diskLayout().catch(error => {
-                streamDeck.logger.warn(`[BuiltinSource] Disk layout poll error: ${String(error)}`);
+            systemInformation.diskLayout().catch(error => {
+                log.warn(() => `Disk layout poll error: ${String(error)}`);
                 return [] as Systeminformation.DiskLayoutData[];
             }),
         ]);
@@ -178,7 +226,7 @@ export class BuiltinSource implements IMetricSource {
     }
 
     private async pollDiskThroughput(): Promise<Record<string, IMetricValue>> {
-        const fileSystemStats = await si.fsStats();
+        const fileSystemStats = await systemInformation.fsStats();
 
         return {
             [getDiskThroughputMetricKey("read")]: {
@@ -198,39 +246,73 @@ export class BuiltinSource implements IMetricSource {
 
     private async pollCpu(): Promise<Record<string, IMetricValue>> {
         try {
-            const load = await si.currentLoad();
-
-            return {
+            const load = await systemInformation.currentLoad();
+            const metrics: Record<string, IMetricValue> = {
                 "cpu.usage_percent": {
                     scalar: load.currentLoad,
                     unit: "%",
                     progress: Math.min(Math.max(load.currentLoad / 100, 0), 1),
                 },
             };
+
+            if (this.cachedCpuBaseFrequencyGigahertz != null) {
+                metrics["cpu.base_frequency"] = {
+                    scalar: this.cachedCpuBaseFrequencyGigahertz,
+                    unit: "GHz",
+                };
+            }
+
+            this.ensureCpuBaseFrequencyCached();
+
+            return metrics;
         } catch (error) {
-            streamDeck.logger.error(`[BuiltinSource] CPU poll error: ${String(error)}`);
+            log.error(() => `CPU poll error: ${String(error)}`);
             return {};
         }
+    }
+
+    private ensureCpuBaseFrequencyCached(): void {
+        if (
+            this.cachedCpuBaseFrequencyGigahertz != null
+            || this.pendingCpuBaseFrequencyPromise
+            || this.hasAttemptedCpuBaseFrequencyPoll
+        ) {
+            return;
+        }
+
+        this.hasAttemptedCpuBaseFrequencyPoll = true;
+        this.pendingCpuBaseFrequencyPromise = systemInformation.cpu()
+            .then(cpuData => {
+                if (isFinitePositiveNumber(cpuData.speed)) {
+                    this.cachedCpuBaseFrequencyGigahertz = cpuData.speed;
+                }
+            })
+            .catch(error => {
+                log.warn(() => `CPU base frequency poll error: ${String(error)}`);
+            })
+            .finally(() => {
+                this.pendingCpuBaseFrequencyPromise = null;
+            });
     }
 
     private async pollNetworkSafely(): Promise<Record<string, IMetricValue>> {
         try {
             return await this.pollNetwork();
         } catch (error) {
-            streamDeck.logger.error(`[BuiltinSource] Network poll error: ${String(error)}`);
+            networkLog.error(() => `Network poll error: ${String(error)}`);
             return {};
         }
     }
 
     private async pollNetwork(): Promise<Record<string, IMetricValue>> {
         const metrics: Record<string, IMetricValue> = {};
-        const networkInterfaces = await si.networkInterfaces();
+        const networkInterfaces = await systemInformation.networkInterfaces();
         const usableNetworkInterfaces = Array.isArray(networkInterfaces)
             ? networkInterfaces.filter(isUsableNetworkInterface)
             : [];
         const interfaceOptions = usableNetworkInterfaces.map(toNetworkInterfaceOption);
         const usableInterfaceIds = new Set(interfaceOptions.map((networkInterface) => networkInterface.id));
-        const networkStats = await si.networkStats("*");
+        const networkStats = await systemInformation.networkStats("*");
         const currentTimestampMilliseconds = Date.now();
         let aggregateDownloadBytesPerSecond = 0;
         let aggregateUploadBytesPerSecond = 0;
@@ -355,8 +437,7 @@ export class BuiltinSource implements IMetricSource {
 
         this.lastNetworkPollDebugLogTimestampMilliseconds = options.currentTimestampMilliseconds;
 
-        streamDeck.logger.debug([
-            "[BuiltinSource][NetworkPoll]",
+        networkLog.trace(() => [
             `reason=${shouldLogSuspiciousZero ? "suspicious-zero" : "periodic"}`,
             `usable=${JSON.stringify(options.interfaceOptions.map(formatNetworkInterfaceOptionDebug))}`,
             `stats=${JSON.stringify(options.networkStats.map(formatNetworkStatDebug))}`,
@@ -367,33 +448,37 @@ export class BuiltinSource implements IMetricSource {
         ].join(" "));
     }
 
-    private async pollGpu(): Promise<Systeminformation.GraphicsControllerData | null> {
+    private async pollGpu(): Promise<GpuTelemetryData | null> {
         const currentTimestampMilliseconds = Date.now();
 
         if (this.cachedGpuData && (currentTimestampMilliseconds - this.cachedGpuTimestampMilliseconds) < BuiltinSource.GPU_CACHE_MS) {
+            gpuLog.trace(() => [
+                "cacheHit",
+                `cacheAgeMs=${currentTimestampMilliseconds - this.cachedGpuTimestampMilliseconds}`,
+            ].join(" "));
             return this.cachedGpuData;
         }
 
         if (this.pendingGpuPromise) {
+            gpuLog.trace("pendingReuse");
             return this.pendingGpuPromise;
         }
 
         this.pendingGpuPromise = (async () => {
             try {
-                const graphicsData = await si.graphics();
-                const nvidiaController = graphicsData.controllers.find(graphicsController =>
-                    graphicsController.vendor.toLowerCase().includes("nvidia") &&
-                    (typeof graphicsController.utilizationGpu === "number" || typeof graphicsController.temperatureGpu === "number")
-                );
+                const gpuData = process.platform === "win32"
+                    ? await pollWindowsNvidiaGpuTelemetry()
+                    : await pollSystemInformationGpuTelemetry();
 
-                if (nvidiaController) {
-                    this.cachedGpuData = nvidiaController;
+                if (gpuData) {
+                    this.cachedGpuData = gpuData;
                     this.cachedGpuTimestampMilliseconds = Date.now();
-                    return nvidiaController;
+                    return gpuData;
                 }
+
                 return null;
             } catch (error) {
-                streamDeck.logger.error(`[BuiltinSource] GPU poll error: ${String(error)}`);
+                gpuLog.error(() => `GPU poll error: ${String(error)}`);
                 return null;
             } finally {
                 this.pendingGpuPromise = null;
@@ -403,21 +488,113 @@ export class BuiltinSource implements IMetricSource {
         return this.pendingGpuPromise;
     }
 
-    private async pollGpuWithTimeout(): Promise<Systeminformation.GraphicsControllerData | null> {
-        const timeoutPromise = new Promise<Systeminformation.GraphicsControllerData | null>((resolve) => {
-            setTimeout(() => {
-                streamDeck.logger.warn("[BuiltinSource] GPU poll exceeded timeout; reusing cached GPU data when available");
-                resolve(this.cachedGpuData);
+    private async pollGpuWithTimeout(): Promise<GpuTelemetryData | null> {
+        const currentTimestampMilliseconds = Date.now();
+
+        if (currentTimestampMilliseconds < this.nextGpuPollAllowedTimestampMilliseconds) {
+            gpuLog.trace(() => [
+                "skippedBackoff",
+                `remainingMs=${this.nextGpuPollAllowedTimestampMilliseconds - currentTimestampMilliseconds}`,
+                `timeoutCount=${this.gpuConsecutiveTimeouts}`,
+            ].join(" "));
+            return null;
+        }
+
+        const pollSequence = nextGpuPollDebugSequence++;
+        const pollStartTimestampMilliseconds = Date.now();
+        gpuLog.trace(() => [
+            "sourceStart",
+            `pollId=${pollSequence}`,
+            `timeoutMs=${BuiltinSource.GPU_POLL_TIMEOUT_MS}`,
+            `activeNvidiaSmiQueries=${activeNvidiaSmiQueryCount}`,
+        ].join(" "));
+
+        let timeoutId: NodeJS.Timeout | null = null;
+        const timeoutPromise = new Promise<GpuTelemetryData | null>((resolve) => {
+            timeoutId = setTimeout(() => {
+                const elapsedMilliseconds = Date.now() - pollStartTimestampMilliseconds;
+                gpuLog.trace(() => [
+                    "sourceTimeout",
+                    `pollId=${pollSequence}`,
+                    `elapsedMs=${elapsedMilliseconds}`,
+                    `timeoutMs=${BuiltinSource.GPU_POLL_TIMEOUT_MS}`,
+                    `timerDelayMs=${Math.max(0, elapsedMilliseconds - BuiltinSource.GPU_POLL_TIMEOUT_MS)}`,
+                    `activeNvidiaSmiQueries=${activeNvidiaSmiQueryCount}`,
+                ].join(" "));
+                this.recordGpuPollTimeout();
+                resolve(null);
             }, BuiltinSource.GPU_POLL_TIMEOUT_MS);
         });
 
-        return Promise.race([this.pollGpu(), timeoutPromise]);
+        const gpuData = await Promise.race([this.pollGpu(), timeoutPromise]);
+
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+
+        if (gpuData && Date.now() < this.nextGpuPollAllowedTimestampMilliseconds) {
+            return gpuData;
+        }
+
+        if (gpuData) {
+            this.gpuConsecutiveTimeouts = 0;
+            this.nextGpuPollAllowedTimestampMilliseconds = 0;
+            gpuLog.trace(() => [
+                "sourceSuccess",
+                `pollId=${pollSequence}`,
+                `elapsedMs=${Date.now() - pollStartTimestampMilliseconds}`,
+            ].join(" "));
+            return gpuData;
+        }
+
+        gpuLog.trace(() => [
+            "sourceNoData",
+            `pollId=${pollSequence}`,
+            `elapsedMs=${Date.now() - pollStartTimestampMilliseconds}`,
+        ].join(" "));
+        return null;
+    }
+
+    private recordGpuPollTimeout(): void {
+        const currentTimestampMilliseconds = Date.now();
+        const backoffIndex = Math.min(
+            this.gpuConsecutiveTimeouts,
+            BuiltinSource.GPU_BACKOFF_STEPS_MS.length - 1,
+        );
+        const backoffMilliseconds = BuiltinSource.GPU_BACKOFF_STEPS_MS[backoffIndex];
+
+        this.gpuConsecutiveTimeouts += 1;
+        this.nextGpuPollAllowedTimestampMilliseconds = currentTimestampMilliseconds + backoffMilliseconds;
+
+        if (
+            currentTimestampMilliseconds - this.lastGpuTimeoutWarningTimestampMilliseconds
+            < BuiltinSource.GPU_TIMEOUT_WARNING_INTERVAL_MS
+        ) {
+            return;
+        }
+
+        this.lastGpuTimeoutWarningTimestampMilliseconds = currentTimestampMilliseconds;
+        gpuLog.warn(() => [
+            "GPU poll exceeded timeout; suppressing stale GPU metrics",
+            `timeoutMs=${BuiltinSource.GPU_POLL_TIMEOUT_MS}`,
+            `timeoutCount=${this.gpuConsecutiveTimeouts}`,
+            `backoffMs=${backoffMilliseconds}`,
+        ].join(" "));
     }
 }
 
 interface NetworkCounterSample {
     bytes: number;
     timestampMilliseconds: number;
+}
+
+interface GpuTelemetryData {
+    utilizationGpu?: number;
+    temperatureGpu?: number;
+    memoryUsed?: number;
+    memoryTotal?: number;
+    powerDraw?: number;
+    powerLimit?: number;
 }
 
 interface NetworkRateCalculation {
@@ -592,6 +769,166 @@ function resolveMetricGroups(metricKeys: readonly string[]): Set<MetricGroup> {
     return metricGroups;
 }
 
+async function pollWindowsNvidiaGpuTelemetry(): Promise<GpuTelemetryData | null> {
+    const output = await runNvidiaSmiTelemetryQuery();
+
+    if (!output) {
+        gpuLog.trace("nvidiaSmiEmptyOutput");
+        return null;
+    }
+
+    const firstGpuLine = output
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .find(line => line.length > 0);
+
+    if (!firstGpuLine) {
+        gpuLog.trace("nvidiaSmiNoDataLine");
+        return null;
+    }
+
+    const fields = firstGpuLine.split(",").map(field => field.trim());
+    const utilizationGpu = parseNvidiaSmiNumber(fields[0]);
+    const temperatureGpu = parseNvidiaSmiNumber(fields[1]);
+    const memoryUsed = parseNvidiaSmiNumber(fields[2]);
+    const memoryTotal = parseNvidiaSmiNumber(fields[3]);
+    const powerDraw = parseNvidiaSmiNumber(fields[4]);
+    const powerLimit = parseNvidiaSmiNumber(fields[5]);
+
+    if (
+        utilizationGpu == null
+        && temperatureGpu == null
+        && memoryUsed == null
+        && memoryTotal == null
+        && powerDraw == null
+        && powerLimit == null
+    ) {
+        gpuLog.trace(() => [
+            "nvidiaSmiNoParsedFields",
+            `raw=${firstGpuLine}`,
+        ].join(" "));
+        return null;
+    }
+
+    return {
+        utilizationGpu,
+        temperatureGpu,
+        memoryUsed,
+        memoryTotal,
+        powerDraw,
+        powerLimit,
+    };
+}
+
+async function pollSystemInformationGpuTelemetry(): Promise<GpuTelemetryData | null> {
+    const graphicsData = await systemInformation.graphics();
+    const nvidiaController = graphicsData.controllers.find(graphicsController =>
+        graphicsController.vendor.toLowerCase().includes("nvidia") &&
+        (typeof graphicsController.utilizationGpu === "number" || typeof graphicsController.temperatureGpu === "number")
+    );
+
+    if (!nvidiaController) {
+        return null;
+    }
+
+    return {
+        utilizationGpu: nvidiaController.utilizationGpu,
+        temperatureGpu: nvidiaController.temperatureGpu,
+        memoryUsed: nvidiaController.memoryUsed,
+        memoryTotal: nvidiaController.memoryTotal,
+        powerDraw: nvidiaController.powerDraw,
+        powerLimit: nvidiaController.powerLimit,
+    };
+}
+
+function runNvidiaSmiTelemetryQuery(): Promise<string | null> {
+    return new Promise(resolve => {
+        const queryStartTimestampMilliseconds = Date.now();
+        const querySequence = nextNvidiaSmiQueryDebugSequence++;
+        activeNvidiaSmiQueryCount += 1;
+        gpuLog.trace(() => [
+            "nvidiaSmiStart",
+            `queryId=${querySequence}`,
+            `timeoutMs=${NVIDIA_SMI_TIMEOUT_MS}`,
+            `activeNvidiaSmiQueries=${activeNvidiaSmiQueryCount}`,
+        ].join(" "));
+
+        execFile(
+            "nvidia-smi",
+            [...NVIDIA_SMI_ARGUMENTS],
+            {
+                timeout: NVIDIA_SMI_TIMEOUT_MS,
+                windowsHide: true,
+                maxBuffer: 32 * 1024,
+            },
+            (error: ExecFileException | null, stdout: string) => {
+                const elapsedMilliseconds = Date.now() - queryStartTimestampMilliseconds;
+                activeNvidiaSmiQueryCount = Math.max(0, activeNvidiaSmiQueryCount - 1);
+
+                if (error) {
+                    logNvidiaSmiFailure({
+                        error,
+                        elapsedMilliseconds,
+                        querySequence,
+                    });
+                    resolve(null);
+                    return;
+                }
+
+                gpuLog.trace(() => [
+                    elapsedMilliseconds > 250 ? "nvidiaSmiSlowSuccess" : "nvidiaSmiSuccess",
+                    `queryId=${querySequence}`,
+                    `elapsedMs=${elapsedMilliseconds}`,
+                    `timeoutMs=${NVIDIA_SMI_TIMEOUT_MS}`,
+                    `timerDelayMs=${Math.max(0, elapsedMilliseconds - NVIDIA_SMI_TIMEOUT_MS)}`,
+                    `stdoutBytes=${stdout.length}`,
+                    `activeNvidiaSmiQueries=${activeNvidiaSmiQueryCount}`,
+                ].join(" "));
+
+                resolve(stdout);
+            },
+        );
+    });
+}
+
+function logNvidiaSmiFailure(options: {
+    error: ExecFileException;
+    elapsedMilliseconds: number;
+    querySequence: number;
+}): void {
+    const currentTimestampMilliseconds = Date.now();
+
+    if (
+        currentTimestampMilliseconds - lastNvidiaSmiFailureLogTimestampMilliseconds
+        < NVIDIA_SMI_FAILURE_LOG_INTERVAL_MS
+    ) {
+        return;
+    }
+
+    lastNvidiaSmiFailureLogTimestampMilliseconds = currentTimestampMilliseconds;
+    gpuLog.warn(() => [
+        "nvidia-smi GPU telemetry query failed",
+        `queryId=${options.querySequence}`,
+        `elapsedMs=${options.elapsedMilliseconds}`,
+        `timeoutMs=${NVIDIA_SMI_TIMEOUT_MS}`,
+        `timerDelayMs=${Math.max(0, options.elapsedMilliseconds - NVIDIA_SMI_TIMEOUT_MS)}`,
+        `code=${String(options.error.code ?? "unknown")}`,
+        `signal=${String(options.error.signal ?? "none")}`,
+        `activeNvidiaSmiQueries=${activeNvidiaSmiQueryCount}`,
+        `message=${options.error.message}`,
+    ].join(" "));
+}
+
+function parseNvidiaSmiNumber(value: string | undefined): number | undefined {
+    if (!value || value.toUpperCase() === "N/A") {
+        return undefined;
+    }
+
+    const numericValue = Number(value);
+
+    return Number.isFinite(numericValue) ? numericValue : undefined;
+}
+
 function isUsableFileSystem(fileSystem: Systeminformation.FsSizeData): boolean {
     return fileSystem.size > 0
         && fileSystem.mount.length > 0
@@ -680,6 +1017,10 @@ function calculatePercent(value: number, total: number): number {
 
 function normalizeNullableRate(value: number | null): number {
     return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function isFinitePositiveNumber(value: number | undefined): value is number {
+    return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
 type MetricGroup = "cpu" | "memory" | "disk" | "network" | "gpu";

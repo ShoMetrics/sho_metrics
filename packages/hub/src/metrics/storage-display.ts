@@ -14,6 +14,10 @@ export function buildMemoryUsageWidgetData(options: {
     label: string;
 }): WidgetData {
     const safeTotalBytes = Math.max(options.totalBytes, 1);
+    const usedAndTotalText = formatUsedAndTotalBytes({
+        usedBytes: options.usedBytesWidgetData.current,
+        totalBytes: safeTotalBytes,
+    });
 
     return {
         current: (options.usedBytesWidgetData.current / safeTotalBytes) * 100,
@@ -21,6 +25,8 @@ export function buildMemoryUsageWidgetData(options: {
         history: options.usedBytesWidgetData.history.map(historyValue => (historyValue / safeTotalBytes) * 100),
         unit: "%",
         label: options.label,
+        displayValue: ((options.usedBytesWidgetData.current / safeTotalBytes) * 100).toFixed(0),
+        secondaryDisplayValue: usedAndTotalText,
         sampleTimestampMilliseconds: options.usedBytesWidgetData.sampleTimestampMilliseconds,
     };
 }
@@ -31,6 +37,7 @@ export function buildDiskUsageWidgetData(options: {
     availableBytes: number;
     displayMode: DiskUsageDisplayMode;
     label: string;
+    linearLabel?: string;
 }): WidgetData {
     const percentageWidgetData = buildMemoryUsageWidgetData({
         usedBytesWidgetData: options.usedBytesWidgetData,
@@ -39,7 +46,10 @@ export function buildDiskUsageWidgetData(options: {
     });
 
     if (options.displayMode === "percentage") {
-        return percentageWidgetData;
+        return {
+            ...percentageWidgetData,
+            linearLabel: options.linearLabel,
+        };
     }
 
     const formattedAvailableSpace = formatDiskAvailableSpace({
@@ -51,6 +61,9 @@ export function buildDiskUsageWidgetData(options: {
         ...percentageWidgetData,
         displayValue: formattedAvailableSpace.value,
         unit: formattedAvailableSpace.unit,
+        linearLabel: options.linearLabel,
+        linearDisplayValue: percentageWidgetData.current.toFixed(0),
+        linearUnit: "%",
     };
 }
 
@@ -96,4 +109,31 @@ function formatDiskAvailableSpace(options: {
     });
 
     return formattedSpace;
+}
+
+function formatUsedAndTotalBytes(options: {
+    usedBytes: number;
+    totalBytes: number;
+}): string {
+    const formattedUsedBytes = formatBytes({
+        bytes: options.usedBytes,
+        base: BINARY_BASE,
+        maximumDisplayDigits: MAXIMUM_SPACE_DISPLAY_DIGITS,
+        minimumUnitIndex: resolveMinimumSpaceUnitIndex(options.totalBytes),
+    });
+    const formattedTotalBytes = formatBytes({
+        bytes: options.totalBytes,
+        base: BINARY_BASE,
+        maximumDisplayDigits: MAXIMUM_SPACE_DISPLAY_DIGITS,
+        minimumUnitIndex: resolveMinimumSpaceUnitIndex(options.totalBytes),
+    });
+    const usedText = formattedUsedBytes.unit === formattedTotalBytes.unit
+        ? formattedUsedBytes.value
+        : `${formattedUsedBytes.value} ${formattedUsedBytes.unit}`;
+
+    return `${usedText} / ${formattedTotalBytes.value} ${formattedTotalBytes.unit}`;
+}
+
+function resolveMinimumSpaceUnitIndex(totalBytes: number): number {
+    return totalBytes >= BINARY_BASE ** 4 ? 4 : 3;
 }

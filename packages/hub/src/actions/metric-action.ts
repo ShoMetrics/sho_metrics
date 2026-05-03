@@ -1,5 +1,6 @@
 import { SingletonAction, WillAppearEvent, WillDisappearEvent, DidReceiveSettingsEvent } from "@elgato/streamdeck";
 import { scheduler } from "../runtime/scheduler";
+import { clearSingleMetricDisplayState } from "./single-metric-display";
 
 type MetricActionSettings = Record<string, unknown>;
 
@@ -40,6 +41,7 @@ export abstract class MetricAction extends SingletonAction {
         this.activeMetricActions.get(event.action.id)?.cleanup();
         this.activeMetricActions.delete(event.action.id);
         this.activeEvents.delete(event.action.id);
+        clearSingleMetricDisplayState(event.action.id);
     }
 
     /**

@@ -1,8 +1,8 @@
 import { action, WillAppearEvent } from "@elgato/streamdeck";
-import streamDeck from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import { metricStore } from "../runtime/metric-store";
 import { setSingleMetricDisplay } from "./single-metric-display";
+import { logger } from "../logging/logger";
 import type { WidgetData } from "../rendering/widget-data";
 import type { SettingValue } from "./metric-visual-settings";
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../runtime/network-interfaces";
@@ -19,6 +19,8 @@ import {
     renderNetworkInterfaceIconFragment,
 } from "../widgets/icons/catalog/network";
 
+const log = logger.for("Action:NetSpeed");
+
 /**
  * Network Speed action.
  * A circle visual fits one-way single-value data. Download or upload speed can
@@ -26,12 +28,22 @@ import {
  */
 @action({ UUID: "com.ez.sho-metrics.net-speed" })
 export class NetSpeed extends MetricAction {
-    private lastDebugLogTimestampMilliseconds = 0;
-
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
         const settings = event.payload.settings as NetworkSpeedSettings;
         const direction = normalizeNetworkDirection(settings.networkDirection);
         const selectedNetworkInterface = resolveNetworkInterface(settings.networkInterfaceId);
+
+        if (settings.graphicType === "linear") {
+            return selectedNetworkInterface
+                ? [
+                    getNetworkInterfaceMetricKey("upload", selectedNetworkInterface.id),
+                    getNetworkInterfaceMetricKey("download", selectedNetworkInterface.id),
+                ]
+                : [
+                    getNetworkAggregateMetricKey("upload"),
+                    getNetworkAggregateMetricKey("download"),
+                ];
+        }
 
         return [
             selectedNetworkInterface
@@ -50,6 +62,16 @@ export class NetSpeed extends MetricAction {
             : getNetworkAggregateMetricKey(direction);
 
         publishNetworkInterfaceOptions(event, settings);
+
+        if (settings.graphicType === "linear") {
+            this.updateLinearNetworkDisplay({
+                event,
+                settings,
+                selectedNetworkInterface,
+                isAutomaticNetworkInterface,
+            });
+            return;
+        }
 
         const rawWidgetData = metricStore.getWidgetData(networkMetricKey, getNetworkDirectionLabel(direction), "B/s");
         const widgetData = buildNetworkWidgetData({
@@ -92,6 +114,94 @@ export class NetSpeed extends MetricAction {
         });
     }
 
+    private updateLinearNetworkDisplay(options: {
+        event: WillAppearEvent;
+        settings: NetworkSpeedSettings;
+        selectedNetworkInterface: NetworkInterfaceOption | null;
+        isAutomaticNetworkInterface: boolean;
+    }): void {
+        const uploadMetricKey = options.selectedNetworkInterface
+            ? getNetworkInterfaceMetricKey("upload", options.selectedNetworkInterface.id)
+            : getNetworkAggregateMetricKey("upload");
+        const downloadMetricKey = options.selectedNetworkInterface
+            ? getNetworkInterfaceMetricKey("download", options.selectedNetworkInterface.id)
+            : getNetworkAggregateMetricKey("download");
+        const uploadRawWidgetData = metricStore.getWidgetData(uploadMetricKey, "UP", "B/s");
+        const downloadRawWidgetData = metricStore.getWidgetData(downloadMetricKey, "DOWN", "B/s");
+        const uploadWidgetData = buildNetworkWidgetData({
+            rawWidgetData: uploadRawWidgetData,
+            direction: "upload",
+            settings: options.settings,
+            selectedNetworkInterface: options.selectedNetworkInterface,
+            isAutomaticNetworkInterface: options.isAutomaticNetworkInterface,
+        });
+        const downloadWidgetData = buildNetworkWidgetData({
+            rawWidgetData: downloadRawWidgetData,
+            direction: "download",
+            settings: options.settings,
+            selectedNetworkInterface: options.selectedNetworkInterface,
+            isAutomaticNetworkInterface: options.isAutomaticNetworkInterface,
+        });
+
+        setSingleMetricDisplay({
+            event: options.event,
+            metricKey: downloadMetricKey,
+            widgetData: {
+                current: downloadWidgetData.current,
+                progress: downloadWidgetData.progress,
+                history: downloadWidgetData.history,
+                unit: downloadWidgetData.unit,
+                label: "NET",
+                linearLabel: "Net Speed",
+                linearChannels: [
+                    {
+                        label: "UP",
+                        displayValue: uploadWidgetData.displayValue ?? uploadWidgetData.current.toFixed(0),
+                        unit: uploadWidgetData.unit,
+                        progress: uploadWidgetData.progress,
+                        color: resolveDirectionSolidColor("upload", options.settings),
+                        iconFragment: renderNetworkDirectionIconFragment({
+                            direction: "upload",
+                            color: resolveDirectionSolidColor("upload", options.settings),
+                            size: NETWORK_TOP_ICON_SIZE,
+                        }),
+                    },
+                    {
+                        label: "DOWN",
+                        displayValue: downloadWidgetData.displayValue ?? downloadWidgetData.current.toFixed(0),
+                        unit: downloadWidgetData.unit,
+                        progress: downloadWidgetData.progress,
+                        color: resolveDirectionSolidColor("download", options.settings),
+                        iconFragment: renderNetworkDirectionIconFragment({
+                            direction: "download",
+                            color: resolveDirectionSolidColor("download", options.settings),
+                            size: NETWORK_TOP_ICON_SIZE,
+                        }),
+                    },
+                ],
+                sampleTimestampMilliseconds: downloadWidgetData.sampleTimestampMilliseconds
+                    ?? uploadWidgetData.sampleTimestampMilliseconds,
+            },
+            centerIconFragment: buildNetworkCenterIconFragment({
+                circularCenterContent: "icon",
+                direction: "download",
+                selectedNetworkInterface: options.selectedNetworkInterface,
+            }),
+            linearIconFragment: renderNetworkInterfaceIconFragment({
+                networkInterface: options.selectedNetworkInterface,
+                size: NETWORK_CENTER_ICON_SIZE,
+            }),
+            statusIcon: getNetworkDirectionStatusIcon({
+                direction: "download",
+                color: NETWORK_DIRECTION_ICON_COLOR,
+            }),
+            visualSettingsOverride: {
+                colorMode: "solid",
+                solidColor: resolveDirectionSolidColor("download", options.settings),
+            },
+        });
+    }
+
     private logNetworkSpeedDebug(options: {
         settings: NetworkSpeedSettings;
         direction: NetworkDirection;
@@ -101,16 +211,7 @@ export class NetSpeed extends MetricAction {
         rawWidgetData: WidgetData;
         widgetData: WidgetData;
     }): void {
-        const currentTimestampMilliseconds = Date.now();
-
-        if (currentTimestampMilliseconds - this.lastDebugLogTimestampMilliseconds < DEBUG_LOG_INTERVAL_MILLISECONDS) {
-            return;
-        }
-
-        this.lastDebugLogTimestampMilliseconds = currentTimestampMilliseconds;
-
-        streamDeck.logger.debug([
-            "[NetSpeed]",
+        log.atTrace().everyMs("speed-sample", DEBUG_LOG_INTERVAL_MILLISECONDS).log(() => [
             `direction=${options.direction}`,
             `metricKey=${options.networkMetricKey}`,
             `selectedInterface=${formatNetworkInterfaceDebugValue(options.selectedNetworkInterface)}`,
@@ -130,6 +231,7 @@ export class NetSpeed extends MetricAction {
 }
 
 interface NetworkSpeedSettings {
+    graphicType?: SettingValue;
     networkDirection?: SettingValue;
     networkInterfaceId?: SettingValue;
     availableNetworkInterfaces?: SettingValue;
@@ -286,6 +388,6 @@ function publishNetworkInterfaceOptions(event: WillAppearEvent, settings: Networ
         ...settings,
         availableNetworkInterfaces,
     }).catch(error => {
-        streamDeck.logger.error(`[NetSpeed] Failed to publish network interfaces: ${String(error)}`);
+        log.error(() => `Failed to publish network interfaces: ${String(error)}`);
     });
 }

@@ -1,6 +1,8 @@
 import { Resvg } from "@resvg/resvg-js";
-import streamDeck from "@elgato/streamdeck";
 import type { KeySize } from "./widget-data";
+import { logger } from "../logging/logger";
+
+const log = logger.for("Rasterizer");
 
 /**
  * Rasterize an SVG string to a Base64-encoded PNG data URL.
@@ -16,7 +18,7 @@ export function rasterizeSvgToPngDataUrl(svgString: string, renderSize: KeySize)
         const base64 = Buffer.from(pngBuffer).toString("base64");
         return `data:image/png;base64,${base64}`;
     } catch (error) {
-        streamDeck.logger.error(`[Rasterizer] SVG render failed: ${error}`);
+        log.error(() => `SVG render failed: ${error}`);
         return "";
     }
 }
