@@ -17,6 +17,7 @@ interface DiskVolumeOption {
     mount: string;
     storageKind: string;
     diskName: string;
+    volumeLabel?: string;
     sizeBytes: number;
 }
 
@@ -51,7 +52,7 @@ function buildDiskVolumeOptions(value: SettingValue): SelectOption[] {
         { value: "", label: "Automatic" },
         ...parseDiskVolumeOptions(value).map((diskVolume) => ({
             value: diskVolume.id,
-            label: `${diskVolume.mount || diskVolume.fs} (${formatByteCount(diskVolume.sizeBytes)})`,
+            label: formatDiskVolumeOptionLabel(diskVolume),
         })),
     ];
 }
@@ -62,6 +63,36 @@ function parseNetworkInterfaceOptions(value: SettingValue): NetworkInterfaceOpti
 
 function parseDiskVolumeOptions(value: SettingValue): DiskVolumeOption[] {
     return parseJsonArray(value).filter(isDiskVolumeOption);
+}
+
+export function resolveSelectedDiskVolumeLabel(context: VisibilityContext): string {
+    const diskVolume = resolveSelectedDiskVolume(context);
+    const volumeLabel = diskVolume?.volumeLabel?.trim();
+
+    return volumeLabel && volumeLabel.length > 0 ? volumeLabel : "-";
+}
+
+export function resolveDiskAutoLinearLabel(context: VisibilityContext): string {
+    const diskVolume = resolveSelectedDiskVolume(context);
+
+    if (!diskVolume) {
+        return "Auto";
+    }
+
+    return `Auto: ${resolveCompactDiskStorageLabel(diskVolume)} (${formatDiskVolumeDisplayLabel(diskVolume)})`;
+}
+
+function resolveSelectedDiskVolume(context: VisibilityContext): DiskVolumeOption | null {
+    const diskVolumes = parseDiskVolumeOptions(context.settings.availableDiskVolumes);
+    const selectedDiskVolumeId = context.settings.diskVolumeId;
+
+    if (typeof selectedDiskVolumeId === "string" && selectedDiskVolumeId.length > 0) {
+        return diskVolumes.find(diskVolume => diskVolume.id === selectedDiskVolumeId) ?? null;
+    }
+
+    return diskVolumes.find(diskVolume => diskVolume.mount === "/" || /^[A-Z]:\\?$/i.test(diskVolume.mount))
+        ?? diskVolumes[0]
+        ?? null;
 }
 
 function parseJsonArray(value: SettingValue): Record<string, SettingValue>[] {
@@ -93,6 +124,60 @@ function isDiskVolumeOption(value: Record<string, SettingValue>): value is DiskV
         && typeof value.storageKind === "string"
         && typeof value.diskName === "string"
         && typeof value.sizeBytes === "number";
+}
+
+function formatDiskVolumeDisplayLabel(diskVolume: DiskVolumeOption): string {
+    const mountLabel = diskVolume.mount || diskVolume.fs || "DISK";
+
+    if (/^[A-Z]:\\?$/i.test(mountLabel)) {
+        return mountLabel.slice(0, 2).toUpperCase();
+    }
+
+    return mountLabel.slice(0, 4).toUpperCase();
+}
+
+function formatDiskVolumeOptionLabel(diskVolume: DiskVolumeOption): string {
+    const volumeLabel = diskVolume.volumeLabel?.trim();
+    const labelText = volumeLabel && volumeLabel.length > 0
+        ? `, ${volumeLabel}`
+        : "";
+
+    return `${formatDiskVolumeSelectionLabel(diskVolume)} (${formatByteCount(diskVolume.sizeBytes)}${labelText})`;
+}
+
+function formatDiskVolumeSelectionLabel(diskVolume: DiskVolumeOption): string {
+    const mountLabel = diskVolume.mount || diskVolume.fs || "Disk";
+    const windowsDriveMatch = /^([A-Z]):\\?$/i.exec(mountLabel);
+
+    if (windowsDriveMatch) {
+        return `${windowsDriveMatch[1].toUpperCase()}:`;
+    }
+
+    if (mountLabel === "/") {
+        return "/";
+    }
+
+    const pathParts = mountLabel.split(/[\\/]/).filter(pathPart => pathPart.length > 0);
+
+    return pathParts.length > 0
+        ? `/${pathParts[pathParts.length - 1]}`
+        : mountLabel;
+}
+
+function resolveCompactDiskStorageLabel(diskVolume: DiskVolumeOption): string {
+    if (diskVolume.storageKind === "ssd") {
+        return "SSD";
+    }
+
+    if (diskVolume.storageKind === "hdd") {
+        return "HDD";
+    }
+
+    if (diskVolume.storageKind === "network") {
+        return "NET";
+    }
+
+    return "DSK";
 }
 
 function isRecord(value: SettingValue | Record<string, SettingValue>): value is Record<string, SettingValue> {

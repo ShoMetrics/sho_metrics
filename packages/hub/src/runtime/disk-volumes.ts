@@ -1,4 +1,4 @@
-export type DiskStorageKind = "ssd" | "hdd" | "unknown";
+export type DiskStorageKind = "ssd" | "hdd" | "network" | "unknown";
 
 export interface DiskVolumeOption {
     id: string;
@@ -9,6 +9,7 @@ export interface DiskVolumeOption {
     availableBytes: number;
     storageKind: DiskStorageKind;
     diskName: string;
+    volumeLabel: string;
 }
 
 class DiskVolumeRegistry {

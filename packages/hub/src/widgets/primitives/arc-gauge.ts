@@ -1,8 +1,13 @@
 import type { WidgetData, KeySize } from "../../rendering/widget-data";
 import { resolveColor } from "../../rendering/color-resolver";
-import { adjustHexColorBrightness, clamp, escapeSvgText } from "../../rendering/svg-utils";
+import {
+    adjustHexColorBrightness,
+    clamp,
+    renderConstrainedSvgText,
+} from "../../rendering/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget.interface";
 import { assertArcGaugeLabel } from "./arc-gauge-label";
+import { renderMetricTextRow } from "./metric-text-row";
 
 type ArcGaugeCenterContent = "value" | "icon" | "icon-value-unit";
 
@@ -49,7 +54,6 @@ export const DEFAULT_ARC_GAUGE_CONFIG: ArcGaugeConfig = {
 const ARC_LAYOUT = {
     outerMargin: 7,
     minimumRadius: 20,
-    valueUnitGap: 5,
     label: {
         fontSize: 23,
         yOffset: -28,
@@ -66,14 +70,14 @@ const ARC_LAYOUT = {
     value: {
         fontSize: 48,
         yOffset: 12,
-        averageDigitWidthRatio: 0.56,
     },
     unit: {
         fontSize: 19,
         yOffset: 40,
-        averageLetterWidthRatio: 0.58,
     },
 } as const;
+
+const ARC_TEXT_FONT_FAMILY = "'Inter','SF Pro Display','Segoe UI',sans-serif";
 
 interface ArcGaugeGeometry {
     centerXCoordinate: number;
@@ -137,16 +141,8 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
             : 0;
         const valueCenterYCoordinate = centerYCoordinate + ARC_LAYOUT.value.yOffset + valueOpticalYOffset;
         const unitText = data.unit;
-
-        // SVG fragments are composed before resvg performs text layout, so exact text
-        // measurement is unavailable here. The ratios below are tuned for Inter/SF/Segoe
-        // on the 144x144 logical canvas and keep a max 4-digit value plus unit centered
-        // against other percent gauges.
-        const valueTextWidth = valueText.length * valueFontSize * ARC_LAYOUT.value.averageDigitWidthRatio;
-        const unitTextWidth = unitText.length * unitFontSize * ARC_LAYOUT.unit.averageLetterWidthRatio;
-        const valueGroupWidth = valueTextWidth + ARC_LAYOUT.valueUnitGap + unitTextWidth;
-        const valueXCoordinate = centerXCoordinate - valueGroupWidth / 2 + valueTextWidth / 2;
-        const unitXCoordinate = centerXCoordinate - valueGroupWidth / 2 + valueTextWidth + ARC_LAYOUT.valueUnitGap;
+        const labelMaxWidth = Math.max(24, radius * 1.55);
+        const centerTextMaxWidth = Math.max(24, radius * 1.58);
         const centerContentFragment = renderCenterContent({
             centerContent: config.centerContent,
             centerIconFragment: config.centerIconFragment,
@@ -157,13 +153,13 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
             labelYCoordinate,
             labelFontSize,
             labelText: data.label,
-            valueXCoordinate,
+            labelMaxWidth,
             valueCenterYCoordinate,
             valueFontSize,
             valueText,
-            unitXCoordinate,
             unitFontSize,
             unitText,
+            centerTextMaxWidth,
             config,
         });
 
@@ -198,13 +194,13 @@ function renderCenterContent(options: {
     labelYCoordinate: number;
     labelFontSize: number;
     labelText: string;
-    valueXCoordinate: number;
+    labelMaxWidth: number;
     valueCenterYCoordinate: number;
     valueFontSize: number;
     valueText: string;
-    unitXCoordinate: number;
     unitFontSize: number;
     unitText: string;
+    centerTextMaxWidth: number;
     config: ArcGaugeConfig;
 }): string {
     if (options.centerContent === "icon") {
@@ -342,31 +338,47 @@ function renderCenterValue(options: {
     labelYCoordinate: number;
     labelFontSize: number;
     labelText: string;
-    valueXCoordinate: number;
+    labelMaxWidth: number;
     valueCenterYCoordinate: number;
     valueFontSize: number;
     valueText: string;
-    unitXCoordinate: number;
     unitFontSize: number;
     unitText: string;
+    centerTextMaxWidth: number;
     config: ArcGaugeConfig;
 }): string {
     assertArcGaugeLabel(options.labelText);
 
     return `
-        <text x="${options.centerXCoordinate}" y="${options.labelYCoordinate}" text-anchor="middle"
-            font-family="'Inter','SF Pro Display','Segoe UI',sans-serif"
-            dominant-baseline="middle"
-            font-size="${options.labelFontSize}" font-weight="800" fill="${options.config.labelTextColor}">${escapeSvgText(options.labelText)}</text>
-        <text x="${options.valueXCoordinate}" y="${options.valueCenterYCoordinate}" text-anchor="middle"
-            dominant-baseline="middle"
-            font-family="'Inter','SF Pro Display','Segoe UI',sans-serif"
-            font-variant-numeric="tabular-nums"
-            font-size="${options.valueFontSize}" font-weight="900" fill="${options.config.valueTextColor}">${escapeSvgText(options.valueText)}</text>
-        <text x="${options.unitXCoordinate}" y="${options.valueCenterYCoordinate}" text-anchor="start"
-            dominant-baseline="middle"
-            font-family="'Inter','SF Pro Display','Segoe UI',sans-serif"
-            font-size="${options.unitFontSize}" font-weight="800" fill="${options.config.unitTextColor}">${escapeSvgText(options.unitText)}</text>
+        ${renderConstrainedSvgText({
+            id: "arc-label",
+            text: options.labelText,
+            xCoordinate: options.centerXCoordinate,
+            yCoordinate: options.labelYCoordinate,
+            maxWidth: options.labelMaxWidth,
+            fontSize: options.labelFontSize,
+            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontWeight: 800,
+            fill: options.config.labelTextColor,
+            textAnchor: "middle",
+        })}
+        ${renderMetricTextRow({
+            id: "arc-value-unit",
+            valueText: options.valueText,
+            unitText: options.unitText,
+            xCoordinate: options.centerXCoordinate,
+            yCoordinate: options.valueCenterYCoordinate,
+            width: options.centerTextMaxWidth,
+            valueFontSize: options.valueFontSize,
+            unitFontSize: options.unitFontSize,
+            fontFamily: ARC_TEXT_FONT_FAMILY,
+            valueFontWeight: 900,
+            unitFontWeight: 800,
+            valueFill: options.config.valueTextColor,
+            unitFill: options.config.unitTextColor,
+            textAnchor: "middle",
+            valueExtraAttributes: ["font-variant-numeric=\"tabular-nums\""],
+        })}
     `;
 }
 
@@ -379,6 +391,7 @@ function renderIconValueUnit(options: {
     valueText: string;
     unitFontSize: number;
     unitText: string;
+    centerTextMaxWidth: number;
     config: ArcGaugeConfig;
 }): string {
     return `
@@ -387,14 +400,30 @@ function renderIconValueUnit(options: {
             options.centerXCoordinate,
             options.centerYCoordinate + ARC_LAYOUT.topIcon.yOffset,
         )}
-        <text x="${options.centerXCoordinate}" y="${options.valueCenterYCoordinate}" text-anchor="middle"
-            dominant-baseline="middle"
-            font-family="'Inter','SF Pro Display','Segoe UI',sans-serif"
-            font-variant-numeric="tabular-nums"
-            font-size="${options.valueFontSize}" font-weight="900" fill="${options.config.valueTextColor}">${escapeSvgText(options.valueText)}</text>
-        <text x="${options.centerXCoordinate}" y="${options.centerYCoordinate + ARC_LAYOUT.unit.yOffset}" text-anchor="middle"
-            dominant-baseline="middle"
-            font-family="'Inter','SF Pro Display','Segoe UI',sans-serif"
-            font-size="${options.unitFontSize}" font-weight="800" fill="${options.config.unitTextColor}">${escapeSvgText(options.unitText)}</text>
+        ${renderConstrainedSvgText({
+            id: "arc-icon-value",
+            text: options.valueText,
+            xCoordinate: options.centerXCoordinate,
+            yCoordinate: options.valueCenterYCoordinate,
+            maxWidth: options.centerTextMaxWidth,
+            fontSize: options.valueFontSize,
+            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontWeight: 900,
+            fill: options.config.valueTextColor,
+            textAnchor: "middle",
+            extraAttributes: ["font-variant-numeric=\"tabular-nums\""],
+        })}
+        ${renderConstrainedSvgText({
+            id: "arc-icon-unit",
+            text: options.unitText,
+            xCoordinate: options.centerXCoordinate,
+            yCoordinate: options.centerYCoordinate + ARC_LAYOUT.unit.yOffset,
+            maxWidth: options.centerTextMaxWidth,
+            fontSize: options.unitFontSize,
+            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontWeight: 800,
+            fill: options.config.unitTextColor,
+            textAnchor: "middle",
+        })}
     `;
 }

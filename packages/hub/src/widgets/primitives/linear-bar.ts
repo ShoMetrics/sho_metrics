@@ -1,7 +1,12 @@
 import type { WidgetData, KeySize } from "../../rendering/widget-data";
 import { resolveColor } from "../../rendering/color-resolver";
-import { adjustHexColorBrightness, clamp, escapeSvgText } from "../../rendering/svg-utils";
+import {
+    adjustHexColorBrightness,
+    clamp,
+    renderConstrainedSvgText,
+} from "../../rendering/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget.interface";
+import { renderMetricTextRow } from "./metric-text-row";
 
 export interface LinearBarConfig extends WidgetBaseConfig {
     trackColor: string;
@@ -41,6 +46,7 @@ interface TextLineLayout {
     xCoordinate: number;
     yCoordinate: number;
     fontSize: number;
+    maxWidth: number;
 }
 
 interface ValueLineLayout extends TextLineLayout {
@@ -61,6 +67,8 @@ interface ChannelLayout {
     iconCenterXCoordinate: number;
     iconCenterYCoordinate: number;
 }
+
+const LINEAR_TEXT_FONT_FAMILY = "'Inter','SF Pro Display','Segoe UI',sans-serif";
 
 /**
  * Linear progress bar. Full width = 100%.
@@ -96,12 +104,14 @@ function buildLinearLayoutPlan(keySize: KeySize, config: LinearBarConfig): Linea
                 xCoordinate: padding,
                 yCoordinate: Math.round(keySize.height * 0.24),
                 fontSize: clamp(Math.round(keySize.height * 0.18), 14, 18),
+                maxWidth: contentWidth,
             },
             singleValue: {
                 xCoordinate: padding,
                 yCoordinate: Math.round(keySize.height * 0.62),
                 fontSize: clamp(Math.round(keySize.height * 0.32), 26, 34),
                 unitFontSize: clamp(Math.round(keySize.height * 0.17), 14, 18),
+                maxWidth: Math.round(keySize.width * 0.42),
             },
             singleBar: {
                 xCoordinate: Math.round(keySize.width * 0.54),
@@ -114,6 +124,7 @@ function buildLinearLayoutPlan(keySize: KeySize, config: LinearBarConfig): Linea
                 xCoordinate: Math.round(keySize.width * 0.54),
                 yCoordinate: Math.round(keySize.height * 0.43),
                 fontSize: clamp(Math.round(keySize.height * 0.15), 12, 16),
+                maxWidth: Math.round(keySize.width * 0.36),
             },
             channelValueFontSize: clamp(Math.round(keySize.height * 0.25), 22, 28),
             channelUnitFontSize: clamp(Math.round(keySize.height * 0.14), 12, 16),
@@ -129,12 +140,14 @@ function buildLinearLayoutPlan(keySize: KeySize, config: LinearBarConfig): Linea
             xCoordinate: padding,
             yCoordinate: Math.round(keySize.height * 0.21),
             fontSize: clamp(Math.round(keySize.height * 0.125), 15, 18),
+            maxWidth: contentWidth,
         },
         singleValue: {
             xCoordinate: padding,
             yCoordinate: Math.round(keySize.height * 0.445),
             fontSize: clamp(Math.round(keySize.height * 0.236), 28, 34),
             unitFontSize: clamp(Math.round(keySize.height * 0.125), 15, 18),
+            maxWidth: contentWidth,
         },
         singleBar: {
             xCoordinate: padding,
@@ -147,6 +160,7 @@ function buildLinearLayoutPlan(keySize: KeySize, config: LinearBarConfig): Linea
             xCoordinate: padding,
             yCoordinate: Math.round(keySize.height * 0.847),
             fontSize: clamp(Math.round(keySize.height * 0.11), 13, 16),
+            maxWidth: contentWidth,
         },
         channelValueFontSize: clamp(Math.round(keySize.height * 0.208), 24, 30),
         channelUnitFontSize: clamp(Math.round(keySize.height * 0.118), 14, 17),
@@ -182,8 +196,10 @@ function renderSingleBar(
             layout: layoutPlan.title,
             iconScale: layoutPlan.mode === "wide" ? 0.3 : 0.34,
             iconGap: layoutPlan.mode === "wide" ? 25 : 27,
+            clipId: "linear-single-title",
         })}
         ${renderValueWithUnit({
+            clipId: "linear-single-value",
             valueText,
             unitText: formatLinearUnit(unitText),
             layout: layoutPlan.singleValue,
@@ -193,6 +209,7 @@ function renderSingleBar(
         ${renderSecondaryText({
             text: data.secondaryDisplayValue,
             layout: layoutPlan.singleSecondary,
+            clipId: "linear-single-secondary",
         })}
     `;
 }
@@ -213,6 +230,7 @@ function renderChannelBars(
             layout: layoutPlan.title,
             iconScale: layoutPlan.mode === "wide" ? 0.3 : 0.34,
             iconGap: layoutPlan.mode === "wide" ? 25 : 27,
+            clipId: "linear-channel-title",
         })}
         ${channels.slice(0, 2).map((channel, channelIndex) => {
             const channelLayout = buildChannelLayout({
@@ -235,6 +253,7 @@ function renderChannelBars(
                     ${channel.iconFragment}
                 </g>
                 ${renderValueWithUnit({
+                    clipId: `linear-channel-${channelIndex}-value`,
                     valueText: channel.displayValue,
                     unitText: channel.unit,
                     layout: channelLayout.value,
@@ -263,6 +282,7 @@ function buildChannelLayout(options: {
                 yCoordinate: valueYCoordinate,
                 fontSize: options.layoutPlan.channelValueFontSize,
                 unitFontSize: options.layoutPlan.channelUnitFontSize,
+                maxWidth: columnWidth - 26,
             },
             bar: {
                 xCoordinate: columnXCoordinate,
@@ -290,6 +310,7 @@ function buildChannelLayout(options: {
             yCoordinate: valueYCoordinate,
             fontSize: options.layoutPlan.channelValueFontSize,
             unitFontSize: options.layoutPlan.channelUnitFontSize,
+            maxWidth: options.keySize.width - options.layoutPlan.padding * 2 - 31,
         },
         bar: {
             xCoordinate: options.layoutPlan.padding,
@@ -309,57 +330,77 @@ function renderTitle(options: {
     layout: TextLineLayout;
     iconScale: number;
     iconGap: number;
+    clipId: string;
 }): string {
     const titleXCoordinate = options.iconFragment
         ? options.layout.xCoordinate + options.iconGap
         : options.layout.xCoordinate;
+    const titleMaxWidth = Math.max(1, options.layout.maxWidth - (titleXCoordinate - options.layout.xCoordinate));
     const iconSvg = options.iconFragment
         ? `<g transform="translate(${options.layout.xCoordinate + 10} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})">${options.iconFragment}</g>`
         : "";
 
     return `
         ${iconSvg}
-        <text x="${titleXCoordinate}" y="${options.layout.yCoordinate}" text-anchor="start"
-            dominant-baseline="middle"
-            font-family="'Inter','SF Pro Display','Segoe UI',sans-serif"
-            font-size="${options.layout.fontSize}" font-weight="850" fill="rgba(255,255,255,0.88)">${escapeSvgText(options.titleText)}</text>
+        ${renderConstrainedSvgText({
+            id: options.clipId,
+            text: options.titleText,
+            xCoordinate: titleXCoordinate,
+            yCoordinate: options.layout.yCoordinate,
+            maxWidth: titleMaxWidth,
+            fontSize: options.layout.fontSize,
+            fontFamily: LINEAR_TEXT_FONT_FAMILY,
+            fontWeight: 850,
+            fill: "rgba(255,255,255,0.88)",
+        })}
     `;
 }
 
 function renderValueWithUnit(options: {
+    clipId: string;
     valueText: string;
     unitText: string;
     layout: ValueLineLayout;
 }): string {
-    const valueWidth = estimateTextWidth(options.valueText, options.layout.fontSize, 0.56);
-
-    return `
-        <text x="${options.layout.xCoordinate}" y="${options.layout.yCoordinate}" text-anchor="start"
-            dominant-baseline="middle"
-            font-family="'Inter','SF Pro Display','Segoe UI',sans-serif"
-            font-variant-numeric="tabular-nums"
-            font-size="${options.layout.fontSize}" font-weight="900" fill="white">${escapeSvgText(options.valueText)}</text>
-        <text x="${options.layout.xCoordinate + valueWidth + 4}" y="${options.layout.yCoordinate + 2}" text-anchor="start"
-            dominant-baseline="middle"
-            font-family="'Inter','SF Pro Display','Segoe UI',sans-serif"
-            font-size="${options.layout.unitFontSize}" font-weight="800" fill="rgba(255,255,255,0.76)">${escapeSvgText(options.unitText)}</text>
-    `;
+    return renderMetricTextRow({
+        id: options.clipId,
+        valueText: options.valueText,
+        unitText: options.unitText,
+        xCoordinate: options.layout.xCoordinate,
+        yCoordinate: options.layout.yCoordinate,
+        width: options.layout.maxWidth,
+        valueFontSize: options.layout.fontSize,
+        unitFontSize: options.layout.unitFontSize,
+        fontFamily: LINEAR_TEXT_FONT_FAMILY,
+        valueFontWeight: 900,
+        unitFontWeight: 800,
+        valueFill: "white",
+        unitFill: "rgba(255,255,255,0.76)",
+        unitBaselineOffset: 2,
+        valueExtraAttributes: ["font-variant-numeric=\"tabular-nums\""],
+    });
 }
 
 function renderSecondaryText(options: {
     text: string | undefined;
     layout: TextLineLayout;
+    clipId: string;
 }): string {
     if (!options.text) {
         return "";
     }
 
-    return `
-        <text x="${options.layout.xCoordinate}" y="${options.layout.yCoordinate}" text-anchor="start"
-            dominant-baseline="middle"
-            font-family="'Inter','SF Pro Display','Segoe UI',sans-serif"
-            font-size="${options.layout.fontSize}" font-weight="750" fill="rgba(255,255,255,0.78)">${escapeSvgText(options.text)}</text>
-    `;
+    return renderConstrainedSvgText({
+        id: options.clipId,
+        text: options.text,
+        xCoordinate: options.layout.xCoordinate,
+        yCoordinate: options.layout.yCoordinate,
+        maxWidth: options.layout.maxWidth,
+        fontSize: options.layout.fontSize,
+        fontFamily: LINEAR_TEXT_FONT_FAMILY,
+        fontWeight: 750,
+        fill: "rgba(255,255,255,0.78)",
+    });
 }
 
 function renderTrack(layout: BarLayout, color: string): string {
@@ -382,8 +423,4 @@ function formatLinearUnit(unit: string): string {
     }
 
     return unit;
-}
-
-function estimateTextWidth(text: string, fontSize: number, averageCharacterWidthRatio: number): number {
-    return text.length * fontSize * averageCharacterWidthRatio;
 }

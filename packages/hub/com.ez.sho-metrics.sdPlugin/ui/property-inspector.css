@@ -77,3 +77,41 @@ body {
     padding: 4px 8px;
     width: 100%;
 }
+
+.readonly-inline {
+    align-items: center;
+    display: grid;
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: 100%;
+}
+
+.readonly-text {
+    color: #d8d8d8;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    user-select: text;
+}
+
+.copy-button {
+    background: #3d3d3d;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: #efefef;
+    cursor: pointer;
+    min-height: 28px;
+    padding: 4px 10px;
+}
+
+.copy-button:disabled {
+    color: #858585;
+    cursor: default;
+    opacity: 0.6;
+}
+
+.copy-success-mark {
+    color: #22c55e;
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1;
+}
