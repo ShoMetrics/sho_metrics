@@ -95,7 +95,7 @@ export const basePropertyInspectorSettings: PropertyInspectorSettings = {
 
 const pollingFrequencyValues = [1, 2, 3, 5, 10, 15, 30, 60] as const;
 
-export function normalizeSettings(
+export function normalizePropertyInspectorSettings(
     rawSettings: Record<string, SettingValue>,
     context: NormalizeSettingsContext,
 ): PropertyInspectorSettings {

@@ -1,153 +1,110 @@
-import { inspectorFieldCatalog } from "./fields";
-import { inspectorScope, type InspectorScope } from "./scopes";
-import type { ActionKind, GraphicType } from "./settings";
+import {
+    basePropertyInspectorSettings,
+    normalizeDiskMetricKind,
+    normalizeDiskThroughputDirection,
+    normalizeDiskUsageDisplayMode,
+    normalizeNetworkDirection,
+    normalizeOptionalPositiveNumber,
+    normalizePollingFrequency,
+    normalizePositiveNumber,
+    normalizePropertyInspectorSettings,
+    normalizeTemperatureUnit,
+    normalizeThreshold,
+    resolveDefaultDiskPollingFrequency,
+    resolveDefaultSolidColor,
+    type NormalizeSettingsContext,
+    type PropertyInspectorSettings,
+    type SettingValue,
+} from "./settings";
+import {
+    resolveScenarioFieldList,
+    type InspectorScenario,
+    type PropertyInspectorState,
+} from "./scenario-model";
 import type { FieldSchema, VisibilityContext } from "./schema";
-
-interface InspectorScenario {
-    scope: InspectorScope;
-    fields: readonly FieldSchema[];
-}
-
-const baseFieldList = [
-    inspectorFieldCatalog.pollingFrequencyField,
-    inspectorFieldCatalog.graphicTypeField,
-] as const;
-
-const circularFieldList = [
-    inspectorFieldCatalog.circularCenterContentField,
-] as const;
-
-const solidColorFieldList = [
-    inspectorFieldCatalog.solidColorField,
-] as const;
-
-const thresholdColorFieldList = [
-    inspectorFieldCatalog.dynamicUsageColorsHeadingField,
-    inspectorFieldCatalog.dynamicUsageColorsNoteField,
-    inspectorFieldCatalog.lowThresholdField,
-    inspectorFieldCatalog.highThresholdField,
-    inspectorFieldCatalog.lowUsageColorField,
-    inspectorFieldCatalog.mediumUsageColorField,
-    inspectorFieldCatalog.highUsageColorField,
-] as const;
-
-const visualStyleFieldList = [
-    inspectorFieldCatalog.graphicStyleField,
-    inspectorFieldCatalog.colorModeField,
-] as const;
-
-const diskUsageCircularScenario = defineScenario({
-    scope: inspectorScope.diskUsageCircularScope,
-    fields: [
-        ...baseFieldList,
-        ...circularFieldList,
-        inspectorFieldCatalog.diskMetricKindField,
-        inspectorFieldCatalog.diskVolumeField,
-        inspectorFieldCatalog.diskUsageDisplayModeField,
-        ...visualStyleFieldList,
-    ],
-});
-
-const diskUsageLinearScenario = defineScenario({
-    scope: inspectorScope.diskUsageLinearScope,
-    fields: [
-        ...baseFieldList,
-        inspectorFieldCatalog.diskMetricKindField,
-        inspectorFieldCatalog.diskVolumeField,
-        inspectorFieldCatalog.diskLinearLabelField,
-        inspectorFieldCatalog.diskVolumeLabelField,
-        ...visualStyleFieldList,
-    ],
-});
-
-const diskUsageSparklineScenario = defineScenario({
-    scope: inspectorScope.diskUsageSparklineScope,
-    fields: [
-        ...baseFieldList,
-        inspectorFieldCatalog.diskMetricKindField,
-        inspectorFieldCatalog.diskVolumeField,
-        ...visualStyleFieldList,
-    ],
-});
-
-const diskThroughputCircularScenario = defineScenario({
-    scope: inspectorScope.diskThroughputCircularScope,
-    fields: [
-        ...baseFieldList,
-        ...circularFieldList,
-        inspectorFieldCatalog.diskMetricKindField,
-        inspectorFieldCatalog.diskThroughputDirectionField,
-        inspectorFieldCatalog.maximumDiskThroughputField,
-        ...visualStyleFieldList,
-    ],
-});
-
-const diskThroughputLinearScenario = defineScenario({
-    scope: inspectorScope.diskThroughputLinearScope,
-    fields: [
-        ...baseFieldList,
-        inspectorFieldCatalog.diskMetricKindField,
-        inspectorFieldCatalog.diskThroughputDirectionField,
-        inspectorFieldCatalog.maximumDiskThroughputField,
-        ...visualStyleFieldList,
-    ],
-});
-
-const diskThroughputSparklineScenario = defineScenario({
-    scope: inspectorScope.diskThroughputSparklineScope,
-    fields: [
-        ...baseFieldList,
-        inspectorFieldCatalog.diskMetricKindField,
-        inspectorFieldCatalog.diskThroughputDirectionField,
-        inspectorFieldCatalog.maximumDiskThroughputField,
-        ...visualStyleFieldList,
-    ],
-});
-
-const netSpeedCircularScenario = defineScenario({
-    scope: inspectorScope.netSpeedCircularScope,
-    fields: [
-        ...baseFieldList,
-        ...circularFieldList,
-        inspectorFieldCatalog.networkDirectionField,
-        inspectorFieldCatalog.networkCircleNoteField,
-        inspectorFieldCatalog.networkInterfaceField,
-        inspectorFieldCatalog.maximumNetworkSpeedField,
-        inspectorFieldCatalog.networkUnitBaseField,
-        inspectorFieldCatalog.downloadIconColorField,
-        inspectorFieldCatalog.uploadIconColorField,
-        ...visualStyleFieldList,
-    ],
-});
-
-const netSpeedLinearScenario = defineScenario({
-    scope: inspectorScope.netSpeedLinearScope,
-    fields: [
-        ...baseFieldList,
-        inspectorFieldCatalog.networkDirectionField,
-        ...visualStyleFieldList,
-    ],
-});
-
-const netSpeedSparklineScenario = defineScenario({
-    scope: inspectorScope.netSpeedSparklineScope,
-    fields: [
-        ...baseFieldList,
-        inspectorFieldCatalog.networkDirectionField,
-        ...visualStyleFieldList,
-    ],
-});
+import { resolveDefaultScenario } from "./scenarios/default";
+import { resolveDiskScenario } from "./scenarios/disk";
+import { resolveGpuPowerScenario, resolveGpuTempScenario } from "./scenarios/gpu";
+import { resolveNetSpeedScenario } from "./scenarios/net-speed";
 
 export function resolveInspectorFieldList(context: VisibilityContext): readonly FieldSchema[] {
     const scenario = resolveInspectorScenario(context);
-    const colorFieldList = context.settings.colorMode === "solid"
-        ? solidColorFieldList
-        : thresholdColorFieldList;
 
-    return [
-        ...scenario.fields,
-        ...colorFieldList,
-    ].filter(field => isFieldAllowedInScenario(field, scenario, context));
+    return resolveScenarioFieldList(scenario, context)
+        .filter(field => isFieldAllowedInScenario(field, scenario, context));
+}
+
+export function normalizeSettings(
+    rawSettings: Record<string, SettingValue>,
+    context: NormalizeSettingsContext,
+): PropertyInspectorSettings {
+    const normalizedSettings = normalizePropertyInspectorSettings(rawSettings, context);
+    const scenario = resolveInspectorScenario({
+        actionKind: context.actionKind,
+        isWindows: context.isWindows,
+        settings: normalizedSettings,
+    });
+
+    return scenario.settingsNormalizer(rawSettings, context, normalizedSettings);
+}
+
+export function normalizeNextSettings(options: {
+    changedKey: string;
+    changedValue: string;
+    state: PropertyInspectorState;
+}): PropertyInspectorSettings {
+    const rawSettings: Record<string, SettingValue> = {
+        ...options.state.settings,
+        [options.changedKey]: options.changedValue,
+    };
+    const diskMetricKind = normalizeDiskMetricKind(
+        options.changedKey === "diskMetricKind" ? options.changedValue : options.state.settings.diskMetricKind,
+        options.state.isWindows,
+    );
+    const lowThreshold = normalizeThreshold(rawSettings.lowThreshold, basePropertyInspectorSettings.lowThreshold);
+    const highThreshold = normalizeThreshold(rawSettings.highThreshold, basePropertyInspectorSettings.highThreshold);
+    const orderedThresholds = resolveOrderedThresholds(options.changedKey, lowThreshold, highThreshold);
+    const networkDirection = normalizeNetworkDirection(rawSettings.networkDirection);
+
+    return normalizeSettings({
+        ...rawSettings,
+        pollingFrequencySeconds: options.changedKey === "diskMetricKind"
+            ? resolveDefaultDiskPollingFrequency(diskMetricKind)
+            : normalizePollingFrequency(rawSettings.pollingFrequencySeconds),
+        diskMetricKind,
+        diskUsageDisplayMode: normalizeDiskUsageDisplayMode(rawSettings.diskUsageDisplayMode),
+        diskThroughputDirection: normalizeDiskThroughputDirection(rawSettings.diskThroughputDirection),
+        maximumDiskThroughputMebibytesPerSecond: normalizePositiveNumber(
+            rawSettings.maximumDiskThroughputMebibytesPerSecond,
+            basePropertyInspectorSettings.maximumDiskThroughputMebibytesPerSecond,
+        ),
+        maximumTemperatureCelsius: normalizePositiveNumber(
+            rawSettings.maximumTemperatureCelsius,
+            basePropertyInspectorSettings.maximumTemperatureCelsius,
+        ),
+        maximumGpuPowerWatts: normalizeOptionalPositiveNumber(rawSettings.maximumGpuPowerWatts),
+        maximumNetworkSpeedMbps: normalizeOptionalPositiveNumber(rawSettings.maximumNetworkSpeedMbps),
+        networkDirection,
+        networkUnitBase: rawSettings.networkUnitBase === "bit" ? "bit" : "byte",
+        temperatureUnit: normalizeTemperatureUnit(rawSettings.temperatureUnit),
+        lowThreshold: orderedThresholds.lowThreshold,
+        highThreshold: orderedThresholds.highThreshold,
+        solidColor: resolveNextSolidColor({
+            changedKey: options.changedKey,
+            changedValue: options.changedValue,
+            networkDirection,
+            state: options.state,
+        }),
+        netSpeedDefaultsApplied: options.state.actionKind === "net-speed"
+            ? true
+            : options.state.settings.netSpeedDefaultsApplied,
+        diskDefaultsApplied: options.state.actionKind === "disk"
+            ? true
+            : options.state.settings.diskDefaultsApplied,
+    }, {
+        actionKind: options.state.actionKind,
+        isWindows: options.state.isWindows,
+    });
 }
 
 function resolveInspectorScenario(context: VisibilityContext): InspectorScenario {
@@ -156,13 +113,7 @@ function resolveInspectorScenario(context: VisibilityContext): InspectorScenario
     }
 
     if (context.actionKind === "net-speed") {
-        return resolveGraphicScenario({
-            actionKind: context.actionKind,
-            graphicType: context.settings.graphicType,
-            circularScenario: netSpeedCircularScenario,
-            linearScenario: netSpeedLinearScenario,
-            sparklineScenario: netSpeedSparklineScenario,
-        });
+        return resolveNetSpeedScenario(context);
     }
 
     if (context.actionKind === "gpu-temp") {
@@ -174,166 +125,6 @@ function resolveInspectorScenario(context: VisibilityContext): InspectorScenario
     }
 
     return resolveDefaultScenario(context.actionKind, context.settings.graphicType);
-}
-
-function resolveDiskScenario(context: VisibilityContext): InspectorScenario {
-    if (context.settings.diskMetricKind === "throughput") {
-        return resolveGraphicScenario({
-            actionKind: "disk",
-            graphicType: context.settings.graphicType,
-            circularScenario: diskThroughputCircularScenario,
-            linearScenario: diskThroughputLinearScenario,
-            sparklineScenario: diskThroughputSparklineScenario,
-        });
-    }
-
-    return resolveGraphicScenario({
-        actionKind: "disk",
-        graphicType: context.settings.graphicType,
-        circularScenario: diskUsageCircularScenario,
-        linearScenario: diskUsageLinearScenario,
-        sparklineScenario: diskUsageSparklineScenario,
-    });
-}
-
-function resolveGpuTempScenario(graphicType: GraphicType): InspectorScenario {
-    const scope = resolveScope({
-        actionKind: "gpu-temp",
-        graphicType,
-        circularScope: inspectorScope.gpuTempCircularScope,
-        linearScope: inspectorScope.gpuTempLinearScope,
-        sparklineScope: inspectorScope.gpuTempSparklineScope,
-    });
-    const scenario = defineScenario({
-        scope,
-        fields: [
-            ...baseFieldList,
-            ...(graphicType === "circular" ? circularFieldList : []),
-            inspectorFieldCatalog.temperatureUnitField,
-            ...(graphicType === "dashed-line" ? [] : [inspectorFieldCatalog.maximumTemperatureField]),
-            ...visualStyleFieldList,
-        ],
-    });
-
-    return scenario;
-}
-
-function resolveGpuPowerScenario(graphicType: GraphicType): InspectorScenario {
-    const scope = resolveScope({
-        actionKind: "gpu-power",
-        graphicType,
-        circularScope: inspectorScope.gpuPowerCircularScope,
-        linearScope: inspectorScope.gpuPowerLinearScope,
-        sparklineScope: inspectorScope.gpuPowerSparklineScope,
-    });
-    const scenario = defineScenario({
-        scope,
-        fields: [
-            ...baseFieldList,
-            ...(graphicType === "circular" ? circularFieldList : []),
-            ...(graphicType === "dashed-line" ? [] : [inspectorFieldCatalog.maximumGpuPowerField]),
-            ...visualStyleFieldList,
-        ],
-    });
-
-    return scenario;
-}
-
-function resolveDefaultScenario(actionKind: ActionKind, graphicType: GraphicType): InspectorScenario {
-    const scope = resolveDefaultScope(actionKind, graphicType);
-
-    return defineScenario({
-        scope,
-        fields: [
-            ...baseFieldList,
-            ...(graphicType === "circular" ? circularFieldList : []),
-            ...visualStyleFieldList,
-        ],
-    });
-}
-
-function resolveGraphicScenario(options: {
-    actionKind: ActionKind;
-    graphicType: GraphicType;
-    circularScenario: InspectorScenario;
-    linearScenario: InspectorScenario;
-    sparklineScenario: InspectorScenario;
-}): InspectorScenario {
-    void options.actionKind;
-
-    if (options.graphicType === "linear") {
-        return options.linearScenario;
-    }
-
-    if (options.graphicType === "dashed-line") {
-        return options.sparklineScenario;
-    }
-
-    return options.circularScenario;
-}
-
-function resolveDefaultScope(actionKind: ActionKind, graphicType: GraphicType): InspectorScope {
-    if (actionKind === "cpu-usage") {
-        return resolveScope({
-            actionKind,
-            graphicType,
-            circularScope: inspectorScope.cpuUsageCircularScope,
-            linearScope: inspectorScope.cpuUsageLinearScope,
-            sparklineScope: inspectorScope.cpuUsageSparklineScope,
-        });
-    }
-
-    if (actionKind === "ram") {
-        return resolveScope({
-            actionKind,
-            graphicType,
-            circularScope: inspectorScope.ramCircularScope,
-            linearScope: inspectorScope.ramLinearScope,
-            sparklineScope: inspectorScope.ramSparklineScope,
-        });
-    }
-
-    if (actionKind === "gpu-usage") {
-        return resolveScope({
-            actionKind,
-            graphicType,
-            circularScope: inspectorScope.gpuUsageCircularScope,
-            linearScope: inspectorScope.gpuUsageLinearScope,
-            sparklineScope: inspectorScope.gpuUsageSparklineScope,
-        });
-    }
-
-    if (actionKind === "gpu-vram") {
-        return resolveScope({
-            actionKind,
-            graphicType,
-            circularScope: inspectorScope.gpuVramCircularScope,
-            linearScope: inspectorScope.gpuVramLinearScope,
-            sparklineScope: inspectorScope.gpuVramSparklineScope,
-        });
-    }
-
-    return inspectorScope.unknownScope;
-}
-
-function resolveScope(options: {
-    actionKind: ActionKind;
-    graphicType: GraphicType;
-    circularScope: InspectorScope;
-    linearScope: InspectorScope;
-    sparklineScope: InspectorScope;
-}): InspectorScope {
-    void options.actionKind;
-
-    if (options.graphicType === "linear") {
-        return options.linearScope;
-    }
-
-    if (options.graphicType === "dashed-line") {
-        return options.sparklineScope;
-    }
-
-    return options.circularScope;
 }
 
 function isFieldAllowedInScenario(
@@ -356,8 +147,41 @@ function isFieldAllowedInScenario(
     return false;
 }
 
-function defineScenario(scenario: InspectorScenario): InspectorScenario {
-    return scenario;
+function resolveOrderedThresholds(
+    changedKey: string,
+    lowThreshold: number,
+    highThreshold: number,
+): { lowThreshold: number; highThreshold: number } {
+    if (lowThreshold <= highThreshold) {
+        return { lowThreshold, highThreshold };
+    }
+
+    if (changedKey === "lowThreshold") {
+        return { lowThreshold, highThreshold: lowThreshold };
+    }
+
+    return { lowThreshold: highThreshold, highThreshold };
+}
+
+function resolveNextSolidColor(options: {
+    changedKey: string;
+    changedValue: SettingValue;
+    networkDirection: SettingValue;
+    state: PropertyInspectorState;
+}): string {
+    if (options.changedKey !== "networkDirection" || options.state.actionKind !== "net-speed") {
+        return typeof options.state.settings.solidColor === "string"
+            ? options.state.settings.solidColor
+            : resolveDefaultSolidColor(options.networkDirection);
+    }
+
+    const currentDefaultColor = resolveDefaultSolidColor(options.state.settings.networkDirection);
+
+    if (options.state.settings.solidColor && options.state.settings.solidColor !== currentDefaultColor) {
+        return options.state.settings.solidColor;
+    }
+
+    return resolveDefaultSolidColor(options.changedValue);
 }
 
 function isDevelopmentEnvironment(): boolean {
