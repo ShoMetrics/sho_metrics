@@ -211,7 +211,7 @@ export class NetSpeed extends MetricAction {
         rawWidgetData: WidgetData;
         widgetData: WidgetData;
     }): void {
-        log.atTrace().everyMs("speed-sample", DEBUG_LOG_INTERVAL_MILLISECONDS).log(() => [
+        log.atDebug().everyMs("speed-sample", DEBUG_LOG_INTERVAL_MILLISECONDS).log(() => [
             `direction=${options.direction}`,
             `metricKey=${options.networkMetricKey}`,
             `selectedInterface=${formatNetworkInterfaceDebugValue(options.selectedNetworkInterface)}`,

@@ -131,7 +131,7 @@ const GPU_VRAM_USED_METRIC_KEY = "gpu.vram_used";
 const GPU_VRAM_TOTAL_METRIC_KEY = "gpu.vram_total";
 const GPU_POWER_METRIC_KEY = "gpu.power";
 const GPU_POWER_LIMIT_METRIC_KEY = "gpu.power_limit";
-const GPU_SAMPLE_STALE_MS = 5000;
+const GPU_SAMPLE_STALE_MS = 7000;
 const GPU_METRIC_KEYS = [
     GPU_USAGE_METRIC_KEY,
     GPU_TEMP_METRIC_KEY,

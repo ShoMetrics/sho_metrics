@@ -389,7 +389,7 @@ function logDisplayDebug(options: {
     rasterizeDurationMilliseconds: number;
 }): void {
     const currentTimestampMilliseconds = Date.now();
-    log.trace(() => [
+    log.debug(() => [
         options.phase,
         `actionId=${options.actionId}`,
         `metricKey=${options.metricKey}`,
@@ -409,7 +409,7 @@ function logUpdateDoneDebug(options: {
     updateStartTimestampMilliseconds: number;
 }): void {
     const currentTimestampMilliseconds = Date.now();
-    log.trace(() => [
+    log.debug(() => [
         options.phase,
         `actionId=${options.actionId}`,
         `metricKey=${options.metricKey}`,
@@ -425,7 +425,7 @@ function logDisplaySkippedDebug(options: {
     composeDurationMilliseconds: number;
 }): void {
     const currentTimestampMilliseconds = Date.now();
-    log.trace(() => [
+    log.debug(() => [
         "skippedUnchanged",
         `actionId=${options.actionId}`,
         `metricKey=${options.metricKey}`,

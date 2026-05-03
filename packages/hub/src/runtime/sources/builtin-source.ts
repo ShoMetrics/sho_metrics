@@ -47,7 +47,7 @@ const NVIDIA_SMI_ARGUMENTS = [
     "--format=csv,noheader,nounits",
 ] as const;
 
-const NVIDIA_SMI_TIMEOUT_MS = 1500;
+const NVIDIA_SMI_TIMEOUT_MS = 3000;
 const NVIDIA_SMI_FAILURE_LOG_INTERVAL_MS = 30000;
 
 /**
@@ -70,7 +70,7 @@ export class BuiltinSource implements IMetricSource {
     private lastGpuTimeoutWarningTimestampMilliseconds = 0;
 
     private static readonly GPU_CACHE_MS = 1000;
-    private static readonly GPU_POLL_TIMEOUT_MS = 1800;
+    private static readonly GPU_POLL_TIMEOUT_MS = 3300;
     private static readonly NETWORK_DEBUG_LOG_INTERVAL_MS = 5000;
     private static readonly GPU_TIMEOUT_WARNING_INTERVAL_MS = 10000;
     private static readonly GPU_BACKOFF_STEPS_MS = [2000, 5000, 10000, 30000] as const;
@@ -437,7 +437,7 @@ export class BuiltinSource implements IMetricSource {
 
         this.lastNetworkPollDebugLogTimestampMilliseconds = options.currentTimestampMilliseconds;
 
-        networkLog.trace(() => [
+        networkLog.debug(() => [
             `reason=${shouldLogSuspiciousZero ? "suspicious-zero" : "periodic"}`,
             `usable=${JSON.stringify(options.interfaceOptions.map(formatNetworkInterfaceOptionDebug))}`,
             `stats=${JSON.stringify(options.networkStats.map(formatNetworkStatDebug))}`,
@@ -452,7 +452,7 @@ export class BuiltinSource implements IMetricSource {
         const currentTimestampMilliseconds = Date.now();
 
         if (this.cachedGpuData && (currentTimestampMilliseconds - this.cachedGpuTimestampMilliseconds) < BuiltinSource.GPU_CACHE_MS) {
-            gpuLog.trace(() => [
+            gpuLog.debug(() => [
                 "cacheHit",
                 `cacheAgeMs=${currentTimestampMilliseconds - this.cachedGpuTimestampMilliseconds}`,
             ].join(" "));
@@ -460,7 +460,7 @@ export class BuiltinSource implements IMetricSource {
         }
 
         if (this.pendingGpuPromise) {
-            gpuLog.trace("pendingReuse");
+            gpuLog.debug("pendingReuse");
             return this.pendingGpuPromise;
         }
 
@@ -492,7 +492,7 @@ export class BuiltinSource implements IMetricSource {
         const currentTimestampMilliseconds = Date.now();
 
         if (currentTimestampMilliseconds < this.nextGpuPollAllowedTimestampMilliseconds) {
-            gpuLog.trace(() => [
+            gpuLog.debug(() => [
                 "skippedBackoff",
                 `remainingMs=${this.nextGpuPollAllowedTimestampMilliseconds - currentTimestampMilliseconds}`,
                 `timeoutCount=${this.gpuConsecutiveTimeouts}`,
@@ -502,7 +502,7 @@ export class BuiltinSource implements IMetricSource {
 
         const pollSequence = nextGpuPollDebugSequence++;
         const pollStartTimestampMilliseconds = Date.now();
-        gpuLog.trace(() => [
+        gpuLog.debug(() => [
             "sourceStart",
             `pollId=${pollSequence}`,
             `timeoutMs=${BuiltinSource.GPU_POLL_TIMEOUT_MS}`,
@@ -513,7 +513,7 @@ export class BuiltinSource implements IMetricSource {
         const timeoutPromise = new Promise<GpuTelemetryData | null>((resolve) => {
             timeoutId = setTimeout(() => {
                 const elapsedMilliseconds = Date.now() - pollStartTimestampMilliseconds;
-                gpuLog.trace(() => [
+                gpuLog.debug(() => [
                     "sourceTimeout",
                     `pollId=${pollSequence}`,
                     `elapsedMs=${elapsedMilliseconds}`,
@@ -539,7 +539,7 @@ export class BuiltinSource implements IMetricSource {
         if (gpuData) {
             this.gpuConsecutiveTimeouts = 0;
             this.nextGpuPollAllowedTimestampMilliseconds = 0;
-            gpuLog.trace(() => [
+            gpuLog.debug(() => [
                 "sourceSuccess",
                 `pollId=${pollSequence}`,
                 `elapsedMs=${Date.now() - pollStartTimestampMilliseconds}`,
@@ -547,7 +547,7 @@ export class BuiltinSource implements IMetricSource {
             return gpuData;
         }
 
-        gpuLog.trace(() => [
+        gpuLog.debug(() => [
             "sourceNoData",
             `pollId=${pollSequence}`,
             `elapsedMs=${Date.now() - pollStartTimestampMilliseconds}`,
@@ -773,7 +773,7 @@ async function pollWindowsNvidiaGpuTelemetry(): Promise<GpuTelemetryData | null>
     const output = await runNvidiaSmiTelemetryQuery();
 
     if (!output) {
-        gpuLog.trace("nvidiaSmiEmptyOutput");
+        gpuLog.debug("nvidiaSmiEmptyOutput");
         return null;
     }
 
@@ -783,7 +783,7 @@ async function pollWindowsNvidiaGpuTelemetry(): Promise<GpuTelemetryData | null>
         .find(line => line.length > 0);
 
     if (!firstGpuLine) {
-        gpuLog.trace("nvidiaSmiNoDataLine");
+        gpuLog.debug("nvidiaSmiNoDataLine");
         return null;
     }
 
@@ -803,7 +803,7 @@ async function pollWindowsNvidiaGpuTelemetry(): Promise<GpuTelemetryData | null>
         && powerDraw == null
         && powerLimit == null
     ) {
-        gpuLog.trace(() => [
+        gpuLog.debug(() => [
             "nvidiaSmiNoParsedFields",
             `raw=${firstGpuLine}`,
         ].join(" "));
@@ -846,7 +846,7 @@ function runNvidiaSmiTelemetryQuery(): Promise<string | null> {
         const queryStartTimestampMilliseconds = Date.now();
         const querySequence = nextNvidiaSmiQueryDebugSequence++;
         activeNvidiaSmiQueryCount += 1;
-        gpuLog.trace(() => [
+        gpuLog.debug(() => [
             "nvidiaSmiStart",
             `queryId=${querySequence}`,
             `timeoutMs=${NVIDIA_SMI_TIMEOUT_MS}`,
@@ -875,7 +875,7 @@ function runNvidiaSmiTelemetryQuery(): Promise<string | null> {
                     return;
                 }
 
-                gpuLog.trace(() => [
+                gpuLog.debug(() => [
                     elapsedMilliseconds > 250 ? "nvidiaSmiSlowSuccess" : "nvidiaSmiSuccess",
                     `queryId=${querySequence}`,
                     `elapsedMs=${elapsedMilliseconds}`,
