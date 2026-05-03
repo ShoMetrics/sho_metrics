@@ -11,7 +11,7 @@ are not reliably available through `systeminformation` in this plugin environmen
 The CLI is usually fast, but it has significant tail latency:
 
 - Median calls can complete in roughly 50-65 ms.
-- Some calls complete around 1.5-2.1 seconds.
+- Some calls complete around 1.5-2.2 seconds.
 - These slow calls can still return valid data.
 - Killing them too early turns a slow-but-valid sample into an empty GPU snapshot.
 
@@ -36,7 +36,7 @@ The plugin now uses more conservative timeouts:
 - GPU source poll timeout: 3300 ms
 - GPU action stale TTL: 7000 ms
 
-This covers the observed 2.0-2.1 second successful CLI calls while still allowing N/A
+This covers the observed 2.0-2.2 second successful CLI calls while still allowing N/A
 after repeated real failures. The TTL is intentionally below 10 seconds to avoid
 showing old values for too long on monitoring-focused Stream Deck profiles.
 
@@ -62,6 +62,11 @@ If a timeout is shorter than normal tail latency, the plugin creates false failu
 Testing separate query groups did not show one consistently slow field. The slow call
 can appear in different groups. Splitting fields increases the number of CLI processes
 and may increase the chance of hitting tail latency.
+
+An overnight split-field run reinforced this conclusion. The full plugin field query
+had a stable median and low p95, but still had roughly 2 second p99/max events. Splitting
+fields would not remove the shared CLI/NVML tail; it would multiply the number of process
+launches per refresh.
 
 ### Stale values vs no-data
 
@@ -369,6 +374,26 @@ Observed sample from the split-field test:
 [util_temp_power] total n=160 min=45.4ms avg=61.9ms p10=47.3ms p50=61.9ms p90=63.9ms p95=77.3ms p99=109.5ms max=110.4ms failures=0
 [all_plugin_fields] total n=160 min=44.6ms avg=74.0ms p10=58.4ms p50=61.9ms p90=63.3ms p95=77.5ms p99=109.4ms max=2011.9ms failures=0
 ```
+
+Overnight split-field sample:
+
+```text
+[summary] uptime=11090s cycles=7655
+[util_temp] total n=7655 min=51.1ms avg=356.5ms p10=52.6ms p50=53.8ms p90=1677.6ms p95=1866.7ms p99=2030.7ms max=2142.6ms failures=0
+[memory] total n=7655 min=42.8ms avg=90.9ms p10=47.0ms p50=61.0ms p90=62.6ms p95=75.9ms p99=2024.7ms max=2086.3ms failures=0
+[power] total n=7655 min=43.9ms avg=91.1ms p10=47.2ms p50=62.3ms p90=64.1ms p95=76.6ms p99=2030.8ms max=2173.5ms failures=0
+[util_temp_memory] total n=7655 min=43.3ms avg=98.6ms p10=47.1ms p50=61.7ms p90=63.5ms p95=77.5ms p99=2033.9ms max=2097.0ms failures=0
+[util_temp_power] total n=7655 min=43.5ms avg=88.9ms p10=47.2ms p50=62.0ms p90=63.7ms p95=77.2ms p99=2025.1ms max=2097.2ms failures=0
+[all_plugin_fields] total n=7655 min=43.6ms avg=94.9ms p10=47.3ms p50=61.8ms p90=63.6ms p95=77.7ms p99=2036.0ms max=2074.4ms failures=0
+```
+
+Findings from the overnight run:
+
+- No command failures were observed; slow calls still returned valid data.
+- The worst observed successful call was 2173.5 ms.
+- `all_plugin_fields` stayed fast for p95 and only showed tail latency at p99/max.
+- `util_temp` was uniquely noisy at p90/p95, but the same 2 second tail also appeared in memory, power, and combined queries.
+- The current 3000 ms process timeout remains above the observed tail with margin, while the old 1500 ms timeout would have killed many successful calls.
 
 ## Plugin Log Evidence
 
