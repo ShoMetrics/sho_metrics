@@ -5,10 +5,11 @@ import {
     KEYPAD_PNG_SIZE,
     TOUCH_STRIP_LOGICAL_SIZE,
     TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE,
+    TOUCH_STRIP_SINGLE_METRIC_SQUARE_PNG_SIZE,
     WIDGET_LOGICAL_SIZE,
 } from "../rendering/widget-data";
-import type { WidgetData } from "../rendering/widget-data";
-import { resolveMetricVisualSettings, type MetricVisualSettings, type SettingValue } from "./metric-visual-settings";
+import type { KeySize, WidgetData } from "../rendering/widget-data";
+import { resolveMetricVisualSettings, type MetricVisualSettings, type ResolvedMetricVisualSettings, type SettingValue } from "./metric-visual-settings";
 import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
 import { logger } from "../logging/logger";
 
@@ -29,7 +30,29 @@ interface SingleMetricDisplaySettings extends MetricVisualSettings {
     circularCenterContent?: SettingValue;
 }
 
-const TOUCH_STRIP_SINGLE_METRIC_LAYOUT = "layouts/single-metric-touchstrip.json";
+type TouchStripMetricLayoutKind = "square" | "wide";
+
+interface TouchStripMetricLayout {
+    kind: TouchStripMetricLayoutKind;
+    layoutPath: string;
+    renderSize: KeySize;
+    pngSize: KeySize;
+}
+
+const TOUCH_STRIP_METRIC_LAYOUTS: Record<TouchStripMetricLayoutKind, TouchStripMetricLayout> = {
+    square: {
+        kind: "square",
+        layoutPath: "layouts/single-metric-touchstrip-square.json",
+        renderSize: WIDGET_LOGICAL_SIZE,
+        pngSize: TOUCH_STRIP_SINGLE_METRIC_SQUARE_PNG_SIZE,
+    },
+    wide: {
+        kind: "wide",
+        layoutPath: "layouts/single-metric-touchstrip-wide.json",
+        renderSize: TOUCH_STRIP_LOGICAL_SIZE,
+        pngSize: TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE,
+    },
+};
 const MAX_CONCURRENT_DISPLAY_UPDATES = 1;
 
 const displayActionStates = new Map<string, DisplayActionState>();
@@ -44,6 +67,7 @@ interface DisplayActionState {
     active: boolean;
     pendingOptions: SingleMetricDisplayOptions | null;
     touchStripLayoutPromise: Promise<void> | null;
+    touchStripLayoutPath: string | null;
     lastRenderedSvg: string | null;
 }
 
@@ -65,6 +89,7 @@ export function clearSingleMetricDisplayState(actionId: string): void {
     displayActionState.isQueued = false;
     displayActionState.pendingOptions = null;
     displayActionState.touchStripLayoutPromise = null;
+    displayActionState.touchStripLayoutPath = null;
     displayActionStates.delete(actionId);
 }
 
@@ -96,8 +121,11 @@ function renderAndSendSingleMetricDisplay(
         hasData,
         shouldRenderMutedIconPlaceholder,
     });
-    const renderSize = options.event.action.isDial() ? TOUCH_STRIP_LOGICAL_SIZE : WIDGET_LOGICAL_SIZE;
-    const pngSize = options.event.action.isDial() ? TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE : KEYPAD_PNG_SIZE;
+    const touchStripMetricLayout = options.event.action.isDial()
+        ? resolveTouchStripMetricLayout(visualSettings)
+        : null;
+    const renderSize = touchStripMetricLayout?.renderSize ?? WIDGET_LOGICAL_SIZE;
+    const pngSize = touchStripMetricLayout?.pngSize ?? KEYPAD_PNG_SIZE;
 
     if (options.event.action.isKey()) {
         options.event.action.setTitle("").catch(error => {
@@ -174,7 +202,7 @@ function renderAndSendSingleMetricDisplay(
                 });
         };
 
-        ensureTouchStripSingleMetricLayout(displayActionState, options.event)
+        ensureTouchStripSingleMetricLayout(displayActionState, options.event, touchStripMetricLayout)
             .then(setFeedback)
             .catch(error => {
                 log.error(() => `Failed to update touch strip metric image: ${error}`);
@@ -273,6 +301,7 @@ function getOrCreateDisplayActionState(actionId: string): DisplayActionState {
         active: true,
         pendingOptions: null,
         touchStripLayoutPromise: null,
+        touchStripLayoutPath: null,
         lastRenderedSvg: null,
     };
     displayActionStates.set(actionId, displayActionState);
@@ -361,21 +390,45 @@ function finishDisplayUpdate(displayActionState: DisplayActionState): void {
 function ensureTouchStripSingleMetricLayout(
     displayActionState: DisplayActionState,
     event: WillAppearEvent,
+    touchStripMetricLayout: TouchStripMetricLayout | null,
 ): Promise<void> {
     if (!event.action.isDial()) {
         return Promise.resolve();
     }
 
-    if (displayActionState.touchStripLayoutPromise) {
+    if (!touchStripMetricLayout) {
+        return Promise.resolve();
+    }
+
+    if (
+        displayActionState.touchStripLayoutPromise
+        && displayActionState.touchStripLayoutPath === touchStripMetricLayout.layoutPath
+    ) {
         return displayActionState.touchStripLayoutPromise;
     }
 
-    const layoutPromise = event.action.setFeedbackLayout(TOUCH_STRIP_SINGLE_METRIC_LAYOUT).catch(error => {
-        displayActionState.touchStripLayoutPromise = null;
-        throw error;
-    });
+    displayActionState.touchStripLayoutPath = touchStripMetricLayout.layoutPath;
+    const layoutPromise = event.action.setFeedbackLayout(touchStripMetricLayout.layoutPath)
+        .catch(error => {
+            if (displayActionState.touchStripLayoutPath === touchStripMetricLayout.layoutPath) {
+                displayActionState.touchStripLayoutPromise = null;
+                displayActionState.touchStripLayoutPath = null;
+            }
+            throw error;
+        });
     displayActionState.touchStripLayoutPromise = layoutPromise;
     return layoutPromise;
+}
+
+function resolveTouchStripMetricLayout(settings: ResolvedMetricVisualSettings): TouchStripMetricLayout {
+    if (settings.graphicType === "circular") {
+        return TOUCH_STRIP_METRIC_LAYOUTS.square;
+    }
+
+    // Touch strip layouts encode both Stream Deck feedback rect and render target
+    // size. Add a new layout kind when a future visual needs a different contract,
+    // for example two centered circles in one 200x100 touch strip region.
+    return TOUCH_STRIP_METRIC_LAYOUTS.wide;
 }
 
 function logDisplayDebug(options: {
