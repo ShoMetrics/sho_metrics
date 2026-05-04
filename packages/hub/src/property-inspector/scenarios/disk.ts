@@ -6,7 +6,7 @@ import {
     diskUsageBaseFieldGroup,
     diskUsageCircularFieldGroup,
     diskUsageLinearLabelFieldGroup,
-    visualStyleFieldGroup,
+    colorSettingsFieldGroup,
 } from "../scenario-field-groups";
 import {
     defaultSettingsNormalizer,
@@ -25,7 +25,7 @@ const diskUsageCircularScenario = defineScenario({
         circularCenterFieldGroup,
         diskUsageBaseFieldGroup,
         diskUsageCircularFieldGroup,
-        visualStyleFieldGroup,
+        colorSettingsFieldGroup,
         ...colorFieldGroupList,
     ],
 });
@@ -37,7 +37,7 @@ const diskUsageLinearScenario = defineScenario({
         baseFieldGroup,
         diskUsageBaseFieldGroup,
         diskUsageLinearLabelFieldGroup,
-        visualStyleFieldGroup,
+        colorSettingsFieldGroup,
         ...colorFieldGroupList,
     ],
 });
@@ -48,7 +48,7 @@ const diskUsageSparklineScenario = defineScenario({
     fieldGroupList: [
         baseFieldGroup,
         diskUsageBaseFieldGroup,
-        visualStyleFieldGroup,
+        colorSettingsFieldGroup,
         ...colorFieldGroupList,
     ],
 });
@@ -60,7 +60,7 @@ const diskThroughputCircularScenario = defineScenario({
         baseFieldGroup,
         circularCenterFieldGroup,
         diskThroughputFieldGroup,
-        visualStyleFieldGroup,
+        colorSettingsFieldGroup,
         ...colorFieldGroupList,
     ],
 });
@@ -71,7 +71,7 @@ const diskThroughputLinearScenario = defineScenario({
     fieldGroupList: [
         baseFieldGroup,
         diskThroughputFieldGroup,
-        visualStyleFieldGroup,
+        colorSettingsFieldGroup,
         ...colorFieldGroupList,
     ],
 });
@@ -82,7 +82,7 @@ const diskThroughputSparklineScenario = defineScenario({
     fieldGroupList: [
         baseFieldGroup,
         diskThroughputFieldGroup,
-        visualStyleFieldGroup,
+        colorSettingsFieldGroup,
         ...colorFieldGroupList,
     ],
 });

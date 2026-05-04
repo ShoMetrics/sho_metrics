@@ -66,52 +66,66 @@ body {
     margin: 6px 0 0;
 }
 
+.section-heading {
+    color: #efefef;
+    font-size: 19px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 18px 0 8px;
+    padding: 0 0 0 8px;
+}
+
 .native-select,
 .native-input {
     appearance: none;
     background: #3d3d3d;
     border: 1px solid #555;
     border-radius: 4px;
+    box-sizing: border-box;
     color: #efefef;
     min-height: 28px;
+    min-width: 0;
     padding: 4px 8px;
+    width: 100%;
+}
+
+.text-field-with-action {
+    align-items: center;
+    display: grid;
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-width: 0;
     width: 100%;
 }
 
 .readonly-inline {
     align-items: center;
-    display: grid;
-    gap: 8px;
-    grid-template-columns: minmax(0, 1fr) auto;
+    display: flex;
+    min-height: 28px;
     width: 100%;
 }
 
 .readonly-text {
     color: #d8d8d8;
-    line-height: 1.35;
+    line-height: 28px;
     overflow-wrap: anywhere;
     user-select: text;
 }
 
-.copy-button {
+.inline-action-button {
     background: #3d3d3d;
     border: 1px solid #555;
     border-radius: 4px;
+    box-sizing: border-box;
     color: #efefef;
     cursor: pointer;
     min-height: 28px;
     padding: 4px 10px;
+    white-space: nowrap;
 }
 
-.copy-button:disabled {
+.inline-action-button:disabled {
     color: #858585;
     cursor: default;
     opacity: 0.6;
-}
-
-.copy-success-mark {
-    color: #22c55e;
-    font-size: 15px;
-    font-weight: 800;
-    line-height: 1;
 }

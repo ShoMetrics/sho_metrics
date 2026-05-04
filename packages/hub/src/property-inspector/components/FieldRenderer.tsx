@@ -3,6 +3,7 @@ import { ColorField } from "./ColorField";
 import { NumberField } from "./NumberField";
 import { RangeField } from "./RangeField";
 import { ReadonlyField } from "./ReadonlyField";
+import { SectionHeading } from "./SectionHeading";
 import { SelectField } from "./SelectField";
 import { TextField } from "./TextField";
 import type { FieldSchema, PropertyInspectorSettingKey, VisibilityContext } from "../schema";
@@ -10,11 +11,12 @@ import type { FieldSchema, PropertyInspectorSettingKey, VisibilityContext } from
 interface FieldRendererProps {
     field: FieldSchema;
     context: VisibilityContext;
+    onSettingChange: (key: PropertyInspectorSettingKey, value: string) => void;
 }
 
-export function FieldRenderer({ field, context }: FieldRendererProps): React.JSX.Element {
+export function FieldRenderer({ field, context, onSettingChange }: FieldRendererProps): React.JSX.Element {
     if (field.kind === "heading") {
-        return <sdpi-heading>{field.text ?? ""}</sdpi-heading>;
+        return <SectionHeading text={field.text ?? ""} />;
     }
 
     if (field.kind === "note") {
@@ -39,7 +41,7 @@ export function FieldRenderer({ field, context }: FieldRendererProps): React.JSX
 
     return (
         <sdpi-item label={field.label ?? ""}>
-            {renderFieldControl(field as FieldSchema & { key: PropertyInspectorSettingKey }, context)}
+            {renderFieldControl(field as FieldSchema & { key: PropertyInspectorSettingKey }, context, onSettingChange)}
         </sdpi-item>
     );
 }
@@ -47,6 +49,7 @@ export function FieldRenderer({ field, context }: FieldRendererProps): React.JSX
 function renderFieldControl(
     field: FieldSchema & { key: PropertyInspectorSettingKey },
     context: VisibilityContext,
+    onSettingChange: (key: PropertyInspectorSettingKey, value: string) => void,
 ): React.JSX.Element {
     switch (field.kind) {
         case "select":
@@ -56,7 +59,7 @@ function renderFieldControl(
         case "number":
             return <NumberField field={field} context={context} />;
         case "text":
-            return <TextField field={field} context={context} />;
+            return <TextField field={field} context={context} onSettingChange={onSettingChange} />;
         case "range":
             return <RangeField field={field} context={context} />;
         case "color-band":

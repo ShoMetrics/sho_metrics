@@ -2,7 +2,7 @@ import {
     baseFieldGroup,
     circularCenterFieldGroup,
     colorFieldGroupList,
-    visualStyleFieldGroup,
+    colorSettingsFieldGroup,
 } from "../scenario-field-groups";
 import {
     defaultSettingsNormalizer,
@@ -20,7 +20,7 @@ export function resolveDefaultScenario(actionKind: ActionKind, graphicType: Grap
         fieldGroupList: [
             baseFieldGroup,
             ...(graphicType === "circular" ? [circularCenterFieldGroup] : []),
-            visualStyleFieldGroup,
+            colorSettingsFieldGroup,
             ...colorFieldGroupList,
         ],
     });

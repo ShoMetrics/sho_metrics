@@ -4,7 +4,7 @@ import {
     colorFieldGroupList,
     networkCircularFieldGroup,
     networkDirectionFieldGroup,
-    visualStyleFieldGroup,
+    colorSettingsFieldGroup,
 } from "../scenario-field-groups";
 import {
     defaultSettingsNormalizer,
@@ -23,7 +23,7 @@ const netSpeedCircularScenario = defineScenario({
         circularCenterFieldGroup,
         networkDirectionFieldGroup,
         networkCircularFieldGroup,
-        visualStyleFieldGroup,
+        colorSettingsFieldGroup,
         ...colorFieldGroupList,
     ],
 });
@@ -34,7 +34,7 @@ const netSpeedLinearScenario = defineScenario({
     fieldGroupList: [
         baseFieldGroup,
         networkDirectionFieldGroup,
-        visualStyleFieldGroup,
+        colorSettingsFieldGroup,
         ...colorFieldGroupList,
     ],
 });
@@ -45,7 +45,7 @@ const netSpeedSparklineScenario = defineScenario({
     fieldGroupList: [
         baseFieldGroup,
         networkDirectionFieldGroup,
-        visualStyleFieldGroup,
+        colorSettingsFieldGroup,
         ...colorFieldGroupList,
     ],
 });
