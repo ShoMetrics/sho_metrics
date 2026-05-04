@@ -2,6 +2,7 @@ import { action, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import { metricStore } from "../runtime/metric-store";
 import { setSingleMetricDisplay } from "./single-metric-display";
+import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-label";
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 
@@ -13,12 +14,11 @@ import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 @action({ UUID: "com.ez.sho-metrics.cpu-usage" })
 export class CpuUsage extends MetricAction {
     protected override getMetricKeys(): readonly string[] {
-        return [CPU_USAGE_METRIC_KEY, CPU_BASE_FREQUENCY_METRIC_KEY];
+        return [CPU_USAGE_METRIC_KEY, CPU_MODEL_METRIC_KEY];
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const widgetData = metricStore.getWidgetData(CPU_USAGE_METRIC_KEY, ARC_GAUGE_LABELS.cpu, "%", 100);
-        const baseFrequencyWidgetData = metricStore.getWidgetData(CPU_BASE_FREQUENCY_METRIC_KEY, ARC_GAUGE_LABELS.cpu, "GHz");
 
         setSingleMetricDisplay({
             event,
@@ -26,7 +26,10 @@ export class CpuUsage extends MetricAction {
             widgetData: {
                 ...widgetData,
                 displayValue: widgetData.current.toFixed(0),
-                secondaryDisplayValue: resolveCpuBaseFrequencyDisplayText(baseFrequencyWidgetData),
+                secondaryDisplayValue: formatCompactHardwareModelLabel(
+                    metricStore.getTextValue(CPU_MODEL_METRIC_KEY),
+                    "cpu",
+                ),
             },
             ...buildMetricDisplayIcons({ hardware: "cpu", status: "percentage" }),
         });
@@ -34,14 +37,4 @@ export class CpuUsage extends MetricAction {
 }
 
 const CPU_USAGE_METRIC_KEY = "cpu.usage_percent";
-const CPU_BASE_FREQUENCY_METRIC_KEY = "cpu.base_frequency";
-
-function resolveCpuBaseFrequencyDisplayText(
-    baseFrequencyWidgetData: ReturnType<typeof metricStore.getWidgetData>,
-): string | undefined {
-    if (baseFrequencyWidgetData.sampleTimestampMilliseconds != null && baseFrequencyWidgetData.current > 0) {
-        return `base: ${baseFrequencyWidgetData.current.toFixed(2)} GHz`;
-    }
-
-    return undefined;
-}
+const CPU_MODEL_METRIC_KEY = "cpu.model";

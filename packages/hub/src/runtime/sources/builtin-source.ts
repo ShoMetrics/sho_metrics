@@ -35,6 +35,7 @@ let activeNvidiaSmiQueryCount = 0;
 
 const NVIDIA_SMI_QUERY_FIELDS = [
     "utilization.gpu",
+    "name",
     "temperature.gpu",
     "memory.used",
     "memory.total",
@@ -63,8 +64,9 @@ export class BuiltinSource implements IMetricSource {
     private cachedGpuTimestampMilliseconds = 0;
     private pendingGpuPromise: Promise<GpuTelemetryData | null> | null = null;
     private cachedCpuBaseFrequencyGigahertz: number | null = null;
-    private pendingCpuBaseFrequencyPromise: Promise<void> | null = null;
-    private hasAttemptedCpuBaseFrequencyPoll = false;
+    private cachedCpuModelText: string | null = null;
+    private pendingCpuInformationPromise: Promise<void> | null = null;
+    private hasAttemptedCpuInformationPoll = false;
     private gpuConsecutiveTimeouts = 0;
     private nextGpuPollAllowedTimestampMilliseconds = 0;
     private lastGpuTimeoutWarningTimestampMilliseconds = 0;
@@ -100,6 +102,11 @@ export class BuiltinSource implements IMetricSource {
                 unit: "%",
                 progress: Math.min(Math.max((gpu.utilizationGpu ?? 0) / 100, 0), 1),
             };
+            if (gpu.modelText) {
+                metrics["gpu.model"] = {
+                    text: gpu.modelText,
+                };
+            }
             metrics["gpu.temp"] = {
                 scalar: gpu.temperatureGpu ?? 0,
                 unit: "°C",
@@ -261,8 +268,13 @@ export class BuiltinSource implements IMetricSource {
                     unit: "GHz",
                 };
             }
+            if (this.cachedCpuModelText) {
+                metrics["cpu.model"] = {
+                    text: this.cachedCpuModelText,
+                };
+            }
 
-            this.ensureCpuBaseFrequencyCached();
+            this.ensureCpuInformationCached();
 
             return metrics;
         } catch (error) {
@@ -271,27 +283,27 @@ export class BuiltinSource implements IMetricSource {
         }
     }
 
-    private ensureCpuBaseFrequencyCached(): void {
+    private ensureCpuInformationCached(): void {
         if (
-            this.cachedCpuBaseFrequencyGigahertz != null
-            || this.pendingCpuBaseFrequencyPromise
-            || this.hasAttemptedCpuBaseFrequencyPoll
+            this.hasAttemptedCpuInformationPoll
+            || this.pendingCpuInformationPromise
         ) {
             return;
         }
 
-        this.hasAttemptedCpuBaseFrequencyPoll = true;
-        this.pendingCpuBaseFrequencyPromise = systemInformation.cpu()
+        this.hasAttemptedCpuInformationPoll = true;
+        this.pendingCpuInformationPromise = systemInformation.cpu()
             .then(cpuData => {
                 if (isFinitePositiveNumber(cpuData.speed)) {
                     this.cachedCpuBaseFrequencyGigahertz = cpuData.speed;
                 }
+                this.cachedCpuModelText = formatCpuModelText(cpuData);
             })
             .catch(error => {
-                log.warn(() => `CPU base frequency poll error: ${String(error)}`);
+                log.warn(() => `CPU information poll error: ${String(error)}`);
             })
             .finally(() => {
-                this.pendingCpuBaseFrequencyPromise = null;
+                this.pendingCpuInformationPromise = null;
             });
     }
 
@@ -590,6 +602,7 @@ interface NetworkCounterSample {
 
 interface GpuTelemetryData {
     utilizationGpu?: number;
+    modelText?: string;
     temperatureGpu?: number;
     memoryUsed?: number;
     memoryTotal?: number;
@@ -789,11 +802,12 @@ async function pollWindowsNvidiaGpuTelemetry(): Promise<GpuTelemetryData | null>
 
     const fields = firstGpuLine.split(",").map(field => field.trim());
     const utilizationGpu = parseNvidiaSmiNumber(fields[0]);
-    const temperatureGpu = parseNvidiaSmiNumber(fields[1]);
-    const memoryUsed = parseNvidiaSmiNumber(fields[2]);
-    const memoryTotal = parseNvidiaSmiNumber(fields[3]);
-    const powerDraw = parseNvidiaSmiNumber(fields[4]);
-    const powerLimit = parseNvidiaSmiNumber(fields[5]);
+    const modelText = normalizeNonEmptyText(fields[1]);
+    const temperatureGpu = parseNvidiaSmiNumber(fields[2]);
+    const memoryUsed = parseNvidiaSmiNumber(fields[3]);
+    const memoryTotal = parseNvidiaSmiNumber(fields[4]);
+    const powerDraw = parseNvidiaSmiNumber(fields[5]);
+    const powerLimit = parseNvidiaSmiNumber(fields[6]);
 
     if (
         utilizationGpu == null
@@ -802,6 +816,7 @@ async function pollWindowsNvidiaGpuTelemetry(): Promise<GpuTelemetryData | null>
         && memoryTotal == null
         && powerDraw == null
         && powerLimit == null
+        && modelText == null
     ) {
         gpuLog.debug(() => [
             "nvidiaSmiNoParsedFields",
@@ -812,6 +827,7 @@ async function pollWindowsNvidiaGpuTelemetry(): Promise<GpuTelemetryData | null>
 
     return {
         utilizationGpu,
+        modelText,
         temperatureGpu,
         memoryUsed,
         memoryTotal,
@@ -833,6 +849,7 @@ async function pollSystemInformationGpuTelemetry(): Promise<GpuTelemetryData | n
 
     return {
         utilizationGpu: nvidiaController.utilizationGpu,
+        modelText: normalizeNonEmptyText(nvidiaController.model),
         temperatureGpu: nvidiaController.temperatureGpu,
         memoryUsed: nvidiaController.memoryUsed,
         memoryTotal: nvidiaController.memoryTotal,
@@ -927,6 +944,27 @@ function parseNvidiaSmiNumber(value: string | undefined): number | undefined {
     const numericValue = Number(value);
 
     return Number.isFinite(numericValue) ? numericValue : undefined;
+}
+
+function normalizeNonEmptyText(value: string | undefined): string | undefined {
+    const normalizedValue = value?.trim();
+
+    return normalizedValue && normalizedValue.toUpperCase() !== "N/A"
+        ? normalizedValue
+        : undefined;
+}
+
+function formatCpuModelText(cpuData: Systeminformation.CpuData): string | null {
+    const modelParts = [
+        normalizeNonEmptyText(cpuData.manufacturer),
+        normalizeNonEmptyText(cpuData.brand),
+    ];
+    const modelText = modelParts
+        .filter((modelPart): modelPart is string => modelPart != null)
+        .join(" ")
+        .trim();
+
+    return modelText.length > 0 ? modelText : null;
 }
 
 function isUsableFileSystem(fileSystem: Systeminformation.FsSizeData): boolean {

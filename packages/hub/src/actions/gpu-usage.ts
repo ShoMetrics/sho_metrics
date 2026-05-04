@@ -5,6 +5,7 @@ import { setSingleMetricDisplay } from "./single-metric-display";
 import type { WidgetData } from "../rendering/widget-data";
 import type { SettingValue } from "./metric-visual-settings";
 import { formatBytes } from "../metrics/byte-display";
+import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-label";
 import { buildGpuPowerWidgetData, resolveMaximumGpuPowerWatts } from "../metrics/gpu-power-display";
 import {
     buildTemperatureWidgetData,
@@ -64,7 +65,12 @@ export class GpuUsage extends GpuBaseAction {
         setSingleMetricDisplay({
             event,
             metricKey: GPU_USAGE_METRIC_KEY,
-            widgetData: data,
+            widgetData: {
+                ...data,
+                secondaryDisplayValue: data.sampleTimestampMilliseconds != null
+                    ? formatCompactHardwareModelLabel(metricStore.getTextValue(GPU_MODEL_METRIC_KEY), "gpu")
+                    : undefined,
+            },
             ...buildMetricDisplayIcons({ hardware: "gpu", status: "percentage" }),
         });
     }
@@ -126,6 +132,7 @@ export class GpuPower extends GpuBaseAction {
 }
 
 const GPU_USAGE_METRIC_KEY = "gpu.usage_percent";
+const GPU_MODEL_METRIC_KEY = "gpu.model";
 const GPU_TEMP_METRIC_KEY = "gpu.temp";
 const GPU_VRAM_USED_METRIC_KEY = "gpu.vram_used";
 const GPU_VRAM_TOTAL_METRIC_KEY = "gpu.vram_total";
@@ -134,6 +141,7 @@ const GPU_POWER_LIMIT_METRIC_KEY = "gpu.power_limit";
 const GPU_SAMPLE_STALE_MS = 7000;
 const GPU_METRIC_KEYS = [
     GPU_USAGE_METRIC_KEY,
+    GPU_MODEL_METRIC_KEY,
     GPU_TEMP_METRIC_KEY,
     GPU_VRAM_USED_METRIC_KEY,
     GPU_VRAM_TOTAL_METRIC_KEY,
