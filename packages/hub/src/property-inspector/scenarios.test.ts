@@ -114,7 +114,9 @@ test("line smoothing slider is exposed only by sparkline scenarios", () => {
         }));
 
         assertFieldAbsent(linearFieldIdList, "line-smoothing");
+        assertFieldAbsent(linearFieldIdList, "sparkline-chart-guide-style");
         assertFieldPresent(sparklineFieldIdList, "line-smoothing");
+        assertFieldPresent(sparklineFieldIdList, "sparkline-chart-guide-style");
     }
 });
 

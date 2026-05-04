@@ -20,6 +20,7 @@ export type DiskMetricKind = "usage" | "throughput";
 export type DiskUsageDisplayMode = "percentage" | "space";
 export type DiskThroughputDirection = "total" | "read" | "write";
 export type TemperatureUnit = "celsius" | "fahrenheit";
+export type SparklineChartGuideStyle = "horizontal" | "time-axis";
 
 export interface PropertyInspectorSettings {
     pollingFrequencySeconds: number;
@@ -34,6 +35,7 @@ export interface PropertyInspectorSettings {
     colorMedium: string;
     colorHigh: string;
     lineSmoothingPercent: number;
+    sparklineChartGuideStyle: SparklineChartGuideStyle;
     networkDirection: NetworkDirection;
     networkInterfaceId: string;
     availableNetworkInterfaces: string;
@@ -93,6 +95,7 @@ export const basePropertyInspectorSettings: PropertyInspectorSettings = {
     colorMedium: "#eab308",
     colorHigh: "#ef4444",
     lineSmoothingPercent: 75,
+    sparklineChartGuideStyle: "horizontal",
 };
 
 const pollingFrequencyValues = [1, 2, 3, 5, 10, 15, 30, 60] as const;
@@ -169,6 +172,7 @@ export function normalizePropertyInspectorSettings(
             rawSettings.lineSmoothingPercent,
             basePropertyInspectorSettings.lineSmoothingPercent,
         ),
+        sparklineChartGuideStyle: normalizeSparklineChartGuideStyle(rawSettings.sparklineChartGuideStyle),
     };
 }
 
@@ -240,6 +244,10 @@ export function normalizeNetworkDirection(value: SettingValue): NetworkDirection
 
 export function normalizeTemperatureUnit(value: SettingValue): TemperatureUnit {
     return value === "fahrenheit" ? "fahrenheit" : "celsius";
+}
+
+export function normalizeSparklineChartGuideStyle(value: SettingValue): SparklineChartGuideStyle {
+    return value === "time-axis" ? "time-axis" : "horizontal";
 }
 
 export function resolveDefaultDiskPollingFrequency(diskMetricKind: DiskMetricKind): number {

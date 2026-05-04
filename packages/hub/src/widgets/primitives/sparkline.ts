@@ -8,10 +8,15 @@ import {
 import type { Widget, WidgetBaseConfig } from "../widget.interface";
 import { renderMetricTextRow } from "./metric-text-row";
 
+export type SparklineChartGuideStyle = "horizontal" | "time-axis";
+
 export interface SparklineConfig extends WidgetBaseConfig {
     lineWidth: number;
     fillOpacity: number;
     lineSmoothingPercent: number;
+    chartGuideStyle: SparklineChartGuideStyle;
+    timeGuideTickCount: number;
+    historyWindowSeconds: number;
     showDots: boolean;
     dashPattern: string;
     topIconFragment?: string;
@@ -26,6 +31,9 @@ export const DEFAULT_SPARKLINE_CONFIG: SparklineConfig = {
     lineWidth: 2,
     fillOpacity: 0.58,
     lineSmoothingPercent: 75,
+    chartGuideStyle: "horizontal",
+    timeGuideTickCount: 5,
+    historyWindowSeconds: 60,
     showDots: false,
     dashPattern: "",
     gradientHeadAdjustmentPercent: 28,
@@ -35,9 +43,18 @@ const SPARKLINE_TEXT_FONT_FAMILY = "'Inter','SF Pro Display','Segoe UI',sans-ser
 const MINIMUM_VISIBLE_RANGE = 1;
 const MINIMUM_AREA_PROGRESS = 0.09;
 const ADAPTIVE_SCALE_HEADROOM_RATIO = 1.18;
-const CHART_REGION_FILL_OPACITY = 0.075;
-const CHART_REGION_GLOW_OPACITY = 0.128;
-const CHART_REGION_RADIUS = 7;
+const CHART_PLOT_TOP_INSET = 2;
+const HORIZONTAL_GUIDE_LINE_COLOR = "rgba(255,255,255,0.24)";
+const CHART_PANEL_FILL = "rgba(255,255,255,0.07)";
+const CHART_PANEL_STROKE = "rgba(255,255,255,0.05)";
+const CHART_PANEL_RADIUS = 7;
+const CHART_LABEL_BAND_HEIGHT = 14;
+const CHART_PLOT_SIDE_INSET = 1;
+const TIME_GUIDE_LINE_COLOR = "rgba(255,255,255,0.28)";
+const TIME_GUIDE_LINE_WIDTH = 1.15;
+const TIME_GUIDE_TICK_HEIGHT = 5;
+const BASELINE_COLOR = "rgba(255,255,255,0.30)";
+const TIME_LABEL_COLOR = "rgba(255,255,255,0.34)";
 
 interface SparklineLayoutPlan {
     title: TextLineLayout;
@@ -87,12 +104,22 @@ export const sparkline: Widget<SparklineConfig> = {
         const lineGradientId = `sparkline-line-${gradientIdSuffix}`;
         const areaGradientId = `sparkline-area-${gradientIdSuffix}`;
         const glowFilterId = `sparkline-glow-${keySize.width}-${keySize.height}`;
-        const chartRegionGlowFilterId = `sparkline-region-glow-${keySize.width}-${keySize.height}`;
-        const points = buildSparklinePoints(visualValues, layoutPlan.chart, data.sparklineScale);
+        const latestPointGlowFilterId = `sparkline-latest-glow-${keySize.width}-${keySize.height}`;
+        const plotLayout = buildPlotLayout(layoutPlan.chart, config.chartGuideStyle);
+        const points = buildSparklinePoints(visualValues, plotLayout, data.sparklineScale);
         const linePath = buildSmoothPath(points);
-        const areaPath = buildAreaPath(points, layoutPlan.chart);
-        const chartRegionSvg = renderChartRegion(layoutPlan.chart, currentColor, chartRegionGlowFilterId);
+        const areaPath = buildAreaPath(points, plotLayout);
+        const chartGuideSvg = renderChartGuides({
+            chartLayout: layoutPlan.chart,
+            plotLayout,
+            guideStyle: config.chartGuideStyle,
+            timeGuideTickCount: config.timeGuideTickCount,
+            historyWindowSeconds: config.historyWindowSeconds,
+        });
         const latestPoint = points[points.length - 1];
+        const latestPointGlowSvg = config.chartGuideStyle === "time-axis" && latestPoint
+            ? renderLatestPointGlow(latestPoint, lineHeadColor, latestPointGlowFilterId)
+            : "";
         const valueText = data.displayValue ?? data.current.toFixed(1);
         const dotSvg = config.showDots && latestPoint
             ? `<circle cx="${formatSvgNumber(latestPoint.xCoordinate)}" cy="${formatSvgNumber(latestPoint.yCoordinate)}" r="2.8" fill="${lineHeadColor}" />`
@@ -110,13 +137,13 @@ export const sparkline: Widget<SparklineConfig> = {
                     <stop offset="48%" stop-color="${currentColor}" stop-opacity="${config.fillOpacity * 0.48}" />
                     <stop offset="100%" stop-color="${currentColor}" stop-opacity="${config.fillOpacity * 0.14}" />
                 </linearGradient>
-                <filter id="${chartRegionGlowFilterId}" x="-8%" y="-16%" width="116%" height="132%">
-                    <feGaussianBlur in="SourceGraphic" stdDeviation="2.1" />
-                </filter>
                 <filter id="${glowFilterId}" x="-10%" y="-30%" width="120%" height="160%">
                     <feGaussianBlur in="SourceGraphic" stdDeviation="1.7" result="blurredLine" />
                     <feColorMatrix in="blurredLine" type="matrix"
                         values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.55 0" />
+                </filter>
+                <filter id="${latestPointGlowFilterId}" x="-80%" y="-80%" width="260%" height="260%">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="3.1" />
                 </filter>
             </defs>
             ${renderTitle({
@@ -143,8 +170,9 @@ export const sparkline: Widget<SparklineConfig> = {
                 unitBaselineOffset: 2,
                 valueExtraAttributes: ["font-variant-numeric=\"tabular-nums\""],
             })}
-            ${chartRegionSvg}
+            ${chartGuideSvg}
             <path d="${areaPath}" fill="url(#${areaGradientId})" />
+            ${latestPointGlowSvg}
             <path d="${linePath}" fill="none" stroke="url(#${lineGradientId})"
                 stroke-width="${Math.max(1, config.lineWidth + 1.4)}" stroke-linejoin="round"
                 stroke-linecap="round" filter="url(#${glowFilterId})" opacity="0.55" />
@@ -427,19 +455,118 @@ function buildAreaPath(
     ].join(" ");
 }
 
-function renderChartRegion(
+function buildPlotLayout(
     chartLayout: ChartLayout,
-    color: string,
-    glowFilterId: string,
-): string {
+    guideStyle: SparklineChartGuideStyle,
+): ChartLayout {
+    if (guideStyle === "time-axis") {
+        return {
+            xCoordinate: chartLayout.xCoordinate + CHART_PLOT_SIDE_INSET,
+            yCoordinate: chartLayout.yCoordinate + CHART_PLOT_TOP_INSET,
+            width: Math.max(1, chartLayout.width - CHART_PLOT_SIDE_INSET * 2),
+            height: Math.max(1, chartLayout.height - CHART_LABEL_BAND_HEIGHT - CHART_PLOT_TOP_INSET),
+        };
+    }
+
+    return {
+        xCoordinate: chartLayout.xCoordinate,
+        yCoordinate: chartLayout.yCoordinate + CHART_PLOT_TOP_INSET,
+        width: chartLayout.width,
+        height: Math.max(1, chartLayout.height - CHART_PLOT_TOP_INSET),
+    };
+}
+
+function renderChartGuides(options: {
+    chartLayout: ChartLayout;
+    plotLayout: ChartLayout;
+    guideStyle: SparklineChartGuideStyle;
+    timeGuideTickCount: number;
+    historyWindowSeconds: number;
+}): string {
+    if (options.guideStyle === "time-axis") {
+        return renderTimeAxisGuides(options);
+    }
+
+    return renderHorizontalGuides({ plotLayout: options.plotLayout });
+}
+
+function renderHorizontalGuides(options: {
+    plotLayout: ChartLayout;
+}): string {
+    const guideList = [1, 0.5, 0].map(progress => {
+        const yCoordinate = options.plotLayout.yCoordinate + options.plotLayout.height * (1 - progress);
+
+        return `
+            <line x1="${formatSvgNumber(options.plotLayout.xCoordinate)}" y1="${formatSvgNumber(yCoordinate)}"
+                x2="${formatSvgNumber(options.plotLayout.xCoordinate + options.plotLayout.width)}"
+                y2="${formatSvgNumber(yCoordinate)}"
+                stroke="${HORIZONTAL_GUIDE_LINE_COLOR}" stroke-width="1"
+                stroke-dasharray="4 4" stroke-linecap="round" />
+        `;
+    });
+
     return `
-        <rect x="${formatSvgNumber(chartLayout.xCoordinate)}" y="${formatSvgNumber(chartLayout.yCoordinate)}"
-            width="${formatSvgNumber(chartLayout.width)}" height="${formatSvgNumber(chartLayout.height)}"
-            rx="${CHART_REGION_RADIUS}" fill="${color}" opacity="${CHART_REGION_GLOW_OPACITY}"
-            filter="url(#${glowFilterId})" />
-        <rect x="${formatSvgNumber(chartLayout.xCoordinate)}" y="${formatSvgNumber(chartLayout.yCoordinate)}"
-            width="${formatSvgNumber(chartLayout.width)}" height="${formatSvgNumber(chartLayout.height)}"
-            rx="${CHART_REGION_RADIUS}" fill="${color}" opacity="${CHART_REGION_FILL_OPACITY}" />
+        <g>
+            ${guideList.join("")}
+        </g>
+    `;
+}
+
+function renderTimeAxisGuides(options: {
+    chartLayout: ChartLayout;
+    plotLayout: ChartLayout;
+    timeGuideTickCount: number;
+    historyWindowSeconds: number;
+}): string {
+    const safeTickCount = Math.max(2, Math.round(options.timeGuideTickCount));
+    const baselineYCoordinate = options.plotLayout.yCoordinate + options.plotLayout.height;
+    const internalGuideList = Array.from({ length: Math.max(0, safeTickCount - 2) }, (ignoredValue, guideIndex) => {
+        const tickIndex = guideIndex + 1;
+        const xCoordinate = options.plotLayout.xCoordinate + (options.plotLayout.width * tickIndex) / (safeTickCount - 1);
+        const labelSeconds = Math.round(options.historyWindowSeconds * (1 - tickIndex / (safeTickCount - 1)));
+
+        return `
+            <line x1="${formatSvgNumber(xCoordinate)}" y1="${formatSvgNumber(options.plotLayout.yCoordinate)}"
+                x2="${formatSvgNumber(xCoordinate)}" y2="${formatSvgNumber(baselineYCoordinate)}"
+                stroke="${TIME_GUIDE_LINE_COLOR}" stroke-width="${TIME_GUIDE_LINE_WIDTH}"
+                stroke-linecap="round" />
+            <line x1="${formatSvgNumber(xCoordinate)}" y1="${formatSvgNumber(baselineYCoordinate)}"
+                x2="${formatSvgNumber(xCoordinate)}" y2="${formatSvgNumber(baselineYCoordinate + TIME_GUIDE_TICK_HEIGHT)}"
+                stroke="${TIME_GUIDE_LINE_COLOR}" stroke-width="${TIME_GUIDE_LINE_WIDTH}"
+                stroke-linecap="round" />
+            ${renderConstrainedSvgText({
+                id: `sparkline-time-${tickIndex}`,
+                text: `${labelSeconds}s`,
+                xCoordinate,
+                yCoordinate: baselineYCoordinate + CHART_LABEL_BAND_HEIGHT - 2,
+                maxWidth: 24,
+                fontSize: 10,
+                fontFamily: SPARKLINE_TEXT_FONT_FAMILY,
+                fontWeight: 750,
+                fill: TIME_LABEL_COLOR,
+                textAnchor: "middle",
+            })}
+        `;
+    });
+
+    return `
+        <g>
+            <rect x="${formatSvgNumber(options.chartLayout.xCoordinate)}" y="${formatSvgNumber(options.chartLayout.yCoordinate)}"
+                width="${formatSvgNumber(options.chartLayout.width)}" height="${formatSvgNumber(options.chartLayout.height)}"
+                rx="${CHART_PANEL_RADIUS}" fill="${CHART_PANEL_FILL}" stroke="${CHART_PANEL_STROKE}" stroke-width="1" />
+            ${internalGuideList.join("")}
+            <line x1="${formatSvgNumber(options.plotLayout.xCoordinate)}" y1="${formatSvgNumber(baselineYCoordinate)}"
+                x2="${formatSvgNumber(options.plotLayout.xCoordinate + options.plotLayout.width)}"
+                y2="${formatSvgNumber(baselineYCoordinate)}"
+                stroke="${BASELINE_COLOR}" stroke-width="1" stroke-dasharray="4 4" stroke-linecap="round" />
+        </g>
+    `;
+}
+
+function renderLatestPointGlow(point: SparklinePoint, color: string, filterId: string): string {
+    return `
+        <circle cx="${formatSvgNumber(point.xCoordinate)}" cy="${formatSvgNumber(point.yCoordinate)}"
+            r="5.5" fill="${color}" opacity="0.34" filter="url(#${filterId})" />
     `;
 }
 
