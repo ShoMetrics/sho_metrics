@@ -19,6 +19,7 @@ test("disk usage linear exposes only linear disk title fields", () => {
     }));
 
     assertFieldPresent(inspectorFieldIdList, "disk-linear-label");
+    assertFieldPresent(inspectorFieldIdList, "disk-linear-label-heading");
     assertFieldPresent(inspectorFieldIdList, "disk-volume-label");
     assertFieldAbsent(inspectorFieldIdList, "disk-usage-display-mode");
 });
@@ -74,9 +75,37 @@ test("color mode selects the matching color section", () => {
     }));
 
     assertFieldPresent(solidFieldIdList, "solid-color");
-    assertFieldAbsent(solidFieldIdList, "dynamic-usage-colors");
-    assertFieldPresent(thresholdFieldIdList, "dynamic-usage-colors");
+    assertFieldPresent(solidFieldIdList, "color-settings-heading");
+    assertFieldPresent(thresholdFieldIdList, "color-settings-heading");
+    assertFieldPresent(thresholdFieldIdList, "dynamic-usage-colors-note");
     assertFieldAbsent(thresholdFieldIdList, "solid-color");
+});
+
+test("shared visual fields keep a consistent order across widgets", () => {
+    const actionKindList: readonly ActionKind[] = [
+        "cpu-usage",
+        "net-speed",
+        "ram",
+        "disk",
+        "gpu-usage",
+        "gpu-temp",
+        "gpu-vram",
+        "gpu-power",
+    ];
+    const graphicTypeList: readonly GraphicType[] = ["circular", "linear", "dashed-line"];
+
+    for (const actionKind of actionKindList) {
+        for (const graphicType of graphicTypeList) {
+            const inspectorFieldIdList = resolveInspectorFieldIdList(buildContext({
+                actionKind,
+                settings: { graphicType },
+            }));
+
+            assertFieldOrder(inspectorFieldIdList, "graphic-type", "graphic-style");
+            assertFieldOrder(inspectorFieldIdList, "graphic-style", "color-settings-heading");
+            assertFieldOrder(inspectorFieldIdList, "color-settings-heading", "color-mode");
+        }
+    }
 });
 
 test("windows hides disk throughput-only controls", () => {
@@ -123,5 +152,23 @@ function assertFieldAbsent(inspectorFieldIdList: readonly string[], fieldId: str
     assert.ok(
         !inspectorFieldIdList.includes(fieldId),
         `Expected field "${fieldId}" to be absent from [${inspectorFieldIdList.join(", ")}].`,
+    );
+}
+
+function assertFieldOrder(inspectorFieldIdList: readonly string[], earlierFieldId: string, laterFieldId: string): void {
+    const earlierIndex = inspectorFieldIdList.indexOf(earlierFieldId);
+    const laterIndex = inspectorFieldIdList.indexOf(laterFieldId);
+
+    assert.ok(
+        earlierIndex >= 0,
+        `Expected field "${earlierFieldId}" in [${inspectorFieldIdList.join(", ")}].`,
+    );
+    assert.ok(
+        laterIndex >= 0,
+        `Expected field "${laterFieldId}" in [${inspectorFieldIdList.join(", ")}].`,
+    );
+    assert.ok(
+        earlierIndex < laterIndex,
+        `Expected field "${earlierFieldId}" before "${laterFieldId}" in [${inspectorFieldIdList.join(", ")}].`,
     );
 }

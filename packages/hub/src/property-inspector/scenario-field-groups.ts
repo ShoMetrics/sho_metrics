@@ -6,6 +6,7 @@ export const baseFieldGroup = defineFieldGroup({
     fieldList: [
         inspectorFieldCatalog.pollingFrequencyField,
         inspectorFieldCatalog.graphicTypeField,
+        inspectorFieldCatalog.graphicStyleField,
     ],
 });
 
@@ -28,7 +29,6 @@ export const thresholdColorFieldGroup = defineFieldGroup({
     name: "thresholdColor",
     include: context => context.settings.colorMode !== "solid",
     fieldList: [
-        inspectorFieldCatalog.dynamicUsageColorsHeadingField,
         inspectorFieldCatalog.dynamicUsageColorsNoteField,
         inspectorFieldCatalog.lowThresholdField,
         inspectorFieldCatalog.highThresholdField,
@@ -38,10 +38,10 @@ export const thresholdColorFieldGroup = defineFieldGroup({
     ],
 });
 
-export const visualStyleFieldGroup = defineFieldGroup({
-    name: "visualStyle",
+export const colorSettingsFieldGroup = defineFieldGroup({
+    name: "colorSettings",
     fieldList: [
-        inspectorFieldCatalog.graphicStyleField,
+        inspectorFieldCatalog.colorSettingsHeadingField,
         inspectorFieldCatalog.colorModeField,
     ],
 });
@@ -69,6 +69,7 @@ export const diskUsageCircularFieldGroup = defineFieldGroup({
 export const diskUsageLinearLabelFieldGroup = defineFieldGroup({
     name: "diskUsageLinearLabel",
     fieldList: [
+        inspectorFieldCatalog.diskLinearLabelHeadingField,
         inspectorFieldCatalog.diskLinearLabelField,
         inspectorFieldCatalog.diskVolumeLabelField,
     ],

@@ -13,6 +13,7 @@ import {
     resolveIsWindowsPropertyInspector,
     type StreamDeckPropertyInspectorClient,
 } from "./stream-deck-client";
+import type { PropertyInspectorSettingKey } from "./schema";
 
 interface AppProps {
     client: StreamDeckPropertyInspectorClient;
@@ -40,6 +41,29 @@ export function App({ client }: AppProps): React.JSX.Element {
         isWindows: state.isWindows,
         settings: state.settings,
     }), [state.actionKind, state.isWindows, state.settings]);
+
+    const updateSetting = (changedKey: PropertyInspectorSettingKey, changedValue: string): void => {
+        setState((currentState) => {
+            const nextSettings = normalizeNextSettings({
+                changedKey,
+                changedValue,
+                state: currentState,
+            });
+
+            client.setSettings(nextSettings).catch((error: Error) => {
+                setState((errorState) => ({
+                    ...errorState,
+                    loadError: `Failed to save settings: ${error.message}`,
+                }));
+            });
+
+            return {
+                ...currentState,
+                settings: nextSettings,
+                loadError: null,
+            };
+        });
+    };
 
     useEffect(() => {
         let isDisposed = false;
@@ -98,26 +122,7 @@ export function App({ client }: AppProps): React.JSX.Element {
                 return;
             }
 
-            setState((currentState) => {
-                const nextSettings = normalizeNextSettings({
-                    changedKey: controlValue.key,
-                    changedValue: controlValue.value,
-                    state: currentState,
-                });
-
-                client.setSettings(nextSettings).catch((error: Error) => {
-                    setState((errorState) => ({
-                        ...errorState,
-                        loadError: `Failed to save settings: ${error.message}`,
-                    }));
-                });
-
-                return {
-                    ...currentState,
-                    settings: nextSettings,
-                    loadError: null,
-                };
-            });
+            updateSetting(controlValue.key, controlValue.value);
         };
 
         root.addEventListener("input", handleControlEvent, true);
@@ -137,7 +142,12 @@ export function App({ client }: AppProps): React.JSX.Element {
         <div ref={rootRef}>
             {resolveInspectorFieldList(visibilityContext)
                 .map((field) => (
-                    <FieldRenderer key={field.id} field={field} context={visibilityContext} />
+                    <FieldRenderer
+                        key={field.id}
+                        field={field}
+                        context={visibilityContext}
+                        onSettingChange={updateSetting}
+                    />
                 ))}
         </div>
     );

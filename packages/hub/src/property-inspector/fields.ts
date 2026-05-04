@@ -158,18 +158,24 @@ export const inspectorFieldCatalog = {
             { value: "space", label: "Free Space" },
         ]),
     }),
+    diskLinearLabelHeadingField: defineField({
+        id: "disk-linear-label-heading",
+        kind: "heading",
+        text: "Display Label",
+        allowedScopes: diskUsageLinearScopeList,
+    }),
     diskLinearLabelField: defineField({
         id: "disk-linear-label",
         key: "diskLinearLabel",
         kind: "text",
-        label: "Key Label",
+        label: "Custom Label",
         placeholderSource: "diskAutoLinearLabel",
         allowedScopes: diskUsageLinearScopeList,
     }),
     diskVolumeLabelField: defineField({
         id: "disk-volume-label",
         kind: "readonly",
-        label: "Volume Label",
+        label: "Detected Label",
         valueSource: "selectedDiskVolumeLabel",
         allowedScopes: diskUsageLinearScopeList,
     }),
@@ -259,10 +265,10 @@ export const inspectorFieldCatalog = {
         defaultValue: "#3b82f6",
         allowedScopes: allMetricScopeList,
     }),
-    dynamicUsageColorsHeadingField: defineField({
-        id: "dynamic-usage-colors",
+    colorSettingsHeadingField: defineField({
+        id: "color-settings-heading",
         kind: "heading",
-        text: "Dynamic Usage Colors",
+        text: "Color Settings",
         allowedScopes: allMetricScopeList,
     }),
     dynamicUsageColorsNoteField: defineField({

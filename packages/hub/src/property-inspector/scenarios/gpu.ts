@@ -5,7 +5,7 @@ import {
     maximumGpuPowerFieldGroup,
     maximumTemperatureFieldGroup,
     temperatureUnitFieldGroup,
-    visualStyleFieldGroup,
+    colorSettingsFieldGroup,
 } from "../scenario-field-groups";
 import {
     defaultSettingsNormalizer,
@@ -30,7 +30,7 @@ export function resolveGpuTempScenario(graphicType: GraphicType): InspectorScena
             ...(graphicType === "circular" ? [circularCenterFieldGroup] : []),
             temperatureUnitFieldGroup,
             ...(graphicType === "dashed-line" ? [] : [maximumTemperatureFieldGroup]),
-            visualStyleFieldGroup,
+            colorSettingsFieldGroup,
             ...colorFieldGroupList,
         ],
     });
@@ -49,7 +49,7 @@ export function resolveGpuPowerScenario(graphicType: GraphicType): InspectorScen
             baseFieldGroup,
             ...(graphicType === "circular" ? [circularCenterFieldGroup] : []),
             ...(graphicType === "dashed-line" ? [] : [maximumGpuPowerFieldGroup]),
-            visualStyleFieldGroup,
+            colorSettingsFieldGroup,
             ...colorFieldGroupList,
         ],
     });
