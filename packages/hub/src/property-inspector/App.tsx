@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FieldRenderer } from "./components/FieldRenderer";
 import { readControlValue } from "./control-events";
-import { normalizeNextSettings, normalizeSettings, resolveInspectorFieldList } from "./scenarios";
+import {
+    normalizeNextSettings,
+    normalizeSettings,
+    resolveInspectorFieldList,
+} from "./scenarios";
 import {
     basePropertyInspectorSettings,
     resolveActionKind,
@@ -41,6 +45,10 @@ export function App({ client }: AppProps): React.JSX.Element {
         isWindows: state.isWindows,
         settings: state.settings,
     }), [state.actionKind, state.isWindows, state.settings]);
+    const inspectorFieldList = useMemo(
+        () => resolveInspectorFieldList(visibilityContext),
+        [visibilityContext],
+    );
 
     const updateSetting = (changedKey: PropertyInspectorSettingKey, changedValue: string): void => {
         setState((currentState) => {
@@ -140,15 +148,14 @@ export function App({ client }: AppProps): React.JSX.Element {
 
     return (
         <div ref={rootRef}>
-            {resolveInspectorFieldList(visibilityContext)
-                .map((field) => (
-                    <FieldRenderer
-                        key={field.id}
-                        field={field}
-                        context={visibilityContext}
-                        onSettingChange={updateSetting}
-                    />
-                ))}
+            {inspectorFieldList.map((field) => (
+                <FieldRenderer
+                    key={field.id}
+                    field={field}
+                    context={visibilityContext}
+                    onSettingChange={updateSetting}
+                />
+            ))}
         </div>
     );
 }

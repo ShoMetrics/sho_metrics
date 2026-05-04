@@ -33,6 +33,7 @@ export interface PropertyInspectorSettings {
     colorLow: string;
     colorMedium: string;
     colorHigh: string;
+    lineSmoothingPercent: number;
     networkDirection: NetworkDirection;
     networkInterfaceId: string;
     availableNetworkInterfaces: string;
@@ -91,6 +92,7 @@ export const basePropertyInspectorSettings: PropertyInspectorSettings = {
     colorLow: "#22c55e",
     colorMedium: "#eab308",
     colorHigh: "#ef4444",
+    lineSmoothingPercent: 75,
 };
 
 const pollingFrequencyValues = [1, 2, 3, 5, 10, 15, 30, 60] as const;
@@ -163,6 +165,10 @@ export function normalizePropertyInspectorSettings(
             basePropertyInspectorSettings.colorMedium,
         ),
         colorHigh: normalizeHexColor(rawSettings.colorHigh, basePropertyInspectorSettings.colorHigh),
+        lineSmoothingPercent: normalizeThreshold(
+            rawSettings.lineSmoothingPercent,
+            basePropertyInspectorSettings.lineSmoothingPercent,
+        ),
     };
 }
 

@@ -7,6 +7,11 @@ const BINARY_BASE = 1024;
 const MAXIMUM_SPACE_DISPLAY_DIGITS = 3;
 const MAXIMUM_THROUGHPUT_DISPLAY_DIGITS = 3;
 const MINIMUM_DISK_RATE_MAXIMUM_BYTES_PER_SECOND = 1024 * 1024;
+const PERCENTAGE_SPARKLINE_SCALE = {
+    mode: "fixed",
+    minimumValue: 0,
+    maximumValue: 100,
+} as const;
 
 export function buildMemoryUsageWidgetData(options: {
     usedBytesWidgetData: WidgetData;
@@ -18,15 +23,18 @@ export function buildMemoryUsageWidgetData(options: {
         usedBytes: options.usedBytesWidgetData.current,
         totalBytes: safeTotalBytes,
     });
+    const usageHistory = options.usedBytesWidgetData.history.map(historyValue => (historyValue / safeTotalBytes) * 100);
+    const currentUsagePercent = (options.usedBytesWidgetData.current / safeTotalBytes) * 100;
 
     return {
-        current: (options.usedBytesWidgetData.current / safeTotalBytes) * 100,
+        current: currentUsagePercent,
         progress: Math.min(Math.max(options.usedBytesWidgetData.current / safeTotalBytes, 0), 1),
-        history: options.usedBytesWidgetData.history.map(historyValue => (historyValue / safeTotalBytes) * 100),
+        history: usageHistory,
         unit: "%",
         label: options.label,
-        displayValue: ((options.usedBytesWidgetData.current / safeTotalBytes) * 100).toFixed(0),
+        displayValue: currentUsagePercent.toFixed(0),
         secondaryDisplayValue: usedAndTotalText,
+        sparklineScale: PERCENTAGE_SPARKLINE_SCALE,
         sampleTimestampMilliseconds: options.usedBytesWidgetData.sampleTimestampMilliseconds,
     };
 }
@@ -88,6 +96,7 @@ export function buildDiskThroughputWidgetData(options: {
         unit: formattedThroughput.unit,
         label: options.label,
         displayValue: formattedThroughput.value,
+        sparklineScale: { mode: "adaptive", minimumValue: 0 },
         sampleTimestampMilliseconds: options.bytesPerSecondWidgetData.sampleTimestampMilliseconds,
     };
 }

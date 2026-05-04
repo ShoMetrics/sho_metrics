@@ -4,21 +4,19 @@ import type { FieldSchema, SelectOption, SelectOptionsSource } from "./schema";
 const allMetricScopeList = Object.values(inspectorScope)
     .filter((scopeValue): scopeValue is InspectorScope => scopeValue !== inspectorScope.unknownScope);
 const circularScopeList = allMetricScopeList.filter(scopeValue => scopeValue.endsWith(".circular"));
+const sparklineScopeList = allMetricScopeList.filter(scopeValue => scopeValue.endsWith(".sparkline"));
 const diskScopeList = allMetricScopeList.filter(scopeValue => scopeValue.startsWith("disk."));
 const diskUsageScopeList = allMetricScopeList.filter(scopeValue => scopeValue.startsWith("disk.usage."));
 const diskUsageLinearScopeList = [inspectorScope.diskUsageLinearScope] as const;
 const diskUsageCircularScopeList = [inspectorScope.diskUsageCircularScope] as const;
 const diskThroughputScopeList = allMetricScopeList.filter(scopeValue => scopeValue.startsWith("disk.throughput."));
+const diskThroughputCircularLinearScopeList = [
+    inspectorScope.diskThroughputCircularScope,
+    inspectorScope.diskThroughputLinearScope,
+] as const;
 const netSpeedCircularScopeList = [inspectorScope.netSpeedCircularScope] as const;
 const gpuTempScopeList = allMetricScopeList.filter(scopeValue => scopeValue.startsWith("gpu-temp."));
-const gpuTempCircularLinearScopeList = [
-    inspectorScope.gpuTempCircularScope,
-    inspectorScope.gpuTempLinearScope,
-] as const;
-const gpuPowerCircularLinearScopeList = [
-    inspectorScope.gpuPowerCircularScope,
-    inspectorScope.gpuPowerLinearScope,
-] as const;
+const gpuPowerScopeList = allMetricScopeList.filter(scopeValue => scopeValue.startsWith("gpu-power."));
 
 export const inspectorFieldCatalog = {
     pollingFrequencyField: defineField({
@@ -200,7 +198,7 @@ export const inspectorFieldCatalog = {
         label: "Max Speed (MiB/s)",
         minimum: 1,
         step: 1,
-        allowedScopes: diskThroughputScopeList,
+        allowedScopes: diskThroughputCircularLinearScopeList,
         excludeWindows: true,
     }),
     temperatureUnitField: defineField({
@@ -222,7 +220,7 @@ export const inspectorFieldCatalog = {
         label: "Max Temp (C)",
         minimum: 1,
         step: 1,
-        allowedScopes: gpuTempCircularLinearScopeList,
+        allowedScopes: gpuTempScopeList,
     }),
     maximumGpuPowerField: defineField({
         id: "maximum-gpu-power",
@@ -231,7 +229,7 @@ export const inspectorFieldCatalog = {
         label: "Max Power (W)",
         minimum: 1,
         step: 1,
-        allowedScopes: gpuPowerCircularLinearScopeList,
+        allowedScopes: gpuPowerScopeList,
     }),
     graphicStyleField: defineField({
         id: "graphic-style",
@@ -244,6 +242,17 @@ export const inspectorFieldCatalog = {
             { value: "flat", label: "Default" },
             { value: "cupertino-glass", label: "Cupertino Glass Style" },
         ]),
+    }),
+    lineSmoothingField: defineField({
+        id: "line-smoothing",
+        key: "lineSmoothingPercent",
+        kind: "range",
+        label: "Line Smoothing",
+        defaultValue: 75,
+        minimum: 0,
+        maximum: 100,
+        step: 5,
+        allowedScopes: sparklineScopeList,
     }),
     colorModeField: defineField({
         id: "color-mode",

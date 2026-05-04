@@ -26,6 +26,11 @@ export class CpuUsage extends MetricAction {
             widgetData: {
                 ...widgetData,
                 displayValue: widgetData.current.toFixed(0),
+                sparklineScale: {
+                    mode: "fixed",
+                    minimumValue: 0,
+                    maximumValue: 100,
+                },
                 secondaryDisplayValue: formatCompactHardwareModelLabel(
                     metricStore.getTextValue(CPU_MODEL_METRIC_KEY),
                     "cpu",

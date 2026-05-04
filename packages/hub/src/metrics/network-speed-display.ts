@@ -37,6 +37,7 @@ export function buildNetworkSpeedWidgetData(options: NetworkSpeedDisplayOptions)
         unit: formattedSpeed.unit,
         label: options.label,
         displayValue: formattedSpeed.value,
+        sparklineScale: { mode: "adaptive", minimumValue: 0 },
         sampleTimestampMilliseconds: options.sampleTimestampMilliseconds,
     };
 }

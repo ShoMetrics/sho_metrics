@@ -7,6 +7,7 @@ import {
     diskUsageCircularFieldGroup,
     diskUsageLinearLabelFieldGroup,
     colorSettingsFieldGroup,
+    sparklineAppearanceFieldGroup,
 } from "../scenario-field-groups";
 import {
     defaultSettingsNormalizer,
@@ -48,6 +49,7 @@ const diskUsageSparklineScenario = defineScenario({
     fieldGroupList: [
         baseFieldGroup,
         diskUsageBaseFieldGroup,
+        sparklineAppearanceFieldGroup,
         colorSettingsFieldGroup,
         ...colorFieldGroupList,
     ],
@@ -82,6 +84,7 @@ const diskThroughputSparklineScenario = defineScenario({
     fieldGroupList: [
         baseFieldGroup,
         diskThroughputFieldGroup,
+        sparklineAppearanceFieldGroup,
         colorSettingsFieldGroup,
         ...colorFieldGroupList,
     ],

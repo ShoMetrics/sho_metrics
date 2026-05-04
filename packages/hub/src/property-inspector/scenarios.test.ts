@@ -81,6 +81,65 @@ test("color mode selects the matching color section", () => {
     assertFieldAbsent(thresholdFieldIdList, "solid-color");
 });
 
+test("line smoothing slider is exposed only by sparkline scenarios", () => {
+    const scenarioList: ReadonlyArray<{
+        actionKind: ActionKind;
+        settings?: Partial<PropertyInspectorSettings>;
+    }> = [
+        { actionKind: "cpu-usage" },
+        { actionKind: "net-speed" },
+        { actionKind: "ram" },
+        { actionKind: "disk", settings: { diskMetricKind: "usage" } },
+        { actionKind: "disk", settings: { diskMetricKind: "throughput" } },
+        { actionKind: "gpu-usage" },
+        { actionKind: "gpu-temp" },
+        { actionKind: "gpu-vram" },
+        { actionKind: "gpu-power" },
+    ];
+
+    for (const scenario of scenarioList) {
+        const linearFieldIdList = resolveInspectorFieldIdList(buildContext({
+            actionKind: scenario.actionKind,
+            settings: {
+                ...scenario.settings,
+                graphicType: "linear",
+            },
+        }));
+        const sparklineFieldIdList = resolveInspectorFieldIdList(buildContext({
+            actionKind: scenario.actionKind,
+            settings: {
+                ...scenario.settings,
+                graphicType: "dashed-line",
+            },
+        }));
+
+        assertFieldAbsent(linearFieldIdList, "line-smoothing");
+        assertFieldPresent(sparklineFieldIdList, "line-smoothing");
+    }
+});
+
+test("sparkline max controls follow graph-specific scale semantics", () => {
+    const gpuTemperatureSparklineFieldIdList = resolveInspectorFieldIdList(buildContext({
+        actionKind: "gpu-temp",
+        settings: { graphicType: "dashed-line" },
+    }));
+    const gpuPowerSparklineFieldIdList = resolveInspectorFieldIdList(buildContext({
+        actionKind: "gpu-power",
+        settings: { graphicType: "dashed-line" },
+    }));
+    const diskThroughputSparklineFieldIdList = resolveInspectorFieldIdList(buildContext({
+        actionKind: "disk",
+        settings: {
+            graphicType: "dashed-line",
+            diskMetricKind: "throughput",
+        },
+    }));
+
+    assertFieldPresent(gpuTemperatureSparklineFieldIdList, "maximum-temperature");
+    assertFieldPresent(gpuPowerSparklineFieldIdList, "maximum-gpu-power");
+    assertFieldAbsent(diskThroughputSparklineFieldIdList, "maximum-disk-throughput");
+});
+
 test("shared visual fields keep a consistent order across widgets", () => {
     const actionKindList: readonly ActionKind[] = [
         "cpu-usage",
