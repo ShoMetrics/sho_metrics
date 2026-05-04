@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveInspectorFieldList } from "../../src/property-inspector/scenarios";
+import { resolveInspectorFieldList } from "./scenarios";
 import {
     basePropertyInspectorSettings,
     type ActionKind,
     type GraphicType,
     type PropertyInspectorSettings,
-} from "../../src/property-inspector/settings";
-import type { VisibilityContext } from "../../src/property-inspector/schema";
+} from "./settings";
+import type { VisibilityContext } from "./schema";
 
 test("disk usage linear exposes only linear disk title fields", () => {
     const inspectorFieldIdList = resolveInspectorFieldIdList(buildContext({

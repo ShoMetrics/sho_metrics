@@ -11,11 +11,13 @@
         "noImplicitOverride": true,
         "outDir": ".test-dist",
         "rootDir": ".",
-        "sourceMap": false
+        "sourceMap": false,
+        "types": [
+            "node"
+        ]
     },
     "include": [
-        "src/property-inspector/**/*.ts",
-        "tests/**/*.ts"
+        "src/property-inspector/**/*.ts"
     ],
     "exclude": [
         "node_modules",

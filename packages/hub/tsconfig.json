@@ -11,7 +11,10 @@
 		],
 		"module": "ES2022",
 		"moduleResolution": "Bundler",
-		"noImplicitOverride": true
+		"noImplicitOverride": true,
+		"types": [
+			"node"
+		]
 	},
 	"include": [
 		"src/**/*.ts",
