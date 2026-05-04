@@ -55,6 +55,7 @@ export const sparklineAppearanceFieldGroup = defineFieldGroup({
     name: "sparklineAppearance",
     fieldList: [
         inspectorFieldCatalog.lineSmoothingField,
+        inspectorFieldCatalog.sparklineChartGuideStyleField,
     ],
 });
 

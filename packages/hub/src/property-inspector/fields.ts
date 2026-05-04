@@ -254,6 +254,18 @@ export const inspectorFieldCatalog = {
         step: 5,
         allowedScopes: sparklineScopeList,
     }),
+    sparklineChartGuideStyleField: defineField({
+        id: "sparkline-chart-guide-style",
+        key: "sparklineChartGuideStyle",
+        kind: "select",
+        label: "Chart Guides",
+        defaultValue: "horizontal",
+        allowedScopes: sparklineScopeList,
+        options: staticOptions([
+            { value: "horizontal", label: "Horizontal Lines" },
+            { value: "time-axis", label: "Time Axis" },
+        ]),
+    }),
     colorModeField: defineField({
         id: "color-mode",
         key: "colorMode",

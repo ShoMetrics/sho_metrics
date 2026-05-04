@@ -1,5 +1,6 @@
 import type { ColorConfig, ColorThreshold } from "../rendering/color-resolver";
 import type { GraphicStyleName, GraphicType } from "../widgets/widget.interface";
+import type { SparklineChartGuideStyle } from "../widgets/primitives/sparkline";
 
 export type SettingValue = string | number | boolean | null | undefined;
 
@@ -15,6 +16,7 @@ export interface MetricVisualSettings {
     colorMid?: SettingValue;
     colorHigh?: SettingValue;
     lineSmoothingPercent?: SettingValue;
+    sparklineChartGuideStyle?: SettingValue;
 }
 
 export interface ResolvedMetricVisualSettings {
@@ -22,6 +24,7 @@ export interface ResolvedMetricVisualSettings {
     graphicStyle: GraphicStyleName;
     colorConfig: ColorConfig;
     lineSmoothingPercent: number;
+    sparklineChartGuideStyle: SparklineChartGuideStyle;
 }
 
 const DEFAULT_LOW_THRESHOLD = 30;
@@ -58,6 +61,7 @@ export function resolveMetricVisualSettings(settings: MetricVisualSettings): Res
             settings.lineSmoothingPercent,
             DEFAULT_LINE_SMOOTHING_PERCENT,
         ),
+        sparklineChartGuideStyle: resolveSparklineChartGuideStyle(settings.sparklineChartGuideStyle),
     };
 }
 
@@ -75,6 +79,10 @@ function resolveGraphicStyle(value: SettingValue): GraphicStyleName {
     }
 
     return "flat";
+}
+
+function resolveSparklineChartGuideStyle(value: SettingValue): SparklineChartGuideStyle {
+    return value === "time-axis" ? "time-axis" : "horizontal";
 }
 
 function buildColorConfig(settings: MetricVisualSettings): ColorConfig {
