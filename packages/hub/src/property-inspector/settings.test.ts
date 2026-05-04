@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeNextSettings, normalizeSettings } from "../../src/property-inspector/scenarios";
-import { basePropertyInspectorSettings } from "../../src/property-inspector/settings";
+import { normalizeNextSettings, normalizeSettings } from "./scenarios";
+import { basePropertyInspectorSettings } from "./settings";
 
 test("disk usage defaults to slow polling on first normalization", () => {
     const settings = normalizeSettings({ diskMetricKind: "usage" }, {
