@@ -67,6 +67,11 @@ export class GpuUsage extends GpuBaseAction {
             metricKey: GPU_USAGE_METRIC_KEY,
             widgetData: {
                 ...data,
+                sparklineScale: {
+                    mode: "fixed",
+                    minimumValue: 0,
+                    maximumValue: 100,
+                },
                 secondaryDisplayValue: data.sampleTimestampMilliseconds != null
                     ? formatCompactHardwareModelLabel(metricStore.getTextValue(GPU_MODEL_METRIC_KEY), "gpu")
                     : undefined,
@@ -178,6 +183,11 @@ function buildGpuVramWidgetData(used: WidgetData, totalMegabytes: number): Widge
         label: ARC_GAUGE_LABELS.vram,
         displayValue: ((used.current / safeTotalMegabytes) * 100).toFixed(0),
         secondaryDisplayValue: usedAndTotalText,
+        sparklineScale: {
+            mode: "fixed",
+            minimumValue: 0,
+            maximumValue: 100,
+        },
         sampleTimestampMilliseconds: used.sampleTimestampMilliseconds,
     };
 }

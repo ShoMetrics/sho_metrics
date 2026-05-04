@@ -3,6 +3,11 @@ import { defineFieldGroup } from "./scenario-model";
 
 export const baseFieldGroup = defineFieldGroup({
     name: "base",
+    /**
+     * Base fields must be valid for every graphic scope. Graphic-specific
+     * controls belong in dedicated field groups that are explicitly attached
+     * by each scenario, so a missing field cannot be hidden by scope filtering.
+     */
     fieldList: [
         inspectorFieldCatalog.pollingFrequencyField,
         inspectorFieldCatalog.graphicTypeField,
@@ -43,6 +48,13 @@ export const colorSettingsFieldGroup = defineFieldGroup({
     fieldList: [
         inspectorFieldCatalog.colorSettingsHeadingField,
         inspectorFieldCatalog.colorModeField,
+    ],
+});
+
+export const sparklineAppearanceFieldGroup = defineFieldGroup({
+    name: "sparklineAppearance",
+    fieldList: [
+        inspectorFieldCatalog.lineSmoothingField,
     ],
 });
 

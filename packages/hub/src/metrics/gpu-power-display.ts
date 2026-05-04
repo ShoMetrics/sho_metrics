@@ -11,7 +11,6 @@ const DEFAULT_MAXIMUM_GPU_POWER_WATTS = 300;
 export function buildGpuPowerWidgetData(options: GpuPowerDisplayOptions): WidgetData {
     const safeMaximumPowerWatts = Math.max(options.maximumPowerWatts, 1);
     const currentPowerWatts = Math.max(options.powerWidgetData.current, 0);
-
     return {
         ...options.powerWidgetData,
         current: (currentPowerWatts / safeMaximumPowerWatts) * 100,
@@ -22,6 +21,11 @@ export function buildGpuPowerWidgetData(options: GpuPowerDisplayOptions): Widget
         unit: "W",
         displayValue: currentPowerWatts.toFixed(0),
         secondaryDisplayValue: `${currentPowerWatts.toFixed(0)}/${safeMaximumPowerWatts.toFixed(0)} W`,
+        sparklineScale: {
+            mode: "fixed",
+            minimumValue: 0,
+            maximumValue: 100,
+        },
     };
 }
 

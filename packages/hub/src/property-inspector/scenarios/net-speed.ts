@@ -5,6 +5,7 @@ import {
     networkCircularFieldGroup,
     networkDirectionFieldGroup,
     colorSettingsFieldGroup,
+    sparklineAppearanceFieldGroup,
 } from "../scenario-field-groups";
 import {
     defaultSettingsNormalizer,
@@ -45,6 +46,7 @@ const netSpeedSparklineScenario = defineScenario({
     fieldGroupList: [
         baseFieldGroup,
         networkDirectionFieldGroup,
+        sparklineAppearanceFieldGroup,
         colorSettingsFieldGroup,
         ...colorFieldGroupList,
     ],

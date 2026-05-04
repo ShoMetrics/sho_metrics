@@ -14,7 +14,28 @@ export interface WidgetData {
     linearDisplayValue?: string;
     linearUnit?: string;
     linearChannels?: readonly LinearChannelWidgetData[];
+    sparklineScale?: SparklineScale;
     sampleTimestampMilliseconds?: number;
+}
+
+export type SparklineScale =
+    | AdaptiveSparklineScale
+    | FixedSparklineScale;
+
+export interface AdaptiveSparklineScale {
+    mode: "adaptive";
+    minimumValue?: number;
+}
+
+/**
+ * Fixed sparkline scale is a graph-specific contract. It should be set only
+ * when the metric has a user-meaningful domain maximum for line height, not
+ * merely because another widget has a progress value.
+ */
+export interface FixedSparklineScale {
+    mode: "fixed";
+    minimumValue: number;
+    maximumValue: number;
 }
 
 export interface LinearChannelWidgetData {

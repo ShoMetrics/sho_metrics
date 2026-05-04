@@ -14,12 +14,14 @@ export interface MetricVisualSettings {
     colorMedium?: SettingValue;
     colorMid?: SettingValue;
     colorHigh?: SettingValue;
+    lineSmoothingPercent?: SettingValue;
 }
 
 export interface ResolvedMetricVisualSettings {
     graphicType: GraphicType;
     graphicStyle: GraphicStyleName;
     colorConfig: ColorConfig;
+    lineSmoothingPercent: number;
 }
 
 const DEFAULT_LOW_THRESHOLD = 30;
@@ -31,6 +33,7 @@ const DEFAULT_SOLID_COLOR = "#3b82f6";
 const DEFAULT_LOW_COLOR = "#22c55e";
 const DEFAULT_MEDIUM_COLOR = "#eab308";
 const DEFAULT_HIGH_COLOR = "#ef4444";
+const DEFAULT_LINE_SMOOTHING_PERCENT = 75;
 
 const GRAPHIC_TYPE_ALIASES: Record<string, GraphicType> = {
     "arc-gauge": "circular",
@@ -51,6 +54,10 @@ export function resolveMetricVisualSettings(settings: MetricVisualSettings): Res
         graphicType,
         graphicStyle,
         colorConfig: buildColorConfig(settings),
+        lineSmoothingPercent: normalizePercentageSetting(
+            settings.lineSmoothingPercent,
+            DEFAULT_LINE_SMOOTHING_PERCENT,
+        ),
     };
 }
 
@@ -121,6 +128,16 @@ function resolveColorSetting(value: SettingValue, fallbackColor: string): string
 
     const normalizedColor = value.trim();
     return /^#[0-9a-f]{6}$/i.test(normalizedColor) ? normalizedColor : fallbackColor;
+}
+
+function normalizePercentageSetting(value: SettingValue, fallbackValue: number): number {
+    const numericValue = Number(value);
+
+    if (!Number.isFinite(numericValue)) {
+        return fallbackValue;
+    }
+
+    return Math.round(Math.min(Math.max(numericValue, MINIMUM_THRESHOLD), MAXIMUM_THRESHOLD));
 }
 
 function buildThresholds(options: {

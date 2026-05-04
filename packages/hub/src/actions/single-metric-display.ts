@@ -141,6 +141,7 @@ function renderAndSendSingleMetricDisplay(
             linearIconFragment: options.linearIconFragment,
             statusIcon: options.statusIcon,
             centerContent,
+            lineSmoothingPercent: visualSettings.lineSmoothingPercent,
         }),
     }, renderSize);
     const composeEndTimestampMilliseconds = Date.now();
@@ -241,17 +242,20 @@ function buildSingleMetricConfigOverrides(options: {
     linearIconFragment: string | undefined;
     statusIcon: ArcGaugeStatusIcon;
     centerContent: "value" | "icon" | "icon-value-unit";
+    lineSmoothingPercent: number;
 }): {
     centerContent?: "value" | "icon" | "icon-value-unit";
     centerIconFragment?: string;
     topIconFragment?: string;
     statusIcon?: ArcGaugeStatusIcon;
+    lineSmoothingPercent?: number;
 } {
     return {
         centerContent: options.centerContent,
         centerIconFragment: options.centerIconFragment,
         topIconFragment: options.linearIconFragment ?? options.centerIconFragment,
         statusIcon: options.statusIcon,
+        lineSmoothingPercent: options.lineSmoothingPercent,
     };
 }
 
