@@ -12,13 +12,18 @@ export class MetricStore {
 
     private static readonly HISTORY_SIZE = 60;
 
-    /** Ingest an entire snapshot, recording all scalar metrics into ring buffers. */
+    /** Ingest an entire snapshot, recording scalar history and latest text values. */
     ingest(snapshot: IMetricSnapshot): void {
         if (!snapshot.metrics) return;
 
         for (const [key, value] of Object.entries(snapshot.metrics)) {
             if (value.scalar != null) {
                 this.record(key, value.scalar, Number(snapshot.timestampMs ?? Date.now()));
+                continue;
+            }
+
+            if (value.text != null) {
+                this.recordText(key, value.text, Number(snapshot.timestampMs ?? Date.now()));
             }
         }
     }
@@ -37,6 +42,20 @@ export class MetricStore {
         metricRecord.timestampMilliseconds = timestampMilliseconds;
     }
 
+    private recordText(key: string, value: string, timestampMilliseconds: number): void {
+        let metricRecord = this.store.get(key);
+        if (!metricRecord) {
+            metricRecord = {
+                buffer: new RingBuffer<number>(MetricStore.HISTORY_SIZE),
+                timestampMilliseconds,
+            };
+            this.store.set(key, metricRecord);
+        }
+
+        metricRecord.text = value;
+        metricRecord.timestampMilliseconds = timestampMilliseconds;
+    }
+
     /** Build a WidgetData for a specific metric key. */
     getWidgetData(key: string, label: string, unit: string, maxValue = 100): WidgetData {
         const metricRecord = this.store.get(key);
@@ -50,11 +69,16 @@ export class MetricStore {
             sampleTimestampMilliseconds: metricRecord?.timestampMilliseconds,
         };
     }
+
+    getTextValue(key: string): string | undefined {
+        return this.store.get(key)?.text;
+    }
 }
 
 interface MetricRecord {
     buffer: RingBuffer<number>;
     timestampMilliseconds: number;
+    text?: string;
 }
 
 /** Singleton MetricStore instance. */

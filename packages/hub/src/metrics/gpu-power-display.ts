@@ -21,6 +21,7 @@ export function buildGpuPowerWidgetData(options: GpuPowerDisplayOptions): Widget
         ),
         unit: "W",
         displayValue: currentPowerWatts.toFixed(0),
+        secondaryDisplayValue: `${currentPowerWatts.toFixed(0)}/${safeMaximumPowerWatts.toFixed(0)} W`,
     };
 }
 
