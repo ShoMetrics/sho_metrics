@@ -3,7 +3,7 @@ import type { IMetricSource, IMetricSnapshot, IMetricValue } from "./source.inte
 import { logger } from "../../logging/logger";
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../network-interfaces";
 import { getNetworkAggregateMetricKey, getNetworkInterfaceMetricKey, type NetworkDirection } from "../network-metric-keys";
-import { diskVolumeRegistry } from "../disk-volumes";
+import { diskVolumeRegistry, type DiskVolumeOption } from "../disk-volumes";
 import {
     getDefaultDiskUsageMetricKey,
     getDiskThroughputMetricKey,
@@ -54,7 +54,27 @@ const {
 
 void blockedCpuCurrentSpeed;
 
-const systemInformation: NodeSystemInformationClient = rawSystemInformation;
+const defaultSystemInformation: NodeSystemInformationClient = rawSystemInformation;
+
+export interface NodeSystemNetworkInterfaceRegistry {
+    update(options: readonly NetworkInterfaceOption[]): void;
+}
+
+export interface NodeSystemDiskVolumeRegistry {
+    update(options: readonly DiskVolumeOption[]): void;
+}
+
+export interface NodeSystemSourceDependencies {
+    systemInformation?: NodeSystemInformationClient;
+    networkRegistry?: NodeSystemNetworkInterfaceRegistry;
+    diskRegistry?: NodeSystemDiskVolumeRegistry;
+    platform?: NodeJS.Platform;
+    now?: () => number;
+    pollWindowsGpuTelemetry?: () => Promise<NodeSystemGpuTelemetryData | null>;
+    pollSystemInformationGpuTelemetry?: (
+        systemInformation: NodeSystemInformationClient,
+    ) => Promise<NodeSystemGpuTelemetryData | null>;
+}
 
 /**
  * Node.js runtime metric source backed by `systeminformation` and OS command helpers.
@@ -62,6 +82,15 @@ const systemInformation: NodeSystemInformationClient = rawSystemInformation;
 export class NodeSystemSource implements IMetricSource {
     readonly sourceId = "node-system";
 
+    private readonly systemInformation: NodeSystemInformationClient;
+    private readonly networkRegistry: NodeSystemNetworkInterfaceRegistry;
+    private readonly diskRegistry: NodeSystemDiskVolumeRegistry;
+    private readonly platform: NodeJS.Platform;
+    private readonly now: () => number;
+    private readonly pollWindowsGpuTelemetry: () => Promise<NodeSystemGpuTelemetryData | null>;
+    private readonly pollSystemInformationGpuTelemetry: (
+        systemInformation: NodeSystemInformationClient,
+    ) => Promise<NodeSystemGpuTelemetryData | null>;
     private lastNetworkStatsByInterface = new Map<string, NodeSystemNetworkCounterSample>();
     private lastNetworkPollDebugLogTimestampMilliseconds = 0;
     private cachedGpuData: NodeSystemGpuTelemetryData | null = null;
@@ -81,6 +110,17 @@ export class NodeSystemSource implements IMetricSource {
     private static readonly GPU_TIMEOUT_WARNING_INTERVAL_MS = 10000;
     private static readonly GPU_BACKOFF_STEPS_MS = [2000, 5000, 10000, 30000] as const;
 
+    constructor(dependencies: NodeSystemSourceDependencies = {}) {
+        this.systemInformation = dependencies.systemInformation ?? defaultSystemInformation;
+        this.networkRegistry = dependencies.networkRegistry ?? networkInterfaceRegistry;
+        this.diskRegistry = dependencies.diskRegistry ?? diskVolumeRegistry;
+        this.platform = dependencies.platform ?? process.platform;
+        this.now = dependencies.now ?? Date.now;
+        this.pollWindowsGpuTelemetry = dependencies.pollWindowsGpuTelemetry ?? pollWindowsNvidiaGpuTelemetry;
+        this.pollSystemInformationGpuTelemetry = dependencies.pollSystemInformationGpuTelemetry
+            ?? pollSystemInformationGpuTelemetry;
+    }
+
     async poll(): Promise<IMetricSnapshot> {
         return this.pollMetrics([]);
     }
@@ -88,7 +128,7 @@ export class NodeSystemSource implements IMetricSource {
     async pollMetrics(metricKeys: readonly string[]): Promise<IMetricSnapshot> {
         const metrics: Record<string, IMetricValue> = {};
         const metricGroups = resolveMetricGroups(metricKeys);
-        const pollStartTimestampMilliseconds = Date.now();
+        const pollStartTimestampMilliseconds = this.now();
 
         const [cpuMetrics, memoryMetrics, diskMetrics, networkMetrics, gpu] = await Promise.all([
             metricGroups.has("cpu") ? this.pollCpu() : Promise.resolve({}),
@@ -146,7 +186,7 @@ export class NodeSystemSource implements IMetricSource {
 
     private async pollMemory(): Promise<Record<string, IMetricValue>> {
         try {
-            const memoryData = await systemInformation.mem();
+            const memoryData = await this.systemInformation.mem();
 
             return {
                 "ram.used": {
@@ -186,7 +226,7 @@ export class NodeSystemSource implements IMetricSource {
             Object.assign(metrics, await this.pollDiskUsage());
         }
 
-        if (shouldPollThroughput && process.platform === "darwin") {
+        if (shouldPollThroughput && this.platform === "darwin") {
             Object.assign(metrics, await this.pollDiskThroughput());
         }
 
@@ -196,12 +236,12 @@ export class NodeSystemSource implements IMetricSource {
     private async pollDiskUsage(): Promise<Record<string, IMetricValue>> {
         const metrics: Record<string, IMetricValue> = {};
         const [fileSystems, blockDevices, diskLayout] = await Promise.all([
-            systemInformation.fsSize(),
-            systemInformation.blockDevices().catch(error => {
+            this.systemInformation.fsSize(),
+            this.systemInformation.blockDevices().catch(error => {
                 log.warn(() => `Block device poll error: ${String(error)}`);
                 return [] as Systeminformation.BlockDevicesData[];
             }),
-            systemInformation.diskLayout().catch(error => {
+            this.systemInformation.diskLayout().catch(error => {
                 log.warn(() => `Disk layout poll error: ${String(error)}`);
                 return [] as Systeminformation.DiskLayoutData[];
             }),
@@ -211,7 +251,7 @@ export class NodeSystemSource implements IMetricSource {
             .map(fileSystem => toDiskVolumeOption(fileSystem, blockDevices, diskLayout));
         const defaultDiskVolume = resolveDefaultDiskVolume(diskVolumes);
 
-        diskVolumeRegistry.update(diskVolumes);
+        this.diskRegistry.update(diskVolumes);
 
         for (const diskVolume of diskVolumes) {
             metrics[getDiskVolumeMetricKey("used", diskVolume.id)] = { scalar: diskVolume.usedBytes, unit: "B" };
@@ -237,7 +277,7 @@ export class NodeSystemSource implements IMetricSource {
     }
 
     private async pollDiskThroughput(): Promise<Record<string, IMetricValue>> {
-        const fileSystemStats = await systemInformation.fsStats();
+        const fileSystemStats = await this.systemInformation.fsStats();
 
         return {
             [getDiskThroughputMetricKey("read")]: {
@@ -257,7 +297,7 @@ export class NodeSystemSource implements IMetricSource {
 
     private async pollCpu(): Promise<Record<string, IMetricValue>> {
         try {
-            const load = await systemInformation.currentLoad();
+            const load = await this.systemInformation.currentLoad();
             const metrics: Record<string, IMetricValue> = {
                 "cpu.usage_percent": {
                     scalar: load.currentLoad,
@@ -296,7 +336,7 @@ export class NodeSystemSource implements IMetricSource {
         }
 
         this.hasAttemptedCpuInformationPoll = true;
-        this.pendingCpuInformationPromise = systemInformation.cpu()
+        this.pendingCpuInformationPromise = this.systemInformation.cpu()
             .then(cpuData => {
                 if (isFinitePositiveNumber(cpuData.speed)) {
                     this.cachedCpuBaseFrequencyGigahertz = cpuData.speed;
@@ -322,19 +362,19 @@ export class NodeSystemSource implements IMetricSource {
 
     private async pollNetwork(): Promise<Record<string, IMetricValue>> {
         const metrics: Record<string, IMetricValue> = {};
-        const networkInterfaces = await systemInformation.networkInterfaces();
+        const networkInterfaces = await this.systemInformation.networkInterfaces();
         const usableNetworkInterfaces = Array.isArray(networkInterfaces)
             ? networkInterfaces.filter(isUsableNetworkInterface)
             : [];
         const interfaceOptions = usableNetworkInterfaces.map(toNetworkInterfaceOption);
         const usableInterfaceIds = new Set(interfaceOptions.map((networkInterface) => networkInterface.id));
-        const networkStats = await systemInformation.networkStats("*");
-        const currentTimestampMilliseconds = Date.now();
+        const networkStats = await this.systemInformation.networkStats("*");
+        const currentTimestampMilliseconds = this.now();
         let aggregateDownloadBytesPerSecond = 0;
         let aggregateUploadBytesPerSecond = 0;
         const rateCalculations: NodeSystemNetworkRateCalculation[] = [];
 
-        networkInterfaceRegistry.update(interfaceOptions);
+        this.networkRegistry.update(interfaceOptions);
 
         for (const networkStat of networkStats) {
             if (!usableInterfaceIds.has(networkStat.iface)) {
@@ -441,7 +481,7 @@ export class NodeSystemSource implements IMetricSource {
     }
 
     private async pollGpu(): Promise<NodeSystemGpuTelemetryData | null> {
-        const currentTimestampMilliseconds = Date.now();
+        const currentTimestampMilliseconds = this.now();
 
         if (this.cachedGpuData && (currentTimestampMilliseconds - this.cachedGpuTimestampMilliseconds) < NodeSystemSource.GPU_CACHE_MS) {
             gpuLog.debug(() => [
@@ -458,13 +498,13 @@ export class NodeSystemSource implements IMetricSource {
 
         this.pendingGpuPromise = (async () => {
             try {
-                const gpuData = process.platform === "win32"
-                    ? await pollWindowsNvidiaGpuTelemetry()
-                    : await pollSystemInformationGpuTelemetry(systemInformation);
+                const gpuData = this.platform === "win32"
+                    ? await this.pollWindowsGpuTelemetry()
+                    : await this.pollSystemInformationGpuTelemetry(this.systemInformation);
 
                 if (gpuData) {
                     this.cachedGpuData = gpuData;
-                    this.cachedGpuTimestampMilliseconds = Date.now();
+                    this.cachedGpuTimestampMilliseconds = this.now();
                     return gpuData;
                 }
 
@@ -481,7 +521,7 @@ export class NodeSystemSource implements IMetricSource {
     }
 
     private async pollGpuWithTimeout(): Promise<NodeSystemGpuTelemetryData | null> {
-        const currentTimestampMilliseconds = Date.now();
+        const currentTimestampMilliseconds = this.now();
 
         if (currentTimestampMilliseconds < this.nextGpuPollAllowedTimestampMilliseconds) {
             gpuLog.debug(() => [
@@ -493,7 +533,7 @@ export class NodeSystemSource implements IMetricSource {
         }
 
         const pollSequence = reserveNodeSystemGpuPollDebugSequence();
-        const pollStartTimestampMilliseconds = Date.now();
+        const pollStartTimestampMilliseconds = this.now();
         gpuLog.debug(() => [
             "sourceStart",
             `pollId=${pollSequence}`,
@@ -504,7 +544,7 @@ export class NodeSystemSource implements IMetricSource {
         let timeoutId: NodeJS.Timeout | null = null;
         const timeoutPromise = new Promise<NodeSystemGpuTelemetryData | null>((resolve) => {
             timeoutId = setTimeout(() => {
-                const elapsedMilliseconds = Date.now() - pollStartTimestampMilliseconds;
+                const elapsedMilliseconds = this.now() - pollStartTimestampMilliseconds;
                 gpuLog.debug(() => [
                     "sourceTimeout",
                     `pollId=${pollSequence}`,
@@ -524,7 +564,7 @@ export class NodeSystemSource implements IMetricSource {
             clearTimeout(timeoutId);
         }
 
-        if (gpuData && Date.now() < this.nextGpuPollAllowedTimestampMilliseconds) {
+        if (gpuData && this.now() < this.nextGpuPollAllowedTimestampMilliseconds) {
             return gpuData;
         }
 
@@ -534,7 +574,7 @@ export class NodeSystemSource implements IMetricSource {
             gpuLog.debug(() => [
                 "sourceSuccess",
                 `pollId=${pollSequence}`,
-                `elapsedMs=${Date.now() - pollStartTimestampMilliseconds}`,
+                `elapsedMs=${this.now() - pollStartTimestampMilliseconds}`,
             ].join(" "));
             return gpuData;
         }
@@ -542,13 +582,13 @@ export class NodeSystemSource implements IMetricSource {
         gpuLog.debug(() => [
             "sourceNoData",
             `pollId=${pollSequence}`,
-            `elapsedMs=${Date.now() - pollStartTimestampMilliseconds}`,
+            `elapsedMs=${this.now() - pollStartTimestampMilliseconds}`,
         ].join(" "));
         return null;
     }
 
     private recordGpuPollTimeout(): void {
-        const currentTimestampMilliseconds = Date.now();
+        const currentTimestampMilliseconds = this.now();
         const backoffIndex = Math.min(
             this.gpuConsecutiveTimeouts,
             NodeSystemSource.GPU_BACKOFF_STEPS_MS.length - 1,
