@@ -2,26 +2,34 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { Systeminformation } from "systeminformation";
 import {
-    calculateNetworkRate,
-    calculatePercent,
     formatCpuModelText,
     isFinitePositiveNumber,
+    normalizeNonEmptyText,
+} from "./node-system-cpu";
+import {
+    calculatePercent,
     isLocalBlockDevice,
     isUsableFileSystem,
-    isUsableNetworkInterface,
-    normalizeNetworkInterfaceType,
-    normalizeNonEmptyText,
     normalizeNullableRate,
-    parseNvidiaSmiNumber,
-    parseNvidiaSmiTelemetryLine,
     resolveDefaultDiskVolume,
     resolveDiskStorageKind,
-    resolveMetricGroups,
     resolvePhysicalDisk,
     toDiskVolumeOption,
+} from "./node-system-disk";
+import {
+    parseNvidiaSmiNumber,
+    parseNvidiaSmiTelemetryLine,
+} from "./node-system-gpu";
+import {
+    calculateNetworkRate,
+    isUsableNetworkInterface,
+    normalizeNetworkInterfaceType,
     toNetworkInterfaceOption,
-    type MetricGroup,
-} from "./builtin-source";
+} from "./node-system-network";
+import {
+    resolveMetricGroups,
+} from "./node-system-source";
+import type { NodeSystemMetricGroup } from "./node-system-source-types";
 import type { DiskVolumeOption } from "../disk-volumes";
 
 test("metric groups resolve all groups when no metric keys are requested", () => {
@@ -224,7 +232,10 @@ test("numeric helpers normalize percentages finite rates and positive values", (
     assert.equal(isFinitePositiveNumber(0), false);
 });
 
-function assertMetricGroups(actualMetricGroups: Set<MetricGroup>, expectedMetricGroups: readonly MetricGroup[]): void {
+function assertMetricGroups(
+    actualMetricGroups: Set<NodeSystemMetricGroup>,
+    expectedMetricGroups: readonly NodeSystemMetricGroup[],
+): void {
     assert.deepEqual([...actualMetricGroups].sort(), [...expectedMetricGroups].sort());
 }
 

@@ -9,7 +9,7 @@ export type IMetricValue = shometrics.v1.IMetricValue;
  * The Scheduler consumes this interface — never a concrete implementation.
  */
 export interface IMetricSource {
-    /** Human-readable identifier, e.g. "builtin-node", "win-native" */
+    /** Human-readable identifier, e.g. "node-system", "win-native" */
     readonly sourceId: string;
 
     /** Fetch the latest metrics snapshot in the universal protobuf-defined format. */
