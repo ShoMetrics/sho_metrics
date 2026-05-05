@@ -364,7 +364,7 @@ export class NodeSystemSource implements IMetricSource {
         const metrics: Record<string, IMetricValue> = {};
         const networkInterfaces = await this.systemInformation.networkInterfaces();
         const usableNetworkInterfaces = Array.isArray(networkInterfaces)
-            ? networkInterfaces.filter(isUsableNetworkInterface)
+            ? networkInterfaces.filter(networkInterface => isUsableNetworkInterface(networkInterface, this.platform))
             : [];
         const interfaceOptions = usableNetworkInterfaces.map(toNetworkInterfaceOption);
         const usableInterfaceIds = new Set(interfaceOptions.map((networkInterface) => networkInterface.id));

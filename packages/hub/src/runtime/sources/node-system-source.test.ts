@@ -9,6 +9,7 @@ import {
 } from "./node-system-cpu";
 import {
     calculatePercent,
+    isNetworkFileSystem,
     isLocalBlockDevice,
     isUsableFileSystem,
     normalizeNullableRate,
@@ -23,6 +24,7 @@ import {
 } from "./node-system-gpu";
 import {
     calculateNetworkRate,
+    isSystemNetworkInterface,
     isUsableNetworkInterface,
     normalizeNetworkInterfaceType,
     toNetworkInterfaceOption,
@@ -206,7 +208,7 @@ test("node system source maps disk usage metrics and updates injected disk regis
                 callCounts.fsSize += 1;
                 return [buildFileSystem({
                     fs: "C:",
-                    mount: "C:\\",
+                    mount: "C:",
                     size: 1000,
                     used: 400,
                     available: 600,
@@ -216,8 +218,10 @@ test("node system source maps disk usage metrics and updates injected disk regis
                 callCounts.blockDevices += 1;
                 return [buildBlockDevice({
                     name: "C:",
-                    mount: "C:\\",
+                    mount: "C:",
                     label: "System",
+                    physical: "Local",
+                    size: "1000",
                 })];
             },
             diskLayout: async () => {
@@ -240,10 +244,10 @@ test("node system source maps disk usage metrics and updates injected disk regis
     const snapshot = await source.pollMetrics(["disk.usage.percent"]);
     const metrics = assertSnapshotMetrics(snapshot);
 
-    assert.equal(metrics["disk.volume.C%3A%5C.percent"]?.scalar, 40);
+    assert.equal(metrics["disk.volume.C%3A.percent"]?.scalar, 40);
     assert.equal(metrics["disk.usage.percent"]?.scalar, 40);
     assert.equal(metrics["disk.throughput.read"], undefined);
-    assert.equal(diskRegistryUpdates[0][0]?.id, "C:\\");
+    assert.equal(diskRegistryUpdates[0][0]?.id, "C:");
     assert.equal(diskRegistryUpdates[0][0]?.volumeLabel, "System");
     assert.equal(callCounts.fsSize, 1);
     assert.equal(callCounts.fsStats, 0);
@@ -274,6 +278,54 @@ test("node system source polls disk throughput only on darwin", async () => {
     assert.equal(metrics["disk.throughput.write"]?.scalar, 20);
     assert.equal(metrics["disk.throughput.total"]?.scalar, 30);
     assert.equal(callCounts.fsStats, 1);
+    assert.equal(callCounts.fsSize, 0);
+});
+
+test("node system source normalizes null darwin disk throughput rates to zero", async () => {
+    const callCounts = buildCallCounts();
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            fsStats: async () => {
+                callCounts.fsStats += 1;
+                return {
+                    rx: 5484090826752,
+                    wx: 2776625758208,
+                    tx: 8260716584960,
+                    rx_sec: null,
+                    wx_sec: null,
+                    tx_sec: null,
+                    ms: 0,
+                } as Systeminformation.FsStatsData;
+            },
+        }),
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+        platform: "darwin",
+    });
+
+    const snapshot = await source.pollMetrics(["disk.throughput.read"]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.equal(metrics["disk.throughput.read"]?.scalar, 0);
+    assert.equal(metrics["disk.throughput.write"]?.scalar, 0);
+    assert.equal(metrics["disk.throughput.total"]?.scalar, 0);
+    assert.equal(callCounts.fsStats, 1);
+});
+
+test("node system source skips disk throughput on Windows even when requested", async () => {
+    const callCounts = buildCallCounts();
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts),
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+        platform: "win32",
+    });
+
+    const snapshot = await source.pollMetrics(["disk.throughput.read"]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.deepEqual(metrics, {});
+    assert.equal(callCounts.fsStats, 0);
     assert.equal(callCounts.fsSize, 0);
 });
 
@@ -381,6 +433,24 @@ test("usable network interfaces exclude internal virtual down and unnamed interf
     assert.equal(isUsableNetworkInterface(buildNetworkInterface({ iface: "" })), false);
 });
 
+test("usable network interfaces exclude macOS system interfaces", () => {
+    assert.equal(isUsableNetworkInterface(buildNetworkInterface({
+        iface: "en0",
+        ifaceName: "en0",
+        type: "wireless",
+        speed: 168.7,
+    }), "darwin"), true);
+    assert.equal(isUsableNetworkInterface(buildNetworkInterface({ iface: "awdl0", ifaceName: "awdl0" }), "darwin"), false);
+    assert.equal(isUsableNetworkInterface(buildNetworkInterface({ iface: "llw0", ifaceName: "llw0" }), "darwin"), false);
+    assert.equal(isUsableNetworkInterface(buildNetworkInterface({ iface: "utun4", ifaceName: "utun4" }), "darwin"), false);
+    assert.equal(isUsableNetworkInterface(buildNetworkInterface({ iface: "bridge0", ifaceName: "bridge0" }), "darwin"), false);
+    assert.equal(isUsableNetworkInterface(buildNetworkInterface({ iface: "ap1", ifaceName: "ap1" }), "darwin"), false);
+    assert.equal(isSystemNetworkInterface("en0", "darwin"), false);
+    assert.equal(isSystemNetworkInterface("awdl0", "darwin"), true);
+    assert.equal(isSystemNetworkInterface("bridge0", "win32"), false);
+    assert.equal(isUsableNetworkInterface(buildNetworkInterface({ iface: "bridge0", ifaceName: "bridge0" }), "win32"), true);
+});
+
 test("network interface options normalize display fields and speed", () => {
     assert.deepEqual(toNetworkInterfaceOption(buildNetworkInterface({
         iface: "en0",
@@ -443,31 +513,99 @@ test("file system usability requires positive size, mount, and non-negative usag
     assert.equal(isUsableFileSystem(buildFileSystem({ mount: "" })), false);
     assert.equal(isUsableFileSystem(buildFileSystem({ available: -1 })), false);
     assert.equal(isUsableFileSystem(buildFileSystem({ used: -1 })), false);
+    assert.equal(isUsableFileSystem(buildFileSystem({ mount: "/System/Volumes/Data" })), false);
+    assert.equal(isUsableFileSystem(buildFileSystem({ mount: "/Volumes/media" })), true);
 });
 
 test("disk volume option maps file system block device and physical disk metadata", () => {
     assert.deepEqual(toDiskVolumeOption(
-        buildFileSystem({ fs: "C:", mount: "C:\\", size: 1000, used: 400, available: 600 }),
-        [buildBlockDevice({ name: "C:", mount: "C:\\", label: "System", physical: "local", model: "Samsung 990" })],
-        [buildDiskLayout({ name: "Samsung 990", type: "NVMe", size: 2000 })],
+        buildFileSystem({ fs: "C:", mount: "C:", size: 1000, used: 400, available: 600 }),
+        [buildBlockDevice({
+            name: "C:",
+            mount: "C:",
+            label: "System",
+            physical: "Local",
+            model: "SKHynix NVMe",
+            size: "1000",
+        })],
+        [buildDiskLayout({ name: "SKHynix NVMe", type: "NVMe", size: 2000 })],
     ), {
-        id: "C:\\",
+        id: "C:",
         fs: "C:",
-        mount: "C:\\",
+        mount: "C:",
         sizeBytes: 1000,
         usedBytes: 400,
         availableBytes: 600,
         storageKind: "ssd",
-        diskName: "Samsung 990",
+        diskName: "SKHynix NVMe",
         volumeLabel: "System",
     });
 });
 
-test("physical disk resolution prefers a matching disk name then size fallback", () => {
+test("disk volume option identifies macOS SMB volumes as network volumes", () => {
+    assert.deepEqual(toDiskVolumeOption(
+        buildFileSystem({
+            fs: "//shiori@fixture-server._smb._tcp.local/media",
+            type: "HFS",
+            mount: "/Volumes/media",
+            size: 1000,
+            used: 400,
+            available: 600,
+        }),
+        [],
+        [buildDiskLayout({
+            device: "disk0",
+            type: "NVMe",
+            name: "Fixture Internal Disk",
+        })],
+    ), {
+        id: "/Volumes/media",
+        fs: "//shiori@fixture-server._smb._tcp.local/media",
+        mount: "/Volumes/media",
+        sizeBytes: 1000,
+        usedBytes: 400,
+        availableBytes: 600,
+        storageKind: "network",
+        diskName: "//shiori@fixture-server._smb._tcp.local/media",
+        volumeLabel: "",
+    });
+    assert.equal(isNetworkFileSystem(buildFileSystem({ fs: "smb://fixture-server/media" })), true);
+});
+
+test("physical disk resolution prefers device match then matching disk name then size fallback", () => {
     const fileSystem = buildFileSystem({ size: 500 });
     const smallDisk = buildDiskLayout({ name: "Small", size: 400 });
     const largeDisk = buildDiskLayout({ name: "Large", size: 1000 });
+    const deviceMatchedDisk = buildDiskLayout({
+        device: "\\\\.\\PHYSICALDRIVE7",
+        name: "Fixture Windows Disk",
+        size: 4000,
+    });
 
+    assert.equal(resolvePhysicalDisk(
+        fileSystem,
+        buildBlockDevice({
+            device: "\\\\.\\PHYSICALDRIVE7",
+            name: "C:",
+            model: "",
+            physical: "Local",
+        }),
+        [smallDisk, deviceMatchedDisk],
+    ), deviceMatchedDisk);
+    assert.equal(resolvePhysicalDisk(
+        fileSystem,
+        buildBlockDevice({
+            device: "/dev/disk0",
+            name: "/dev/disk3s1s1",
+            physical: "SSD",
+        }),
+        [buildDiskLayout({
+            device: "disk0",
+            type: "NVMe",
+            name: "Fixture Internal Disk",
+            size: 500277792768,
+        })],
+    )?.name, "Fixture Internal Disk");
     assert.equal(resolvePhysicalDisk(
         fileSystem,
         buildBlockDevice({ device: "/dev/disk-large", name: "partition", model: "model" }),
@@ -480,13 +618,16 @@ test("disk storage kind resolves local disk types and network block devices", ()
     assert.equal(resolveDiskStorageKind(buildDiskLayout({ type: "NVMe" }), undefined), "ssd");
     assert.equal(resolveDiskStorageKind(buildDiskLayout({ type: "HD" }), undefined), "hdd");
     assert.equal(resolveDiskStorageKind(buildDiskLayout({ type: "USB" }), undefined), "unknown");
-    assert.equal(resolveDiskStorageKind(undefined, buildBlockDevice({ physical: "network" })), "network");
-    assert.equal(isLocalBlockDevice(buildBlockDevice({ physical: "network" })), false);
+    assert.equal(resolveDiskStorageKind(undefined, buildBlockDevice({ physical: "Network" })), "network");
+    assert.equal(isLocalBlockDevice(buildBlockDevice({ physical: "Network" })), false);
+    assert.equal(isLocalBlockDevice(buildBlockDevice({ physical: "Local" })), true);
+    assert.equal(isLocalBlockDevice(buildBlockDevice({ physical: "Removable" })), true);
+    assert.equal(isLocalBlockDevice(buildBlockDevice({ physical: "SSD" })), true);
 });
 
 test("default disk volume prefers root mounts before first fallback", () => {
     const secondaryVolume = buildDiskVolume({ id: "secondary", mount: "D:\\Games" });
-    const rootVolume = buildDiskVolume({ id: "root", mount: "C:\\" });
+    const rootVolume = buildDiskVolume({ id: "root", mount: "C:" });
 
     assert.equal(resolveDefaultDiskVolume([secondaryVolume, rootVolume]), rootVolume);
     assert.equal(resolveDefaultDiskVolume([secondaryVolume]), secondaryVolume);
@@ -702,7 +843,11 @@ function buildFileSystem(overrides: Partial<Systeminformation.FsSizeData> = {}):
     } as Systeminformation.FsSizeData;
 }
 
-function buildBlockDevice(overrides: Partial<Systeminformation.BlockDevicesData> = {}): Systeminformation.BlockDevicesData {
+type BlockDeviceTestOverrides =
+    Partial<Omit<Systeminformation.BlockDevicesData, "size">>
+    & { size?: number | string };
+
+function buildBlockDevice(overrides: BlockDeviceTestOverrides = {}): Systeminformation.BlockDevicesData {
     return {
         name: "disk1",
         type: "disk",

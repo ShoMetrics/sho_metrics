@@ -50,11 +50,15 @@ interface RawNetworkInterfaceDebug {
     speedMegabitsPerSecond: number | null;
 }
 
-export function isUsableNetworkInterface(networkInterface: Systeminformation.NetworkInterfacesData): boolean {
+export function isUsableNetworkInterface(
+    networkInterface: Systeminformation.NetworkInterfacesData,
+    platform: NodeJS.Platform = process.platform,
+): boolean {
     return !networkInterface.internal
         && !networkInterface.virtual
         && networkInterface.operstate === "up"
-        && networkInterface.iface.length > 0;
+        && networkInterface.iface.length > 0
+        && !isSystemNetworkInterface(networkInterface.iface, platform);
 }
 
 export function toNetworkInterfaceOption(networkInterface: Systeminformation.NetworkInterfacesData): NetworkInterfaceOption {
@@ -75,6 +79,22 @@ export function normalizeNetworkInterfaceType(type: string): NetworkInterfaceOpt
     }
 
     return "unknown";
+}
+
+export function isSystemNetworkInterface(interfaceId: string, platform: NodeJS.Platform = process.platform): boolean {
+    const normalizedInterfaceId = interfaceId.toLowerCase();
+
+    if (platform === "darwin") {
+        return normalizedInterfaceId === "lo0"
+            || normalizedInterfaceId.startsWith("awdl")
+            || normalizedInterfaceId.startsWith("llw")
+            || normalizedInterfaceId.startsWith("utun")
+            || normalizedInterfaceId.startsWith("anpi")
+            || normalizedInterfaceId.startsWith("bridge")
+            || /^ap\d+$/u.test(normalizedInterfaceId);
+    }
+
+    return false;
 }
 
 export function formatNetworkInterfaceOptionDebug(
