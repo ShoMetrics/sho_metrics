@@ -7,11 +7,15 @@ const log = logger.for("Scheduler");
 
 export type MetricsSnapshot = IMetricSnapshot;
 
-type MetricSubscriber = (metrics: MetricsSnapshot) => void;
+export type MetricSubscriber = (metrics: MetricsSnapshot) => void;
 
-interface SubscriptionOptions {
+export interface SubscriptionOptions {
     pollingIntervalMilliseconds?: number;
     metricKeys?: readonly string[];
+}
+
+export interface MetricSnapshotStore {
+    ingest(snapshot: IMetricSnapshot): void;
 }
 
 interface SubscriberRecord {
@@ -31,19 +35,21 @@ interface DueSubscriberGroup {
  * Central Scheduler that polls an IMetricSource for due metric/frequency groups.
  * Subscribers sharing the same frequency and metric keys receive the same snapshot.
  */
-class Scheduler {
+export class Scheduler {
     private subscribers = new Map<MetricSubscriber, SubscriberRecord>();
     private intervalId?: NodeJS.Timeout;
     private activePolls = new Set<string>();
     private source: IMetricSource;
+    private snapshotStore: MetricSnapshotStore;
     private nextPollTimestampByGroup = new Map<string, number>();
 
     private static readonly TICK_INTERVAL_MS = 1000;
     private static readonly DEFAULT_POLLING_INTERVAL_MS = 1000;
     private static readonly ALLOWED_POLLING_INTERVALS_MS = new Set([1000, 2000, 3000, 5000, 10000, 15000, 30000, 60000]);
 
-    constructor(source: IMetricSource) {
+    constructor(source: IMetricSource, snapshotStore: MetricSnapshotStore = metricStore) {
         this.source = source;
+        this.snapshotStore = snapshotStore;
     }
 
     setSource(source: IMetricSource): void {
@@ -172,7 +178,7 @@ class Scheduler {
             ].join(" "));
 
             const snapshot = await this.pollSource(group.metricKeys);
-            metricStore.ingest(snapshot);
+            this.snapshotStore.ingest(snapshot);
             const ingestTimestampMilliseconds = Date.now();
 
             log.debug(() => [

@@ -1,5 +1,5 @@
 import type { ColorConfig, ColorThreshold } from "../rendering/color-resolver";
-import type { GraphicStyleName, GraphicType } from "../widgets/widget.interface";
+import type { GraphicThemePresetName, GraphicType } from "../widgets/widget.interface";
 import type { SparklineGridLineType, SparklineGridLineVisibility } from "../widgets/primitives/sparkline";
 
 export type SettingValue = string | number | boolean | null | undefined;
@@ -22,7 +22,7 @@ export interface MetricVisualSettings {
 
 export interface ResolvedMetricVisualSettings {
     graphicType: GraphicType;
-    graphicStyle: GraphicStyleName;
+    graphicStyle: GraphicThemePresetName;
     colorConfig: ColorConfig;
     lineSmoothingPercent: number;
     gridLineVisibility: SparklineGridLineVisibility;
@@ -49,7 +49,7 @@ const GRAPHIC_TYPE_ALIASES: Record<string, GraphicType> = {
     "dashed-line": "dashed-line",
 };
 
-const GRAPHIC_STYLES: readonly GraphicStyleName[] = ["flat", "cupertino-glass"];
+const GRAPHIC_THEME_PRESET_NAMES: readonly GraphicThemePresetName[] = ["flat", "cupertino-glass"];
 
 export function resolveMetricVisualSettings(settings: MetricVisualSettings): ResolvedMetricVisualSettings {
     const graphicType = resolveGraphicType(settings.graphicType);
@@ -76,9 +76,9 @@ function resolveGraphicType(value: SettingValue): GraphicType {
     return GRAPHIC_TYPE_ALIASES[value] ?? "circular";
 }
 
-function resolveGraphicStyle(value: SettingValue): GraphicStyleName {
-    if (GRAPHIC_STYLES.includes(value as GraphicStyleName)) {
-        return value as GraphicStyleName;
+function resolveGraphicStyle(value: SettingValue): GraphicThemePresetName {
+    if (GRAPHIC_THEME_PRESET_NAMES.includes(value as GraphicThemePresetName)) {
+        return value as GraphicThemePresetName;
     }
 
     return "flat";

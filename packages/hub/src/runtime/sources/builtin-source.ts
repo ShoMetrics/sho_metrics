@@ -396,34 +396,10 @@ export class BuiltinSource implements IMetricSource {
             timestampMilliseconds: options.currentTimestampMilliseconds,
         });
 
-        if (!previousSample || options.currentTimestampMilliseconds <= previousSample.timestampMilliseconds) {
-            return {
-                interfaceId: options.interfaceId,
-                direction: options.direction,
-                currentBytes: options.currentBytes,
-                previousBytes: previousSample?.bytes ?? null,
-                bytesDelta: null,
-                elapsedMilliseconds: previousSample
-                    ? options.currentTimestampMilliseconds - previousSample.timestampMilliseconds
-                    : null,
-                bytesPerSecond: 0,
-                hadPreviousSample: previousSample != null,
-            };
-        }
-
-        const elapsedSeconds = (options.currentTimestampMilliseconds - previousSample.timestampMilliseconds) / 1000;
-        const bytesDelta = options.currentBytes - previousSample.bytes;
-
-        return {
-            interfaceId: options.interfaceId,
-            direction: options.direction,
-            currentBytes: options.currentBytes,
-            previousBytes: previousSample.bytes,
-            bytesDelta,
-            elapsedMilliseconds: options.currentTimestampMilliseconds - previousSample.timestampMilliseconds,
-            bytesPerSecond: Math.max(0, bytesDelta / elapsedSeconds),
-            hadPreviousSample: true,
-        };
+        return calculateNetworkRate({
+            ...options,
+            previousSample,
+        });
     }
 
     private logNetworkPollDebug(options: {
@@ -595,12 +571,12 @@ export class BuiltinSource implements IMetricSource {
     }
 }
 
-interface NetworkCounterSample {
+export interface NetworkCounterSample {
     bytes: number;
     timestampMilliseconds: number;
 }
 
-interface GpuTelemetryData {
+export interface GpuTelemetryData {
     utilizationGpu?: number;
     modelText?: string;
     temperatureGpu?: number;
@@ -610,7 +586,7 @@ interface GpuTelemetryData {
     powerLimit?: number;
 }
 
-interface NetworkRateCalculation {
+export interface NetworkRateCalculation {
     interfaceId: string;
     direction: NetworkDirection;
     currentBytes: number;
@@ -665,14 +641,14 @@ interface RawNetworkInterfaceDebug {
     speedMegabitsPerSecond: number | null;
 }
 
-function isUsableNetworkInterface(networkInterface: Systeminformation.NetworkInterfacesData): boolean {
+export function isUsableNetworkInterface(networkInterface: Systeminformation.NetworkInterfacesData): boolean {
     return !networkInterface.internal
         && !networkInterface.virtual
         && networkInterface.operstate === "up"
         && networkInterface.iface.length > 0;
 }
 
-function toNetworkInterfaceOption(networkInterface: Systeminformation.NetworkInterfacesData): NetworkInterfaceOption {
+export function toNetworkInterfaceOption(networkInterface: Systeminformation.NetworkInterfacesData): NetworkInterfaceOption {
     return {
         id: networkInterface.iface,
         name: networkInterface.ifaceName || networkInterface.iface,
@@ -684,7 +660,7 @@ function toNetworkInterfaceOption(networkInterface: Systeminformation.NetworkInt
     };
 }
 
-function normalizeNetworkInterfaceType(type: string): NetworkInterfaceOption["type"] {
+export function normalizeNetworkInterfaceType(type: string): NetworkInterfaceOption["type"] {
     if (type === "wired" || type === "wireless") {
         return type;
     }
@@ -746,7 +722,44 @@ function formatRawNetworkInterfaceDebug(networkInterface: Systeminformation.Netw
     };
 }
 
-function resolveMetricGroups(metricKeys: readonly string[]): Set<MetricGroup> {
+export function calculateNetworkRate(options: {
+    interfaceId: string;
+    direction: NetworkDirection;
+    currentBytes: number;
+    currentTimestampMilliseconds: number;
+    previousSample: NetworkCounterSample | undefined;
+}): NetworkRateCalculation {
+    if (!options.previousSample || options.currentTimestampMilliseconds <= options.previousSample.timestampMilliseconds) {
+        return {
+            interfaceId: options.interfaceId,
+            direction: options.direction,
+            currentBytes: options.currentBytes,
+            previousBytes: options.previousSample?.bytes ?? null,
+            bytesDelta: null,
+            elapsedMilliseconds: options.previousSample
+                ? options.currentTimestampMilliseconds - options.previousSample.timestampMilliseconds
+                : null,
+            bytesPerSecond: 0,
+            hadPreviousSample: options.previousSample != null,
+        };
+    }
+
+    const elapsedSeconds = (options.currentTimestampMilliseconds - options.previousSample.timestampMilliseconds) / 1000;
+    const bytesDelta = options.currentBytes - options.previousSample.bytes;
+
+    return {
+        interfaceId: options.interfaceId,
+        direction: options.direction,
+        currentBytes: options.currentBytes,
+        previousBytes: options.previousSample.bytes,
+        bytesDelta,
+        elapsedMilliseconds: options.currentTimestampMilliseconds - options.previousSample.timestampMilliseconds,
+        bytesPerSecond: Math.max(0, bytesDelta / elapsedSeconds),
+        hadPreviousSample: true,
+    };
+}
+
+export function resolveMetricGroups(metricKeys: readonly string[]): Set<MetricGroup> {
     if (metricKeys.length === 0) {
         return new Set(["cpu", "memory", "disk", "network", "gpu"]);
     }
@@ -800,24 +813,9 @@ async function pollWindowsNvidiaGpuTelemetry(): Promise<GpuTelemetryData | null>
         return null;
     }
 
-    const fields = firstGpuLine.split(",").map(field => field.trim());
-    const utilizationGpu = parseNvidiaSmiNumber(fields[0]);
-    const modelText = normalizeNonEmptyText(fields[1]);
-    const temperatureGpu = parseNvidiaSmiNumber(fields[2]);
-    const memoryUsed = parseNvidiaSmiNumber(fields[3]);
-    const memoryTotal = parseNvidiaSmiNumber(fields[4]);
-    const powerDraw = parseNvidiaSmiNumber(fields[5]);
-    const powerLimit = parseNvidiaSmiNumber(fields[6]);
+    const gpuData = parseNvidiaSmiTelemetryLine(firstGpuLine);
 
-    if (
-        utilizationGpu == null
-        && temperatureGpu == null
-        && memoryUsed == null
-        && memoryTotal == null
-        && powerDraw == null
-        && powerLimit == null
-        && modelText == null
-    ) {
+    if (!gpuData) {
         gpuLog.debug(() => [
             "nvidiaSmiNoParsedFields",
             `raw=${firstGpuLine}`,
@@ -825,15 +823,7 @@ async function pollWindowsNvidiaGpuTelemetry(): Promise<GpuTelemetryData | null>
         return null;
     }
 
-    return {
-        utilizationGpu,
-        modelText,
-        temperatureGpu,
-        memoryUsed,
-        memoryTotal,
-        powerDraw,
-        powerLimit,
-    };
+    return gpuData;
 }
 
 async function pollSystemInformationGpuTelemetry(): Promise<GpuTelemetryData | null> {
@@ -936,7 +926,40 @@ function logNvidiaSmiFailure(options: {
     ].join(" "));
 }
 
-function parseNvidiaSmiNumber(value: string | undefined): number | undefined {
+export function parseNvidiaSmiTelemetryLine(firstGpuLine: string): GpuTelemetryData | null {
+    const fields = firstGpuLine.split(",").map(field => field.trim());
+    const utilizationGpu = parseNvidiaSmiNumber(fields[0]);
+    const modelText = normalizeNonEmptyText(fields[1]);
+    const temperatureGpu = parseNvidiaSmiNumber(fields[2]);
+    const memoryUsed = parseNvidiaSmiNumber(fields[3]);
+    const memoryTotal = parseNvidiaSmiNumber(fields[4]);
+    const powerDraw = parseNvidiaSmiNumber(fields[5]);
+    const powerLimit = parseNvidiaSmiNumber(fields[6]);
+
+    if (
+        utilizationGpu == null
+        && temperatureGpu == null
+        && memoryUsed == null
+        && memoryTotal == null
+        && powerDraw == null
+        && powerLimit == null
+        && modelText == null
+    ) {
+        return null;
+    }
+
+    return {
+        utilizationGpu,
+        modelText,
+        temperatureGpu,
+        memoryUsed,
+        memoryTotal,
+        powerDraw,
+        powerLimit,
+    };
+}
+
+export function parseNvidiaSmiNumber(value: string | undefined): number | undefined {
     if (!value || value.toUpperCase() === "N/A") {
         return undefined;
     }
@@ -946,7 +969,7 @@ function parseNvidiaSmiNumber(value: string | undefined): number | undefined {
     return Number.isFinite(numericValue) ? numericValue : undefined;
 }
 
-function normalizeNonEmptyText(value: string | undefined): string | undefined {
+export function normalizeNonEmptyText(value: string | undefined): string | undefined {
     const normalizedValue = value?.trim();
 
     return normalizedValue && normalizedValue.toUpperCase() !== "N/A"
@@ -954,7 +977,7 @@ function normalizeNonEmptyText(value: string | undefined): string | undefined {
         : undefined;
 }
 
-function formatCpuModelText(cpuData: Systeminformation.CpuData): string | null {
+export function formatCpuModelText(cpuData: Systeminformation.CpuData): string | null {
     const modelParts = [
         normalizeNonEmptyText(cpuData.manufacturer),
         normalizeNonEmptyText(cpuData.brand),
@@ -967,14 +990,14 @@ function formatCpuModelText(cpuData: Systeminformation.CpuData): string | null {
     return modelText.length > 0 ? modelText : null;
 }
 
-function isUsableFileSystem(fileSystem: Systeminformation.FsSizeData): boolean {
+export function isUsableFileSystem(fileSystem: Systeminformation.FsSizeData): boolean {
     return fileSystem.size > 0
         && fileSystem.mount.length > 0
         && fileSystem.available >= 0
         && fileSystem.used >= 0;
 }
 
-function toDiskVolumeOption(
+export function toDiskVolumeOption(
     fileSystem: Systeminformation.FsSizeData,
     blockDevices: readonly Systeminformation.BlockDevicesData[],
     diskLayout: readonly Systeminformation.DiskLayoutData[],
@@ -995,7 +1018,7 @@ function toDiskVolumeOption(
     };
 }
 
-function resolvePhysicalDisk(
+export function resolvePhysicalDisk(
     fileSystem: Systeminformation.FsSizeData,
     blockDevice: Systeminformation.BlockDevicesData | undefined,
     diskLayout: readonly Systeminformation.DiskLayoutData[],
@@ -1030,7 +1053,7 @@ function resolvePhysicalDisk(
         ?? diskLayout[0];
 }
 
-function resolveDiskStorageKind(
+export function resolveDiskStorageKind(
     diskLayout: Systeminformation.DiskLayoutData | undefined,
     blockDevice: Systeminformation.BlockDevicesData | undefined,
 ): DiskStorageKind {
@@ -1055,7 +1078,7 @@ function resolveDiskStorageKind(
     return "unknown";
 }
 
-function isLocalBlockDevice(blockDevice: Systeminformation.BlockDevicesData): boolean {
+export function isLocalBlockDevice(blockDevice: Systeminformation.BlockDevicesData): boolean {
     const physicalKind = blockDevice.physical.toLowerCase();
 
     if (physicalKind === "network") {
@@ -1065,22 +1088,22 @@ function isLocalBlockDevice(blockDevice: Systeminformation.BlockDevicesData): bo
     return true;
 }
 
-function resolveDefaultDiskVolume(diskVolumes: readonly DiskVolumeOption[]): DiskVolumeOption | null {
+export function resolveDefaultDiskVolume(diskVolumes: readonly DiskVolumeOption[]): DiskVolumeOption | null {
     return diskVolumes.find(diskVolume => diskVolume.mount === "/" || /^[A-Z]:\\?$/i.test(diskVolume.mount))
         ?? diskVolumes[0]
         ?? null;
 }
 
-function calculatePercent(value: number, total: number): number {
+export function calculatePercent(value: number, total: number): number {
     return total > 0 ? (value / total) * 100 : 0;
 }
 
-function normalizeNullableRate(value: number | null): number {
+export function normalizeNullableRate(value: number | null): number {
     return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
-function isFinitePositiveNumber(value: number | undefined): value is number {
+export function isFinitePositiveNumber(value: number | undefined): value is number {
     return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
-type MetricGroup = "cpu" | "memory" | "disk" | "network" | "gpu";
+export type MetricGroup = "cpu" | "memory" | "disk" | "network" | "gpu";

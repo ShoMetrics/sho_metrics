@@ -1,7 +1,8 @@
 {
     "scripts": {
         "build": "rollup -c",
-        "test:pi": "tsc -p tsconfig.test.json && node scripts/write-test-package.mjs && node --test .test-dist/src/**/*.test.js",
+        "test": "npm run test:unit",
+        "test:unit": "tsc -p tsconfig.test.json && node scripts/write-test-package.mjs && node --test --test-isolation=none .test-dist/src/**/*.test.js",
         "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart com.ez.sho-metrics\"",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",

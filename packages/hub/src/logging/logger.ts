@@ -1,5 +1,7 @@
 import streamDeck from "@elgato/streamdeck";
-import type { LogEntryData, LogLevel } from "@elgato/utils/logging";
+
+type LogLevel = "error" | "warn" | "info" | "debug" | "trace";
+type LogEntryData = unknown[] | [string, ...unknown[]];
 
 /**
  * Log message input.

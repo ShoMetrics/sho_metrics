@@ -1,6 +1,6 @@
 import type { DualChannelWidgetData, WidgetData, KeySize } from "./widget-data";
 import type { GraphicStyle } from "../widgets/styles/style.interface";
-import type { GraphicType, GraphicStyleName } from "../widgets/widget.interface";
+import type { GraphicThemePresetName, GraphicType } from "../widgets/widget.interface";
 import { arcGauge, DEFAULT_ARC_GAUGE_CONFIG, type ArcGaugeConfig } from "../widgets/primitives/arc-gauge";
 import { sparkline, DEFAULT_SPARKLINE_CONFIG, type SparklineConfig } from "../widgets/primitives/sparkline";
 import { linearBar, DEFAULT_LINEAR_BAR_CONFIG, type LinearBarConfig } from "../widgets/primitives/linear-bar";
@@ -51,14 +51,18 @@ const WIDGET_REGISTRY: Record<GraphicType, WidgetRegistryEntry> = {
     },
 };
 
-const STYLE_REGISTRY: Record<GraphicStyleName, GraphicStyle> = {
+const THEME_PRESET_REGISTRY: Record<GraphicThemePresetName, GraphicStyle> = {
     "flat": flatStyle,
     "cupertino-glass": cupertinoGlassStyle,
 };
 
 export interface ComposeOptions {
     graphicType: GraphicType;
-    graphicStyle: GraphicStyleName;
+    /**
+     * Persisted setting name is still `graphicStyle`, but the value now
+     * represents a theme preset/treatment rather than a widget primitive.
+     */
+    graphicStyle: GraphicThemePresetName;
     colorConfig?: ColorConfig;
     configOverrides?: WidgetConfigOverrides;
     muted?: boolean;
@@ -111,11 +115,11 @@ export function composeDualChannelSvg(
 
 function composeStyledSvg(options: {
     widgetSvgFragment: string;
-    graphicStyle: GraphicStyleName;
+    graphicStyle: GraphicThemePresetName;
     muted: boolean;
     keySize: KeySize;
 }): string {
-    const style = STYLE_REGISTRY[options.graphicStyle] ?? flatStyle;
+    const style = THEME_PRESET_REGISTRY[options.graphicStyle] ?? flatStyle;
     const filterId = `muted-widget-${options.keySize.width}-${options.keySize.height}`;
     const mutedDefs = options.muted
         ? `
