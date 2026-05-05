@@ -1,5 +1,5 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
-import { composeSvg } from "../rendering/composer";
+import { composeDualChannelSvg, composeSvg } from "../rendering/composer";
 import { rasterizeSvgToPngDataUrl } from "../rendering/rasterizer";
 import {
     KEYPAD_PNG_SIZE,
@@ -8,17 +8,16 @@ import {
     TOUCH_STRIP_SINGLE_METRIC_SQUARE_PNG_SIZE,
     WIDGET_LOGICAL_SIZE,
 } from "../rendering/widget-data";
-import type { KeySize, WidgetData } from "../rendering/widget-data";
+import type { DualChannelWidgetData, KeySize, WidgetData } from "../rendering/widget-data";
 import { resolveMetricVisualSettings, type MetricVisualSettings, type ResolvedMetricVisualSettings, type SettingValue } from "./metric-visual-settings";
 import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
 import { logger } from "../logging/logger";
 
 const log = logger.for("SingleMetricDisplay");
 
-export interface SingleMetricDisplayOptions {
+interface BaseMetricDisplayOptions {
     event: WillAppearEvent;
     metricKey: string;
-    widgetData: WidgetData;
     centerIconFragment: string;
     linearIconFragment?: string;
     statusIcon: ArcGaugeStatusIcon;
@@ -26,9 +25,25 @@ export interface SingleMetricDisplayOptions {
     visualSettingsOverride?: Partial<MetricVisualSettings>;
 }
 
+export interface SingleMetricDisplayOptions extends BaseMetricDisplayOptions {
+    widgetData: WidgetData;
+}
+
+export interface DualMetricDisplayOptions extends BaseMetricDisplayOptions {
+    widgetData: DualChannelWidgetData;
+    titleText: string;
+    chartMode?: "overlay" | "mirrored";
+    positiveColor: string;
+    negativeColor: string;
+    positiveIconFragment?: string;
+    negativeIconFragment?: string;
+}
+
 interface SingleMetricDisplaySettings extends MetricVisualSettings {
     circularCenterContent?: SettingValue;
 }
+
+type MetricDisplayOptions = SingleMetricDisplayOptions | DualMetricDisplayOptions;
 
 type TouchStripMetricLayoutKind = "square" | "wide";
 
@@ -65,13 +80,20 @@ interface DisplayActionState {
     isRenderInFlight: boolean;
     isQueued: boolean;
     active: boolean;
-    pendingOptions: SingleMetricDisplayOptions | null;
+    pendingOptions: MetricDisplayOptions | null;
     touchStripLayoutPromise: Promise<void> | null;
     touchStripLayoutPath: string | null;
     lastRenderedSvg: string | null;
 }
 
 export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): void {
+    const displayActionState = getOrCreateDisplayActionState(options.event.action.id);
+
+    displayActionState.pendingOptions = options;
+    enqueueDisplayAction(displayActionState);
+}
+
+export function setDualMetricDisplay(options: DualMetricDisplayOptions): void {
     const displayActionState = getOrCreateDisplayActionState(options.event.action.id);
 
     displayActionState.pendingOptions = options;
@@ -95,7 +117,7 @@ export function clearSingleMetricDisplayState(actionId: string): void {
 
 function renderAndSendSingleMetricDisplay(
     displayActionState: DisplayActionState,
-    options: SingleMetricDisplayOptions,
+    options: MetricDisplayOptions,
 ): void {
     displayActionState.isRenderInFlight = true;
     displayActionState.pendingOptions = null;
@@ -112,15 +134,11 @@ function renderAndSendSingleMetricDisplay(
         graphicType: visualSettings.graphicType,
         circularCenterContentOverride: options.circularCenterContentOverride,
     });
-    const hasData = options.widgetData.sampleTimestampMilliseconds != null;
-    const shouldRenderMutedIconPlaceholder = !hasData
+    const displayHasData = hasMetricDisplayData(options);
+    const shouldRenderMutedIconPlaceholder = !displayHasData
+        && !isDualMetricDisplayOptions(options)
         && visualSettings.graphicType === "circular"
         && centerContent === "icon";
-    const renderWidgetData = buildRenderWidgetData({
-        widgetData: options.widgetData,
-        hasData,
-        shouldRenderMutedIconPlaceholder,
-    });
     const touchStripMetricLayout = options.event.action.isDial()
         ? resolveTouchStripMetricLayout(visualSettings)
         : null;
@@ -133,19 +151,52 @@ function renderAndSendSingleMetricDisplay(
         });
     }
 
-    const svg = composeSvg(renderWidgetData, {
-        ...visualSettings,
-        muted: shouldRenderMutedIconPlaceholder,
-        configOverrides: buildSingleMetricConfigOverrides({
-            centerIconFragment: options.centerIconFragment,
-            linearIconFragment: options.linearIconFragment,
-            statusIcon: options.statusIcon,
-            centerContent,
-            lineSmoothingPercent: visualSettings.lineSmoothingPercent,
-            gridLineVisibility: visualSettings.gridLineVisibility,
-            gridLineType: visualSettings.gridLineType,
-        }),
-    }, renderSize);
+    let renderedMetricData: WidgetData | DualChannelWidgetData;
+    let svg: string;
+
+    if (isDualMetricDisplayOptions(options)) {
+        const renderDualWidgetData = buildRenderDualChannelWidgetData({
+            widgetData: options.widgetData,
+            hasData: displayHasData,
+        });
+        renderedMetricData = renderDualWidgetData;
+        svg = composeDualChannelSvg(renderDualWidgetData, {
+            graphicStyle: visualSettings.graphicStyle,
+            muted: false,
+            configOverrides: buildDualMetricConfigOverrides({
+                positiveColor: options.positiveColor,
+                negativeColor: options.negativeColor,
+                titleText: options.titleText,
+                chartMode: options.chartMode ?? "overlay",
+                topIconFragment: options.centerIconFragment,
+                positiveIconFragment: options.positiveIconFragment,
+                negativeIconFragment: options.negativeIconFragment,
+                lineSmoothingPercent: visualSettings.lineSmoothingPercent,
+                gridLineVisibility: visualSettings.gridLineVisibility,
+                gridLineType: visualSettings.gridLineType,
+            }),
+        }, renderSize);
+    } else {
+        const renderSingleWidgetData = buildRenderWidgetData({
+            widgetData: options.widgetData,
+            hasData: displayHasData,
+            shouldRenderMutedIconPlaceholder,
+        });
+        renderedMetricData = renderSingleWidgetData;
+        svg = composeSvg(renderSingleWidgetData, {
+            ...visualSettings,
+            muted: shouldRenderMutedIconPlaceholder,
+            configOverrides: buildSingleMetricConfigOverrides({
+                centerIconFragment: options.centerIconFragment,
+                linearIconFragment: options.linearIconFragment,
+                statusIcon: options.statusIcon,
+                centerContent,
+                lineSmoothingPercent: visualSettings.lineSmoothingPercent,
+                gridLineVisibility: visualSettings.gridLineVisibility,
+                gridLineType: visualSettings.gridLineType,
+            }),
+        }, renderSize);
+    }
     const composeEndTimestampMilliseconds = Date.now();
 
     if (svg === displayActionState.lastRenderedSvg) {
@@ -171,8 +222,8 @@ function renderAndSendSingleMetricDisplay(
         actionId: options.event.action.id,
         metricKey: options.metricKey,
         phase: "rendered",
-        value: renderWidgetData.current,
-        sampleTimestampMilliseconds: renderWidgetData.sampleTimestampMilliseconds,
+        value: resolveDisplayLogValue(renderedMetricData),
+        sampleTimestampMilliseconds: resolveDisplaySampleTimestampMilliseconds(renderedMetricData),
         renderStartTimestampMilliseconds,
         composeDurationMilliseconds: composeEndTimestampMilliseconds - renderStartTimestampMilliseconds,
         rasterizeDurationMilliseconds: rasterizeEndTimestampMilliseconds - composeEndTimestampMilliseconds,
@@ -193,7 +244,7 @@ function renderAndSendSingleMetricDisplay(
                         actionId: options.event.action.id,
                         metricKey: options.metricKey,
                         phase: "setFeedbackDone",
-                        sampleTimestampMilliseconds: renderWidgetData.sampleTimestampMilliseconds,
+                        sampleTimestampMilliseconds: resolveDisplaySampleTimestampMilliseconds(renderedMetricData),
                         updateStartTimestampMilliseconds,
                     });
                 })
@@ -223,7 +274,7 @@ function renderAndSendSingleMetricDisplay(
                     actionId: options.event.action.id,
                     metricKey: options.metricKey,
                     phase: "setImageDone",
-                    sampleTimestampMilliseconds: renderWidgetData.sampleTimestampMilliseconds,
+                    sampleTimestampMilliseconds: resolveDisplaySampleTimestampMilliseconds(renderedMetricData),
                     updateStartTimestampMilliseconds,
                 });
             })
@@ -261,6 +312,43 @@ function buildSingleMetricConfigOverrides(options: {
         centerIconFragment: options.centerIconFragment,
         topIconFragment: options.linearIconFragment ?? options.centerIconFragment,
         statusIcon: options.statusIcon,
+        lineSmoothingPercent: options.lineSmoothingPercent,
+        gridLineVisibility: options.gridLineVisibility,
+        gridLineType: options.gridLineType,
+    };
+}
+
+function buildDualMetricConfigOverrides(options: {
+    positiveColor: string;
+    negativeColor: string;
+    titleText: string;
+    chartMode: "overlay" | "mirrored";
+    topIconFragment: string;
+    positiveIconFragment: string | undefined;
+    negativeIconFragment: string | undefined;
+    lineSmoothingPercent: number;
+    gridLineVisibility: ResolvedMetricVisualSettings["gridLineVisibility"];
+    gridLineType: ResolvedMetricVisualSettings["gridLineType"];
+}): {
+    positiveColor: string;
+    negativeColor: string;
+    titleText?: string;
+    chartMode?: "overlay" | "mirrored";
+    topIconFragment?: string;
+    positiveIconFragment?: string;
+    negativeIconFragment?: string;
+    lineSmoothingPercent?: number;
+    gridLineVisibility?: ResolvedMetricVisualSettings["gridLineVisibility"];
+    gridLineType?: ResolvedMetricVisualSettings["gridLineType"];
+} {
+    return {
+        positiveColor: options.positiveColor,
+        negativeColor: options.negativeColor,
+        titleText: options.titleText,
+        chartMode: options.chartMode,
+        topIconFragment: options.topIconFragment,
+        positiveIconFragment: options.positiveIconFragment,
+        negativeIconFragment: options.negativeIconFragment,
         lineSmoothingPercent: options.lineSmoothingPercent,
         gridLineVisibility: options.gridLineVisibility,
         gridLineType: options.gridLineType,
@@ -430,6 +518,82 @@ function ensureTouchStripSingleMetricLayout(
         });
     displayActionState.touchStripLayoutPromise = layoutPromise;
     return layoutPromise;
+}
+
+function buildRenderDualChannelWidgetData(options: {
+    widgetData: DualChannelWidgetData;
+    hasData: boolean;
+}): DualChannelWidgetData {
+    if (!options.hasData) {
+        return {
+            positive: buildPlaceholderChannelWidgetData(options.widgetData.positive, "N/A"),
+            negative: buildPlaceholderChannelWidgetData(options.widgetData.negative, "N/A"),
+        };
+    }
+
+    return {
+        positive: options.widgetData.positive.sampleTimestampMilliseconds == null
+            ? buildZeroChannelWidgetData(options.widgetData.positive, options.widgetData.negative.history.length)
+            : options.widgetData.positive,
+        negative: options.widgetData.negative.sampleTimestampMilliseconds == null
+            ? buildZeroChannelWidgetData(options.widgetData.negative, options.widgetData.positive.history.length)
+            : options.widgetData.negative,
+    };
+}
+
+function buildPlaceholderChannelWidgetData(widgetData: WidgetData, displayValue: string): WidgetData {
+    return {
+        ...widgetData,
+        current: 0,
+        progress: 0,
+        history: [],
+        unit: "",
+        displayValue,
+    };
+}
+
+function buildZeroChannelWidgetData(widgetData: WidgetData, referenceHistoryLength: number): WidgetData {
+    return {
+        ...widgetData,
+        current: 0,
+        progress: 0,
+        history: Array.from({ length: Math.max(2, referenceHistoryLength) }, () => 0),
+        displayValue: "0",
+    };
+}
+
+function isDualMetricDisplayOptions(options: MetricDisplayOptions): options is DualMetricDisplayOptions {
+    return "positiveColor" in options;
+}
+
+function hasMetricDisplayData(options: MetricDisplayOptions): boolean {
+    if (isDualMetricDisplayOptions(options)) {
+        return options.widgetData.positive.sampleTimestampMilliseconds != null
+            || options.widgetData.negative.sampleTimestampMilliseconds != null;
+    }
+
+    return options.widgetData.sampleTimestampMilliseconds != null;
+}
+
+function resolveDisplayLogValue(widgetData: WidgetData | DualChannelWidgetData): number {
+    if (isDualChannelWidgetData(widgetData)) {
+        return widgetData.positive.current + widgetData.negative.current;
+    }
+
+    return widgetData.current;
+}
+
+function resolveDisplaySampleTimestampMilliseconds(widgetData: WidgetData | DualChannelWidgetData): number | undefined {
+    if (isDualChannelWidgetData(widgetData)) {
+        return widgetData.positive.sampleTimestampMilliseconds
+            ?? widgetData.negative.sampleTimestampMilliseconds;
+    }
+
+    return widgetData.sampleTimestampMilliseconds;
+}
+
+function isDualChannelWidgetData(widgetData: WidgetData | DualChannelWidgetData): widgetData is DualChannelWidgetData {
+    return "positive" in widgetData && "negative" in widgetData;
 }
 
 function resolveTouchStripMetricLayout(settings: ResolvedMetricVisualSettings): TouchStripMetricLayout {

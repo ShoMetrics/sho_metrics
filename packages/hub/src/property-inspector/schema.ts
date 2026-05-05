@@ -43,6 +43,7 @@ export interface FieldSchema {
     valueSource?: FieldValueSource;
     placeholder?: string;
     placeholderSource?: FieldPlaceholderSource;
+    disabled?: boolean;
     disabledWhen?: {
         key: PropertyInspectorSettingKey;
         equals: SettingValue;

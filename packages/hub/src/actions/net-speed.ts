@@ -1,17 +1,23 @@
 import { action, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import { metricStore } from "../runtime/metric-store";
-import { setSingleMetricDisplay } from "./single-metric-display";
+import { setDualMetricDisplay, setSingleMetricDisplay } from "./single-metric-display";
 import { logger } from "../logging/logger";
 import type { WidgetData } from "../rendering/widget-data";
 import type { SettingValue } from "./metric-visual-settings";
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../runtime/network-interfaces";
 import { getNetworkAggregateMetricKey, getNetworkInterfaceMetricKey, type NetworkDirection } from "../runtime/network-metric-keys";
 import {
+    normalizeNetworkDisplayDirection,
+    resolveNetSpeedMetricKeys,
+    resolveSingleNetworkDirection,
+} from "./net-speed-metric-keys";
+import {
     buildNetworkSpeedWidgetData,
     convertMegabitsPerSecondToBytesPerSecond,
     type NetworkSpeedUnitBase,
 } from "../metrics/network-speed-display";
+import { resolveColor, type ColorConfig } from "../rendering/color-resolver";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import {
     getNetworkDirectionStatusIcon,
@@ -29,32 +35,13 @@ const log = logger.for("Action:NetSpeed");
 @action({ UUID: "com.ez.sho-metrics.net-speed" })
 export class NetSpeed extends MetricAction {
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
-        const settings = event.payload.settings as NetworkSpeedSettings;
-        const direction = normalizeNetworkDirection(settings.networkDirection);
-        const selectedNetworkInterface = resolveNetworkInterface(settings.networkInterfaceId);
-
-        if (settings.graphicType === "linear") {
-            return selectedNetworkInterface
-                ? [
-                    getNetworkInterfaceMetricKey("upload", selectedNetworkInterface.id),
-                    getNetworkInterfaceMetricKey("download", selectedNetworkInterface.id),
-                ]
-                : [
-                    getNetworkAggregateMetricKey("upload"),
-                    getNetworkAggregateMetricKey("download"),
-                ];
-        }
-
-        return [
-            selectedNetworkInterface
-                ? getNetworkInterfaceMetricKey(direction, selectedNetworkInterface.id)
-                : getNetworkAggregateMetricKey(direction),
-        ];
+        return resolveNetSpeedMetricKeys(event.payload.settings as NetworkSpeedSettings);
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = event.payload.settings as NetworkSpeedSettings;
-        const direction = normalizeNetworkDirection(settings.networkDirection);
+        const displayDirection = normalizeNetworkDisplayDirection(settings.networkDirection);
+        const direction = resolveSingleNetworkDirection(displayDirection);
         const isAutomaticNetworkInterface = !isNonEmptyString(settings.networkInterfaceId);
         const selectedNetworkInterface = resolveNetworkInterface(settings.networkInterfaceId);
         const networkMetricKey = selectedNetworkInterface
@@ -65,6 +52,16 @@ export class NetSpeed extends MetricAction {
 
         if (settings.graphicType === "linear") {
             this.updateLinearNetworkDisplay({
+                event,
+                settings,
+                selectedNetworkInterface,
+                isAutomaticNetworkInterface,
+            });
+            return;
+        }
+
+        if (settings.graphicType === "dashed-line" && displayDirection === "both") {
+            this.updateDualNetworkSparklineDisplay({
                 event,
                 settings,
                 selectedNetworkInterface,
@@ -109,7 +106,79 @@ export class NetSpeed extends MetricAction {
             circularCenterContentOverride: circularCenterContent,
             visualSettingsOverride: {
                 colorMode: settings.colorMode ?? "solid",
-                solidColor: settings.solidColor ?? resolveDirectionSolidColor(direction, settings),
+                solidColor: settings.solidColor ?? resolveNetworkChannelColor(direction, settings),
+            },
+        });
+    }
+
+    private updateDualNetworkSparklineDisplay(options: {
+        event: WillAppearEvent;
+        settings: NetworkSpeedSettings;
+        selectedNetworkInterface: NetworkInterfaceOption | null;
+        isAutomaticNetworkInterface: boolean;
+    }): void {
+        const uploadMetricKey = options.selectedNetworkInterface
+            ? getNetworkInterfaceMetricKey("upload", options.selectedNetworkInterface.id)
+            : getNetworkAggregateMetricKey("upload");
+        const downloadMetricKey = options.selectedNetworkInterface
+            ? getNetworkInterfaceMetricKey("download", options.selectedNetworkInterface.id)
+            : getNetworkAggregateMetricKey("download");
+        const uploadWidgetData = buildNetworkWidgetData({
+            rawWidgetData: metricStore.getWidgetData(uploadMetricKey, "UP", "B/s"),
+            direction: "upload",
+            settings: options.settings,
+            selectedNetworkInterface: options.selectedNetworkInterface,
+            isAutomaticNetworkInterface: options.isAutomaticNetworkInterface,
+        });
+        const downloadWidgetData = buildNetworkWidgetData({
+            rawWidgetData: metricStore.getWidgetData(downloadMetricKey, "DOWN", "B/s"),
+            direction: "download",
+            settings: options.settings,
+            selectedNetworkInterface: options.selectedNetworkInterface,
+            isAutomaticNetworkInterface: options.isAutomaticNetworkInterface,
+        });
+        const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData);
+        const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
+        const trafficDisplayMode = resolveNetworkTrafficDisplayMode(options.settings.networkTrafficDisplayMode);
+        const positiveDirection = trafficDisplayMode === "mirrored" ? "upload" : "download";
+        const negativeDirection = trafficDisplayMode === "mirrored" ? "download" : "upload";
+        const positiveWidgetData = trafficDisplayMode === "mirrored" ? uploadWidgetData : downloadWidgetData;
+        const negativeWidgetData = trafficDisplayMode === "mirrored" ? downloadWidgetData : uploadWidgetData;
+        const positiveColor = positiveDirection === "download" ? downloadColor : uploadColor;
+        const negativeColor = negativeDirection === "download" ? downloadColor : uploadColor;
+
+        setDualMetricDisplay({
+            event: options.event,
+            metricKey: `${downloadMetricKey},${uploadMetricKey}`,
+            widgetData: {
+                positive: positiveWidgetData,
+                negative: negativeWidgetData,
+            },
+            titleText: "NETWORK",
+            chartMode: trafficDisplayMode,
+            centerIconFragment: renderNetworkInterfaceIconFragment({
+                networkInterface: options.selectedNetworkInterface,
+                size: NETWORK_CENTER_ICON_SIZE,
+            }),
+            statusIcon: getNetworkDirectionStatusIcon({
+                direction: "download",
+                color: NETWORK_DIRECTION_ICON_COLOR,
+            }),
+            positiveColor,
+            negativeColor,
+            positiveIconFragment: renderNetworkDirectionIconFragment({
+                direction: positiveDirection,
+                color: positiveColor,
+                size: NETWORK_TOP_ICON_SIZE,
+            }),
+            negativeIconFragment: renderNetworkDirectionIconFragment({
+                direction: negativeDirection,
+                color: negativeColor,
+                size: NETWORK_TOP_ICON_SIZE,
+            }),
+            visualSettingsOverride: {
+                colorMode: "solid",
+                solidColor: downloadColor,
             },
         });
     }
@@ -155,26 +224,26 @@ export class NetSpeed extends MetricAction {
                 linearLabel: "Net Speed",
                 linearChannels: [
                     {
-                        label: "UP",
-                        displayValue: uploadWidgetData.displayValue ?? uploadWidgetData.current.toFixed(0),
-                        unit: uploadWidgetData.unit,
-                        progress: uploadWidgetData.progress,
-                        color: resolveDirectionSolidColor("upload", options.settings),
-                        iconFragment: renderNetworkDirectionIconFragment({
-                            direction: "upload",
-                            color: resolveDirectionSolidColor("upload", options.settings),
-                            size: NETWORK_TOP_ICON_SIZE,
-                        }),
-                    },
-                    {
                         label: "DOWN",
                         displayValue: downloadWidgetData.displayValue ?? downloadWidgetData.current.toFixed(0),
                         unit: downloadWidgetData.unit,
                         progress: downloadWidgetData.progress,
-                        color: resolveDirectionSolidColor("download", options.settings),
+                        color: resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData),
                         iconFragment: renderNetworkDirectionIconFragment({
                             direction: "download",
-                            color: resolveDirectionSolidColor("download", options.settings),
+                            color: NETWORK_DIRECTION_ICON_COLOR,
+                            size: NETWORK_TOP_ICON_SIZE,
+                        }),
+                    },
+                    {
+                        label: "UP",
+                        displayValue: uploadWidgetData.displayValue ?? uploadWidgetData.current.toFixed(0),
+                        unit: uploadWidgetData.unit,
+                        progress: uploadWidgetData.progress,
+                        color: resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData),
+                        iconFragment: renderNetworkDirectionIconFragment({
+                            direction: "upload",
+                            color: NETWORK_DIRECTION_ICON_COLOR,
                             size: NETWORK_TOP_ICON_SIZE,
                         }),
                     },
@@ -197,7 +266,7 @@ export class NetSpeed extends MetricAction {
             }),
             visualSettingsOverride: {
                 colorMode: "solid",
-                solidColor: resolveDirectionSolidColor("download", options.settings),
+                solidColor: resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData),
             },
         });
     }
@@ -230,32 +299,39 @@ export class NetSpeed extends MetricAction {
     }
 }
 
-interface NetworkSpeedSettings {
+export interface NetworkSpeedSettings {
     graphicType?: SettingValue;
     networkDirection?: SettingValue;
     networkInterfaceId?: SettingValue;
     availableNetworkInterfaces?: SettingValue;
     maximumNetworkSpeedMbps?: SettingValue;
     networkUnitBase?: SettingValue;
-    downloadIconColor?: SettingValue;
-    uploadIconColor?: SettingValue;
+    networkTrafficDisplayMode?: SettingValue;
+    downloadColorMode?: SettingValue;
+    downloadSolidColor?: SettingValue;
+    downloadColorLow?: SettingValue;
+    downloadColorMedium?: SettingValue;
+    downloadColorHigh?: SettingValue;
+    uploadColorMode?: SettingValue;
+    uploadSolidColor?: SettingValue;
+    uploadColorLow?: SettingValue;
+    uploadColorMedium?: SettingValue;
+    uploadColorHigh?: SettingValue;
+    lowThreshold?: SettingValue;
+    highThreshold?: SettingValue;
     circularCenterContent?: SettingValue;
     colorMode?: SettingValue;
     solidColor?: SettingValue;
 }
 
-const ACTIVE_DOWNLOAD_ICON_COLOR = "#3b82f6";
-const ACTIVE_UPLOAD_ICON_COLOR = "#ef4444";
+const DEFAULT_DOWNLOAD_COLOR = "#3b82f6";
+const DEFAULT_UPLOAD_COLOR = "#ef4444";
 const NETWORK_DIRECTION_ICON_COLOR = "rgba(255,255,255,0.88)";
 const FALLBACK_MAXIMUM_SPEED_MEGABITS_PER_SECOND = 1000;
 const NETWORK_SPEED_MAXIMUM_DISPLAY_DIGITS = 3;
 const NETWORK_CENTER_ICON_SIZE = 58;
 const NETWORK_TOP_ICON_SIZE = 30;
 const DEBUG_LOG_INTERVAL_MILLISECONDS = 5000;
-
-function normalizeNetworkDirection(value: SettingValue): NetworkDirection {
-    return value === "upload" ? "upload" : "download";
-}
 
 function resolveNetworkInterface(value: SettingValue): NetworkInterfaceOption | null {
     if (isNonEmptyString(value)) {
@@ -320,6 +396,10 @@ function resolveUnitBase(value: SettingValue): NetworkSpeedUnitBase {
     return value === "bit" ? "bit" : "byte";
 }
 
+function resolveNetworkTrafficDisplayMode(value: SettingValue): "overlay" | "mirrored" {
+    return value === "overlay" ? "overlay" : "mirrored";
+}
+
 function getNetworkDirectionLabel(direction: NetworkDirection): string {
     return direction === "download" ? ARC_GAUGE_LABELS.download : ARC_GAUGE_LABELS.upload;
 }
@@ -343,12 +423,64 @@ function buildNetworkCenterIconFragment(options: {
     });
 }
 
-function resolveDirectionSolidColor(direction: NetworkDirection, settings: NetworkSpeedSettings): string {
+function resolveNetworkChannelColor(direction: NetworkDirection, settings: NetworkSpeedSettings): string {
+    return resolveColor(0, buildNetworkChannelColorConfig(direction, settings));
+}
+
+function resolveNetworkWidgetChannelColor(direction: NetworkDirection, settings: NetworkSpeedSettings, widgetData: WidgetData): string {
+    return resolveColor(widgetData.progress * 100, buildNetworkChannelColorConfig(direction, settings));
+}
+
+function buildNetworkChannelColorConfig(direction: NetworkDirection, settings: NetworkSpeedSettings): ColorConfig {
     if (direction === "download") {
-        return resolveHexColor(settings.downloadIconColor, ACTIVE_DOWNLOAD_ICON_COLOR);
+        return {
+            mode: settings.downloadColorMode === "threshold" ? "threshold" : "solid",
+            solidColor: resolveHexColor(settings.downloadSolidColor, DEFAULT_DOWNLOAD_COLOR),
+            thresholds: buildChannelThresholds({
+                settings,
+                lowColor: resolveHexColor(settings.downloadColorLow, "#22c55e"),
+                mediumColor: resolveHexColor(settings.downloadColorMedium, DEFAULT_DOWNLOAD_COLOR),
+                highColor: resolveHexColor(settings.downloadColorHigh, "#60a5fa"),
+            }),
+        };
     }
 
-    return resolveHexColor(settings.uploadIconColor, ACTIVE_UPLOAD_ICON_COLOR);
+    return {
+        mode: settings.uploadColorMode === "threshold" ? "threshold" : "solid",
+        solidColor: resolveHexColor(settings.uploadSolidColor, DEFAULT_UPLOAD_COLOR),
+        thresholds: buildChannelThresholds({
+            settings,
+            lowColor: resolveHexColor(settings.uploadColorLow, "#f97316"),
+            mediumColor: resolveHexColor(settings.uploadColorMedium, DEFAULT_UPLOAD_COLOR),
+            highColor: resolveHexColor(settings.uploadColorHigh, "#f472b6"),
+        }),
+    };
+}
+
+function buildChannelThresholds(options: {
+    settings: NetworkSpeedSettings;
+    lowColor: string;
+    mediumColor: string;
+    highColor: string;
+}): ColorConfig["thresholds"] {
+    const lowThreshold = normalizeThreshold(options.settings.lowThreshold, 30);
+    const highThreshold = Math.max(lowThreshold, normalizeThreshold(options.settings.highThreshold, 70));
+
+    return [
+        { min: 0, max: lowThreshold, color: options.lowColor },
+        { min: lowThreshold, max: highThreshold, color: options.mediumColor },
+        { min: highThreshold, max: 101, color: options.highColor },
+    ];
+}
+
+function normalizeThreshold(value: SettingValue, fallbackValue: number): number {
+    const numericValue = Number(value);
+
+    if (!Number.isFinite(numericValue)) {
+        return fallbackValue;
+    }
+
+    return Math.min(Math.max(Math.round(numericValue), 0), 100);
 }
 
 function resolveHexColor(value: SettingValue, fallbackColor: string): string {

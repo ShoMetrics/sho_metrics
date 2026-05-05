@@ -7,6 +7,7 @@ import {
     temperatureUnitFieldGroup,
     colorSettingsFieldGroup,
     sparklineAppearanceFieldGroup,
+    sparklineGridLineFieldGroup,
 } from "../scenario-field-groups";
 import {
     defaultSettingsNormalizer,
@@ -29,7 +30,7 @@ export function resolveGpuTempScenario(graphicType: GraphicType): InspectorScena
         fieldGroupList: [
             baseFieldGroup,
             ...(graphicType === "circular" ? [circularCenterFieldGroup] : []),
-            ...(graphicType === "dashed-line" ? [sparklineAppearanceFieldGroup] : []),
+            ...(graphicType === "dashed-line" ? [sparklineAppearanceFieldGroup, sparklineGridLineFieldGroup] : []),
             temperatureUnitFieldGroup,
             maximumTemperatureFieldGroup,
             colorSettingsFieldGroup,
@@ -50,7 +51,7 @@ export function resolveGpuPowerScenario(graphicType: GraphicType): InspectorScen
         fieldGroupList: [
             baseFieldGroup,
             ...(graphicType === "circular" ? [circularCenterFieldGroup] : []),
-            ...(graphicType === "dashed-line" ? [sparklineAppearanceFieldGroup] : []),
+            ...(graphicType === "dashed-line" ? [sparklineAppearanceFieldGroup, sparklineGridLineFieldGroup] : []),
             maximumGpuPowerFieldGroup,
             colorSettingsFieldGroup,
             ...colorFieldGroupList,

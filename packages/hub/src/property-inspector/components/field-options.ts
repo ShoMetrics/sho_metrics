@@ -2,7 +2,8 @@ import { resolveFieldOptions } from "../options";
 import type { FieldSchema, SelectOption, VisibilityContext } from "../schema";
 
 export function isFieldDisabled(field: FieldSchema, context: VisibilityContext): boolean {
-    return field.disabledWhen != null
+    return field.disabled === true
+        || field.disabledWhen != null
         && context.settings[field.disabledWhen.key] === field.disabledWhen.equals;
 }
 

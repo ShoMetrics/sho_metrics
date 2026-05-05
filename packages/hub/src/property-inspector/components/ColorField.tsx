@@ -12,7 +12,6 @@ export function ColorField({ field, context }: ColorFieldProps): React.JSX.Eleme
         <sdpi-color
             id={field.id}
             data-setting-key={field.key}
-            setting={field.key}
             default={String(field.defaultValue ?? value)}
             value={value}
         />

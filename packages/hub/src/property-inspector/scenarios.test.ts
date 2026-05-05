@@ -56,6 +56,126 @@ test("network direction note is limited to circular scope", () => {
     assertFieldPresent(circularFieldIdList, "network-circle-note");
 });
 
+test("network sparkline exposes dual-stream network controls", () => {
+    const sparklineFieldIdList = resolveInspectorFieldIdList(buildContext({
+        actionKind: "net-speed",
+        settings: {
+            graphicType: "dashed-line",
+        },
+    }));
+
+    assertFieldPresent(sparklineFieldIdList, "network-direction");
+    assertFieldPresent(sparklineFieldIdList, "network-interface");
+    assertFieldPresent(sparklineFieldIdList, "maximum-network-speed");
+    assertFieldPresent(sparklineFieldIdList, "network-unit-base");
+    assertFieldPresent(sparklineFieldIdList, "network-traffic-display-mode");
+    assertFieldPresent(sparklineFieldIdList, "download-color-mode");
+    assertFieldPresent(sparklineFieldIdList, "download-solid-color");
+    assertFieldPresent(sparklineFieldIdList, "upload-color-mode");
+    assertFieldPresent(sparklineFieldIdList, "upload-solid-color");
+    assertFieldAbsent(sparklineFieldIdList, "color-mode");
+    assertFieldAbsent(sparklineFieldIdList, "solid-color");
+    assertFieldAbsent(sparklineFieldIdList, "network-circle-note");
+});
+
+test("network single-stream sparkline uses standard color settings", () => {
+    const sparklineFieldIdList = resolveInspectorFieldIdList(buildContext({
+        actionKind: "net-speed",
+        settings: {
+            graphicType: "dashed-line",
+            networkDirection: "download",
+            colorMode: "solid",
+        },
+    }));
+
+    assertFieldPresent(sparklineFieldIdList, "color-mode");
+    assertFieldPresent(sparklineFieldIdList, "solid-color");
+    assertFieldAbsent(sparklineFieldIdList, "download-color-mode");
+    assertFieldAbsent(sparklineFieldIdList, "upload-color-mode");
+});
+
+test("network dual linear exposes download before upload channel colors", () => {
+    const fieldIdList = resolveInspectorFieldIdList(buildContext({
+        actionKind: "net-speed",
+        settings: {
+            graphicType: "linear",
+            networkDirection: "both",
+        },
+    }));
+
+    assertFieldPresent(fieldIdList, "download-color-mode");
+    assertFieldPresent(fieldIdList, "upload-color-mode");
+    assertFieldAbsent(fieldIdList, "color-mode");
+    assertFieldOrder(fieldIdList, "download-color-heading", "upload-color-heading");
+});
+
+test("network traffic display mode is hidden when sparkline shows a single direction", () => {
+    const sparklineFieldIdList = resolveInspectorFieldIdList(buildContext({
+        actionKind: "net-speed",
+        settings: {
+            graphicType: "dashed-line",
+            networkDirection: "download",
+        },
+    }));
+
+    assertFieldAbsent(sparklineFieldIdList, "network-traffic-display-mode");
+});
+
+test("network mirrored traffic disables grid controls and explains the limitation", () => {
+    const context = buildContext({
+        actionKind: "net-speed",
+        settings: {
+            graphicType: "dashed-line",
+            networkDirection: "both",
+            networkTrafficDisplayMode: "mirrored",
+        },
+    });
+    const sparklineFieldList = resolveInspectorFieldList(context);
+    const sparklineFieldIdList = sparklineFieldList.map(field => field.id);
+    const gridLineVisibilityField = sparklineFieldList.find(field => field.id === "grid-line-visibility");
+    const gridLineTypeField = sparklineFieldList.find(field => field.id === "grid-line-type");
+
+    assertFieldPresent(sparklineFieldIdList, "line-smoothing");
+    assertFieldPresent(sparklineFieldIdList, "visual-guides-heading");
+    assertFieldPresent(sparklineFieldIdList, "mirrored-grid-line-note");
+    assertFieldPresent(sparklineFieldIdList, "grid-line-visibility");
+    assert.equal(gridLineVisibilityField?.disabled, true);
+    assert.equal(gridLineVisibilityField?.defaultValue, "none");
+    assert.equal(gridLineTypeField?.disabled, true);
+    assertFieldAbsent(sparklineFieldIdList, "adaptive-grid-line-note");
+    assertFieldPresent(sparklineFieldIdList, "grid-line-type");
+});
+
+test("disk usage sparkline does not expose throughput direction controls", () => {
+    const sparklineFieldIdList = resolveInspectorFieldIdList(buildContext({
+        actionKind: "disk",
+        settings: {
+            graphicType: "dashed-line",
+            diskMetricKind: "usage",
+        },
+    }));
+
+    assertFieldAbsent(sparklineFieldIdList, "disk-throughput-direction");
+});
+
+test("disk throughput dual sparkline exposes read and write channel colors", () => {
+    const fieldIdList = resolveInspectorFieldIdList(buildContext({
+        actionKind: "disk",
+        settings: {
+            graphicType: "dashed-line",
+            diskMetricKind: "throughput",
+            diskThroughputDirection: "both",
+        },
+    }));
+
+    assertFieldPresent(fieldIdList, "disk-read-color-mode");
+    assertFieldPresent(fieldIdList, "disk-read-solid-color");
+    assertFieldPresent(fieldIdList, "disk-write-color-mode");
+    assertFieldPresent(fieldIdList, "disk-write-solid-color");
+    assertFieldAbsent(fieldIdList, "color-mode");
+    assertFieldAbsent(fieldIdList, "solid-color");
+});
+
 test("color mode selects the matching color section", () => {
     const solidFieldIdList = resolveInspectorFieldIdList(buildContext({
         actionKind: "disk",
@@ -110,6 +230,7 @@ test("line smoothing slider is exposed only by sparkline scenarios", () => {
             settings: {
                 ...scenario.settings,
                 graphicType: "dashed-line",
+                networkTrafficDisplayMode: "overlay",
             },
         }));
 
@@ -170,7 +291,10 @@ test("shared visual fields keep a consistent order across widgets", () => {
 
             assertFieldOrder(inspectorFieldIdList, "graphic-type", "graphic-style");
             assertFieldOrder(inspectorFieldIdList, "graphic-style", "color-settings-heading");
-            assertFieldOrder(inspectorFieldIdList, "color-settings-heading", "color-mode");
+
+            if (inspectorFieldIdList.includes("color-mode")) {
+                assertFieldOrder(inspectorFieldIdList, "color-settings-heading", "color-mode");
+            }
         }
     }
 });

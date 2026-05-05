@@ -49,7 +49,7 @@ export interface LinearChannelWidgetData {
 
 /**
  * Dual-channel data for mirrored traffic graphs (net, disk I/O).
- * Positive = download/read, Negative = upload/write.
+ * Positive and negative identify chart channels, not fixed metric directions.
  */
 export interface DualChannelWidgetData {
     positive: WidgetData;
