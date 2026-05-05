@@ -133,6 +133,12 @@ function formatDiskVolumeDisplayLabel(diskVolume: DiskVolumeOption): string {
         return mountLabel.slice(0, 2).toUpperCase();
     }
 
+    const pathParts = mountLabel.split(/[\\/]/).filter(pathPart => pathPart.length > 0);
+
+    if (pathParts.length > 0) {
+        return pathParts[pathParts.length - 1].slice(0, 4).toUpperCase();
+    }
+
     return mountLabel.slice(0, 4).toUpperCase();
 }
 
