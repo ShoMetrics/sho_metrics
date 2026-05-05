@@ -1,4 +1,4 @@
-import { isOptionDisabled, isOptionHidden, resolveSelectedOptionValue, resolveSelectOptions } from "./field-options";
+import { isFieldDisabled, isOptionDisabled, isOptionHidden, resolveSelectedOptionValue, resolveSelectOptions } from "./field-options";
 import type { FieldSchema, PropertyInspectorSettingKey, VisibilityContext } from "../schema";
 
 interface SelectFieldProps {
@@ -21,6 +21,7 @@ export function SelectField({ field, context }: SelectFieldProps): React.JSX.Ele
             className="native-select"
             data-setting-key={field.key}
             value={selectedValue}
+            disabled={isFieldDisabled(field, context)}
             onChange={() => undefined}
         >
             {options.map((fieldOption) => (

@@ -17,7 +17,7 @@
         ]
     },
     "include": [
-        "src/property-inspector/**/*.ts"
+        "src/**/*.test.ts"
     ],
     "exclude": [
         "node_modules",

@@ -4,17 +4,24 @@ import {
     adjustHexColorBrightness,
     clamp,
     renderConstrainedSvgText,
+    type SvgTextAnchor,
 } from "../../rendering/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget.interface";
 import { renderMetricTextRow } from "./metric-text-row";
+import {
+    resolveSparklineGridLineOpacity,
+    type SparklineGridLineType,
+    type SparklineGridLineVisibility,
+} from "./sparkline-grid-lines";
 
-export type SparklineChartGuideStyle = "horizontal" | "time-axis";
+export type { SparklineGridLineType, SparklineGridLineVisibility } from "./sparkline-grid-lines";
 
 export interface SparklineConfig extends WidgetBaseConfig {
     lineWidth: number;
     fillOpacity: number;
     lineSmoothingPercent: number;
-    chartGuideStyle: SparklineChartGuideStyle;
+    gridLineVisibility: SparklineGridLineVisibility;
+    gridLineType: SparklineGridLineType;
     timeGuideTickCount: number;
     historyWindowSeconds: number;
     showDots: boolean;
@@ -31,7 +38,8 @@ export const DEFAULT_SPARKLINE_CONFIG: SparklineConfig = {
     lineWidth: 2,
     fillOpacity: 0.58,
     lineSmoothingPercent: 75,
-    chartGuideStyle: "horizontal",
+    gridLineVisibility: "adaptive",
+    gridLineType: "horizontal",
     timeGuideTickCount: 5,
     historyWindowSeconds: 60,
     showDots: false,
@@ -44,7 +52,7 @@ const MINIMUM_VISIBLE_RANGE = 1;
 const MINIMUM_AREA_PROGRESS = 0.09;
 const ADAPTIVE_SCALE_HEADROOM_RATIO = 1.18;
 const CHART_PLOT_TOP_INSET = 2;
-const HORIZONTAL_GUIDE_LINE_COLOR = "rgba(255,255,255,0.24)";
+const HORIZONTAL_GUIDE_LINE_COLOR = "rgba(255,255,255,1)";
 const CHART_PANEL_FILL = "rgba(255,255,255,0.07)";
 const CHART_PANEL_STROKE = "rgba(255,255,255,0.05)";
 const CHART_PANEL_RADIUS = 7;
@@ -73,6 +81,7 @@ interface TextLineLayout {
 
 interface ValueLineLayout extends TextLineLayout {
     unitFontSize: number;
+    textAnchor?: SvgTextAnchor;
 }
 
 interface ChartLayout {
@@ -105,19 +114,21 @@ export const sparkline: Widget<SparklineConfig> = {
         const areaGradientId = `sparkline-area-${gradientIdSuffix}`;
         const glowFilterId = `sparkline-glow-${keySize.width}-${keySize.height}`;
         const latestPointGlowFilterId = `sparkline-latest-glow-${keySize.width}-${keySize.height}`;
-        const plotLayout = buildPlotLayout(layoutPlan.chart, config.chartGuideStyle);
+        const plotLayout = buildPlotLayout(layoutPlan.chart, config.gridLineVisibility, config.gridLineType);
         const points = buildSparklinePoints(visualValues, plotLayout, data.sparklineScale);
         const linePath = buildSmoothPath(points);
         const areaPath = buildAreaPath(points, plotLayout);
-        const chartGuideSvg = renderChartGuides({
+        const gridLineSvg = renderGridLines({
             chartLayout: layoutPlan.chart,
             plotLayout,
-            guideStyle: config.chartGuideStyle,
+            points,
+            gridLineVisibility: config.gridLineVisibility,
+            gridLineType: config.gridLineType,
             timeGuideTickCount: config.timeGuideTickCount,
             historyWindowSeconds: config.historyWindowSeconds,
         });
         const latestPoint = points[points.length - 1];
-        const latestPointGlowSvg = config.chartGuideStyle === "time-axis" && latestPoint
+        const latestPointGlowSvg = config.gridLineVisibility !== "none" && config.gridLineType === "vertical" && latestPoint
             ? renderLatestPointGlow(latestPoint, lineHeadColor, latestPointGlowFilterId)
             : "";
         const valueText = data.displayValue ?? data.current.toFixed(1);
@@ -168,10 +179,11 @@ export const sparkline: Widget<SparklineConfig> = {
                 valueFill: "rgba(255,255,255,0.96)",
                 unitFill: "rgba(255,255,255,0.75)",
                 unitBaselineOffset: 2,
+                textAnchor: layoutPlan.value.textAnchor,
                 valueExtraAttributes: ["font-variant-numeric=\"tabular-nums\""],
             })}
-            ${chartGuideSvg}
             <path d="${areaPath}" fill="url(#${areaGradientId})" />
+            ${gridLineSvg}
             ${latestPointGlowSvg}
             <path d="${linePath}" fill="none" stroke="url(#${lineGradientId})"
                 stroke-width="${Math.max(1, config.lineWidth + 1.4)}" stroke-linejoin="round"
@@ -196,21 +208,22 @@ function buildSparklineLayoutPlan(keySize: KeySize): SparklineLayoutPlan {
             title: {
                 xCoordinate: padding,
                 yCoordinate: Math.round(keySize.height * 0.22),
-                maxWidth: Math.round(contentWidth * 0.45),
+                maxWidth: Math.round(contentWidth * 0.52),
                 fontSize: clamp(Math.round(keySize.height * 0.16), 13, 17),
             },
             value: {
-                xCoordinate: padding,
-                yCoordinate: Math.round(keySize.height * 0.62),
-                maxWidth: Math.round(contentWidth * 0.43),
-                fontSize: clamp(Math.round(keySize.height * 0.31), 25, 33),
-                unitFontSize: clamp(Math.round(keySize.height * 0.15), 13, 17),
+                xCoordinate: keySize.width - padding,
+                yCoordinate: Math.round(keySize.height * 0.24),
+                maxWidth: Math.round(contentWidth * 0.42),
+                fontSize: clamp(Math.round(keySize.height * 0.25), 22, 27),
+                unitFontSize: clamp(Math.round(keySize.height * 0.13), 12, 15),
+                textAnchor: "end",
             },
             chart: {
-                xCoordinate: Math.round(keySize.width * 0.49),
-                yCoordinate: Math.round(keySize.height * 0.2),
-                width: Math.round(keySize.width * 0.41),
-                height: Math.round(keySize.height * 0.72),
+                xCoordinate: padding,
+                yCoordinate: Math.round(keySize.height * 0.42),
+                width: contentWidth,
+                height: Math.round(keySize.height * 0.43),
             },
             iconScale: 0.28,
             iconGap: 23,
@@ -457,9 +470,10 @@ function buildAreaPath(
 
 function buildPlotLayout(
     chartLayout: ChartLayout,
-    guideStyle: SparklineChartGuideStyle,
+    gridLineVisibility: SparklineGridLineVisibility,
+    gridLineType: SparklineGridLineType,
 ): ChartLayout {
-    if (guideStyle === "time-axis") {
+    if (gridLineVisibility !== "none" && gridLineType === "vertical") {
         return {
             xCoordinate: chartLayout.xCoordinate + CHART_PLOT_SIDE_INSET,
             yCoordinate: chartLayout.yCoordinate + CHART_PLOT_TOP_INSET,
@@ -476,22 +490,40 @@ function buildPlotLayout(
     };
 }
 
-function renderChartGuides(options: {
+function renderGridLines(options: {
     chartLayout: ChartLayout;
     plotLayout: ChartLayout;
-    guideStyle: SparklineChartGuideStyle;
+    points: readonly SparklinePoint[];
+    gridLineVisibility: SparklineGridLineVisibility;
+    gridLineType: SparklineGridLineType;
     timeGuideTickCount: number;
     historyWindowSeconds: number;
 }): string {
-    if (options.guideStyle === "time-axis") {
-        return renderTimeAxisGuides(options);
+    if (options.gridLineVisibility === "none") {
+        return "";
     }
 
-    return renderHorizontalGuides({ plotLayout: options.plotLayout });
+    const gridLineMetrics = resolveSparklineGridLineOpacity({
+        gridLineVisibility: options.gridLineVisibility,
+        gridLineType: options.gridLineType,
+        points: options.points,
+        plotLayout: options.plotLayout,
+    });
+
+    if (!gridLineMetrics) {
+        return "";
+    }
+
+    if (options.gridLineType === "vertical") {
+        return renderVerticalGridLines({ ...options, opacity: gridLineMetrics.opacity });
+    }
+
+    return renderHorizontalGuides({ plotLayout: options.plotLayout, opacity: gridLineMetrics.opacity });
 }
 
 function renderHorizontalGuides(options: {
     plotLayout: ChartLayout;
+    opacity: number;
 }): string {
     const guideList = [1, 0.5, 0].map(progress => {
         const yCoordinate = options.plotLayout.yCoordinate + options.plotLayout.height * (1 - progress);
@@ -500,7 +532,7 @@ function renderHorizontalGuides(options: {
             <line x1="${formatSvgNumber(options.plotLayout.xCoordinate)}" y1="${formatSvgNumber(yCoordinate)}"
                 x2="${formatSvgNumber(options.plotLayout.xCoordinate + options.plotLayout.width)}"
                 y2="${formatSvgNumber(yCoordinate)}"
-                stroke="${HORIZONTAL_GUIDE_LINE_COLOR}" stroke-width="1"
+                stroke="${HORIZONTAL_GUIDE_LINE_COLOR}" stroke-opacity="${formatSvgNumber(options.opacity)}" stroke-width="1"
                 stroke-dasharray="4 4" stroke-linecap="round" />
         `;
     });
@@ -512,11 +544,12 @@ function renderHorizontalGuides(options: {
     `;
 }
 
-function renderTimeAxisGuides(options: {
+function renderVerticalGridLines(options: {
     chartLayout: ChartLayout;
     plotLayout: ChartLayout;
     timeGuideTickCount: number;
     historyWindowSeconds: number;
+    opacity: number;
 }): string {
     const safeTickCount = Math.max(2, Math.round(options.timeGuideTickCount));
     const baselineYCoordinate = options.plotLayout.yCoordinate + options.plotLayout.height;
@@ -550,7 +583,7 @@ function renderTimeAxisGuides(options: {
     });
 
     return `
-        <g>
+        <g opacity="${formatSvgNumber(options.opacity)}">
             <rect x="${formatSvgNumber(options.chartLayout.xCoordinate)}" y="${formatSvgNumber(options.chartLayout.yCoordinate)}"
                 width="${formatSvgNumber(options.chartLayout.width)}" height="${formatSvgNumber(options.chartLayout.height)}"
                 rx="${CHART_PANEL_RADIUS}" fill="${CHART_PANEL_FILL}" stroke="${CHART_PANEL_STROKE}" stroke-width="1" />

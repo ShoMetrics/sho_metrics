@@ -20,7 +20,8 @@ export type DiskMetricKind = "usage" | "throughput";
 export type DiskUsageDisplayMode = "percentage" | "space";
 export type DiskThroughputDirection = "total" | "read" | "write";
 export type TemperatureUnit = "celsius" | "fahrenheit";
-export type SparklineChartGuideStyle = "horizontal" | "time-axis";
+export type GridLineVisibility = "adaptive" | "always" | "none";
+export type GridLineType = "horizontal" | "vertical";
 
 export interface PropertyInspectorSettings {
     pollingFrequencySeconds: number;
@@ -35,7 +36,8 @@ export interface PropertyInspectorSettings {
     colorMedium: string;
     colorHigh: string;
     lineSmoothingPercent: number;
-    sparklineChartGuideStyle: SparklineChartGuideStyle;
+    gridLineVisibility: GridLineVisibility;
+    gridLineType: GridLineType;
     networkDirection: NetworkDirection;
     networkInterfaceId: string;
     availableNetworkInterfaces: string;
@@ -95,7 +97,8 @@ export const basePropertyInspectorSettings: PropertyInspectorSettings = {
     colorMedium: "#eab308",
     colorHigh: "#ef4444",
     lineSmoothingPercent: 75,
-    sparklineChartGuideStyle: "horizontal",
+    gridLineVisibility: "adaptive",
+    gridLineType: "horizontal",
 };
 
 const pollingFrequencyValues = [1, 2, 3, 5, 10, 15, 30, 60] as const;
@@ -172,7 +175,8 @@ export function normalizePropertyInspectorSettings(
             rawSettings.lineSmoothingPercent,
             basePropertyInspectorSettings.lineSmoothingPercent,
         ),
-        sparklineChartGuideStyle: normalizeSparklineChartGuideStyle(rawSettings.sparklineChartGuideStyle),
+        gridLineVisibility: normalizeGridLineVisibility(rawSettings.gridLineVisibility),
+        gridLineType: normalizeGridLineType(rawSettings.gridLineType),
     };
 }
 
@@ -246,8 +250,20 @@ export function normalizeTemperatureUnit(value: SettingValue): TemperatureUnit {
     return value === "fahrenheit" ? "fahrenheit" : "celsius";
 }
 
-export function normalizeSparklineChartGuideStyle(value: SettingValue): SparklineChartGuideStyle {
-    return value === "time-axis" ? "time-axis" : "horizontal";
+export function normalizeGridLineVisibility(value: SettingValue): GridLineVisibility {
+    if (value === "none") {
+        return "none";
+    }
+
+    if (value === "always") {
+        return "always";
+    }
+
+    return "adaptive";
+}
+
+export function normalizeGridLineType(value: SettingValue): GridLineType {
+    return value === "vertical" ? "vertical" : "horizontal";
 }
 
 export function resolveDefaultDiskPollingFrequency(diskMetricKind: DiskMetricKind): number {

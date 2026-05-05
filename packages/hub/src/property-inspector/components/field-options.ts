@@ -1,6 +1,11 @@
 import { resolveFieldOptions } from "../options";
 import type { FieldSchema, SelectOption, VisibilityContext } from "../schema";
 
+export function isFieldDisabled(field: FieldSchema, context: VisibilityContext): boolean {
+    return field.disabledWhen != null
+        && context.settings[field.disabledWhen.key] === field.disabledWhen.equals;
+}
+
 export function resolveSelectOptions(field: FieldSchema, context: VisibilityContext): readonly SelectOption[] {
     if (!field.options) {
         return [];

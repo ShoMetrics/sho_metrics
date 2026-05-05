@@ -20,8 +20,10 @@ export function FieldRenderer({ field, context, onSettingChange }: FieldRenderer
     }
 
     if (field.kind === "note") {
+        const noteVariant = field.noteVariant ?? "default";
+
         return (
-            <sdpi-item>
+            <sdpi-item className={`note-item note-item-${noteVariant}`}>
                 <p className="section-note">{field.text ?? ""}</p>
             </sdpi-item>
         );
