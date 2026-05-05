@@ -13,6 +13,8 @@ import {
     type SparklineGridLineType,
     type SparklineGridLineVisibility,
 } from "./sparkline-grid-lines";
+import { buildSparklineAreaPath, buildSparklineLinePath } from "./sparkline-path";
+import { smoothSparklineValues } from "./sparkline-smoothing";
 
 export type { SparklineGridLineType, SparklineGridLineVisibility } from "./sparkline-grid-lines";
 
@@ -116,8 +118,15 @@ export const sparkline: Widget<SparklineConfig> = {
         const latestPointGlowFilterId = `sparkline-latest-glow-${keySize.width}-${keySize.height}`;
         const plotLayout = buildPlotLayout(layoutPlan.chart, config.gridLineVisibility, config.gridLineType);
         const points = buildSparklinePoints(visualValues, plotLayout, data.sparklineScale);
-        const linePath = buildSmoothPath(points);
-        const areaPath = buildAreaPath(points, plotLayout);
+        const linePath = buildSparklineLinePath({
+            points,
+            lineSmoothingPercent: config.lineSmoothingPercent,
+        });
+        const areaPath = buildSparklineAreaPath({
+            points,
+            baselineYCoordinate: plotLayout.yCoordinate + plotLayout.height,
+            lineSmoothingPercent: config.lineSmoothingPercent,
+        });
         const gridLineSvg = renderGridLines({
             chartLayout: layoutPlan.chart,
             plotLayout,
@@ -363,109 +372,6 @@ function resolveAdaptiveMinimumValue(
     return typeof candidateMinimumValue === "number" && Number.isFinite(candidateMinimumValue)
         ? candidateMinimumValue
         : Math.min(...values, 0);
-}
-
-/**
- * Applies a weighted moving average to the visual series only. A higher
- * smoothing value favors a calm wave shape, while zero keeps the raw samples.
- */
-function smoothSparklineValues(values: readonly number[], lineSmoothingPercent: number): readonly number[] {
-    const smoothingRatio = clamp(lineSmoothingPercent, 0, 100) / 100;
-
-    if (smoothingRatio <= 0 || values.length <= 2) {
-        return values;
-    }
-
-    const smoothingRadius = Math.max(1, Math.round(1 + smoothingRatio * 7));
-    const firstPassValues = applyWeightedMovingAverage(values, smoothingRadius);
-    const secondPassValues = smoothingRatio >= 0.55
-        ? applyWeightedMovingAverage(firstPassValues, Math.max(1, Math.round(smoothingRadius * 0.7)))
-        : firstPassValues;
-
-    return values.map((value, valueIndex) =>
-        value * (1 - smoothingRatio) + secondPassValues[valueIndex] * smoothingRatio
-    );
-}
-
-function applyWeightedMovingAverage(values: readonly number[], radius: number): readonly number[] {
-    return values.map((ignoredValue, valueIndex) => {
-        let weightedSum = 0;
-        let totalWeight = 0;
-
-        for (let offset = -radius; offset <= radius; offset++) {
-            const sampleIndex = valueIndex + offset;
-
-            if (sampleIndex < 0 || sampleIndex >= values.length) {
-                continue;
-            }
-
-            const weight = radius + 1 - Math.abs(offset);
-            weightedSum += values[sampleIndex] * weight;
-            totalWeight += weight;
-        }
-
-        return totalWeight > 0 ? weightedSum / totalWeight : values[valueIndex];
-    });
-}
-
-/**
- * Converts chronological points to a Catmull-Rom-inspired cubic Bezier path.
- * The curve is visually smooth without moving through invented extrema.
- */
-function buildSmoothPath(points: readonly SparklinePoint[]): string {
-    if (points.length === 0) {
-        return "";
-    }
-
-    if (points.length === 1) {
-        const point = points[0];
-        return `M ${formatSvgNumber(point.xCoordinate)} ${formatSvgNumber(point.yCoordinate)}`;
-    }
-
-    const commands = [`M ${formatSvgNumber(points[0].xCoordinate)} ${formatSvgNumber(points[0].yCoordinate)}`];
-
-    for (let pointIndex = 0; pointIndex < points.length - 1; pointIndex++) {
-        const previousPoint = points[Math.max(0, pointIndex - 1)];
-        const currentPoint = points[pointIndex];
-        const nextPoint = points[pointIndex + 1];
-        const followingPoint = points[Math.min(points.length - 1, pointIndex + 2)];
-        const controlStartXCoordinate = currentPoint.xCoordinate + (nextPoint.xCoordinate - previousPoint.xCoordinate) / 6;
-        const controlStartYCoordinate = currentPoint.yCoordinate + (nextPoint.yCoordinate - previousPoint.yCoordinate) / 6;
-        const controlEndXCoordinate = nextPoint.xCoordinate - (followingPoint.xCoordinate - currentPoint.xCoordinate) / 6;
-        const controlEndYCoordinate = nextPoint.yCoordinate - (followingPoint.yCoordinate - currentPoint.yCoordinate) / 6;
-
-        commands.push([
-            "C",
-            formatSvgNumber(controlStartXCoordinate),
-            formatSvgNumber(controlStartYCoordinate),
-            formatSvgNumber(controlEndXCoordinate),
-            formatSvgNumber(controlEndYCoordinate),
-            formatSvgNumber(nextPoint.xCoordinate),
-            formatSvgNumber(nextPoint.yCoordinate),
-        ].join(" "));
-    }
-
-    return commands.join(" ");
-}
-
-function buildAreaPath(
-    points: readonly SparklinePoint[],
-    chartLayout: ChartLayout,
-): string {
-    if (points.length === 0) {
-        return "";
-    }
-
-    const firstPoint = points[0];
-    const lastPoint = points[points.length - 1];
-    const baselineYCoordinate = chartLayout.yCoordinate + chartLayout.height;
-
-    return [
-        buildSmoothPath(points),
-        `L ${formatSvgNumber(lastPoint.xCoordinate)} ${formatSvgNumber(baselineYCoordinate)}`,
-        `L ${formatSvgNumber(firstPoint.xCoordinate)} ${formatSvgNumber(baselineYCoordinate)}`,
-        "Z",
-    ].join(" ");
 }
 
 function buildPlotLayout(
