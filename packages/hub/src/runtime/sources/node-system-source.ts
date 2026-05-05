@@ -1,21 +1,48 @@
-import { execFile, type ExecFileException } from "node:child_process";
 import si, { type Systeminformation } from "systeminformation";
 import type { IMetricSource, IMetricSnapshot, IMetricValue } from "./source.interface";
 import { logger } from "../../logging/logger";
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../network-interfaces";
 import { getNetworkAggregateMetricKey, getNetworkInterfaceMetricKey, type NetworkDirection } from "../network-metric-keys";
-import { diskVolumeRegistry, type DiskStorageKind, type DiskVolumeOption } from "../disk-volumes";
+import { diskVolumeRegistry } from "../disk-volumes";
 import {
     getDefaultDiskUsageMetricKey,
     getDiskThroughputMetricKey,
     getDiskVolumeMetricKey,
 } from "../disk-metric-keys";
+import { formatCpuModelText, isFinitePositiveNumber } from "./node-system-cpu";
+import {
+    calculatePercent,
+    isUsableFileSystem,
+    normalizeNullableRate,
+    resolveDefaultDiskVolume,
+    toDiskVolumeOption,
+} from "./node-system-disk";
+import {
+    getActiveNvidiaSmiQueryCount,
+    pollSystemInformationGpuTelemetry,
+    pollWindowsNvidiaGpuTelemetry,
+    reserveNodeSystemGpuPollDebugSequence,
+} from "./node-system-gpu";
+import {
+    calculateNetworkRate,
+    formatNetworkInterfaceOptionDebug,
+    formatNetworkRateCalculationDebug,
+    formatNetworkStatDebug,
+    formatRawNetworkInterfaceDebug,
+    isUsableNetworkInterface,
+    toNetworkInterfaceOption,
+} from "./node-system-network";
+import type {
+    NodeSystemGpuTelemetryData,
+    NodeSystemInformationClient,
+    NodeSystemMetricGroup,
+    NodeSystemNetworkCounterSample,
+    NodeSystemNetworkRateCalculation,
+} from "./node-system-source-types";
 
-const log = logger.for("Source:Builtin");
-const networkLog = logger.for("Source:Builtin:Network");
-const gpuLog = logger.for("Source:Builtin:GPU");
-
-type BuiltinSystemInformationClient = Omit<typeof si, "cpuCurrentSpeed">;
+const log = logger.for("Source:NodeSystem");
+const networkLog = logger.for("Source:NodeSystem:Network");
+const gpuLog = logger.for("Source:NodeSystem:GPU");
 
 const {
     // Do not use. systeminformation v5 documents this as unreliable on Windows
@@ -27,42 +54,19 @@ const {
 
 void blockedCpuCurrentSpeed;
 
-const systemInformation: BuiltinSystemInformationClient = rawSystemInformation;
-let lastNvidiaSmiFailureLogTimestampMilliseconds = 0;
-let nextGpuPollDebugSequence = 1;
-let nextNvidiaSmiQueryDebugSequence = 1;
-let activeNvidiaSmiQueryCount = 0;
-
-const NVIDIA_SMI_QUERY_FIELDS = [
-    "utilization.gpu",
-    "name",
-    "temperature.gpu",
-    "memory.used",
-    "memory.total",
-    "power.draw",
-    "power.limit",
-] as const;
-
-const NVIDIA_SMI_ARGUMENTS = [
-    `--query-gpu=${NVIDIA_SMI_QUERY_FIELDS.join(",")}`,
-    "--format=csv,noheader,nounits",
-] as const;
-
-const NVIDIA_SMI_TIMEOUT_MS = 3000;
-const NVIDIA_SMI_FAILURE_LOG_INTERVAL_MS = 30000;
+const systemInformation: NodeSystemInformationClient = rawSystemInformation;
 
 /**
- * Built-in metric source using the `systeminformation` npm package.
- * Provides basic CPU, network, and GPU metrics mapped to the universal protobuf schema.
+ * Node.js runtime metric source backed by `systeminformation` and OS command helpers.
  */
-export class BuiltinSource implements IMetricSource {
-    readonly sourceId = "builtin-node";
+export class NodeSystemSource implements IMetricSource {
+    readonly sourceId = "node-system";
 
-    private lastNetworkStatsByInterface = new Map<string, NetworkCounterSample>();
+    private lastNetworkStatsByInterface = new Map<string, NodeSystemNetworkCounterSample>();
     private lastNetworkPollDebugLogTimestampMilliseconds = 0;
-    private cachedGpuData: GpuTelemetryData | null = null;
+    private cachedGpuData: NodeSystemGpuTelemetryData | null = null;
     private cachedGpuTimestampMilliseconds = 0;
-    private pendingGpuPromise: Promise<GpuTelemetryData | null> | null = null;
+    private pendingGpuPromise: Promise<NodeSystemGpuTelemetryData | null> | null = null;
     private cachedCpuBaseFrequencyGigahertz: number | null = null;
     private cachedCpuModelText: string | null = null;
     private pendingCpuInformationPromise: Promise<void> | null = null;
@@ -328,7 +332,7 @@ export class BuiltinSource implements IMetricSource {
         const currentTimestampMilliseconds = Date.now();
         let aggregateDownloadBytesPerSecond = 0;
         let aggregateUploadBytesPerSecond = 0;
-        const rateCalculations: NetworkRateCalculation[] = [];
+        const rateCalculations: NodeSystemNetworkRateCalculation[] = [];
 
         networkInterfaceRegistry.update(interfaceOptions);
 
@@ -388,7 +392,7 @@ export class BuiltinSource implements IMetricSource {
         direction: NetworkDirection;
         currentBytes: number;
         currentTimestampMilliseconds: number;
-    }): NetworkRateCalculation {
+    }): NodeSystemNetworkRateCalculation {
         const sampleKey = `${options.interfaceId}:${options.direction}`;
         const previousSample = this.lastNetworkStatsByInterface.get(sampleKey);
         this.lastNetworkStatsByInterface.set(sampleKey, {
@@ -406,7 +410,7 @@ export class BuiltinSource implements IMetricSource {
         networkInterfaces: readonly Systeminformation.NetworkInterfacesData[];
         interfaceOptions: readonly NetworkInterfaceOption[];
         networkStats: readonly Systeminformation.NetworkStatsData[];
-        rateCalculations: readonly NetworkRateCalculation[];
+        rateCalculations: readonly NodeSystemNetworkRateCalculation[];
         aggregateDownloadBytesPerSecond: number;
         aggregateUploadBytesPerSecond: number;
         currentTimestampMilliseconds: number;
@@ -416,7 +420,7 @@ export class BuiltinSource implements IMetricSource {
         const hasStats = options.networkStats.length > 0;
         const isAggregateZero = options.aggregateDownloadBytesPerSecond === 0 && options.aggregateUploadBytesPerSecond === 0;
         const shouldLogPeriodic = options.currentTimestampMilliseconds - this.lastNetworkPollDebugLogTimestampMilliseconds
-            >= BuiltinSource.NETWORK_DEBUG_LOG_INTERVAL_MS;
+            >= NodeSystemSource.NETWORK_DEBUG_LOG_INTERVAL_MS;
         const shouldLogSuspiciousZero = hasUsableInterfaces && hasStats && hasPreviousSample && isAggregateZero;
 
         if (!shouldLogPeriodic && !shouldLogSuspiciousZero) {
@@ -436,10 +440,10 @@ export class BuiltinSource implements IMetricSource {
         ].join(" "));
     }
 
-    private async pollGpu(): Promise<GpuTelemetryData | null> {
+    private async pollGpu(): Promise<NodeSystemGpuTelemetryData | null> {
         const currentTimestampMilliseconds = Date.now();
 
-        if (this.cachedGpuData && (currentTimestampMilliseconds - this.cachedGpuTimestampMilliseconds) < BuiltinSource.GPU_CACHE_MS) {
+        if (this.cachedGpuData && (currentTimestampMilliseconds - this.cachedGpuTimestampMilliseconds) < NodeSystemSource.GPU_CACHE_MS) {
             gpuLog.debug(() => [
                 "cacheHit",
                 `cacheAgeMs=${currentTimestampMilliseconds - this.cachedGpuTimestampMilliseconds}`,
@@ -456,7 +460,7 @@ export class BuiltinSource implements IMetricSource {
             try {
                 const gpuData = process.platform === "win32"
                     ? await pollWindowsNvidiaGpuTelemetry()
-                    : await pollSystemInformationGpuTelemetry();
+                    : await pollSystemInformationGpuTelemetry(systemInformation);
 
                 if (gpuData) {
                     this.cachedGpuData = gpuData;
@@ -476,7 +480,7 @@ export class BuiltinSource implements IMetricSource {
         return this.pendingGpuPromise;
     }
 
-    private async pollGpuWithTimeout(): Promise<GpuTelemetryData | null> {
+    private async pollGpuWithTimeout(): Promise<NodeSystemGpuTelemetryData | null> {
         const currentTimestampMilliseconds = Date.now();
 
         if (currentTimestampMilliseconds < this.nextGpuPollAllowedTimestampMilliseconds) {
@@ -488,30 +492,30 @@ export class BuiltinSource implements IMetricSource {
             return null;
         }
 
-        const pollSequence = nextGpuPollDebugSequence++;
+        const pollSequence = reserveNodeSystemGpuPollDebugSequence();
         const pollStartTimestampMilliseconds = Date.now();
         gpuLog.debug(() => [
             "sourceStart",
             `pollId=${pollSequence}`,
-            `timeoutMs=${BuiltinSource.GPU_POLL_TIMEOUT_MS}`,
-            `activeNvidiaSmiQueries=${activeNvidiaSmiQueryCount}`,
+            `timeoutMs=${NodeSystemSource.GPU_POLL_TIMEOUT_MS}`,
+            `activeNvidiaSmiQueries=${getActiveNvidiaSmiQueryCount()}`,
         ].join(" "));
 
         let timeoutId: NodeJS.Timeout | null = null;
-        const timeoutPromise = new Promise<GpuTelemetryData | null>((resolve) => {
+        const timeoutPromise = new Promise<NodeSystemGpuTelemetryData | null>((resolve) => {
             timeoutId = setTimeout(() => {
                 const elapsedMilliseconds = Date.now() - pollStartTimestampMilliseconds;
                 gpuLog.debug(() => [
                     "sourceTimeout",
                     `pollId=${pollSequence}`,
                     `elapsedMs=${elapsedMilliseconds}`,
-                    `timeoutMs=${BuiltinSource.GPU_POLL_TIMEOUT_MS}`,
-                    `timerDelayMs=${Math.max(0, elapsedMilliseconds - BuiltinSource.GPU_POLL_TIMEOUT_MS)}`,
-                    `activeNvidiaSmiQueries=${activeNvidiaSmiQueryCount}`,
+                    `timeoutMs=${NodeSystemSource.GPU_POLL_TIMEOUT_MS}`,
+                    `timerDelayMs=${Math.max(0, elapsedMilliseconds - NodeSystemSource.GPU_POLL_TIMEOUT_MS)}`,
+                    `activeNvidiaSmiQueries=${getActiveNvidiaSmiQueryCount()}`,
                 ].join(" "));
                 this.recordGpuPollTimeout();
                 resolve(null);
-            }, BuiltinSource.GPU_POLL_TIMEOUT_MS);
+            }, NodeSystemSource.GPU_POLL_TIMEOUT_MS);
         });
 
         const gpuData = await Promise.race([this.pollGpu(), timeoutPromise]);
@@ -547,16 +551,16 @@ export class BuiltinSource implements IMetricSource {
         const currentTimestampMilliseconds = Date.now();
         const backoffIndex = Math.min(
             this.gpuConsecutiveTimeouts,
-            BuiltinSource.GPU_BACKOFF_STEPS_MS.length - 1,
+            NodeSystemSource.GPU_BACKOFF_STEPS_MS.length - 1,
         );
-        const backoffMilliseconds = BuiltinSource.GPU_BACKOFF_STEPS_MS[backoffIndex];
+        const backoffMilliseconds = NodeSystemSource.GPU_BACKOFF_STEPS_MS[backoffIndex];
 
         this.gpuConsecutiveTimeouts += 1;
         this.nextGpuPollAllowedTimestampMilliseconds = currentTimestampMilliseconds + backoffMilliseconds;
 
         if (
             currentTimestampMilliseconds - this.lastGpuTimeoutWarningTimestampMilliseconds
-            < BuiltinSource.GPU_TIMEOUT_WARNING_INTERVAL_MS
+            < NodeSystemSource.GPU_TIMEOUT_WARNING_INTERVAL_MS
         ) {
             return;
         }
@@ -564,207 +568,19 @@ export class BuiltinSource implements IMetricSource {
         this.lastGpuTimeoutWarningTimestampMilliseconds = currentTimestampMilliseconds;
         gpuLog.warn(() => [
             "GPU poll exceeded timeout; suppressing stale GPU metrics",
-            `timeoutMs=${BuiltinSource.GPU_POLL_TIMEOUT_MS}`,
+            `timeoutMs=${NodeSystemSource.GPU_POLL_TIMEOUT_MS}`,
             `timeoutCount=${this.gpuConsecutiveTimeouts}`,
             `backoffMs=${backoffMilliseconds}`,
         ].join(" "));
     }
 }
 
-export interface NetworkCounterSample {
-    bytes: number;
-    timestampMilliseconds: number;
-}
-
-export interface GpuTelemetryData {
-    utilizationGpu?: number;
-    modelText?: string;
-    temperatureGpu?: number;
-    memoryUsed?: number;
-    memoryTotal?: number;
-    powerDraw?: number;
-    powerLimit?: number;
-}
-
-export interface NetworkRateCalculation {
-    interfaceId: string;
-    direction: NetworkDirection;
-    currentBytes: number;
-    previousBytes: number | null;
-    bytesDelta: number | null;
-    elapsedMilliseconds: number | null;
-    bytesPerSecond: number;
-    hadPreviousSample: boolean;
-}
-
-interface NetworkInterfaceOptionDebug {
-    id: string;
-    name: string;
-    type: NetworkInterfaceOption["type"];
-    isDefault: boolean;
-    speedMegabitsPerSecond: number | null;
-}
-
-interface NetworkStatDebug {
-    interfaceId: string;
-    operstate: string;
-    receiveBytes: number;
-    receiveBytesPerSecond: number;
-    receiveErrors: number;
-    receiveDropped: number;
-    transmitBytes: number;
-    transmitBytesPerSecond: number;
-    transmitErrors: number;
-    transmitDropped: number;
-    sampleMilliseconds: number;
-}
-
-interface NetworkRateCalculationDebug {
-    interfaceId: string;
-    direction: NetworkDirection;
-    currentBytes: number;
-    previousBytes: number | null;
-    bytesDelta: number | null;
-    elapsedMilliseconds: number | null;
-    computedBytesPerSecond: number;
-    hadPreviousSample: boolean;
-}
-
-interface RawNetworkInterfaceDebug {
-    interfaceId: string;
-    name: string;
-    type: string;
-    operstate: string;
-    isDefault: boolean;
-    isInternal: boolean;
-    isVirtual: boolean;
-    speedMegabitsPerSecond: number | null;
-}
-
-export function isUsableNetworkInterface(networkInterface: Systeminformation.NetworkInterfacesData): boolean {
-    return !networkInterface.internal
-        && !networkInterface.virtual
-        && networkInterface.operstate === "up"
-        && networkInterface.iface.length > 0;
-}
-
-export function toNetworkInterfaceOption(networkInterface: Systeminformation.NetworkInterfacesData): NetworkInterfaceOption {
-    return {
-        id: networkInterface.iface,
-        name: networkInterface.ifaceName || networkInterface.iface,
-        type: normalizeNetworkInterfaceType(networkInterface.type),
-        isDefault: networkInterface.default,
-        speedMegabitsPerSecond: typeof networkInterface.speed === "number" && Number.isFinite(networkInterface.speed)
-            ? networkInterface.speed
-            : null,
-    };
-}
-
-export function normalizeNetworkInterfaceType(type: string): NetworkInterfaceOption["type"] {
-    if (type === "wired" || type === "wireless") {
-        return type;
-    }
-
-    return "unknown";
-}
-
-function formatNetworkInterfaceOptionDebug(networkInterface: NetworkInterfaceOption): NetworkInterfaceOptionDebug {
-    return {
-        id: networkInterface.id,
-        name: networkInterface.name,
-        type: networkInterface.type,
-        isDefault: networkInterface.isDefault,
-        speedMegabitsPerSecond: networkInterface.speedMegabitsPerSecond,
-    };
-}
-
-function formatNetworkStatDebug(networkStat: Systeminformation.NetworkStatsData): NetworkStatDebug {
-    return {
-        interfaceId: networkStat.iface,
-        operstate: networkStat.operstate,
-        receiveBytes: networkStat.rx_bytes,
-        receiveBytesPerSecond: networkStat.rx_sec,
-        receiveErrors: networkStat.rx_errors,
-        receiveDropped: networkStat.rx_dropped,
-        transmitBytes: networkStat.tx_bytes,
-        transmitBytesPerSecond: networkStat.tx_sec,
-        transmitErrors: networkStat.tx_errors,
-        transmitDropped: networkStat.tx_dropped,
-        sampleMilliseconds: networkStat.ms,
-    };
-}
-
-function formatNetworkRateCalculationDebug(rateCalculation: NetworkRateCalculation): NetworkRateCalculationDebug {
-    return {
-        interfaceId: rateCalculation.interfaceId,
-        direction: rateCalculation.direction,
-        currentBytes: rateCalculation.currentBytes,
-        previousBytes: rateCalculation.previousBytes,
-        bytesDelta: rateCalculation.bytesDelta,
-        elapsedMilliseconds: rateCalculation.elapsedMilliseconds,
-        computedBytesPerSecond: Math.round(rateCalculation.bytesPerSecond),
-        hadPreviousSample: rateCalculation.hadPreviousSample,
-    };
-}
-
-function formatRawNetworkInterfaceDebug(networkInterface: Systeminformation.NetworkInterfacesData): RawNetworkInterfaceDebug {
-    return {
-        interfaceId: networkInterface.iface,
-        name: networkInterface.ifaceName || networkInterface.iface,
-        type: networkInterface.type,
-        operstate: networkInterface.operstate,
-        isDefault: networkInterface.default,
-        isInternal: networkInterface.internal,
-        isVirtual: networkInterface.virtual,
-        speedMegabitsPerSecond: typeof networkInterface.speed === "number" && Number.isFinite(networkInterface.speed)
-            ? networkInterface.speed
-            : null,
-    };
-}
-
-export function calculateNetworkRate(options: {
-    interfaceId: string;
-    direction: NetworkDirection;
-    currentBytes: number;
-    currentTimestampMilliseconds: number;
-    previousSample: NetworkCounterSample | undefined;
-}): NetworkRateCalculation {
-    if (!options.previousSample || options.currentTimestampMilliseconds <= options.previousSample.timestampMilliseconds) {
-        return {
-            interfaceId: options.interfaceId,
-            direction: options.direction,
-            currentBytes: options.currentBytes,
-            previousBytes: options.previousSample?.bytes ?? null,
-            bytesDelta: null,
-            elapsedMilliseconds: options.previousSample
-                ? options.currentTimestampMilliseconds - options.previousSample.timestampMilliseconds
-                : null,
-            bytesPerSecond: 0,
-            hadPreviousSample: options.previousSample != null,
-        };
-    }
-
-    const elapsedSeconds = (options.currentTimestampMilliseconds - options.previousSample.timestampMilliseconds) / 1000;
-    const bytesDelta = options.currentBytes - options.previousSample.bytes;
-
-    return {
-        interfaceId: options.interfaceId,
-        direction: options.direction,
-        currentBytes: options.currentBytes,
-        previousBytes: options.previousSample.bytes,
-        bytesDelta,
-        elapsedMilliseconds: options.currentTimestampMilliseconds - options.previousSample.timestampMilliseconds,
-        bytesPerSecond: Math.max(0, bytesDelta / elapsedSeconds),
-        hadPreviousSample: true,
-    };
-}
-
-export function resolveMetricGroups(metricKeys: readonly string[]): Set<MetricGroup> {
+export function resolveMetricGroups(metricKeys: readonly string[]): Set<NodeSystemMetricGroup> {
     if (metricKeys.length === 0) {
         return new Set(["cpu", "memory", "disk", "network", "gpu"]);
     }
 
-    const metricGroups = new Set<MetricGroup>();
+    const metricGroups = new Set<NodeSystemMetricGroup>();
 
     for (const metricKey of metricKeys) {
         if (metricKey.startsWith("cpu.")) {
@@ -794,316 +610,3 @@ export function resolveMetricGroups(metricKeys: readonly string[]): Set<MetricGr
 
     return metricGroups;
 }
-
-async function pollWindowsNvidiaGpuTelemetry(): Promise<GpuTelemetryData | null> {
-    const output = await runNvidiaSmiTelemetryQuery();
-
-    if (!output) {
-        gpuLog.debug("nvidiaSmiEmptyOutput");
-        return null;
-    }
-
-    const firstGpuLine = output
-        .split(/\r?\n/)
-        .map(line => line.trim())
-        .find(line => line.length > 0);
-
-    if (!firstGpuLine) {
-        gpuLog.debug("nvidiaSmiNoDataLine");
-        return null;
-    }
-
-    const gpuData = parseNvidiaSmiTelemetryLine(firstGpuLine);
-
-    if (!gpuData) {
-        gpuLog.debug(() => [
-            "nvidiaSmiNoParsedFields",
-            `raw=${firstGpuLine}`,
-        ].join(" "));
-        return null;
-    }
-
-    return gpuData;
-}
-
-async function pollSystemInformationGpuTelemetry(): Promise<GpuTelemetryData | null> {
-    const graphicsData = await systemInformation.graphics();
-    const nvidiaController = graphicsData.controllers.find(graphicsController =>
-        graphicsController.vendor.toLowerCase().includes("nvidia") &&
-        (typeof graphicsController.utilizationGpu === "number" || typeof graphicsController.temperatureGpu === "number")
-    );
-
-    if (!nvidiaController) {
-        return null;
-    }
-
-    return {
-        utilizationGpu: nvidiaController.utilizationGpu,
-        modelText: normalizeNonEmptyText(nvidiaController.model),
-        temperatureGpu: nvidiaController.temperatureGpu,
-        memoryUsed: nvidiaController.memoryUsed,
-        memoryTotal: nvidiaController.memoryTotal,
-        powerDraw: nvidiaController.powerDraw,
-        powerLimit: nvidiaController.powerLimit,
-    };
-}
-
-function runNvidiaSmiTelemetryQuery(): Promise<string | null> {
-    return new Promise(resolve => {
-        const queryStartTimestampMilliseconds = Date.now();
-        const querySequence = nextNvidiaSmiQueryDebugSequence++;
-        activeNvidiaSmiQueryCount += 1;
-        gpuLog.debug(() => [
-            "nvidiaSmiStart",
-            `queryId=${querySequence}`,
-            `timeoutMs=${NVIDIA_SMI_TIMEOUT_MS}`,
-            `activeNvidiaSmiQueries=${activeNvidiaSmiQueryCount}`,
-        ].join(" "));
-
-        execFile(
-            "nvidia-smi",
-            [...NVIDIA_SMI_ARGUMENTS],
-            {
-                timeout: NVIDIA_SMI_TIMEOUT_MS,
-                windowsHide: true,
-                maxBuffer: 32 * 1024,
-            },
-            (error: ExecFileException | null, stdout: string) => {
-                const elapsedMilliseconds = Date.now() - queryStartTimestampMilliseconds;
-                activeNvidiaSmiQueryCount = Math.max(0, activeNvidiaSmiQueryCount - 1);
-
-                if (error) {
-                    logNvidiaSmiFailure({
-                        error,
-                        elapsedMilliseconds,
-                        querySequence,
-                    });
-                    resolve(null);
-                    return;
-                }
-
-                gpuLog.debug(() => [
-                    elapsedMilliseconds > 250 ? "nvidiaSmiSlowSuccess" : "nvidiaSmiSuccess",
-                    `queryId=${querySequence}`,
-                    `elapsedMs=${elapsedMilliseconds}`,
-                    `timeoutMs=${NVIDIA_SMI_TIMEOUT_MS}`,
-                    `timerDelayMs=${Math.max(0, elapsedMilliseconds - NVIDIA_SMI_TIMEOUT_MS)}`,
-                    `stdoutBytes=${stdout.length}`,
-                    `activeNvidiaSmiQueries=${activeNvidiaSmiQueryCount}`,
-                ].join(" "));
-
-                resolve(stdout);
-            },
-        );
-    });
-}
-
-function logNvidiaSmiFailure(options: {
-    error: ExecFileException;
-    elapsedMilliseconds: number;
-    querySequence: number;
-}): void {
-    const currentTimestampMilliseconds = Date.now();
-
-    if (
-        currentTimestampMilliseconds - lastNvidiaSmiFailureLogTimestampMilliseconds
-        < NVIDIA_SMI_FAILURE_LOG_INTERVAL_MS
-    ) {
-        return;
-    }
-
-    lastNvidiaSmiFailureLogTimestampMilliseconds = currentTimestampMilliseconds;
-    gpuLog.warn(() => [
-        "nvidia-smi GPU telemetry query failed",
-        `queryId=${options.querySequence}`,
-        `elapsedMs=${options.elapsedMilliseconds}`,
-        `timeoutMs=${NVIDIA_SMI_TIMEOUT_MS}`,
-        `timerDelayMs=${Math.max(0, options.elapsedMilliseconds - NVIDIA_SMI_TIMEOUT_MS)}`,
-        `code=${String(options.error.code ?? "unknown")}`,
-        `signal=${String(options.error.signal ?? "none")}`,
-        `activeNvidiaSmiQueries=${activeNvidiaSmiQueryCount}`,
-        `message=${options.error.message}`,
-    ].join(" "));
-}
-
-export function parseNvidiaSmiTelemetryLine(firstGpuLine: string): GpuTelemetryData | null {
-    const fields = firstGpuLine.split(",").map(field => field.trim());
-    const utilizationGpu = parseNvidiaSmiNumber(fields[0]);
-    const modelText = normalizeNonEmptyText(fields[1]);
-    const temperatureGpu = parseNvidiaSmiNumber(fields[2]);
-    const memoryUsed = parseNvidiaSmiNumber(fields[3]);
-    const memoryTotal = parseNvidiaSmiNumber(fields[4]);
-    const powerDraw = parseNvidiaSmiNumber(fields[5]);
-    const powerLimit = parseNvidiaSmiNumber(fields[6]);
-
-    if (
-        utilizationGpu == null
-        && temperatureGpu == null
-        && memoryUsed == null
-        && memoryTotal == null
-        && powerDraw == null
-        && powerLimit == null
-        && modelText == null
-    ) {
-        return null;
-    }
-
-    return {
-        utilizationGpu,
-        modelText,
-        temperatureGpu,
-        memoryUsed,
-        memoryTotal,
-        powerDraw,
-        powerLimit,
-    };
-}
-
-export function parseNvidiaSmiNumber(value: string | undefined): number | undefined {
-    if (!value || value.toUpperCase() === "N/A") {
-        return undefined;
-    }
-
-    const numericValue = Number(value);
-
-    return Number.isFinite(numericValue) ? numericValue : undefined;
-}
-
-export function normalizeNonEmptyText(value: string | undefined): string | undefined {
-    const normalizedValue = value?.trim();
-
-    return normalizedValue && normalizedValue.toUpperCase() !== "N/A"
-        ? normalizedValue
-        : undefined;
-}
-
-export function formatCpuModelText(cpuData: Systeminformation.CpuData): string | null {
-    const modelParts = [
-        normalizeNonEmptyText(cpuData.manufacturer),
-        normalizeNonEmptyText(cpuData.brand),
-    ];
-    const modelText = modelParts
-        .filter((modelPart): modelPart is string => modelPart != null)
-        .join(" ")
-        .trim();
-
-    return modelText.length > 0 ? modelText : null;
-}
-
-export function isUsableFileSystem(fileSystem: Systeminformation.FsSizeData): boolean {
-    return fileSystem.size > 0
-        && fileSystem.mount.length > 0
-        && fileSystem.available >= 0
-        && fileSystem.used >= 0;
-}
-
-export function toDiskVolumeOption(
-    fileSystem: Systeminformation.FsSizeData,
-    blockDevices: readonly Systeminformation.BlockDevicesData[],
-    diskLayout: readonly Systeminformation.DiskLayoutData[],
-): DiskVolumeOption {
-    const blockDevice = blockDevices.find(device => device.mount === fileSystem.mount || device.name === fileSystem.fs);
-    const physicalDisk = resolvePhysicalDisk(fileSystem, blockDevice, diskLayout);
-
-    return {
-        id: fileSystem.mount || fileSystem.fs,
-        fs: fileSystem.fs,
-        mount: fileSystem.mount,
-        sizeBytes: fileSystem.size,
-        usedBytes: fileSystem.used,
-        availableBytes: fileSystem.available,
-        storageKind: resolveDiskStorageKind(physicalDisk, blockDevice),
-        diskName: physicalDisk?.name ?? fileSystem.fs,
-        volumeLabel: blockDevice?.label ?? "",
-    };
-}
-
-export function resolvePhysicalDisk(
-    fileSystem: Systeminformation.FsSizeData,
-    blockDevice: Systeminformation.BlockDevicesData | undefined,
-    diskLayout: readonly Systeminformation.DiskLayoutData[],
-): Systeminformation.DiskLayoutData | undefined {
-    if (blockDevice && !isLocalBlockDevice(blockDevice)) {
-        return undefined;
-    }
-
-    if (diskLayout.length === 0) {
-        return undefined;
-    }
-
-    const normalizedBlockDeviceText = blockDevice
-        ? `${blockDevice.device ?? ""} ${blockDevice.name} ${blockDevice.model}`.toLowerCase()
-        : "";
-    const matchingDisk = diskLayout.find(disk => {
-        const normalizedDiskText = `${disk.device ?? ""} ${disk.name}`.toLowerCase();
-        return normalizedDiskText.length > 0 && normalizedBlockDeviceText.includes(normalizedDiskText);
-    });
-
-    if (matchingDisk) {
-        return matchingDisk;
-    }
-
-    if (diskLayout.length === 1) {
-        return diskLayout[0];
-    }
-
-    return diskLayout
-        .filter(disk => disk.size >= fileSystem.size)
-        .sort((leftDisk, rightDisk) => leftDisk.size - rightDisk.size)[0]
-        ?? diskLayout[0];
-}
-
-export function resolveDiskStorageKind(
-    diskLayout: Systeminformation.DiskLayoutData | undefined,
-    blockDevice: Systeminformation.BlockDevicesData | undefined,
-): DiskStorageKind {
-    if (blockDevice && !isLocalBlockDevice(blockDevice)) {
-        return "network";
-    }
-
-    if (!diskLayout) {
-        return "unknown";
-    }
-
-    const diskType = diskLayout.type.toLowerCase();
-
-    if (diskType === "ssd" || diskType === "nvme" || diskType === "scm") {
-        return "ssd";
-    }
-
-    if (diskType === "hd") {
-        return "hdd";
-    }
-
-    return "unknown";
-}
-
-export function isLocalBlockDevice(blockDevice: Systeminformation.BlockDevicesData): boolean {
-    const physicalKind = blockDevice.physical.toLowerCase();
-
-    if (physicalKind === "network") {
-        return false;
-    }
-
-    return true;
-}
-
-export function resolveDefaultDiskVolume(diskVolumes: readonly DiskVolumeOption[]): DiskVolumeOption | null {
-    return diskVolumes.find(diskVolume => diskVolume.mount === "/" || /^[A-Z]:\\?$/i.test(diskVolume.mount))
-        ?? diskVolumes[0]
-        ?? null;
-}
-
-export function calculatePercent(value: number, total: number): number {
-    return total > 0 ? (value / total) * 100 : 0;
-}
-
-export function normalizeNullableRate(value: number | null): number {
-    return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
-}
-
-export function isFinitePositiveNumber(value: number | undefined): value is number {
-    return typeof value === "number" && Number.isFinite(value) && value > 0;
-}
-
-export type MetricGroup = "cpu" | "memory" | "disk" | "network" | "gpu";

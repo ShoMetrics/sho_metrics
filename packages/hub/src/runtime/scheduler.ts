@@ -1,5 +1,5 @@
 import type { IMetricSource, IMetricSnapshot } from "./sources/source.interface";
-import { BuiltinSource } from "./sources/builtin-source";
+import { NodeSystemSource } from "./sources/node-system-source";
 import { metricStore } from "./metric-store";
 import { logger } from "../logging/logger";
 
@@ -229,4 +229,4 @@ function formatMetricKeys(metricKeys: readonly string[]): string {
     return metricKeys.length > 0 ? metricKeys.join(",") : "all";
 }
 
-export const scheduler = new Scheduler(new BuiltinSource());
+export const scheduler = new Scheduler(new NodeSystemSource());
