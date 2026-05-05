@@ -73,6 +73,11 @@ export class MetricStore {
     getTextValue(key: string): string | undefined {
         return this.store.get(key)?.text;
     }
+
+    /** Clear all sampled metric history and text values. Intended for isolated tests and source resets. */
+    clear(): void {
+        this.store.clear();
+    }
 }
 
 interface MetricRecord {

@@ -20,10 +20,24 @@ export interface PropertyInspectorState {
     settings: PropertyInspectorSettings;
 }
 
+export type ScenarioSectionId =
+    | "general"
+    | "content"
+    | "source"
+    | "appearance"
+    | "visual-guides"
+    | "color";
+
 export interface ScenarioFieldGroup {
     name: string;
+    sectionId?: ScenarioSectionId;
     fieldList: readonly FieldSchema[];
     include?: (context: VisibilityContext) => boolean;
+}
+
+export interface ScenarioSection {
+    id: ScenarioSectionId;
+    fieldGroupList: readonly ScenarioFieldGroup[];
 }
 
 export interface InspectorScenario {
@@ -59,6 +73,29 @@ export function resolveScenarioFieldList(
     });
 }
 
+export function resolveScenarioSectionList(
+    scenario: InspectorScenario,
+    context: VisibilityContext,
+): readonly ScenarioSection[] {
+    const sectionMap = new Map<ScenarioSectionId, ScenarioFieldGroup[]>();
+
+    for (const fieldGroup of scenario.fieldGroupList) {
+        if (fieldGroup.include && !fieldGroup.include(context)) {
+            continue;
+        }
+
+        const sectionId = fieldGroup.sectionId ?? resolveDefaultSectionId(fieldGroup.name);
+        const sectionFieldGroupList = sectionMap.get(sectionId) ?? [];
+        sectionFieldGroupList.push(fieldGroup);
+        sectionMap.set(sectionId, sectionFieldGroupList);
+    }
+
+    return Array.from(sectionMap.entries()).map(([id, fieldGroupList]) => ({
+        id,
+        fieldGroupList,
+    }));
+}
+
 export function resolveGraphicScenario(options: {
     graphicType: GraphicType;
     circularScenario: InspectorScenario;
@@ -91,4 +128,47 @@ export function resolveGraphicScope(options: {
     }
 
     return options.circularScope;
+}
+
+function resolveDefaultSectionId(fieldGroupName: string): ScenarioSectionId {
+    if (
+        fieldGroupName.includes("Color")
+        || fieldGroupName.includes("color")
+        || fieldGroupName.includes("Threshold")
+        || fieldGroupName.includes("threshold")
+        || fieldGroupName === "solidColor"
+        || fieldGroupName === "thresholdColor"
+    ) {
+        return "color";
+    }
+
+    if (
+        fieldGroupName.includes("GridLine")
+        || fieldGroupName.includes("gridLine")
+        || fieldGroupName === "sparklineAppearance"
+    ) {
+        return "visual-guides";
+    }
+
+    if (
+        fieldGroupName.includes("Center")
+        || fieldGroupName.includes("Label")
+        || fieldGroupName.includes("Unit")
+        || fieldGroupName === "networkCircular"
+    ) {
+        return "content";
+    }
+
+    if (
+        fieldGroupName.includes("Endpoint")
+        || fieldGroupName.includes("Volume")
+        || fieldGroupName.includes("Throughput")
+        || fieldGroupName.includes("Usage")
+        || fieldGroupName === "networkDirection"
+        || fieldGroupName === "diskUsageBase"
+    ) {
+        return "source";
+    }
+
+    return fieldGroupName === "base" ? "general" : "appearance";
 }

@@ -13,5 +13,15 @@ export interface Widget<TConfig extends WidgetBaseConfig = WidgetBaseConfig> {
     render(data: WidgetData, config: TConfig, keySize: KeySize): string;
 }
 
-export type GraphicType = "circular" | "linear" | "dashed-line" | "arc-gauge" | "sparkline" | "linear-bar" | "mirrored-traffic";
-export type GraphicStyleName = "flat" | "cupertino-glass";
+export type GraphicPrimitiveType = "circular" | "linear" | "dashed-line" | "arc-gauge" | "sparkline" | "linear-bar" | "mirrored-traffic";
+
+/**
+ * Current settings still persist this as `graphicType`; the type name makes the
+ * primitive/theme split explicit for upcoming theme work.
+ */
+export type GraphicType = GraphicPrimitiveType;
+
+export type GraphicThemePresetName = "flat" | "cupertino-glass";
+
+/** @deprecated Prefer GraphicThemePresetName for new rendering/theme code. */
+export type GraphicStyleName = GraphicThemePresetName;

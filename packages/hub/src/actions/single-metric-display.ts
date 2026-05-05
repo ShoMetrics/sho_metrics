@@ -1,73 +1,26 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
 import { composeDualChannelSvg, composeSvg } from "../rendering/composer";
 import { rasterizeSvgToPngDataUrl } from "../rendering/rasterizer";
+import type { DualChannelWidgetData, WidgetData } from "../rendering/widget-data";
 import {
-    KEYPAD_PNG_SIZE,
-    TOUCH_STRIP_LOGICAL_SIZE,
-    TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE,
-    TOUCH_STRIP_SINGLE_METRIC_SQUARE_PNG_SIZE,
-    WIDGET_LOGICAL_SIZE,
-} from "../rendering/widget-data";
-import type { DualChannelWidgetData, KeySize, WidgetData } from "../rendering/widget-data";
-import { resolveMetricVisualSettings, type MetricVisualSettings, type ResolvedMetricVisualSettings, type SettingValue } from "./metric-visual-settings";
+    buildMetricDisplayRenderPlan,
+    buildRenderDualChannelWidgetData,
+    buildRenderWidgetData,
+    isDualMetricDisplayOptions,
+    resolveDisplayLogValue,
+    resolveDisplaySampleTimestampMilliseconds,
+    type DualMetricDisplayOptions,
+    type MetricDisplayOptions,
+    type SingleMetricDisplayOptions,
+    type SingleMetricDisplaySettings,
+    type TouchStripMetricLayout,
+} from "./single-metric-display-model";
+import type { ResolvedMetricVisualSettings } from "./metric-visual-settings";
 import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
 import { logger } from "../logging/logger";
 
 const log = logger.for("SingleMetricDisplay");
 
-interface BaseMetricDisplayOptions {
-    event: WillAppearEvent;
-    metricKey: string;
-    centerIconFragment: string;
-    linearIconFragment?: string;
-    statusIcon: ArcGaugeStatusIcon;
-    circularCenterContentOverride?: "value" | "icon" | "icon-value-unit";
-    visualSettingsOverride?: Partial<MetricVisualSettings>;
-}
-
-export interface SingleMetricDisplayOptions extends BaseMetricDisplayOptions {
-    widgetData: WidgetData;
-}
-
-export interface DualMetricDisplayOptions extends BaseMetricDisplayOptions {
-    widgetData: DualChannelWidgetData;
-    titleText: string;
-    chartMode?: "overlay" | "mirrored";
-    positiveColor: string;
-    negativeColor: string;
-    positiveIconFragment?: string;
-    negativeIconFragment?: string;
-}
-
-interface SingleMetricDisplaySettings extends MetricVisualSettings {
-    circularCenterContent?: SettingValue;
-}
-
-type MetricDisplayOptions = SingleMetricDisplayOptions | DualMetricDisplayOptions;
-
-type TouchStripMetricLayoutKind = "square" | "wide";
-
-interface TouchStripMetricLayout {
-    kind: TouchStripMetricLayoutKind;
-    layoutPath: string;
-    renderSize: KeySize;
-    pngSize: KeySize;
-}
-
-const TOUCH_STRIP_METRIC_LAYOUTS: Record<TouchStripMetricLayoutKind, TouchStripMetricLayout> = {
-    square: {
-        kind: "square",
-        layoutPath: "layouts/single-metric-touchstrip-square.json",
-        renderSize: WIDGET_LOGICAL_SIZE,
-        pngSize: TOUCH_STRIP_SINGLE_METRIC_SQUARE_PNG_SIZE,
-    },
-    wide: {
-        kind: "wide",
-        layoutPath: "layouts/single-metric-touchstrip-wide.json",
-        renderSize: TOUCH_STRIP_LOGICAL_SIZE,
-        pngSize: TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE,
-    },
-};
 const MAX_CONCURRENT_DISPLAY_UPDATES = 1;
 
 const displayActionStates = new Map<string, DisplayActionState>();
@@ -125,25 +78,11 @@ function renderAndSendSingleMetricDisplay(
 
     const renderStartTimestampMilliseconds = Date.now();
     const settings = options.event.payload.settings as SingleMetricDisplaySettings;
-    const visualSettings = resolveMetricVisualSettings({
-        ...settings,
-        ...options.visualSettingsOverride,
-    });
-    const centerContent = resolveCircularCenterContent({
+    const renderPlan = buildMetricDisplayRenderPlan({
+        displayOptions: options,
         settings,
-        graphicType: visualSettings.graphicType,
-        circularCenterContentOverride: options.circularCenterContentOverride,
+        isDial: options.event.action.isDial(),
     });
-    const displayHasData = hasMetricDisplayData(options);
-    const shouldRenderMutedIconPlaceholder = !displayHasData
-        && !isDualMetricDisplayOptions(options)
-        && visualSettings.graphicType === "circular"
-        && centerContent === "icon";
-    const touchStripMetricLayout = options.event.action.isDial()
-        ? resolveTouchStripMetricLayout(visualSettings)
-        : null;
-    const renderSize = touchStripMetricLayout?.renderSize ?? WIDGET_LOGICAL_SIZE;
-    const pngSize = touchStripMetricLayout?.pngSize ?? KEYPAD_PNG_SIZE;
 
     if (options.event.action.isKey()) {
         options.event.action.setTitle("").catch(error => {
@@ -157,11 +96,11 @@ function renderAndSendSingleMetricDisplay(
     if (isDualMetricDisplayOptions(options)) {
         const renderDualWidgetData = buildRenderDualChannelWidgetData({
             widgetData: options.widgetData,
-            hasData: displayHasData,
+            hasData: renderPlan.displayHasData,
         });
         renderedMetricData = renderDualWidgetData;
         svg = composeDualChannelSvg(renderDualWidgetData, {
-            graphicStyle: visualSettings.graphicStyle,
+            graphicStyle: renderPlan.visualSettings.graphicStyle,
             muted: false,
             configOverrides: buildDualMetricConfigOverrides({
                 positiveColor: options.positiveColor,
@@ -171,31 +110,31 @@ function renderAndSendSingleMetricDisplay(
                 topIconFragment: options.centerIconFragment,
                 positiveIconFragment: options.positiveIconFragment,
                 negativeIconFragment: options.negativeIconFragment,
-                lineSmoothingPercent: visualSettings.lineSmoothingPercent,
-                gridLineVisibility: visualSettings.gridLineVisibility,
-                gridLineType: visualSettings.gridLineType,
+                lineSmoothingPercent: renderPlan.visualSettings.lineSmoothingPercent,
+                gridLineVisibility: renderPlan.visualSettings.gridLineVisibility,
+                gridLineType: renderPlan.visualSettings.gridLineType,
             }),
-        }, renderSize);
+        }, renderPlan.renderSize);
     } else {
         const renderSingleWidgetData = buildRenderWidgetData({
             widgetData: options.widgetData,
-            hasData: displayHasData,
-            shouldRenderMutedIconPlaceholder,
+            hasData: renderPlan.displayHasData,
+            shouldRenderMutedIconPlaceholder: renderPlan.shouldRenderMutedIconPlaceholder,
         });
         renderedMetricData = renderSingleWidgetData;
         svg = composeSvg(renderSingleWidgetData, {
-            ...visualSettings,
-            muted: shouldRenderMutedIconPlaceholder,
+            ...renderPlan.visualSettings,
+            muted: renderPlan.shouldRenderMutedIconPlaceholder,
             configOverrides: buildSingleMetricConfigOverrides({
                 centerIconFragment: options.centerIconFragment,
                 linearIconFragment: options.linearIconFragment,
                 statusIcon: options.statusIcon,
-                centerContent,
-                lineSmoothingPercent: visualSettings.lineSmoothingPercent,
-                gridLineVisibility: visualSettings.gridLineVisibility,
-                gridLineType: visualSettings.gridLineType,
+                centerContent: renderPlan.centerContent,
+                lineSmoothingPercent: renderPlan.visualSettings.lineSmoothingPercent,
+                gridLineVisibility: renderPlan.visualSettings.gridLineVisibility,
+                gridLineType: renderPlan.visualSettings.gridLineType,
             }),
-        }, renderSize);
+        }, renderPlan.renderSize);
     }
     const composeEndTimestampMilliseconds = Date.now();
 
@@ -210,7 +149,7 @@ function renderAndSendSingleMetricDisplay(
         return;
     }
 
-    const pngDataUrl = rasterizeSvgToPngDataUrl(svg, pngSize);
+    const pngDataUrl = rasterizeSvgToPngDataUrl(svg, renderPlan.pngSize);
     const rasterizeEndTimestampMilliseconds = Date.now();
 
     if (!pngDataUrl) {
@@ -256,7 +195,7 @@ function renderAndSendSingleMetricDisplay(
                 });
         };
 
-        ensureTouchStripSingleMetricLayout(displayActionState, options.event, touchStripMetricLayout)
+        ensureTouchStripSingleMetricLayout(displayActionState, options.event, renderPlan.touchStripMetricLayout)
             .then(setFeedback)
             .catch(error => {
                 log.error(() => `Failed to update touch strip metric image: ${error}`);
@@ -352,38 +291,6 @@ function buildDualMetricConfigOverrides(options: {
         lineSmoothingPercent: options.lineSmoothingPercent,
         gridLineVisibility: options.gridLineVisibility,
         gridLineType: options.gridLineType,
-    };
-}
-
-function resolveCircularCenterContent(options: {
-    settings: SingleMetricDisplaySettings;
-    graphicType: string;
-    circularCenterContentOverride: "value" | "icon" | "icon-value-unit" | undefined;
-}): "value" | "icon" | "icon-value-unit" {
-    if (options.graphicType !== "circular") {
-        return "value";
-    }
-
-    return options.circularCenterContentOverride
-        ?? (options.settings.circularCenterContent === "icon" ? "icon" : "value");
-}
-
-function buildRenderWidgetData(options: {
-    widgetData: WidgetData;
-    hasData: boolean;
-    shouldRenderMutedIconPlaceholder: boolean;
-}): WidgetData {
-    if (options.hasData || options.shouldRenderMutedIconPlaceholder) {
-        return options.widgetData;
-    }
-
-    return {
-        ...options.widgetData,
-        current: 0,
-        progress: 0,
-        history: [],
-        unit: "",
-        displayValue: "N/A",
     };
 }
 
@@ -518,93 +425,6 @@ function ensureTouchStripSingleMetricLayout(
         });
     displayActionState.touchStripLayoutPromise = layoutPromise;
     return layoutPromise;
-}
-
-function buildRenderDualChannelWidgetData(options: {
-    widgetData: DualChannelWidgetData;
-    hasData: boolean;
-}): DualChannelWidgetData {
-    if (!options.hasData) {
-        return {
-            positive: buildPlaceholderChannelWidgetData(options.widgetData.positive, "N/A"),
-            negative: buildPlaceholderChannelWidgetData(options.widgetData.negative, "N/A"),
-        };
-    }
-
-    return {
-        positive: options.widgetData.positive.sampleTimestampMilliseconds == null
-            ? buildZeroChannelWidgetData(options.widgetData.positive, options.widgetData.negative.history.length)
-            : options.widgetData.positive,
-        negative: options.widgetData.negative.sampleTimestampMilliseconds == null
-            ? buildZeroChannelWidgetData(options.widgetData.negative, options.widgetData.positive.history.length)
-            : options.widgetData.negative,
-    };
-}
-
-function buildPlaceholderChannelWidgetData(widgetData: WidgetData, displayValue: string): WidgetData {
-    return {
-        ...widgetData,
-        current: 0,
-        progress: 0,
-        history: [],
-        unit: "",
-        displayValue,
-    };
-}
-
-function buildZeroChannelWidgetData(widgetData: WidgetData, referenceHistoryLength: number): WidgetData {
-    return {
-        ...widgetData,
-        current: 0,
-        progress: 0,
-        history: Array.from({ length: Math.max(2, referenceHistoryLength) }, () => 0),
-        displayValue: "0",
-    };
-}
-
-function isDualMetricDisplayOptions(options: MetricDisplayOptions): options is DualMetricDisplayOptions {
-    return "positiveColor" in options;
-}
-
-function hasMetricDisplayData(options: MetricDisplayOptions): boolean {
-    if (isDualMetricDisplayOptions(options)) {
-        return options.widgetData.positive.sampleTimestampMilliseconds != null
-            || options.widgetData.negative.sampleTimestampMilliseconds != null;
-    }
-
-    return options.widgetData.sampleTimestampMilliseconds != null;
-}
-
-function resolveDisplayLogValue(widgetData: WidgetData | DualChannelWidgetData): number {
-    if (isDualChannelWidgetData(widgetData)) {
-        return widgetData.positive.current + widgetData.negative.current;
-    }
-
-    return widgetData.current;
-}
-
-function resolveDisplaySampleTimestampMilliseconds(widgetData: WidgetData | DualChannelWidgetData): number | undefined {
-    if (isDualChannelWidgetData(widgetData)) {
-        return widgetData.positive.sampleTimestampMilliseconds
-            ?? widgetData.negative.sampleTimestampMilliseconds;
-    }
-
-    return widgetData.sampleTimestampMilliseconds;
-}
-
-function isDualChannelWidgetData(widgetData: WidgetData | DualChannelWidgetData): widgetData is DualChannelWidgetData {
-    return "positive" in widgetData && "negative" in widgetData;
-}
-
-function resolveTouchStripMetricLayout(settings: ResolvedMetricVisualSettings): TouchStripMetricLayout {
-    if (settings.graphicType === "circular") {
-        return TOUCH_STRIP_METRIC_LAYOUTS.square;
-    }
-
-    // Touch strip layouts encode both Stream Deck feedback rect and render target
-    // size. Add a new layout kind when a future visual needs a different contract,
-    // for example two centered circles in one 200x100 touch strip region.
-    return TOUCH_STRIP_METRIC_LAYOUTS.wide;
 }
 
 function logDisplayDebug(options: {
