@@ -54,8 +54,11 @@ export const colorSettingsFieldGroup = defineFieldGroup({
 export const sparklineAppearanceFieldGroup = defineFieldGroup({
     name: "sparklineAppearance",
     fieldList: [
+        inspectorFieldCatalog.visualGuidesHeadingField,
         inspectorFieldCatalog.lineSmoothingField,
-        inspectorFieldCatalog.sparklineChartGuideStyleField,
+        inspectorFieldCatalog.gridLineVisibilityField,
+        inspectorFieldCatalog.adaptiveGridLineNoteField,
+        inspectorFieldCatalog.gridLineTypeField,
     ],
 });
 

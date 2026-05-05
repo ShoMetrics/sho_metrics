@@ -6,6 +6,7 @@ export type FieldKind = "select" | "color" | "number" | "range" | "text" | "read
 export type OptionProviderId = "networkInterfaces" | "diskVolumes";
 export type FieldValueSource = "selectedDiskVolumeLabel";
 export type FieldPlaceholderSource = "diskAutoLinearLabel";
+export type FieldNoteVariant = "default" | "caption";
 
 export interface SelectOption {
     value: string;
@@ -32,6 +33,7 @@ export interface FieldSchema {
     key?: PropertyInspectorSettingKey;
     label?: string;
     text?: string;
+    noteVariant?: FieldNoteVariant;
     defaultValue?: SettingValue;
     minimum?: number;
     step?: number;
@@ -41,4 +43,8 @@ export interface FieldSchema {
     valueSource?: FieldValueSource;
     placeholder?: string;
     placeholderSource?: FieldPlaceholderSource;
+    disabledWhen?: {
+        key: PropertyInspectorSettingKey;
+        equals: SettingValue;
+    };
 }

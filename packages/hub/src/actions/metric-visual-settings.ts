@@ -1,6 +1,6 @@
 import type { ColorConfig, ColorThreshold } from "../rendering/color-resolver";
 import type { GraphicStyleName, GraphicType } from "../widgets/widget.interface";
-import type { SparklineChartGuideStyle } from "../widgets/primitives/sparkline";
+import type { SparklineGridLineType, SparklineGridLineVisibility } from "../widgets/primitives/sparkline";
 
 export type SettingValue = string | number | boolean | null | undefined;
 
@@ -16,7 +16,8 @@ export interface MetricVisualSettings {
     colorMid?: SettingValue;
     colorHigh?: SettingValue;
     lineSmoothingPercent?: SettingValue;
-    sparklineChartGuideStyle?: SettingValue;
+    gridLineVisibility?: SettingValue;
+    gridLineType?: SettingValue;
 }
 
 export interface ResolvedMetricVisualSettings {
@@ -24,7 +25,8 @@ export interface ResolvedMetricVisualSettings {
     graphicStyle: GraphicStyleName;
     colorConfig: ColorConfig;
     lineSmoothingPercent: number;
-    sparklineChartGuideStyle: SparklineChartGuideStyle;
+    gridLineVisibility: SparklineGridLineVisibility;
+    gridLineType: SparklineGridLineType;
 }
 
 const DEFAULT_LOW_THRESHOLD = 30;
@@ -61,7 +63,8 @@ export function resolveMetricVisualSettings(settings: MetricVisualSettings): Res
             settings.lineSmoothingPercent,
             DEFAULT_LINE_SMOOTHING_PERCENT,
         ),
-        sparklineChartGuideStyle: resolveSparklineChartGuideStyle(settings.sparklineChartGuideStyle),
+        gridLineVisibility: resolveGridLineVisibility(settings.gridLineVisibility),
+        gridLineType: resolveGridLineType(settings.gridLineType),
     };
 }
 
@@ -81,8 +84,20 @@ function resolveGraphicStyle(value: SettingValue): GraphicStyleName {
     return "flat";
 }
 
-function resolveSparklineChartGuideStyle(value: SettingValue): SparklineChartGuideStyle {
-    return value === "time-axis" ? "time-axis" : "horizontal";
+function resolveGridLineVisibility(value: SettingValue): SparklineGridLineVisibility {
+    if (value === "none") {
+        return "none";
+    }
+
+    if (value === "always") {
+        return "always";
+    }
+
+    return "adaptive";
+}
+
+function resolveGridLineType(value: SettingValue): SparklineGridLineType {
+    return value === "vertical" ? "vertical" : "horizontal";
 }
 
 function buildColorConfig(settings: MetricVisualSettings): ColorConfig {

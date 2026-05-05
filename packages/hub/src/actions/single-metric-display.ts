@@ -142,7 +142,8 @@ function renderAndSendSingleMetricDisplay(
             statusIcon: options.statusIcon,
             centerContent,
             lineSmoothingPercent: visualSettings.lineSmoothingPercent,
-            chartGuideStyle: visualSettings.sparklineChartGuideStyle,
+            gridLineVisibility: visualSettings.gridLineVisibility,
+            gridLineType: visualSettings.gridLineType,
         }),
     }, renderSize);
     const composeEndTimestampMilliseconds = Date.now();
@@ -244,14 +245,16 @@ function buildSingleMetricConfigOverrides(options: {
     statusIcon: ArcGaugeStatusIcon;
     centerContent: "value" | "icon" | "icon-value-unit";
     lineSmoothingPercent: number;
-    chartGuideStyle: ResolvedMetricVisualSettings["sparklineChartGuideStyle"];
+    gridLineVisibility: ResolvedMetricVisualSettings["gridLineVisibility"];
+    gridLineType: ResolvedMetricVisualSettings["gridLineType"];
 }): {
     centerContent?: "value" | "icon" | "icon-value-unit";
     centerIconFragment?: string;
     topIconFragment?: string;
     statusIcon?: ArcGaugeStatusIcon;
     lineSmoothingPercent?: number;
-    chartGuideStyle?: ResolvedMetricVisualSettings["sparklineChartGuideStyle"];
+    gridLineVisibility?: ResolvedMetricVisualSettings["gridLineVisibility"];
+    gridLineType?: ResolvedMetricVisualSettings["gridLineType"];
 } {
     return {
         centerContent: options.centerContent,
@@ -259,7 +262,8 @@ function buildSingleMetricConfigOverrides(options: {
         topIconFragment: options.linearIconFragment ?? options.centerIconFragment,
         statusIcon: options.statusIcon,
         lineSmoothingPercent: options.lineSmoothingPercent,
-        chartGuideStyle: options.chartGuideStyle,
+        gridLineVisibility: options.gridLineVisibility,
+        gridLineType: options.gridLineType,
     };
 }
 
