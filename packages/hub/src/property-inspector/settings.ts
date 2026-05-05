@@ -14,11 +14,12 @@ export type ActionKind =
 export type GraphicType = "circular" | "linear" | "dashed-line";
 export type GraphicStyle = "flat" | "cupertino-glass";
 export type ColorMode = "threshold" | "solid";
-export type NetworkDirection = "download" | "upload";
+export type NetworkDirection = "both" | "download" | "upload";
+export type NetworkTrafficDisplayMode = "overlay" | "mirrored";
 export type NetworkUnitBase = "byte" | "bit";
 export type DiskMetricKind = "usage" | "throughput";
 export type DiskUsageDisplayMode = "percentage" | "space";
-export type DiskThroughputDirection = "total" | "read" | "write";
+export type DiskThroughputDirection = "both" | "total" | "read" | "write";
 export type TemperatureUnit = "celsius" | "fahrenheit";
 export type GridLineVisibility = "adaptive" | "always" | "none";
 export type GridLineType = "horizontal" | "vertical";
@@ -39,12 +40,21 @@ export interface PropertyInspectorSettings {
     gridLineVisibility: GridLineVisibility;
     gridLineType: GridLineType;
     networkDirection: NetworkDirection;
+    networkTrafficDisplayMode: NetworkTrafficDisplayMode;
     networkInterfaceId: string;
     availableNetworkInterfaces: string;
     maximumNetworkSpeedMbps: number | "";
     networkUnitBase: NetworkUnitBase;
-    downloadIconColor: string;
-    uploadIconColor: string;
+    downloadColorMode: ColorMode;
+    downloadSolidColor: string;
+    downloadColorLow: string;
+    downloadColorMedium: string;
+    downloadColorHigh: string;
+    uploadColorMode: ColorMode;
+    uploadSolidColor: string;
+    uploadColorLow: string;
+    uploadColorMedium: string;
+    uploadColorHigh: string;
     netSpeedDefaultsApplied: boolean;
     diskMetricKind: DiskMetricKind;
     diskUsageDisplayMode: DiskUsageDisplayMode;
@@ -53,6 +63,16 @@ export interface PropertyInspectorSettings {
     availableDiskVolumes: string;
     diskLinearLabel: string;
     maximumDiskThroughputMebibytesPerSecond: number;
+    diskReadColorMode: ColorMode;
+    diskReadSolidColor: string;
+    diskReadColorLow: string;
+    diskReadColorMedium: string;
+    diskReadColorHigh: string;
+    diskWriteColorMode: ColorMode;
+    diskWriteSolidColor: string;
+    diskWriteColorLow: string;
+    diskWriteColorMedium: string;
+    diskWriteColorHigh: string;
     diskDefaultsApplied: boolean;
     maximumTemperatureCelsius: number;
     maximumGpuPowerWatts: number | "";
@@ -72,21 +92,40 @@ export const basePropertyInspectorSettings: PropertyInspectorSettings = {
     circularCenterContent: "value",
     graphicStyle: "flat",
     solidColor: "#3b82f6",
-    networkDirection: "download",
+    networkDirection: "both",
+    networkTrafficDisplayMode: "mirrored",
     networkInterfaceId: "",
     availableNetworkInterfaces: "[]",
     maximumNetworkSpeedMbps: "",
     networkUnitBase: "byte",
-    downloadIconColor: "#3b82f6",
-    uploadIconColor: "#ef4444",
+    downloadColorMode: "solid",
+    downloadSolidColor: "#3b82f6",
+    downloadColorLow: "#22c55e",
+    downloadColorMedium: "#3b82f6",
+    downloadColorHigh: "#60a5fa",
+    uploadColorMode: "solid",
+    uploadSolidColor: "#ef4444",
+    uploadColorLow: "#f97316",
+    uploadColorMedium: "#ef4444",
+    uploadColorHigh: "#f472b6",
     netSpeedDefaultsApplied: false,
     diskMetricKind: "usage",
     diskUsageDisplayMode: "percentage",
-    diskThroughputDirection: "total",
+    diskThroughputDirection: "both",
     diskVolumeId: "",
     availableDiskVolumes: "[]",
     diskLinearLabel: "",
     maximumDiskThroughputMebibytesPerSecond: 1000,
+    diskReadColorMode: "solid",
+    diskReadSolidColor: "#38bdf8",
+    diskReadColorLow: "#22c55e",
+    diskReadColorMedium: "#38bdf8",
+    diskReadColorHigh: "#60a5fa",
+    diskWriteColorMode: "solid",
+    diskWriteSolidColor: "#f472b6",
+    diskWriteColorLow: "#f97316",
+    diskWriteColorMedium: "#f472b6",
+    diskWriteColorHigh: "#fb7185",
     diskDefaultsApplied: false,
     maximumTemperatureCelsius: 100,
     maximumGpuPowerWatts: "",
@@ -125,6 +164,7 @@ export function normalizePropertyInspectorSettings(
         circularCenterContent: rawSettings.circularCenterContent === "icon" ? "icon" : "value",
         graphicStyle: rawSettings.graphicStyle === "cupertino-glass" ? "cupertino-glass" : "flat",
         networkDirection,
+        networkTrafficDisplayMode: normalizeNetworkTrafficDisplayMode(rawSettings.networkTrafficDisplayMode),
         networkInterfaceId: normalizeString(rawSettings.networkInterfaceId, basePropertyInspectorSettings.networkInterfaceId),
         availableNetworkInterfaces: normalizeString(
             rawSettings.availableNetworkInterfaces,
@@ -151,8 +191,26 @@ export function normalizePropertyInspectorSettings(
             rawSettings.maximumDiskThroughputMebibytesPerSecond ?? rawSettings.maximumDiskThroughputMbps,
             basePropertyInspectorSettings.maximumDiskThroughputMebibytesPerSecond,
         ),
-        downloadIconColor: normalizeHexColor(rawSettings.downloadIconColor, basePropertyInspectorSettings.downloadIconColor),
-        uploadIconColor: normalizeHexColor(rawSettings.uploadIconColor, basePropertyInspectorSettings.uploadIconColor),
+        downloadColorMode: normalizeChannelColorMode(rawSettings.downloadColorMode),
+        downloadSolidColor: normalizeHexColor(rawSettings.downloadSolidColor, basePropertyInspectorSettings.downloadSolidColor),
+        downloadColorLow: normalizeHexColor(rawSettings.downloadColorLow, basePropertyInspectorSettings.downloadColorLow),
+        downloadColorMedium: normalizeHexColor(rawSettings.downloadColorMedium, basePropertyInspectorSettings.downloadColorMedium),
+        downloadColorHigh: normalizeHexColor(rawSettings.downloadColorHigh, basePropertyInspectorSettings.downloadColorHigh),
+        uploadColorMode: normalizeChannelColorMode(rawSettings.uploadColorMode),
+        uploadSolidColor: normalizeHexColor(rawSettings.uploadSolidColor, basePropertyInspectorSettings.uploadSolidColor),
+        uploadColorLow: normalizeHexColor(rawSettings.uploadColorLow, basePropertyInspectorSettings.uploadColorLow),
+        uploadColorMedium: normalizeHexColor(rawSettings.uploadColorMedium, basePropertyInspectorSettings.uploadColorMedium),
+        uploadColorHigh: normalizeHexColor(rawSettings.uploadColorHigh, basePropertyInspectorSettings.uploadColorHigh),
+        diskReadColorMode: normalizeChannelColorMode(rawSettings.diskReadColorMode),
+        diskReadSolidColor: normalizeHexColor(rawSettings.diskReadSolidColor, basePropertyInspectorSettings.diskReadSolidColor),
+        diskReadColorLow: normalizeHexColor(rawSettings.diskReadColorLow, basePropertyInspectorSettings.diskReadColorLow),
+        diskReadColorMedium: normalizeHexColor(rawSettings.diskReadColorMedium, basePropertyInspectorSettings.diskReadColorMedium),
+        diskReadColorHigh: normalizeHexColor(rawSettings.diskReadColorHigh, basePropertyInspectorSettings.diskReadColorHigh),
+        diskWriteColorMode: normalizeChannelColorMode(rawSettings.diskWriteColorMode),
+        diskWriteSolidColor: normalizeHexColor(rawSettings.diskWriteSolidColor, basePropertyInspectorSettings.diskWriteSolidColor),
+        diskWriteColorLow: normalizeHexColor(rawSettings.diskWriteColorLow, basePropertyInspectorSettings.diskWriteColorLow),
+        diskWriteColorMedium: normalizeHexColor(rawSettings.diskWriteColorMedium, basePropertyInspectorSettings.diskWriteColorMedium),
+        diskWriteColorHigh: normalizeHexColor(rawSettings.diskWriteColorHigh, basePropertyInspectorSettings.diskWriteColorHigh),
         colorMode: shouldApplyNetSpeedDefaults ? "solid" : normalizeColorMode(rawSettings.colorMode, context.actionKind),
         solidColor: shouldApplyNetSpeedDefaults
             ? resolveDefaultSolidColor(networkDirection)
@@ -235,15 +293,31 @@ export function normalizeDiskUsageDisplayMode(value: SettingValue): DiskUsageDis
 }
 
 export function normalizeDiskThroughputDirection(value: SettingValue): DiskThroughputDirection {
-    if (value === "read" || value === "write") {
+    if (value === "both") {
+        return "both";
+    }
+
+    if (value === "read" || value === "write" || value === "total") {
         return value;
     }
 
-    return "total";
+    return "both";
 }
 
 export function normalizeNetworkDirection(value: SettingValue): NetworkDirection {
-    return value === "upload" ? "upload" : "download";
+    if (value === "both") {
+        return "both";
+    }
+
+    if (value === "download" || value === "upload") {
+        return value;
+    }
+
+    return "both";
+}
+
+export function normalizeNetworkTrafficDisplayMode(value: SettingValue): NetworkTrafficDisplayMode {
+    return value === "overlay" ? "overlay" : "mirrored";
 }
 
 export function normalizeTemperatureUnit(value: SettingValue): TemperatureUnit {
@@ -272,8 +346,8 @@ export function resolveDefaultDiskPollingFrequency(diskMetricKind: DiskMetricKin
 
 export function resolveDefaultSolidColor(networkDirection: SettingValue): string {
     return normalizeNetworkDirection(networkDirection) === "upload"
-        ? basePropertyInspectorSettings.uploadIconColor
-        : basePropertyInspectorSettings.downloadIconColor;
+        ? basePropertyInspectorSettings.uploadSolidColor
+        : basePropertyInspectorSettings.downloadSolidColor;
 }
 
 export function resolveActionKind(actionUuid: string): ActionKind {
@@ -309,6 +383,10 @@ function normalizeColorMode(value: SettingValue, actionKind: ActionKind): ColorM
     }
 
     return actionKind === "net-speed" ? "solid" : "threshold";
+}
+
+function normalizeChannelColorMode(value: SettingValue): ColorMode {
+    return value === "threshold" ? "threshold" : "solid";
 }
 
 function normalizeHexColor(value: SettingValue, fallbackColor: string): string {

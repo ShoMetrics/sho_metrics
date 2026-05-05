@@ -20,6 +20,7 @@ test("disk throughput defaults to fast polling on first normalization", () => {
     });
 
     assert.equal(settings.pollingFrequencySeconds, 1);
+    assert.equal(settings.diskThroughputDirection, "both");
     assert.equal(settings.diskDefaultsApplied, true);
 });
 
@@ -40,8 +41,30 @@ test("net speed applies solid download color defaults once", () => {
     });
 
     assert.equal(settings.colorMode, "solid");
-    assert.equal(settings.solidColor, settings.downloadIconColor);
+    assert.equal(settings.solidColor, settings.downloadSolidColor);
     assert.equal(settings.netSpeedDefaultsApplied, true);
+});
+
+test("net speed defaults to dual direction", () => {
+    const settings = normalizeSettings({}, {
+        actionKind: "net-speed",
+        isWindows: false,
+    });
+
+    assert.equal(settings.networkDirection, "both");
+    assert.equal(settings.networkTrafficDisplayMode, "mirrored");
+    assert.equal(settings.solidColor, settings.downloadSolidColor);
+});
+
+test("net speed normalizes overlay traffic display mode", () => {
+    const settings = normalizeSettings({
+        networkTrafficDisplayMode: "overlay",
+    }, {
+        actionKind: "net-speed",
+        isWindows: false,
+    });
+
+    assert.equal(settings.networkTrafficDisplayMode, "overlay");
 });
 
 test("net speed keeps custom solid color after defaults were applied", () => {
@@ -88,13 +111,13 @@ test("next net speed direction switches solid color only when the old color was 
                 ...basePropertyInspectorSettings,
                 colorMode: "solid",
                 networkDirection: "download",
-                solidColor: basePropertyInspectorSettings.downloadIconColor,
+                solidColor: basePropertyInspectorSettings.downloadSolidColor,
                 netSpeedDefaultsApplied: true,
             },
         },
     });
 
-    assert.equal(settings.solidColor, basePropertyInspectorSettings.uploadIconColor);
+    assert.equal(settings.solidColor, basePropertyInspectorSettings.uploadSolidColor);
 });
 
 test("next net speed direction preserves custom solid color", () => {

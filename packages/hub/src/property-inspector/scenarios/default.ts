@@ -4,6 +4,7 @@ import {
     colorFieldGroupList,
     colorSettingsFieldGroup,
     sparklineAppearanceFieldGroup,
+    sparklineGridLineFieldGroup,
 } from "../scenario-field-groups";
 import {
     defaultSettingsNormalizer,
@@ -21,7 +22,7 @@ export function resolveDefaultScenario(actionKind: ActionKind, graphicType: Grap
         fieldGroupList: [
             baseFieldGroup,
             ...(graphicType === "circular" ? [circularCenterFieldGroup] : []),
-            ...(graphicType === "dashed-line" ? [sparklineAppearanceFieldGroup] : []),
+            ...(graphicType === "dashed-line" ? [sparklineAppearanceFieldGroup, sparklineGridLineFieldGroup] : []),
             colorSettingsFieldGroup,
             ...colorFieldGroupList,
         ],

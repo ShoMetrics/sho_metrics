@@ -1,14 +1,19 @@
-import type { WidgetData, KeySize } from "./widget-data";
+import type { DualChannelWidgetData, WidgetData, KeySize } from "./widget-data";
 import type { GraphicStyle } from "../widgets/styles/style.interface";
 import type { GraphicType, GraphicStyleName } from "../widgets/widget.interface";
 import { arcGauge, DEFAULT_ARC_GAUGE_CONFIG, type ArcGaugeConfig } from "../widgets/primitives/arc-gauge";
 import { sparkline, DEFAULT_SPARKLINE_CONFIG, type SparklineConfig } from "../widgets/primitives/sparkline";
 import { linearBar, DEFAULT_LINEAR_BAR_CONFIG, type LinearBarConfig } from "../widgets/primitives/linear-bar";
+import {
+    DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG,
+    renderDualChannelSparkline,
+    type DualChannelSparklineConfig,
+} from "../widgets/primitives/dual-channel-sparkline";
 import { flatStyle } from "../widgets/styles/flat";
 import { cupertinoGlassStyle } from "../widgets/styles/cupertino-glass";
 import type { ColorConfig } from "./color-resolver";
 
-export type WidgetConfigOverrides = Partial<ArcGaugeConfig & LinearBarConfig & SparklineConfig>;
+export type WidgetConfigOverrides = Partial<ArcGaugeConfig & LinearBarConfig & SparklineConfig & DualChannelSparklineConfig>;
 
 interface WidgetRegistryEntry {
     render(data: WidgetData, configOverrides: WidgetConfigOverrides | undefined, keySize: KeySize): string;
@@ -65,7 +70,6 @@ export function composeSvg(
     keySize: KeySize,
 ): string {
     const widgetEntry = WIDGET_REGISTRY[options.graphicType];
-    const style = STYLE_REGISTRY[options.graphicStyle] ?? flatStyle;
     const configOverrides: WidgetConfigOverrides = {
         ...options.configOverrides,
     };
@@ -75,7 +79,44 @@ export function composeSvg(
     }
 
     const widgetSvgFragment = widgetEntry.render(data, configOverrides, keySize);
-    const filterId = `muted-widget-${keySize.width}-${keySize.height}`;
+    return composeStyledSvg({
+        widgetSvgFragment,
+        graphicStyle: options.graphicStyle,
+        muted: options.muted === true,
+        keySize,
+    });
+}
+
+export function composeDualChannelSvg(
+    data: DualChannelWidgetData,
+    options: Omit<ComposeOptions, "graphicType" | "colorConfig">,
+    keySize: KeySize,
+): string {
+    const configOverrides: WidgetConfigOverrides = {
+        ...options.configOverrides,
+    };
+    const widgetSvgFragment = renderDualChannelSparkline(
+        data,
+        { ...DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG, ...configOverrides },
+        keySize,
+    );
+
+    return composeStyledSvg({
+        widgetSvgFragment,
+        graphicStyle: options.graphicStyle,
+        muted: options.muted === true,
+        keySize,
+    });
+}
+
+function composeStyledSvg(options: {
+    widgetSvgFragment: string;
+    graphicStyle: GraphicStyleName;
+    muted: boolean;
+    keySize: KeySize;
+}): string {
+    const style = STYLE_REGISTRY[options.graphicStyle] ?? flatStyle;
+    const filterId = `muted-widget-${options.keySize.width}-${options.keySize.height}`;
     const mutedDefs = options.muted
         ? `
             <filter id="${filterId}" color-interpolation-filters="sRGB">
@@ -87,15 +128,15 @@ export function composeSvg(
         `
         : "";
     const renderedWidgetFragment = options.muted
-        ? `<g filter="url(#${filterId})">${widgetSvgFragment}</g>`
-        : widgetSvgFragment;
+        ? `<g filter="url(#${filterId})">${options.widgetSvgFragment}</g>`
+        : options.widgetSvgFragment;
 
     return `<svg xmlns="http://www.w3.org/2000/svg"
-        width="${keySize.width}" height="${keySize.height}"
-        viewBox="0 0 ${keySize.width} ${keySize.height}">
-        <defs>${style.renderDefs(keySize)}${mutedDefs}</defs>
-        ${style.renderBackground(keySize)}
+        width="${options.keySize.width}" height="${options.keySize.height}"
+        viewBox="0 0 ${options.keySize.width} ${options.keySize.height}">
+        <defs>${style.renderDefs(options.keySize)}${mutedDefs}</defs>
+        ${style.renderBackground(options.keySize)}
         ${renderedWidgetFragment}
-        ${style.renderOverlay(keySize)}
+        ${style.renderOverlay(options.keySize)}
     </svg>`;
 }

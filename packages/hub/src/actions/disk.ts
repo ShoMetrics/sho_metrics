@@ -1,7 +1,7 @@
 import { action, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import { metricStore } from "../runtime/metric-store";
-import { setSingleMetricDisplay } from "./single-metric-display";
+import { setDualMetricDisplay, setSingleMetricDisplay } from "./single-metric-display";
 import { logger } from "../logging/logger";
 import type { SettingValue } from "./metric-visual-settings";
 import { buildDiskThroughputWidgetData, buildDiskUsageWidgetData, type DiskUsageDisplayMode } from "../metrics/storage-display";
@@ -12,10 +12,17 @@ import {
     getDiskVolumeMetricKey,
     type DiskThroughputDirection,
 } from "../runtime/disk-metric-keys";
+import {
+    normalizeDiskThroughputDisplayDirection,
+    resolveDiskMetricKeys,
+    resolveSingleDiskThroughputDirection,
+} from "./disk-metric-keys";
 import { getDiskIcon, getDiskIconFragment, renderCenteredHardwareIconFragment } from "../widgets/icons/hardware-icons";
+import { renderDiskThroughputDirectionIconFragment } from "../widgets/icons/catalog/disk";
 import { getMetricStatusIcon } from "../widgets/icons/metric-status-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import { escapeSvgText } from "../rendering/svg-utils";
+import { resolveColor, type ColorConfig } from "../rendering/color-resolver";
 
 const log = logger.for("Action:Disk");
 
@@ -31,7 +38,7 @@ export class Disk extends MetricAction {
         const metricKind = normalizeDiskMetricKind(settings.diskMetricKind);
 
         if (metricKind === "throughput") {
-            return [getDiskThroughputMetricKey(normalizeDiskThroughputDirection(settings.diskThroughputDirection))];
+            return resolveDiskMetricKeys(settings);
         }
 
         const selectedVolume = resolveSelectedDiskVolume(settings.diskVolumeId);
@@ -102,9 +109,16 @@ export class Disk extends MetricAction {
             return;
         }
 
-        const throughputDirection = normalizeDiskThroughputDirection(settings.diskThroughputDirection);
-        const throughputMetricKey = getDiskThroughputMetricKey(throughputDirection);
-        const bytesPerSecondWidgetData = metricStore.getWidgetData(throughputMetricKey, getDiskThroughputLabel(throughputDirection), "B/s");
+        const throughputDirection = normalizeDiskThroughputDisplayDirection(settings.diskThroughputDirection);
+
+        if (settings.graphicType === "dashed-line" && throughputDirection === "both") {
+            this.updateDualThroughputSparklineDisplay(event, settings);
+            return;
+        }
+
+        const singleThroughputDirection = resolveSingleDiskThroughputDirection(throughputDirection);
+        const throughputMetricKey = getDiskThroughputMetricKey(singleThroughputDirection);
+        const bytesPerSecondWidgetData = metricStore.getWidgetData(throughputMetricKey, getDiskThroughputLabel(singleThroughputDirection), "B/s");
 
         setSingleMetricDisplay({
             event,
@@ -115,7 +129,7 @@ export class Disk extends MetricAction {
                     settings.maximumDiskThroughputMebibytesPerSecond,
                     DEFAULT_MAXIMUM_DISK_THROUGHPUT_MEBIBYTES_PER_SECOND,
                 ) * 1024 * 1024,
-                label: getDiskThroughputLabel(throughputDirection),
+                label: getDiskThroughputLabel(singleThroughputDirection),
             }),
             centerIconFragment: getDiskIconFragment("unknown"),
             statusIcon: getMetricStatusIcon("percentage"),
@@ -123,6 +137,55 @@ export class Disk extends MetricAction {
             visualSettingsOverride: {
                 colorMode: settings.colorMode ?? "solid",
                 solidColor: typeof settings.solidColor === "string" ? settings.solidColor : DEFAULT_DISK_THROUGHPUT_COLOR,
+            },
+        });
+    }
+
+    private updateDualThroughputSparklineDisplay(event: WillAppearEvent, settings: DiskSettings): void {
+        const readMetricKey = getDiskThroughputMetricKey("read");
+        const writeMetricKey = getDiskThroughputMetricKey("write");
+        const maximumBytesPerSecond = normalizePositiveNumber(
+            settings.maximumDiskThroughputMebibytesPerSecond,
+            DEFAULT_MAXIMUM_DISK_THROUGHPUT_MEBIBYTES_PER_SECOND,
+        ) * 1024 * 1024;
+        const readWidgetData = buildDiskThroughputWidgetData({
+            bytesPerSecondWidgetData: metricStore.getWidgetData(readMetricKey, "READ", "B/s"),
+            maximumBytesPerSecond,
+            label: "READ",
+        });
+        const writeWidgetData = buildDiskThroughputWidgetData({
+            bytesPerSecondWidgetData: metricStore.getWidgetData(writeMetricKey, "WRIT", "B/s"),
+            maximumBytesPerSecond,
+            label: "WRIT",
+        });
+        const readColor = resolveDiskWidgetChannelColor("read", settings, readWidgetData);
+        const writeColor = resolveDiskWidgetChannelColor("write", settings, writeWidgetData);
+
+        setDualMetricDisplay({
+            event,
+            metricKey: `${readMetricKey},${writeMetricKey}`,
+            widgetData: {
+                positive: readWidgetData,
+                negative: writeWidgetData,
+            },
+            titleText: "DISK",
+            centerIconFragment: getDiskIconFragment("unknown"),
+            statusIcon: getMetricStatusIcon("percentage"),
+            positiveColor: readColor,
+            negativeColor: writeColor,
+            positiveIconFragment: renderDiskThroughputDirectionIconFragment({
+                direction: "read",
+                color: readColor,
+                size: DISK_THROUGHPUT_DIRECTION_ICON_SIZE,
+            }),
+            negativeIconFragment: renderDiskThroughputDirectionIconFragment({
+                direction: "write",
+                color: writeColor,
+                size: DISK_THROUGHPUT_DIRECTION_ICON_SIZE,
+            }),
+            visualSettingsOverride: {
+                colorMode: "solid",
+                solidColor: readColor,
             },
         });
     }
@@ -196,7 +259,8 @@ function buildDiskCenterIconFragment(diskVolume: DiskVolumeOption | null): strin
     `;
 }
 
-interface DiskSettings {
+export interface DiskSettings {
+    graphicType?: SettingValue;
     diskMetricKind?: SettingValue;
     diskUsageDisplayMode?: SettingValue;
     diskThroughputDirection?: SettingValue;
@@ -208,10 +272,25 @@ interface DiskSettings {
     circularCenterContent?: SettingValue;
     colorMode?: SettingValue;
     solidColor?: SettingValue;
+    diskReadColorMode?: SettingValue;
+    diskReadSolidColor?: SettingValue;
+    diskReadColorLow?: SettingValue;
+    diskReadColorMedium?: SettingValue;
+    diskReadColorHigh?: SettingValue;
+    diskWriteColorMode?: SettingValue;
+    diskWriteSolidColor?: SettingValue;
+    diskWriteColorLow?: SettingValue;
+    diskWriteColorMedium?: SettingValue;
+    diskWriteColorHigh?: SettingValue;
+    lowThreshold?: SettingValue;
+    highThreshold?: SettingValue;
 }
 
 const DEFAULT_MAXIMUM_DISK_THROUGHPUT_MEBIBYTES_PER_SECOND = 1000;
 const DEFAULT_DISK_THROUGHPUT_COLOR = "#38bdf8";
+const DEFAULT_DISK_READ_COLOR = "#38bdf8";
+const DEFAULT_DISK_WRITE_COLOR = "#f472b6";
+const DISK_THROUGHPUT_DIRECTION_ICON_SIZE = 30;
 
 function normalizeDiskMetricKind(value: SettingValue): "usage" | "throughput" {
     return value === "throughput" ? "throughput" : "usage";
@@ -219,14 +298,6 @@ function normalizeDiskMetricKind(value: SettingValue): "usage" | "throughput" {
 
 function normalizeDiskUsageDisplayMode(value: SettingValue): DiskUsageDisplayMode {
     return value === "space" ? "space" : "percentage";
-}
-
-function normalizeDiskThroughputDirection(value: SettingValue): DiskThroughputDirection {
-    if (value === "read" || value === "write") {
-        return value;
-    }
-
-    return "total";
 }
 
 function resolveSelectedDiskVolume(value: SettingValue): DiskVolumeOption | null {
@@ -257,6 +328,74 @@ function normalizePositiveNumber(value: SettingValue, fallbackValue: number): nu
     }
 
     return numericValue;
+}
+
+function resolveDiskWidgetChannelColor(
+    direction: Exclude<DiskThroughputDirection, "total">,
+    settings: DiskSettings,
+    widgetData: { progress: number },
+): string {
+    return resolveColor(widgetData.progress * 100, buildDiskChannelColorConfig(direction, settings));
+}
+
+function buildDiskChannelColorConfig(direction: Exclude<DiskThroughputDirection, "total">, settings: DiskSettings): ColorConfig {
+    if (direction === "read") {
+        return {
+            mode: settings.diskReadColorMode === "threshold" ? "threshold" : "solid",
+            solidColor: resolveHexColor(settings.diskReadSolidColor, DEFAULT_DISK_READ_COLOR),
+            thresholds: buildDiskChannelThresholds({
+                settings,
+                lowColor: resolveHexColor(settings.diskReadColorLow, "#22c55e"),
+                mediumColor: resolveHexColor(settings.diskReadColorMedium, DEFAULT_DISK_READ_COLOR),
+                highColor: resolveHexColor(settings.diskReadColorHigh, "#60a5fa"),
+            }),
+        };
+    }
+
+    return {
+        mode: settings.diskWriteColorMode === "threshold" ? "threshold" : "solid",
+        solidColor: resolveHexColor(settings.diskWriteSolidColor, DEFAULT_DISK_WRITE_COLOR),
+        thresholds: buildDiskChannelThresholds({
+            settings,
+            lowColor: resolveHexColor(settings.diskWriteColorLow, "#f97316"),
+            mediumColor: resolveHexColor(settings.diskWriteColorMedium, DEFAULT_DISK_WRITE_COLOR),
+            highColor: resolveHexColor(settings.diskWriteColorHigh, "#fb7185"),
+        }),
+    };
+}
+
+function buildDiskChannelThresholds(options: {
+    settings: DiskSettings;
+    lowColor: string;
+    mediumColor: string;
+    highColor: string;
+}): ColorConfig["thresholds"] {
+    const lowThreshold = normalizeThreshold(options.settings.lowThreshold, 30);
+    const highThreshold = Math.max(lowThreshold, normalizeThreshold(options.settings.highThreshold, 70));
+
+    return [
+        { min: 0, max: lowThreshold, color: options.lowColor },
+        { min: lowThreshold, max: highThreshold, color: options.mediumColor },
+        { min: highThreshold, max: 101, color: options.highColor },
+    ];
+}
+
+function normalizeThreshold(value: SettingValue, fallbackValue: number): number {
+    const numericValue = Number(value);
+
+    if (!Number.isFinite(numericValue)) {
+        return fallbackValue;
+    }
+
+    return Math.min(Math.max(Math.round(numericValue), 0), 100);
+}
+
+function resolveHexColor(value: SettingValue, fallbackColor: string): string {
+    if (typeof value !== "string") {
+        return fallbackColor;
+    }
+
+    return /^#[0-9a-f]{6}$/i.test(value) ? value : fallbackColor;
 }
 
 function publishDiskVolumeOptions(event: WillAppearEvent, settings: DiskSettings): void {
