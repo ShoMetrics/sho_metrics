@@ -4,6 +4,7 @@ import { type DiskStorageKind, type DiskVolumeOption } from "../disk-volumes";
 export function isUsableFileSystem(fileSystem: Systeminformation.FsSizeData): boolean {
     return fileSystem.size > 0
         && fileSystem.mount.length > 0
+        && isUserFacingFileSystemMount(fileSystem.mount)
         && fileSystem.available >= 0
         && fileSystem.used >= 0;
 }
@@ -14,7 +15,10 @@ export function toDiskVolumeOption(
     diskLayout: readonly Systeminformation.DiskLayoutData[],
 ): DiskVolumeOption {
     const blockDevice = blockDevices.find(device => device.mount === fileSystem.mount || device.name === fileSystem.fs);
-    const physicalDisk = resolvePhysicalDisk(fileSystem, blockDevice, diskLayout);
+    const isNetworkVolume = isNetworkFileSystem(fileSystem);
+    const physicalDisk = isNetworkVolume
+        ? undefined
+        : resolvePhysicalDisk(fileSystem, blockDevice, diskLayout);
 
     return {
         id: fileSystem.mount || fileSystem.fs,
@@ -23,8 +27,8 @@ export function toDiskVolumeOption(
         sizeBytes: fileSystem.size,
         usedBytes: fileSystem.used,
         availableBytes: fileSystem.available,
-        storageKind: resolveDiskStorageKind(physicalDisk, blockDevice),
-        diskName: physicalDisk?.name ?? fileSystem.fs,
+        storageKind: isNetworkVolume ? "network" : resolveDiskStorageKind(physicalDisk, blockDevice),
+        diskName: physicalDisk?.name ?? blockDevice?.model ?? fileSystem.fs,
         volumeLabel: blockDevice?.label ?? "",
     };
 }
@@ -45,6 +49,17 @@ export function resolvePhysicalDisk(
     const normalizedBlockDeviceText = blockDevice
         ? `${blockDevice.device ?? ""} ${blockDevice.name} ${blockDevice.model}`.toLowerCase()
         : "";
+    const normalizedBlockDevicePath = normalizeDiskDevicePath(blockDevice?.device);
+    const deviceMatchedDisk = diskLayout.find(disk =>
+        normalizedBlockDevicePath
+        && disk.device
+        && normalizeDiskDevicePath(disk.device) === normalizedBlockDevicePath
+    );
+
+    if (deviceMatchedDisk) {
+        return deviceMatchedDisk;
+    }
+
     const matchingDisk = diskLayout.find(disk => {
         const normalizedDiskText = `${disk.device ?? ""} ${disk.name}`.toLowerCase();
         return normalizedDiskText.length > 0 && normalizedBlockDeviceText.includes(normalizedDiskText);
@@ -111,4 +126,33 @@ export function calculatePercent(value: number, total: number): number {
 
 export function normalizeNullableRate(value: number | null): number {
     return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+export function isNetworkFileSystem(fileSystem: Systeminformation.FsSizeData): boolean {
+    return fileSystem.fs.startsWith("//")
+        || fileSystem.fs.startsWith("smb://")
+        || fileSystem.type.toLowerCase() === "smbfs";
+}
+
+function isUserFacingFileSystemMount(mount: string): boolean {
+    if (mount === "/" || /^[A-Z]:\\?$/i.test(mount)) {
+        return true;
+    }
+
+    if (mount.startsWith("/Volumes/")) {
+        return true;
+    }
+
+    return !mount.startsWith("/System/Volumes/");
+}
+
+function normalizeDiskDevicePath(devicePath: string | undefined): string | null {
+    if (!devicePath) {
+        return null;
+    }
+
+    return devicePath
+        .toLowerCase()
+        .replace(/^\/dev\//, "")
+        .replace(/^\\\\\.\\/, "");
 }
