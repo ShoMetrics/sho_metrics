@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Systeminformation } from "systeminformation";
+import type { IMetricSnapshot, IMetricValue } from "./source.interface";
 import {
     formatCpuModelText,
     isFinitePositiveNumber,
@@ -27,10 +28,16 @@ import {
     toNetworkInterfaceOption,
 } from "./node-system-network";
 import {
+    NodeSystemSource,
     resolveMetricGroups,
 } from "./node-system-source";
-import type { NodeSystemMetricGroup } from "./node-system-source-types";
+import type {
+    NodeSystemGpuTelemetryData,
+    NodeSystemInformationClient,
+    NodeSystemMetricGroup,
+} from "./node-system-source-types";
 import type { DiskVolumeOption } from "../disk-volumes";
+import type { NetworkInterfaceOption } from "../network-interfaces";
 
 test("metric groups resolve all groups when no metric keys are requested", () => {
     assertMetricGroups(resolveMetricGroups([]), ["cpu", "disk", "gpu", "memory", "network"]);
@@ -43,6 +50,270 @@ test("metric groups resolve only requested key prefixes", () => {
         "gpu.temp",
         "unknown.metric",
     ]), ["cpu", "gpu", "network"]);
+});
+
+test("node system source polls only the requested CPU group and exposes cached CPU info on the next poll", async () => {
+    const callCounts = buildCallCounts();
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            currentLoad: async () => {
+                callCounts.currentLoad += 1;
+                return {
+                    currentLoad: 42,
+                } as Systeminformation.CurrentLoadData;
+            },
+            cpu: async () => {
+                callCounts.cpu += 1;
+                return buildCpuData({
+                    manufacturer: "AMD",
+                    brand: "Ryzen 9",
+                    speed: 4.2,
+                });
+            },
+        }),
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+        now: () => 1234,
+    });
+
+    const firstSnapshot = await source.pollMetrics(["cpu.usage_percent"]);
+    await Promise.resolve();
+    const secondSnapshot = await source.pollMetrics(["cpu.usage_percent"]);
+    const firstMetrics = assertSnapshotMetrics(firstSnapshot);
+    const secondMetrics = assertSnapshotMetrics(secondSnapshot);
+
+    assert.deepEqual(firstMetrics["cpu.usage_percent"], {
+        scalar: 42,
+        unit: "%",
+        progress: 0.42,
+    });
+    assert.equal(firstMetrics["cpu.base_frequency"], undefined);
+    assert.deepEqual(secondMetrics["cpu.base_frequency"], {
+        scalar: 4.2,
+        unit: "GHz",
+    });
+    assert.deepEqual(secondMetrics["cpu.model"], {
+        text: "AMD Ryzen 9",
+    });
+    assert.equal(firstSnapshot.sourceId, "node-system");
+    assert.equal(firstSnapshot.timestampMs, 1234);
+    assert.equal(callCounts.currentLoad, 2);
+    assert.equal(callCounts.cpu, 1);
+    assert.equal(callCounts.mem, 0);
+    assert.equal(callCounts.fsSize, 0);
+    assert.equal(callCounts.networkInterfaces, 0);
+    assert.equal(callCounts.windowsGpu, 0);
+    assert.equal(callCounts.systemGpu, 0);
+});
+
+test("node system source polls only memory when RAM metrics are requested", async () => {
+    const callCounts = buildCallCounts();
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            mem: async () => {
+                callCounts.mem += 1;
+                return {
+                    used: 8,
+                    total: 16,
+                } as Systeminformation.MemData;
+            },
+        }),
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+    });
+
+    const snapshot = await source.pollMetrics(["ram.used"]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.deepEqual(metrics, {
+        "ram.used": {
+            scalar: 8,
+            unit: "B",
+        },
+        "ram.total": {
+            scalar: 16,
+            unit: "B",
+        },
+    });
+    assert.equal(callCounts.mem, 1);
+    assert.equal(callCounts.currentLoad, 0);
+    assert.equal(callCounts.fsSize, 0);
+    assert.equal(callCounts.networkInterfaces, 0);
+    assert.equal(callCounts.windowsGpu, 0);
+});
+
+test("node system source maintains network counter state and updates injected interface registry", async () => {
+    const callCounts = buildCallCounts();
+    const networkRegistryUpdates: NetworkInterfaceOption[][] = [];
+    const networkStatsQueue: Systeminformation.NetworkStatsData[][] = [
+        [buildNetworkStats({ rx_bytes: 1000, tx_bytes: 500 })],
+        [buildNetworkStats({ rx_bytes: 5000, tx_bytes: 2500 })],
+    ];
+    let currentTimestampMilliseconds = 1000;
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            networkInterfaces: (async () => {
+                callCounts.networkInterfaces += 1;
+                return [buildNetworkInterface({
+                    iface: "eth0",
+                    ifaceName: "Ethernet",
+                    type: "wired",
+                    speed: 1000,
+                })];
+            }) as NodeSystemInformationClient["networkInterfaces"],
+            networkStats: async () => {
+                callCounts.networkStats += 1;
+                return networkStatsQueue.shift() ?? [];
+            },
+        }),
+        networkRegistry: {
+            update: options => networkRegistryUpdates.push([...options]),
+        },
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+        now: () => currentTimestampMilliseconds,
+    });
+
+    const firstSnapshot = await source.pollMetrics(["net.down"]);
+    currentTimestampMilliseconds = 3000;
+    const secondSnapshot = await source.pollMetrics(["net.down"]);
+    const firstMetrics = assertSnapshotMetrics(firstSnapshot);
+    const secondMetrics = assertSnapshotMetrics(secondSnapshot);
+
+    assert.equal(firstMetrics["net.down.eth0"]?.scalar, 0);
+    assert.equal(secondMetrics["net.down.eth0"]?.scalar, 2000);
+    assert.equal(secondMetrics["net.up.eth0"]?.scalar, 1000);
+    assert.equal(secondMetrics["net.down"]?.scalar, 2000);
+    assert.equal(secondMetrics["net.up"]?.scalar, 1000);
+    assert.deepEqual(networkRegistryUpdates[0], [{
+        id: "eth0",
+        name: "Ethernet",
+        type: "wired",
+        isDefault: false,
+        speedMegabitsPerSecond: 1000,
+    }]);
+    assert.equal(callCounts.networkInterfaces, 2);
+    assert.equal(callCounts.networkStats, 2);
+    assert.equal(callCounts.currentLoad, 0);
+});
+
+test("node system source maps disk usage metrics and updates injected disk registry", async () => {
+    const callCounts = buildCallCounts();
+    const diskRegistryUpdates: DiskVolumeOption[][] = [];
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            fsSize: async () => {
+                callCounts.fsSize += 1;
+                return [buildFileSystem({
+                    fs: "C:",
+                    mount: "C:\\",
+                    size: 1000,
+                    used: 400,
+                    available: 600,
+                })];
+            },
+            blockDevices: async () => {
+                callCounts.blockDevices += 1;
+                return [buildBlockDevice({
+                    name: "C:",
+                    mount: "C:\\",
+                    label: "System",
+                })];
+            },
+            diskLayout: async () => {
+                callCounts.diskLayout += 1;
+                return [buildDiskLayout({
+                    name: "Example Disk",
+                    type: "SSD",
+                    size: 1000,
+                })];
+            },
+        }),
+        diskRegistry: {
+            update: options => diskRegistryUpdates.push([...options]),
+        },
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+        platform: "win32",
+    });
+
+    const snapshot = await source.pollMetrics(["disk.usage.percent"]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.equal(metrics["disk.volume.C%3A%5C.percent"]?.scalar, 40);
+    assert.equal(metrics["disk.usage.percent"]?.scalar, 40);
+    assert.equal(metrics["disk.throughput.read"], undefined);
+    assert.equal(diskRegistryUpdates[0][0]?.id, "C:\\");
+    assert.equal(diskRegistryUpdates[0][0]?.volumeLabel, "System");
+    assert.equal(callCounts.fsSize, 1);
+    assert.equal(callCounts.fsStats, 0);
+});
+
+test("node system source polls disk throughput only on darwin", async () => {
+    const callCounts = buildCallCounts();
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            fsStats: async () => {
+                callCounts.fsStats += 1;
+                return {
+                    rx_sec: 10,
+                    wx_sec: 20,
+                    tx_sec: 30,
+                } as Systeminformation.FsStatsData;
+            },
+        }),
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+        platform: "darwin",
+    });
+
+    const snapshot = await source.pollMetrics(["disk.throughput.read"]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.equal(metrics["disk.throughput.read"]?.scalar, 10);
+    assert.equal(metrics["disk.throughput.write"]?.scalar, 20);
+    assert.equal(metrics["disk.throughput.total"]?.scalar, 30);
+    assert.equal(callCounts.fsStats, 1);
+    assert.equal(callCounts.fsSize, 0);
+});
+
+test("node system source maps injected GPU telemetry without polling systeminformation on Windows", async () => {
+    const callCounts = buildCallCounts();
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts),
+        pollWindowsGpuTelemetry: async () => {
+            callCounts.windowsGpu += 1;
+            return {
+                utilizationGpu: 75,
+                modelText: "NVIDIA RTX",
+                temperatureGpu: 68,
+                memoryUsed: 12000,
+                memoryTotal: 24000,
+                powerDraw: 250,
+                powerLimit: 450,
+            };
+        },
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+        platform: "win32",
+    });
+
+    const snapshot = await source.pollMetrics(["gpu.usage_percent"]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.deepEqual(metrics["gpu.usage_percent"], {
+        scalar: 75,
+        unit: "%",
+        progress: 0.75,
+    });
+    assert.deepEqual(metrics["gpu.model"], { text: "NVIDIA RTX" });
+    assert.equal(metrics["gpu.temp"]?.scalar, 68);
+    assert.equal(metrics["gpu.vram_used"]?.scalar, 12000);
+    assert.equal(metrics["gpu.vram_total"]?.scalar, 24000);
+    assert.equal(metrics["gpu.power"]?.scalar, 250);
+    assert.equal(metrics["gpu.power_limit"]?.scalar, 450);
+    assert.equal(callCounts.windowsGpu, 1);
+    assert.equal(callCounts.systemGpu, 0);
+    assert.equal(callCounts.currentLoad, 0);
 });
 
 test("first network counter sample produces a zero rate", () => {
@@ -239,6 +510,110 @@ function assertMetricGroups(
     assert.deepEqual([...actualMetricGroups].sort(), [...expectedMetricGroups].sort());
 }
 
+function assertSnapshotMetrics(snapshot: IMetricSnapshot): Record<string, IMetricValue> {
+    assert.ok(snapshot.metrics);
+    return snapshot.metrics;
+}
+
+interface NodeSystemSourceCallCounts {
+    currentLoad: number;
+    cpu: number;
+    mem: number;
+    fsSize: number;
+    blockDevices: number;
+    diskLayout: number;
+    fsStats: number;
+    networkInterfaces: number;
+    networkStats: number;
+    graphics: number;
+    windowsGpu: number;
+    systemGpu: number;
+}
+
+function buildCallCounts(): NodeSystemSourceCallCounts {
+    return {
+        currentLoad: 0,
+        cpu: 0,
+        mem: 0,
+        fsSize: 0,
+        blockDevices: 0,
+        diskLayout: 0,
+        fsStats: 0,
+        networkInterfaces: 0,
+        networkStats: 0,
+        graphics: 0,
+        windowsGpu: 0,
+        systemGpu: 0,
+    };
+}
+
+function buildCountingSystemInformation(
+    callCounts: NodeSystemSourceCallCounts,
+    overrides: Partial<NodeSystemInformationClient> = {},
+): NodeSystemInformationClient {
+    return {
+        currentLoad: async () => {
+            callCounts.currentLoad += 1;
+            return { currentLoad: 0 } as Systeminformation.CurrentLoadData;
+        },
+        cpu: async () => {
+            callCounts.cpu += 1;
+            return buildCpuData({});
+        },
+        mem: async () => {
+            callCounts.mem += 1;
+            return { used: 0, total: 0 } as Systeminformation.MemData;
+        },
+        fsSize: async () => {
+            callCounts.fsSize += 1;
+            return [];
+        },
+        blockDevices: async () => {
+            callCounts.blockDevices += 1;
+            return [];
+        },
+        diskLayout: async () => {
+            callCounts.diskLayout += 1;
+            return [];
+        },
+        fsStats: async () => {
+            callCounts.fsStats += 1;
+            return { rx_sec: 0, wx_sec: 0, tx_sec: 0 } as Systeminformation.FsStatsData;
+        },
+        networkInterfaces: async () => {
+            callCounts.networkInterfaces += 1;
+            return [];
+        },
+        networkStats: async () => {
+            callCounts.networkStats += 1;
+            return [];
+        },
+        graphics: async () => {
+            callCounts.graphics += 1;
+            return { controllers: [], displays: [] } as Systeminformation.GraphicsData;
+        },
+        ...overrides,
+    } as NodeSystemInformationClient;
+}
+
+function buildNoGpuPoller(
+    callCounts: NodeSystemSourceCallCounts,
+): () => Promise<NodeSystemGpuTelemetryData | null> {
+    return async () => {
+        callCounts.windowsGpu += 1;
+        return null;
+    };
+}
+
+function buildNoSystemGpuPoller(
+    callCounts: NodeSystemSourceCallCounts,
+): (systemInformation: NodeSystemInformationClient) => Promise<NodeSystemGpuTelemetryData | null> {
+    return async () => {
+        callCounts.systemGpu += 1;
+        return null;
+    };
+}
+
 function buildNetworkInterface(
     overrides: Partial<Systeminformation.NetworkInterfacesData> = {},
 ): Systeminformation.NetworkInterfacesData {
@@ -265,6 +640,25 @@ function buildNetworkInterface(
         carrierChanges: 0,
         ...overrides,
     } as Systeminformation.NetworkInterfacesData;
+}
+
+function buildNetworkStats(
+    overrides: Partial<Systeminformation.NetworkStatsData> = {},
+): Systeminformation.NetworkStatsData {
+    return {
+        iface: "eth0",
+        operstate: "up",
+        rx_bytes: 0,
+        rx_dropped: 0,
+        rx_errors: 0,
+        rx_sec: 0,
+        tx_bytes: 0,
+        tx_dropped: 0,
+        tx_errors: 0,
+        tx_sec: 0,
+        ms: 0,
+        ...overrides,
+    } as Systeminformation.NetworkStatsData;
 }
 
 function buildCpuData(overrides: Partial<Systeminformation.CpuData>): Systeminformation.CpuData {
