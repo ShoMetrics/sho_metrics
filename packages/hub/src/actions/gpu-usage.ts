@@ -66,12 +66,7 @@ export class GpuUsage extends GpuBaseAction {
             event,
             metricKey: GPU_USAGE_METRIC_KEY,
             widgetData: {
-                ...data,
-                sparklineScale: {
-                    mode: "fixed",
-                    minimumValue: 0,
-                    maximumValue: 100,
-                },
+                ...buildGpuUsageWidgetData(data),
                 secondaryDisplayValue: data.sampleTimestampMilliseconds != null
                     ? formatCompactHardwareModelLabel(metricStore.getTextValue(GPU_MODEL_METRIC_KEY), "gpu")
                     : undefined,
@@ -162,6 +157,18 @@ function isFreshGpuWidgetData(widgetData: WidgetData): boolean {
     return Date.now() - widgetData.sampleTimestampMilliseconds <= GPU_SAMPLE_STALE_MS;
 }
 
+export function buildGpuUsageWidgetData(widgetData: WidgetData): WidgetData {
+    return {
+        ...widgetData,
+        displayValue: widgetData.current.toFixed(0),
+        sparklineScale: {
+            mode: "fixed",
+            minimumValue: 0,
+            maximumValue: 100,
+        },
+    };
+}
+
 interface GpuTemperatureSettings {
     maximumTemperatureCelsius?: SettingValue;
     temperatureUnit?: SettingValue;
@@ -171,7 +178,7 @@ interface GpuPowerSettings {
     maximumGpuPowerWatts?: SettingValue;
 }
 
-function buildGpuVramWidgetData(used: WidgetData, totalMegabytes: number): WidgetData {
+export function buildGpuVramWidgetData(used: WidgetData, totalMegabytes: number): WidgetData {
     const safeTotalMegabytes = totalMegabytes > 0 ? totalMegabytes : 1;
     const usedAndTotalText = formatUsedAndTotalMegabytes(used.current, safeTotalMegabytes);
 

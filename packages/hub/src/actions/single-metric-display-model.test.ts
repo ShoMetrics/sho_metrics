@@ -74,6 +74,7 @@ test("single circular icon placeholder keeps source data and marks the render pl
 
 test("single widget with data keeps the original render data", () => {
     const widgetData = buildWidgetData({
+        displayValue: "7",
         sampleTimestampMilliseconds: 1000,
     });
 
@@ -82,6 +83,22 @@ test("single widget with data keeps the original render data", () => {
         hasData: true,
         shouldRenderMutedIconPlaceholder: false,
     }), widgetData);
+});
+
+test("placeholder rendering does not overwrite metric display values when data is present", () => {
+    const widgetData = buildWidgetData({
+        current: 1,
+        displayValue: "1",
+        sampleTimestampMilliseconds: 1000,
+    });
+    const renderWidgetData = buildRenderWidgetData({
+        widgetData,
+        hasData: true,
+        shouldRenderMutedIconPlaceholder: false,
+    });
+
+    assert.equal(renderWidgetData.displayValue, "1");
+    assert.equal(renderWidgetData.unit, "%");
 });
 
 test("dual-channel widget without any data renders both channels as N/A", () => {

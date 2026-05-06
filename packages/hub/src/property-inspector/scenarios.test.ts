@@ -105,6 +105,9 @@ test("network dual linear exposes download before upload channel colors", () => 
 
     assertFieldPresent(fieldIdList, "download-color-mode");
     assertFieldPresent(fieldIdList, "upload-color-mode");
+    assertFieldPresent(fieldIdList, "network-interface");
+    assertFieldPresent(fieldIdList, "maximum-network-speed");
+    assertFieldPresent(fieldIdList, "network-unit-base");
     assertFieldAbsent(fieldIdList, "color-mode");
     assertFieldOrder(fieldIdList, "download-color-heading", "upload-color-heading");
 });
