@@ -119,7 +119,12 @@ export class Disk extends MetricAction {
 
         const singleThroughputDirection = resolveSingleDiskThroughputDirection(throughputDirection);
         const throughputMetricKey = getDiskThroughputMetricKey(singleThroughputDirection);
-        const bytesPerSecondWidgetData = metricStore.getWidgetData(throughputMetricKey, getDiskThroughputLabel(singleThroughputDirection), "B/s");
+        const selectedVolume = resolveSelectedDiskVolume(settings.diskVolumeId);
+        const throughputLabel = selectedVolume
+            ? formatDiskNameDisplayLabel(selectedVolume)
+            : ARC_GAUGE_LABELS.disk;
+        const bytesPerSecondWidgetData = metricStore.getWidgetData(throughputMetricKey, throughputLabel, "B/s");
+        const circularCenterContent = settings.circularCenterContent === "icon" ? "icon" : "value";
 
         setSingleMetricDisplay({
             event,
@@ -130,11 +135,14 @@ export class Disk extends MetricAction {
                     settings.maximumDiskThroughputMebibytesPerSecond,
                     DEFAULT_MAXIMUM_DISK_THROUGHPUT_MEBIBYTES_PER_SECOND,
                 ) * 1024 * 1024,
-                label: getDiskThroughputLabel(singleThroughputDirection),
+                label: throughputLabel,
             }),
             centerIconFragment: getDiskIconFragment("unknown"),
+            footerIconFragment: settings.graphicType === "circular" && circularCenterContent === "value"
+                ? buildDiskThroughputFooterIconFragment(singleThroughputDirection)
+                : undefined,
             statusIcon: getMetricStatusIcon("percentage"),
-            circularCenterContentOverride: settings.circularCenterContent === "icon" ? "icon" : "icon-value-unit",
+            circularCenterContentOverride: circularCenterContent,
             visualSettingsOverride: {
                 colorMode: settings.colorMode ?? "solid",
                 solidColor: typeof settings.solidColor === "string" ? settings.solidColor : DEFAULT_DISK_THROUGHPUT_COLOR,
@@ -205,6 +213,16 @@ function formatDiskVolumeDisplayLabel(diskVolume: DiskVolumeOption): string {
     }
 
     return mountLabel.slice(0, 4).toUpperCase();
+}
+
+function formatDiskNameDisplayLabel(diskVolume: DiskVolumeOption): string {
+    const diskNameLabel = diskVolume.diskName.trim()
+        || diskVolume.volumeLabel.trim()
+        || diskVolume.mount
+        || diskVolume.fs
+        || ARC_GAUGE_LABELS.disk;
+
+    return Array.from(diskNameLabel).slice(0, 4).join("").toUpperCase();
 }
 
 function buildDiskLinearLabel(diskVolume: DiskVolumeOption | null, fallbackLabel: string): string {
@@ -296,6 +314,7 @@ const DEFAULT_MAXIMUM_DISK_THROUGHPUT_MEBIBYTES_PER_SECOND = 1000;
 const DEFAULT_DISK_THROUGHPUT_COLOR = "#38bdf8";
 const DEFAULT_DISK_READ_COLOR = "#38bdf8";
 const DEFAULT_DISK_WRITE_COLOR = "#f472b6";
+const DISK_THROUGHPUT_DIRECTION_ICON_COLOR = "rgba(255,255,255,0.88)";
 const DISK_THROUGHPUT_DIRECTION_ICON_SIZE = 30;
 
 function normalizeDiskMetricKind(value: SettingValue): "usage" | "throughput" {
@@ -314,16 +333,16 @@ function resolveSelectedDiskVolume(value: SettingValue): DiskVolumeOption | null
     return diskVolumeRegistry.resolveDefaultSelection();
 }
 
-function getDiskThroughputLabel(direction: DiskThroughputDirection): string {
-    if (direction === "read") {
-        return "READ";
+function buildDiskThroughputFooterIconFragment(direction: DiskThroughputDirection): string | undefined {
+    if (direction !== "read" && direction !== "write") {
+        return undefined;
     }
 
-    if (direction === "write") {
-        return "WRIT";
-    }
-
-    return "DISK";
+    return renderDiskThroughputDirectionIconFragment({
+        direction,
+        color: DISK_THROUGHPUT_DIRECTION_ICON_COLOR,
+        size: DISK_THROUGHPUT_DIRECTION_ICON_SIZE,
+    });
 }
 
 function normalizePositiveNumber(value: SettingValue, fallbackValue: number): number {

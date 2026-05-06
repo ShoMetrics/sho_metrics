@@ -162,7 +162,7 @@ test("center content falls back to value outside circular graphics", () => {
     assert.equal(resolveCircularCenterContent({
         settings: { circularCenterContent: "icon" },
         graphicType: "linear",
-        circularCenterContentOverride: "icon-value-unit",
+        circularCenterContentOverride: "icon",
     }), "value");
 });
 
@@ -170,8 +170,8 @@ test("center content override wins for circular graphics", () => {
     assert.equal(resolveCircularCenterContent({
         settings: { circularCenterContent: "value" },
         graphicType: "circular",
-        circularCenterContentOverride: "icon-value-unit",
-    }), "icon-value-unit");
+        circularCenterContentOverride: "icon",
+    }), "icon");
 });
 
 test("key render plan uses keypad PNG dimensions and no touch strip layout", () => {

@@ -9,7 +9,7 @@ import type { Widget, WidgetBaseConfig } from "../widget.interface";
 import { assertArcGaugeLabel } from "./arc-gauge-label";
 import { renderMetricTextRow } from "./metric-text-row";
 
-type ArcGaugeCenterContent = "value" | "icon" | "icon-value-unit";
+type ArcGaugeCenterContent = "value" | "icon";
 
 export interface ArcGaugeStatusIcon {
     fragment: string;
@@ -32,6 +32,7 @@ export interface ArcGaugeConfig extends WidgetBaseConfig {
     innerTextScale: number;
     centerContent: ArcGaugeCenterContent;
     centerIconFragment?: string;
+    footerIconFragment?: string;
     statusIcon?: ArcGaugeStatusIcon;
 }
 
@@ -58,18 +59,17 @@ const ARC_LAYOUT = {
         fontSize: 23,
         yOffset: -28,
     },
-    topIcon: {
-        yOffset: -32,
-    },
     statusIconGapWidthRatio: 5,
     statusIconDefaultSizeRatio: 2.35,
     statusIconDefaultOpticalYOffsetRatio: 0.24,
-    networkValueScale: 0.9,
     placeholderValueScale: 0.68,
-    singleDigitValueOpticalYOffset: -4,
     value: {
         fontSize: 48,
         yOffset: 12,
+    },
+    footerIcon: {
+        yOffset: 39,
+        valueRowXOffset: 6,
     },
     unit: {
         fontSize: 19,
@@ -129,23 +129,19 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
 
         const innerTextScale = config.innerTextScale;
         const labelFontSize = ARC_LAYOUT.label.fontSize * innerTextScale;
-        const isIconValueUnit = config.centerContent === "icon-value-unit";
-        const metricTextScale = isIconValueUnit ? ARC_LAYOUT.networkValueScale : 1;
         const valueText = data.displayValue ?? `${data.current.toFixed(0)}`;
         const placeholderTextScale = valueText === "N/A" ? ARC_LAYOUT.placeholderValueScale : 1;
-        const valueFontSize = ARC_LAYOUT.value.fontSize * innerTextScale * metricTextScale * placeholderTextScale;
-        const unitFontSize = ARC_LAYOUT.unit.fontSize * innerTextScale * metricTextScale;
+        const valueFontSize = ARC_LAYOUT.value.fontSize * innerTextScale * placeholderTextScale;
+        const unitFontSize = ARC_LAYOUT.unit.fontSize * innerTextScale;
         const labelYCoordinate = centerYCoordinate + ARC_LAYOUT.label.yOffset;
-        const valueOpticalYOffset = isIconValueUnit && valueText.length === 1
-            ? ARC_LAYOUT.singleDigitValueOpticalYOffset
-            : 0;
-        const valueCenterYCoordinate = centerYCoordinate + ARC_LAYOUT.value.yOffset + valueOpticalYOffset;
+        const valueCenterYCoordinate = centerYCoordinate + ARC_LAYOUT.value.yOffset;
         const unitText = data.unit;
         const labelMaxWidth = Math.max(24, radius * 1.55);
-        const centerTextMaxWidth = Math.max(24, radius * 1.58);
+        const centerTextMaxWidth = Math.max(24, radius * 1.5);
         const centerContentFragment = renderCenterContent({
             centerContent: config.centerContent,
             centerIconFragment: config.centerIconFragment,
+            footerIconFragment: config.footerIconFragment,
             statusIcon: config.statusIcon,
             statusNotchGeometry,
             centerXCoordinate,
@@ -187,6 +183,7 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
 function renderCenterContent(options: {
     centerContent: ArcGaugeCenterContent;
     centerIconFragment: string | undefined;
+    footerIconFragment: string | undefined;
     statusIcon: ArcGaugeStatusIcon | undefined;
     statusNotchGeometry: StatusNotchGeometry | null;
     centerXCoordinate: number;
@@ -208,10 +205,6 @@ function renderCenterContent(options: {
             ${renderStatusIcon(options.statusIcon, options.centerXCoordinate, options.statusNotchGeometry)}
             ${renderCenterIcon(options.centerIconFragment, options.centerXCoordinate, options.centerYCoordinate)}
         `;
-    }
-
-    if (options.centerContent === "icon-value-unit") {
-        return renderIconValueUnit(options);
     }
 
     return renderCenterValue(options);
@@ -335,6 +328,7 @@ function renderCenterIcon(
 
 function renderCenterValue(options: {
     centerXCoordinate: number;
+    centerYCoordinate: number;
     labelYCoordinate: number;
     labelFontSize: number;
     labelText: string;
@@ -345,6 +339,7 @@ function renderCenterValue(options: {
     unitFontSize: number;
     unitText: string;
     centerTextMaxWidth: number;
+    footerIconFragment: string | undefined;
     config: ArcGaugeConfig;
 }): string {
     assertArcGaugeLabel(options.labelText);
@@ -366,7 +361,7 @@ function renderCenterValue(options: {
             id: "arc-value-unit",
             valueText: options.valueText,
             unitText: options.unitText,
-            xCoordinate: options.centerXCoordinate,
+            xCoordinate: resolveValueRowXCoordinate(options.centerXCoordinate, options.footerIconFragment),
             yCoordinate: options.valueCenterYCoordinate,
             width: options.centerTextMaxWidth,
             valueFontSize: options.valueFontSize,
@@ -378,52 +373,20 @@ function renderCenterValue(options: {
             unitFill: options.config.unitTextColor,
             textAnchor: "middle",
             valueExtraAttributes: ["font-variant-numeric=\"tabular-nums\""],
+            fitOptions: options.unitText.length > 1
+                ? { minimumFontScale: 0.42, widthGuardRatio: 1.45 }
+                : undefined,
         })}
+        ${renderCenterIcon(
+            options.footerIconFragment,
+            options.centerXCoordinate,
+            options.centerYCoordinate + ARC_LAYOUT.footerIcon.yOffset,
+        )}
     `;
 }
 
-function renderIconValueUnit(options: {
-    centerIconFragment: string | undefined;
-    centerXCoordinate: number;
-    centerYCoordinate: number;
-    valueCenterYCoordinate: number;
-    valueFontSize: number;
-    valueText: string;
-    unitFontSize: number;
-    unitText: string;
-    centerTextMaxWidth: number;
-    config: ArcGaugeConfig;
-}): string {
-    return `
-        ${renderCenterIcon(
-            options.centerIconFragment,
-            options.centerXCoordinate,
-            options.centerYCoordinate + ARC_LAYOUT.topIcon.yOffset,
-        )}
-        ${renderConstrainedSvgText({
-            id: "arc-icon-value",
-            text: options.valueText,
-            xCoordinate: options.centerXCoordinate,
-            yCoordinate: options.valueCenterYCoordinate,
-            maxWidth: options.centerTextMaxWidth,
-            fontSize: options.valueFontSize,
-            fontFamily: ARC_TEXT_FONT_FAMILY,
-            fontWeight: 900,
-            fill: options.config.valueTextColor,
-            textAnchor: "middle",
-            extraAttributes: ["font-variant-numeric=\"tabular-nums\""],
-        })}
-        ${renderConstrainedSvgText({
-            id: "arc-icon-unit",
-            text: options.unitText,
-            xCoordinate: options.centerXCoordinate,
-            yCoordinate: options.centerYCoordinate + ARC_LAYOUT.unit.yOffset,
-            maxWidth: options.centerTextMaxWidth,
-            fontSize: options.unitFontSize,
-            fontFamily: ARC_TEXT_FONT_FAMILY,
-            fontWeight: 800,
-            fill: options.config.unitTextColor,
-            textAnchor: "middle",
-        })}
-    `;
+function resolveValueRowXCoordinate(centerXCoordinate: number, footerIconFragment: string | undefined): number {
+    return footerIconFragment
+        ? centerXCoordinate + ARC_LAYOUT.footerIcon.valueRowXOffset
+        : centerXCoordinate;
 }

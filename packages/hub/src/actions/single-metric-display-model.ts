@@ -21,9 +21,10 @@ interface BaseMetricDisplayOptions {
     event: WillAppearEvent;
     metricKey: string;
     centerIconFragment: string;
+    footerIconFragment?: string;
     linearIconFragment?: string;
     statusIcon: ArcGaugeStatusIcon;
-    circularCenterContentOverride?: "value" | "icon" | "icon-value-unit";
+    circularCenterContentOverride?: "value" | "icon";
     visualSettingsOverride?: Partial<MetricVisualSettings>;
 }
 
@@ -61,7 +62,7 @@ export interface TouchStripMetricLayout {
 
 export interface MetricDisplayRenderPlan {
     visualSettings: ResolvedMetricVisualSettings;
-    centerContent: "value" | "icon" | "icon-value-unit";
+    centerContent: "value" | "icon";
     displayHasData: boolean;
     shouldRenderMutedIconPlaceholder: boolean;
     touchStripMetricLayout: TouchStripMetricLayout | null;
@@ -121,8 +122,8 @@ export function buildMetricDisplayRenderPlan(options: {
 export function resolveCircularCenterContent(options: {
     settings: SingleMetricDisplaySettings;
     graphicType: ResolvedMetricVisualSettings["graphicType"];
-    circularCenterContentOverride: "value" | "icon" | "icon-value-unit" | undefined;
-}): "value" | "icon" | "icon-value-unit" {
+    circularCenterContentOverride: "value" | "icon" | undefined;
+}): "value" | "icon" {
     if (options.graphicType !== "circular") {
         return "value";
     }
