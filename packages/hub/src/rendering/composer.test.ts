@@ -46,6 +46,23 @@ test("dual-channel composer renders the dual sparkline instead of a single widge
     assert.match(svg, /dual-sparkline-negative-row/);
 });
 
+test("dual-channel composer renders the circular dual-channel gauge when requested", () => {
+    const svg = composeDualChannelSvg(buildDualChannelData(), {
+        graphicType: "circular",
+        graphicStyle: "flat",
+        configOverrides: {
+            centerContent: "value",
+            positiveColor: "#3b82f6",
+            negativeColor: "#ef4444",
+        },
+    }, { width: 144, height: 144 });
+
+    assert.match(svg, /width="144" height="144"/);
+    assert.match(svg, /dual-arc-positive-row/);
+    assert.match(svg, /dual-arc-negative-row/);
+    assert.doesNotMatch(svg, /dual-sparkline-positive-row/);
+});
+
 test("composer rejects mirrored traffic when single-channel data is passed", () => {
     assert.throws(() => composeSvg(buildWidgetData(), {
         graphicType: "mirrored-traffic",

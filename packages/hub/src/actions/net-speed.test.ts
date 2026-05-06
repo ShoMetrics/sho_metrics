@@ -16,9 +16,9 @@ test("network sparkline single mode subscribes to one direction", () => {
     }), ["net.up"]);
 });
 
-test("network non-sparkline both mode falls back to download", () => {
+test("network circular both mode subscribes to upload and download", () => {
     assert.deepEqual(resolveNetSpeedMetricKeys({
         graphicType: "circular",
         networkDirection: "both",
-    }), ["net.down"]);
+    }), ["net.up", "net.down"]);
 });

@@ -18,7 +18,10 @@ export function resolveNetSpeedMetricKeys(settings: NetworkSpeedMetricKeySetting
     const selectedNetworkInterface = resolveNetworkInterface(settings.networkInterfaceId);
     const displayDirection = normalizeNetworkDisplayDirection(settings.networkDirection);
 
-    if (settings.graphicType === "linear" || (settings.graphicType === "dashed-line" && displayDirection === "both")) {
+    if (
+        settings.graphicType === "linear"
+        || displayDirection === "both"
+    ) {
         return selectedNetworkInterface
             ? [
                 getNetworkInterfaceMetricKey("upload", selectedNetworkInterface.id),
