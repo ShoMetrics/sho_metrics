@@ -1,5 +1,6 @@
 import { ColorBandField } from "./ColorBandField";
 import { ColorField } from "./ColorField";
+import { GraphicTypePicker } from "./GraphicTypePicker";
 import { NumberField } from "./NumberField";
 import { RangeField } from "./RangeField";
 import { ReadonlyField } from "./ReadonlyField";
@@ -56,6 +57,8 @@ function renderFieldControl(
     switch (field.kind) {
         case "select":
             return <SelectField field={field} context={context} />;
+        case "graphic-type-picker":
+            return <GraphicTypePicker field={field} context={context} onSettingChange={onSettingChange} />;
         case "color":
             return <ColorField field={field} context={context} />;
         case "number":

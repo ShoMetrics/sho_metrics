@@ -27,9 +27,28 @@ export interface ConstrainedSvgTextOptions {
     dominantBaseline?: "middle" | "auto";
     clipHeight?: number;
     extraAttributes?: readonly string[];
+    fitOptions?: SvgTextFitOptions;
+}
+
+export interface SvgTextFitOptions {
+    minimumFontScale?: number;
+    widthGuardRatio?: number;
+}
+
+export interface SvgTextFitRun {
+    text: string;
+    fontSize: number;
+    fontWeight?: number | string;
+}
+
+export interface SvgTextFitResult {
+    fontScale: number;
+    textLength: number | null;
 }
 
 const MINIMUM_TEXT_WIDTH = 1;
+const DEFAULT_MINIMUM_TEXT_FONT_SCALE = 0.78;
+const DEFAULT_TEXT_WIDTH_GUARD_RATIO = 1.08;
 
 /**
  * Renders text inside an explicit SVG box. This helper intentionally does not
@@ -40,7 +59,16 @@ export function renderConstrainedSvgText(options: ConstrainedSvgTextOptions): st
     const maxWidth = Math.max(MINIMUM_TEXT_WIDTH, options.maxWidth);
     const textAnchor = options.textAnchor ?? "start";
     const dominantBaseline = options.dominantBaseline ?? "middle";
-    const fontSize = options.fontSize;
+    const textFit = resolveSvgTextFit({
+        runs: [{
+            text: options.text,
+            fontSize: options.fontSize,
+            fontWeight: options.fontWeight,
+        }],
+        maxWidth,
+        fitOptions: options.fitOptions,
+    });
+    const fontSize = options.fontSize * textFit.fontScale;
     const clipHeight = options.clipHeight ?? fontSize * 1.45;
     const clipXCoordinate = resolveTextClipXCoordinate(options.xCoordinate, maxWidth, textAnchor);
     const clipYCoordinate = dominantBaseline === "middle"
@@ -50,6 +78,7 @@ export function renderConstrainedSvgText(options: ConstrainedSvgTextOptions): st
     const extraAttributes = options.extraAttributes?.length
         ? ` ${options.extraAttributes.join(" ")}`
         : "";
+    const textFitAttributes = formatSvgTextFitAttributes(textFit);
 
     return `
         <defs>
@@ -63,9 +92,65 @@ export function renderConstrainedSvgText(options: ConstrainedSvgTextOptions): st
                 text-anchor="${textAnchor}" dominant-baseline="${dominantBaseline}"
                 font-family="${escapeSvgText(options.fontFamily)}"
                 font-size="${formatSvgNumber(fontSize)}" font-weight="${escapeSvgText(String(options.fontWeight))}"
-                fill="${escapeSvgText(options.fill)}"${extraAttributes}>${escapeSvgText(options.text)}</text>
+                fill="${escapeSvgText(options.fill)}"${textFitAttributes}${extraAttributes}>${escapeSvgText(options.text)}</text>
         </g>
     `;
+}
+
+/**
+ * Estimates whether text should shrink inside a fixed SVG box.
+ *
+ * resvg does not expose cheap pre-render text measurement from JavaScript, and
+ * per-frame native measurement would hurt the hot render path. This estimator is
+ * intentionally conservative: near-boundary text gets a small font reduction
+ * plus SVG textLength as a hard final guard. Very long user text can still be
+ * compressed, but it cannot spill outside the widget.
+ */
+export function resolveSvgTextFit(options: {
+    runs: readonly SvgTextFitRun[];
+    maxWidth: number;
+    extraWidth?: number;
+    fitOptions?: SvgTextFitOptions;
+}): SvgTextFitResult {
+    const maxWidth = Math.max(MINIMUM_TEXT_WIDTH, options.maxWidth);
+    const minimumFontScale = clamp(
+        options.fitOptions?.minimumFontScale ?? DEFAULT_MINIMUM_TEXT_FONT_SCALE,
+        0.35,
+        1,
+    );
+    const widthGuardRatio = clamp(
+        options.fitOptions?.widthGuardRatio ?? DEFAULT_TEXT_WIDTH_GUARD_RATIO,
+        1,
+        2,
+    );
+    const estimatedWidth = options.runs.reduce(
+        (widthTotal, textRun) => widthTotal + estimateSvgTextRunWidth(textRun),
+        Math.max(0, options.extraWidth ?? 0),
+    );
+    const guardedWidth = estimatedWidth * widthGuardRatio;
+
+    if (guardedWidth <= maxWidth) {
+        return {
+            fontScale: 1,
+            textLength: null,
+        };
+    }
+
+    const idealFontScale = maxWidth / guardedWidth;
+    const fontScale = clamp(idealFontScale, minimumFontScale, 1);
+
+    return {
+        fontScale,
+        textLength: maxWidth,
+    };
+}
+
+export function formatSvgTextFitAttributes(textFit: SvgTextFitResult): string {
+    if (textFit.textLength == null) {
+        return "";
+    }
+
+    return ` textLength="${formatSvgNumber(textFit.textLength)}" lengthAdjust="spacingAndGlyphs"`;
 }
 
 export function adjustHexColorBrightness(hexColor: string, adjustmentPercent: number): string {
@@ -108,6 +193,51 @@ function resolveTextClipXCoordinate(xCoordinate: number, maxWidth: number, textA
     }
 
     return xCoordinate;
+}
+
+function estimateSvgTextRunWidth(textRun: SvgTextFitRun): number {
+    const fontWeight = typeof textRun.fontWeight === "number" ? textRun.fontWeight : 400;
+    const weightRatio = fontWeight >= 850 ? 1.03 : fontWeight >= 700 ? 1.015 : 1;
+
+    return Array.from(textRun.text).reduce((widthTotal, character) => {
+        return widthTotal + estimateSvgCharacterWidthRatio(character) * textRun.fontSize * weightRatio;
+    }, 0);
+}
+
+function estimateSvgCharacterWidthRatio(character: string): number {
+    if (character === "\t" || character === " ") {
+        return 0.32;
+    }
+
+    if (/[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/u.test(character)) {
+        return 1;
+    }
+
+    if (/[ilI1|!.,:;]/u.test(character)) {
+        return 0.28;
+    }
+
+    if (/[fjrt]/u.test(character)) {
+        return 0.36;
+    }
+
+    if (/[mwMW@#%&]/u.test(character)) {
+        return 0.86;
+    }
+
+    if (/[A-Z0-9]/u.test(character)) {
+        return 0.62;
+    }
+
+    if (/[\u2190-\u21ff\u2200-\u22ff]/u.test(character)) {
+        return 0.72;
+    }
+
+    if (/[\u00b0\u03bc\u03a9+\-=/*\\]/u.test(character)) {
+        return 0.52;
+    }
+
+    return 0.52;
 }
 
 function sanitizeSvgId(id: string): string {

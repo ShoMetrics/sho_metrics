@@ -100,6 +100,23 @@ test("next settings keep thresholds ordered when low threshold crosses high thre
     assert.equal(settings.highThreshold, 90);
 });
 
+test("next settings apply graphic type changes from the PI picker", () => {
+    const settings = normalizeNextSettings({
+        changedKey: "graphicType",
+        changedValue: "linear",
+        state: {
+            actionKind: "cpu-usage",
+            isWindows: false,
+            settings: {
+                ...basePropertyInspectorSettings,
+                graphicType: "circular",
+            },
+        },
+    });
+
+    assert.equal(settings.graphicType, "linear");
+});
+
 test("next net speed direction switches solid color only when the old color was default", () => {
     const settings = normalizeNextSettings({
         changedKey: "networkDirection",

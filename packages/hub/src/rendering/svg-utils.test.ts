@@ -44,6 +44,40 @@ test("constrained SVG text sanitizes ids, escapes text attributes, and preserves
     assert.match(svgFragment, /font-variant-numeric="tabular-nums"/);
 });
 
+test("constrained SVG text shrinks near-boundary labels instead of clipping them", () => {
+    const svgFragment = renderConstrainedSvgText({
+        id: "linear-title",
+        text: "Net Speed",
+        xCoordinate: 42,
+        yCoordinate: 30,
+        maxWidth: 87,
+        fontSize: 18,
+        fill: "#fff",
+        fontFamily: "Inter",
+        fontWeight: 850,
+    });
+
+    assert.match(svgFragment, /font-size="17\.[0-9]+"/);
+    assert.match(svgFragment, /textLength="87" lengthAdjust="spacingAndGlyphs"/);
+});
+
+test("constrained SVG text leaves clearly short labels at their original size", () => {
+    const svgFragment = renderConstrainedSvgText({
+        id: "short-title",
+        text: "CPU",
+        xCoordinate: 42,
+        yCoordinate: 30,
+        maxWidth: 87,
+        fontSize: 18,
+        fill: "#fff",
+        fontFamily: "Inter",
+        fontWeight: 850,
+    });
+
+    assert.match(svgFragment, /font-size="18"/);
+    assert.doesNotMatch(svgFragment, /textLength=/);
+});
+
 test("hex color brightness adjusts valid colors and leaves invalid colors unchanged", () => {
     assert.equal(adjustHexColorBrightness("#000000", 50), "#808080");
     assert.equal(adjustHexColorBrightness("#808080", -50), "#404040");
