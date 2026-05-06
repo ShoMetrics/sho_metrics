@@ -179,6 +179,41 @@ test("disk throughput dual sparkline exposes read and write channel colors", () 
     assertFieldAbsent(fieldIdList, "solid-color");
 });
 
+test("disk throughput dual circular exposes read and write channel colors", () => {
+    const fieldIdList = resolveInspectorFieldIdList(buildContext({
+        actionKind: "disk",
+        settings: {
+            graphicType: "circular",
+            diskMetricKind: "throughput",
+            diskThroughputDirection: "both",
+        },
+    }));
+
+    assertFieldPresent(fieldIdList, "disk-read-color-mode");
+    assertFieldPresent(fieldIdList, "disk-read-solid-color");
+    assertFieldPresent(fieldIdList, "disk-write-color-mode");
+    assertFieldPresent(fieldIdList, "disk-write-solid-color");
+    assertFieldAbsent(fieldIdList, "color-mode");
+    assertFieldAbsent(fieldIdList, "solid-color");
+});
+
+test("disk throughput single circular uses standard color settings", () => {
+    const fieldIdList = resolveInspectorFieldIdList(buildContext({
+        actionKind: "disk",
+        settings: {
+            graphicType: "circular",
+            diskMetricKind: "throughput",
+            diskThroughputDirection: "read",
+            colorMode: "solid",
+        },
+    }));
+
+    assertFieldPresent(fieldIdList, "color-mode");
+    assertFieldPresent(fieldIdList, "solid-color");
+    assertFieldAbsent(fieldIdList, "disk-read-color-mode");
+    assertFieldAbsent(fieldIdList, "disk-write-color-mode");
+});
+
 test("color mode selects the matching color section", () => {
     const solidFieldIdList = resolveInspectorFieldIdList(buildContext({
         actionKind: "disk",

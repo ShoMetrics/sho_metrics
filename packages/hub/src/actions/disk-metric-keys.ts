@@ -19,7 +19,7 @@ export function resolveDiskMetricKeys(settings: DiskMetricKeySettings): readonly
 
     const throughputDirection = normalizeDiskThroughputDisplayDirection(settings.diskThroughputDirection);
 
-    if (settings.graphicType === "dashed-line" && throughputDirection === "both") {
+    if (isDualDiskThroughputDisplay(settings.graphicType, throughputDirection)) {
         return [
             getDiskThroughputMetricKey("read"),
             getDiskThroughputMetricKey("write"),
@@ -41,4 +41,12 @@ export function resolveSingleDiskThroughputDirection(
     direction: DiskThroughputDisplayDirection,
 ): DiskThroughputDirection {
     return direction === "read" || direction === "write" ? direction : "total";
+}
+
+export function isDualDiskThroughputDisplay(
+    graphicType: SettingValue,
+    direction: DiskThroughputDisplayDirection,
+): boolean {
+    return direction === "both"
+        && (graphicType === "circular" || graphicType === "dashed-line");
 }

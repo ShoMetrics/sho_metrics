@@ -18,10 +18,18 @@ test("disk throughput sparkline single mode subscribes to one direction", () => 
     }), ["disk.throughput.read"]);
 });
 
-test("disk throughput non-sparkline both mode falls back to total", () => {
+test("disk throughput circular both mode subscribes to read and write", () => {
     assert.deepEqual(resolveDiskMetricKeys({
         diskMetricKind: "throughput",
         graphicType: "circular",
+        diskThroughputDirection: "both",
+    }), ["disk.throughput.read", "disk.throughput.write"]);
+});
+
+test("disk throughput linear both mode falls back to total", () => {
+    assert.deepEqual(resolveDiskMetricKeys({
+        diskMetricKind: "throughput",
+        graphicType: "linear",
         diskThroughputDirection: "both",
     }), ["disk.throughput.total"]);
 });
