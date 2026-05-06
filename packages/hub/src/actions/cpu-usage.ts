@@ -5,6 +5,7 @@ import { setSingleMetricDisplay } from "./single-metric-display";
 import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-label";
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
+import type { WidgetData } from "../rendering/widget-data";
 
 /**
  * CPU Usage action with full theming support.
@@ -24,13 +25,7 @@ export class CpuUsage extends MetricAction {
             event,
             metricKey: CPU_USAGE_METRIC_KEY,
             widgetData: {
-                ...widgetData,
-                displayValue: widgetData.current.toFixed(0),
-                sparklineScale: {
-                    mode: "fixed",
-                    minimumValue: 0,
-                    maximumValue: 100,
-                },
+                ...buildCpuUsageWidgetData(widgetData),
                 secondaryDisplayValue: formatCompactHardwareModelLabel(
                     metricStore.getTextValue(CPU_MODEL_METRIC_KEY),
                     "cpu",
@@ -43,3 +38,15 @@ export class CpuUsage extends MetricAction {
 
 const CPU_USAGE_METRIC_KEY = "cpu.usage_percent";
 const CPU_MODEL_METRIC_KEY = "cpu.model";
+
+export function buildCpuUsageWidgetData(widgetData: WidgetData): WidgetData {
+    return {
+        ...widgetData,
+        displayValue: widgetData.current.toFixed(0),
+        sparklineScale: {
+            mode: "fixed",
+            minimumValue: 0,
+            maximumValue: 100,
+        },
+    };
+}

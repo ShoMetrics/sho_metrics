@@ -32,6 +32,27 @@ test("wide overlay sparkline keeps value rows outside the chart area", () => {
     assert.match(svgFragment, /<rect x="8" y="10\.40"\s+width="184"/);
 });
 
+test("dual-channel sparkline honors metric-specific display values", () => {
+    const svgFragment = renderDualChannelSparkline({
+        positive: buildWidgetData({
+            label: "Download",
+            current: 1,
+            displayValue: "1",
+        }),
+        negative: buildWidgetData({
+            label: "Upload",
+            current: 1,
+            displayValue: "1",
+        }),
+    }, {
+        ...DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG,
+        chartMode: "overlay",
+    }, { width: 200, height: 100 });
+
+    assert.match(svgFragment, />1</);
+    assert.doesNotMatch(svgFragment, />1\.0</);
+});
+
 function buildDualChannelData(): DualChannelWidgetData {
     return {
         positive: buildWidgetData({

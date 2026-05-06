@@ -48,6 +48,7 @@ const netSpeedLinearScenario = defineScenario({
     fieldGroupList: [
         baseFieldGroup,
         networkDirectionFieldGroup,
+        networkEndpointFieldGroup,
         networkChannelColorSettingsFieldGroup,
         networkChannelThresholdFieldGroup,
         downloadChannelColorModeFieldGroup,

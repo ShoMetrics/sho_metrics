@@ -15,6 +15,11 @@ const diskThroughputCircularLinearScopeList = [
     inspectorScope.diskThroughputLinearScope,
 ] as const;
 const netSpeedCircularScopeList = [inspectorScope.netSpeedCircularScope] as const;
+const netSpeedEndpointScopeList = [
+    inspectorScope.netSpeedCircularScope,
+    inspectorScope.netSpeedLinearScope,
+    inspectorScope.netSpeedSparklineScope,
+] as const;
 const netSpeedCircularSparklineScopeList = [
     inspectorScope.netSpeedCircularScope,
     inspectorScope.netSpeedSparklineScope,
@@ -96,7 +101,7 @@ export const inspectorFieldCatalog = {
         key: "networkInterfaceId",
         kind: "select",
         label: "Network Interface",
-        allowedScopes: netSpeedCircularSparklineScopeList,
+        allowedScopes: netSpeedEndpointScopeList,
         options: { kind: "provider", providerId: "networkInterfaces" },
     }),
     networkTrafficDisplayModeField: defineField({
@@ -118,14 +123,14 @@ export const inspectorFieldCatalog = {
         label: "Max Speed (Mbps)",
         minimum: 1,
         step: 1,
-        allowedScopes: netSpeedCircularSparklineScopeList,
+        allowedScopes: netSpeedEndpointScopeList,
     }),
     networkUnitBaseField: defineField({
         id: "network-unit-base",
         key: "networkUnitBase",
         kind: "select",
         label: "Unit",
-        allowedScopes: netSpeedCircularSparklineScopeList,
+        allowedScopes: netSpeedEndpointScopeList,
         options: staticOptions([
             { value: "byte", label: "Byte/s" },
             { value: "bit", label: "Bit/s" },
