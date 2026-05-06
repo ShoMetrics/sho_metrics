@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { RasterizerPerformanceStats, formatRasterizerPerformanceSummary } from "./rasterizer-performance-stats";
+import {
+    RasterizerPerformanceStats,
+    formatRasterizerPerformanceSummary,
+    shouldWarnRasterizerPerformanceSummary,
+} from "./rasterizer-performance-stats";
 
+// Do not assert wall-clock render speed here. resvg timing depends on OS,
+// installed fonts, disk/cache state, and Node version; unit tests cover guard logic only.
 test("rasterizer performance stats aggregates breakdown windows", () => {
     const stats = new RasterizerPerformanceStats(5000);
 
@@ -88,4 +94,53 @@ test("rasterizer performance summary is log-friendly", () => {
             "maxTotalMs=116",
         ].join(" "),
     );
+});
+
+test("rasterizer performance summary warns only on degraded render windows", () => {
+    const fastSummary = new RasterizerPerformanceStats(0).record({
+        success: true,
+        renderWidth: 144,
+        renderHeight: 144,
+        svgByteLength: 1000,
+        fontFileCount: 2,
+        pngByteLength: 2000,
+        constructMilliseconds: 3,
+        renderMilliseconds: 1,
+        asPngMilliseconds: 1,
+        base64Milliseconds: 0,
+        totalMilliseconds: 5,
+    }, 2000);
+    const slowSummary = new RasterizerPerformanceStats(0).record({
+        success: true,
+        renderWidth: 144,
+        renderHeight: 144,
+        svgByteLength: 1000,
+        fontFileCount: 2,
+        pngByteLength: 2000,
+        constructMilliseconds: 120,
+        renderMilliseconds: 1,
+        asPngMilliseconds: 1,
+        base64Milliseconds: 0,
+        totalMilliseconds: 122,
+    }, 2000);
+    const failedSummary = new RasterizerPerformanceStats(0).record({
+        success: false,
+        renderWidth: 144,
+        renderHeight: 144,
+        svgByteLength: 1000,
+        fontFileCount: 0,
+        pngByteLength: null,
+        constructMilliseconds: 0,
+        renderMilliseconds: 0,
+        asPngMilliseconds: 0,
+        base64Milliseconds: 0,
+        totalMilliseconds: 1,
+    }, 2000);
+
+    assert.ok(fastSummary);
+    assert.ok(slowSummary);
+    assert.ok(failedSummary);
+    assert.equal(shouldWarnRasterizerPerformanceSummary(fastSummary), false);
+    assert.equal(shouldWarnRasterizerPerformanceSummary(slowSummary), true);
+    assert.equal(shouldWarnRasterizerPerformanceSummary(failedSummary), true);
 });

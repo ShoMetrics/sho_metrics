@@ -35,6 +35,9 @@ export interface RasterizerPerformanceSummary {
     totalDuration: RasterizerDurationSummary;
 }
 
+const RASTERIZER_WARNING_TOTAL_MILLISECONDS = 100;
+const RASTERIZER_WARNING_AVERAGE_TOTAL_MILLISECONDS = 40;
+
 interface RasterizerDurationAccumulator {
     count: number;
     totalMilliseconds: number;
@@ -111,6 +114,12 @@ export function formatRasterizerPerformanceSummary(summary: RasterizerPerformanc
         `avgTotalMs=${formatAverageDuration(summary.totalDuration)}`,
         `maxTotalMs=${formatMaximumDuration(summary.totalDuration)}`,
     ].join(" ");
+}
+
+export function shouldWarnRasterizerPerformanceSummary(summary: RasterizerPerformanceSummary): boolean {
+    return summary.failureCount > 0
+        || exceedsDuration(summary.totalDuration.maximumMilliseconds, RASTERIZER_WARNING_TOTAL_MILLISECONDS)
+        || exceedsDuration(summary.totalDuration.averageMilliseconds, RASTERIZER_WARNING_AVERAGE_TOTAL_MILLISECONDS);
 }
 
 function createRasterizerPerformanceWindow(startTimestampMilliseconds: number): RasterizerPerformanceWindow {
@@ -227,4 +236,8 @@ function formatMaximumDuration(summary: RasterizerDurationSummary): string {
     }
 
     return summary.maximumMilliseconds.toFixed(0);
+}
+
+function exceedsDuration(durationMilliseconds: number | null, thresholdMilliseconds: number): boolean {
+    return durationMilliseconds != null && durationMilliseconds >= thresholdMilliseconds;
 }
