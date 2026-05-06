@@ -98,17 +98,27 @@ export class NetSpeed extends MetricAction {
             widgetData,
         });
 
-        const circularCenterContent = settings.circularCenterContent === "icon" ? "icon" : "icon-value-unit";
+        const circularCenterContent = settings.circularCenterContent === "icon" ? "icon" : "value";
+        const renderedWidgetData = settings.graphicType === "circular" && circularCenterContent === "value"
+            ? { ...widgetData, label: ARC_GAUGE_LABELS.network }
+            : widgetData;
 
         setSingleMetricDisplay({
             event,
             metricKey: networkMetricKey,
-            widgetData,
+            widgetData: renderedWidgetData,
             centerIconFragment: buildNetworkCenterIconFragment({
                 circularCenterContent,
                 direction,
                 selectedNetworkInterface,
             }),
+            footerIconFragment: settings.graphicType === "circular" && circularCenterContent === "value"
+                ? renderNetworkDirectionIconFragment({
+                    direction,
+                    color: NETWORK_DIRECTION_ICON_COLOR,
+                    size: NETWORK_FOOTER_ICON_SIZE,
+                })
+                : undefined,
             statusIcon: getNetworkDirectionStatusIcon({
                 direction,
                 color: NETWORK_DIRECTION_ICON_COLOR,
@@ -416,6 +426,7 @@ const FALLBACK_MAXIMUM_SPEED_MEGABITS_PER_SECOND = 1000;
 const NETWORK_SPEED_MAXIMUM_DISPLAY_DIGITS = 3;
 const NETWORK_CENTER_ICON_SIZE = 58;
 const NETWORK_TOP_ICON_SIZE = 30;
+const NETWORK_FOOTER_ICON_SIZE = 21;
 const DEBUG_LOG_INTERVAL_MILLISECONDS = 5000;
 
 function resolveNetworkInterface(value: SettingValue): NetworkInterfaceOption | null {
@@ -490,7 +501,7 @@ function getNetworkDirectionLabel(direction: NetworkDirection): string {
 }
 
 function buildNetworkCenterIconFragment(options: {
-    circularCenterContent: "icon" | "icon-value-unit";
+    circularCenterContent: "icon" | "value";
     direction: NetworkDirection;
     selectedNetworkInterface: NetworkInterfaceOption | null;
 }): string {

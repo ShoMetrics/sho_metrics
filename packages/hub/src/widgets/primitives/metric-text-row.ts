@@ -4,6 +4,7 @@ import {
     formatSvgTextFitAttributes,
     resolveSvgTextFit,
     type SvgTextAnchor,
+    type SvgTextFitOptions,
 } from "../../rendering/svg-utils";
 
 export interface MetricTextRowOptions {
@@ -24,6 +25,7 @@ export interface MetricTextRowOptions {
     unitBaselineOffset?: number;
     clipHeight?: number;
     valueExtraAttributes?: readonly string[];
+    fitOptions?: SvgTextFitOptions;
 }
 
 const MINIMUM_ROW_WIDTH = 1;
@@ -54,6 +56,7 @@ export function renderMetricTextRow(options: MetricTextRowOptions): string {
         ],
         maxWidth: width,
         extraWidth: options.unitText.length > 0 ? unitTier.gap : 0,
+        fitOptions: options.fitOptions,
     });
     const valueFontSize = options.valueFontSize * textFit.fontScale;
     const unitFontSize = rawUnitFontSize * textFit.fontScale;

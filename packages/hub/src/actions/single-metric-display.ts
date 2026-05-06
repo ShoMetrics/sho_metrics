@@ -174,6 +174,7 @@ function renderAndSendSingleMetricDisplay(
             muted: renderPlan.shouldRenderMutedIconPlaceholder,
             configOverrides: buildSingleMetricConfigOverrides({
                 centerIconFragment: options.centerIconFragment,
+                footerIconFragment: options.footerIconFragment,
                 linearIconFragment: options.linearIconFragment,
                 statusIcon: options.statusIcon,
                 centerContent: renderPlan.centerContent,
@@ -415,15 +416,17 @@ function renderAndSendSingleMetricDisplay(
 
 function buildSingleMetricConfigOverrides(options: {
     centerIconFragment: string;
+    footerIconFragment: string | undefined;
     linearIconFragment: string | undefined;
     statusIcon: ArcGaugeStatusIcon;
-    centerContent: "value" | "icon" | "icon-value-unit";
+    centerContent: "value" | "icon";
     lineSmoothingPercent: number;
     gridLineVisibility: ResolvedMetricVisualSettings["gridLineVisibility"];
     gridLineType: ResolvedMetricVisualSettings["gridLineType"];
 }): {
-    centerContent?: "value" | "icon" | "icon-value-unit";
+    centerContent?: "value" | "icon";
     centerIconFragment?: string;
+    footerIconFragment?: string;
     topIconFragment?: string;
     statusIcon?: ArcGaugeStatusIcon;
     lineSmoothingPercent?: number;
@@ -433,6 +436,7 @@ function buildSingleMetricConfigOverrides(options: {
     return {
         centerContent: options.centerContent,
         centerIconFragment: options.centerIconFragment,
+        footerIconFragment: options.footerIconFragment,
         topIconFragment: options.linearIconFragment ?? options.centerIconFragment,
         statusIcon: options.statusIcon,
         lineSmoothingPercent: options.lineSmoothingPercent,
@@ -446,7 +450,7 @@ function buildDualMetricConfigOverrides(options: {
     negativeColor: string;
     titleText: string;
     chartMode: "overlay" | "mirrored";
-    centerContent: "value" | "icon" | "icon-value-unit";
+    centerContent: "value" | "icon";
     topIconFragment: string;
     positiveIconFragment: string | undefined;
     negativeIconFragment: string | undefined;
@@ -460,7 +464,7 @@ function buildDualMetricConfigOverrides(options: {
     negativeColor: string;
     titleText?: string;
     chartMode?: "overlay" | "mirrored";
-    centerContent?: "value" | "icon" | "icon-value-unit";
+    centerContent?: "value" | "icon";
     centerIconFragment?: string;
     topIconFragment?: string;
     positiveIconFragment?: string;
