@@ -4,6 +4,7 @@ import { logger } from "../logging/logger";
 import {
     RasterizerPerformanceStats,
     formatRasterizerPerformanceSummary,
+    shouldWarnRasterizerPerformanceSummary,
     type RasterizerPerformanceSample,
 } from "./rasterizer-performance-stats";
 import { resolveResvgFontOptions } from "./resvg-font-options";
@@ -71,6 +72,13 @@ function recordRasterizerPerformanceSample(sample: RasterizerPerformanceSample):
     const summary = rasterizerPerformanceStats.record(sample);
 
     if (summary) {
-        log.info(() => formatRasterizerPerformanceSummary(summary));
+        if (shouldWarnRasterizerPerformanceSummary(summary)) {
+            log.atWarn()
+                .everyMs("rasterizer-performance-warning", 60000)
+                .log(() => formatRasterizerPerformanceSummary(summary));
+            return;
+        }
+
+        log.debug(() => formatRasterizerPerformanceSummary(summary));
     }
 }

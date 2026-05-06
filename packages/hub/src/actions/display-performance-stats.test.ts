@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DisplayPerformanceStats, formatDisplayPerformanceSummary } from "./display-performance-stats";
+import {
+    DisplayPerformanceStats,
+    formatDisplayPerformanceSummary,
+    shouldWarnDisplayPerformanceSummary,
+} from "./display-performance-stats";
 
+// These tests use synthetic durations. Real performance baselines belong in
+// platform-specific benchmarks, not hermetic unit tests.
 test("display performance stats aggregates render windows", () => {
     const stats = new DisplayPerformanceStats(5000);
 
@@ -94,4 +100,53 @@ test("display performance summary is log-friendly", () => {
             "maxTotalMs=5",
         ].join(" "),
     );
+});
+
+test("display performance summary warns only on degraded display windows", () => {
+    const fastSummary = new DisplayPerformanceStats(0).record({
+        requestReason: "metric-tick",
+        displayKind: "key",
+        outcome: "rendered",
+        queuedMilliseconds: 3,
+        composeMilliseconds: 2,
+        rasterizeMilliseconds: 5,
+        sdkPromiseMilliseconds: 1,
+        totalMilliseconds: 11,
+        queueLength: 1,
+        activeActionCount: 1,
+        titleClearRequested: false,
+    }, 2000);
+    const queuedSummary = new DisplayPerformanceStats(0).record({
+        requestReason: "metric-tick",
+        displayKind: "key",
+        outcome: "rendered",
+        queuedMilliseconds: 501,
+        composeMilliseconds: 2,
+        rasterizeMilliseconds: 5,
+        sdkPromiseMilliseconds: 1,
+        totalMilliseconds: 509,
+        queueLength: 12,
+        activeActionCount: 48,
+        titleClearRequested: false,
+    }, 2000);
+    const failedSummary = new DisplayPerformanceStats(0).record({
+        requestReason: "metric-tick",
+        displayKind: "key",
+        outcome: "failed",
+        queuedMilliseconds: 3,
+        composeMilliseconds: 2,
+        rasterizeMilliseconds: null,
+        sdkPromiseMilliseconds: null,
+        totalMilliseconds: 5,
+        queueLength: 1,
+        activeActionCount: 1,
+        titleClearRequested: false,
+    }, 2000);
+
+    assert.ok(fastSummary);
+    assert.ok(queuedSummary);
+    assert.ok(failedSummary);
+    assert.equal(shouldWarnDisplayPerformanceSummary(fastSummary), false);
+    assert.equal(shouldWarnDisplayPerformanceSummary(queuedSummary), true);
+    assert.equal(shouldWarnDisplayPerformanceSummary(failedSummary), true);
 });

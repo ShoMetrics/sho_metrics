@@ -22,6 +22,7 @@ import { DisplayUpdateQueue } from "./display-update-queue";
 import {
     DisplayPerformanceStats,
     formatDisplayPerformanceSummary,
+    shouldWarnDisplayPerformanceSummary,
     type DisplayPerformanceKind,
     type DisplayPerformanceOutcome,
 } from "./display-performance-stats";
@@ -696,7 +697,14 @@ function recordDisplayPerformanceSample(options: {
     }, options.updateEndTimestampMilliseconds);
 
     if (summary) {
-        log.info(() => formatDisplayPerformanceSummary(summary));
+        if (shouldWarnDisplayPerformanceSummary(summary)) {
+            log.atWarn()
+                .everyMs("display-performance-warning", 60000)
+                .log(() => formatDisplayPerformanceSummary(summary));
+            return;
+        }
+
+        log.debug(() => formatDisplayPerformanceSummary(summary));
     }
 }
 

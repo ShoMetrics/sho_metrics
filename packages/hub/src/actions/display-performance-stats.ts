@@ -42,6 +42,10 @@ export interface DisplayPerformanceSummary {
     totalDuration: DurationSummary;
 }
 
+const DISPLAY_WARNING_MAXIMUM_QUEUED_MILLISECONDS = 500;
+const DISPLAY_WARNING_AVERAGE_QUEUED_MILLISECONDS = 250;
+const DISPLAY_WARNING_MAXIMUM_TOTAL_MILLISECONDS = 1000;
+
 interface DurationAccumulator {
     count: number;
     totalMilliseconds: number;
@@ -126,6 +130,13 @@ export function formatDisplayPerformanceSummary(summary: DisplayPerformanceSumma
         `avgTotalMs=${formatAverageDuration(summary.totalDuration)}`,
         `maxTotalMs=${formatMaximumDuration(summary.totalDuration)}`,
     ].join(" ");
+}
+
+export function shouldWarnDisplayPerformanceSummary(summary: DisplayPerformanceSummary): boolean {
+    return summary.failedCount > 0
+        || exceedsDuration(summary.queuedDuration.maximumMilliseconds, DISPLAY_WARNING_MAXIMUM_QUEUED_MILLISECONDS)
+        || exceedsDuration(summary.queuedDuration.averageMilliseconds, DISPLAY_WARNING_AVERAGE_QUEUED_MILLISECONDS)
+        || exceedsDuration(summary.totalDuration.maximumMilliseconds, DISPLAY_WARNING_MAXIMUM_TOTAL_MILLISECONDS);
 }
 
 function createDisplayPerformanceWindow(startTimestampMilliseconds: number): DisplayPerformanceWindow {
@@ -252,4 +263,8 @@ function formatMaximumDuration(summary: DurationSummary): string {
     }
 
     return summary.maximumMilliseconds.toFixed(0);
+}
+
+function exceedsDuration(durationMilliseconds: number | null, thresholdMilliseconds: number): boolean {
+    return durationMilliseconds != null && durationMilliseconds >= thresholdMilliseconds;
 }

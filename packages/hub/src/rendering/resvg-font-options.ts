@@ -83,6 +83,11 @@ export function detectFontScriptsFromSvg(svgString: string): readonly FontScript
     return scriptList;
 }
 
+export function clearResvgFontOptionsCacheForTests(): void {
+    fontFileCacheByKey.clear();
+    fontOptionsCacheByKey.clear();
+}
+
 export function extractVisibleSvgText(svgString: string): string {
     const visibleTextFragments: string[] = [];
     const cleanedSvgString = svgString.replace(/<!--[\s\S]*?-->/g, "");
