@@ -121,7 +121,7 @@ export class Disk extends MetricAction {
         const throughputMetricKey = getDiskThroughputMetricKey(singleThroughputDirection);
         const selectedVolume = resolveSelectedDiskVolume(settings.diskVolumeId);
         const throughputLabel = selectedVolume
-            ? formatDiskNameDisplayLabel(selectedVolume)
+            ? formatDiskVolumeDisplayLabel(selectedVolume)
             : ARC_GAUGE_LABELS.disk;
         const bytesPerSecondWidgetData = metricStore.getWidgetData(throughputMetricKey, throughputLabel, "B/s");
         const circularCenterContent = settings.circularCenterContent === "icon" ? "icon" : "value";
@@ -213,16 +213,6 @@ function formatDiskVolumeDisplayLabel(diskVolume: DiskVolumeOption): string {
     }
 
     return mountLabel.slice(0, 4).toUpperCase();
-}
-
-function formatDiskNameDisplayLabel(diskVolume: DiskVolumeOption): string {
-    const diskNameLabel = diskVolume.diskName.trim()
-        || diskVolume.volumeLabel.trim()
-        || diskVolume.mount
-        || diskVolume.fs
-        || ARC_GAUGE_LABELS.disk;
-
-    return Array.from(diskNameLabel).slice(0, 4).join("").toUpperCase();
 }
 
 function buildDiskLinearLabel(diskVolume: DiskVolumeOption | null, fallbackLabel: string): string {
