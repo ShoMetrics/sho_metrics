@@ -34,11 +34,14 @@ export interface SingleMetricDisplayOptions extends BaseMetricDisplayOptions {
 export interface DualMetricDisplayOptions extends BaseMetricDisplayOptions {
     widgetData: DualChannelWidgetData;
     titleText: string;
+    dualGraphicType?: "circular" | "dashed-line";
     chartMode?: "overlay" | "mirrored";
     positiveColor: string;
     negativeColor: string;
     positiveIconFragment?: string;
     negativeIconFragment?: string;
+    positiveStatusIcon?: ArcGaugeStatusIcon;
+    negativeStatusIcon?: ArcGaugeStatusIcon;
 }
 
 export interface SingleMetricDisplaySettings extends MetricVisualSettings {

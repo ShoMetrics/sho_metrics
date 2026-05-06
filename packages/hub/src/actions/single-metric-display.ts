@@ -143,6 +143,7 @@ function renderAndSendSingleMetricDisplay(
         });
         renderedMetricData = renderDualWidgetData;
         svg = composeDualChannelSvg(renderDualWidgetData, {
+            graphicType: options.dualGraphicType,
             graphicStyle: renderPlan.visualSettings.graphicStyle,
             muted: false,
             configOverrides: buildDualMetricConfigOverrides({
@@ -150,9 +151,12 @@ function renderAndSendSingleMetricDisplay(
                 negativeColor: options.negativeColor,
                 titleText: options.titleText,
                 chartMode: options.chartMode ?? "overlay",
+                centerContent: renderPlan.centerContent,
                 topIconFragment: options.centerIconFragment,
                 positiveIconFragment: options.positiveIconFragment,
                 negativeIconFragment: options.negativeIconFragment,
+                positiveStatusIcon: options.positiveStatusIcon,
+                negativeStatusIcon: options.negativeStatusIcon,
                 lineSmoothingPercent: renderPlan.visualSettings.lineSmoothingPercent,
                 gridLineVisibility: renderPlan.visualSettings.gridLineVisibility,
                 gridLineType: renderPlan.visualSettings.gridLineType,
@@ -442,9 +446,12 @@ function buildDualMetricConfigOverrides(options: {
     negativeColor: string;
     titleText: string;
     chartMode: "overlay" | "mirrored";
+    centerContent: "value" | "icon" | "icon-value-unit";
     topIconFragment: string;
     positiveIconFragment: string | undefined;
     negativeIconFragment: string | undefined;
+    positiveStatusIcon: ArcGaugeStatusIcon | undefined;
+    negativeStatusIcon: ArcGaugeStatusIcon | undefined;
     lineSmoothingPercent: number;
     gridLineVisibility: ResolvedMetricVisualSettings["gridLineVisibility"];
     gridLineType: ResolvedMetricVisualSettings["gridLineType"];
@@ -453,9 +460,13 @@ function buildDualMetricConfigOverrides(options: {
     negativeColor: string;
     titleText?: string;
     chartMode?: "overlay" | "mirrored";
+    centerContent?: "value" | "icon" | "icon-value-unit";
+    centerIconFragment?: string;
     topIconFragment?: string;
     positiveIconFragment?: string;
     negativeIconFragment?: string;
+    positiveStatusIcon?: ArcGaugeStatusIcon;
+    negativeStatusIcon?: ArcGaugeStatusIcon;
     lineSmoothingPercent?: number;
     gridLineVisibility?: ResolvedMetricVisualSettings["gridLineVisibility"];
     gridLineType?: ResolvedMetricVisualSettings["gridLineType"];
@@ -465,9 +476,13 @@ function buildDualMetricConfigOverrides(options: {
         negativeColor: options.negativeColor,
         titleText: options.titleText,
         chartMode: options.chartMode,
+        centerContent: options.centerContent,
+        centerIconFragment: options.topIconFragment,
         topIconFragment: options.topIconFragment,
         positiveIconFragment: options.positiveIconFragment,
         negativeIconFragment: options.negativeIconFragment,
+        positiveStatusIcon: options.positiveStatusIcon,
+        negativeStatusIcon: options.negativeStatusIcon,
         lineSmoothingPercent: options.lineSmoothingPercent,
         gridLineVisibility: options.gridLineVisibility,
         gridLineType: options.gridLineType,

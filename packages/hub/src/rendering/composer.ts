@@ -9,11 +9,22 @@ import {
     renderDualChannelSparkline,
     type DualChannelSparklineConfig,
 } from "../widgets/primitives/dual-channel-sparkline";
+import {
+    DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG,
+    renderDualChannelArcGauge,
+    type DualChannelArcGaugeConfig,
+} from "../widgets/primitives/dual-channel-arc-gauge";
 import { flatStyle } from "../widgets/styles/flat";
 import { cupertinoGlassStyle } from "../widgets/styles/cupertino-glass";
 import type { ColorConfig } from "./color-resolver";
 
-export type WidgetConfigOverrides = Partial<ArcGaugeConfig & LinearBarConfig & SparklineConfig & DualChannelSparklineConfig>;
+export type WidgetConfigOverrides = Partial<
+    ArcGaugeConfig
+    & LinearBarConfig
+    & SparklineConfig
+    & DualChannelSparklineConfig
+    & DualChannelArcGaugeConfig
+>;
 
 interface WidgetRegistryEntry {
     render(data: WidgetData, configOverrides: WidgetConfigOverrides | undefined, keySize: KeySize): string;
@@ -93,17 +104,23 @@ export function composeSvg(
 
 export function composeDualChannelSvg(
     data: DualChannelWidgetData,
-    options: Omit<ComposeOptions, "graphicType" | "colorConfig">,
+    options: Omit<ComposeOptions, "graphicType" | "colorConfig"> & { graphicType?: "circular" | "dashed-line" },
     keySize: KeySize,
 ): string {
     const configOverrides: WidgetConfigOverrides = {
         ...options.configOverrides,
     };
-    const widgetSvgFragment = renderDualChannelSparkline(
-        data,
-        { ...DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG, ...configOverrides },
-        keySize,
-    );
+    const widgetSvgFragment = options.graphicType === "circular"
+        ? renderDualChannelArcGauge(
+            data,
+            { ...DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG, ...configOverrides },
+            keySize,
+        )
+        : renderDualChannelSparkline(
+            data,
+            { ...DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG, ...configOverrides },
+            keySize,
+        );
 
     return composeStyledSvg({
         widgetSvgFragment,

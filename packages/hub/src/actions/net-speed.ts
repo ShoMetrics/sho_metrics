@@ -29,8 +29,8 @@ const log = logger.for("Action:NetSpeed");
 
 /**
  * Network Speed action.
- * A circle visual fits one-way single-value data. Download or upload speed can
- * use a circle independently, but combined download/upload needs another graph.
+ * Circle, linear, and sparkline visuals all support either one network
+ * direction or combined download/upload telemetry.
  */
 @action({ UUID: "com.ez.sho-metrics.net-speed" })
 export class NetSpeed extends MetricAction {
@@ -62,6 +62,16 @@ export class NetSpeed extends MetricAction {
 
         if (settings.graphicType === "dashed-line" && displayDirection === "both") {
             this.updateDualNetworkSparklineDisplay({
+                event,
+                settings,
+                selectedNetworkInterface,
+                isAutomaticNetworkInterface,
+            });
+            return;
+        }
+
+        if (displayDirection === "both") {
+            this.updateDualNetworkCircularDisplay({
                 event,
                 settings,
                 selectedNetworkInterface,
@@ -107,6 +117,81 @@ export class NetSpeed extends MetricAction {
             visualSettingsOverride: {
                 colorMode: settings.colorMode ?? "solid",
                 solidColor: settings.solidColor ?? resolveNetworkChannelColor(direction, settings),
+            },
+        });
+    }
+
+    private updateDualNetworkCircularDisplay(options: {
+        event: WillAppearEvent;
+        settings: NetworkSpeedSettings;
+        selectedNetworkInterface: NetworkInterfaceOption | null;
+        isAutomaticNetworkInterface: boolean;
+    }): void {
+        const uploadMetricKey = options.selectedNetworkInterface
+            ? getNetworkInterfaceMetricKey("upload", options.selectedNetworkInterface.id)
+            : getNetworkAggregateMetricKey("upload");
+        const downloadMetricKey = options.selectedNetworkInterface
+            ? getNetworkInterfaceMetricKey("download", options.selectedNetworkInterface.id)
+            : getNetworkAggregateMetricKey("download");
+        const uploadWidgetData = buildNetworkWidgetData({
+            rawWidgetData: metricStore.getWidgetData(uploadMetricKey, "UP", "B/s"),
+            direction: "upload",
+            settings: options.settings,
+            selectedNetworkInterface: options.selectedNetworkInterface,
+            isAutomaticNetworkInterface: options.isAutomaticNetworkInterface,
+        });
+        const downloadWidgetData = buildNetworkWidgetData({
+            rawWidgetData: metricStore.getWidgetData(downloadMetricKey, "DOWN", "B/s"),
+            direction: "download",
+            settings: options.settings,
+            selectedNetworkInterface: options.selectedNetworkInterface,
+            isAutomaticNetworkInterface: options.isAutomaticNetworkInterface,
+        });
+        const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData);
+        const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
+        const circularCenterContent = options.settings.circularCenterContent === "icon" ? "icon" : "value";
+
+        setDualMetricDisplay({
+            event: options.event,
+            metricKey: `${downloadMetricKey},${uploadMetricKey}`,
+            dualGraphicType: "circular",
+            widgetData: {
+                positive: uploadWidgetData,
+                negative: downloadWidgetData,
+            },
+            titleText: "NETWORK",
+            centerIconFragment: renderNetworkInterfaceIconFragment({
+                networkInterface: options.selectedNetworkInterface,
+                size: NETWORK_CENTER_ICON_SIZE,
+            }),
+            statusIcon: getNetworkDirectionStatusIcon({
+                direction: "download",
+                color: NETWORK_DIRECTION_ICON_COLOR,
+            }),
+            circularCenterContentOverride: circularCenterContent,
+            positiveColor: uploadColor,
+            negativeColor: downloadColor,
+            positiveIconFragment: renderNetworkDirectionIconFragment({
+                direction: "upload",
+                color: uploadColor,
+                size: NETWORK_TOP_ICON_SIZE,
+            }),
+            negativeIconFragment: renderNetworkDirectionIconFragment({
+                direction: "download",
+                color: downloadColor,
+                size: NETWORK_TOP_ICON_SIZE,
+            }),
+            positiveStatusIcon: getNetworkDirectionStatusIcon({
+                direction: "upload",
+                color: uploadColor,
+            }),
+            negativeStatusIcon: getNetworkDirectionStatusIcon({
+                direction: "download",
+                color: downloadColor,
+            }),
+            visualSettingsOverride: {
+                colorMode: "solid",
+                solidColor: uploadColor,
             },
         });
     }

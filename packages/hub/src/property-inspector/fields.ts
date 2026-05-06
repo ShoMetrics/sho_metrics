@@ -20,7 +20,8 @@ const netSpeedEndpointScopeList = [
     inspectorScope.netSpeedLinearScope,
     inspectorScope.netSpeedSparklineScope,
 ] as const;
-const netSpeedLinearSparklineScopeList = [
+const netSpeedChannelColorScopeList = [
+    inspectorScope.netSpeedCircularScope,
     inspectorScope.netSpeedLinearScope,
     inspectorScope.netSpeedSparklineScope,
 ] as const;
@@ -89,7 +90,7 @@ export const inspectorFieldCatalog = {
     networkCircleNoteField: defineField({
         id: "network-circle-note",
         kind: "note",
-        text: "A circle can show one direction at a time.",
+        text: "Download and upload split the circle into two halves.",
         allowedScopes: netSpeedCircularScopeList,
     }),
     networkInterfaceField: defineField({
@@ -136,7 +137,7 @@ export const inspectorFieldCatalog = {
         id: "download-color-heading",
         kind: "heading",
         text: "Download",
-        allowedScopes: netSpeedLinearSparklineScopeList,
+        allowedScopes: netSpeedChannelColorScopeList,
     }),
     downloadColorModeField: defineField({
         id: "download-color-mode",
@@ -144,7 +145,7 @@ export const inspectorFieldCatalog = {
         kind: "select",
         label: "Color Mode",
         defaultValue: "solid",
-        allowedScopes: netSpeedLinearSparklineScopeList,
+        allowedScopes: netSpeedChannelColorScopeList,
         options: staticOptions([
             { value: "solid", label: "Solid Color" },
             { value: "threshold", label: "Dynamic (By Percentage)" },
@@ -156,7 +157,7 @@ export const inspectorFieldCatalog = {
         kind: "color",
         label: "Solid Color",
         defaultValue: "#3b82f6",
-        allowedScopes: netSpeedLinearSparklineScopeList,
+        allowedScopes: netSpeedChannelColorScopeList,
     }),
     downloadLowColorField: defineField({
         id: "download-low-color",
@@ -164,7 +165,7 @@ export const inspectorFieldCatalog = {
         kind: "color",
         label: "Low Color",
         defaultValue: "#22c55e",
-        allowedScopes: netSpeedLinearSparklineScopeList,
+        allowedScopes: netSpeedChannelColorScopeList,
     }),
     downloadMediumColorField: defineField({
         id: "download-medium-color",
@@ -172,7 +173,7 @@ export const inspectorFieldCatalog = {
         kind: "color",
         label: "Medium Color",
         defaultValue: "#3b82f6",
-        allowedScopes: netSpeedLinearSparklineScopeList,
+        allowedScopes: netSpeedChannelColorScopeList,
     }),
     downloadHighColorField: defineField({
         id: "download-high-color",
@@ -180,13 +181,13 @@ export const inspectorFieldCatalog = {
         kind: "color",
         label: "High Color",
         defaultValue: "#60a5fa",
-        allowedScopes: netSpeedLinearSparklineScopeList,
+        allowedScopes: netSpeedChannelColorScopeList,
     }),
     uploadColorHeadingField: defineField({
         id: "upload-color-heading",
         kind: "heading",
         text: "Upload",
-        allowedScopes: netSpeedLinearSparklineScopeList,
+        allowedScopes: netSpeedChannelColorScopeList,
     }),
     uploadColorModeField: defineField({
         id: "upload-color-mode",
@@ -194,7 +195,7 @@ export const inspectorFieldCatalog = {
         kind: "select",
         label: "Color Mode",
         defaultValue: "solid",
-        allowedScopes: netSpeedLinearSparklineScopeList,
+        allowedScopes: netSpeedChannelColorScopeList,
         options: staticOptions([
             { value: "solid", label: "Solid Color" },
             { value: "threshold", label: "Dynamic (By Percentage)" },
@@ -206,7 +207,7 @@ export const inspectorFieldCatalog = {
         kind: "color",
         label: "Solid Color",
         defaultValue: "#ef4444",
-        allowedScopes: netSpeedLinearSparklineScopeList,
+        allowedScopes: netSpeedChannelColorScopeList,
     }),
     uploadLowColorField: defineField({
         id: "upload-low-color",
@@ -214,7 +215,7 @@ export const inspectorFieldCatalog = {
         kind: "color",
         label: "Low Color",
         defaultValue: "#f97316",
-        allowedScopes: netSpeedLinearSparklineScopeList,
+        allowedScopes: netSpeedChannelColorScopeList,
     }),
     uploadMediumColorField: defineField({
         id: "upload-medium-color",
@@ -222,7 +223,7 @@ export const inspectorFieldCatalog = {
         kind: "color",
         label: "Medium Color",
         defaultValue: "#ef4444",
-        allowedScopes: netSpeedLinearSparklineScopeList,
+        allowedScopes: netSpeedChannelColorScopeList,
     }),
     uploadHighColorField: defineField({
         id: "upload-high-color",
@@ -230,7 +231,7 @@ export const inspectorFieldCatalog = {
         kind: "color",
         label: "High Color",
         defaultValue: "#f472b6",
-        allowedScopes: netSpeedLinearSparklineScopeList,
+        allowedScopes: netSpeedChannelColorScopeList,
     }),
     diskReadColorHeadingField: defineField({
         id: "disk-read-color-heading",
