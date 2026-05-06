@@ -127,7 +127,7 @@ export const uploadDynamicChannelColorFieldGroup = defineFieldGroup({
 
 export const diskThroughputChannelColorSettingsFieldGroup = defineFieldGroup({
     name: "diskThroughputChannelColorSettings",
-    include: isDualDiskThroughputSparkline,
+    include: isDualDiskThroughputChannelColor,
     fieldList: [
         inspectorFieldCatalog.colorSettingsHeadingField,
     ],
@@ -135,7 +135,7 @@ export const diskThroughputChannelColorSettingsFieldGroup = defineFieldGroup({
 
 export const diskThroughputChannelThresholdFieldGroup = defineFieldGroup({
     name: "diskThroughputChannelThreshold",
-    include: context => isDualDiskThroughputSparkline(context)
+    include: context => isDualDiskThroughputChannelColor(context)
         && (context.settings.diskReadColorMode === "threshold" || context.settings.diskWriteColorMode === "threshold"),
     fieldList: [
         inspectorFieldCatalog.lowThresholdField,
@@ -145,7 +145,7 @@ export const diskThroughputChannelThresholdFieldGroup = defineFieldGroup({
 
 export const diskReadChannelColorModeFieldGroup = defineFieldGroup({
     name: "diskReadChannelColorMode",
-    include: isDualDiskThroughputSparkline,
+    include: isDualDiskThroughputChannelColor,
     fieldList: [
         inspectorFieldCatalog.diskReadColorHeadingField,
         inspectorFieldCatalog.diskReadColorModeField,
@@ -154,7 +154,7 @@ export const diskReadChannelColorModeFieldGroup = defineFieldGroup({
 
 export const diskReadSolidChannelColorFieldGroup = defineFieldGroup({
     name: "diskReadSolidChannelColor",
-    include: context => isDualDiskThroughputSparkline(context) && context.settings.diskReadColorMode !== "threshold",
+    include: context => isDualDiskThroughputChannelColor(context) && context.settings.diskReadColorMode !== "threshold",
     fieldList: [
         inspectorFieldCatalog.diskReadSolidColorField,
     ],
@@ -162,7 +162,7 @@ export const diskReadSolidChannelColorFieldGroup = defineFieldGroup({
 
 export const diskReadDynamicChannelColorFieldGroup = defineFieldGroup({
     name: "diskReadDynamicChannelColor",
-    include: context => isDualDiskThroughputSparkline(context) && context.settings.diskReadColorMode === "threshold",
+    include: context => isDualDiskThroughputChannelColor(context) && context.settings.diskReadColorMode === "threshold",
     fieldList: [
         inspectorFieldCatalog.diskReadLowColorField,
         inspectorFieldCatalog.diskReadMediumColorField,
@@ -172,7 +172,7 @@ export const diskReadDynamicChannelColorFieldGroup = defineFieldGroup({
 
 export const diskWriteChannelColorModeFieldGroup = defineFieldGroup({
     name: "diskWriteChannelColorMode",
-    include: isDualDiskThroughputSparkline,
+    include: isDualDiskThroughputChannelColor,
     fieldList: [
         inspectorFieldCatalog.diskWriteColorHeadingField,
         inspectorFieldCatalog.diskWriteColorModeField,
@@ -181,7 +181,7 @@ export const diskWriteChannelColorModeFieldGroup = defineFieldGroup({
 
 export const diskWriteSolidChannelColorFieldGroup = defineFieldGroup({
     name: "diskWriteSolidChannelColor",
-    include: context => isDualDiskThroughputSparkline(context) && context.settings.diskWriteColorMode !== "threshold",
+    include: context => isDualDiskThroughputChannelColor(context) && context.settings.diskWriteColorMode !== "threshold",
     fieldList: [
         inspectorFieldCatalog.diskWriteSolidColorField,
     ],
@@ -189,7 +189,7 @@ export const diskWriteSolidChannelColorFieldGroup = defineFieldGroup({
 
 export const diskWriteDynamicChannelColorFieldGroup = defineFieldGroup({
     name: "diskWriteDynamicChannelColor",
-    include: context => isDualDiskThroughputSparkline(context) && context.settings.diskWriteColorMode === "threshold",
+    include: context => isDualDiskThroughputChannelColor(context) && context.settings.diskWriteColorMode === "threshold",
     fieldList: [
         inspectorFieldCatalog.diskWriteLowColorField,
         inspectorFieldCatalog.diskWriteMediumColorField,
@@ -322,7 +322,7 @@ function isMirroredNetworkTraffic(context: VisibilityContext): boolean {
 }
 
 function usesChannelColorSettings(context: VisibilityContext): boolean {
-    return isDualNetworkChannelColor(context) || isDualDiskThroughputSparkline(context);
+    return isDualNetworkChannelColor(context) || isDualDiskThroughputChannelColor(context);
 }
 
 function isDualNetworkChannelColor(context: VisibilityContext): boolean {
@@ -331,9 +331,9 @@ function isDualNetworkChannelColor(context: VisibilityContext): boolean {
         && (context.settings.graphicType === "linear" || context.settings.graphicType === "dashed-line");
 }
 
-function isDualDiskThroughputSparkline(context: VisibilityContext): boolean {
+function isDualDiskThroughputChannelColor(context: VisibilityContext): boolean {
     return context.actionKind === "disk"
         && context.settings.diskMetricKind === "throughput"
         && context.settings.diskThroughputDirection === "both"
-        && context.settings.graphicType === "dashed-line";
+        && (context.settings.graphicType === "circular" || context.settings.graphicType === "dashed-line");
 }

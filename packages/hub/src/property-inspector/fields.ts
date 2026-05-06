@@ -26,7 +26,10 @@ const netSpeedChannelColorScopeList = [
     inspectorScope.netSpeedSparklineScope,
 ] as const;
 const netSpeedSparklineScopeList = [inspectorScope.netSpeedSparklineScope] as const;
-const diskThroughputSparklineScopeList = [inspectorScope.diskThroughputSparklineScope] as const;
+const diskThroughputChannelColorScopeList = [
+    inspectorScope.diskThroughputCircularScope,
+    inspectorScope.diskThroughputSparklineScope,
+] as const;
 const gpuTempScopeList = allMetricScopeList.filter(scopeValue => scopeValue.startsWith("gpu-temp."));
 const gpuPowerScopeList = allMetricScopeList.filter(scopeValue => scopeValue.startsWith("gpu-power."));
 
@@ -237,7 +240,7 @@ export const inspectorFieldCatalog = {
         id: "disk-read-color-heading",
         kind: "heading",
         text: "Read",
-        allowedScopes: diskThroughputSparklineScopeList,
+        allowedScopes: diskThroughputChannelColorScopeList,
     }),
     diskReadColorModeField: defineField({
         id: "disk-read-color-mode",
@@ -245,7 +248,7 @@ export const inspectorFieldCatalog = {
         kind: "select",
         label: "Color Mode",
         defaultValue: "solid",
-        allowedScopes: diskThroughputSparklineScopeList,
+        allowedScopes: diskThroughputChannelColorScopeList,
         options: staticOptions([
             { value: "solid", label: "Solid Color" },
             { value: "threshold", label: "Dynamic (By Percentage)" },
@@ -257,7 +260,7 @@ export const inspectorFieldCatalog = {
         kind: "color",
         label: "Solid Color",
         defaultValue: "#38bdf8",
-        allowedScopes: diskThroughputSparklineScopeList,
+        allowedScopes: diskThroughputChannelColorScopeList,
     }),
     diskReadLowColorField: defineField({
         id: "disk-read-low-color",
@@ -265,7 +268,7 @@ export const inspectorFieldCatalog = {
         kind: "color",
         label: "Low Color",
         defaultValue: "#22c55e",
-        allowedScopes: diskThroughputSparklineScopeList,
+        allowedScopes: diskThroughputChannelColorScopeList,
     }),
     diskReadMediumColorField: defineField({
         id: "disk-read-medium-color",
@@ -273,7 +276,7 @@ export const inspectorFieldCatalog = {
         kind: "color",
         label: "Medium Color",
         defaultValue: "#38bdf8",
-        allowedScopes: diskThroughputSparklineScopeList,
+        allowedScopes: diskThroughputChannelColorScopeList,
     }),
     diskReadHighColorField: defineField({
         id: "disk-read-high-color",
@@ -281,13 +284,13 @@ export const inspectorFieldCatalog = {
         kind: "color",
         label: "High Color",
         defaultValue: "#60a5fa",
-        allowedScopes: diskThroughputSparklineScopeList,
+        allowedScopes: diskThroughputChannelColorScopeList,
     }),
     diskWriteColorHeadingField: defineField({
         id: "disk-write-color-heading",
         kind: "heading",
         text: "Write",
-        allowedScopes: diskThroughputSparklineScopeList,
+        allowedScopes: diskThroughputChannelColorScopeList,
     }),
     diskWriteColorModeField: defineField({
         id: "disk-write-color-mode",
@@ -295,7 +298,7 @@ export const inspectorFieldCatalog = {
         kind: "select",
         label: "Color Mode",
         defaultValue: "solid",
-        allowedScopes: diskThroughputSparklineScopeList,
+        allowedScopes: diskThroughputChannelColorScopeList,
         options: staticOptions([
             { value: "solid", label: "Solid Color" },
             { value: "threshold", label: "Dynamic (By Percentage)" },
@@ -307,7 +310,7 @@ export const inspectorFieldCatalog = {
         kind: "color",
         label: "Solid Color",
         defaultValue: "#f472b6",
-        allowedScopes: diskThroughputSparklineScopeList,
+        allowedScopes: diskThroughputChannelColorScopeList,
     }),
     diskWriteLowColorField: defineField({
         id: "disk-write-low-color",
@@ -315,7 +318,7 @@ export const inspectorFieldCatalog = {
         kind: "color",
         label: "Low Color",
         defaultValue: "#f97316",
-        allowedScopes: diskThroughputSparklineScopeList,
+        allowedScopes: diskThroughputChannelColorScopeList,
     }),
     diskWriteMediumColorField: defineField({
         id: "disk-write-medium-color",
@@ -323,7 +326,7 @@ export const inspectorFieldCatalog = {
         kind: "color",
         label: "Medium Color",
         defaultValue: "#f472b6",
-        allowedScopes: diskThroughputSparklineScopeList,
+        allowedScopes: diskThroughputChannelColorScopeList,
     }),
     diskWriteHighColorField: defineField({
         id: "disk-write-high-color",
@@ -331,7 +334,7 @@ export const inspectorFieldCatalog = {
         kind: "color",
         label: "High Color",
         defaultValue: "#fb7185",
-        allowedScopes: diskThroughputSparklineScopeList,
+        allowedScopes: diskThroughputChannelColorScopeList,
     }),
     diskMetricKindField: defineField({
         id: "disk-metric-kind",

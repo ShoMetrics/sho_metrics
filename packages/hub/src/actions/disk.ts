@@ -13,6 +13,7 @@ import {
     type DiskThroughputDirection,
 } from "../runtime/disk-metric-keys";
 import {
+    isDualDiskThroughputDisplay,
     normalizeDiskThroughputDisplayDirection,
     resolveDiskMetricKeys,
     resolveSingleDiskThroughputDirection,
@@ -111,8 +112,8 @@ export class Disk extends MetricAction {
 
         const throughputDirection = normalizeDiskThroughputDisplayDirection(settings.diskThroughputDirection);
 
-        if (settings.graphicType === "dashed-line" && throughputDirection === "both") {
-            this.updateDualThroughputSparklineDisplay(event, settings);
+        if (isDualDiskThroughputDisplay(settings.graphicType, throughputDirection)) {
+            this.updateDualThroughputDisplay(event, settings);
             return;
         }
 
@@ -141,9 +142,10 @@ export class Disk extends MetricAction {
         });
     }
 
-    private updateDualThroughputSparklineDisplay(event: WillAppearEvent, settings: DiskSettings): void {
+    private updateDualThroughputDisplay(event: WillAppearEvent, settings: DiskSettings): void {
         const readMetricKey = getDiskThroughputMetricKey("read");
         const writeMetricKey = getDiskThroughputMetricKey("write");
+        const dualGraphicType = settings.graphicType === "circular" ? "circular" : undefined;
         const maximumBytesPerSecond = normalizePositiveNumber(
             settings.maximumDiskThroughputMebibytesPerSecond,
             DEFAULT_MAXIMUM_DISK_THROUGHPUT_MEBIBYTES_PER_SECOND,
@@ -164,6 +166,7 @@ export class Disk extends MetricAction {
         setDualMetricDisplay({
             event,
             metricKey: `${readMetricKey},${writeMetricKey}`,
+            dualGraphicType,
             widgetData: {
                 positive: readWidgetData,
                 negative: writeWidgetData,
@@ -171,6 +174,9 @@ export class Disk extends MetricAction {
             titleText: "DISK",
             centerIconFragment: getDiskIconFragment("unknown"),
             statusIcon: getMetricStatusIcon("percentage"),
+            circularCenterContentOverride: dualGraphicType === "circular"
+                ? settings.circularCenterContent === "icon" ? "icon" : "value"
+                : undefined,
             positiveColor: readColor,
             negativeColor: writeColor,
             positiveIconFragment: renderDiskThroughputDirectionIconFragment({
