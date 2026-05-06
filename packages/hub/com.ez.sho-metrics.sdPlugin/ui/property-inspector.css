@@ -98,6 +98,63 @@ body {
     width: 100%;
 }
 
+.graphic-type-picker {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+}
+
+.graphic-type-option {
+    align-items: center;
+    background: #3a3a3a;
+    border: 1px solid #555;
+    border-radius: 6px;
+    box-sizing: border-box;
+    color: #d8d8d8;
+    cursor: pointer;
+    display: grid;
+    gap: 5px;
+    grid-template-rows: 52px auto;
+    justify-items: center;
+    min-width: 0;
+    padding: 7px 6px 6px;
+    position: relative;
+    user-select: none;
+}
+
+.graphic-type-option:disabled {
+    cursor: default;
+}
+
+.graphic-type-option[data-selected="true"] {
+    background: #243447;
+    border-color: #5aa7ff;
+    box-shadow: inset 0 0 0 1px #5aa7ff;
+    color: #ffffff;
+}
+
+.graphic-type-option[data-disabled="true"] {
+    cursor: default;
+    opacity: 0.55;
+}
+
+.graphic-type-preview {
+    aspect-ratio: 1;
+    display: block;
+    height: 52px;
+    width: 52px;
+}
+
+.graphic-type-label {
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.1;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    text-align: center;
+}
+
 .text-field-with-action {
     align-items: center;
     display: grid;

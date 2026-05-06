@@ -3,6 +3,7 @@ import json from "@rollup/plugin-json";
 import nodeResolve from "@rollup/plugin-node-resolve";
 import terser from "@rollup/plugin-terser";
 import typescript from "@rollup/plugin-typescript";
+import fs from "node:fs";
 import path from "node:path";
 import url from "node:url";
 
@@ -29,6 +30,29 @@ function replaceCompileTimeConstants() {
                     .replaceAll("__LOG_LEVEL__", JSON.stringify(logLevel)),
                 map: null,
             };
+        },
+    };
+}
+
+function copyRuntimeAssets() {
+    const assetFiles = [
+        ["assets/fonts/inter/InterVariable.ttf", `${sdPlugin}/assets/fonts/inter/InterVariable.ttf`],
+        ["assets/fonts/inter/LICENSE.txt", `${sdPlugin}/assets/fonts/inter/LICENSE.txt`],
+        ["assets/fonts/inter/README.md", `${sdPlugin}/assets/fonts/inter/README.md`],
+    ];
+
+    return {
+        name: "copy-runtime-assets",
+        buildStart() {
+            for (const [sourceFile] of assetFiles) {
+                this.addWatchFile(sourceFile);
+            }
+        },
+        writeBundle() {
+            for (const [sourceFile, destinationFile] of assetFiles) {
+                fs.mkdirSync(path.dirname(destinationFile), { recursive: true });
+                fs.copyFileSync(sourceFile, destinationFile);
+            }
         },
     };
 }
@@ -79,6 +103,7 @@ const pluginConfig = {
         json(),
         replaceCompileTimeConstants(),
         !isWatching && terser(),
+        copyRuntimeAssets(),
         {
             name: "emit-module-package-file",
             generateBundle() {

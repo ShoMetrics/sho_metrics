@@ -2,7 +2,17 @@ import type { ActionKind, PropertyInspectorSettings, SettingValue } from "./sett
 import type { InspectorScope } from "./scopes";
 
 export type PropertyInspectorSettingKey = Extract<keyof PropertyInspectorSettings, string>;
-export type FieldKind = "select" | "color" | "number" | "range" | "text" | "readonly" | "note" | "heading" | "color-band";
+export type FieldKind =
+    | "select"
+    | "graphic-type-picker"
+    | "color"
+    | "number"
+    | "range"
+    | "text"
+    | "readonly"
+    | "note"
+    | "heading"
+    | "color-band";
 export type OptionProviderId = "networkInterfaces" | "diskVolumes";
 export type FieldValueSource = "selectedDiskVolumeLabel";
 export type FieldPlaceholderSource = "diskAutoLinearLabel";

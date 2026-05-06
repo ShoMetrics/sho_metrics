@@ -77,6 +77,27 @@ test("metric text row escapes values and clamps non-finite coordinates", () => {
     assert.match(svgFragment, /MB\/s &amp;/);
 });
 
+test("metric text row shrinks long values and units into the row width", () => {
+    const svgFragment = renderMetricTextRow({
+        id: "metric-long-value",
+        valueText: "999.9",
+        unitText: "MB/s",
+        xCoordinate: 16,
+        yCoordinate: 61,
+        width: 48,
+        valueFontSize: 24,
+        unitFontSize: 14,
+        fontFamily: "Inter",
+        valueFontWeight: 900,
+        unitFontWeight: 800,
+        valueFill: "white",
+        unitFill: "#aaa",
+    });
+
+    assert.match(svgFragment, /textLength="48" lengthAdjust="spacingAndGlyphs"/);
+    assert.match(svgFragment, /font-size="18\.[0-9]+"/);
+});
+
 test("mirrored traffic renders labels, center line, and both channel graphs", () => {
     const svgFragment = renderMirroredTraffic(buildDualChannelData(), DEFAULT_MIRRORED_TRAFFIC_CONFIG, keySize);
 

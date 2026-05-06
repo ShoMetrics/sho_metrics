@@ -20,10 +20,6 @@ const netSpeedEndpointScopeList = [
     inspectorScope.netSpeedLinearScope,
     inspectorScope.netSpeedSparklineScope,
 ] as const;
-const netSpeedCircularSparklineScopeList = [
-    inspectorScope.netSpeedCircularScope,
-    inspectorScope.netSpeedSparklineScope,
-] as const;
 const netSpeedLinearSparklineScopeList = [
     inspectorScope.netSpeedLinearScope,
     inspectorScope.netSpeedSparklineScope,
@@ -55,13 +51,13 @@ export const inspectorFieldCatalog = {
     graphicTypeField: defineField({
         id: "graphic-type",
         key: "graphicType",
-        kind: "select",
+        kind: "graphic-type-picker",
         label: "Graphic Type",
         defaultValue: "circular",
         allowedScopes: allMetricScopeList,
         options: staticOptions([
-            { value: "circular", label: "Circular" },
-            { value: "linear", label: "Linear" },
+            { value: "circular", label: "Circle" },
+            { value: "linear", label: "Line" },
             { value: "dashed-line", label: "Sparkline" },
         ]),
     }),

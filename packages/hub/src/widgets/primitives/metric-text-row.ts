@@ -1,4 +1,10 @@
-import { clamp, escapeSvgText, type SvgTextAnchor } from "../../rendering/svg-utils";
+import {
+    clamp,
+    escapeSvgText,
+    formatSvgTextFitAttributes,
+    resolveSvgTextFit,
+    type SvgTextAnchor,
+} from "../../rendering/svg-utils";
 
 export interface MetricTextRowOptions {
     id: string;
@@ -32,9 +38,28 @@ export function renderMetricTextRow(options: MetricTextRowOptions): string {
     const width = Math.max(MINIMUM_ROW_WIDTH, options.width);
     const textAnchor = options.textAnchor ?? "start";
     const unitTier = resolveUnitTier(options.unitText);
-    const unitFontSize = options.unitFontSize * unitTier.fontScale;
+    const rawUnitFontSize = options.unitFontSize * unitTier.fontScale;
+    const textFit = resolveSvgTextFit({
+        runs: [
+            {
+                text: options.valueText,
+                fontSize: options.valueFontSize,
+                fontWeight: options.valueFontWeight,
+            },
+            {
+                text: options.unitText,
+                fontSize: rawUnitFontSize,
+                fontWeight: options.unitFontWeight,
+            },
+        ],
+        maxWidth: width,
+        extraWidth: options.unitText.length > 0 ? unitTier.gap : 0,
+    });
+    const valueFontSize = options.valueFontSize * textFit.fontScale;
+    const unitFontSize = rawUnitFontSize * textFit.fontScale;
+    const unitGap = unitTier.gap * textFit.fontScale;
     const clipHeight = options.clipHeight
-        ?? Math.max(options.valueFontSize, unitFontSize) * 1.45;
+        ?? Math.max(valueFontSize, unitFontSize) * 1.45;
     const clipPathId = sanitizeSvgId(options.id);
     const clipXCoordinate = resolveClipXCoordinate(options.xCoordinate, width, textAnchor);
     const clipYCoordinate = options.yCoordinate - clipHeight / 2;
@@ -42,13 +67,14 @@ export function renderMetricTextRow(options: MetricTextRowOptions): string {
         ? ` ${options.valueExtraAttributes.join(" ")}`
         : "";
     const unitTspan = options.unitText.length > 0
-        ? `<tspan dx="${formatSvgNumber(unitTier.gap)}" dy="${formatSvgNumber(options.unitBaselineOffset ?? 0)}"
+        ? `<tspan dx="${formatSvgNumber(unitGap)}" dy="${formatSvgNumber(options.unitBaselineOffset ?? 0)}"
                 font-size="${formatSvgNumber(unitFontSize)}" font-weight="${escapeSvgText(String(options.unitFontWeight))}"
                 fill="${escapeSvgText(options.unitFill)}">${escapeSvgText(options.unitText)}</tspan>`
         : "";
+    const textFitAttributes = formatSvgTextFitAttributes(textFit);
     const textElement = `<text x="${formatSvgNumber(options.xCoordinate)}" y="${formatSvgNumber(options.yCoordinate)}"
                 text-anchor="${textAnchor}" dominant-baseline="middle"
-                font-family="${escapeSvgText(options.fontFamily)}"><tspan font-size="${formatSvgNumber(options.valueFontSize)}"
+                font-family="${escapeSvgText(options.fontFamily)}"${textFitAttributes}><tspan font-size="${formatSvgNumber(valueFontSize)}"
                     font-weight="${escapeSvgText(String(options.valueFontWeight))}"
                     fill="${escapeSvgText(options.valueFill)}"${valueAttributes}>${escapeSvgText(options.valueText)}</tspan>${unitTspan}</text>`;
 

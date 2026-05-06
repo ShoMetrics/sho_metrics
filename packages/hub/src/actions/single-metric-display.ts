@@ -15,16 +15,24 @@ import {
     type SingleMetricDisplaySettings,
     type TouchStripMetricLayout,
 } from "./single-metric-display-model";
-import type { ResolvedMetricVisualSettings } from "./metric-visual-settings";
+import { resolveMetricVisualSettings, type ResolvedMetricVisualSettings } from "./metric-visual-settings";
 import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
 import { logger } from "../logging/logger";
+import { DisplayUpdateQueue } from "./display-update-queue";
+import {
+    DisplayPerformanceStats,
+    formatDisplayPerformanceSummary,
+    type DisplayPerformanceKind,
+    type DisplayPerformanceOutcome,
+} from "./display-performance-stats";
 
 const log = logger.for("SingleMetricDisplay");
 
 const MAX_CONCURRENT_DISPLAY_UPDATES = 1;
 
 const displayActionStates = new Map<string, DisplayActionState>();
-const displayActionQueue: string[] = [];
+const displayActionQueue = new DisplayUpdateQueue();
+const displayPerformanceStats = new DisplayPerformanceStats();
 let activeDisplayUpdateCount = 0;
 let isDisplayQueueDrainScheduled = false;
 
@@ -34,14 +42,21 @@ interface DisplayActionState {
     isQueued: boolean;
     active: boolean;
     pendingOptions: MetricDisplayOptions | null;
+    pendingRequestTimestampMilliseconds: number | null;
+    pendingRequestReason: DisplayRequestReason;
+    pendingSettingsSignature: string | null;
     touchStripLayoutPromise: Promise<void> | null;
     touchStripLayoutPath: string | null;
     lastRenderedSvg: string | null;
+    lastRequestedSettingsSignature: string | null;
 }
+
+type DisplayRequestReason = "settings-change" | "metric-tick";
 
 export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): void {
     const displayActionState = getOrCreateDisplayActionState(options.event.action.id);
 
+    recordDisplayRequest(displayActionState, options);
     displayActionState.pendingOptions = options;
     enqueueDisplayAction(displayActionState);
 }
@@ -49,6 +64,7 @@ export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): voi
 export function setDualMetricDisplay(options: DualMetricDisplayOptions): void {
     const displayActionState = getOrCreateDisplayActionState(options.event.action.id);
 
+    recordDisplayRequest(displayActionState, options);
     displayActionState.pendingOptions = options;
     enqueueDisplayAction(displayActionState);
 }
@@ -63,8 +79,12 @@ export function clearSingleMetricDisplayState(actionId: string): void {
     displayActionState.active = false;
     displayActionState.isQueued = false;
     displayActionState.pendingOptions = null;
+    displayActionState.pendingRequestTimestampMilliseconds = null;
+    displayActionState.pendingRequestReason = "metric-tick";
+    displayActionState.pendingSettingsSignature = null;
     displayActionState.touchStripLayoutPromise = null;
     displayActionState.touchStripLayoutPath = null;
+    displayActionQueue.remove(actionId);
     displayActionStates.delete(actionId);
 }
 
@@ -72,8 +92,15 @@ function renderAndSendSingleMetricDisplay(
     displayActionState: DisplayActionState,
     options: MetricDisplayOptions,
 ): void {
+    const requestTimestampMilliseconds = displayActionState.pendingRequestTimestampMilliseconds;
+    const requestReason = displayActionState.pendingRequestReason;
+    const settingsSignature = displayActionState.pendingSettingsSignature;
+
     displayActionState.isRenderInFlight = true;
     displayActionState.pendingOptions = null;
+    displayActionState.pendingRequestTimestampMilliseconds = null;
+    displayActionState.pendingRequestReason = "metric-tick";
+    displayActionState.pendingSettingsSignature = null;
     activeDisplayUpdateCount += 1;
 
     const renderStartTimestampMilliseconds = Date.now();
@@ -83,8 +110,23 @@ function renderAndSendSingleMetricDisplay(
         settings,
         isDial: options.event.action.isDial(),
     });
+    const displayKind = resolveDisplayPerformanceKind(options.event);
+    const titleClearRequested = options.event.action.isKey();
 
-    if (options.event.action.isKey()) {
+    if (requestReason === "settings-change") {
+        log.info(() => [
+            "settingsDisplayRenderStart",
+            `actionId=${options.event.action.id}`,
+            `metricKey=${options.metricKey}`,
+            `graphicType=${renderPlan.visualSettings.graphicType}`,
+            `queuedMs=${formatElapsedMilliseconds(requestTimestampMilliseconds, renderStartTimestampMilliseconds)}`,
+            `activeUpdates=${activeDisplayUpdateCount}`,
+            `queueLength=${displayActionQueue.length}`,
+            `signature=${settingsSignature ?? "unknown"}`,
+        ].join(" "));
+    }
+
+    if (titleClearRequested) {
         options.event.action.setTitle("").catch(error => {
             log.error(() => `Failed to clear key title: ${error}`);
         });
@@ -139,11 +181,35 @@ function renderAndSendSingleMetricDisplay(
     const composeEndTimestampMilliseconds = Date.now();
 
     if (svg === displayActionState.lastRenderedSvg) {
+        if (requestReason === "settings-change") {
+            log.info(() => [
+                "settingsDisplaySkippedUnchanged",
+                `actionId=${options.event.action.id}`,
+                `metricKey=${options.metricKey}`,
+                `graphicType=${renderPlan.visualSettings.graphicType}`,
+                `queuedMs=${formatElapsedMilliseconds(requestTimestampMilliseconds, renderStartTimestampMilliseconds)}`,
+                `composeMs=${composeEndTimestampMilliseconds - renderStartTimestampMilliseconds}`,
+                `totalMs=${formatElapsedMilliseconds(requestTimestampMilliseconds, composeEndTimestampMilliseconds)}`,
+            ].join(" "));
+        }
+
         logDisplaySkippedDebug({
             actionId: options.event.action.id,
             metricKey: options.metricKey,
             renderStartTimestampMilliseconds,
             composeDurationMilliseconds: composeEndTimestampMilliseconds - renderStartTimestampMilliseconds,
+        });
+        recordDisplayPerformanceSample({
+            requestReason,
+            displayKind,
+            outcome: "skipped",
+            titleClearRequested,
+            requestTimestampMilliseconds,
+            renderStartTimestampMilliseconds,
+            composeEndTimestampMilliseconds,
+            rasterizeEndTimestampMilliseconds: null,
+            updateStartTimestampMilliseconds: null,
+            updateEndTimestampMilliseconds: composeEndTimestampMilliseconds,
         });
         finishDisplayUpdate(displayActionState);
         return;
@@ -153,6 +219,18 @@ function renderAndSendSingleMetricDisplay(
     const rasterizeEndTimestampMilliseconds = Date.now();
 
     if (!pngDataUrl) {
+        recordDisplayPerformanceSample({
+            requestReason,
+            displayKind,
+            outcome: "failed",
+            titleClearRequested,
+            requestTimestampMilliseconds,
+            renderStartTimestampMilliseconds,
+            composeEndTimestampMilliseconds,
+            rasterizeEndTimestampMilliseconds,
+            updateStartTimestampMilliseconds: null,
+            updateEndTimestampMilliseconds: rasterizeEndTimestampMilliseconds,
+        });
         finishDisplayUpdate(displayActionState);
         return;
     }
@@ -178,7 +256,32 @@ function renderAndSendSingleMetricDisplay(
             const updateStartTimestampMilliseconds = Date.now();
             options.event.action.setFeedback({ metricImage: pngDataUrl })
                 .then(() => {
+                    const updateEndTimestampMilliseconds = Date.now();
                     displayActionState.lastRenderedSvg = svg;
+                    recordDisplayPerformanceSample({
+                        requestReason,
+                        displayKind,
+                        outcome: "rendered",
+                        titleClearRequested,
+                        requestTimestampMilliseconds,
+                        renderStartTimestampMilliseconds,
+                        composeEndTimestampMilliseconds,
+                        rasterizeEndTimestampMilliseconds,
+                        updateStartTimestampMilliseconds,
+                        updateEndTimestampMilliseconds,
+                    });
+                    logSettingsUpdateDoneInfo({
+                        requestReason,
+                        actionId: options.event.action.id,
+                        metricKey: options.metricKey,
+                        phase: "setFeedbackDone",
+                        graphicType: renderPlan.visualSettings.graphicType,
+                        requestTimestampMilliseconds,
+                        renderStartTimestampMilliseconds,
+                        composeEndTimestampMilliseconds,
+                        rasterizeEndTimestampMilliseconds,
+                        updateStartTimestampMilliseconds,
+                    });
                     logUpdateDoneDebug({
                         actionId: options.event.action.id,
                         metricKey: options.metricKey,
@@ -188,6 +291,19 @@ function renderAndSendSingleMetricDisplay(
                     });
                 })
                 .catch(error => {
+                    const updateEndTimestampMilliseconds = Date.now();
+                    recordDisplayPerformanceSample({
+                        requestReason,
+                        displayKind,
+                        outcome: "failed",
+                        titleClearRequested,
+                        requestTimestampMilliseconds,
+                        renderStartTimestampMilliseconds,
+                        composeEndTimestampMilliseconds,
+                        rasterizeEndTimestampMilliseconds,
+                        updateStartTimestampMilliseconds,
+                        updateEndTimestampMilliseconds,
+                    });
                     log.error(() => `Failed to set touch strip feedback: ${error}`);
                 })
                 .finally(() => {
@@ -198,6 +314,19 @@ function renderAndSendSingleMetricDisplay(
         ensureTouchStripSingleMetricLayout(displayActionState, options.event, renderPlan.touchStripMetricLayout)
             .then(setFeedback)
             .catch(error => {
+                const updateEndTimestampMilliseconds = Date.now();
+                recordDisplayPerformanceSample({
+                    requestReason,
+                    displayKind,
+                    outcome: "failed",
+                    titleClearRequested,
+                    requestTimestampMilliseconds,
+                    renderStartTimestampMilliseconds,
+                    composeEndTimestampMilliseconds,
+                    rasterizeEndTimestampMilliseconds,
+                    updateStartTimestampMilliseconds: null,
+                    updateEndTimestampMilliseconds,
+                });
                 log.error(() => `Failed to update touch strip metric image: ${error}`);
                 finishDisplayUpdate(displayActionState);
             });
@@ -208,7 +337,32 @@ function renderAndSendSingleMetricDisplay(
         const updateStartTimestampMilliseconds = Date.now();
         options.event.action.setImage(pngDataUrl)
             .then(() => {
+                const updateEndTimestampMilliseconds = Date.now();
                 displayActionState.lastRenderedSvg = svg;
+                recordDisplayPerformanceSample({
+                    requestReason,
+                    displayKind,
+                    outcome: "rendered",
+                    titleClearRequested,
+                    requestTimestampMilliseconds,
+                    renderStartTimestampMilliseconds,
+                    composeEndTimestampMilliseconds,
+                    rasterizeEndTimestampMilliseconds,
+                    updateStartTimestampMilliseconds,
+                    updateEndTimestampMilliseconds,
+                });
+                logSettingsUpdateDoneInfo({
+                    requestReason,
+                    actionId: options.event.action.id,
+                    metricKey: options.metricKey,
+                    phase: "setImageDone",
+                    graphicType: renderPlan.visualSettings.graphicType,
+                    requestTimestampMilliseconds,
+                    renderStartTimestampMilliseconds,
+                    composeEndTimestampMilliseconds,
+                    rasterizeEndTimestampMilliseconds,
+                    updateStartTimestampMilliseconds,
+                });
                 logUpdateDoneDebug({
                     actionId: options.event.action.id,
                     metricKey: options.metricKey,
@@ -218,6 +372,19 @@ function renderAndSendSingleMetricDisplay(
                 });
             })
             .catch(error => {
+                const updateEndTimestampMilliseconds = Date.now();
+                recordDisplayPerformanceSample({
+                    requestReason,
+                    displayKind,
+                    outcome: "failed",
+                    titleClearRequested,
+                    requestTimestampMilliseconds,
+                    renderStartTimestampMilliseconds,
+                    composeEndTimestampMilliseconds,
+                    rasterizeEndTimestampMilliseconds,
+                    updateStartTimestampMilliseconds,
+                    updateEndTimestampMilliseconds,
+                });
                 log.error(() => `Failed to set key image: ${error}`);
             })
             .finally(() => {
@@ -226,6 +393,18 @@ function renderAndSendSingleMetricDisplay(
         return;
     }
 
+    recordDisplayPerformanceSample({
+        requestReason,
+        displayKind,
+        outcome: "failed",
+        titleClearRequested,
+        requestTimestampMilliseconds,
+        renderStartTimestampMilliseconds,
+        composeEndTimestampMilliseconds,
+        rasterizeEndTimestampMilliseconds,
+        updateStartTimestampMilliseconds: null,
+        updateEndTimestampMilliseconds: Date.now(),
+    });
     finishDisplayUpdate(displayActionState);
 }
 
@@ -307,25 +486,64 @@ function getOrCreateDisplayActionState(actionId: string): DisplayActionState {
         isQueued: false,
         active: true,
         pendingOptions: null,
+        pendingRequestTimestampMilliseconds: null,
+        pendingRequestReason: "metric-tick",
+        pendingSettingsSignature: null,
         touchStripLayoutPromise: null,
         touchStripLayoutPath: null,
         lastRenderedSvg: null,
+        lastRequestedSettingsSignature: null,
     };
     displayActionStates.set(actionId, displayActionState);
     return displayActionState;
 }
 
+function recordDisplayRequest(displayActionState: DisplayActionState, options: MetricDisplayOptions): void {
+    const settingsSignature = buildSettingsSignature(options.event.payload.settings as SingleMetricDisplaySettings);
+    const isSettingsChange = displayActionState.lastRequestedSettingsSignature !== null
+        && displayActionState.lastRequestedSettingsSignature !== settingsSignature;
+    const requestTimestampMilliseconds = Date.now();
+
+    displayActionState.lastRequestedSettingsSignature = settingsSignature;
+
+    if (!isSettingsChange && displayActionState.pendingRequestReason === "settings-change") {
+        return;
+    }
+
+    displayActionState.pendingRequestTimestampMilliseconds = requestTimestampMilliseconds;
+    displayActionState.pendingRequestReason = isSettingsChange ? "settings-change" : "metric-tick";
+    displayActionState.pendingSettingsSignature = settingsSignature;
+
+    if (!isSettingsChange) {
+        return;
+    }
+
+    const visualSettings = resolveMetricVisualSettings(options.event.payload.settings as SingleMetricDisplaySettings);
+
+    log.info(() => [
+        "settingsDisplayRequested",
+        `actionId=${options.event.action.id}`,
+        `metricKey=${options.metricKey}`,
+        `graphicType=${visualSettings.graphicType}`,
+        `displayKind=${isDualMetricDisplayOptions(options) ? "dual" : "single"}`,
+        `isRenderInFlight=${displayActionState.isRenderInFlight}`,
+        `isQueued=${displayActionState.isQueued}`,
+        `activeUpdates=${activeDisplayUpdateCount}`,
+        `queueLength=${displayActionQueue.length}`,
+        `signature=${settingsSignature}`,
+    ].join(" "));
+}
+
 function enqueueDisplayAction(displayActionState: DisplayActionState): void {
     if (
         !displayActionState.active
-        || displayActionState.isQueued
         || displayActionState.isRenderInFlight
     ) {
         return;
     }
 
+    displayActionQueue.enqueue(displayActionState.actionId, displayActionState.pendingRequestReason);
     displayActionState.isQueued = true;
-    displayActionQueue.push(displayActionState.actionId);
     scheduleDisplayQueueDrain();
 }
 
@@ -345,7 +563,7 @@ function drainDisplayQueue(): void {
         activeDisplayUpdateCount < MAX_CONCURRENT_DISPLAY_UPDATES
         && displayActionQueue.length > 0
     ) {
-        const actionId = displayActionQueue.shift();
+        const actionId = displayActionQueue.dequeue();
         if (!actionId) {
             continue;
         }
@@ -427,6 +645,61 @@ function ensureTouchStripSingleMetricLayout(
     return layoutPromise;
 }
 
+function resolveDisplayPerformanceKind(event: WillAppearEvent): DisplayPerformanceKind {
+    if (event.action.isKey()) {
+        return "key";
+    }
+
+    if (event.action.isDial()) {
+        return "dial";
+    }
+
+    return "unknown";
+}
+
+function recordDisplayPerformanceSample(options: {
+    requestReason: DisplayRequestReason;
+    displayKind: DisplayPerformanceKind;
+    outcome: DisplayPerformanceOutcome;
+    titleClearRequested: boolean;
+    requestTimestampMilliseconds: number | null;
+    renderStartTimestampMilliseconds: number;
+    composeEndTimestampMilliseconds: number;
+    rasterizeEndTimestampMilliseconds: number | null;
+    updateStartTimestampMilliseconds: number | null;
+    updateEndTimestampMilliseconds: number;
+}): void {
+    const summary = displayPerformanceStats.record({
+        requestReason: options.requestReason,
+        displayKind: options.displayKind,
+        outcome: options.outcome,
+        queuedMilliseconds: calculateElapsedMilliseconds(
+            options.requestTimestampMilliseconds,
+            options.renderStartTimestampMilliseconds,
+        ),
+        composeMilliseconds: options.composeEndTimestampMilliseconds - options.renderStartTimestampMilliseconds,
+        rasterizeMilliseconds: calculateStepMilliseconds(
+            options.composeEndTimestampMilliseconds,
+            options.rasterizeEndTimestampMilliseconds,
+        ),
+        sdkPromiseMilliseconds: calculateStepMilliseconds(
+            options.updateStartTimestampMilliseconds,
+            options.updateEndTimestampMilliseconds,
+        ),
+        totalMilliseconds: calculateElapsedMilliseconds(
+            options.requestTimestampMilliseconds,
+            options.updateEndTimestampMilliseconds,
+        ) ?? Math.max(0, options.updateEndTimestampMilliseconds - options.renderStartTimestampMilliseconds),
+        queueLength: displayActionQueue.length,
+        activeActionCount: displayActionStates.size,
+        titleClearRequested: options.titleClearRequested,
+    }, options.updateEndTimestampMilliseconds);
+
+    if (summary) {
+        log.info(() => formatDisplayPerformanceSummary(summary));
+    }
+}
+
 function logDisplayDebug(options: {
     actionId: string;
     metricKey: string;
@@ -467,6 +740,38 @@ function logUpdateDoneDebug(options: {
     ].join(" "));
 }
 
+function logSettingsUpdateDoneInfo(options: {
+    requestReason: DisplayRequestReason;
+    actionId: string;
+    metricKey: string;
+    phase: string;
+    graphicType: string;
+    requestTimestampMilliseconds: number | null;
+    renderStartTimestampMilliseconds: number;
+    composeEndTimestampMilliseconds: number;
+    rasterizeEndTimestampMilliseconds: number;
+    updateStartTimestampMilliseconds: number;
+}): void {
+    if (options.requestReason !== "settings-change") {
+        return;
+    }
+
+    const currentTimestampMilliseconds = Date.now();
+
+    log.info(() => [
+        "settingsDisplayUpdateDone",
+        `phase=${options.phase}`,
+        `actionId=${options.actionId}`,
+        `metricKey=${options.metricKey}`,
+        `graphicType=${options.graphicType}`,
+        `queuedMs=${formatElapsedMilliseconds(options.requestTimestampMilliseconds, options.renderStartTimestampMilliseconds)}`,
+        `composeMs=${options.composeEndTimestampMilliseconds - options.renderStartTimestampMilliseconds}`,
+        `rasterizeMs=${options.rasterizeEndTimestampMilliseconds - options.composeEndTimestampMilliseconds}`,
+        `sdkPromiseMs=${currentTimestampMilliseconds - options.updateStartTimestampMilliseconds}`,
+        `totalMs=${formatElapsedMilliseconds(options.requestTimestampMilliseconds, currentTimestampMilliseconds)}`,
+    ].join(" "));
+}
+
 function logDisplaySkippedDebug(options: {
     actionId: string;
     metricKey: string;
@@ -492,4 +797,57 @@ function formatAgeMilliseconds(
     }
 
     return String(currentTimestampMilliseconds - sampleTimestampMilliseconds);
+}
+
+function buildSettingsSignature(settings: SingleMetricDisplaySettings): string {
+    const visualSettings = resolveMetricVisualSettings(settings);
+
+    return [
+        `graphicType=${visualSettings.graphicType}`,
+        `graphicStyle=${visualSettings.graphicStyle}`,
+        `colorMode=${String(settings.colorMode ?? "")}`,
+        `solidColor=${String(settings.solidColor ?? "")}`,
+        `lineSmoothingPercent=${visualSettings.lineSmoothingPercent}`,
+        `gridLineVisibility=${visualSettings.gridLineVisibility}`,
+        `gridLineType=${visualSettings.gridLineType}`,
+        `circularCenterContent=${String(settings.circularCenterContent ?? "")}`,
+    ].join(";");
+}
+
+function formatElapsedMilliseconds(
+    startTimestampMilliseconds: number | null,
+    endTimestampMilliseconds: number,
+): string {
+    const elapsedMilliseconds = calculateElapsedMilliseconds(
+        startTimestampMilliseconds,
+        endTimestampMilliseconds,
+    );
+
+    if (elapsedMilliseconds == null) {
+        return "unknown";
+    }
+
+    return String(elapsedMilliseconds);
+}
+
+function calculateElapsedMilliseconds(
+    startTimestampMilliseconds: number | null,
+    endTimestampMilliseconds: number,
+): number | null {
+    if (startTimestampMilliseconds == null) {
+        return null;
+    }
+
+    return Math.max(0, endTimestampMilliseconds - startTimestampMilliseconds);
+}
+
+function calculateStepMilliseconds(
+    startTimestampMilliseconds: number | null,
+    endTimestampMilliseconds: number | null,
+): number | null {
+    if (startTimestampMilliseconds == null || endTimestampMilliseconds == null) {
+        return null;
+    }
+
+    return Math.max(0, endTimestampMilliseconds - startTimestampMilliseconds);
 }

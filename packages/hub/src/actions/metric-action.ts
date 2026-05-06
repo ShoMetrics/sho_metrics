@@ -1,8 +1,11 @@
 import { SingletonAction, WillAppearEvent, WillDisappearEvent, DidReceiveSettingsEvent } from "@elgato/streamdeck";
 import { scheduler } from "../runtime/scheduler";
 import { clearSingleMetricDisplayState } from "./single-metric-display";
+import { logger } from "../logging/logger";
 
 type MetricActionSettings = Record<string, unknown>;
+
+const log = logger.for("MetricAction");
 
 interface ActiveMetricAction {
     cleanup: () => void;
@@ -29,6 +32,18 @@ export abstract class MetricAction extends SingletonAction {
     override onDidReceiveSettings(event: DidReceiveSettingsEvent): void {
         const activeEvent = this.activeEvents.get(event.action.id);
         if (activeEvent) {
+            const previousSettings = activeEvent.payload.settings as MetricActionSettings;
+            const nextSettings = event.payload.settings as MetricActionSettings;
+
+            log.info(() => [
+                "settingsReceived",
+                `actionId=${event.action.id}`,
+                `previousGraphicType=${formatSettingValue(previousSettings.graphicType)}`,
+                `nextGraphicType=${formatSettingValue(nextSettings.graphicType)}`,
+                `previousPollingFrequencySeconds=${formatSettingValue(previousSettings.pollingFrequencySeconds)}`,
+                `nextPollingFrequencySeconds=${formatSettingValue(nextSettings.pollingFrequencySeconds)}`,
+            ].join(" "));
+
             // Update the settings in the active event so the polling loop sees them.
             activeEvent.payload.settings = event.payload.settings;
             this.resubscribeActionIfFrequencyChanged(activeEvent);
@@ -124,4 +139,12 @@ const ALLOWED_POLLING_FREQUENCY_SECONDS = new Set([1, 2, 3, 5, 10, 15, 30, 60]);
 
 function normalizeMetricKeys(metricKeys: readonly string[]): readonly string[] {
     return Array.from(new Set(metricKeys)).sort();
+}
+
+function formatSettingValue(value: unknown): string {
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+        return String(value);
+    }
+
+    return "unset";
 }
