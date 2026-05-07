@@ -8,6 +8,7 @@ import {
     normalizePollingFrequency,
     normalizePositiveNumber,
     normalizePropertyInspectorSettings,
+    normalizeScaleMode,
     normalizeTemperatureUnit,
     normalizeThreshold,
     resolveDefaultDiskPollingFrequency,
@@ -74,16 +75,27 @@ export function normalizeNextSettings(options: {
         diskMetricKind,
         diskUsageDisplayMode: normalizeDiskUsageDisplayMode(rawSettings.diskUsageDisplayMode),
         diskThroughputDirection: normalizeDiskThroughputDirection(rawSettings.diskThroughputDirection),
-        maximumDiskThroughputMebibytesPerSecond: normalizePositiveNumber(
-            rawSettings.maximumDiskThroughputMebibytesPerSecond,
-            basePropertyInspectorSettings.maximumDiskThroughputMebibytesPerSecond,
+        networkScaleMode: options.changedKey === "maximumDownloadSpeedMbps"
+            || options.changedKey === "maximumUploadSpeedMbps"
+            ? "custom"
+            : normalizeScaleMode(rawSettings.networkScaleMode),
+        diskThroughputScaleMode: options.changedKey === "maximumDiskReadThroughputMebibytesPerSecond"
+            || options.changedKey === "maximumDiskWriteThroughputMebibytesPerSecond"
+            ? "custom"
+            : normalizeScaleMode(rawSettings.diskThroughputScaleMode),
+        maximumDiskReadThroughputMebibytesPerSecond: normalizeOptionalPositiveNumber(
+            rawSettings.maximumDiskReadThroughputMebibytesPerSecond,
+        ),
+        maximumDiskWriteThroughputMebibytesPerSecond: normalizeOptionalPositiveNumber(
+            rawSettings.maximumDiskWriteThroughputMebibytesPerSecond,
         ),
         maximumTemperatureCelsius: normalizePositiveNumber(
             rawSettings.maximumTemperatureCelsius,
             basePropertyInspectorSettings.maximumTemperatureCelsius,
         ),
         maximumGpuPowerWatts: normalizeOptionalPositiveNumber(rawSettings.maximumGpuPowerWatts),
-        maximumNetworkSpeedMbps: normalizeOptionalPositiveNumber(rawSettings.maximumNetworkSpeedMbps),
+        maximumDownloadSpeedMbps: normalizeOptionalPositiveNumber(rawSettings.maximumDownloadSpeedMbps),
+        maximumUploadSpeedMbps: normalizeOptionalPositiveNumber(rawSettings.maximumUploadSpeedMbps),
         networkDirection,
         networkUnitBase: rawSettings.networkUnitBase === "bit" ? "bit" : "byte",
         temperatureUnit: normalizeTemperatureUnit(rawSettings.temperatureUnit),

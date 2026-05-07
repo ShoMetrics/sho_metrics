@@ -24,6 +24,7 @@ export type DiskThroughputDirection = "both" | "total" | "read" | "write";
 export type TemperatureUnit = "celsius" | "fahrenheit";
 export type GridLineVisibility = "adaptive" | "always" | "none";
 export type GridLineType = "horizontal" | "vertical";
+export type ScaleMode = "auto" | "custom";
 
 export interface PropertyInspectorSettings {
     pollingFrequencySeconds: number;
@@ -44,14 +45,14 @@ export interface PropertyInspectorSettings {
     networkTrafficDisplayMode: NetworkTrafficDisplayMode;
     networkInterfaceId: string;
     availableNetworkInterfaces: string;
-    maximumNetworkSpeedMbps: number | "";
+    networkScaleMode: ScaleMode;
+    maximumDownloadSpeedMbps: number | "";
+    maximumUploadSpeedMbps: number | "";
     networkUnitBase: NetworkUnitBase;
-    downloadColorMode: ColorMode;
     downloadSolidColor: string;
     downloadColorLow: string;
     downloadColorMedium: string;
     downloadColorHigh: string;
-    uploadColorMode: ColorMode;
     uploadSolidColor: string;
     uploadColorLow: string;
     uploadColorMedium: string;
@@ -63,13 +64,13 @@ export interface PropertyInspectorSettings {
     diskVolumeId: string;
     availableDiskVolumes: string;
     diskLinearLabel: string;
-    maximumDiskThroughputMebibytesPerSecond: number;
-    diskReadColorMode: ColorMode;
+    diskThroughputScaleMode: ScaleMode;
+    maximumDiskReadThroughputMebibytesPerSecond: number | "";
+    maximumDiskWriteThroughputMebibytesPerSecond: number | "";
     diskReadSolidColor: string;
     diskReadColorLow: string;
     diskReadColorMedium: string;
     diskReadColorHigh: string;
-    diskWriteColorMode: ColorMode;
     diskWriteSolidColor: string;
     diskWriteColorLow: string;
     diskWriteColorMedium: string;
@@ -97,14 +98,14 @@ export const basePropertyInspectorSettings: PropertyInspectorSettings = {
     networkTrafficDisplayMode: "mirrored",
     networkInterfaceId: "",
     availableNetworkInterfaces: "[]",
-    maximumNetworkSpeedMbps: "",
+    networkScaleMode: "auto",
+    maximumDownloadSpeedMbps: "",
+    maximumUploadSpeedMbps: "",
     networkUnitBase: "byte",
-    downloadColorMode: "solid",
     downloadSolidColor: "#3b82f6",
     downloadColorLow: "#22c55e",
     downloadColorMedium: "#3b82f6",
     downloadColorHigh: "#60a5fa",
-    uploadColorMode: "solid",
     uploadSolidColor: "#ef4444",
     uploadColorLow: "#f97316",
     uploadColorMedium: "#ef4444",
@@ -116,13 +117,13 @@ export const basePropertyInspectorSettings: PropertyInspectorSettings = {
     diskVolumeId: "",
     availableDiskVolumes: "[]",
     diskLinearLabel: "",
-    maximumDiskThroughputMebibytesPerSecond: 1000,
-    diskReadColorMode: "solid",
+    diskThroughputScaleMode: "auto",
+    maximumDiskReadThroughputMebibytesPerSecond: "",
+    maximumDiskWriteThroughputMebibytesPerSecond: "",
     diskReadSolidColor: "#38bdf8",
     diskReadColorLow: "#22c55e",
     diskReadColorMedium: "#38bdf8",
     diskReadColorHigh: "#60a5fa",
-    diskWriteColorMode: "solid",
     diskWriteSolidColor: "#f472b6",
     diskWriteColorLow: "#f97316",
     diskWriteColorMedium: "#f472b6",
@@ -171,7 +172,9 @@ export function normalizePropertyInspectorSettings(
             rawSettings.availableNetworkInterfaces,
             basePropertyInspectorSettings.availableNetworkInterfaces,
         ),
-        maximumNetworkSpeedMbps: normalizeOptionalPositiveNumber(rawSettings.maximumNetworkSpeedMbps),
+        networkScaleMode: normalizeScaleMode(rawSettings.networkScaleMode),
+        maximumDownloadSpeedMbps: normalizeOptionalPositiveNumber(rawSettings.maximumDownloadSpeedMbps),
+        maximumUploadSpeedMbps: normalizeOptionalPositiveNumber(rawSettings.maximumUploadSpeedMbps),
         networkUnitBase: rawSettings.networkUnitBase === "bit" ? "bit" : "byte",
         maximumTemperatureCelsius: normalizePositiveNumber(
             rawSettings.maximumTemperatureCelsius,
@@ -188,26 +191,25 @@ export function normalizePropertyInspectorSettings(
             basePropertyInspectorSettings.availableDiskVolumes,
         ),
         diskLinearLabel: normalizeString(rawSettings.diskLinearLabel, basePropertyInspectorSettings.diskLinearLabel),
-        maximumDiskThroughputMebibytesPerSecond: normalizePositiveNumber(
-            rawSettings.maximumDiskThroughputMebibytesPerSecond ?? rawSettings.maximumDiskThroughputMbps,
-            basePropertyInspectorSettings.maximumDiskThroughputMebibytesPerSecond,
+        diskThroughputScaleMode: normalizeScaleMode(rawSettings.diskThroughputScaleMode),
+        maximumDiskReadThroughputMebibytesPerSecond: normalizeOptionalPositiveNumber(
+            rawSettings.maximumDiskReadThroughputMebibytesPerSecond,
         ),
-        downloadColorMode: normalizeChannelColorMode(rawSettings.downloadColorMode),
+        maximumDiskWriteThroughputMebibytesPerSecond: normalizeOptionalPositiveNumber(
+            rawSettings.maximumDiskWriteThroughputMebibytesPerSecond,
+        ),
         downloadSolidColor: normalizeHexColor(rawSettings.downloadSolidColor, basePropertyInspectorSettings.downloadSolidColor),
         downloadColorLow: normalizeHexColor(rawSettings.downloadColorLow, basePropertyInspectorSettings.downloadColorLow),
         downloadColorMedium: normalizeHexColor(rawSettings.downloadColorMedium, basePropertyInspectorSettings.downloadColorMedium),
         downloadColorHigh: normalizeHexColor(rawSettings.downloadColorHigh, basePropertyInspectorSettings.downloadColorHigh),
-        uploadColorMode: normalizeChannelColorMode(rawSettings.uploadColorMode),
         uploadSolidColor: normalizeHexColor(rawSettings.uploadSolidColor, basePropertyInspectorSettings.uploadSolidColor),
         uploadColorLow: normalizeHexColor(rawSettings.uploadColorLow, basePropertyInspectorSettings.uploadColorLow),
         uploadColorMedium: normalizeHexColor(rawSettings.uploadColorMedium, basePropertyInspectorSettings.uploadColorMedium),
         uploadColorHigh: normalizeHexColor(rawSettings.uploadColorHigh, basePropertyInspectorSettings.uploadColorHigh),
-        diskReadColorMode: normalizeChannelColorMode(rawSettings.diskReadColorMode),
         diskReadSolidColor: normalizeHexColor(rawSettings.diskReadSolidColor, basePropertyInspectorSettings.diskReadSolidColor),
         diskReadColorLow: normalizeHexColor(rawSettings.diskReadColorLow, basePropertyInspectorSettings.diskReadColorLow),
         diskReadColorMedium: normalizeHexColor(rawSettings.diskReadColorMedium, basePropertyInspectorSettings.diskReadColorMedium),
         diskReadColorHigh: normalizeHexColor(rawSettings.diskReadColorHigh, basePropertyInspectorSettings.diskReadColorHigh),
-        diskWriteColorMode: normalizeChannelColorMode(rawSettings.diskWriteColorMode),
         diskWriteSolidColor: normalizeHexColor(rawSettings.diskWriteSolidColor, basePropertyInspectorSettings.diskWriteSolidColor),
         diskWriteColorLow: normalizeHexColor(rawSettings.diskWriteColorLow, basePropertyInspectorSettings.diskWriteColorLow),
         diskWriteColorMedium: normalizeHexColor(rawSettings.diskWriteColorMedium, basePropertyInspectorSettings.diskWriteColorMedium),
@@ -325,6 +327,10 @@ export function normalizeTemperatureUnit(value: SettingValue): TemperatureUnit {
     return value === "fahrenheit" ? "fahrenheit" : "celsius";
 }
 
+export function normalizeScaleMode(value: SettingValue): ScaleMode {
+    return value === "custom" ? "custom" : "auto";
+}
+
 export function normalizeGridLineVisibility(value: SettingValue): GridLineVisibility {
     if (value === "none") {
         return "none";
@@ -387,15 +393,15 @@ function normalizeCircleStyle(value: SettingValue): CircleStyle {
 }
 
 function normalizeColorMode(value: SettingValue, actionKind: ActionKind): ColorMode {
+    if (value === "threshold") {
+        return "threshold";
+    }
+
     if (value === "solid") {
         return "solid";
     }
 
     return actionKind === "net-speed" ? "solid" : "threshold";
-}
-
-function normalizeChannelColorMode(value: SettingValue): ColorMode {
-    return value === "threshold" ? "threshold" : "solid";
 }
 
 function normalizeHexColor(value: SettingValue, fallbackColor: string): string {

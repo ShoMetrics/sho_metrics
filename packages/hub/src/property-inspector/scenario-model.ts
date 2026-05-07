@@ -26,7 +26,8 @@ export type ScenarioSectionId =
     | "source"
     | "appearance"
     | "visual-guides"
-    | "color";
+    | "color"
+    | "update";
 
 export interface ScenarioFieldGroup {
     name: string;

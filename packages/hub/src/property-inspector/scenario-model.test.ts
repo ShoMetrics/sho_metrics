@@ -21,6 +21,7 @@ test("network mirrored sparkline resolves stable UI sections in scenario order",
         "appearance",
         "visual-guides",
         "color",
+        "update",
     ]);
 });
 
@@ -37,6 +38,7 @@ test("network single-direction sparkline omits traffic display section when grou
         "source",
         "visual-guides",
         "color",
+        "update",
     ]);
 });
 
@@ -56,12 +58,14 @@ test("disk usage linear separates source label and color sections", () => {
         "source",
         "content",
         "color",
+        "update",
     ]);
     assert.deepEqual(sectionList.map(section => section.fieldGroupList.map(fieldGroup => fieldGroup.name)), [
         ["base"],
         ["diskUsageBase"],
         ["diskUsageLinearLabel"],
         ["colorSettings", "thresholdColor"],
+        ["update"],
     ]);
 });
 

@@ -62,6 +62,7 @@ export class Disk extends MetricAction {
         const metricKind = normalizeDiskMetricKind(settings.diskMetricKind);
 
         publishDiskVolumeOptions(event, settings);
+        publishDiskThroughputScaleLearning(event, settings);
 
         if (metricKind === "throughput") {
             this.updateThroughputDisplay(event, settings);
@@ -136,10 +137,11 @@ export class Disk extends MetricAction {
             metricKey: throughputMetricKey,
             widgetData: buildDiskThroughputWidgetData({
                 bytesPerSecondWidgetData,
-                maximumBytesPerSecond: normalizePositiveNumber(
-                    settings.maximumDiskThroughputMebibytesPerSecond,
-                    DEFAULT_MAXIMUM_DISK_THROUGHPUT_MEBIBYTES_PER_SECOND,
-                ) * 1024 * 1024,
+                maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond(
+                    singleThroughputDirection,
+                    settings,
+                    selectedVolume,
+                ),
                 label: throughputLabel,
             }),
             centerIconFragment: getDiskIconFragment("unknown"),
@@ -161,18 +163,15 @@ export class Disk extends MetricAction {
         const dualGraphicType = settings.graphicType === "circular"
             ? "circular"
             : settings.graphicType === "text" ? "text" : undefined;
-        const maximumBytesPerSecond = normalizePositiveNumber(
-            settings.maximumDiskThroughputMebibytesPerSecond,
-            DEFAULT_MAXIMUM_DISK_THROUGHPUT_MEBIBYTES_PER_SECOND,
-        ) * 1024 * 1024;
+        const selectedVolume = resolveSelectedDiskVolume(settings.diskVolumeId);
         const readWidgetData = buildDiskThroughputWidgetData({
             bytesPerSecondWidgetData: metricStore.getWidgetData(readMetricKey, "READ", "B/s"),
-            maximumBytesPerSecond,
+            maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("read", settings, selectedVolume),
             label: "READ",
         });
         const writeWidgetData = buildDiskThroughputWidgetData({
             bytesPerSecondWidgetData: metricStore.getWidgetData(writeMetricKey, "WRIT", "B/s"),
-            maximumBytesPerSecond,
+            maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("write", settings, selectedVolume),
             label: "WRIT",
         });
         const readColor = resolveDiskWidgetChannelColor("read", settings, readWidgetData);
@@ -299,17 +298,17 @@ export interface DiskSettings {
     diskVolumeId?: SettingValue;
     availableDiskVolumes?: SettingValue;
     diskLinearLabel?: SettingValue;
-    maximumDiskThroughputMebibytesPerSecond?: SettingValue;
+    diskThroughputScaleMode?: SettingValue;
+    maximumDiskReadThroughputMebibytesPerSecond?: SettingValue;
+    maximumDiskWriteThroughputMebibytesPerSecond?: SettingValue;
     pollingFrequencySeconds?: SettingValue;
     circleStyle?: SettingValue;
     colorMode?: SettingValue;
     solidColor?: SettingValue;
-    diskReadColorMode?: SettingValue;
     diskReadSolidColor?: SettingValue;
     diskReadColorLow?: SettingValue;
     diskReadColorMedium?: SettingValue;
     diskReadColorHigh?: SettingValue;
-    diskWriteColorMode?: SettingValue;
     diskWriteSolidColor?: SettingValue;
     diskWriteColorLow?: SettingValue;
     diskWriteColorMedium?: SettingValue;
@@ -318,7 +317,13 @@ export interface DiskSettings {
     highThreshold?: SettingValue;
 }
 
-const DEFAULT_MAXIMUM_DISK_THROUGHPUT_MEBIBYTES_PER_SECOND = 1000;
+const DEFAULT_HDD_READ_THROUGHPUT_MEBIBYTES_PER_SECOND = 220;
+const DEFAULT_HDD_WRITE_THROUGHPUT_MEBIBYTES_PER_SECOND = 180;
+const DEFAULT_SSD_READ_THROUGHPUT_MEBIBYTES_PER_SECOND = 1500;
+const DEFAULT_SSD_WRITE_THROUGHPUT_MEBIBYTES_PER_SECOND = 1200;
+const DEFAULT_NETWORK_DISK_THROUGHPUT_MEBIBYTES_PER_SECOND = 125;
+const DEFAULT_UNKNOWN_READ_THROUGHPUT_MEBIBYTES_PER_SECOND = 1000;
+const DEFAULT_UNKNOWN_WRITE_THROUGHPUT_MEBIBYTES_PER_SECOND = 1000;
 const DEFAULT_DISK_THROUGHPUT_COLOR = "#38bdf8";
 const DEFAULT_DISK_READ_COLOR = "#38bdf8";
 const DEFAULT_DISK_WRITE_COLOR = "#f472b6";
@@ -362,14 +367,61 @@ function buildDiskThroughputFooterIconFragment(direction: DiskThroughputDirectio
     });
 }
 
-function normalizePositiveNumber(value: SettingValue, fallbackValue: number): number {
-    const numericValue = Number(value);
+function resolveDiskMaximumThroughputBytesPerSecond(
+    direction: DiskThroughputDirection,
+    settings: DiskSettings,
+    selectedVolume: DiskVolumeOption | null,
+): number {
+    const maximumReadMebibytesPerSecond = resolveDiskMaximumThroughputMebibytesPerSecond("read", settings, selectedVolume);
+    const maximumWriteMebibytesPerSecond = resolveDiskMaximumThroughputMebibytesPerSecond("write", settings, selectedVolume);
+    const maximumMebibytesPerSecond = direction === "write"
+        ? maximumWriteMebibytesPerSecond
+        : direction === "total"
+            ? maximumReadMebibytesPerSecond + maximumWriteMebibytesPerSecond
+            : maximumReadMebibytesPerSecond;
 
-    if (!Number.isFinite(numericValue) || numericValue <= 0) {
-        return fallbackValue;
+    return maximumMebibytesPerSecond * 1024 * 1024;
+}
+
+function resolveDiskMaximumThroughputMebibytesPerSecond(
+    direction: Exclude<DiskThroughputDirection, "both" | "total">,
+    settings: DiskSettings,
+    selectedVolume: DiskVolumeOption | null,
+): number {
+    const configuredMaximum = Number(direction === "read"
+        ? settings.maximumDiskReadThroughputMebibytesPerSecond
+        : settings.maximumDiskWriteThroughputMebibytesPerSecond);
+
+    if (Number.isFinite(configuredMaximum) && configuredMaximum > 0) {
+        return configuredMaximum;
     }
 
-    return numericValue;
+    return resolveDefaultDiskMaximumThroughputMebibytesPerSecond(direction, selectedVolume);
+}
+
+function resolveDefaultDiskMaximumThroughputMebibytesPerSecond(
+    direction: Exclude<DiskThroughputDirection, "both" | "total">,
+    selectedVolume: DiskVolumeOption | null,
+): number {
+    if (selectedVolume?.storageKind === "hdd") {
+        return direction === "read"
+            ? DEFAULT_HDD_READ_THROUGHPUT_MEBIBYTES_PER_SECOND
+            : DEFAULT_HDD_WRITE_THROUGHPUT_MEBIBYTES_PER_SECOND;
+    }
+
+    if (selectedVolume?.storageKind === "ssd") {
+        return direction === "read"
+            ? DEFAULT_SSD_READ_THROUGHPUT_MEBIBYTES_PER_SECOND
+            : DEFAULT_SSD_WRITE_THROUGHPUT_MEBIBYTES_PER_SECOND;
+    }
+
+    if (selectedVolume?.storageKind === "network") {
+        return DEFAULT_NETWORK_DISK_THROUGHPUT_MEBIBYTES_PER_SECOND;
+    }
+
+    return direction === "read"
+        ? DEFAULT_UNKNOWN_READ_THROUGHPUT_MEBIBYTES_PER_SECOND
+        : DEFAULT_UNKNOWN_WRITE_THROUGHPUT_MEBIBYTES_PER_SECOND;
 }
 
 function resolveDiskWidgetChannelColor(
@@ -383,7 +435,7 @@ function resolveDiskWidgetChannelColor(
 function buildDiskChannelColorConfig(direction: Exclude<DiskThroughputDirection, "total">, settings: DiskSettings): ColorConfig {
     if (direction === "read") {
         return {
-            mode: settings.diskReadColorMode === "threshold" ? "threshold" : "solid",
+            mode: settings.colorMode === "threshold" ? "threshold" : "solid",
             solidColor: resolveHexColor(settings.diskReadSolidColor, DEFAULT_DISK_READ_COLOR),
             thresholds: buildDiskChannelThresholds({
                 settings,
@@ -395,7 +447,7 @@ function buildDiskChannelColorConfig(direction: Exclude<DiskThroughputDirection,
     }
 
     return {
-        mode: settings.diskWriteColorMode === "threshold" ? "threshold" : "solid",
+        mode: settings.colorMode === "threshold" ? "threshold" : "solid",
         solidColor: resolveHexColor(settings.diskWriteSolidColor, DEFAULT_DISK_WRITE_COLOR),
         thresholds: buildDiskChannelThresholds({
             settings,
@@ -453,6 +505,58 @@ function publishDiskVolumeOptions(event: WillAppearEvent, settings: DiskSettings
     }).catch(error => {
         log.error(() => `Failed to publish disk volumes: ${String(error)}`);
     });
+}
+
+function publishDiskThroughputScaleLearning(event: WillAppearEvent, settings: DiskSettings): void {
+    if (normalizeDiskMetricKind(settings.diskMetricKind) !== "throughput" || settings.diskThroughputScaleMode === "custom") {
+        return;
+    }
+
+    const selectedVolume = resolveSelectedDiskVolume(settings.diskVolumeId);
+    const nextReadMaximum = resolveLearnedDiskMaximumThroughputMebibytesPerSecond({
+        direction: "read",
+        settings,
+        selectedVolume,
+        observedBytesPerSecond: metricStore.getWidgetData(getDiskThroughputMetricKey("read"), "READ", "B/s").current,
+    });
+    const nextWriteMaximum = resolveLearnedDiskMaximumThroughputMebibytesPerSecond({
+        direction: "write",
+        settings,
+        selectedVolume,
+        observedBytesPerSecond: metricStore.getWidgetData(getDiskThroughputMetricKey("write"), "WRIT", "B/s").current,
+    });
+
+    if (
+        settings.maximumDiskReadThroughputMebibytesPerSecond === nextReadMaximum
+        && settings.maximumDiskWriteThroughputMebibytesPerSecond === nextWriteMaximum
+    ) {
+        return;
+    }
+
+    event.action.setSettings({
+        ...settings,
+        maximumDiskReadThroughputMebibytesPerSecond: nextReadMaximum,
+        maximumDiskWriteThroughputMebibytesPerSecond: nextWriteMaximum,
+    }).catch(error => {
+        log.error(() => `Failed to publish learned disk throughput scale: ${String(error)}`);
+    });
+}
+
+function resolveLearnedDiskMaximumThroughputMebibytesPerSecond(options: {
+    direction: Exclude<DiskThroughputDirection, "both" | "total">;
+    settings: DiskSettings;
+    selectedVolume: DiskVolumeOption | null;
+    observedBytesPerSecond: number;
+}): number {
+    const currentMaximum = resolveDiskMaximumThroughputMebibytesPerSecond(
+        options.direction,
+        options.settings,
+        options.selectedVolume,
+    );
+    const observedMebibytesPerSecond = Math.max(0, options.observedBytesPerSecond) / 1024 / 1024;
+    const learnedMaximum = Math.ceil(observedMebibytesPerSecond * 1.1);
+
+    return Math.max(currentMaximum, learnedMaximum);
 }
 
 function showDiskThroughputUnavailable(event: WillAppearEvent): void {

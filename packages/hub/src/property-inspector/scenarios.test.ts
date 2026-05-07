@@ -98,14 +98,14 @@ test("network sparkline exposes dual-stream network controls", () => {
 
     assertFieldPresent(sparklineFieldIdList, "network-direction");
     assertFieldPresent(sparklineFieldIdList, "network-interface");
-    assertFieldPresent(sparklineFieldIdList, "maximum-network-speed");
+    assertFieldPresent(sparklineFieldIdList, "network-scale-mode");
+    assertFieldPresent(sparklineFieldIdList, "maximum-download-speed");
+    assertFieldPresent(sparklineFieldIdList, "maximum-upload-speed");
     assertFieldPresent(sparklineFieldIdList, "network-unit-base");
     assertFieldPresent(sparklineFieldIdList, "network-traffic-display-mode");
-    assertFieldPresent(sparklineFieldIdList, "download-color-mode");
-    assertFieldPresent(sparklineFieldIdList, "download-solid-color");
-    assertFieldPresent(sparklineFieldIdList, "upload-color-mode");
-    assertFieldPresent(sparklineFieldIdList, "upload-solid-color");
-    assertFieldAbsent(sparklineFieldIdList, "color-mode");
+    assertFieldPresent(sparklineFieldIdList, "color-mode");
+    assertFieldPresent(sparklineFieldIdList, "download-color-heading");
+    assertFieldPresent(sparklineFieldIdList, "upload-color-heading");
     assertFieldAbsent(sparklineFieldIdList, "solid-color");
     assertFieldAbsent(sparklineFieldIdList, "network-circle-note");
 });
@@ -116,17 +116,16 @@ test("network dual circular exposes independent download and upload colors", () 
         settings: {
             graphicType: "circular",
             networkDirection: "both",
+            colorMode: "solid",
         },
     }));
 
     assertFieldPresent(fieldIdList, "color-settings-heading");
+    assertFieldPresent(fieldIdList, "color-mode");
     assertFieldPresent(fieldIdList, "download-color-heading");
-    assertFieldPresent(fieldIdList, "download-color-mode");
     assertFieldPresent(fieldIdList, "download-solid-color");
     assertFieldPresent(fieldIdList, "upload-color-heading");
-    assertFieldPresent(fieldIdList, "upload-color-mode");
     assertFieldPresent(fieldIdList, "upload-solid-color");
-    assertFieldAbsent(fieldIdList, "color-mode");
     assertFieldAbsent(fieldIdList, "solid-color");
     assertFieldOrder(fieldIdList, "download-color-heading", "upload-color-heading");
 });
@@ -143,8 +142,8 @@ test("network single-stream sparkline uses standard color settings", () => {
 
     assertFieldPresent(sparklineFieldIdList, "color-mode");
     assertFieldPresent(sparklineFieldIdList, "solid-color");
-    assertFieldAbsent(sparklineFieldIdList, "download-color-mode");
-    assertFieldAbsent(sparklineFieldIdList, "upload-color-mode");
+    assertFieldAbsent(sparklineFieldIdList, "download-color-heading");
+    assertFieldAbsent(sparklineFieldIdList, "upload-color-heading");
 });
 
 test("network dual text exposes download before upload channel colors", () => {
@@ -153,15 +152,18 @@ test("network dual text exposes download before upload channel colors", () => {
         settings: {
             graphicType: "text",
             networkDirection: "both",
+            colorMode: "solid",
         },
     }));
 
-    assertFieldPresent(fieldIdList, "download-color-mode");
-    assertFieldPresent(fieldIdList, "upload-color-mode");
+    assertFieldPresent(fieldIdList, "color-mode");
+    assertFieldPresent(fieldIdList, "download-color-heading");
+    assertFieldPresent(fieldIdList, "upload-color-heading");
     assertFieldPresent(fieldIdList, "network-interface");
-    assertFieldPresent(fieldIdList, "maximum-network-speed");
+    assertFieldPresent(fieldIdList, "network-scale-mode");
+    assertFieldPresent(fieldIdList, "maximum-download-speed");
+    assertFieldPresent(fieldIdList, "maximum-upload-speed");
     assertFieldPresent(fieldIdList, "network-unit-base");
-    assertFieldAbsent(fieldIdList, "color-mode");
     assertFieldOrder(fieldIdList, "download-color-heading", "upload-color-heading");
 });
 
@@ -171,15 +173,18 @@ test("network dual linear exposes download before upload channel colors", () => 
         settings: {
             graphicType: "linear",
             networkDirection: "both",
+            colorMode: "solid",
         },
     }));
 
-    assertFieldPresent(fieldIdList, "download-color-mode");
-    assertFieldPresent(fieldIdList, "upload-color-mode");
+    assertFieldPresent(fieldIdList, "color-mode");
+    assertFieldPresent(fieldIdList, "download-color-heading");
+    assertFieldPresent(fieldIdList, "upload-color-heading");
     assertFieldPresent(fieldIdList, "network-interface");
-    assertFieldPresent(fieldIdList, "maximum-network-speed");
+    assertFieldPresent(fieldIdList, "network-scale-mode");
+    assertFieldPresent(fieldIdList, "maximum-download-speed");
+    assertFieldPresent(fieldIdList, "maximum-upload-speed");
     assertFieldPresent(fieldIdList, "network-unit-base");
-    assertFieldAbsent(fieldIdList, "color-mode");
     assertFieldOrder(fieldIdList, "download-color-heading", "upload-color-heading");
 });
 
@@ -239,14 +244,15 @@ test("disk throughput dual sparkline exposes read and write channel colors", () 
             graphicType: "dashed-line",
             diskMetricKind: "throughput",
             diskThroughputDirection: "both",
+            colorMode: "solid",
         },
     }));
 
-    assertFieldPresent(fieldIdList, "disk-read-color-mode");
+    assertFieldPresent(fieldIdList, "color-mode");
+    assertFieldPresent(fieldIdList, "disk-read-color-heading");
     assertFieldPresent(fieldIdList, "disk-read-solid-color");
-    assertFieldPresent(fieldIdList, "disk-write-color-mode");
+    assertFieldPresent(fieldIdList, "disk-write-color-heading");
     assertFieldPresent(fieldIdList, "disk-write-solid-color");
-    assertFieldAbsent(fieldIdList, "color-mode");
     assertFieldAbsent(fieldIdList, "solid-color");
 });
 
@@ -257,14 +263,15 @@ test("disk throughput dual circular exposes read and write channel colors", () =
             graphicType: "circular",
             diskMetricKind: "throughput",
             diskThroughputDirection: "both",
+            colorMode: "solid",
         },
     }));
 
-    assertFieldPresent(fieldIdList, "disk-read-color-mode");
+    assertFieldPresent(fieldIdList, "color-mode");
+    assertFieldPresent(fieldIdList, "disk-read-color-heading");
     assertFieldPresent(fieldIdList, "disk-read-solid-color");
-    assertFieldPresent(fieldIdList, "disk-write-color-mode");
+    assertFieldPresent(fieldIdList, "disk-write-color-heading");
     assertFieldPresent(fieldIdList, "disk-write-solid-color");
-    assertFieldAbsent(fieldIdList, "color-mode");
     assertFieldAbsent(fieldIdList, "solid-color");
 });
 
@@ -281,8 +288,8 @@ test("disk throughput single circular uses standard color settings", () => {
 
     assertFieldPresent(fieldIdList, "color-mode");
     assertFieldPresent(fieldIdList, "solid-color");
-    assertFieldAbsent(fieldIdList, "disk-read-color-mode");
-    assertFieldAbsent(fieldIdList, "disk-write-color-mode");
+    assertFieldAbsent(fieldIdList, "disk-read-color-heading");
+    assertFieldAbsent(fieldIdList, "disk-write-color-heading");
 });
 
 test("color mode selects the matching color section", () => {
@@ -375,7 +382,9 @@ test("sparkline max controls follow graph-specific scale semantics", () => {
 
     assertFieldPresent(gpuTemperatureSparklineFieldIdList, "maximum-temperature");
     assertFieldPresent(gpuPowerSparklineFieldIdList, "maximum-gpu-power");
-    assertFieldAbsent(diskThroughputSparklineFieldIdList, "maximum-disk-throughput");
+    assertFieldPresent(diskThroughputSparklineFieldIdList, "disk-throughput-scale-mode");
+    assertFieldPresent(diskThroughputSparklineFieldIdList, "maximum-disk-read-throughput");
+    assertFieldPresent(diskThroughputSparklineFieldIdList, "maximum-disk-write-throughput");
 });
 
 test("shared visual fields keep a consistent order across widgets", () => {
@@ -419,7 +428,8 @@ test("windows hides disk throughput-only controls", () => {
     }));
 
     assertFieldAbsent(inspectorFieldIdList, "disk-throughput-direction");
-    assertFieldAbsent(inspectorFieldIdList, "maximum-disk-throughput");
+    assertFieldAbsent(inspectorFieldIdList, "maximum-disk-read-throughput");
+    assertFieldAbsent(inspectorFieldIdList, "maximum-disk-write-throughput");
 });
 
 function buildContext(options: {

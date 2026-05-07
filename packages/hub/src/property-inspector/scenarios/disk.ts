@@ -2,7 +2,7 @@ import {
     baseFieldGroup,
     circleStyleFieldGroup,
     colorFieldGroupList,
-    diskReadChannelColorModeFieldGroup,
+    diskReadChannelColorHeadingFieldGroup,
     diskReadDynamicChannelColorFieldGroup,
     diskReadSolidChannelColorFieldGroup,
     diskThroughputFieldGroup,
@@ -11,12 +11,13 @@ import {
     diskUsageLinearLabelFieldGroup,
     diskThroughputChannelColorSettingsFieldGroup,
     diskThroughputChannelThresholdFieldGroup,
-    diskWriteChannelColorModeFieldGroup,
+    diskWriteChannelColorHeadingFieldGroup,
     diskWriteDynamicChannelColorFieldGroup,
     diskWriteSolidChannelColorFieldGroup,
     colorSettingsFieldGroup,
     sparklineAppearanceFieldGroup,
     sparklineGridLineFieldGroup,
+    updateFieldGroup,
 } from "../scenario-field-groups";
 import {
     defaultSettingsNormalizer,
@@ -37,6 +38,7 @@ const diskUsageCircularScenario = defineScenario({
         diskUsageCircularFieldGroup,
         colorSettingsFieldGroup,
         ...colorFieldGroupList,
+        updateFieldGroup,
     ],
 });
 
@@ -49,6 +51,7 @@ const diskUsageTextScenario = defineScenario({
         diskUsageCircularFieldGroup,
         colorSettingsFieldGroup,
         ...colorFieldGroupList,
+        updateFieldGroup,
     ],
 });
 
@@ -61,6 +64,7 @@ const diskUsageLinearScenario = defineScenario({
         diskUsageLinearLabelFieldGroup,
         colorSettingsFieldGroup,
         ...colorFieldGroupList,
+        updateFieldGroup,
     ],
 });
 
@@ -74,6 +78,7 @@ const diskUsageSparklineScenario = defineScenario({
         sparklineGridLineFieldGroup,
         colorSettingsFieldGroup,
         ...colorFieldGroupList,
+        updateFieldGroup,
     ],
 });
 
@@ -86,14 +91,15 @@ const diskThroughputCircularScenario = defineScenario({
         diskThroughputFieldGroup,
         diskThroughputChannelColorSettingsFieldGroup,
         diskThroughputChannelThresholdFieldGroup,
-        diskReadChannelColorModeFieldGroup,
+        diskReadChannelColorHeadingFieldGroup,
         diskReadSolidChannelColorFieldGroup,
         diskReadDynamicChannelColorFieldGroup,
-        diskWriteChannelColorModeFieldGroup,
+        diskWriteChannelColorHeadingFieldGroup,
         diskWriteSolidChannelColorFieldGroup,
         diskWriteDynamicChannelColorFieldGroup,
         colorSettingsFieldGroup,
         ...colorFieldGroupList,
+        updateFieldGroup,
     ],
 });
 
@@ -105,14 +111,15 @@ const diskThroughputTextScenario = defineScenario({
         diskThroughputFieldGroup,
         diskThroughputChannelColorSettingsFieldGroup,
         diskThroughputChannelThresholdFieldGroup,
-        diskReadChannelColorModeFieldGroup,
+        diskReadChannelColorHeadingFieldGroup,
         diskReadSolidChannelColorFieldGroup,
         diskReadDynamicChannelColorFieldGroup,
-        diskWriteChannelColorModeFieldGroup,
+        diskWriteChannelColorHeadingFieldGroup,
         diskWriteSolidChannelColorFieldGroup,
         diskWriteDynamicChannelColorFieldGroup,
         colorSettingsFieldGroup,
         ...colorFieldGroupList,
+        updateFieldGroup,
     ],
 });
 
@@ -124,6 +131,7 @@ const diskThroughputLinearScenario = defineScenario({
         diskThroughputFieldGroup,
         colorSettingsFieldGroup,
         ...colorFieldGroupList,
+        updateFieldGroup,
     ],
 });
 
@@ -137,14 +145,15 @@ const diskThroughputSparklineScenario = defineScenario({
         sparklineGridLineFieldGroup,
         diskThroughputChannelColorSettingsFieldGroup,
         diskThroughputChannelThresholdFieldGroup,
-        diskReadChannelColorModeFieldGroup,
+        diskReadChannelColorHeadingFieldGroup,
         diskReadSolidChannelColorFieldGroup,
         diskReadDynamicChannelColorFieldGroup,
-        diskWriteChannelColorModeFieldGroup,
+        diskWriteChannelColorHeadingFieldGroup,
         diskWriteSolidChannelColorFieldGroup,
         diskWriteDynamicChannelColorFieldGroup,
         colorSettingsFieldGroup,
         ...colorFieldGroupList,
+        updateFieldGroup,
     ],
 });
 
