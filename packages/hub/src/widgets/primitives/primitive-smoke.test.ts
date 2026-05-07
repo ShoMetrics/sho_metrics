@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { DualChannelWidgetData, WidgetData } from "../../rendering/widget-data";
 import { arcGauge, DEFAULT_ARC_GAUGE_CONFIG } from "./arc-gauge";
-import { buildGaugeRangeColorPlan } from "./arc-gauge-range";
+import { buildGaugeRangeColorPlan, resolveGaugeMarkerGap, resolveGaugeMarkerRenderProgress } from "./arc-gauge-range";
+import { DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG, renderDualChannelArcGauge } from "./dual-channel-arc-gauge";
 import { linearBar, DEFAULT_LINEAR_BAR_CONFIG } from "./linear-bar";
 import { renderMetricTextRow } from "./metric-text-row";
 import { DEFAULT_MIRRORED_TRAFFIC_CONFIG, renderMirroredTraffic } from "./mirrored-traffic";
@@ -205,6 +206,191 @@ test("gauge circle style keeps the range track uncolored while data is unavailab
     assert.match(svgFragment, /stroke-dasharray="/);
 });
 
+test("gauge marker uses a conservative visual range without changing true endpoints", () => {
+    assert.equal(roundMarkerProgress(resolveGaugeMarkerRenderProgress({
+        progress: 0,
+        gapLength: 4,
+        visibleLength: 100,
+    })), 0);
+    assert.equal(roundMarkerProgress(resolveGaugeMarkerRenderProgress({
+        progress: 0.01,
+        gapLength: 4,
+        visibleLength: 100,
+    })), 0.1274);
+    assert.equal(roundMarkerProgress(resolveGaugeMarkerRenderProgress({
+        progress: 0.5,
+        gapLength: 4,
+        visibleLength: 100,
+    })), 0.49);
+    assert.equal(roundMarkerProgress(resolveGaugeMarkerRenderProgress({
+        progress: 0.96,
+        gapLength: 4,
+        visibleLength: 100,
+    })), 0.8304);
+    assert.equal(roundMarkerProgress(resolveGaugeMarkerRenderProgress({
+        progress: 1,
+        gapLength: 4,
+        visibleLength: 100,
+    })), 1);
+});
+
+test("gauge marker visual range still honors the minimum geometric gap", () => {
+    assert.equal(roundMarkerProgress(resolveGaugeMarkerRenderProgress({
+        progress: 0.01,
+        gapLength: 20,
+        visibleLength: 100,
+    })), 0.2842);
+});
+
+test("gauge marker gap only cuts the marker travel domain for non-endpoint values", () => {
+    assert.deepEqual(roundMarkerGap(resolveGaugeMarkerGap({
+        progress: 0.8304,
+        gapLength: 4,
+        visibleLength: 100,
+    })), {
+        startProgress: 0.7904,
+        endProgress: 0.8704,
+    });
+    assert.deepEqual(roundMarkerGap(resolveGaugeMarkerGap({
+        progress: 0.1274,
+        gapLength: 4,
+        visibleLength: 100,
+    })), {
+        startProgress: 0.0874,
+        endProgress: 0.1674,
+    });
+    assert.deepEqual(roundMarkerGap(resolveGaugeMarkerGap({
+        progress: 1,
+        gapLength: 4,
+        visibleLength: 100,
+    })), {
+        startProgress: 0.96,
+        endProgress: 1,
+    });
+});
+
+test("dual-channel gauge style renders two full-color gauge lanes with marker dots", () => {
+    const svgFragment = renderDualChannelArcGauge({
+        positive: {
+            ...buildWidgetData(),
+            current: 0,
+            progress: 0,
+            displayValue: "0",
+            unit: "KB/s",
+        },
+        negative: {
+            ...buildWidgetData(),
+            current: 6,
+            progress: 0.6,
+            displayValue: "6",
+            unit: "KB/s",
+        },
+    }, {
+        ...DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG,
+        circleStyle: "gauge",
+        titleText: "NETWORK",
+        positiveColor: "#ef4444",
+        negativeColor: "#3b82f6",
+        positiveColorConfig: {
+            mode: "threshold",
+            solidColor: "#ef4444",
+            thresholds: [
+                { min: 0, max: 30, color: "#111111" },
+                { min: 30, max: 70, color: "#222222" },
+                { min: 70, max: 101, color: "#333333" },
+            ],
+        },
+        negativeColorConfig: {
+            mode: "threshold",
+            solidColor: "#3b82f6",
+            thresholds: [
+                { min: 0, max: 30, color: "#44ff44" },
+                { min: 30, max: 70, color: "#ff8800" },
+                { min: 70, max: 101, color: "#00aaff" },
+            ],
+        },
+        positiveIconFragment: "<path id=\"upload-icon\" />",
+        negativeIconFragment: "<path id=\"download-icon\" />",
+    }, keySize);
+
+    assert.match(svgFragment, /dual-arc-positive-range-/);
+    assert.match(svgFragment, /dual-arc-negative-range-/);
+    assert.match(svgFragment, /class="dual-arc-gauge-positive-segment"/);
+    assert.match(svgFragment, /class="dual-arc-gauge-negative-segment"/);
+    assert.match(svgFragment, /class="dual-arc-gauge-positive-marker"/);
+    assert.match(svgFragment, /class="dual-arc-gauge-negative-marker"/);
+    assert.match(svgFragment, /#44ff44/);
+    assert.match(svgFragment, /#ff8800/);
+    assert.match(svgFragment, /#00aaff/);
+    assert.match(svgFragment, /upload-icon/);
+    assert.match(svgFragment, /download-icon/);
+    assert.match(svgFragment, /dual-arc-gauge-positive-row-value/);
+    assert.match(svgFragment, /dual-arc-gauge-negative-row-value/);
+    assert.match(svgFragment, /x="76\.76"[\s\S]*>0<\/text>/);
+    assert.match(svgFragment, /font-size="12"[\s\S]*>KB\/s<\/text>/);
+    assert.match(svgFragment, /dual-arc-gauge-bottom-label/);
+    assert.match(svgFragment, /NET/);
+    assert.doesNotMatch(svgFragment, /NETWORK/);
+    assert.doesNotMatch(svgFragment, /stroke="rgba\(255,255,255,0\.14\)"/);
+});
+
+test("dual-channel gauge style keeps long row values out of icon space", () => {
+    const svgFragment = renderDualChannelArcGauge({
+        positive: {
+            ...buildWidgetData(),
+            current: 34,
+            progress: 0.34,
+            displayValue: "34",
+            unit: "KB/s",
+        },
+        negative: {
+            ...buildWidgetData(),
+            current: 328,
+            progress: 0.8,
+            displayValue: "328",
+            unit: "KB/s",
+        },
+    }, {
+        ...DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG,
+        circleStyle: "gauge",
+        titleText: "NETWORK",
+        positiveIconFragment: "<path id=\"upload-icon\" />",
+        negativeIconFragment: "<path id=\"download-icon\" />",
+    }, keySize);
+
+    assert.match(svgFragment, /id="dual-arc-gauge-negative-row-value"/);
+    assert.match(svgFragment, /font-size="13\.50"[^>]*>328<\/text>/);
+    assert.match(svgFragment, /id="dual-arc-gauge-negative-row-unit"/);
+    assert.match(svgFragment, /download-icon/);
+});
+
+test("dual-channel gauge style uses a safe single-row placeholder for unavailable values", () => {
+    const svgFragment = renderDualChannelArcGauge({
+        positive: {
+            ...buildWidgetData(),
+            displayValue: "N/A",
+            unit: "KB/s",
+        },
+        negative: {
+            ...buildWidgetData(),
+            displayValue: "N/A",
+            unit: "KB/s",
+        },
+    }, {
+        ...DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG,
+        circleStyle: "gauge",
+        titleText: "NETWORK",
+        positiveIconFragment: "<path id=\"upload-icon\" />",
+        negativeIconFragment: "<path id=\"download-icon\" />",
+    }, keySize);
+
+    assert.match(svgFragment, /id="dual-arc-gauge-positive-row-value"/);
+    assert.match(svgFragment, /id="dual-arc-gauge-negative-row-value"/);
+    assert.match(svgFragment, /text-anchor="start"/);
+    assert.doesNotMatch(svgFragment, /dual-arc-gauge-positive-row-unit/);
+    assert.doesNotMatch(svgFragment, /dual-arc-gauge-negative-row-unit/);
+});
+
 test("linear bar renders at most two channel bars", () => {
     const svgFragment = linearBar.render({
         ...buildWidgetData(),
@@ -316,6 +502,17 @@ function renderGaugeValueSample(displayValue: string, unit: string): string {
         ...DEFAULT_ARC_GAUGE_CONFIG,
         circleStyle: "gauge",
     }, keySize);
+}
+
+function roundMarkerProgress(progress: number): number {
+    return Number(progress.toFixed(4));
+}
+
+function roundMarkerGap(markerGap: ReturnType<typeof resolveGaugeMarkerGap>): ReturnType<typeof resolveGaugeMarkerGap> {
+    return {
+        startProgress: roundMarkerProgress(markerGap.startProgress),
+        endProgress: roundMarkerProgress(markerGap.endProgress),
+    };
 }
 
 function buildLinearChannel(label: string, displayValue: string): NonNullable<WidgetData["linearChannels"]>[number] {

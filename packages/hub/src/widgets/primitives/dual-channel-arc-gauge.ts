@@ -1,10 +1,12 @@
 import type { DualChannelWidgetData, KeySize } from "../../rendering/widget-data";
+import type { ColorConfig } from "../../rendering/color-resolver";
 import {
     clamp,
     renderConstrainedSvgText,
 } from "../../rendering/svg-utils";
 import type { WidgetBaseConfig } from "../widget.interface";
-import type { ArcGaugeStatusIcon } from "./arc-gauge";
+import type { ArcGaugeStatusIcon, ArcGaugeStyle } from "./arc-gauge";
+import { renderDualGaugeRing } from "./dual-channel-gauge-ring";
 
 export type DualChannelArcGaugeCenterContent = "value" | "icon" | "icon-value-unit";
 
@@ -15,6 +17,8 @@ export interface DualChannelArcGaugeConfig extends WidgetBaseConfig {
     unitTextColor: string;
     dividerColor: string;
     centerContent: DualChannelArcGaugeCenterContent;
+    circleStyle: ArcGaugeStyle;
+    titleText?: string;
     centerIconFragment?: string;
     positiveIconFragment?: string;
     negativeIconFragment?: string;
@@ -22,6 +26,8 @@ export interface DualChannelArcGaugeConfig extends WidgetBaseConfig {
     negativeStatusIcon?: ArcGaugeStatusIcon;
     positiveColor: string;
     negativeColor: string;
+    positiveColorConfig?: ColorConfig;
+    negativeColorConfig?: ColorConfig;
 }
 
 export const DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG: DualChannelArcGaugeConfig = {
@@ -32,6 +38,8 @@ export const DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG: DualChannelArcGaugeConfig = 
     unitTextColor: "rgba(255,255,255,0.74)",
     dividerColor: "rgba(255,255,255,0.18)",
     centerContent: "value",
+    circleStyle: "value",
+    titleText: "",
     positiveColor: "#3b82f6",
     negativeColor: "#ef4444",
 };
@@ -54,6 +62,29 @@ const ARC_LAYOUT = {
     unitFontSize: 15.5,
     dividerDiameterRatio: 0.78,
     dividerYOffset: 0,
+    gaugeBottomGapAngleDegrees: 92,
+    gaugeTopGapAngleDegrees: 25,
+    gaugeRowIconXRatio: 0.50,
+    gaugeRowValueEndXRatio: 0.18,
+    gaugeRowOneDigitValueEndXRatio: 0.08,
+    gaugeRowUnitXRatio: 0.27,
+    gaugeRowYOffset: 17,
+    gaugeValueFontSize: 20,
+    gaugeUnitFontSize: 12,
+    gaugeValueWidth: 40,
+    gaugeUnitWidth: 31,
+    gaugeUnavailableValueXRatio: -0.02,
+    gaugeUnavailableValueWidth: 36,
+    gaugeUnavailableValueFontSize: 17,
+    gaugeValueDigitFontSizes: {
+        one: 20,
+        two: 20,
+        three: 13.5,
+        many: 11,
+    },
+    gaugeBottomLabelFontSize: 17,
+    gaugeBottomLabelYOffset: 45,
+    gaugeBottomLabelMaxWidthRatio: 1.10,
     centerIconScale: 0.86,
     notchIconSizeRatio: 2.15,
     notchGapWidthRatio: 4.4,
@@ -73,7 +104,10 @@ interface RingGeometry {
 interface ChannelArcModel {
     channelId: "positive" | "negative";
     color: string;
+    colorConfig: ColorConfig;
     progress: number;
+    gaugeStartAngleDegrees: number;
+    gaugeEndAngleDegrees: number;
     rotationDegrees: number;
     iconRotationDegrees: number;
     iconFragment: string | undefined;
@@ -114,11 +148,15 @@ export function renderDualChannelArcGauge(
         circumference,
         halfLength: circumference / 2,
     };
+    const isGaugeStyle = config.circleStyle === "gauge";
     const channelArcModels: readonly ChannelArcModel[] = [
         {
             channelId: "positive",
             color: config.positiveColor,
+            colorConfig: config.positiveColorConfig ?? buildSolidChannelColorConfig(config.positiveColor),
             progress: data.positive.progress,
+            gaugeStartAngleDegrees: 270 + ARC_LAYOUT.gaugeTopGapAngleDegrees / 2,
+            gaugeEndAngleDegrees: 450 - ARC_LAYOUT.gaugeBottomGapAngleDegrees / 2,
             rotationDegrees: -90,
             iconRotationDegrees: -90,
             iconFragment: config.positiveIconFragment,
@@ -127,7 +165,10 @@ export function renderDualChannelArcGauge(
         {
             channelId: "negative",
             color: config.negativeColor,
+            colorConfig: config.negativeColorConfig ?? buildSolidChannelColorConfig(config.negativeColor),
             progress: data.negative.progress,
+            gaugeStartAngleDegrees: 90 + ARC_LAYOUT.gaugeBottomGapAngleDegrees / 2,
+            gaugeEndAngleDegrees: 270 - ARC_LAYOUT.gaugeTopGapAngleDegrees / 2,
             rotationDegrees: 90,
             iconRotationDegrees: 90,
             iconFragment: config.negativeIconFragment,
@@ -141,9 +182,11 @@ export function renderDualChannelArcGauge(
             channelArcModels,
             trackColor: config.trackColor,
             strokeWidth: config.strokeWidth,
-            hasNotches: config.centerContent === "icon",
+            mode: isGaugeStyle ? "gauge" : "circle",
+            hasNotches: !isGaugeStyle && config.centerContent === "icon",
         })}
         ${renderCenterContent({ data, config, geometry })}
+        ${isGaugeStyle ? renderGaugeBottomLabel({ config, geometry }) : ""}
     `;
 }
 
@@ -152,13 +195,23 @@ function renderRing(options: {
     channelArcModels: readonly ChannelArcModel[];
     trackColor: string;
     strokeWidth: number;
+    mode: "circle" | "gauge";
     hasNotches: boolean;
 }): string {
+    if (options.mode === "gauge") {
+        return renderDualGaugeRing({
+            geometry: options.geometry,
+            channelModels: options.channelArcModels,
+            strokeWidth: options.strokeWidth,
+        });
+    }
+
     const notchGapLength = options.hasNotches
         ? options.strokeWidth * ARC_LAYOUT.notchGapWidthRatio
         : 0;
     const visibleHalfLength = Math.max(1, options.geometry.halfLength - notchGapLength);
     const trackDashArray = `${visibleHalfLength} ${options.geometry.circumference - visibleHalfLength}`;
+    const gapRotationOffset = options.hasNotches ? resolveNotchAngleDegrees(options.geometry, notchGapLength) / 2 : 0;
 
     return `
         ${options.channelArcModels.map(channel => renderArcSegment({
@@ -167,7 +220,7 @@ function renderRing(options: {
             strokeWidth: options.strokeWidth,
             dashArray: trackDashArray,
             dashOffset: 0,
-            rotationDegrees: channel.rotationDegrees + (options.hasNotches ? resolveNotchAngleDegrees(options.geometry, notchGapLength) / 2 : 0),
+            rotationDegrees: channel.rotationDegrees + gapRotationOffset,
         })).join("")}
         ${options.channelArcModels.map(channel => {
             const progressLength = visibleHalfLength * clamp(channel.progress, 0, 1);
@@ -178,12 +231,11 @@ function renderRing(options: {
 
             return renderArcSegment({
                 geometry: options.geometry,
-                stroke: buildChannelGradient(channel),
+                stroke: channel.color,
                 strokeWidth: options.strokeWidth,
                 dashArray: `${progressLength} ${options.geometry.circumference - progressLength}`,
                 dashOffset: 0,
-                rotationDegrees: channel.rotationDegrees
-                    + (options.hasNotches ? resolveNotchAngleDegrees(options.geometry, notchGapLength) / 2 : 0),
+                rotationDegrees: channel.rotationDegrees + gapRotationOffset,
             });
         }).join("")}
         ${options.hasNotches ? options.channelArcModels.map(channel => renderNotchIcon({
@@ -192,6 +244,14 @@ function renderRing(options: {
             channel,
         })).join("") : ""}
     `;
+}
+
+function buildSolidChannelColorConfig(color: string): ColorConfig {
+    return {
+        mode: "solid",
+        solidColor: color,
+        thresholds: [],
+    };
 }
 
 function renderArcSegment(options: {
@@ -211,10 +271,6 @@ function renderArcSegment(options: {
             stroke-linecap="round"
             transform="rotate(${formatSvgNumber(options.rotationDegrees)} ${formatSvgNumber(options.geometry.centerXCoordinate)} ${formatSvgNumber(options.geometry.centerYCoordinate)})" />
     `;
-}
-
-function buildChannelGradient(channel: ChannelArcModel): string {
-    return channel.color;
 }
 
 function renderNotchIcon(options: {
@@ -263,6 +319,10 @@ function renderCenterContent(options: {
             centerIconFragment: options.config.centerIconFragment,
             geometry: options.geometry,
         });
+    }
+
+    if (options.config.circleStyle === "gauge") {
+        return renderGaugeValueRows(options);
     }
 
     return renderValueRows(options);
@@ -316,6 +376,192 @@ function renderValueRows(options: {
             config: options.config,
         })}
     `;
+}
+
+function renderGaugeValueRows(options: {
+    data: DualChannelWidgetData;
+    config: DualChannelArcGaugeConfig;
+    geometry: RingGeometry;
+}): string {
+    const dividerYCoordinate = options.geometry.centerYCoordinate + ARC_LAYOUT.dividerYOffset;
+    const dividerHalfWidth = options.geometry.radius * ARC_LAYOUT.dividerDiameterRatio;
+
+    return `
+        ${renderGaugeChannelValueRow({
+            rowId: "dual-arc-gauge-positive-row",
+            widgetData: options.data.positive,
+            iconFragment: options.config.positiveIconFragment,
+            color: options.config.positiveColor,
+            yCoordinate: dividerYCoordinate - ARC_LAYOUT.gaugeRowYOffset,
+            geometry: options.geometry,
+            config: options.config,
+        })}
+        <line x1="${formatSvgNumber(options.geometry.centerXCoordinate - dividerHalfWidth)}"
+            y1="${formatSvgNumber(dividerYCoordinate)}"
+            x2="${formatSvgNumber(options.geometry.centerXCoordinate + dividerHalfWidth)}"
+            y2="${formatSvgNumber(dividerYCoordinate)}"
+            stroke="${options.config.dividerColor}" stroke-width="1.2" stroke-linecap="round" />
+        ${renderGaugeChannelValueRow({
+            rowId: "dual-arc-gauge-negative-row",
+            widgetData: options.data.negative,
+            iconFragment: options.config.negativeIconFragment,
+            color: options.config.negativeColor,
+            yCoordinate: dividerYCoordinate + ARC_LAYOUT.gaugeRowYOffset,
+            geometry: options.geometry,
+            config: options.config,
+        })}
+    `;
+}
+
+function renderGaugeBottomLabel(options: {
+    config: DualChannelArcGaugeConfig;
+    geometry: RingGeometry;
+}): string {
+    const labelText = resolveGaugeBottomLabelText(options.config);
+
+    if (labelText.length === 0) {
+        return "";
+    }
+
+    return renderConstrainedSvgText({
+        id: "dual-arc-gauge-bottom-label",
+        text: labelText,
+        xCoordinate: options.geometry.centerXCoordinate,
+        yCoordinate: options.geometry.centerYCoordinate + ARC_LAYOUT.gaugeBottomLabelYOffset,
+        maxWidth: Math.max(24, options.geometry.radius * ARC_LAYOUT.gaugeBottomLabelMaxWidthRatio),
+        fontSize: ARC_LAYOUT.gaugeBottomLabelFontSize,
+        fontFamily: ARC_TEXT_FONT_FAMILY,
+        fontWeight: 850,
+        fill: options.config.unitTextColor,
+        textAnchor: "middle",
+    });
+}
+
+function resolveGaugeBottomLabelText(config: DualChannelArcGaugeConfig): string {
+    const titleText = config.titleText?.trim() ?? "";
+
+    if (titleText.toUpperCase() === "NETWORK") {
+        return "NET";
+    }
+
+    return titleText;
+}
+
+function renderGaugeChannelValueRow(options: {
+    rowId: string;
+    widgetData: DualChannelWidgetData["positive"];
+    iconFragment: string | undefined;
+    color: string;
+    yCoordinate: number;
+    geometry: RingGeometry;
+    config: DualChannelArcGaugeConfig;
+}): string {
+    const iconXCoordinate = options.geometry.centerXCoordinate - options.geometry.radius * ARC_LAYOUT.gaugeRowIconXRatio;
+    const unitXCoordinate = options.geometry.centerXCoordinate + options.geometry.radius * ARC_LAYOUT.gaugeRowUnitXRatio;
+    const valueText = options.widgetData.displayValue ?? options.widgetData.current.toFixed(1);
+    const valueDigitCount = resolveGaugeRowDigitCount(valueText);
+    const valueXCoordinate = resolveGaugeRowValueXCoordinate({
+        centerXCoordinate: options.geometry.centerXCoordinate,
+        radius: options.geometry.radius,
+        digitCount: valueDigitCount,
+    });
+
+    if (valueText === "N/A") {
+        return `
+            ${renderInlineIcon({
+                iconFragment: options.iconFragment,
+                color: options.color,
+                xCoordinate: iconXCoordinate,
+                yCoordinate: options.yCoordinate,
+                opticalYOffset: 0,
+            })}
+            ${renderConstrainedSvgText({
+                id: `${options.rowId}-value`,
+                text: valueText,
+                xCoordinate: options.geometry.centerXCoordinate + options.geometry.radius * ARC_LAYOUT.gaugeUnavailableValueXRatio,
+                yCoordinate: options.yCoordinate,
+                maxWidth: ARC_LAYOUT.gaugeUnavailableValueWidth,
+                fontSize: ARC_LAYOUT.gaugeUnavailableValueFontSize,
+                fontFamily: ARC_TEXT_FONT_FAMILY,
+                fontWeight: 900,
+                fill: options.config.valueTextColor,
+                textAnchor: "start",
+                extraAttributes: ["font-variant-numeric=\"tabular-nums\""],
+                fitOptions: { minimumFontScale: 0.70 },
+            })}
+        `;
+    }
+
+    return `
+        ${renderInlineIcon({
+            iconFragment: options.iconFragment,
+            color: options.color,
+            xCoordinate: iconXCoordinate,
+            yCoordinate: options.yCoordinate,
+            opticalYOffset: 0,
+        })}
+        ${renderConstrainedSvgText({
+            id: `${options.rowId}-value`,
+            text: valueText,
+            xCoordinate: valueXCoordinate,
+            yCoordinate: options.yCoordinate,
+            maxWidth: ARC_LAYOUT.gaugeValueWidth,
+            fontSize: resolveGaugeRowValueFontSize(valueDigitCount),
+            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontWeight: 900,
+            fill: options.config.valueTextColor,
+            textAnchor: "end",
+            extraAttributes: ["font-variant-numeric=\"tabular-nums\""],
+            fitOptions: { minimumFontScale: 0.52 },
+        })}
+        ${renderConstrainedSvgText({
+            id: `${options.rowId}-unit`,
+            text: options.widgetData.unit,
+            xCoordinate: unitXCoordinate,
+            yCoordinate: options.yCoordinate,
+            maxWidth: ARC_LAYOUT.gaugeUnitWidth,
+            fontSize: ARC_LAYOUT.gaugeUnitFontSize,
+            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontWeight: 780,
+            fill: options.config.unitTextColor,
+            textAnchor: "start",
+            fitOptions: { minimumFontScale: 0.62 },
+        })}
+    `;
+}
+
+function resolveGaugeRowValueXCoordinate(options: {
+    centerXCoordinate: number;
+    radius: number;
+    digitCount: number;
+}): number {
+    const endXRatio = options.digitCount <= 1
+        ? ARC_LAYOUT.gaugeRowOneDigitValueEndXRatio
+        : ARC_LAYOUT.gaugeRowValueEndXRatio;
+
+    return options.centerXCoordinate + options.radius * endXRatio;
+}
+
+function resolveGaugeRowValueFontSize(digitCount: number): number {
+    const fontSizes = ARC_LAYOUT.gaugeValueDigitFontSizes;
+
+    if (digitCount <= 1) {
+        return fontSizes.one;
+    }
+
+    if (digitCount === 2) {
+        return fontSizes.two;
+    }
+
+    if (digitCount === 3) {
+        return fontSizes.three;
+    }
+
+    return fontSizes.many;
+}
+
+function resolveGaugeRowDigitCount(valueText: string): number {
+    return Array.from(valueText).filter(character => /\d/u.test(character)).length;
 }
 
 function resolveChannelValueRowLayout(

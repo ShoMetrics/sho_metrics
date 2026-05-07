@@ -177,6 +177,8 @@ export class Disk extends MetricAction {
         });
         const readColor = resolveDiskWidgetChannelColor("read", settings, readWidgetData);
         const writeColor = resolveDiskWidgetChannelColor("write", settings, writeWidgetData);
+        const readColorConfig = buildDiskChannelColorConfig("read", settings);
+        const writeColorConfig = buildDiskChannelColorConfig("write", settings);
 
         setDualMetricDisplay({
             event,
@@ -194,6 +196,8 @@ export class Disk extends MetricAction {
                 : undefined,
             positiveColor: readColor,
             negativeColor: writeColor,
+            positiveColorConfig: readColorConfig,
+            negativeColorConfig: writeColorConfig,
             positiveIconFragment: renderDiskThroughputDirectionIconFragment({
                 direction: "read",
                 color: readColor,

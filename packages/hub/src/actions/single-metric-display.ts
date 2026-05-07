@@ -1,6 +1,7 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
 import { composeDualChannelSvg, composeSvg } from "../rendering/composer";
 import { rasterizeSvgToPngDataUrl } from "../rendering/rasterizer";
+import type { ColorConfig } from "../rendering/color-resolver";
 import type { DualChannelWidgetData, WidgetData } from "../rendering/widget-data";
 import {
     buildMetricDisplayRenderPlan,
@@ -149,6 +150,8 @@ function renderAndSendSingleMetricDisplay(
             configOverrides: buildDualMetricConfigOverrides({
                 positiveColor: options.positiveColor,
                 negativeColor: options.negativeColor,
+                positiveColorConfig: options.positiveColorConfig,
+                negativeColorConfig: options.negativeColorConfig,
                 titleText: options.titleText,
                 chartMode: options.chartMode ?? "overlay",
                 centerContent: renderPlan.centerContent,
@@ -453,6 +456,8 @@ function buildSingleMetricConfigOverrides(options: {
 function buildDualMetricConfigOverrides(options: {
     positiveColor: string;
     negativeColor: string;
+    positiveColorConfig: ColorConfig | undefined;
+    negativeColorConfig: ColorConfig | undefined;
     titleText: string;
     chartMode: "overlay" | "mirrored";
     centerContent: "value" | "icon";
@@ -468,6 +473,8 @@ function buildDualMetricConfigOverrides(options: {
 }): {
     positiveColor: string;
     negativeColor: string;
+    positiveColorConfig?: ColorConfig;
+    negativeColorConfig?: ColorConfig;
     titleText?: string;
     chartMode?: "overlay" | "mirrored";
     centerContent?: "value" | "icon";
@@ -485,6 +492,8 @@ function buildDualMetricConfigOverrides(options: {
     return {
         positiveColor: options.positiveColor,
         negativeColor: options.negativeColor,
+        positiveColorConfig: options.positiveColorConfig,
+        negativeColorConfig: options.negativeColorConfig,
         titleText: options.titleText,
         chartMode: options.chartMode,
         centerContent: options.centerContent,

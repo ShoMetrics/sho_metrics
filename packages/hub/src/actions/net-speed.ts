@@ -162,6 +162,8 @@ export class NetSpeed extends MetricAction {
         });
         const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData);
         const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
+        const uploadColorConfig = buildNetworkChannelColorConfig("upload", options.settings);
+        const downloadColorConfig = buildNetworkChannelColorConfig("download", options.settings);
         const circleStyle = resolveCircleStyle(options.settings.circleStyle);
 
         setDualMetricDisplay({
@@ -184,6 +186,8 @@ export class NetSpeed extends MetricAction {
             circleStyleOverride: circleStyle,
             positiveColor: uploadColor,
             negativeColor: downloadColor,
+            positiveColorConfig: uploadColorConfig,
+            negativeColorConfig: downloadColorConfig,
             positiveIconFragment: renderNetworkDirectionIconFragment({
                 direction: "upload",
                 color: uploadColor,
