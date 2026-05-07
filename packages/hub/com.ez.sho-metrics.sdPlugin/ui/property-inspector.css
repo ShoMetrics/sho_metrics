@@ -75,12 +75,28 @@ body {
     margin-top: 0;
 }
 
+.settings-section {
+    margin: 0 0 16px;
+}
+
+.section-title {
+    border-bottom: 1px solid #4b4b4b;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0;
+    line-height: 1.2;
+    margin: 18px 0 10px;
+    padding: 0 0 6px 0;
+    text-transform: uppercase;
+}
+
 .section-heading {
     color: #efefef;
-    font-size: 19px;
+    font-size: 15px;
     font-weight: 700;
     line-height: 1.2;
-    margin: 18px 0 8px;
+    margin: 14px 0 8px;
     padding: 0 0 0 8px;
 }
 

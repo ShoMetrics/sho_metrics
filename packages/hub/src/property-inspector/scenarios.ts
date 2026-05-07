@@ -19,8 +19,10 @@ import {
 } from "./settings";
 import {
     resolveScenarioFieldList,
+    resolveScenarioSectionList,
     type InspectorScenario,
     type PropertyInspectorState,
+    type ScenarioSectionId,
 } from "./scenario-model";
 import type { FieldSchema, VisibilityContext } from "./schema";
 import { resolveDefaultScenario } from "./scenarios/default";
@@ -33,6 +35,25 @@ export function resolveInspectorFieldList(context: VisibilityContext): readonly 
 
     return resolveScenarioFieldList(scenario, context)
         .filter(field => isFieldAllowedInScenario(field, scenario, context));
+}
+
+export interface InspectorSectionView {
+    id: ScenarioSectionId;
+    label: string;
+    fieldList: readonly FieldSchema[];
+}
+
+export function resolveInspectorSectionList(context: VisibilityContext): readonly InspectorSectionView[] {
+    const scenario = resolveInspectorScenario(context);
+
+    return resolveScenarioSectionList(scenario, context)
+        .map(section => ({
+            id: section.id,
+            label: resolveSectionLabel(section.id),
+            fieldList: section.fieldGroupList.flatMap(fieldGroup => fieldGroup.fieldList)
+                .filter(field => isFieldAllowedInScenario(field, scenario, context)),
+        }))
+        .filter(section => section.fieldList.length > 0);
 }
 
 export function normalizeSettings(
@@ -200,4 +221,23 @@ function isDevelopmentEnvironment(): boolean {
     return typeof process !== "undefined"
         && typeof process.env === "object"
         && process.env.NODE_ENV === "development";
+}
+
+function resolveSectionLabel(sectionId: ScenarioSectionId): string {
+    switch (sectionId) {
+        case "metric":
+            return "Metric";
+        case "layout":
+            return "Layout";
+        case "scale":
+            return "Scale & Units";
+        case "trend":
+            return "Trend";
+        case "labels":
+            return "Labels";
+        case "colors":
+            return "Colors";
+        case "update":
+            return "Update";
+    }
 }
