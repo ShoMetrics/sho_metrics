@@ -5,6 +5,7 @@ import {
     colorSettingsFieldGroup,
     sparklineAppearanceFieldGroup,
     sparklineGridLineFieldGroup,
+    updateFieldGroup,
 } from "../scenario-field-groups";
 import {
     defaultSettingsNormalizer,
@@ -25,6 +26,7 @@ export function resolveDefaultScenario(actionKind: ActionKind, graphicType: Grap
             ...(graphicType === "dashed-line" ? [sparklineAppearanceFieldGroup, sparklineGridLineFieldGroup] : []),
             colorSettingsFieldGroup,
             ...colorFieldGroupList,
+            updateFieldGroup,
         ],
     });
 }

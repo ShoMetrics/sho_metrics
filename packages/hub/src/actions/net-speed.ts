@@ -49,6 +49,7 @@ export class NetSpeed extends MetricAction {
             : getNetworkAggregateMetricKey(direction);
 
         publishNetworkInterfaceOptions(event, settings);
+        publishNetworkScaleLearning(event, settings, selectedNetworkInterface);
 
         if (settings.graphicType === "linear") {
             this.updateLinearNetworkDisplay({
@@ -387,8 +388,10 @@ export class NetSpeed extends MetricAction {
             `metricKey=${options.networkMetricKey}`,
             `selectedInterface=${formatNetworkInterfaceDebugValue(options.selectedNetworkInterface)}`,
             `automaticInterface=${options.isAutomaticNetworkInterface}`,
-            `manualMaxMbps=${String(options.settings.maximumNetworkSpeedMbps ?? "")}`,
+            `downloadMaxMbps=${String(options.settings.maximumDownloadSpeedMbps ?? "")}`,
+            `uploadMaxMbps=${String(options.settings.maximumUploadSpeedMbps ?? "")}`,
             `resolvedMaxBytesPerSecond=${resolveMaximumBytesPerSecond({
+                direction: options.direction,
                 settings: options.settings,
                 selectedNetworkInterface: options.selectedNetworkInterface,
                 isAutomaticNetworkInterface: options.isAutomaticNetworkInterface,
@@ -407,15 +410,15 @@ export interface NetworkSpeedSettings {
     networkDirection?: SettingValue;
     networkInterfaceId?: SettingValue;
     availableNetworkInterfaces?: SettingValue;
-    maximumNetworkSpeedMbps?: SettingValue;
+    networkScaleMode?: SettingValue;
+    maximumDownloadSpeedMbps?: SettingValue;
+    maximumUploadSpeedMbps?: SettingValue;
     networkUnitBase?: SettingValue;
     networkTrafficDisplayMode?: SettingValue;
-    downloadColorMode?: SettingValue;
     downloadSolidColor?: SettingValue;
     downloadColorLow?: SettingValue;
     downloadColorMedium?: SettingValue;
     downloadColorHigh?: SettingValue;
-    uploadColorMode?: SettingValue;
     uploadSolidColor?: SettingValue;
     uploadColorLow?: SettingValue;
     uploadColorMedium?: SettingValue;
@@ -429,7 +432,8 @@ export interface NetworkSpeedSettings {
 const DEFAULT_DOWNLOAD_COLOR = "#3b82f6";
 const DEFAULT_UPLOAD_COLOR = "#ef4444";
 const NETWORK_DIRECTION_ICON_COLOR = "rgba(255,255,255,0.88)";
-const FALLBACK_MAXIMUM_SPEED_MEGABITS_PER_SECOND = 1000;
+const DEFAULT_DOWNLOAD_MAXIMUM_SPEED_MEGABITS_PER_SECOND = 100;
+const DEFAULT_UPLOAD_MAXIMUM_SPEED_MEGABITS_PER_SECOND = 20;
 const NETWORK_SPEED_MAXIMUM_DISPLAY_DIGITS = 3;
 const NETWORK_CENTER_ICON_SIZE = 58;
 const NETWORK_TOP_ICON_SIZE = 30;
@@ -455,6 +459,7 @@ function buildNetworkWidgetData(options: {
         bytesPerSecond: options.rawWidgetData.current,
         historyBytesPerSecond: options.rawWidgetData.history,
         maximumBytesPerSecond: resolveMaximumBytesPerSecond({
+            direction: options.direction,
             settings: options.settings,
             selectedNetworkInterface: options.selectedNetworkInterface,
             isAutomaticNetworkInterface: options.isAutomaticNetworkInterface,
@@ -467,32 +472,36 @@ function buildNetworkWidgetData(options: {
 }
 
 function resolveMaximumBytesPerSecond(options: {
+    direction: NetworkDirection;
     settings: NetworkSpeedSettings;
     selectedNetworkInterface: NetworkInterfaceOption | null;
     isAutomaticNetworkInterface: boolean;
 }): number {
-    const customMaximumMegabitsPerSecond = Number(options.settings.maximumNetworkSpeedMbps);
+    return convertMegabitsPerSecondToBytesPerSecond(resolveMaximumMegabitsPerSecond(options));
+}
+
+function resolveMaximumMegabitsPerSecond(options: {
+    direction: NetworkDirection;
+    settings: NetworkSpeedSettings;
+    selectedNetworkInterface: NetworkInterfaceOption | null;
+    isAutomaticNetworkInterface: boolean;
+}): number {
+    const customMaximumMegabitsPerSecond = Number(
+        options.direction === "download"
+            ? options.settings.maximumDownloadSpeedMbps
+            : options.settings.maximumUploadSpeedMbps,
+    );
 
     if (
         Number.isFinite(customMaximumMegabitsPerSecond)
         && customMaximumMegabitsPerSecond > 0
     ) {
-        return convertMegabitsPerSecondToBytesPerSecond(customMaximumMegabitsPerSecond);
+        return customMaximumMegabitsPerSecond;
     }
 
-    if (options.isAutomaticNetworkInterface) {
-        const maximumAutomaticSpeedMegabitsPerSecond = networkInterfaceRegistry.resolveMaximumAutomaticSpeedMegabitsPerSecond();
-
-        if (maximumAutomaticSpeedMegabitsPerSecond) {
-            return convertMegabitsPerSecondToBytesPerSecond(maximumAutomaticSpeedMegabitsPerSecond);
-        }
-    }
-
-    if (options.selectedNetworkInterface?.speedMegabitsPerSecond) {
-        return convertMegabitsPerSecondToBytesPerSecond(options.selectedNetworkInterface.speedMegabitsPerSecond);
-    }
-
-    return convertMegabitsPerSecondToBytesPerSecond(FALLBACK_MAXIMUM_SPEED_MEGABITS_PER_SECOND);
+    return options.direction === "download"
+        ? DEFAULT_DOWNLOAD_MAXIMUM_SPEED_MEGABITS_PER_SECOND
+        : DEFAULT_UPLOAD_MAXIMUM_SPEED_MEGABITS_PER_SECOND;
 }
 
 function resolveUnitBase(value: SettingValue): NetworkSpeedUnitBase {
@@ -545,7 +554,7 @@ function resolveNetworkWidgetChannelColor(direction: NetworkDirection, settings:
 function buildNetworkChannelColorConfig(direction: NetworkDirection, settings: NetworkSpeedSettings): ColorConfig {
     if (direction === "download") {
         return {
-            mode: settings.downloadColorMode === "threshold" ? "threshold" : "solid",
+            mode: settings.colorMode === "threshold" ? "threshold" : "solid",
             solidColor: resolveHexColor(settings.downloadSolidColor, DEFAULT_DOWNLOAD_COLOR),
             thresholds: buildChannelThresholds({
                 settings,
@@ -557,7 +566,7 @@ function buildNetworkChannelColorConfig(direction: NetworkDirection, settings: N
     }
 
     return {
-        mode: settings.uploadColorMode === "threshold" ? "threshold" : "solid",
+        mode: settings.colorMode === "threshold" ? "threshold" : "solid",
         solidColor: resolveHexColor(settings.uploadSolidColor, DEFAULT_UPLOAD_COLOR),
         thresholds: buildChannelThresholds({
             settings,
@@ -633,4 +642,66 @@ function publishNetworkInterfaceOptions(event: WillAppearEvent, settings: Networ
     }).catch(error => {
         log.error(() => `Failed to publish network interfaces: ${String(error)}`);
     });
+}
+
+function publishNetworkScaleLearning(
+    event: WillAppearEvent,
+    settings: NetworkSpeedSettings,
+    selectedNetworkInterface: NetworkInterfaceOption | null,
+): void {
+    if (settings.networkScaleMode === "custom") {
+        return;
+    }
+
+    const downloadMetricKey = selectedNetworkInterface
+        ? getNetworkInterfaceMetricKey("download", selectedNetworkInterface.id)
+        : getNetworkAggregateMetricKey("download");
+    const uploadMetricKey = selectedNetworkInterface
+        ? getNetworkInterfaceMetricKey("upload", selectedNetworkInterface.id)
+        : getNetworkAggregateMetricKey("upload");
+    const nextDownloadMaximum = resolveLearnedNetworkMaximumMegabitsPerSecond({
+        direction: "download",
+        settings,
+        observedBytesPerSecond: metricStore.getWidgetData(downloadMetricKey, "DOWN", "B/s").current,
+        selectedNetworkInterface,
+    });
+    const nextUploadMaximum = resolveLearnedNetworkMaximumMegabitsPerSecond({
+        direction: "upload",
+        settings,
+        observedBytesPerSecond: metricStore.getWidgetData(uploadMetricKey, "UP", "B/s").current,
+        selectedNetworkInterface,
+    });
+
+    if (
+        settings.maximumDownloadSpeedMbps === nextDownloadMaximum
+        && settings.maximumUploadSpeedMbps === nextUploadMaximum
+    ) {
+        return;
+    }
+
+    event.action.setSettings({
+        ...settings,
+        maximumDownloadSpeedMbps: nextDownloadMaximum,
+        maximumUploadSpeedMbps: nextUploadMaximum,
+    }).catch(error => {
+        log.error(() => `Failed to publish learned network scale: ${String(error)}`);
+    });
+}
+
+function resolveLearnedNetworkMaximumMegabitsPerSecond(options: {
+    direction: NetworkDirection;
+    settings: NetworkSpeedSettings;
+    observedBytesPerSecond: number;
+    selectedNetworkInterface: NetworkInterfaceOption | null;
+}): number {
+    const currentMaximum = resolveMaximumMegabitsPerSecond({
+        direction: options.direction,
+        settings: options.settings,
+        selectedNetworkInterface: options.selectedNetworkInterface,
+        isAutomaticNetworkInterface: false,
+    });
+    const observedMegabitsPerSecond = (Math.max(0, options.observedBytesPerSecond) * 8) / 1_000_000;
+    const learnedMaximum = Math.ceil(observedMegabitsPerSecond * 1.1);
+
+    return Math.max(currentMaximum, learnedMaximum);
 }

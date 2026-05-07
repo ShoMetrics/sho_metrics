@@ -13,10 +13,6 @@ const diskUsageValueScopeList = [
     inspectorScope.diskUsageTextScope,
 ] as const;
 const diskThroughputScopeList = allMetricScopeList.filter(scopeValue => scopeValue.startsWith("disk.throughput."));
-const diskThroughputCircularLinearScopeList = [
-    inspectorScope.diskThroughputCircularScope,
-    inspectorScope.diskThroughputLinearScope,
-] as const;
 const netSpeedCircularScopeList = [inspectorScope.netSpeedCircularScope] as const;
 const netSpeedEndpointScopeList = [
     inspectorScope.netSpeedCircularScope,
@@ -129,13 +125,36 @@ export const inspectorFieldCatalog = {
             { value: "mirrored", label: "Mirrored" },
         ]),
     }),
-    maximumNetworkSpeedField: defineField({
-        id: "maximum-network-speed",
-        key: "maximumNetworkSpeedMbps",
+    networkScaleModeField: defineField({
+        id: "network-scale-mode",
+        key: "networkScaleMode",
+        kind: "select",
+        label: "Scale",
+        defaultValue: "auto",
+        allowedScopes: netSpeedEndpointScopeList,
+        options: staticOptions([
+            { value: "auto", label: "Auto" },
+            { value: "custom", label: "Custom" },
+        ]),
+    }),
+    maximumDownloadSpeedField: defineField({
+        id: "maximum-download-speed",
+        key: "maximumDownloadSpeedMbps",
         kind: "number",
-        label: "Max Speed (Mbps)",
+        label: "Download Max (Mbps)",
         minimum: 1,
         step: 1,
+        disabledWhen: { key: "networkScaleMode", equals: "auto" },
+        allowedScopes: netSpeedEndpointScopeList,
+    }),
+    maximumUploadSpeedField: defineField({
+        id: "maximum-upload-speed",
+        key: "maximumUploadSpeedMbps",
+        kind: "number",
+        label: "Upload Max (Mbps)",
+        minimum: 1,
+        step: 1,
+        disabledWhen: { key: "networkScaleMode", equals: "auto" },
         allowedScopes: netSpeedEndpointScopeList,
     }),
     networkUnitBaseField: defineField({
@@ -154,18 +173,6 @@ export const inspectorFieldCatalog = {
         kind: "heading",
         text: "Color - Download",
         allowedScopes: netSpeedChannelColorScopeList,
-    }),
-    downloadColorModeField: defineField({
-        id: "download-color-mode",
-        key: "downloadColorMode",
-        kind: "select",
-        label: "Color Mode",
-        defaultValue: "solid",
-        allowedScopes: netSpeedChannelColorScopeList,
-        options: staticOptions([
-            { value: "solid", label: "Solid Color" },
-            { value: "threshold", label: "Dynamic (By Percentage)" },
-        ]),
     }),
     downloadSolidColorField: defineField({
         id: "download-solid-color",
@@ -205,18 +212,6 @@ export const inspectorFieldCatalog = {
         text: "Color - Upload",
         allowedScopes: netSpeedChannelColorScopeList,
     }),
-    uploadColorModeField: defineField({
-        id: "upload-color-mode",
-        key: "uploadColorMode",
-        kind: "select",
-        label: "Color Mode",
-        defaultValue: "solid",
-        allowedScopes: netSpeedChannelColorScopeList,
-        options: staticOptions([
-            { value: "solid", label: "Solid Color" },
-            { value: "threshold", label: "Dynamic (By Percentage)" },
-        ]),
-    }),
     uploadSolidColorField: defineField({
         id: "upload-solid-color",
         key: "uploadSolidColor",
@@ -255,18 +250,6 @@ export const inspectorFieldCatalog = {
         text: "Read",
         allowedScopes: diskThroughputChannelColorScopeList,
     }),
-    diskReadColorModeField: defineField({
-        id: "disk-read-color-mode",
-        key: "diskReadColorMode",
-        kind: "select",
-        label: "Color Mode",
-        defaultValue: "solid",
-        allowedScopes: diskThroughputChannelColorScopeList,
-        options: staticOptions([
-            { value: "solid", label: "Solid Color" },
-            { value: "threshold", label: "Dynamic (By Percentage)" },
-        ]),
-    }),
     diskReadSolidColorField: defineField({
         id: "disk-read-solid-color",
         key: "diskReadSolidColor",
@@ -304,18 +287,6 @@ export const inspectorFieldCatalog = {
         kind: "heading",
         text: "Write",
         allowedScopes: diskThroughputChannelColorScopeList,
-    }),
-    diskWriteColorModeField: defineField({
-        id: "disk-write-color-mode",
-        key: "diskWriteColorMode",
-        kind: "select",
-        label: "Color Mode",
-        defaultValue: "solid",
-        allowedScopes: diskThroughputChannelColorScopeList,
-        options: staticOptions([
-            { value: "solid", label: "Solid Color" },
-            { value: "threshold", label: "Dynamic (By Percentage)" },
-        ]),
     }),
     diskWriteSolidColorField: defineField({
         id: "disk-write-solid-color",
@@ -417,14 +388,39 @@ export const inspectorFieldCatalog = {
             { value: "write", label: "Write" },
         ]),
     }),
-    maximumDiskThroughputField: defineField({
-        id: "maximum-disk-throughput",
-        key: "maximumDiskThroughputMebibytesPerSecond",
+    diskThroughputScaleModeField: defineField({
+        id: "disk-throughput-scale-mode",
+        key: "diskThroughputScaleMode",
+        kind: "select",
+        label: "Scale",
+        defaultValue: "auto",
+        allowedScopes: diskThroughputScopeList,
+        excludeWindows: true,
+        options: staticOptions([
+            { value: "auto", label: "Auto" },
+            { value: "custom", label: "Custom" },
+        ]),
+    }),
+    maximumDiskReadThroughputField: defineField({
+        id: "maximum-disk-read-throughput",
+        key: "maximumDiskReadThroughputMebibytesPerSecond",
         kind: "number",
-        label: "Max Speed (MiB/s)",
+        label: "Read Max (MiB/s)",
         minimum: 1,
         step: 1,
-        allowedScopes: diskThroughputCircularLinearScopeList,
+        disabledWhen: { key: "diskThroughputScaleMode", equals: "auto" },
+        allowedScopes: diskThroughputScopeList,
+        excludeWindows: true,
+    }),
+    maximumDiskWriteThroughputField: defineField({
+        id: "maximum-disk-write-throughput",
+        key: "maximumDiskWriteThroughputMebibytesPerSecond",
+        kind: "number",
+        label: "Write Max (MiB/s)",
+        minimum: 1,
+        step: 1,
+        disabledWhen: { key: "diskThroughputScaleMode", equals: "auto" },
+        allowedScopes: diskThroughputScopeList,
         excludeWindows: true,
     }),
     temperatureUnitField: defineField({

@@ -8,6 +8,7 @@ import {
     colorSettingsFieldGroup,
     sparklineAppearanceFieldGroup,
     sparklineGridLineFieldGroup,
+    updateFieldGroup,
 } from "../scenario-field-groups";
 import {
     defaultSettingsNormalizer,
@@ -36,6 +37,7 @@ export function resolveGpuTempScenario(graphicType: GraphicType): InspectorScena
             maximumTemperatureFieldGroup,
             colorSettingsFieldGroup,
             ...colorFieldGroupList,
+            updateFieldGroup,
         ],
     });
 }
@@ -57,6 +59,7 @@ export function resolveGpuPowerScenario(graphicType: GraphicType): InspectorScen
             maximumGpuPowerFieldGroup,
             colorSettingsFieldGroup,
             ...colorFieldGroupList,
+            updateFieldGroup,
         ],
     });
 }
