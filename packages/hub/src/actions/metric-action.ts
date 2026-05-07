@@ -2,6 +2,7 @@ import { SingletonAction, WillAppearEvent, WillDisappearEvent, DidReceiveSetting
 import { scheduler } from "../runtime/scheduler";
 import { clearSingleMetricDisplayState } from "./single-metric-display";
 import { logger } from "../logging/logger";
+import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 
 type MetricActionSettings = Record<string, unknown>;
 
@@ -22,6 +23,16 @@ export abstract class MetricAction extends SingletonAction {
     /** Track active events per action instance ID to ensure settings are always current. */
     private activeEvents = new Map<string, WillAppearEvent>();
     private activeMetricActions = new Map<string, ActiveMetricAction>();
+
+    constructor() {
+        super();
+        pluginGlobalSettingsStore.subscribe(() => {
+            this.resubscribeAllActions();
+            for (const activeEvent of this.activeEvents.values()) {
+                this.onMetricsUpdate(activeEvent);
+            }
+        });
+    }
 
     override onWillAppear(event: WillAppearEvent): void {
         this.activeEvents.set(event.action.id, event);
@@ -118,6 +129,14 @@ export abstract class MetricAction extends SingletonAction {
 
         activeMetricAction?.cleanup();
         this.subscribeAction(event);
+    }
+
+    private resubscribeAllActions(): void {
+        for (const event of this.activeEvents.values()) {
+            this.activeMetricActions.get(event.action.id)?.cleanup();
+            this.activeMetricActions.delete(event.action.id);
+            this.subscribeAction(event);
+        }
     }
 }
 

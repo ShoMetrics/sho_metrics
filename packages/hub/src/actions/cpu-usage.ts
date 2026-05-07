@@ -6,6 +6,7 @@ import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-label
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import type { WidgetData } from "../rendering/widget-data";
+import { resolveActionSettings } from "./action-settings-resolver";
 
 /**
  * CPU Usage action with full theming support.
@@ -23,6 +24,10 @@ export class CpuUsage extends MetricAction {
 
         setSingleMetricDisplay({
             event,
+            resolvedSettings: resolveActionSettings(
+                event.payload.settings as Record<string, unknown>,
+                "cpu-usage",
+            ),
             metricKey: CPU_USAGE_METRIC_KEY,
             widgetData: {
                 ...buildCpuUsageWidgetData(widgetData),

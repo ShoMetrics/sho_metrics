@@ -3,9 +3,10 @@ import type { FieldSchema, PropertyInspectorSettingKey, VisibilityContext } from
 interface ColorFieldProps {
     field: FieldSchema & { key: PropertyInspectorSettingKey };
     context: VisibilityContext;
+    disabled?: boolean;
 }
 
-export function ColorField({ field, context }: ColorFieldProps): React.JSX.Element {
+export function ColorField({ field, context, disabled = false }: ColorFieldProps): React.JSX.Element {
     const value = String(context.settings[field.key] ?? field.defaultValue ?? "");
 
     return (
@@ -14,6 +15,7 @@ export function ColorField({ field, context }: ColorFieldProps): React.JSX.Eleme
             data-setting-key={field.key}
             default={String(field.defaultValue ?? value)}
             value={value}
+            disabled={disabled}
         />
     );
 }

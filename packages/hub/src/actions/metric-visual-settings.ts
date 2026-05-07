@@ -55,21 +55,24 @@ const GRAPHIC_TYPE_ALIASES: Record<string, GraphicType> = {
 
 const GRAPHIC_THEME_PRESET_NAMES: readonly GraphicThemePresetName[] = ["flat", "cupertino-glass"];
 
-export function resolveMetricVisualSettings(settings: MetricVisualSettings): ResolvedMetricVisualSettings {
-    const graphicType = resolveGraphicType(settings.graphicType);
-    const graphicStyle = resolveGraphicStyle(settings.graphicStyle);
+export function resolveMetricVisualSettings(
+    settings: MetricVisualSettings,
+): ResolvedMetricVisualSettings {
+    const effectiveSettings = settings;
+    const graphicType = resolveGraphicType(effectiveSettings.graphicType);
+    const graphicStyle = resolveGraphicStyle(effectiveSettings.graphicStyle);
 
     return {
         graphicType,
-        circleStyle: resolveCircleStyle(settings.circleStyle),
+        circleStyle: resolveCircleStyle(effectiveSettings.circleStyle),
         graphicStyle,
-        colorConfig: buildColorConfig(settings),
+        colorConfig: buildColorConfig(effectiveSettings),
         lineSmoothingPercent: normalizePercentageSetting(
-            settings.lineSmoothingPercent,
+            effectiveSettings.lineSmoothingPercent,
             DEFAULT_LINE_SMOOTHING_PERCENT,
         ),
-        gridLineVisibility: resolveGridLineVisibility(settings.gridLineVisibility),
-        gridLineType: resolveGridLineType(settings.gridLineType),
+        gridLineVisibility: resolveGridLineVisibility(effectiveSettings.gridLineVisibility),
+        gridLineType: resolveGridLineType(effectiveSettings.gridLineType),
     };
 }
 

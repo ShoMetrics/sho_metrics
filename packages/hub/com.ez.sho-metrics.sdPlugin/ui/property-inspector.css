@@ -79,6 +79,79 @@ body {
     margin: 0 0 16px;
 }
 
+.settings-tab-list {
+    border-bottom: 1px solid #4b4b4b;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    margin: 0 0 14px;
+}
+
+.settings-tab {
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    color: #b8b8b8;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0;
+    min-height: 34px;
+    padding: 7px 8px;
+    text-transform: uppercase;
+}
+
+.settings-tab[data-selected="true"] {
+    border-bottom-color: #5aa7ff;
+    color: #ffffff;
+}
+
+.native-checkbox-row {
+    align-items: center;
+    display: flex;
+    min-height: 28px;
+}
+
+.native-checkbox-row input {
+    height: 16px;
+    margin: 0;
+    width: 16px;
+}
+
+.override-toggle-item {
+    margin-bottom: 8px;
+}
+
+.override-toggle-row {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    min-height: 28px;
+    width: 100%;
+}
+
+.override-toggle-row input {
+    flex: 0 0 auto;
+    height: 16px;
+    margin: 0;
+    width: 16px;
+}
+
+.override-toggle-title {
+    color: #efefef;
+    flex: 0 0 auto;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.override-toggle-note {
+    color: #b8b8b8;
+    font-size: 12px;
+    line-height: 1.25;
+    min-width: 0;
+}
+
 .section-title {
     border-bottom: 1px solid #4b4b4b;
     color: #ffffff;
@@ -112,6 +185,14 @@ body {
     min-width: 0;
     padding: 4px 8px;
     width: 100%;
+}
+
+.native-select:disabled,
+.native-input:disabled,
+.range-control input:disabled,
+.usage-range input:disabled {
+    cursor: default;
+    opacity: 0.55;
 }
 
 .graphic-type-picker {
@@ -210,4 +291,8 @@ body {
     color: #858585;
     cursor: default;
     opacity: 0.6;
+}
+
+.widget-reset-item {
+    margin-bottom: 8px;
 }

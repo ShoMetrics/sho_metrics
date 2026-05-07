@@ -24,18 +24,25 @@ import { getMetricStatusIcon } from "../widgets/icons/metric-status-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import { escapeSvgText } from "../rendering/svg-utils";
 import { resolveColor, type ColorConfig } from "../rendering/color-resolver";
+import { buildGlobalChannelColorConfig } from "../settings/global-appearance";
+import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
+import {
+    normalizeActionStoredSettings,
+    resolveActionSettings,
+    serializeActionStoredSettings,
+} from "./action-settings-resolver";
 
 const log = logger.for("Action:Disk");
 
 @action({ UUID: "com.ez.sho-metrics.disk" })
 export class Disk extends MetricAction {
     protected override getDefaultPollingFrequencySeconds(event: WillAppearEvent): number {
-        const settings = event.payload.settings as DiskSettings;
+        const settings = resolveDiskSettings(event);
         return normalizeDiskMetricKind(settings.diskMetricKind) === "throughput" ? 1 : 60;
     }
 
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
-        const settings = event.payload.settings as DiskSettings;
+        const settings = resolveDiskSettings(event);
         const metricKind = normalizeDiskMetricKind(settings.diskMetricKind);
 
         if (metricKind === "throughput") {
@@ -58,7 +65,7 @@ export class Disk extends MetricAction {
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
-        const settings = event.payload.settings as DiskSettings;
+        const settings = resolveDiskSettings(event);
         const metricKind = normalizeDiskMetricKind(settings.diskMetricKind);
 
         publishDiskVolumeOptions(event, settings);
@@ -87,11 +94,13 @@ export class Disk extends MetricAction {
         const usedBytesWidgetData = metricStore.getWidgetData(usedMetricKey, label, "B");
         const totalBytesWidgetData = metricStore.getWidgetData(totalMetricKey, label, "B");
         const availableBytesWidgetData = metricStore.getWidgetData(availableMetricKey, label, "B");
+        const effectiveGraphicType = resolveGraphicType(settings.graphicType);
         const circleStyle = resolveCircleStyle(settings.circleStyle);
-        const shouldRenderGauge = settings.graphicType === "circular" && circleStyle === "gauge";
+        const shouldRenderGauge = effectiveGraphicType === "circular" && circleStyle === "gauge";
 
         setSingleMetricDisplay({
             event,
+            resolvedSettings: settings,
             metricKey: usedMetricKey,
             widgetData: buildDiskUsageWidgetData({
                 usedBytesWidgetData,
@@ -116,8 +125,9 @@ export class Disk extends MetricAction {
         }
 
         const throughputDirection = normalizeDiskThroughputDisplayDirection(settings.diskThroughputDirection);
+        const effectiveGraphicType = resolveGraphicType(settings.graphicType);
 
-        if (isDualDiskThroughputDisplay(settings.graphicType, throughputDirection)) {
+        if (isDualDiskThroughputDisplay(effectiveGraphicType, throughputDirection)) {
             this.updateDualThroughputDisplay(event, settings);
             return;
         }
@@ -130,10 +140,11 @@ export class Disk extends MetricAction {
             : ARC_GAUGE_LABELS.disk;
         const bytesPerSecondWidgetData = metricStore.getWidgetData(throughputMetricKey, throughputLabel, "B/s");
         const circleStyle = resolveCircleStyle(settings.circleStyle);
-        const shouldRenderGaugeFooter = settings.graphicType === "circular" && circleStyle === "gauge";
+        const shouldRenderGaugeFooter = effectiveGraphicType === "circular" && circleStyle === "gauge";
 
         setSingleMetricDisplay({
             event,
+            resolvedSettings: settings,
             metricKey: throughputMetricKey,
             widgetData: buildDiskThroughputWidgetData({
                 bytesPerSecondWidgetData,
@@ -160,9 +171,10 @@ export class Disk extends MetricAction {
     private updateDualThroughputDisplay(event: WillAppearEvent, settings: DiskSettings): void {
         const readMetricKey = getDiskThroughputMetricKey("read");
         const writeMetricKey = getDiskThroughputMetricKey("write");
-        const dualGraphicType = settings.graphicType === "circular"
+        const effectiveGraphicType = resolveGraphicType(settings.graphicType);
+        const dualGraphicType = effectiveGraphicType === "circular"
             ? "circular"
-            : settings.graphicType === "text" ? "text" : undefined;
+            : effectiveGraphicType === "text" ? "text" : undefined;
         const selectedVolume = resolveSelectedDiskVolume(settings.diskVolumeId);
         const readWidgetData = buildDiskThroughputWidgetData({
             bytesPerSecondWidgetData: metricStore.getWidgetData(readMetricKey, "READ", "B/s"),
@@ -181,6 +193,7 @@ export class Disk extends MetricAction {
 
         setDualMetricDisplay({
             event,
+            resolvedSettings: settings,
             metricKey: `${readMetricKey},${writeMetricKey}`,
             dualGraphicType,
             widgetData: {
@@ -331,12 +344,23 @@ const DISK_THROUGHPUT_DIRECTION_ICON_COLOR = "rgba(255,255,255,0.88)";
 const DISK_THROUGHPUT_DIRECTION_ICON_SIZE = 30;
 const DISK_GAUGE_FOOTER_ICON_SIZE = 25;
 
+function resolveDiskSettings(event: WillAppearEvent): DiskSettings {
+    return resolveActionSettings(
+        event.payload.settings as Record<string, unknown>,
+        "disk",
+    ) as DiskSettings;
+}
+
 function normalizeDiskMetricKind(value: SettingValue): "usage" | "throughput" {
     return value === "throughput" ? "throughput" : "usage";
 }
 
-function normalizeDiskUsageDisplayMode(value: SettingValue): DiskUsageDisplayMode {
-    return value === "space" ? "space" : "percentage";
+function resolveGraphicType(value: SettingValue): "circular" | "text" | "linear" | "dashed-line" {
+    if (value === "text" || value === "linear" || value === "dashed-line") {
+        return value;
+    }
+
+    return "circular";
 }
 
 function resolveCircleStyle(value: SettingValue): "value" | "compact" | "gauge" {
@@ -345,6 +369,10 @@ function resolveCircleStyle(value: SettingValue): "value" | "compact" | "gauge" 
     }
 
     return "value";
+}
+
+function normalizeDiskUsageDisplayMode(value: SettingValue): DiskUsageDisplayMode {
+    return value === "space" ? "space" : "percentage";
 }
 
 function resolveSelectedDiskVolume(value: SettingValue): DiskVolumeOption | null {
@@ -433,6 +461,11 @@ function resolveDiskWidgetChannelColor(
 }
 
 function buildDiskChannelColorConfig(direction: Exclude<DiskThroughputDirection, "total">, settings: DiskSettings): ColorConfig {
+    const globalSettings = pluginGlobalSettingsStore.get();
+    if (globalSettings.overrideWidgetAppearance) {
+        return buildGlobalChannelColorConfig(direction === "read" ? "primary" : "secondary", globalSettings);
+    }
+
     if (direction === "read") {
         return {
             mode: settings.colorMode === "threshold" ? "threshold" : "solid",
@@ -499,10 +532,18 @@ function publishDiskVolumeOptions(event: WillAppearEvent, settings: DiskSettings
         return;
     }
 
-    event.action.setSettings({
-        ...settings,
-        availableDiskVolumes,
-    }).catch(error => {
+    const storedSettings = normalizeActionStoredSettings(
+        event.payload.settings as Record<string, unknown>,
+        "disk",
+    );
+
+    event.action.setSettings(serializeActionStoredSettings({
+        ...storedSettings,
+        runtimeCache: {
+            ...storedSettings.runtimeCache,
+            availableDiskVolumes,
+        },
+    })).catch(error => {
         log.error(() => `Failed to publish disk volumes: ${String(error)}`);
     });
 }
@@ -526,18 +567,26 @@ function publishDiskThroughputScaleLearning(event: WillAppearEvent, settings: Di
         observedBytesPerSecond: metricStore.getWidgetData(getDiskThroughputMetricKey("write"), "WRIT", "B/s").current,
     });
 
+    const storedSettings = normalizeActionStoredSettings(
+        event.payload.settings as Record<string, unknown>,
+        "disk",
+    );
+
     if (
-        settings.maximumDiskReadThroughputMebibytesPerSecond === nextReadMaximum
-        && settings.maximumDiskWriteThroughputMebibytesPerSecond === nextWriteMaximum
+        storedSettings.runtimeCache.learnedMaximumDiskReadThroughputMebibytesPerSecond === nextReadMaximum
+        && storedSettings.runtimeCache.learnedMaximumDiskWriteThroughputMebibytesPerSecond === nextWriteMaximum
     ) {
         return;
     }
 
-    event.action.setSettings({
-        ...settings,
-        maximumDiskReadThroughputMebibytesPerSecond: nextReadMaximum,
-        maximumDiskWriteThroughputMebibytesPerSecond: nextWriteMaximum,
-    }).catch(error => {
+    event.action.setSettings(serializeActionStoredSettings({
+        ...storedSettings,
+        runtimeCache: {
+            ...storedSettings.runtimeCache,
+            learnedMaximumDiskReadThroughputMebibytesPerSecond: nextReadMaximum,
+            learnedMaximumDiskWriteThroughputMebibytesPerSecond: nextWriteMaximum,
+        },
+    })).catch(error => {
         log.error(() => `Failed to publish learned disk throughput scale: ${String(error)}`);
     });
 }

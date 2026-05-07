@@ -12,6 +12,7 @@ interface PreviewOptionPickerProps {
     context: VisibilityContext;
     onSettingChange: (key: PropertyInspectorSettingKey, value: string) => void;
     buildPreviewUri: (value: string) => string;
+    disabled?: boolean;
 }
 
 export function PreviewOptionPicker({
@@ -19,6 +20,7 @@ export function PreviewOptionPicker({
     context,
     onSettingChange,
     buildPreviewUri,
+    disabled = false,
 }: PreviewOptionPickerProps): React.JSX.Element {
     const options = resolveSelectOptions(field, context);
     const selectedValue = resolveSelectedOptionValue({
@@ -27,7 +29,7 @@ export function PreviewOptionPicker({
         value: String(context.settings[field.key]),
         fallbackValue: field.defaultValue == null ? undefined : String(field.defaultValue),
     });
-    const isDisabled = isFieldDisabled(field, context);
+    const isDisabled = disabled || isFieldDisabled(field, context);
 
     return (
         <div className="graphic-type-picker" role="radiogroup" aria-label={field.label ?? field.id}>

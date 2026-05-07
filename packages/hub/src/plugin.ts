@@ -6,8 +6,14 @@ import { GpuUsage, GpuTemp, GpuVram, GpuPower } from "./actions/gpu-usage";
 import { RamUsage } from "./actions/ram-usage";
 import { Disk } from "./actions/disk";
 import { logger } from "./logging/logger";
+import { pluginGlobalSettingsStore } from "./settings/global-settings-store";
 
 logger.setLevel(__LOG_LEVEL__);
+const log = logger.for("Plugin");
+
+streamDeck.settings.onDidReceiveGlobalSettings(event => {
+    pluginGlobalSettingsStore.update(event.settings as Record<string, unknown>);
+});
 
 streamDeck.actions.registerAction(new CpuUsage());
 streamDeck.actions.registerAction(new NetSpeed());
@@ -19,4 +25,11 @@ streamDeck.actions.registerAction(new GpuVram());
 streamDeck.actions.registerAction(new GpuPower());
 
 // Finally, connect to the Stream Deck.
-streamDeck.connect();
+streamDeck.connect()
+    .then(() => streamDeck.settings.getGlobalSettings())
+    .then(settings => {
+        pluginGlobalSettingsStore.update(settings as Record<string, unknown>);
+    })
+    .catch(error => {
+        log.warn(() => `Failed to connect or load global settings: ${String(error)}`);
+    });

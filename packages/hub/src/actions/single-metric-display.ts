@@ -106,7 +106,7 @@ function renderAndSendSingleMetricDisplay(
     activeDisplayUpdateCount += 1;
 
     const renderStartTimestampMilliseconds = Date.now();
-    const settings = options.event.payload.settings as SingleMetricDisplaySettings;
+    const settings = options.resolvedSettings ?? options.event.payload.settings as SingleMetricDisplaySettings;
     const renderPlan = buildMetricDisplayRenderPlan({
         displayOptions: options,
         settings,
@@ -536,7 +536,8 @@ function getOrCreateDisplayActionState(actionId: string): DisplayActionState {
 }
 
 function recordDisplayRequest(displayActionState: DisplayActionState, options: MetricDisplayOptions): void {
-    const settingsSignature = buildSettingsSignature(options.event.payload.settings as SingleMetricDisplaySettings);
+    const settings = options.resolvedSettings ?? options.event.payload.settings as SingleMetricDisplaySettings;
+    const settingsSignature = buildSettingsSignature(settings);
     const isSettingsChange = displayActionState.lastRequestedSettingsSignature !== null
         && displayActionState.lastRequestedSettingsSignature !== settingsSignature;
     const requestTimestampMilliseconds = Date.now();
@@ -555,7 +556,7 @@ function recordDisplayRequest(displayActionState: DisplayActionState, options: M
         return;
     }
 
-    const visualSettings = resolveMetricVisualSettings(options.event.payload.settings as SingleMetricDisplaySettings);
+    const visualSettings = resolveMetricVisualSettings(settings);
 
     log.info(() => [
         "settingsDisplayRequested",
@@ -850,8 +851,9 @@ function buildSettingsSignature(settings: SingleMetricDisplaySettings): string {
         `graphicType=${visualSettings.graphicType}`,
         `circleStyle=${visualSettings.circleStyle}`,
         `graphicStyle=${visualSettings.graphicStyle}`,
-        `colorMode=${String(settings.colorMode ?? "")}`,
-        `solidColor=${String(settings.solidColor ?? "")}`,
+        `colorMode=${visualSettings.colorConfig.mode}`,
+        `solidColor=${visualSettings.colorConfig.solidColor}`,
+        `thresholds=${visualSettings.colorConfig.thresholds.map(threshold => threshold.color).join(",")}`,
         `lineSmoothingPercent=${visualSettings.lineSmoothingPercent}`,
         `gridLineVisibility=${visualSettings.gridLineVisibility}`,
         `gridLineType=${visualSettings.gridLineType}`,

@@ -11,6 +11,7 @@ declare module "react" {
                 setting?: string;
                 default?: string;
                 value?: string;
+                disabled?: boolean;
             };
         }
     }

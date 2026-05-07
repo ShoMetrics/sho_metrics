@@ -27,6 +27,7 @@ interface BaseMetricDisplayOptions {
     statusIcon: ArcGaugeStatusIcon;
     circleStyleOverride?: ResolvedMetricVisualSettings["circleStyle"];
     visualSettingsOverride?: Partial<MetricVisualSettings>;
+    resolvedSettings?: SingleMetricDisplaySettings;
 }
 
 export interface SingleMetricDisplayOptions extends BaseMetricDisplayOptions {
@@ -94,8 +95,9 @@ export function buildMetricDisplayRenderPlan(options: {
     settings: SingleMetricDisplaySettings;
     isDial: boolean;
 }): MetricDisplayRenderPlan {
+    const resolvedSettings = options.displayOptions.resolvedSettings ?? options.settings;
     const visualSettings = resolveMetricVisualSettings({
-        ...options.settings,
+        ...resolvedSettings,
         ...options.displayOptions.visualSettingsOverride,
     });
     const circleStyle = resolveCircleStyle({

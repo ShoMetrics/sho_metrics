@@ -5,9 +5,10 @@ interface TextFieldProps {
     field: FieldSchema & { key: PropertyInspectorSettingKey };
     context: VisibilityContext;
     onSettingChange: (key: PropertyInspectorSettingKey, value: string) => void;
+    disabled?: boolean;
 }
 
-export function TextField({ field, context, onSettingChange }: TextFieldProps): React.JSX.Element {
+export function TextField({ field, context, onSettingChange, disabled = false }: TextFieldProps): React.JSX.Element {
     const placeholder = field.placeholderSource === "diskAutoLinearLabel"
         ? resolveDiskAutoLinearLabel(context)
         : field.placeholder;
@@ -19,6 +20,7 @@ export function TextField({ field, context, onSettingChange }: TextFieldProps): 
             data-setting-key={field.key}
             placeholder={placeholder ?? ""}
             value={String(context.settings[field.key] ?? "")}
+            disabled={disabled}
             onChange={() => undefined}
         />
     );
@@ -46,7 +48,7 @@ export function TextField({ field, context, onSettingChange }: TextFieldProps): 
             <button
                 className="inline-action-button"
                 type="button"
-                disabled={!canUseDetectedLabel}
+                disabled={disabled || !canUseDetectedLabel}
                 onClick={useDetectedLabel}
                 aria-label="Use detected label as custom label"
             >
