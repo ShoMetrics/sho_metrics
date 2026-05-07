@@ -110,6 +110,27 @@ test("network sparkline exposes dual-stream network controls", () => {
     assertFieldAbsent(sparklineFieldIdList, "network-circle-note");
 });
 
+test("network dual circular exposes independent download and upload colors", () => {
+    const fieldIdList = resolveInspectorFieldIdList(buildContext({
+        actionKind: "net-speed",
+        settings: {
+            graphicType: "circular",
+            networkDirection: "both",
+        },
+    }));
+
+    assertFieldPresent(fieldIdList, "color-settings-heading");
+    assertFieldPresent(fieldIdList, "download-color-heading");
+    assertFieldPresent(fieldIdList, "download-color-mode");
+    assertFieldPresent(fieldIdList, "download-solid-color");
+    assertFieldPresent(fieldIdList, "upload-color-heading");
+    assertFieldPresent(fieldIdList, "upload-color-mode");
+    assertFieldPresent(fieldIdList, "upload-solid-color");
+    assertFieldAbsent(fieldIdList, "color-mode");
+    assertFieldAbsent(fieldIdList, "solid-color");
+    assertFieldOrder(fieldIdList, "download-color-heading", "upload-color-heading");
+});
+
 test("network single-stream sparkline uses standard color settings", () => {
     const sparklineFieldIdList = resolveInspectorFieldIdList(buildContext({
         actionKind: "net-speed",

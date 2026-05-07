@@ -329,7 +329,8 @@ function isDualNetworkChannelColor(context: VisibilityContext): boolean {
     return context.actionKind === "net-speed"
         && context.settings.networkDirection === "both"
         && (
-            context.settings.graphicType === "text"
+            context.settings.graphicType === "circular"
+            || context.settings.graphicType === "text"
             || context.settings.graphicType === "linear"
             || context.settings.graphicType === "dashed-line"
         );

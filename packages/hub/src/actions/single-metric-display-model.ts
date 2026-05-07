@@ -1,4 +1,5 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
+import type { ColorConfig } from "../rendering/color-resolver";
 import {
     KEYPAD_PNG_SIZE,
     TOUCH_STRIP_LOGICAL_SIZE,
@@ -39,6 +40,8 @@ export interface DualMetricDisplayOptions extends BaseMetricDisplayOptions {
     chartMode?: "overlay" | "mirrored";
     positiveColor: string;
     negativeColor: string;
+    positiveColorConfig?: ColorConfig;
+    negativeColorConfig?: ColorConfig;
     positiveIconFragment?: string;
     negativeIconFragment?: string;
     positiveStatusIcon?: ArcGaugeStatusIcon;

@@ -152,7 +152,7 @@ export const inspectorFieldCatalog = {
     downloadColorHeadingField: defineField({
         id: "download-color-heading",
         kind: "heading",
-        text: "Download",
+        text: "Color - Download",
         allowedScopes: netSpeedChannelColorScopeList,
     }),
     downloadColorModeField: defineField({
@@ -202,7 +202,7 @@ export const inspectorFieldCatalog = {
     uploadColorHeadingField: defineField({
         id: "upload-color-heading",
         kind: "heading",
-        text: "Upload",
+        text: "Color - Upload",
         allowedScopes: netSpeedChannelColorScopeList,
     }),
     uploadColorModeField: defineField({

@@ -52,8 +52,26 @@ export interface GaugeMarkerDot {
     fill: string;
 }
 
+export interface GaugeRangeLaneGeometry {
+    startAngleDegrees: number;
+    endAngleDegrees: number;
+    visibleLength: number;
+}
+
+export interface GaugeMarkerGap {
+    startProgress: number;
+    endProgress: number;
+}
+
+interface GaugeMarkerTravelDomain {
+    minimumProgress: number;
+    maximumProgress: number;
+}
+
 const GAUGE_RANGE_SEGMENT_OVERLAP_PROGRESS = 0.002;
 const MAX_GAUGE_RANGE_BLEND_PROGRESS = 0.24;
+const GAUGE_MARKER_VISUAL_MIN_PROGRESS = 0.08;
+const GAUGE_MARKER_VISUAL_MAX_PROGRESS = 0.90;
 
 export function buildGaugeRangeColorPlan(options: {
     circleStyle: ArcGaugeStyle;
@@ -109,8 +127,13 @@ export function resolveGaugeMarkerDot(options: {
     radius: number;
     gapLength: number;
 }): GaugeMarkerDot {
+    const markerRenderProgress = resolveGaugeMarkerRenderProgress({
+        progress: options.progress,
+        gapLength: options.gapLength,
+        visibleLength: options.notchGeometry.visibleLength,
+    });
     const visibleAngleDegrees = 360 - options.notchGeometry.gapAngleDegrees;
-    const markerAngleDegrees = options.notchGeometry.startRotationDegrees + visibleAngleDegrees * options.progress;
+    const markerAngleDegrees = options.notchGeometry.startRotationDegrees + visibleAngleDegrees * markerRenderProgress;
     const markerPoint = resolvePointOnCircle({
         geometry: options.geometry,
         angleDegrees: markerAngleDegrees,
@@ -120,7 +143,7 @@ export function resolveGaugeMarkerDot(options: {
     return {
         xCoordinate: markerPoint.xCoordinate,
         yCoordinate: markerPoint.yCoordinate,
-        progress: options.progress,
+        progress: markerRenderProgress,
         radius: options.radius,
         gapLength: options.gapLength,
         fill: options.fill,
@@ -134,20 +157,48 @@ export function renderGaugeRangeArcSegments(options: {
     rangeColorPlan: GaugeRangeColorPlan;
     strokeWidth: number;
 }): string {
+    return renderGaugeRangeLaneSegments({
+        geometry: options.geometry,
+        laneGeometry: {
+            startAngleDegrees: options.notchGeometry.startRotationDegrees,
+            endAngleDegrees: options.notchGeometry.startRotationDegrees + 360 - options.notchGeometry.gapAngleDegrees,
+            visibleLength: options.notchGeometry.visibleLength,
+        },
+        markerDot: options.markerDot,
+        rangeColorPlan: options.rangeColorPlan,
+        strokeWidth: options.strokeWidth,
+        segmentClassName: "arc-gauge-range-segment",
+        capClassName: "arc-gauge-range-cap",
+        gradientIdentifierPrefix: "arc-gauge-range",
+    });
+}
+
+export function renderGaugeRangeLaneSegments(options: {
+    geometry: ArcGaugeGeometry;
+    laneGeometry: GaugeRangeLaneGeometry;
+    markerDot: GaugeMarkerDot | null;
+    rangeColorPlan: GaugeRangeColorPlan;
+    strokeWidth: number;
+    segmentClassName: string;
+    capClassName: string;
+    gradientIdentifierPrefix: string;
+}): string {
     const markerGap = options.markerDot
-        ? {
-            startProgress: clamp(options.markerDot.progress - options.markerDot.gapLength / options.notchGeometry.visibleLength, 0, 1),
-            endProgress: clamp(options.markerDot.progress + options.markerDot.gapLength / options.notchGeometry.visibleLength, 0, 1),
-        }
+        ? resolveGaugeMarkerGap({
+            progress: options.markerDot.progress,
+            gapLength: options.markerDot.gapLength,
+            visibleLength: options.laneGeometry.visibleLength,
+        })
         : null;
     const visibleSegments = options.rangeColorPlan.paintSegments.flatMap((segment) => {
         return splitGaugeRangeSegmentByMarkerGap(segment, markerGap);
     });
     const arcSegments = visibleSegments.map((segment, segmentIndex) => renderGaugeRangeArcSegment({
         geometry: options.geometry,
-        notchGeometry: options.notchGeometry,
+        laneGeometry: options.laneGeometry,
         segment,
-        gradientIdentifier: `arc-gauge-range-${segmentIndex}`,
+        gradientIdentifier: `${options.gradientIdentifierPrefix}-${segmentIndex}`,
+        className: options.segmentClassName,
         strokeWidth: options.strokeWidth,
     }));
     const caps = buildGaugeRangeCaps({
@@ -155,10 +206,11 @@ export function renderGaugeRangeArcSegments(options: {
         markerGap,
     }).map((cap) => renderGaugeRangeCap({
         geometry: options.geometry,
-        notchGeometry: options.notchGeometry,
+        laneGeometry: options.laneGeometry,
         progress: cap.progress,
         color: cap.color,
         radius: options.strokeWidth / 2,
+        className: options.capClassName,
     }));
 
     return [...arcSegments, ...caps].join("");
@@ -377,7 +429,7 @@ function normalizeGradientStops(stops: readonly GaugeRangeGradientStop[]): reado
 
 function buildGaugeRangeCaps(options: {
     paintSegments: readonly GaugeRangePaintSegment[];
-    markerGap: { startProgress: number; endProgress: number } | null;
+    markerGap: GaugeMarkerGap | null;
 }): Array<{ progress: number; color: string }> {
     const caps: Array<{ progress: number; color: string }> = [
         { progress: 0, color: resolveGaugeRangePaintColor(0, options.paintSegments) },
@@ -387,11 +439,17 @@ function buildGaugeRangeCaps(options: {
     if (options.markerGap) {
         caps.push({
             progress: options.markerGap.startProgress,
-            color: resolveGaugeRangePaintColor(options.markerGap.startProgress - 0.001, options.paintSegments),
+            color: resolveGaugeRangePaintColor(
+                clamp(options.markerGap.startProgress - 0.001, 0, 1),
+                options.paintSegments,
+            ),
         });
         caps.push({
             progress: options.markerGap.endProgress,
-            color: resolveGaugeRangePaintColor(options.markerGap.endProgress + 0.001, options.paintSegments),
+            color: resolveGaugeRangePaintColor(
+                clamp(options.markerGap.endProgress + 0.001, 0, 1),
+                options.paintSegments,
+            ),
         });
     }
 
@@ -400,7 +458,7 @@ function buildGaugeRangeCaps(options: {
 
 function splitGaugeRangeSegmentByMarkerGap(
     segment: GaugeRangePaintSegment,
-    markerGap: { startProgress: number; endProgress: number } | null,
+    markerGap: GaugeMarkerGap | null,
 ): GaugeRangePaintSegment[] {
     if (
         !markerGap
@@ -433,11 +491,86 @@ function splitGaugeRangeSegmentByMarkerGap(
     return segments;
 }
 
+export function resolveGaugeMarkerRenderProgress(options: {
+    progress: number;
+    gapLength: number;
+    visibleLength: number;
+}): number {
+    const clampedProgress = clamp(options.progress, 0, 1);
+    const markerTravelDomain = resolveGaugeMarkerTravelDomain(options);
+
+    if (
+        clampedProgress === 0
+        || clampedProgress === 1
+        || markerTravelDomain.maximumProgress <= markerTravelDomain.minimumProgress
+    ) {
+        return clampedProgress;
+    }
+
+    return markerTravelDomain.minimumProgress
+        + clampedProgress * (markerTravelDomain.maximumProgress - markerTravelDomain.minimumProgress);
+}
+
+export function resolveGaugeMarkerGap(options: {
+    progress: number;
+    gapLength: number;
+    visibleLength: number;
+}): GaugeMarkerGap {
+    const markerRenderProgress = clamp(options.progress, 0, 1);
+    const halfGapProgress = resolveGaugeMarkerHalfGapProgress(options);
+
+    if (markerRenderProgress === 0 || markerRenderProgress === 1) {
+        return {
+            startProgress: clamp(markerRenderProgress - halfGapProgress, 0, 1),
+            endProgress: clamp(markerRenderProgress + halfGapProgress, 0, 1),
+        };
+    }
+
+    return {
+        startProgress: clamp(
+            markerRenderProgress - halfGapProgress,
+            GAUGE_MARKER_VISUAL_MIN_PROGRESS,
+            GAUGE_MARKER_VISUAL_MAX_PROGRESS,
+        ),
+        endProgress: clamp(
+            markerRenderProgress + halfGapProgress,
+            GAUGE_MARKER_VISUAL_MIN_PROGRESS,
+            GAUGE_MARKER_VISUAL_MAX_PROGRESS,
+        ),
+    };
+}
+
+function resolveGaugeMarkerTravelDomain(options: {
+    gapLength: number;
+    visibleLength: number;
+}): GaugeMarkerTravelDomain {
+    const halfGapProgress = resolveGaugeMarkerHalfGapProgress(options);
+    const minimumProgress = GAUGE_MARKER_VISUAL_MIN_PROGRESS + halfGapProgress;
+    const maximumProgress = GAUGE_MARKER_VISUAL_MAX_PROGRESS - halfGapProgress;
+
+    return {
+        minimumProgress,
+        maximumProgress,
+    };
+}
+
+function resolveGaugeMarkerHalfGapProgress(options: {
+    gapLength: number;
+    visibleLength: number;
+}): number {
+    if (options.visibleLength <= 0) {
+        return 0;
+    }
+
+    return clamp(options.gapLength / options.visibleLength, 0, 0.5);
+}
+
 function renderGaugeRangeArcSegment(options: {
     geometry: ArcGaugeGeometry;
-    notchGeometry: RingNotchGeometry;
+    laneGeometry: GaugeRangeLaneGeometry;
     segment: GaugeRangePaintSegment;
     gradientIdentifier: string;
+    className: string;
     strokeWidth: number;
 }): string {
     if (options.segment.endProgress - options.segment.startProgress <= 0.001) {
@@ -449,8 +582,8 @@ function renderGaugeRangeArcSegment(options: {
         options.segment.startProgress,
         1,
     );
-    const startAngleDegrees = resolveGaugeRangeAngleDegrees(options.notchGeometry, options.segment.startProgress);
-    const endAngleDegrees = resolveGaugeRangeAngleDegrees(options.notchGeometry, endProgress);
+    const startAngleDegrees = resolveGaugeRangeAngleDegrees(options.laneGeometry, options.segment.startProgress);
+    const endAngleDegrees = resolveGaugeRangeAngleDegrees(options.laneGeometry, endProgress);
     const startPoint = resolvePointOnCircle({
         geometry: options.geometry,
         angleDegrees: startAngleDegrees,
@@ -474,7 +607,7 @@ function renderGaugeRangeArcSegment(options: {
             <stop offset="100%" stop-color="${options.segment.endColor}" />
         </linearGradient>`;
 
-    return `${gradient}<path class="arc-gauge-range-segment"
+    return `${gradient}<path class="${options.className}"
         d="${renderAnnularArcPath({
             geometry: options.geometry,
             startAngleDegrees,
@@ -532,18 +665,19 @@ function renderAnnularArcPath(options: {
 
 function renderGaugeRangeCap(options: {
     geometry: ArcGaugeGeometry;
-    notchGeometry: RingNotchGeometry;
+    laneGeometry: GaugeRangeLaneGeometry;
     progress: number;
     color: string;
     radius: number;
+    className: string;
 }): string {
     const point = resolvePointOnCircle({
         geometry: options.geometry,
-        angleDegrees: resolveGaugeRangeAngleDegrees(options.notchGeometry, options.progress),
+        angleDegrees: resolveGaugeRangeAngleDegrees(options.laneGeometry, options.progress),
         radialOffset: 0,
     });
 
-    return `<circle class="arc-gauge-range-cap" cx="${formatSvgNumber(point.xCoordinate)}"
+    return `<circle class="${options.className}" cx="${formatSvgNumber(point.xCoordinate)}"
         cy="${formatSvgNumber(point.yCoordinate)}" r="${formatSvgNumber(options.radius)}"
         fill="${options.color}" />`;
 }
@@ -624,8 +758,8 @@ function resolvePointOnCircle(options: {
     };
 }
 
-function resolveGaugeRangeAngleDegrees(notchGeometry: RingNotchGeometry, progress: number): number {
-    const visibleAngleDegrees = 360 - notchGeometry.gapAngleDegrees;
+function resolveGaugeRangeAngleDegrees(laneGeometry: GaugeRangeLaneGeometry, progress: number): number {
+    const visibleAngleDegrees = laneGeometry.endAngleDegrees - laneGeometry.startAngleDegrees;
 
-    return notchGeometry.startRotationDegrees + visibleAngleDegrees * clamp(progress, 0, 1);
+    return laneGeometry.startAngleDegrees + visibleAngleDegrees * clamp(progress, 0, 1);
 }

@@ -30,13 +30,17 @@ function readElementValue(element: HTMLElement): string {
         return element.value;
     }
 
+    const shadowInput = element.shadowRoot?.querySelector<HTMLInputElement | HTMLSelectElement>("input, select");
+
+    if (isColorControl(element) && shadowInput && shadowInput.value.length > 0) {
+        return shadowInput.value;
+    }
+
     const propertyValue = readValueProperty(element);
 
     if (typeof propertyValue === "string") {
         return propertyValue;
     }
-
-    const shadowInput = element.shadowRoot?.querySelector<HTMLInputElement | HTMLSelectElement>("input, select");
 
     if (shadowInput && shadowInput.value.length > 0) {
         return shadowInput.value;
@@ -48,4 +52,8 @@ function readElementValue(element: HTMLElement): string {
 function readValueProperty(element: HTMLElement): SettingValue {
     const propertyTarget = element as HTMLElement & { value?: SettingValue };
     return propertyTarget.value;
+}
+
+function isColorControl(element: HTMLElement): boolean {
+    return element.tagName.toLowerCase() === "sdpi-color";
 }
