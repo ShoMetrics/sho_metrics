@@ -86,6 +86,8 @@ export class Disk extends MetricAction {
         const usedBytesWidgetData = metricStore.getWidgetData(usedMetricKey, label, "B");
         const totalBytesWidgetData = metricStore.getWidgetData(totalMetricKey, label, "B");
         const availableBytesWidgetData = metricStore.getWidgetData(availableMetricKey, label, "B");
+        const circleStyle = resolveCircleStyle(settings.circleStyle);
+        const shouldRenderGauge = settings.graphicType === "circular" && circleStyle === "gauge";
 
         setSingleMetricDisplay({
             event,
@@ -99,9 +101,10 @@ export class Disk extends MetricAction {
                 linearLabel: resolveDiskLinearLabel(settings.diskLinearLabel, selectedVolume, label),
             }),
             centerIconFragment: buildDiskCenterIconFragment(selectedVolume),
-            footerIconFragment: buildDiskGaugeFooterIconFragment(selectedVolume),
+            footerIconFragment: shouldRenderGauge ? undefined : buildDiskGaugeFooterIconFragment(selectedVolume),
             linearIconFragment: getDiskIconFragment(selectedVolume?.storageKind ?? "unknown"),
             statusIcon: getMetricStatusIcon("percentage"),
+            circleStyleOverride: circleStyle,
         });
     }
 
