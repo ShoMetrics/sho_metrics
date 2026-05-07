@@ -18,6 +18,12 @@ test("network speed scenarios expose settings used by the runtime display path",
             requiredFieldIds: ["network-interface", "maximum-network-speed", "network-unit-base"],
         },
         {
+            name: "text",
+            graphicType: "text",
+            settings: { networkDirection: "both" },
+            requiredFieldIds: ["network-interface", "maximum-network-speed", "network-unit-base"],
+        },
+        {
             name: "linear",
             graphicType: "linear",
             settings: { networkDirection: "both" },

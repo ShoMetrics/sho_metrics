@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { DualChannelWidgetData, WidgetData } from "../../rendering/widget-data";
 import { arcGauge, DEFAULT_ARC_GAUGE_CONFIG } from "./arc-gauge";
+import { buildGaugeRangeColorPlan } from "./arc-gauge-range";
 import { linearBar, DEFAULT_LINEAR_BAR_CONFIG } from "./linear-bar";
 import { renderMetricTextRow } from "./metric-text-row";
 import { DEFAULT_MIRRORED_TRAFFIC_CONFIG, renderMirroredTraffic } from "./mirrored-traffic";
+import { DEFAULT_TEXT_METRIC_CONFIG, renderDualTextMetric, textMetric } from "./text-metric";
 
 const keySize = { width: 144, height: 144 };
 
@@ -36,6 +38,110 @@ test("linear bar clamps fill width and renders secondary text safely", () => {
     assert.match(svgFragment, /linear-progress-750-144-144/);
     assert.match(svgFragment, /width="114"/);
     assert.match(svgFragment, /C:\\ &lt;System&gt;/);
+});
+
+test("text metric renders a pure text layout without a ring", () => {
+    const svgFragment = textMetric.render({
+        ...buildWidgetData(),
+        label: `<CPU>`,
+        displayValue: `<42>`,
+        secondaryDisplayValue: `Ryzen & Threadripper`,
+    }, DEFAULT_TEXT_METRIC_CONFIG, keySize);
+
+    assert.match(svgFragment, /text-metric-label/);
+    assert.match(svgFragment, /&lt;CPU&gt;/);
+    assert.match(svgFragment, /&lt;42&gt;/);
+    assert.match(svgFragment, /fill="#3b82f6"/);
+    assert.match(svgFragment, /Ryzen &amp; Threadripper/);
+    assert.doesNotMatch(svgFragment, /Arc Gauge: track/);
+});
+
+test("gauge circle style opens the bottom arc and renders a marker dot", () => {
+    const svgFragment = arcGauge.render(buildWidgetData(), {
+        ...DEFAULT_ARC_GAUGE_CONFIG,
+        circleStyle: "gauge",
+        centerIconFragment: "<path />",
+    }, keySize);
+
+    assert.match(svgFragment, /arc-gauge-marker/);
+    assert.match(svgFragment, /arc-gauge-range-segment/);
+    assert.doesNotMatch(svgFragment, /mask id="arc-gauge-marker-gap-/);
+    assert.doesNotMatch(svgFragment, /fill="black"/);
+    assert.doesNotMatch(svgFragment, /class="arc-gauge-marker"[^>]+stroke=/);
+    assert.doesNotMatch(svgFragment, /stroke-dasharray="284\.[0-9]+ 89\.[0-9]+"/);
+});
+
+test("gauge circle style uses semantic range bands for dynamic colors", () => {
+    const svgFragment = arcGauge.render({
+        ...buildWidgetData(),
+        current: 50,
+        progress: 0.5,
+    }, {
+        ...DEFAULT_ARC_GAUGE_CONFIG,
+        circleStyle: "gauge",
+        colorConfig: {
+            mode: "threshold",
+            solidColor: "#000000",
+            thresholds: [
+                { min: 0, max: 30, color: "#00ff00" },
+                { min: 30, max: 70, color: "#ffff00" },
+                { min: 70, max: 101, color: "#ff0000" },
+            ],
+        },
+    }, keySize);
+
+    assert.equal((svgFragment.match(/class="arc-gauge-range-segment"/g)?.length ?? 0) > 2, true);
+    assert.match(svgFragment, /fill="#00ff00"/);
+    assert.match(svgFragment, /fill="#ffff00"/);
+    assert.match(svgFragment, /fill="#ff0000"/);
+    assert.match(svgFragment, /fill="url\(#arc-gauge-range-/);
+    assert.match(svgFragment, /class="arc-gauge-marker"[^>]+fill="#ffff00"/);
+});
+
+test("gauge circle style moves blend ranges with custom dynamic thresholds", () => {
+    const colorPlan = buildGaugeRangeColorPlan({
+        circleStyle: "gauge",
+        baseColor: "#000000",
+        progress: 0.6,
+        gradientHeadAdjustmentPercent: -42,
+        gaugeRangeBlendProgress: DEFAULT_ARC_GAUGE_CONFIG.gaugeRangeBlendProgress,
+        colorConfig: {
+            mode: "threshold",
+            solidColor: "#000000",
+            thresholds: [
+                { min: 0, max: 50, color: "#111111" },
+                { min: 50, max: 70, color: "#777777" },
+                { min: 70, max: 101, color: "#eeeeee" },
+            ],
+        },
+    });
+
+    assert.deepEqual(colorPlan.stops.map(stop => ({
+        offset: Number(stop.offset.toFixed(2)),
+        color: stop.color,
+    })), [
+        { offset: 0, color: "#111111" },
+        { offset: 0.42, color: "#111111" },
+        { offset: 0.58, color: "#777777" },
+        { offset: 0.62, color: "#777777" },
+        { offset: 0.78, color: "#eeeeee" },
+        { offset: 1, color: "#eeeeee" },
+    ]);
+});
+
+test("gauge circle style keeps the range track uncolored while data is unavailable", () => {
+    const svgFragment = arcGauge.render({
+        ...buildWidgetData(),
+        displayValue: "N/A",
+        progress: 0,
+    }, {
+        ...DEFAULT_ARC_GAUGE_CONFIG,
+        circleStyle: "gauge",
+        centerIconFragment: "<path />",
+    }, keySize);
+
+    assert.doesNotMatch(svgFragment, /arc-gauge-marker/);
+    assert.equal(svgFragment.match(/stroke-dasharray="284\.[0-9]+ 89\.[0-9]+"/g)?.length, 1);
 });
 
 test("linear bar renders at most two channel bars", () => {
@@ -107,6 +213,26 @@ test("mirrored traffic renders labels, center line, and both channel graphs", ()
     assert.match(svgFragment, /Mirrored Traffic: negative/);
     assert.match(svgFragment, /mirrored-pos-/);
     assert.match(svgFragment, /mirrored-neg-/);
+});
+
+test("dual text metric renders two escaped value rows", () => {
+    const svgFragment = renderDualTextMetric({
+        positive: {
+            ...buildWidgetData(),
+            label: `<UP>`,
+            displayValue: "12",
+        },
+        negative: {
+            ...buildWidgetData(),
+            label: `<DOWN>`,
+            displayValue: "4",
+        },
+    }, DEFAULT_TEXT_METRIC_CONFIG, keySize);
+
+    assert.match(svgFragment, /text-metric-positive-value/);
+    assert.match(svgFragment, /text-metric-negative-value/);
+    assert.match(svgFragment, /&lt;UP&gt;/);
+    assert.match(svgFragment, /&lt;DOWN&gt;/);
 });
 
 function buildWidgetData(): WidgetData {

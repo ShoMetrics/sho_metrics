@@ -24,7 +24,7 @@ interface BaseMetricDisplayOptions {
     footerIconFragment?: string;
     linearIconFragment?: string;
     statusIcon: ArcGaugeStatusIcon;
-    circularCenterContentOverride?: "value" | "icon";
+    circleStyleOverride?: ResolvedMetricVisualSettings["circleStyle"];
     visualSettingsOverride?: Partial<MetricVisualSettings>;
 }
 
@@ -35,7 +35,7 @@ export interface SingleMetricDisplayOptions extends BaseMetricDisplayOptions {
 export interface DualMetricDisplayOptions extends BaseMetricDisplayOptions {
     widgetData: DualChannelWidgetData;
     titleText: string;
-    dualGraphicType?: "circular" | "dashed-line";
+    dualGraphicType?: "circular" | "text" | "dashed-line";
     chartMode?: "overlay" | "mirrored";
     positiveColor: string;
     negativeColor: string;
@@ -46,7 +46,7 @@ export interface DualMetricDisplayOptions extends BaseMetricDisplayOptions {
 }
 
 export interface SingleMetricDisplaySettings extends MetricVisualSettings {
-    circularCenterContent?: SettingValue;
+    circleStyle?: SettingValue;
 }
 
 export type MetricDisplayOptions = SingleMetricDisplayOptions | DualMetricDisplayOptions;
@@ -63,6 +63,7 @@ export interface TouchStripMetricLayout {
 export interface MetricDisplayRenderPlan {
     visualSettings: ResolvedMetricVisualSettings;
     centerContent: "value" | "icon";
+    circleStyle: ResolvedMetricVisualSettings["circleStyle"];
     displayHasData: boolean;
     shouldRenderMutedIconPlaceholder: boolean;
     touchStripMetricLayout: TouchStripMetricLayout | null;
@@ -94,16 +95,17 @@ export function buildMetricDisplayRenderPlan(options: {
         ...options.settings,
         ...options.displayOptions.visualSettingsOverride,
     });
-    const centerContent = resolveCircularCenterContent({
-        settings: options.settings,
+    const circleStyle = resolveCircleStyle({
         graphicType: visualSettings.graphicType,
-        circularCenterContentOverride: options.displayOptions.circularCenterContentOverride,
+        circleStyle: visualSettings.circleStyle,
+        circleStyleOverride: options.displayOptions.circleStyleOverride,
     });
+    const centerContent = circleStyle === "compact" ? "icon" : "value";
     const displayHasData = hasMetricDisplayData(options.displayOptions);
     const shouldRenderMutedIconPlaceholder = !displayHasData
         && !isDualMetricDisplayOptions(options.displayOptions)
         && visualSettings.graphicType === "circular"
-        && centerContent === "icon";
+        && circleStyle === "compact";
     const touchStripMetricLayout = options.isDial
         ? resolveTouchStripMetricLayout(visualSettings)
         : null;
@@ -111,6 +113,7 @@ export function buildMetricDisplayRenderPlan(options: {
     return {
         visualSettings,
         centerContent,
+        circleStyle,
         displayHasData,
         shouldRenderMutedIconPlaceholder,
         touchStripMetricLayout,
@@ -120,16 +123,31 @@ export function buildMetricDisplayRenderPlan(options: {
 }
 
 export function resolveCircularCenterContent(options: {
-    settings: SingleMetricDisplaySettings;
     graphicType: ResolvedMetricVisualSettings["graphicType"];
-    circularCenterContentOverride: "value" | "icon" | undefined;
+    circleStyle: ResolvedMetricVisualSettings["circleStyle"];
+    circleStyleOverride: ResolvedMetricVisualSettings["circleStyle"] | undefined;
 }): "value" | "icon" {
     if (options.graphicType !== "circular") {
         return "value";
     }
 
-    return options.circularCenterContentOverride
-        ?? (options.settings.circularCenterContent === "icon" ? "icon" : "value");
+    return resolveCircleStyle({
+        graphicType: options.graphicType,
+        circleStyle: options.circleStyle,
+        circleStyleOverride: options.circleStyleOverride,
+    }) === "compact" ? "icon" : "value";
+}
+
+export function resolveCircleStyle(options: {
+    graphicType: ResolvedMetricVisualSettings["graphicType"];
+    circleStyle: ResolvedMetricVisualSettings["circleStyle"];
+    circleStyleOverride: ResolvedMetricVisualSettings["circleStyle"] | undefined;
+}): ResolvedMetricVisualSettings["circleStyle"] {
+    if (options.graphicType !== "circular") {
+        return "value";
+    }
+
+    return options.circleStyleOverride ?? options.circleStyle;
 }
 
 export function buildRenderWidgetData(options: {

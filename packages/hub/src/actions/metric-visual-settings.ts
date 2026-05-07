@@ -1,11 +1,13 @@
 import type { ColorConfig, ColorThreshold } from "../rendering/color-resolver";
 import type { GraphicThemePresetName, GraphicType } from "../widgets/widget.interface";
+import type { ArcGaugeStyle } from "../widgets/primitives/arc-gauge";
 import type { SparklineGridLineType, SparklineGridLineVisibility } from "../widgets/primitives/sparkline";
 
 export type SettingValue = string | number | boolean | null | undefined;
 
 export interface MetricVisualSettings {
     graphicType?: SettingValue;
+    circleStyle?: SettingValue;
     graphicStyle?: SettingValue;
     colorMode?: SettingValue;
     solidColor?: SettingValue;
@@ -22,6 +24,7 @@ export interface MetricVisualSettings {
 
 export interface ResolvedMetricVisualSettings {
     graphicType: GraphicType;
+    circleStyle: ArcGaugeStyle;
     graphicStyle: GraphicThemePresetName;
     colorConfig: ColorConfig;
     lineSmoothingPercent: number;
@@ -45,6 +48,7 @@ const GRAPHIC_TYPE_ALIASES: Record<string, GraphicType> = {
     "linear-bar": "linear",
     "sparkline": "dashed-line",
     "circular": "circular",
+    "text": "text",
     "linear": "linear",
     "dashed-line": "dashed-line",
 };
@@ -57,6 +61,7 @@ export function resolveMetricVisualSettings(settings: MetricVisualSettings): Res
 
     return {
         graphicType,
+        circleStyle: resolveCircleStyle(settings.circleStyle),
         graphicStyle,
         colorConfig: buildColorConfig(settings),
         lineSmoothingPercent: normalizePercentageSetting(
@@ -74,6 +79,14 @@ function resolveGraphicType(value: SettingValue): GraphicType {
     }
 
     return GRAPHIC_TYPE_ALIASES[value] ?? "circular";
+}
+
+function resolveCircleStyle(value: SettingValue): ArcGaugeStyle {
+    if (value === "compact" || value === "gauge") {
+        return value;
+    }
+
+    return "value";
 }
 
 function resolveGraphicStyle(value: SettingValue): GraphicThemePresetName {

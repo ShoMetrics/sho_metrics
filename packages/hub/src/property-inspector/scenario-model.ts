@@ -99,9 +99,14 @@ export function resolveScenarioSectionList(
 export function resolveGraphicScenario(options: {
     graphicType: GraphicType;
     circularScenario: InspectorScenario;
+    textScenario: InspectorScenario;
     linearScenario: InspectorScenario;
     sparklineScenario: InspectorScenario;
 }): InspectorScenario {
+    if (options.graphicType === "text") {
+        return options.textScenario;
+    }
+
     if (options.graphicType === "linear") {
         return options.linearScenario;
     }
@@ -116,9 +121,14 @@ export function resolveGraphicScenario(options: {
 export function resolveGraphicScope(options: {
     graphicType: GraphicType;
     circularScope: InspectorScope;
+    textScope: InspectorScope;
     linearScope: InspectorScope;
     sparklineScope: InspectorScope;
 }): InspectorScope {
+    if (options.graphicType === "text") {
+        return options.textScope;
+    }
+
     if (options.graphicType === "linear") {
         return options.linearScope;
     }
@@ -152,6 +162,8 @@ function resolveDefaultSectionId(fieldGroupName: string): ScenarioSectionId {
 
     if (
         fieldGroupName.includes("Center")
+        || fieldGroupName.includes("Circle")
+        || fieldGroupName.includes("circle")
         || fieldGroupName.includes("Label")
         || fieldGroupName.includes("Unit")
         || fieldGroupName === "networkCircular"

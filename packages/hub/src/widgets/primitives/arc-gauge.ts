@@ -1,15 +1,25 @@
 import type { WidgetData, KeySize } from "../../rendering/widget-data";
 import { resolveColor } from "../../rendering/color-resolver";
 import {
-    adjustHexColorBrightness,
     clamp,
     renderConstrainedSvgText,
 } from "../../rendering/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget.interface";
 import { assertArcGaugeLabel } from "./arc-gauge-label";
+import {
+    buildGaugeRangeColorPlan,
+    formatSvgNumber,
+    renderGaugeMarkerDot,
+    renderGaugeRangeArcSegments,
+    renderGradientStop,
+    resolveGaugeMarkerDot,
+    type ArcGaugeGeometry,
+    type GaugeRangeColorPlan,
+    type RingNotchGeometry,
+} from "./arc-gauge-range";
 import { renderMetricTextRow } from "./metric-text-row";
 
-type ArcGaugeCenterContent = "value" | "icon";
+export type ArcGaugeStyle = "value" | "compact" | "gauge";
 
 export interface ArcGaugeStatusIcon {
     fragment: string;
@@ -30,7 +40,8 @@ export interface ArcGaugeConfig extends WidgetBaseConfig {
     valueTextColor: string;
     unitTextColor: string;
     innerTextScale: number;
-    centerContent: ArcGaugeCenterContent;
+    circleStyle: ArcGaugeStyle;
+    gaugeRangeBlendProgress: number;
     centerIconFragment?: string;
     footerIconFragment?: string;
     statusIcon?: ArcGaugeStatusIcon;
@@ -49,7 +60,8 @@ export const DEFAULT_ARC_GAUGE_CONFIG: ArcGaugeConfig = {
     unitTextColor: "rgba(255,255,255,0.74)",
     gradientHeadAdjustmentPercent: -42,
     innerTextScale: 1,
-    centerContent: "value",
+    circleStyle: "value",
+    gaugeRangeBlendProgress: 0.16,
 };
 
 const ARC_LAYOUT = {
@@ -62,6 +74,12 @@ const ARC_LAYOUT = {
     statusIconGapWidthRatio: 5,
     statusIconDefaultSizeRatio: 2.35,
     statusIconDefaultOpticalYOffsetRatio: 0.24,
+    gaugeGapAngleDegrees: 86,
+    gaugeMarkerRadiusRatio: 0.78,
+    gaugeMarkerGapPaddingRatio: 0.22,
+    gaugeMarkerGapScale: 1.5,
+    gaugeFooterIconScale: 0.42,
+    gaugeFooterIconYOffset: 42,
     placeholderValueScale: 0.68,
     value: {
         fontSize: 48,
@@ -79,17 +97,11 @@ const ARC_LAYOUT = {
 
 const ARC_TEXT_FONT_FAMILY = "'Inter','SF Pro Display','Segoe UI',sans-serif";
 
-interface ArcGaugeGeometry {
-    centerXCoordinate: number;
-    centerYCoordinate: number;
-    radius: number;
-    circumference: number;
-}
-
 interface StatusNotchGeometry {
     gapLength: number;
     visibleLength: number;
     startRotationDegrees: number;
+    gapAngleDegrees: number;
     iconSize: number;
     iconCenterYCoordinate: number;
 }
@@ -120,12 +132,23 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
             circumference,
         };
         const arcColor = resolveColor(data.current, config.colorConfig);
-        const arcHeadColor = adjustHexColorBrightness(arcColor, config.gradientHeadAdjustmentPercent ?? -15);
-        const arcMidColor = adjustHexColorBrightness(arcColor, 34);
         const gradientId = `circular-progress-${Math.round(data.current * 10)}-${keySize.width}-${keySize.height}`;
-        const statusNotchGeometry = config.centerContent === "icon" && config.statusIcon
+        const circleStyle = config.circleStyle;
+        const rangeColorPlan = buildGaugeRangeColorPlan({
+            circleStyle,
+            colorConfig: config.colorConfig,
+            baseColor: arcColor,
+            progress: data.progress,
+            gradientHeadAdjustmentPercent: config.gradientHeadAdjustmentPercent ?? -15,
+            gaugeRangeBlendProgress: config.gaugeRangeBlendProgress,
+        });
+        const statusNotchGeometry = circleStyle === "compact" && config.statusIcon
             ? buildStatusNotchGeometry(geometry, config.strokeWidth, config.statusIcon)
             : null;
+        const gaugeNotchGeometry = circleStyle === "gauge"
+            ? buildGaugeNotchGeometry(geometry)
+            : null;
+        const ringNotchGeometry = statusNotchGeometry ?? gaugeNotchGeometry;
 
         const innerTextScale = config.innerTextScale;
         const labelFontSize = ARC_LAYOUT.label.fontSize * innerTextScale;
@@ -139,7 +162,7 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
         const labelMaxWidth = Math.max(24, radius * 1.55);
         const centerTextMaxWidth = Math.max(24, radius * 1.5);
         const centerContentFragment = renderCenterContent({
-            centerContent: config.centerContent,
+            circleStyle,
             centerIconFragment: config.centerIconFragment,
             footerIconFragment: config.footerIconFragment,
             statusIcon: config.statusIcon,
@@ -159,21 +182,30 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
             config,
         });
 
+        const shouldRenderFullRangeArc = circleStyle === "gauge" && valueText !== "N/A";
+        const shouldRenderProgressRing = !shouldRenderFullRangeArc && data.progress > 0;
+        const progressGradientDefs = shouldRenderProgressRing
+            ? `
+                <defs>
+                    <linearGradient id="${gradientId}" x1="5%" y1="95%" x2="95%" y2="5%">
+                        ${rangeColorPlan.stops.map(renderGradientStop).join("")}
+                    </linearGradient>
+                </defs>
+            `
+            : "";
+
         return `
-            <defs>
-                <linearGradient id="${gradientId}" x1="5%" y1="95%" x2="95%" y2="5%">
-                    <stop offset="0%" stop-color="${arcColor}" />
-                    <stop offset="50%" stop-color="${arcMidColor}" />
-                    <stop offset="100%" stop-color="${arcHeadColor}" />
-                </linearGradient>
-            </defs>
+            ${progressGradientDefs}
             ${renderRing({
                 geometry,
                 progress: data.progress,
                 trackColor: config.trackColor,
                 progressStroke: `url(#${gradientId})`,
+                rangeColorPlan,
                 strokeWidth: config.strokeWidth,
-                statusNotchGeometry,
+                notchGeometry: ringNotchGeometry,
+                shouldRenderFullRangeArc,
+                shouldRenderMarker: circleStyle === "gauge" && valueText !== "N/A",
             })}
             ${centerContentFragment}
         `;
@@ -181,7 +213,7 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
 };
 
 function renderCenterContent(options: {
-    centerContent: ArcGaugeCenterContent;
+    circleStyle: ArcGaugeStyle;
     centerIconFragment: string | undefined;
     footerIconFragment: string | undefined;
     statusIcon: ArcGaugeStatusIcon | undefined;
@@ -200,14 +232,32 @@ function renderCenterContent(options: {
     centerTextMaxWidth: number;
     config: ArcGaugeConfig;
 }): string {
-    if (options.centerContent === "icon") {
+    if (options.circleStyle === "compact") {
         return `
             ${renderStatusIcon(options.statusIcon, options.centerXCoordinate, options.statusNotchGeometry)}
             ${renderCenterIcon(options.centerIconFragment, options.centerXCoordinate, options.centerYCoordinate)}
         `;
     }
 
-    return renderCenterValue(options);
+    if (options.circleStyle === "gauge") {
+        return `
+            ${renderCenterValue({
+                ...options,
+                footerIconFragment: undefined,
+            })}
+            ${renderGaugeFooterIcon({
+                iconFragment: options.footerIconFragment ?? options.centerIconFragment,
+                centerXCoordinate: options.centerXCoordinate,
+                centerYCoordinate: options.centerYCoordinate,
+                shouldScaleFallbackIcon: !options.footerIconFragment,
+            })}
+        `;
+    }
+
+    return renderCenterValue({
+        ...options,
+        footerIconFragment: undefined,
+    });
 }
 
 function renderStatusIcon(
@@ -247,8 +297,21 @@ function buildStatusNotchGeometry(
         gapLength,
         visibleLength: geometry.circumference - gapLength,
         startRotationDegrees: -90 + gapAngleDegrees / 2,
+        gapAngleDegrees,
         iconSize,
         iconCenterYCoordinate: geometry.centerYCoordinate - geometry.radius + opticalYOffset,
+    };
+}
+
+function buildGaugeNotchGeometry(geometry: ArcGaugeGeometry): RingNotchGeometry {
+    const gapAngleDegrees = ARC_LAYOUT.gaugeGapAngleDegrees;
+    const gapLength = geometry.circumference * (gapAngleDegrees / 360);
+
+    return {
+        gapLength,
+        visibleLength: geometry.circumference - gapLength,
+        startRotationDegrees: 90 + gapAngleDegrees / 2,
+        gapAngleDegrees,
     };
 }
 
@@ -257,42 +320,74 @@ function renderRing(options: {
     progress: number;
     trackColor: string;
     progressStroke: string;
+    rangeColorPlan: GaugeRangeColorPlan;
     strokeWidth: number;
-    statusNotchGeometry: StatusNotchGeometry | null;
+    notchGeometry: RingNotchGeometry | null;
+    shouldRenderFullRangeArc: boolean;
+    shouldRenderMarker: boolean;
 }): string {
     const progress = clamp(options.progress, 0, 1);
-    const trackDashArray = options.statusNotchGeometry
-        ? `${options.statusNotchGeometry.visibleLength} ${options.statusNotchGeometry.gapLength}`
+    const trackDashArray = options.notchGeometry
+        ? `${options.notchGeometry.visibleLength} ${options.notchGeometry.gapLength}`
         : `${options.geometry.circumference}`;
-    const progressLength = options.statusNotchGeometry
-        ? options.statusNotchGeometry.visibleLength * progress
+    const visibleArcLength = options.notchGeometry
+        ? options.notchGeometry.visibleLength
         : options.geometry.circumference;
-    const rotationDegrees = options.statusNotchGeometry?.startRotationDegrees ?? -90;
-    const progressRing = progress > 0
+    const progressLength = options.shouldRenderFullRangeArc
+        ? visibleArcLength
+        : visibleArcLength * progress;
+    const rotationDegrees = options.notchGeometry?.startRotationDegrees ?? -90;
+    const shouldRenderProgressRing = options.shouldRenderFullRangeArc || progress > 0;
+    const markerDot = options.shouldRenderMarker && options.notchGeometry
+        ? resolveGaugeMarkerDot({
+            geometry: options.geometry,
+            notchGeometry: options.notchGeometry,
+            progress,
+            fill: options.rangeColorPlan.markerFill,
+            radius: options.strokeWidth * ARC_LAYOUT.gaugeMarkerRadiusRatio,
+            gapLength: options.strokeWidth * (
+                ARC_LAYOUT.gaugeMarkerRadiusRatio + 0.5 + ARC_LAYOUT.gaugeMarkerGapPaddingRatio
+            ) * ARC_LAYOUT.gaugeMarkerGapScale,
+        })
+        : null;
+    const progressRing = options.shouldRenderFullRangeArc && options.notchGeometry
+        ? renderGaugeRangeArcSegments({
+            geometry: options.geometry,
+            notchGeometry: options.notchGeometry,
+            markerDot,
+            rangeColorPlan: options.rangeColorPlan,
+            strokeWidth: options.strokeWidth,
+        })
+        : shouldRenderProgressRing
         ? renderRingCircle({
             geometry: options.geometry,
             stroke: options.progressStroke,
             strokeWidth: options.strokeWidth,
-            dashArray: options.statusNotchGeometry
+            dashArray: options.notchGeometry
                 ? `${progressLength} ${options.geometry.circumference - progressLength}`
                 : `${options.geometry.circumference}`,
-            dashOffset: options.statusNotchGeometry ? 0 : options.geometry.circumference * (1 - progress),
+            dashOffset: options.notchGeometry ? 0 : options.geometry.circumference * (1 - progress),
             rotationDegrees,
         })
         : "";
-
-    return `
-        <!-- Arc Gauge: track -->
-        ${renderRingCircle({
+    const markerDotFragment = markerDot ? renderGaugeMarkerDot(markerDot) : "";
+    const trackRing = options.shouldRenderFullRangeArc
+        ? ""
+        : renderRingCircle({
             geometry: options.geometry,
             stroke: options.trackColor,
             strokeWidth: options.strokeWidth,
             dashArray: trackDashArray,
             dashOffset: 0,
             rotationDegrees,
-        })}
+        });
+
+    return `
+        <!-- Arc Gauge: track -->
+        ${trackRing}
         <!-- Arc Gauge: progress arc -->
         ${progressRing}
+        ${markerDotFragment}
     `;
 }
 
@@ -324,6 +419,21 @@ function renderCenterIcon(
     }
 
     return `<g transform="translate(${centerXCoordinate} ${centerYCoordinate})">${centerIconFragment}</g>`;
+}
+
+function renderGaugeFooterIcon(options: {
+    iconFragment: string | undefined;
+    centerXCoordinate: number;
+    centerYCoordinate: number;
+    shouldScaleFallbackIcon: boolean;
+}): string {
+    if (!options.iconFragment) {
+        return "";
+    }
+
+    const scale = options.shouldScaleFallbackIcon ? ARC_LAYOUT.gaugeFooterIconScale : 1;
+
+    return `<g transform="translate(${formatSvgNumber(options.centerXCoordinate)} ${formatSvgNumber(options.centerYCoordinate + ARC_LAYOUT.gaugeFooterIconYOffset)}) scale(${formatSvgNumber(scale)})">${options.iconFragment}</g>`;
 }
 
 function renderCenterValue(options: {

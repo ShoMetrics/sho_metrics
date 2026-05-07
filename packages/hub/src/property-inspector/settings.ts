@@ -11,7 +11,8 @@ export type ActionKind =
     | "gpu-power"
     | "unknown";
 
-export type GraphicType = "circular" | "linear" | "dashed-line";
+export type GraphicType = "circular" | "text" | "linear" | "dashed-line";
+export type CircleStyle = "value" | "compact" | "gauge";
 export type GraphicStyle = "flat" | "cupertino-glass";
 export type ColorMode = "threshold" | "solid";
 export type NetworkDirection = "both" | "download" | "upload";
@@ -27,7 +28,7 @@ export type GridLineType = "horizontal" | "vertical";
 export interface PropertyInspectorSettings {
     pollingFrequencySeconds: number;
     graphicType: GraphicType;
-    circularCenterContent: "value" | "icon";
+    circleStyle: CircleStyle;
     graphicStyle: GraphicStyle;
     colorMode: ColorMode;
     solidColor: string;
@@ -89,7 +90,7 @@ export const basePropertyInspectorSettings: PropertyInspectorSettings = {
     colorMode: "threshold",
     pollingFrequencySeconds: 1,
     graphicType: "circular",
-    circularCenterContent: "value",
+    circleStyle: "value",
     graphicStyle: "flat",
     solidColor: "#3b82f6",
     networkDirection: "both",
@@ -161,7 +162,7 @@ export function normalizePropertyInspectorSettings(
             ? resolveDefaultDiskPollingFrequency(diskMetricKind)
             : normalizePollingFrequency(rawSettings.pollingFrequencySeconds),
         graphicType: normalizeGraphicType(rawSettings.graphicType),
-        circularCenterContent: rawSettings.circularCenterContent === "icon" ? "icon" : "value",
+        circleStyle: normalizeCircleStyle(rawSettings.circleStyle),
         graphicStyle: rawSettings.graphicStyle === "cupertino-glass" ? "cupertino-glass" : "flat",
         networkDirection,
         networkTrafficDisplayMode: normalizeNetworkTrafficDisplayMode(rawSettings.networkTrafficDisplayMode),
@@ -370,11 +371,19 @@ export function resolveActionKind(actionUuid: string): ActionKind {
 }
 
 function normalizeGraphicType(value: SettingValue): GraphicType {
-    if (value === "linear" || value === "dashed-line") {
+    if (value === "text" || value === "linear" || value === "dashed-line") {
         return value;
     }
 
     return "circular";
+}
+
+function normalizeCircleStyle(value: SettingValue): CircleStyle {
+    if (value === "compact" || value === "gauge") {
+        return value;
+    }
+
+    return "value";
 }
 
 function normalizeColorMode(value: SettingValue, actionKind: ActionKind): ColorMode {

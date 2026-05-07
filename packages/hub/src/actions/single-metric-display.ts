@@ -152,6 +152,7 @@ function renderAndSendSingleMetricDisplay(
                 titleText: options.titleText,
                 chartMode: options.chartMode ?? "overlay",
                 centerContent: renderPlan.centerContent,
+                circleStyle: renderPlan.circleStyle,
                 topIconFragment: options.centerIconFragment,
                 positiveIconFragment: options.positiveIconFragment,
                 negativeIconFragment: options.negativeIconFragment,
@@ -178,6 +179,7 @@ function renderAndSendSingleMetricDisplay(
                 linearIconFragment: options.linearIconFragment,
                 statusIcon: options.statusIcon,
                 centerContent: renderPlan.centerContent,
+                circleStyle: renderPlan.circleStyle,
                 lineSmoothingPercent: renderPlan.visualSettings.lineSmoothingPercent,
                 gridLineVisibility: renderPlan.visualSettings.gridLineVisibility,
                 gridLineType: renderPlan.visualSettings.gridLineType,
@@ -420,11 +422,13 @@ function buildSingleMetricConfigOverrides(options: {
     linearIconFragment: string | undefined;
     statusIcon: ArcGaugeStatusIcon;
     centerContent: "value" | "icon";
+    circleStyle: ResolvedMetricVisualSettings["circleStyle"];
     lineSmoothingPercent: number;
     gridLineVisibility: ResolvedMetricVisualSettings["gridLineVisibility"];
     gridLineType: ResolvedMetricVisualSettings["gridLineType"];
 }): {
     centerContent?: "value" | "icon";
+    circleStyle?: ResolvedMetricVisualSettings["circleStyle"];
     centerIconFragment?: string;
     footerIconFragment?: string;
     topIconFragment?: string;
@@ -435,6 +439,7 @@ function buildSingleMetricConfigOverrides(options: {
 } {
     return {
         centerContent: options.centerContent,
+        circleStyle: options.circleStyle,
         centerIconFragment: options.centerIconFragment,
         footerIconFragment: options.footerIconFragment,
         topIconFragment: options.linearIconFragment ?? options.centerIconFragment,
@@ -451,6 +456,7 @@ function buildDualMetricConfigOverrides(options: {
     titleText: string;
     chartMode: "overlay" | "mirrored";
     centerContent: "value" | "icon";
+    circleStyle: ResolvedMetricVisualSettings["circleStyle"];
     topIconFragment: string;
     positiveIconFragment: string | undefined;
     negativeIconFragment: string | undefined;
@@ -465,6 +471,7 @@ function buildDualMetricConfigOverrides(options: {
     titleText?: string;
     chartMode?: "overlay" | "mirrored";
     centerContent?: "value" | "icon";
+    circleStyle?: ResolvedMetricVisualSettings["circleStyle"];
     centerIconFragment?: string;
     topIconFragment?: string;
     positiveIconFragment?: string;
@@ -481,6 +488,7 @@ function buildDualMetricConfigOverrides(options: {
         titleText: options.titleText,
         chartMode: options.chartMode,
         centerContent: options.centerContent,
+        circleStyle: options.circleStyle,
         centerIconFragment: options.topIconFragment,
         topIconFragment: options.topIconFragment,
         positiveIconFragment: options.positiveIconFragment,
@@ -831,13 +839,13 @@ function buildSettingsSignature(settings: SingleMetricDisplaySettings): string {
 
     return [
         `graphicType=${visualSettings.graphicType}`,
+        `circleStyle=${visualSettings.circleStyle}`,
         `graphicStyle=${visualSettings.graphicStyle}`,
         `colorMode=${String(settings.colorMode ?? "")}`,
         `solidColor=${String(settings.solidColor ?? "")}`,
         `lineSmoothingPercent=${visualSettings.lineSmoothingPercent}`,
         `gridLineVisibility=${visualSettings.gridLineVisibility}`,
         `gridLineType=${visualSettings.gridLineType}`,
-        `circularCenterContent=${String(settings.circularCenterContent ?? "")}`,
     ].join(";");
 }
 

@@ -1,26 +1,23 @@
 import { composeSvg } from "../rendering/composer";
 import type { WidgetData } from "../rendering/widget-data";
 import { WIDGET_LOGICAL_SIZE } from "../rendering/widget-data";
-import type { GraphicType } from "../widgets/widget.interface";
+import { getHardwareIconFragment } from "../widgets/icons/hardware-icons";
+import { getMetricStatusIcon } from "../widgets/icons/metric-status-icons";
+import type { CircleStyle } from "./settings";
 
 const previewData: WidgetData = {
     current: 68,
     progress: 0.68,
     history: [18, 24, 21, 36, 31, 47, 42, 58, 53, 69, 62, 76, 68],
     unit: "%",
-    label: "CPU",
+    label: "VRAM",
     displayValue: "68",
     sampleTimestampMilliseconds: 1,
 };
 
-/**
- * Generates static preview art through the same widget renderer used by key
- * rendering. The PI consumes it as an image data URI so renderer-owned SVG is
- * not injected into the browser DOM.
- */
-export function buildGraphicTypePreviewUri(graphicType: GraphicType): string {
+export function buildCircleStylePreviewUri(circleStyle: CircleStyle): string {
     const svg = composeSvg(previewData, {
-        graphicType,
+        graphicType: "circular",
         graphicStyle: "flat",
         colorConfig: {
             mode: "solid",
@@ -28,10 +25,9 @@ export function buildGraphicTypePreviewUri(graphicType: GraphicType): string {
             thresholds: [],
         },
         configOverrides: {
-            circleStyle: "value",
-            lineSmoothingPercent: 75,
-            gridLineVisibility: "adaptive",
-            gridLineType: "horizontal",
+            circleStyle,
+            centerIconFragment: getHardwareIconFragment("memory"),
+            statusIcon: getMetricStatusIcon("percentage"),
         },
     }, WIDGET_LOGICAL_SIZE);
 

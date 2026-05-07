@@ -2,6 +2,12 @@ import type { DualChannelWidgetData, WidgetData, KeySize } from "./widget-data";
 import type { GraphicStyle } from "../widgets/styles/style.interface";
 import type { GraphicThemePresetName, GraphicType } from "../widgets/widget.interface";
 import { arcGauge, DEFAULT_ARC_GAUGE_CONFIG, type ArcGaugeConfig } from "../widgets/primitives/arc-gauge";
+import {
+    DEFAULT_TEXT_METRIC_CONFIG,
+    renderDualTextMetric,
+    textMetric,
+    type TextMetricConfig,
+} from "../widgets/primitives/text-metric";
 import { sparkline, DEFAULT_SPARKLINE_CONFIG, type SparklineConfig } from "../widgets/primitives/sparkline";
 import { linearBar, DEFAULT_LINEAR_BAR_CONFIG, type LinearBarConfig } from "../widgets/primitives/linear-bar";
 import {
@@ -20,6 +26,7 @@ import type { ColorConfig } from "./color-resolver";
 
 export type WidgetConfigOverrides = Partial<
     ArcGaugeConfig
+    & TextMetricConfig
     & LinearBarConfig
     & SparklineConfig
     & DualChannelSparklineConfig
@@ -34,6 +41,10 @@ const WIDGET_REGISTRY: Record<GraphicType, WidgetRegistryEntry> = {
     "circular": {
         render: (data, configOverrides, keySize) =>
             arcGauge.render(data, { ...DEFAULT_ARC_GAUGE_CONFIG, ...configOverrides }, keySize),
+    },
+    "text": {
+        render: (data, configOverrides, keySize) =>
+            textMetric.render(data, { ...DEFAULT_TEXT_METRIC_CONFIG, ...configOverrides }, keySize),
     },
     "linear": {
         render: (data, configOverrides, keySize) =>
@@ -104,23 +115,18 @@ export function composeSvg(
 
 export function composeDualChannelSvg(
     data: DualChannelWidgetData,
-    options: Omit<ComposeOptions, "graphicType" | "colorConfig"> & { graphicType?: "circular" | "dashed-line" },
+    options: Omit<ComposeOptions, "graphicType" | "colorConfig"> & { graphicType?: "circular" | "text" | "dashed-line" },
     keySize: KeySize,
 ): string {
     const configOverrides: WidgetConfigOverrides = {
         ...options.configOverrides,
     };
-    const widgetSvgFragment = options.graphicType === "circular"
-        ? renderDualChannelArcGauge(
-            data,
-            { ...DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG, ...configOverrides },
-            keySize,
-        )
-        : renderDualChannelSparkline(
-            data,
-            { ...DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG, ...configOverrides },
-            keySize,
-        );
+    const widgetSvgFragment = resolveDualChannelWidgetSvg({
+        data,
+        graphicType: options.graphicType,
+        configOverrides,
+        keySize,
+    });
 
     return composeStyledSvg({
         widgetSvgFragment,
@@ -128,6 +134,35 @@ export function composeDualChannelSvg(
         muted: options.muted === true,
         keySize,
     });
+}
+
+function resolveDualChannelWidgetSvg(options: {
+    data: DualChannelWidgetData;
+    graphicType: "circular" | "text" | "dashed-line" | undefined;
+    configOverrides: WidgetConfigOverrides;
+    keySize: KeySize;
+}): string {
+    if (options.graphicType === "circular") {
+        return renderDualChannelArcGauge(
+            options.data,
+            { ...DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG, ...options.configOverrides },
+            options.keySize,
+        );
+    }
+
+    if (options.graphicType === "text") {
+        return renderDualTextMetric(
+            options.data,
+            { ...DEFAULT_TEXT_METRIC_CONFIG, ...options.configOverrides },
+            options.keySize,
+        );
+    }
+
+    return renderDualChannelSparkline(
+        options.data,
+        { ...DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG, ...options.configOverrides },
+        options.keySize,
+    );
 }
 
 function composeStyledSvg(options: {

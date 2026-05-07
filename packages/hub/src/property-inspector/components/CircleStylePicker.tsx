@@ -1,21 +1,21 @@
 import { PreviewOptionPicker } from "./PreviewOptionPicker";
-import { buildGraphicTypePreviewUri } from "../graphic-type-preview";
+import { buildCircleStylePreviewUri } from "../circle-style-preview";
 import type { FieldSchema, PropertyInspectorSettingKey, VisibilityContext } from "../schema";
-import type { GraphicType } from "../settings";
+import type { CircleStyle } from "../settings";
 
-interface GraphicTypePickerProps {
+interface CircleStylePickerProps {
     field: FieldSchema & { key: PropertyInspectorSettingKey };
     context: VisibilityContext;
     onSettingChange: (key: PropertyInspectorSettingKey, value: string) => void;
 }
 
-export function GraphicTypePicker({ field, context, onSettingChange }: GraphicTypePickerProps): React.JSX.Element {
+export function CircleStylePicker({ field, context, onSettingChange }: CircleStylePickerProps): React.JSX.Element {
     return (
         <PreviewOptionPicker
             field={field}
             context={context}
             onSettingChange={onSettingChange}
-            buildPreviewUri={(value) => buildGraphicTypePreviewUri(value as GraphicType)}
+            buildPreviewUri={(value) => buildCircleStylePreviewUri(value as CircleStyle)}
         />
     );
 }

@@ -5,6 +5,7 @@ export type PropertyInspectorSettingKey = Extract<keyof PropertyInspectorSetting
 export type FieldKind =
     | "select"
     | "graphic-type-picker"
+    | "circle-style-picker"
     | "color"
     | "number"
     | "range"
