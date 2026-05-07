@@ -1,6 +1,6 @@
 import {
     baseFieldGroup,
-    circularCenterFieldGroup,
+    circleStyleFieldGroup,
     colorFieldGroupList,
     colorSettingsFieldGroup,
     sparklineAppearanceFieldGroup,
@@ -21,7 +21,7 @@ export function resolveDefaultScenario(actionKind: ActionKind, graphicType: Grap
         settingsNormalizer: defaultSettingsNormalizer,
         fieldGroupList: [
             baseFieldGroup,
-            ...(graphicType === "circular" ? [circularCenterFieldGroup] : []),
+            ...(graphicType === "circular" ? [circleStyleFieldGroup] : []),
             ...(graphicType === "dashed-line" ? [sparklineAppearanceFieldGroup, sparklineGridLineFieldGroup] : []),
             colorSettingsFieldGroup,
             ...colorFieldGroupList,
@@ -34,6 +34,7 @@ function resolveDefaultScope(actionKind: ActionKind, graphicType: GraphicType): 
         return resolveGraphicScope({
             graphicType,
             circularScope: inspectorScope.cpuUsageCircularScope,
+            textScope: inspectorScope.cpuUsageTextScope,
             linearScope: inspectorScope.cpuUsageLinearScope,
             sparklineScope: inspectorScope.cpuUsageSparklineScope,
         });
@@ -43,6 +44,7 @@ function resolveDefaultScope(actionKind: ActionKind, graphicType: GraphicType): 
         return resolveGraphicScope({
             graphicType,
             circularScope: inspectorScope.ramCircularScope,
+            textScope: inspectorScope.ramTextScope,
             linearScope: inspectorScope.ramLinearScope,
             sparklineScope: inspectorScope.ramSparklineScope,
         });
@@ -52,6 +54,7 @@ function resolveDefaultScope(actionKind: ActionKind, graphicType: GraphicType): 
         return resolveGraphicScope({
             graphicType,
             circularScope: inspectorScope.gpuUsageCircularScope,
+            textScope: inspectorScope.gpuUsageTextScope,
             linearScope: inspectorScope.gpuUsageLinearScope,
             sparklineScope: inspectorScope.gpuUsageSparklineScope,
         });
@@ -61,6 +64,7 @@ function resolveDefaultScope(actionKind: ActionKind, graphicType: GraphicType): 
         return resolveGraphicScope({
             graphicType,
             circularScope: inspectorScope.gpuVramCircularScope,
+            textScope: inspectorScope.gpuVramTextScope,
             linearScope: inspectorScope.gpuVramLinearScope,
             sparklineScope: inspectorScope.gpuVramSparklineScope,
         });

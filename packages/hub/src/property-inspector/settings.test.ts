@@ -117,6 +117,17 @@ test("next settings apply graphic type changes from the PI picker", () => {
     assert.equal(settings.graphicType, "linear");
 });
 
+test("settings normalize circle style picker values", () => {
+    const settings = normalizeSettings({
+        circleStyle: "gauge",
+    }, {
+        actionKind: "cpu-usage",
+        isWindows: false,
+    });
+
+    assert.equal(settings.circleStyle, "gauge");
+});
+
 test("next net speed direction switches solid color only when the old color was default", () => {
     const settings = normalizeNextSettings({
         changedKey: "networkDirection",

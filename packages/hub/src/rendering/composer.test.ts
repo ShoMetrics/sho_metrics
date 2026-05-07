@@ -46,6 +46,16 @@ test("dual-channel composer renders the dual sparkline instead of a single widge
     assert.match(svg, /dual-sparkline-negative-row/);
 });
 
+test("composer renders the pure text widget when selected", () => {
+    const svg = composeSvg(buildWidgetData(), {
+        graphicType: "text",
+        graphicStyle: "flat",
+    }, { width: 144, height: 144 });
+
+    assert.match(svg, /text-metric-value/);
+    assert.doesNotMatch(svg, /Arc Gauge: track/);
+});
+
 test("dual-channel composer renders the circular dual-channel gauge when requested", () => {
     const svg = composeDualChannelSvg(buildDualChannelData(), {
         graphicType: "circular",
@@ -60,6 +70,17 @@ test("dual-channel composer renders the circular dual-channel gauge when request
     assert.match(svg, /width="144" height="144"/);
     assert.match(svg, /dual-arc-positive-row/);
     assert.match(svg, /dual-arc-negative-row/);
+    assert.doesNotMatch(svg, /dual-sparkline-positive-row/);
+});
+
+test("dual-channel composer renders the dual text widget when requested", () => {
+    const svg = composeDualChannelSvg(buildDualChannelData(), {
+        graphicType: "text",
+        graphicStyle: "flat",
+    }, { width: 144, height: 144 });
+
+    assert.match(svg, /text-metric-positive-value/);
+    assert.match(svg, /text-metric-negative-value/);
     assert.doesNotMatch(svg, /dual-sparkline-positive-row/);
 });
 

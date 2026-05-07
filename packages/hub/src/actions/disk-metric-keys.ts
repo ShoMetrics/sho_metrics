@@ -48,5 +48,5 @@ export function isDualDiskThroughputDisplay(
     direction: DiskThroughputDisplayDirection,
 ): boolean {
     return direction === "both"
-        && (graphicType === "circular" || graphicType === "dashed-line");
+        && (graphicType === "circular" || graphicType === "text" || graphicType === "dashed-line");
 }

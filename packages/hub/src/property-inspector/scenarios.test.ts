@@ -38,6 +38,20 @@ test("disk usage circular exposes circular-only usage display", () => {
     assertFieldAbsent(inspectorFieldIdList, "disk-volume-label");
 });
 
+test("disk usage text exposes value display without circle style", () => {
+    const inspectorFieldIdList = resolveInspectorFieldIdList(buildContext({
+        actionKind: "disk",
+        settings: {
+            graphicType: "text",
+            diskMetricKind: "usage",
+        },
+    }));
+
+    assertFieldPresent(inspectorFieldIdList, "disk-usage-display-mode");
+    assertFieldAbsent(inspectorFieldIdList, "circle-style");
+    assertFieldAbsent(inspectorFieldIdList, "disk-linear-label");
+});
+
 test("network direction note is limited to circular scope", () => {
     const linearFieldIdList = resolveInspectorFieldIdList(buildContext({
         actionKind: "net-speed",
@@ -54,6 +68,24 @@ test("network direction note is limited to circular scope", () => {
 
     assertFieldAbsent(linearFieldIdList, "network-circle-note");
     assertFieldPresent(circularFieldIdList, "network-circle-note");
+});
+
+test("circle style is limited to circular layouts", () => {
+    const circularFieldIdList = resolveInspectorFieldIdList(buildContext({
+        actionKind: "cpu-usage",
+        settings: {
+            graphicType: "circular",
+        },
+    }));
+    const textFieldIdList = resolveInspectorFieldIdList(buildContext({
+        actionKind: "cpu-usage",
+        settings: {
+            graphicType: "text",
+        },
+    }));
+
+    assertFieldPresent(circularFieldIdList, "circle-style");
+    assertFieldAbsent(textFieldIdList, "circle-style");
 });
 
 test("network sparkline exposes dual-stream network controls", () => {
@@ -92,6 +124,24 @@ test("network single-stream sparkline uses standard color settings", () => {
     assertFieldPresent(sparklineFieldIdList, "solid-color");
     assertFieldAbsent(sparklineFieldIdList, "download-color-mode");
     assertFieldAbsent(sparklineFieldIdList, "upload-color-mode");
+});
+
+test("network dual text exposes download before upload channel colors", () => {
+    const fieldIdList = resolveInspectorFieldIdList(buildContext({
+        actionKind: "net-speed",
+        settings: {
+            graphicType: "text",
+            networkDirection: "both",
+        },
+    }));
+
+    assertFieldPresent(fieldIdList, "download-color-mode");
+    assertFieldPresent(fieldIdList, "upload-color-mode");
+    assertFieldPresent(fieldIdList, "network-interface");
+    assertFieldPresent(fieldIdList, "maximum-network-speed");
+    assertFieldPresent(fieldIdList, "network-unit-base");
+    assertFieldAbsent(fieldIdList, "color-mode");
+    assertFieldOrder(fieldIdList, "download-color-heading", "upload-color-heading");
 });
 
 test("network dual linear exposes download before upload channel colors", () => {
@@ -318,7 +368,7 @@ test("shared visual fields keep a consistent order across widgets", () => {
         "gpu-vram",
         "gpu-power",
     ];
-    const graphicTypeList: readonly GraphicType[] = ["circular", "linear", "dashed-line"];
+    const graphicTypeList: readonly GraphicType[] = ["circular", "text", "linear", "dashed-line"];
 
     for (const actionKind of actionKindList) {
         for (const graphicType of graphicTypeList) {

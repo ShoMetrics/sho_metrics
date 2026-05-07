@@ -76,6 +76,7 @@ export class NetSpeed extends MetricAction {
                 settings,
                 selectedNetworkInterface,
                 isAutomaticNetworkInterface,
+                dualGraphicType: settings.graphicType === "text" ? "text" : "circular",
             });
             return;
         }
@@ -98,8 +99,9 @@ export class NetSpeed extends MetricAction {
             widgetData,
         });
 
-        const circularCenterContent = settings.circularCenterContent === "icon" ? "icon" : "value";
-        const renderedWidgetData = settings.graphicType === "circular" && circularCenterContent === "value"
+        const circleStyle = resolveCircleStyle(settings.circleStyle);
+        const shouldRenderGaugeFooter = settings.graphicType === "circular" && circleStyle === "gauge";
+        const renderedWidgetData = shouldRenderGaugeFooter
             ? { ...widgetData, label: ARC_GAUGE_LABELS.network }
             : widgetData;
 
@@ -108,11 +110,11 @@ export class NetSpeed extends MetricAction {
             metricKey: networkMetricKey,
             widgetData: renderedWidgetData,
             centerIconFragment: buildNetworkCenterIconFragment({
-                circularCenterContent,
+                circleStyle,
                 direction,
                 selectedNetworkInterface,
             }),
-            footerIconFragment: settings.graphicType === "circular" && circularCenterContent === "value"
+            footerIconFragment: shouldRenderGaugeFooter
                 ? renderNetworkDirectionIconFragment({
                     direction,
                     color: NETWORK_DIRECTION_ICON_COLOR,
@@ -123,7 +125,7 @@ export class NetSpeed extends MetricAction {
                 direction,
                 color: NETWORK_DIRECTION_ICON_COLOR,
             }),
-            circularCenterContentOverride: circularCenterContent,
+            circleStyleOverride: circleStyle,
             visualSettingsOverride: {
                 colorMode: settings.colorMode ?? "solid",
                 solidColor: settings.solidColor ?? resolveNetworkChannelColor(direction, settings),
@@ -136,6 +138,7 @@ export class NetSpeed extends MetricAction {
         settings: NetworkSpeedSettings;
         selectedNetworkInterface: NetworkInterfaceOption | null;
         isAutomaticNetworkInterface: boolean;
+        dualGraphicType: "circular" | "text";
     }): void {
         const uploadMetricKey = options.selectedNetworkInterface
             ? getNetworkInterfaceMetricKey("upload", options.selectedNetworkInterface.id)
@@ -159,12 +162,12 @@ export class NetSpeed extends MetricAction {
         });
         const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData);
         const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
-        const circularCenterContent = options.settings.circularCenterContent === "icon" ? "icon" : "value";
+        const circleStyle = resolveCircleStyle(options.settings.circleStyle);
 
         setDualMetricDisplay({
             event: options.event,
             metricKey: `${downloadMetricKey},${uploadMetricKey}`,
-            dualGraphicType: "circular",
+            dualGraphicType: options.dualGraphicType,
             widgetData: {
                 positive: uploadWidgetData,
                 negative: downloadWidgetData,
@@ -178,7 +181,7 @@ export class NetSpeed extends MetricAction {
                 direction: "download",
                 color: NETWORK_DIRECTION_ICON_COLOR,
             }),
-            circularCenterContentOverride: circularCenterContent,
+            circleStyleOverride: circleStyle,
             positiveColor: uploadColor,
             negativeColor: downloadColor,
             positiveIconFragment: renderNetworkDirectionIconFragment({
@@ -347,7 +350,7 @@ export class NetSpeed extends MetricAction {
                     ?? uploadWidgetData.sampleTimestampMilliseconds,
             },
             centerIconFragment: buildNetworkCenterIconFragment({
-                circularCenterContent: "icon",
+                circleStyle: "compact",
                 direction: "download",
                 selectedNetworkInterface: options.selectedNetworkInterface,
             }),
@@ -396,6 +399,7 @@ export class NetSpeed extends MetricAction {
 
 export interface NetworkSpeedSettings {
     graphicType?: SettingValue;
+    circleStyle?: SettingValue;
     networkDirection?: SettingValue;
     networkInterfaceId?: SettingValue;
     availableNetworkInterfaces?: SettingValue;
@@ -414,7 +418,6 @@ export interface NetworkSpeedSettings {
     uploadColorHigh?: SettingValue;
     lowThreshold?: SettingValue;
     highThreshold?: SettingValue;
-    circularCenterContent?: SettingValue;
     colorMode?: SettingValue;
     solidColor?: SettingValue;
 }
@@ -501,11 +504,11 @@ function getNetworkDirectionLabel(direction: NetworkDirection): string {
 }
 
 function buildNetworkCenterIconFragment(options: {
-    circularCenterContent: "icon" | "value";
+    circleStyle: "value" | "compact" | "gauge";
     direction: NetworkDirection;
     selectedNetworkInterface: NetworkInterfaceOption | null;
 }): string {
-    if (options.circularCenterContent === "icon") {
+    if (options.circleStyle === "compact") {
         return renderNetworkInterfaceIconFragment({
             networkInterface: options.selectedNetworkInterface,
             size: NETWORK_CENTER_ICON_SIZE,
@@ -517,6 +520,14 @@ function buildNetworkCenterIconFragment(options: {
         color: NETWORK_DIRECTION_ICON_COLOR,
         size: NETWORK_TOP_ICON_SIZE,
     });
+}
+
+function resolveCircleStyle(value: SettingValue): "value" | "compact" | "gauge" {
+    if (value === "compact" || value === "gauge") {
+        return value;
+    }
+
+    return "value";
 }
 
 function resolveNetworkChannelColor(direction: NetworkDirection, settings: NetworkSpeedSettings): string {

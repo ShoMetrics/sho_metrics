@@ -13,7 +13,15 @@ export interface Widget<TConfig extends WidgetBaseConfig = WidgetBaseConfig> {
     render(data: WidgetData, config: TConfig, keySize: KeySize): string;
 }
 
-export type GraphicPrimitiveType = "circular" | "linear" | "dashed-line" | "arc-gauge" | "sparkline" | "linear-bar" | "mirrored-traffic";
+export type GraphicPrimitiveType =
+    | "circular"
+    | "text"
+    | "linear"
+    | "dashed-line"
+    | "arc-gauge"
+    | "sparkline"
+    | "linear-bar"
+    | "mirrored-traffic";
 
 /**
  * Current settings still persist this as `graphicType`; the type name makes the

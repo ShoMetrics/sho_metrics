@@ -8,7 +8,10 @@ const sparklineScopeList = allMetricScopeList.filter(scopeValue => scopeValue.en
 const diskScopeList = allMetricScopeList.filter(scopeValue => scopeValue.startsWith("disk."));
 const diskUsageScopeList = allMetricScopeList.filter(scopeValue => scopeValue.startsWith("disk.usage."));
 const diskUsageLinearScopeList = [inspectorScope.diskUsageLinearScope] as const;
-const diskUsageCircularScopeList = [inspectorScope.diskUsageCircularScope] as const;
+const diskUsageValueScopeList = [
+    inspectorScope.diskUsageCircularScope,
+    inspectorScope.diskUsageTextScope,
+] as const;
 const diskThroughputScopeList = allMetricScopeList.filter(scopeValue => scopeValue.startsWith("disk.throughput."));
 const diskThroughputCircularLinearScopeList = [
     inspectorScope.diskThroughputCircularScope,
@@ -17,17 +20,20 @@ const diskThroughputCircularLinearScopeList = [
 const netSpeedCircularScopeList = [inspectorScope.netSpeedCircularScope] as const;
 const netSpeedEndpointScopeList = [
     inspectorScope.netSpeedCircularScope,
+    inspectorScope.netSpeedTextScope,
     inspectorScope.netSpeedLinearScope,
     inspectorScope.netSpeedSparklineScope,
 ] as const;
 const netSpeedChannelColorScopeList = [
     inspectorScope.netSpeedCircularScope,
+    inspectorScope.netSpeedTextScope,
     inspectorScope.netSpeedLinearScope,
     inspectorScope.netSpeedSparklineScope,
 ] as const;
 const netSpeedSparklineScopeList = [inspectorScope.netSpeedSparklineScope] as const;
 const diskThroughputChannelColorScopeList = [
     inspectorScope.diskThroughputCircularScope,
+    inspectorScope.diskThroughputTextScope,
     inspectorScope.diskThroughputSparklineScope,
 ] as const;
 const gpuTempScopeList = allMetricScopeList.filter(scopeValue => scopeValue.startsWith("gpu-temp."));
@@ -56,25 +62,27 @@ export const inspectorFieldCatalog = {
         id: "graphic-type",
         key: "graphicType",
         kind: "graphic-type-picker",
-        label: "Graphic Type",
+        label: "Layout",
         defaultValue: "circular",
         allowedScopes: allMetricScopeList,
         options: staticOptions([
             { value: "circular", label: "Circle" },
-            { value: "linear", label: "Line" },
-            { value: "dashed-line", label: "Sparkline" },
+            { value: "text", label: "Text" },
+            { value: "linear", label: "Bar" },
+            { value: "dashed-line", label: "Trend" },
         ]),
     }),
-    circularCenterContentField: defineField({
-        id: "circular-center-content",
-        key: "circularCenterContent",
-        kind: "select",
-        label: "Center Content",
+    circleStyleField: defineField({
+        id: "circle-style",
+        key: "circleStyle",
+        kind: "circle-style-picker",
+        label: "Circle Style",
         defaultValue: "value",
         allowedScopes: circularScopeList,
         options: staticOptions([
             { value: "value", label: "Value" },
-            { value: "icon", label: "Minimal Icon" },
+            { value: "compact", label: "Compact" },
+            { value: "gauge", label: "Gauge" },
         ]),
     }),
     networkDirectionField: defineField({
@@ -83,7 +91,12 @@ export const inspectorFieldCatalog = {
         kind: "select",
         label: "Network Metric",
         defaultValue: "both",
-        allowedScopes: [inspectorScope.netSpeedCircularScope, inspectorScope.netSpeedLinearScope, inspectorScope.netSpeedSparklineScope],
+        allowedScopes: [
+            inspectorScope.netSpeedCircularScope,
+            inspectorScope.netSpeedTextScope,
+            inspectorScope.netSpeedLinearScope,
+            inspectorScope.netSpeedSparklineScope,
+        ],
         options: staticOptions([
             { value: "both", label: "Download & Upload" },
             { value: "download", label: "Download" },
@@ -362,7 +375,7 @@ export const inspectorFieldCatalog = {
         kind: "select",
         label: "Usage Display",
         defaultValue: "percentage",
-        allowedScopes: diskUsageCircularScopeList,
+        allowedScopes: diskUsageValueScopeList,
         options: staticOptions([
             { value: "percentage", label: "Percentage" },
             { value: "space", label: "Free Space" },

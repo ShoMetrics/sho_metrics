@@ -1,6 +1,6 @@
 import {
     baseFieldGroup,
-    circularCenterFieldGroup,
+    circleStyleFieldGroup,
     colorFieldGroupList,
     downloadChannelColorModeFieldGroup,
     downloadDynamicChannelColorFieldGroup,
@@ -33,10 +33,30 @@ const netSpeedCircularScenario = defineScenario({
     settingsNormalizer: defaultSettingsNormalizer,
     fieldGroupList: [
         baseFieldGroup,
-        circularCenterFieldGroup,
+        circleStyleFieldGroup,
         networkDirectionFieldGroup,
         networkCircularFieldGroup,
         networkEndpointFieldGroup,
+        colorSettingsFieldGroup,
+        ...colorFieldGroupList,
+    ],
+});
+
+const netSpeedTextScenario = defineScenario({
+    scope: inspectorScope.netSpeedTextScope,
+    settingsNormalizer: defaultSettingsNormalizer,
+    fieldGroupList: [
+        baseFieldGroup,
+        networkDirectionFieldGroup,
+        networkEndpointFieldGroup,
+        networkChannelColorSettingsFieldGroup,
+        networkChannelThresholdFieldGroup,
+        downloadChannelColorModeFieldGroup,
+        downloadSolidChannelColorFieldGroup,
+        downloadDynamicChannelColorFieldGroup,
+        uploadChannelColorModeFieldGroup,
+        uploadSolidChannelColorFieldGroup,
+        uploadDynamicChannelColorFieldGroup,
         colorSettingsFieldGroup,
         ...colorFieldGroupList,
     ],
@@ -90,6 +110,7 @@ export function resolveNetSpeedScenario(context: VisibilityContext): InspectorSc
     return resolveGraphicScenario({
         graphicType: context.settings.graphicType,
         circularScenario: netSpeedCircularScenario,
+        textScenario: netSpeedTextScenario,
         linearScenario: netSpeedLinearScenario,
         sparklineScenario: netSpeedSparklineScenario,
     });

@@ -17,6 +17,7 @@ import {
     buildRenderWidgetData,
     hasMetricDisplayData,
     resolveCircularCenterContent,
+    resolveCircleStyle,
     resolveDisplayLogValue,
     resolveDisplaySampleTimestampMilliseconds,
     resolveTouchStripMetricLayout,
@@ -57,7 +58,7 @@ test("single circular icon placeholder keeps source data and marks the render pl
         displayOptions,
         settings: {
             graphicType: "circular",
-            circularCenterContent: "icon",
+            circleStyle: "compact",
         },
         isDial: false,
     });
@@ -160,17 +161,25 @@ test("display data helpers treat either dual-channel timestamp as available data
 
 test("center content falls back to value outside circular graphics", () => {
     assert.equal(resolveCircularCenterContent({
-        settings: { circularCenterContent: "icon" },
         graphicType: "linear",
-        circularCenterContentOverride: "icon",
+        circleStyle: "compact",
+        circleStyleOverride: "compact",
     }), "value");
 });
 
-test("center content override wins for circular graphics", () => {
-    assert.equal(resolveCircularCenterContent({
-        settings: { circularCenterContent: "value" },
+test("circle style override wins for circular graphics", () => {
+    assert.equal(resolveCircleStyle({
         graphicType: "circular",
-        circularCenterContentOverride: "icon",
+        circleStyle: "value",
+        circleStyleOverride: "gauge",
+    }), "gauge");
+});
+
+test("compact circle style uses icon center content", () => {
+    assert.equal(resolveCircularCenterContent({
+        graphicType: "circular",
+        circleStyle: "compact",
+        circleStyleOverride: undefined,
     }), "icon");
 });
 
@@ -209,6 +218,7 @@ test("touch strip layout uses square rendering for circular graphics", () => {
 test("touch strip layout uses wide rendering for non-circular graphics", () => {
     const touchStripMetricLayout = resolveTouchStripMetricLayout({
         graphicType: "dashed-line",
+        circleStyle: "value",
         graphicStyle: "flat",
         colorConfig: {
             mode: "solid",

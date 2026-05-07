@@ -16,10 +16,10 @@ export const baseFieldGroup = defineFieldGroup({
     ],
 });
 
-export const circularCenterFieldGroup = defineFieldGroup({
-    name: "circularCenter",
+export const circleStyleFieldGroup = defineFieldGroup({
+    name: "circleStyle",
     fieldList: [
-        inspectorFieldCatalog.circularCenterContentField,
+        inspectorFieldCatalog.circleStyleField,
     ],
 });
 
@@ -328,12 +328,20 @@ function usesChannelColorSettings(context: VisibilityContext): boolean {
 function isDualNetworkChannelColor(context: VisibilityContext): boolean {
     return context.actionKind === "net-speed"
         && context.settings.networkDirection === "both"
-        && (context.settings.graphicType === "linear" || context.settings.graphicType === "dashed-line");
+        && (
+            context.settings.graphicType === "text"
+            || context.settings.graphicType === "linear"
+            || context.settings.graphicType === "dashed-line"
+        );
 }
 
 function isDualDiskThroughputChannelColor(context: VisibilityContext): boolean {
     return context.actionKind === "disk"
         && context.settings.diskMetricKind === "throughput"
         && context.settings.diskThroughputDirection === "both"
-        && (context.settings.graphicType === "circular" || context.settings.graphicType === "dashed-line");
+        && (
+            context.settings.graphicType === "circular"
+            || context.settings.graphicType === "text"
+            || context.settings.graphicType === "dashed-line"
+        );
 }

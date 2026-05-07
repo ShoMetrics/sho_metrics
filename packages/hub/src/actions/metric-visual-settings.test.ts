@@ -8,6 +8,12 @@ test("graphic type aliases normalize legacy primitive names", () => {
     assert.equal(resolveMetricVisualSettings({ graphicType: "sparkline" }).graphicType, "dashed-line");
 });
 
+test("circle style normalizes to curated presets", () => {
+    assert.equal(resolveMetricVisualSettings({ circleStyle: "compact" }).circleStyle, "compact");
+    assert.equal(resolveMetricVisualSettings({ circleStyle: "gauge" }).circleStyle, "gauge");
+    assert.equal(resolveMetricVisualSettings({ circleStyle: "unknown" }).circleStyle, "value");
+});
+
 test("invalid graphic type falls back to circular", () => {
     assert.equal(resolveMetricVisualSettings({ graphicType: "unknown" }).graphicType, "circular");
 });

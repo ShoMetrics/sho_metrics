@@ -26,6 +26,14 @@ test("disk throughput circular both mode subscribes to read and write", () => {
     }), ["disk.throughput.read", "disk.throughput.write"]);
 });
 
+test("disk throughput text both mode subscribes to read and write", () => {
+    assert.deepEqual(resolveDiskMetricKeys({
+        diskMetricKind: "throughput",
+        graphicType: "text",
+        diskThroughputDirection: "both",
+    }), ["disk.throughput.read", "disk.throughput.write"]);
+});
+
 test("disk throughput linear both mode falls back to total", () => {
     assert.deepEqual(resolveDiskMetricKeys({
         diskMetricKind: "throughput",

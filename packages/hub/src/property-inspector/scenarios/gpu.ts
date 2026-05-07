@@ -1,6 +1,6 @@
 import {
     baseFieldGroup,
-    circularCenterFieldGroup,
+    circleStyleFieldGroup,
     colorFieldGroupList,
     maximumGpuPowerFieldGroup,
     maximumTemperatureFieldGroup,
@@ -23,13 +23,14 @@ export function resolveGpuTempScenario(graphicType: GraphicType): InspectorScena
         scope: resolveGraphicScope({
             graphicType,
             circularScope: inspectorScope.gpuTempCircularScope,
+            textScope: inspectorScope.gpuTempTextScope,
             linearScope: inspectorScope.gpuTempLinearScope,
             sparklineScope: inspectorScope.gpuTempSparklineScope,
         }),
         settingsNormalizer: defaultSettingsNormalizer,
         fieldGroupList: [
             baseFieldGroup,
-            ...(graphicType === "circular" ? [circularCenterFieldGroup] : []),
+            ...(graphicType === "circular" ? [circleStyleFieldGroup] : []),
             ...(graphicType === "dashed-line" ? [sparklineAppearanceFieldGroup, sparklineGridLineFieldGroup] : []),
             temperatureUnitFieldGroup,
             maximumTemperatureFieldGroup,
@@ -44,13 +45,14 @@ export function resolveGpuPowerScenario(graphicType: GraphicType): InspectorScen
         scope: resolveGraphicScope({
             graphicType,
             circularScope: inspectorScope.gpuPowerCircularScope,
+            textScope: inspectorScope.gpuPowerTextScope,
             linearScope: inspectorScope.gpuPowerLinearScope,
             sparklineScope: inspectorScope.gpuPowerSparklineScope,
         }),
         settingsNormalizer: defaultSettingsNormalizer,
         fieldGroupList: [
             baseFieldGroup,
-            ...(graphicType === "circular" ? [circularCenterFieldGroup] : []),
+            ...(graphicType === "circular" ? [circleStyleFieldGroup] : []),
             ...(graphicType === "dashed-line" ? [sparklineAppearanceFieldGroup, sparklineGridLineFieldGroup] : []),
             maximumGpuPowerFieldGroup,
             colorSettingsFieldGroup,

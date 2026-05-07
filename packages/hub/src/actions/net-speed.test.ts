@@ -22,3 +22,10 @@ test("network circular both mode subscribes to upload and download", () => {
         networkDirection: "both",
     }), ["net.up", "net.down"]);
 });
+
+test("network text both mode subscribes to upload and download", () => {
+    assert.deepEqual(resolveNetSpeedMetricKeys({
+        graphicType: "text",
+        networkDirection: "both",
+    }), ["net.up", "net.down"]);
+});

@@ -1,5 +1,6 @@
 import { ColorBandField } from "./ColorBandField";
 import { ColorField } from "./ColorField";
+import { CircleStylePicker } from "./CircleStylePicker";
 import { GraphicTypePicker } from "./GraphicTypePicker";
 import { NumberField } from "./NumberField";
 import { RangeField } from "./RangeField";
@@ -59,6 +60,8 @@ function renderFieldControl(
             return <SelectField field={field} context={context} />;
         case "graphic-type-picker":
             return <GraphicTypePicker field={field} context={context} onSettingChange={onSettingChange} />;
+        case "circle-style-picker":
+            return <CircleStylePicker field={field} context={context} onSettingChange={onSettingChange} />;
         case "color":
             return <ColorField field={field} context={context} />;
         case "number":

@@ -99,6 +99,7 @@ export class Disk extends MetricAction {
                 linearLabel: resolveDiskLinearLabel(settings.diskLinearLabel, selectedVolume, label),
             }),
             centerIconFragment: buildDiskCenterIconFragment(selectedVolume),
+            footerIconFragment: buildDiskGaugeFooterIconFragment(selectedVolume),
             linearIconFragment: getDiskIconFragment(selectedVolume?.storageKind ?? "unknown"),
             statusIcon: getMetricStatusIcon("percentage"),
         });
@@ -124,7 +125,8 @@ export class Disk extends MetricAction {
             ? formatDiskVolumeDisplayLabel(selectedVolume)
             : ARC_GAUGE_LABELS.disk;
         const bytesPerSecondWidgetData = metricStore.getWidgetData(throughputMetricKey, throughputLabel, "B/s");
-        const circularCenterContent = settings.circularCenterContent === "icon" ? "icon" : "value";
+        const circleStyle = resolveCircleStyle(settings.circleStyle);
+        const shouldRenderGaugeFooter = settings.graphicType === "circular" && circleStyle === "gauge";
 
         setSingleMetricDisplay({
             event,
@@ -138,11 +140,11 @@ export class Disk extends MetricAction {
                 label: throughputLabel,
             }),
             centerIconFragment: getDiskIconFragment("unknown"),
-            footerIconFragment: settings.graphicType === "circular" && circularCenterContent === "value"
+            footerIconFragment: shouldRenderGaugeFooter
                 ? buildDiskThroughputFooterIconFragment(singleThroughputDirection)
                 : undefined,
             statusIcon: getMetricStatusIcon("percentage"),
-            circularCenterContentOverride: circularCenterContent,
+            circleStyleOverride: circleStyle,
             visualSettingsOverride: {
                 colorMode: settings.colorMode ?? "solid",
                 solidColor: typeof settings.solidColor === "string" ? settings.solidColor : DEFAULT_DISK_THROUGHPUT_COLOR,
@@ -153,7 +155,9 @@ export class Disk extends MetricAction {
     private updateDualThroughputDisplay(event: WillAppearEvent, settings: DiskSettings): void {
         const readMetricKey = getDiskThroughputMetricKey("read");
         const writeMetricKey = getDiskThroughputMetricKey("write");
-        const dualGraphicType = settings.graphicType === "circular" ? "circular" : undefined;
+        const dualGraphicType = settings.graphicType === "circular"
+            ? "circular"
+            : settings.graphicType === "text" ? "text" : undefined;
         const maximumBytesPerSecond = normalizePositiveNumber(
             settings.maximumDiskThroughputMebibytesPerSecond,
             DEFAULT_MAXIMUM_DISK_THROUGHPUT_MEBIBYTES_PER_SECOND,
@@ -182,8 +186,8 @@ export class Disk extends MetricAction {
             titleText: "DISK",
             centerIconFragment: getDiskIconFragment("unknown"),
             statusIcon: getMetricStatusIcon("percentage"),
-            circularCenterContentOverride: dualGraphicType === "circular"
-                ? settings.circularCenterContent === "icon" ? "icon" : "value"
+            circleStyleOverride: dualGraphicType === "circular"
+                ? resolveCircleStyle(settings.circleStyle)
                 : undefined,
             positiveColor: readColor,
             negativeColor: writeColor,
@@ -273,6 +277,13 @@ function buildDiskCenterIconFragment(diskVolume: DiskVolumeOption | null): strin
     `;
 }
 
+function buildDiskGaugeFooterIconFragment(diskVolume: DiskVolumeOption | null): string {
+    return renderCenteredHardwareIconFragment(
+        getDiskIcon(diskVolume?.storageKind ?? "unknown"),
+        DISK_GAUGE_FOOTER_ICON_SIZE,
+    );
+}
+
 export interface DiskSettings {
     graphicType?: SettingValue;
     diskMetricKind?: SettingValue;
@@ -283,7 +294,7 @@ export interface DiskSettings {
     diskLinearLabel?: SettingValue;
     maximumDiskThroughputMebibytesPerSecond?: SettingValue;
     pollingFrequencySeconds?: SettingValue;
-    circularCenterContent?: SettingValue;
+    circleStyle?: SettingValue;
     colorMode?: SettingValue;
     solidColor?: SettingValue;
     diskReadColorMode?: SettingValue;
@@ -306,6 +317,7 @@ const DEFAULT_DISK_READ_COLOR = "#38bdf8";
 const DEFAULT_DISK_WRITE_COLOR = "#f472b6";
 const DISK_THROUGHPUT_DIRECTION_ICON_COLOR = "rgba(255,255,255,0.88)";
 const DISK_THROUGHPUT_DIRECTION_ICON_SIZE = 30;
+const DISK_GAUGE_FOOTER_ICON_SIZE = 25;
 
 function normalizeDiskMetricKind(value: SettingValue): "usage" | "throughput" {
     return value === "throughput" ? "throughput" : "usage";
@@ -313,6 +325,14 @@ function normalizeDiskMetricKind(value: SettingValue): "usage" | "throughput" {
 
 function normalizeDiskUsageDisplayMode(value: SettingValue): DiskUsageDisplayMode {
     return value === "space" ? "space" : "percentage";
+}
+
+function resolveCircleStyle(value: SettingValue): "value" | "compact" | "gauge" {
+    if (value === "compact" || value === "gauge") {
+        return value;
+    }
+
+    return "value";
 }
 
 function resolveSelectedDiskVolume(value: SettingValue): DiskVolumeOption | null {

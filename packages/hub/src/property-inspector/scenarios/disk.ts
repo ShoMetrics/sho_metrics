@@ -1,6 +1,6 @@
 import {
     baseFieldGroup,
-    circularCenterFieldGroup,
+    circleStyleFieldGroup,
     colorFieldGroupList,
     diskReadChannelColorModeFieldGroup,
     diskReadDynamicChannelColorFieldGroup,
@@ -32,7 +32,19 @@ const diskUsageCircularScenario = defineScenario({
     settingsNormalizer: defaultSettingsNormalizer,
     fieldGroupList: [
         baseFieldGroup,
-        circularCenterFieldGroup,
+        circleStyleFieldGroup,
+        diskUsageBaseFieldGroup,
+        diskUsageCircularFieldGroup,
+        colorSettingsFieldGroup,
+        ...colorFieldGroupList,
+    ],
+});
+
+const diskUsageTextScenario = defineScenario({
+    scope: inspectorScope.diskUsageTextScope,
+    settingsNormalizer: defaultSettingsNormalizer,
+    fieldGroupList: [
+        baseFieldGroup,
         diskUsageBaseFieldGroup,
         diskUsageCircularFieldGroup,
         colorSettingsFieldGroup,
@@ -70,7 +82,26 @@ const diskThroughputCircularScenario = defineScenario({
     settingsNormalizer: defaultSettingsNormalizer,
     fieldGroupList: [
         baseFieldGroup,
-        circularCenterFieldGroup,
+        circleStyleFieldGroup,
+        diskThroughputFieldGroup,
+        diskThroughputChannelColorSettingsFieldGroup,
+        diskThroughputChannelThresholdFieldGroup,
+        diskReadChannelColorModeFieldGroup,
+        diskReadSolidChannelColorFieldGroup,
+        diskReadDynamicChannelColorFieldGroup,
+        diskWriteChannelColorModeFieldGroup,
+        diskWriteSolidChannelColorFieldGroup,
+        diskWriteDynamicChannelColorFieldGroup,
+        colorSettingsFieldGroup,
+        ...colorFieldGroupList,
+    ],
+});
+
+const diskThroughputTextScenario = defineScenario({
+    scope: inspectorScope.diskThroughputTextScope,
+    settingsNormalizer: defaultSettingsNormalizer,
+    fieldGroupList: [
+        baseFieldGroup,
         diskThroughputFieldGroup,
         diskThroughputChannelColorSettingsFieldGroup,
         diskThroughputChannelThresholdFieldGroup,
@@ -122,6 +153,7 @@ export function resolveDiskScenario(context: VisibilityContext): InspectorScenar
         return resolveGraphicScenario({
             graphicType: context.settings.graphicType,
             circularScenario: diskThroughputCircularScenario,
+            textScenario: diskThroughputTextScenario,
             linearScenario: diskThroughputLinearScenario,
             sparklineScenario: diskThroughputSparklineScenario,
         });
@@ -130,6 +162,7 @@ export function resolveDiskScenario(context: VisibilityContext): InspectorScenar
     return resolveGraphicScenario({
         graphicType: context.settings.graphicType,
         circularScenario: diskUsageCircularScenario,
+        textScenario: diskUsageTextScenario,
         linearScenario: diskUsageLinearScenario,
         sparklineScenario: diskUsageSparklineScenario,
     });
