@@ -21,12 +21,12 @@ export interface PropertyInspectorState {
 }
 
 export type ScenarioSectionId =
-    | "general"
-    | "content"
-    | "source"
-    | "appearance"
-    | "visual-guides"
-    | "color"
+    | "metric"
+    | "layout"
+    | "scale"
+    | "trend"
+    | "labels"
+    | "colors"
     | "update";
 
 export interface ScenarioFieldGroup {
@@ -150,7 +150,7 @@ function resolveDefaultSectionId(fieldGroupName: string): ScenarioSectionId {
         || fieldGroupName === "solidColor"
         || fieldGroupName === "thresholdColor"
     ) {
-        return "color";
+        return "colors";
     }
 
     if (
@@ -158,7 +158,7 @@ function resolveDefaultSectionId(fieldGroupName: string): ScenarioSectionId {
         || fieldGroupName.includes("gridLine")
         || fieldGroupName === "sparklineAppearance"
     ) {
-        return "visual-guides";
+        return "trend";
     }
 
     if (
@@ -169,7 +169,7 @@ function resolveDefaultSectionId(fieldGroupName: string): ScenarioSectionId {
         || fieldGroupName.includes("Unit")
         || fieldGroupName === "networkCircular"
     ) {
-        return "content";
+        return "labels";
     }
 
     if (
@@ -180,8 +180,8 @@ function resolveDefaultSectionId(fieldGroupName: string): ScenarioSectionId {
         || fieldGroupName === "networkDirection"
         || fieldGroupName === "diskUsageBase"
     ) {
-        return "source";
+        return "metric";
     }
 
-    return fieldGroupName === "base" ? "general" : "appearance";
+    return fieldGroupName === "base" ? "layout" : "scale";
 }

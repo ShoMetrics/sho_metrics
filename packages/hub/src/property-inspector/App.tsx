@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FieldRenderer } from "./components/FieldRenderer";
+import { SectionHeading } from "./components/SectionHeading";
 import { readControlValue } from "./control-events";
 import {
     normalizeNextSettings,
     normalizeSettings,
-    resolveInspectorFieldList,
+    resolveInspectorSectionList,
 } from "./scenarios";
 import {
     basePropertyInspectorSettings,
@@ -45,8 +46,8 @@ export function App({ client }: AppProps): React.JSX.Element {
         isWindows: state.isWindows,
         settings: state.settings,
     }), [state.actionKind, state.isWindows, state.settings]);
-    const inspectorFieldList = useMemo(
-        () => resolveInspectorFieldList(visibilityContext),
+    const inspectorSectionList = useMemo(
+        () => resolveInspectorSectionList(visibilityContext),
         [visibilityContext],
     );
 
@@ -148,13 +149,18 @@ export function App({ client }: AppProps): React.JSX.Element {
 
     return (
         <div ref={rootRef}>
-            {inspectorFieldList.map((field) => (
-                <FieldRenderer
-                    key={field.id}
-                    field={field}
-                    context={visibilityContext}
-                    onSettingChange={updateSetting}
-                />
+            {inspectorSectionList.map((section) => (
+                <section key={section.id} className="settings-section">
+                    <SectionHeading text={section.label} variant="section" />
+                    {section.fieldList.map((field, fieldIndex) => (
+                        <FieldRenderer
+                            key={`${section.id}-${field.id}-${fieldIndex}`}
+                            field={field}
+                            context={visibilityContext}
+                            onSettingChange={updateSetting}
+                        />
+                    ))}
+                </section>
             ))}
         </div>
     );

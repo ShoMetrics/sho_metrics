@@ -16,11 +16,11 @@ test("network mirrored sparkline resolves stable UI sections in scenario order",
     });
 
     assert.deepEqual(resolveSectionIdList(resolveScenarioSectionList(resolveNetSpeedScenario(context), context)), [
-        "general",
-        "source",
-        "appearance",
-        "visual-guides",
-        "color",
+        "layout",
+        "metric",
+        "scale",
+        "trend",
+        "colors",
         "update",
     ]);
 });
@@ -34,10 +34,11 @@ test("network single-direction sparkline omits traffic display section when grou
     });
 
     assert.deepEqual(resolveSectionIdList(resolveScenarioSectionList(resolveNetSpeedScenario(context), context)), [
-        "general",
-        "source",
-        "visual-guides",
-        "color",
+        "layout",
+        "metric",
+        "scale",
+        "trend",
+        "colors",
         "update",
     ]);
 });
@@ -54,10 +55,10 @@ test("disk usage linear separates source label and color sections", () => {
     const sectionList = resolveScenarioSectionList(resolveDiskScenario(context), context);
 
     assert.deepEqual(resolveSectionIdList(sectionList), [
-        "general",
-        "source",
-        "content",
-        "color",
+        "layout",
+        "metric",
+        "labels",
+        "colors",
         "update",
     ]);
     assert.deepEqual(sectionList.map(section => section.fieldGroupList.map(fieldGroup => fieldGroup.name)), [

@@ -4,6 +4,7 @@ import type { VisibilityContext } from "./schema";
 
 export const baseFieldGroup = defineFieldGroup({
     name: "base",
+    sectionId: "layout",
     /**
      * Base fields must be valid for every graphic scope. Graphic-specific
      * controls belong in dedicated field groups that are explicitly attached
@@ -25,6 +26,7 @@ export const updateFieldGroup = defineFieldGroup({
 
 export const circleStyleFieldGroup = defineFieldGroup({
     name: "circleStyle",
+    sectionId: "layout",
     fieldList: [
         inspectorFieldCatalog.circleStyleField,
     ],
@@ -32,6 +34,7 @@ export const circleStyleFieldGroup = defineFieldGroup({
 
 export const solidColorFieldGroup = defineFieldGroup({
     name: "solidColor",
+    sectionId: "colors",
     include: context => !usesChannelColorSettings(context) && context.settings.colorMode === "solid",
     fieldList: [
         inspectorFieldCatalog.solidColorField,
@@ -40,6 +43,7 @@ export const solidColorFieldGroup = defineFieldGroup({
 
 export const thresholdColorFieldGroup = defineFieldGroup({
     name: "thresholdColor",
+    sectionId: "colors",
     include: context => !usesChannelColorSettings(context) && context.settings.colorMode !== "solid",
     fieldList: [
         inspectorFieldCatalog.dynamicUsageColorsNoteField,
@@ -53,6 +57,7 @@ export const thresholdColorFieldGroup = defineFieldGroup({
 
 export const colorSettingsFieldGroup = defineFieldGroup({
     name: "colorSettings",
+    sectionId: "colors",
     include: context => !usesChannelColorSettings(context),
     fieldList: [
         inspectorFieldCatalog.colorSettingsHeadingField,
@@ -62,6 +67,7 @@ export const colorSettingsFieldGroup = defineFieldGroup({
 
 export const networkChannelColorSettingsFieldGroup = defineFieldGroup({
     name: "networkChannelColorSettings",
+    sectionId: "colors",
     include: isDualNetworkChannelColor,
     fieldList: [
         inspectorFieldCatalog.colorSettingsHeadingField,
@@ -71,6 +77,7 @@ export const networkChannelColorSettingsFieldGroup = defineFieldGroup({
 
 export const networkChannelThresholdFieldGroup = defineFieldGroup({
     name: "networkChannelThreshold",
+    sectionId: "colors",
     include: context => isDualNetworkChannelColor(context) && context.settings.colorMode === "threshold",
     fieldList: [
         inspectorFieldCatalog.lowThresholdField,
@@ -80,6 +87,7 @@ export const networkChannelThresholdFieldGroup = defineFieldGroup({
 
 export const downloadChannelColorHeadingFieldGroup = defineFieldGroup({
     name: "downloadChannelColorHeading",
+    sectionId: "colors",
     include: isDualNetworkChannelColor,
     fieldList: [
         inspectorFieldCatalog.downloadColorHeadingField,
@@ -88,6 +96,7 @@ export const downloadChannelColorHeadingFieldGroup = defineFieldGroup({
 
 export const downloadSolidChannelColorFieldGroup = defineFieldGroup({
     name: "downloadSolidChannelColor",
+    sectionId: "colors",
     include: context => isDualNetworkChannelColor(context) && context.settings.colorMode !== "threshold",
     fieldList: [
         inspectorFieldCatalog.downloadSolidColorField,
@@ -96,6 +105,7 @@ export const downloadSolidChannelColorFieldGroup = defineFieldGroup({
 
 export const downloadDynamicChannelColorFieldGroup = defineFieldGroup({
     name: "downloadDynamicChannelColor",
+    sectionId: "colors",
     include: context => isDualNetworkChannelColor(context) && context.settings.colorMode === "threshold",
     fieldList: [
         inspectorFieldCatalog.downloadLowColorField,
@@ -106,6 +116,7 @@ export const downloadDynamicChannelColorFieldGroup = defineFieldGroup({
 
 export const uploadChannelColorHeadingFieldGroup = defineFieldGroup({
     name: "uploadChannelColorHeading",
+    sectionId: "colors",
     include: isDualNetworkChannelColor,
     fieldList: [
         inspectorFieldCatalog.uploadColorHeadingField,
@@ -114,6 +125,7 @@ export const uploadChannelColorHeadingFieldGroup = defineFieldGroup({
 
 export const uploadSolidChannelColorFieldGroup = defineFieldGroup({
     name: "uploadSolidChannelColor",
+    sectionId: "colors",
     include: context => isDualNetworkChannelColor(context) && context.settings.colorMode !== "threshold",
     fieldList: [
         inspectorFieldCatalog.uploadSolidColorField,
@@ -122,6 +134,7 @@ export const uploadSolidChannelColorFieldGroup = defineFieldGroup({
 
 export const uploadDynamicChannelColorFieldGroup = defineFieldGroup({
     name: "uploadDynamicChannelColor",
+    sectionId: "colors",
     include: context => isDualNetworkChannelColor(context) && context.settings.colorMode === "threshold",
     fieldList: [
         inspectorFieldCatalog.uploadLowColorField,
@@ -132,6 +145,7 @@ export const uploadDynamicChannelColorFieldGroup = defineFieldGroup({
 
 export const diskThroughputChannelColorSettingsFieldGroup = defineFieldGroup({
     name: "diskThroughputChannelColorSettings",
+    sectionId: "colors",
     include: isDualDiskThroughputChannelColor,
     fieldList: [
         inspectorFieldCatalog.colorSettingsHeadingField,
@@ -141,6 +155,7 @@ export const diskThroughputChannelColorSettingsFieldGroup = defineFieldGroup({
 
 export const diskThroughputChannelThresholdFieldGroup = defineFieldGroup({
     name: "diskThroughputChannelThreshold",
+    sectionId: "colors",
     include: context => isDualDiskThroughputChannelColor(context) && context.settings.colorMode === "threshold",
     fieldList: [
         inspectorFieldCatalog.lowThresholdField,
@@ -150,6 +165,7 @@ export const diskThroughputChannelThresholdFieldGroup = defineFieldGroup({
 
 export const diskReadChannelColorHeadingFieldGroup = defineFieldGroup({
     name: "diskReadChannelColorHeading",
+    sectionId: "colors",
     include: isDualDiskThroughputChannelColor,
     fieldList: [
         inspectorFieldCatalog.diskReadColorHeadingField,
@@ -158,6 +174,7 @@ export const diskReadChannelColorHeadingFieldGroup = defineFieldGroup({
 
 export const diskReadSolidChannelColorFieldGroup = defineFieldGroup({
     name: "diskReadSolidChannelColor",
+    sectionId: "colors",
     include: context => isDualDiskThroughputChannelColor(context) && context.settings.colorMode !== "threshold",
     fieldList: [
         inspectorFieldCatalog.diskReadSolidColorField,
@@ -166,6 +183,7 @@ export const diskReadSolidChannelColorFieldGroup = defineFieldGroup({
 
 export const diskReadDynamicChannelColorFieldGroup = defineFieldGroup({
     name: "diskReadDynamicChannelColor",
+    sectionId: "colors",
     include: context => isDualDiskThroughputChannelColor(context) && context.settings.colorMode === "threshold",
     fieldList: [
         inspectorFieldCatalog.diskReadLowColorField,
@@ -176,6 +194,7 @@ export const diskReadDynamicChannelColorFieldGroup = defineFieldGroup({
 
 export const diskWriteChannelColorHeadingFieldGroup = defineFieldGroup({
     name: "diskWriteChannelColorHeading",
+    sectionId: "colors",
     include: isDualDiskThroughputChannelColor,
     fieldList: [
         inspectorFieldCatalog.diskWriteColorHeadingField,
@@ -184,6 +203,7 @@ export const diskWriteChannelColorHeadingFieldGroup = defineFieldGroup({
 
 export const diskWriteSolidChannelColorFieldGroup = defineFieldGroup({
     name: "diskWriteSolidChannelColor",
+    sectionId: "colors",
     include: context => isDualDiskThroughputChannelColor(context) && context.settings.colorMode !== "threshold",
     fieldList: [
         inspectorFieldCatalog.diskWriteSolidColorField,
@@ -192,6 +212,7 @@ export const diskWriteSolidChannelColorFieldGroup = defineFieldGroup({
 
 export const diskWriteDynamicChannelColorFieldGroup = defineFieldGroup({
     name: "diskWriteDynamicChannelColor",
+    sectionId: "colors",
     include: context => isDualDiskThroughputChannelColor(context) && context.settings.colorMode === "threshold",
     fieldList: [
         inspectorFieldCatalog.diskWriteLowColorField,
@@ -202,6 +223,7 @@ export const diskWriteDynamicChannelColorFieldGroup = defineFieldGroup({
 
 export const sparklineAppearanceFieldGroup = defineFieldGroup({
     name: "sparklineAppearance",
+    sectionId: "trend",
     fieldList: [
         inspectorFieldCatalog.visualGuidesHeadingField,
         inspectorFieldCatalog.lineSmoothingField,
@@ -210,6 +232,7 @@ export const sparklineAppearanceFieldGroup = defineFieldGroup({
 
 export const sparklineGridLineFieldGroup = defineFieldGroup({
     name: "sparklineGridLine",
+    sectionId: "trend",
     include: context => !isMirroredNetworkTraffic(context),
     fieldList: [
         inspectorFieldCatalog.gridLineVisibilityField,
@@ -220,6 +243,7 @@ export const sparklineGridLineFieldGroup = defineFieldGroup({
 
 export const mirroredGridLineNoteFieldGroup = defineFieldGroup({
     name: "mirroredGridLineNote",
+    sectionId: "trend",
     include: isMirroredNetworkTraffic,
     fieldList: [
         inspectorFieldCatalog.mirroredGridLineVisibilityField,
@@ -235,6 +259,7 @@ export const colorFieldGroupList = [
 
 export const diskUsageBaseFieldGroup = defineFieldGroup({
     name: "diskUsageBase",
+    sectionId: "metric",
     fieldList: [
         inspectorFieldCatalog.diskMetricKindField,
         inspectorFieldCatalog.diskVolumeField,
@@ -243,6 +268,7 @@ export const diskUsageBaseFieldGroup = defineFieldGroup({
 
 export const diskUsageCircularFieldGroup = defineFieldGroup({
     name: "diskUsageCircular",
+    sectionId: "scale",
     fieldList: [
         inspectorFieldCatalog.diskUsageDisplayModeField,
     ],
@@ -250,6 +276,7 @@ export const diskUsageCircularFieldGroup = defineFieldGroup({
 
 export const diskUsageLinearLabelFieldGroup = defineFieldGroup({
     name: "diskUsageLinearLabel",
+    sectionId: "labels",
     fieldList: [
         inspectorFieldCatalog.diskLinearLabelHeadingField,
         inspectorFieldCatalog.diskLinearLabelField,
@@ -257,11 +284,19 @@ export const diskUsageLinearLabelFieldGroup = defineFieldGroup({
     ],
 });
 
-export const diskThroughputFieldGroup = defineFieldGroup({
-    name: "diskThroughput",
+export const diskThroughputMetricFieldGroup = defineFieldGroup({
+    name: "diskThroughputMetric",
+    sectionId: "metric",
     fieldList: [
         inspectorFieldCatalog.diskMetricKindField,
         inspectorFieldCatalog.diskThroughputDirectionField,
+    ],
+});
+
+export const diskThroughputScaleFieldGroup = defineFieldGroup({
+    name: "diskThroughputScale",
+    sectionId: "scale",
+    fieldList: [
         inspectorFieldCatalog.diskThroughputScaleModeField,
         inspectorFieldCatalog.maximumDiskReadThroughputField,
         inspectorFieldCatalog.maximumDiskWriteThroughputField,
@@ -270,6 +305,7 @@ export const diskThroughputFieldGroup = defineFieldGroup({
 
 export const networkDirectionFieldGroup = defineFieldGroup({
     name: "networkDirection",
+    sectionId: "metric",
     fieldList: [
         inspectorFieldCatalog.networkDirectionField,
     ],
@@ -277,15 +313,24 @@ export const networkDirectionFieldGroup = defineFieldGroup({
 
 export const networkCircularFieldGroup = defineFieldGroup({
     name: "networkCircular",
+    sectionId: "metric",
     fieldList: [
         inspectorFieldCatalog.networkCircleNoteField,
     ],
 });
 
-export const networkEndpointFieldGroup = defineFieldGroup({
-    name: "networkEndpoint",
+export const networkInterfaceFieldGroup = defineFieldGroup({
+    name: "networkInterface",
+    sectionId: "metric",
     fieldList: [
         inspectorFieldCatalog.networkInterfaceField,
+    ],
+});
+
+export const networkScaleFieldGroup = defineFieldGroup({
+    name: "networkScale",
+    sectionId: "scale",
+    fieldList: [
         inspectorFieldCatalog.networkScaleModeField,
         inspectorFieldCatalog.maximumDownloadSpeedField,
         inspectorFieldCatalog.maximumUploadSpeedField,
@@ -295,6 +340,7 @@ export const networkEndpointFieldGroup = defineFieldGroup({
 
 export const networkTrafficDisplayModeFieldGroup = defineFieldGroup({
     name: "networkTrafficDisplayMode",
+    sectionId: "trend",
     include: context => context.settings.networkDirection === "both",
     fieldList: [
         inspectorFieldCatalog.networkTrafficDisplayModeField,
@@ -303,6 +349,7 @@ export const networkTrafficDisplayModeFieldGroup = defineFieldGroup({
 
 export const temperatureUnitFieldGroup = defineFieldGroup({
     name: "temperatureUnit",
+    sectionId: "scale",
     fieldList: [
         inspectorFieldCatalog.temperatureUnitField,
     ],
@@ -310,6 +357,7 @@ export const temperatureUnitFieldGroup = defineFieldGroup({
 
 export const maximumTemperatureFieldGroup = defineFieldGroup({
     name: "maximumTemperature",
+    sectionId: "scale",
     fieldList: [
         inspectorFieldCatalog.maximumTemperatureField,
     ],
@@ -317,6 +365,7 @@ export const maximumTemperatureFieldGroup = defineFieldGroup({
 
 export const maximumGpuPowerFieldGroup = defineFieldGroup({
     name: "maximumGpuPower",
+    sectionId: "scale",
     fieldList: [
         inspectorFieldCatalog.maximumGpuPowerField,
     ],
