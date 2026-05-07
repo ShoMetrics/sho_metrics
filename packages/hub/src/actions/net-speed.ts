@@ -18,6 +18,13 @@ import {
     type NetworkSpeedUnitBase,
 } from "../metrics/network-speed-display";
 import { resolveColor, type ColorConfig } from "../rendering/color-resolver";
+import { buildGlobalChannelColorConfig } from "../settings/global-appearance";
+import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
+import {
+    normalizeActionStoredSettings,
+    resolveActionSettings,
+    serializeActionStoredSettings,
+} from "./action-settings-resolver";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import {
     getNetworkDirectionStatusIcon,
@@ -35,11 +42,18 @@ const log = logger.for("Action:NetSpeed");
 @action({ UUID: "com.ez.sho-metrics.net-speed" })
 export class NetSpeed extends MetricAction {
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
-        return resolveNetSpeedMetricKeys(event.payload.settings as NetworkSpeedSettings);
+        return resolveNetSpeedMetricKeys(resolveActionSettings(
+            event.payload.settings as Record<string, unknown>,
+            "net-speed",
+        ) as NetworkSpeedSettings);
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
-        const settings = event.payload.settings as NetworkSpeedSettings;
+        const settings = resolveActionSettings(
+            event.payload.settings as Record<string, unknown>,
+            "net-speed",
+        ) as NetworkSpeedSettings;
+        const effectiveGraphicType = resolveGraphicType(settings.graphicType);
         const displayDirection = normalizeNetworkDisplayDirection(settings.networkDirection);
         const direction = resolveSingleNetworkDirection(displayDirection);
         const isAutomaticNetworkInterface = !isNonEmptyString(settings.networkInterfaceId);
@@ -51,7 +65,7 @@ export class NetSpeed extends MetricAction {
         publishNetworkInterfaceOptions(event, settings);
         publishNetworkScaleLearning(event, settings, selectedNetworkInterface);
 
-        if (settings.graphicType === "linear") {
+        if (effectiveGraphicType === "linear") {
             this.updateLinearNetworkDisplay({
                 event,
                 settings,
@@ -61,7 +75,7 @@ export class NetSpeed extends MetricAction {
             return;
         }
 
-        if (settings.graphicType === "dashed-line" && displayDirection === "both") {
+        if (effectiveGraphicType === "dashed-line" && displayDirection === "both") {
             this.updateDualNetworkSparklineDisplay({
                 event,
                 settings,
@@ -77,7 +91,7 @@ export class NetSpeed extends MetricAction {
                 settings,
                 selectedNetworkInterface,
                 isAutomaticNetworkInterface,
-                dualGraphicType: settings.graphicType === "text" ? "text" : "circular",
+                dualGraphicType: effectiveGraphicType === "text" ? "text" : "circular",
             });
             return;
         }
@@ -101,13 +115,14 @@ export class NetSpeed extends MetricAction {
         });
 
         const circleStyle = resolveCircleStyle(settings.circleStyle);
-        const shouldRenderGaugeFooter = settings.graphicType === "circular" && circleStyle === "gauge";
+        const shouldRenderGaugeFooter = effectiveGraphicType === "circular" && circleStyle === "gauge";
         const renderedWidgetData = shouldRenderGaugeFooter
             ? { ...widgetData, label: ARC_GAUGE_LABELS.network }
             : widgetData;
 
         setSingleMetricDisplay({
             event,
+            resolvedSettings: settings,
             metricKey: networkMetricKey,
             widgetData: renderedWidgetData,
             centerIconFragment: buildNetworkCenterIconFragment({
@@ -169,6 +184,7 @@ export class NetSpeed extends MetricAction {
 
         setDualMetricDisplay({
             event: options.event,
+            resolvedSettings: options.settings,
             metricKey: `${downloadMetricKey},${uploadMetricKey}`,
             dualGraphicType: options.dualGraphicType,
             widgetData: {
@@ -252,6 +268,7 @@ export class NetSpeed extends MetricAction {
 
         setDualMetricDisplay({
             event: options.event,
+            resolvedSettings: options.settings,
             metricKey: `${downloadMetricKey},${uploadMetricKey}`,
             widgetData: {
                 positive: positiveWidgetData,
@@ -317,6 +334,7 @@ export class NetSpeed extends MetricAction {
 
         setSingleMetricDisplay({
             event: options.event,
+            resolvedSettings: options.settings,
             metricKey: downloadMetricKey,
             widgetData: {
                 current: downloadWidgetData.current,
@@ -512,6 +530,22 @@ function resolveNetworkTrafficDisplayMode(value: SettingValue): "overlay" | "mir
     return value === "overlay" ? "overlay" : "mirrored";
 }
 
+function resolveGraphicType(value: SettingValue): "circular" | "text" | "linear" | "dashed-line" {
+    if (value === "text" || value === "linear" || value === "dashed-line") {
+        return value;
+    }
+
+    return "circular";
+}
+
+function resolveCircleStyle(value: SettingValue): "value" | "compact" | "gauge" {
+    if (value === "compact" || value === "gauge") {
+        return value;
+    }
+
+    return "value";
+}
+
 function getNetworkDirectionLabel(direction: NetworkDirection): string {
     return direction === "download" ? ARC_GAUGE_LABELS.download : ARC_GAUGE_LABELS.upload;
 }
@@ -535,14 +569,6 @@ function buildNetworkCenterIconFragment(options: {
     });
 }
 
-function resolveCircleStyle(value: SettingValue): "value" | "compact" | "gauge" {
-    if (value === "compact" || value === "gauge") {
-        return value;
-    }
-
-    return "value";
-}
-
 function resolveNetworkChannelColor(direction: NetworkDirection, settings: NetworkSpeedSettings): string {
     return resolveColor(0, buildNetworkChannelColorConfig(direction, settings));
 }
@@ -552,6 +578,11 @@ function resolveNetworkWidgetChannelColor(direction: NetworkDirection, settings:
 }
 
 function buildNetworkChannelColorConfig(direction: NetworkDirection, settings: NetworkSpeedSettings): ColorConfig {
+    const globalSettings = pluginGlobalSettingsStore.get();
+    if (globalSettings.overrideWidgetAppearance) {
+        return buildGlobalChannelColorConfig(direction === "download" ? "primary" : "secondary", globalSettings);
+    }
+
     if (direction === "download") {
         return {
             mode: settings.colorMode === "threshold" ? "threshold" : "solid",
@@ -636,10 +667,18 @@ function publishNetworkInterfaceOptions(event: WillAppearEvent, settings: Networ
         return;
     }
 
-    event.action.setSettings({
-        ...settings,
-        availableNetworkInterfaces,
-    }).catch(error => {
+    const storedSettings = normalizeActionStoredSettings(
+        event.payload.settings as Record<string, unknown>,
+        "net-speed",
+    );
+
+    event.action.setSettings(serializeActionStoredSettings({
+        ...storedSettings,
+        runtimeCache: {
+            ...storedSettings.runtimeCache,
+            availableNetworkInterfaces,
+        },
+    })).catch(error => {
         log.error(() => `Failed to publish network interfaces: ${String(error)}`);
     });
 }
@@ -672,18 +711,26 @@ function publishNetworkScaleLearning(
         selectedNetworkInterface,
     });
 
+    const storedSettings = normalizeActionStoredSettings(
+        event.payload.settings as Record<string, unknown>,
+        "net-speed",
+    );
+
     if (
-        settings.maximumDownloadSpeedMbps === nextDownloadMaximum
-        && settings.maximumUploadSpeedMbps === nextUploadMaximum
+        storedSettings.runtimeCache.learnedMaximumDownloadSpeedMbps === nextDownloadMaximum
+        && storedSettings.runtimeCache.learnedMaximumUploadSpeedMbps === nextUploadMaximum
     ) {
         return;
     }
 
-    event.action.setSettings({
-        ...settings,
-        maximumDownloadSpeedMbps: nextDownloadMaximum,
-        maximumUploadSpeedMbps: nextUploadMaximum,
-    }).catch(error => {
+    event.action.setSettings(serializeActionStoredSettings({
+        ...storedSettings,
+        runtimeCache: {
+            ...storedSettings.runtimeCache,
+            learnedMaximumDownloadSpeedMbps: nextDownloadMaximum,
+            learnedMaximumUploadSpeedMbps: nextUploadMaximum,
+        },
+    })).catch(error => {
         log.error(() => `Failed to publish learned network scale: ${String(error)}`);
     });
 }

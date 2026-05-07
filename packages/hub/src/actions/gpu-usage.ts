@@ -3,7 +3,6 @@ import { MetricAction } from "./metric-action";
 import { metricStore } from "../runtime/metric-store";
 import { setSingleMetricDisplay } from "./single-metric-display";
 import type { WidgetData } from "../rendering/widget-data";
-import type { SettingValue } from "./metric-visual-settings";
 import { formatBytes } from "../metrics/byte-display";
 import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-label";
 import { buildGpuPowerWidgetData, resolveMaximumGpuPowerWatts } from "../metrics/gpu-power-display";
@@ -14,6 +13,8 @@ import {
 } from "../metrics/temperature-display";
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
+import { resolveActionSettings } from "./action-settings-resolver";
+import type { ActionKind, FlatWidgetSettings } from "../settings/widget-settings";
 
 /**
  * Base class for GPU-related actions.
@@ -60,10 +61,12 @@ abstract class GpuBaseAction extends MetricAction {
 @action({ UUID: "com.ez.sho-metrics.gpu-usage" })
 export class GpuUsage extends GpuBaseAction {
     protected updateGpuDisplay(event: WillAppearEvent): void {
+        const settings = resolveGpuActionSettings(event, "gpu-usage");
         const data = this.getGpuWidgetData(GPU_USAGE_METRIC_KEY, ARC_GAUGE_LABELS.gpu, "%");
 
         setSingleMetricDisplay({
             event,
+            resolvedSettings: settings,
             metricKey: GPU_USAGE_METRIC_KEY,
             widgetData: {
                 ...buildGpuUsageWidgetData(data),
@@ -79,7 +82,7 @@ export class GpuUsage extends GpuBaseAction {
 @action({ UUID: "com.ez.sho-metrics.gpu-temp" })
 export class GpuTemp extends GpuBaseAction {
     protected updateGpuDisplay(event: WillAppearEvent): void {
-        const settings = event.payload.settings as GpuTemperatureSettings;
+        const settings = resolveGpuActionSettings(event, "gpu-temp") as GpuTemperatureSettings;
         const celsiusWidgetData = this.getGpuWidgetData(GPU_TEMP_METRIC_KEY, ARC_GAUGE_LABELS.gpu, "C");
         const widgetData = buildTemperatureWidgetData({
             celsiusWidgetData,
@@ -89,6 +92,7 @@ export class GpuTemp extends GpuBaseAction {
 
         setSingleMetricDisplay({
             event,
+            resolvedSettings: settings,
             metricKey: GPU_TEMP_METRIC_KEY,
             widgetData,
             ...buildMetricDisplayIcons({ hardware: "gpu", status: "temperature" }),
@@ -99,11 +103,13 @@ export class GpuTemp extends GpuBaseAction {
 @action({ UUID: "com.ez.sho-metrics.gpu-vram" })
 export class GpuVram extends GpuBaseAction {
     protected updateGpuDisplay(event: WillAppearEvent): void {
+        const settings = resolveGpuActionSettings(event, "gpu-vram");
         const used = this.getGpuWidgetData(GPU_VRAM_USED_METRIC_KEY, ARC_GAUGE_LABELS.vram, "MB");
         const total = this.getGpuWidgetData(GPU_VRAM_TOTAL_METRIC_KEY, ARC_GAUGE_LABELS.vram, "MB");
 
         setSingleMetricDisplay({
             event,
+            resolvedSettings: settings,
             metricKey: GPU_VRAM_USED_METRIC_KEY,
             widgetData: buildGpuVramWidgetData(used, total.current),
             ...buildMetricDisplayIcons({ hardware: "gpu", status: "percentage" }),
@@ -114,7 +120,7 @@ export class GpuVram extends GpuBaseAction {
 @action({ UUID: "com.ez.sho-metrics.gpu-power" })
 export class GpuPower extends GpuBaseAction {
     protected updateGpuDisplay(event: WillAppearEvent): void {
-        const settings = event.payload.settings as GpuPowerSettings;
+        const settings = resolveGpuActionSettings(event, "gpu-power") as GpuPowerSettings;
         const powerWidgetData = this.getGpuWidgetData(GPU_POWER_METRIC_KEY, ARC_GAUGE_LABELS.gpu, "W");
         const powerLimitWidgetData = this.getGpuWidgetData(GPU_POWER_LIMIT_METRIC_KEY, ARC_GAUGE_LABELS.gpu, "W");
         const maximumPowerWatts = resolveMaximumGpuPowerWatts({
@@ -124,6 +130,7 @@ export class GpuPower extends GpuBaseAction {
 
         setSingleMetricDisplay({
             event,
+            resolvedSettings: settings,
             metricKey: GPU_POWER_METRIC_KEY,
             widgetData: buildGpuPowerWidgetData({ powerWidgetData, maximumPowerWatts }),
             ...buildMetricDisplayIcons({ hardware: "gpu", status: "power" }),
@@ -149,6 +156,13 @@ const GPU_METRIC_KEYS = [
     GPU_POWER_LIMIT_METRIC_KEY,
 ];
 
+function resolveGpuActionSettings(event: WillAppearEvent, actionKind: ActionKind): FlatWidgetSettings {
+    return resolveActionSettings(
+        event.payload.settings as Record<string, unknown>,
+        actionKind,
+    );
+}
+
 function isFreshGpuWidgetData(widgetData: WidgetData): boolean {
     if (widgetData.sampleTimestampMilliseconds == null) {
         return false;
@@ -169,14 +183,8 @@ export function buildGpuUsageWidgetData(widgetData: WidgetData): WidgetData {
     };
 }
 
-interface GpuTemperatureSettings {
-    maximumTemperatureCelsius?: SettingValue;
-    temperatureUnit?: SettingValue;
-}
-
-interface GpuPowerSettings {
-    maximumGpuPowerWatts?: SettingValue;
-}
+type GpuTemperatureSettings = FlatWidgetSettings;
+type GpuPowerSettings = FlatWidgetSettings;
 
 export function buildGpuVramWidgetData(used: WidgetData, totalMegabytes: number): WidgetData {
     const safeTotalMegabytes = totalMegabytes > 0 ? totalMegabytes : 1;

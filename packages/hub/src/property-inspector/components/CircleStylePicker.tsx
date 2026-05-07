@@ -7,15 +7,17 @@ interface CircleStylePickerProps {
     field: FieldSchema & { key: PropertyInspectorSettingKey };
     context: VisibilityContext;
     onSettingChange: (key: PropertyInspectorSettingKey, value: string) => void;
+    disabled?: boolean;
 }
 
-export function CircleStylePicker({ field, context, onSettingChange }: CircleStylePickerProps): React.JSX.Element {
+export function CircleStylePicker({ field, context, onSettingChange, disabled = false }: CircleStylePickerProps): React.JSX.Element {
     return (
         <PreviewOptionPicker
             field={field}
             context={context}
             onSettingChange={onSettingChange}
             buildPreviewUri={(value) => buildCircleStylePreviewUri(value as CircleStyle)}
+            disabled={disabled}
         />
     );
 }

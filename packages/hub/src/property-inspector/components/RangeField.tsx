@@ -3,9 +3,10 @@ import type { FieldSchema, PropertyInspectorSettingKey, VisibilityContext } from
 interface RangeFieldProps {
     field: FieldSchema & { key: PropertyInspectorSettingKey };
     context: VisibilityContext;
+    disabled?: boolean;
 }
 
-export function RangeField({ field, context }: RangeFieldProps): React.JSX.Element {
+export function RangeField({ field, context, disabled = false }: RangeFieldProps): React.JSX.Element {
     const value = String(context.settings[field.key] ?? field.defaultValue ?? 0);
 
     return (
@@ -18,6 +19,7 @@ export function RangeField({ field, context }: RangeFieldProps): React.JSX.Eleme
                 max={field.maximum ?? 100}
                 step={field.step ?? 1}
                 value={value}
+                disabled={disabled}
                 onChange={() => undefined}
             />
             <span className="range-value">{value}%</span>

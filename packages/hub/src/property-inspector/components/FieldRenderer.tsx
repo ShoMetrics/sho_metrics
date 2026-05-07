@@ -14,9 +14,15 @@ interface FieldRendererProps {
     field: FieldSchema;
     context: VisibilityContext;
     onSettingChange: (key: PropertyInspectorSettingKey, value: string) => void;
+    disabled?: boolean;
 }
 
-export function FieldRenderer({ field, context, onSettingChange }: FieldRendererProps): React.JSX.Element {
+export function FieldRenderer({
+    field,
+    context,
+    onSettingChange,
+    disabled = false,
+}: FieldRendererProps): React.JSX.Element {
     if (field.kind === "heading") {
         return <SectionHeading text={field.text ?? ""} />;
     }
@@ -43,9 +49,11 @@ export function FieldRenderer({ field, context, onSettingChange }: FieldRenderer
         return <sdpi-item />;
     }
 
+    const keyedField = field as FieldSchema & { key: PropertyInspectorSettingKey };
+
     return (
         <sdpi-item label={field.label ?? ""}>
-            {renderFieldControl(field as FieldSchema & { key: PropertyInspectorSettingKey }, context, onSettingChange)}
+            {renderFieldControl(keyedField, context, onSettingChange, disabled)}
         </sdpi-item>
     );
 }
@@ -54,24 +62,25 @@ function renderFieldControl(
     field: FieldSchema & { key: PropertyInspectorSettingKey },
     context: VisibilityContext,
     onSettingChange: (key: PropertyInspectorSettingKey, value: string) => void,
+    disabled: boolean,
 ): React.JSX.Element {
     switch (field.kind) {
         case "select":
-            return <SelectField field={field} context={context} />;
+            return <SelectField field={field} context={context} disabled={disabled} />;
         case "graphic-type-picker":
-            return <GraphicTypePicker field={field} context={context} onSettingChange={onSettingChange} />;
+            return <GraphicTypePicker field={field} context={context} onSettingChange={onSettingChange} disabled={disabled} />;
         case "circle-style-picker":
-            return <CircleStylePicker field={field} context={context} onSettingChange={onSettingChange} />;
+            return <CircleStylePicker field={field} context={context} onSettingChange={onSettingChange} disabled={disabled} />;
         case "color":
-            return <ColorField field={field} context={context} />;
+            return <ColorField field={field} context={context} disabled={disabled} />;
         case "number":
-            return <NumberField field={field} context={context} />;
+            return <NumberField field={field} context={context} disabled={disabled} />;
         case "text":
-            return <TextField field={field} context={context} onSettingChange={onSettingChange} />;
+            return <TextField field={field} context={context} onSettingChange={onSettingChange} disabled={disabled} />;
         case "range":
-            return <RangeField field={field} context={context} />;
+            return <RangeField field={field} context={context} disabled={disabled} />;
         case "color-band":
-            return <ColorBandField field={field} context={context} />;
+            return <ColorBandField field={field} context={context} disabled={disabled} />;
         case "heading":
         case "note":
         case "readonly":

@@ -3,16 +3,24 @@ import type { FieldSchema, PropertyInspectorSettingKey, VisibilityContext } from
 interface ColorBandFieldProps {
     field: FieldSchema & { key: PropertyInspectorSettingKey };
     context: VisibilityContext;
+    disabled?: boolean;
 }
 
-export function ColorBandField({ field, context }: ColorBandFieldProps): React.JSX.Element {
+export function ColorBandField({ field, context, disabled = false }: ColorBandFieldProps): React.JSX.Element {
     const value = String(context.settings[field.key]);
 
     return (
         <div className="color-band-control">
             <label className="usage-range" style={{ backgroundColor: value }}>
                 <span>{resolveColorBandText(field.key, context)}</span>
-                <input id={field.id} type="color" data-setting-key={field.key} value={value} onChange={() => undefined} />
+                <input
+                    id={field.id}
+                    type="color"
+                    data-setting-key={field.key}
+                    value={value}
+                    disabled={disabled}
+                    onChange={() => undefined}
+                />
             </label>
         </div>
     );

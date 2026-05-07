@@ -4,9 +4,10 @@ import type { FieldSchema, PropertyInspectorSettingKey, VisibilityContext } from
 interface NumberFieldProps {
     field: FieldSchema & { key: PropertyInspectorSettingKey };
     context: VisibilityContext;
+    disabled?: boolean;
 }
 
-export function NumberField({ field, context }: NumberFieldProps): React.JSX.Element {
+export function NumberField({ field, context, disabled = false }: NumberFieldProps): React.JSX.Element {
     return (
         <input
             id={field.id}
@@ -16,7 +17,7 @@ export function NumberField({ field, context }: NumberFieldProps): React.JSX.Ele
             min={field.minimum}
             step={field.step}
             value={String(context.settings[field.key] ?? "")}
-            disabled={isFieldDisabled(field, context)}
+            disabled={disabled || isFieldDisabled(field, context)}
             onChange={() => undefined}
         />
     );

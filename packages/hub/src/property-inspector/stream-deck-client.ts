@@ -1,22 +1,33 @@
-import type { SettingValue } from "./settings";
-
 export interface StreamDeckPropertyInspectorClient {
     didReceiveSettings: {
         subscribe(callback: (event: DidReceiveSettingsEvent) => void): void;
     };
+    didReceiveGlobalSettings: {
+        subscribe(callback: (event: DidReceiveGlobalSettingsEvent) => void): void;
+    };
     getConnectionInfo(): Promise<ConnectionInfo>;
     getSettings(): Promise<GetSettingsPayload>;
-    setSettings(settings: Record<string, SettingValue>): Promise<void>;
+    getGlobalSettings(): Promise<GetSettingsPayload>;
+    setSettings(settings: SettingsRecord): Promise<void>;
+    setGlobalSettings(settings: SettingsRecord): Promise<void>;
 }
+
+export type SettingsRecord = Record<string, unknown>;
 
 export interface DidReceiveSettingsEvent {
     payload: {
-        settings: Record<string, SettingValue>;
+        settings: SettingsRecord;
     };
 }
 
 export interface GetSettingsPayload {
-    settings: Record<string, SettingValue>;
+    settings: SettingsRecord;
+}
+
+export interface DidReceiveGlobalSettingsEvent {
+    payload: {
+        settings: SettingsRecord;
+    };
 }
 
 export interface ConnectionInfo {

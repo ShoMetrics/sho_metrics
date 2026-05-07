@@ -4,9 +4,10 @@ import type { FieldSchema, PropertyInspectorSettingKey, VisibilityContext } from
 interface SelectFieldProps {
     field: FieldSchema & { key: PropertyInspectorSettingKey };
     context: VisibilityContext;
+    disabled?: boolean;
 }
 
-export function SelectField({ field, context }: SelectFieldProps): React.JSX.Element {
+export function SelectField({ field, context, disabled = false }: SelectFieldProps): React.JSX.Element {
     const options = resolveSelectOptions(field, context);
     const selectedValue = resolveSelectedOptionValue({
         context,
@@ -21,7 +22,7 @@ export function SelectField({ field, context }: SelectFieldProps): React.JSX.Ele
             className="native-select"
             data-setting-key={field.key}
             value={selectedValue}
-            disabled={isFieldDisabled(field, context)}
+            disabled={disabled || isFieldDisabled(field, context)}
             onChange={() => undefined}
         >
             {options.map((fieldOption) => (
