@@ -38,9 +38,11 @@
 			"Encoder": {
 				"layout": "$B1"
 			},
+			"UserTitleEnabled": false,
 			"States": [
 				{
 					"Image": "imgs/actions/counter/key",
+					"ShowTitle": false,
 					"TitleAlignment": "middle"
 				}
 			]
@@ -168,9 +170,11 @@
 			"Encoder": {
 				"layout": "$B1"
 			},
+			"UserTitleEnabled": false,
 			"States": [
 				{
 					"Image": "imgs/actions/counter/key",
+					"ShowTitle": false,
 					"TitleAlignment": "middle"
 				}
 			]
