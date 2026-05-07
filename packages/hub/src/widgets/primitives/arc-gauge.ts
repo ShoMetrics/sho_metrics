@@ -3,6 +3,7 @@ import { resolveColor } from "../../rendering/color-resolver";
 import {
     clamp,
     renderConstrainedSvgText,
+    type SvgTextAnchor,
 } from "../../rendering/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget.interface";
 import { assertArcGaugeLabel } from "./arc-gauge-label";
@@ -74,12 +75,41 @@ const ARC_LAYOUT = {
     statusIconGapWidthRatio: 5,
     statusIconDefaultSizeRatio: 2.35,
     statusIconDefaultOpticalYOffsetRatio: 0.24,
-    gaugeGapAngleDegrees: 86,
+    gaugeGapAngleDegrees: 92,
     gaugeMarkerRadiusRatio: 0.78,
     gaugeMarkerGapPaddingRatio: 0.22,
     gaugeMarkerGapScale: 1.5,
-    gaugeFooterIconScale: 0.42,
-    gaugeFooterIconYOffset: 42,
+    gaugeValueYOffset: 2,
+    gaugeValueRow: {
+        shortUnitValueEndXOffset: 20,
+        shortUnitStartXOffset: 25,
+        shortUnitTwoDigitOpticalXOffset: -6,
+        shortUnitValueMaxWidth: 74,
+        shortUnitMaxWidth: 28,
+        shortUnitDigitFontSizes: {
+            one: 48,
+            two: 48,
+            three: 31,
+            many: 21,
+        },
+        longUnitValueEndXOffset: 2,
+        longUnitStartXOffset: 13,
+        longUnitFontSize: 13,
+        longUnitValueMaxWidth: 52,
+        longUnitMaxWidth: 46,
+        longUnitDigitFontSizes: {
+            one: 43,
+            two: 37,
+            three: 25,
+            many: 21,
+        },
+    },
+    gaugeBottomLabel: {
+        fontSize: 20,
+        yOffset: 45,
+        iconScale: 0.54,
+        iconGap: 5,
+    },
     placeholderValueScale: 0.68,
     value: {
         fontSize: 48,
@@ -96,6 +126,7 @@ const ARC_LAYOUT = {
 } as const;
 
 const ARC_TEXT_FONT_FAMILY = "'Inter','SF Pro Display','Segoe UI',sans-serif";
+const GAUGE_INLINE_ICON_ASSUMED_SIZE = 30;
 
 interface StatusNotchGeometry {
     gapLength: number;
@@ -240,18 +271,7 @@ function renderCenterContent(options: {
     }
 
     if (options.circleStyle === "gauge") {
-        return `
-            ${renderCenterValue({
-                ...options,
-                footerIconFragment: undefined,
-            })}
-            ${renderGaugeFooterIcon({
-                iconFragment: options.footerIconFragment ?? options.centerIconFragment,
-                centerXCoordinate: options.centerXCoordinate,
-                centerYCoordinate: options.centerYCoordinate,
-                shouldScaleFallbackIcon: !options.footerIconFragment,
-            })}
-        `;
+        return renderGaugeValueContent(options);
     }
 
     return renderCenterValue({
@@ -421,19 +441,238 @@ function renderCenterIcon(
     return `<g transform="translate(${centerXCoordinate} ${centerYCoordinate})">${centerIconFragment}</g>`;
 }
 
-function renderGaugeFooterIcon(options: {
+function renderGaugeInlineIcon(options: {
     iconFragment: string | undefined;
-    centerXCoordinate: number;
-    centerYCoordinate: number;
-    shouldScaleFallbackIcon: boolean;
+    xCoordinate: number;
+    yCoordinate: number;
 }): string {
     if (!options.iconFragment) {
         return "";
     }
 
-    const scale = options.shouldScaleFallbackIcon ? ARC_LAYOUT.gaugeFooterIconScale : 1;
+    return `<g transform="translate(${formatSvgNumber(options.xCoordinate)} ${formatSvgNumber(options.yCoordinate)}) scale(${formatSvgNumber(ARC_LAYOUT.gaugeBottomLabel.iconScale)})">${options.iconFragment}</g>`;
+}
 
-    return `<g transform="translate(${formatSvgNumber(options.centerXCoordinate)} ${formatSvgNumber(options.centerYCoordinate + ARC_LAYOUT.gaugeFooterIconYOffset)}) scale(${formatSvgNumber(scale)})">${options.iconFragment}</g>`;
+function renderGaugeValueContent(options: {
+    centerXCoordinate: number;
+    centerYCoordinate: number;
+    labelText: string;
+    labelMaxWidth: number;
+    valueFontSize: number;
+    valueText: string;
+    unitFontSize: number;
+    unitText: string;
+    centerTextMaxWidth: number;
+    footerIconFragment: string | undefined;
+    config: ArcGaugeConfig;
+}): string {
+    assertArcGaugeLabel(options.labelText);
+    const bottomLabelYCoordinate = options.centerYCoordinate + ARC_LAYOUT.gaugeBottomLabel.yOffset;
+
+    return `
+        ${renderGaugeValueRow(options)}
+        ${renderGaugeBottomLabel({
+            labelText: options.labelText,
+            iconFragment: options.footerIconFragment,
+            centerXCoordinate: options.centerXCoordinate,
+            yCoordinate: bottomLabelYCoordinate,
+            maxWidth: options.labelMaxWidth,
+            config: options.config,
+        })}
+    `;
+}
+
+function renderGaugeValueRow(options: {
+    centerXCoordinate: number;
+    centerYCoordinate: number;
+    valueFontSize: number;
+    valueText: string;
+    unitFontSize: number;
+    unitText: string;
+    centerTextMaxWidth: number;
+    config: ArcGaugeConfig;
+}): string {
+    const yCoordinate = options.centerYCoordinate + ARC_LAYOUT.gaugeValueYOffset;
+
+    if (options.unitText.length === 0) {
+        return renderConstrainedSvgText({
+            id: "arc-gauge-value",
+            text: options.valueText,
+            xCoordinate: options.centerXCoordinate,
+            yCoordinate,
+            maxWidth: options.centerTextMaxWidth,
+            fontSize: options.valueFontSize,
+            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontWeight: 900,
+            fill: options.config.valueTextColor,
+            textAnchor: "middle",
+            extraAttributes: ["font-variant-numeric=\"tabular-nums\""],
+        });
+    }
+
+    const unitLength = Array.from(options.unitText.trim()).length;
+    const isShortUnit = unitLength === 1;
+    const layout = ARC_LAYOUT.gaugeValueRow;
+    const valuePlacement = resolveGaugeValuePlacement({
+        centerXCoordinate: options.centerXCoordinate,
+        isShortUnit,
+        valueText: options.valueText,
+        fallbackFontSize: options.valueFontSize,
+    });
+    const unitXCoordinate = options.centerXCoordinate + (
+        isShortUnit ? layout.shortUnitStartXOffset : layout.longUnitStartXOffset
+    );
+    const unitFontSize = isShortUnit ? options.unitFontSize : layout.longUnitFontSize;
+
+    return `
+        ${renderConstrainedSvgText({
+            id: "arc-gauge-value",
+            text: options.valueText,
+            xCoordinate: valuePlacement.xCoordinate,
+            yCoordinate,
+            maxWidth: valuePlacement.maxWidth,
+            fontSize: valuePlacement.fontSize,
+            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontWeight: 900,
+            fill: options.config.valueTextColor,
+            textAnchor: valuePlacement.textAnchor,
+            extraAttributes: ["font-variant-numeric=\"tabular-nums\""],
+        })}
+        ${renderConstrainedSvgText({
+            id: "arc-gauge-unit",
+            text: options.unitText,
+            xCoordinate: unitXCoordinate,
+            yCoordinate,
+            maxWidth: isShortUnit ? layout.shortUnitMaxWidth : layout.longUnitMaxWidth,
+            fontSize: unitFontSize,
+            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontWeight: 800,
+            fill: options.config.unitTextColor,
+            textAnchor: "start",
+        })}
+    `;
+}
+
+function resolveGaugeValuePlacement(options: {
+    centerXCoordinate: number;
+    isShortUnit: boolean;
+    valueText: string;
+    fallbackFontSize: number;
+}): {
+    xCoordinate: number;
+    maxWidth: number;
+    fontSize: number;
+    textAnchor: SvgTextAnchor;
+} {
+    const layout = ARC_LAYOUT.gaugeValueRow;
+    const digitCount = countDigits(options.valueText);
+
+    if (options.isShortUnit && digitCount <= 2) {
+        const opticalXOffset = digitCount === 2
+            ? layout.shortUnitTwoDigitOpticalXOffset
+            : 0;
+
+        return {
+            xCoordinate: options.centerXCoordinate + opticalXOffset,
+            maxWidth: layout.shortUnitValueMaxWidth,
+            fontSize: resolveGaugeValueFontSize({
+                digitCount,
+                fallbackFontSize: options.fallbackFontSize,
+                digitFontSizes: layout.shortUnitDigitFontSizes,
+            }),
+            textAnchor: "middle",
+        };
+    }
+
+    const xOffset = options.isShortUnit
+        ? layout.shortUnitValueEndXOffset
+        : layout.longUnitValueEndXOffset;
+
+    return {
+        xCoordinate: options.centerXCoordinate + xOffset,
+        maxWidth: options.isShortUnit ? layout.shortUnitValueMaxWidth : layout.longUnitValueMaxWidth,
+        fontSize: resolveGaugeValueFontSize({
+            digitCount,
+            fallbackFontSize: options.fallbackFontSize,
+            digitFontSizes: options.isShortUnit
+                ? layout.shortUnitDigitFontSizes
+                : layout.longUnitDigitFontSizes,
+        }),
+        textAnchor: "end",
+    };
+}
+
+function resolveGaugeValueFontSize(options: {
+    digitCount: number;
+    fallbackFontSize: number;
+    digitFontSizes: {
+        one: number;
+        two: number;
+        three: number;
+        many: number;
+    };
+}): number {
+    if (options.digitCount === 0) {
+        return options.fallbackFontSize;
+    }
+
+    if (options.digitCount <= 1) {
+        return options.digitFontSizes.one;
+    }
+
+    if (options.digitCount === 2) {
+        return options.digitFontSizes.two;
+    }
+
+    if (options.digitCount === 3) {
+        return options.digitFontSizes.three;
+    }
+
+    return options.digitFontSizes.many;
+}
+
+function countDigits(value: string): number {
+    return Array.from(value).filter(character => /\d/u.test(character)).length;
+}
+
+function renderGaugeBottomLabel(options: {
+    labelText: string;
+    iconFragment: string | undefined;
+    centerXCoordinate: number;
+    yCoordinate: number;
+    maxWidth: number;
+    config: ArcGaugeConfig;
+}): string {
+    const fontSize = ARC_LAYOUT.gaugeBottomLabel.fontSize;
+    const estimatedLabelWidth = Math.min(options.maxWidth, options.labelText.length * fontSize * 0.62);
+    const iconSize = options.iconFragment
+        ? GAUGE_INLINE_ICON_ASSUMED_SIZE * ARC_LAYOUT.gaugeBottomLabel.iconScale
+        : 0;
+    const iconGap = options.iconFragment ? ARC_LAYOUT.gaugeBottomLabel.iconGap : 0;
+    const labelXCoordinate = options.iconFragment
+        ? options.centerXCoordinate - (iconSize + iconGap) / 2
+        : options.centerXCoordinate;
+    const iconXCoordinate = labelXCoordinate + estimatedLabelWidth / 2 + iconGap + iconSize / 2;
+
+    return `
+        ${renderConstrainedSvgText({
+            id: "arc-gauge-bottom-label",
+            text: options.labelText,
+            xCoordinate: labelXCoordinate,
+            yCoordinate: options.yCoordinate,
+            maxWidth: Math.max(12, options.maxWidth - iconSize - iconGap),
+            fontSize,
+            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontWeight: 850,
+            fill: options.config.labelTextColor,
+            textAnchor: "middle",
+        })}
+        ${renderGaugeInlineIcon({
+            iconFragment: options.iconFragment,
+            xCoordinate: iconXCoordinate,
+            yCoordinate: options.yCoordinate,
+        })}
+    `;
 }
 
 function renderCenterValue(options: {

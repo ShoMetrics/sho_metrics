@@ -71,6 +71,66 @@ test("gauge circle style opens the bottom arc and renders a marker dot", () => {
     assert.doesNotMatch(svgFragment, /stroke-dasharray="284\.[0-9]+ 89\.[0-9]+"/);
 });
 
+test("gauge circle style puts the label and direction icon at the bottom", () => {
+    const svgFragment = arcGauge.render({
+        ...buildWidgetData(),
+        label: "NET",
+    }, {
+        ...DEFAULT_ARC_GAUGE_CONFIG,
+        circleStyle: "gauge",
+        footerIconFragment: "<path id=\"direction-icon\" />",
+    }, keySize);
+
+    assert.match(svgFragment, /arc-gauge-bottom-label/);
+    assert.match(svgFragment, /NET/);
+    assert.match(svgFragment, /direction-icon/);
+    assert.doesNotMatch(svgFragment, /id="arc-label"/);
+});
+
+test("gauge circle style keeps value and unit in fixed regions", () => {
+    const singleDigitFragment = renderGaugeValueSample("3", "KB/s");
+    const doubleDigitFragment = renderGaugeValueSample("70", "KB/s");
+    const tripleDigitFragment = renderGaugeValueSample("552", "KB/s");
+    const shortUnitSingleDigitFragment = renderGaugeValueSample("3", "%");
+    const shortUnitDoubleDigitFragment = renderGaugeValueSample("38", "%");
+    const shortUnitTripleDigitFragment = renderGaugeValueSample("301", "W");
+    const longUnitManyDigitFragment = renderGaugeValueSample("1234", "ms");
+
+    assert.match(singleDigitFragment, /id="arc-gauge-value"/);
+    assert.match(singleDigitFragment, /id="arc-gauge-unit"/);
+    assert.match(singleDigitFragment, /x="74"/);
+    assert.match(singleDigitFragment, /x="85"/);
+    assert.match(singleDigitFragment, /font-size="43"/);
+    assert.match(singleDigitFragment, /font-size="13"/);
+    assert.match(doubleDigitFragment, /x="74"/);
+    assert.match(doubleDigitFragment, /x="85"/);
+    assert.match(doubleDigitFragment, /font-size="37"/);
+    assert.match(doubleDigitFragment, /font-size="13"/);
+    assert.match(tripleDigitFragment, /x="74"/);
+    assert.match(tripleDigitFragment, /x="85"/);
+    assert.match(tripleDigitFragment, /font-size="25"/);
+    assert.match(tripleDigitFragment, /font-size="13"/);
+    assert.match(shortUnitSingleDigitFragment, /x="72"/);
+    assert.match(shortUnitSingleDigitFragment, /x="97"/);
+    assert.match(shortUnitSingleDigitFragment, /font-size="48"/);
+    assert.match(shortUnitDoubleDigitFragment, /x="66"/);
+    assert.match(shortUnitDoubleDigitFragment, /x="97"/);
+    assert.match(shortUnitDoubleDigitFragment, /font-size="48"/);
+    assert.match(shortUnitTripleDigitFragment, /x="92"/);
+    assert.match(shortUnitTripleDigitFragment, /x="97"/);
+    assert.match(shortUnitTripleDigitFragment, /font-size="31"/);
+    assert.match(longUnitManyDigitFragment, /x="74"/);
+    assert.match(longUnitManyDigitFragment, /x="85"/);
+    assert.match(longUnitManyDigitFragment, /font-size="21"/);
+    assert.doesNotMatch(singleDigitFragment, /arc-gauge-value-unit/);
+    assert.doesNotMatch(singleDigitFragment, /textLength=/);
+    assert.doesNotMatch(doubleDigitFragment, /textLength=/);
+    assert.doesNotMatch(tripleDigitFragment, /textLength=/);
+    assert.doesNotMatch(shortUnitSingleDigitFragment, /textLength=/);
+    assert.doesNotMatch(shortUnitDoubleDigitFragment, /textLength=/);
+    assert.doesNotMatch(shortUnitTripleDigitFragment, /textLength=/);
+});
+
 test("gauge circle style uses semantic range bands for dynamic colors", () => {
     const svgFragment = arcGauge.render({
         ...buildWidgetData(),
@@ -141,7 +201,8 @@ test("gauge circle style keeps the range track uncolored while data is unavailab
     }, keySize);
 
     assert.doesNotMatch(svgFragment, /arc-gauge-marker/);
-    assert.equal(svgFragment.match(/stroke-dasharray="284\.[0-9]+ 89\.[0-9]+"/g)?.length, 1);
+    assert.doesNotMatch(svgFragment, /arc-gauge-range-segment/);
+    assert.match(svgFragment, /stroke-dasharray="/);
 });
 
 test("linear bar renders at most two channel bars", () => {
@@ -244,6 +305,17 @@ function buildWidgetData(): WidgetData {
         label: "CPU",
         displayValue: "42",
     };
+}
+
+function renderGaugeValueSample(displayValue: string, unit: string): string {
+    return arcGauge.render({
+        ...buildWidgetData(),
+        displayValue,
+        unit,
+    }, {
+        ...DEFAULT_ARC_GAUGE_CONFIG,
+        circleStyle: "gauge",
+    }, keySize);
 }
 
 function buildLinearChannel(label: string, displayValue: string): NonNullable<WidgetData["linearChannels"]>[number] {
