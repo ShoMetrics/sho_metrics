@@ -24,6 +24,7 @@ import {
     normalizeActionStoredSettings,
     serializeActionStoredSettings,
 } from "./action-settings-resolver";
+import type { ResolvedWidgetSettings } from "../settings/widget-settings";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import {
     getNetworkDirectionStatusIcon,
@@ -43,21 +44,26 @@ export class NetSpeed extends MetricAction {
     protected readonly actionKind = "net-speed";
 
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
-        return resolveNetSpeedMetricKeys(this.resolveSettings(event) as NetworkSpeedSettings);
+        const settings = this.resolveSettings(event);
+        return resolveNetSpeedMetricKeys({
+            graphicType: settings.appearance.graphicType,
+            networkDirection: settings.metric.networkDirection,
+            networkInterfaceId: settings.metric.networkInterfaceId,
+        });
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
-        const settings = this.resolveSettings(event) as NetworkSpeedSettings;
-        const effectiveGraphicType = resolveGraphicType(settings.graphicType);
-        const displayDirection = normalizeNetworkDisplayDirection(settings.networkDirection);
+        const settings = this.resolveSettings(event);
+        const effectiveGraphicType = resolveGraphicType(settings.appearance.graphicType);
+        const displayDirection = normalizeNetworkDisplayDirection(settings.metric.networkDirection);
         const direction = resolveSingleNetworkDirection(displayDirection);
-        const isAutomaticNetworkInterface = !isNonEmptyString(settings.networkInterfaceId);
-        const selectedNetworkInterface = resolveNetworkInterface(settings.networkInterfaceId);
+        const isAutomaticNetworkInterface = !isNonEmptyString(settings.metric.networkInterfaceId);
+        const selectedNetworkInterface = resolveNetworkInterface(settings.metric.networkInterfaceId);
         const networkMetricKey = selectedNetworkInterface
             ? getNetworkInterfaceMetricKey(direction, selectedNetworkInterface.id)
             : getNetworkAggregateMetricKey(direction);
 
-        publishNetworkInterfaceOptions(event, settings);
+        publishNetworkInterfaceOptions(event);
         publishNetworkScaleLearning(event, settings, selectedNetworkInterface);
 
         if (effectiveGraphicType === "linear") {
@@ -109,7 +115,7 @@ export class NetSpeed extends MetricAction {
             widgetData,
         });
 
-        const circleStyle = resolveCircleStyle(settings.circleStyle);
+        const circleStyle = resolveCircleStyle(settings.appearance.circleStyle);
         const shouldRenderGaugeFooter = effectiveGraphicType === "circular" && circleStyle === "gauge";
         const renderedWidgetData = shouldRenderGaugeFooter
             ? { ...widgetData, label: ARC_GAUGE_LABELS.network }
@@ -117,7 +123,7 @@ export class NetSpeed extends MetricAction {
 
         setSingleMetricDisplay({
             event,
-            resolvedSettings: settings,
+            resolvedSettings: settings.appearance,
             metricKey: networkMetricKey,
             widgetData: renderedWidgetData,
             centerIconFragment: buildNetworkCenterIconFragment({
@@ -138,8 +144,8 @@ export class NetSpeed extends MetricAction {
             }),
             circleStyleOverride: circleStyle,
             visualSettingsOverride: {
-                colorMode: settings.colorMode ?? "solid",
-                solidColor: settings.solidColor ?? resolveNetworkChannelColor(direction, settings),
+                colorMode: settings.appearance.colorMode,
+                solidColor: settings.appearance.solidColor || resolveNetworkChannelColor(direction, settings),
             },
         });
     }
@@ -175,11 +181,11 @@ export class NetSpeed extends MetricAction {
         const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
         const uploadColorConfig = buildNetworkChannelColorConfig("upload", options.settings);
         const downloadColorConfig = buildNetworkChannelColorConfig("download", options.settings);
-        const circleStyle = resolveCircleStyle(options.settings.circleStyle);
+        const circleStyle = resolveCircleStyle(options.settings.appearance.circleStyle);
 
         setDualMetricDisplay({
             event: options.event,
-            resolvedSettings: options.settings,
+            resolvedSettings: options.settings.appearance,
             metricKey: `${downloadMetricKey},${uploadMetricKey}`,
             dualGraphicType: options.dualGraphicType,
             widgetData: {
@@ -253,7 +259,7 @@ export class NetSpeed extends MetricAction {
         });
         const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData);
         const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
-        const trafficDisplayMode = resolveNetworkTrafficDisplayMode(options.settings.networkTrafficDisplayMode);
+        const trafficDisplayMode = resolveNetworkTrafficDisplayMode(options.settings.local.networkTrafficDisplayMode);
         const positiveDirection = trafficDisplayMode === "mirrored" ? "upload" : "download";
         const negativeDirection = trafficDisplayMode === "mirrored" ? "download" : "upload";
         const positiveWidgetData = trafficDisplayMode === "mirrored" ? uploadWidgetData : downloadWidgetData;
@@ -263,7 +269,7 @@ export class NetSpeed extends MetricAction {
 
         setDualMetricDisplay({
             event: options.event,
-            resolvedSettings: options.settings,
+            resolvedSettings: options.settings.appearance,
             metricKey: `${downloadMetricKey},${uploadMetricKey}`,
             widgetData: {
                 positive: positiveWidgetData,
@@ -329,7 +335,7 @@ export class NetSpeed extends MetricAction {
 
         setSingleMetricDisplay({
             event: options.event,
-            resolvedSettings: options.settings,
+            resolvedSettings: options.settings.appearance,
             metricKey: downloadMetricKey,
             widgetData: {
                 current: downloadWidgetData.current,
@@ -401,8 +407,8 @@ export class NetSpeed extends MetricAction {
             `metricKey=${options.networkMetricKey}`,
             `selectedInterface=${formatNetworkInterfaceDebugValue(options.selectedNetworkInterface)}`,
             `automaticInterface=${options.isAutomaticNetworkInterface}`,
-            `downloadMaxMbps=${String(options.settings.maximumDownloadSpeedMbps ?? "")}`,
-            `uploadMaxMbps=${String(options.settings.maximumUploadSpeedMbps ?? "")}`,
+            `downloadMaxMbps=${String(options.settings.network.maximumDownloadSpeedMbps ?? "")}`,
+            `uploadMaxMbps=${String(options.settings.network.maximumUploadSpeedMbps ?? "")}`,
             `resolvedMaxBytesPerSecond=${resolveMaximumBytesPerSecond({
                 direction: options.direction,
                 settings: options.settings,
@@ -417,30 +423,7 @@ export class NetSpeed extends MetricAction {
     }
 }
 
-export interface NetworkSpeedSettings {
-    graphicType?: SettingValue;
-    circleStyle?: SettingValue;
-    networkDirection?: SettingValue;
-    networkInterfaceId?: SettingValue;
-    availableNetworkInterfaces?: SettingValue;
-    networkScaleMode?: SettingValue;
-    maximumDownloadSpeedMbps?: SettingValue;
-    maximumUploadSpeedMbps?: SettingValue;
-    networkUnitBase?: SettingValue;
-    networkTrafficDisplayMode?: SettingValue;
-    downloadSolidColor?: SettingValue;
-    downloadColorLow?: SettingValue;
-    downloadColorMedium?: SettingValue;
-    downloadColorHigh?: SettingValue;
-    uploadSolidColor?: SettingValue;
-    uploadColorLow?: SettingValue;
-    uploadColorMedium?: SettingValue;
-    uploadColorHigh?: SettingValue;
-    lowThreshold?: SettingValue;
-    highThreshold?: SettingValue;
-    colorMode?: SettingValue;
-    solidColor?: SettingValue;
-}
+type NetworkSpeedSettings = ResolvedWidgetSettings;
 
 const DEFAULT_DOWNLOAD_COLOR = "#3b82f6";
 const DEFAULT_UPLOAD_COLOR = "#ef4444";
@@ -478,7 +461,7 @@ function buildNetworkWidgetData(options: {
             isAutomaticNetworkInterface: options.isAutomaticNetworkInterface,
         }),
         label: getNetworkDirectionLabel(options.direction),
-        unitBase: resolveUnitBase(options.settings.networkUnitBase),
+        unitBase: resolveUnitBase(options.settings.network.networkUnitBase),
         maximumDisplayDigits: NETWORK_SPEED_MAXIMUM_DISPLAY_DIGITS,
         sampleTimestampMilliseconds: options.rawWidgetData.sampleTimestampMilliseconds,
     });
@@ -501,8 +484,8 @@ function resolveMaximumMegabitsPerSecond(options: {
 }): number {
     const customMaximumMegabitsPerSecond = Number(
         options.direction === "download"
-            ? options.settings.maximumDownloadSpeedMbps
-            : options.settings.maximumUploadSpeedMbps,
+            ? options.settings.network.maximumDownloadSpeedMbps
+            : options.settings.network.maximumUploadSpeedMbps,
     );
 
     if (
@@ -580,25 +563,25 @@ function buildNetworkChannelColorConfig(direction: NetworkDirection, settings: N
 
     if (direction === "download") {
         return {
-            mode: settings.colorMode === "threshold" ? "threshold" : "solid",
-            solidColor: resolveHexColor(settings.downloadSolidColor, DEFAULT_DOWNLOAD_COLOR),
+            mode: settings.appearance.colorMode === "threshold" ? "threshold" : "solid",
+            solidColor: resolveHexColor(settings.appearance.downloadSolidColor, DEFAULT_DOWNLOAD_COLOR),
             thresholds: buildChannelThresholds({
                 settings,
-                lowColor: resolveHexColor(settings.downloadColorLow, "#22c55e"),
-                mediumColor: resolveHexColor(settings.downloadColorMedium, DEFAULT_DOWNLOAD_COLOR),
-                highColor: resolveHexColor(settings.downloadColorHigh, "#60a5fa"),
+                lowColor: resolveHexColor(settings.appearance.downloadColorLow, "#22c55e"),
+                mediumColor: resolveHexColor(settings.appearance.downloadColorMedium, DEFAULT_DOWNLOAD_COLOR),
+                highColor: resolveHexColor(settings.appearance.downloadColorHigh, "#60a5fa"),
             }),
         };
     }
 
     return {
-        mode: settings.colorMode === "threshold" ? "threshold" : "solid",
-        solidColor: resolveHexColor(settings.uploadSolidColor, DEFAULT_UPLOAD_COLOR),
+        mode: settings.appearance.colorMode === "threshold" ? "threshold" : "solid",
+        solidColor: resolveHexColor(settings.appearance.uploadSolidColor, DEFAULT_UPLOAD_COLOR),
         thresholds: buildChannelThresholds({
             settings,
-            lowColor: resolveHexColor(settings.uploadColorLow, "#f97316"),
-            mediumColor: resolveHexColor(settings.uploadColorMedium, DEFAULT_UPLOAD_COLOR),
-            highColor: resolveHexColor(settings.uploadColorHigh, "#f472b6"),
+            lowColor: resolveHexColor(settings.appearance.uploadColorLow, "#f97316"),
+            mediumColor: resolveHexColor(settings.appearance.uploadColorMedium, DEFAULT_UPLOAD_COLOR),
+            highColor: resolveHexColor(settings.appearance.uploadColorHigh, "#f472b6"),
         }),
     };
 }
@@ -609,8 +592,8 @@ function buildChannelThresholds(options: {
     mediumColor: string;
     highColor: string;
 }): ColorConfig["thresholds"] {
-    const lowThreshold = normalizeThreshold(options.settings.lowThreshold, 30);
-    const highThreshold = Math.max(lowThreshold, normalizeThreshold(options.settings.highThreshold, 70));
+    const lowThreshold = normalizeThreshold(options.settings.appearance.lowThreshold, 30);
+    const highThreshold = Math.max(lowThreshold, normalizeThreshold(options.settings.appearance.highThreshold, 70));
 
     return [
         { min: 0, max: lowThreshold, color: options.lowColor },
@@ -655,17 +638,17 @@ function formatNetworkInterfaceDebugValue(networkInterface: NetworkInterfaceOpti
     });
 }
 
-function publishNetworkInterfaceOptions(event: WillAppearEvent, settings: NetworkSpeedSettings): void {
+function publishNetworkInterfaceOptions(event: WillAppearEvent): void {
     const availableNetworkInterfaces = JSON.stringify(networkInterfaceRegistry.getOptions());
-
-    if (settings.availableNetworkInterfaces === availableNetworkInterfaces) {
-        return;
-    }
 
     const storedSettings = normalizeActionStoredSettings(
         event.payload.settings as Record<string, unknown>,
         "net-speed",
     );
+
+    if (storedSettings.runtimeCache.availableNetworkInterfaces === availableNetworkInterfaces) {
+        return;
+    }
 
     event.action.setSettings(serializeActionStoredSettings({
         ...storedSettings,
@@ -683,7 +666,7 @@ function publishNetworkScaleLearning(
     settings: NetworkSpeedSettings,
     selectedNetworkInterface: NetworkInterfaceOption | null,
 ): void {
-    if (settings.networkScaleMode === "custom") {
+    if (settings.network.networkScaleMode === "custom") {
         return;
     }
 

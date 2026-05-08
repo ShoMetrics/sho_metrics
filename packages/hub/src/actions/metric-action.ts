@@ -4,7 +4,7 @@ import { clearSingleMetricDisplayState } from "./single-metric-display";
 import { logger } from "../logging/logger";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import { resolveActionSettings } from "./action-settings-resolver";
-import type { ActionKind, FlatWidgetSettings } from "../settings/widget-settings";
+import type { ActionKind, ResolvedWidgetSettings } from "../settings/widget-settings";
 
 const log = logger.for("MetricAction");
 
@@ -51,10 +51,10 @@ export abstract class MetricAction extends SingletonAction {
             log.info(() => [
                 "settingsReceived",
                 `actionId=${event.action.id}`,
-                `previousGraphicType=${formatSettingValue(previousSettings.graphicType)}`,
-                `nextGraphicType=${formatSettingValue(nextSettings.graphicType)}`,
-                `previousPollingFrequencySeconds=${formatSettingValue(previousSettings.pollingFrequencySeconds)}`,
-                `nextPollingFrequencySeconds=${formatSettingValue(nextSettings.pollingFrequencySeconds)}`,
+                `previousGraphicType=${formatSettingValue(previousSettings.appearance.graphicType)}`,
+                `nextGraphicType=${formatSettingValue(nextSettings.appearance.graphicType)}`,
+                `previousPollingFrequencySeconds=${formatSettingValue(previousSettings.local.pollingFrequencySeconds)}`,
+                `nextPollingFrequencySeconds=${formatSettingValue(nextSettings.local.pollingFrequencySeconds)}`,
             ].join(" "));
 
             // Update the settings in the active event so the polling loop sees them.
@@ -83,13 +83,13 @@ export abstract class MetricAction extends SingletonAction {
         return [];
     }
 
-    protected resolveSettings(event: WillAppearEvent): FlatWidgetSettings {
+    protected resolveSettings(event: WillAppearEvent): ResolvedWidgetSettings {
         return this.resolveRawSettings(event.payload.settings);
     }
 
     private subscribeAction(event: WillAppearEvent): void {
         const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
-            this.resolveSettings(event).pollingFrequencySeconds,
+            this.resolveSettings(event).local.pollingFrequencySeconds,
         );
         const metricKeys = normalizeMetricKeys(this.getMetricKeys(event));
         const metricKeySignature = metricKeys.join(",");
@@ -114,7 +114,7 @@ export abstract class MetricAction extends SingletonAction {
     private resubscribeActionIfFrequencyChanged(event: WillAppearEvent): void {
         const activeMetricAction = this.activeMetricActions.get(event.action.id);
         const nextPollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
-            this.resolveSettings(event).pollingFrequencySeconds,
+            this.resolveSettings(event).local.pollingFrequencySeconds,
         );
         const nextMetricKeys = normalizeMetricKeys(this.getMetricKeys(event));
         const nextMetricKeySignature = nextMetricKeys.join(",");
@@ -138,7 +138,7 @@ export abstract class MetricAction extends SingletonAction {
         }
     }
 
-    private resolveRawSettings(rawSettings: unknown): FlatWidgetSettings {
+    private resolveRawSettings(rawSettings: unknown): ResolvedWidgetSettings {
         return resolveActionSettings(readSettingsRecord(rawSettings), this.actionKind);
     }
 }

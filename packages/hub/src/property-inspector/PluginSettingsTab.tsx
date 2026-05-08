@@ -176,7 +176,7 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                         type="number"
                         min={1}
                         step={1}
-                        value={settings.networkDefaults.maximumDownloadSpeedMbps}
+                        value={settings.networkDefaults.maximumDownloadSpeedMbps ?? ""}
                         disabled={settings.networkDefaults.networkScaleMode === "auto"}
                         onChange={(event) => updateNetworkSetting("maximumDownloadSpeedMbps", event.currentTarget.value)}
                     />
@@ -187,7 +187,7 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                         type="number"
                         min={1}
                         step={1}
-                        value={settings.networkDefaults.maximumUploadSpeedMbps}
+                        value={settings.networkDefaults.maximumUploadSpeedMbps ?? ""}
                         disabled={settings.networkDefaults.networkScaleMode === "auto"}
                         onChange={(event) => updateNetworkSetting("maximumUploadSpeedMbps", event.currentTarget.value)}
                     />
@@ -212,7 +212,7 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                         type="number"
                         min={1}
                         step={1}
-                        value={settings.diskThroughputDefaults.maximumDiskReadThroughputMebibytesPerSecond}
+                        value={settings.diskThroughputDefaults.maximumDiskReadThroughputMebibytesPerSecond ?? ""}
                         disabled={settings.diskThroughputDefaults.diskThroughputScaleMode === "auto"}
                         onChange={(event) => updateDiskThroughputSetting(
                             "maximumDiskReadThroughputMebibytesPerSecond",
@@ -226,7 +226,7 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                         type="number"
                         min={1}
                         step={1}
-                        value={settings.diskThroughputDefaults.maximumDiskWriteThroughputMebibytesPerSecond}
+                        value={settings.diskThroughputDefaults.maximumDiskWriteThroughputMebibytesPerSecond ?? ""}
                         disabled={settings.diskThroughputDefaults.diskThroughputScaleMode === "auto"}
                         onChange={(event) => updateDiskThroughputSetting(
                             "maximumDiskWriteThroughputMebibytesPerSecond",

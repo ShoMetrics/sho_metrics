@@ -21,11 +21,12 @@ export class CpuUsage extends MetricAction {
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
+        const settings = this.resolveSettings(event);
         const widgetData = metricStore.getWidgetData(CPU_USAGE_METRIC_KEY, ARC_GAUGE_LABELS.cpu, "%", 100);
 
         setSingleMetricDisplay({
             event,
-            resolvedSettings: this.resolveSettings(event),
+            resolvedSettings: settings.appearance,
             metricKey: CPU_USAGE_METRIC_KEY,
             widgetData: {
                 ...buildCpuUsageWidgetData(widgetData),
