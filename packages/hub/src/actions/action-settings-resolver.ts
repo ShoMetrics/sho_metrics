@@ -1,9 +1,9 @@
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
     normalizeWidgetStoredSettings,
-    resolveFlatWidgetSettings,
+    resolveWidgetSettings,
     type ActionKind,
-    type FlatWidgetSettings,
+    type ResolvedWidgetSettings,
     type WidgetStoredSettings,
 } from "../settings/widget-settings";
 
@@ -13,10 +13,10 @@ type JsonObject = {
     [key: string]: JsonValue;
 };
 
-export function resolveActionSettings(rawSettings: Record<string, unknown>, actionKind: ActionKind): FlatWidgetSettings {
+export function resolveActionSettings(rawSettings: Record<string, unknown>, actionKind: ActionKind): ResolvedWidgetSettings {
     const storedSettings = normalizeActionStoredSettings(rawSettings, actionKind);
 
-    return resolveFlatWidgetSettings({
+    return resolveWidgetSettings({
         actionKind,
         isWindows: process.platform === "win32",
         storedSettings,

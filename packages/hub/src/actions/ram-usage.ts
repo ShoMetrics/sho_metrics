@@ -15,12 +15,13 @@ export class RamUsage extends MetricAction {
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
+        const settings = this.resolveSettings(event);
         const usedBytesWidgetData = metricStore.getWidgetData(RAM_USED_METRIC_KEY, ARC_GAUGE_LABELS.ram, "B");
         const totalBytesWidgetData = metricStore.getWidgetData(RAM_TOTAL_METRIC_KEY, ARC_GAUGE_LABELS.ram, "B");
 
         setSingleMetricDisplay({
             event,
-            resolvedSettings: this.resolveSettings(event),
+            resolvedSettings: settings.appearance,
             metricKey: RAM_USED_METRIC_KEY,
             widgetData: buildMemoryUsageWidgetData({
                 usedBytesWidgetData,

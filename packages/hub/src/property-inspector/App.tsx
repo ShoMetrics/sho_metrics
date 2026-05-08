@@ -16,7 +16,7 @@ import {
     defaultPluginGlobalSettings,
     normalizePluginGlobalSettings,
     normalizeWidgetStoredSettings,
-    resolveFlatWidgetSettings,
+    resolveWidgetSettings,
     setWidgetFieldOverride,
     type PluginGlobalSettings,
     type WidgetStoredSettingKey,
@@ -358,7 +358,32 @@ function buildResolvedPropertyInspectorSettings(options: {
     actionKind: ActionKind;
     isWindows: boolean;
 }): PropertyInspectorSettings {
-    return resolveFlatWidgetSettings(options) as PropertyInspectorSettings;
+    const resolvedSettings = resolveWidgetSettings(options);
+
+    return {
+        ...resolvedSettings.appearance,
+        ...resolvedSettings.metric,
+        ...resolvedSettings.local,
+        ...resolvedSettings.network,
+        ...resolvedSettings.diskThroughput,
+        maximumGpuPowerWatts: toInspectorOptionalNumber(resolvedSettings.local.maximumGpuPowerWatts),
+        maximumDownloadSpeedMbps: toInspectorOptionalNumber(resolvedSettings.network.maximumDownloadSpeedMbps),
+        maximumUploadSpeedMbps: toInspectorOptionalNumber(resolvedSettings.network.maximumUploadSpeedMbps),
+        maximumDiskReadThroughputMebibytesPerSecond: toInspectorOptionalNumber(
+            resolvedSettings.diskThroughput.maximumDiskReadThroughputMebibytesPerSecond,
+        ),
+        maximumDiskWriteThroughputMebibytesPerSecond: toInspectorOptionalNumber(
+            resolvedSettings.diskThroughput.maximumDiskWriteThroughputMebibytesPerSecond,
+        ),
+        availableNetworkInterfaces: options.storedSettings.runtimeCache.availableNetworkInterfaces,
+        availableDiskVolumes: options.storedSettings.runtimeCache.availableDiskVolumes,
+        netSpeedDefaultsApplied: true,
+        diskDefaultsApplied: true,
+    };
+}
+
+function toInspectorOptionalNumber(value: number | undefined): number | "" {
+    return value ?? "";
 }
 
 function readSettingsRecord(payload: unknown): Record<string, unknown> {

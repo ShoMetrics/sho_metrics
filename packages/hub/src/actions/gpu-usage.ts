@@ -13,7 +13,7 @@ import {
 } from "../metrics/temperature-display";
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
-import type { FlatWidgetSettings } from "../settings/widget-settings";
+import type { ResolvedWidgetSettings } from "../settings/widget-settings";
 
 /**
  * Base class for GPU-related actions.
@@ -67,7 +67,7 @@ export class GpuUsage extends GpuBaseAction {
 
         setSingleMetricDisplay({
             event,
-            resolvedSettings: settings,
+            resolvedSettings: settings.appearance,
             metricKey: GPU_USAGE_METRIC_KEY,
             widgetData: {
                 ...buildGpuUsageWidgetData(data),
@@ -89,13 +89,13 @@ export class GpuTemp extends GpuBaseAction {
         const celsiusWidgetData = this.getGpuWidgetData(GPU_TEMP_METRIC_KEY, ARC_GAUGE_LABELS.gpu, "C");
         const widgetData = buildTemperatureWidgetData({
             celsiusWidgetData,
-            maximumCelsius: resolveMaximumTemperatureCelsius(settings.maximumTemperatureCelsius),
-            unit: resolveTemperatureUnit(settings.temperatureUnit),
+            maximumCelsius: resolveMaximumTemperatureCelsius(settings.local.maximumTemperatureCelsius),
+            unit: resolveTemperatureUnit(settings.local.temperatureUnit),
         });
 
         setSingleMetricDisplay({
             event,
-            resolvedSettings: settings,
+            resolvedSettings: settings.appearance,
             metricKey: GPU_TEMP_METRIC_KEY,
             widgetData,
             ...buildMetricDisplayIcons({ hardware: "gpu", status: "temperature" }),
@@ -114,7 +114,7 @@ export class GpuVram extends GpuBaseAction {
 
         setSingleMetricDisplay({
             event,
-            resolvedSettings: settings,
+            resolvedSettings: settings.appearance,
             metricKey: GPU_VRAM_USED_METRIC_KEY,
             widgetData: buildGpuVramWidgetData(used, total.current),
             ...buildMetricDisplayIcons({ hardware: "gpu", status: "percentage" }),
@@ -131,13 +131,13 @@ export class GpuPower extends GpuBaseAction {
         const powerWidgetData = this.getGpuWidgetData(GPU_POWER_METRIC_KEY, ARC_GAUGE_LABELS.gpu, "W");
         const powerLimitWidgetData = this.getGpuWidgetData(GPU_POWER_LIMIT_METRIC_KEY, ARC_GAUGE_LABELS.gpu, "W");
         const maximumPowerWatts = resolveMaximumGpuPowerWatts({
-            customMaximumPowerWatts: settings.maximumGpuPowerWatts,
+            customMaximumPowerWatts: settings.local.maximumGpuPowerWatts,
             automaticMaximumPowerWatts: powerLimitWidgetData.current,
         });
 
         setSingleMetricDisplay({
             event,
-            resolvedSettings: settings,
+            resolvedSettings: settings.appearance,
             metricKey: GPU_POWER_METRIC_KEY,
             widgetData: buildGpuPowerWidgetData({ powerWidgetData, maximumPowerWatts }),
             ...buildMetricDisplayIcons({ hardware: "gpu", status: "power" }),
@@ -183,8 +183,8 @@ export function buildGpuUsageWidgetData(widgetData: WidgetData): WidgetData {
     };
 }
 
-type GpuTemperatureSettings = FlatWidgetSettings;
-type GpuPowerSettings = FlatWidgetSettings;
+type GpuTemperatureSettings = ResolvedWidgetSettings;
+type GpuPowerSettings = ResolvedWidgetSettings;
 
 export function buildGpuVramWidgetData(used: WidgetData, totalMegabytes: number): WidgetData {
     const safeTotalMegabytes = totalMegabytes > 0 ? totalMegabytes : 1;

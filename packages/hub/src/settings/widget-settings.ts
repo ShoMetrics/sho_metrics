@@ -67,15 +67,15 @@ export interface AppearanceSettings {
 
 export interface NetworkDefaultSettings {
     networkScaleMode: ScaleMode;
-    maximumDownloadSpeedMbps: number | "";
-    maximumUploadSpeedMbps: number | "";
+    maximumDownloadSpeedMbps: number | undefined;
+    maximumUploadSpeedMbps: number | undefined;
     networkUnitBase: NetworkUnitBase;
 }
 
 export interface DiskThroughputDefaultSettings {
     diskThroughputScaleMode: ScaleMode;
-    maximumDiskReadThroughputMebibytesPerSecond: number | "";
-    maximumDiskWriteThroughputMebibytesPerSecond: number | "";
+    maximumDiskReadThroughputMebibytesPerSecond: number | undefined;
+    maximumDiskWriteThroughputMebibytesPerSecond: number | undefined;
 }
 
 export interface MetricSettings {
@@ -100,17 +100,17 @@ export interface WidgetLocalSettings {
     diskUsageDisplayMode: DiskUsageDisplayMode;
     diskLinearLabel: string;
     maximumTemperatureCelsius: number;
-    maximumGpuPowerWatts: number | "";
+    maximumGpuPowerWatts: number | undefined;
     temperatureUnit: TemperatureUnit;
 }
 
 export interface WidgetRuntimeCache {
     availableNetworkInterfaces: string;
     availableDiskVolumes: string;
-    learnedMaximumDownloadSpeedMbps: number | "";
-    learnedMaximumUploadSpeedMbps: number | "";
-    learnedMaximumDiskReadThroughputMebibytesPerSecond: number | "";
-    learnedMaximumDiskWriteThroughputMebibytesPerSecond: number | "";
+    learnedMaximumDownloadSpeedMbps: number | undefined;
+    learnedMaximumUploadSpeedMbps: number | undefined;
+    learnedMaximumDiskReadThroughputMebibytesPerSecond: number | undefined;
+    learnedMaximumDiskWriteThroughputMebibytesPerSecond: number | undefined;
 }
 
 export interface WidgetStoredSettings {
@@ -137,61 +137,6 @@ export interface ResolvedWidgetSettings {
     appearance: AppearanceSettings;
     network: NetworkDefaultSettings;
     diskThroughput: DiskThroughputDefaultSettings;
-}
-
-export interface FlatWidgetSettings extends Record<string, SettingValue> {
-    pollingFrequencySeconds: number;
-    graphicType: GraphicType;
-    circleStyle: CircleStyle;
-    graphicStyle: GraphicStyle;
-    colorMode: ColorMode;
-    solidColor: string;
-    lowThreshold: number;
-    highThreshold: number;
-    colorLow: string;
-    colorMedium: string;
-    colorHigh: string;
-    lineSmoothingPercent: number;
-    gridLineVisibility: GridLineVisibility;
-    gridLineType: GridLineType;
-    networkDirection: NetworkDirection;
-    networkTrafficDisplayMode: NetworkTrafficDisplayMode;
-    networkInterfaceId: string;
-    availableNetworkInterfaces: string;
-    networkScaleMode: ScaleMode;
-    maximumDownloadSpeedMbps: number | "";
-    maximumUploadSpeedMbps: number | "";
-    networkUnitBase: NetworkUnitBase;
-    downloadSolidColor: string;
-    downloadColorLow: string;
-    downloadColorMedium: string;
-    downloadColorHigh: string;
-    uploadSolidColor: string;
-    uploadColorLow: string;
-    uploadColorMedium: string;
-    uploadColorHigh: string;
-    diskMetricKind: DiskMetricKind;
-    diskUsageDisplayMode: DiskUsageDisplayMode;
-    diskThroughputDirection: DiskThroughputDirection;
-    diskVolumeId: string;
-    availableDiskVolumes: string;
-    diskLinearLabel: string;
-    diskThroughputScaleMode: ScaleMode;
-    maximumDiskReadThroughputMebibytesPerSecond: number | "";
-    maximumDiskWriteThroughputMebibytesPerSecond: number | "";
-    diskReadSolidColor: string;
-    diskReadColorLow: string;
-    diskReadColorMedium: string;
-    diskReadColorHigh: string;
-    diskWriteSolidColor: string;
-    diskWriteColorLow: string;
-    diskWriteColorMedium: string;
-    diskWriteColorHigh: string;
-    maximumTemperatureCelsius: number;
-    maximumGpuPowerWatts: number | "";
-    temperatureUnit: TemperatureUnit;
-    netSpeedDefaultsApplied: boolean;
-    diskDefaultsApplied: boolean;
 }
 
 export interface SettingsContext {
@@ -233,15 +178,15 @@ export const defaultAppearanceSettings: AppearanceSettings = {
 
 export const defaultNetworkSettings: NetworkDefaultSettings = {
     networkScaleMode: "auto",
-    maximumDownloadSpeedMbps: "",
-    maximumUploadSpeedMbps: "",
+    maximumDownloadSpeedMbps: undefined,
+    maximumUploadSpeedMbps: undefined,
     networkUnitBase: "byte",
 };
 
 export const defaultDiskThroughputSettings: DiskThroughputDefaultSettings = {
     diskThroughputScaleMode: "auto",
-    maximumDiskReadThroughputMebibytesPerSecond: "",
-    maximumDiskWriteThroughputMebibytesPerSecond: "",
+    maximumDiskReadThroughputMebibytesPerSecond: undefined,
+    maximumDiskWriteThroughputMebibytesPerSecond: undefined,
 };
 
 export const defaultMetricSettings: MetricSettings = {
@@ -258,17 +203,17 @@ export const defaultLocalSettings: WidgetLocalSettings = {
     diskUsageDisplayMode: "percentage",
     diskLinearLabel: "",
     maximumTemperatureCelsius: 100,
-    maximumGpuPowerWatts: "",
+    maximumGpuPowerWatts: undefined,
     temperatureUnit: "celsius",
 };
 
 export const defaultRuntimeCache: WidgetRuntimeCache = {
     availableNetworkInterfaces: "[]",
     availableDiskVolumes: "[]",
-    learnedMaximumDownloadSpeedMbps: "",
-    learnedMaximumUploadSpeedMbps: "",
-    learnedMaximumDiskReadThroughputMebibytesPerSecond: "",
-    learnedMaximumDiskWriteThroughputMebibytesPerSecond: "",
+    learnedMaximumDownloadSpeedMbps: undefined,
+    learnedMaximumUploadSpeedMbps: undefined,
+    learnedMaximumDiskReadThroughputMebibytesPerSecond: undefined,
+    learnedMaximumDiskWriteThroughputMebibytesPerSecond: undefined,
 };
 
 export const defaultPluginGlobalSettings: PluginGlobalSettings = {
@@ -382,18 +327,6 @@ export function normalizeWidgetStoredSettings(
     };
 }
 
-export function resolveFlatWidgetSettings(options: {
-    storedSettings: WidgetStoredSettings;
-    globalSettings: PluginGlobalSettings;
-    actionKind: ActionKind;
-    isWindows: boolean;
-}): FlatWidgetSettings {
-    return flattenWidgetSettings(
-        resolveWidgetSettings(options),
-        options.storedSettings.runtimeCache,
-    );
-}
-
 export function resolveWidgetSettings(options: {
     storedSettings: WidgetStoredSettings;
     globalSettings: PluginGlobalSettings;
@@ -476,23 +409,6 @@ export function setWidgetFieldOverride(
     }
 
     return setCompleteWidgetField(storedSettings, key, value);
-}
-
-export function flattenWidgetSettings(
-    resolvedSettings: ResolvedWidgetSettings,
-    runtimeCache: WidgetRuntimeCache,
-): FlatWidgetSettings {
-    return {
-        ...resolvedSettings.appearance,
-        ...resolvedSettings.metric,
-        ...resolvedSettings.local,
-        ...resolvedSettings.network,
-        ...resolvedSettings.diskThroughput,
-        availableNetworkInterfaces: runtimeCache.availableNetworkInterfaces,
-        availableDiskVolumes: runtimeCache.availableDiskVolumes,
-        netSpeedDefaultsApplied: true,
-        diskDefaultsApplied: true,
-    };
 }
 
 function resolveNetworkSettings(
@@ -830,21 +746,24 @@ function normalizePositiveNumber(value: unknown, fallbackValue: number): number 
     return Number.isFinite(numericValue) && numericValue > 0 ? Math.round(numericValue) : fallbackValue;
 }
 
-function normalizeOptionalPositiveNumber(value: unknown): number | "" {
+function normalizeOptionalPositiveNumber(value: unknown): number | undefined {
     if (value === "" || value == null) {
-        return "";
+        return undefined;
     }
 
     const numericValue = Number(value);
-    return Number.isFinite(numericValue) && numericValue > 0 ? Math.round(numericValue) : "";
+    return Number.isFinite(numericValue) && numericValue > 0 ? Math.round(numericValue) : undefined;
 }
 
-function maxOptionalPositiveNumber(firstValue: number | "", secondValue: number | ""): number | "" {
-    if (firstValue === "") {
+function maxOptionalPositiveNumber(
+    firstValue: number | undefined,
+    secondValue: number | undefined,
+): number | undefined {
+    if (firstValue === undefined) {
         return secondValue;
     }
 
-    if (secondValue === "") {
+    if (secondValue === undefined) {
         return firstValue;
     }
 
