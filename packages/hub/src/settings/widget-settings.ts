@@ -567,7 +567,10 @@ function normalizeLocalSettings(rawSettings: Record<string, unknown>, context: S
     const diskMetricKind = normalizeDiskMetricKind(readRecord(rawSettings).diskMetricKind, context.isWindows);
 
     return {
-        pollingFrequencySeconds: normalizePollingFrequency(rawSettings.pollingFrequencySeconds, diskMetricKind),
+        pollingFrequencySeconds: normalizePollingFrequency(
+            rawSettings.pollingFrequencySeconds,
+            resolveDefaultPollingFrequencySeconds(context, diskMetricKind),
+        ),
         networkTrafficDisplayMode: rawSettings.networkTrafficDisplayMode === "overlay" ? "overlay" : "mirrored",
         diskUsageDisplayMode: rawSettings.diskUsageDisplayMode === "space" ? "space" : "percentage",
         diskLinearLabel: normalizeString(rawSettings.diskLinearLabel, defaultLocalSettings.diskLinearLabel),
@@ -811,9 +814,14 @@ function normalizeGridLineVisibility(value: unknown, fallbackValue: GridLineVisi
     return fallbackValue;
 }
 
-function normalizePollingFrequency(value: unknown, diskMetricKind: DiskMetricKind): number {
+function resolveDefaultPollingFrequencySeconds(context: SettingsContext, diskMetricKind: DiskMetricKind): number {
+    return context.actionKind === "disk" && diskMetricKind === "usage"
+        ? 60
+        : defaultLocalSettings.pollingFrequencySeconds;
+}
+
+function normalizePollingFrequency(value: unknown, fallbackValue: number): number {
     const numericValue = Number(value);
-    const fallbackValue = diskMetricKind === "throughput" ? 1 : defaultLocalSettings.pollingFrequencySeconds;
     return [1, 2, 3, 5, 10, 15, 30, 60].includes(numericValue) ? numericValue : fallbackValue;
 }
 

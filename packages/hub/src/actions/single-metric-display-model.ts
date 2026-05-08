@@ -27,7 +27,7 @@ interface BaseMetricDisplayOptions {
     statusIcon: ArcGaugeStatusIcon;
     circleStyleOverride?: ResolvedMetricVisualSettings["circleStyle"];
     visualSettingsOverride?: Partial<MetricVisualSettings>;
-    resolvedSettings?: SingleMetricDisplaySettings;
+    resolvedSettings: SingleMetricDisplaySettings;
 }
 
 export interface SingleMetricDisplayOptions extends BaseMetricDisplayOptions {
@@ -92,12 +92,10 @@ const TOUCH_STRIP_METRIC_LAYOUTS: Record<TouchStripMetricLayoutKind, TouchStripM
 
 export function buildMetricDisplayRenderPlan(options: {
     displayOptions: MetricDisplayOptions;
-    settings: SingleMetricDisplaySettings;
     isDial: boolean;
 }): MetricDisplayRenderPlan {
-    const resolvedSettings = options.displayOptions.resolvedSettings ?? options.settings;
     const visualSettings = resolveMetricVisualSettings({
-        ...resolvedSettings,
+        ...options.displayOptions.resolvedSettings,
         ...options.displayOptions.visualSettingsOverride,
     });
     const circleStyle = resolveCircleStyle({

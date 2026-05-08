@@ -6,7 +6,6 @@ import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-label
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import type { WidgetData } from "../rendering/widget-data";
-import { resolveActionSettings } from "./action-settings-resolver";
 
 /**
  * CPU Usage action with full theming support.
@@ -15,6 +14,8 @@ import { resolveActionSettings } from "./action-settings-resolver";
  */
 @action({ UUID: "com.ez.sho-metrics.cpu-usage" })
 export class CpuUsage extends MetricAction {
+    protected readonly actionKind = "cpu-usage";
+
     protected override getMetricKeys(): readonly string[] {
         return [CPU_USAGE_METRIC_KEY, CPU_MODEL_METRIC_KEY];
     }
@@ -24,10 +25,7 @@ export class CpuUsage extends MetricAction {
 
         setSingleMetricDisplay({
             event,
-            resolvedSettings: resolveActionSettings(
-                event.payload.settings as Record<string, unknown>,
-                "cpu-usage",
-            ),
+            resolvedSettings: this.resolveSettings(event),
             metricKey: CPU_USAGE_METRIC_KEY,
             widgetData: {
                 ...buildCpuUsageWidgetData(widgetData),

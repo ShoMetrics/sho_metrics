@@ -106,10 +106,8 @@ function renderAndSendSingleMetricDisplay(
     activeDisplayUpdateCount += 1;
 
     const renderStartTimestampMilliseconds = Date.now();
-    const settings = options.resolvedSettings ?? options.event.payload.settings as SingleMetricDisplaySettings;
     const renderPlan = buildMetricDisplayRenderPlan({
         displayOptions: options,
-        settings,
         isDial: options.event.action.isDial(),
     });
     const displayKind = resolveDisplayPerformanceKind(options.event);
@@ -536,8 +534,7 @@ function getOrCreateDisplayActionState(actionId: string): DisplayActionState {
 }
 
 function recordDisplayRequest(displayActionState: DisplayActionState, options: MetricDisplayOptions): void {
-    const settings = options.resolvedSettings ?? options.event.payload.settings as SingleMetricDisplaySettings;
-    const settingsSignature = buildSettingsSignature(settings);
+    const settingsSignature = buildSettingsSignature(options.resolvedSettings);
     const isSettingsChange = displayActionState.lastRequestedSettingsSignature !== null
         && displayActionState.lastRequestedSettingsSignature !== settingsSignature;
     const requestTimestampMilliseconds = Date.now();
@@ -556,7 +553,7 @@ function recordDisplayRequest(displayActionState: DisplayActionState, options: M
         return;
     }
 
-    const visualSettings = resolveMetricVisualSettings(settings);
+    const visualSettings = resolveMetricVisualSettings(options.resolvedSettings);
 
     log.info(() => [
         "settingsDisplayRequested",

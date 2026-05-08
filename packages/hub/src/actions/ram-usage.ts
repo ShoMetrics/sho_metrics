@@ -5,10 +5,11 @@ import { setSingleMetricDisplay } from "./single-metric-display";
 import { buildMemoryUsageWidgetData } from "../metrics/storage-display";
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
-import { resolveActionSettings } from "./action-settings-resolver";
 
 @action({ UUID: "com.ez.sho-metrics.ram" })
 export class RamUsage extends MetricAction {
+    protected readonly actionKind = "ram";
+
     protected override getMetricKeys(): readonly string[] {
         return [RAM_USED_METRIC_KEY, RAM_TOTAL_METRIC_KEY];
     }
@@ -19,10 +20,7 @@ export class RamUsage extends MetricAction {
 
         setSingleMetricDisplay({
             event,
-            resolvedSettings: resolveActionSettings(
-                event.payload.settings as Record<string, unknown>,
-                "ram",
-            ),
+            resolvedSettings: this.resolveSettings(event),
             metricKey: RAM_USED_METRIC_KEY,
             widgetData: buildMemoryUsageWidgetData({
                 usedBytesWidgetData,

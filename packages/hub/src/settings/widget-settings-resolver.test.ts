@@ -181,6 +181,32 @@ test("runtime cache participates only in auto scale resolution", () => {
     }).network.maximumDownloadSpeedMbps, 300);
 });
 
+test("disk usage stored settings default to slow polling", () => {
+    const storedSettings = normalizeWidgetStoredSettings({
+        metric: {
+            diskMetricKind: "usage",
+        },
+    }, {
+        actionKind: "disk",
+        isWindows: false,
+    });
+
+    assert.equal(storedSettings.local.pollingFrequencySeconds, 60);
+});
+
+test("disk throughput stored settings default to fast polling", () => {
+    const storedSettings = normalizeWidgetStoredSettings({
+        metric: {
+            diskMetricKind: "throughput",
+        },
+    }, {
+        actionKind: "disk",
+        isWindows: false,
+    });
+
+    assert.equal(storedSettings.local.pollingFrequencySeconds, 1);
+});
+
 test("Windows normalizes disk throughput metric identity back to usage", () => {
     const storedSettings = normalizeWidgetStoredSettings({
         metric: {
