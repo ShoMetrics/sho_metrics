@@ -52,14 +52,14 @@ test("single value-capable widget without data renders an N/A placeholder copy",
 test("single circular icon placeholder keeps source data and marks the render plan as muted", () => {
     const displayOptions = buildSingleMetricDisplayOptions({
         widgetData: buildWidgetData(),
+        resolvedSettings: {
+            graphicType: "circular",
+            circleStyle: "compact",
+        },
     });
 
     const renderPlan = buildMetricDisplayRenderPlan({
         displayOptions,
-        settings: {
-            graphicType: "circular",
-            circleStyle: "compact",
-        },
         isDial: false,
     });
     const renderWidgetData = buildRenderWidgetData({
@@ -187,10 +187,10 @@ test("key render plan uses keypad PNG dimensions and no touch strip layout", () 
     const renderPlan = buildMetricDisplayRenderPlan({
         displayOptions: buildSingleMetricDisplayOptions({
             widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
+            resolvedSettings: {
+                graphicType: "linear",
+            },
         }),
-        settings: {
-            graphicType: "linear",
-        },
         isDial: false,
     });
 
@@ -203,10 +203,10 @@ test("touch strip layout uses square rendering for circular graphics", () => {
     const renderPlan = buildMetricDisplayRenderPlan({
         displayOptions: buildSingleMetricDisplayOptions({
             widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
+            resolvedSettings: {
+                graphicType: "circular",
+            },
         }),
-        settings: {
-            graphicType: "circular",
-        },
         isDial: true,
     });
 
@@ -237,6 +237,7 @@ test("touch strip layout uses wide rendering for non-circular graphics", () => {
 
 function buildSingleMetricDisplayOptions(options: {
     widgetData: WidgetData;
+    resolvedSettings?: SingleMetricDisplayOptions["resolvedSettings"];
 }): SingleMetricDisplayOptions {
     return {
         event: {
@@ -251,6 +252,7 @@ function buildSingleMetricDisplayOptions(options: {
         centerIconFragment: "<path />",
         statusIcon: buildStatusIcon(),
         widgetData: options.widgetData,
+        resolvedSettings: options.resolvedSettings ?? {},
     };
 }
 

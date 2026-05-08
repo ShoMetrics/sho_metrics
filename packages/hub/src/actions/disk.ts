@@ -28,7 +28,6 @@ import { buildGlobalChannelColorConfig } from "../settings/global-appearance";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
     normalizeActionStoredSettings,
-    resolveActionSettings,
     serializeActionStoredSettings,
 } from "./action-settings-resolver";
 
@@ -36,13 +35,10 @@ const log = logger.for("Action:Disk");
 
 @action({ UUID: "com.ez.sho-metrics.disk" })
 export class Disk extends MetricAction {
-    protected override getDefaultPollingFrequencySeconds(event: WillAppearEvent): number {
-        const settings = resolveDiskSettings(event);
-        return normalizeDiskMetricKind(settings.diskMetricKind) === "throughput" ? 1 : 60;
-    }
+    protected readonly actionKind = "disk";
 
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
-        const settings = resolveDiskSettings(event);
+        const settings = this.resolveSettings(event) as DiskSettings;
         const metricKind = normalizeDiskMetricKind(settings.diskMetricKind);
 
         if (metricKind === "throughput") {
@@ -65,7 +61,7 @@ export class Disk extends MetricAction {
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
-        const settings = resolveDiskSettings(event);
+        const settings = this.resolveSettings(event) as DiskSettings;
         const metricKind = normalizeDiskMetricKind(settings.diskMetricKind);
 
         publishDiskVolumeOptions(event, settings);
@@ -343,13 +339,6 @@ const DEFAULT_DISK_WRITE_COLOR = "#f472b6";
 const DISK_THROUGHPUT_DIRECTION_ICON_COLOR = "rgba(255,255,255,0.88)";
 const DISK_THROUGHPUT_DIRECTION_ICON_SIZE = 30;
 const DISK_GAUGE_FOOTER_ICON_SIZE = 25;
-
-function resolveDiskSettings(event: WillAppearEvent): DiskSettings {
-    return resolveActionSettings(
-        event.payload.settings as Record<string, unknown>,
-        "disk",
-    ) as DiskSettings;
-}
 
 function normalizeDiskMetricKind(value: SettingValue): "usage" | "throughput" {
     return value === "throughput" ? "throughput" : "usage";

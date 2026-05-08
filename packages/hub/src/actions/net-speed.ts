@@ -22,7 +22,6 @@ import { buildGlobalChannelColorConfig } from "../settings/global-appearance";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
     normalizeActionStoredSettings,
-    resolveActionSettings,
     serializeActionStoredSettings,
 } from "./action-settings-resolver";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
@@ -41,18 +40,14 @@ const log = logger.for("Action:NetSpeed");
  */
 @action({ UUID: "com.ez.sho-metrics.net-speed" })
 export class NetSpeed extends MetricAction {
+    protected readonly actionKind = "net-speed";
+
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
-        return resolveNetSpeedMetricKeys(resolveActionSettings(
-            event.payload.settings as Record<string, unknown>,
-            "net-speed",
-        ) as NetworkSpeedSettings);
+        return resolveNetSpeedMetricKeys(this.resolveSettings(event) as NetworkSpeedSettings);
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
-        const settings = resolveActionSettings(
-            event.payload.settings as Record<string, unknown>,
-            "net-speed",
-        ) as NetworkSpeedSettings;
+        const settings = this.resolveSettings(event) as NetworkSpeedSettings;
         const effectiveGraphicType = resolveGraphicType(settings.graphicType);
         const displayDirection = normalizeNetworkDisplayDirection(settings.networkDirection);
         const direction = resolveSingleNetworkDirection(displayDirection);

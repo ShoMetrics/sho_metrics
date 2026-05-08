@@ -3,8 +3,8 @@ import { scheduler } from "../runtime/scheduler";
 import { clearSingleMetricDisplayState } from "./single-metric-display";
 import { logger } from "../logging/logger";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
-
-type MetricActionSettings = Record<string, unknown>;
+import { resolveActionSettings } from "./action-settings-resolver";
+import type { ActionKind, FlatWidgetSettings } from "../settings/widget-settings";
 
 const log = logger.for("MetricAction");
 
@@ -23,6 +23,8 @@ export abstract class MetricAction extends SingletonAction {
     /** Track active events per action instance ID to ensure settings are always current. */
     private activeEvents = new Map<string, WillAppearEvent>();
     private activeMetricActions = new Map<string, ActiveMetricAction>();
+
+    protected abstract readonly actionKind: ActionKind;
 
     constructor() {
         super();
@@ -43,8 +45,8 @@ export abstract class MetricAction extends SingletonAction {
     override onDidReceiveSettings(event: DidReceiveSettingsEvent): void {
         const activeEvent = this.activeEvents.get(event.action.id);
         if (activeEvent) {
-            const previousSettings = activeEvent.payload.settings as MetricActionSettings;
-            const nextSettings = event.payload.settings as MetricActionSettings;
+            const previousSettings = this.resolveSettings(activeEvent);
+            const nextSettings = this.resolveRawSettings(event.payload.settings);
 
             log.info(() => [
                 "settingsReceived",
@@ -81,15 +83,13 @@ export abstract class MetricAction extends SingletonAction {
         return [];
     }
 
-    protected getDefaultPollingFrequencySeconds(event: WillAppearEvent): number {
-        void event;
-        return DEFAULT_POLLING_FREQUENCY_SECONDS;
+    protected resolveSettings(event: WillAppearEvent): FlatWidgetSettings {
+        return this.resolveRawSettings(event.payload.settings);
     }
 
     private subscribeAction(event: WillAppearEvent): void {
         const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
-            event.payload.settings as MetricActionSettings,
-            this.getDefaultPollingFrequencySeconds(event),
+            this.resolveSettings(event).pollingFrequencySeconds,
         );
         const metricKeys = normalizeMetricKeys(this.getMetricKeys(event));
         const metricKeySignature = metricKeys.join(",");
@@ -114,8 +114,7 @@ export abstract class MetricAction extends SingletonAction {
     private resubscribeActionIfFrequencyChanged(event: WillAppearEvent): void {
         const activeMetricAction = this.activeMetricActions.get(event.action.id);
         const nextPollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
-            event.payload.settings as MetricActionSettings,
-            this.getDefaultPollingFrequencySeconds(event),
+            this.resolveSettings(event).pollingFrequencySeconds,
         );
         const nextMetricKeys = normalizeMetricKeys(this.getMetricKeys(event));
         const nextMetricKeySignature = nextMetricKeys.join(",");
@@ -138,19 +137,18 @@ export abstract class MetricAction extends SingletonAction {
             this.subscribeAction(event);
         }
     }
+
+    private resolveRawSettings(rawSettings: unknown): FlatWidgetSettings {
+        return resolveActionSettings(readSettingsRecord(rawSettings), this.actionKind);
+    }
 }
 
-function resolvePollingIntervalMilliseconds(settings: MetricActionSettings, defaultPollingFrequencySeconds: number): number {
-    const pollingFrequencySeconds = Number(settings.pollingFrequencySeconds);
-    const resolvedDefaultPollingFrequencySeconds = ALLOWED_POLLING_FREQUENCY_SECONDS.has(defaultPollingFrequencySeconds)
-        ? defaultPollingFrequencySeconds
-        : DEFAULT_POLLING_FREQUENCY_SECONDS;
-
+function resolvePollingIntervalMilliseconds(pollingFrequencySeconds: number): number {
     if (ALLOWED_POLLING_FREQUENCY_SECONDS.has(pollingFrequencySeconds)) {
         return pollingFrequencySeconds * 1000;
     }
 
-    return resolvedDefaultPollingFrequencySeconds * 1000;
+    return DEFAULT_POLLING_FREQUENCY_SECONDS * 1000;
 }
 
 const DEFAULT_POLLING_FREQUENCY_SECONDS = 1;
@@ -158,6 +156,12 @@ const ALLOWED_POLLING_FREQUENCY_SECONDS = new Set([1, 2, 3, 5, 10, 15, 30, 60]);
 
 function normalizeMetricKeys(metricKeys: readonly string[]): readonly string[] {
     return Array.from(new Set(metricKeys)).sort();
+}
+
+function readSettingsRecord(value: unknown): Record<string, unknown> {
+    return value && typeof value === "object" && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : {};
 }
 
 function formatSettingValue(value: unknown): string {
