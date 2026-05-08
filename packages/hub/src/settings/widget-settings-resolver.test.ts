@@ -5,7 +5,6 @@ import {
     normalizePluginGlobalSettings,
     normalizeWidgetStoredSettings,
     resolveWidgetSettings,
-    setWidgetFieldOverride,
 } from "./widget-settings";
 
 test("stored widget settings stay sparse and do not expand globalizable fields", () => {
@@ -115,28 +114,6 @@ test("global appearance override wins without mutating widget overrides", () => 
     assert.equal(resolvedSettings.appearance.solidColor, "#93c5fd");
     assert.equal(storedSettings.appearanceOverrides.graphicType, "linear");
     assert.equal(storedSettings.appearanceOverrides.solidColor, "#222222");
-});
-
-test("field changes write only the mapped sparse setting group", () => {
-    const storedSettings = normalizeWidgetStoredSettings({}, {
-        actionKind: "cpu-usage",
-        isWindows: false,
-    });
-    const customizedSettings = setWidgetFieldOverride(storedSettings, "solidColor", "#123456");
-
-    assert.deepEqual(customizedSettings.appearanceOverrides, { solidColor: "#123456" });
-    assert.deepEqual(customizedSettings.networkOverrides, {});
-});
-
-test("manual network max switches to custom scale", () => {
-    const storedSettings = normalizeWidgetStoredSettings({}, {
-        actionKind: "net-speed",
-        isWindows: false,
-    });
-    const customizedSettings = setWidgetFieldOverride(storedSettings, "maximumDownloadSpeedMbps", 500);
-
-    assert.equal(customizedSettings.networkOverrides.networkScaleMode, "custom");
-    assert.equal(customizedSettings.networkOverrides.maximumDownloadSpeedMbps, 500);
 });
 
 test("runtime cache participates only in auto scale resolution", () => {

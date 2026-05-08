@@ -1,5 +1,3 @@
-export type SettingValue = string | number | boolean | null | undefined;
-
 export type ActionKind =
     | "cpu-usage"
     | "net-speed"
@@ -25,13 +23,6 @@ export type DiskMetricKind = "usage" | "throughput";
 export type DiskUsageDisplayMode = "percentage" | "space";
 export type DiskThroughputDirection = "both" | "total" | "read" | "write";
 export type TemperatureUnit = "celsius" | "fahrenheit";
-
-export type WidgetStoredSettingKey =
-    | keyof MetricSettings
-    | keyof WidgetLocalSettings
-    | keyof AppearanceSettings
-    | keyof NetworkDefaultSettings
-    | keyof DiskThroughputDefaultSettings;
 
 export interface AppearanceSettings {
     graphicType: GraphicType;
@@ -357,60 +348,6 @@ export function resolveWidgetSettings(options: {
     };
 }
 
-export function setWidgetFieldOverride(
-    storedSettings: WidgetStoredSettings,
-    key: WidgetStoredSettingKey,
-    value: SettingValue,
-): WidgetStoredSettings {
-    if (APPEARANCE_KEYS.has(key as keyof AppearanceSettings)) {
-        const nextAppearanceOverrides = {
-            ...storedSettings.appearanceOverrides,
-            [key]: normalizeAppearanceField(key as keyof AppearanceSettings, value),
-        };
-        return {
-            ...storedSettings,
-            appearanceOverrides: nextAppearanceOverrides,
-        };
-    }
-
-    if (NETWORK_KEYS.has(key as keyof NetworkDefaultSettings)) {
-        const nextNetworkOverrides = {
-            ...storedSettings.networkOverrides,
-            [key]: normalizeNetworkField(key as keyof NetworkDefaultSettings, value),
-        };
-
-        if (key === "maximumDownloadSpeedMbps" || key === "maximumUploadSpeedMbps") {
-            nextNetworkOverrides.networkScaleMode = "custom";
-        }
-
-        return {
-            ...storedSettings,
-            networkOverrides: nextNetworkOverrides,
-        };
-    }
-
-    if (DISK_THROUGHPUT_KEYS.has(key as keyof DiskThroughputDefaultSettings)) {
-        const nextDiskThroughputOverrides = {
-            ...storedSettings.diskThroughputOverrides,
-            [key]: normalizeDiskThroughputField(key as keyof DiskThroughputDefaultSettings, value),
-        };
-
-        if (
-            key === "maximumDiskReadThroughputMebibytesPerSecond"
-            || key === "maximumDiskWriteThroughputMebibytesPerSecond"
-        ) {
-            nextDiskThroughputOverrides.diskThroughputScaleMode = "custom";
-        }
-
-        return {
-            ...storedSettings,
-            diskThroughputOverrides: nextDiskThroughputOverrides,
-        };
-    }
-
-    return setCompleteWidgetField(storedSettings, key, value);
-}
-
 function resolveNetworkSettings(
     storedSettings: WidgetStoredSettings,
     globalSettings: PluginGlobalSettings,
@@ -600,49 +537,6 @@ function normalizeRuntimeCache(rawSettings: Record<string, unknown>): WidgetRunt
             rawSettings.learnedMaximumDiskWriteThroughputMebibytesPerSecond,
         ),
     };
-}
-
-function setCompleteWidgetField(
-    storedSettings: WidgetStoredSettings,
-    key: WidgetStoredSettingKey,
-    value: SettingValue,
-): WidgetStoredSettings {
-    if (key in storedSettings.metric) {
-        return {
-            ...storedSettings,
-            metric: normalizeMetricSettings({
-                ...storedSettings.metric,
-                [key]: value,
-            }, { actionKind: "unknown", isWindows: false }),
-        };
-    }
-
-    if (key in storedSettings.local) {
-        return {
-            ...storedSettings,
-            local: normalizeLocalSettings({
-                ...storedSettings.local,
-                [key]: value,
-            }, { actionKind: "unknown", isWindows: false }),
-        };
-    }
-
-    return storedSettings;
-}
-
-function normalizeAppearanceField(key: keyof AppearanceSettings, value: SettingValue): AppearanceSettings[keyof AppearanceSettings] {
-    return normalizeAppearanceSettings({ [key]: value }, { ...defaultAppearanceSettings })[key];
-}
-
-function normalizeNetworkField(key: keyof NetworkDefaultSettings, value: SettingValue): NetworkDefaultSettings[keyof NetworkDefaultSettings] {
-    return normalizeNetworkSettings({ [key]: value }, { ...defaultNetworkSettings })[key];
-}
-
-function normalizeDiskThroughputField(
-    key: keyof DiskThroughputDefaultSettings,
-    value: SettingValue,
-): DiskThroughputDefaultSettings[keyof DiskThroughputDefaultSettings] {
-    return normalizeDiskThroughputSettings({ [key]: value }, { ...defaultDiskThroughputSettings })[key];
 }
 
 function copyPresentKeys<TSettings extends object, TKey extends keyof TSettings>(

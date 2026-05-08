@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeNextSettings, normalizeSettings } from "./scenarios";
-import { basePropertyInspectorSettings } from "./settings";
+import { normalizeSettings } from "./scenarios";
 
 test("disk usage defaults to slow polling on first normalization", () => {
     const settings = normalizeSettings({ diskMetricKind: "usage" }, {
@@ -81,42 +80,6 @@ test("net speed keeps custom solid color after defaults were applied", () => {
     assert.equal(settings.solidColor, "#123456");
 });
 
-test("next settings keep thresholds ordered when low threshold crosses high threshold", () => {
-    const settings = normalizeNextSettings({
-        changedKey: "lowThreshold",
-        changedValue: "90",
-        state: {
-            actionKind: "cpu-usage",
-            isWindows: false,
-            settings: {
-                ...basePropertyInspectorSettings,
-                lowThreshold: 30,
-                highThreshold: 70,
-            },
-        },
-    });
-
-    assert.equal(settings.lowThreshold, 90);
-    assert.equal(settings.highThreshold, 90);
-});
-
-test("next settings apply graphic type changes from the PI picker", () => {
-    const settings = normalizeNextSettings({
-        changedKey: "graphicType",
-        changedValue: "linear",
-        state: {
-            actionKind: "cpu-usage",
-            isWindows: false,
-            settings: {
-                ...basePropertyInspectorSettings,
-                graphicType: "circular",
-            },
-        },
-    });
-
-    assert.equal(settings.graphicType, "linear");
-});
-
 test("settings normalize circle style picker values", () => {
     const settings = normalizeSettings({
         circleStyle: "gauge",
@@ -126,44 +89,4 @@ test("settings normalize circle style picker values", () => {
     });
 
     assert.equal(settings.circleStyle, "gauge");
-});
-
-test("next net speed direction switches solid color only when the old color was default", () => {
-    const settings = normalizeNextSettings({
-        changedKey: "networkDirection",
-        changedValue: "upload",
-        state: {
-            actionKind: "net-speed",
-            isWindows: false,
-            settings: {
-                ...basePropertyInspectorSettings,
-                colorMode: "solid",
-                networkDirection: "download",
-                solidColor: basePropertyInspectorSettings.downloadSolidColor,
-                netSpeedDefaultsApplied: true,
-            },
-        },
-    });
-
-    assert.equal(settings.solidColor, basePropertyInspectorSettings.uploadSolidColor);
-});
-
-test("next net speed direction preserves custom solid color", () => {
-    const settings = normalizeNextSettings({
-        changedKey: "networkDirection",
-        changedValue: "upload",
-        state: {
-            actionKind: "net-speed",
-            isWindows: false,
-            settings: {
-                ...basePropertyInspectorSettings,
-                colorMode: "solid",
-                networkDirection: "download",
-                solidColor: "#123456",
-                netSpeedDefaultsApplied: true,
-            },
-        },
-    });
-
-    assert.equal(settings.solidColor, "#123456");
 });
