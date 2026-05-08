@@ -1,4 +1,4 @@
-import type { SettingValue } from "./settings";
+import type { ControlSettingValue } from "./settings";
 
 export interface ControlValue {
     key: string;
@@ -49,8 +49,8 @@ function readElementValue(element: HTMLElement): string {
     return element.getAttribute("value") ?? "";
 }
 
-function readValueProperty(element: HTMLElement): SettingValue {
-    const propertyTarget = element as HTMLElement & { value?: SettingValue };
+function readValueProperty(element: HTMLElement): ControlSettingValue {
+    const propertyTarget = element as HTMLElement & { value?: ControlSettingValue };
     return propertyTarget.value;
 }
 

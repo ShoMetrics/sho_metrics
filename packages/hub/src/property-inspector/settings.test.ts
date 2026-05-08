@@ -90,3 +90,16 @@ test("settings normalize circle style picker values", () => {
 
     assert.equal(settings.circleStyle, "gauge");
 });
+
+test("legacy graphic and color aliases are ignored", () => {
+    const settings = normalizeSettings({
+        graphicType: "sparkline",
+        colorMid: "#123456",
+    }, {
+        actionKind: "cpu-usage",
+        isWindows: false,
+    });
+
+    assert.equal(settings.graphicType, "circular");
+    assert.equal(settings.colorMedium, "#eab308");
+});

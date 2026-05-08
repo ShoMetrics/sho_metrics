@@ -10,11 +10,11 @@ import {
     type WidgetStoredSettings,
 } from "../settings/widget-settings";
 import type { PropertyInspectorSettingKey } from "./schema";
-import type { PropertyInspectorSettings, SettingValue } from "./settings";
+import type { PropertyInspectorSettings, ControlSettingValue } from "./settings";
 
 export interface WidgetSettingBinding {
     readonly id: PropertyInspectorSettingKey;
-    read(settings: PropertyInspectorSettings): SettingValue;
+    read(settings: PropertyInspectorSettings): ControlSettingValue;
     write(settings: WidgetStoredSettings, value: string, context: SettingsContext): WidgetStoredSettings;
 }
 

@@ -1,13 +1,13 @@
-import type { SettingValue } from "./metric-visual-settings";
 import {
     getDiskThroughputMetricKey,
     type DiskThroughputDirection,
 } from "../runtime/disk-metric-keys";
+import type { DiskMetricKind, GraphicType } from "../settings/widget-settings";
 
 export interface DiskMetricKeySettings {
-    diskMetricKind?: SettingValue;
-    graphicType?: SettingValue;
-    diskThroughputDirection?: SettingValue;
+    diskMetricKind?: DiskMetricKind;
+    graphicType?: GraphicType;
+    diskThroughputDirection?: DiskThroughputDisplayDirection;
 }
 
 export type DiskThroughputDisplayDirection = DiskThroughputDirection | "both";
@@ -29,7 +29,9 @@ export function resolveDiskMetricKeys(settings: DiskMetricKeySettings): readonly
     return [getDiskThroughputMetricKey(resolveSingleDiskThroughputDirection(throughputDirection))];
 }
 
-export function normalizeDiskThroughputDisplayDirection(value: SettingValue): DiskThroughputDisplayDirection {
+export function normalizeDiskThroughputDisplayDirection(
+    value: DiskMetricKeySettings["diskThroughputDirection"],
+): DiskThroughputDisplayDirection {
     if (value === "read" || value === "write" || value === "total") {
         return value;
     }
@@ -44,7 +46,7 @@ export function resolveSingleDiskThroughputDirection(
 }
 
 export function isDualDiskThroughputDisplay(
-    graphicType: SettingValue,
+    graphicType: GraphicType | undefined,
     direction: DiskThroughputDisplayDirection,
 ): boolean {
     return direction === "both"

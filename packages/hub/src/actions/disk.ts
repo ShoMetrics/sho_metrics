@@ -3,8 +3,7 @@ import { MetricAction } from "./metric-action";
 import { metricStore } from "../runtime/metric-store";
 import { setDualMetricDisplay, setSingleMetricDisplay } from "./single-metric-display";
 import { logger } from "../logging/logger";
-import type { SettingValue } from "./metric-visual-settings";
-import { buildDiskThroughputWidgetData, buildDiskUsageWidgetData, type DiskUsageDisplayMode } from "../metrics/storage-display";
+import { buildDiskThroughputWidgetData, buildDiskUsageWidgetData } from "../metrics/storage-display";
 import { diskVolumeRegistry, type DiskVolumeOption } from "../runtime/disk-volumes";
 import {
     getDefaultDiskUsageMetricKey,
@@ -40,7 +39,7 @@ export class Disk extends MetricAction {
 
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
         const settings = this.resolveSettings(event) as DiskSettings;
-        const metricKind = normalizeDiskMetricKind(settings.metric.diskMetricKind);
+        const metricKind = settings.metric.diskMetricKind;
 
         if (metricKind === "throughput") {
             return resolveDiskMetricKeys({
@@ -67,7 +66,7 @@ export class Disk extends MetricAction {
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event) as DiskSettings;
-        const metricKind = normalizeDiskMetricKind(settings.metric.diskMetricKind);
+        const metricKind = settings.metric.diskMetricKind;
 
         publishDiskVolumeOptions(event);
         publishDiskThroughputScaleLearning(event, settings);
@@ -95,8 +94,8 @@ export class Disk extends MetricAction {
         const usedBytesWidgetData = metricStore.getWidgetData(usedMetricKey, label, "B");
         const totalBytesWidgetData = metricStore.getWidgetData(totalMetricKey, label, "B");
         const availableBytesWidgetData = metricStore.getWidgetData(availableMetricKey, label, "B");
-        const effectiveGraphicType = resolveGraphicType(settings.appearance.graphicType);
-        const circleStyle = resolveCircleStyle(settings.appearance.circleStyle);
+        const effectiveGraphicType = settings.appearance.graphicType;
+        const circleStyle = settings.appearance.circleStyle;
         const shouldRenderGauge = effectiveGraphicType === "circular" && circleStyle === "gauge";
 
         setSingleMetricDisplay({
@@ -107,7 +106,7 @@ export class Disk extends MetricAction {
                 usedBytesWidgetData,
                 totalBytes: totalBytesWidgetData.current,
                 availableBytes: availableBytesWidgetData.current,
-                displayMode: normalizeDiskUsageDisplayMode(settings.local.diskUsageDisplayMode),
+                displayMode: settings.local.diskUsageDisplayMode,
                 label,
                 linearLabel: resolveDiskLinearLabel(settings.local.diskLinearLabel, selectedVolume, label),
             }),
@@ -126,7 +125,7 @@ export class Disk extends MetricAction {
         }
 
         const throughputDirection = normalizeDiskThroughputDisplayDirection(settings.metric.diskThroughputDirection);
-        const effectiveGraphicType = resolveGraphicType(settings.appearance.graphicType);
+        const effectiveGraphicType = settings.appearance.graphicType;
 
         if (isDualDiskThroughputDisplay(effectiveGraphicType, throughputDirection)) {
             this.updateDualThroughputDisplay(event, settings);
@@ -140,7 +139,7 @@ export class Disk extends MetricAction {
             ? formatDiskVolumeDisplayLabel(selectedVolume)
             : ARC_GAUGE_LABELS.disk;
         const bytesPerSecondWidgetData = metricStore.getWidgetData(throughputMetricKey, throughputLabel, "B/s");
-        const circleStyle = resolveCircleStyle(settings.appearance.circleStyle);
+        const circleStyle = settings.appearance.circleStyle;
         const shouldRenderGaugeFooter = effectiveGraphicType === "circular" && circleStyle === "gauge";
 
         setSingleMetricDisplay({
@@ -172,7 +171,7 @@ export class Disk extends MetricAction {
     private updateDualThroughputDisplay(event: WillAppearEvent, settings: DiskSettings): void {
         const readMetricKey = getDiskThroughputMetricKey("read");
         const writeMetricKey = getDiskThroughputMetricKey("write");
-        const effectiveGraphicType = resolveGraphicType(settings.appearance.graphicType);
+        const effectiveGraphicType = settings.appearance.graphicType;
         const dualGraphicType = effectiveGraphicType === "circular"
             ? "circular"
             : effectiveGraphicType === "text" ? "text" : undefined;
@@ -205,7 +204,7 @@ export class Disk extends MetricAction {
             centerIconFragment: getDiskIconFragment("unknown"),
             statusIcon: getMetricStatusIcon("percentage"),
             circleStyleOverride: dualGraphicType === "circular"
-                ? resolveCircleStyle(settings.appearance.circleStyle)
+                ? settings.appearance.circleStyle
                 : undefined,
             positiveColor: readColor,
             negativeColor: writeColor,
@@ -251,16 +250,14 @@ function buildDiskLinearLabel(diskVolume: DiskVolumeOption | null, fallbackLabel
 }
 
 function resolveDiskLinearLabel(
-    customLinearLabel: SettingValue,
+    customLinearLabel: string,
     diskVolume: DiskVolumeOption | null,
     fallbackLabel: string,
 ): string {
-    if (typeof customLinearLabel === "string") {
-        const normalizedLinearLabel = customLinearLabel.trim();
+    const normalizedLinearLabel = customLinearLabel.trim();
 
-        if (normalizedLinearLabel.length > 0) {
-            return normalizedLinearLabel;
-        }
+    if (normalizedLinearLabel.length > 0) {
+        return normalizedLinearLabel;
     }
 
     return buildDiskLinearLabel(diskVolume, fallbackLabel);
@@ -320,32 +317,8 @@ const DISK_THROUGHPUT_DIRECTION_ICON_COLOR = "rgba(255,255,255,0.88)";
 const DISK_THROUGHPUT_DIRECTION_ICON_SIZE = 30;
 const DISK_GAUGE_FOOTER_ICON_SIZE = 25;
 
-function normalizeDiskMetricKind(value: SettingValue): "usage" | "throughput" {
-    return value === "throughput" ? "throughput" : "usage";
-}
-
-function resolveGraphicType(value: SettingValue): "circular" | "text" | "linear" | "dashed-line" {
-    if (value === "text" || value === "linear" || value === "dashed-line") {
-        return value;
-    }
-
-    return "circular";
-}
-
-function resolveCircleStyle(value: SettingValue): "value" | "compact" | "gauge" {
-    if (value === "compact" || value === "gauge") {
-        return value;
-    }
-
-    return "value";
-}
-
-function normalizeDiskUsageDisplayMode(value: SettingValue): DiskUsageDisplayMode {
-    return value === "space" ? "space" : "percentage";
-}
-
-function resolveSelectedDiskVolume(value: SettingValue): DiskVolumeOption | null {
-    if (typeof value === "string" && value.length > 0) {
+function resolveSelectedDiskVolume(value: string): DiskVolumeOption | null {
+    if (value.length > 0) {
         return diskVolumeRegistry.findById(value);
     }
 
@@ -476,7 +449,7 @@ function buildDiskChannelThresholds(options: {
     ];
 }
 
-function normalizeThreshold(value: SettingValue, fallbackValue: number): number {
+function normalizeThreshold(value: number, fallbackValue: number): number {
     const numericValue = Number(value);
 
     if (!Number.isFinite(numericValue)) {
@@ -486,11 +459,7 @@ function normalizeThreshold(value: SettingValue, fallbackValue: number): number 
     return Math.min(Math.max(Math.round(numericValue), 0), 100);
 }
 
-function resolveHexColor(value: SettingValue, fallbackColor: string): string {
-    if (typeof value !== "string") {
-        return fallbackColor;
-    }
-
+function resolveHexColor(value: string, fallbackColor: string): string {
     return /^#[0-9a-f]{6}$/i.test(value) ? value : fallbackColor;
 }
 
@@ -519,7 +488,7 @@ function publishDiskVolumeOptions(event: WillAppearEvent): void {
 
 function publishDiskThroughputScaleLearning(event: WillAppearEvent, settings: DiskSettings): void {
     if (
-        normalizeDiskMetricKind(settings.metric.diskMetricKind) !== "throughput"
+        settings.metric.diskMetricKind !== "throughput"
         || settings.diskThroughput.diskThroughputScaleMode === "custom"
     ) {
         return;

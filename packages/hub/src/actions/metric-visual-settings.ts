@@ -2,25 +2,25 @@ import type { ColorConfig, ColorThreshold } from "../rendering/color-resolver";
 import type { GraphicThemePresetName, GraphicType } from "../widgets/widget.interface";
 import type { ArcGaugeStyle } from "../widgets/primitives/arc-gauge";
 import type { SparklineGridLineType, SparklineGridLineVisibility } from "../widgets/primitives/sparkline";
+import { defaultAppearanceSettings, type AppearanceSettings } from "../settings/widget-settings";
 
-export type SettingValue = string | number | boolean | null | undefined;
-
-export interface MetricVisualSettings {
-    graphicType?: SettingValue;
-    circleStyle?: SettingValue;
-    graphicStyle?: SettingValue;
-    colorMode?: SettingValue;
-    solidColor?: SettingValue;
-    lowThreshold?: SettingValue;
-    highThreshold?: SettingValue;
-    colorLow?: SettingValue;
-    colorMedium?: SettingValue;
-    colorMid?: SettingValue;
-    colorHigh?: SettingValue;
-    lineSmoothingPercent?: SettingValue;
-    gridLineVisibility?: SettingValue;
-    gridLineType?: SettingValue;
-}
+export type MetricVisualSettings = AppearanceSettings;
+export type MetricVisualSettingsOverride = Partial<Pick<
+    AppearanceSettings,
+    | "graphicType"
+    | "circleStyle"
+    | "graphicStyle"
+    | "colorMode"
+    | "solidColor"
+    | "lowThreshold"
+    | "highThreshold"
+    | "colorLow"
+    | "colorMedium"
+    | "colorHigh"
+    | "lineSmoothingPercent"
+    | "gridLineVisibility"
+    | "gridLineType"
+>>;
 
 export interface ResolvedMetricVisualSettings {
     graphicType: GraphicType;
@@ -32,113 +32,100 @@ export interface ResolvedMetricVisualSettings {
     gridLineType: SparklineGridLineType;
 }
 
-const DEFAULT_LOW_THRESHOLD = 30;
-const DEFAULT_HIGH_THRESHOLD = 70;
 const MINIMUM_THRESHOLD = 0;
 const MAXIMUM_THRESHOLD = 100;
 
-const DEFAULT_SOLID_COLOR = "#3b82f6";
-const DEFAULT_LOW_COLOR = "#22c55e";
-const DEFAULT_MEDIUM_COLOR = "#eab308";
-const DEFAULT_HIGH_COLOR = "#ef4444";
-const DEFAULT_LINE_SMOOTHING_PERCENT = 75;
-
-const GRAPHIC_TYPE_ALIASES: Record<string, GraphicType> = {
-    "arc-gauge": "circular",
-    "linear-bar": "linear",
-    "sparkline": "dashed-line",
-    "circular": "circular",
-    "text": "text",
-    "linear": "linear",
-    "dashed-line": "dashed-line",
-};
-
-const GRAPHIC_THEME_PRESET_NAMES: readonly GraphicThemePresetName[] = ["flat", "cupertino-glass"];
-
 export function resolveMetricVisualSettings(
-    settings: MetricVisualSettings,
+    settings: AppearanceSettings,
 ): ResolvedMetricVisualSettings {
-    const effectiveSettings = settings;
-    const graphicType = resolveGraphicType(effectiveSettings.graphicType);
-    const graphicStyle = resolveGraphicStyle(effectiveSettings.graphicStyle);
+    const graphicType = resolveGraphicType(settings.graphicType);
+    const graphicStyle = resolveGraphicStyle(settings.graphicStyle);
 
     return {
         graphicType,
-        circleStyle: resolveCircleStyle(effectiveSettings.circleStyle),
+        circleStyle: resolveCircleStyle(settings.circleStyle),
         graphicStyle,
-        colorConfig: buildColorConfig(effectiveSettings),
+        colorConfig: buildColorConfig(settings),
         lineSmoothingPercent: normalizePercentageSetting(
-            effectiveSettings.lineSmoothingPercent,
-            DEFAULT_LINE_SMOOTHING_PERCENT,
+            settings.lineSmoothingPercent,
+            defaultAppearanceSettings.lineSmoothingPercent,
         ),
-        gridLineVisibility: resolveGridLineVisibility(effectiveSettings.gridLineVisibility),
-        gridLineType: resolveGridLineType(effectiveSettings.gridLineType),
+        gridLineVisibility: resolveGridLineVisibility(settings.gridLineVisibility),
+        gridLineType: resolveGridLineType(settings.gridLineType),
     };
 }
 
-function resolveGraphicType(value: SettingValue): GraphicType {
-    if (typeof value !== "string") {
-        return "circular";
+function resolveGraphicType(value: AppearanceSettings["graphicType"]): GraphicType {
+    switch (value) {
+        case "circular":
+        case "text":
+        case "linear":
+        case "dashed-line":
+            return value;
     }
 
-    return GRAPHIC_TYPE_ALIASES[value] ?? "circular";
+    return defaultAppearanceSettings.graphicType;
 }
 
-function resolveCircleStyle(value: SettingValue): ArcGaugeStyle {
-    if (value === "compact" || value === "gauge") {
-        return value;
+function resolveCircleStyle(value: AppearanceSettings["circleStyle"]): ArcGaugeStyle {
+    switch (value) {
+        case "compact":
+        case "gauge":
+        case "value":
+            return value;
     }
 
-    return "value";
+    return defaultAppearanceSettings.circleStyle;
 }
 
-function resolveGraphicStyle(value: SettingValue): GraphicThemePresetName {
-    if (GRAPHIC_THEME_PRESET_NAMES.includes(value as GraphicThemePresetName)) {
-        return value as GraphicThemePresetName;
+function resolveGraphicStyle(value: AppearanceSettings["graphicStyle"]): GraphicThemePresetName {
+    switch (value) {
+        case "flat":
+        case "cupertino-glass":
+            return value;
     }
 
-    return "flat";
+    return defaultAppearanceSettings.graphicStyle;
 }
 
-function resolveGridLineVisibility(value: SettingValue): SparklineGridLineVisibility {
-    if (value === "none") {
-        return "none";
+function resolveGridLineVisibility(value: AppearanceSettings["gridLineVisibility"]): SparklineGridLineVisibility {
+    switch (value) {
+        case "none":
+        case "always":
+        case "adaptive":
+            return value;
     }
 
-    if (value === "always") {
-        return "always";
-    }
-
-    return "adaptive";
+    return defaultAppearanceSettings.gridLineVisibility;
 }
 
-function resolveGridLineType(value: SettingValue): SparklineGridLineType {
-    return value === "vertical" ? "vertical" : "horizontal";
+function resolveGridLineType(value: AppearanceSettings["gridLineType"]): SparklineGridLineType {
+    return value === "vertical" ? "vertical" : defaultAppearanceSettings.gridLineType;
 }
 
-function buildColorConfig(settings: MetricVisualSettings): ColorConfig {
+function buildColorConfig(settings: AppearanceSettings): ColorConfig {
     const colorMode = settings.colorMode === "solid" ? "solid" : "threshold";
     const { lowThreshold, highThreshold } = resolveThresholdPair(settings.lowThreshold, settings.highThreshold);
 
     return {
         mode: colorMode,
-        solidColor: resolveColorSetting(settings.solidColor, DEFAULT_SOLID_COLOR),
+        solidColor: resolveColorSetting(settings.solidColor, defaultAppearanceSettings.solidColor),
         thresholds: buildThresholds({
             lowThreshold,
             highThreshold,
-            lowColor: resolveColorSetting(settings.colorLow, DEFAULT_LOW_COLOR),
-            mediumColor: resolveColorSetting(settings.colorMedium ?? settings.colorMid, DEFAULT_MEDIUM_COLOR),
-            highColor: resolveColorSetting(settings.colorHigh, DEFAULT_HIGH_COLOR),
+            lowColor: resolveColorSetting(settings.colorLow, defaultAppearanceSettings.colorLow),
+            mediumColor: resolveColorSetting(settings.colorMedium, defaultAppearanceSettings.colorMedium),
+            highColor: resolveColorSetting(settings.colorHigh, defaultAppearanceSettings.colorHigh),
         }),
     };
 }
 
 function resolveThresholdPair(
-    lowThresholdValue: SettingValue,
-    highThresholdValue: SettingValue,
+    lowThresholdValue: number,
+    highThresholdValue: number,
 ): { lowThreshold: number; highThreshold: number } {
-    const lowThreshold = resolveThresholdValue(lowThresholdValue, DEFAULT_LOW_THRESHOLD);
-    const highThreshold = resolveThresholdValue(highThresholdValue, DEFAULT_HIGH_THRESHOLD);
+    const lowThreshold = resolveThresholdValue(lowThresholdValue, defaultAppearanceSettings.lowThreshold);
+    const highThreshold = resolveThresholdValue(highThresholdValue, defaultAppearanceSettings.highThreshold);
 
     if (lowThreshold <= highThreshold) {
         return { lowThreshold, highThreshold };
@@ -150,7 +137,7 @@ function resolveThresholdPair(
     };
 }
 
-function resolveThresholdValue(value: SettingValue, fallbackValue: number): number {
+function resolveThresholdValue(value: number, fallbackValue: number): number {
     const numericValue = Number(value);
 
     if (!Number.isFinite(numericValue)) {
@@ -160,7 +147,7 @@ function resolveThresholdValue(value: SettingValue, fallbackValue: number): numb
     return Math.round(Math.min(Math.max(numericValue, MINIMUM_THRESHOLD), MAXIMUM_THRESHOLD));
 }
 
-function resolveColorSetting(value: SettingValue, fallbackColor: string): string {
+function resolveColorSetting(value: string, fallbackColor: string): string {
     if (typeof value !== "string") {
         return fallbackColor;
     }
@@ -169,7 +156,7 @@ function resolveColorSetting(value: SettingValue, fallbackColor: string): string
     return /^#[0-9a-f]{6}$/i.test(normalizedColor) ? normalizedColor : fallbackColor;
 }
 
-function normalizePercentageSetting(value: SettingValue, fallbackValue: number): number {
+function normalizePercentageSetting(value: number, fallbackValue: number): number {
     const numericValue = Number(value);
 
     if (!Number.isFinite(numericValue)) {

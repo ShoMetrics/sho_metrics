@@ -14,8 +14,8 @@ import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
 import {
     resolveMetricVisualSettings,
     type MetricVisualSettings,
+    type MetricVisualSettingsOverride,
     type ResolvedMetricVisualSettings,
-    type SettingValue,
 } from "./metric-visual-settings";
 
 interface BaseMetricDisplayOptions {
@@ -26,7 +26,7 @@ interface BaseMetricDisplayOptions {
     linearIconFragment?: string;
     statusIcon: ArcGaugeStatusIcon;
     circleStyleOverride?: ResolvedMetricVisualSettings["circleStyle"];
-    visualSettingsOverride?: Partial<MetricVisualSettings>;
+    visualSettingsOverride?: MetricVisualSettingsOverride;
     resolvedSettings: SingleMetricDisplaySettings;
 }
 
@@ -49,9 +49,7 @@ export interface DualMetricDisplayOptions extends BaseMetricDisplayOptions {
     negativeStatusIcon?: ArcGaugeStatusIcon;
 }
 
-export interface SingleMetricDisplaySettings extends MetricVisualSettings {
-    circleStyle?: SettingValue;
-}
+export type SingleMetricDisplaySettings = MetricVisualSettings;
 
 export type MetricDisplayOptions = SingleMetricDisplayOptions | DualMetricDisplayOptions;
 

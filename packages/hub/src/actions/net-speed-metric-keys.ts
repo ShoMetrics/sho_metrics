@@ -1,15 +1,15 @@
-import type { SettingValue } from "./metric-visual-settings";
 import { networkInterfaceRegistry } from "../runtime/network-interfaces";
 import {
     getNetworkAggregateMetricKey,
     getNetworkInterfaceMetricKey,
     type NetworkDirection,
 } from "../runtime/network-metric-keys";
+import type { GraphicType } from "../settings/widget-settings";
 
 export interface NetworkSpeedMetricKeySettings {
-    graphicType?: SettingValue;
-    networkDirection?: SettingValue;
-    networkInterfaceId?: SettingValue;
+    graphicType?: GraphicType;
+    networkDirection?: NetworkDisplayDirection;
+    networkInterfaceId?: string;
 }
 
 type NetworkDisplayDirection = NetworkDirection | "both";
@@ -42,7 +42,7 @@ export function resolveNetSpeedMetricKeys(settings: NetworkSpeedMetricKeySetting
     ];
 }
 
-export function normalizeNetworkDisplayDirection(value: SettingValue): NetworkDisplayDirection {
+export function normalizeNetworkDisplayDirection(value: NetworkSpeedMetricKeySettings["networkDirection"]): NetworkDisplayDirection {
     if (value === "download" || value === "upload") {
         return value;
     }
@@ -54,8 +54,8 @@ export function resolveSingleNetworkDirection(direction: NetworkDisplayDirection
     return direction === "upload" ? "upload" : "download";
 }
 
-function resolveNetworkInterface(value: SettingValue) {
-    if (typeof value === "string" && value.length > 0) {
+function resolveNetworkInterface(value: string | undefined) {
+    if (value && value.length > 0) {
         return networkInterfaceRegistry.findById(value);
     }
 
