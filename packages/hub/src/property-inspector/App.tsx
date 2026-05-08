@@ -17,9 +17,7 @@ import {
     normalizePluginGlobalSettings,
     normalizeWidgetStoredSettings,
     resolveWidgetSettings,
-    setWidgetFieldOverride,
     type PluginGlobalSettings,
-    type WidgetStoredSettingKey,
     type WidgetStoredSettings,
 } from "../settings/widget-settings";
 import {
@@ -29,6 +27,10 @@ import {
 } from "./stream-deck-client";
 import type { PropertyInspectorSettingKey, VisibilityContext } from "./schema";
 import type { ScenarioSectionId } from "./scenario-model";
+import {
+    findWidgetSettingBinding,
+    updateWidgetStoredSettings,
+} from "./widget-setting-bindings";
 
 interface AppProps {
     client: StreamDeckPropertyInspectorClient;
@@ -70,11 +72,21 @@ export function App({ client }: AppProps): React.JSX.Element {
 
     const updateSetting = (changedKey: PropertyInspectorSettingKey, changedValue: string): void => {
         setState((currentState) => {
-            const nextStoredSettings = setWidgetFieldOverride(
-                currentState.storedSettings,
-                changedKey as WidgetStoredSettingKey,
-                changedValue,
-            );
+            const binding = findWidgetSettingBinding(changedKey);
+
+            if (!binding) {
+                return currentState;
+            }
+
+            const nextStoredSettings = updateWidgetStoredSettings({
+                storedSettings: currentState.storedSettings,
+                binding,
+                value: changedValue,
+                context: {
+                    actionKind: currentState.actionKind,
+                    isWindows: currentState.isWindows,
+                },
+            });
             const nextSettings = buildResolvedPropertyInspectorSettings({
                 storedSettings: nextStoredSettings,
                 globalSettings: currentState.globalSettings,
