@@ -4,7 +4,6 @@ import { metricStore } from "../runtime/metric-store";
 import { setDualMetricDisplay, setSingleMetricDisplay } from "./single-metric-display";
 import { logger } from "../logging/logger";
 import type { WidgetData } from "../rendering/widget-data";
-import type { SettingValue } from "./metric-visual-settings";
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../runtime/network-interfaces";
 import { getNetworkAggregateMetricKey, getNetworkInterfaceMetricKey, type NetworkDirection } from "../runtime/network-metric-keys";
 import {
@@ -15,7 +14,6 @@ import {
 import {
     buildNetworkSpeedWidgetData,
     convertMegabitsPerSecondToBytesPerSecond,
-    type NetworkSpeedUnitBase,
 } from "../metrics/network-speed-display";
 import { resolveColor, type ColorConfig } from "../rendering/color-resolver";
 import { buildGlobalChannelColorConfig } from "../settings/global-appearance";
@@ -54,10 +52,10 @@ export class NetSpeed extends MetricAction {
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event);
-        const effectiveGraphicType = resolveGraphicType(settings.appearance.graphicType);
+        const effectiveGraphicType = settings.appearance.graphicType;
         const displayDirection = normalizeNetworkDisplayDirection(settings.metric.networkDirection);
         const direction = resolveSingleNetworkDirection(displayDirection);
-        const isAutomaticNetworkInterface = !isNonEmptyString(settings.metric.networkInterfaceId);
+        const isAutomaticNetworkInterface = settings.metric.networkInterfaceId.length === 0;
         const selectedNetworkInterface = resolveNetworkInterface(settings.metric.networkInterfaceId);
         const networkMetricKey = selectedNetworkInterface
             ? getNetworkInterfaceMetricKey(direction, selectedNetworkInterface.id)
@@ -115,7 +113,7 @@ export class NetSpeed extends MetricAction {
             widgetData,
         });
 
-        const circleStyle = resolveCircleStyle(settings.appearance.circleStyle);
+        const circleStyle = settings.appearance.circleStyle;
         const shouldRenderGaugeFooter = effectiveGraphicType === "circular" && circleStyle === "gauge";
         const renderedWidgetData = shouldRenderGaugeFooter
             ? { ...widgetData, label: ARC_GAUGE_LABELS.network }
@@ -181,7 +179,7 @@ export class NetSpeed extends MetricAction {
         const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
         const uploadColorConfig = buildNetworkChannelColorConfig("upload", options.settings);
         const downloadColorConfig = buildNetworkChannelColorConfig("download", options.settings);
-        const circleStyle = resolveCircleStyle(options.settings.appearance.circleStyle);
+        const circleStyle = options.settings.appearance.circleStyle;
 
         setDualMetricDisplay({
             event: options.event,
@@ -259,7 +257,7 @@ export class NetSpeed extends MetricAction {
         });
         const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData);
         const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
-        const trafficDisplayMode = resolveNetworkTrafficDisplayMode(options.settings.local.networkTrafficDisplayMode);
+        const trafficDisplayMode = options.settings.local.networkTrafficDisplayMode;
         const positiveDirection = trafficDisplayMode === "mirrored" ? "upload" : "download";
         const negativeDirection = trafficDisplayMode === "mirrored" ? "download" : "upload";
         const positiveWidgetData = trafficDisplayMode === "mirrored" ? uploadWidgetData : downloadWidgetData;
@@ -436,8 +434,8 @@ const NETWORK_TOP_ICON_SIZE = 30;
 const NETWORK_FOOTER_ICON_SIZE = 21;
 const DEBUG_LOG_INTERVAL_MILLISECONDS = 5000;
 
-function resolveNetworkInterface(value: SettingValue): NetworkInterfaceOption | null {
-    if (isNonEmptyString(value)) {
+function resolveNetworkInterface(value: string): NetworkInterfaceOption | null {
+    if (value.length > 0) {
         return networkInterfaceRegistry.findById(value);
     }
 
@@ -461,7 +459,7 @@ function buildNetworkWidgetData(options: {
             isAutomaticNetworkInterface: options.isAutomaticNetworkInterface,
         }),
         label: getNetworkDirectionLabel(options.direction),
-        unitBase: resolveUnitBase(options.settings.network.networkUnitBase),
+        unitBase: options.settings.network.networkUnitBase,
         maximumDisplayDigits: NETWORK_SPEED_MAXIMUM_DISPLAY_DIGITS,
         sampleTimestampMilliseconds: options.rawWidgetData.sampleTimestampMilliseconds,
     });
@@ -498,30 +496,6 @@ function resolveMaximumMegabitsPerSecond(options: {
     return options.direction === "download"
         ? DEFAULT_DOWNLOAD_MAXIMUM_SPEED_MEGABITS_PER_SECOND
         : DEFAULT_UPLOAD_MAXIMUM_SPEED_MEGABITS_PER_SECOND;
-}
-
-function resolveUnitBase(value: SettingValue): NetworkSpeedUnitBase {
-    return value === "bit" ? "bit" : "byte";
-}
-
-function resolveNetworkTrafficDisplayMode(value: SettingValue): "overlay" | "mirrored" {
-    return value === "overlay" ? "overlay" : "mirrored";
-}
-
-function resolveGraphicType(value: SettingValue): "circular" | "text" | "linear" | "dashed-line" {
-    if (value === "text" || value === "linear" || value === "dashed-line") {
-        return value;
-    }
-
-    return "circular";
-}
-
-function resolveCircleStyle(value: SettingValue): "value" | "compact" | "gauge" {
-    if (value === "compact" || value === "gauge") {
-        return value;
-    }
-
-    return "value";
 }
 
 function getNetworkDirectionLabel(direction: NetworkDirection): string {
@@ -602,7 +576,7 @@ function buildChannelThresholds(options: {
     ];
 }
 
-function normalizeThreshold(value: SettingValue, fallbackValue: number): number {
+function normalizeThreshold(value: number, fallbackValue: number): number {
     const numericValue = Number(value);
 
     if (!Number.isFinite(numericValue)) {
@@ -612,16 +586,8 @@ function normalizeThreshold(value: SettingValue, fallbackValue: number): number 
     return Math.min(Math.max(Math.round(numericValue), 0), 100);
 }
 
-function resolveHexColor(value: SettingValue, fallbackColor: string): string {
-    if (typeof value !== "string") {
-        return fallbackColor;
-    }
-
+function resolveHexColor(value: string, fallbackColor: string): string {
     return /^#[0-9a-f]{6}$/i.test(value) ? value : fallbackColor;
-}
-
-function isNonEmptyString(value: SettingValue): value is string {
-    return typeof value === "string" && value.length > 0;
 }
 
 function formatNetworkInterfaceDebugValue(networkInterface: NetworkInterfaceOption | null): string {

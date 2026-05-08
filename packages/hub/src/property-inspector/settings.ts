@@ -1,4 +1,4 @@
-export type SettingValue = string | number | boolean | null | undefined;
+export type ControlSettingValue = string | number | boolean | null | undefined;
 
 export type ActionKind =
     | "cpu-usage"
@@ -79,7 +79,7 @@ export interface PropertyInspectorSettings {
     maximumTemperatureCelsius: number;
     maximumGpuPowerWatts: number | "";
     temperatureUnit: TemperatureUnit;
-    [key: string]: SettingValue;
+    [key: string]: ControlSettingValue;
 }
 
 export interface NormalizeSettingsContext {
@@ -145,7 +145,7 @@ export const basePropertyInspectorSettings: PropertyInspectorSettings = {
 const pollingFrequencyValues = [1, 2, 3, 5, 10, 15, 30, 60] as const;
 
 export function normalizePropertyInspectorSettings(
-    rawSettings: Record<string, SettingValue>,
+    rawSettings: Record<string, ControlSettingValue>,
     context: NormalizeSettingsContext,
 ): PropertyInspectorSettings {
     const shouldApplyNetSpeedDefaults = context.actionKind === "net-speed"
@@ -227,10 +227,7 @@ export function normalizePropertyInspectorSettings(
         lowThreshold: normalizeThreshold(rawSettings.lowThreshold, basePropertyInspectorSettings.lowThreshold),
         highThreshold: normalizeThreshold(rawSettings.highThreshold, basePropertyInspectorSettings.highThreshold),
         colorLow: normalizeHexColor(rawSettings.colorLow, basePropertyInspectorSettings.colorLow),
-        colorMedium: normalizeHexColor(
-            rawSettings.colorMedium ?? rawSettings.colorMid,
-            basePropertyInspectorSettings.colorMedium,
-        ),
+        colorMedium: normalizeHexColor(rawSettings.colorMedium, basePropertyInspectorSettings.colorMedium),
         colorHigh: normalizeHexColor(rawSettings.colorHigh, basePropertyInspectorSettings.colorHigh),
         lineSmoothingPercent: normalizeThreshold(
             rawSettings.lineSmoothingPercent,
@@ -241,7 +238,7 @@ export function normalizePropertyInspectorSettings(
     };
 }
 
-export function normalizeThreshold(value: SettingValue, fallbackValue: number): number {
+export function normalizeThreshold(value: ControlSettingValue, fallbackValue: number): number {
     const numericValue = Number(value);
 
     if (!Number.isFinite(numericValue)) {
@@ -251,7 +248,7 @@ export function normalizeThreshold(value: SettingValue, fallbackValue: number): 
     return Math.min(Math.max(Math.round(numericValue), 0), 100);
 }
 
-export function normalizePositiveNumber(value: SettingValue, fallbackValue: number): number {
+export function normalizePositiveNumber(value: ControlSettingValue, fallbackValue: number): number {
     const numericValue = Number(value);
 
     if (!Number.isFinite(numericValue) || numericValue <= 0) {
@@ -261,7 +258,7 @@ export function normalizePositiveNumber(value: SettingValue, fallbackValue: numb
     return Math.round(numericValue);
 }
 
-export function normalizeOptionalPositiveNumber(value: SettingValue): number | "" {
+export function normalizeOptionalPositiveNumber(value: ControlSettingValue): number | "" {
     if (value === "" || value == null) {
         return "";
     }
@@ -275,7 +272,7 @@ export function normalizeOptionalPositiveNumber(value: SettingValue): number | "
     return Math.round(numericValue);
 }
 
-export function normalizePollingFrequency(value: SettingValue): number {
+export function normalizePollingFrequency(value: ControlSettingValue): number {
     const numericValue = Number(value);
 
     return pollingFrequencyValues.includes(numericValue as typeof pollingFrequencyValues[number])
@@ -283,7 +280,7 @@ export function normalizePollingFrequency(value: SettingValue): number {
         : basePropertyInspectorSettings.pollingFrequencySeconds;
 }
 
-export function normalizeDiskMetricKind(value: SettingValue, isWindows: boolean): DiskMetricKind {
+export function normalizeDiskMetricKind(value: ControlSettingValue, isWindows: boolean): DiskMetricKind {
     if (isWindows && value === "throughput") {
         return "usage";
     }
@@ -291,11 +288,11 @@ export function normalizeDiskMetricKind(value: SettingValue, isWindows: boolean)
     return value === "throughput" ? "throughput" : "usage";
 }
 
-export function normalizeDiskUsageDisplayMode(value: SettingValue): DiskUsageDisplayMode {
+export function normalizeDiskUsageDisplayMode(value: ControlSettingValue): DiskUsageDisplayMode {
     return value === "space" ? "space" : "percentage";
 }
 
-export function normalizeDiskThroughputDirection(value: SettingValue): DiskThroughputDirection {
+export function normalizeDiskThroughputDirection(value: ControlSettingValue): DiskThroughputDirection {
     if (value === "both") {
         return "both";
     }
@@ -307,7 +304,7 @@ export function normalizeDiskThroughputDirection(value: SettingValue): DiskThrou
     return "both";
 }
 
-export function normalizeNetworkDirection(value: SettingValue): NetworkDirection {
+export function normalizeNetworkDirection(value: ControlSettingValue): NetworkDirection {
     if (value === "both") {
         return "both";
     }
@@ -319,19 +316,19 @@ export function normalizeNetworkDirection(value: SettingValue): NetworkDirection
     return "both";
 }
 
-export function normalizeNetworkTrafficDisplayMode(value: SettingValue): NetworkTrafficDisplayMode {
+export function normalizeNetworkTrafficDisplayMode(value: ControlSettingValue): NetworkTrafficDisplayMode {
     return value === "overlay" ? "overlay" : "mirrored";
 }
 
-export function normalizeTemperatureUnit(value: SettingValue): TemperatureUnit {
+export function normalizeTemperatureUnit(value: ControlSettingValue): TemperatureUnit {
     return value === "fahrenheit" ? "fahrenheit" : "celsius";
 }
 
-export function normalizeScaleMode(value: SettingValue): ScaleMode {
+export function normalizeScaleMode(value: ControlSettingValue): ScaleMode {
     return value === "custom" ? "custom" : "auto";
 }
 
-export function normalizeGridLineVisibility(value: SettingValue): GridLineVisibility {
+export function normalizeGridLineVisibility(value: ControlSettingValue): GridLineVisibility {
     if (value === "none") {
         return "none";
     }
@@ -343,7 +340,7 @@ export function normalizeGridLineVisibility(value: SettingValue): GridLineVisibi
     return "adaptive";
 }
 
-export function normalizeGridLineType(value: SettingValue): GridLineType {
+export function normalizeGridLineType(value: ControlSettingValue): GridLineType {
     return value === "vertical" ? "vertical" : "horizontal";
 }
 
@@ -351,7 +348,7 @@ export function resolveDefaultDiskPollingFrequency(diskMetricKind: DiskMetricKin
     return diskMetricKind === "throughput" ? 1 : 60;
 }
 
-export function resolveDefaultSolidColor(networkDirection: SettingValue): string {
+export function resolveDefaultSolidColor(networkDirection: ControlSettingValue): string {
     return normalizeNetworkDirection(networkDirection) === "upload"
         ? basePropertyInspectorSettings.uploadSolidColor
         : basePropertyInspectorSettings.downloadSolidColor;
@@ -376,7 +373,7 @@ export function resolveActionKind(actionUuid: string): ActionKind {
     return "unknown";
 }
 
-function normalizeGraphicType(value: SettingValue): GraphicType {
+function normalizeGraphicType(value: ControlSettingValue): GraphicType {
     if (value === "text" || value === "linear" || value === "dashed-line") {
         return value;
     }
@@ -384,7 +381,7 @@ function normalizeGraphicType(value: SettingValue): GraphicType {
     return "circular";
 }
 
-function normalizeCircleStyle(value: SettingValue): CircleStyle {
+function normalizeCircleStyle(value: ControlSettingValue): CircleStyle {
     if (value === "compact" || value === "gauge") {
         return value;
     }
@@ -392,7 +389,7 @@ function normalizeCircleStyle(value: SettingValue): CircleStyle {
     return "value";
 }
 
-function normalizeColorMode(value: SettingValue, actionKind: ActionKind): ColorMode {
+function normalizeColorMode(value: ControlSettingValue, actionKind: ActionKind): ColorMode {
     if (value === "threshold") {
         return "threshold";
     }
@@ -404,7 +401,7 @@ function normalizeColorMode(value: SettingValue, actionKind: ActionKind): ColorM
     return actionKind === "net-speed" ? "solid" : "threshold";
 }
 
-function normalizeHexColor(value: SettingValue, fallbackColor: string): string {
+function normalizeHexColor(value: ControlSettingValue, fallbackColor: string): string {
     if (typeof value !== "string") {
         return fallbackColor;
     }
@@ -412,6 +409,6 @@ function normalizeHexColor(value: SettingValue, fallbackColor: string): string {
     return /^#[0-9a-f]{6}$/i.test(value) ? value : fallbackColor;
 }
 
-function normalizeString(value: SettingValue, fallbackValue: string): string {
+function normalizeString(value: ControlSettingValue, fallbackValue: string): string {
     return typeof value === "string" ? value : fallbackValue;
 }

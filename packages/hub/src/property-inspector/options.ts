@@ -1,8 +1,8 @@
 import type { OptionProviderId, SelectOption, VisibilityContext } from "./schema";
-import type { SettingValue } from "./settings";
+import type { ControlSettingValue } from "./settings";
 
 interface NetworkInterfaceOption {
-    [key: string]: SettingValue;
+    [key: string]: ControlSettingValue;
     id: string;
     name: string;
     type: string;
@@ -11,7 +11,7 @@ interface NetworkInterfaceOption {
 }
 
 interface DiskVolumeOption {
-    [key: string]: SettingValue;
+    [key: string]: ControlSettingValue;
     id: string;
     fs: string;
     mount: string;
@@ -29,7 +29,7 @@ export function resolveFieldOptions(providerId: OptionProviderId, context: Visib
     return buildDiskVolumeOptions(context.settings.availableDiskVolumes);
 }
 
-function buildNetworkInterfaceOptions(value: SettingValue): SelectOption[] {
+function buildNetworkInterfaceOptions(value: ControlSettingValue): SelectOption[] {
     return [
         { value: "", label: "Automatic" },
         ...parseNetworkInterfaceOptions(value).map((networkInterface) => {
@@ -47,7 +47,7 @@ function buildNetworkInterfaceOptions(value: SettingValue): SelectOption[] {
     ];
 }
 
-function buildDiskVolumeOptions(value: SettingValue): SelectOption[] {
+function buildDiskVolumeOptions(value: ControlSettingValue): SelectOption[] {
     return [
         { value: "", label: "Automatic" },
         ...parseDiskVolumeOptions(value).map((diskVolume) => ({
@@ -57,11 +57,11 @@ function buildDiskVolumeOptions(value: SettingValue): SelectOption[] {
     ];
 }
 
-function parseNetworkInterfaceOptions(value: SettingValue): NetworkInterfaceOption[] {
+function parseNetworkInterfaceOptions(value: ControlSettingValue): NetworkInterfaceOption[] {
     return parseJsonArray(value).filter(isNetworkInterfaceOption);
 }
 
-function parseDiskVolumeOptions(value: SettingValue): DiskVolumeOption[] {
+function parseDiskVolumeOptions(value: ControlSettingValue): DiskVolumeOption[] {
     return parseJsonArray(value).filter(isDiskVolumeOption);
 }
 
@@ -95,13 +95,13 @@ function resolveSelectedDiskVolume(context: VisibilityContext): DiskVolumeOption
         ?? null;
 }
 
-function parseJsonArray(value: SettingValue): Record<string, SettingValue>[] {
+function parseJsonArray(value: ControlSettingValue): Record<string, ControlSettingValue>[] {
     if (typeof value !== "string") {
         return [];
     }
 
     try {
-        const parsedValue = JSON.parse(value) as SettingValue | Record<string, SettingValue>[];
+        const parsedValue = JSON.parse(value) as ControlSettingValue | Record<string, ControlSettingValue>[];
 
         return Array.isArray(parsedValue)
             ? parsedValue.filter(isRecord)
@@ -111,13 +111,13 @@ function parseJsonArray(value: SettingValue): Record<string, SettingValue>[] {
     }
 }
 
-function isNetworkInterfaceOption(value: Record<string, SettingValue>): value is NetworkInterfaceOption {
+function isNetworkInterfaceOption(value: Record<string, ControlSettingValue>): value is NetworkInterfaceOption {
     return typeof value.id === "string"
         && typeof value.name === "string"
         && typeof value.type === "string";
 }
 
-function isDiskVolumeOption(value: Record<string, SettingValue>): value is DiskVolumeOption {
+function isDiskVolumeOption(value: Record<string, ControlSettingValue>): value is DiskVolumeOption {
     return typeof value.id === "string"
         && typeof value.fs === "string"
         && typeof value.mount === "string"
@@ -186,7 +186,7 @@ function resolveCompactDiskStorageLabel(diskVolume: DiskVolumeOption): string {
     return "DSK";
 }
 
-function isRecord(value: SettingValue | Record<string, SettingValue>): value is Record<string, SettingValue> {
+function isRecord(value: ControlSettingValue | Record<string, ControlSettingValue>): value is Record<string, ControlSettingValue> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 

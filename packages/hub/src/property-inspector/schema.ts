@@ -1,4 +1,4 @@
-import type { ActionKind, PropertyInspectorSettings, SettingValue } from "./settings";
+import type { ActionKind, PropertyInspectorSettings, ControlSettingValue } from "./settings";
 import type { InspectorScope } from "./scopes";
 
 export type PropertyInspectorSettingKey = Extract<keyof PropertyInspectorSettings, string>;
@@ -45,7 +45,7 @@ export interface FieldSchema {
     label?: string;
     text?: string;
     noteVariant?: FieldNoteVariant;
-    defaultValue?: SettingValue;
+    defaultValue?: ControlSettingValue;
     minimum?: number;
     step?: number;
     maximum?: number;
@@ -57,6 +57,6 @@ export interface FieldSchema {
     disabled?: boolean;
     disabledWhen?: {
         key: PropertyInspectorSettingKey;
-        equals: SettingValue;
+        equals: ControlSettingValue;
     };
 }

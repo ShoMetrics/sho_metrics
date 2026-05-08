@@ -5,11 +5,11 @@ import type {
     GraphicType,
     NormalizeSettingsContext,
     PropertyInspectorSettings,
-    SettingValue,
+    ControlSettingValue,
 } from "./settings";
 
 export type InspectorSettingsNormalizer = (
-    rawSettings: Record<string, SettingValue>,
+    rawSettings: Record<string, ControlSettingValue>,
     context: NormalizeSettingsContext,
     normalizedSettings: PropertyInspectorSettings,
 ) => PropertyInspectorSettings;

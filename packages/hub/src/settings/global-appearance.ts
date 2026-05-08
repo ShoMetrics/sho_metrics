@@ -1,7 +1,5 @@
 import type { ColorConfig, ColorThreshold } from "../rendering/color-resolver";
-import type { GraphicThemePresetName, GraphicType } from "../widgets/widget.interface";
-import type { ArcGaugeStyle } from "../widgets/primitives/arc-gauge";
-import type { MetricVisualSettings, SettingValue } from "../actions/metric-visual-settings";
+import type { MetricVisualSettings } from "../actions/metric-visual-settings";
 import {
     defaultPluginGlobalSettings,
     type PluginGlobalSettings,
@@ -43,18 +41,6 @@ export function applyGlobalAppearanceToVisualSettings(
         colorMedium: thresholdColors.mediumColor,
         colorHigh: thresholdColors.highColor,
     };
-}
-
-export function resolveEffectiveGraphicType(widgetGraphicType: SettingValue, globalSettings: PluginGlobalSettings): GraphicType {
-    return globalSettings.overrideWidgetAppearance
-        ? globalSettings.appearanceDefaults.graphicType
-        : normalizeGraphicType(widgetGraphicType);
-}
-
-export function resolveEffectiveCircleStyle(widgetCircleStyle: SettingValue, globalSettings: PluginGlobalSettings): ArcGaugeStyle {
-    return globalSettings.overrideWidgetAppearance
-        ? globalSettings.appearanceDefaults.circleStyle
-        : normalizeCircleStyle(widgetCircleStyle);
 }
 
 export function buildGlobalChannelColorConfig(
@@ -123,37 +109,7 @@ export function buildTintThresholdColors(baseColor: string): {
     };
 }
 
-function normalizeGraphicType(value: SettingValue): GraphicType {
-    if (value === "text" || value === "linear" || value === "dashed-line") {
-        return value;
-    }
-
-    return "circular";
-}
-
-function normalizeCircleStyle(value: SettingValue): ArcGaugeStyle {
-    if (value === "compact" || value === "gauge") {
-        return value;
-    }
-
-    return "value";
-}
-
-function normalizeThreshold(value: SettingValue, fallbackValue: number): number {
-    const numericValue = Number(value);
-
-    if (!Number.isFinite(numericValue)) {
-        return fallbackValue;
-    }
-
-    return Math.min(Math.max(Math.round(numericValue), MINIMUM_THRESHOLD), MAXIMUM_THRESHOLD);
-}
-
-function normalizeHexColor(value: SettingValue, fallbackColor: string): string {
-    if (typeof value !== "string") {
-        return fallbackColor;
-    }
-
+function normalizeHexColor(value: string, fallbackColor: string): string {
     const normalizedColor = value.trim();
     return /^#[0-9a-f]{6}$/i.test(normalizedColor) ? normalizedColor.toLowerCase() : fallbackColor;
 }

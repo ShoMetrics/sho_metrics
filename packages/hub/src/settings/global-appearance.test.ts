@@ -3,6 +3,7 @@ import test from "node:test";
 import {
     applyGlobalAppearanceToVisualSettings,
     buildGlobalChannelColorConfig,
+    defaultPluginGlobalSettings,
     deriveTintChannelColors,
     normalizePluginGlobalSettings,
 } from "./global-appearance";
@@ -33,6 +34,7 @@ test("global appearance settings normalize unsupported values", () => {
 
 test("global override replaces widget appearance without mutating non-appearance settings", () => {
     const settings = applyGlobalAppearanceToVisualSettings({
+        ...defaultPluginGlobalSettings.appearanceDefaults,
         graphicType: "linear",
         circleStyle: "compact",
         graphicStyle: "flat",

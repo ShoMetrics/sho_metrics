@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { WillAppearEvent } from "@elgato/streamdeck";
+import { defaultAppearanceSettings } from "../settings/widget-settings";
 import {
     KEYPAD_PNG_SIZE,
     TOUCH_STRIP_LOGICAL_SIZE,
@@ -237,7 +238,7 @@ test("touch strip layout uses wide rendering for non-circular graphics", () => {
 
 function buildSingleMetricDisplayOptions(options: {
     widgetData: WidgetData;
-    resolvedSettings?: SingleMetricDisplayOptions["resolvedSettings"];
+    resolvedSettings?: Partial<SingleMetricDisplayOptions["resolvedSettings"]>;
 }): SingleMetricDisplayOptions {
     return {
         event: {
@@ -252,7 +253,10 @@ function buildSingleMetricDisplayOptions(options: {
         centerIconFragment: "<path />",
         statusIcon: buildStatusIcon(),
         widgetData: options.widgetData,
-        resolvedSettings: options.resolvedSettings ?? {},
+        resolvedSettings: {
+            ...defaultAppearanceSettings,
+            ...options.resolvedSettings,
+        },
     };
 }
 

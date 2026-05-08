@@ -2,7 +2,7 @@ import {
     normalizePropertyInspectorSettings,
     type NormalizeSettingsContext,
     type PropertyInspectorSettings,
-    type SettingValue,
+    type ControlSettingValue,
 } from "./settings";
 import {
     resolveScenarioFieldList,
@@ -43,7 +43,7 @@ export function resolveInspectorSectionList(context: VisibilityContext): readonl
 }
 
 export function normalizeSettings(
-    rawSettings: Record<string, SettingValue>,
+    rawSettings: Record<string, ControlSettingValue>,
     context: NormalizeSettingsContext,
 ): PropertyInspectorSettings {
     const normalizedSettings = normalizePropertyInspectorSettings(rawSettings, context);
