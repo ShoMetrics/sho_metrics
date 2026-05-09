@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FieldRenderer } from "./components/FieldRenderer";
+import { InspectorItem } from "./components/InspectorItem";
 import { PluginSettingsTab } from "./PluginSettingsTab";
 import { SectionHeading } from "./components/SectionHeading";
 import { readControlValue } from "./control-events";
@@ -345,9 +346,9 @@ function SettingsNoticeSlot(options: {
 
 function SettingsNoticeView({ notice }: { notice: SettingsNotice }): React.JSX.Element {
     return (
-        <sdpi-item className={`settings-notice settings-notice-${notice.kind}`}>
+        <InspectorItem className={`settings-notice settings-notice-${notice.kind}`}>
             <p className="section-note">{notice.text}</p>
-        </sdpi-item>
+        </InspectorItem>
     );
 }
 
@@ -360,7 +361,7 @@ function WidgetSettingsTab(options: {
 }): React.JSX.Element {
     return (
         <>
-            <sdpi-item className="widget-reset-item">
+            <InspectorItem className="widget-reset-item">
                 <button
                     className="inline-action-button"
                     type="button"
@@ -368,11 +369,11 @@ function WidgetSettingsTab(options: {
                 >
                     Reset Widget Settings
                 </button>
-            </sdpi-item>
+            </InspectorItem>
             {options.isGlobalAppearanceOverrideEnabled && (
-                <sdpi-item className="note-item note-item-caption">
+                <InspectorItem className="note-item note-item-caption">
                     <p className="section-note">Some settings are disabled since global override is enabled.</p>
-                </sdpi-item>
+                </InspectorItem>
             )}
             {options.inspectorSectionList.map((section) => {
                 const isSectionDisabled = options.isGlobalAppearanceOverrideEnabled

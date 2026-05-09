@@ -2,6 +2,7 @@ import { ColorBandField } from "./ColorBandField";
 import { ColorField } from "./ColorField";
 import { CircleStylePicker } from "./CircleStylePicker";
 import { GraphicTypePicker } from "./GraphicTypePicker";
+import { InspectorItem } from "./InspectorItem";
 import { NumberField } from "./NumberField";
 import { RangeField } from "./RangeField";
 import { ReadonlyField } from "./ReadonlyField";
@@ -40,54 +41,54 @@ export function FieldRenderer({
         const noteVariant = field.noteVariant ?? "default";
 
         return (
-            <sdpi-item className={`note-item note-item-${noteVariant}`}>
+            <InspectorItem className={`note-item note-item-${noteVariant}`}>
                 <p className="section-note">{field.text ?? ""}</p>
-            </sdpi-item>
+            </InspectorItem>
         );
     }
 
     if (field.kind === "readonly") {
         return (
-            <sdpi-item label={field.label ?? ""}>
+            <InspectorItem label={field.label ?? ""}>
                 <ReadonlyField field={field} context={context} />
-            </sdpi-item>
+            </InspectorItem>
         );
     }
 
     if (field.kind === "color" && hasColorBinding(field)) {
         return (
-            <sdpi-item label={field.label ?? ""}>
+            <InspectorItem label={field.label ?? ""}>
                 <ColorField
                     field={field}
                     context={context}
                     onSettingChange={onSettingChange}
                     disabled={disabled}
                 />
-            </sdpi-item>
+            </InspectorItem>
         );
     }
 
     if (field.kind === "color-band" && hasColorBinding(field)) {
         return (
-            <sdpi-item label={field.label ?? ""}>
+            <InspectorItem label={field.label ?? ""}>
                 <ColorBandField
                     field={field}
                     context={context}
                     onSettingChange={onSettingChange}
                     disabled={disabled}
                 />
-            </sdpi-item>
+            </InspectorItem>
         );
     }
 
     if (!hasSettingKey(field)) {
-        return <sdpi-item />;
+        return <InspectorItem />;
     }
 
     return (
-        <sdpi-item label={field.label ?? ""}>
+        <InspectorItem label={field.label ?? ""}>
             {renderFieldControl(field, context, onSettingChange, disabled)}
-        </sdpi-item>
+        </InspectorItem>
     );
 }
 
