@@ -81,6 +81,50 @@ This will confirm whether the ~300ms is WebSocket open time, registration timing
 
 7. Keep this fix inside the PI startup boundary. Do not change the stored settings model, resolver cascade, or renderer contracts for this issue.
 
+## Follow-up Observation: Initial Payload Freshness
+
+Temporary diagnostics compared three PI settings sources while switching widgets,
+switching profiles, reopening the PI, changing settings repeatedly, rebuilding,
+and restarting Stream Deck:
+
+```txt
+pi-connection-info-settings
+pi-did-receive-settings
+pi-get-settings
+```
+
+Observed result:
+
+- all three sources had the same settings signature for each PI open;
+- after editing a widget setting, reopening the PI showed the edited signature
+  immediately from `connectionInfo.actionInfo.payload.settings`;
+- opening another widget of the same action type but with different settings
+  produced a different signature;
+- switching profiles did not cause same-action-type widgets to share settings;
+- after restarting Stream Deck, the initial PI payload still matched the stored
+  widget settings.
+
+This means the PI startup path can safely use
+`connectionInfo.actionInfo.payload.settings` for first paint in the tested
+scenarios. It is not merely the last plugin `willAppear` payload, and it did not
+show stale A -> B jumps where initial payload was old but `getSettings()` later
+returned new values.
+
+Important caveat:
+
+- PI `connectionInfo.actionInfo.action` / `uuid` identifies the manifest action
+  type, for example `com.ez.sho-metrics.cpu-usage`.
+- It is not the action instance id used by plugin runtime events.
+- Therefore PI should not use that value as a cache key for a plugin-side widget
+  settings store.
+
+Current conclusion:
+
+- Keep PI first paint based on `connectionInfo.actionInfo.payload.settings`.
+- Keep `getSettings()` as a refresh/guard, not as a first-paint blocker.
+- Do not build a PI -> plugin settings cache bridge unless a real action
+  instance id is available in the PI context.
+
 ## Missing Settings
 
 Missing settings are normal for a newly dragged widget. The UI should show defaults and no error.
@@ -90,3 +134,11 @@ During pre-proto cleanup, the codec intentionally does not validate raw settings
 ## Risk To Watch
 
 Do not write default/resolved values back into stored settings while rendering early. The early render should use resolver defaults in memory only.
+
+If future testing shows a stale initial payload, compare the signatures of
+`pi-connection-info-settings`, `pi-did-receive-settings`, and
+`pi-get-settings` before changing startup behavior. The fallback trade-off is
+between:
+
+- rendering immediately and accepting a possible rare A -> B refresh; or
+- waiting for `getSettings()` and reintroducing the startup delay.
