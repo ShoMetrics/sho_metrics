@@ -7,7 +7,6 @@ import {
     type ActionKind,
 } from "./settings";
 import {
-    sanitizeWidgetSettings,
     type GlobalSettings,
     type WidgetSettings,
     type WidgetStoredSettings,
@@ -55,7 +54,7 @@ interface SettingsNotice {
 const initialState: PropertyInspectorState = {
     actionKind: "unknown",
     isWindows: false,
-    storedSettings: sanitizeWidgetSettings({}),
+    storedSettings: {},
     globalSettings: {},
     settingsNotice: null,
     activeTab: "widget",
@@ -97,7 +96,7 @@ export function App({ client }: AppProps): React.JSX.Element {
 
     const resetWidgetSettings = (): void => {
         setState((currentState) => {
-            const nextStoredSettings = sanitizeWidgetSettings({});
+            const nextStoredSettings: WidgetStoredSettings = {};
 
             client.setSettings(writeWidgetSettings(nextStoredSettings)).catch((error: Error) => {
                 setState((errorState) => ({
@@ -339,8 +338,8 @@ function readInitialWidgetSettings(connectionInfo: ConnectionInfo): {
     return {
         classification,
         storedSettings: classification === "present"
-            ? sanitizeWidgetSettings(readWidgetSettings(rawSettings))
-            : sanitizeWidgetSettings({}),
+            ? readWidgetSettings(rawSettings)
+            : {},
     };
 }
 
@@ -353,8 +352,8 @@ function readRefreshedWidgetSettings(rawSettings: unknown): {
     return {
         classification,
         storedSettings: classification === "present"
-            ? sanitizeWidgetSettings(readWidgetSettings(rawSettings))
-            : sanitizeWidgetSettings({}),
+            ? readWidgetSettings(rawSettings)
+            : {},
     };
 }
 

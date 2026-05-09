@@ -1,4 +1,3 @@
-import { sanitizeWidgetSettings } from "./widget-settings";
 import type { AppearanceColorRampKey, AppearanceSettingsOverride, WidgetSettings } from "./model";
 
 type WidgetSettingsBranch =
@@ -31,24 +30,33 @@ export function updateWidgetSettingsBranch<TBranch extends WidgetSettingsBranch>
 }
 
 export function mergeWidgetSettingsPatch(settings: WidgetSettings, patch: WidgetSettings): WidgetSettings {
-    return sanitizeWidgetSettings({
-        ...settings,
-        ...patch,
-        metric: patch.metric ? { ...settings.metric, ...patch.metric } : settings.metric,
-        local: patch.local ? { ...settings.local, ...patch.local } : settings.local,
-        appearanceOverrides: patch.appearanceOverrides
-            ? mergeAppearancePatch(settings.appearanceOverrides, patch.appearanceOverrides)
-            : settings.appearanceOverrides,
-        networkOverrides: patch.networkOverrides
-            ? { ...settings.networkOverrides, ...patch.networkOverrides }
-            : settings.networkOverrides,
-        diskThroughputOverrides: patch.diskThroughputOverrides
-            ? { ...settings.diskThroughputOverrides, ...patch.diskThroughputOverrides }
-            : settings.diskThroughputOverrides,
-        runtimeCache: patch.runtimeCache
-            ? { ...settings.runtimeCache, ...patch.runtimeCache }
-            : settings.runtimeCache,
-    });
+    const output: WidgetSettings = { ...settings, ...patch };
+
+    if (patch.metric) {
+        output.metric = { ...settings.metric, ...patch.metric };
+    }
+
+    if (patch.local) {
+        output.local = { ...settings.local, ...patch.local };
+    }
+
+    if (patch.appearanceOverrides) {
+        output.appearanceOverrides = mergeAppearancePatch(settings.appearanceOverrides, patch.appearanceOverrides);
+    }
+
+    if (patch.networkOverrides) {
+        output.networkOverrides = { ...settings.networkOverrides, ...patch.networkOverrides };
+    }
+
+    if (patch.diskThroughputOverrides) {
+        output.diskThroughputOverrides = { ...settings.diskThroughputOverrides, ...patch.diskThroughputOverrides };
+    }
+
+    if (patch.runtimeCache) {
+        output.runtimeCache = { ...settings.runtimeCache, ...patch.runtimeCache };
+    }
+
+    return output;
 }
 
 export function updateWidgetRuntimeCache(
