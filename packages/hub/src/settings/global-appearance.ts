@@ -1,4 +1,12 @@
 import type { ColorConfig, ColorThreshold } from "../rendering/color-resolver";
+import {
+    formatHexColor,
+    hslToRgb,
+    normalizeHexColor,
+    parseHexColor,
+    rgbToHsl,
+    type RgbColor,
+} from "../shared/color-utils";
 import type { MetricVisualSettings } from "./visual-adapter";
 import {
     defaultPluginGlobalSettings,
@@ -69,7 +77,7 @@ export function buildGlobalChannelColorConfig(
 
 export function deriveTintChannelColors(tintColor: string): TintChannelColors {
     const primaryColor = normalizeHexColor(tintColor, defaultPluginGlobalSettings.appearanceDefaults.usageColors.solidColor);
-    const primaryHslColor = rgbToHsl(hexToRgb(primaryColor));
+    const primaryHslColor = rgbToHsl(readValidHexColor(primaryColor));
     const isPrimaryLight = primaryHslColor.lightness >= 0.55;
     const secondaryLightness = isPrimaryLight
         ? Math.max(0.22, primaryHslColor.lightness - 0.42)
@@ -80,7 +88,7 @@ export function deriveTintChannelColors(tintColor: string): TintChannelColors {
 
     return {
         primaryColor,
-        secondaryColor: rgbToHex(hslToRgb({
+        secondaryColor: formatHexColor(hslToRgb({
             hue: primaryHslColor.hue,
             saturation: secondarySaturation,
             lightness: secondaryLightness,
@@ -93,27 +101,22 @@ export function buildTintThresholdColors(baseColor: string): {
     mediumColor: string;
     highColor: string;
 } {
-    const baseHslColor = rgbToHsl(hexToRgb(normalizeHexColor(baseColor, defaultPluginGlobalSettings.appearanceDefaults.usageColors.solidColor)));
+    const baseHslColor = rgbToHsl(readValidHexColor(normalizeHexColor(baseColor, defaultPluginGlobalSettings.appearanceDefaults.usageColors.solidColor)));
     const isBaseLight = baseHslColor.lightness >= 0.55;
 
     return {
-        lowColor: rgbToHex(hslToRgb({
+        lowColor: formatHexColor(hslToRgb({
             hue: baseHslColor.hue,
             saturation: Math.max(0.25, baseHslColor.saturation * 0.72),
             lightness: isBaseLight ? Math.min(0.9, baseHslColor.lightness + 0.12) : Math.min(0.78, baseHslColor.lightness + 0.28),
         })),
         mediumColor: normalizeHexColor(baseColor, defaultPluginGlobalSettings.appearanceDefaults.usageColors.solidColor),
-        highColor: rgbToHex(hslToRgb({
+        highColor: formatHexColor(hslToRgb({
             hue: baseHslColor.hue,
             saturation: Math.min(1, Math.max(0.5, baseHslColor.saturation + 0.16)),
             lightness: isBaseLight ? Math.max(0.36, baseHslColor.lightness - 0.24) : Math.max(0.24, baseHslColor.lightness - 0.12),
         })),
     };
-}
-
-function normalizeHexColor(value: string, fallbackColor: string): string {
-    const normalizedColor = value.trim();
-    return /^#[0-9a-f]{6}$/i.test(normalizedColor) ? normalizedColor.toLowerCase() : fallbackColor;
 }
 
 function buildThresholds(options: {
@@ -130,96 +133,18 @@ function buildThresholds(options: {
     ];
 }
 
-interface RgbColor {
-    red: number;
-    green: number;
-    blue: number;
-}
+function readValidHexColor(hexColor: string): RgbColor {
+    const color = parseHexColor(hexColor);
 
-interface HslColor {
-    hue: number;
-    saturation: number;
-    lightness: number;
-}
-
-function hexToRgb(hexColor: string): RgbColor {
-    return {
-        red: Number.parseInt(hexColor.slice(1, 3), 16),
-        green: Number.parseInt(hexColor.slice(3, 5), 16),
-        blue: Number.parseInt(hexColor.slice(5, 7), 16),
-    };
-}
-
-function rgbToHex(color: RgbColor): string {
-    return `#${toHexByte(color.red)}${toHexByte(color.green)}${toHexByte(color.blue)}`;
-}
-
-function toHexByte(value: number): string {
-    return Math.round(Math.min(Math.max(value, 0), 255)).toString(16).padStart(2, "0");
-}
-
-function rgbToHsl(color: RgbColor): HslColor {
-    const red = color.red / 255;
-    const green = color.green / 255;
-    const blue = color.blue / 255;
-    const maximum = Math.max(red, green, blue);
-    const minimum = Math.min(red, green, blue);
-    const delta = maximum - minimum;
-    const lightness = (maximum + minimum) / 2;
-    const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * lightness - 1));
-    let hue = 0;
-
-    if (delta !== 0) {
-        if (maximum === red) {
-            hue = 60 * (((green - blue) / delta) % 6);
-        } else if (maximum === green) {
-            hue = 60 * ((blue - red) / delta + 2);
-        } else {
-            hue = 60 * ((red - green) / delta + 4);
-        }
+    if (color) {
+        return color;
     }
 
-    return {
-        hue: hue < 0 ? hue + 360 : hue,
-        saturation,
-        lightness,
-    };
-}
+    const fallbackColor = parseHexColor(defaultPluginGlobalSettings.appearanceDefaults.usageColors.solidColor);
 
-function hslToRgb(color: HslColor): RgbColor {
-    const chroma = (1 - Math.abs(2 * color.lightness - 1)) * color.saturation;
-    const huePrime = color.hue / 60;
-    const secondary = chroma * (1 - Math.abs((huePrime % 2) - 1));
-    const match = color.lightness - chroma / 2;
-    const [redPrime, greenPrime, bluePrime] = resolveRgbPrime(huePrime, chroma, secondary);
-
-    return {
-        red: (redPrime + match) * 255,
-        green: (greenPrime + match) * 255,
-        blue: (bluePrime + match) * 255,
-    };
-}
-
-function resolveRgbPrime(huePrime: number, chroma: number, secondary: number): readonly [number, number, number] {
-    if (huePrime < 1) {
-        return [chroma, secondary, 0];
+    if (!fallbackColor) {
+        throw new Error("Default global appearance tint color must be a valid hex color.");
     }
 
-    if (huePrime < 2) {
-        return [secondary, chroma, 0];
-    }
-
-    if (huePrime < 3) {
-        return [0, chroma, secondary];
-    }
-
-    if (huePrime < 4) {
-        return [0, secondary, chroma];
-    }
-
-    if (huePrime < 5) {
-        return [secondary, 0, chroma];
-    }
-
-    return [chroma, 0, secondary];
+    return fallbackColor;
 }
