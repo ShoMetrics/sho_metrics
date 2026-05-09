@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readInspectorControlValue } from "./widget-setting-bindings";
 import {
     resolveDiskAutoLinearLabel,
     resolveDiskVolumeOptions,
@@ -84,7 +83,7 @@ test("selected disk labels prefer explicit selection then root fallback", () => 
     });
     const automaticContext = buildContext({
         runtimeCache: {
-            availableDiskVolumes: readInspectorControlValue(context, "availableDiskVolumes") as string,
+            availableDiskVolumes: context.settings.runtimeCache?.availableDiskVolumes,
         },
     });
 

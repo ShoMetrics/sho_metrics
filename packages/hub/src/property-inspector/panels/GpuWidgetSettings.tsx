@@ -26,7 +26,7 @@ export function GpuWidgetSettings(props: WidgetSettingsPanelProps & {
 
 function GpuTemperatureScaleSettings({
     context,
-    onSettingChange,
+    onSettingsPatch,
 }: WidgetSettingsPanelProps): React.JSX.Element {
     return (
         <SettingsSection title="Scale & Units">
@@ -34,12 +34,16 @@ function GpuTemperatureScaleSettings({
                 label="Unit"
                 value={context.resolved.local.temperatureUnit}
                 optionList={temperatureUnitOptionList}
-                onValueChange={(value) => onSettingChange("temperatureUnit", value)}
+                onValueChange={(temperatureUnit) => onSettingsPatch({
+                    local: { temperatureUnit },
+                })}
             />
             <NumberSetting
                 label="Max Temp (C)"
                 value={context.resolved.local.maximumTemperatureCelsius}
-                onValueChange={(value) => onSettingChange("maximumTemperatureCelsius", value)}
+                onValueChange={(maximumTemperatureCelsius) => onSettingsPatch({
+                    local: { maximumTemperatureCelsius },
+                })}
                 minimum={1}
                 step={1}
             />
@@ -49,14 +53,16 @@ function GpuTemperatureScaleSettings({
 
 function GpuPowerScaleSettings({
     context,
-    onSettingChange,
+    onSettingsPatch,
 }: WidgetSettingsPanelProps): React.JSX.Element {
     return (
         <SettingsSection title="Scale & Units">
             <NumberSetting
                 label="Max Power (W)"
                 value={context.resolved.local.maximumGpuPowerWatts}
-                onValueChange={(value) => onSettingChange("maximumGpuPowerWatts", value)}
+                onValueChange={(maximumGpuPowerWatts) => onSettingsPatch({
+                    local: { maximumGpuPowerWatts },
+                })}
                 minimum={1}
                 step={1}
                 optional

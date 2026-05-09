@@ -5,7 +5,6 @@ import { ColorBandSetting } from "../controls/ColorBandSetting";
 import { ColorSetting } from "../controls/ColorSetting";
 import { RangeSetting } from "../controls/RangeSetting";
 import { SelectSetting } from "../controls/SelectSetting";
-import { appearanceColorTarget } from "../controls/appearance-color-target";
 import type { VisibilityContext } from "../types";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
@@ -71,7 +70,7 @@ export function usesDiskThroughputChannelColorSettings(context: VisibilityContex
 
 function ColorModeSetting({
     context,
-    onSettingChange,
+    onSettingsPatch,
     appearanceDisabled = false,
 }: WidgetSettingsPanelProps): React.JSX.Element {
     return (
@@ -79,7 +78,9 @@ function ColorModeSetting({
             label="Color Mode"
             value={context.resolved.appearance.colorMode}
             optionList={colorModeOptionList}
-            onValueChange={(value) => onSettingChange("colorMode", value)}
+            onValueChange={(colorMode) => onSettingsPatch({
+                appearanceOverrides: { colorMode },
+            })}
             disabled={appearanceDisabled}
         />
     );
@@ -131,7 +132,7 @@ function ChannelThresholdControls(props: WidgetSettingsPanelProps): React.JSX.El
 
 function ThresholdRangeSettings({
     context,
-    onSettingChange,
+    onSettingsPatch,
     appearanceDisabled = false,
 }: WidgetSettingsPanelProps): React.JSX.Element {
     return (
@@ -142,7 +143,13 @@ function ThresholdRangeSettings({
                 minimum={0}
                 maximum={100}
                 step={1}
-                onValueChange={(value) => onSettingChange("lowThreshold", value)}
+                onValueChange={(lowThreshold) => {
+                    const patch = lowThreshold > context.resolved.appearance.highThreshold
+                        ? { lowThreshold, highThreshold: lowThreshold }
+                        : { lowThreshold };
+
+                    onSettingsPatch({ appearanceOverrides: patch });
+                }}
                 disabled={appearanceDisabled}
             />
             <RangeSetting
@@ -151,7 +158,13 @@ function ThresholdRangeSettings({
                 minimum={0}
                 maximum={100}
                 step={1}
-                onValueChange={(value) => onSettingChange("highThreshold", value)}
+                onValueChange={(highThreshold) => {
+                    const patch = highThreshold < context.resolved.appearance.lowThreshold
+                        ? { lowThreshold: highThreshold, highThreshold }
+                        : { highThreshold };
+
+                    onSettingsPatch({ appearanceOverrides: patch });
+                }}
                 disabled={appearanceDisabled}
             />
         </>
@@ -197,12 +210,12 @@ function DiskWriteColorSettings(props: WidgetSettingsPanelProps): React.JSX.Elem
 function ChannelColorFields({
     rampKey,
     context,
-    onSettingChange,
+    onSettingsPatch,
     appearanceDisabled = false,
 }: WidgetSettingsPanelProps & {
     rampKey: "downloadColors" | "uploadColors" | "diskReadColors" | "diskWriteColors";
 }): React.JSX.Element {
-    const props = { onSettingChange };
+    const props = { onSettingsPatch };
 
     if (context.resolved.appearance.colorMode !== "threshold") {
         return (
@@ -248,9 +261,15 @@ function readAppearanceColor(
 }
 
 function writeAppearanceColor(
-    props: Pick<WidgetSettingsPanelProps, "onSettingChange">,
+    props: Pick<WidgetSettingsPanelProps, "onSettingsPatch">,
     rampKey: AppearanceColorRampKey,
     colorKey: keyof ColorRamp,
 ): (value: string) => void {
-    return (value) => props.onSettingChange(appearanceColorTarget(rampKey, colorKey), value);
+    return (value) => props.onSettingsPatch({
+        appearanceOverrides: {
+            [rampKey]: {
+                [colorKey]: value,
+            },
+        },
+    });
 }

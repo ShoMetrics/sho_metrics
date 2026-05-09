@@ -1,15 +1,15 @@
 import type { SelectOption } from "../types";
 
 export const pollingFrequencyOptionList = [
-    { value: "1", label: "1s" },
-    { value: "2", label: "2s" },
-    { value: "3", label: "3s" },
-    { value: "5", label: "5s" },
-    { value: "10", label: "10s" },
-    { value: "15", label: "15s" },
-    { value: "30", label: "30s" },
-    { value: "60", label: "60s" },
-] as const satisfies readonly SelectOption[];
+    { value: 1, label: "1s" },
+    { value: 2, label: "2s" },
+    { value: 3, label: "3s" },
+    { value: 5, label: "5s" },
+    { value: 10, label: "10s" },
+    { value: 15, label: "15s" },
+    { value: 30, label: "30s" },
+    { value: 60, label: "60s" },
+] as const satisfies readonly SelectOption<number>[];
 
 export const graphicStyleOptionList = [
     { value: "flat", label: "Default" },

@@ -5,15 +5,17 @@ import { pollingFrequencyOptionList } from "./setting-options";
 
 export function PollingSettings({
     context,
-    onSettingChange,
+    onSettingsPatch,
 }: WidgetSettingsPanelProps): React.JSX.Element {
     return (
         <SettingsSection title="Update">
             <SelectSetting
                 label="Polling Frequency"
-                value={String(context.resolved.local.pollingFrequencySeconds)}
+                value={context.resolved.local.pollingFrequencySeconds}
                 optionList={pollingFrequencyOptionList}
-                onValueChange={(value) => onSettingChange("pollingFrequencySeconds", value)}
+                onValueChange={(pollingFrequencySeconds) => onSettingsPatch({
+                    local: { pollingFrequencySeconds },
+                })}
             />
         </SettingsSection>
     );

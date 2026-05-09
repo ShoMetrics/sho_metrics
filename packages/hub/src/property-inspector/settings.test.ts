@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildVisibilityContext } from "./test-context";
-import { readInspectorControlValue } from "./widget-setting-bindings";
 
 test("PI context reads resolved disk polling defaults without persisting them", () => {
     const context = buildVisibilityContext({
@@ -14,7 +13,6 @@ test("PI context reads resolved disk polling defaults without persisting them", 
     });
 
     assert.equal(context.resolved.local.pollingFrequencySeconds, 60);
-    assert.equal(readInspectorControlValue(context, "pollingFrequencySeconds"), 60);
     assert.equal(context.settings.local, undefined);
 });
 
