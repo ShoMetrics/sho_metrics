@@ -7,6 +7,9 @@ import {
     defaultRuntimeCache,
 } from "./defaults";
 import type {
+    AppearanceSettings,
+    AppearanceSettingsOverride,
+    ColorRamp,
     DiskMetricKind,
     DiskThroughputDefaultSettings,
     MetricSettings,
@@ -26,10 +29,10 @@ export function resolveWidgetSettings(options: {
 }): ResolvedWidgetSettings {
     const metric = resolveMetricSettings(options.storedSettings.metric, options.context);
     const local = resolveLocalSettings(options.storedSettings.local, options.context, metric.diskMetricKind);
-    const appearance = {
-        ...defaultAppearanceSettings,
-        ...options.storedSettings.appearanceOverrides,
-    };
+    const appearance = mergeAppearanceSettings(
+        defaultAppearanceSettings,
+        options.storedSettings.appearanceOverrides,
+    );
     const network = resolveNetworkSettings(options.storedSettings, options.globalSettings);
     const diskThroughput = resolveDiskThroughputSettings(options.storedSettings, options.globalSettings);
 
@@ -37,10 +40,32 @@ export function resolveWidgetSettings(options: {
         metric,
         local,
         appearance: options.globalSettings.overrideWidgetAppearance
-            ? { ...defaultAppearanceSettings, ...options.globalSettings.appearanceDefaults }
+            ? mergeAppearanceSettings(defaultAppearanceSettings, options.globalSettings.appearanceDefaults)
             : appearance,
         network,
         diskThroughput,
+    };
+}
+
+function mergeAppearanceSettings(
+    defaults: AppearanceSettings,
+    overrides: AppearanceSettingsOverride | undefined,
+): AppearanceSettings {
+    return {
+        ...defaults,
+        ...overrides,
+        usageColors: mergeColorRamp(defaults.usageColors, overrides?.usageColors),
+        downloadColors: mergeColorRamp(defaults.downloadColors, overrides?.downloadColors),
+        uploadColors: mergeColorRamp(defaults.uploadColors, overrides?.uploadColors),
+        diskReadColors: mergeColorRamp(defaults.diskReadColors, overrides?.diskReadColors),
+        diskWriteColors: mergeColorRamp(defaults.diskWriteColors, overrides?.diskWriteColors),
+    };
+}
+
+function mergeColorRamp(defaults: ColorRamp, overrides: Partial<ColorRamp> | undefined): ColorRamp {
+    return {
+        ...defaults,
+        ...overrides,
     };
 }
 

@@ -39,11 +39,17 @@ test("graphic style resolves theme preset names with flat fallback", () => {
 test("solid color mode uses validated color with fallback", () => {
     assert.equal(buildMetricVisualSettings(buildAppearanceSettings({
         colorMode: "solid",
-        solidColor: " #123456 ",
+        usageColors: {
+            ...defaultAppearanceSettings.usageColors,
+            solidColor: " #123456 ",
+        },
     })).colorConfig.solidColor, "#123456");
     assert.equal(buildMetricVisualSettings(buildAppearanceSettings({
         colorMode: "solid",
-        solidColor: "not-a-color",
+        usageColors: {
+            ...defaultAppearanceSettings.usageColors,
+            solidColor: "not-a-color",
+        },
     })).colorConfig.solidColor, "#3b82f6");
 });
 
@@ -65,9 +71,12 @@ test("threshold values are clamped and ordered", () => {
 
 test("threshold colors use normalized appearance colors", () => {
     const colorConfig = buildMetricVisualSettings(buildAppearanceSettings({
-        colorLow: "#111111",
-        colorMedium: "#222222",
-        colorHigh: "#333333",
+        usageColors: {
+            ...defaultAppearanceSettings.usageColors,
+            lowColor: "#111111",
+            mediumColor: "#222222",
+            highColor: "#333333",
+        },
     })).colorConfig;
 
     assert.deepEqual(colorConfig.thresholds.map(threshold => threshold.color), [

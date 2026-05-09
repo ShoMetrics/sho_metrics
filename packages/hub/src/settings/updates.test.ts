@@ -12,7 +12,9 @@ test("updating runtime state preserves user preferences and overrides", () => {
             networkTrafficDisplayMode: "overlay",
         },
         appearanceOverrides: {
-            solidColor: "#123456",
+            usageColors: {
+                solidColor: "#123456",
+            },
         },
         networkOverrides: {
             networkUnitBase: "bit",
@@ -36,12 +38,16 @@ test("updating runtime state preserves user preferences and overrides", () => {
 
 test("updating appearance writes sparse overrides only", () => {
     const nextSettings = updateWidgetSettingsBranch({}, "appearanceOverrides", {
-        solidColor: "#123456",
+        usageColors: {
+            solidColor: "#123456",
+        },
     });
 
     assert.deepEqual(nextSettings, {
         appearanceOverrides: {
-            solidColor: "#123456",
+            usageColors: {
+                solidColor: "#123456",
+            },
         },
     });
 });

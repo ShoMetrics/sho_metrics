@@ -2,25 +2,15 @@ import type { ColorConfig, ColorThreshold } from "../rendering/color-resolver";
 import type { GraphicThemePresetName, GraphicType } from "../widgets/widget.interface";
 import type { ArcGaugeStyle } from "../widgets/primitives/arc-gauge";
 import type { SparklineGridLineType, SparklineGridLineVisibility } from "../widgets/primitives/sparkline";
-import { defaultAppearanceSettings, type AppearanceSettings } from "./widget-settings";
+import {
+    defaultAppearanceSettings,
+    type AppearanceSettings,
+    type AppearanceSettingsOverride,
+    type ColorRamp,
+} from "./widget-settings";
 
 export type MetricVisualSettings = AppearanceSettings;
-export type MetricVisualSettingsOverride = Partial<Pick<
-    AppearanceSettings,
-    | "graphicType"
-    | "circleStyle"
-    | "graphicStyle"
-    | "colorMode"
-    | "solidColor"
-    | "lowThreshold"
-    | "highThreshold"
-    | "colorLow"
-    | "colorMedium"
-    | "colorHigh"
-    | "lineSmoothingPercent"
-    | "gridLineVisibility"
-    | "gridLineType"
->>;
+export type MetricVisualSettingsOverride = AppearanceSettingsOverride;
 
 export interface ResolvedMetricVisualSettings {
     graphicType: GraphicType;
@@ -52,6 +42,25 @@ export function buildMetricVisualSettings(
         ),
         gridLineVisibility: resolveGridLineVisibility(settings.gridLineVisibility),
         gridLineType: resolveGridLineType(settings.gridLineType),
+    };
+}
+
+export function mergeMetricVisualSettings(
+    settings: MetricVisualSettings,
+    override: MetricVisualSettingsOverride | undefined,
+): MetricVisualSettings {
+    if (!override) {
+        return settings;
+    }
+
+    return {
+        ...settings,
+        ...override,
+        usageColors: mergeColorRamp(settings.usageColors, override.usageColors),
+        downloadColors: mergeColorRamp(settings.downloadColors, override.downloadColors),
+        uploadColors: mergeColorRamp(settings.uploadColors, override.uploadColors),
+        diskReadColors: mergeColorRamp(settings.diskReadColors, override.diskReadColors),
+        diskWriteColors: mergeColorRamp(settings.diskWriteColors, override.diskWriteColors),
     };
 }
 
@@ -106,17 +115,25 @@ function resolveGridLineType(value: AppearanceSettings["gridLineType"]): Sparkli
 function buildColorConfig(settings: AppearanceSettings): ColorConfig {
     const colorMode = settings.colorMode === "solid" ? "solid" : "threshold";
     const { lowThreshold, highThreshold } = resolveThresholdPair(settings.lowThreshold, settings.highThreshold);
+    const colors = settings.usageColors;
 
     return {
         mode: colorMode,
-        solidColor: resolveColorSetting(settings.solidColor, defaultAppearanceSettings.solidColor),
+        solidColor: resolveColorSetting(colors.solidColor, defaultAppearanceSettings.usageColors.solidColor),
         thresholds: buildThresholds({
             lowThreshold,
             highThreshold,
-            lowColor: resolveColorSetting(settings.colorLow, defaultAppearanceSettings.colorLow),
-            mediumColor: resolveColorSetting(settings.colorMedium, defaultAppearanceSettings.colorMedium),
-            highColor: resolveColorSetting(settings.colorHigh, defaultAppearanceSettings.colorHigh),
+            lowColor: resolveColorSetting(colors.lowColor, defaultAppearanceSettings.usageColors.lowColor),
+            mediumColor: resolveColorSetting(colors.mediumColor, defaultAppearanceSettings.usageColors.mediumColor),
+            highColor: resolveColorSetting(colors.highColor, defaultAppearanceSettings.usageColors.highColor),
         }),
+    };
+}
+
+function mergeColorRamp(colors: ColorRamp, override: Partial<ColorRamp> | undefined): ColorRamp {
+    return {
+        ...colors,
+        ...override,
     };
 }
 

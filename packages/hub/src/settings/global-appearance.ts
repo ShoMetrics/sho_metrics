@@ -25,7 +25,7 @@ export function applyGlobalAppearanceToVisualSettings(
     }
 
     const appearanceDefaults = globalSettings.appearanceDefaults;
-    const channelColors = deriveTintChannelColors(appearanceDefaults.solidColor);
+    const channelColors = deriveTintChannelColors(appearanceDefaults.usageColors.solidColor);
     const thresholdColors = buildTintThresholdColors(channelColors.primaryColor);
 
     return {
@@ -34,12 +34,14 @@ export function applyGlobalAppearanceToVisualSettings(
         circleStyle: appearanceDefaults.circleStyle,
         graphicStyle: appearanceDefaults.graphicStyle,
         colorMode: appearanceDefaults.colorMode,
-        solidColor: channelColors.primaryColor,
+        usageColors: {
+            solidColor: channelColors.primaryColor,
+            lowColor: thresholdColors.lowColor,
+            mediumColor: thresholdColors.mediumColor,
+            highColor: thresholdColors.highColor,
+        },
         lowThreshold: appearanceDefaults.lowThreshold,
         highThreshold: appearanceDefaults.highThreshold,
-        colorLow: thresholdColors.lowColor,
-        colorMedium: thresholdColors.mediumColor,
-        colorHigh: thresholdColors.highColor,
     };
 }
 
@@ -48,7 +50,7 @@ export function buildGlobalChannelColorConfig(
     globalSettings: PluginGlobalSettings,
 ): ColorConfig {
     const appearanceDefaults = globalSettings.appearanceDefaults;
-    const channelColors = deriveTintChannelColors(appearanceDefaults.solidColor);
+    const channelColors = deriveTintChannelColors(appearanceDefaults.usageColors.solidColor);
     const channelColor = channel === "primary" ? channelColors.primaryColor : channelColors.secondaryColor;
     const thresholdColors = buildTintThresholdColors(channelColor);
 
@@ -66,7 +68,7 @@ export function buildGlobalChannelColorConfig(
 }
 
 export function deriveTintChannelColors(tintColor: string): TintChannelColors {
-    const primaryColor = normalizeHexColor(tintColor, defaultPluginGlobalSettings.appearanceDefaults.solidColor);
+    const primaryColor = normalizeHexColor(tintColor, defaultPluginGlobalSettings.appearanceDefaults.usageColors.solidColor);
     const primaryHslColor = rgbToHsl(hexToRgb(primaryColor));
     const isPrimaryLight = primaryHslColor.lightness >= 0.55;
     const secondaryLightness = isPrimaryLight
@@ -91,7 +93,7 @@ export function buildTintThresholdColors(baseColor: string): {
     mediumColor: string;
     highColor: string;
 } {
-    const baseHslColor = rgbToHsl(hexToRgb(normalizeHexColor(baseColor, defaultPluginGlobalSettings.appearanceDefaults.solidColor)));
+    const baseHslColor = rgbToHsl(hexToRgb(normalizeHexColor(baseColor, defaultPluginGlobalSettings.appearanceDefaults.usageColors.solidColor)));
     const isBaseLight = baseHslColor.lightness >= 0.55;
 
     return {
@@ -100,7 +102,7 @@ export function buildTintThresholdColors(baseColor: string): {
             saturation: Math.max(0.25, baseHslColor.saturation * 0.72),
             lightness: isBaseLight ? Math.min(0.9, baseHslColor.lightness + 0.12) : Math.min(0.78, baseHslColor.lightness + 0.28),
         })),
-        mediumColor: normalizeHexColor(baseColor, defaultPluginGlobalSettings.appearanceDefaults.solidColor),
+        mediumColor: normalizeHexColor(baseColor, defaultPluginGlobalSettings.appearanceDefaults.usageColors.solidColor),
         highColor: rgbToHex(hslToRgb({
             hue: baseHslColor.hue,
             saturation: Math.min(1, Math.max(0.5, baseHslColor.saturation + 0.16)),

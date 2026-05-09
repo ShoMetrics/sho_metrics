@@ -1,6 +1,6 @@
 import type {
     ActionKind,
-    AppearanceSettings,
+    AppearanceScalarSettings,
     DiskThroughputDefaultSettings,
     MetricSettings,
     NetworkDefaultSettings,
@@ -12,8 +12,30 @@ import type {
 import type { InspectorScope } from "./scopes";
 
 export type InspectorControlValue = string | number | boolean | null | undefined;
+export type AppearanceColorControlKey =
+    | "solidColor"
+    | "colorLow"
+    | "colorMedium"
+    | "colorHigh"
+    | "downloadSolidColor"
+    | "downloadColorLow"
+    | "downloadColorMedium"
+    | "downloadColorHigh"
+    | "uploadSolidColor"
+    | "uploadColorLow"
+    | "uploadColorMedium"
+    | "uploadColorHigh"
+    | "diskReadSolidColor"
+    | "diskReadColorLow"
+    | "diskReadColorMedium"
+    | "diskReadColorHigh"
+    | "diskWriteSolidColor"
+    | "diskWriteColorLow"
+    | "diskWriteColorMedium"
+    | "diskWriteColorHigh";
 export type PropertyInspectorSettingKey =
-    | Extract<keyof AppearanceSettings, string>
+    | Extract<keyof AppearanceScalarSettings, string>
+    | AppearanceColorControlKey
     | Extract<keyof MetricSettings, string>
     | Extract<keyof WidgetLocalSettings, string>
     | Extract<keyof NetworkDefaultSettings, string>

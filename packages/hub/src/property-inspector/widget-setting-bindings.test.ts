@@ -19,7 +19,11 @@ const defaultContext: SettingsContext = {
 test("widget setting binding writes appearance overrides only", () => {
     const settings = writeSetting("solidColor", "#123456", defaultContext);
 
-    assert.deepEqual(settings.appearanceOverrides, { solidColor: "#123456" });
+    assert.deepEqual(settings.appearanceOverrides, {
+        usageColors: {
+            solidColor: "#123456",
+        },
+    });
     assert.equal(settings.networkOverrides, undefined);
 });
 
@@ -32,6 +36,22 @@ test("widget setting binding reads resolved values", () => {
 
     assert.equal(readInspectorControlValue(context, "graphicType"), "linear");
     assert.equal(readInspectorControlValue(context, "maximumGpuPowerWatts"), "");
+});
+
+test("channel color bindings read and write nested color ramps", () => {
+    const storedSettings = writeSetting("downloadColorHigh", "#60a5fa", {
+        actionKind: "net-speed",
+        isWindows: false,
+    });
+    const context = buildContext(storedSettings, {
+        actionKind: "net-speed",
+        isWindows: false,
+    });
+
+    assert.deepEqual(storedSettings.appearanceOverrides?.downloadColors, {
+        highColor: "#60a5fa",
+    });
+    assert.equal(readInspectorControlValue(context, "downloadColorHigh"), "#60a5fa");
 });
 
 test("network maximum binding switches scale to custom", () => {

@@ -1,6 +1,7 @@
 import { SectionHeading } from "./components/SectionHeading";
 import {
     normalizePluginGlobalSettings,
+    type ColorRamp,
     type PluginGlobalSettings,
 } from "../settings/widget-settings";
 import type { InspectorControlValue } from "./schema";
@@ -23,6 +24,18 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
             appearanceDefaults: {
                 ...settings.appearanceDefaults,
                 [key]: value,
+            },
+        }));
+    };
+    const updateAppearanceUsageColor = (key: keyof ColorRamp, value: InspectorControlValue): void => {
+        onSettingsChange(normalizePluginGlobalSettings({
+            ...settings,
+            appearanceDefaults: {
+                ...settings.appearanceDefaults,
+                usageColors: {
+                    ...settings.appearanceDefaults.usageColors,
+                    [key]: value,
+                },
             },
         }));
     };
@@ -103,10 +116,10 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                     </sdpi-item>
                     <sdpi-item label="Tint Color">
                         <sdpi-color
-                            value={settings.appearanceDefaults.solidColor}
-                            default={settings.appearanceDefaults.solidColor}
-                            onInput={(event) => updateAppearanceSetting("solidColor", readColorValue(event))}
-                            onChange={(event) => updateAppearanceSetting("solidColor", readColorValue(event))}
+                            value={settings.appearanceDefaults.usageColors.solidColor}
+                            default={settings.appearanceDefaults.usageColors.solidColor}
+                            onInput={(event) => updateAppearanceUsageColor("solidColor", readColorValue(event))}
+                            onChange={(event) => updateAppearanceUsageColor("solidColor", readColorValue(event))}
                         />
                     </sdpi-item>
                     <sdpi-item label="Color Mode">

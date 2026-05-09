@@ -13,6 +13,7 @@ import {
 import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
 import {
     buildMetricVisualSettings,
+    mergeMetricVisualSettings,
     type MetricVisualSettings,
     type MetricVisualSettingsOverride,
     type ResolvedMetricVisualSettings,
@@ -92,10 +93,10 @@ export function buildMetricDisplayRenderPlan(options: {
     displayOptions: MetricDisplayOptions;
     isDial: boolean;
 }): MetricDisplayRenderPlan {
-    const visualSettings = buildMetricVisualSettings({
-        ...options.displayOptions.resolvedSettings,
-        ...options.displayOptions.visualSettingsOverride,
-    });
+    const visualSettings = buildMetricVisualSettings(mergeMetricVisualSettings(
+        options.displayOptions.resolvedSettings,
+        options.displayOptions.visualSettingsOverride,
+    ));
     const circleStyle = resolveCircleStyle({
         graphicType: visualSettings.graphicType,
         circleStyle: visualSettings.circleStyle,
