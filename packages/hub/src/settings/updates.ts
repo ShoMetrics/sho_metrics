@@ -1,12 +1,15 @@
 import { normalizeWidgetStoredSettings } from "./widget-settings";
-import type {
-    AppearanceSettings,
-    DiskThroughputDefaultSettings,
-    MetricSettings,
-    NetworkDefaultSettings,
-    WidgetLocalSettings,
-    WidgetSettings,
-} from "./model";
+import type { WidgetSettings } from "./model";
+
+type WidgetSettingsBranch =
+    | "metric"
+    | "local"
+    | "appearanceOverrides"
+    | "networkOverrides"
+    | "diskThroughputOverrides";
+
+type WidgetSettingsBranchPatch<TBranch extends WidgetSettingsBranch> =
+    NonNullable<WidgetSettings[TBranch]>;
 
 export interface RuntimeStatePatch {
     availableNetworkInterfaces?: string;
@@ -17,66 +20,15 @@ export interface RuntimeStatePatch {
     learnedMaximumDiskWriteThroughputMebibytesPerSecond?: number;
 }
 
-export function updateWidgetMetric(
+export function updateWidgetSettingsBranch<TBranch extends WidgetSettingsBranch>(
     settings: WidgetSettings,
-    patch: Partial<MetricSettings>,
+    branch: TBranch,
+    patch: WidgetSettingsBranchPatch<TBranch>,
 ): WidgetSettings {
     return sanitizeWidgetSettings({
         ...settings,
-        metric: {
-            ...settings.metric,
-            ...patch,
-        },
-    });
-}
-
-export function updateWidgetLocal(
-    settings: WidgetSettings,
-    patch: Partial<WidgetLocalSettings>,
-): WidgetSettings {
-    return sanitizeWidgetSettings({
-        ...settings,
-        local: {
-            ...settings.local,
-            ...patch,
-        },
-    });
-}
-
-export function updateWidgetAppearance(
-    settings: WidgetSettings,
-    patch: Partial<AppearanceSettings>,
-): WidgetSettings {
-    return sanitizeWidgetSettings({
-        ...settings,
-        appearanceOverrides: {
-            ...settings.appearanceOverrides,
-            ...patch,
-        },
-    });
-}
-
-export function updateWidgetNetwork(
-    settings: WidgetSettings,
-    patch: Partial<NetworkDefaultSettings>,
-): WidgetSettings {
-    return sanitizeWidgetSettings({
-        ...settings,
-        networkOverrides: {
-            ...settings.networkOverrides,
-            ...patch,
-        },
-    });
-}
-
-export function updateWidgetDiskThroughput(
-    settings: WidgetSettings,
-    patch: Partial<DiskThroughputDefaultSettings>,
-): WidgetSettings {
-    return sanitizeWidgetSettings({
-        ...settings,
-        diskThroughputOverrides: {
-            ...settings.diskThroughputOverrides,
+        [branch]: {
+            ...settings[branch],
             ...patch,
         },
     });

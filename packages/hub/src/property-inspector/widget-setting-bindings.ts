@@ -1,19 +1,11 @@
 import {
     defaultAppearanceSettings,
-    type AppearanceSettings,
-    type DiskThroughputDefaultSettings,
-    type MetricSettings,
-    type NetworkDefaultSettings,
     type SettingsContext,
-    type WidgetLocalSettings,
+    type WidgetSettings,
     type WidgetStoredSettings,
 } from "../settings/widget-settings";
 import {
-    updateWidgetAppearance,
-    updateWidgetDiskThroughput,
-    updateWidgetLocal,
-    updateWidgetMetric,
-    updateWidgetNetwork,
+    updateWidgetSettingsBranch,
 } from "../settings/updates";
 import type { PropertyInspectorSettingKey } from "./schema";
 import type { PropertyInspectorSettings, ControlSettingValue } from "./settings";
@@ -115,57 +107,47 @@ function defineBindings<TBindings extends Partial<Record<PropertyInspectorSettin
     return output;
 }
 
-function metricBinding(key: keyof MetricSettings): BindingWriter {
-    return (settings, value) => updateWidgetMetric(settings, {
-        [key]: value,
-    } as Partial<MetricSettings>);
+function metricBinding(key: keyof NonNullable<WidgetSettings["metric"]>): BindingWriter {
+    return branchBinding("metric", key);
 }
 
-function localBinding(key: keyof WidgetLocalSettings): BindingWriter {
-    return (settings, value) => updateWidgetLocal(settings, {
-        [key]: value,
-    } as Partial<WidgetLocalSettings>);
+function localBinding(key: keyof NonNullable<WidgetSettings["local"]>): BindingWriter {
+    return branchBinding("local", key);
 }
 
-function appearanceBinding(key: keyof AppearanceSettings): BindingWriter {
-    return (settings, value) => updateWidgetAppearance(settings, {
-        [key]: value,
-    } as Partial<AppearanceSettings>);
+function appearanceBinding(key: keyof NonNullable<WidgetSettings["appearanceOverrides"]>): BindingWriter {
+    return branchBinding("appearanceOverrides", key);
 }
 
-function networkBinding(key: keyof NetworkDefaultSettings): BindingWriter {
-    return (settings, value) => updateWidgetNetwork(settings, {
-        [key]: value,
-    } as Partial<NetworkDefaultSettings>);
+function networkBinding(key: keyof NonNullable<WidgetSettings["networkOverrides"]>): BindingWriter {
+    return branchBinding("networkOverrides", key);
 }
 
 function networkMaximumBinding(
     key: "maximumDownloadSpeedMbps" | "maximumUploadSpeedMbps",
 ): BindingWriter {
-    return (settings, value) => updateWidgetNetwork(settings, {
+    return (settings, value) => updateWidgetSettingsBranch(settings, "networkOverrides", {
         [key]: value,
         networkScaleMode: "custom",
-    } as Partial<NetworkDefaultSettings>);
+    });
 }
 
-function diskThroughputBinding(key: keyof DiskThroughputDefaultSettings): BindingWriter {
-    return (settings, value) => updateWidgetDiskThroughput(settings, {
-        [key]: value,
-    } as Partial<DiskThroughputDefaultSettings>);
+function diskThroughputBinding(key: keyof NonNullable<WidgetSettings["diskThroughputOverrides"]>): BindingWriter {
+    return branchBinding("diskThroughputOverrides", key);
 }
 
 function diskThroughputMaximumBinding(
     key: "maximumDiskReadThroughputMebibytesPerSecond" | "maximumDiskWriteThroughputMebibytesPerSecond",
 ): BindingWriter {
-    return (settings, value) => updateWidgetDiskThroughput(settings, {
+    return (settings, value) => updateWidgetSettingsBranch(settings, "diskThroughputOverrides", {
         [key]: value,
         diskThroughputScaleMode: "custom",
-    } as Partial<DiskThroughputDefaultSettings>);
+    });
 }
 
 function diskMetricKindBinding(): BindingWriter {
-    return (settings, value) => updateWidgetMetric(settings, {
-        diskMetricKind: value as MetricSettings["diskMetricKind"],
+    return (settings, value) => updateWidgetSettingsBranch(settings, "metric", {
+        diskMetricKind: value as NonNullable<WidgetSettings["metric"]>["diskMetricKind"],
     });
 }
 
@@ -190,11 +172,23 @@ function thresholdBinding(key: "lowThreshold" | "highThreshold"): BindingWriter 
         );
 
         void context;
-        return updateWidgetAppearance(settings, {
+        return updateWidgetSettingsBranch(settings, "appearanceOverrides", {
             lowThreshold: orderedThresholds.lowThreshold,
             highThreshold: orderedThresholds.highThreshold,
         });
     };
+}
+
+function branchBinding<TBranch extends keyof Pick<
+    WidgetSettings,
+    "metric" | "local" | "appearanceOverrides" | "networkOverrides" | "diskThroughputOverrides"
+>>(
+    branch: TBranch,
+    key: keyof NonNullable<WidgetSettings[TBranch]>,
+): BindingWriter {
+    return (settings, value) => updateWidgetSettingsBranch(settings, branch, {
+        [key]: value,
+    } as NonNullable<WidgetSettings[TBranch]>);
 }
 
 function parseThreshold(value: unknown, fallbackValue: number): number {
