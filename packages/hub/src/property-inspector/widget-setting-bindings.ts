@@ -186,30 +186,13 @@ function diskThroughputMaximumBinding(
 }
 
 function diskMetricKindBinding(): BindingWriter {
-    return (settings, value, context) => {
-        const normalizedMetric = normalizeStoredSettings({
-            ...settings,
-            metric: {
-                ...settings.metric,
-                diskMetricKind: value as MetricSettings["diskMetricKind"],
-            },
-        }, context).metric;
-        const diskMetricKind = context.isWindows && normalizedMetric?.diskMetricKind === "throughput"
-            ? "usage"
-            : normalizedMetric?.diskMetricKind ?? "usage";
-
-        return normalizeStoredSettings({
-            ...settings,
-            metric: {
-                ...settings.metric,
-                diskMetricKind,
-            },
-            local: {
-                ...settings.local,
-                pollingFrequencySeconds: resolveDiskPollingFrequency(diskMetricKind),
-            },
-        }, context);
-    };
+    return (settings, value, context) => normalizeStoredSettings({
+        ...settings,
+        metric: {
+            ...settings.metric,
+            diskMetricKind: value as MetricSettings["diskMetricKind"],
+        },
+    }, context);
 }
 
 function thresholdBinding(key: "lowThreshold" | "highThreshold"): BindingWriter {
@@ -276,8 +259,4 @@ function resolveThresholdPair(
     return changedKey === "lowThreshold"
         ? { lowThreshold, highThreshold: lowThreshold }
         : { lowThreshold: highThreshold, highThreshold };
-}
-
-function resolveDiskPollingFrequency(diskMetricKind: MetricSettings["diskMetricKind"]): number {
-    return diskMetricKind === "throughput" ? 1 : 60;
 }
