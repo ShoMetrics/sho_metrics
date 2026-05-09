@@ -1,4 +1,5 @@
 import { SectionHeading } from "./components/SectionHeading";
+import { NativeColorInput } from "./components/NativeColorInput";
 import {
     normalizePluginGlobalSettings,
     type ColorRamp,
@@ -115,11 +116,9 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                         </select>
                     </sdpi-item>
                     <sdpi-item label="Tint Color">
-                        <sdpi-color
+                        <NativeColorInput
                             value={settings.appearanceDefaults.usageColors.solidColor}
-                            default={settings.appearanceDefaults.usageColors.solidColor}
-                            onInput={(event) => updateAppearanceUsageColor("solidColor", readColorValue(event))}
-                            onChange={(event) => updateAppearanceUsageColor("solidColor", readColorValue(event))}
+                            onValueChange={(value) => updateAppearanceUsageColor("solidColor", value)}
                         />
                     </sdpi-item>
                     <sdpi-item label="Color Mode">
@@ -250,9 +249,4 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
             </section>
         </div>
     );
-}
-
-function readColorValue(event: React.SyntheticEvent): string {
-    const target = event.target as { value?: string };
-    return String(target.value ?? "");
 }
