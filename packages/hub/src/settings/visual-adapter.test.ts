@@ -22,7 +22,7 @@ test("circle style normalizes to curated presets", () => {
 
 test("invalid graphic type falls back to circular", () => {
     assert.equal(buildMetricVisualSettings(buildAppearanceSettings({
-        graphicType: "arc-gauge" as AppearanceSettings["graphicType"],
+        graphicType: "unsupported-graphic" as AppearanceSettings["graphicType"],
     })).graphicType, "circular");
 });
 
