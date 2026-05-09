@@ -612,11 +612,13 @@ function formatNetworkInterfaceDebugValue(networkInterface: NetworkInterfaceOpti
 }
 
 function publishNetworkInterfaceOptions(event: WillAppearEvent): void {
-    const availableNetworkInterfaces = JSON.stringify(networkInterfaceRegistry.getOptions());
+    const availableNetworkInterfaces = [...networkInterfaceRegistry.getOptions()];
 
     const storedSettings = readActionStoredSettings(event);
 
-    if (storedSettings.runtimeCache?.availableNetworkInterfaces === availableNetworkInterfaces) {
+    // TODO(settings-contract): Temporary pre-proto/pre-Zod deep compare. Move this to the codec/schema layer
+    // when persisted settings get a real contract.
+    if (JSON.stringify(storedSettings.runtimeCache?.availableNetworkInterfaces ?? []) === JSON.stringify(availableNetworkInterfaces)) {
         return;
     }
 

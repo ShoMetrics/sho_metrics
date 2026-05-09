@@ -1,4 +1,9 @@
-import type { AppearanceColorRampKey, AppearanceSettingsOverride, WidgetSettings } from "./model";
+import type {
+    AppearanceColorRampKey,
+    AppearanceSettingsOverride,
+    WidgetRuntimeCache,
+    WidgetSettings,
+} from "./model";
 
 type WidgetSettingsBranch =
     | "metric"
@@ -11,8 +16,8 @@ type WidgetSettingsBranchPatch<TBranch extends WidgetSettingsBranch> =
     NonNullable<WidgetSettings[TBranch]>;
 
 export interface RuntimeStatePatch {
-    availableNetworkInterfaces?: string;
-    availableDiskVolumes?: string;
+    availableNetworkInterfaces?: WidgetRuntimeCache["availableNetworkInterfaces"];
+    availableDiskVolumes?: WidgetRuntimeCache["availableDiskVolumes"];
     learnedMaximumDownloadSpeedMbps?: number;
     learnedMaximumUploadSpeedMbps?: number;
     learnedMaximumDiskReadThroughputMebibytesPerSecond?: number;

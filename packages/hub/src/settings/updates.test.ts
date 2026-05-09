@@ -22,7 +22,13 @@ test("updating runtime state preserves user preferences and overrides", () => {
     };
 
     const nextSettings = updateWidgetRuntimeCache(settings, {
-        availableNetworkInterfaces: "[{\"id\":\"eth0\"}]",
+        availableNetworkInterfaces: [{
+            id: "eth0",
+            name: "Ethernet",
+            type: "wired",
+            isDefault: true,
+            speedMegabitsPerSecond: 1000,
+        }],
         learnedMaximumDownloadSpeedMbps: 900,
     });
 
@@ -31,7 +37,13 @@ test("updating runtime state preserves user preferences and overrides", () => {
     assert.deepEqual(nextSettings.appearanceOverrides, settings.appearanceOverrides);
     assert.deepEqual(nextSettings.networkOverrides, settings.networkOverrides);
     assert.deepEqual(nextSettings.runtimeCache, {
-        availableNetworkInterfaces: "[{\"id\":\"eth0\"}]",
+        availableNetworkInterfaces: [{
+            id: "eth0",
+            name: "Ethernet",
+            type: "wired",
+            isDefault: true,
+            speedMegabitsPerSecond: 1000,
+        }],
         learnedMaximumDownloadSpeedMbps: 900,
     });
 });

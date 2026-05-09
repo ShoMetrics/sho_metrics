@@ -1,37 +1,19 @@
-import type { InspectorControlValue, SelectOption, VisibilityContext } from "./types";
-
-interface NetworkInterfaceOption {
-    [key: string]: InspectorControlValue;
-    id: string;
-    name: string;
-    type: string;
-    isDefault?: boolean;
-    speedMegabitsPerSecond?: number;
-}
-
-interface DiskVolumeOption {
-    [key: string]: InspectorControlValue;
-    id: string;
-    fs: string;
-    mount: string;
-    storageKind: string;
-    diskName: string;
-    volumeLabel?: string;
-    sizeBytes: number;
-}
+import type { DiskVolumeOption } from "../runtime/disk-volumes";
+import type { NetworkInterfaceOption } from "../runtime/network-interfaces";
+import type { SelectOption, VisibilityContext } from "./types";
 
 export function resolveNetworkInterfaceOptions(context: VisibilityContext): SelectOption[] {
-    return buildNetworkInterfaceOptions(context.settings.runtimeCache?.availableNetworkInterfaces);
+    return buildNetworkInterfaceOptions(context.settings.runtimeCache?.availableNetworkInterfaces ?? []);
 }
 
 export function resolveDiskVolumeOptions(context: VisibilityContext): SelectOption[] {
-    return buildDiskVolumeOptions(context.settings.runtimeCache?.availableDiskVolumes);
+    return buildDiskVolumeOptions(context.settings.runtimeCache?.availableDiskVolumes ?? []);
 }
 
-function buildNetworkInterfaceOptions(value: InspectorControlValue): SelectOption[] {
+function buildNetworkInterfaceOptions(networkInterfaces: readonly NetworkInterfaceOption[]): SelectOption[] {
     return [
         { value: "", label: "Automatic" },
-        ...parseNetworkInterfaceOptions(value).map((networkInterface) => {
+        ...networkInterfaces.map((networkInterface) => {
             const speedLabel = networkInterface.speedMegabitsPerSecond
                 ? `, ${networkInterface.speedMegabitsPerSecond} Mbps`
                 : "";
@@ -46,22 +28,14 @@ function buildNetworkInterfaceOptions(value: InspectorControlValue): SelectOptio
     ];
 }
 
-function buildDiskVolumeOptions(value: InspectorControlValue): SelectOption[] {
+function buildDiskVolumeOptions(diskVolumes: readonly DiskVolumeOption[]): SelectOption[] {
     return [
         { value: "", label: "Automatic" },
-        ...parseDiskVolumeOptions(value).map((diskVolume) => ({
+        ...diskVolumes.map((diskVolume) => ({
             value: diskVolume.id,
             label: formatDiskVolumeOptionLabel(diskVolume),
         })),
     ];
-}
-
-function parseNetworkInterfaceOptions(value: InspectorControlValue): NetworkInterfaceOption[] {
-    return parseJsonArray(value).filter(isNetworkInterfaceOption);
-}
-
-function parseDiskVolumeOptions(value: InspectorControlValue): DiskVolumeOption[] {
-    return parseJsonArray(value).filter(isDiskVolumeOption);
 }
 
 export function resolveSelectedDiskVolumeLabel(context: VisibilityContext): string {
@@ -82,7 +56,7 @@ export function resolveDiskAutoLinearLabel(context: VisibilityContext): string {
 }
 
 function resolveSelectedDiskVolume(context: VisibilityContext): DiskVolumeOption | null {
-    const diskVolumes = parseDiskVolumeOptions(context.settings.runtimeCache?.availableDiskVolumes);
+    const diskVolumes = context.settings.runtimeCache?.availableDiskVolumes ?? [];
     const selectedDiskVolumeId = context.resolved.metric.diskVolumeId;
 
     if (selectedDiskVolumeId.length > 0) {
@@ -92,37 +66,6 @@ function resolveSelectedDiskVolume(context: VisibilityContext): DiskVolumeOption
     return diskVolumes.find(diskVolume => diskVolume.mount === "/" || /^[A-Z]:\\?$/i.test(diskVolume.mount))
         ?? diskVolumes[0]
         ?? null;
-}
-
-function parseJsonArray(value: InspectorControlValue): Record<string, InspectorControlValue>[] {
-    if (typeof value !== "string") {
-        return [];
-    }
-
-    try {
-        const parsedValue = JSON.parse(value) as InspectorControlValue | Record<string, InspectorControlValue>[];
-
-        return Array.isArray(parsedValue)
-            ? parsedValue.filter(isRecord)
-            : [];
-    } catch {
-        return [];
-    }
-}
-
-function isNetworkInterfaceOption(value: Record<string, InspectorControlValue>): value is NetworkInterfaceOption {
-    return typeof value.id === "string"
-        && typeof value.name === "string"
-        && typeof value.type === "string";
-}
-
-function isDiskVolumeOption(value: Record<string, InspectorControlValue>): value is DiskVolumeOption {
-    return typeof value.id === "string"
-        && typeof value.fs === "string"
-        && typeof value.mount === "string"
-        && typeof value.storageKind === "string"
-        && typeof value.diskName === "string"
-        && typeof value.sizeBytes === "number";
 }
 
 function formatDiskVolumeDisplayLabel(diskVolume: DiskVolumeOption): string {
@@ -185,15 +128,9 @@ function resolveCompactDiskStorageLabel(diskVolume: DiskVolumeOption): string {
     return "DSK";
 }
 
-function isRecord(
-    value: InspectorControlValue | Record<string, InspectorControlValue>,
-): value is Record<string, InspectorControlValue> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function formatByteCount(bytes: number): string {
     const units = ["B", "KB", "MB", "GB", "TB", "PB"];
-    let displayValue = Math.max(0, Number(bytes));
+    let displayValue = Math.max(0, bytes);
     let unitIndex = 0;
 
     while (displayValue >= 1024 && unitIndex < units.length - 1) {
