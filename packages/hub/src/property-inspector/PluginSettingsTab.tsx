@@ -1,4 +1,5 @@
 import { SectionHeading } from "./components/SectionHeading";
+import { InspectorItem } from "./components/InspectorItem";
 import { NativeColorInput } from "./components/NativeColorInput";
 import {
     normalizePluginGlobalSettings,
@@ -63,7 +64,7 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
         <div>
             <section className="settings-section">
                 <SectionHeading text="Override" variant="section" />
-                <sdpi-item className="override-toggle-item">
+                <InspectorItem className="override-toggle-item">
                     <label className="override-toggle-row">
                         <input
                             type="checkbox"
@@ -75,13 +76,13 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                             When enabled, widget appearance settings are disabled but kept.
                         </span>
                     </label>
-                </sdpi-item>
+                </InspectorItem>
             </section>
 
             {settings.overrideWidgetAppearance && (
                 <section className="settings-section">
                     <SectionHeading text="Override Appearance" variant="section" />
-                    <sdpi-item label="Graphic Type">
+                    <InspectorItem label="Graphic Type">
                         <select
                             className="native-select"
                             value={settings.appearanceDefaults.graphicType}
@@ -92,8 +93,8 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                             <option value="linear">Linear</option>
                             <option value="dashed-line">Sparkline</option>
                         </select>
-                    </sdpi-item>
-                    <sdpi-item label="Circle Style">
+                    </InspectorItem>
+                    <InspectorItem label="Circle Style">
                         <select
                             className="native-select"
                             value={settings.appearanceDefaults.circleStyle}
@@ -104,8 +105,8 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                             <option value="compact">Compact</option>
                             <option value="gauge">Gauge</option>
                         </select>
-                    </sdpi-item>
-                    <sdpi-item label="Graphic Style">
+                    </InspectorItem>
+                    <InspectorItem label="Graphic Style">
                         <select
                             className="native-select"
                             value={settings.appearanceDefaults.graphicStyle}
@@ -114,14 +115,14 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                             <option value="flat">Flat</option>
                             <option value="cupertino-glass">Cupertino Glass</option>
                         </select>
-                    </sdpi-item>
-                    <sdpi-item label="Tint Color">
+                    </InspectorItem>
+                    <InspectorItem label="Tint Color">
                         <NativeColorInput
                             value={settings.appearanceDefaults.usageColors.solidColor}
                             onValueChange={(value) => updateAppearanceUsageColor("solidColor", value)}
                         />
-                    </sdpi-item>
-                    <sdpi-item label="Color Mode">
+                    </InspectorItem>
+                    <InspectorItem label="Color Mode">
                         <select
                             className="native-select"
                             value={settings.appearanceDefaults.colorMode}
@@ -130,10 +131,10 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                             <option value="solid">Solid</option>
                             <option value="threshold">Dynamic</option>
                         </select>
-                    </sdpi-item>
+                    </InspectorItem>
                     {settings.appearanceDefaults.colorMode === "threshold" && (
                         <>
-                            <sdpi-item label="Low Threshold">
+                            <InspectorItem label="Low Threshold">
                                 <input
                                     className="native-input"
                                     type="number"
@@ -143,8 +144,8 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                                     value={settings.appearanceDefaults.lowThreshold}
                                     onChange={(event) => updateAppearanceSetting("lowThreshold", event.currentTarget.value)}
                                 />
-                            </sdpi-item>
-                            <sdpi-item label="High Threshold">
+                            </InspectorItem>
+                            <InspectorItem label="High Threshold">
                                 <input
                                     className="native-input"
                                     type="number"
@@ -154,7 +155,7 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                                     value={settings.appearanceDefaults.highThreshold}
                                     onChange={(event) => updateAppearanceSetting("highThreshold", event.currentTarget.value)}
                                 />
-                            </sdpi-item>
+                            </InspectorItem>
                         </>
                     )}
                 </section>
@@ -162,7 +163,7 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
 
             <section className="settings-section">
                 <SectionHeading text="Network Defaults" variant="section" />
-                <sdpi-item label="Unit">
+                <InspectorItem label="Unit">
                     <select
                         className="native-select"
                         value={settings.networkDefaults.networkUnitBase}
@@ -171,8 +172,8 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                         <option value="byte">Byte/s</option>
                         <option value="bit">Bit/s</option>
                     </select>
-                </sdpi-item>
-                <sdpi-item label="Scale">
+                </InspectorItem>
+                <InspectorItem label="Scale">
                     <select
                         className="native-select"
                         value={settings.networkDefaults.networkScaleMode}
@@ -181,8 +182,8 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                         <option value="auto">Auto</option>
                         <option value="custom">Custom</option>
                     </select>
-                </sdpi-item>
-                <sdpi-item label="Download Max">
+                </InspectorItem>
+                <InspectorItem label="Download Max">
                     <input
                         className="native-input"
                         type="number"
@@ -192,8 +193,8 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                         disabled={settings.networkDefaults.networkScaleMode === "auto"}
                         onChange={(event) => updateNetworkSetting("maximumDownloadSpeedMbps", event.currentTarget.value)}
                     />
-                </sdpi-item>
-                <sdpi-item label="Upload Max">
+                </InspectorItem>
+                <InspectorItem label="Upload Max">
                     <input
                         className="native-input"
                         type="number"
@@ -203,12 +204,12 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                         disabled={settings.networkDefaults.networkScaleMode === "auto"}
                         onChange={(event) => updateNetworkSetting("maximumUploadSpeedMbps", event.currentTarget.value)}
                     />
-                </sdpi-item>
+                </InspectorItem>
             </section>
 
             <section className="settings-section">
                 <SectionHeading text="Disk Throughput Defaults" variant="section" />
-                <sdpi-item label="Scale">
+                <InspectorItem label="Scale">
                     <select
                         className="native-select"
                         value={settings.diskThroughputDefaults.diskThroughputScaleMode}
@@ -217,8 +218,8 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                         <option value="auto">Auto</option>
                         <option value="custom">Custom</option>
                     </select>
-                </sdpi-item>
-                <sdpi-item label="Read Max">
+                </InspectorItem>
+                <InspectorItem label="Read Max">
                     <input
                         className="native-input"
                         type="number"
@@ -231,8 +232,8 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                             event.currentTarget.value,
                         )}
                     />
-                </sdpi-item>
-                <sdpi-item label="Write Max">
+                </InspectorItem>
+                <InspectorItem label="Write Max">
                     <input
                         className="native-input"
                         type="number"
@@ -245,7 +246,7 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
                             event.currentTarget.value,
                         )}
                     />
-                </sdpi-item>
+                </InspectorItem>
             </section>
         </div>
     );

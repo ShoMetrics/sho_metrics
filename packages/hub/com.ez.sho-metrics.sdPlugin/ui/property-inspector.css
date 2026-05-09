@@ -66,6 +66,33 @@ body {
     width: 100%;
 }
 
+.inspector-item {
+    align-items: start;
+    color: #efefef;
+    display: grid;
+    font-size: 9pt;
+    grid-template-columns: 95px minmax(0, 1fr);
+    margin: 0 0 10px;
+    user-select: none;
+}
+
+.inspector-item-label-cell {
+    align-items: center;
+    display: flex;
+    justify-self: end;
+    min-height: var(--inspector-control-height);
+    padding-right: 11px;
+    text-align: right;
+}
+
+.inspector-item-label-cell label {
+    cursor: default;
+}
+
+.inspector-item-content {
+    min-width: 0;
+}
+
 .section-note {
     color: #b8b8b8;
     font-size: 12px;
