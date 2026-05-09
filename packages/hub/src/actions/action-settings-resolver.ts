@@ -1,5 +1,9 @@
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
+    writeWidgetSettings,
+    type JsonObject,
+} from "../settings/codec";
+import {
     normalizeWidgetStoredSettings,
     resolveWidgetSettings,
     type ActionKind,
@@ -7,13 +11,7 @@ import {
     type WidgetStoredSettings,
 } from "../settings/widget-settings";
 
-type JsonPrimitive = boolean | number | string | null | undefined;
-type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
-type JsonObject = {
-    [key: string]: JsonValue;
-};
-
-export function resolveActionSettings(rawSettings: Record<string, unknown>, actionKind: ActionKind): ResolvedWidgetSettings {
+export function resolveActionSettings(rawSettings: unknown, actionKind: ActionKind): ResolvedWidgetSettings {
     const storedSettings = normalizeActionStoredSettings(rawSettings, actionKind);
 
     return resolveWidgetSettings({
@@ -24,7 +22,7 @@ export function resolveActionSettings(rawSettings: Record<string, unknown>, acti
     });
 }
 
-export function normalizeActionStoredSettings(rawSettings: Record<string, unknown>, actionKind: ActionKind): WidgetStoredSettings {
+export function normalizeActionStoredSettings(rawSettings: unknown, actionKind: ActionKind): WidgetStoredSettings {
     return normalizeWidgetStoredSettings(rawSettings, {
         actionKind,
         isWindows: process.platform === "win32",
@@ -32,12 +30,5 @@ export function normalizeActionStoredSettings(rawSettings: Record<string, unknow
 }
 
 export function serializeActionStoredSettings(storedSettings: WidgetStoredSettings): JsonObject {
-    return {
-        metric: { ...storedSettings.metric } as JsonObject,
-        local: { ...storedSettings.local } as JsonObject,
-        appearanceOverrides: { ...storedSettings.appearanceOverrides } as JsonObject,
-        networkOverrides: { ...storedSettings.networkOverrides } as JsonObject,
-        diskThroughputOverrides: { ...storedSettings.diskThroughputOverrides } as JsonObject,
-        runtimeCache: { ...storedSettings.runtimeCache } as JsonObject,
-    };
+    return writeWidgetSettings(storedSettings);
 }

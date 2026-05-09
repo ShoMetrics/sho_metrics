@@ -608,7 +608,7 @@ function publishNetworkInterfaceOptions(event: WillAppearEvent): void {
     const availableNetworkInterfaces = JSON.stringify(networkInterfaceRegistry.getOptions());
 
     const storedSettings = normalizeActionStoredSettings(
-        event.payload.settings as Record<string, unknown>,
+        event.payload.settings,
         "net-speed",
     );
 
@@ -656,7 +656,7 @@ function publishNetworkScaleLearning(
     });
 
     const storedSettings = normalizeActionStoredSettings(
-        event.payload.settings as Record<string, unknown>,
+        event.payload.settings,
         "net-speed",
     );
 

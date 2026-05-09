@@ -467,7 +467,7 @@ function publishDiskVolumeOptions(event: WillAppearEvent): void {
     const availableDiskVolumes = JSON.stringify(diskVolumeRegistry.getOptions());
 
     const storedSettings = normalizeActionStoredSettings(
-        event.payload.settings as Record<string, unknown>,
+        event.payload.settings,
         "disk",
     );
 
@@ -509,7 +509,7 @@ function publishDiskThroughputScaleLearning(event: WillAppearEvent, settings: Di
     });
 
     const storedSettings = normalizeActionStoredSettings(
-        event.payload.settings as Record<string, unknown>,
+        event.payload.settings,
         "disk",
     );
 
