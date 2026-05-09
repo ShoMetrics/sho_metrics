@@ -1,41 +1,42 @@
+import { useId } from "react";
 import { InspectorItem } from "../components/InspectorItem";
-import { resolveSettingTargetName } from "../schema";
-import { readInspectorControlValue } from "../widget-setting-bindings";
-import type { ScalarSettingControlProps } from "./setting-control";
+import type { SettingControlProps } from "./setting-control";
 
-interface RangeSettingProps extends ScalarSettingControlProps {
+interface RangeSettingProps extends SettingControlProps {
     label: string;
+    value: number;
+    onValueChange: (value: string) => void;
     minimum?: number;
     maximum?: number;
     step?: number;
 }
 
 export function RangeSetting({
-    target,
     label,
+    value,
+    onValueChange,
     minimum = 0,
     maximum = 100,
     step = 1,
-    context,
-    onSettingChange,
     disabled = false,
 }: RangeSettingProps): React.JSX.Element {
-    const value = String(readInspectorControlValue(context, target) ?? minimum);
+    const inputId = useId();
+    const displayValue = String(value);
 
     return (
-        <InspectorItem label={label}>
+        <InspectorItem label={label} labelFor={inputId}>
             <div className="range-control">
                 <input
+                    id={inputId}
                     type="range"
-                    data-setting-target={resolveSettingTargetName(target)}
                     min={minimum}
                     max={maximum}
                     step={step}
-                    value={value}
+                    value={displayValue}
                     disabled={disabled}
-                    onChange={(event) => onSettingChange(target, event.currentTarget.value)}
+                    onChange={(event) => onValueChange(event.currentTarget.value)}
                 />
-                <span className="range-value">{value}%</span>
+                <span className="range-value">{displayValue}%</span>
             </div>
         </InspectorItem>
     );

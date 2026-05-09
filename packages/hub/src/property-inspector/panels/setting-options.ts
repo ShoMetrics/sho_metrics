@@ -1,4 +1,4 @@
-import type { SelectOption } from "../schema";
+import type { SelectOption } from "../types";
 
 export const pollingFrequencyOptionList = [
     { value: "1", label: "1s" },

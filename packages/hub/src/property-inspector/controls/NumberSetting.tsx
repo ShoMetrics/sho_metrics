@@ -1,34 +1,36 @@
+import { useId } from "react";
 import { InspectorItem } from "../components/InspectorItem";
-import { resolveSettingTargetName } from "../schema";
-import { readInspectorControlValue } from "../widget-setting-bindings";
-import type { ScalarSettingControlProps } from "./setting-control";
+import type { SettingControlProps } from "./setting-control";
 
-interface NumberSettingProps extends ScalarSettingControlProps {
+interface NumberSettingProps extends SettingControlProps {
     label: string;
+    value: string;
+    onValueChange: (value: string) => void;
     minimum?: number;
     step?: number;
 }
 
 export function NumberSetting({
-    target,
     label,
+    value,
+    onValueChange,
     minimum,
     step,
-    context,
-    onSettingChange,
     disabled = false,
 }: NumberSettingProps): React.JSX.Element {
+    const inputId = useId();
+
     return (
-        <InspectorItem label={label}>
+        <InspectorItem label={label} labelFor={inputId}>
             <input
+                id={inputId}
                 className="native-input"
                 type="number"
-                data-setting-target={resolveSettingTargetName(target)}
                 min={minimum}
                 step={step}
-                value={String(readInspectorControlValue(context, target) ?? "")}
+                value={value}
                 disabled={disabled}
-                onChange={(event) => onSettingChange(target, event.currentTarget.value)}
+                onChange={(event) => onValueChange(event.currentTarget.value)}
             />
         </InspectorItem>
     );

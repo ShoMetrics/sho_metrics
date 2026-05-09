@@ -1,38 +1,40 @@
+import { useId } from "react";
 import { InspectorItem } from "../components/InspectorItem";
-import { resolveSettingTargetName, type SelectOption } from "../schema";
-import { readInspectorControlValue } from "../widget-setting-bindings";
+import type { SelectOption } from "../types";
 import {
     isOptionDisabled,
     resolveSelectedOptionValue,
-    type ScalarSettingControlProps,
+    type SettingControlProps,
 } from "./setting-control";
 
-interface SelectSettingProps extends ScalarSettingControlProps {
+interface SelectSettingProps<TValue extends string> extends SettingControlProps {
     label: string;
-    optionList: readonly SelectOption[];
+    value: TValue;
+    optionList: readonly SelectOption<TValue>[];
+    onValueChange: (value: TValue) => void;
 }
 
-export function SelectSetting({
-    target,
+export function SelectSetting<TValue extends string>({
     label,
+    value,
     optionList,
-    context,
-    onSettingChange,
+    onValueChange,
     disabled = false,
-}: SelectSettingProps): React.JSX.Element {
+}: SelectSettingProps<TValue>): React.JSX.Element {
+    const inputId = useId();
     const selectedValue = resolveSelectedOptionValue({
         optionList,
-        value: String(readInspectorControlValue(context, target)),
+        value,
     });
 
     return (
-        <InspectorItem label={label}>
+        <InspectorItem label={label} labelFor={inputId}>
             <select
+                id={inputId}
                 className="native-select"
-                data-setting-target={resolveSettingTargetName(target)}
                 value={selectedValue}
                 disabled={disabled}
-                onChange={(event) => onSettingChange(target, event.currentTarget.value)}
+                onChange={(event) => onValueChange(event.currentTarget.value as TValue)}
             >
                 {optionList.map((option) => (
                     <option

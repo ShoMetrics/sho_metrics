@@ -1,37 +1,38 @@
+import { useId } from "react";
 import { InspectorItem } from "../components/InspectorItem";
-import { resolveSettingTargetName } from "../schema";
-import { readInspectorControlValue } from "../widget-setting-bindings";
-import type { ScalarSettingControlProps } from "./setting-control";
+import type { SettingControlProps } from "./setting-control";
 
-interface TextSettingProps extends ScalarSettingControlProps {
+interface TextSettingProps extends SettingControlProps {
     label: string;
+    value: string;
+    onValueChange: (value: string) => void;
     placeholder?: string;
     actionButton?: React.JSX.Element;
 }
 
 export function TextSetting({
-    target,
     label,
+    value,
+    onValueChange,
     placeholder,
     actionButton,
-    context,
-    onSettingChange,
     disabled = false,
 }: TextSettingProps): React.JSX.Element {
+    const inputId = useId();
     const input = (
         <input
+            id={inputId}
             className="native-input"
             type="text"
-            data-setting-target={resolveSettingTargetName(target)}
             placeholder={placeholder ?? ""}
-            value={String(readInspectorControlValue(context, target) ?? "")}
+            value={value}
             disabled={disabled}
-            onChange={(event) => onSettingChange(target, event.currentTarget.value)}
+            onChange={(event) => onValueChange(event.currentTarget.value)}
         />
     );
 
     return (
-        <InspectorItem label={label}>
+        <InspectorItem label={label} labelFor={inputId}>
             {actionButton ? (
                 <div className="text-field-with-action">
                     {input}

@@ -21,14 +21,16 @@ export type PropertyInspectorSettingKey =
     | Extract<keyof DiskThroughputDefaultSettings, string>
     | "availableNetworkInterfaces"
     | "availableDiskVolumes";
+
 export interface AppearanceColorTarget {
     rampKey: AppearanceColorRampKey;
     colorKey: keyof ColorRamp;
 }
+
 export type InspectorSettingTarget = PropertyInspectorSettingKey | AppearanceColorTarget;
 
-export interface SelectOption {
-    value: string;
+export interface SelectOption<TValue extends string = string> {
+    value: TValue;
     label: string;
     disabled?: boolean;
 }
@@ -39,12 +41,4 @@ export interface VisibilityContext {
     settings: WidgetStoredSettings;
     globalSettings: PluginGlobalSettings;
     resolved: ResolvedWidgetSettings;
-}
-
-export function resolveSettingTargetName(target: InspectorSettingTarget): string {
-    if (typeof target === "string") {
-        return target;
-    }
-
-    return `${target.rampKey}.${String(target.colorKey)}`;
 }

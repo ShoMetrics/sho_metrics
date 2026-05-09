@@ -1,14 +1,12 @@
 import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import type { ActionKind } from "../settings";
-import {
-    LayoutSettings,
-    PollingSettings,
-    SparklineSettings,
-    StandardColorSettings,
-    type WidgetSettingsPanelProps,
-} from "./CommonSettings";
+import { StandardColorSettings } from "./ColorSettings";
+import { LayoutSettings } from "./LayoutSettings";
+import { PollingSettings } from "./PollingSettings";
+import { SparklineSettings } from "./SparklineSettings";
 import { SettingsSection } from "./SettingsSection";
+import type { WidgetSettingsPanelProps } from "./panel-props";
 import { temperatureUnitOptionList } from "./setting-options";
 
 export function GpuWidgetSettings(props: WidgetSettingsPanelProps & {
@@ -33,19 +31,17 @@ function GpuTemperatureScaleSettings({
     return (
         <SettingsSection title="Scale & Units">
             <SelectSetting
-                target="temperatureUnit"
                 label="Unit"
+                value={context.resolved.local.temperatureUnit}
                 optionList={temperatureUnitOptionList}
-                context={context}
-                onSettingChange={onSettingChange}
+                onValueChange={(value) => onSettingChange("temperatureUnit", value)}
             />
             <NumberSetting
-                target="maximumTemperatureCelsius"
                 label="Max Temp (C)"
+                value={String(context.resolved.local.maximumTemperatureCelsius)}
+                onValueChange={(value) => onSettingChange("maximumTemperatureCelsius", value)}
                 minimum={1}
                 step={1}
-                context={context}
-                onSettingChange={onSettingChange}
             />
         </SettingsSection>
     );
@@ -58,12 +54,11 @@ function GpuPowerScaleSettings({
     return (
         <SettingsSection title="Scale & Units">
             <NumberSetting
-                target="maximumGpuPowerWatts"
                 label="Max Power (W)"
+                value={String(context.resolved.local.maximumGpuPowerWatts ?? "")}
+                onValueChange={(value) => onSettingChange("maximumGpuPowerWatts", value)}
                 minimum={1}
                 step={1}
-                context={context}
-                onSettingChange={onSettingChange}
             />
         </SettingsSection>
     );

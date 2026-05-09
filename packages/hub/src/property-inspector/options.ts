@@ -1,4 +1,4 @@
-import type { InspectorControlValue, SelectOption, VisibilityContext } from "./schema";
+import type { InspectorControlValue, SelectOption, VisibilityContext } from "./types";
 import { readInspectorControlValue } from "./widget-setting-bindings";
 
 interface NetworkInterfaceOption {

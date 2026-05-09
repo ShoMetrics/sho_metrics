@@ -14,12 +14,11 @@ test("disk usage linear settings render label controls without usage-mode contro
             diskMetricKind: "usage",
         },
     });
-    const targetNameList = readTargetNames(markup);
 
-    assert.ok(targetNameList.includes("diskVolumeId"));
-    assert.ok(targetNameList.includes("diskLinearLabel"));
-    assert.ok(!targetNameList.includes("diskUsageDisplayMode"));
+    assert.match(markup, /Volume:/);
+    assert.match(markup, /Custom Label:/);
     assert.match(markup, /Detected Label/);
+    assert.doesNotMatch(markup, /Usage Display:/);
 });
 
 test("disk usage circular settings render usage display controls", () => {
@@ -30,10 +29,9 @@ test("disk usage circular settings render usage display controls", () => {
             diskMetricKind: "usage",
         },
     });
-    const targetNameList = readTargetNames(markup);
 
-    assert.ok(targetNameList.includes("diskUsageDisplayMode"));
-    assert.ok(!targetNameList.includes("diskLinearLabel"));
+    assert.match(markup, /Usage Display:/);
+    assert.doesNotMatch(markup, /Custom Label:/);
 });
 
 test("windows disk settings use usage controls when throughput is unavailable", () => {
@@ -45,12 +43,11 @@ test("windows disk settings use usage controls when throughput is unavailable", 
             diskMetricKind: "throughput",
         },
     });
-    const targetNameList = readTargetNames(markup);
 
-    assert.ok(targetNameList.includes("diskMetricKind"));
-    assert.ok(!targetNameList.includes("diskThroughputDirection"));
-    assert.ok(!targetNameList.includes("maximumDiskReadThroughputMebibytesPerSecond"));
-    assert.ok(!targetNameList.includes("maximumDiskWriteThroughputMebibytesPerSecond"));
+    assert.match(markup, /Disk Metric:/);
+    assert.doesNotMatch(markup, /Direction:/);
+    assert.doesNotMatch(markup, /Read Max/);
+    assert.doesNotMatch(markup, /Write Max/);
 });
 
 test("network dual-channel settings render channel colors instead of usage colors", () => {
@@ -61,11 +58,9 @@ test("network dual-channel settings render channel colors instead of usage color
             networkDirection: "both",
         },
     });
-    const targetNameList = readTargetNames(markup);
 
-    assert.ok(targetNameList.includes("downloadColors.solidColor"));
-    assert.ok(targetNameList.includes("uploadColors.solidColor"));
-    assert.ok(!targetNameList.includes("usageColors.solidColor"));
+    assert.match(markup, /Color - Download/);
+    assert.match(markup, /Color - Upload/);
 });
 
 test("network single-channel settings render standard usage colors", () => {
@@ -76,11 +71,10 @@ test("network single-channel settings render standard usage colors", () => {
             networkDirection: "download",
         },
     });
-    const targetNameList = readTargetNames(markup);
 
-    assert.ok(targetNameList.includes("usageColors.solidColor"));
-    assert.ok(!targetNameList.includes("downloadColors.solidColor"));
-    assert.ok(!targetNameList.includes("uploadColors.solidColor"));
+    assert.match(markup, /Solid Color:/);
+    assert.doesNotMatch(markup, /Color - Download/);
+    assert.doesNotMatch(markup, /Color - Upload/);
 });
 
 test("network mirrored trend disables grid controls in the panel", () => {
@@ -92,11 +86,10 @@ test("network mirrored trend disables grid controls in the panel", () => {
             networkTrafficDisplayMode: "mirrored",
         },
     });
-    const targetNameList = readTargetNames(markup);
 
-    assert.ok(targetNameList.includes("networkTrafficDisplayMode"));
-    assert.ok(targetNameList.includes("gridLineVisibility"));
-    assert.ok(targetNameList.includes("gridLineType"));
+    assert.match(markup, /Traffic Graph:/);
+    assert.match(markup, /Grid Line Visibility:/);
+    assert.match(markup, /Grid Line Type:/);
     assert.match(markup, /Grid line settings are not supported/);
 });
 
@@ -110,11 +103,10 @@ test("disk throughput linear settings use standard colors", () => {
             graphicType: "linear",
         },
     });
-    const targetNameList = readTargetNames(markup);
 
-    assert.ok(targetNameList.includes("usageColors.solidColor"));
-    assert.ok(!targetNameList.includes("diskReadColors.solidColor"));
-    assert.ok(!targetNameList.includes("diskWriteColors.solidColor"));
+    assert.match(markup, /Solid Color:/);
+    assert.doesNotMatch(markup, sectionHeadingPattern("Read"));
+    assert.doesNotMatch(markup, sectionHeadingPattern("Write"));
 });
 
 test("disk throughput dual-channel settings render read/write colors", () => {
@@ -127,11 +119,9 @@ test("disk throughput dual-channel settings render read/write colors", () => {
             graphicType: "circular",
         },
     });
-    const targetNameList = readTargetNames(markup);
 
-    assert.ok(targetNameList.includes("diskReadColors.solidColor"));
-    assert.ok(targetNameList.includes("diskWriteColors.solidColor"));
-    assert.ok(!targetNameList.includes("usageColors.solidColor"));
+    assert.match(markup, sectionHeadingPattern("Read"));
+    assert.match(markup, sectionHeadingPattern("Write"));
 });
 
 function renderWidgetSettings(options: {
@@ -152,7 +142,6 @@ function renderWidgetSettings(options: {
     }));
 }
 
-function readTargetNames(markup: string): string[] {
-    return [...markup.matchAll(/data-setting-target="([^"]+)"/g)]
-        .map(match => match[1]);
+function sectionHeadingPattern(text: string): RegExp {
+    return new RegExp(`class="section-heading"[^>]*>${text}<`);
 }

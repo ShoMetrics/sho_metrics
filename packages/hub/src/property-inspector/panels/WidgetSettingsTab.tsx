@@ -1,5 +1,5 @@
 import { InspectorItem } from "../components/InspectorItem";
-import type { InspectorSettingTarget, VisibilityContext } from "../schema";
+import type { InspectorSettingTarget, VisibilityContext } from "../types";
 import type { ActionKind } from "../settings";
 import { DefaultWidgetSettings } from "./DefaultWidgetSettings";
 import { DiskWidgetSettings } from "./DiskWidgetSettings";

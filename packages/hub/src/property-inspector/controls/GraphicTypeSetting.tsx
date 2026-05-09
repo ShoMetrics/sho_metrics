@@ -10,14 +10,18 @@ const graphicTypeOptionList = [
     { value: "dashed-line", label: "Trend" },
 ] as const;
 
-export function GraphicTypeSetting(props: SettingControlProps): React.JSX.Element {
+interface GraphicTypeSettingProps extends SettingControlProps {
+    value: GraphicType;
+    onValueChange: (value: GraphicType) => void;
+}
+
+export function GraphicTypeSetting(props: GraphicTypeSettingProps): React.JSX.Element {
     return (
         <PreviewOptionSetting
             {...props}
-            target="graphicType"
             label="Layout"
             optionList={graphicTypeOptionList}
-            buildPreviewUri={(value) => buildGraphicTypePreviewUri(value as GraphicType)}
+            buildPreviewUri={buildGraphicTypePreviewUri}
         />
     );
 }

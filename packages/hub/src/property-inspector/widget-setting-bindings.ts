@@ -29,7 +29,7 @@ import type {
     InspectorSettingTarget,
     PropertyInspectorSettingKey,
     VisibilityContext,
-} from "./schema";
+} from "./types";
 
 export type InspectorBindingContext = VisibilityContext;
 
