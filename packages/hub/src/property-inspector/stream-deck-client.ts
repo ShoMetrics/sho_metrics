@@ -35,6 +35,9 @@ export interface ConnectionInfo {
     actionInfo?: {
         action?: string;
         uuid?: string;
+        payload?: {
+            settings?: SettingsRecord;
+        };
     };
     application?: {
         platform?: string;

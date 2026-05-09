@@ -58,11 +58,12 @@ _connection.setResult
 
 This will confirm whether the ~300ms is WebSocket open time, registration timing, or Stream Deck host scheduling.
 
-## Proposed Fix Direction
+## Implemented Fix Direction
 
 1. Set `actionKind` and `isWindows` immediately after `getConnectionInfo()` resolves.
-2. Render fields from default stored/global settings while real settings are still loading.
-3. Fetch widget settings and global settings in parallel after connection info:
+2. Prefer `connectionInfo.actionInfo.payload.settings` as first paint widget settings when available.
+3. Render editable controls immediately. Show the lightweight loading notice only when no initial widget settings were available from `actionInfo`.
+4. Fetch widget settings and global settings in parallel after connection info:
 
    ```ts
    const [payload, globalPayload] = await Promise.all([
@@ -71,8 +72,20 @@ This will confirm whether the ~300ms is WebSocket open time, registration timing
    ]);
    ```
 
-4. Prefer `connectionInfo.actionInfo.payload.settings` as initial widget settings if it is available, then use `getSettings()` only as a refresh/confirmation.
-5. Keep this fix inside the PI startup boundary. Do not change the stored settings model, resolver cascade, or renderer contracts for this issue.
+5. Use `getSettings()` as an always-run refresh so stale actionInfo/cache values do not become authoritative.
+6. If settings cannot be loaded because the refresh request fails, keep the UI editable and show a one-time top notice:
+
+   ```txt
+   We couldn't load this widget's saved settings, so defaults are shown.
+   ```
+
+7. Keep this fix inside the PI startup boundary. Do not change the stored settings model, resolver cascade, or renderer contracts for this issue.
+
+## Missing Settings
+
+Missing settings are normal for a newly dragged widget. The UI should show defaults and no error.
+
+During pre-proto cleanup, the codec intentionally does not validate raw settings. It only classifies `null`, non-object, arrays, and empty objects as missing; any non-empty object is treated as present. A future proto/Zod codec should own the authoritative invalid/corrupt decision.
 
 ## Risk To Watch
 
