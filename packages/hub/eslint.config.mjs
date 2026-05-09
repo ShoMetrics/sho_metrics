@@ -35,6 +35,14 @@ const restrictedConcreteActionRawSettingsSyntax = [
   },
 ];
 
+const restrictedConcreteActionVisualFallbackSyntax = [
+  'normalizeThreshold',
+  'resolveHexColor',
+].map(name => ({
+  selector: `Identifier[name="${name}"]`,
+  message: `${name} is action-level visual settings fallback. Actions must trust resolved settings and renderer adapters.`,
+}));
+
 const restrictedSchemaHardeningImports = {
   paths: [
     {
@@ -151,6 +159,7 @@ export default tseslint.config(
         'error',
         ...restrictedLegacySettingSyntax,
         ...restrictedConcreteActionRawSettingsSyntax,
+        ...restrictedConcreteActionVisualFallbackSyntax,
       ],
     },
   },
