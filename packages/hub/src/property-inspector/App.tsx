@@ -17,8 +17,14 @@ import {
     type PluginGlobalSettings,
     type WidgetStoredSettings,
 } from "../settings/widget-settings";
-import { readWidgetSettings, writeWidgetSettings } from "../settings/codec";
 import {
+    classifyRawWidgetSettings,
+    readWidgetSettings,
+    writeWidgetSettings,
+    type RawWidgetSettingsClassification,
+} from "../settings/codec";
+import {
+    type ConnectionInfo,
     readActionUuid,
     resolveIsWindowsPropertyInspector,
     type StreamDeckPropertyInspectorClient,
@@ -40,8 +46,16 @@ interface PropertyInspectorState {
     isWindows: boolean;
     storedSettings: WidgetStoredSettings;
     globalSettings: PluginGlobalSettings;
+    settingsNotice: SettingsNotice | null;
     activeTab: "widget" | "plugin";
     loadError: string | null;
+}
+
+type SettingsNoticeKind = "loading" | "warning";
+
+interface SettingsNotice {
+    kind: SettingsNoticeKind;
+    text: string;
 }
 
 const initialState: PropertyInspectorState = {
@@ -49,6 +63,7 @@ const initialState: PropertyInspectorState = {
     isWindows: false,
     storedSettings: normalizeWidgetStoredSettings({}),
     globalSettings: { ...defaultPluginGlobalSettings },
+    settingsNotice: null,
     activeTab: "widget",
     loadError: null,
 };
@@ -133,34 +148,82 @@ export function App({ client }: AppProps): React.JSX.Element {
 
         async function loadSettings(): Promise<void> {
             const connectionInfo = await client.getConnectionInfo();
-            const payload = await client.getSettings();
-            const globalPayload = await client.getGlobalSettings();
             const actionKind = resolveActionKind(readActionUuid(connectionInfo));
             const isWindows = resolveIsWindowsPropertyInspector(connectionInfo);
-            const globalSettings = normalizePluginGlobalSettings(readSettingsRecord(globalPayload));
-            const storedSettings = normalizeWidgetStoredSettings(readWidgetSettings(payload.settings));
+            const initialSettings = readInitialWidgetSettings(connectionInfo);
 
             if (isDisposed) {
                 return;
             }
 
-            setState({
+            setState((currentState) => ({
+                ...currentState,
                 actionKind,
                 isWindows,
-                storedSettings,
-                globalSettings,
-                activeTab: "widget",
+                storedSettings: initialSettings.classification === "present"
+                    ? initialSettings.storedSettings
+                    : currentState.storedSettings,
+                settingsNotice: initialSettings.classification === "missing"
+                    ? {
+                        kind: "loading",
+                        text: "Loading settings...",
+                    }
+                    : null,
                 loadError: null,
+            }));
+
+            const [settingsResult, globalSettingsResult] = await Promise.allSettled([
+                client.getSettings(),
+                client.getGlobalSettings(),
+            ]);
+
+            if (isDisposed) {
+                return;
+            }
+
+            setState((currentState) => {
+                const nextState: PropertyInspectorState = {
+                    ...currentState,
+                    activeTab: "widget",
+                    loadError: null,
+                };
+
+                if (settingsResult.status === "fulfilled") {
+                    const refreshedSettings = readRefreshedWidgetSettings(settingsResult.value.settings);
+                    if (refreshedSettings.classification === "present") {
+                        nextState.storedSettings = refreshedSettings.storedSettings;
+                    }
+                    nextState.settingsNotice = null;
+                } else {
+                    nextState.settingsNotice = {
+                        kind: "warning",
+                        text: "We couldn't load this widget's saved settings, so defaults are shown.",
+                    };
+                }
+
+                if (globalSettingsResult.status === "fulfilled") {
+                    nextState.globalSettings = normalizePluginGlobalSettings(readSettingsRecord(globalSettingsResult.value));
+                } else {
+                    nextState.settingsNotice = {
+                        kind: "warning",
+                        text: "We couldn't load plugin settings, so defaults are shown.",
+                    };
+                }
+
+                return nextState;
             });
         }
 
         client.didReceiveSettings.subscribe((event) => {
             setState((currentState) => {
-                const storedSettings = normalizeWidgetStoredSettings(readWidgetSettings(event.payload.settings));
+                const refreshedSettings = readRefreshedWidgetSettings(event.payload.settings);
 
                 return {
                     ...currentState,
-                    storedSettings,
+                    storedSettings: refreshedSettings.classification === "present"
+                        ? refreshedSettings.storedSettings
+                        : currentState.storedSettings,
+                    settingsNotice: null,
                 };
             });
         });
@@ -172,6 +235,7 @@ export function App({ client }: AppProps): React.JSX.Element {
                 return {
                     ...currentState,
                     globalSettings,
+                    settingsNotice: currentState.settingsNotice,
                 };
             });
         });
@@ -216,10 +280,6 @@ export function App({ client }: AppProps): React.JSX.Element {
         };
     }, [client]);
 
-    if (state.loadError) {
-        return <div ref={rootRef}>{state.loadError}</div>;
-    }
-
     return (
         <div ref={rootRef}>
             <div className="settings-tab-list" role="tablist" aria-label="Settings">
@@ -245,6 +305,8 @@ export function App({ client }: AppProps): React.JSX.Element {
                 </button>
             </div>
 
+            <SettingsNoticeSlot notice={state.settingsNotice} loadError={state.loadError} />
+
             {state.activeTab === "widget" ? (
                     <WidgetSettingsTab
                         inspectorSectionList={inspectorSectionList}
@@ -260,6 +322,32 @@ export function App({ client }: AppProps): React.JSX.Element {
                 />
             )}
         </div>
+    );
+}
+
+function SettingsNoticeSlot(options: {
+    notice: SettingsNotice | null;
+    loadError: string | null;
+}): React.JSX.Element | null {
+    const notice = options.loadError
+        ? {
+            kind: "warning" as const,
+            text: options.loadError,
+        }
+        : options.notice;
+
+    if (!notice) {
+        return null;
+    }
+
+    return <SettingsNoticeView notice={notice} />;
+}
+
+function SettingsNoticeView({ notice }: { notice: SettingsNotice }): React.JSX.Element {
+    return (
+        <sdpi-item className={`settings-notice settings-notice-${notice.kind}`}>
+            <p className="section-note">{notice.text}</p>
+        </sdpi-item>
     );
 }
 
@@ -336,6 +424,35 @@ function readSettingsRecord(payload: unknown): Record<string, unknown> {
     }
 
     return {};
+}
+
+function readInitialWidgetSettings(connectionInfo: ConnectionInfo): {
+    classification: RawWidgetSettingsClassification;
+    storedSettings: WidgetStoredSettings;
+} {
+    const rawSettings = connectionInfo.actionInfo?.payload?.settings;
+    const classification = classifyRawWidgetSettings(rawSettings);
+
+    return {
+        classification,
+        storedSettings: classification === "present"
+            ? normalizeWidgetStoredSettings(readWidgetSettings(rawSettings))
+            : normalizeWidgetStoredSettings({}),
+    };
+}
+
+function readRefreshedWidgetSettings(rawSettings: unknown): {
+    classification: RawWidgetSettingsClassification;
+    storedSettings: WidgetStoredSettings;
+} {
+    const classification = classifyRawWidgetSettings(rawSettings);
+
+    return {
+        classification,
+        storedSettings: classification === "present"
+            ? normalizeWidgetStoredSettings(readWidgetSettings(rawSettings))
+            : normalizeWidgetStoredSettings({}),
+    };
 }
 
 function isSettingsPayload(payload: unknown): payload is { settings: Record<string, unknown> } {

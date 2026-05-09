@@ -8,6 +8,7 @@ export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
 export type JsonObject = {
     [key: string]: JsonValue;
 };
+export type RawWidgetSettingsClassification = "missing" | "present";
 
 export function readWidgetSettings(rawSettings: unknown): WidgetSettings {
     if (!rawSettings || typeof rawSettings !== "object" || Array.isArray(rawSettings)) {
@@ -23,6 +24,17 @@ export function readPluginGlobalSettings(rawSettings: unknown): GlobalSettings {
     }
 
     return rawSettings as GlobalSettings;
+}
+
+export function classifyRawWidgetSettings(rawSettings: unknown): RawWidgetSettingsClassification {
+    if (!rawSettings || typeof rawSettings !== "object" || Array.isArray(rawSettings)) {
+        return "missing";
+    }
+
+    // TODO: When proto/Zod owns this codec boundary, return an explicit
+    // invalid/corrupt result from real decode/parse failures. During the
+    // pre-contract cleanup we intentionally do not validate raw settings.
+    return Object.keys(rawSettings).length === 0 ? "missing" : "present";
 }
 
 export function writeWidgetSettings(settings: WidgetSettings): JsonObject {
