@@ -1,7 +1,6 @@
 import type {
     GlobalSettings,
     WidgetSettings,
-    WidgetStoredSettings,
 } from "./model";
 
 export type JsonPrimitive = boolean | number | string | null | undefined;
@@ -26,13 +25,32 @@ export function readPluginGlobalSettings(rawSettings: unknown): GlobalSettings {
     return rawSettings as GlobalSettings;
 }
 
-export function writeWidgetSettings(settings: WidgetStoredSettings): JsonObject {
-    return {
-        metric: { ...settings.metric } as JsonObject,
-        local: { ...settings.local } as JsonObject,
-        appearanceOverrides: { ...settings.appearanceOverrides } as JsonObject,
-        networkOverrides: { ...settings.networkOverrides } as JsonObject,
-        diskThroughputOverrides: { ...settings.diskThroughputOverrides } as JsonObject,
-        runtimeCache: { ...settings.runtimeCache } as JsonObject,
-    };
+export function writeWidgetSettings(settings: WidgetSettings): JsonObject {
+    const output: JsonObject = {};
+
+    if (settings.metric) {
+        output.metric = { ...settings.metric } as JsonObject;
+    }
+
+    if (settings.local) {
+        output.local = { ...settings.local } as JsonObject;
+    }
+
+    if (settings.appearanceOverrides) {
+        output.appearanceOverrides = { ...settings.appearanceOverrides } as JsonObject;
+    }
+
+    if (settings.networkOverrides) {
+        output.networkOverrides = { ...settings.networkOverrides } as JsonObject;
+    }
+
+    if (settings.diskThroughputOverrides) {
+        output.diskThroughputOverrides = { ...settings.diskThroughputOverrides } as JsonObject;
+    }
+
+    if (settings.runtimeCache) {
+        output.runtimeCache = { ...settings.runtimeCache } as JsonObject;
+    }
+
+    return output;
 }

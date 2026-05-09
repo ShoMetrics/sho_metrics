@@ -18,7 +18,7 @@ test("widget setting binding writes appearance overrides only", () => {
     const settings = writeSetting("solidColor", "#123456", defaultContext);
 
     assert.deepEqual(settings.appearanceOverrides, { solidColor: "#123456" });
-    assert.deepEqual(settings.networkOverrides, {});
+    assert.equal(settings.networkOverrides, undefined);
 });
 
 test("network maximum binding switches scale to custom", () => {
@@ -27,21 +27,21 @@ test("network maximum binding switches scale to custom", () => {
         isWindows: false,
     });
 
-    assert.equal(settings.networkOverrides.networkScaleMode, "custom");
-    assert.equal(settings.networkOverrides.maximumDownloadSpeedMbps, 500);
+    assert.equal(settings.networkOverrides?.networkScaleMode, "custom");
+    assert.equal(settings.networkOverrides?.maximumDownloadSpeedMbps, 500);
 });
 
 test("graphic type binding writes the selected appearance override", () => {
     const settings = writeSetting("graphicType", "linear", defaultContext);
 
-    assert.equal(settings.appearanceOverrides.graphicType, "linear");
+    assert.equal(settings.appearanceOverrides?.graphicType, "linear");
 });
 
 test("threshold bindings keep stored thresholds ordered", () => {
     const lowSettings = writeSetting("lowThreshold", "90", defaultContext);
 
-    assert.equal(lowSettings.appearanceOverrides.lowThreshold, 90);
-    assert.equal(lowSettings.appearanceOverrides.highThreshold, 90);
+    assert.equal(lowSettings.appearanceOverrides?.lowThreshold, 90);
+    assert.equal(lowSettings.appearanceOverrides?.highThreshold, 90);
 });
 
 test("disk metric kind binding updates polling frequency from real context", () => {
@@ -50,8 +50,8 @@ test("disk metric kind binding updates polling frequency from real context", () 
         isWindows: false,
     });
 
-    assert.equal(settings.metric.diskMetricKind, "throughput");
-    assert.equal(settings.local.pollingFrequencySeconds, 1);
+    assert.equal(settings.metric?.diskMetricKind, "throughput");
+    assert.equal(settings.local?.pollingFrequencySeconds, 1);
 });
 
 test("disk metric kind binding respects Windows throughput restriction", () => {
@@ -60,8 +60,8 @@ test("disk metric kind binding respects Windows throughput restriction", () => {
         isWindows: true,
     });
 
-    assert.equal(settings.metric.diskMetricKind, "usage");
-    assert.equal(settings.local.pollingFrequencySeconds, 60);
+    assert.equal(settings.metric?.diskMetricKind, "usage");
+    assert.equal(settings.local?.pollingFrequencySeconds, 60);
 });
 
 function writeSetting(
@@ -74,7 +74,7 @@ function writeSetting(
     assert.ok(binding);
 
     return updateWidgetStoredSettings({
-        storedSettings: normalizeWidgetStoredSettings({}, context),
+        storedSettings: normalizeWidgetStoredSettings({}),
         binding,
         value,
         context,

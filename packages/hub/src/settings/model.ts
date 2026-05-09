@@ -114,15 +114,7 @@ export interface WidgetSettings {
     [key: string]: unknown;
 }
 
-export interface WidgetStoredSettings {
-    metric: MetricSettings;
-    local: WidgetLocalSettings;
-    appearanceOverrides: Partial<AppearanceSettings>;
-    networkOverrides: Partial<NetworkDefaultSettings>;
-    diskThroughputOverrides: Partial<DiskThroughputDefaultSettings>;
-    runtimeCache: WidgetRuntimeCache;
-    [key: string]: unknown;
-}
+export type WidgetStoredSettings = WidgetSettings;
 
 export interface GlobalSettings {
     overrideWidgetAppearance?: boolean;

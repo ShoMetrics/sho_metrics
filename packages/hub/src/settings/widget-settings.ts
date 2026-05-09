@@ -2,14 +2,11 @@ import { readPluginGlobalSettings, readWidgetSettings } from "./codec";
 import {
     defaultAppearanceSettings,
     defaultDiskThroughputSettings,
-    defaultLocalSettings,
-    defaultMetricSettings,
     defaultNetworkSettings,
     defaultPluginGlobalSettings,
     defaultRuntimeCache,
 } from "./defaults";
 import type {
-    ActionKind,
     AppearanceSettings,
     CircleStyle,
     DiskMetricKind,
@@ -21,8 +18,6 @@ import type {
     NetworkDefaultSettings,
     NetworkDirection,
     PluginGlobalSettings,
-    ResolvedWidgetSettings,
-    SettingsContext,
     WidgetLocalSettings,
     WidgetRuntimeCache,
     WidgetStoredSettings,
@@ -110,6 +105,15 @@ const DISK_THROUGHPUT_KEYS = new Set<keyof DiskThroughputDefaultSettings>([
     "maximumDiskWriteThroughputMebibytesPerSecond",
 ]);
 
+const RUNTIME_CACHE_KEYS = new Set<keyof WidgetRuntimeCache>([
+    "availableNetworkInterfaces",
+    "availableDiskVolumes",
+    "learnedMaximumDownloadSpeedMbps",
+    "learnedMaximumUploadSpeedMbps",
+    "learnedMaximumDiskReadThroughputMebibytesPerSecond",
+    "learnedMaximumDiskWriteThroughputMebibytesPerSecond",
+]);
+
 export function normalizePluginGlobalSettings(rawSettings: unknown): PluginGlobalSettings {
     const settings = readPluginGlobalSettings(rawSettings);
     const rawOverrideWidgetAppearance = settings.overrideWidgetAppearance as unknown;
@@ -136,161 +140,107 @@ export function normalizePluginGlobalSettings(rawSettings: unknown): PluginGloba
 
 export function normalizeWidgetStoredSettings(
     rawSettings: unknown,
-    context: SettingsContext,
 ): WidgetStoredSettings {
     const settings = readWidgetSettings(rawSettings);
-    const metric = normalizeMetricSettings({
-        ...pickKnownFields(settings, defaultMetricSettings),
-        ...readRecord(settings.metric),
-    }, context);
-    const local = normalizeLocalSettings({
-        ...pickKnownFields(settings, defaultLocalSettings),
-        diskMetricKind: metric.diskMetricKind,
-        ...readRecord(settings.local),
-    }, context);
-    const appearanceOverrides = normalizeAppearanceOverrides({
-        ...pickKnownFields(settings, defaultAppearanceSettings),
-        ...readRecord(settings.appearanceOverrides),
-    });
-    const networkOverrides = normalizeNetworkOverrides({
-        ...pickKnownFields(settings, defaultNetworkSettings),
-        ...readRecord(settings.networkOverrides),
-    });
-    const diskThroughputOverrides = normalizeDiskThroughputOverrides({
-        ...pickKnownFields(settings, defaultDiskThroughputSettings),
-        ...readRecord(settings.diskThroughputOverrides),
-    });
-    const runtimeCache = normalizeRuntimeCache({
-        ...pickKnownFields(settings, defaultRuntimeCache),
-        ...readRecord(settings.runtimeCache),
-    });
+    const storedSettings: WidgetStoredSettings = {};
+    const metric = normalizeMetricOverrides(readRecord(settings.metric));
+    const local = normalizeLocalOverrides(readRecord(settings.local));
+    const appearanceOverrides = normalizeAppearanceOverrides(readRecord(settings.appearanceOverrides));
+    const networkOverrides = normalizeNetworkOverrides(readRecord(settings.networkOverrides));
+    const diskThroughputOverrides = normalizeDiskThroughputOverrides(readRecord(settings.diskThroughputOverrides));
+    const runtimeCache = normalizeRuntimeCache(readRecord(settings.runtimeCache));
 
-    return {
-        metric,
-        local,
-        appearanceOverrides,
-        networkOverrides,
-        diskThroughputOverrides,
-        runtimeCache,
-    };
-}
-
-export function resolveWidgetSettings(options: {
-    storedSettings: WidgetStoredSettings;
-    globalSettings: PluginGlobalSettings;
-    actionKind: ActionKind;
-    isWindows: boolean;
-}): ResolvedWidgetSettings {
-    const context = {
-        actionKind: options.actionKind,
-        isWindows: options.isWindows,
-    };
-    const metric = normalizeMetricSettings({ ...options.storedSettings.metric }, context);
-    const local = normalizeLocalSettings({ ...options.storedSettings.local }, context);
-    const appearance = {
-        ...defaultAppearanceSettings,
-        ...options.storedSettings.appearanceOverrides,
-    };
-    const network = resolveNetworkSettings(options.storedSettings, options.globalSettings);
-    const diskThroughput = resolveDiskThroughputSettings(options.storedSettings, options.globalSettings);
-
-    return {
-        metric,
-        local,
-        appearance: options.globalSettings.overrideWidgetAppearance
-            ? { ...defaultAppearanceSettings, ...options.globalSettings.appearanceDefaults }
-            : appearance,
-        network,
-        diskThroughput,
-    };
-}
-
-function resolveNetworkSettings(
-    storedSettings: WidgetStoredSettings,
-    globalSettings: PluginGlobalSettings,
-): NetworkDefaultSettings {
-    const network = {
-        ...defaultNetworkSettings,
-        ...globalSettings.networkDefaults,
-        ...storedSettings.networkOverrides,
-    };
-
-    if (network.networkScaleMode === "auto") {
-        return {
-            ...network,
-            maximumDownloadSpeedMbps: maxOptionalPositiveNumber(
-                network.maximumDownloadSpeedMbps,
-                storedSettings.runtimeCache.learnedMaximumDownloadSpeedMbps,
-            ),
-            maximumUploadSpeedMbps: maxOptionalPositiveNumber(
-                network.maximumUploadSpeedMbps,
-                storedSettings.runtimeCache.learnedMaximumUploadSpeedMbps,
-            ),
-        };
+    if (hasStoredValues(metric)) {
+        storedSettings.metric = metric;
     }
 
-    return network;
-}
-
-function resolveDiskThroughputSettings(
-    storedSettings: WidgetStoredSettings,
-    globalSettings: PluginGlobalSettings,
-): DiskThroughputDefaultSettings {
-    const diskThroughput = {
-        ...defaultDiskThroughputSettings,
-        ...globalSettings.diskThroughputDefaults,
-        ...storedSettings.diskThroughputOverrides,
-    };
-
-    if (diskThroughput.diskThroughputScaleMode === "auto") {
-        return {
-            ...diskThroughput,
-            maximumDiskReadThroughputMebibytesPerSecond: maxOptionalPositiveNumber(
-                diskThroughput.maximumDiskReadThroughputMebibytesPerSecond,
-                storedSettings.runtimeCache.learnedMaximumDiskReadThroughputMebibytesPerSecond,
-            ),
-            maximumDiskWriteThroughputMebibytesPerSecond: maxOptionalPositiveNumber(
-                diskThroughput.maximumDiskWriteThroughputMebibytesPerSecond,
-                storedSettings.runtimeCache.learnedMaximumDiskWriteThroughputMebibytesPerSecond,
-            ),
-        };
+    if (hasStoredValues(local)) {
+        storedSettings.local = local;
     }
 
-    return diskThroughput;
+    if (hasStoredValues(appearanceOverrides)) {
+        storedSettings.appearanceOverrides = appearanceOverrides;
+    }
+
+    if (hasStoredValues(networkOverrides)) {
+        storedSettings.networkOverrides = networkOverrides;
+    }
+
+    if (hasStoredValues(diskThroughputOverrides)) {
+        storedSettings.diskThroughputOverrides = diskThroughputOverrides;
+    }
+
+    if (hasStoredValues(runtimeCache)) {
+        storedSettings.runtimeCache = runtimeCache;
+    }
+
+    return storedSettings;
 }
 
-function normalizeMetricSettings(rawSettings: Record<string, unknown>, context: SettingsContext): MetricSettings {
-    const diskMetricKind = normalizeDiskMetricKind(rawSettings.diskMetricKind, context.isWindows);
+function normalizeMetricOverrides(rawSettings: Record<string, unknown>): Partial<MetricSettings> {
+    const output: Partial<MetricSettings> = {};
+    const networkDirection = normalizeOptionalNetworkDirection(rawSettings.networkDirection);
+    const diskMetricKind = normalizeOptionalDiskMetricKind(rawSettings.diskMetricKind);
+    const diskThroughputDirection = normalizeOptionalDiskThroughputDirection(rawSettings.diskThroughputDirection);
 
-    return {
-        networkDirection: normalizeNetworkDirection(rawSettings.networkDirection),
-        networkInterfaceId: normalizeString(rawSettings.networkInterfaceId, defaultMetricSettings.networkInterfaceId),
-        diskMetricKind,
-        diskVolumeId: normalizeString(rawSettings.diskVolumeId, defaultMetricSettings.diskVolumeId),
-        diskThroughputDirection: diskMetricKind === "throughput"
-            ? normalizeDiskThroughputDirection(rawSettings.diskThroughputDirection)
-            : defaultMetricSettings.diskThroughputDirection,
-    };
+    if (networkDirection) {
+        output.networkDirection = networkDirection;
+    }
+
+    if (typeof rawSettings.networkInterfaceId === "string") {
+        output.networkInterfaceId = rawSettings.networkInterfaceId;
+    }
+
+    if (diskMetricKind) {
+        output.diskMetricKind = diskMetricKind;
+    }
+
+    if (typeof rawSettings.diskVolumeId === "string") {
+        output.diskVolumeId = rawSettings.diskVolumeId;
+    }
+
+    if (diskThroughputDirection) {
+        output.diskThroughputDirection = diskThroughputDirection;
+    }
+
+    return output;
 }
 
-function normalizeLocalSettings(rawSettings: Record<string, unknown>, context: SettingsContext): WidgetLocalSettings {
-    const diskMetricKind = normalizeDiskMetricKind(readRecord(rawSettings).diskMetricKind, context.isWindows);
+function normalizeLocalOverrides(rawSettings: Record<string, unknown>): Partial<WidgetLocalSettings> {
+    const output: Partial<WidgetLocalSettings> = {};
+    const pollingFrequencySeconds = normalizeOptionalPollingFrequency(rawSettings.pollingFrequencySeconds);
+    const maximumTemperatureCelsius = normalizeOptionalPositiveNumber(rawSettings.maximumTemperatureCelsius);
+    const maximumGpuPowerWatts = normalizeOptionalPositiveNumber(rawSettings.maximumGpuPowerWatts);
 
-    return {
-        pollingFrequencySeconds: normalizePollingFrequency(
-            rawSettings.pollingFrequencySeconds,
-            resolveDefaultPollingFrequencySeconds(context, diskMetricKind),
-        ),
-        networkTrafficDisplayMode: rawSettings.networkTrafficDisplayMode === "overlay" ? "overlay" : "mirrored",
-        diskUsageDisplayMode: rawSettings.diskUsageDisplayMode === "space" ? "space" : "percentage",
-        diskLinearLabel: normalizeString(rawSettings.diskLinearLabel, defaultLocalSettings.diskLinearLabel),
-        maximumTemperatureCelsius: normalizePositiveNumber(
-            rawSettings.maximumTemperatureCelsius,
-            defaultLocalSettings.maximumTemperatureCelsius,
-        ),
-        maximumGpuPowerWatts: normalizeOptionalPositiveNumber(rawSettings.maximumGpuPowerWatts),
-        temperatureUnit: rawSettings.temperatureUnit === "fahrenheit" ? "fahrenheit" : "celsius",
-    };
+    if (pollingFrequencySeconds !== undefined) {
+        output.pollingFrequencySeconds = pollingFrequencySeconds;
+    }
+
+    if (rawSettings.networkTrafficDisplayMode === "overlay" || rawSettings.networkTrafficDisplayMode === "mirrored") {
+        output.networkTrafficDisplayMode = rawSettings.networkTrafficDisplayMode;
+    }
+
+    if (rawSettings.diskUsageDisplayMode === "space" || rawSettings.diskUsageDisplayMode === "percentage") {
+        output.diskUsageDisplayMode = rawSettings.diskUsageDisplayMode;
+    }
+
+    if (typeof rawSettings.diskLinearLabel === "string") {
+        output.diskLinearLabel = rawSettings.diskLinearLabel;
+    }
+
+    if (maximumTemperatureCelsius !== undefined) {
+        output.maximumTemperatureCelsius = maximumTemperatureCelsius;
+    }
+
+    if (maximumGpuPowerWatts !== undefined) {
+        output.maximumGpuPowerWatts = maximumGpuPowerWatts;
+    }
+
+    if (rawSettings.temperatureUnit === "fahrenheit" || rawSettings.temperatureUnit === "celsius") {
+        output.temperatureUnit = rawSettings.temperatureUnit;
+    }
+
+    return output;
 }
 
 function normalizeAppearanceSettings(
@@ -378,8 +328,8 @@ function normalizeDiskThroughputOverrides(rawSettings: Record<string, unknown>):
     return copyPresentKeys(rawSettings, normalizedSettings, DISK_THROUGHPUT_KEYS);
 }
 
-function normalizeRuntimeCache(rawSettings: Record<string, unknown>): WidgetRuntimeCache {
-    return {
+function normalizeRuntimeCache(rawSettings: Record<string, unknown>): Partial<WidgetRuntimeCache> {
+    const normalizedSettings: WidgetRuntimeCache = {
         availableNetworkInterfaces: normalizeString(
             rawSettings.availableNetworkInterfaces,
             defaultRuntimeCache.availableNetworkInterfaces,
@@ -394,6 +344,8 @@ function normalizeRuntimeCache(rawSettings: Record<string, unknown>): WidgetRunt
             rawSettings.learnedMaximumDiskWriteThroughputMebibytesPerSecond,
         ),
     };
+
+    return copyPresentKeys(rawSettings, normalizedSettings, RUNTIME_CACHE_KEYS);
 }
 
 function copyPresentKeys<TSettings extends object, TKey extends keyof TSettings>(
@@ -418,19 +370,8 @@ function readRecord(value: unknown): Record<string, unknown> {
         : {};
 }
 
-function pickKnownFields<TSettings extends object>(
-    rawSettings: Record<string, unknown>,
-    shape: TSettings,
-): Record<string, unknown> {
-    const output: Record<string, unknown> = {};
-
-    for (const key of Object.keys(shape)) {
-        if (Object.hasOwn(rawSettings, key)) {
-            output[key] = rawSettings[key];
-        }
-    }
-
-    return output;
+function hasStoredValues(settings: object): boolean {
+    return Object.keys(settings).length > 0;
 }
 
 function normalizeGraphicType(value: unknown, fallbackValue: GraphicType): GraphicType {
@@ -449,28 +390,24 @@ function normalizeCircleStyle(value: unknown, fallbackValue: CircleStyle): Circl
     return fallbackValue;
 }
 
-function normalizeNetworkDirection(value: unknown): NetworkDirection {
-    if (value === "download" || value === "upload") {
+function normalizeOptionalNetworkDirection(value: unknown): NetworkDirection | undefined {
+    if (value === "both" || value === "download" || value === "upload") {
         return value;
     }
 
-    return "both";
+    return undefined;
 }
 
-function normalizeDiskMetricKind(value: unknown, isWindows: boolean): DiskMetricKind {
-    if (isWindows && value === "throughput") {
-        return "usage";
-    }
-
-    return value === "throughput" ? "throughput" : "usage";
+function normalizeOptionalDiskMetricKind(value: unknown): DiskMetricKind | undefined {
+    return value === "usage" || value === "throughput" ? value : undefined;
 }
 
-function normalizeDiskThroughputDirection(value: unknown): DiskThroughputDirection {
-    if (value === "read" || value === "write" || value === "total") {
+function normalizeOptionalDiskThroughputDirection(value: unknown): DiskThroughputDirection | undefined {
+    if (value === "both" || value === "read" || value === "write" || value === "total") {
         return value;
     }
 
-    return "both";
+    return undefined;
 }
 
 function normalizeGridLineVisibility(value: unknown, fallbackValue: GridLineVisibility): GridLineVisibility {
@@ -481,20 +418,9 @@ function normalizeGridLineVisibility(value: unknown, fallbackValue: GridLineVisi
     return fallbackValue;
 }
 
-function resolveDefaultPollingFrequencySeconds(context: SettingsContext, diskMetricKind: DiskMetricKind): number {
-    return context.actionKind === "disk" && diskMetricKind === "usage"
-        ? 60
-        : defaultLocalSettings.pollingFrequencySeconds;
-}
-
-function normalizePollingFrequency(value: unknown, fallbackValue: number): number {
+function normalizeOptionalPollingFrequency(value: unknown): number | undefined {
     const numericValue = Number(value);
-    return [1, 2, 3, 5, 10, 15, 30, 60].includes(numericValue) ? numericValue : fallbackValue;
-}
-
-function normalizePositiveNumber(value: unknown, fallbackValue: number): number {
-    const numericValue = Number(value);
-    return Number.isFinite(numericValue) && numericValue > 0 ? Math.round(numericValue) : fallbackValue;
+    return [1, 2, 3, 5, 10, 15, 30, 60].includes(numericValue) ? numericValue : undefined;
 }
 
 function normalizeOptionalPositiveNumber(value: unknown): number | undefined {
@@ -504,21 +430,6 @@ function normalizeOptionalPositiveNumber(value: unknown): number | undefined {
 
     const numericValue = Number(value);
     return Number.isFinite(numericValue) && numericValue > 0 ? Math.round(numericValue) : undefined;
-}
-
-function maxOptionalPositiveNumber(
-    firstValue: number | undefined,
-    secondValue: number | undefined,
-): number | undefined {
-    if (firstValue === undefined) {
-        return secondValue;
-    }
-
-    if (secondValue === undefined) {
-        return firstValue;
-    }
-
-    return Math.max(firstValue, secondValue);
 }
 
 function normalizeThreshold(value: unknown, fallbackValue: number): number {

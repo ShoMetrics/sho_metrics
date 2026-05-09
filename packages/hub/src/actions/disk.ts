@@ -466,12 +466,9 @@ function resolveHexColor(value: string, fallbackColor: string): string {
 function publishDiskVolumeOptions(event: WillAppearEvent): void {
     const availableDiskVolumes = JSON.stringify(diskVolumeRegistry.getOptions());
 
-    const storedSettings = normalizeActionStoredSettings(
-        event.payload.settings,
-        "disk",
-    );
+    const storedSettings = normalizeActionStoredSettings(event.payload.settings);
 
-    if (storedSettings.runtimeCache.availableDiskVolumes === availableDiskVolumes) {
+    if (storedSettings.runtimeCache?.availableDiskVolumes === availableDiskVolumes) {
         return;
     }
 
@@ -508,14 +505,11 @@ function publishDiskThroughputScaleLearning(event: WillAppearEvent, settings: Di
         observedBytesPerSecond: metricStore.getWidgetData(getDiskThroughputMetricKey("write"), "WRIT", "B/s").current,
     });
 
-    const storedSettings = normalizeActionStoredSettings(
-        event.payload.settings,
-        "disk",
-    );
+    const storedSettings = normalizeActionStoredSettings(event.payload.settings);
 
     if (
-        storedSettings.runtimeCache.learnedMaximumDiskReadThroughputMebibytesPerSecond === nextReadMaximum
-        && storedSettings.runtimeCache.learnedMaximumDiskWriteThroughputMebibytesPerSecond === nextWriteMaximum
+        storedSettings.runtimeCache?.learnedMaximumDiskReadThroughputMebibytesPerSecond === nextReadMaximum
+        && storedSettings.runtimeCache?.learnedMaximumDiskWriteThroughputMebibytesPerSecond === nextWriteMaximum
     ) {
         return;
     }
