@@ -1,6 +1,5 @@
 import type { ActionKind } from "../settings/widget-settings";
 
-export type { InspectorControlValue as ControlSettingValue } from "./schema";
 export type {
     ActionKind,
     CircleStyle,

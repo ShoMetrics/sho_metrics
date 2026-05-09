@@ -1,9 +1,8 @@
-import type { OptionProviderId, SelectOption, VisibilityContext } from "./schema";
-import type { ControlSettingValue } from "./settings";
+import type { InspectorControlValue, OptionProviderId, SelectOption, VisibilityContext } from "./schema";
 import { readInspectorControlValue } from "./widget-setting-bindings";
 
 interface NetworkInterfaceOption {
-    [key: string]: ControlSettingValue;
+    [key: string]: InspectorControlValue;
     id: string;
     name: string;
     type: string;
@@ -12,7 +11,7 @@ interface NetworkInterfaceOption {
 }
 
 interface DiskVolumeOption {
-    [key: string]: ControlSettingValue;
+    [key: string]: InspectorControlValue;
     id: string;
     fs: string;
     mount: string;
@@ -30,7 +29,7 @@ export function resolveFieldOptions(providerId: OptionProviderId, context: Visib
     return buildDiskVolumeOptions(readInspectorControlValue(context, "availableDiskVolumes"));
 }
 
-function buildNetworkInterfaceOptions(value: ControlSettingValue): SelectOption[] {
+function buildNetworkInterfaceOptions(value: InspectorControlValue): SelectOption[] {
     return [
         { value: "", label: "Automatic" },
         ...parseNetworkInterfaceOptions(value).map((networkInterface) => {
@@ -48,7 +47,7 @@ function buildNetworkInterfaceOptions(value: ControlSettingValue): SelectOption[
     ];
 }
 
-function buildDiskVolumeOptions(value: ControlSettingValue): SelectOption[] {
+function buildDiskVolumeOptions(value: InspectorControlValue): SelectOption[] {
     return [
         { value: "", label: "Automatic" },
         ...parseDiskVolumeOptions(value).map((diskVolume) => ({
@@ -58,11 +57,11 @@ function buildDiskVolumeOptions(value: ControlSettingValue): SelectOption[] {
     ];
 }
 
-function parseNetworkInterfaceOptions(value: ControlSettingValue): NetworkInterfaceOption[] {
+function parseNetworkInterfaceOptions(value: InspectorControlValue): NetworkInterfaceOption[] {
     return parseJsonArray(value).filter(isNetworkInterfaceOption);
 }
 
-function parseDiskVolumeOptions(value: ControlSettingValue): DiskVolumeOption[] {
+function parseDiskVolumeOptions(value: InspectorControlValue): DiskVolumeOption[] {
     return parseJsonArray(value).filter(isDiskVolumeOption);
 }
 
@@ -96,13 +95,13 @@ function resolveSelectedDiskVolume(context: VisibilityContext): DiskVolumeOption
         ?? null;
 }
 
-function parseJsonArray(value: ControlSettingValue): Record<string, ControlSettingValue>[] {
+function parseJsonArray(value: InspectorControlValue): Record<string, InspectorControlValue>[] {
     if (typeof value !== "string") {
         return [];
     }
 
     try {
-        const parsedValue = JSON.parse(value) as ControlSettingValue | Record<string, ControlSettingValue>[];
+        const parsedValue = JSON.parse(value) as InspectorControlValue | Record<string, InspectorControlValue>[];
 
         return Array.isArray(parsedValue)
             ? parsedValue.filter(isRecord)
@@ -112,13 +111,13 @@ function parseJsonArray(value: ControlSettingValue): Record<string, ControlSetti
     }
 }
 
-function isNetworkInterfaceOption(value: Record<string, ControlSettingValue>): value is NetworkInterfaceOption {
+function isNetworkInterfaceOption(value: Record<string, InspectorControlValue>): value is NetworkInterfaceOption {
     return typeof value.id === "string"
         && typeof value.name === "string"
         && typeof value.type === "string";
 }
 
-function isDiskVolumeOption(value: Record<string, ControlSettingValue>): value is DiskVolumeOption {
+function isDiskVolumeOption(value: Record<string, InspectorControlValue>): value is DiskVolumeOption {
     return typeof value.id === "string"
         && typeof value.fs === "string"
         && typeof value.mount === "string"
@@ -187,7 +186,9 @@ function resolveCompactDiskStorageLabel(diskVolume: DiskVolumeOption): string {
     return "DSK";
 }
 
-function isRecord(value: ControlSettingValue | Record<string, ControlSettingValue>): value is Record<string, ControlSettingValue> {
+function isRecord(
+    value: InspectorControlValue | Record<string, InspectorControlValue>,
+): value is Record<string, InspectorControlValue> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 

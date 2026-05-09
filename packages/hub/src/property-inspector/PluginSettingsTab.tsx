@@ -3,7 +3,7 @@ import {
     normalizePluginGlobalSettings,
     type PluginGlobalSettings,
 } from "../settings/widget-settings";
-import type { ControlSettingValue } from "./settings";
+import type { InspectorControlValue } from "./schema";
 
 interface PluginSettingsTabProps {
     settings: PluginGlobalSettings;
@@ -11,13 +11,13 @@ interface PluginSettingsTabProps {
 }
 
 export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettingsTabProps): React.JSX.Element {
-    const updateRootSetting = (key: "overrideWidgetAppearance", value: ControlSettingValue): void => {
+    const updateRootSetting = (key: "overrideWidgetAppearance", value: InspectorControlValue): void => {
         onSettingsChange(normalizePluginGlobalSettings({
             ...settings,
             [key]: value,
         }));
     };
-    const updateAppearanceSetting = (key: string, value: ControlSettingValue): void => {
+    const updateAppearanceSetting = (key: string, value: InspectorControlValue): void => {
         onSettingsChange(normalizePluginGlobalSettings({
             ...settings,
             appearanceDefaults: {
@@ -26,7 +26,7 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
             },
         }));
     };
-    const updateNetworkSetting = (key: string, value: ControlSettingValue): void => {
+    const updateNetworkSetting = (key: string, value: InspectorControlValue): void => {
         onSettingsChange(normalizePluginGlobalSettings({
             ...settings,
             networkDefaults: {
@@ -35,7 +35,7 @@ export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettings
             },
         }));
     };
-    const updateDiskThroughputSetting = (key: string, value: ControlSettingValue): void => {
+    const updateDiskThroughputSetting = (key: string, value: InspectorControlValue): void => {
         onSettingsChange(normalizePluginGlobalSettings({
             ...settings,
             diskThroughputDefaults: {
