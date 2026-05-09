@@ -5,6 +5,7 @@ import {
     normalizeWidgetStoredSettings,
     type SettingsContext,
 } from "../settings/widget-settings";
+import type { InspectorSettingTarget } from "./schema";
 import {
     buildInspectorBindingContext,
     readInspectorControlValue,
@@ -17,7 +18,7 @@ const defaultContext: SettingsContext = {
 };
 
 test("widget setting binding writes appearance overrides only", () => {
-    const settings = writeSetting("solidColor", "#123456", defaultContext);
+    const settings = writeSetting(usageSolidColorBinding, "#123456", defaultContext);
 
     assert.deepEqual(settings.appearanceOverrides, {
         usageColors: {
@@ -39,7 +40,7 @@ test("widget setting binding reads resolved values", () => {
 });
 
 test("channel color bindings read and write nested color ramps", () => {
-    const storedSettings = writeSetting("downloadColorHigh", "#60a5fa", {
+    const storedSettings = writeSetting(downloadHighColorBinding, "#60a5fa", {
         actionKind: "net-speed",
         isWindows: false,
     });
@@ -51,7 +52,7 @@ test("channel color bindings read and write nested color ramps", () => {
     assert.deepEqual(storedSettings.appearanceOverrides?.downloadColors, {
         highColor: "#60a5fa",
     });
-    assert.equal(readInspectorControlValue(context, "downloadColorHigh"), "#60a5fa");
+    assert.equal(readInspectorControlValue(context, downloadHighColorBinding), "#60a5fa");
 });
 
 test("network maximum binding switches scale to custom", () => {
@@ -98,7 +99,7 @@ test("disk metric kind binding does not apply platform context to stored setting
 });
 
 function writeSetting(
-    key: Parameters<typeof updateWidgetStoredSettings>[0]["key"],
+    target: InspectorSettingTarget,
     value: string,
     context: SettingsContext,
 ) {
@@ -106,7 +107,7 @@ function writeSetting(
 
     return updateWidgetStoredSettings({
         storedSettings,
-        key,
+        target,
         value,
         context: buildContext(storedSettings, context),
     });
@@ -123,3 +124,15 @@ function buildContext(
         isWindows: context.isWindows,
     });
 }
+
+const usageSolidColorBinding = {
+    kind: "appearanceColor",
+    rampKey: "usageColors",
+    colorKey: "solidColor",
+} as const;
+
+const downloadHighColorBinding = {
+    kind: "appearanceColor",
+    rampKey: "downloadColors",
+    colorKey: "highColor",
+} as const;

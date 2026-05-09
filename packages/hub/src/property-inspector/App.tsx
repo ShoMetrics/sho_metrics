@@ -23,7 +23,7 @@ import {
     resolveIsWindowsPropertyInspector,
     type StreamDeckPropertyInspectorClient,
 } from "./stream-deck-client";
-import type { PropertyInspectorSettingKey, VisibilityContext } from "./schema";
+import type { InspectorSettingTarget, VisibilityContext } from "./schema";
 import type { ScenarioSectionId } from "./scenario-model";
 import {
     buildInspectorBindingContext,
@@ -68,13 +68,13 @@ export function App({ client }: AppProps): React.JSX.Element {
     );
     const isGlobalAppearanceOverrideEnabled = state.globalSettings.overrideWidgetAppearance;
 
-    const updateSetting = (changedKey: PropertyInspectorSettingKey, changedValue: string): void => {
+    const updateSetting = (changedTarget: InspectorSettingTarget, changedValue: string): void => {
         setState((currentState) => {
             const currentContext = buildContextFromState(currentState);
 
             const nextStoredSettings = updateWidgetStoredSettings({
                 storedSettings: currentState.storedSettings,
-                key: changedKey,
+                target: changedTarget,
                 value: changedValue,
                 context: currentContext,
             });
@@ -267,7 +267,7 @@ function WidgetSettingsTab(options: {
     inspectorSectionList: ReturnType<typeof resolveInspectorSectionList>;
     visibilityContext: VisibilityContext;
     isGlobalAppearanceOverrideEnabled: boolean;
-    onSettingChange: (key: PropertyInspectorSettingKey, value: string) => void;
+    onSettingChange: (target: InspectorSettingTarget, value: string) => void;
     onResetWidgetSettings: () => void;
 }): React.JSX.Element {
     return (

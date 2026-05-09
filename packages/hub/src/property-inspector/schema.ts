@@ -1,6 +1,8 @@
 import type {
     ActionKind,
+    AppearanceColorRampKey,
     AppearanceScalarSettings,
+    ColorRamp,
     DiskThroughputDefaultSettings,
     MetricSettings,
     NetworkDefaultSettings,
@@ -12,36 +14,20 @@ import type {
 import type { InspectorScope } from "./scopes";
 
 export type InspectorControlValue = string | number | boolean | null | undefined;
-export type AppearanceColorControlKey =
-    | "solidColor"
-    | "colorLow"
-    | "colorMedium"
-    | "colorHigh"
-    | "downloadSolidColor"
-    | "downloadColorLow"
-    | "downloadColorMedium"
-    | "downloadColorHigh"
-    | "uploadSolidColor"
-    | "uploadColorLow"
-    | "uploadColorMedium"
-    | "uploadColorHigh"
-    | "diskReadSolidColor"
-    | "diskReadColorLow"
-    | "diskReadColorMedium"
-    | "diskReadColorHigh"
-    | "diskWriteSolidColor"
-    | "diskWriteColorLow"
-    | "diskWriteColorMedium"
-    | "diskWriteColorHigh";
 export type PropertyInspectorSettingKey =
     | Extract<keyof AppearanceScalarSettings, string>
-    | AppearanceColorControlKey
     | Extract<keyof MetricSettings, string>
     | Extract<keyof WidgetLocalSettings, string>
     | Extract<keyof NetworkDefaultSettings, string>
     | Extract<keyof DiskThroughputDefaultSettings, string>
     | "availableNetworkInterfaces"
     | "availableDiskVolumes";
+export interface AppearanceColorBinding {
+    kind: "appearanceColor";
+    rampKey: AppearanceColorRampKey;
+    colorKey: keyof ColorRamp;
+}
+export type InspectorSettingTarget = PropertyInspectorSettingKey | AppearanceColorBinding;
 export type FieldKind =
     | "select"
     | "graphic-type-picker"
@@ -88,6 +74,7 @@ export interface FieldSchema {
     text?: string;
     noteVariant?: FieldNoteVariant;
     defaultValue?: InspectorControlValue;
+    colorBinding?: AppearanceColorBinding;
     minimum?: number;
     step?: number;
     maximum?: number;
