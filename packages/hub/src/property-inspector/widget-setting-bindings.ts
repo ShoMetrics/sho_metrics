@@ -24,7 +24,7 @@ import {
 } from "../settings/updates";
 import { resolveWidgetSettings } from "../settings/resolver";
 import type {
-    AppearanceColorBinding,
+    AppearanceColorTarget,
     InspectorControlValue,
     InspectorSettingTarget,
     PropertyInspectorSettingKey,
@@ -78,7 +78,7 @@ export function readInspectorControlValue(
     context: InspectorBindingContext,
     target: InspectorSettingTarget,
 ): InspectorControlValue {
-    if (isAppearanceColorBinding(target)) {
+    if (isAppearanceColorTarget(target)) {
         return context.resolved.appearance[target.rampKey][target.colorKey];
     }
 
@@ -117,7 +117,7 @@ function writeInspectorControlValue(
     value: string,
     context: InspectorBindingContext,
 ): WidgetStoredSettings {
-    if (isAppearanceColorBinding(target)) {
+    if (isAppearanceColorTarget(target)) {
         return writeColorControlValue(settings, target, value);
     }
 
@@ -193,13 +193,13 @@ function toControlValue(value: InspectorControlValue, key: PropertyInspectorSett
 
 function writeColorControlValue(
     settings: WidgetStoredSettings,
-    binding: AppearanceColorBinding,
+    target: AppearanceColorTarget,
     value: string,
 ): WidgetStoredSettings {
     return updateWidgetSettingsBranch(settings, "appearanceOverrides", {
-        [binding.rampKey]: {
-            ...settings.appearanceOverrides?.[binding.rampKey],
-            [binding.colorKey]: value,
+        [target.rampKey]: {
+            ...settings.appearanceOverrides?.[target.rampKey],
+            [target.colorKey]: value,
         },
     });
 }
@@ -208,8 +208,8 @@ function isAppearanceScalarKey(key: string): key is keyof AppearanceScalarSettin
     return key in defaultAppearanceSettings && !isAppearanceColorRampKey(key);
 }
 
-function isAppearanceColorBinding(target: InspectorSettingTarget): target is AppearanceColorBinding {
-    return typeof target === "object" && target.kind === "appearanceColor";
+function isAppearanceColorTarget(target: InspectorSettingTarget): target is AppearanceColorTarget {
+    return typeof target === "object";
 }
 
 function isAppearanceColorRampKey(key: string): key is AppearanceColorRampKey {

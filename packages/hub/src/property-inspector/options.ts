@@ -1,4 +1,4 @@
-import type { InspectorControlValue, OptionProviderId, SelectOption, VisibilityContext } from "./schema";
+import type { InspectorControlValue, SelectOption, VisibilityContext } from "./schema";
 import { readInspectorControlValue } from "./widget-setting-bindings";
 
 interface NetworkInterfaceOption {
@@ -21,11 +21,11 @@ interface DiskVolumeOption {
     sizeBytes: number;
 }
 
-export function resolveFieldOptions(providerId: OptionProviderId, context: VisibilityContext): SelectOption[] {
-    if (providerId === "networkInterfaces") {
-        return buildNetworkInterfaceOptions(readInspectorControlValue(context, "availableNetworkInterfaces"));
-    }
+export function resolveNetworkInterfaceOptions(context: VisibilityContext): SelectOption[] {
+    return buildNetworkInterfaceOptions(readInspectorControlValue(context, "availableNetworkInterfaces"));
+}
 
+export function resolveDiskVolumeOptions(context: VisibilityContext): SelectOption[] {
     return buildDiskVolumeOptions(readInspectorControlValue(context, "availableDiskVolumes"));
 }
 

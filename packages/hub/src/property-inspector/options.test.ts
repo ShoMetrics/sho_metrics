@@ -3,7 +3,8 @@ import test from "node:test";
 import { readInspectorControlValue } from "./widget-setting-bindings";
 import {
     resolveDiskAutoLinearLabel,
-    resolveFieldOptions,
+    resolveDiskVolumeOptions,
+    resolveNetworkInterfaceOptions,
     resolveSelectedDiskVolumeLabel,
 } from "./options";
 import { buildVisibilityContext, type InspectorTestSettings } from "./test-context";
@@ -25,7 +26,7 @@ test("network interface options include automatic and formatted valid interfaces
         ]),
     });
 
-    assert.deepEqual(resolveFieldOptions("networkInterfaces", context), [
+    assert.deepEqual(resolveNetworkInterfaceOptions(context), [
         { value: "", label: "Automatic" },
         { value: "eth0", label: "Ethernet (default, wired, eth0, 2500 Mbps)" },
     ]);
@@ -47,7 +48,7 @@ test("disk volume options include automatic and compact capacity labels", () => 
         ]),
     });
 
-    assert.deepEqual(resolveFieldOptions("diskVolumes", context), [
+    assert.deepEqual(resolveDiskVolumeOptions(context), [
         { value: "", label: "Automatic" },
         { value: "C:\\", label: "C: (1.0 GB, System)" },
     ]);
@@ -59,8 +60,8 @@ test("invalid serialized option payloads safely fall back to automatic only", ()
         availableDiskVolumes: "{}",
     });
 
-    assert.deepEqual(resolveFieldOptions("networkInterfaces", context), [{ value: "", label: "Automatic" }]);
-    assert.deepEqual(resolveFieldOptions("diskVolumes", context), [{ value: "", label: "Automatic" }]);
+    assert.deepEqual(resolveNetworkInterfaceOptions(context), [{ value: "", label: "Automatic" }]);
+    assert.deepEqual(resolveDiskVolumeOptions(context), [{ value: "", label: "Automatic" }]);
 });
 
 test("selected disk labels prefer explicit selection then root fallback", () => {
