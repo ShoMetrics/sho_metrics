@@ -1,27 +1,19 @@
 import {
-    normalizeWidgetStoredSettings,
+    sanitizeWidgetSettings,
     type ActionKind,
+    type WidgetStoredSettings,
 } from "../settings/widget-settings";
-import { readWidgetSettings } from "../settings/codec";
-import type { InspectorControlValue, PropertyInspectorSettingKey, VisibilityContext } from "./types";
+import type { VisibilityContext } from "./types";
 import { buildInspectorBindingContext } from "./widget-setting-bindings";
 
-export type InspectorTestSettings = Partial<Record<PropertyInspectorSettingKey, InspectorControlValue>>;
+export type InspectorTestSettings = WidgetStoredSettings;
 
 export function buildVisibilityContext(options: {
     actionKind?: ActionKind;
     isWindows?: boolean;
     settings?: InspectorTestSettings;
 } = {}): VisibilityContext {
-    const settings = options.settings ?? {};
-    const storedSettings = normalizeWidgetStoredSettings(readWidgetSettings({
-        appearanceOverrides: settings,
-        metric: settings,
-        local: settings,
-        networkOverrides: settings,
-        diskThroughputOverrides: settings,
-        runtimeCache: settings,
-    }));
+    const storedSettings = sanitizeWidgetSettings(options.settings ?? {});
 
     return buildInspectorBindingContext({
         storedSettings,

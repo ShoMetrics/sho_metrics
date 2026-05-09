@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-    normalizeWidgetStoredSettings,
+    sanitizeWidgetSettings,
     type SettingsContext,
 } from "../settings/widget-settings";
 import type { InspectorSettingTarget } from "./types";
@@ -28,7 +28,7 @@ test("widget setting binding writes appearance overrides only", () => {
 });
 
 test("widget setting binding reads resolved values", () => {
-    const context = buildContext(normalizeWidgetStoredSettings({
+    const context = buildContext(sanitizeWidgetSettings({
         appearanceOverrides: {
             graphicType: "linear",
         },
@@ -102,7 +102,7 @@ function writeSetting(
     value: string,
     context: SettingsContext,
 ) {
-    const storedSettings = normalizeWidgetStoredSettings({});
+    const storedSettings = sanitizeWidgetSettings({});
 
     return updateWidgetStoredSettings({
         storedSettings,
@@ -113,7 +113,7 @@ function writeSetting(
 }
 
 function buildContext(
-    storedSettings: ReturnType<typeof normalizeWidgetStoredSettings>,
+    storedSettings: ReturnType<typeof sanitizeWidgetSettings>,
     context: SettingsContext,
 ) {
     return buildInspectorBindingContext({

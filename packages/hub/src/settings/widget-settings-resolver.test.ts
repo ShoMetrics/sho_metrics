@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-    normalizeWidgetStoredSettings,
+    sanitizeWidgetSettings,
     type GlobalSettings,
 } from "./widget-settings";
 import { resolveGlobalSettings, resolveWidgetSettings } from "./resolver";
 
 test("stored widget settings stay sparse and do not expand globalizable fields", () => {
-    const storedSettings = normalizeWidgetStoredSettings({
+    const storedSettings = sanitizeWidgetSettings({
         metric: {
             networkDirection: "download",
         },
@@ -33,7 +33,7 @@ test("resolver cascades domain defaults, metric defaults, and widget overrides",
             maximumDownloadSpeedMbps: 250,
         },
     };
-    const storedSettings = normalizeWidgetStoredSettings({
+    const storedSettings = sanitizeWidgetSettings({
         appearanceOverrides: {
             usageColors: {
                 solidColor: "#222222",
@@ -61,7 +61,7 @@ test("resolver cascades domain defaults, metric defaults, and widget overrides",
 });
 
 test("global appearance settings affect widgets only when override is enabled", () => {
-    const storedSettings = normalizeWidgetStoredSettings({});
+    const storedSettings = sanitizeWidgetSettings({});
     const globalSettings: GlobalSettings = {
         appearanceDefaults: {
             graphicType: "linear",
@@ -85,7 +85,7 @@ test("global appearance settings affect widgets only when override is enabled", 
 });
 
 test("global appearance override wins without mutating widget overrides", () => {
-    const storedSettings = normalizeWidgetStoredSettings({
+    const storedSettings = sanitizeWidgetSettings({
         appearanceOverrides: {
             graphicType: "linear",
             usageColors: {
@@ -127,12 +127,12 @@ test("runtime cache participates only in auto scale resolution", () => {
             maximumDownloadSpeedMbps: 100,
         },
     };
-    const autoStoredSettings = normalizeWidgetStoredSettings({
+    const autoStoredSettings = sanitizeWidgetSettings({
         runtimeCache: {
             learnedMaximumDownloadSpeedMbps: 800,
         },
     });
-    const customStoredSettings = normalizeWidgetStoredSettings({
+    const customStoredSettings = sanitizeWidgetSettings({
         networkOverrides: {
             networkScaleMode: "custom",
             maximumDownloadSpeedMbps: 300,
@@ -161,7 +161,7 @@ test("runtime cache participates only in auto scale resolution", () => {
 });
 
 test("disk usage resolved settings default to slow polling", () => {
-    const storedSettings = normalizeWidgetStoredSettings({
+    const storedSettings = sanitizeWidgetSettings({
         metric: {
             diskMetricKind: "usage",
         },
@@ -180,7 +180,7 @@ test("disk usage resolved settings default to slow polling", () => {
 });
 
 test("disk throughput resolved settings default to fast polling", () => {
-    const storedSettings = normalizeWidgetStoredSettings({
+    const storedSettings = sanitizeWidgetSettings({
         metric: {
             diskMetricKind: "throughput",
         },
@@ -199,7 +199,7 @@ test("disk throughput resolved settings default to fast polling", () => {
 });
 
 test("Windows resolves disk throughput metric identity back to usage", () => {
-    const storedSettings = normalizeWidgetStoredSettings({
+    const storedSettings = sanitizeWidgetSettings({
         metric: {
             diskMetricKind: "throughput",
         },

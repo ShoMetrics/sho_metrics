@@ -5,7 +5,7 @@ import {
     defaultMetricSettings,
     defaultNetworkSettings,
     defaultRuntimeCache,
-    normalizeWidgetStoredSettings,
+    sanitizeWidgetSettings,
     type AppearanceColorRampKey,
     type AppearanceScalarSettings,
     type AppearanceSettingsOverride,
@@ -159,7 +159,7 @@ function writeInspectorControlValue(
         } as NonNullable<WidgetSettings["diskThroughputOverrides"]>);
     }
 
-    return normalizeWidgetStoredSettings(settings);
+    return sanitizeWidgetSettings(settings);
 }
 
 function writeThresholdControlValue(
