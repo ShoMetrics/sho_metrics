@@ -1,7 +1,7 @@
-import type { InspectorSettingTarget, VisibilityContext } from "../types";
+import type { InspectorControlValue, InspectorSettingTarget, VisibilityContext } from "../types";
 
 export interface WidgetSettingsPanelProps {
     context: VisibilityContext;
-    onSettingChange: (target: InspectorSettingTarget, value: string) => void;
+    onSettingChange: (target: InspectorSettingTarget, value: InspectorControlValue) => void;
     appearanceDisabled?: boolean;
 }

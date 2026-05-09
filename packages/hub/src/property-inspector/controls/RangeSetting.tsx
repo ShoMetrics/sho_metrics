@@ -5,7 +5,7 @@ import type { SettingControlProps } from "./setting-control";
 interface RangeSettingProps extends SettingControlProps {
     label: string;
     value: number;
-    onValueChange: (value: string) => void;
+    onValueChange: (value: number) => void;
     minimum?: number;
     maximum?: number;
     step?: number;
@@ -34,7 +34,12 @@ export function RangeSetting({
                     step={step}
                     value={displayValue}
                     disabled={disabled}
-                    onChange={(event) => onValueChange(event.currentTarget.value)}
+                    onChange={(event) => {
+                        const numericValue = Number(event.currentTarget.value);
+                        if (Number.isFinite(numericValue)) {
+                            onValueChange(numericValue);
+                        }
+                    }}
                 />
                 <span className="range-value">{displayValue}%</span>
             </div>

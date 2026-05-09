@@ -38,7 +38,7 @@ function GpuTemperatureScaleSettings({
             />
             <NumberSetting
                 label="Max Temp (C)"
-                value={String(context.resolved.local.maximumTemperatureCelsius)}
+                value={context.resolved.local.maximumTemperatureCelsius}
                 onValueChange={(value) => onSettingChange("maximumTemperatureCelsius", value)}
                 minimum={1}
                 step={1}
@@ -55,10 +55,11 @@ function GpuPowerScaleSettings({
         <SettingsSection title="Scale & Units">
             <NumberSetting
                 label="Max Power (W)"
-                value={String(context.resolved.local.maximumGpuPowerWatts ?? "")}
+                value={context.resolved.local.maximumGpuPowerWatts}
                 onValueChange={(value) => onSettingChange("maximumGpuPowerWatts", value)}
                 minimum={1}
                 step={1}
+                optional
             />
         </SettingsSection>
     );

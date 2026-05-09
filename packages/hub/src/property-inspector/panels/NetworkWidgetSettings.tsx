@@ -78,18 +78,20 @@ function NetworkScaleSettings({
             />
             <NumberSetting
                 label="Download Max (Mbps)"
-                value={String(context.resolved.network.maximumDownloadSpeedMbps ?? "")}
+                value={context.resolved.network.maximumDownloadSpeedMbps}
                 onValueChange={(value) => onSettingChange("maximumDownloadSpeedMbps", value)}
                 minimum={1}
                 step={1}
+                optional
                 disabled={isAutoScale}
             />
             <NumberSetting
                 label="Upload Max (Mbps)"
-                value={String(context.resolved.network.maximumUploadSpeedMbps ?? "")}
+                value={context.resolved.network.maximumUploadSpeedMbps}
                 onValueChange={(value) => onSettingChange("maximumUploadSpeedMbps", value)}
                 minimum={1}
                 step={1}
+                optional
                 disabled={isAutoScale}
             />
             <SelectSetting
