@@ -3,6 +3,7 @@ import { afterEach, beforeEach, test } from "node:test";
 import {
     StreamDeckClient,
     type ActionInfo,
+    type DidReceiveGlobalSettingsEvent,
     type DidReceiveSettingsEvent,
     type RegistrationInfo,
     type SendToPropertyInspectorEvent,
@@ -64,6 +65,83 @@ test("connect registers the property inspector and publishes initial action sett
     assert.deepEqual(receivedEventList[0]?.payload.settings, {
         graphicType: "text",
     });
+});
+
+test("connect saves the Stream Deck registration metadata", async () => {
+    const client = new StreamDeckClient();
+    const registrationInfo = createRegistrationInfo();
+    const actionInfo = createActionInfo({
+        graphicType: "text",
+    });
+
+    await client.connect("1234", "pi-uuid", "registerPropertyInspector", registrationInfo, actionInfo);
+    const connectionInfo = await client.getConnectionInfo();
+
+    assert.equal(connectionInfo.propertyInspectorUUID, "pi-uuid");
+    assert.equal(connectionInfo.registerEvent, "registerPropertyInspector");
+    assert.deepEqual(connectionInfo.info, registrationInfo);
+    assert.deepEqual(connectionInfo.actionInfo, actionInfo);
+});
+
+test("websocket messages dispatch didReceiveGlobalSettings subscribers", async () => {
+    const client = new StreamDeckClient();
+    await connectClient(client);
+    const socket = readSingleSocket();
+    const receivedEventList: DidReceiveGlobalSettingsEvent[] = [];
+    client.didReceiveGlobalSettings.subscribe((event) => receivedEventList.push(event));
+    const receivedEvent: DidReceiveGlobalSettingsEvent = {
+        event: "didReceiveGlobalSettings",
+        payload: {
+            settings: {
+                overrideWidgetAppearance: true,
+            },
+        },
+    };
+
+    socket.receive(receivedEvent);
+
+    assert.deepEqual(receivedEventList, [receivedEvent]);
+});
+
+test("websocket messages dispatch didReceiveSettings subscribers", async () => {
+    const client = new StreamDeckClient();
+    await connectClient(client);
+    const socket = readSingleSocket();
+    const receivedEventList: DidReceiveSettingsEvent[] = [];
+    client.didReceiveSettings.subscribe((event) => receivedEventList.push(event));
+    const receivedEvent: DidReceiveSettingsEvent = {
+        event: "didReceiveSettings",
+        action: "com.example.action",
+        context: "action-context",
+        device: "device-id",
+        payload: {
+            settings: {
+                graphicType: "linear",
+            },
+        },
+    };
+
+    socket.receive(receivedEvent);
+
+    assert.deepEqual(receivedEventList, [receivedEvent]);
+});
+
+test("websocket messages dispatch the generic message stream", async () => {
+    const client = new StreamDeckClient();
+    await connectClient(client);
+    const socket = readSingleSocket();
+    const receivedMessageList: StreamDeckMessage[] = [];
+    client.message.subscribe((event) => receivedMessageList.push(event));
+    const receivedMessage: StreamDeckMessage = {
+        event: "other",
+        payload: {
+            value: 42,
+        },
+    };
+
+    socket.receive(receivedMessage);
+
+    assert.deepEqual(receivedMessageList, [receivedMessage]);
 });
 
 test("getSettings sends the current action request and waits for the matching settings event", async () => {
@@ -131,6 +209,8 @@ test("getGlobalSettings returns the received settings payload", async () => {
         context: "pi-uuid",
         action: "com.example.action",
     });
+    // SDPIComponents returns raw global settings here. The local client returns
+    // the payload shape App already consumes, so this deviation is intentional.
     assert.deepEqual(await globalSettingsPromise, {
         settings: {
             overrideWidgetAppearance: true,
