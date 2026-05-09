@@ -1,5 +1,4 @@
 import {
-    sanitizeWidgetSettings,
     type ActionKind,
     type WidgetStoredSettings,
 } from "../settings/widget-settings";
@@ -13,7 +12,7 @@ export function buildVisibilityContext(options: {
     isWindows?: boolean;
     settings?: InspectorTestSettings;
 } = {}): VisibilityContext {
-    const storedSettings = sanitizeWidgetSettings(options.settings ?? {});
+    const storedSettings = options.settings ?? {};
 
     return buildPropertyInspectorContext({
         storedSettings,
