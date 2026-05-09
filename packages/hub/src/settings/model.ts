@@ -139,7 +139,6 @@ export interface WidgetSettings {
     networkOverrides?: Partial<NetworkDefaultSettings>;
     diskThroughputOverrides?: Partial<DiskThroughputDefaultSettings>;
     runtimeCache?: Partial<WidgetRuntimeCache>;
-    [key: string]: unknown;
 }
 
 export type WidgetStoredSettings = WidgetSettings;
@@ -149,7 +148,6 @@ export interface GlobalSettings {
     appearanceDefaults?: AppearanceSettingsOverride;
     networkDefaults?: Partial<NetworkDefaultSettings>;
     diskThroughputDefaults?: Partial<DiskThroughputDefaultSettings>;
-    [key: string]: unknown;
 }
 
 export interface ResolvedGlobalSettings {
