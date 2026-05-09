@@ -469,11 +469,13 @@ function resolveHexColor(value: string, fallbackColor: string): string {
 }
 
 function publishDiskVolumeOptions(event: WillAppearEvent): void {
-    const availableDiskVolumes = JSON.stringify(diskVolumeRegistry.getOptions());
+    const availableDiskVolumes = [...diskVolumeRegistry.getOptions()];
 
     const storedSettings = readActionStoredSettings(event);
 
-    if (storedSettings.runtimeCache?.availableDiskVolumes === availableDiskVolumes) {
+    // TODO(settings-contract): Temporary pre-proto/pre-Zod deep compare. Move this to the codec/schema layer
+    // when persisted settings get a real contract.
+    if (JSON.stringify(storedSettings.runtimeCache?.availableDiskVolumes ?? []) === JSON.stringify(availableDiskVolumes)) {
         return;
     }
 

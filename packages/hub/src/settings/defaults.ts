@@ -82,8 +82,8 @@ export const defaultLocalSettings: WidgetLocalSettings = {
 };
 
 export const defaultRuntimeCache: WidgetRuntimeCache = {
-    availableNetworkInterfaces: "[]",
-    availableDiskVolumes: "[]",
+    availableNetworkInterfaces: [],
+    availableDiskVolumes: [],
     learnedMaximumDownloadSpeedMbps: undefined,
     learnedMaximumUploadSpeedMbps: undefined,
     learnedMaximumDiskReadThroughputMebibytesPerSecond: undefined,

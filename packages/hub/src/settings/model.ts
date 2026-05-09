@@ -23,6 +23,7 @@ export type DiskMetricKind = "usage" | "throughput";
 export type DiskUsageDisplayMode = "percentage" | "space";
 export type DiskThroughputDirection = "both" | "total" | "read" | "write";
 export type TemperatureUnit = "celsius" | "fahrenheit";
+export type DiskStorageKind = "ssd" | "hdd" | "network" | "unknown";
 
 export interface ColorRamp {
     solidColor: string;
@@ -102,9 +103,29 @@ export interface WidgetLocalSettings {
     temperatureUnit: TemperatureUnit;
 }
 
+export interface NetworkInterfaceCacheItem {
+    id: string;
+    name: string;
+    type: "wired" | "wireless" | "unknown";
+    isDefault: boolean;
+    speedMegabitsPerSecond: number | null;
+}
+
+export interface DiskVolumeCacheItem {
+    id: string;
+    fs: string;
+    mount: string;
+    sizeBytes: number;
+    usedBytes: number;
+    availableBytes: number;
+    storageKind: DiskStorageKind;
+    diskName: string;
+    volumeLabel: string;
+}
+
 export interface WidgetRuntimeCache {
-    availableNetworkInterfaces: string;
-    availableDiskVolumes: string;
+    availableNetworkInterfaces: NetworkInterfaceCacheItem[];
+    availableDiskVolumes: DiskVolumeCacheItem[];
     learnedMaximumDownloadSpeedMbps: number | undefined;
     learnedMaximumUploadSpeedMbps: number | undefined;
     learnedMaximumDiskReadThroughputMebibytesPerSecond: number | undefined;
