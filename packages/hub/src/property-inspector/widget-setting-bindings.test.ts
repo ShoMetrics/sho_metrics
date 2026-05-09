@@ -126,13 +126,11 @@ function buildContext(
 }
 
 const usageSolidColorBinding = {
-    kind: "appearanceColor",
     rampKey: "usageColors",
     colorKey: "solidColor",
 } as const;
 
 const downloadHighColorBinding = {
-    kind: "appearanceColor",
     rampKey: "downloadColors",
     colorKey: "highColor",
 } as const;

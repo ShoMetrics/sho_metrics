@@ -1,12 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { FieldRenderer } from "./components/FieldRenderer";
+import { useEffect, useMemo, useState } from "react";
 import { InspectorItem } from "./components/InspectorItem";
 import { PluginSettingsTab } from "./PluginSettingsTab";
-import { SectionHeading } from "./components/SectionHeading";
-import { readControlValue } from "./control-events";
-import {
-    resolveInspectorSectionList,
-} from "./scenarios";
+import { WidgetSettingsTab } from "./panels/WidgetSettingsTab";
 import {
     resolveActionKind,
     type ActionKind,
@@ -30,11 +25,9 @@ import {
     resolveIsWindowsPropertyInspector,
     type StreamDeckPropertyInspectorClient,
 } from "./stream-deck-client";
-import type { InspectorSettingTarget, VisibilityContext } from "./schema";
-import type { ScenarioSectionId } from "./scenario-model";
+import type { InspectorSettingTarget } from "./schema";
 import {
     buildInspectorBindingContext,
-    isPropertyInspectorSettingKey,
     updateWidgetStoredSettings,
 } from "./widget-setting-bindings";
 
@@ -70,7 +63,6 @@ const initialState: PropertyInspectorState = {
 };
 
 export function App({ client }: AppProps): React.JSX.Element {
-    const rootRef = useRef<HTMLDivElement | null>(null);
     const [state, setState] = useState<PropertyInspectorState>(initialState);
     const visibilityContext = useMemo(() => buildInspectorBindingContext({
         storedSettings: state.storedSettings,
@@ -78,10 +70,6 @@ export function App({ client }: AppProps): React.JSX.Element {
         actionKind: state.actionKind,
         isWindows: state.isWindows,
     }), [state.storedSettings, state.globalSettings, state.actionKind, state.isWindows]);
-    const inspectorSectionList = useMemo(
-        () => resolveInspectorSectionList(visibilityContext),
-        [visibilityContext],
-    );
     const isGlobalAppearanceOverrideEnabled = state.globalSettings.overrideWidgetAppearance;
 
     const updateSetting = (changedTarget: InspectorSettingTarget, changedValue: string): void => {
@@ -253,36 +241,8 @@ export function App({ client }: AppProps): React.JSX.Element {
         };
     }, [client]);
 
-    useEffect(() => {
-        const root = rootRef.current;
-
-        if (!root) {
-            return;
-        }
-
-        const handleControlEvent = (event: Event): void => {
-            const controlValue = readControlValue(event);
-
-            if (!controlValue) {
-                return;
-            }
-
-            if (isPropertyInspectorSettingKey(controlValue.key)) {
-                updateSetting(controlValue.key, controlValue.value);
-            }
-        };
-
-        root.addEventListener("input", handleControlEvent, true);
-        root.addEventListener("change", handleControlEvent, true);
-
-        return () => {
-            root.removeEventListener("input", handleControlEvent, true);
-            root.removeEventListener("change", handleControlEvent, true);
-        };
-    }, [client]);
-
     return (
-        <div ref={rootRef}>
+        <div>
             <div className="settings-tab-list" role="tablist" aria-label="Settings">
                 <button
                     className="settings-tab"
@@ -309,13 +269,13 @@ export function App({ client }: AppProps): React.JSX.Element {
             <SettingsNoticeSlot notice={state.settingsNotice} loadError={state.loadError} />
 
             {state.activeTab === "widget" ? (
-                    <WidgetSettingsTab
-                        inspectorSectionList={inspectorSectionList}
-                        visibilityContext={visibilityContext}
-                        isGlobalAppearanceOverrideEnabled={isGlobalAppearanceOverrideEnabled}
-                        onSettingChange={updateSetting}
-                        onResetWidgetSettings={resetWidgetSettings}
-                    />
+                <WidgetSettingsTab
+                    actionKind={state.actionKind}
+                    context={visibilityContext}
+                    isGlobalAppearanceOverrideEnabled={isGlobalAppearanceOverrideEnabled}
+                    onSettingChange={updateSetting}
+                    onResetWidgetSettings={resetWidgetSettings}
+                />
             ) : (
                 <PluginSettingsTab
                     settings={state.globalSettings}
@@ -350,56 +310,6 @@ function SettingsNoticeView({ notice }: { notice: SettingsNotice }): React.JSX.E
             <p className="section-note">{notice.text}</p>
         </InspectorItem>
     );
-}
-
-function WidgetSettingsTab(options: {
-    inspectorSectionList: ReturnType<typeof resolveInspectorSectionList>;
-    visibilityContext: VisibilityContext;
-    isGlobalAppearanceOverrideEnabled: boolean;
-    onSettingChange: (target: InspectorSettingTarget, value: string) => void;
-    onResetWidgetSettings: () => void;
-}): React.JSX.Element {
-    return (
-        <>
-            <InspectorItem className="widget-reset-item">
-                <button
-                    className="inline-action-button"
-                    type="button"
-                    onClick={options.onResetWidgetSettings}
-                >
-                    Reset Widget Settings
-                </button>
-            </InspectorItem>
-            {options.isGlobalAppearanceOverrideEnabled && (
-                <InspectorItem className="note-item note-item-caption">
-                    <p className="section-note">Some settings are disabled since global override is enabled.</p>
-                </InspectorItem>
-            )}
-            {options.inspectorSectionList.map((section) => {
-                const isSectionDisabled = options.isGlobalAppearanceOverrideEnabled
-                    && isGlobalAppearanceSection(section.id);
-
-                return (
-                    <section key={section.id} className="settings-section">
-                        <SectionHeading text={section.label} variant="section" />
-                        {section.fieldList.map((field, fieldIndex) => (
-                            <FieldRenderer
-                                key={`${section.id}-${field.id}-${fieldIndex}`}
-                                field={field}
-                                context={options.visibilityContext}
-                                onSettingChange={options.onSettingChange}
-                                disabled={isSectionDisabled}
-                            />
-                        ))}
-                    </section>
-                );
-            })}
-        </>
-    );
-}
-
-function isGlobalAppearanceSection(sectionId: ScenarioSectionId): boolean {
-    return sectionId === "layout" || sectionId === "colors";
 }
 
 function buildContextFromState(state: PropertyInspectorState): ReturnType<typeof buildInspectorBindingContext> {
