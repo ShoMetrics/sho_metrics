@@ -12,7 +12,7 @@ import {
     type DiskThroughputDefaultSettings,
     type MetricSettings,
     type NetworkDefaultSettings,
-    type PluginGlobalSettings,
+    type GlobalSettings,
     type SettingsContext,
     type WidgetLocalSettings,
     type WidgetSettings,
@@ -35,7 +35,7 @@ export type InspectorBindingContext = VisibilityContext;
 
 export function buildInspectorBindingContext(options: {
     storedSettings: WidgetStoredSettings;
-    globalSettings: PluginGlobalSettings;
+    globalSettings: GlobalSettings;
     actionKind: SettingsContext["actionKind"];
     isWindows: boolean;
 }): InspectorBindingContext {

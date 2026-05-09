@@ -9,10 +9,10 @@ import {
 } from "../shared/color-utils";
 import type { MetricVisualSettings } from "./visual-adapter";
 import {
-    defaultPluginGlobalSettings,
-    type PluginGlobalSettings,
+    defaultResolvedGlobalSettings,
+    type ResolvedGlobalSettings,
 } from "./widget-settings";
-export { defaultPluginGlobalSettings, normalizePluginGlobalSettings } from "./widget-settings";
+export { defaultResolvedGlobalSettings } from "./widget-settings";
 
 export type GlobalAppearanceColorMode = "solid" | "threshold";
 
@@ -26,7 +26,7 @@ const MAXIMUM_THRESHOLD = 100;
 
 export function applyGlobalAppearanceToVisualSettings(
     widgetSettings: MetricVisualSettings,
-    globalSettings: PluginGlobalSettings,
+    globalSettings: ResolvedGlobalSettings,
 ): MetricVisualSettings {
     if (!globalSettings.overrideWidgetAppearance) {
         return widgetSettings;
@@ -55,7 +55,7 @@ export function applyGlobalAppearanceToVisualSettings(
 
 export function buildGlobalChannelColorConfig(
     channel: "primary" | "secondary",
-    globalSettings: PluginGlobalSettings,
+    globalSettings: ResolvedGlobalSettings,
 ): ColorConfig {
     const appearanceDefaults = globalSettings.appearanceDefaults;
     const channelColors = deriveTintChannelColors(appearanceDefaults.usageColors.solidColor);
@@ -76,7 +76,7 @@ export function buildGlobalChannelColorConfig(
 }
 
 export function deriveTintChannelColors(tintColor: string): TintChannelColors {
-    const primaryColor = normalizeHexColor(tintColor, defaultPluginGlobalSettings.appearanceDefaults.usageColors.solidColor);
+    const primaryColor = normalizeHexColor(tintColor, defaultResolvedGlobalSettings.appearanceDefaults.usageColors.solidColor);
     const primaryHslColor = rgbToHsl(readValidHexColor(primaryColor));
     const isPrimaryLight = primaryHslColor.lightness >= 0.55;
     const secondaryLightness = isPrimaryLight
@@ -101,7 +101,7 @@ export function buildTintThresholdColors(baseColor: string): {
     mediumColor: string;
     highColor: string;
 } {
-    const baseHslColor = rgbToHsl(readValidHexColor(normalizeHexColor(baseColor, defaultPluginGlobalSettings.appearanceDefaults.usageColors.solidColor)));
+    const baseHslColor = rgbToHsl(readValidHexColor(normalizeHexColor(baseColor, defaultResolvedGlobalSettings.appearanceDefaults.usageColors.solidColor)));
     const isBaseLight = baseHslColor.lightness >= 0.55;
 
     return {
@@ -110,7 +110,7 @@ export function buildTintThresholdColors(baseColor: string): {
             saturation: Math.max(0.25, baseHslColor.saturation * 0.72),
             lightness: isBaseLight ? Math.min(0.9, baseHslColor.lightness + 0.12) : Math.min(0.78, baseHslColor.lightness + 0.28),
         })),
-        mediumColor: normalizeHexColor(baseColor, defaultPluginGlobalSettings.appearanceDefaults.usageColors.solidColor),
+        mediumColor: normalizeHexColor(baseColor, defaultResolvedGlobalSettings.appearanceDefaults.usageColors.solidColor),
         highColor: formatHexColor(hslToRgb({
             hue: baseHslColor.hue,
             saturation: Math.min(1, Math.max(0.5, baseHslColor.saturation + 0.16)),
@@ -140,7 +140,7 @@ function readValidHexColor(hexColor: string): RgbColor {
         return color;
     }
 
-    const fallbackColor = parseHexColor(defaultPluginGlobalSettings.appearanceDefaults.usageColors.solidColor);
+    const fallbackColor = parseHexColor(defaultResolvedGlobalSettings.appearanceDefaults.usageColors.solidColor);
 
     if (!fallbackColor) {
         throw new Error("Default global appearance tint color must be a valid hex color.");

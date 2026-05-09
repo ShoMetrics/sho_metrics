@@ -4,6 +4,7 @@ import {
     defaultLocalSettings,
     defaultMetricSettings,
     defaultNetworkSettings,
+    defaultResolvedGlobalSettings,
     defaultRuntimeCache,
 } from "./defaults";
 import type {
@@ -12,9 +13,10 @@ import type {
     ColorRamp,
     DiskMetricKind,
     DiskThroughputDefaultSettings,
+    GlobalSettings,
     MetricSettings,
     NetworkDefaultSettings,
-    PluginGlobalSettings,
+    ResolvedGlobalSettings,
     ResolvedWidgetSettings,
     SettingsContext,
     WidgetLocalSettings,
@@ -24,26 +26,45 @@ import type {
 
 export function resolveWidgetSettings(options: {
     storedSettings: WidgetSettings;
-    globalSettings: PluginGlobalSettings;
+    globalSettings: GlobalSettings;
     context: SettingsContext;
 }): ResolvedWidgetSettings {
+    const globalSettings = resolveGlobalSettings(options.globalSettings);
     const metric = resolveMetricSettings(options.storedSettings.metric, options.context);
     const local = resolveLocalSettings(options.storedSettings.local, options.context, metric.diskMetricKind);
     const appearance = mergeAppearanceSettings(
         defaultAppearanceSettings,
         options.storedSettings.appearanceOverrides,
     );
-    const network = resolveNetworkSettings(options.storedSettings, options.globalSettings);
-    const diskThroughput = resolveDiskThroughputSettings(options.storedSettings, options.globalSettings);
+    const network = resolveNetworkSettings(options.storedSettings, globalSettings);
+    const diskThroughput = resolveDiskThroughputSettings(options.storedSettings, globalSettings);
 
     return {
         metric,
         local,
-        appearance: options.globalSettings.overrideWidgetAppearance
-            ? mergeAppearanceSettings(defaultAppearanceSettings, options.globalSettings.appearanceDefaults)
+        appearance: globalSettings.overrideWidgetAppearance
+            ? globalSettings.appearanceDefaults
             : appearance,
         network,
         diskThroughput,
+    };
+}
+
+export function resolveGlobalSettings(globalSettings: GlobalSettings | undefined): ResolvedGlobalSettings {
+    return {
+        overrideWidgetAppearance: globalSettings?.overrideWidgetAppearance === true,
+        appearanceDefaults: mergeAppearanceSettings(
+            defaultResolvedGlobalSettings.appearanceDefaults,
+            globalSettings?.appearanceDefaults,
+        ),
+        networkDefaults: {
+            ...defaultResolvedGlobalSettings.networkDefaults,
+            ...globalSettings?.networkDefaults,
+        },
+        diskThroughputDefaults: {
+            ...defaultResolvedGlobalSettings.diskThroughputDefaults,
+            ...globalSettings?.diskThroughputDefaults,
+        },
     };
 }
 
@@ -109,7 +130,7 @@ function resolveLocalSettings(
 
 function resolveNetworkSettings(
     storedSettings: WidgetSettings,
-    globalSettings: PluginGlobalSettings,
+    globalSettings: ResolvedGlobalSettings,
 ): NetworkDefaultSettings {
     const runtimeCache = resolveRuntimeCache(storedSettings.runtimeCache);
     const network = {
@@ -137,7 +158,7 @@ function resolveNetworkSettings(
 
 function resolveDiskThroughputSettings(
     storedSettings: WidgetSettings,
-    globalSettings: PluginGlobalSettings,
+    globalSettings: ResolvedGlobalSettings,
 ): DiskThroughputDefaultSettings {
     const runtimeCache = resolveRuntimeCache(storedSettings.runtimeCache);
     const diskThroughput = {

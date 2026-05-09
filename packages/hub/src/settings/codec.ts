@@ -18,7 +18,7 @@ export function readWidgetSettings(rawSettings: unknown): WidgetSettings {
     return rawSettings as WidgetSettings;
 }
 
-export function readPluginGlobalSettings(rawSettings: unknown): GlobalSettings {
+export function readGlobalSettings(rawSettings: unknown): GlobalSettings {
     if (!rawSettings || typeof rawSettings !== "object" || Array.isArray(rawSettings)) {
         return {};
     }
@@ -62,6 +62,28 @@ export function writeWidgetSettings(settings: WidgetSettings): JsonObject {
 
     if (settings.runtimeCache) {
         output.runtimeCache = { ...settings.runtimeCache } as JsonObject;
+    }
+
+    return output;
+}
+
+export function writeGlobalSettings(settings: GlobalSettings): JsonObject {
+    const output: JsonObject = {};
+
+    if (settings.overrideWidgetAppearance !== undefined) {
+        output.overrideWidgetAppearance = settings.overrideWidgetAppearance;
+    }
+
+    if (settings.appearanceDefaults) {
+        output.appearanceDefaults = { ...settings.appearanceDefaults } as JsonObject;
+    }
+
+    if (settings.networkDefaults) {
+        output.networkDefaults = { ...settings.networkDefaults } as JsonObject;
+    }
+
+    if (settings.diskThroughputDefaults) {
+        output.diskThroughputDefaults = { ...settings.diskThroughputDefaults } as JsonObject;
     }
 
     return output;

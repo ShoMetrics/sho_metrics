@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-    defaultPluginGlobalSettings,
     normalizeWidgetStoredSettings,
     type SettingsContext,
 } from "../settings/widget-settings";
@@ -119,7 +118,7 @@ function buildContext(
 ) {
     return buildInspectorBindingContext({
         storedSettings,
-        globalSettings: { ...defaultPluginGlobalSettings },
+        globalSettings: {},
         actionKind: context.actionKind,
         isWindows: context.isWindows,
     });

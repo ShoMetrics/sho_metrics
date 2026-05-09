@@ -7,45 +7,19 @@ import {
 import {
     applyGlobalAppearanceToVisualSettings,
     buildGlobalChannelColorConfig,
-    defaultPluginGlobalSettings,
+    defaultResolvedGlobalSettings,
     deriveTintChannelColors,
-    normalizePluginGlobalSettings,
 } from "./global-appearance";
-
-test("global appearance settings normalize unsupported values", () => {
-    const settings = normalizePluginGlobalSettings({
-        overrideWidgetAppearance: "true",
-        appearanceDefaults: {
-            graphicType: "linear",
-            circleStyle: "gauge",
-            graphicStyle: "unknown",
-            usageColors: {
-                solidColor: "bad",
-            },
-            colorMode: "threshold",
-            lowThreshold: 90,
-            highThreshold: 20,
-        },
-    });
-
-    assert.equal(settings.overrideWidgetAppearance, true);
-    assert.equal(settings.appearanceDefaults.graphicType, "linear");
-    assert.equal(settings.appearanceDefaults.circleStyle, "gauge");
-    assert.equal(settings.appearanceDefaults.graphicStyle, "flat");
-    assert.equal(settings.appearanceDefaults.usageColors.solidColor, "#3b82f6");
-    assert.equal(settings.appearanceDefaults.colorMode, "threshold");
-    assert.equal(settings.appearanceDefaults.lowThreshold, 20);
-    assert.equal(settings.appearanceDefaults.highThreshold, 90);
-});
+import { resolveGlobalSettings } from "./resolver";
 
 test("global override replaces widget appearance without mutating non-appearance settings", () => {
     const settings = applyGlobalAppearanceToVisualSettings({
-        ...defaultPluginGlobalSettings.appearanceDefaults,
+        ...defaultResolvedGlobalSettings.appearanceDefaults,
         graphicType: "linear",
         circleStyle: "compact",
         graphicStyle: "flat",
         lineSmoothingPercent: 25,
-    }, normalizePluginGlobalSettings({
+    }, resolveGlobalSettings({
         overrideWidgetAppearance: true,
         appearanceDefaults: {
             graphicType: "circular",
@@ -79,7 +53,7 @@ test("tint channel derivation keeps the selected color as primary and creates st
 });
 
 test("global channel color config maps primary to one channel and secondary to the other", () => {
-    const settings = normalizePluginGlobalSettings({
+    const settings = resolveGlobalSettings({
         overrideWidgetAppearance: true,
         appearanceDefaults: {
             usageColors: {
