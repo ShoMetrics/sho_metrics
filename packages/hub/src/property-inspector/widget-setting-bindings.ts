@@ -194,16 +194,19 @@ function diskMetricKindBinding(): BindingWriter {
                 diskMetricKind: value as MetricSettings["diskMetricKind"],
             },
         }, context).metric;
+        const diskMetricKind = context.isWindows && normalizedMetric?.diskMetricKind === "throughput"
+            ? "usage"
+            : normalizedMetric?.diskMetricKind ?? "usage";
 
         return normalizeStoredSettings({
             ...settings,
             metric: {
                 ...settings.metric,
-                diskMetricKind: value as MetricSettings["diskMetricKind"],
+                diskMetricKind,
             },
             local: {
                 ...settings.local,
-                pollingFrequencySeconds: resolveDiskPollingFrequency(normalizedMetric.diskMetricKind),
+                pollingFrequencySeconds: resolveDiskPollingFrequency(diskMetricKind),
             },
         }, context);
     };
@@ -212,11 +215,11 @@ function diskMetricKindBinding(): BindingWriter {
 function thresholdBinding(key: "lowThreshold" | "highThreshold"): BindingWriter {
     return (settings, value, context) => {
         const currentLowThreshold = parseThreshold(
-            settings.appearanceOverrides.lowThreshold,
+            settings.appearanceOverrides?.lowThreshold,
             defaultAppearanceSettings.lowThreshold,
         );
         const currentHighThreshold = parseThreshold(
-            settings.appearanceOverrides.highThreshold,
+            settings.appearanceOverrides?.highThreshold,
             defaultAppearanceSettings.highThreshold,
         );
         const nextThreshold = parseThreshold(
@@ -244,7 +247,8 @@ function normalizeStoredSettings(
     settings: WidgetStoredSettings,
     context: SettingsContext,
 ): WidgetStoredSettings {
-    return normalizeWidgetStoredSettings(settings, context);
+    void context;
+    return normalizeWidgetStoredSettings(settings);
 }
 
 function parseThreshold(value: unknown, fallbackValue: number): number {

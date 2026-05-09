@@ -607,12 +607,9 @@ function formatNetworkInterfaceDebugValue(networkInterface: NetworkInterfaceOpti
 function publishNetworkInterfaceOptions(event: WillAppearEvent): void {
     const availableNetworkInterfaces = JSON.stringify(networkInterfaceRegistry.getOptions());
 
-    const storedSettings = normalizeActionStoredSettings(
-        event.payload.settings,
-        "net-speed",
-    );
+    const storedSettings = normalizeActionStoredSettings(event.payload.settings);
 
-    if (storedSettings.runtimeCache.availableNetworkInterfaces === availableNetworkInterfaces) {
+    if (storedSettings.runtimeCache?.availableNetworkInterfaces === availableNetworkInterfaces) {
         return;
     }
 
@@ -655,14 +652,11 @@ function publishNetworkScaleLearning(
         selectedNetworkInterface,
     });
 
-    const storedSettings = normalizeActionStoredSettings(
-        event.payload.settings,
-        "net-speed",
-    );
+    const storedSettings = normalizeActionStoredSettings(event.payload.settings);
 
     if (
-        storedSettings.runtimeCache.learnedMaximumDownloadSpeedMbps === nextDownloadMaximum
-        && storedSettings.runtimeCache.learnedMaximumUploadSpeedMbps === nextUploadMaximum
+        storedSettings.runtimeCache?.learnedMaximumDownloadSpeedMbps === nextDownloadMaximum
+        && storedSettings.runtimeCache?.learnedMaximumUploadSpeedMbps === nextUploadMaximum
     ) {
         return;
     }

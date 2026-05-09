@@ -5,28 +5,28 @@ import {
 } from "../settings/codec";
 import {
     normalizeWidgetStoredSettings,
-    resolveWidgetSettings,
     type ActionKind,
     type ResolvedWidgetSettings,
     type WidgetStoredSettings,
 } from "../settings/widget-settings";
+import { resolveWidgetSettings } from "../settings/resolver";
 
 export function resolveActionSettings(rawSettings: unknown, actionKind: ActionKind): ResolvedWidgetSettings {
-    const storedSettings = normalizeActionStoredSettings(rawSettings, actionKind);
-
-    return resolveWidgetSettings({
+    const context = {
         actionKind,
         isWindows: process.platform === "win32",
+    };
+    const storedSettings = normalizeActionStoredSettings(rawSettings);
+
+    return resolveWidgetSettings({
         storedSettings,
         globalSettings: pluginGlobalSettingsStore.get(),
+        context,
     });
 }
 
-export function normalizeActionStoredSettings(rawSettings: unknown, actionKind: ActionKind): WidgetStoredSettings {
-    return normalizeWidgetStoredSettings(rawSettings, {
-        actionKind,
-        isWindows: process.platform === "win32",
-    });
+export function normalizeActionStoredSettings(rawSettings: unknown): WidgetStoredSettings {
+    return normalizeWidgetStoredSettings(rawSettings);
 }
 
 export function serializeActionStoredSettings(storedSettings: WidgetStoredSettings): JsonObject {

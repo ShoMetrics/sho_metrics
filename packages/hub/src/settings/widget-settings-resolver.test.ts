@@ -4,23 +4,21 @@ import {
     defaultPluginGlobalSettings,
     normalizePluginGlobalSettings,
     normalizeWidgetStoredSettings,
-    resolveWidgetSettings,
 } from "./widget-settings";
+import { resolveWidgetSettings } from "./resolver";
 
 test("stored widget settings stay sparse and do not expand globalizable fields", () => {
     const storedSettings = normalizeWidgetStoredSettings({
         metric: {
             networkDirection: "download",
         },
-    }, {
-        actionKind: "net-speed",
-        isWindows: false,
     });
 
-    assert.equal(storedSettings.metric.networkDirection, "download");
-    assert.deepEqual(storedSettings.appearanceOverrides, {});
-    assert.deepEqual(storedSettings.networkOverrides, {});
-    assert.deepEqual(storedSettings.diskThroughputOverrides, {});
+    assert.deepEqual(storedSettings, {
+        metric: {
+            networkDirection: "download",
+        },
+    });
 });
 
 test("resolver cascades domain defaults, metric defaults, and widget overrides", () => {
@@ -41,16 +39,15 @@ test("resolver cascades domain defaults, metric defaults, and widget overrides",
         networkOverrides: {
             maximumUploadSpeedMbps: 50,
         },
-    }, {
-        actionKind: "net-speed",
-        isWindows: false,
     });
 
     const resolvedSettings = resolveWidgetSettings({
-        actionKind: "net-speed",
-        isWindows: false,
         storedSettings,
         globalSettings,
+        context: {
+            actionKind: "net-speed",
+            isWindows: false,
+        },
     });
 
     assert.equal(resolvedSettings.appearance.graphicType, "circular");
@@ -61,10 +58,7 @@ test("resolver cascades domain defaults, metric defaults, and widget overrides",
 });
 
 test("global appearance settings affect widgets only when override is enabled", () => {
-    const storedSettings = normalizeWidgetStoredSettings({}, {
-        actionKind: "cpu-usage",
-        isWindows: false,
-    });
+    const storedSettings = normalizeWidgetStoredSettings({});
     const globalSettings = normalizePluginGlobalSettings({
         appearanceDefaults: {
             graphicType: "linear",
@@ -73,10 +67,12 @@ test("global appearance settings affect widgets only when override is enabled", 
     });
 
     const resolvedSettings = resolveWidgetSettings({
-        actionKind: "cpu-usage",
-        isWindows: false,
         storedSettings,
         globalSettings,
+        context: {
+            actionKind: "cpu-usage",
+            isWindows: false,
+        },
     });
 
     assert.equal(resolvedSettings.appearance.graphicType, "circular");
@@ -89,9 +85,6 @@ test("global appearance override wins without mutating widget overrides", () => 
             graphicType: "linear",
             solidColor: "#222222",
         },
-    }, {
-        actionKind: "cpu-usage",
-        isWindows: false,
     });
     const globalSettings = normalizePluginGlobalSettings({
         overrideWidgetAppearance: true,
@@ -103,17 +96,19 @@ test("global appearance override wins without mutating widget overrides", () => 
     });
 
     const resolvedSettings = resolveWidgetSettings({
-        actionKind: "cpu-usage",
-        isWindows: false,
         storedSettings,
         globalSettings,
+        context: {
+            actionKind: "cpu-usage",
+            isWindows: false,
+        },
     });
 
     assert.equal(resolvedSettings.appearance.graphicType, "circular");
     assert.equal(resolvedSettings.appearance.circleStyle, "gauge");
     assert.equal(resolvedSettings.appearance.solidColor, "#93c5fd");
-    assert.equal(storedSettings.appearanceOverrides.graphicType, "linear");
-    assert.equal(storedSettings.appearanceOverrides.solidColor, "#222222");
+    assert.equal(storedSettings.appearanceOverrides?.graphicType, "linear");
+    assert.equal(storedSettings.appearanceOverrides?.solidColor, "#222222");
 });
 
 test("runtime cache participates only in auto scale resolution", () => {
@@ -127,9 +122,6 @@ test("runtime cache participates only in auto scale resolution", () => {
         runtimeCache: {
             learnedMaximumDownloadSpeedMbps: 800,
         },
-    }, {
-        actionKind: "net-speed",
-        isWindows: false,
     });
     const customStoredSettings = normalizeWidgetStoredSettings({
         networkOverrides: {
@@ -139,67 +131,79 @@ test("runtime cache participates only in auto scale resolution", () => {
         runtimeCache: {
             learnedMaximumDownloadSpeedMbps: 800,
         },
-    }, {
-        actionKind: "net-speed",
-        isWindows: false,
     });
 
     assert.equal(resolveWidgetSettings({
-        actionKind: "net-speed",
-        isWindows: false,
         storedSettings: autoStoredSettings,
         globalSettings,
+        context: {
+            actionKind: "net-speed",
+            isWindows: false,
+        },
     }).network.maximumDownloadSpeedMbps, 800);
     assert.equal(resolveWidgetSettings({
-        actionKind: "net-speed",
-        isWindows: false,
         storedSettings: customStoredSettings,
         globalSettings,
+        context: {
+            actionKind: "net-speed",
+            isWindows: false,
+        },
     }).network.maximumDownloadSpeedMbps, 300);
 });
 
-test("disk usage stored settings default to slow polling", () => {
+test("disk usage resolved settings default to slow polling", () => {
     const storedSettings = normalizeWidgetStoredSettings({
         metric: {
             diskMetricKind: "usage",
         },
-    }, {
-        actionKind: "disk",
-        isWindows: false,
-    });
-
-    assert.equal(storedSettings.local.pollingFrequencySeconds, 60);
-});
-
-test("disk throughput stored settings default to fast polling", () => {
-    const storedSettings = normalizeWidgetStoredSettings({
-        metric: {
-            diskMetricKind: "throughput",
-        },
-    }, {
-        actionKind: "disk",
-        isWindows: false,
-    });
-
-    assert.equal(storedSettings.local.pollingFrequencySeconds, 1);
-});
-
-test("Windows normalizes disk throughput metric identity back to usage", () => {
-    const storedSettings = normalizeWidgetStoredSettings({
-        metric: {
-            diskMetricKind: "throughput",
-        },
-    }, {
-        actionKind: "disk",
-        isWindows: true,
     });
     const resolvedSettings = resolveWidgetSettings({
-        actionKind: "disk",
-        isWindows: true,
         storedSettings,
         globalSettings: defaultPluginGlobalSettings,
+        context: {
+            actionKind: "disk",
+            isWindows: false,
+        },
     });
 
-    assert.equal(storedSettings.metric.diskMetricKind, "usage");
+    assert.equal(storedSettings.local, undefined);
+    assert.equal(resolvedSettings.local.pollingFrequencySeconds, 60);
+});
+
+test("disk throughput resolved settings default to fast polling", () => {
+    const storedSettings = normalizeWidgetStoredSettings({
+        metric: {
+            diskMetricKind: "throughput",
+        },
+    });
+    const resolvedSettings = resolveWidgetSettings({
+        storedSettings,
+        globalSettings: defaultPluginGlobalSettings,
+        context: {
+            actionKind: "disk",
+            isWindows: false,
+        },
+    });
+
+    assert.equal(storedSettings.local, undefined);
+    assert.equal(resolvedSettings.local.pollingFrequencySeconds, 1);
+});
+
+test("Windows resolves disk throughput metric identity back to usage", () => {
+    const storedSettings = normalizeWidgetStoredSettings({
+        metric: {
+            diskMetricKind: "throughput",
+        },
+    });
+    const resolvedSettings = resolveWidgetSettings({
+        storedSettings,
+        globalSettings: defaultPluginGlobalSettings,
+        context: {
+            actionKind: "disk",
+            isWindows: true,
+        },
+    });
+
+    assert.equal(storedSettings.metric?.diskMetricKind, "throughput");
     assert.equal(resolvedSettings.metric.diskMetricKind, "usage");
 });

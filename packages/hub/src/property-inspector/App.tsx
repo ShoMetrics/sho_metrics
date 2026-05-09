@@ -13,13 +13,14 @@ import {
     type PropertyInspectorSettings,
 } from "./settings";
 import {
+    defaultRuntimeCache,
     defaultPluginGlobalSettings,
     normalizePluginGlobalSettings,
     normalizeWidgetStoredSettings,
-    resolveWidgetSettings,
     type PluginGlobalSettings,
     type WidgetStoredSettings,
 } from "../settings/widget-settings";
+import { resolveWidgetSettings } from "../settings/resolver";
 import {
     readActionUuid,
     resolveIsWindowsPropertyInspector,
@@ -49,7 +50,7 @@ interface PropertyInspectorState {
 const initialState: PropertyInspectorState = {
     actionKind: "unknown",
     isWindows: false,
-    storedSettings: normalizeWidgetStoredSettings({}, { actionKind: "unknown", isWindows: false }),
+    storedSettings: normalizeWidgetStoredSettings({}),
     settings: { ...basePropertyInspectorSettings },
     globalSettings: { ...defaultPluginGlobalSettings },
     activeTab: "widget",
@@ -112,10 +113,7 @@ export function App({ client }: AppProps): React.JSX.Element {
 
     const resetWidgetSettings = (): void => {
         setState((currentState) => {
-            const nextStoredSettings = normalizeWidgetStoredSettings({}, {
-                actionKind: currentState.actionKind,
-                isWindows: currentState.isWindows,
-            });
+            const nextStoredSettings = normalizeWidgetStoredSettings({});
             const nextSettings = buildResolvedPropertyInspectorSettings({
                 storedSettings: nextStoredSettings,
                 globalSettings: currentState.globalSettings,
@@ -170,7 +168,7 @@ export function App({ client }: AppProps): React.JSX.Element {
             const actionKind = resolveActionKind(readActionUuid(connectionInfo));
             const isWindows = resolveIsWindowsPropertyInspector(connectionInfo);
             const globalSettings = normalizePluginGlobalSettings(readSettingsRecord(globalPayload));
-            const storedSettings = normalizeWidgetStoredSettings(payload.settings, { actionKind, isWindows });
+            const storedSettings = normalizeWidgetStoredSettings(payload.settings);
 
             if (isDisposed) {
                 return;
@@ -194,10 +192,7 @@ export function App({ client }: AppProps): React.JSX.Element {
 
         client.didReceiveSettings.subscribe((event) => {
             setState((currentState) => {
-                const storedSettings = normalizeWidgetStoredSettings(event.payload.settings, {
-                    actionKind: currentState.actionKind,
-                    isWindows: currentState.isWindows,
-                });
+                const storedSettings = normalizeWidgetStoredSettings(event.payload.settings);
 
                 return {
                     ...currentState,
@@ -370,7 +365,14 @@ function buildResolvedPropertyInspectorSettings(options: {
     actionKind: ActionKind;
     isWindows: boolean;
 }): PropertyInspectorSettings {
-    const resolvedSettings = resolveWidgetSettings(options);
+    const resolvedSettings = resolveWidgetSettings({
+        storedSettings: options.storedSettings,
+        globalSettings: options.globalSettings,
+        context: {
+            actionKind: options.actionKind,
+            isWindows: options.isWindows,
+        },
+    });
 
     return {
         ...resolvedSettings.appearance,
@@ -387,8 +389,10 @@ function buildResolvedPropertyInspectorSettings(options: {
         maximumDiskWriteThroughputMebibytesPerSecond: toInspectorOptionalNumber(
             resolvedSettings.diskThroughput.maximumDiskWriteThroughputMebibytesPerSecond,
         ),
-        availableNetworkInterfaces: options.storedSettings.runtimeCache.availableNetworkInterfaces,
-        availableDiskVolumes: options.storedSettings.runtimeCache.availableDiskVolumes,
+        availableNetworkInterfaces: options.storedSettings.runtimeCache?.availableNetworkInterfaces
+            ?? defaultRuntimeCache.availableNetworkInterfaces,
+        availableDiskVolumes: options.storedSettings.runtimeCache?.availableDiskVolumes
+            ?? defaultRuntimeCache.availableDiskVolumes,
         netSpeedDefaultsApplied: true,
         diskDefaultsApplied: true,
     };
