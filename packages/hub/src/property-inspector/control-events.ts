@@ -32,10 +32,6 @@ function readElementValue(element: HTMLElement): string {
 
     const shadowInput = element.shadowRoot?.querySelector<HTMLInputElement | HTMLSelectElement>("input, select");
 
-    if (isColorControl(element) && shadowInput && shadowInput.value.length > 0) {
-        return shadowInput.value;
-    }
-
     const propertyValue = readValueProperty(element);
 
     if (typeof propertyValue === "string") {
@@ -52,8 +48,4 @@ function readElementValue(element: HTMLElement): string {
 function readValueProperty(element: HTMLElement): InspectorControlValue {
     const propertyTarget = element as HTMLElement & { value?: InspectorControlValue };
     return propertyTarget.value;
-}
-
-function isColorControl(element: HTMLElement): boolean {
-    return element.tagName.toLowerCase() === "sdpi-color";
 }

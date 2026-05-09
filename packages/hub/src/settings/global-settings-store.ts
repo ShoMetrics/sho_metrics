@@ -12,7 +12,7 @@ class PluginGlobalSettingsStore {
         return this.settings;
     }
 
-    update(rawSettings: Record<string, unknown>): PluginGlobalSettings {
+    update(rawSettings: unknown): PluginGlobalSettings {
         this.settings = normalizePluginGlobalSettings(rawSettings);
         for (const listener of this.listeners) {
             listener(this.settings);

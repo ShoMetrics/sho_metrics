@@ -7,12 +7,6 @@ declare module "react" {
             "sdpi-item": DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
                 label?: string;
             };
-            "sdpi-color": DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
-                setting?: string;
-                default?: string;
-                value?: string;
-                disabled?: boolean;
-            };
         }
     }
 }

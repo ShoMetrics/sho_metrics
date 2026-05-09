@@ -12,7 +12,7 @@ logger.setLevel(__LOG_LEVEL__);
 const log = logger.for("Plugin");
 
 streamDeck.settings.onDidReceiveGlobalSettings(event => {
-    pluginGlobalSettingsStore.update(event.settings as Record<string, unknown>);
+    pluginGlobalSettingsStore.update(event.settings);
 });
 
 streamDeck.actions.registerAction(new CpuUsage());
@@ -28,7 +28,7 @@ streamDeck.actions.registerAction(new GpuPower());
 streamDeck.connect()
     .then(() => streamDeck.settings.getGlobalSettings())
     .then(settings => {
-        pluginGlobalSettingsStore.update(settings as Record<string, unknown>);
+        pluginGlobalSettingsStore.update(settings);
     })
     .catch(error => {
         log.warn(() => `Failed to connect or load global settings: ${String(error)}`);

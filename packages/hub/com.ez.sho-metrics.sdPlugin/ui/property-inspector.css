@@ -1,4 +1,11 @@
 body {
+    --inspector-control-bg: #3d3d3d;
+    --inspector-control-border: #555;
+    --inspector-control-fg: #efefef;
+    --inspector-control-disabled-opacity: 0.55;
+    --inspector-control-radius: 4px;
+    --inspector-control-height: 28px;
+
     background-color: #2d2d2d;
     color: #efefef;
     font-family: sans-serif;
@@ -189,14 +196,39 @@ body {
 .native-select,
 .native-input {
     appearance: none;
-    background: #3d3d3d;
-    border: 1px solid #555;
-    border-radius: 4px;
+    background: var(--inspector-control-bg);
+    border: 1px solid var(--inspector-control-border);
+    border-radius: var(--inspector-control-radius);
     box-sizing: border-box;
-    color: #efefef;
-    min-height: 28px;
+    color: var(--inspector-control-fg);
+    min-height: var(--inspector-control-height);
     min-width: 0;
     padding: 4px 8px;
+    width: 100%;
+}
+
+.native-color-input {
+    background: var(--inspector-control-bg);
+    border: 1px solid var(--inspector-control-border);
+    border-radius: var(--inspector-control-radius);
+    box-sizing: border-box;
+    cursor: pointer;
+    display: block;
+    height: var(--inspector-control-height);
+    min-width: 0;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+}
+
+.native-color-input input[type="color"] {
+    border: 0;
+    cursor: pointer;
+    height: 100%;
+    inset: 0;
+    opacity: 0;
+    padding: 0;
+    position: absolute;
     width: 100%;
 }
 
@@ -205,7 +237,16 @@ body {
 .range-control input:disabled,
 .usage-range input:disabled {
     cursor: default;
-    opacity: 0.55;
+    opacity: var(--inspector-control-disabled-opacity);
+}
+
+.native-color-input[data-disabled="true"] {
+    cursor: default;
+    opacity: var(--inspector-control-disabled-opacity);
+}
+
+.native-color-input[data-disabled="true"] input[type="color"] {
+    cursor: default;
 }
 
 .graphic-type-picker {
