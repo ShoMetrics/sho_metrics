@@ -314,8 +314,6 @@ const DEFAULT_NETWORK_DISK_THROUGHPUT_MEBIBYTES_PER_SECOND = 125;
 const DEFAULT_UNKNOWN_READ_THROUGHPUT_MEBIBYTES_PER_SECOND = 1000;
 const DEFAULT_UNKNOWN_WRITE_THROUGHPUT_MEBIBYTES_PER_SECOND = 1000;
 const DEFAULT_DISK_THROUGHPUT_COLOR = "#38bdf8";
-const DEFAULT_DISK_READ_COLOR = "#38bdf8";
-const DEFAULT_DISK_WRITE_COLOR = "#f472b6";
 const DISK_THROUGHPUT_DIRECTION_ICON_COLOR = "rgba(255,255,255,0.88)";
 const DISK_THROUGHPUT_DIRECTION_ICON_SIZE = 30;
 const DISK_GAUGE_FOOTER_ICON_SIZE = 25;
@@ -414,26 +412,26 @@ function buildDiskChannelColorConfig(direction: Exclude<DiskThroughputDirection,
     if (direction === "read") {
         const colors = settings.appearance.diskReadColors;
         return {
-            mode: settings.appearance.colorMode === "threshold" ? "threshold" : "solid",
-            solidColor: resolveHexColor(colors.solidColor, DEFAULT_DISK_READ_COLOR),
+            mode: settings.appearance.colorMode,
+            solidColor: colors.solidColor,
             thresholds: buildDiskChannelThresholds({
                 settings,
-                lowColor: resolveHexColor(colors.lowColor, "#22c55e"),
-                mediumColor: resolveHexColor(colors.mediumColor, DEFAULT_DISK_READ_COLOR),
-                highColor: resolveHexColor(colors.highColor, "#60a5fa"),
+                lowColor: colors.lowColor,
+                mediumColor: colors.mediumColor,
+                highColor: colors.highColor,
             }),
         };
     }
 
     const colors = settings.appearance.diskWriteColors;
     return {
-        mode: settings.appearance.colorMode === "threshold" ? "threshold" : "solid",
-        solidColor: resolveHexColor(colors.solidColor, DEFAULT_DISK_WRITE_COLOR),
+        mode: settings.appearance.colorMode,
+        solidColor: colors.solidColor,
         thresholds: buildDiskChannelThresholds({
             settings,
-            lowColor: resolveHexColor(colors.lowColor, "#f97316"),
-            mediumColor: resolveHexColor(colors.mediumColor, DEFAULT_DISK_WRITE_COLOR),
-            highColor: resolveHexColor(colors.highColor, "#fb7185"),
+            lowColor: colors.lowColor,
+            mediumColor: colors.mediumColor,
+            highColor: colors.highColor,
         }),
     };
 }
@@ -444,28 +442,13 @@ function buildDiskChannelThresholds(options: {
     mediumColor: string;
     highColor: string;
 }): ColorConfig["thresholds"] {
-    const lowThreshold = normalizeThreshold(options.settings.appearance.lowThreshold, 30);
-    const highThreshold = Math.max(lowThreshold, normalizeThreshold(options.settings.appearance.highThreshold, 70));
+    const { lowThreshold, highThreshold } = options.settings.appearance;
 
     return [
         { min: 0, max: lowThreshold, color: options.lowColor },
         { min: lowThreshold, max: highThreshold, color: options.mediumColor },
         { min: highThreshold, max: 101, color: options.highColor },
     ];
-}
-
-function normalizeThreshold(value: number, fallbackValue: number): number {
-    const numericValue = Number(value);
-
-    if (!Number.isFinite(numericValue)) {
-        return fallbackValue;
-    }
-
-    return Math.min(Math.max(Math.round(numericValue), 0), 100);
-}
-
-function resolveHexColor(value: string, fallbackColor: string): string {
-    return /^#[0-9a-f]{6}$/i.test(value) ? value : fallbackColor;
 }
 
 function publishDiskVolumeOptions(event: WillAppearEvent): void {

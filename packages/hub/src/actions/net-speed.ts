@@ -427,9 +427,6 @@ export class NetSpeed extends MetricAction {
 }
 
 type NetworkSpeedSettings = ResolvedWidgetSettings;
-
-const DEFAULT_DOWNLOAD_COLOR = "#3b82f6";
-const DEFAULT_UPLOAD_COLOR = "#ef4444";
 const NETWORK_DIRECTION_ICON_COLOR = "rgba(255,255,255,0.88)";
 const DEFAULT_DOWNLOAD_MAXIMUM_SPEED_MEGABITS_PER_SECOND = 100;
 const DEFAULT_UPLOAD_MAXIMUM_SPEED_MEGABITS_PER_SECOND = 20;
@@ -543,26 +540,26 @@ function buildNetworkChannelColorConfig(direction: NetworkDirection, settings: N
     if (direction === "download") {
         const colors = settings.appearance.downloadColors;
         return {
-            mode: settings.appearance.colorMode === "threshold" ? "threshold" : "solid",
-            solidColor: resolveHexColor(colors.solidColor, DEFAULT_DOWNLOAD_COLOR),
+            mode: settings.appearance.colorMode,
+            solidColor: colors.solidColor,
             thresholds: buildChannelThresholds({
                 settings,
-                lowColor: resolveHexColor(colors.lowColor, "#22c55e"),
-                mediumColor: resolveHexColor(colors.mediumColor, DEFAULT_DOWNLOAD_COLOR),
-                highColor: resolveHexColor(colors.highColor, "#60a5fa"),
+                lowColor: colors.lowColor,
+                mediumColor: colors.mediumColor,
+                highColor: colors.highColor,
             }),
         };
     }
 
     const colors = settings.appearance.uploadColors;
     return {
-        mode: settings.appearance.colorMode === "threshold" ? "threshold" : "solid",
-        solidColor: resolveHexColor(colors.solidColor, DEFAULT_UPLOAD_COLOR),
+        mode: settings.appearance.colorMode,
+        solidColor: colors.solidColor,
         thresholds: buildChannelThresholds({
             settings,
-            lowColor: resolveHexColor(colors.lowColor, "#f97316"),
-            mediumColor: resolveHexColor(colors.mediumColor, DEFAULT_UPLOAD_COLOR),
-            highColor: resolveHexColor(colors.highColor, "#f472b6"),
+            lowColor: colors.lowColor,
+            mediumColor: colors.mediumColor,
+            highColor: colors.highColor,
         }),
     };
 }
@@ -573,28 +570,13 @@ function buildChannelThresholds(options: {
     mediumColor: string;
     highColor: string;
 }): ColorConfig["thresholds"] {
-    const lowThreshold = normalizeThreshold(options.settings.appearance.lowThreshold, 30);
-    const highThreshold = Math.max(lowThreshold, normalizeThreshold(options.settings.appearance.highThreshold, 70));
+    const { lowThreshold, highThreshold } = options.settings.appearance;
 
     return [
         { min: 0, max: lowThreshold, color: options.lowColor },
         { min: lowThreshold, max: highThreshold, color: options.mediumColor },
         { min: highThreshold, max: 101, color: options.highColor },
     ];
-}
-
-function normalizeThreshold(value: number, fallbackValue: number): number {
-    const numericValue = Number(value);
-
-    if (!Number.isFinite(numericValue)) {
-        return fallbackValue;
-    }
-
-    return Math.min(Math.max(Math.round(numericValue), 0), 100);
-}
-
-function resolveHexColor(value: string, fallbackColor: string): string {
-    return /^#[0-9a-f]{6}$/i.test(value) ? value : fallbackColor;
 }
 
 function formatNetworkInterfaceDebugValue(networkInterface: NetworkInterfaceOption | null): string {
