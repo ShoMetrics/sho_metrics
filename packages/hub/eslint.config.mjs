@@ -4,8 +4,15 @@ import globals from 'globals';
 
 const restrictedLegacySettingSyntax = [
   'FlatWidgetSettings',
+  'PropertyInspectorSettings',
+  'SingleMetricDisplaySettings',
+  'SettingValue',
   'resolveFlatWidgetSettings',
   'flattenWidgetSettings',
+  'APPEARANCE_COLOR_CONTROL_PATHS',
+  'AppearanceColorControlKey',
+  'GRAPHIC_TYPE_ALIASES',
+  'GRAPHIC_THEME_PRESET_NAMES',
   'colorMid',
 ].map(name => ({
   selector: `Identifier[name="${name}"]`,
@@ -27,6 +34,65 @@ const restrictedConcreteActionRawSettingsSyntax = [
     message: 'Concrete actions must read stored settings through action-settings-resolver helpers.',
   },
 ];
+
+const restrictedSchemaHardeningImports = {
+  paths: [
+    {
+      name: 'zod',
+      message: 'Do not introduce Zod before the pre-proto settings cleanup is complete.',
+    },
+  ],
+  patterns: [
+    {
+      group: ['**/generated/settings*'],
+      message: 'Generated settings contracts are not allowed before the codec boundary is ready.',
+    },
+  ],
+};
+
+const restrictedRendererSettingsImports = {
+  patterns: [
+    {
+      group: ['../settings/*', '../../settings/*', '../../../settings/*', '**/settings/*'],
+      message: 'Rendering and widget primitives must receive renderer contracts, not persisted settings models.',
+    },
+  ],
+};
+
+const restrictedConcreteActionSettingsImports = {
+  paths: [
+    {
+      name: '../settings/codec',
+      message: 'Concrete actions must read and write settings through action-settings-resolver helpers.',
+    },
+    {
+      name: '../settings/resolver',
+      importNames: ['resolveWidgetSettings'],
+      message: 'Concrete actions must receive resolved settings from action-settings-resolver helpers.',
+    },
+    {
+      name: '../settings/widget-settings',
+      importNames: ['normalizeWidgetStoredSettings'],
+      message: 'Concrete actions must not normalize raw SDK settings directly.',
+    },
+  ],
+};
+
+const restrictedRendererImportRules = {
+  paths: [...restrictedSchemaHardeningImports.paths],
+  patterns: [
+    ...restrictedSchemaHardeningImports.patterns,
+    ...restrictedRendererSettingsImports.patterns,
+  ],
+};
+
+const restrictedConcreteActionImportRules = {
+  paths: [
+    ...restrictedSchemaHardeningImports.paths,
+    ...restrictedConcreteActionSettingsImports.paths,
+  ],
+  patterns: [...restrictedSchemaHardeningImports.patterns],
+};
 
 export default tseslint.config(
   {
@@ -53,12 +119,20 @@ export default tseslint.config(
     files: ['src/**/*.{ts,tsx}'],
     ignores: ['src/**/*.test.ts'],
     rules: {
+      'no-restricted-imports': ['error', restrictedSchemaHardeningImports],
       'no-restricted-syntax': ['error', ...restrictedLegacySettingSyntax],
+    },
+  },
+  {
+    files: ['src/{rendering,widgets}/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', restrictedRendererImportRules],
     },
   },
   {
     files: ['src/actions/single-metric-display*.ts'],
     rules: {
+      'no-restricted-imports': ['error', restrictedConcreteActionImportRules],
       'no-restricted-syntax': [
         'error',
         ...restrictedLegacySettingSyntax,
@@ -72,6 +146,7 @@ export default tseslint.config(
   {
     files: ['src/actions/{cpu-usage,disk,gpu-usage,net-speed,ram-usage}.ts'],
     rules: {
+      'no-restricted-imports': ['error', restrictedConcreteActionImportRules],
       'no-restricted-syntax': [
         'error',
         ...restrictedLegacySettingSyntax,
