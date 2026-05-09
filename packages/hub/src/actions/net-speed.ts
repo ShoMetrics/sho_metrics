@@ -23,6 +23,7 @@ import {
     serializeActionStoredSettings,
 } from "./action-settings-resolver";
 import type { ResolvedWidgetSettings } from "../settings/widget-settings";
+import { updateWidgetRuntimeCache } from "../settings/updates";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import {
     getNetworkDirectionStatusIcon,
@@ -613,13 +614,9 @@ function publishNetworkInterfaceOptions(event: WillAppearEvent): void {
         return;
     }
 
-    event.action.setSettings(serializeActionStoredSettings({
-        ...storedSettings,
-        runtimeCache: {
-            ...storedSettings.runtimeCache,
-            availableNetworkInterfaces,
-        },
-    })).catch(error => {
+    event.action.setSettings(serializeActionStoredSettings(updateWidgetRuntimeCache(storedSettings, {
+        availableNetworkInterfaces,
+    }))).catch(error => {
         log.error(() => `Failed to publish network interfaces: ${String(error)}`);
     });
 }
@@ -661,14 +658,10 @@ function publishNetworkScaleLearning(
         return;
     }
 
-    event.action.setSettings(serializeActionStoredSettings({
-        ...storedSettings,
-        runtimeCache: {
-            ...storedSettings.runtimeCache,
-            learnedMaximumDownloadSpeedMbps: nextDownloadMaximum,
-            learnedMaximumUploadSpeedMbps: nextUploadMaximum,
-        },
-    })).catch(error => {
+    event.action.setSettings(serializeActionStoredSettings(updateWidgetRuntimeCache(storedSettings, {
+        learnedMaximumDownloadSpeedMbps: nextDownloadMaximum,
+        learnedMaximumUploadSpeedMbps: nextUploadMaximum,
+    }))).catch(error => {
         log.error(() => `Failed to publish learned network scale: ${String(error)}`);
     });
 }
