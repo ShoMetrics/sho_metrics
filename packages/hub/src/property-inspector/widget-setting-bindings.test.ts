@@ -44,24 +44,24 @@ test("threshold bindings keep stored thresholds ordered", () => {
     assert.equal(lowSettings.appearanceOverrides?.highThreshold, 90);
 });
 
-test("disk metric kind binding updates polling frequency from real context", () => {
+test("disk metric kind binding writes only the selected metric kind", () => {
     const settings = writeSetting("diskMetricKind", "throughput", {
         actionKind: "disk",
         isWindows: false,
     });
 
     assert.equal(settings.metric?.diskMetricKind, "throughput");
-    assert.equal(settings.local?.pollingFrequencySeconds, 1);
+    assert.equal(settings.local, undefined);
 });
 
-test("disk metric kind binding respects Windows throughput restriction", () => {
+test("disk metric kind binding does not apply platform context to stored settings", () => {
     const settings = writeSetting("diskMetricKind", "throughput", {
         actionKind: "disk",
         isWindows: true,
     });
 
-    assert.equal(settings.metric?.diskMetricKind, "usage");
-    assert.equal(settings.local?.pollingFrequencySeconds, 60);
+    assert.equal(settings.metric?.diskMetricKind, "throughput");
+    assert.equal(settings.local, undefined);
 });
 
 function writeSetting(
