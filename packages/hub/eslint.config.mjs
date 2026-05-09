@@ -21,6 +21,13 @@ const restrictedMetricVisualAliasSyntax = [
   message: `${value} is a renderer/widget alias and must not be accepted as visual settings input.`,
 }));
 
+const restrictedConcreteActionRawSettingsSyntax = [
+  {
+    selector: 'MemberExpression[object.type="MemberExpression"][object.property.name="payload"][property.name="settings"]',
+    message: 'Concrete actions must read stored settings through action-settings-resolver helpers.',
+  },
+];
+
 export default tseslint.config(
   {
     ignores: [
@@ -63,7 +70,17 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/actions/metric-visual-settings.ts'],
+    files: ['src/actions/{cpu-usage,disk,gpu-usage,net-speed,ram-usage}.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...restrictedLegacySettingSyntax,
+        ...restrictedConcreteActionRawSettingsSyntax,
+      ],
+    },
+  },
+  {
+    files: ['src/settings/visual-adapter.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',

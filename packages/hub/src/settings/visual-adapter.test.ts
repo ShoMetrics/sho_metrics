@@ -1,54 +1,54 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveMetricVisualSettings } from "./metric-visual-settings";
+import { buildMetricVisualSettings } from "./visual-adapter";
 import {
     defaultAppearanceSettings,
     type AppearanceSettings,
-} from "../settings/widget-settings";
+} from "./widget-settings";
 
 test("graphic type maps normalized appearance settings to renderer names", () => {
-    assert.equal(resolveMetricVisualSettings(buildAppearanceSettings({ graphicType: "circular" })).graphicType, "circular");
-    assert.equal(resolveMetricVisualSettings(buildAppearanceSettings({ graphicType: "linear" })).graphicType, "linear");
-    assert.equal(resolveMetricVisualSettings(buildAppearanceSettings({ graphicType: "dashed-line" })).graphicType, "dashed-line");
+    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({ graphicType: "circular" })).graphicType, "circular");
+    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({ graphicType: "linear" })).graphicType, "linear");
+    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({ graphicType: "dashed-line" })).graphicType, "dashed-line");
 });
 
 test("circle style normalizes to curated presets", () => {
-    assert.equal(resolveMetricVisualSettings(buildAppearanceSettings({ circleStyle: "compact" })).circleStyle, "compact");
-    assert.equal(resolveMetricVisualSettings(buildAppearanceSettings({ circleStyle: "gauge" })).circleStyle, "gauge");
-    assert.equal(resolveMetricVisualSettings(buildAppearanceSettings({
+    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({ circleStyle: "compact" })).circleStyle, "compact");
+    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({ circleStyle: "gauge" })).circleStyle, "gauge");
+    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({
         circleStyle: "unknown" as AppearanceSettings["circleStyle"],
     })).circleStyle, "value");
 });
 
 test("invalid graphic type falls back to circular", () => {
-    assert.equal(resolveMetricVisualSettings(buildAppearanceSettings({
+    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({
         graphicType: "arc-gauge" as AppearanceSettings["graphicType"],
     })).graphicType, "circular");
 });
 
 test("graphic style resolves theme preset names with flat fallback", () => {
-    assert.equal(resolveMetricVisualSettings(buildAppearanceSettings({
+    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({
         graphicStyle: "cupertino-glass",
     })).graphicStyle, "cupertino-glass");
-    assert.equal(resolveMetricVisualSettings(buildAppearanceSettings({
+    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({
         graphicStyle: "unknown" as AppearanceSettings["graphicStyle"],
     })).graphicStyle, "flat");
-    assert.equal(resolveMetricVisualSettings(buildAppearanceSettings()).graphicStyle, "flat");
+    assert.equal(buildMetricVisualSettings(buildAppearanceSettings()).graphicStyle, "flat");
 });
 
 test("solid color mode uses validated color with fallback", () => {
-    assert.equal(resolveMetricVisualSettings(buildAppearanceSettings({
+    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({
         colorMode: "solid",
         solidColor: " #123456 ",
     })).colorConfig.solidColor, "#123456");
-    assert.equal(resolveMetricVisualSettings(buildAppearanceSettings({
+    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({
         colorMode: "solid",
         solidColor: "not-a-color",
     })).colorConfig.solidColor, "#3b82f6");
 });
 
 test("threshold values are clamped and ordered", () => {
-    const colorConfig = resolveMetricVisualSettings(buildAppearanceSettings({
+    const colorConfig = buildMetricVisualSettings(buildAppearanceSettings({
         lowThreshold: 90,
         highThreshold: 20,
     })).colorConfig;
@@ -64,7 +64,7 @@ test("threshold values are clamped and ordered", () => {
 });
 
 test("threshold colors use normalized appearance colors", () => {
-    const colorConfig = resolveMetricVisualSettings(buildAppearanceSettings({
+    const colorConfig = buildMetricVisualSettings(buildAppearanceSettings({
         colorLow: "#111111",
         colorMedium: "#222222",
         colorHigh: "#333333",
@@ -78,12 +78,12 @@ test("threshold colors use normalized appearance colors", () => {
 });
 
 test("line smoothing and grid options normalize to supported values", () => {
-    const highSettings = resolveMetricVisualSettings(buildAppearanceSettings({
+    const highSettings = buildMetricVisualSettings(buildAppearanceSettings({
         lineSmoothingPercent: 120,
         gridLineVisibility: "always",
         gridLineType: "vertical",
     }));
-    const defaultSettings = resolveMetricVisualSettings(buildAppearanceSettings({
+    const defaultSettings = buildMetricVisualSettings(buildAppearanceSettings({
         lineSmoothingPercent: Number.NaN,
         gridLineVisibility: "unknown" as AppearanceSettings["gridLineVisibility"],
         gridLineType: "unknown" as AppearanceSettings["gridLineType"],

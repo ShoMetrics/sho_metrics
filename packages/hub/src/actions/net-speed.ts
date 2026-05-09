@@ -19,7 +19,7 @@ import { resolveColor, type ColorConfig } from "../rendering/color-resolver";
 import { buildGlobalChannelColorConfig } from "../settings/global-appearance";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
-    normalizeActionStoredSettings,
+    readActionStoredSettings,
     serializeActionStoredSettings,
 } from "./action-settings-resolver";
 import type { ResolvedWidgetSettings } from "../settings/widget-settings";
@@ -608,7 +608,7 @@ function formatNetworkInterfaceDebugValue(networkInterface: NetworkInterfaceOpti
 function publishNetworkInterfaceOptions(event: WillAppearEvent): void {
     const availableNetworkInterfaces = JSON.stringify(networkInterfaceRegistry.getOptions());
 
-    const storedSettings = normalizeActionStoredSettings(event.payload.settings);
+    const storedSettings = readActionStoredSettings(event);
 
     if (storedSettings.runtimeCache?.availableNetworkInterfaces === availableNetworkInterfaces) {
         return;
@@ -649,7 +649,7 @@ function publishNetworkScaleLearning(
         selectedNetworkInterface,
     });
 
-    const storedSettings = normalizeActionStoredSettings(event.payload.settings);
+    const storedSettings = readActionStoredSettings(event);
 
     if (
         storedSettings.runtimeCache?.learnedMaximumDownloadSpeedMbps === nextDownloadMaximum

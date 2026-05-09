@@ -12,11 +12,11 @@ import {
 } from "../rendering/widget-data";
 import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
 import {
-    resolveMetricVisualSettings,
+    buildMetricVisualSettings,
     type MetricVisualSettings,
     type MetricVisualSettingsOverride,
     type ResolvedMetricVisualSettings,
-} from "./metric-visual-settings";
+} from "../settings/visual-adapter";
 
 interface BaseMetricDisplayOptions {
     event: WillAppearEvent;
@@ -92,7 +92,7 @@ export function buildMetricDisplayRenderPlan(options: {
     displayOptions: MetricDisplayOptions;
     isDial: boolean;
 }): MetricDisplayRenderPlan {
-    const visualSettings = resolveMetricVisualSettings({
+    const visualSettings = buildMetricVisualSettings({
         ...options.displayOptions.resolvedSettings,
         ...options.displayOptions.visualSettingsOverride,
     });
