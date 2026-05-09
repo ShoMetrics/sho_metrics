@@ -10,8 +10,12 @@ test("disk usage linear settings render label controls without usage-mode contro
     const markup = renderWidgetSettings({
         actionKind: "disk",
         settings: {
-            graphicType: "linear",
-            diskMetricKind: "usage",
+            appearanceOverrides: {
+                graphicType: "linear",
+            },
+            metric: {
+                diskMetricKind: "usage",
+            },
         },
     });
 
@@ -25,8 +29,12 @@ test("disk usage circular settings render usage display controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",
         settings: {
-            graphicType: "circular",
-            diskMetricKind: "usage",
+            appearanceOverrides: {
+                graphicType: "circular",
+            },
+            metric: {
+                diskMetricKind: "usage",
+            },
         },
     });
 
@@ -39,8 +47,12 @@ test("windows disk settings use usage controls when throughput is unavailable", 
         actionKind: "disk",
         isWindows: true,
         settings: {
-            graphicType: "linear",
-            diskMetricKind: "throughput",
+            appearanceOverrides: {
+                graphicType: "linear",
+            },
+            metric: {
+                diskMetricKind: "throughput",
+            },
         },
     });
 
@@ -54,8 +66,12 @@ test("network dual-channel settings render channel colors instead of usage color
     const markup = renderWidgetSettings({
         actionKind: "net-speed",
         settings: {
-            colorMode: "solid",
-            networkDirection: "both",
+            appearanceOverrides: {
+                colorMode: "solid",
+            },
+            metric: {
+                networkDirection: "both",
+            },
         },
     });
 
@@ -67,8 +83,12 @@ test("network single-channel settings render standard usage colors", () => {
     const markup = renderWidgetSettings({
         actionKind: "net-speed",
         settings: {
-            colorMode: "solid",
-            networkDirection: "download",
+            appearanceOverrides: {
+                colorMode: "solid",
+            },
+            metric: {
+                networkDirection: "download",
+            },
         },
     });
 
@@ -81,9 +101,15 @@ test("network mirrored trend disables grid controls in the panel", () => {
     const markup = renderWidgetSettings({
         actionKind: "net-speed",
         settings: {
-            graphicType: "dashed-line",
-            networkDirection: "both",
-            networkTrafficDisplayMode: "mirrored",
+            appearanceOverrides: {
+                graphicType: "dashed-line",
+            },
+            metric: {
+                networkDirection: "both",
+            },
+            local: {
+                networkTrafficDisplayMode: "mirrored",
+            },
         },
     });
 
@@ -97,10 +123,14 @@ test("disk throughput linear settings use standard colors", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",
         settings: {
-            colorMode: "solid",
-            diskMetricKind: "throughput",
-            diskThroughputDirection: "both",
-            graphicType: "linear",
+            appearanceOverrides: {
+                colorMode: "solid",
+                graphicType: "linear",
+            },
+            metric: {
+                diskMetricKind: "throughput",
+                diskThroughputDirection: "both",
+            },
         },
     });
 
@@ -113,10 +143,14 @@ test("disk throughput dual-channel settings render read/write colors", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",
         settings: {
-            colorMode: "solid",
-            diskMetricKind: "throughput",
-            diskThroughputDirection: "both",
-            graphicType: "circular",
+            appearanceOverrides: {
+                colorMode: "solid",
+                graphicType: "circular",
+            },
+            metric: {
+                diskMetricKind: "throughput",
+                diskThroughputDirection: "both",
+            },
         },
     });
 

@@ -5,7 +5,7 @@ import {
     type JsonObject,
 } from "../settings/codec";
 import {
-    normalizeWidgetStoredSettings,
+    sanitizeWidgetSettings,
     type ActionKind,
     type ResolvedWidgetSettings,
     type WidgetStoredSettings,
@@ -23,7 +23,7 @@ export function resolveActionSettings(rawSettings: unknown, actionKind: ActionKi
         actionKind,
         isWindows: process.platform === "win32",
     };
-    const storedSettings = normalizeActionStoredSettings(rawSettings);
+    const storedSettings = sanitizeWidgetSettings(readWidgetSettings(rawSettings));
 
     return resolveWidgetSettings({
         storedSettings,
@@ -32,12 +32,8 @@ export function resolveActionSettings(rawSettings: unknown, actionKind: ActionKi
     });
 }
 
-function normalizeActionStoredSettings(rawSettings: unknown): WidgetStoredSettings {
-    return normalizeWidgetStoredSettings(readWidgetSettings(rawSettings));
-}
-
 export function readActionStoredSettings(event: ActionSettingsEvent): WidgetStoredSettings {
-    return normalizeActionStoredSettings(event.payload.settings);
+    return sanitizeWidgetSettings(readWidgetSettings(event.payload.settings));
 }
 
 export function serializeActionStoredSettings(storedSettings: WidgetStoredSettings): JsonObject {

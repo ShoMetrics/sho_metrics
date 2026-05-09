@@ -7,7 +7,9 @@ test("PI context reads resolved disk polling defaults without persisting them", 
     const context = buildVisibilityContext({
         actionKind: "disk",
         settings: {
-            diskMetricKind: "usage",
+            metric: {
+                diskMetricKind: "usage",
+            },
         },
     });
 
@@ -21,8 +23,12 @@ test("PI context uses resolver platform rules for scenario visibility", () => {
         actionKind: "disk",
         isWindows: true,
         settings: {
-            graphicType: "linear",
-            diskMetricKind: "throughput",
+            appearanceOverrides: {
+                graphicType: "linear",
+            },
+            metric: {
+                diskMetricKind: "throughput",
+            },
         },
     });
 

@@ -7,7 +7,7 @@ import {
     type ActionKind,
 } from "./settings";
 import {
-    normalizeWidgetStoredSettings,
+    sanitizeWidgetSettings,
     type GlobalSettings,
     type WidgetStoredSettings,
 } from "../settings/widget-settings";
@@ -57,7 +57,7 @@ interface SettingsNotice {
 const initialState: PropertyInspectorState = {
     actionKind: "unknown",
     isWindows: false,
-    storedSettings: normalizeWidgetStoredSettings({}),
+    storedSettings: sanitizeWidgetSettings({}),
     globalSettings: {},
     settingsNotice: null,
     activeTab: "widget",
@@ -106,7 +106,7 @@ export function App({ client }: AppProps): React.JSX.Element {
 
     const resetWidgetSettings = (): void => {
         setState((currentState) => {
-            const nextStoredSettings = normalizeWidgetStoredSettings({});
+            const nextStoredSettings = sanitizeWidgetSettings({});
 
             client.setSettings(writeWidgetSettings(nextStoredSettings)).catch((error: Error) => {
                 setState((errorState) => ({
@@ -357,8 +357,8 @@ function readInitialWidgetSettings(connectionInfo: ConnectionInfo): {
     return {
         classification,
         storedSettings: classification === "present"
-            ? normalizeWidgetStoredSettings(readWidgetSettings(rawSettings))
-            : normalizeWidgetStoredSettings({}),
+            ? sanitizeWidgetSettings(readWidgetSettings(rawSettings))
+            : sanitizeWidgetSettings({}),
     };
 }
 
@@ -371,8 +371,8 @@ function readRefreshedWidgetSettings(rawSettings: unknown): {
     return {
         classification,
         storedSettings: classification === "present"
-            ? normalizeWidgetStoredSettings(readWidgetSettings(rawSettings))
-            : normalizeWidgetStoredSettings({}),
+            ? sanitizeWidgetSettings(readWidgetSettings(rawSettings))
+            : sanitizeWidgetSettings({}),
     };
 }
 

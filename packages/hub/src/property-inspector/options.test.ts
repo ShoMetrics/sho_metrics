@@ -11,19 +11,21 @@ import { buildVisibilityContext, type InspectorTestSettings } from "./test-conte
 
 test("network interface options include automatic and formatted valid interfaces only", () => {
     const context = buildContext({
-        availableNetworkInterfaces: JSON.stringify([
-            {
-                id: "eth0",
-                name: "Ethernet",
-                type: "wired",
-                isDefault: true,
-                speedMegabitsPerSecond: 2500,
-            },
-            {
-                id: "broken",
-                name: "Missing type",
-            },
-        ]),
+        runtimeCache: {
+            availableNetworkInterfaces: JSON.stringify([
+                {
+                    id: "eth0",
+                    name: "Ethernet",
+                    type: "wired",
+                    isDefault: true,
+                    speedMegabitsPerSecond: 2500,
+                },
+                {
+                    id: "broken",
+                    name: "Missing type",
+                },
+            ]),
+        },
     });
 
     assert.deepEqual(resolveNetworkInterfaceOptions(context), [
@@ -34,18 +36,20 @@ test("network interface options include automatic and formatted valid interfaces
 
 test("disk volume options include automatic and compact capacity labels", () => {
     const context = buildContext({
-        availableDiskVolumes: JSON.stringify([
-            buildDiskVolume({
-                id: "C:\\",
-                mount: "C:\\",
-                volumeLabel: "System",
-                sizeBytes: 1024 ** 3,
-            }),
-            {
-                id: "broken",
-                fs: "D:",
-            },
-        ]),
+        runtimeCache: {
+            availableDiskVolumes: JSON.stringify([
+                buildDiskVolume({
+                    id: "C:\\",
+                    mount: "C:\\",
+                    volumeLabel: "System",
+                    sizeBytes: 1024 ** 3,
+                }),
+                {
+                    id: "broken",
+                    fs: "D:",
+                },
+            ]),
+        },
     });
 
     assert.deepEqual(resolveDiskVolumeOptions(context), [
@@ -56,8 +60,10 @@ test("disk volume options include automatic and compact capacity labels", () => 
 
 test("invalid serialized option payloads safely fall back to automatic only", () => {
     const context = buildContext({
-        availableNetworkInterfaces: "{",
-        availableDiskVolumes: "{}",
+        runtimeCache: {
+            availableNetworkInterfaces: "{",
+            availableDiskVolumes: "{}",
+        },
     });
 
     assert.deepEqual(resolveNetworkInterfaceOptions(context), [{ value: "", label: "Automatic" }]);
@@ -66,14 +72,20 @@ test("invalid serialized option payloads safely fall back to automatic only", ()
 
 test("selected disk labels prefer explicit selection then root fallback", () => {
     const context = buildContext({
-        diskVolumeId: "D:\\Games",
-        availableDiskVolumes: JSON.stringify([
-            buildDiskVolume({ id: "C:\\", mount: "C:\\", volumeLabel: "System", storageKind: "ssd" }),
-            buildDiskVolume({ id: "D:\\Games", mount: "D:\\Games", volumeLabel: "Games", storageKind: "hdd" }),
-        ]),
+        metric: {
+            diskVolumeId: "D:\\Games",
+        },
+        runtimeCache: {
+            availableDiskVolumes: JSON.stringify([
+                buildDiskVolume({ id: "C:\\", mount: "C:\\", volumeLabel: "System", storageKind: "ssd" }),
+                buildDiskVolume({ id: "D:\\Games", mount: "D:\\Games", volumeLabel: "Games", storageKind: "hdd" }),
+            ]),
+        },
     });
     const automaticContext = buildContext({
-        availableDiskVolumes: readInspectorControlValue(context, "availableDiskVolumes"),
+        runtimeCache: {
+            availableDiskVolumes: readInspectorControlValue(context, "availableDiskVolumes") as string,
+        },
     });
 
     assert.equal(resolveSelectedDiskVolumeLabel(context), "Games");

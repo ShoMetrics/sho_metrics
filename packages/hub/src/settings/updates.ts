@@ -1,4 +1,4 @@
-import { normalizeWidgetStoredSettings } from "./widget-settings";
+import { sanitizeWidgetSettings } from "./widget-settings";
 import type { WidgetSettings } from "./model";
 
 type WidgetSettingsBranch =
@@ -45,8 +45,4 @@ export function updateWidgetRuntimeCache(
             ...patch,
         },
     });
-}
-
-function sanitizeWidgetSettings(settings: WidgetSettings): WidgetSettings {
-    return normalizeWidgetStoredSettings(settings);
 }
