@@ -4,9 +4,9 @@ import type {
     AppearanceScalarSettings,
     ColorRamp,
     DiskThroughputDefaultSettings,
+    GlobalSettings,
     MetricSettings,
     NetworkDefaultSettings,
-    PluginGlobalSettings,
     ResolvedWidgetSettings,
     WidgetLocalSettings,
     WidgetStoredSettings,
@@ -39,6 +39,6 @@ export interface VisibilityContext {
     actionKind: ActionKind;
     isWindows: boolean;
     settings: WidgetStoredSettings;
-    globalSettings: PluginGlobalSettings;
+    globalSettings: GlobalSettings;
     resolved: ResolvedWidgetSettings;
 }

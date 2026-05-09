@@ -3,6 +3,10 @@ import { ColorSetting } from "./controls/ColorSetting";
 import { GraphicTypeSetting } from "./controls/GraphicTypeSetting";
 import { NumberSetting } from "./controls/NumberSetting";
 import { SelectSetting } from "./controls/SelectSetting";
+import {
+    parseOptionalNumberControlValue,
+    parseRequiredNumberControlValue,
+} from "./control-values";
 import { InspectorItem } from "./components/InspectorItem";
 import { SettingsSection } from "./panels/SettingsSection";
 import {
@@ -12,56 +16,48 @@ import {
     scaleModeOptionList,
 } from "./panels/setting-options";
 import {
-    updatePluginAppearanceDefaults,
-    updatePluginAppearanceNumber,
-    updatePluginDiskThroughputDefaults,
-    updatePluginDiskThroughputOptionalNumber,
-    updatePluginNetworkDefaults,
-    updatePluginNetworkOptionalNumber,
-    updatePluginSettings,
-    updatePluginUsageColors,
-} from "./plugin-settings-updates";
-import {
-    type PluginGlobalSettings,
+    type AppearanceSettings,
+    type DiskThroughputDefaultSettings,
+    type GlobalSettings,
+    type NetworkDefaultSettings,
+    type ResolvedGlobalSettings,
 } from "../settings/widget-settings";
 
 interface PluginSettingsTabProps {
-    settings: PluginGlobalSettings;
-    onSettingsChange: (settings: PluginGlobalSettings) => void;
+    resolvedSettings: ResolvedGlobalSettings;
+    onSettingsPatch: (patch: GlobalSettings) => void;
 }
 
-export function PluginSettingsTab({ settings, onSettingsChange }: PluginSettingsTabProps): React.JSX.Element {
+export function PluginSettingsTab({ resolvedSettings, onSettingsPatch }: PluginSettingsTabProps): React.JSX.Element {
     return (
         <div>
             <OverrideSection
-                settings={settings}
-                onOverrideChange={(overrideWidgetAppearance) => {
-                    onSettingsChange(updatePluginSettings(settings, { overrideWidgetAppearance }));
-                }}
+                overrideWidgetAppearance={resolvedSettings.overrideWidgetAppearance}
+                onOverrideChange={(overrideWidgetAppearance) => onSettingsPatch({ overrideWidgetAppearance })}
             />
-            {settings.overrideWidgetAppearance && (
+            {resolvedSettings.overrideWidgetAppearance && (
                 <OverrideAppearanceSection
-                    settings={settings}
-                    onSettingsChange={onSettingsChange}
+                    appearance={resolvedSettings.appearanceDefaults}
+                    onAppearancePatch={(appearanceDefaults) => onSettingsPatch({ appearanceDefaults })}
                 />
             )}
             <NetworkDefaultsSection
-                settings={settings}
-                onSettingsChange={onSettingsChange}
+                network={resolvedSettings.networkDefaults}
+                onNetworkPatch={(networkDefaults) => onSettingsPatch({ networkDefaults })}
             />
             <DiskThroughputDefaultsSection
-                settings={settings}
-                onSettingsChange={onSettingsChange}
+                diskThroughput={resolvedSettings.diskThroughputDefaults}
+                onDiskThroughputPatch={(diskThroughputDefaults) => onSettingsPatch({ diskThroughputDefaults })}
             />
         </div>
     );
 }
 
 function OverrideSection({
-    settings,
+    overrideWidgetAppearance,
     onOverrideChange,
 }: {
-    settings: PluginGlobalSettings;
+    overrideWidgetAppearance: boolean;
     onOverrideChange: (overrideWidgetAppearance: boolean) => void;
 }): React.JSX.Element {
     return (
@@ -70,7 +66,7 @@ function OverrideSection({
                 <label className="override-toggle-row">
                     <input
                         type="checkbox"
-                        checked={settings.overrideWidgetAppearance}
+                        checked={overrideWidgetAppearance}
                         onChange={(event) => onOverrideChange(event.currentTarget.checked)}
                     />
                     <span className="override-toggle-title">Override Widgets</span>
@@ -84,69 +80,59 @@ function OverrideSection({
 }
 
 function OverrideAppearanceSection({
-    settings,
-    onSettingsChange,
+    appearance,
+    onAppearancePatch,
 }: {
-    settings: PluginGlobalSettings;
-    onSettingsChange: (settings: PluginGlobalSettings) => void;
+    appearance: AppearanceSettings;
+    onAppearancePatch: (patch: GlobalSettings["appearanceDefaults"]) => void;
 }): React.JSX.Element {
     return (
         <SettingsSection title="Override Appearance">
             <GraphicTypeSetting
-                value={settings.appearanceDefaults.graphicType}
-                onValueChange={(graphicType) => {
-                    onSettingsChange(updatePluginAppearanceDefaults(settings, { graphicType }));
-                }}
+                value={appearance.graphicType}
+                onValueChange={(graphicType) => onAppearancePatch({ graphicType })}
             />
             <CircleStyleSetting
-                value={settings.appearanceDefaults.circleStyle}
-                onValueChange={(circleStyle) => {
-                    onSettingsChange(updatePluginAppearanceDefaults(settings, { circleStyle }));
-                }}
-                disabled={settings.appearanceDefaults.graphicType !== "circular"}
+                value={appearance.circleStyle}
+                onValueChange={(circleStyle) => onAppearancePatch({ circleStyle })}
+                disabled={appearance.graphicType !== "circular"}
             />
             <SelectSetting
                 label="Graphic Style"
-                value={settings.appearanceDefaults.graphicStyle}
+                value={appearance.graphicStyle}
                 optionList={graphicStyleOptionList}
-                onValueChange={(graphicStyle) => {
-                    onSettingsChange(updatePluginAppearanceDefaults(settings, { graphicStyle }));
-                }}
+                onValueChange={(graphicStyle) => onAppearancePatch({ graphicStyle })}
             />
             <ColorSetting
                 label="Tint Color"
-                value={settings.appearanceDefaults.usageColors.solidColor}
-                onValueChange={(solidColor) => {
-                    onSettingsChange(updatePluginUsageColors(settings, { solidColor }));
-                }}
+                value={appearance.usageColors.solidColor}
+                onValueChange={(solidColor) => onAppearancePatch({ usageColors: { solidColor } })}
             />
             <SelectSetting
                 label="Color Mode"
-                value={settings.appearanceDefaults.colorMode}
+                value={appearance.colorMode}
                 optionList={colorModeOptionList}
-                onValueChange={(colorMode) => {
-                    onSettingsChange(updatePluginAppearanceDefaults(settings, { colorMode }));
-                }}
+                onValueChange={(colorMode) => onAppearancePatch({ colorMode })}
             />
-            {settings.appearanceDefaults.colorMode === "threshold" && (
+            {appearance.colorMode === "threshold" && (
                 <>
                     <NumberSetting
                         label="Low Threshold"
-                        value={String(settings.appearanceDefaults.lowThreshold)}
+                        value={String(appearance.lowThreshold)}
                         minimum={0}
                         step={1}
-                        onValueChange={(value) => {
-                            onSettingsChange(updatePluginAppearanceNumber(settings, "lowThreshold", value));
-                        }}
+                        onValueChange={(value) => onAppearancePatch({
+                            lowThreshold: parseRequiredNumberControlValue(value),
+                        })}
                     />
                     <NumberSetting
                         label="High Threshold"
-                        value={String(settings.appearanceDefaults.highThreshold)}
+                        value={String(appearance.highThreshold)}
                         minimum={0}
                         step={1}
-                        onValueChange={(value) => {
-                            onSettingsChange(updatePluginAppearanceNumber(settings, "highThreshold", value));
-                        }}
+                        onValueChange={(value) => onAppearancePatch({
+                            highThreshold: parseRequiredNumberControlValue(value),
+                        })}
                     />
                 </>
             )}
@@ -155,102 +141,88 @@ function OverrideAppearanceSection({
 }
 
 function NetworkDefaultsSection({
-    settings,
-    onSettingsChange,
+    network,
+    onNetworkPatch,
 }: {
-    settings: PluginGlobalSettings;
-    onSettingsChange: (settings: PluginGlobalSettings) => void;
+    network: NetworkDefaultSettings;
+    onNetworkPatch: (patch: GlobalSettings["networkDefaults"]) => void;
 }): React.JSX.Element {
-    const isAutoScale = settings.networkDefaults.networkScaleMode === "auto";
+    const isAutoScale = network.networkScaleMode === "auto";
 
     return (
         <SettingsSection title="Network Defaults">
             <SelectSetting
                 label="Unit"
-                value={settings.networkDefaults.networkUnitBase}
+                value={network.networkUnitBase}
                 optionList={networkUnitBaseOptionList}
-                onValueChange={(networkUnitBase) => {
-                    onSettingsChange(updatePluginNetworkDefaults(settings, { networkUnitBase }));
-                }}
+                onValueChange={(networkUnitBase) => onNetworkPatch({ networkUnitBase })}
             />
             <SelectSetting
                 label="Scale"
-                value={settings.networkDefaults.networkScaleMode}
+                value={network.networkScaleMode}
                 optionList={scaleModeOptionList}
-                onValueChange={(networkScaleMode) => {
-                    onSettingsChange(updatePluginNetworkDefaults(settings, { networkScaleMode }));
-                }}
+                onValueChange={(networkScaleMode) => onNetworkPatch({ networkScaleMode })}
             />
             <NumberSetting
                 label="Download Max"
-                value={String(settings.networkDefaults.maximumDownloadSpeedMbps ?? "")}
+                value={String(network.maximumDownloadSpeedMbps ?? "")}
                 minimum={1}
                 step={1}
                 disabled={isAutoScale}
-                onValueChange={(value) => {
-                    onSettingsChange(updatePluginNetworkOptionalNumber(settings, "maximumDownloadSpeedMbps", value));
-                }}
+                onValueChange={(value) => onNetworkPatch({
+                    maximumDownloadSpeedMbps: parseOptionalNumberControlValue(value),
+                })}
             />
             <NumberSetting
                 label="Upload Max"
-                value={String(settings.networkDefaults.maximumUploadSpeedMbps ?? "")}
+                value={String(network.maximumUploadSpeedMbps ?? "")}
                 minimum={1}
                 step={1}
                 disabled={isAutoScale}
-                onValueChange={(value) => {
-                    onSettingsChange(updatePluginNetworkOptionalNumber(settings, "maximumUploadSpeedMbps", value));
-                }}
+                onValueChange={(value) => onNetworkPatch({
+                    maximumUploadSpeedMbps: parseOptionalNumberControlValue(value),
+                })}
             />
         </SettingsSection>
     );
 }
 
 function DiskThroughputDefaultsSection({
-    settings,
-    onSettingsChange,
+    diskThroughput,
+    onDiskThroughputPatch,
 }: {
-    settings: PluginGlobalSettings;
-    onSettingsChange: (settings: PluginGlobalSettings) => void;
+    diskThroughput: DiskThroughputDefaultSettings;
+    onDiskThroughputPatch: (patch: GlobalSettings["diskThroughputDefaults"]) => void;
 }): React.JSX.Element {
-    const isAutoScale = settings.diskThroughputDefaults.diskThroughputScaleMode === "auto";
+    const isAutoScale = diskThroughput.diskThroughputScaleMode === "auto";
 
     return (
         <SettingsSection title="Disk Throughput Defaults">
             <SelectSetting
                 label="Scale"
-                value={settings.diskThroughputDefaults.diskThroughputScaleMode}
+                value={diskThroughput.diskThroughputScaleMode}
                 optionList={scaleModeOptionList}
-                onValueChange={(diskThroughputScaleMode) => {
-                    onSettingsChange(updatePluginDiskThroughputDefaults(settings, { diskThroughputScaleMode }));
-                }}
+                onValueChange={(diskThroughputScaleMode) => onDiskThroughputPatch({ diskThroughputScaleMode })}
             />
             <NumberSetting
                 label="Read Max"
-                value={String(settings.diskThroughputDefaults.maximumDiskReadThroughputMebibytesPerSecond ?? "")}
+                value={String(diskThroughput.maximumDiskReadThroughputMebibytesPerSecond ?? "")}
                 minimum={1}
                 step={1}
                 disabled={isAutoScale}
-                onValueChange={(value) => {
-                    onSettingsChange(updatePluginDiskThroughputOptionalNumber(
-                        settings,
-                        "maximumDiskReadThroughputMebibytesPerSecond",
-                        value,
-                    ));
-                }}
+                onValueChange={(value) => onDiskThroughputPatch({
+                    maximumDiskReadThroughputMebibytesPerSecond: parseOptionalNumberControlValue(value),
+                })}
             />
             <NumberSetting
                 label="Write Max"
-                value={String(settings.diskThroughputDefaults.maximumDiskWriteThroughputMebibytesPerSecond ?? "")}
+                value={String(diskThroughput.maximumDiskWriteThroughputMebibytesPerSecond ?? "")}
                 minimum={1}
                 step={1}
                 disabled={isAutoScale}
-                onValueChange={(value) => {
-                    onSettingsChange(updatePluginDiskThroughputOptionalNumber(
-                        settings,
-                        "maximumDiskWriteThroughputMebibytesPerSecond",
-                        value,
-                    ));
-                }}
+                onValueChange={(value) => onDiskThroughputPatch({
+                    maximumDiskWriteThroughputMebibytesPerSecond: parseOptionalNumberControlValue(value),
+                })}
             />
         </SettingsSection>
     );

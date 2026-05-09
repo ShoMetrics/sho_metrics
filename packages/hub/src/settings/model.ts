@@ -131,12 +131,11 @@ export interface GlobalSettings {
     [key: string]: unknown;
 }
 
-export interface PluginGlobalSettings {
+export interface ResolvedGlobalSettings {
     overrideWidgetAppearance: boolean;
     appearanceDefaults: AppearanceSettings;
     networkDefaults: NetworkDefaultSettings;
     diskThroughputDefaults: DiskThroughputDefaultSettings;
-    [key: string]: unknown;
 }
 
 export interface ResolvedWidgetSettings {

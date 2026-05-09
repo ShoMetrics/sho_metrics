@@ -406,7 +406,7 @@ function resolveDiskWidgetChannelColor(
 }
 
 function buildDiskChannelColorConfig(direction: Exclude<DiskThroughputDirection, "total">, settings: DiskSettings): ColorConfig {
-    const globalSettings = pluginGlobalSettingsStore.get();
+    const globalSettings = pluginGlobalSettingsStore.getResolved();
     if (globalSettings.overrideWidgetAppearance) {
         return buildGlobalChannelColorConfig(direction === "read" ? "primary" : "secondary", globalSettings);
     }

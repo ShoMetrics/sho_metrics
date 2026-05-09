@@ -535,7 +535,7 @@ function resolveNetworkWidgetChannelColor(direction: NetworkDirection, settings:
 }
 
 function buildNetworkChannelColorConfig(direction: NetworkDirection, settings: NetworkSpeedSettings): ColorConfig {
-    const globalSettings = pluginGlobalSettingsStore.get();
+    const globalSettings = pluginGlobalSettingsStore.getResolved();
     if (globalSettings.overrideWidgetAppearance) {
         return buildGlobalChannelColorConfig(direction === "download" ? "primary" : "secondary", globalSettings);
     }

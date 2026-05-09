@@ -1,9 +1,7 @@
-import { readPluginGlobalSettings } from "./codec";
 import {
     defaultAppearanceSettings,
     defaultDiskThroughputSettings,
     defaultNetworkSettings,
-    defaultPluginGlobalSettings,
     defaultRuntimeCache,
 } from "./defaults";
 import type {
@@ -21,7 +19,6 @@ import type {
     MetricSettings,
     NetworkDefaultSettings,
     NetworkDirection,
-    PluginGlobalSettings,
     WidgetLocalSettings,
     WidgetRuntimeCache,
     WidgetSettings,
@@ -34,7 +31,7 @@ export {
     defaultLocalSettings,
     defaultMetricSettings,
     defaultNetworkSettings,
-    defaultPluginGlobalSettings,
+    defaultResolvedGlobalSettings,
     defaultRuntimeCache,
 } from "./defaults";
 export type {
@@ -61,7 +58,7 @@ export type {
     NetworkDirection,
     NetworkTrafficDisplayMode,
     NetworkUnitBase,
-    PluginGlobalSettings,
+    ResolvedGlobalSettings,
     ResolvedWidgetSettings,
     ScaleMode,
     SettingsContext,
@@ -116,30 +113,6 @@ const RUNTIME_CACHE_KEYS = new Set<keyof WidgetRuntimeCache>([
     "learnedMaximumDiskReadThroughputMebibytesPerSecond",
     "learnedMaximumDiskWriteThroughputMebibytesPerSecond",
 ]);
-
-export function normalizePluginGlobalSettings(rawSettings: unknown): PluginGlobalSettings {
-    const settings = readPluginGlobalSettings(rawSettings);
-    const rawOverrideWidgetAppearance = settings.overrideWidgetAppearance as unknown;
-
-    return {
-        ...defaultPluginGlobalSettings,
-        ...settings,
-        overrideWidgetAppearance: rawOverrideWidgetAppearance === true
-            || rawOverrideWidgetAppearance === "true",
-        appearanceDefaults: normalizeAppearanceSettings(
-            readRecord(settings.appearanceDefaults),
-            defaultPluginGlobalSettings.appearanceDefaults,
-        ),
-        networkDefaults: normalizeNetworkSettings(
-            readRecord(settings.networkDefaults),
-            defaultPluginGlobalSettings.networkDefaults,
-        ),
-        diskThroughputDefaults: normalizeDiskThroughputSettings(
-            readRecord(settings.diskThroughputDefaults),
-            defaultPluginGlobalSettings.diskThroughputDefaults,
-        ),
-    };
-}
 
 export function normalizeWidgetStoredSettings(
     settings: WidgetSettings,

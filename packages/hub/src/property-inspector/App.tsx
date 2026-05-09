@@ -7,18 +7,19 @@ import {
     type ActionKind,
 } from "./settings";
 import {
-    defaultPluginGlobalSettings,
-    normalizePluginGlobalSettings,
     normalizeWidgetStoredSettings,
-    type PluginGlobalSettings,
+    type GlobalSettings,
     type WidgetStoredSettings,
 } from "../settings/widget-settings";
 import {
     classifyRawWidgetSettings,
+    readGlobalSettings,
     readWidgetSettings,
+    writeGlobalSettings,
     writeWidgetSettings,
     type RawWidgetSettingsClassification,
 } from "../settings/codec";
+import { resolveGlobalSettings } from "../settings/resolver";
 import {
     type ConnectionInfo,
     readActionUuid,
@@ -30,6 +31,7 @@ import {
     buildInspectorBindingContext,
     updateWidgetStoredSettings,
 } from "./widget-setting-bindings";
+import { applyGlobalSettingsPatch } from "./plugin-settings-updates";
 
 interface AppProps {
     client: StreamDeckPropertyInspectorClient;
@@ -39,7 +41,7 @@ interface PropertyInspectorState {
     actionKind: ActionKind;
     isWindows: boolean;
     storedSettings: WidgetStoredSettings;
-    globalSettings: PluginGlobalSettings;
+    globalSettings: GlobalSettings;
     settingsNotice: SettingsNotice | null;
     activeTab: "widget" | "plugin";
     loadError: string | null;
@@ -56,7 +58,7 @@ const initialState: PropertyInspectorState = {
     actionKind: "unknown",
     isWindows: false,
     storedSettings: normalizeWidgetStoredSettings({}),
-    globalSettings: { ...defaultPluginGlobalSettings },
+    globalSettings: {},
     settingsNotice: null,
     activeTab: "widget",
     loadError: null,
@@ -64,13 +66,17 @@ const initialState: PropertyInspectorState = {
 
 export function App({ client }: AppProps): React.JSX.Element {
     const [state, setState] = useState<PropertyInspectorState>(initialState);
+    const resolvedGlobalSettings = useMemo(
+        () => resolveGlobalSettings(state.globalSettings),
+        [state.globalSettings],
+    );
     const visibilityContext = useMemo(() => buildInspectorBindingContext({
         storedSettings: state.storedSettings,
         globalSettings: state.globalSettings,
         actionKind: state.actionKind,
         isWindows: state.isWindows,
     }), [state.storedSettings, state.globalSettings, state.actionKind, state.isWindows]);
-    const isGlobalAppearanceOverrideEnabled = state.globalSettings.overrideWidgetAppearance;
+    const isGlobalAppearanceOverrideEnabled = resolvedGlobalSettings.overrideWidgetAppearance;
 
     const updateSetting = (changedTarget: InspectorSettingTarget, changedValue: string): void => {
         setState((currentState) => {
@@ -117,18 +123,22 @@ export function App({ client }: AppProps): React.JSX.Element {
         });
     };
 
-    const updateGlobalSettings = (nextGlobalSettings: PluginGlobalSettings): void => {
-        setState((currentState) => ({
-            ...currentState,
-            globalSettings: nextGlobalSettings,
-            loadError: null,
-        }));
+    const updateGlobalSettings = (patch: GlobalSettings): void => {
+        setState((currentState) => {
+            const nextGlobalSettings = applyGlobalSettingsPatch(currentState.globalSettings, patch);
 
-        client.setGlobalSettings(nextGlobalSettings).catch((error: Error) => {
-            setState((errorState) => ({
-                ...errorState,
-                loadError: `Failed to save global settings: ${error.message}`,
-            }));
+            client.setGlobalSettings(writeGlobalSettings(nextGlobalSettings)).catch((error: Error) => {
+                setState((errorState) => ({
+                    ...errorState,
+                    loadError: `Failed to save global settings: ${error.message}`,
+                }));
+            });
+
+            return {
+                ...currentState,
+                globalSettings: nextGlobalSettings,
+                loadError: null,
+            };
         });
     };
 
@@ -191,7 +201,7 @@ export function App({ client }: AppProps): React.JSX.Element {
                 }
 
                 if (globalSettingsResult.status === "fulfilled") {
-                    nextState.globalSettings = normalizePluginGlobalSettings(readSettingsRecord(globalSettingsResult.value));
+                    nextState.globalSettings = readGlobalSettings(readSettingsRecord(globalSettingsResult.value));
                 } else {
                     nextState.settingsNotice = {
                         kind: "warning",
@@ -219,7 +229,7 @@ export function App({ client }: AppProps): React.JSX.Element {
 
         client.didReceiveGlobalSettings.subscribe((event) => {
             setState((currentState) => {
-                const globalSettings = normalizePluginGlobalSettings(readSettingsRecord(event));
+                const globalSettings = readGlobalSettings(readSettingsRecord(event));
 
                 return {
                     ...currentState,
@@ -278,8 +288,8 @@ export function App({ client }: AppProps): React.JSX.Element {
                 />
             ) : (
                 <PluginSettingsTab
-                    settings={state.globalSettings}
-                    onSettingsChange={updateGlobalSettings}
+                    resolvedSettings={resolvedGlobalSettings}
+                    onSettingsPatch={updateGlobalSettings}
                 />
             )}
         </div>

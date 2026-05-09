@@ -3,7 +3,7 @@ import type {
     DiskThroughputDefaultSettings,
     MetricSettings,
     NetworkDefaultSettings,
-    PluginGlobalSettings,
+    ResolvedGlobalSettings,
     WidgetLocalSettings,
     WidgetRuntimeCache,
 } from "./model";
@@ -90,7 +90,7 @@ export const defaultRuntimeCache: WidgetRuntimeCache = {
     learnedMaximumDiskWriteThroughputMebibytesPerSecond: undefined,
 };
 
-export const defaultPluginGlobalSettings: PluginGlobalSettings = {
+export const defaultResolvedGlobalSettings: ResolvedGlobalSettings = {
     overrideWidgetAppearance: false,
     appearanceDefaults: {
         ...defaultAppearanceSettings,

@@ -1,5 +1,4 @@
 import {
-    defaultPluginGlobalSettings,
     normalizeWidgetStoredSettings,
     type ActionKind,
 } from "../settings/widget-settings";
@@ -26,7 +25,7 @@ export function buildVisibilityContext(options: {
 
     return buildInspectorBindingContext({
         storedSettings,
-        globalSettings: { ...defaultPluginGlobalSettings },
+        globalSettings: {},
         actionKind: options.actionKind ?? "cpu-usage",
         isWindows: options.isWindows ?? false,
     });
