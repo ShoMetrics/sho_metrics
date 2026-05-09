@@ -1,5 +1,5 @@
 import type { AppearanceColorRampKey, ColorRamp } from "../../settings/widget-settings";
-import type { AppearanceColorTarget } from "../schema";
+import type { AppearanceColorTarget } from "../types";
 
 export function appearanceColorTarget(
     rampKey: AppearanceColorRampKey,

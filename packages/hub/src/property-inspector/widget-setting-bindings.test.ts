@@ -5,7 +5,7 @@ import {
     normalizeWidgetStoredSettings,
     type SettingsContext,
 } from "../settings/widget-settings";
-import type { InspectorSettingTarget } from "./schema";
+import type { InspectorSettingTarget } from "./types";
 import {
     buildInspectorBindingContext,
     readInspectorControlValue,

@@ -1,30 +1,30 @@
 import { InspectorItem } from "../components/InspectorItem";
-import type { SelectOption } from "../schema";
-import { readInspectorControlValue } from "../widget-setting-bindings";
+import type { SelectOption } from "../types";
 import {
     isOptionDisabled,
     resolveSelectedOptionValue,
-    type ScalarSettingControlProps,
+    type SettingControlProps,
 } from "./setting-control";
 
-interface PreviewOptionSettingProps extends ScalarSettingControlProps {
+interface PreviewOptionSettingProps<TValue extends string> extends SettingControlProps {
     label: string;
-    optionList: readonly SelectOption[];
-    buildPreviewUri: (value: string) => string;
+    value: TValue;
+    optionList: readonly SelectOption<TValue>[];
+    buildPreviewUri: (value: TValue) => string;
+    onValueChange: (value: TValue) => void;
 }
 
-export function PreviewOptionSetting({
-    target,
+export function PreviewOptionSetting<TValue extends string>({
     label,
+    value,
     optionList,
     buildPreviewUri,
-    context,
-    onSettingChange,
+    onValueChange,
     disabled = false,
-}: PreviewOptionSettingProps): React.JSX.Element {
+}: PreviewOptionSettingProps<TValue>): React.JSX.Element {
     const selectedValue = resolveSelectedOptionValue({
         optionList,
-        value: String(readInspectorControlValue(context, target)),
+        value,
     });
 
     return (
@@ -43,7 +43,7 @@ export function PreviewOptionSetting({
                             disabled={optionDisabled}
                             role="radio"
                             aria-checked={selectedValue === option.value}
-                            onClick={() => onSettingChange(target, option.value)}
+                            onClick={() => onValueChange(option.value)}
                         >
                             <img
                                 className="graphic-type-preview"

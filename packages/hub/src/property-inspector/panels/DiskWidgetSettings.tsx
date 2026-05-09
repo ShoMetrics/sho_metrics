@@ -4,17 +4,16 @@ import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { TextSetting } from "../controls/TextSetting";
 import { resolveDiskAutoLinearLabel, resolveDiskVolumeOptions, resolveSelectedDiskVolumeLabel } from "../options";
-import { readInspectorControlValue } from "../widget-setting-bindings";
 import {
     DiskThroughputChannelColorSettings,
-    LayoutSettings,
-    PollingSettings,
-    SparklineSettings,
     StandardColorSettings,
-    type WidgetSettingsPanelProps,
     usesDiskThroughputChannelColorSettings,
-} from "./CommonSettings";
+} from "./ColorSettings";
+import { LayoutSettings } from "./LayoutSettings";
+import { PollingSettings } from "./PollingSettings";
+import { SparklineSettings } from "./SparklineSettings";
 import { SettingsSection } from "./SettingsSection";
+import type { WidgetSettingsPanelProps } from "./panel-props";
 import {
     diskMetricKindOptionList,
     diskThroughputDirectionOptionList,
@@ -51,21 +50,19 @@ function DiskUsageSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
             <SettingsSection title="Metric">
                 <DiskMetricKindSetting {...props} />
                 <SelectSetting
-                    target="diskVolumeId"
                     label="Volume"
+                    value={props.context.resolved.metric.diskVolumeId}
                     optionList={resolveDiskVolumeOptions(props.context)}
-                    context={props.context}
-                    onSettingChange={props.onSettingChange}
+                    onValueChange={(value) => props.onSettingChange("diskVolumeId", value)}
                 />
             </SettingsSection>
             {(graphicType === "circular" || graphicType === "text") && (
                 <SettingsSection title="Scale & Units">
                     <SelectSetting
-                        target="diskUsageDisplayMode"
                         label="Usage Display"
+                        value={props.context.resolved.local.diskUsageDisplayMode}
                         optionList={diskUsageDisplayModeOptionList}
-                        context={props.context}
-                        onSettingChange={props.onSettingChange}
+                        onValueChange={(value) => props.onSettingChange("diskUsageDisplayMode", value)}
                     />
                 </SettingsSection>
             )}
@@ -83,37 +80,33 @@ function DiskThroughputSettings(props: WidgetSettingsPanelProps): React.JSX.Elem
             <SettingsSection title="Metric">
                 <DiskMetricKindSetting {...props} />
                 <SelectSetting
-                    target="diskThroughputDirection"
                     label="Direction"
+                    value={props.context.resolved.metric.diskThroughputDirection}
                     optionList={diskThroughputDirectionOptionList}
-                    context={props.context}
-                    onSettingChange={props.onSettingChange}
+                    onValueChange={(value) => props.onSettingChange("diskThroughputDirection", value)}
                 />
             </SettingsSection>
             <SettingsSection title="Scale & Units">
                 <SelectSetting
-                    target="diskThroughputScaleMode"
                     label="Scale"
+                    value={props.context.resolved.diskThroughput.diskThroughputScaleMode}
                     optionList={scaleModeOptionList}
-                    context={props.context}
-                    onSettingChange={props.onSettingChange}
+                    onValueChange={(value) => props.onSettingChange("diskThroughputScaleMode", value)}
                 />
                 <NumberSetting
-                    target="maximumDiskReadThroughputMebibytesPerSecond"
                     label="Read Max (MiB/s)"
+                    value={String(props.context.resolved.diskThroughput.maximumDiskReadThroughputMebibytesPerSecond ?? "")}
+                    onValueChange={(value) => props.onSettingChange("maximumDiskReadThroughputMebibytesPerSecond", value)}
                     minimum={1}
                     step={1}
-                    context={props.context}
-                    onSettingChange={props.onSettingChange}
                     disabled={isAutoScale}
                 />
                 <NumberSetting
-                    target="maximumDiskWriteThroughputMebibytesPerSecond"
                     label="Write Max (MiB/s)"
+                    value={String(props.context.resolved.diskThroughput.maximumDiskWriteThroughputMebibytesPerSecond ?? "")}
+                    onValueChange={(value) => props.onSettingChange("maximumDiskWriteThroughputMebibytesPerSecond", value)}
                     minimum={1}
                     step={1}
-                    context={props.context}
-                    onSettingChange={props.onSettingChange}
                     disabled={isAutoScale}
                 />
             </SettingsSection>
@@ -132,11 +125,10 @@ function DiskMetricKindSetting({
 
     return (
         <SelectSetting
-            target="diskMetricKind"
             label="Disk Metric"
+            value={context.resolved.metric.diskMetricKind}
             optionList={optionList}
-            context={context}
-            onSettingChange={onSettingChange}
+            onValueChange={(value) => onSettingChange("diskMetricKind", value)}
         />
     );
 }
@@ -146,7 +138,7 @@ function DiskUsageLabelSettings({
     onSettingChange,
 }: WidgetSettingsPanelProps): React.JSX.Element {
     const detectedLabel = resolveSelectedDiskVolumeLabel(context);
-    const currentLabel = String(readInspectorControlValue(context, "diskLinearLabel") ?? "");
+    const currentLabel = context.resolved.local.diskLinearLabel;
     const canUseDetectedLabel = detectedLabel.length > 0
         && detectedLabel !== "-"
         && currentLabel.trim() !== detectedLabel;
@@ -155,11 +147,10 @@ function DiskUsageLabelSettings({
         <SettingsSection title="Labels">
             <SectionHeading text="Display Label" />
             <TextSetting
-                target="diskLinearLabel"
                 label="Custom Label"
+                value={currentLabel}
+                onValueChange={(value) => onSettingChange("diskLinearLabel", value)}
                 placeholder={resolveDiskAutoLinearLabel(context)}
-                context={context}
-                onSettingChange={onSettingChange}
                 actionButton={(
                     <button
                         className="inline-action-button"

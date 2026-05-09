@@ -25,7 +25,7 @@ import {
     resolveIsWindowsPropertyInspector,
     type StreamDeckPropertyInspectorClient,
 } from "./stream-deck-client";
-import type { InspectorSettingTarget } from "./schema";
+import type { InspectorSettingTarget } from "./types";
 import {
     buildInspectorBindingContext,
     updateWidgetStoredSettings,

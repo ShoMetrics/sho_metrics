@@ -3,15 +3,15 @@ import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { resolveNetworkInterfaceOptions } from "../options";
 import {
-    LayoutSettings,
     NetworkChannelColorSettings,
-    PollingSettings,
-    SparklineSettings,
     StandardColorSettings,
-    type WidgetSettingsPanelProps,
     usesNetworkChannelColorSettings,
-} from "./CommonSettings";
+} from "./ColorSettings";
+import { LayoutSettings } from "./LayoutSettings";
+import { PollingSettings } from "./PollingSettings";
+import { SparklineSettings } from "./SparklineSettings";
 import { SettingsSection } from "./SettingsSection";
+import type { WidgetSettingsPanelProps } from "./panel-props";
 import {
     networkDirectionOptionList,
     networkUnitBaseOptionList,
@@ -42,11 +42,10 @@ function NetworkMetricSettings({
     return (
         <SettingsSection title="Metric">
             <SelectSetting
-                target="networkDirection"
                 label="Network Metric"
+                value={context.resolved.metric.networkDirection}
                 optionList={networkDirectionOptionList}
-                context={context}
-                onSettingChange={onSettingChange}
+                onValueChange={(value) => onSettingChange("networkDirection", value)}
             />
             {context.resolved.appearance.graphicType === "circular" && (
                 <InspectorItem className="note-item note-item-default">
@@ -54,11 +53,10 @@ function NetworkMetricSettings({
                 </InspectorItem>
             )}
             <SelectSetting
-                target="networkInterfaceId"
                 label="Network Interface"
+                value={context.resolved.metric.networkInterfaceId}
                 optionList={resolveNetworkInterfaceOptions(context)}
-                context={context}
-                onSettingChange={onSettingChange}
+                onValueChange={(value) => onSettingChange("networkInterfaceId", value)}
             />
         </SettingsSection>
     );
@@ -73,36 +71,32 @@ function NetworkScaleSettings({
     return (
         <SettingsSection title="Scale & Units">
             <SelectSetting
-                target="networkScaleMode"
                 label="Scale"
+                value={context.resolved.network.networkScaleMode}
                 optionList={scaleModeOptionList}
-                context={context}
-                onSettingChange={onSettingChange}
+                onValueChange={(value) => onSettingChange("networkScaleMode", value)}
             />
             <NumberSetting
-                target="maximumDownloadSpeedMbps"
                 label="Download Max (Mbps)"
+                value={String(context.resolved.network.maximumDownloadSpeedMbps ?? "")}
+                onValueChange={(value) => onSettingChange("maximumDownloadSpeedMbps", value)}
                 minimum={1}
                 step={1}
-                context={context}
-                onSettingChange={onSettingChange}
                 disabled={isAutoScale}
             />
             <NumberSetting
-                target="maximumUploadSpeedMbps"
                 label="Upload Max (Mbps)"
+                value={String(context.resolved.network.maximumUploadSpeedMbps ?? "")}
+                onValueChange={(value) => onSettingChange("maximumUploadSpeedMbps", value)}
                 minimum={1}
                 step={1}
-                context={context}
-                onSettingChange={onSettingChange}
                 disabled={isAutoScale}
             />
             <SelectSetting
-                target="networkUnitBase"
                 label="Unit"
+                value={context.resolved.network.networkUnitBase}
                 optionList={networkUnitBaseOptionList}
-                context={context}
-                onSettingChange={onSettingChange}
+                onValueChange={(value) => onSettingChange("networkUnitBase", value)}
             />
         </SettingsSection>
     );

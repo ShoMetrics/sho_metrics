@@ -4,7 +4,7 @@ import {
     type ActionKind,
 } from "../settings/widget-settings";
 import { readWidgetSettings } from "../settings/codec";
-import type { InspectorControlValue, PropertyInspectorSettingKey, VisibilityContext } from "./schema";
+import type { InspectorControlValue, PropertyInspectorSettingKey, VisibilityContext } from "./types";
 import { buildInspectorBindingContext } from "./widget-setting-bindings";
 
 export type InspectorTestSettings = Partial<Record<PropertyInspectorSettingKey, InspectorControlValue>>;

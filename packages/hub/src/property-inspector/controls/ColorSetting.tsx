@@ -1,28 +1,29 @@
+import { useId } from "react";
 import { InspectorItem } from "../components/InspectorItem";
 import { NativeColorInput } from "../components/NativeColorInput";
-import { resolveSettingTargetName, type AppearanceColorTarget } from "../schema";
-import { readInspectorControlValue } from "../widget-setting-bindings";
 import type { SettingControlProps } from "./setting-control";
 
 interface ColorSettingProps extends SettingControlProps {
-    target: AppearanceColorTarget;
     label: string;
+    value: string;
+    onValueChange: (value: string) => void;
 }
 
 export function ColorSetting({
-    target,
     label,
-    context,
-    onSettingChange,
+    value,
+    onValueChange,
     disabled = false,
 }: ColorSettingProps): React.JSX.Element {
+    const inputId = useId();
+
     return (
-        <InspectorItem label={label}>
+        <InspectorItem label={label} labelFor={inputId}>
             <NativeColorInput
-                dataSettingTarget={resolveSettingTargetName(target)}
-                value={String(readInspectorControlValue(context, target) ?? "")}
+                id={inputId}
+                value={value}
                 disabled={disabled}
-                onValueChange={(nextValue) => onSettingChange(target, nextValue)}
+                onValueChange={onValueChange}
             />
         </InspectorItem>
     );

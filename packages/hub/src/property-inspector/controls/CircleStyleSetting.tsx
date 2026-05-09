@@ -9,14 +9,18 @@ const circleStyleOptionList = [
     { value: "gauge", label: "Gauge" },
 ] as const;
 
-export function CircleStyleSetting(props: SettingControlProps): React.JSX.Element {
+interface CircleStyleSettingProps extends SettingControlProps {
+    value: CircleStyle;
+    onValueChange: (value: CircleStyle) => void;
+}
+
+export function CircleStyleSetting(props: CircleStyleSettingProps): React.JSX.Element {
     return (
         <PreviewOptionSetting
             {...props}
-            target="circleStyle"
             label="Circle Style"
             optionList={circleStyleOptionList}
-            buildPreviewUri={(value) => buildCircleStylePreviewUri(value as CircleStyle)}
+            buildPreviewUri={buildCircleStylePreviewUri}
         />
     );
 }

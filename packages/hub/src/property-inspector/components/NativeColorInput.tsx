@@ -1,6 +1,5 @@
 interface NativeColorInputProps {
     id?: string;
-    dataSettingTarget?: string;
     value: string;
     disabled?: boolean;
     onValueChange: (value: string) => void;
@@ -8,7 +7,6 @@ interface NativeColorInputProps {
 
 export function NativeColorInput({
     id,
-    dataSettingTarget,
     value,
     disabled = false,
     onValueChange,
@@ -25,7 +23,6 @@ export function NativeColorInput({
         >
             <input
                 id={id}
-                data-setting-target={dataSettingTarget}
                 type="color"
                 value={value}
                 disabled={disabled}
