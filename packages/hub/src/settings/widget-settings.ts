@@ -7,8 +7,12 @@ import {
     defaultRuntimeCache,
 } from "./defaults";
 import type {
+    AppearanceColorRampKey,
     AppearanceSettings,
+    AppearanceSettingsOverride,
+    AppearanceScalarSettings,
     CircleStyle,
+    ColorRamp,
     DiskMetricKind,
     DiskThroughputDefaultSettings,
     DiskThroughputDirection,
@@ -35,9 +39,14 @@ export {
 } from "./defaults";
 export type {
     ActionKind,
+    AppearanceColorRampKey,
     AppearanceSettings,
+    AppearanceSettingsOverride,
+    AppearanceScalarSettings,
     CircleStyle,
     ColorMode,
+    ColorRamp,
+    ColorRampOverride,
     DiskMetricKind,
     DiskThroughputDefaultSettings,
     DiskThroughputDirection,
@@ -63,36 +72,29 @@ export type {
     WidgetStoredSettings,
 } from "./model";
 
-const APPEARANCE_KEYS = new Set<keyof AppearanceSettings>([
+const APPEARANCE_SCALAR_KEYS = new Set<keyof AppearanceScalarSettings>([
     "graphicType",
     "circleStyle",
     "graphicStyle",
     "colorMode",
-    "solidColor",
     "lowThreshold",
     "highThreshold",
-    "colorLow",
-    "colorMedium",
-    "colorHigh",
     "lineSmoothingPercent",
     "gridLineVisibility",
     "gridLineType",
-    "downloadSolidColor",
-    "downloadColorLow",
-    "downloadColorMedium",
-    "downloadColorHigh",
-    "uploadSolidColor",
-    "uploadColorLow",
-    "uploadColorMedium",
-    "uploadColorHigh",
-    "diskReadSolidColor",
-    "diskReadColorLow",
-    "diskReadColorMedium",
-    "diskReadColorHigh",
-    "diskWriteSolidColor",
-    "diskWriteColorLow",
-    "diskWriteColorMedium",
-    "diskWriteColorHigh",
+]);
+const APPEARANCE_COLOR_RAMP_KEYS = new Set<AppearanceColorRampKey>([
+    "usageColors",
+    "downloadColors",
+    "uploadColors",
+    "diskReadColors",
+    "diskWriteColors",
+]);
+const COLOR_RAMP_KEYS = new Set<keyof ColorRamp>([
+    "solidColor",
+    "lowColor",
+    "mediumColor",
+    "highColor",
 ]);
 const NETWORK_KEYS = new Set<keyof NetworkDefaultSettings>([
     "networkScaleMode",
@@ -256,31 +258,25 @@ function normalizeAppearanceSettings(
         circleStyle: normalizeCircleStyle(rawSettings.circleStyle, fallbackSettings.circleStyle),
         graphicStyle: rawSettings.graphicStyle === "cupertino-glass" ? "cupertino-glass" : fallbackSettings.graphicStyle,
         colorMode: rawSettings.colorMode === "solid" ? "solid" : rawSettings.colorMode === "threshold" ? "threshold" : fallbackSettings.colorMode,
-        solidColor: normalizeHexColor(rawSettings.solidColor, fallbackSettings.solidColor),
+        usageColors: normalizeColorRamp(readRecord(rawSettings.usageColors), fallbackSettings.usageColors),
+        downloadColors: normalizeColorRamp(readRecord(rawSettings.downloadColors), fallbackSettings.downloadColors),
+        uploadColors: normalizeColorRamp(readRecord(rawSettings.uploadColors), fallbackSettings.uploadColors),
+        diskReadColors: normalizeColorRamp(readRecord(rawSettings.diskReadColors), fallbackSettings.diskReadColors),
+        diskWriteColors: normalizeColorRamp(readRecord(rawSettings.diskWriteColors), fallbackSettings.diskWriteColors),
         lowThreshold: thresholds.lowThreshold,
         highThreshold: thresholds.highThreshold,
-        colorLow: normalizeHexColor(rawSettings.colorLow, fallbackSettings.colorLow),
-        colorMedium: normalizeHexColor(rawSettings.colorMedium, fallbackSettings.colorMedium),
-        colorHigh: normalizeHexColor(rawSettings.colorHigh, fallbackSettings.colorHigh),
         lineSmoothingPercent: normalizeThreshold(rawSettings.lineSmoothingPercent, fallbackSettings.lineSmoothingPercent),
         gridLineVisibility: normalizeGridLineVisibility(rawSettings.gridLineVisibility, fallbackSettings.gridLineVisibility),
         gridLineType: rawSettings.gridLineType === "vertical" ? "vertical" : fallbackSettings.gridLineType,
-        downloadSolidColor: normalizeHexColor(rawSettings.downloadSolidColor, fallbackSettings.downloadSolidColor),
-        downloadColorLow: normalizeHexColor(rawSettings.downloadColorLow, fallbackSettings.downloadColorLow),
-        downloadColorMedium: normalizeHexColor(rawSettings.downloadColorMedium, fallbackSettings.downloadColorMedium),
-        downloadColorHigh: normalizeHexColor(rawSettings.downloadColorHigh, fallbackSettings.downloadColorHigh),
-        uploadSolidColor: normalizeHexColor(rawSettings.uploadSolidColor, fallbackSettings.uploadSolidColor),
-        uploadColorLow: normalizeHexColor(rawSettings.uploadColorLow, fallbackSettings.uploadColorLow),
-        uploadColorMedium: normalizeHexColor(rawSettings.uploadColorMedium, fallbackSettings.uploadColorMedium),
-        uploadColorHigh: normalizeHexColor(rawSettings.uploadColorHigh, fallbackSettings.uploadColorHigh),
-        diskReadSolidColor: normalizeHexColor(rawSettings.diskReadSolidColor, fallbackSettings.diskReadSolidColor),
-        diskReadColorLow: normalizeHexColor(rawSettings.diskReadColorLow, fallbackSettings.diskReadColorLow),
-        diskReadColorMedium: normalizeHexColor(rawSettings.diskReadColorMedium, fallbackSettings.diskReadColorMedium),
-        diskReadColorHigh: normalizeHexColor(rawSettings.diskReadColorHigh, fallbackSettings.diskReadColorHigh),
-        diskWriteSolidColor: normalizeHexColor(rawSettings.diskWriteSolidColor, fallbackSettings.diskWriteSolidColor),
-        diskWriteColorLow: normalizeHexColor(rawSettings.diskWriteColorLow, fallbackSettings.diskWriteColorLow),
-        diskWriteColorMedium: normalizeHexColor(rawSettings.diskWriteColorMedium, fallbackSettings.diskWriteColorMedium),
-        diskWriteColorHigh: normalizeHexColor(rawSettings.diskWriteColorHigh, fallbackSettings.diskWriteColorHigh),
+    };
+}
+
+function normalizeColorRamp(rawSettings: Record<string, unknown>, fallbackSettings: ColorRamp): ColorRamp {
+    return {
+        solidColor: normalizeHexColor(rawSettings.solidColor, fallbackSettings.solidColor),
+        lowColor: normalizeHexColor(rawSettings.lowColor, fallbackSettings.lowColor),
+        mediumColor: normalizeHexColor(rawSettings.mediumColor, fallbackSettings.mediumColor),
+        highColor: normalizeHexColor(rawSettings.highColor, fallbackSettings.highColor),
     };
 }
 
@@ -313,9 +309,20 @@ function normalizeDiskThroughputSettings(
     };
 }
 
-function normalizeAppearanceOverrides(rawSettings: Record<string, unknown>): Partial<AppearanceSettings> {
+function normalizeAppearanceOverrides(rawSettings: Record<string, unknown>): AppearanceSettingsOverride {
     const normalizedSettings = normalizeAppearanceSettings(rawSettings, defaultAppearanceSettings);
-    return copyPresentKeys(rawSettings, normalizedSettings, APPEARANCE_KEYS);
+    const output: AppearanceSettingsOverride = copyPresentKeys(rawSettings, normalizedSettings, APPEARANCE_SCALAR_KEYS);
+
+    for (const rampKey of APPEARANCE_COLOR_RAMP_KEYS) {
+        const rawColorRamp = readRecord(rawSettings[rampKey]);
+        const colorRampOverride = copyPresentKeys(rawColorRamp, normalizedSettings[rampKey], COLOR_RAMP_KEYS);
+
+        if (hasStoredValues(colorRampOverride)) {
+            output[rampKey] = colorRampOverride;
+        }
+    }
+
+    return output;
 }
 
 function normalizeNetworkOverrides(rawSettings: Record<string, unknown>): Partial<NetworkDefaultSettings> {

@@ -164,7 +164,9 @@ export class Disk extends MetricAction {
             circleStyleOverride: circleStyle,
             visualSettingsOverride: {
                 colorMode: settings.appearance.colorMode,
-                solidColor: settings.appearance.solidColor || DEFAULT_DISK_THROUGHPUT_COLOR,
+                usageColors: {
+                    solidColor: settings.appearance.usageColors.solidColor || DEFAULT_DISK_THROUGHPUT_COLOR,
+                },
             },
         });
     }
@@ -223,7 +225,7 @@ export class Disk extends MetricAction {
             }),
             visualSettingsOverride: {
                 colorMode: "solid",
-                solidColor: readColor,
+                usageColors: { solidColor: readColor },
             },
         });
     }
@@ -410,26 +412,28 @@ function buildDiskChannelColorConfig(direction: Exclude<DiskThroughputDirection,
     }
 
     if (direction === "read") {
+        const colors = settings.appearance.diskReadColors;
         return {
             mode: settings.appearance.colorMode === "threshold" ? "threshold" : "solid",
-            solidColor: resolveHexColor(settings.appearance.diskReadSolidColor, DEFAULT_DISK_READ_COLOR),
+            solidColor: resolveHexColor(colors.solidColor, DEFAULT_DISK_READ_COLOR),
             thresholds: buildDiskChannelThresholds({
                 settings,
-                lowColor: resolveHexColor(settings.appearance.diskReadColorLow, "#22c55e"),
-                mediumColor: resolveHexColor(settings.appearance.diskReadColorMedium, DEFAULT_DISK_READ_COLOR),
-                highColor: resolveHexColor(settings.appearance.diskReadColorHigh, "#60a5fa"),
+                lowColor: resolveHexColor(colors.lowColor, "#22c55e"),
+                mediumColor: resolveHexColor(colors.mediumColor, DEFAULT_DISK_READ_COLOR),
+                highColor: resolveHexColor(colors.highColor, "#60a5fa"),
             }),
         };
     }
 
+    const colors = settings.appearance.diskWriteColors;
     return {
         mode: settings.appearance.colorMode === "threshold" ? "threshold" : "solid",
-        solidColor: resolveHexColor(settings.appearance.diskWriteSolidColor, DEFAULT_DISK_WRITE_COLOR),
+        solidColor: resolveHexColor(colors.solidColor, DEFAULT_DISK_WRITE_COLOR),
         thresholds: buildDiskChannelThresholds({
             settings,
-            lowColor: resolveHexColor(settings.appearance.diskWriteColorLow, "#f97316"),
-            mediumColor: resolveHexColor(settings.appearance.diskWriteColorMedium, DEFAULT_DISK_WRITE_COLOR),
-            highColor: resolveHexColor(settings.appearance.diskWriteColorHigh, "#fb7185"),
+            lowColor: resolveHexColor(colors.lowColor, "#f97316"),
+            mediumColor: resolveHexColor(colors.mediumColor, DEFAULT_DISK_WRITE_COLOR),
+            highColor: resolveHexColor(colors.highColor, "#fb7185"),
         }),
     };
 }

@@ -144,7 +144,9 @@ export class NetSpeed extends MetricAction {
             circleStyleOverride: circleStyle,
             visualSettingsOverride: {
                 colorMode: settings.appearance.colorMode,
-                solidColor: settings.appearance.solidColor || resolveNetworkChannelColor(direction, settings),
+                usageColors: {
+                    solidColor: settings.appearance.usageColors.solidColor || resolveNetworkChannelColor(direction, settings),
+                },
             },
         });
     }
@@ -225,7 +227,7 @@ export class NetSpeed extends MetricAction {
             }),
             visualSettingsOverride: {
                 colorMode: "solid",
-                solidColor: uploadColor,
+                usageColors: { solidColor: uploadColor },
             },
         });
     }
@@ -298,7 +300,7 @@ export class NetSpeed extends MetricAction {
             }),
             visualSettingsOverride: {
                 colorMode: "solid",
-                solidColor: downloadColor,
+                usageColors: { solidColor: downloadColor },
             },
         });
     }
@@ -387,7 +389,9 @@ export class NetSpeed extends MetricAction {
             }),
             visualSettingsOverride: {
                 colorMode: "solid",
-                solidColor: resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData),
+                usageColors: {
+                    solidColor: resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData),
+                },
             },
         });
     }
@@ -537,26 +541,28 @@ function buildNetworkChannelColorConfig(direction: NetworkDirection, settings: N
     }
 
     if (direction === "download") {
+        const colors = settings.appearance.downloadColors;
         return {
             mode: settings.appearance.colorMode === "threshold" ? "threshold" : "solid",
-            solidColor: resolveHexColor(settings.appearance.downloadSolidColor, DEFAULT_DOWNLOAD_COLOR),
+            solidColor: resolveHexColor(colors.solidColor, DEFAULT_DOWNLOAD_COLOR),
             thresholds: buildChannelThresholds({
                 settings,
-                lowColor: resolveHexColor(settings.appearance.downloadColorLow, "#22c55e"),
-                mediumColor: resolveHexColor(settings.appearance.downloadColorMedium, DEFAULT_DOWNLOAD_COLOR),
-                highColor: resolveHexColor(settings.appearance.downloadColorHigh, "#60a5fa"),
+                lowColor: resolveHexColor(colors.lowColor, "#22c55e"),
+                mediumColor: resolveHexColor(colors.mediumColor, DEFAULT_DOWNLOAD_COLOR),
+                highColor: resolveHexColor(colors.highColor, "#60a5fa"),
             }),
         };
     }
 
+    const colors = settings.appearance.uploadColors;
     return {
         mode: settings.appearance.colorMode === "threshold" ? "threshold" : "solid",
-        solidColor: resolveHexColor(settings.appearance.uploadSolidColor, DEFAULT_UPLOAD_COLOR),
+        solidColor: resolveHexColor(colors.solidColor, DEFAULT_UPLOAD_COLOR),
         thresholds: buildChannelThresholds({
             settings,
-            lowColor: resolveHexColor(settings.appearance.uploadColorLow, "#f97316"),
-            mediumColor: resolveHexColor(settings.appearance.uploadColorMedium, DEFAULT_UPLOAD_COLOR),
-            highColor: resolveHexColor(settings.appearance.uploadColorHigh, "#f472b6"),
+            lowColor: resolveHexColor(colors.lowColor, "#f97316"),
+            mediumColor: resolveHexColor(colors.mediumColor, DEFAULT_UPLOAD_COLOR),
+            highColor: resolveHexColor(colors.highColor, "#f472b6"),
         }),
     };
 }

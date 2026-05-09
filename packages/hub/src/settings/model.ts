@@ -24,37 +24,44 @@ export type DiskUsageDisplayMode = "percentage" | "space";
 export type DiskThroughputDirection = "both" | "total" | "read" | "write";
 export type TemperatureUnit = "celsius" | "fahrenheit";
 
+export interface ColorRamp {
+    solidColor: string;
+    lowColor: string;
+    mediumColor: string;
+    highColor: string;
+}
+
+export type ColorRampOverride = Partial<ColorRamp>;
+
 export interface AppearanceSettings {
     graphicType: GraphicType;
     circleStyle: CircleStyle;
     graphicStyle: GraphicStyle;
     colorMode: ColorMode;
-    solidColor: string;
+    usageColors: ColorRamp;
+    downloadColors: ColorRamp;
+    uploadColors: ColorRamp;
+    diskReadColors: ColorRamp;
+    diskWriteColors: ColorRamp;
     lowThreshold: number;
     highThreshold: number;
-    colorLow: string;
-    colorMedium: string;
-    colorHigh: string;
     lineSmoothingPercent: number;
     gridLineVisibility: GridLineVisibility;
     gridLineType: GridLineType;
-    downloadSolidColor: string;
-    downloadColorLow: string;
-    downloadColorMedium: string;
-    downloadColorHigh: string;
-    uploadSolidColor: string;
-    uploadColorLow: string;
-    uploadColorMedium: string;
-    uploadColorHigh: string;
-    diskReadSolidColor: string;
-    diskReadColorLow: string;
-    diskReadColorMedium: string;
-    diskReadColorHigh: string;
-    diskWriteSolidColor: string;
-    diskWriteColorLow: string;
-    diskWriteColorMedium: string;
-    diskWriteColorHigh: string;
 }
+
+export type AppearanceColorRampKey =
+    | "usageColors"
+    | "downloadColors"
+    | "uploadColors"
+    | "diskReadColors"
+    | "diskWriteColors";
+
+export type AppearanceScalarSettings = Omit<AppearanceSettings, AppearanceColorRampKey>;
+
+export type AppearanceSettingsOverride =
+    Partial<AppearanceScalarSettings>
+    & Partial<Record<AppearanceColorRampKey, ColorRampOverride>>;
 
 export interface NetworkDefaultSettings {
     networkScaleMode: ScaleMode;
@@ -107,7 +114,7 @@ export interface WidgetRuntimeCache {
 export interface WidgetSettings {
     metric?: Partial<MetricSettings>;
     local?: Partial<WidgetLocalSettings>;
-    appearanceOverrides?: Partial<AppearanceSettings>;
+    appearanceOverrides?: AppearanceSettingsOverride;
     networkOverrides?: Partial<NetworkDefaultSettings>;
     diskThroughputOverrides?: Partial<DiskThroughputDefaultSettings>;
     runtimeCache?: Partial<WidgetRuntimeCache>;
@@ -118,7 +125,7 @@ export type WidgetStoredSettings = WidgetSettings;
 
 export interface GlobalSettings {
     overrideWidgetAppearance?: boolean;
-    appearanceDefaults?: Partial<AppearanceSettings>;
+    appearanceDefaults?: AppearanceSettingsOverride;
     networkDefaults?: Partial<NetworkDefaultSettings>;
     diskThroughputDefaults?: Partial<DiskThroughputDefaultSettings>;
     [key: string]: unknown;

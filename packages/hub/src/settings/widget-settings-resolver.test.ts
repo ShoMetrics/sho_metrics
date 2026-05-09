@@ -25,7 +25,9 @@ test("resolver cascades domain defaults, metric defaults, and widget overrides",
     const globalSettings = normalizePluginGlobalSettings({
         appearanceDefaults: {
             graphicType: "linear",
-            solidColor: "#111111",
+            usageColors: {
+                solidColor: "#111111",
+            },
         },
         networkDefaults: {
             networkUnitBase: "bit",
@@ -34,7 +36,9 @@ test("resolver cascades domain defaults, metric defaults, and widget overrides",
     });
     const storedSettings = normalizeWidgetStoredSettings({
         appearanceOverrides: {
-            solidColor: "#222222",
+            usageColors: {
+                solidColor: "#222222",
+            },
         },
         networkOverrides: {
             maximumUploadSpeedMbps: 50,
@@ -51,7 +55,7 @@ test("resolver cascades domain defaults, metric defaults, and widget overrides",
     });
 
     assert.equal(resolvedSettings.appearance.graphicType, "circular");
-    assert.equal(resolvedSettings.appearance.solidColor, "#222222");
+    assert.equal(resolvedSettings.appearance.usageColors.solidColor, "#222222");
     assert.equal(resolvedSettings.network.networkUnitBase, "bit");
     assert.equal(resolvedSettings.network.maximumDownloadSpeedMbps, 250);
     assert.equal(resolvedSettings.network.maximumUploadSpeedMbps, 50);
@@ -62,7 +66,9 @@ test("global appearance settings affect widgets only when override is enabled", 
     const globalSettings = normalizePluginGlobalSettings({
         appearanceDefaults: {
             graphicType: "linear",
-            solidColor: "#111111",
+            usageColors: {
+                solidColor: "#111111",
+            },
         },
     });
 
@@ -76,14 +82,16 @@ test("global appearance settings affect widgets only when override is enabled", 
     });
 
     assert.equal(resolvedSettings.appearance.graphicType, "circular");
-    assert.equal(resolvedSettings.appearance.solidColor, "#3b82f6");
+    assert.equal(resolvedSettings.appearance.usageColors.solidColor, "#3b82f6");
 });
 
 test("global appearance override wins without mutating widget overrides", () => {
     const storedSettings = normalizeWidgetStoredSettings({
         appearanceOverrides: {
             graphicType: "linear",
-            solidColor: "#222222",
+            usageColors: {
+                solidColor: "#222222",
+            },
         },
     });
     const globalSettings = normalizePluginGlobalSettings({
@@ -91,7 +99,9 @@ test("global appearance override wins without mutating widget overrides", () => 
         appearanceDefaults: {
             graphicType: "circular",
             circleStyle: "gauge",
-            solidColor: "#93c5fd",
+            usageColors: {
+                solidColor: "#93c5fd",
+            },
         },
     });
 
@@ -106,9 +116,9 @@ test("global appearance override wins without mutating widget overrides", () => 
 
     assert.equal(resolvedSettings.appearance.graphicType, "circular");
     assert.equal(resolvedSettings.appearance.circleStyle, "gauge");
-    assert.equal(resolvedSettings.appearance.solidColor, "#93c5fd");
+    assert.equal(resolvedSettings.appearance.usageColors.solidColor, "#93c5fd");
     assert.equal(storedSettings.appearanceOverrides?.graphicType, "linear");
-    assert.equal(storedSettings.appearanceOverrides?.solidColor, "#222222");
+    assert.equal(storedSettings.appearanceOverrides?.usageColors?.solidColor, "#222222");
 });
 
 test("runtime cache participates only in auto scale resolution", () => {

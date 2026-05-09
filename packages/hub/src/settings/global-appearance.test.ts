@@ -15,7 +15,9 @@ test("global appearance settings normalize unsupported values", () => {
             graphicType: "linear",
             circleStyle: "gauge",
             graphicStyle: "unknown",
-            solidColor: "bad",
+            usageColors: {
+                solidColor: "bad",
+            },
             colorMode: "threshold",
             lowThreshold: 90,
             highThreshold: 20,
@@ -26,7 +28,7 @@ test("global appearance settings normalize unsupported values", () => {
     assert.equal(settings.appearanceDefaults.graphicType, "linear");
     assert.equal(settings.appearanceDefaults.circleStyle, "gauge");
     assert.equal(settings.appearanceDefaults.graphicStyle, "flat");
-    assert.equal(settings.appearanceDefaults.solidColor, "#3b82f6");
+    assert.equal(settings.appearanceDefaults.usageColors.solidColor, "#3b82f6");
     assert.equal(settings.appearanceDefaults.colorMode, "threshold");
     assert.equal(settings.appearanceDefaults.lowThreshold, 20);
     assert.equal(settings.appearanceDefaults.highThreshold, 90);
@@ -45,7 +47,9 @@ test("global override replaces widget appearance without mutating non-appearance
             graphicType: "circular",
             circleStyle: "gauge",
             graphicStyle: "cupertino-glass",
-            solidColor: "#111827",
+            usageColors: {
+                solidColor: "#111827",
+            },
             colorMode: "solid",
         },
     }));
@@ -53,7 +57,7 @@ test("global override replaces widget appearance without mutating non-appearance
     assert.equal(settings.graphicType, "circular");
     assert.equal(settings.circleStyle, "gauge");
     assert.equal(settings.graphicStyle, "cupertino-glass");
-    assert.equal(settings.solidColor, "#111827");
+    assert.equal(settings.usageColors.solidColor, "#111827");
     assert.equal(settings.lineSmoothingPercent, 25);
 });
 
@@ -74,7 +78,9 @@ test("global channel color config maps primary to one channel and secondary to t
     const settings = normalizePluginGlobalSettings({
         overrideWidgetAppearance: true,
         appearanceDefaults: {
-            solidColor: "#3b82f6",
+            usageColors: {
+                solidColor: "#3b82f6",
+            },
             colorMode: "threshold",
         },
     });
