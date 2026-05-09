@@ -1,218 +1,71 @@
-export type ActionKind =
-    | "cpu-usage"
-    | "net-speed"
-    | "ram"
-    | "disk"
-    | "gpu-usage"
-    | "gpu-temp"
-    | "gpu-vram"
-    | "gpu-power"
-    | "unknown";
+import { readPluginGlobalSettings, readWidgetSettings } from "./codec";
+import {
+    defaultAppearanceSettings,
+    defaultDiskThroughputSettings,
+    defaultLocalSettings,
+    defaultMetricSettings,
+    defaultNetworkSettings,
+    defaultPluginGlobalSettings,
+    defaultRuntimeCache,
+} from "./defaults";
+import type {
+    ActionKind,
+    AppearanceSettings,
+    CircleStyle,
+    DiskMetricKind,
+    DiskThroughputDefaultSettings,
+    DiskThroughputDirection,
+    GraphicType,
+    GridLineVisibility,
+    MetricSettings,
+    NetworkDefaultSettings,
+    NetworkDirection,
+    PluginGlobalSettings,
+    ResolvedWidgetSettings,
+    SettingsContext,
+    WidgetLocalSettings,
+    WidgetRuntimeCache,
+    WidgetStoredSettings,
+} from "./model";
 
-export type GraphicType = "circular" | "text" | "linear" | "dashed-line";
-export type CircleStyle = "value" | "compact" | "gauge";
-export type GraphicStyle = "flat" | "cupertino-glass";
-export type ColorMode = "threshold" | "solid";
-export type GridLineVisibility = "adaptive" | "always" | "none";
-export type GridLineType = "horizontal" | "vertical";
-export type NetworkDirection = "both" | "download" | "upload";
-export type NetworkTrafficDisplayMode = "overlay" | "mirrored";
-export type NetworkUnitBase = "byte" | "bit";
-export type ScaleMode = "auto" | "custom";
-export type DiskMetricKind = "usage" | "throughput";
-export type DiskUsageDisplayMode = "percentage" | "space";
-export type DiskThroughputDirection = "both" | "total" | "read" | "write";
-export type TemperatureUnit = "celsius" | "fahrenheit";
-
-export interface AppearanceSettings {
-    graphicType: GraphicType;
-    circleStyle: CircleStyle;
-    graphicStyle: GraphicStyle;
-    colorMode: ColorMode;
-    solidColor: string;
-    lowThreshold: number;
-    highThreshold: number;
-    colorLow: string;
-    colorMedium: string;
-    colorHigh: string;
-    lineSmoothingPercent: number;
-    gridLineVisibility: GridLineVisibility;
-    gridLineType: GridLineType;
-    downloadSolidColor: string;
-    downloadColorLow: string;
-    downloadColorMedium: string;
-    downloadColorHigh: string;
-    uploadSolidColor: string;
-    uploadColorLow: string;
-    uploadColorMedium: string;
-    uploadColorHigh: string;
-    diskReadSolidColor: string;
-    diskReadColorLow: string;
-    diskReadColorMedium: string;
-    diskReadColorHigh: string;
-    diskWriteSolidColor: string;
-    diskWriteColorLow: string;
-    diskWriteColorMedium: string;
-    diskWriteColorHigh: string;
-}
-
-export interface NetworkDefaultSettings {
-    networkScaleMode: ScaleMode;
-    maximumDownloadSpeedMbps: number | undefined;
-    maximumUploadSpeedMbps: number | undefined;
-    networkUnitBase: NetworkUnitBase;
-}
-
-export interface DiskThroughputDefaultSettings {
-    diskThroughputScaleMode: ScaleMode;
-    maximumDiskReadThroughputMebibytesPerSecond: number | undefined;
-    maximumDiskWriteThroughputMebibytesPerSecond: number | undefined;
-}
-
-export interface MetricSettings {
-    /**
-     * Required per-widget identity/source settings. This is intentionally
-     * complete rather than sparse: every widget must know what it displays.
-     */
-    networkDirection: NetworkDirection;
-    networkInterfaceId: string;
-    diskMetricKind: DiskMetricKind;
-    diskVolumeId: string;
-    diskThroughputDirection: DiskThroughputDirection;
-}
-
-export interface WidgetLocalSettings {
-    /**
-     * Local settings are per-widget behavior/content choices, not plugin-level
-     * style defaults. They do not participate in global cascade.
-     */
-    pollingFrequencySeconds: number;
-    networkTrafficDisplayMode: NetworkTrafficDisplayMode;
-    diskUsageDisplayMode: DiskUsageDisplayMode;
-    diskLinearLabel: string;
-    maximumTemperatureCelsius: number;
-    maximumGpuPowerWatts: number | undefined;
-    temperatureUnit: TemperatureUnit;
-}
-
-export interface WidgetRuntimeCache {
-    availableNetworkInterfaces: string;
-    availableDiskVolumes: string;
-    learnedMaximumDownloadSpeedMbps: number | undefined;
-    learnedMaximumUploadSpeedMbps: number | undefined;
-    learnedMaximumDiskReadThroughputMebibytesPerSecond: number | undefined;
-    learnedMaximumDiskWriteThroughputMebibytesPerSecond: number | undefined;
-}
-
-export interface WidgetStoredSettings {
-    metric: MetricSettings;
-    local: WidgetLocalSettings;
-    appearanceOverrides: Partial<AppearanceSettings>;
-    networkOverrides: Partial<NetworkDefaultSettings>;
-    diskThroughputOverrides: Partial<DiskThroughputDefaultSettings>;
-    runtimeCache: WidgetRuntimeCache;
-    [key: string]: unknown;
-}
-
-export interface PluginGlobalSettings {
-    overrideWidgetAppearance: boolean;
-    appearanceDefaults: AppearanceSettings;
-    networkDefaults: NetworkDefaultSettings;
-    diskThroughputDefaults: DiskThroughputDefaultSettings;
-    [key: string]: unknown;
-}
-
-export interface ResolvedWidgetSettings {
-    metric: MetricSettings;
-    local: WidgetLocalSettings;
-    appearance: AppearanceSettings;
-    network: NetworkDefaultSettings;
-    diskThroughput: DiskThroughputDefaultSettings;
-}
-
-export interface SettingsContext {
-    actionKind: ActionKind;
-    isWindows: boolean;
-}
-
-export const defaultAppearanceSettings: AppearanceSettings = {
-    graphicType: "circular",
-    circleStyle: "value",
-    graphicStyle: "flat",
-    colorMode: "threshold",
-    solidColor: "#3b82f6",
-    lowThreshold: 30,
-    highThreshold: 70,
-    colorLow: "#22c55e",
-    colorMedium: "#eab308",
-    colorHigh: "#ef4444",
-    lineSmoothingPercent: 75,
-    gridLineVisibility: "adaptive",
-    gridLineType: "horizontal",
-    downloadSolidColor: "#3b82f6",
-    downloadColorLow: "#22c55e",
-    downloadColorMedium: "#3b82f6",
-    downloadColorHigh: "#60a5fa",
-    uploadSolidColor: "#ef4444",
-    uploadColorLow: "#f97316",
-    uploadColorMedium: "#ef4444",
-    uploadColorHigh: "#f472b6",
-    diskReadSolidColor: "#38bdf8",
-    diskReadColorLow: "#22c55e",
-    diskReadColorMedium: "#38bdf8",
-    diskReadColorHigh: "#60a5fa",
-    diskWriteSolidColor: "#f472b6",
-    diskWriteColorLow: "#f97316",
-    diskWriteColorMedium: "#f472b6",
-    diskWriteColorHigh: "#fb7185",
-};
-
-export const defaultNetworkSettings: NetworkDefaultSettings = {
-    networkScaleMode: "auto",
-    maximumDownloadSpeedMbps: undefined,
-    maximumUploadSpeedMbps: undefined,
-    networkUnitBase: "byte",
-};
-
-export const defaultDiskThroughputSettings: DiskThroughputDefaultSettings = {
-    diskThroughputScaleMode: "auto",
-    maximumDiskReadThroughputMebibytesPerSecond: undefined,
-    maximumDiskWriteThroughputMebibytesPerSecond: undefined,
-};
-
-export const defaultMetricSettings: MetricSettings = {
-    networkDirection: "both",
-    networkInterfaceId: "",
-    diskMetricKind: "usage",
-    diskVolumeId: "",
-    diskThroughputDirection: "both",
-};
-
-export const defaultLocalSettings: WidgetLocalSettings = {
-    pollingFrequencySeconds: 1,
-    networkTrafficDisplayMode: "mirrored",
-    diskUsageDisplayMode: "percentage",
-    diskLinearLabel: "",
-    maximumTemperatureCelsius: 100,
-    maximumGpuPowerWatts: undefined,
-    temperatureUnit: "celsius",
-};
-
-export const defaultRuntimeCache: WidgetRuntimeCache = {
-    availableNetworkInterfaces: "[]",
-    availableDiskVolumes: "[]",
-    learnedMaximumDownloadSpeedMbps: undefined,
-    learnedMaximumUploadSpeedMbps: undefined,
-    learnedMaximumDiskReadThroughputMebibytesPerSecond: undefined,
-    learnedMaximumDiskWriteThroughputMebibytesPerSecond: undefined,
-};
-
-export const defaultPluginGlobalSettings: PluginGlobalSettings = {
-    overrideWidgetAppearance: false,
-    appearanceDefaults: { ...defaultAppearanceSettings, colorMode: "solid" },
-    networkDefaults: { ...defaultNetworkSettings },
-    diskThroughputDefaults: { ...defaultDiskThroughputSettings },
-};
+export {
+    defaultAppearanceSettings,
+    defaultDiskThroughputSettings,
+    defaultLocalSettings,
+    defaultMetricSettings,
+    defaultNetworkSettings,
+    defaultPluginGlobalSettings,
+    defaultRuntimeCache,
+} from "./defaults";
+export type {
+    ActionKind,
+    AppearanceSettings,
+    CircleStyle,
+    ColorMode,
+    DiskMetricKind,
+    DiskThroughputDefaultSettings,
+    DiskThroughputDirection,
+    DiskUsageDisplayMode,
+    GlobalSettings,
+    GraphicStyle,
+    GraphicType,
+    GridLineType,
+    GridLineVisibility,
+    MetricSettings,
+    NetworkDefaultSettings,
+    NetworkDirection,
+    NetworkTrafficDisplayMode,
+    NetworkUnitBase,
+    PluginGlobalSettings,
+    ResolvedWidgetSettings,
+    ScaleMode,
+    SettingsContext,
+    TemperatureUnit,
+    WidgetLocalSettings,
+    WidgetRuntimeCache,
+    WidgetSettings,
+    WidgetStoredSettings,
+} from "./model";
 
 const APPEARANCE_KEYS = new Set<keyof AppearanceSettings>([
     "graphicType",
@@ -257,55 +110,59 @@ const DISK_THROUGHPUT_KEYS = new Set<keyof DiskThroughputDefaultSettings>([
     "maximumDiskWriteThroughputMebibytesPerSecond",
 ]);
 
-export function normalizePluginGlobalSettings(rawSettings: Record<string, unknown>): PluginGlobalSettings {
+export function normalizePluginGlobalSettings(rawSettings: unknown): PluginGlobalSettings {
+    const settings = readPluginGlobalSettings(rawSettings);
+    const rawOverrideWidgetAppearance = settings.overrideWidgetAppearance as unknown;
+
     return {
         ...defaultPluginGlobalSettings,
-        ...rawSettings,
-        overrideWidgetAppearance: rawSettings.overrideWidgetAppearance === true
-            || rawSettings.overrideWidgetAppearance === "true",
+        ...settings,
+        overrideWidgetAppearance: rawOverrideWidgetAppearance === true
+            || rawOverrideWidgetAppearance === "true",
         appearanceDefaults: normalizeAppearanceSettings(
-            readRecord(rawSettings.appearanceDefaults),
+            readRecord(settings.appearanceDefaults),
             defaultPluginGlobalSettings.appearanceDefaults,
         ),
         networkDefaults: normalizeNetworkSettings(
-            readRecord(rawSettings.networkDefaults),
+            readRecord(settings.networkDefaults),
             defaultPluginGlobalSettings.networkDefaults,
         ),
         diskThroughputDefaults: normalizeDiskThroughputSettings(
-            readRecord(rawSettings.diskThroughputDefaults),
+            readRecord(settings.diskThroughputDefaults),
             defaultPluginGlobalSettings.diskThroughputDefaults,
         ),
     };
 }
 
 export function normalizeWidgetStoredSettings(
-    rawSettings: Record<string, unknown>,
+    rawSettings: unknown,
     context: SettingsContext,
 ): WidgetStoredSettings {
+    const settings = readWidgetSettings(rawSettings);
     const metric = normalizeMetricSettings({
-        ...pickKnownFields(rawSettings, defaultMetricSettings),
-        ...readRecord(rawSettings.metric),
+        ...pickKnownFields(settings, defaultMetricSettings),
+        ...readRecord(settings.metric),
     }, context);
     const local = normalizeLocalSettings({
-        ...pickKnownFields(rawSettings, defaultLocalSettings),
+        ...pickKnownFields(settings, defaultLocalSettings),
         diskMetricKind: metric.diskMetricKind,
-        ...readRecord(rawSettings.local),
+        ...readRecord(settings.local),
     }, context);
     const appearanceOverrides = normalizeAppearanceOverrides({
-        ...pickKnownFields(rawSettings, defaultAppearanceSettings),
-        ...readRecord(rawSettings.appearanceOverrides),
+        ...pickKnownFields(settings, defaultAppearanceSettings),
+        ...readRecord(settings.appearanceOverrides),
     });
     const networkOverrides = normalizeNetworkOverrides({
-        ...pickKnownFields(rawSettings, defaultNetworkSettings),
-        ...readRecord(rawSettings.networkOverrides),
+        ...pickKnownFields(settings, defaultNetworkSettings),
+        ...readRecord(settings.networkOverrides),
     });
     const diskThroughputOverrides = normalizeDiskThroughputOverrides({
-        ...pickKnownFields(rawSettings, defaultDiskThroughputSettings),
-        ...readRecord(rawSettings.diskThroughputOverrides),
+        ...pickKnownFields(settings, defaultDiskThroughputSettings),
+        ...readRecord(settings.diskThroughputOverrides),
     });
     const runtimeCache = normalizeRuntimeCache({
-        ...pickKnownFields(rawSettings, defaultRuntimeCache),
-        ...readRecord(rawSettings.runtimeCache),
+        ...pickKnownFields(settings, defaultRuntimeCache),
+        ...readRecord(settings.runtimeCache),
     });
 
     return {
