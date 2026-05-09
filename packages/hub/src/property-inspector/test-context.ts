@@ -4,7 +4,7 @@ import {
     type WidgetStoredSettings,
 } from "../settings/widget-settings";
 import type { VisibilityContext } from "./types";
-import { buildInspectorBindingContext } from "./widget-setting-bindings";
+import { buildPropertyInspectorContext } from "./inspector-context";
 
 export type InspectorTestSettings = WidgetStoredSettings;
 
@@ -15,7 +15,7 @@ export function buildVisibilityContext(options: {
 } = {}): VisibilityContext {
     const storedSettings = sanitizeWidgetSettings(options.settings ?? {});
 
-    return buildInspectorBindingContext({
+    return buildPropertyInspectorContext({
         storedSettings,
         globalSettings: {},
         actionKind: options.actionKind ?? "cpu-usage",

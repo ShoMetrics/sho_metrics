@@ -171,7 +171,7 @@ function renderWidgetSettings(options: {
             settings: options.settings,
         }),
         isGlobalAppearanceOverrideEnabled: false,
-        onSettingChange: () => undefined,
+        onSettingsPatch: () => undefined,
         onResetWidgetSettings: () => undefined,
     }));
 }

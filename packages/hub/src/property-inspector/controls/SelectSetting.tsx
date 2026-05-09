@@ -3,18 +3,20 @@ import { InspectorItem } from "../components/InspectorItem";
 import type { SelectOption } from "../types";
 import {
     isOptionDisabled,
+    readSelectedOptionValue,
     resolveSelectedOptionValue,
     type SettingControlProps,
 } from "./setting-control";
+import type { SelectOptionValue } from "../types";
 
-interface SelectSettingProps<TValue extends string> extends SettingControlProps {
+interface SelectSettingProps<TValue extends SelectOptionValue> extends SettingControlProps {
     label: string;
     value: TValue;
     optionList: readonly SelectOption<TValue>[];
     onValueChange: (value: TValue) => void;
 }
 
-export function SelectSetting<TValue extends string>({
+export function SelectSetting<TValue extends SelectOptionValue>({
     label,
     value,
     optionList,
@@ -32,14 +34,23 @@ export function SelectSetting<TValue extends string>({
             <select
                 id={inputId}
                 className="native-select"
-                value={selectedValue}
+                value={String(selectedValue)}
                 disabled={disabled}
-                onChange={(event) => onValueChange(event.currentTarget.value as TValue)}
+                onChange={(event) => {
+                    const selectedOptionValue = readSelectedOptionValue({
+                        optionList,
+                        rawValue: event.currentTarget.value,
+                    });
+
+                    if (selectedOptionValue !== undefined) {
+                        onValueChange(selectedOptionValue);
+                    }
+                }}
             >
                 {optionList.map((option) => (
                     <option
                         key={option.value}
-                        value={option.value}
+                        value={String(option.value)}
                         disabled={isOptionDisabled(option)}
                     >
                         {option.label}

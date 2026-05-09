@@ -1,14 +1,14 @@
-import type { SelectOption } from "../types";
+import type { SelectOption, SelectOptionValue } from "../types";
 
 export interface SettingControlProps {
     disabled?: boolean;
 }
 
-export function isOptionDisabled(option: SelectOption): boolean {
+export function isOptionDisabled<TValue extends SelectOptionValue>(option: SelectOption<TValue>): boolean {
     return option.disabled === true;
 }
 
-export function resolveSelectedOptionValue<TValue extends string>(options: {
+export function resolveSelectedOptionValue<TValue extends SelectOptionValue>(options: {
     optionList: readonly SelectOption<TValue>[];
     value: TValue;
 }): TValue | "" {
@@ -19,6 +19,15 @@ export function resolveSelectedOptionValue<TValue extends string>(options: {
     return options.optionList.find(isSelectableOption)?.value ?? "";
 }
 
-function isSelectableOption(option: SelectOption): boolean {
+export function readSelectedOptionValue<TValue extends SelectOptionValue>(options: {
+    optionList: readonly SelectOption<TValue>[];
+    rawValue: string;
+}): TValue | undefined {
+    return options.optionList.find(option =>
+        String(option.value) === options.rawValue && isSelectableOption(option)
+    )?.value;
+}
+
+function isSelectableOption<TValue extends SelectOptionValue>(option: SelectOption<TValue>): boolean {
     return !isOptionDisabled(option);
 }

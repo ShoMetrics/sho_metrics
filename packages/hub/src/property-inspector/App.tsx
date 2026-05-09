@@ -9,8 +9,10 @@ import {
 import {
     sanitizeWidgetSettings,
     type GlobalSettings,
+    type WidgetSettings,
     type WidgetStoredSettings,
 } from "../settings/widget-settings";
+import { mergeWidgetSettingsPatch } from "../settings/updates";
 import {
     classifyRawWidgetSettings,
     readGlobalSettings,
@@ -26,11 +28,7 @@ import {
     resolveIsWindowsPropertyInspector,
     type StreamDeckPropertyInspectorClient,
 } from "./stream-deck-client";
-import type { InspectorControlValue, InspectorSettingTarget } from "./types";
-import {
-    buildInspectorBindingContext,
-    updateWidgetStoredSettings,
-} from "./widget-setting-bindings";
+import { buildPropertyInspectorContext } from "./inspector-context";
 import { applyGlobalSettingsPatch } from "./plugin-settings-updates";
 
 interface AppProps {
@@ -70,7 +68,7 @@ export function App({ client }: AppProps): React.JSX.Element {
         () => resolveGlobalSettings(state.globalSettings),
         [state.globalSettings],
     );
-    const visibilityContext = useMemo(() => buildInspectorBindingContext({
+    const visibilityContext = useMemo(() => buildPropertyInspectorContext({
         storedSettings: state.storedSettings,
         globalSettings: state.globalSettings,
         actionKind: state.actionKind,
@@ -78,16 +76,9 @@ export function App({ client }: AppProps): React.JSX.Element {
     }), [state.storedSettings, state.globalSettings, state.actionKind, state.isWindows]);
     const isGlobalAppearanceOverrideEnabled = resolvedGlobalSettings.overrideWidgetAppearance;
 
-    const updateSetting = (changedTarget: InspectorSettingTarget, changedValue: InspectorControlValue): void => {
+    const updateWidgetSettings = (patch: WidgetSettings): void => {
         setState((currentState) => {
-            const currentContext = buildContextFromState(currentState);
-
-            const nextStoredSettings = updateWidgetStoredSettings({
-                storedSettings: currentState.storedSettings,
-                target: changedTarget,
-                value: changedValue,
-                context: currentContext,
-            });
+            const nextStoredSettings = mergeWidgetSettingsPatch(currentState.storedSettings, patch);
 
             client.setSettings(writeWidgetSettings(nextStoredSettings)).catch((error: Error) => {
                 setState((errorState) => ({
@@ -283,7 +274,7 @@ export function App({ client }: AppProps): React.JSX.Element {
                     actionKind={state.actionKind}
                     context={visibilityContext}
                     isGlobalAppearanceOverrideEnabled={isGlobalAppearanceOverrideEnabled}
-                    onSettingChange={updateSetting}
+                    onSettingsPatch={updateWidgetSettings}
                     onResetWidgetSettings={resetWidgetSettings}
                 />
             ) : (
@@ -320,15 +311,6 @@ function SettingsNoticeView({ notice }: { notice: SettingsNotice }): React.JSX.E
             <p className="section-note">{notice.text}</p>
         </InspectorItem>
     );
-}
-
-function buildContextFromState(state: PropertyInspectorState): ReturnType<typeof buildInspectorBindingContext> {
-    return buildInspectorBindingContext({
-        storedSettings: state.storedSettings,
-        globalSettings: state.globalSettings,
-        actionKind: state.actionKind,
-        isWindows: state.isWindows,
-    });
 }
 
 function readSettingsRecord(payload: unknown): Record<string, unknown> {

@@ -37,7 +37,7 @@ export function NetworkWidgetSettings(props: WidgetSettingsPanelProps): React.JS
 
 function NetworkMetricSettings({
     context,
-    onSettingChange,
+    onSettingsPatch,
 }: WidgetSettingsPanelProps): React.JSX.Element {
     return (
         <SettingsSection title="Metric">
@@ -45,7 +45,9 @@ function NetworkMetricSettings({
                 label="Network Metric"
                 value={context.resolved.metric.networkDirection}
                 optionList={networkDirectionOptionList}
-                onValueChange={(value) => onSettingChange("networkDirection", value)}
+                onValueChange={(networkDirection) => onSettingsPatch({
+                    metric: { networkDirection },
+                })}
             />
             {context.resolved.appearance.graphicType === "circular" && (
                 <InspectorItem className="note-item note-item-default">
@@ -56,7 +58,9 @@ function NetworkMetricSettings({
                 label="Network Interface"
                 value={context.resolved.metric.networkInterfaceId}
                 optionList={resolveNetworkInterfaceOptions(context)}
-                onValueChange={(value) => onSettingChange("networkInterfaceId", value)}
+                onValueChange={(networkInterfaceId) => onSettingsPatch({
+                    metric: { networkInterfaceId },
+                })}
             />
         </SettingsSection>
     );
@@ -64,7 +68,7 @@ function NetworkMetricSettings({
 
 function NetworkScaleSettings({
     context,
-    onSettingChange,
+    onSettingsPatch,
 }: WidgetSettingsPanelProps): React.JSX.Element {
     const isAutoScale = context.resolved.network.networkScaleMode === "auto";
 
@@ -74,12 +78,19 @@ function NetworkScaleSettings({
                 label="Scale"
                 value={context.resolved.network.networkScaleMode}
                 optionList={scaleModeOptionList}
-                onValueChange={(value) => onSettingChange("networkScaleMode", value)}
+                onValueChange={(networkScaleMode) => onSettingsPatch({
+                    networkOverrides: { networkScaleMode },
+                })}
             />
             <NumberSetting
                 label="Download Max (Mbps)"
                 value={context.resolved.network.maximumDownloadSpeedMbps}
-                onValueChange={(value) => onSettingChange("maximumDownloadSpeedMbps", value)}
+                onValueChange={(maximumDownloadSpeedMbps) => onSettingsPatch({
+                    networkOverrides: {
+                        networkScaleMode: "custom",
+                        maximumDownloadSpeedMbps,
+                    },
+                })}
                 minimum={1}
                 step={1}
                 optional
@@ -88,7 +99,12 @@ function NetworkScaleSettings({
             <NumberSetting
                 label="Upload Max (Mbps)"
                 value={context.resolved.network.maximumUploadSpeedMbps}
-                onValueChange={(value) => onSettingChange("maximumUploadSpeedMbps", value)}
+                onValueChange={(maximumUploadSpeedMbps) => onSettingsPatch({
+                    networkOverrides: {
+                        networkScaleMode: "custom",
+                        maximumUploadSpeedMbps,
+                    },
+                })}
                 minimum={1}
                 step={1}
                 optional
@@ -98,7 +114,9 @@ function NetworkScaleSettings({
                 label="Unit"
                 value={context.resolved.network.networkUnitBase}
                 optionList={networkUnitBaseOptionList}
-                onValueChange={(value) => onSettingChange("networkUnitBase", value)}
+                onValueChange={(networkUnitBase) => onSettingsPatch({
+                    networkOverrides: { networkUnitBase },
+                })}
             />
         </SettingsSection>
     );

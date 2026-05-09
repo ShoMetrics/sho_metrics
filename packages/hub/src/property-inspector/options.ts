@@ -1,5 +1,4 @@
 import type { InspectorControlValue, SelectOption, VisibilityContext } from "./types";
-import { readInspectorControlValue } from "./widget-setting-bindings";
 
 interface NetworkInterfaceOption {
     [key: string]: InspectorControlValue;
@@ -22,11 +21,11 @@ interface DiskVolumeOption {
 }
 
 export function resolveNetworkInterfaceOptions(context: VisibilityContext): SelectOption[] {
-    return buildNetworkInterfaceOptions(readInspectorControlValue(context, "availableNetworkInterfaces"));
+    return buildNetworkInterfaceOptions(context.settings.runtimeCache?.availableNetworkInterfaces);
 }
 
 export function resolveDiskVolumeOptions(context: VisibilityContext): SelectOption[] {
-    return buildDiskVolumeOptions(readInspectorControlValue(context, "availableDiskVolumes"));
+    return buildDiskVolumeOptions(context.settings.runtimeCache?.availableDiskVolumes);
 }
 
 function buildNetworkInterfaceOptions(value: InspectorControlValue): SelectOption[] {
@@ -83,10 +82,10 @@ export function resolveDiskAutoLinearLabel(context: VisibilityContext): string {
 }
 
 function resolveSelectedDiskVolume(context: VisibilityContext): DiskVolumeOption | null {
-    const diskVolumes = parseDiskVolumeOptions(readInspectorControlValue(context, "availableDiskVolumes"));
-    const selectedDiskVolumeId = readInspectorControlValue(context, "diskVolumeId");
+    const diskVolumes = parseDiskVolumeOptions(context.settings.runtimeCache?.availableDiskVolumes);
+    const selectedDiskVolumeId = context.resolved.metric.diskVolumeId;
 
-    if (typeof selectedDiskVolumeId === "string" && selectedDiskVolumeId.length > 0) {
+    if (selectedDiskVolumeId.length > 0) {
         return diskVolumes.find(diskVolume => diskVolume.id === selectedDiskVolumeId) ?? null;
     }
 

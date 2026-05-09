@@ -1,5 +1,6 @@
 import { InspectorItem } from "../components/InspectorItem";
-import type { InspectorControlValue, InspectorSettingTarget, VisibilityContext } from "../types";
+import type { WidgetSettings } from "../../settings/widget-settings";
+import type { VisibilityContext } from "../types";
 import type { ActionKind } from "../settings";
 import { DefaultWidgetSettings } from "./DefaultWidgetSettings";
 import { DiskWidgetSettings } from "./DiskWidgetSettings";
@@ -10,7 +11,7 @@ interface WidgetSettingsTabProps {
     actionKind: ActionKind;
     context: VisibilityContext;
     isGlobalAppearanceOverrideEnabled: boolean;
-    onSettingChange: (target: InspectorSettingTarget, value: InspectorControlValue) => void;
+    onSettingsPatch: (patch: WidgetSettings) => void;
     onResetWidgetSettings: () => void;
 }
 
@@ -18,12 +19,12 @@ export function WidgetSettingsTab({
     actionKind,
     context,
     isGlobalAppearanceOverrideEnabled,
-    onSettingChange,
+    onSettingsPatch,
     onResetWidgetSettings,
 }: WidgetSettingsTabProps): React.JSX.Element {
     const panelProps = {
         context,
-        onSettingChange,
+        onSettingsPatch,
         appearanceDisabled: isGlobalAppearanceOverrideEnabled,
     };
 
@@ -52,7 +53,7 @@ function renderActionPanel(
     actionKind: ActionKind,
     panelProps: {
         context: VisibilityContext;
-        onSettingChange: (target: InspectorSettingTarget, value: InspectorControlValue) => void;
+        onSettingsPatch: (patch: WidgetSettings) => void;
         appearanceDisabled: boolean;
     },
 ): React.JSX.Element | null {

@@ -13,7 +13,7 @@ import {
 
 export function SparklineSettings({
     context,
-    onSettingChange,
+    onSettingsPatch,
 }: WidgetSettingsPanelProps): React.JSX.Element | null {
     if (context.resolved.appearance.graphicType !== "dashed-line") {
         return null;
@@ -30,7 +30,9 @@ export function SparklineSettings({
                     label="Traffic Graph"
                     value={context.resolved.local.networkTrafficDisplayMode}
                     optionList={networkTrafficDisplayModeOptionList}
-                    onValueChange={(value) => onSettingChange("networkTrafficDisplayMode", value)}
+                    onValueChange={(networkTrafficDisplayMode) => onSettingsPatch({
+                        local: { networkTrafficDisplayMode },
+                    })}
                 />
             )}
             <SectionHeading text="Visual Guides" />
@@ -40,7 +42,9 @@ export function SparklineSettings({
                 minimum={0}
                 maximum={100}
                 step={5}
-                onValueChange={(value) => onSettingChange("lineSmoothingPercent", value)}
+                onValueChange={(lineSmoothingPercent) => onSettingsPatch({
+                    appearanceOverrides: { lineSmoothingPercent },
+                })}
             />
             {isMirroredNetworkTraffic ? (
                 <>
@@ -48,7 +52,9 @@ export function SparklineSettings({
                         label="Grid Line Visibility"
                         value="none"
                         optionList={disabledGridLineVisibilityOptionList}
-                        onValueChange={(value) => onSettingChange("gridLineVisibility", value)}
+                        onValueChange={(gridLineVisibility) => onSettingsPatch({
+                            appearanceOverrides: { gridLineVisibility },
+                        })}
                         disabled
                     />
                     <InspectorItem className="note-item note-item-caption">
@@ -58,7 +64,9 @@ export function SparklineSettings({
                         label="Grid Line Type"
                         value={context.resolved.appearance.gridLineType}
                         optionList={gridLineTypeOptionList}
-                        onValueChange={(value) => onSettingChange("gridLineType", value)}
+                        onValueChange={(gridLineType) => onSettingsPatch({
+                            appearanceOverrides: { gridLineType },
+                        })}
                         disabled
                     />
                 </>
@@ -68,7 +76,9 @@ export function SparklineSettings({
                         label="Grid Line Visibility"
                         value={context.resolved.appearance.gridLineVisibility}
                         optionList={gridLineVisibilityOptionList}
-                        onValueChange={(value) => onSettingChange("gridLineVisibility", value)}
+                        onValueChange={(gridLineVisibility) => onSettingsPatch({
+                            appearanceOverrides: { gridLineVisibility },
+                        })}
                     />
                     <InspectorItem className="note-item note-item-caption">
                         <p className="section-note">Adaptive: grid line visibility adapts to chart activity.</p>
@@ -77,7 +87,9 @@ export function SparklineSettings({
                         label="Grid Line Type"
                         value={context.resolved.appearance.gridLineType}
                         optionList={gridLineTypeOptionList}
-                        onValueChange={(value) => onSettingChange("gridLineType", value)}
+                        onValueChange={(gridLineType) => onSettingsPatch({
+                            appearanceOverrides: { gridLineType },
+                        })}
                         disabled={context.resolved.appearance.gridLineVisibility === "none"}
                     />
                 </>

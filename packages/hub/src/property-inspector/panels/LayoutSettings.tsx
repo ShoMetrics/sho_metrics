@@ -7,27 +7,33 @@ import { graphicStyleOptionList } from "./setting-options";
 
 export function LayoutSettings({
     context,
-    onSettingChange,
+    onSettingsPatch,
     appearanceDisabled = false,
 }: WidgetSettingsPanelProps): React.JSX.Element {
     return (
         <SettingsSection title="Layout">
             <GraphicTypeSetting
                 value={context.resolved.appearance.graphicType}
-                onValueChange={(value) => onSettingChange("graphicType", value)}
+                onValueChange={(graphicType) => onSettingsPatch({
+                    appearanceOverrides: { graphicType },
+                })}
                 disabled={appearanceDisabled}
             />
             <SelectSetting
                 label="Graphic Style"
                 value={context.resolved.appearance.graphicStyle}
                 optionList={graphicStyleOptionList}
-                onValueChange={(value) => onSettingChange("graphicStyle", value)}
+                onValueChange={(graphicStyle) => onSettingsPatch({
+                    appearanceOverrides: { graphicStyle },
+                })}
                 disabled={appearanceDisabled}
             />
             {context.resolved.appearance.graphicType === "circular" && (
                 <CircleStyleSetting
                     value={context.resolved.appearance.circleStyle}
-                    onValueChange={(value) => onSettingChange("circleStyle", value)}
+                    onValueChange={(circleStyle) => onSettingsPatch({
+                        appearanceOverrides: { circleStyle },
+                    })}
                     disabled={appearanceDisabled}
                 />
             )}

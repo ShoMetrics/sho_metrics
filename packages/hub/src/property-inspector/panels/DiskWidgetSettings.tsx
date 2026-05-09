@@ -53,7 +53,9 @@ function DiskUsageSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
                     label="Volume"
                     value={props.context.resolved.metric.diskVolumeId}
                     optionList={resolveDiskVolumeOptions(props.context)}
-                    onValueChange={(value) => props.onSettingChange("diskVolumeId", value)}
+                    onValueChange={(diskVolumeId) => props.onSettingsPatch({
+                        metric: { diskVolumeId },
+                    })}
                 />
             </SettingsSection>
             {(graphicType === "circular" || graphicType === "text") && (
@@ -62,7 +64,9 @@ function DiskUsageSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
                         label="Usage Display"
                         value={props.context.resolved.local.diskUsageDisplayMode}
                         optionList={diskUsageDisplayModeOptionList}
-                        onValueChange={(value) => props.onSettingChange("diskUsageDisplayMode", value)}
+                        onValueChange={(diskUsageDisplayMode) => props.onSettingsPatch({
+                            local: { diskUsageDisplayMode },
+                        })}
                     />
                 </SettingsSection>
             )}
@@ -83,7 +87,9 @@ function DiskThroughputSettings(props: WidgetSettingsPanelProps): React.JSX.Elem
                     label="Direction"
                     value={props.context.resolved.metric.diskThroughputDirection}
                     optionList={diskThroughputDirectionOptionList}
-                    onValueChange={(value) => props.onSettingChange("diskThroughputDirection", value)}
+                    onValueChange={(diskThroughputDirection) => props.onSettingsPatch({
+                        metric: { diskThroughputDirection },
+                    })}
                 />
             </SettingsSection>
             <SettingsSection title="Scale & Units">
@@ -91,12 +97,19 @@ function DiskThroughputSettings(props: WidgetSettingsPanelProps): React.JSX.Elem
                     label="Scale"
                     value={props.context.resolved.diskThroughput.diskThroughputScaleMode}
                     optionList={scaleModeOptionList}
-                    onValueChange={(value) => props.onSettingChange("diskThroughputScaleMode", value)}
+                    onValueChange={(diskThroughputScaleMode) => props.onSettingsPatch({
+                        diskThroughputOverrides: { diskThroughputScaleMode },
+                    })}
                 />
                 <NumberSetting
                     label="Read Max (MiB/s)"
                     value={props.context.resolved.diskThroughput.maximumDiskReadThroughputMebibytesPerSecond}
-                    onValueChange={(value) => props.onSettingChange("maximumDiskReadThroughputMebibytesPerSecond", value)}
+                    onValueChange={(maximumDiskReadThroughputMebibytesPerSecond) => props.onSettingsPatch({
+                        diskThroughputOverrides: {
+                            diskThroughputScaleMode: "custom",
+                            maximumDiskReadThroughputMebibytesPerSecond,
+                        },
+                    })}
                     minimum={1}
                     step={1}
                     optional
@@ -105,7 +118,12 @@ function DiskThroughputSettings(props: WidgetSettingsPanelProps): React.JSX.Elem
                 <NumberSetting
                     label="Write Max (MiB/s)"
                     value={props.context.resolved.diskThroughput.maximumDiskWriteThroughputMebibytesPerSecond}
-                    onValueChange={(value) => props.onSettingChange("maximumDiskWriteThroughputMebibytesPerSecond", value)}
+                    onValueChange={(maximumDiskWriteThroughputMebibytesPerSecond) => props.onSettingsPatch({
+                        diskThroughputOverrides: {
+                            diskThroughputScaleMode: "custom",
+                            maximumDiskWriteThroughputMebibytesPerSecond,
+                        },
+                    })}
                     minimum={1}
                     step={1}
                     optional
@@ -119,7 +137,7 @@ function DiskThroughputSettings(props: WidgetSettingsPanelProps): React.JSX.Elem
 
 function DiskMetricKindSetting({
     context,
-    onSettingChange,
+    onSettingsPatch,
 }: WidgetSettingsPanelProps): React.JSX.Element {
     const optionList = context.isWindows
         ? diskMetricKindOptionList.filter(option => option.value !== "throughput")
@@ -130,14 +148,16 @@ function DiskMetricKindSetting({
             label="Disk Metric"
             value={context.resolved.metric.diskMetricKind}
             optionList={optionList}
-            onValueChange={(value) => onSettingChange("diskMetricKind", value)}
+            onValueChange={(diskMetricKind) => onSettingsPatch({
+                metric: { diskMetricKind },
+            })}
         />
     );
 }
 
 function DiskUsageLabelSettings({
     context,
-    onSettingChange,
+    onSettingsPatch,
 }: WidgetSettingsPanelProps): React.JSX.Element {
     const detectedLabel = resolveSelectedDiskVolumeLabel(context);
     const currentLabel = context.resolved.local.diskLinearLabel;
@@ -151,7 +171,9 @@ function DiskUsageLabelSettings({
             <TextSetting
                 label="Custom Label"
                 value={currentLabel}
-                onValueChange={(value) => onSettingChange("diskLinearLabel", value)}
+                onValueChange={(diskLinearLabel) => onSettingsPatch({
+                    local: { diskLinearLabel },
+                })}
                 placeholder={resolveDiskAutoLinearLabel(context)}
                 actionButton={(
                     <button
@@ -160,7 +182,9 @@ function DiskUsageLabelSettings({
                         disabled={!canUseDetectedLabel}
                         onClick={() => {
                             if (canUseDetectedLabel) {
-                                onSettingChange("diskLinearLabel", detectedLabel);
+                                onSettingsPatch({
+                                    local: { diskLinearLabel: detectedLabel },
+                                });
                             }
                         }}
                         aria-label="Use detected label as custom label"
