@@ -28,7 +28,7 @@ interface BaseMetricDisplayOptions {
     statusIcon: ArcGaugeStatusIcon;
     circleStyleOverride?: ResolvedMetricVisualSettings["circleStyle"];
     visualSettingsOverride?: MetricVisualSettingsOverride;
-    resolvedSettings: SingleMetricDisplaySettings;
+    resolvedSettings: MetricVisualSettings;
 }
 
 export interface SingleMetricDisplayOptions extends BaseMetricDisplayOptions {
@@ -49,8 +49,6 @@ export interface DualMetricDisplayOptions extends BaseMetricDisplayOptions {
     positiveStatusIcon?: ArcGaugeStatusIcon;
     negativeStatusIcon?: ArcGaugeStatusIcon;
 }
-
-export type SingleMetricDisplaySettings = MetricVisualSettings;
 
 export type MetricDisplayOptions = SingleMetricDisplayOptions | DualMetricDisplayOptions;
 
