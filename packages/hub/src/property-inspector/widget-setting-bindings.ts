@@ -9,7 +9,6 @@ import {
     type AppearanceColorRampKey,
     type AppearanceScalarSettings,
     type AppearanceSettingsOverride,
-    type ColorRamp,
     type DiskThroughputDefaultSettings,
     type MetricSettings,
     type NetworkDefaultSettings,
@@ -25,39 +24,14 @@ import {
 } from "../settings/updates";
 import { resolveWidgetSettings } from "../settings/resolver";
 import type {
-    AppearanceColorControlKey,
+    AppearanceColorBinding,
     InspectorControlValue,
+    InspectorSettingTarget,
     PropertyInspectorSettingKey,
     VisibilityContext,
 } from "./schema";
 
 export type InspectorBindingContext = VisibilityContext;
-
-const APPEARANCE_COLOR_CONTROL_PATHS = {
-    solidColor: { rampKey: "usageColors", colorKey: "solidColor" },
-    colorLow: { rampKey: "usageColors", colorKey: "lowColor" },
-    colorMedium: { rampKey: "usageColors", colorKey: "mediumColor" },
-    colorHigh: { rampKey: "usageColors", colorKey: "highColor" },
-    downloadSolidColor: { rampKey: "downloadColors", colorKey: "solidColor" },
-    downloadColorLow: { rampKey: "downloadColors", colorKey: "lowColor" },
-    downloadColorMedium: { rampKey: "downloadColors", colorKey: "mediumColor" },
-    downloadColorHigh: { rampKey: "downloadColors", colorKey: "highColor" },
-    uploadSolidColor: { rampKey: "uploadColors", colorKey: "solidColor" },
-    uploadColorLow: { rampKey: "uploadColors", colorKey: "lowColor" },
-    uploadColorMedium: { rampKey: "uploadColors", colorKey: "mediumColor" },
-    uploadColorHigh: { rampKey: "uploadColors", colorKey: "highColor" },
-    diskReadSolidColor: { rampKey: "diskReadColors", colorKey: "solidColor" },
-    diskReadColorLow: { rampKey: "diskReadColors", colorKey: "lowColor" },
-    diskReadColorMedium: { rampKey: "diskReadColors", colorKey: "mediumColor" },
-    diskReadColorHigh: { rampKey: "diskReadColors", colorKey: "highColor" },
-    diskWriteSolidColor: { rampKey: "diskWriteColors", colorKey: "solidColor" },
-    diskWriteColorLow: { rampKey: "diskWriteColors", colorKey: "lowColor" },
-    diskWriteColorMedium: { rampKey: "diskWriteColors", colorKey: "mediumColor" },
-    diskWriteColorHigh: { rampKey: "diskWriteColors", colorKey: "highColor" },
-} satisfies Record<
-    AppearanceColorControlKey,
-    { rampKey: AppearanceColorRampKey; colorKey: keyof ColorRamp }
->;
 
 export function buildInspectorBindingContext(options: {
     storedSettings: WidgetStoredSettings;
@@ -84,16 +58,15 @@ export function buildInspectorBindingContext(options: {
 
 export function updateWidgetStoredSettings(options: {
     storedSettings: WidgetStoredSettings;
-    key: PropertyInspectorSettingKey;
+    target: InspectorSettingTarget;
     value: string;
     context: InspectorBindingContext;
 }): WidgetStoredSettings {
-    return writeInspectorControlValue(options.storedSettings, options.key, options.value, options.context);
+    return writeInspectorControlValue(options.storedSettings, options.target, options.value, options.context);
 }
 
 export function isPropertyInspectorSettingKey(value: string): value is PropertyInspectorSettingKey {
     return isAppearanceScalarKey(value)
-        || isAppearanceColorControlKey(value)
         || isMetricKey(value)
         || isLocalKey(value)
         || isNetworkKey(value)
@@ -103,12 +76,13 @@ export function isPropertyInspectorSettingKey(value: string): value is PropertyI
 
 export function readInspectorControlValue(
     context: InspectorBindingContext,
-    key: PropertyInspectorSettingKey,
+    target: InspectorSettingTarget,
 ): InspectorControlValue {
-    if (isAppearanceColorControlKey(key)) {
-        const colorPath = APPEARANCE_COLOR_CONTROL_PATHS[key];
-        return context.resolved.appearance[colorPath.rampKey][colorPath.colorKey];
+    if (isAppearanceColorBinding(target)) {
+        return context.resolved.appearance[target.rampKey][target.colorKey];
     }
+
+    const key = target;
 
     if (isAppearanceScalarKey(key)) {
         return context.resolved.appearance[key];
@@ -139,16 +113,18 @@ export function readInspectorControlValue(
 
 function writeInspectorControlValue(
     settings: WidgetStoredSettings,
-    key: PropertyInspectorSettingKey,
+    target: InspectorSettingTarget,
     value: string,
     context: InspectorBindingContext,
 ): WidgetStoredSettings {
-    if (key === "lowThreshold" || key === "highThreshold") {
-        return writeThresholdControlValue(settings, key, value, context);
+    if (isAppearanceColorBinding(target)) {
+        return writeColorControlValue(settings, target, value);
     }
 
-    if (isAppearanceColorControlKey(key)) {
-        return writeColorControlValue(settings, key, value);
+    const key = target;
+
+    if (key === "lowThreshold" || key === "highThreshold") {
+        return writeThresholdControlValue(settings, key, value, context);
     }
 
     if (isAppearanceScalarKey(key)) {
@@ -217,15 +193,13 @@ function toControlValue(value: InspectorControlValue, key: PropertyInspectorSett
 
 function writeColorControlValue(
     settings: WidgetStoredSettings,
-    key: AppearanceColorControlKey,
+    binding: AppearanceColorBinding,
     value: string,
 ): WidgetStoredSettings {
-    const colorPath = APPEARANCE_COLOR_CONTROL_PATHS[key];
-
     return updateWidgetSettingsBranch(settings, "appearanceOverrides", {
-        [colorPath.rampKey]: {
-            ...settings.appearanceOverrides?.[colorPath.rampKey],
-            [colorPath.colorKey]: value,
+        [binding.rampKey]: {
+            ...settings.appearanceOverrides?.[binding.rampKey],
+            [binding.colorKey]: value,
         },
     });
 }
@@ -234,8 +208,8 @@ function isAppearanceScalarKey(key: string): key is keyof AppearanceScalarSettin
     return key in defaultAppearanceSettings && !isAppearanceColorRampKey(key);
 }
 
-function isAppearanceColorControlKey(key: string): key is AppearanceColorControlKey {
-    return Object.hasOwn(APPEARANCE_COLOR_CONTROL_PATHS, key);
+function isAppearanceColorBinding(target: InspectorSettingTarget): target is AppearanceColorBinding {
+    return typeof target === "object" && target.kind === "appearanceColor";
 }
 
 function isAppearanceColorRampKey(key: string): key is AppearanceColorRampKey {

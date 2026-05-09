@@ -1,5 +1,6 @@
 import { inspectorScope, type InspectorScope } from "./scopes";
-import type { FieldSchema, SelectOption, SelectOptionsSource } from "./schema";
+import type { AppearanceColorBinding, FieldSchema, SelectOption, SelectOptionsSource } from "./schema";
+import type { AppearanceColorRampKey, ColorRamp } from "../settings/widget-settings";
 
 const allMetricScopeList = Object.values(inspectorScope)
     .filter((scopeValue): scopeValue is InspectorScope => scopeValue !== inspectorScope.unknownScope);
@@ -176,7 +177,7 @@ export const inspectorFieldCatalog = {
     }),
     downloadSolidColorField: defineField({
         id: "download-solid-color",
-        key: "downloadSolidColor",
+        colorBinding: colorBinding("downloadColors", "solidColor"),
         kind: "color",
         label: "Solid Color",
         defaultValue: "#3b82f6",
@@ -184,7 +185,7 @@ export const inspectorFieldCatalog = {
     }),
     downloadLowColorField: defineField({
         id: "download-low-color",
-        key: "downloadColorLow",
+        colorBinding: colorBinding("downloadColors", "lowColor"),
         kind: "color",
         label: "Low Color",
         defaultValue: "#22c55e",
@@ -192,7 +193,7 @@ export const inspectorFieldCatalog = {
     }),
     downloadMediumColorField: defineField({
         id: "download-medium-color",
-        key: "downloadColorMedium",
+        colorBinding: colorBinding("downloadColors", "mediumColor"),
         kind: "color",
         label: "Medium Color",
         defaultValue: "#3b82f6",
@@ -200,7 +201,7 @@ export const inspectorFieldCatalog = {
     }),
     downloadHighColorField: defineField({
         id: "download-high-color",
-        key: "downloadColorHigh",
+        colorBinding: colorBinding("downloadColors", "highColor"),
         kind: "color",
         label: "High Color",
         defaultValue: "#60a5fa",
@@ -214,7 +215,7 @@ export const inspectorFieldCatalog = {
     }),
     uploadSolidColorField: defineField({
         id: "upload-solid-color",
-        key: "uploadSolidColor",
+        colorBinding: colorBinding("uploadColors", "solidColor"),
         kind: "color",
         label: "Solid Color",
         defaultValue: "#ef4444",
@@ -222,7 +223,7 @@ export const inspectorFieldCatalog = {
     }),
     uploadLowColorField: defineField({
         id: "upload-low-color",
-        key: "uploadColorLow",
+        colorBinding: colorBinding("uploadColors", "lowColor"),
         kind: "color",
         label: "Low Color",
         defaultValue: "#f97316",
@@ -230,7 +231,7 @@ export const inspectorFieldCatalog = {
     }),
     uploadMediumColorField: defineField({
         id: "upload-medium-color",
-        key: "uploadColorMedium",
+        colorBinding: colorBinding("uploadColors", "mediumColor"),
         kind: "color",
         label: "Medium Color",
         defaultValue: "#ef4444",
@@ -238,7 +239,7 @@ export const inspectorFieldCatalog = {
     }),
     uploadHighColorField: defineField({
         id: "upload-high-color",
-        key: "uploadColorHigh",
+        colorBinding: colorBinding("uploadColors", "highColor"),
         kind: "color",
         label: "High Color",
         defaultValue: "#f472b6",
@@ -252,7 +253,7 @@ export const inspectorFieldCatalog = {
     }),
     diskReadSolidColorField: defineField({
         id: "disk-read-solid-color",
-        key: "diskReadSolidColor",
+        colorBinding: colorBinding("diskReadColors", "solidColor"),
         kind: "color",
         label: "Solid Color",
         defaultValue: "#38bdf8",
@@ -260,7 +261,7 @@ export const inspectorFieldCatalog = {
     }),
     diskReadLowColorField: defineField({
         id: "disk-read-low-color",
-        key: "diskReadColorLow",
+        colorBinding: colorBinding("diskReadColors", "lowColor"),
         kind: "color",
         label: "Low Color",
         defaultValue: "#22c55e",
@@ -268,7 +269,7 @@ export const inspectorFieldCatalog = {
     }),
     diskReadMediumColorField: defineField({
         id: "disk-read-medium-color",
-        key: "diskReadColorMedium",
+        colorBinding: colorBinding("diskReadColors", "mediumColor"),
         kind: "color",
         label: "Medium Color",
         defaultValue: "#38bdf8",
@@ -276,7 +277,7 @@ export const inspectorFieldCatalog = {
     }),
     diskReadHighColorField: defineField({
         id: "disk-read-high-color",
-        key: "diskReadColorHigh",
+        colorBinding: colorBinding("diskReadColors", "highColor"),
         kind: "color",
         label: "High Color",
         defaultValue: "#60a5fa",
@@ -290,7 +291,7 @@ export const inspectorFieldCatalog = {
     }),
     diskWriteSolidColorField: defineField({
         id: "disk-write-solid-color",
-        key: "diskWriteSolidColor",
+        colorBinding: colorBinding("diskWriteColors", "solidColor"),
         kind: "color",
         label: "Solid Color",
         defaultValue: "#f472b6",
@@ -298,7 +299,7 @@ export const inspectorFieldCatalog = {
     }),
     diskWriteLowColorField: defineField({
         id: "disk-write-low-color",
-        key: "diskWriteColorLow",
+        colorBinding: colorBinding("diskWriteColors", "lowColor"),
         kind: "color",
         label: "Low Color",
         defaultValue: "#f97316",
@@ -306,7 +307,7 @@ export const inspectorFieldCatalog = {
     }),
     diskWriteMediumColorField: defineField({
         id: "disk-write-medium-color",
-        key: "diskWriteColorMedium",
+        colorBinding: colorBinding("diskWriteColors", "mediumColor"),
         kind: "color",
         label: "Medium Color",
         defaultValue: "#f472b6",
@@ -314,7 +315,7 @@ export const inspectorFieldCatalog = {
     }),
     diskWriteHighColorField: defineField({
         id: "disk-write-high-color",
-        key: "diskWriteColorHigh",
+        colorBinding: colorBinding("diskWriteColors", "highColor"),
         kind: "color",
         label: "High Color",
         defaultValue: "#fb7185",
@@ -561,7 +562,7 @@ export const inspectorFieldCatalog = {
     }),
     solidColorField: defineField({
         id: "solid-color",
-        key: "solidColor",
+        colorBinding: colorBinding("usageColors", "solidColor"),
         kind: "color",
         label: "Solid Color",
         defaultValue: "#3b82f6",
@@ -601,21 +602,21 @@ export const inspectorFieldCatalog = {
     }),
     lowUsageColorField: defineField({
         id: "low-usage-color",
-        key: "colorLow",
+        colorBinding: colorBinding("usageColors", "lowColor"),
         kind: "color-band",
         label: "Low Usage Color",
         allowedScopes: allMetricScopeList,
     }),
     mediumUsageColorField: defineField({
         id: "medium-usage-color",
-        key: "colorMedium",
+        colorBinding: colorBinding("usageColors", "mediumColor"),
         kind: "color-band",
         label: "Medium Usage Color",
         allowedScopes: allMetricScopeList,
     }),
     highUsageColorField: defineField({
         id: "high-usage-color",
-        key: "colorHigh",
+        colorBinding: colorBinding("usageColors", "highColor"),
         kind: "color-band",
         label: "High Usage Color",
         allowedScopes: allMetricScopeList,
@@ -624,6 +625,10 @@ export const inspectorFieldCatalog = {
 
 function defineField(field: FieldSchema): FieldSchema {
     return field;
+}
+
+function colorBinding(rampKey: AppearanceColorRampKey, colorKey: keyof ColorRamp): AppearanceColorBinding {
+    return { kind: "appearanceColor", rampKey, colorKey };
 }
 
 function staticOptions(values: readonly SelectOption[]): SelectOptionsSource {

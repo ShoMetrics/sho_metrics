@@ -8,12 +8,21 @@ import { ReadonlyField } from "./ReadonlyField";
 import { SectionHeading } from "./SectionHeading";
 import { SelectField } from "./SelectField";
 import { TextField } from "./TextField";
-import type { FieldSchema, PropertyInspectorSettingKey, VisibilityContext } from "../schema";
+import type {
+    AppearanceColorBinding,
+    FieldSchema,
+    InspectorSettingTarget,
+    PropertyInspectorSettingKey,
+    VisibilityContext,
+} from "../schema";
+
+type KeyedFieldSchema = FieldSchema & { key: PropertyInspectorSettingKey };
+type ColorBoundFieldSchema = FieldSchema & { colorBinding: AppearanceColorBinding };
 
 interface FieldRendererProps {
     field: FieldSchema;
     context: VisibilityContext;
-    onSettingChange: (key: PropertyInspectorSettingKey, value: string) => void;
+    onSettingChange: (target: InspectorSettingTarget, value: string) => void;
     disabled?: boolean;
 }
 
@@ -45,23 +54,47 @@ export function FieldRenderer({
         );
     }
 
-    if (!field.key) {
+    if (field.kind === "color" && hasColorBinding(field)) {
+        return (
+            <sdpi-item label={field.label ?? ""}>
+                <ColorField
+                    field={field}
+                    context={context}
+                    onSettingChange={onSettingChange}
+                    disabled={disabled}
+                />
+            </sdpi-item>
+        );
+    }
+
+    if (field.kind === "color-band" && hasColorBinding(field)) {
+        return (
+            <sdpi-item label={field.label ?? ""}>
+                <ColorBandField
+                    field={field}
+                    context={context}
+                    onSettingChange={onSettingChange}
+                    disabled={disabled}
+                />
+            </sdpi-item>
+        );
+    }
+
+    if (!hasSettingKey(field)) {
         return <sdpi-item />;
     }
 
-    const keyedField = field as FieldSchema & { key: PropertyInspectorSettingKey };
-
     return (
         <sdpi-item label={field.label ?? ""}>
-            {renderFieldControl(keyedField, context, onSettingChange, disabled)}
+            {renderFieldControl(field, context, onSettingChange, disabled)}
         </sdpi-item>
     );
 }
 
 function renderFieldControl(
-    field: FieldSchema & { key: PropertyInspectorSettingKey },
+    field: KeyedFieldSchema,
     context: VisibilityContext,
-    onSettingChange: (key: PropertyInspectorSettingKey, value: string) => void,
+    onSettingChange: (target: InspectorSettingTarget, value: string) => void,
     disabled: boolean,
 ): React.JSX.Element {
     switch (field.kind) {
@@ -72,7 +105,7 @@ function renderFieldControl(
         case "circle-style-picker":
             return <CircleStylePicker field={field} context={context} onSettingChange={onSettingChange} disabled={disabled} />;
         case "color":
-            return <ColorField field={field} context={context} disabled={disabled} />;
+            return <span />;
         case "number":
             return <NumberField field={field} context={context} disabled={disabled} />;
         case "text":
@@ -80,10 +113,18 @@ function renderFieldControl(
         case "range":
             return <RangeField field={field} context={context} disabled={disabled} />;
         case "color-band":
-            return <ColorBandField field={field} context={context} disabled={disabled} />;
+            return <span />;
         case "heading":
         case "note":
         case "readonly":
             return <span />;
     }
+}
+
+function hasColorBinding(field: FieldSchema): field is ColorBoundFieldSchema {
+    return field.colorBinding !== undefined;
+}
+
+function hasSettingKey(field: FieldSchema): field is KeyedFieldSchema {
+    return field.key !== undefined;
 }
