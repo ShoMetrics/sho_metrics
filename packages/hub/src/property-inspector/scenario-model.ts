@@ -1,24 +1,6 @@
 import type { FieldSchema, VisibilityContext } from "./schema";
 import type { InspectorScope } from "./scopes";
-import type {
-    ActionKind,
-    GraphicType,
-    NormalizeSettingsContext,
-    PropertyInspectorSettings,
-    ControlSettingValue,
-} from "./settings";
-
-export type InspectorSettingsNormalizer = (
-    rawSettings: Record<string, ControlSettingValue>,
-    context: NormalizeSettingsContext,
-    normalizedSettings: PropertyInspectorSettings,
-) => PropertyInspectorSettings;
-
-export interface PropertyInspectorState {
-    actionKind: ActionKind;
-    isWindows: boolean;
-    settings: PropertyInspectorSettings;
-}
+import type { GraphicType } from "./settings";
 
 export type ScenarioSectionId =
     | "metric"
@@ -44,14 +26,7 @@ export interface ScenarioSection {
 export interface InspectorScenario {
     scope: InspectorScope;
     fieldGroupList: readonly ScenarioFieldGroup[];
-    settingsNormalizer: InspectorSettingsNormalizer;
 }
-
-export const defaultSettingsNormalizer: InspectorSettingsNormalizer = (
-    _rawSettings,
-    _context,
-    normalizedSettings,
-) => normalizedSettings;
 
 export function defineScenario(scenario: InspectorScenario): InspectorScenario {
     return scenario;

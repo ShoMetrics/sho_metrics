@@ -7,20 +7,17 @@ import {
     resolveInspectorSectionList,
 } from "./scenarios";
 import {
-    basePropertyInspectorSettings,
     resolveActionKind,
     type ActionKind,
-    type PropertyInspectorSettings,
 } from "./settings";
 import {
-    defaultRuntimeCache,
     defaultPluginGlobalSettings,
     normalizePluginGlobalSettings,
     normalizeWidgetStoredSettings,
     type PluginGlobalSettings,
     type WidgetStoredSettings,
 } from "../settings/widget-settings";
-import { resolveWidgetSettings } from "../settings/resolver";
+import { readWidgetSettings, writeWidgetSettings } from "../settings/codec";
 import {
     readActionUuid,
     resolveIsWindowsPropertyInspector,
@@ -29,7 +26,8 @@ import {
 import type { PropertyInspectorSettingKey, VisibilityContext } from "./schema";
 import type { ScenarioSectionId } from "./scenario-model";
 import {
-    findWidgetSettingBinding,
+    buildInspectorBindingContext,
+    isPropertyInspectorSettingKey,
     updateWidgetStoredSettings,
 } from "./widget-setting-bindings";
 
@@ -41,7 +39,6 @@ interface PropertyInspectorState {
     actionKind: ActionKind;
     isWindows: boolean;
     storedSettings: WidgetStoredSettings;
-    settings: PropertyInspectorSettings;
     globalSettings: PluginGlobalSettings;
     activeTab: "widget" | "plugin";
     loadError: string | null;
@@ -51,7 +48,6 @@ const initialState: PropertyInspectorState = {
     actionKind: "unknown",
     isWindows: false,
     storedSettings: normalizeWidgetStoredSettings({}),
-    settings: { ...basePropertyInspectorSettings },
     globalSettings: { ...defaultPluginGlobalSettings },
     activeTab: "widget",
     loadError: null,
@@ -60,11 +56,12 @@ const initialState: PropertyInspectorState = {
 export function App({ client }: AppProps): React.JSX.Element {
     const rootRef = useRef<HTMLDivElement | null>(null);
     const [state, setState] = useState<PropertyInspectorState>(initialState);
-    const visibilityContext = useMemo(() => ({
+    const visibilityContext = useMemo(() => buildInspectorBindingContext({
+        storedSettings: state.storedSettings,
+        globalSettings: state.globalSettings,
         actionKind: state.actionKind,
         isWindows: state.isWindows,
-        settings: state.settings,
-    }), [state.actionKind, state.isWindows, state.settings]);
+    }), [state.storedSettings, state.globalSettings, state.actionKind, state.isWindows]);
     const inspectorSectionList = useMemo(
         () => resolveInspectorSectionList(visibilityContext),
         [visibilityContext],
@@ -73,29 +70,16 @@ export function App({ client }: AppProps): React.JSX.Element {
 
     const updateSetting = (changedKey: PropertyInspectorSettingKey, changedValue: string): void => {
         setState((currentState) => {
-            const binding = findWidgetSettingBinding(changedKey);
-
-            if (!binding) {
-                return currentState;
-            }
+            const currentContext = buildContextFromState(currentState);
 
             const nextStoredSettings = updateWidgetStoredSettings({
                 storedSettings: currentState.storedSettings,
-                binding,
+                key: changedKey,
                 value: changedValue,
-                context: {
-                    actionKind: currentState.actionKind,
-                    isWindows: currentState.isWindows,
-                },
-            });
-            const nextSettings = buildResolvedPropertyInspectorSettings({
-                storedSettings: nextStoredSettings,
-                globalSettings: currentState.globalSettings,
-                actionKind: currentState.actionKind,
-                isWindows: currentState.isWindows,
+                context: currentContext,
             });
 
-            client.setSettings(nextStoredSettings).catch((error: Error) => {
+            client.setSettings(writeWidgetSettings(nextStoredSettings)).catch((error: Error) => {
                 setState((errorState) => ({
                     ...errorState,
                     loadError: `Failed to save settings: ${error.message}`,
@@ -105,7 +89,6 @@ export function App({ client }: AppProps): React.JSX.Element {
             return {
                 ...currentState,
                 storedSettings: nextStoredSettings,
-                settings: nextSettings,
                 loadError: null,
             };
         });
@@ -114,14 +97,8 @@ export function App({ client }: AppProps): React.JSX.Element {
     const resetWidgetSettings = (): void => {
         setState((currentState) => {
             const nextStoredSettings = normalizeWidgetStoredSettings({});
-            const nextSettings = buildResolvedPropertyInspectorSettings({
-                storedSettings: nextStoredSettings,
-                globalSettings: currentState.globalSettings,
-                actionKind: currentState.actionKind,
-                isWindows: currentState.isWindows,
-            });
 
-            client.setSettings(nextStoredSettings).catch((error: Error) => {
+            client.setSettings(writeWidgetSettings(nextStoredSettings)).catch((error: Error) => {
                 setState((errorState) => ({
                     ...errorState,
                     loadError: `Failed to save settings: ${error.message}`,
@@ -131,7 +108,6 @@ export function App({ client }: AppProps): React.JSX.Element {
             return {
                 ...currentState,
                 storedSettings: nextStoredSettings,
-                settings: nextSettings,
                 loadError: null,
             };
         });
@@ -141,12 +117,6 @@ export function App({ client }: AppProps): React.JSX.Element {
         setState((currentState) => ({
             ...currentState,
             globalSettings: nextGlobalSettings,
-            settings: buildResolvedPropertyInspectorSettings({
-                storedSettings: currentState.storedSettings,
-                globalSettings: nextGlobalSettings,
-                actionKind: currentState.actionKind,
-                isWindows: currentState.isWindows,
-            }),
             loadError: null,
         }));
 
@@ -168,7 +138,7 @@ export function App({ client }: AppProps): React.JSX.Element {
             const actionKind = resolveActionKind(readActionUuid(connectionInfo));
             const isWindows = resolveIsWindowsPropertyInspector(connectionInfo);
             const globalSettings = normalizePluginGlobalSettings(readSettingsRecord(globalPayload));
-            const storedSettings = normalizeWidgetStoredSettings(payload.settings);
+            const storedSettings = normalizeWidgetStoredSettings(readWidgetSettings(payload.settings));
 
             if (isDisposed) {
                 return;
@@ -178,12 +148,6 @@ export function App({ client }: AppProps): React.JSX.Element {
                 actionKind,
                 isWindows,
                 storedSettings,
-                settings: buildResolvedPropertyInspectorSettings({
-                    storedSettings,
-                    globalSettings,
-                    actionKind,
-                    isWindows,
-                }),
                 globalSettings,
                 activeTab: "widget",
                 loadError: null,
@@ -192,17 +156,11 @@ export function App({ client }: AppProps): React.JSX.Element {
 
         client.didReceiveSettings.subscribe((event) => {
             setState((currentState) => {
-                const storedSettings = normalizeWidgetStoredSettings(event.payload.settings);
+                const storedSettings = normalizeWidgetStoredSettings(readWidgetSettings(event.payload.settings));
 
                 return {
                     ...currentState,
                     storedSettings,
-                    settings: buildResolvedPropertyInspectorSettings({
-                        storedSettings,
-                        globalSettings: currentState.globalSettings,
-                        actionKind: currentState.actionKind,
-                        isWindows: currentState.isWindows,
-                    }),
                 };
             });
         });
@@ -214,12 +172,6 @@ export function App({ client }: AppProps): React.JSX.Element {
                 return {
                     ...currentState,
                     globalSettings,
-                    settings: buildResolvedPropertyInspectorSettings({
-                        storedSettings: currentState.storedSettings,
-                        globalSettings,
-                        actionKind: currentState.actionKind,
-                        isWindows: currentState.isWindows,
-                    }),
                 };
             });
         });
@@ -250,7 +202,9 @@ export function App({ client }: AppProps): React.JSX.Element {
                 return;
             }
 
-            updateSetting(controlValue.key, controlValue.value);
+            if (isPropertyInspectorSettingKey(controlValue.key)) {
+                updateSetting(controlValue.key, controlValue.value);
+            }
         };
 
         root.addEventListener("input", handleControlEvent, true);
@@ -359,47 +313,13 @@ function isGlobalAppearanceSection(sectionId: ScenarioSectionId): boolean {
     return sectionId === "layout" || sectionId === "colors";
 }
 
-function buildResolvedPropertyInspectorSettings(options: {
-    storedSettings: WidgetStoredSettings;
-    globalSettings: PluginGlobalSettings;
-    actionKind: ActionKind;
-    isWindows: boolean;
-}): PropertyInspectorSettings {
-    const resolvedSettings = resolveWidgetSettings({
-        storedSettings: options.storedSettings,
-        globalSettings: options.globalSettings,
-        context: {
-            actionKind: options.actionKind,
-            isWindows: options.isWindows,
-        },
+function buildContextFromState(state: PropertyInspectorState): ReturnType<typeof buildInspectorBindingContext> {
+    return buildInspectorBindingContext({
+        storedSettings: state.storedSettings,
+        globalSettings: state.globalSettings,
+        actionKind: state.actionKind,
+        isWindows: state.isWindows,
     });
-
-    return {
-        ...resolvedSettings.appearance,
-        ...resolvedSettings.metric,
-        ...resolvedSettings.local,
-        ...resolvedSettings.network,
-        ...resolvedSettings.diskThroughput,
-        maximumGpuPowerWatts: toInspectorOptionalNumber(resolvedSettings.local.maximumGpuPowerWatts),
-        maximumDownloadSpeedMbps: toInspectorOptionalNumber(resolvedSettings.network.maximumDownloadSpeedMbps),
-        maximumUploadSpeedMbps: toInspectorOptionalNumber(resolvedSettings.network.maximumUploadSpeedMbps),
-        maximumDiskReadThroughputMebibytesPerSecond: toInspectorOptionalNumber(
-            resolvedSettings.diskThroughput.maximumDiskReadThroughputMebibytesPerSecond,
-        ),
-        maximumDiskWriteThroughputMebibytesPerSecond: toInspectorOptionalNumber(
-            resolvedSettings.diskThroughput.maximumDiskWriteThroughputMebibytesPerSecond,
-        ),
-        availableNetworkInterfaces: options.storedSettings.runtimeCache?.availableNetworkInterfaces
-            ?? defaultRuntimeCache.availableNetworkInterfaces,
-        availableDiskVolumes: options.storedSettings.runtimeCache?.availableDiskVolumes
-            ?? defaultRuntimeCache.availableDiskVolumes,
-        netSpeedDefaultsApplied: true,
-        diskDefaultsApplied: true,
-    };
-}
-
-function toInspectorOptionalNumber(value: number | undefined): number | "" {
-    return value ?? "";
 }
 
 function readSettingsRecord(payload: unknown): Record<string, unknown> {

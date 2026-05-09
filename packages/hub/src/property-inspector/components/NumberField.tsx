@@ -1,5 +1,6 @@
 import { isFieldDisabled } from "./field-options";
 import type { FieldSchema, PropertyInspectorSettingKey, VisibilityContext } from "../schema";
+import { readInspectorControlValue } from "../widget-setting-bindings";
 
 interface NumberFieldProps {
     field: FieldSchema & { key: PropertyInspectorSettingKey };
@@ -16,7 +17,7 @@ export function NumberField({ field, context, disabled = false }: NumberFieldPro
             data-setting-key={field.key}
             min={field.minimum}
             step={field.step}
-            value={String(context.settings[field.key] ?? "")}
+            value={String(readInspectorControlValue(context, field.key) ?? "")}
             disabled={disabled || isFieldDisabled(field, context)}
             onChange={() => undefined}
         />

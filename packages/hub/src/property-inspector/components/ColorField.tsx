@@ -1,4 +1,5 @@
 import type { FieldSchema, PropertyInspectorSettingKey, VisibilityContext } from "../schema";
+import { readInspectorControlValue } from "../widget-setting-bindings";
 
 interface ColorFieldProps {
     field: FieldSchema & { key: PropertyInspectorSettingKey };
@@ -7,7 +8,7 @@ interface ColorFieldProps {
 }
 
 export function ColorField({ field, context, disabled = false }: ColorFieldProps): React.JSX.Element {
-    const value = String(context.settings[field.key] ?? field.defaultValue ?? "");
+    const value = String(readInspectorControlValue(context, field.key) ?? field.defaultValue ?? "");
 
     return (
         <sdpi-color

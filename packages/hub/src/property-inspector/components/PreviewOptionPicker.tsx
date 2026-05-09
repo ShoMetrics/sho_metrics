@@ -6,6 +6,7 @@ import {
     resolveSelectOptions,
 } from "./field-options";
 import type { FieldSchema, PropertyInspectorSettingKey, VisibilityContext } from "../schema";
+import { readInspectorControlValue } from "../widget-setting-bindings";
 
 interface PreviewOptionPickerProps {
     field: FieldSchema & { key: PropertyInspectorSettingKey };
@@ -26,7 +27,7 @@ export function PreviewOptionPicker({
     const selectedValue = resolveSelectedOptionValue({
         context,
         options,
-        value: String(context.settings[field.key]),
+        value: String(readInspectorControlValue(context, field.key)),
         fallbackValue: field.defaultValue == null ? undefined : String(field.defaultValue),
     });
     const isDisabled = disabled || isFieldDisabled(field, context);

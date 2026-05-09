@@ -21,7 +21,6 @@ import {
     updateFieldGroup,
 } from "../scenario-field-groups";
 import {
-    defaultSettingsNormalizer,
     defineScenario,
     resolveGraphicScenario,
     type InspectorScenario,
@@ -31,7 +30,6 @@ import { inspectorScope } from "../scopes";
 
 const diskUsageCircularScenario = defineScenario({
     scope: inspectorScope.diskUsageCircularScope,
-    settingsNormalizer: defaultSettingsNormalizer,
     fieldGroupList: [
         baseFieldGroup,
         circleStyleFieldGroup,
@@ -45,7 +43,6 @@ const diskUsageCircularScenario = defineScenario({
 
 const diskUsageTextScenario = defineScenario({
     scope: inspectorScope.diskUsageTextScope,
-    settingsNormalizer: defaultSettingsNormalizer,
     fieldGroupList: [
         baseFieldGroup,
         diskUsageBaseFieldGroup,
@@ -58,7 +55,6 @@ const diskUsageTextScenario = defineScenario({
 
 const diskUsageLinearScenario = defineScenario({
     scope: inspectorScope.diskUsageLinearScope,
-    settingsNormalizer: defaultSettingsNormalizer,
     fieldGroupList: [
         baseFieldGroup,
         diskUsageBaseFieldGroup,
@@ -71,7 +67,6 @@ const diskUsageLinearScenario = defineScenario({
 
 const diskUsageSparklineScenario = defineScenario({
     scope: inspectorScope.diskUsageSparklineScope,
-    settingsNormalizer: defaultSettingsNormalizer,
     fieldGroupList: [
         baseFieldGroup,
         diskUsageBaseFieldGroup,
@@ -85,7 +80,6 @@ const diskUsageSparklineScenario = defineScenario({
 
 const diskThroughputCircularScenario = defineScenario({
     scope: inspectorScope.diskThroughputCircularScope,
-    settingsNormalizer: defaultSettingsNormalizer,
     fieldGroupList: [
         baseFieldGroup,
         circleStyleFieldGroup,
@@ -107,7 +101,6 @@ const diskThroughputCircularScenario = defineScenario({
 
 const diskThroughputTextScenario = defineScenario({
     scope: inspectorScope.diskThroughputTextScope,
-    settingsNormalizer: defaultSettingsNormalizer,
     fieldGroupList: [
         baseFieldGroup,
         diskThroughputMetricFieldGroup,
@@ -128,7 +121,6 @@ const diskThroughputTextScenario = defineScenario({
 
 const diskThroughputLinearScenario = defineScenario({
     scope: inspectorScope.diskThroughputLinearScope,
-    settingsNormalizer: defaultSettingsNormalizer,
     fieldGroupList: [
         baseFieldGroup,
         diskThroughputMetricFieldGroup,
@@ -141,7 +133,6 @@ const diskThroughputLinearScenario = defineScenario({
 
 const diskThroughputSparklineScenario = defineScenario({
     scope: inspectorScope.diskThroughputSparklineScope,
-    settingsNormalizer: defaultSettingsNormalizer,
     fieldGroupList: [
         baseFieldGroup,
         diskThroughputMetricFieldGroup,
@@ -163,9 +154,9 @@ const diskThroughputSparklineScenario = defineScenario({
 });
 
 export function resolveDiskScenario(context: VisibilityContext): InspectorScenario {
-    if (context.settings.diskMetricKind === "throughput") {
+    if (context.resolved.metric.diskMetricKind === "throughput") {
         return resolveGraphicScenario({
-            graphicType: context.settings.graphicType,
+            graphicType: context.resolved.appearance.graphicType,
             circularScenario: diskThroughputCircularScenario,
             textScenario: diskThroughputTextScenario,
             linearScenario: diskThroughputLinearScenario,
@@ -174,7 +165,7 @@ export function resolveDiskScenario(context: VisibilityContext): InspectorScenar
     }
 
     return resolveGraphicScenario({
-        graphicType: context.settings.graphicType,
+        graphicType: context.resolved.appearance.graphicType,
         circularScenario: diskUsageCircularScenario,
         textScenario: diskUsageTextScenario,
         linearScenario: diskUsageLinearScenario,

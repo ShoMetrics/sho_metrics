@@ -1,10 +1,4 @@
 import {
-    normalizePropertyInspectorSettings,
-    type NormalizeSettingsContext,
-    type PropertyInspectorSettings,
-    type ControlSettingValue,
-} from "./settings";
-import {
     resolveScenarioFieldList,
     resolveScenarioSectionList,
     type InspectorScenario,
@@ -42,20 +36,6 @@ export function resolveInspectorSectionList(context: VisibilityContext): readonl
         .filter(section => section.fieldList.length > 0);
 }
 
-export function normalizeSettings(
-    rawSettings: Record<string, ControlSettingValue>,
-    context: NormalizeSettingsContext,
-): PropertyInspectorSettings {
-    const normalizedSettings = normalizePropertyInspectorSettings(rawSettings, context);
-    const scenario = resolveInspectorScenario({
-        actionKind: context.actionKind,
-        isWindows: context.isWindows,
-        settings: normalizedSettings,
-    });
-
-    return scenario.settingsNormalizer(rawSettings, context, normalizedSettings);
-}
-
 function resolveInspectorScenario(context: VisibilityContext): InspectorScenario {
     if (context.actionKind === "disk") {
         return resolveDiskScenario(context);
@@ -66,14 +46,14 @@ function resolveInspectorScenario(context: VisibilityContext): InspectorScenario
     }
 
     if (context.actionKind === "gpu-temp") {
-        return resolveGpuTempScenario(context.settings.graphicType);
+        return resolveGpuTempScenario(context.resolved.appearance.graphicType);
     }
 
     if (context.actionKind === "gpu-power") {
-        return resolveGpuPowerScenario(context.settings.graphicType);
+        return resolveGpuPowerScenario(context.resolved.appearance.graphicType);
     }
 
-    return resolveDefaultScenario(context.actionKind, context.settings.graphicType);
+    return resolveDefaultScenario(context.actionKind, context.resolved.appearance.graphicType);
 }
 
 function isFieldAllowedInScenario(

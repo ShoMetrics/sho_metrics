@@ -1,14 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { resolveInspectorFieldList } from "./scenarios";
-import { basePropertyInspectorSettings, type ActionKind, type GraphicType, type PropertyInspectorSettings } from "./settings";
+import type { ActionKind, GraphicType } from "./settings";
 import type { VisibilityContext } from "./schema";
+import { buildVisibilityContext, type InspectorTestSettings } from "./test-context";
 
 test("network speed scenarios expose settings used by the runtime display path", () => {
     const testCases: ReadonlyArray<{
         name: string;
         graphicType: GraphicType;
-        settings?: Partial<PropertyInspectorSettings>;
+        settings?: InspectorTestSettings;
         requiredFieldIds: readonly string[];
     }> = [
         {
@@ -82,16 +83,12 @@ test("network speed scenarios expose settings used by the runtime display path",
 
 function buildContext(options: {
     actionKind: ActionKind;
-    settings: Partial<PropertyInspectorSettings>;
+    settings: InspectorTestSettings;
 }): VisibilityContext {
-    return {
+    return buildVisibilityContext({
         actionKind: options.actionKind,
-        isWindows: false,
-        settings: {
-            ...basePropertyInspectorSettings,
-            ...options.settings,
-        },
-    };
+        settings: options.settings,
+    });
 }
 
 function resolveInspectorFieldIdList(context: VisibilityContext): readonly string[] {

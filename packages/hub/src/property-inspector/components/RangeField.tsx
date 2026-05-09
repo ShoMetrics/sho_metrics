@@ -1,4 +1,5 @@
 import type { FieldSchema, PropertyInspectorSettingKey, VisibilityContext } from "../schema";
+import { readInspectorControlValue } from "../widget-setting-bindings";
 
 interface RangeFieldProps {
     field: FieldSchema & { key: PropertyInspectorSettingKey };
@@ -7,7 +8,7 @@ interface RangeFieldProps {
 }
 
 export function RangeField({ field, context, disabled = false }: RangeFieldProps): React.JSX.Element {
-    const value = String(context.settings[field.key] ?? field.defaultValue ?? 0);
+    const value = String(readInspectorControlValue(context, field.key) ?? field.defaultValue ?? 0);
 
     return (
         <div className="range-control">

@@ -1,5 +1,6 @@
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
+    readWidgetSettings,
     writeWidgetSettings,
     type JsonObject,
 } from "../settings/codec";
@@ -32,7 +33,7 @@ export function resolveActionSettings(rawSettings: unknown, actionKind: ActionKi
 }
 
 function normalizeActionStoredSettings(rawSettings: unknown): WidgetStoredSettings {
-    return normalizeWidgetStoredSettings(rawSettings);
+    return normalizeWidgetStoredSettings(readWidgetSettings(rawSettings));
 }
 
 export function readActionStoredSettings(event: ActionSettingsEvent): WidgetStoredSettings {

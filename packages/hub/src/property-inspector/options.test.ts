@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { basePropertyInspectorSettings } from "./settings";
-import type { VisibilityContext } from "./schema";
+import { readInspectorControlValue } from "./widget-setting-bindings";
 import {
     resolveDiskAutoLinearLabel,
     resolveFieldOptions,
     resolveSelectedDiskVolumeLabel,
 } from "./options";
+import { buildVisibilityContext, type InspectorTestSettings } from "./test-context";
 
 test("network interface options include automatic and formatted valid interfaces only", () => {
     const context = buildContext({
@@ -72,7 +72,7 @@ test("selected disk labels prefer explicit selection then root fallback", () => 
         ]),
     });
     const automaticContext = buildContext({
-        availableDiskVolumes: context.settings.availableDiskVolumes,
+        availableDiskVolumes: readInspectorControlValue(context, "availableDiskVolumes"),
     });
 
     assert.equal(resolveSelectedDiskVolumeLabel(context), "Games");
@@ -85,15 +85,13 @@ test("selected disk label returns dash when no valid disk is available", () => {
     assert.equal(resolveDiskAutoLinearLabel(buildContext()), "Auto");
 });
 
-function buildContext(settings: Partial<typeof basePropertyInspectorSettings> = {}): VisibilityContext {
-    return {
+function buildContext(settings: InspectorTestSettings = {}) {
+    return buildVisibilityContext({
         actionKind: "disk",
-        isWindows: false,
         settings: {
-            ...basePropertyInspectorSettings,
             ...settings,
         },
-    };
+    });
 }
 
 function buildDiskVolume(overrides: Record<string, unknown> = {}): Record<string, unknown> {

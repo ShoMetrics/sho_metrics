@@ -1,4 +1,4 @@
-import { readPluginGlobalSettings, readWidgetSettings } from "./codec";
+import { readPluginGlobalSettings } from "./codec";
 import {
     defaultAppearanceSettings,
     defaultDiskThroughputSettings,
@@ -20,6 +20,7 @@ import type {
     PluginGlobalSettings,
     WidgetLocalSettings,
     WidgetRuntimeCache,
+    WidgetSettings,
     WidgetStoredSettings,
 } from "./model";
 
@@ -139,9 +140,8 @@ export function normalizePluginGlobalSettings(rawSettings: unknown): PluginGloba
 }
 
 export function normalizeWidgetStoredSettings(
-    rawSettings: unknown,
+    settings: WidgetSettings,
 ): WidgetStoredSettings {
-    const settings = readWidgetSettings(rawSettings);
     const storedSettings: WidgetStoredSettings = {};
     const metric = normalizeMetricOverrides(readRecord(settings.metric));
     const local = normalizeLocalOverrides(readRecord(settings.local));
