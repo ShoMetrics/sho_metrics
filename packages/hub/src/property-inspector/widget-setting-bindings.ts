@@ -1,6 +1,5 @@
 import {
     defaultAppearanceSettings,
-    normalizeWidgetStoredSettings,
     type AppearanceSettings,
     type DiskThroughputDefaultSettings,
     type MetricSettings,
@@ -9,6 +8,13 @@ import {
     type WidgetLocalSettings,
     type WidgetStoredSettings,
 } from "../settings/widget-settings";
+import {
+    updateWidgetAppearance,
+    updateWidgetDiskThroughput,
+    updateWidgetLocal,
+    updateWidgetMetric,
+    updateWidgetNetwork,
+} from "../settings/updates";
 import type { PropertyInspectorSettingKey } from "./schema";
 import type { PropertyInspectorSettings, ControlSettingValue } from "./settings";
 
@@ -110,89 +116,57 @@ function defineBindings<TBindings extends Partial<Record<PropertyInspectorSettin
 }
 
 function metricBinding(key: keyof MetricSettings): BindingWriter {
-    return (settings, value, context) => normalizeStoredSettings({
-        ...settings,
-        metric: {
-            ...settings.metric,
-            [key]: value,
-        },
-    }, context);
+    return (settings, value) => updateWidgetMetric(settings, {
+        [key]: value,
+    } as Partial<MetricSettings>);
 }
 
 function localBinding(key: keyof WidgetLocalSettings): BindingWriter {
-    return (settings, value, context) => normalizeStoredSettings({
-        ...settings,
-        local: {
-            ...settings.local,
-            [key]: value,
-        },
-    }, context);
+    return (settings, value) => updateWidgetLocal(settings, {
+        [key]: value,
+    } as Partial<WidgetLocalSettings>);
 }
 
 function appearanceBinding(key: keyof AppearanceSettings): BindingWriter {
-    return (settings, value, context) => normalizeStoredSettings({
-        ...settings,
-        appearanceOverrides: {
-            ...settings.appearanceOverrides,
-            [key]: value,
-        },
-    }, context);
+    return (settings, value) => updateWidgetAppearance(settings, {
+        [key]: value,
+    } as Partial<AppearanceSettings>);
 }
 
 function networkBinding(key: keyof NetworkDefaultSettings): BindingWriter {
-    return (settings, value, context) => normalizeStoredSettings({
-        ...settings,
-        networkOverrides: {
-            ...settings.networkOverrides,
-            [key]: value,
-        },
-    }, context);
+    return (settings, value) => updateWidgetNetwork(settings, {
+        [key]: value,
+    } as Partial<NetworkDefaultSettings>);
 }
 
 function networkMaximumBinding(
     key: "maximumDownloadSpeedMbps" | "maximumUploadSpeedMbps",
 ): BindingWriter {
-    return (settings, value, context) => normalizeStoredSettings({
-        ...settings,
-        networkOverrides: {
-            ...settings.networkOverrides,
-            [key]: value,
-            networkScaleMode: "custom",
-        },
-    }, context);
+    return (settings, value) => updateWidgetNetwork(settings, {
+        [key]: value,
+        networkScaleMode: "custom",
+    } as Partial<NetworkDefaultSettings>);
 }
 
 function diskThroughputBinding(key: keyof DiskThroughputDefaultSettings): BindingWriter {
-    return (settings, value, context) => normalizeStoredSettings({
-        ...settings,
-        diskThroughputOverrides: {
-            ...settings.diskThroughputOverrides,
-            [key]: value,
-        },
-    }, context);
+    return (settings, value) => updateWidgetDiskThroughput(settings, {
+        [key]: value,
+    } as Partial<DiskThroughputDefaultSettings>);
 }
 
 function diskThroughputMaximumBinding(
     key: "maximumDiskReadThroughputMebibytesPerSecond" | "maximumDiskWriteThroughputMebibytesPerSecond",
 ): BindingWriter {
-    return (settings, value, context) => normalizeStoredSettings({
-        ...settings,
-        diskThroughputOverrides: {
-            ...settings.diskThroughputOverrides,
-            [key]: value,
-            diskThroughputScaleMode: "custom",
-        },
-    }, context);
+    return (settings, value) => updateWidgetDiskThroughput(settings, {
+        [key]: value,
+        diskThroughputScaleMode: "custom",
+    } as Partial<DiskThroughputDefaultSettings>);
 }
 
 function diskMetricKindBinding(): BindingWriter {
-    return (settings, value, context) => normalizeStoredSettings({
-        ...settings,
-        metric: {
-            ...settings.metric,
-            diskMetricKind: value as MetricSettings["diskMetricKind"],
-        },
-    }, context);
+    return (settings, value) => updateWidgetMetric(settings, {
+        diskMetricKind: value as MetricSettings["diskMetricKind"],
+    });
 }
 
 function thresholdBinding(key: "lowThreshold" | "highThreshold"): BindingWriter {
@@ -215,23 +189,12 @@ function thresholdBinding(key: "lowThreshold" | "highThreshold"): BindingWriter 
             key === "highThreshold" ? nextThreshold : currentHighThreshold,
         );
 
-        return normalizeStoredSettings({
-            ...settings,
-            appearanceOverrides: {
-                ...settings.appearanceOverrides,
-                lowThreshold: orderedThresholds.lowThreshold,
-                highThreshold: orderedThresholds.highThreshold,
-            },
-        }, context);
+        void context;
+        return updateWidgetAppearance(settings, {
+            lowThreshold: orderedThresholds.lowThreshold,
+            highThreshold: orderedThresholds.highThreshold,
+        });
     };
-}
-
-function normalizeStoredSettings(
-    settings: WidgetStoredSettings,
-    context: SettingsContext,
-): WidgetStoredSettings {
-    void context;
-    return normalizeWidgetStoredSettings(settings);
 }
 
 function parseThreshold(value: unknown, fallbackValue: number): number {

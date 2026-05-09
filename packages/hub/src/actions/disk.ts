@@ -30,6 +30,7 @@ import {
     serializeActionStoredSettings,
 } from "./action-settings-resolver";
 import type { ResolvedWidgetSettings } from "../settings/widget-settings";
+import { updateWidgetRuntimeCache } from "../settings/updates";
 
 const log = logger.for("Action:Disk");
 
@@ -472,13 +473,9 @@ function publishDiskVolumeOptions(event: WillAppearEvent): void {
         return;
     }
 
-    event.action.setSettings(serializeActionStoredSettings({
-        ...storedSettings,
-        runtimeCache: {
-            ...storedSettings.runtimeCache,
-            availableDiskVolumes,
-        },
-    })).catch(error => {
+    event.action.setSettings(serializeActionStoredSettings(updateWidgetRuntimeCache(storedSettings, {
+        availableDiskVolumes,
+    }))).catch(error => {
         log.error(() => `Failed to publish disk volumes: ${String(error)}`);
     });
 }
@@ -514,14 +511,10 @@ function publishDiskThroughputScaleLearning(event: WillAppearEvent, settings: Di
         return;
     }
 
-    event.action.setSettings(serializeActionStoredSettings({
-        ...storedSettings,
-        runtimeCache: {
-            ...storedSettings.runtimeCache,
-            learnedMaximumDiskReadThroughputMebibytesPerSecond: nextReadMaximum,
-            learnedMaximumDiskWriteThroughputMebibytesPerSecond: nextWriteMaximum,
-        },
-    })).catch(error => {
+    event.action.setSettings(serializeActionStoredSettings(updateWidgetRuntimeCache(storedSettings, {
+        learnedMaximumDiskReadThroughputMebibytesPerSecond: nextReadMaximum,
+        learnedMaximumDiskWriteThroughputMebibytesPerSecond: nextWriteMaximum,
+    }))).catch(error => {
         log.error(() => `Failed to publish learned disk throughput scale: ${String(error)}`);
     });
 }
