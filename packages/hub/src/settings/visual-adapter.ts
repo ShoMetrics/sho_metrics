@@ -2,7 +2,7 @@ import type { ColorConfig, ColorThreshold } from "../rendering/color-resolver";
 import type { GraphicThemePresetName, GraphicType } from "../widgets/widget.interface";
 import type { ArcGaugeStyle } from "../widgets/primitives/arc-gauge";
 import type { SparklineGridLineType, SparklineGridLineVisibility } from "../widgets/primitives/sparkline";
-import { defaultAppearanceSettings, type AppearanceSettings } from "../settings/widget-settings";
+import { defaultAppearanceSettings, type AppearanceSettings } from "./widget-settings";
 
 export type MetricVisualSettings = AppearanceSettings;
 export type MetricVisualSettingsOverride = Partial<Pick<
@@ -35,7 +35,7 @@ export interface ResolvedMetricVisualSettings {
 const MINIMUM_THRESHOLD = 0;
 const MAXIMUM_THRESHOLD = 100;
 
-export function resolveMetricVisualSettings(
+export function buildMetricVisualSettings(
     settings: AppearanceSettings,
 ): ResolvedMetricVisualSettings {
     const graphicType = resolveGraphicType(settings.graphicType);

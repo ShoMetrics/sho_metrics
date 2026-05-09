@@ -16,7 +16,7 @@ import {
     type SingleMetricDisplaySettings,
     type TouchStripMetricLayout,
 } from "./single-metric-display-model";
-import { resolveMetricVisualSettings, type ResolvedMetricVisualSettings } from "./metric-visual-settings";
+import { buildMetricVisualSettings, type ResolvedMetricVisualSettings } from "../settings/visual-adapter";
 import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
 import { logger } from "../logging/logger";
 import { DisplayUpdateQueue } from "./display-update-queue";
@@ -553,7 +553,7 @@ function recordDisplayRequest(displayActionState: DisplayActionState, options: M
         return;
     }
 
-    const visualSettings = resolveMetricVisualSettings(options.resolvedSettings);
+    const visualSettings = buildMetricVisualSettings(options.resolvedSettings);
 
     log.info(() => [
         "settingsDisplayRequested",
@@ -842,7 +842,7 @@ function formatAgeMilliseconds(
 }
 
 function buildSettingsSignature(settings: SingleMetricDisplaySettings): string {
-    const visualSettings = resolveMetricVisualSettings(settings);
+    const visualSettings = buildMetricVisualSettings(settings);
 
     return [
         `graphicType=${visualSettings.graphicType}`,

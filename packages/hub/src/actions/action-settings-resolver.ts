@@ -11,6 +11,12 @@ import {
 } from "../settings/widget-settings";
 import { resolveWidgetSettings } from "../settings/resolver";
 
+interface ActionSettingsEvent {
+    payload: {
+        settings?: unknown;
+    };
+}
+
 export function resolveActionSettings(rawSettings: unknown, actionKind: ActionKind): ResolvedWidgetSettings {
     const context = {
         actionKind,
@@ -25,8 +31,12 @@ export function resolveActionSettings(rawSettings: unknown, actionKind: ActionKi
     });
 }
 
-export function normalizeActionStoredSettings(rawSettings: unknown): WidgetStoredSettings {
+function normalizeActionStoredSettings(rawSettings: unknown): WidgetStoredSettings {
     return normalizeWidgetStoredSettings(rawSettings);
+}
+
+export function readActionStoredSettings(event: ActionSettingsEvent): WidgetStoredSettings {
+    return normalizeActionStoredSettings(event.payload.settings);
 }
 
 export function serializeActionStoredSettings(storedSettings: WidgetStoredSettings): JsonObject {

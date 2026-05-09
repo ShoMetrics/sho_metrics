@@ -26,7 +26,7 @@ import { resolveColor, type ColorConfig } from "../rendering/color-resolver";
 import { buildGlobalChannelColorConfig } from "../settings/global-appearance";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
-    normalizeActionStoredSettings,
+    readActionStoredSettings,
     serializeActionStoredSettings,
 } from "./action-settings-resolver";
 import type { ResolvedWidgetSettings } from "../settings/widget-settings";
@@ -467,7 +467,7 @@ function resolveHexColor(value: string, fallbackColor: string): string {
 function publishDiskVolumeOptions(event: WillAppearEvent): void {
     const availableDiskVolumes = JSON.stringify(diskVolumeRegistry.getOptions());
 
-    const storedSettings = normalizeActionStoredSettings(event.payload.settings);
+    const storedSettings = readActionStoredSettings(event);
 
     if (storedSettings.runtimeCache?.availableDiskVolumes === availableDiskVolumes) {
         return;
@@ -502,7 +502,7 @@ function publishDiskThroughputScaleLearning(event: WillAppearEvent, settings: Di
         observedBytesPerSecond: metricStore.getWidgetData(getDiskThroughputMetricKey("write"), "WRIT", "B/s").current,
     });
 
-    const storedSettings = normalizeActionStoredSettings(event.payload.settings);
+    const storedSettings = readActionStoredSettings(event);
 
     if (
         storedSettings.runtimeCache?.learnedMaximumDiskReadThroughputMebibytesPerSecond === nextReadMaximum

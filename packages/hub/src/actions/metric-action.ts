@@ -139,7 +139,7 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     private resolveRawSettings(rawSettings: unknown): ResolvedWidgetSettings {
-        return resolveActionSettings(readSettingsRecord(rawSettings), this.actionKind);
+        return resolveActionSettings(rawSettings, this.actionKind);
     }
 }
 
@@ -156,12 +156,6 @@ const ALLOWED_POLLING_FREQUENCY_SECONDS = new Set([1, 2, 3, 5, 10, 15, 30, 60]);
 
 function normalizeMetricKeys(metricKeys: readonly string[]): readonly string[] {
     return Array.from(new Set(metricKeys)).sort();
-}
-
-function readSettingsRecord(value: unknown): Record<string, unknown> {
-    return value && typeof value === "object" && !Array.isArray(value)
-        ? value as Record<string, unknown>
-        : {};
 }
 
 function formatSettingValue(value: unknown): string {

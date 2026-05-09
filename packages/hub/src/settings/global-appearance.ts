@@ -1,5 +1,5 @@
 import type { ColorConfig, ColorThreshold } from "../rendering/color-resolver";
-import type { MetricVisualSettings } from "../actions/metric-visual-settings";
+import type { MetricVisualSettings } from "./visual-adapter";
 import {
     defaultPluginGlobalSettings,
     type PluginGlobalSettings,
