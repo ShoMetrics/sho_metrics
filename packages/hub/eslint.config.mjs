@@ -80,7 +80,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/settings/visual-adapter.ts'],
+    files: ['src/settings/visual-adapter*.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',
