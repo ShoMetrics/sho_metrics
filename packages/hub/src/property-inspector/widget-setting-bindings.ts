@@ -59,7 +59,7 @@ export function buildInspectorBindingContext(options: {
 export function updateWidgetStoredSettings(options: {
     storedSettings: WidgetStoredSettings;
     target: InspectorSettingTarget;
-    value: string;
+    value: InspectorControlValue;
     context: InspectorBindingContext;
 }): WidgetStoredSettings {
     return writeInspectorControlValue(options.storedSettings, options.target, options.value, options.context);
@@ -114,7 +114,7 @@ export function readInspectorControlValue(
 function writeInspectorControlValue(
     settings: WidgetStoredSettings,
     target: InspectorSettingTarget,
-    value: string,
+    value: InspectorControlValue,
     context: InspectorBindingContext,
 ): WidgetStoredSettings {
     if (isAppearanceColorTarget(target)) {
@@ -165,7 +165,7 @@ function writeInspectorControlValue(
 function writeThresholdControlValue(
     settings: WidgetStoredSettings,
     key: "lowThreshold" | "highThreshold",
-    value: string,
+    value: InspectorControlValue,
     context: InspectorBindingContext,
 ): WidgetStoredSettings {
     const currentLowThreshold = context.resolved.appearance.lowThreshold;
@@ -194,12 +194,12 @@ function toControlValue(value: InspectorControlValue, key: PropertyInspectorSett
 function writeColorControlValue(
     settings: WidgetStoredSettings,
     target: AppearanceColorTarget,
-    value: string,
+    value: InspectorControlValue,
 ): WidgetStoredSettings {
     return updateWidgetSettingsBranch(settings, "appearanceOverrides", {
         [target.rampKey]: {
             ...settings.appearanceOverrides?.[target.rampKey],
-            [target.colorKey]: value,
+            [target.colorKey]: value as string,
         },
     });
 }
@@ -260,12 +260,10 @@ function isOptionalNumberControlKey(key: string): boolean {
         || isDiskThroughputMaximumKey(key);
 }
 
-function parseThreshold(value: string, fallbackValue: number): number {
-    const numericValue = Number(value);
-
-    if (!Number.isFinite(numericValue)) {
+function parseThreshold(value: InspectorControlValue, fallbackValue: number): number {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
         return fallbackValue;
     }
 
-    return Math.min(Math.max(Math.round(numericValue), 0), 100);
+    return Math.min(Math.max(Math.round(value), 0), 100);
 }

@@ -4,7 +4,7 @@ import {
     sanitizeWidgetSettings,
     type SettingsContext,
 } from "../settings/widget-settings";
-import type { InspectorSettingTarget } from "./types";
+import type { InspectorControlValue, InspectorSettingTarget } from "./types";
 import {
     buildInspectorBindingContext,
     readInspectorControlValue,
@@ -55,7 +55,7 @@ test("channel color bindings read and write nested color ramps", () => {
 });
 
 test("network maximum binding switches scale to custom", () => {
-    const settings = writeSetting("maximumDownloadSpeedMbps", "500", {
+    const settings = writeSetting("maximumDownloadSpeedMbps", 500, {
         actionKind: "net-speed",
         isWindows: false,
     });
@@ -71,7 +71,7 @@ test("graphic type binding writes the selected appearance override", () => {
 });
 
 test("threshold bindings keep stored thresholds ordered", () => {
-    const lowSettings = writeSetting("lowThreshold", "90", defaultContext);
+    const lowSettings = writeSetting("lowThreshold", 90, defaultContext);
 
     assert.equal(lowSettings.appearanceOverrides?.lowThreshold, 90);
     assert.equal(lowSettings.appearanceOverrides?.highThreshold, 90);
@@ -99,7 +99,7 @@ test("disk metric kind binding does not apply platform context to stored setting
 
 function writeSetting(
     target: InspectorSettingTarget,
-    value: string,
+    value: InspectorControlValue,
     context: SettingsContext,
 ) {
     const storedSettings = sanitizeWidgetSettings({});

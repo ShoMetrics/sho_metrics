@@ -95,18 +95,20 @@ function DiskThroughputSettings(props: WidgetSettingsPanelProps): React.JSX.Elem
                 />
                 <NumberSetting
                     label="Read Max (MiB/s)"
-                    value={String(props.context.resolved.diskThroughput.maximumDiskReadThroughputMebibytesPerSecond ?? "")}
+                    value={props.context.resolved.diskThroughput.maximumDiskReadThroughputMebibytesPerSecond}
                     onValueChange={(value) => props.onSettingChange("maximumDiskReadThroughputMebibytesPerSecond", value)}
                     minimum={1}
                     step={1}
+                    optional
                     disabled={isAutoScale}
                 />
                 <NumberSetting
                     label="Write Max (MiB/s)"
-                    value={String(props.context.resolved.diskThroughput.maximumDiskWriteThroughputMebibytesPerSecond ?? "")}
+                    value={props.context.resolved.diskThroughput.maximumDiskWriteThroughputMebibytesPerSecond}
                     onValueChange={(value) => props.onSettingChange("maximumDiskWriteThroughputMebibytesPerSecond", value)}
                     minimum={1}
                     step={1}
+                    optional
                     disabled={isAutoScale}
                 />
             </SettingsSection>

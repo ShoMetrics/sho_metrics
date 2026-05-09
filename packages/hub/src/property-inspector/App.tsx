@@ -26,7 +26,7 @@ import {
     resolveIsWindowsPropertyInspector,
     type StreamDeckPropertyInspectorClient,
 } from "./stream-deck-client";
-import type { InspectorSettingTarget } from "./types";
+import type { InspectorControlValue, InspectorSettingTarget } from "./types";
 import {
     buildInspectorBindingContext,
     updateWidgetStoredSettings,
@@ -78,7 +78,7 @@ export function App({ client }: AppProps): React.JSX.Element {
     }), [state.storedSettings, state.globalSettings, state.actionKind, state.isWindows]);
     const isGlobalAppearanceOverrideEnabled = resolvedGlobalSettings.overrideWidgetAppearance;
 
-    const updateSetting = (changedTarget: InspectorSettingTarget, changedValue: string): void => {
+    const updateSetting = (changedTarget: InspectorSettingTarget, changedValue: InspectorControlValue): void => {
         setState((currentState) => {
             const currentContext = buildContextFromState(currentState);
 

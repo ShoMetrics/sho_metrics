@@ -3,10 +3,6 @@ import { ColorSetting } from "./controls/ColorSetting";
 import { GraphicTypeSetting } from "./controls/GraphicTypeSetting";
 import { NumberSetting } from "./controls/NumberSetting";
 import { SelectSetting } from "./controls/SelectSetting";
-import {
-    parseOptionalNumberControlValue,
-    parseRequiredNumberControlValue,
-} from "./control-values";
 import { InspectorItem } from "./components/InspectorItem";
 import { SettingsSection } from "./panels/SettingsSection";
 import {
@@ -118,20 +114,20 @@ function OverrideAppearanceSection({
                 <>
                     <NumberSetting
                         label="Low Threshold"
-                        value={String(appearance.lowThreshold)}
+                        value={appearance.lowThreshold}
                         minimum={0}
                         step={1}
                         onValueChange={(value) => onAppearancePatch({
-                            lowThreshold: parseRequiredNumberControlValue(value),
+                            lowThreshold: value,
                         })}
                     />
                     <NumberSetting
                         label="High Threshold"
-                        value={String(appearance.highThreshold)}
+                        value={appearance.highThreshold}
                         minimum={0}
                         step={1}
                         onValueChange={(value) => onAppearancePatch({
-                            highThreshold: parseRequiredNumberControlValue(value),
+                            highThreshold: value,
                         })}
                     />
                 </>
@@ -165,22 +161,24 @@ function NetworkDefaultsSection({
             />
             <NumberSetting
                 label="Download Max"
-                value={String(network.maximumDownloadSpeedMbps ?? "")}
+                value={network.maximumDownloadSpeedMbps}
                 minimum={1}
                 step={1}
+                optional
                 disabled={isAutoScale}
                 onValueChange={(value) => onNetworkPatch({
-                    maximumDownloadSpeedMbps: parseOptionalNumberControlValue(value),
+                    maximumDownloadSpeedMbps: value,
                 })}
             />
             <NumberSetting
                 label="Upload Max"
-                value={String(network.maximumUploadSpeedMbps ?? "")}
+                value={network.maximumUploadSpeedMbps}
                 minimum={1}
                 step={1}
+                optional
                 disabled={isAutoScale}
                 onValueChange={(value) => onNetworkPatch({
-                    maximumUploadSpeedMbps: parseOptionalNumberControlValue(value),
+                    maximumUploadSpeedMbps: value,
                 })}
             />
         </SettingsSection>
@@ -206,22 +204,24 @@ function DiskThroughputDefaultsSection({
             />
             <NumberSetting
                 label="Read Max"
-                value={String(diskThroughput.maximumDiskReadThroughputMebibytesPerSecond ?? "")}
+                value={diskThroughput.maximumDiskReadThroughputMebibytesPerSecond}
                 minimum={1}
                 step={1}
+                optional
                 disabled={isAutoScale}
                 onValueChange={(value) => onDiskThroughputPatch({
-                    maximumDiskReadThroughputMebibytesPerSecond: parseOptionalNumberControlValue(value),
+                    maximumDiskReadThroughputMebibytesPerSecond: value,
                 })}
             />
             <NumberSetting
                 label="Write Max"
-                value={String(diskThroughput.maximumDiskWriteThroughputMebibytesPerSecond ?? "")}
+                value={diskThroughput.maximumDiskWriteThroughputMebibytesPerSecond}
                 minimum={1}
                 step={1}
+                optional
                 disabled={isAutoScale}
                 onValueChange={(value) => onDiskThroughputPatch({
-                    maximumDiskWriteThroughputMebibytesPerSecond: parseOptionalNumberControlValue(value),
+                    maximumDiskWriteThroughputMebibytesPerSecond: value,
                 })}
             />
         </SettingsSection>
