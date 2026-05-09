@@ -3,8 +3,8 @@ import test from "node:test";
 import { resolveScenarioSectionList, type ScenarioSectionId } from "./scenario-model";
 import { resolveDiskScenario } from "./scenarios/disk";
 import { resolveNetSpeedScenario } from "./scenarios/net-speed";
-import { basePropertyInspectorSettings, type PropertyInspectorSettings } from "./settings";
 import type { VisibilityContext } from "./schema";
+import { buildVisibilityContext, type InspectorTestSettings } from "./test-context";
 
 test("network mirrored sparkline resolves stable UI sections in scenario order", () => {
     const context = buildContext({
@@ -76,14 +76,10 @@ function resolveSectionIdList(sectionList: ReturnType<typeof resolveScenarioSect
 
 function buildContext(options: {
     actionKind?: VisibilityContext["actionKind"];
-    settings?: Partial<PropertyInspectorSettings>;
+    settings?: InspectorTestSettings;
 }): VisibilityContext {
-    return {
+    return buildVisibilityContext({
         actionKind: options.actionKind ?? "net-speed",
-        isWindows: false,
-        settings: {
-            ...basePropertyInspectorSettings,
-            ...options.settings,
-        },
-    };
+        settings: options.settings,
+    });
 }

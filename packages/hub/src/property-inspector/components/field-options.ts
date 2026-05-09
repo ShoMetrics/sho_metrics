@@ -1,10 +1,11 @@
 import { resolveFieldOptions } from "../options";
 import type { FieldSchema, SelectOption, VisibilityContext } from "../schema";
+import { readInspectorControlValue } from "../widget-setting-bindings";
 
 export function isFieldDisabled(field: FieldSchema, context: VisibilityContext): boolean {
     return field.disabled === true
         || field.disabledWhen != null
-        && context.settings[field.disabledWhen.key] === field.disabledWhen.equals;
+        && readInspectorControlValue(context, field.disabledWhen.key) === field.disabledWhen.equals;
 }
 
 export function resolveSelectOptions(field: FieldSchema, context: VisibilityContext): readonly SelectOption[] {

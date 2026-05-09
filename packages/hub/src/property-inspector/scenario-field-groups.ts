@@ -35,7 +35,7 @@ export const circleStyleFieldGroup = defineFieldGroup({
 export const solidColorFieldGroup = defineFieldGroup({
     name: "solidColor",
     sectionId: "colors",
-    include: context => !usesChannelColorSettings(context) && context.settings.colorMode === "solid",
+    include: context => !usesChannelColorSettings(context) && context.resolved.appearance.colorMode === "solid",
     fieldList: [
         inspectorFieldCatalog.solidColorField,
     ],
@@ -44,7 +44,7 @@ export const solidColorFieldGroup = defineFieldGroup({
 export const thresholdColorFieldGroup = defineFieldGroup({
     name: "thresholdColor",
     sectionId: "colors",
-    include: context => !usesChannelColorSettings(context) && context.settings.colorMode !== "solid",
+    include: context => !usesChannelColorSettings(context) && context.resolved.appearance.colorMode !== "solid",
     fieldList: [
         inspectorFieldCatalog.dynamicUsageColorsNoteField,
         inspectorFieldCatalog.lowThresholdField,
@@ -78,7 +78,7 @@ export const networkChannelColorSettingsFieldGroup = defineFieldGroup({
 export const networkChannelThresholdFieldGroup = defineFieldGroup({
     name: "networkChannelThreshold",
     sectionId: "colors",
-    include: context => isDualNetworkChannelColor(context) && context.settings.colorMode === "threshold",
+    include: context => isDualNetworkChannelColor(context) && context.resolved.appearance.colorMode === "threshold",
     fieldList: [
         inspectorFieldCatalog.lowThresholdField,
         inspectorFieldCatalog.highThresholdField,
@@ -97,7 +97,7 @@ export const downloadChannelColorHeadingFieldGroup = defineFieldGroup({
 export const downloadSolidChannelColorFieldGroup = defineFieldGroup({
     name: "downloadSolidChannelColor",
     sectionId: "colors",
-    include: context => isDualNetworkChannelColor(context) && context.settings.colorMode !== "threshold",
+    include: context => isDualNetworkChannelColor(context) && context.resolved.appearance.colorMode !== "threshold",
     fieldList: [
         inspectorFieldCatalog.downloadSolidColorField,
     ],
@@ -106,7 +106,7 @@ export const downloadSolidChannelColorFieldGroup = defineFieldGroup({
 export const downloadDynamicChannelColorFieldGroup = defineFieldGroup({
     name: "downloadDynamicChannelColor",
     sectionId: "colors",
-    include: context => isDualNetworkChannelColor(context) && context.settings.colorMode === "threshold",
+    include: context => isDualNetworkChannelColor(context) && context.resolved.appearance.colorMode === "threshold",
     fieldList: [
         inspectorFieldCatalog.downloadLowColorField,
         inspectorFieldCatalog.downloadMediumColorField,
@@ -126,7 +126,7 @@ export const uploadChannelColorHeadingFieldGroup = defineFieldGroup({
 export const uploadSolidChannelColorFieldGroup = defineFieldGroup({
     name: "uploadSolidChannelColor",
     sectionId: "colors",
-    include: context => isDualNetworkChannelColor(context) && context.settings.colorMode !== "threshold",
+    include: context => isDualNetworkChannelColor(context) && context.resolved.appearance.colorMode !== "threshold",
     fieldList: [
         inspectorFieldCatalog.uploadSolidColorField,
     ],
@@ -135,7 +135,7 @@ export const uploadSolidChannelColorFieldGroup = defineFieldGroup({
 export const uploadDynamicChannelColorFieldGroup = defineFieldGroup({
     name: "uploadDynamicChannelColor",
     sectionId: "colors",
-    include: context => isDualNetworkChannelColor(context) && context.settings.colorMode === "threshold",
+    include: context => isDualNetworkChannelColor(context) && context.resolved.appearance.colorMode === "threshold",
     fieldList: [
         inspectorFieldCatalog.uploadLowColorField,
         inspectorFieldCatalog.uploadMediumColorField,
@@ -156,7 +156,7 @@ export const diskThroughputChannelColorSettingsFieldGroup = defineFieldGroup({
 export const diskThroughputChannelThresholdFieldGroup = defineFieldGroup({
     name: "diskThroughputChannelThreshold",
     sectionId: "colors",
-    include: context => isDualDiskThroughputChannelColor(context) && context.settings.colorMode === "threshold",
+    include: context => isDualDiskThroughputChannelColor(context) && context.resolved.appearance.colorMode === "threshold",
     fieldList: [
         inspectorFieldCatalog.lowThresholdField,
         inspectorFieldCatalog.highThresholdField,
@@ -175,7 +175,7 @@ export const diskReadChannelColorHeadingFieldGroup = defineFieldGroup({
 export const diskReadSolidChannelColorFieldGroup = defineFieldGroup({
     name: "diskReadSolidChannelColor",
     sectionId: "colors",
-    include: context => isDualDiskThroughputChannelColor(context) && context.settings.colorMode !== "threshold",
+    include: context => isDualDiskThroughputChannelColor(context) && context.resolved.appearance.colorMode !== "threshold",
     fieldList: [
         inspectorFieldCatalog.diskReadSolidColorField,
     ],
@@ -184,7 +184,7 @@ export const diskReadSolidChannelColorFieldGroup = defineFieldGroup({
 export const diskReadDynamicChannelColorFieldGroup = defineFieldGroup({
     name: "diskReadDynamicChannelColor",
     sectionId: "colors",
-    include: context => isDualDiskThroughputChannelColor(context) && context.settings.colorMode === "threshold",
+    include: context => isDualDiskThroughputChannelColor(context) && context.resolved.appearance.colorMode === "threshold",
     fieldList: [
         inspectorFieldCatalog.diskReadLowColorField,
         inspectorFieldCatalog.diskReadMediumColorField,
@@ -204,7 +204,7 @@ export const diskWriteChannelColorHeadingFieldGroup = defineFieldGroup({
 export const diskWriteSolidChannelColorFieldGroup = defineFieldGroup({
     name: "diskWriteSolidChannelColor",
     sectionId: "colors",
-    include: context => isDualDiskThroughputChannelColor(context) && context.settings.colorMode !== "threshold",
+    include: context => isDualDiskThroughputChannelColor(context) && context.resolved.appearance.colorMode !== "threshold",
     fieldList: [
         inspectorFieldCatalog.diskWriteSolidColorField,
     ],
@@ -213,7 +213,7 @@ export const diskWriteSolidChannelColorFieldGroup = defineFieldGroup({
 export const diskWriteDynamicChannelColorFieldGroup = defineFieldGroup({
     name: "diskWriteDynamicChannelColor",
     sectionId: "colors",
-    include: context => isDualDiskThroughputChannelColor(context) && context.settings.colorMode === "threshold",
+    include: context => isDualDiskThroughputChannelColor(context) && context.resolved.appearance.colorMode === "threshold",
     fieldList: [
         inspectorFieldCatalog.diskWriteLowColorField,
         inspectorFieldCatalog.diskWriteMediumColorField,
@@ -341,7 +341,7 @@ export const networkScaleFieldGroup = defineFieldGroup({
 export const networkTrafficDisplayModeFieldGroup = defineFieldGroup({
     name: "networkTrafficDisplayMode",
     sectionId: "trend",
-    include: context => context.settings.networkDirection === "both",
+    include: context => context.resolved.metric.networkDirection === "both",
     fieldList: [
         inspectorFieldCatalog.networkTrafficDisplayModeField,
     ],
@@ -373,8 +373,8 @@ export const maximumGpuPowerFieldGroup = defineFieldGroup({
 
 function isMirroredNetworkTraffic(context: VisibilityContext): boolean {
     return context.actionKind === "net-speed"
-        && context.settings.networkDirection === "both"
-        && context.settings.networkTrafficDisplayMode === "mirrored";
+        && context.resolved.metric.networkDirection === "both"
+        && context.resolved.local.networkTrafficDisplayMode === "mirrored";
 }
 
 function usesChannelColorSettings(context: VisibilityContext): boolean {
@@ -383,22 +383,22 @@ function usesChannelColorSettings(context: VisibilityContext): boolean {
 
 function isDualNetworkChannelColor(context: VisibilityContext): boolean {
     return context.actionKind === "net-speed"
-        && context.settings.networkDirection === "both"
+        && context.resolved.metric.networkDirection === "both"
         && (
-            context.settings.graphicType === "circular"
-            || context.settings.graphicType === "text"
-            || context.settings.graphicType === "linear"
-            || context.settings.graphicType === "dashed-line"
+            context.resolved.appearance.graphicType === "circular"
+            || context.resolved.appearance.graphicType === "text"
+            || context.resolved.appearance.graphicType === "linear"
+            || context.resolved.appearance.graphicType === "dashed-line"
         );
 }
 
 function isDualDiskThroughputChannelColor(context: VisibilityContext): boolean {
     return context.actionKind === "disk"
-        && context.settings.diskMetricKind === "throughput"
-        && context.settings.diskThroughputDirection === "both"
+        && context.resolved.metric.diskMetricKind === "throughput"
+        && context.resolved.metric.diskThroughputDirection === "both"
         && (
-            context.settings.graphicType === "circular"
-            || context.settings.graphicType === "text"
-            || context.settings.graphicType === "dashed-line"
+            context.resolved.appearance.graphicType === "circular"
+            || context.resolved.appearance.graphicType === "text"
+            || context.resolved.appearance.graphicType === "dashed-line"
         );
 }

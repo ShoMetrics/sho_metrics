@@ -22,7 +22,6 @@ import {
     uploadSolidChannelColorFieldGroup,
 } from "../scenario-field-groups";
 import {
-    defaultSettingsNormalizer,
     defineScenario,
     resolveGraphicScenario,
     type InspectorScenario,
@@ -32,7 +31,6 @@ import { inspectorScope } from "../scopes";
 
 const netSpeedCircularScenario = defineScenario({
     scope: inspectorScope.netSpeedCircularScope,
-    settingsNormalizer: defaultSettingsNormalizer,
     fieldGroupList: [
         baseFieldGroup,
         circleStyleFieldGroup,
@@ -56,7 +54,6 @@ const netSpeedCircularScenario = defineScenario({
 
 const netSpeedTextScenario = defineScenario({
     scope: inspectorScope.netSpeedTextScope,
-    settingsNormalizer: defaultSettingsNormalizer,
     fieldGroupList: [
         baseFieldGroup,
         networkDirectionFieldGroup,
@@ -78,7 +75,6 @@ const netSpeedTextScenario = defineScenario({
 
 const netSpeedLinearScenario = defineScenario({
     scope: inspectorScope.netSpeedLinearScope,
-    settingsNormalizer: defaultSettingsNormalizer,
     fieldGroupList: [
         baseFieldGroup,
         networkDirectionFieldGroup,
@@ -100,7 +96,6 @@ const netSpeedLinearScenario = defineScenario({
 
 const netSpeedSparklineScenario = defineScenario({
     scope: inspectorScope.netSpeedSparklineScope,
-    settingsNormalizer: defaultSettingsNormalizer,
     fieldGroupList: [
         baseFieldGroup,
         networkDirectionFieldGroup,
@@ -126,7 +121,7 @@ const netSpeedSparklineScenario = defineScenario({
 
 export function resolveNetSpeedScenario(context: VisibilityContext): InspectorScenario {
     return resolveGraphicScenario({
-        graphicType: context.settings.graphicType,
+        graphicType: context.resolved.appearance.graphicType,
         circularScenario: netSpeedCircularScenario,
         textScenario: netSpeedTextScenario,
         linearScenario: netSpeedLinearScenario,

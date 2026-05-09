@@ -1,7 +1,25 @@
-import type { ActionKind, PropertyInspectorSettings, ControlSettingValue } from "./settings";
+import type {
+    ActionKind,
+    AppearanceSettings,
+    DiskThroughputDefaultSettings,
+    MetricSettings,
+    NetworkDefaultSettings,
+    PluginGlobalSettings,
+    ResolvedWidgetSettings,
+    WidgetLocalSettings,
+    WidgetStoredSettings,
+} from "../settings/widget-settings";
 import type { InspectorScope } from "./scopes";
 
-export type PropertyInspectorSettingKey = Extract<keyof PropertyInspectorSettings, string>;
+export type InspectorControlValue = string | number | boolean | null | undefined;
+export type PropertyInspectorSettingKey =
+    | Extract<keyof AppearanceSettings, string>
+    | Extract<keyof MetricSettings, string>
+    | Extract<keyof WidgetLocalSettings, string>
+    | Extract<keyof NetworkDefaultSettings, string>
+    | Extract<keyof DiskThroughputDefaultSettings, string>
+    | "availableNetworkInterfaces"
+    | "availableDiskVolumes";
 export type FieldKind =
     | "select"
     | "graphic-type-picker"
@@ -34,7 +52,9 @@ export type SelectOptionsSource =
 export interface VisibilityContext {
     actionKind: ActionKind;
     isWindows: boolean;
-    settings: PropertyInspectorSettings;
+    settings: WidgetStoredSettings;
+    globalSettings: PluginGlobalSettings;
+    resolved: ResolvedWidgetSettings;
 }
 
 export interface FieldSchema {
@@ -45,7 +65,7 @@ export interface FieldSchema {
     label?: string;
     text?: string;
     noteVariant?: FieldNoteVariant;
-    defaultValue?: ControlSettingValue;
+    defaultValue?: InspectorControlValue;
     minimum?: number;
     step?: number;
     maximum?: number;
@@ -57,6 +77,6 @@ export interface FieldSchema {
     disabled?: boolean;
     disabledWhen?: {
         key: PropertyInspectorSettingKey;
-        equals: ControlSettingValue;
+        equals: InspectorControlValue;
     };
 }

@@ -7,19 +7,13 @@ import {
     sparklineGridLineFieldGroup,
     updateFieldGroup,
 } from "../scenario-field-groups";
-import {
-    defaultSettingsNormalizer,
-    defineScenario,
-    resolveGraphicScope,
-    type InspectorScenario,
-} from "../scenario-model";
+import { defineScenario, resolveGraphicScope, type InspectorScenario } from "../scenario-model";
 import { inspectorScope, type InspectorScope } from "../scopes";
 import type { ActionKind, GraphicType } from "../settings";
 
 export function resolveDefaultScenario(actionKind: ActionKind, graphicType: GraphicType): InspectorScenario {
     return defineScenario({
         scope: resolveDefaultScope(actionKind, graphicType),
-        settingsNormalizer: defaultSettingsNormalizer,
         fieldGroupList: [
             baseFieldGroup,
             ...(graphicType === "circular" ? [circleStyleFieldGroup] : []),

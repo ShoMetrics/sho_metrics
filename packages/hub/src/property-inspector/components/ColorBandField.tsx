@@ -1,4 +1,5 @@
 import type { FieldSchema, PropertyInspectorSettingKey, VisibilityContext } from "../schema";
+import { readInspectorControlValue } from "../widget-setting-bindings";
 
 interface ColorBandFieldProps {
     field: FieldSchema & { key: PropertyInspectorSettingKey };
@@ -7,7 +8,7 @@ interface ColorBandFieldProps {
 }
 
 export function ColorBandField({ field, context, disabled = false }: ColorBandFieldProps): React.JSX.Element {
-    const value = String(context.settings[field.key]);
+    const value = String(readInspectorControlValue(context, field.key));
 
     return (
         <div className="color-band-control">
@@ -28,15 +29,15 @@ export function ColorBandField({ field, context, disabled = false }: ColorBandFi
 
 function resolveColorBandText(key: PropertyInspectorSettingKey, context: VisibilityContext): string {
     if (key === "colorLow") {
-        return `0-${context.settings.lowThreshold}%`;
+        return `0-${readInspectorControlValue(context, "lowThreshold")}%`;
     }
 
     if (key === "colorMedium") {
-        return `${context.settings.lowThreshold}-${context.settings.highThreshold}%`;
+        return `${readInspectorControlValue(context, "lowThreshold")}-${readInspectorControlValue(context, "highThreshold")}%`;
     }
 
     if (key === "colorHigh") {
-        return `${context.settings.highThreshold}-100%`;
+        return `${readInspectorControlValue(context, "highThreshold")}-100%`;
     }
 
     return "";

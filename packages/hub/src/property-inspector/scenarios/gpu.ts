@@ -10,12 +10,7 @@ import {
     sparklineGridLineFieldGroup,
     updateFieldGroup,
 } from "../scenario-field-groups";
-import {
-    defaultSettingsNormalizer,
-    defineScenario,
-    resolveGraphicScope,
-    type InspectorScenario,
-} from "../scenario-model";
+import { defineScenario, resolveGraphicScope, type InspectorScenario } from "../scenario-model";
 import type { GraphicType } from "../settings";
 import { inspectorScope } from "../scopes";
 
@@ -28,7 +23,6 @@ export function resolveGpuTempScenario(graphicType: GraphicType): InspectorScena
             linearScope: inspectorScope.gpuTempLinearScope,
             sparklineScope: inspectorScope.gpuTempSparklineScope,
         }),
-        settingsNormalizer: defaultSettingsNormalizer,
         fieldGroupList: [
             baseFieldGroup,
             ...(graphicType === "circular" ? [circleStyleFieldGroup] : []),
@@ -51,7 +45,6 @@ export function resolveGpuPowerScenario(graphicType: GraphicType): InspectorScen
             linearScope: inspectorScope.gpuPowerLinearScope,
             sparklineScope: inspectorScope.gpuPowerSparklineScope,
         }),
-        settingsNormalizer: defaultSettingsNormalizer,
         fieldGroupList: [
             baseFieldGroup,
             ...(graphicType === "circular" ? [circleStyleFieldGroup] : []),

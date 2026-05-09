@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { FieldSchema, SelectOption, VisibilityContext } from "../schema";
+import type { FieldSchema, SelectOption } from "../schema";
 import { inspectorScope } from "../scopes";
-import { basePropertyInspectorSettings } from "../settings";
+import { buildVisibilityContext, type InspectorTestSettings } from "../test-context";
 import {
     isFieldDisabled,
     isOptionDisabled,
@@ -90,17 +90,14 @@ test("option disabled and hidden states account for Windows-only options", () =>
 });
 
 function buildContext(
-    settings: Partial<typeof basePropertyInspectorSettings> = {},
+    settings: InspectorTestSettings = {},
     isWindows = false,
-): VisibilityContext {
-    return {
+){
+    return buildVisibilityContext({
         actionKind: "cpu-usage",
         isWindows,
-        settings: {
-            ...basePropertyInspectorSettings,
-            ...settings,
-        },
-    };
+        settings,
+    });
 }
 
 function buildField(overrides: Partial<FieldSchema> = {}): FieldSchema {

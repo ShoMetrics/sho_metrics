@@ -1,5 +1,6 @@
 import { resolveDiskAutoLinearLabel, resolveSelectedDiskVolumeLabel } from "../options";
 import type { FieldSchema, PropertyInspectorSettingKey, VisibilityContext } from "../schema";
+import { readInspectorControlValue } from "../widget-setting-bindings";
 
 interface TextFieldProps {
     field: FieldSchema & { key: PropertyInspectorSettingKey };
@@ -19,7 +20,7 @@ export function TextField({ field, context, onSettingChange, disabled = false }:
             type="text"
             data-setting-key={field.key}
             placeholder={placeholder ?? ""}
-            value={String(context.settings[field.key] ?? "")}
+            value={String(readInspectorControlValue(context, field.key) ?? "")}
             disabled={disabled}
             onChange={() => undefined}
         />
@@ -30,9 +31,10 @@ export function TextField({ field, context, onSettingChange, disabled = false }:
     }
 
     const detectedLabel = resolveSelectedDiskVolumeLabel(context);
+    const currentLabel = String(readInspectorControlValue(context, "diskLinearLabel") ?? "");
     const canUseDetectedLabel = detectedLabel.length > 0
         && detectedLabel !== "-"
-        && context.settings.diskLinearLabel.trim() !== detectedLabel;
+        && currentLabel.trim() !== detectedLabel;
 
     const useDetectedLabel = (): void => {
         if (!canUseDetectedLabel) {

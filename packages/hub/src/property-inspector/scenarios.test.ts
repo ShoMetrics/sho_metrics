@@ -1,13 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { resolveInspectorFieldList } from "./scenarios";
-import {
-    basePropertyInspectorSettings,
-    type ActionKind,
-    type GraphicType,
-    type PropertyInspectorSettings,
-} from "./settings";
+import type { ActionKind, GraphicType } from "./settings";
 import type { VisibilityContext } from "./schema";
+import { buildVisibilityContext, type InspectorTestSettings } from "./test-context";
 
 test("disk usage linear exposes only linear disk title fields", () => {
     const inspectorFieldIdList = resolveInspectorFieldIdList(buildContext({
@@ -320,7 +316,7 @@ test("color mode selects the matching color section", () => {
 test("line smoothing slider is exposed only by sparkline scenarios", () => {
     const scenarioList: ReadonlyArray<{
         actionKind: ActionKind;
-        settings?: Partial<PropertyInspectorSettings>;
+        settings?: InspectorTestSettings;
     }> = [
         { actionKind: "cpu-usage" },
         { actionKind: "net-speed" },
@@ -435,16 +431,13 @@ test("windows hides disk throughput-only controls", () => {
 function buildContext(options: {
     actionKind: ActionKind;
     isWindows?: boolean;
-    settings: Partial<PropertyInspectorSettings> & { graphicType?: GraphicType };
+    settings: InspectorTestSettings & { graphicType?: GraphicType };
 }): VisibilityContext {
-    return {
+    return buildVisibilityContext({
         actionKind: options.actionKind,
         isWindows: options.isWindows ?? false,
-        settings: {
-            ...basePropertyInspectorSettings,
-            ...options.settings,
-        },
-    };
+        settings: options.settings,
+    });
 }
 
 function resolveInspectorFieldIdList(context: VisibilityContext): readonly string[] {

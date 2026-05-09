@@ -1,197 +1,221 @@
 import {
     defaultAppearanceSettings,
+    defaultDiskThroughputSettings,
+    defaultLocalSettings,
+    defaultMetricSettings,
+    defaultNetworkSettings,
+    defaultRuntimeCache,
+    normalizeWidgetStoredSettings,
+    type AppearanceSettings,
+    type DiskThroughputDefaultSettings,
+    type MetricSettings,
+    type NetworkDefaultSettings,
+    type PluginGlobalSettings,
     type SettingsContext,
+    type WidgetLocalSettings,
     type WidgetSettings,
+    type WidgetRuntimeCache,
     type WidgetStoredSettings,
 } from "../settings/widget-settings";
 import {
     updateWidgetSettingsBranch,
 } from "../settings/updates";
-import type { PropertyInspectorSettingKey } from "./schema";
-import type { PropertyInspectorSettings, ControlSettingValue } from "./settings";
+import { resolveWidgetSettings } from "../settings/resolver";
+import type { InspectorControlValue, PropertyInspectorSettingKey, VisibilityContext } from "./schema";
 
-export interface WidgetSettingBinding {
-    readonly id: PropertyInspectorSettingKey;
-    read(settings: PropertyInspectorSettings): ControlSettingValue;
-    write(settings: WidgetStoredSettings, value: string, context: SettingsContext): WidgetStoredSettings;
-}
+export type InspectorBindingContext = VisibilityContext;
 
-type BindingWriter = (
-    settings: WidgetStoredSettings,
-    value: string,
-    context: SettingsContext,
-) => WidgetStoredSettings;
+export function buildInspectorBindingContext(options: {
+    storedSettings: WidgetStoredSettings;
+    globalSettings: PluginGlobalSettings;
+    actionKind: SettingsContext["actionKind"];
+    isWindows: boolean;
+}): InspectorBindingContext {
+    const context: SettingsContext = {
+        actionKind: options.actionKind,
+        isWindows: options.isWindows,
+    };
 
-const widgetSettingBindings = defineBindings({
-    pollingFrequencySeconds: localBinding("pollingFrequencySeconds"),
-    graphicType: appearanceBinding("graphicType"),
-    circleStyle: appearanceBinding("circleStyle"),
-    graphicStyle: appearanceBinding("graphicStyle"),
-    colorMode: appearanceBinding("colorMode"),
-    solidColor: appearanceBinding("solidColor"),
-    lowThreshold: thresholdBinding("lowThreshold"),
-    highThreshold: thresholdBinding("highThreshold"),
-    colorLow: appearanceBinding("colorLow"),
-    colorMedium: appearanceBinding("colorMedium"),
-    colorHigh: appearanceBinding("colorHigh"),
-    lineSmoothingPercent: appearanceBinding("lineSmoothingPercent"),
-    gridLineVisibility: appearanceBinding("gridLineVisibility"),
-    gridLineType: appearanceBinding("gridLineType"),
-    networkDirection: metricBinding("networkDirection"),
-    networkInterfaceId: metricBinding("networkInterfaceId"),
-    networkTrafficDisplayMode: localBinding("networkTrafficDisplayMode"),
-    networkScaleMode: networkBinding("networkScaleMode"),
-    maximumDownloadSpeedMbps: networkMaximumBinding("maximumDownloadSpeedMbps"),
-    maximumUploadSpeedMbps: networkMaximumBinding("maximumUploadSpeedMbps"),
-    networkUnitBase: networkBinding("networkUnitBase"),
-    downloadSolidColor: appearanceBinding("downloadSolidColor"),
-    downloadColorLow: appearanceBinding("downloadColorLow"),
-    downloadColorMedium: appearanceBinding("downloadColorMedium"),
-    downloadColorHigh: appearanceBinding("downloadColorHigh"),
-    uploadSolidColor: appearanceBinding("uploadSolidColor"),
-    uploadColorLow: appearanceBinding("uploadColorLow"),
-    uploadColorMedium: appearanceBinding("uploadColorMedium"),
-    uploadColorHigh: appearanceBinding("uploadColorHigh"),
-    diskMetricKind: diskMetricKindBinding(),
-    diskVolumeId: metricBinding("diskVolumeId"),
-    diskUsageDisplayMode: localBinding("diskUsageDisplayMode"),
-    diskLinearLabel: localBinding("diskLinearLabel"),
-    diskThroughputDirection: metricBinding("diskThroughputDirection"),
-    diskThroughputScaleMode: diskThroughputBinding("diskThroughputScaleMode"),
-    maximumDiskReadThroughputMebibytesPerSecond: diskThroughputMaximumBinding(
-        "maximumDiskReadThroughputMebibytesPerSecond",
-    ),
-    maximumDiskWriteThroughputMebibytesPerSecond: diskThroughputMaximumBinding(
-        "maximumDiskWriteThroughputMebibytesPerSecond",
-    ),
-    temperatureUnit: localBinding("temperatureUnit"),
-    maximumTemperatureCelsius: localBinding("maximumTemperatureCelsius"),
-    maximumGpuPowerWatts: localBinding("maximumGpuPowerWatts"),
-    diskReadSolidColor: appearanceBinding("diskReadSolidColor"),
-    diskReadColorLow: appearanceBinding("diskReadColorLow"),
-    diskReadColorMedium: appearanceBinding("diskReadColorMedium"),
-    diskReadColorHigh: appearanceBinding("diskReadColorHigh"),
-    diskWriteSolidColor: appearanceBinding("diskWriteSolidColor"),
-    diskWriteColorLow: appearanceBinding("diskWriteColorLow"),
-    diskWriteColorMedium: appearanceBinding("diskWriteColorMedium"),
-    diskWriteColorHigh: appearanceBinding("diskWriteColorHigh"),
-} satisfies Partial<Record<PropertyInspectorSettingKey, BindingWriter>>);
-
-export function findWidgetSettingBinding(bindingId: string): WidgetSettingBinding | null {
-    return Object.values(widgetSettingBindings)
-        .find(binding => binding.id === bindingId) ?? null;
+    return {
+        ...context,
+        settings: options.storedSettings,
+        globalSettings: options.globalSettings,
+        resolved: resolveWidgetSettings({
+            storedSettings: options.storedSettings,
+            globalSettings: options.globalSettings,
+            context,
+        }),
+    };
 }
 
 export function updateWidgetStoredSettings(options: {
     storedSettings: WidgetStoredSettings;
-    binding: WidgetSettingBinding;
+    key: PropertyInspectorSettingKey;
     value: string;
-    context: SettingsContext;
+    context: InspectorBindingContext;
 }): WidgetStoredSettings {
-    return options.binding.write(options.storedSettings, options.value, options.context);
+    return writeInspectorControlValue(options.storedSettings, options.key, options.value, options.context);
 }
 
-function defineBindings<TBindings extends Partial<Record<PropertyInspectorSettingKey, BindingWriter>>>(
-    bindings: TBindings,
-): { [TKey in keyof TBindings]: WidgetSettingBinding } {
-    const output = {} as { [TKey in keyof TBindings]: WidgetSettingBinding };
+export function isPropertyInspectorSettingKey(value: string): value is PropertyInspectorSettingKey {
+    return isAppearanceKey(value)
+        || isMetricKey(value)
+        || isLocalKey(value)
+        || isNetworkKey(value)
+        || isDiskThroughputKey(value)
+        || isRuntimeCacheKey(value);
+}
 
-    for (const [id, write] of Object.entries(bindings) as [keyof TBindings, BindingWriter][]) {
-        output[id] = {
-            id: id as PropertyInspectorSettingKey,
-            read: settings => settings[id as PropertyInspectorSettingKey],
-            write,
-        };
+export function readInspectorControlValue(
+    context: InspectorBindingContext,
+    key: PropertyInspectorSettingKey,
+): InspectorControlValue {
+    if (isAppearanceKey(key)) {
+        return context.resolved.appearance[key];
     }
 
-    return output;
+    if (isMetricKey(key)) {
+        return context.resolved.metric[key];
+    }
+
+    if (isLocalKey(key)) {
+        return toControlValue(context.resolved.local[key], key);
+    }
+
+    if (isNetworkKey(key)) {
+        return toControlValue(context.resolved.network[key], key);
+    }
+
+    if (isDiskThroughputKey(key)) {
+        return toControlValue(context.resolved.diskThroughput[key], key);
+    }
+
+    if (isRuntimeCacheKey(key)) {
+        return context.settings.runtimeCache?.[key] ?? defaultRuntimeCache[key];
+    }
+
+    return undefined;
 }
 
-function metricBinding(key: keyof NonNullable<WidgetSettings["metric"]>): BindingWriter {
-    return branchBinding("metric", key);
-}
+function writeInspectorControlValue(
+    settings: WidgetStoredSettings,
+    key: PropertyInspectorSettingKey,
+    value: string,
+    context: InspectorBindingContext,
+): WidgetStoredSettings {
+    if (key === "lowThreshold" || key === "highThreshold") {
+        return writeThresholdControlValue(settings, key, value, context);
+    }
 
-function localBinding(key: keyof NonNullable<WidgetSettings["local"]>): BindingWriter {
-    return branchBinding("local", key);
-}
-
-function appearanceBinding(key: keyof NonNullable<WidgetSettings["appearanceOverrides"]>): BindingWriter {
-    return branchBinding("appearanceOverrides", key);
-}
-
-function networkBinding(key: keyof NonNullable<WidgetSettings["networkOverrides"]>): BindingWriter {
-    return branchBinding("networkOverrides", key);
-}
-
-function networkMaximumBinding(
-    key: "maximumDownloadSpeedMbps" | "maximumUploadSpeedMbps",
-): BindingWriter {
-    return (settings, value) => updateWidgetSettingsBranch(settings, "networkOverrides", {
-        [key]: value,
-        networkScaleMode: "custom",
-    });
-}
-
-function diskThroughputBinding(key: keyof NonNullable<WidgetSettings["diskThroughputOverrides"]>): BindingWriter {
-    return branchBinding("diskThroughputOverrides", key);
-}
-
-function diskThroughputMaximumBinding(
-    key: "maximumDiskReadThroughputMebibytesPerSecond" | "maximumDiskWriteThroughputMebibytesPerSecond",
-): BindingWriter {
-    return (settings, value) => updateWidgetSettingsBranch(settings, "diskThroughputOverrides", {
-        [key]: value,
-        diskThroughputScaleMode: "custom",
-    });
-}
-
-function diskMetricKindBinding(): BindingWriter {
-    return (settings, value) => updateWidgetSettingsBranch(settings, "metric", {
-        diskMetricKind: value as NonNullable<WidgetSettings["metric"]>["diskMetricKind"],
-    });
-}
-
-function thresholdBinding(key: "lowThreshold" | "highThreshold"): BindingWriter {
-    return (settings, value, context) => {
-        const currentLowThreshold = parseThreshold(
-            settings.appearanceOverrides?.lowThreshold,
-            defaultAppearanceSettings.lowThreshold,
-        );
-        const currentHighThreshold = parseThreshold(
-            settings.appearanceOverrides?.highThreshold,
-            defaultAppearanceSettings.highThreshold,
-        );
-        const nextThreshold = parseThreshold(
-            value,
-            key === "lowThreshold" ? currentLowThreshold : currentHighThreshold,
-        );
-        const orderedThresholds = resolveThresholdPair(
-            key,
-            key === "lowThreshold" ? nextThreshold : currentLowThreshold,
-            key === "highThreshold" ? nextThreshold : currentHighThreshold,
-        );
-
-        void context;
+    if (isAppearanceKey(key)) {
         return updateWidgetSettingsBranch(settings, "appearanceOverrides", {
-            lowThreshold: orderedThresholds.lowThreshold,
-            highThreshold: orderedThresholds.highThreshold,
-        });
-    };
+            [key]: value,
+        } as NonNullable<WidgetSettings["appearanceOverrides"]>);
+    }
+
+    if (isMetricKey(key)) {
+        return updateWidgetSettingsBranch(settings, "metric", {
+            [key]: value,
+        } as NonNullable<WidgetSettings["metric"]>);
+    }
+
+    if (isLocalKey(key)) {
+        return updateWidgetSettingsBranch(settings, "local", {
+            [key]: value,
+        } as NonNullable<WidgetSettings["local"]>);
+    }
+
+    if (isNetworkKey(key)) {
+        return updateWidgetSettingsBranch(settings, "networkOverrides", {
+            [key]: value,
+            ...(isNetworkMaximumKey(key) ? { networkScaleMode: "custom" as const } : {}),
+        } as NonNullable<WidgetSettings["networkOverrides"]>);
+    }
+
+    if (isDiskThroughputKey(key)) {
+        return updateWidgetSettingsBranch(settings, "diskThroughputOverrides", {
+            [key]: value,
+            ...(isDiskThroughputMaximumKey(key) ? { diskThroughputScaleMode: "custom" as const } : {}),
+        } as NonNullable<WidgetSettings["diskThroughputOverrides"]>);
+    }
+
+    return normalizeWidgetStoredSettings(settings);
 }
 
-function branchBinding<TBranch extends keyof Pick<
-    WidgetSettings,
-    "metric" | "local" | "appearanceOverrides" | "networkOverrides" | "diskThroughputOverrides"
->>(
-    branch: TBranch,
-    key: keyof NonNullable<WidgetSettings[TBranch]>,
-): BindingWriter {
-    return (settings, value) => updateWidgetSettingsBranch(settings, branch, {
-        [key]: value,
-    } as NonNullable<WidgetSettings[TBranch]>);
+function writeThresholdControlValue(
+    settings: WidgetStoredSettings,
+    key: "lowThreshold" | "highThreshold",
+    value: string,
+    context: InspectorBindingContext,
+): WidgetStoredSettings {
+    const currentLowThreshold = context.resolved.appearance.lowThreshold;
+    const currentHighThreshold = context.resolved.appearance.highThreshold;
+    const nextThreshold = parseThreshold(
+        value,
+        key === "lowThreshold" ? currentLowThreshold : currentHighThreshold,
+    );
+    const patch: Partial<AppearanceSettings> = { [key]: nextThreshold };
+
+    if (key === "lowThreshold" && nextThreshold > currentHighThreshold) {
+        patch.highThreshold = nextThreshold;
+    }
+
+    if (key === "highThreshold" && nextThreshold < currentLowThreshold) {
+        patch.lowThreshold = nextThreshold;
+    }
+
+    return updateWidgetSettingsBranch(settings, "appearanceOverrides", patch);
 }
 
-function parseThreshold(value: unknown, fallbackValue: number): number {
+function toControlValue(value: InspectorControlValue, key: PropertyInspectorSettingKey): InspectorControlValue {
+    return value === undefined && isOptionalNumberControlKey(key) ? "" : value;
+}
+
+function isAppearanceKey(key: string): key is keyof AppearanceSettings {
+    return key in defaultAppearanceSettings;
+}
+
+function isMetricKey(key: string): key is keyof MetricSettings {
+    return key in defaultMetricSettings;
+}
+
+function isLocalKey(key: string): key is keyof WidgetLocalSettings {
+    return key in defaultLocalSettings;
+}
+
+function isNetworkKey(key: string): key is keyof NetworkDefaultSettings {
+    return key in defaultNetworkSettings;
+}
+
+function isDiskThroughputKey(key: string): key is keyof DiskThroughputDefaultSettings {
+    return key in defaultDiskThroughputSettings;
+}
+
+function isRuntimeCacheKey(key: string): key is Extract<
+    keyof WidgetRuntimeCache,
+    "availableNetworkInterfaces" | "availableDiskVolumes"
+> {
+    return key === "availableNetworkInterfaces" || key === "availableDiskVolumes";
+}
+
+function isNetworkMaximumKey(key: string): key is "maximumDownloadSpeedMbps" | "maximumUploadSpeedMbps" {
+    return key === "maximumDownloadSpeedMbps" || key === "maximumUploadSpeedMbps";
+}
+
+function isDiskThroughputMaximumKey(
+    key: string,
+): key is "maximumDiskReadThroughputMebibytesPerSecond" | "maximumDiskWriteThroughputMebibytesPerSecond" {
+    return key === "maximumDiskReadThroughputMebibytesPerSecond"
+        || key === "maximumDiskWriteThroughputMebibytesPerSecond";
+}
+
+function isOptionalNumberControlKey(key: string): boolean {
+    return key === "maximumGpuPowerWatts"
+        || isNetworkMaximumKey(key)
+        || isDiskThroughputMaximumKey(key);
+}
+
+function parseThreshold(value: string, fallbackValue: number): number {
     const numericValue = Number(value);
 
     if (!Number.isFinite(numericValue)) {
@@ -199,21 +223,4 @@ function parseThreshold(value: unknown, fallbackValue: number): number {
     }
 
     return Math.min(Math.max(Math.round(numericValue), 0), 100);
-}
-
-function resolveThresholdPair(
-    changedKey: "lowThreshold" | "highThreshold",
-    lowThreshold: number,
-    highThreshold: number,
-): {
-    lowThreshold: number;
-    highThreshold: number;
-} {
-    if (lowThreshold <= highThreshold) {
-        return { lowThreshold, highThreshold };
-    }
-
-    return changedKey === "lowThreshold"
-        ? { lowThreshold, highThreshold: lowThreshold }
-        : { lowThreshold: highThreshold, highThreshold };
 }

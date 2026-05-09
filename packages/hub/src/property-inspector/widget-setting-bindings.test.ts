@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+    defaultPluginGlobalSettings,
     normalizeWidgetStoredSettings,
     type SettingsContext,
 } from "../settings/widget-settings";
 import {
-    findWidgetSettingBinding,
+    buildInspectorBindingContext,
+    readInspectorControlValue,
     updateWidgetStoredSettings,
 } from "./widget-setting-bindings";
 
@@ -19,6 +21,17 @@ test("widget setting binding writes appearance overrides only", () => {
 
     assert.deepEqual(settings.appearanceOverrides, { solidColor: "#123456" });
     assert.equal(settings.networkOverrides, undefined);
+});
+
+test("widget setting binding reads resolved values", () => {
+    const context = buildContext(normalizeWidgetStoredSettings({
+        appearanceOverrides: {
+            graphicType: "linear",
+        },
+    }), defaultContext);
+
+    assert.equal(readInspectorControlValue(context, "graphicType"), "linear");
+    assert.equal(readInspectorControlValue(context, "maximumGpuPowerWatts"), "");
 });
 
 test("network maximum binding switches scale to custom", () => {
@@ -65,18 +78,28 @@ test("disk metric kind binding does not apply platform context to stored setting
 });
 
 function writeSetting(
-    bindingId: string,
+    key: Parameters<typeof updateWidgetStoredSettings>[0]["key"],
     value: string,
     context: SettingsContext,
 ) {
-    const binding = findWidgetSettingBinding(bindingId);
-
-    assert.ok(binding);
+    const storedSettings = normalizeWidgetStoredSettings({});
 
     return updateWidgetStoredSettings({
-        storedSettings: normalizeWidgetStoredSettings({}),
-        binding,
+        storedSettings,
+        key,
         value,
-        context,
+        context: buildContext(storedSettings, context),
+    });
+}
+
+function buildContext(
+    storedSettings: ReturnType<typeof normalizeWidgetStoredSettings>,
+    context: SettingsContext,
+) {
+    return buildInspectorBindingContext({
+        storedSettings,
+        globalSettings: { ...defaultPluginGlobalSettings },
+        actionKind: context.actionKind,
+        isWindows: context.isWindows,
     });
 }
