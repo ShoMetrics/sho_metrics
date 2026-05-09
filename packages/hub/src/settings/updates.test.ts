@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { updateWidgetAppearance, updateWidgetRuntimeCache } from "./updates";
+import { updateWidgetRuntimeCache, updateWidgetSettingsBranch } from "./updates";
 import type { WidgetSettings } from "./model";
 
 test("updating runtime state preserves user preferences and overrides", () => {
@@ -35,7 +35,7 @@ test("updating runtime state preserves user preferences and overrides", () => {
 });
 
 test("updating appearance writes sparse overrides only", () => {
-    const nextSettings = updateWidgetAppearance({}, {
+    const nextSettings = updateWidgetSettingsBranch({}, "appearanceOverrides", {
         solidColor: "#123456",
     });
 
