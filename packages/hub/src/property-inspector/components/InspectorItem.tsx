@@ -7,6 +7,7 @@ interface InspectorItemProps {
 }
 
 export function InspectorItem({ label, className, children }: InspectorItemProps): React.JSX.Element {
+    const hasLabel = label !== undefined && label !== "";
     const handleLabelClick = (event: MouseEvent<HTMLLabelElement>): void => {
         const item = event.currentTarget.closest(".inspector-item");
         const focusTarget = item?.querySelector<HTMLElement>(
@@ -18,9 +19,9 @@ export function InspectorItem({ label, className, children }: InspectorItemProps
     const itemClassName = className ? `inspector-item ${className}` : "inspector-item";
 
     return (
-        <div className={itemClassName}>
+        <div className={itemClassName} data-has-label={hasLabel ? "true" : "false"}>
             <div className="inspector-item-label-cell">
-                <label onClick={handleLabelClick}>{label ? `${label}:` : null}</label>
+                <label onClick={handleLabelClick}>{hasLabel ? `${label}:` : null}</label>
             </div>
             <div className="inspector-item-content">{children}</div>
         </div>
