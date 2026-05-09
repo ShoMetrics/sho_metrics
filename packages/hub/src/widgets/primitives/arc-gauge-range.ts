@@ -3,6 +3,7 @@ import {
     adjustHexColorBrightness,
     clamp,
 } from "../../rendering/svg-utils";
+import { interpolateHexColor } from "../../shared/color-utils";
 import type { ArcGaugeStyle } from "./arc-gauge";
 
 export interface ArcGaugeGeometry {
@@ -699,49 +700,6 @@ function resolveGaugeRangeSegmentColor(segment: GaugeRangePaintSegment, progress
     const ratio = span > 0 ? (progress - segment.startProgress) / span : 0;
 
     return interpolateHexColor(segment.startColor, segment.endColor, ratio);
-}
-
-function interpolateHexColor(fromColor: string, toColor: string, ratio: number): string {
-    const fromChannels = parseHexColorChannels(fromColor);
-    const toChannels = parseHexColorChannels(toColor);
-
-    if (!fromChannels || !toChannels) {
-        return ratio < 0.5 ? fromColor : toColor;
-    }
-
-    const redChannel = interpolateColorChannel(fromChannels.redChannel, toChannels.redChannel, ratio);
-    const greenChannel = interpolateColorChannel(fromChannels.greenChannel, toChannels.greenChannel, ratio);
-    const blueChannel = interpolateColorChannel(fromChannels.blueChannel, toChannels.blueChannel, ratio);
-
-    return `#${formatHexChannel(redChannel)}${formatHexChannel(greenChannel)}${formatHexChannel(blueChannel)}`;
-}
-
-function parseHexColorChannels(hexColor: string): {
-    redChannel: number;
-    greenChannel: number;
-    blueChannel: number;
-} | null {
-    const colorMatch = /^#?([0-9a-f]{6})$/i.exec(hexColor.trim());
-
-    if (!colorMatch) {
-        return null;
-    }
-
-    const colorValue = colorMatch[1];
-
-    return {
-        redChannel: parseInt(colorValue.slice(0, 2), 16),
-        greenChannel: parseInt(colorValue.slice(2, 4), 16),
-        blueChannel: parseInt(colorValue.slice(4, 6), 16),
-    };
-}
-
-function interpolateColorChannel(fromChannel: number, toChannel: number, ratio: number): number {
-    return Math.round(fromChannel + (toChannel - fromChannel) * clamp(ratio, 0, 1));
-}
-
-function formatHexChannel(channelValue: number): string {
-    return clamp(channelValue, 0, 255).toString(16).padStart(2, "0");
 }
 
 function resolvePointOnCircle(options: {

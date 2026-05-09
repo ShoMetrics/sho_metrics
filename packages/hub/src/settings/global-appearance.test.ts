@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+    parseHexColor,
+    resolveRelativeLuminance,
+} from "../shared/color-utils";
+import {
     applyGlobalAppearanceToVisualSettings,
     buildGlobalChannelColorConfig,
     defaultPluginGlobalSettings,
@@ -67,11 +71,11 @@ test("tint channel derivation keeps the selected color as primary and creates st
 
     assert.equal(lightBlueChannels.primaryColor, "#93c5fd");
     assert.notEqual(lightBlueChannels.secondaryColor, lightBlueChannels.primaryColor);
-    assert.ok(resolveRelativeLuminance(lightBlueChannels.secondaryColor) < resolveRelativeLuminance(lightBlueChannels.primaryColor));
+    assert.ok(readRelativeLuminance(lightBlueChannels.secondaryColor) < readRelativeLuminance(lightBlueChannels.primaryColor));
 
     assert.equal(darkBlueChannels.primaryColor, "#1e3a8a");
     assert.notEqual(darkBlueChannels.secondaryColor, darkBlueChannels.primaryColor);
-    assert.ok(resolveRelativeLuminance(darkBlueChannels.secondaryColor) > resolveRelativeLuminance(darkBlueChannels.primaryColor));
+    assert.ok(readRelativeLuminance(darkBlueChannels.secondaryColor) > readRelativeLuminance(darkBlueChannels.primaryColor));
 });
 
 test("global channel color config maps primary to one channel and secondary to the other", () => {
@@ -94,10 +98,12 @@ test("global channel color config maps primary to one channel and secondary to t
     assert.equal(secondaryConfig.thresholds.length, 3);
 });
 
-function resolveRelativeLuminance(hexColor: string): number {
-    const red = Number.parseInt(hexColor.slice(1, 3), 16) / 255;
-    const green = Number.parseInt(hexColor.slice(3, 5), 16) / 255;
-    const blue = Number.parseInt(hexColor.slice(5, 7), 16) / 255;
+function readRelativeLuminance(hexColor: string): number {
+    const color = parseHexColor(hexColor);
 
-    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+    if (!color) {
+        throw new Error(`Expected a valid hex color, got ${hexColor}.`);
+    }
+
+    return resolveRelativeLuminance(color);
 }
