@@ -43,6 +43,20 @@ const restrictedConcreteActionVisualFallbackSyntax = [
   message: `${name} is action-level visual settings fallback. Actions must trust resolved settings and renderer adapters.`,
 }));
 
+const restrictedConcreteActionResolvedSettingsAliasSyntax = [
+  {
+    selector: 'TSTypeAliasDeclaration[typeAnnotation.typeName.name="ResolvedWidgetSettings"]',
+    message: 'Do not create no-op action settings aliases. Use ResolvedWidgetSettings directly unless the type actually narrows fields.',
+  },
+];
+
+const restrictedConcreteActionColorFallbackSyntax = [
+  {
+    selector: 'Property[key.name="solidColor"][value.type="LogicalExpression"][value.operator="||"]',
+    message: 'Actions must trust resolved colors. Put missing-value defaults in settings defaults/resolver, not concrete action fallbacks.',
+  },
+];
+
 const restrictedSchemaHardeningImports = {
   paths: [
     {
@@ -160,6 +174,8 @@ export default tseslint.config(
         ...restrictedLegacySettingSyntax,
         ...restrictedConcreteActionRawSettingsSyntax,
         ...restrictedConcreteActionVisualFallbackSyntax,
+        ...restrictedConcreteActionResolvedSettingsAliasSyntax,
+        ...restrictedConcreteActionColorFallbackSyntax,
       ],
     },
   },

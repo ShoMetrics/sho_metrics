@@ -13,7 +13,6 @@ import {
 } from "../metrics/temperature-display";
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
-import type { ResolvedWidgetSettings } from "../settings/widget-settings";
 
 /**
  * Base class for GPU-related actions.
@@ -85,7 +84,7 @@ export class GpuTemp extends GpuBaseAction {
     protected readonly actionKind = "gpu-temp";
 
     protected updateGpuDisplay(event: WillAppearEvent): void {
-        const settings = this.resolveSettings(event) as GpuTemperatureSettings;
+        const settings = this.resolveSettings(event);
         const celsiusWidgetData = this.getGpuWidgetData(GPU_TEMP_METRIC_KEY, ARC_GAUGE_LABELS.gpu, "C");
         const widgetData = buildTemperatureWidgetData({
             celsiusWidgetData,
@@ -127,7 +126,7 @@ export class GpuPower extends GpuBaseAction {
     protected readonly actionKind = "gpu-power";
 
     protected updateGpuDisplay(event: WillAppearEvent): void {
-        const settings = this.resolveSettings(event) as GpuPowerSettings;
+        const settings = this.resolveSettings(event);
         const powerWidgetData = this.getGpuWidgetData(GPU_POWER_METRIC_KEY, ARC_GAUGE_LABELS.gpu, "W");
         const powerLimitWidgetData = this.getGpuWidgetData(GPU_POWER_LIMIT_METRIC_KEY, ARC_GAUGE_LABELS.gpu, "W");
         const maximumPowerWatts = resolveMaximumGpuPowerWatts({
@@ -182,9 +181,6 @@ export function buildGpuUsageWidgetData(widgetData: WidgetData): WidgetData {
         },
     };
 }
-
-type GpuTemperatureSettings = ResolvedWidgetSettings;
-type GpuPowerSettings = ResolvedWidgetSettings;
 
 export function buildGpuVramWidgetData(used: WidgetData, totalMegabytes: number): WidgetData {
     const safeTotalMegabytes = totalMegabytes > 0 ? totalMegabytes : 1;
