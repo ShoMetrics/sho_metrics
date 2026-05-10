@@ -14,14 +14,19 @@ interface ActiveMetricAction {
     pollingIntervalMilliseconds: number;
 }
 
+interface ActiveActionState {
+    event: WillAppearEvent;
+    rawSettings: unknown;
+}
+
 /**
  * Base class for all metric-display actions.
  * Handles scheduler subscription lifecycle and real-time settings updates.
  * Subclasses implement `onMetricsUpdate` which is called on every tick.
  */
 export abstract class MetricAction extends SingletonAction {
-    /** Track active events per action instance ID to ensure settings are always current. */
-    private activeEvents = new Map<string, WillAppearEvent>();
+    /** Track active action state per action instance ID without mutating SDK event payloads. */
+    private activeActionStates = new Map<string, ActiveActionState>();
     private activeMetricActions = new Map<string, ActiveMetricAction>();
 
     protected abstract readonly actionKind: ActionKind;
@@ -30,22 +35,27 @@ export abstract class MetricAction extends SingletonAction {
         super();
         pluginGlobalSettingsStore.subscribe(() => {
             this.resubscribeAllActions();
-            for (const activeEvent of this.activeEvents.values()) {
-                this.onMetricsUpdate(activeEvent);
+            for (const activeActionState of this.activeActionStates.values()) {
+                this.onMetricsUpdate(activeActionState.event);
             }
         });
     }
 
     override onWillAppear(event: WillAppearEvent): void {
-        this.activeEvents.set(event.action.id, event);
-        this.subscribeAction(event);
+        const activeActionState = {
+            event,
+            rawSettings: event.payload.settings,
+        };
+
+        this.activeActionStates.set(event.action.id, activeActionState);
+        this.subscribeAction(activeActionState);
         this.onMetricsUpdate(event);
     }
 
     override onDidReceiveSettings(event: DidReceiveSettingsEvent): void {
-        const activeEvent = this.activeEvents.get(event.action.id);
-        if (activeEvent) {
-            const previousSettings = this.resolveSettings(activeEvent);
+        const activeActionState = this.activeActionStates.get(event.action.id);
+        if (activeActionState) {
+            const previousSettings = this.resolveSettings(activeActionState.event);
             const nextSettings = this.resolveRawSettings(event.payload.settings);
 
             log.info(() => [
@@ -57,18 +67,17 @@ export abstract class MetricAction extends SingletonAction {
                 `nextPollingFrequencySeconds=${formatSettingValue(nextSettings.local.pollingFrequencySeconds)}`,
             ].join(" "));
 
-            // Update the settings in the active event so the polling loop sees them.
-            activeEvent.payload.settings = event.payload.settings;
-            this.resubscribeActionIfFrequencyChanged(activeEvent);
+            activeActionState.rawSettings = event.payload.settings;
+            this.resubscribeActionIfFrequencyChanged(activeActionState);
             // Force an immediate update for snappy UI feedback.
-            this.onMetricsUpdate(activeEvent);
+            this.onMetricsUpdate(activeActionState.event);
         }
     }
 
     override onWillDisappear(event: WillDisappearEvent): void {
         this.activeMetricActions.get(event.action.id)?.cleanup();
         this.activeMetricActions.delete(event.action.id);
-        this.activeEvents.delete(event.action.id);
+        this.activeActionStates.delete(event.action.id);
         clearSingleMetricDisplayState(event.action.id);
     }
 
@@ -84,20 +93,21 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     protected resolveSettings(event: WillAppearEvent): ResolvedWidgetSettings {
-        return this.resolveRawSettings(event.payload.settings);
+        return this.resolveRawSettings(this.activeActionStates.get(event.action.id)!.rawSettings);
     }
 
-    private subscribeAction(event: WillAppearEvent): void {
+    private subscribeAction(activeActionState: ActiveActionState): void {
+        const { event } = activeActionState;
         const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
             this.resolveSettings(event).local.pollingFrequencySeconds,
         );
         const metricKeys = normalizeMetricKeys(this.getMetricKeys(event));
         const metricKeySignature = metricKeys.join(",");
         const cleanup = scheduler.subscribe(() => {
-            const currentEvent = this.activeEvents.get(event.action.id);
+            const currentActionState = this.activeActionStates.get(event.action.id);
 
-            if (currentEvent) {
-                this.onMetricsUpdate(currentEvent);
+            if (currentActionState) {
+                this.onMetricsUpdate(currentActionState.event);
             }
         }, {
             metricKeys,
@@ -111,7 +121,8 @@ export abstract class MetricAction extends SingletonAction {
         });
     }
 
-    private resubscribeActionIfFrequencyChanged(event: WillAppearEvent): void {
+    private resubscribeActionIfFrequencyChanged(activeActionState: ActiveActionState): void {
+        const { event } = activeActionState;
         const activeMetricAction = this.activeMetricActions.get(event.action.id);
         const nextPollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
             this.resolveSettings(event).local.pollingFrequencySeconds,
@@ -127,14 +138,15 @@ export abstract class MetricAction extends SingletonAction {
         }
 
         activeMetricAction?.cleanup();
-        this.subscribeAction(event);
+        this.subscribeAction(activeActionState);
     }
 
     private resubscribeAllActions(): void {
-        for (const event of this.activeEvents.values()) {
+        for (const activeActionState of this.activeActionStates.values()) {
+            const { event } = activeActionState;
             this.activeMetricActions.get(event.action.id)?.cleanup();
             this.activeMetricActions.delete(event.action.id);
-            this.subscribeAction(event);
+            this.subscribeAction(activeActionState);
         }
     }
 
