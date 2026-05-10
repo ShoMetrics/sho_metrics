@@ -34,7 +34,7 @@ import {
     type DisplayPerformanceOutcome,
 } from "./display-performance-stats";
 
-const log = logger.for("SingleMetricDisplay");
+const log = logger.for("MetricDisplayRunner");
 
 const MAX_CONCURRENT_DISPLAY_UPDATES = 1;
 
@@ -50,15 +50,15 @@ interface DisplayActionState {
     isQueued: boolean;
     active: boolean;
     pendingOptions: MetricDisplayOptions | null;
-    pendingRequestTimestampMilliseconds: number | null;
-    pendingRequestReason: DisplayRequestReason;
+    pendingUpdateTimestampMilliseconds: number | null;
+    pendingUpdateReason: DisplayUpdateReason;
     pendingSettingsSignature: string | null;
     touchStripMetricLayoutState: TouchStripMetricLayoutState;
     lastRenderedSvg: string | null;
-    lastRequestedSettingsSignature: string | null;
+    lastScheduledSettingsSignature: string | null;
 }
 
-type DisplayRequestReason = "settings-change" | "metric-tick";
+type DisplayUpdateReason = "settings-change" | "metric-tick";
 
 interface ComposedMetricDisplayFrame {
     readonly svg: string;
@@ -75,7 +75,7 @@ interface RenderedMetricBody {
 export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): void {
     const displayActionState = getOrCreateDisplayActionState(options.event.action.id);
 
-    recordDisplayRequest(displayActionState, options);
+    recordDisplayUpdate(displayActionState, options);
     displayActionState.pendingOptions = options;
     enqueueDisplayAction(displayActionState);
 }
@@ -83,7 +83,7 @@ export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): voi
 export function setDualMetricDisplay(options: DualMetricDisplayOptions): void {
     const displayActionState = getOrCreateDisplayActionState(options.event.action.id);
 
-    recordDisplayRequest(displayActionState, options);
+    recordDisplayUpdate(displayActionState, options);
     displayActionState.pendingOptions = options;
     enqueueDisplayAction(displayActionState);
 }
@@ -97,7 +97,7 @@ export function setMetricDisplay(options: MetricDisplayOptions): void {
     setSingleMetricDisplay(options);
 }
 
-export function clearSingleMetricDisplayState(actionId: string): void {
+export function clearMetricDisplayState(actionId: string): void {
     const displayActionState = displayActionStates.get(actionId);
 
     if (!displayActionState) {
@@ -107,8 +107,8 @@ export function clearSingleMetricDisplayState(actionId: string): void {
     displayActionState.active = false;
     displayActionState.isQueued = false;
     displayActionState.pendingOptions = null;
-    displayActionState.pendingRequestTimestampMilliseconds = null;
-    displayActionState.pendingRequestReason = "metric-tick";
+    displayActionState.pendingUpdateTimestampMilliseconds = null;
+    displayActionState.pendingUpdateReason = "metric-tick";
     displayActionState.pendingSettingsSignature = null;
     displayActionState.touchStripMetricLayoutState.layoutPromise = null;
     displayActionState.touchStripMetricLayoutState.layoutPath = null;
@@ -120,14 +120,14 @@ function runMetricDisplayUpdate(
     displayActionState: DisplayActionState,
     options: MetricDisplayOptions,
 ): void {
-    const requestTimestampMilliseconds = displayActionState.pendingRequestTimestampMilliseconds;
-    const requestReason = displayActionState.pendingRequestReason;
+    const updateTimestampMilliseconds = displayActionState.pendingUpdateTimestampMilliseconds;
+    const updateReason = displayActionState.pendingUpdateReason;
     const settingsSignature = displayActionState.pendingSettingsSignature;
 
     displayActionState.isRenderInFlight = true;
     displayActionState.pendingOptions = null;
-    displayActionState.pendingRequestTimestampMilliseconds = null;
-    displayActionState.pendingRequestReason = "metric-tick";
+    displayActionState.pendingUpdateTimestampMilliseconds = null;
+    displayActionState.pendingUpdateReason = "metric-tick";
     displayActionState.pendingSettingsSignature = null;
     activeDisplayUpdateCount += 1;
 
@@ -142,13 +142,13 @@ function runMetricDisplayUpdate(
     const displayKind = resolveDisplayPerformanceKind(options.event);
     const titleClearRequested = options.event.action.isKey();
 
-    if (requestReason === "settings-change") {
+    if (updateReason === "settings-change") {
         log.info(() => [
             "settingsDisplayRenderStart",
             `actionId=${options.event.action.id}`,
             `metricKey=${options.metricKey}`,
             `graphicType=${renderPlan.visualSettings.graphicType}`,
-            `queuedMs=${formatElapsedMilliseconds(requestTimestampMilliseconds, renderStartTimestampMilliseconds)}`,
+            `queuedMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, renderStartTimestampMilliseconds)}`,
             `activeUpdates=${activeDisplayUpdateCount}`,
             `queueLength=${displayActionQueue.length}`,
             `signature=${settingsSignature ?? "unknown"}`,
@@ -164,15 +164,15 @@ function runMetricDisplayUpdate(
     const composeEndTimestampMilliseconds = Date.now();
 
     if (svg === displayActionState.lastRenderedSvg) {
-        if (requestReason === "settings-change") {
+        if (updateReason === "settings-change") {
             log.info(() => [
                 "settingsDisplaySkippedUnchanged",
                 `actionId=${options.event.action.id}`,
                 `metricKey=${options.metricKey}`,
                 `graphicType=${renderPlan.visualSettings.graphicType}`,
-                `queuedMs=${formatElapsedMilliseconds(requestTimestampMilliseconds, renderStartTimestampMilliseconds)}`,
+                `queuedMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, renderStartTimestampMilliseconds)}`,
                 `composeMs=${composeEndTimestampMilliseconds - renderStartTimestampMilliseconds}`,
-                `totalMs=${formatElapsedMilliseconds(requestTimestampMilliseconds, composeEndTimestampMilliseconds)}`,
+                `totalMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, composeEndTimestampMilliseconds)}`,
             ].join(" "));
         }
 
@@ -183,11 +183,11 @@ function runMetricDisplayUpdate(
             composeDurationMilliseconds: composeEndTimestampMilliseconds - renderStartTimestampMilliseconds,
         });
         recordDisplayPerformanceSample({
-            requestReason,
+            updateReason,
             displayKind,
             outcome: "skipped",
             titleClearRequested,
-            requestTimestampMilliseconds,
+            updateTimestampMilliseconds,
             renderStartTimestampMilliseconds,
             composeEndTimestampMilliseconds,
             rasterizeEndTimestampMilliseconds: null,
@@ -203,11 +203,11 @@ function runMetricDisplayUpdate(
 
     if (!pngDataUrl) {
         recordDisplayPerformanceSample({
-            requestReason,
+            updateReason,
             displayKind,
             outcome: "failed",
             titleClearRequested,
-            requestTimestampMilliseconds,
+            updateTimestampMilliseconds,
             renderStartTimestampMilliseconds,
             composeEndTimestampMilliseconds,
             rasterizeEndTimestampMilliseconds,
@@ -246,11 +246,11 @@ function runMetricDisplayUpdate(
             }
 
             recordDisplayPerformanceSample({
-                requestReason,
+                updateReason,
                 displayKind,
                 outcome: dispatchResult.status === "rendered" ? "rendered" : "failed",
                 titleClearRequested,
-                requestTimestampMilliseconds,
+                updateTimestampMilliseconds,
                 renderStartTimestampMilliseconds,
                 composeEndTimestampMilliseconds,
                 rasterizeEndTimestampMilliseconds,
@@ -264,12 +264,12 @@ function runMetricDisplayUpdate(
             }
 
             logSettingsUpdateDoneInfo({
-                requestReason,
+                updateReason,
                 actionId: options.event.action.id,
                 metricKey: options.metricKey,
                 phase: dispatchResult.donePhase,
                 graphicType: renderPlan.visualSettings.graphicType,
-                requestTimestampMilliseconds,
+                updateTimestampMilliseconds,
                 renderStartTimestampMilliseconds,
                 composeEndTimestampMilliseconds,
                 rasterizeEndTimestampMilliseconds,
@@ -386,34 +386,34 @@ function getOrCreateDisplayActionState(actionId: string): DisplayActionState {
         isQueued: false,
         active: true,
         pendingOptions: null,
-        pendingRequestTimestampMilliseconds: null,
-        pendingRequestReason: "metric-tick",
+        pendingUpdateTimestampMilliseconds: null,
+        pendingUpdateReason: "metric-tick",
         pendingSettingsSignature: null,
         touchStripMetricLayoutState: {
             layoutPromise: null,
             layoutPath: null,
         },
         lastRenderedSvg: null,
-        lastRequestedSettingsSignature: null,
+        lastScheduledSettingsSignature: null,
     };
     displayActionStates.set(actionId, displayActionState);
     return displayActionState;
 }
 
-function recordDisplayRequest(displayActionState: DisplayActionState, options: MetricDisplayOptions): void {
+function recordDisplayUpdate(displayActionState: DisplayActionState, options: MetricDisplayOptions): void {
     const settingsSignature = buildSettingsSignature(options.resolvedSettings);
-    const isSettingsChange = displayActionState.lastRequestedSettingsSignature !== null
-        && displayActionState.lastRequestedSettingsSignature !== settingsSignature;
-    const requestTimestampMilliseconds = Date.now();
+    const isSettingsChange = displayActionState.lastScheduledSettingsSignature !== null
+        && displayActionState.lastScheduledSettingsSignature !== settingsSignature;
+    const updateTimestampMilliseconds = Date.now();
 
-    displayActionState.lastRequestedSettingsSignature = settingsSignature;
+    displayActionState.lastScheduledSettingsSignature = settingsSignature;
 
-    if (!isSettingsChange && displayActionState.pendingRequestReason === "settings-change") {
+    if (!isSettingsChange && displayActionState.pendingUpdateReason === "settings-change") {
         return;
     }
 
-    displayActionState.pendingRequestTimestampMilliseconds = requestTimestampMilliseconds;
-    displayActionState.pendingRequestReason = isSettingsChange ? "settings-change" : "metric-tick";
+    displayActionState.pendingUpdateTimestampMilliseconds = updateTimestampMilliseconds;
+    displayActionState.pendingUpdateReason = isSettingsChange ? "settings-change" : "metric-tick";
     displayActionState.pendingSettingsSignature = settingsSignature;
 
     if (!isSettingsChange) {
@@ -423,7 +423,7 @@ function recordDisplayRequest(displayActionState: DisplayActionState, options: M
     const visualSettings = buildMetricVisualSettings(options.resolvedSettings);
 
     log.info(() => [
-        "settingsDisplayRequested",
+        "settingsDisplayScheduled",
         `actionId=${options.event.action.id}`,
         `metricKey=${options.metricKey}`,
         `graphicType=${visualSettings.graphicType}`,
@@ -444,7 +444,7 @@ function enqueueDisplayAction(displayActionState: DisplayActionState): void {
         return;
     }
 
-    displayActionQueue.enqueue(displayActionState.actionId, displayActionState.pendingRequestReason);
+    displayActionQueue.enqueue(displayActionState.actionId, displayActionState.pendingUpdateReason);
     displayActionState.isQueued = true;
     scheduleDisplayQueueDrain();
 }
@@ -527,11 +527,11 @@ function resolveDisplayPerformanceKind(event: WillAppearEvent): DisplayPerforman
 }
 
 function recordDisplayPerformanceSample(options: {
-    requestReason: DisplayRequestReason;
+    updateReason: DisplayUpdateReason;
     displayKind: DisplayPerformanceKind;
     outcome: DisplayPerformanceOutcome;
     titleClearRequested: boolean;
-    requestTimestampMilliseconds: number | null;
+    updateTimestampMilliseconds: number | null;
     renderStartTimestampMilliseconds: number;
     composeEndTimestampMilliseconds: number;
     rasterizeEndTimestampMilliseconds: number | null;
@@ -539,11 +539,11 @@ function recordDisplayPerformanceSample(options: {
     updateEndTimestampMilliseconds: number;
 }): void {
     const summary = displayPerformanceStats.record({
-        requestReason: options.requestReason,
+        requestReason: options.updateReason,
         displayKind: options.displayKind,
         outcome: options.outcome,
         queuedMilliseconds: calculateElapsedMilliseconds(
-            options.requestTimestampMilliseconds,
+            options.updateTimestampMilliseconds,
             options.renderStartTimestampMilliseconds,
         ),
         composeMilliseconds: options.composeEndTimestampMilliseconds - options.renderStartTimestampMilliseconds,
@@ -556,7 +556,7 @@ function recordDisplayPerformanceSample(options: {
             options.updateEndTimestampMilliseconds,
         ),
         totalMilliseconds: calculateElapsedMilliseconds(
-            options.requestTimestampMilliseconds,
+            options.updateTimestampMilliseconds,
             options.updateEndTimestampMilliseconds,
         ) ?? Math.max(0, options.updateEndTimestampMilliseconds - options.renderStartTimestampMilliseconds),
         queueLength: displayActionQueue.length,
@@ -617,18 +617,18 @@ function logUpdateDoneDebug(options: {
 }
 
 function logSettingsUpdateDoneInfo(options: {
-    requestReason: DisplayRequestReason;
+    updateReason: DisplayUpdateReason;
     actionId: string;
     metricKey: string;
     phase: string;
     graphicType: string;
-    requestTimestampMilliseconds: number | null;
+    updateTimestampMilliseconds: number | null;
     renderStartTimestampMilliseconds: number;
     composeEndTimestampMilliseconds: number;
     rasterizeEndTimestampMilliseconds: number;
     updateStartTimestampMilliseconds: number;
 }): void {
-    if (options.requestReason !== "settings-change") {
+    if (options.updateReason !== "settings-change") {
         return;
     }
 
@@ -640,11 +640,11 @@ function logSettingsUpdateDoneInfo(options: {
         `actionId=${options.actionId}`,
         `metricKey=${options.metricKey}`,
         `graphicType=${options.graphicType}`,
-        `queuedMs=${formatElapsedMilliseconds(options.requestTimestampMilliseconds, options.renderStartTimestampMilliseconds)}`,
+        `queuedMs=${formatElapsedMilliseconds(options.updateTimestampMilliseconds, options.renderStartTimestampMilliseconds)}`,
         `composeMs=${options.composeEndTimestampMilliseconds - options.renderStartTimestampMilliseconds}`,
         `rasterizeMs=${options.rasterizeEndTimestampMilliseconds - options.composeEndTimestampMilliseconds}`,
         `sdkPromiseMs=${currentTimestampMilliseconds - options.updateStartTimestampMilliseconds}`,
-        `totalMs=${formatElapsedMilliseconds(options.requestTimestampMilliseconds, currentTimestampMilliseconds)}`,
+        `totalMs=${formatElapsedMilliseconds(options.updateTimestampMilliseconds, currentTimestampMilliseconds)}`,
     ].join(" "));
 }
 

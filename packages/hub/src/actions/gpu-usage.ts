@@ -1,7 +1,7 @@
 import { action, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import { metricStore } from "../runtime/metric-store";
-import { setSingleMetricDisplay } from "./single-metric-display";
+import { setSingleMetricDisplay } from "./metric-display-runner";
 import type { WidgetData } from "../rendering/widget-data";
 import { formatByteCount } from "../metrics/byte-format";
 import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-format";
