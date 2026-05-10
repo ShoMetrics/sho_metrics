@@ -30,6 +30,3 @@ export type GraphicPrimitiveType =
 export type GraphicType = GraphicPrimitiveType;
 
 export type GraphicThemePresetName = "flat" | "cupertino-glass";
-
-/** @deprecated Prefer GraphicThemePresetName for new rendering/theme code. */
-export type GraphicStyleName = GraphicThemePresetName;

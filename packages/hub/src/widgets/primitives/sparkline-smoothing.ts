@@ -1,10 +1,5 @@
 import { clamp } from "../../rendering/svg-utils";
 
-export interface SparklineSmoothingPoint {
-    xCoordinate: number;
-    yCoordinate: number;
-}
-
 const MAXIMUM_SMOOTHING_RADIUS = 18;
 const STRONG_SMOOTHING_THRESHOLD = 0.55;
 const VERY_STRONG_SMOOTHING_THRESHOLD = 0.84;

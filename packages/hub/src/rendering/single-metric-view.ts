@@ -23,17 +23,15 @@ import {
 
 type SingleMetricGraphicType = "circular" | "text" | "linear" | "dashed-line";
 
-interface SingleMetricVisualSettings {
-    graphicType: SingleMetricGraphicType;
-    colorConfig: ColorConfig;
-    lineSmoothingPercent: number;
-    gridLineVisibility: SparklineGridLineVisibility;
-    gridLineType: SparklineGridLineType;
-}
-
 export interface SingleMetricBodyViewProps {
     data: WidgetData;
-    visual: SingleMetricVisualSettings;
+    visual: {
+        graphicType: SingleMetricGraphicType;
+        colorConfig: ColorConfig;
+        lineSmoothingPercent: number;
+        gridLineVisibility: SparklineGridLineVisibility;
+        gridLineType: SparklineGridLineType;
+    };
     renderSize: KeySize;
     centerIcon: string;
     footerIcon?: string;

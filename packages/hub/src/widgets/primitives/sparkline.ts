@@ -1,5 +1,5 @@
 import type { WidgetData, KeySize, SparklineScale } from "../../rendering/widget-data";
-import { resolveColor } from "../../rendering/color-resolver";
+import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
     adjustHexColorBrightness,
     clamp,
@@ -108,7 +108,7 @@ export const sparkline: Widget<SparklineConfig> = {
         const layoutPlan = buildSparklineLayoutPlan(keySize);
         const rawValues = buildRenderableValues(data);
         const visualValues = smoothSparklineValues(rawValues, config.lineSmoothingPercent);
-        const currentColor = resolveColor(data.current, config.colorConfig);
+        const currentColor = resolveColorForThresholdValue(data.current, config.colorConfig);
         const lineHeadColor = adjustHexColorBrightness(currentColor, config.gradientHeadAdjustmentPercent ?? 28);
         const lineTailColor = adjustHexColorBrightness(currentColor, -18);
         const gradientIdSuffix = `${keySize.width}-${keySize.height}-${Math.round(data.current * 10)}-${rawValues.length}`;

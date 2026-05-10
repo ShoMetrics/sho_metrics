@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
     buildGradientStops,
-    resolveColor,
+    resolveColorForThresholdValue,
     type ColorConfig,
 } from "./color-resolver";
 
@@ -17,7 +17,7 @@ const thresholdConfig: ColorConfig = {
 };
 
 test("solid color mode ignores thresholds", () => {
-    assert.equal(resolveColor(95, {
+    assert.equal(resolveColorForThresholdValue(95, {
         ...thresholdConfig,
         mode: "solid",
         solidColor: "#123456",
@@ -25,14 +25,17 @@ test("solid color mode ignores thresholds", () => {
 });
 
 test("threshold color mode uses inclusive lower and exclusive upper bounds", () => {
-    assert.equal(resolveColor(49.9, thresholdConfig), "#00ff00");
-    assert.equal(resolveColor(50, thresholdConfig), "#ffff00");
-    assert.equal(resolveColor(80, thresholdConfig), "#ff0000");
+    assert.equal(resolveColorForThresholdValue(49.9, thresholdConfig), "#00ff00");
+    assert.equal(resolveColorForThresholdValue(50, thresholdConfig), "#ffff00");
+    assert.equal(resolveColorForThresholdValue(80, thresholdConfig), "#ff0000");
 });
 
 test("threshold color mode falls back to the last threshold color", () => {
-    assert.equal(resolveColor(200, thresholdConfig), "#ff0000");
-    assert.equal(resolveColor(200, { mode: "threshold", solidColor: "#123456", thresholds: [] }), "#123456");
+    assert.equal(resolveColorForThresholdValue(200, thresholdConfig), "#ff0000");
+    assert.equal(
+        resolveColorForThresholdValue(200, { mode: "threshold", solidColor: "#123456", thresholds: [] }),
+        "#123456",
+    );
 });
 
 test("gradient stops produce paired stops at threshold transitions", () => {

@@ -1,5 +1,5 @@
 import type { WidgetData, KeySize } from "../../rendering/widget-data";
-import { resolveColor } from "../../rendering/color-resolver";
+import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
     clamp,
     renderConstrainedSvgText,
@@ -162,7 +162,7 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
             radius,
             circumference,
         };
-        const arcColor = resolveColor(data.current, config.colorConfig);
+        const arcColor = resolveColorForThresholdValue(data.current, config.colorConfig);
         const gradientId = `circular-progress-${Math.round(data.current * 10)}-${keySize.width}-${keySize.height}`;
         const circleStyle = config.circleStyle;
         const rangeColorPlan = buildGaugeRangeColorPlan({

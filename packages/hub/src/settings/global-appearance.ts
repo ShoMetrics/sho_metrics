@@ -14,8 +14,6 @@ import {
 } from "./widget-settings";
 export { defaultResolvedGlobalSettings } from "./widget-settings";
 
-export type GlobalAppearanceColorMode = "solid" | "threshold";
-
 export interface TintChannelColors {
     primaryColor: string;
     secondaryColor: string;

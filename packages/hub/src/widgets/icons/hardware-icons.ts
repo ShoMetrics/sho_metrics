@@ -1,5 +1,4 @@
 export type { DiskIconKind, HardwareIconKind } from "./catalog/hardware";
-export type HardwareIcon = import("./icon-types").SvgIconDefinition;
 
 import {
     getDiskIconDefinition,

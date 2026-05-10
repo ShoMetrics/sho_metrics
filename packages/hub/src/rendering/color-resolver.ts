@@ -30,24 +30,29 @@ export const DEFAULT_COLOR_CONFIG: ColorConfig = {
 };
 
 /**
- * Resolve a single color for a given value based on the color config.
+ * Resolves the renderer paint color for a metric threshold value.
+ *
+ * In solid mode the threshold value is ignored and the configured solid color
+ * is returned. In threshold mode the value is matched against the configured
+ * [min, max) bands and the matching band color is returned.
  */
-export function resolveColor(value: number, config: ColorConfig): string {
-    if (config.mode === "solid") {
-        return config.solidColor;
+export function resolveColorForThresholdValue(thresholdValue: number, colorConfig: ColorConfig): string {
+    if (colorConfig.mode === "solid") {
+        return colorConfig.solidColor;
     }
-    for (const threshold of config.thresholds) {
-        if (value >= threshold.min && value < threshold.max) {
+    for (const threshold of colorConfig.thresholds) {
+        if (thresholdValue >= threshold.min && thresholdValue < threshold.max) {
             return threshold.color;
         }
     }
     // Fallback: last threshold or solid color
-    return config.thresholds[config.thresholds.length - 1]?.color ?? config.solidColor;
+    return colorConfig.thresholds[colorConfig.thresholds.length - 1]?.color ?? colorConfig.solidColor;
 }
 
 /**
- * Build SVG gradient stops for a sparkline where each data point
+ * Builds SVG gradient stops for a sparkline where each data point
  * may have a different threshold color.
+ * 
  * Returns an array of { offset (0–1), color } entries with paired stops
  * for sharp color transitions.
  */
@@ -64,11 +69,11 @@ export function buildGradientStops(
     }
 
     const stops: Array<{ offset: number; color: string }> = [];
-    let previousColor = resolveColor(values[0], config);
+    let previousColor = resolveColorForThresholdValue(values[0], config);
     stops.push({ offset: 0, color: previousColor });
 
     for (let index = 1; index < values.length; index++) {
-        const currentColor = resolveColor(values[index], config);
+        const currentColor = resolveColorForThresholdValue(values[index], config);
         const offset = index / (values.length - 1);
 
         if (currentColor !== previousColor) {

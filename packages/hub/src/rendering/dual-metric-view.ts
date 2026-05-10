@@ -22,12 +22,6 @@ import type {
 
 type DualMetricGraphicType = "circular" | "text" | "dashed-line";
 
-interface DualMetricVisualSettings {
-    lineSmoothingPercent: number;
-    gridLineVisibility: SparklineGridLineVisibility;
-    gridLineType: SparklineGridLineType;
-}
-
 interface DualMetricChannelViewProps {
     color: string;
     colorConfig?: ColorConfig;
@@ -37,7 +31,11 @@ interface DualMetricChannelViewProps {
 
 export interface DualMetricBodyViewProps {
     data: DualChannelWidgetData;
-    visual: DualMetricVisualSettings;
+    visual: {
+        lineSmoothingPercent: number;
+        gridLineVisibility: SparklineGridLineVisibility;
+        gridLineType: SparklineGridLineType;
+    };
     graphicType: DualMetricGraphicType;
     renderSize: KeySize;
     titleText: string;
