@@ -1,5 +1,5 @@
 import type { ColorConfig, ColorThreshold } from "../rendering/color-resolver";
-import type { GraphicThemePresetName, GraphicType } from "../widgets/widget.interface";
+import type { GraphicThemePresetName } from "../widgets/widget.interface";
 import type { ArcGaugeStyle } from "../widgets/primitives/arc-gauge";
 import type { SparklineGridLineType, SparklineGridLineVisibility } from "../widgets/primitives/sparkline";
 import {
@@ -12,7 +12,7 @@ export type MetricVisualSettings = AppearanceSettings;
 export type MetricVisualSettingsOverride = AppearanceSettingsOverride;
 
 export interface ResolvedMetricVisualSettings {
-    graphicType: GraphicType;
+    graphicType: AppearanceSettings["graphicType"];
     circleStyle: ArcGaugeStyle;
     graphicStyle: GraphicThemePresetName;
     colorConfig: ColorConfig;
