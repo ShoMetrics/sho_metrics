@@ -1,5 +1,5 @@
 import type { WidgetData } from "../rendering/widget-data";
-import { formatByteRate, formatBytes } from "./byte-display";
+import { formatByteCount, formatBytesPerSecond } from "./byte-format";
 
 export type DiskUsageDisplayMode = "percentage" | "space";
 
@@ -81,7 +81,7 @@ export function buildDiskThroughputWidgetData(options: {
     label: string;
 }): WidgetData {
     const safeBytesPerSecond = Math.max(0, options.bytesPerSecondWidgetData.current);
-    const formattedThroughput = formatByteRate({
+    const formattedThroughput = formatBytesPerSecond({
         bytesPerSecond: safeBytesPerSecond,
         unitBase: "byte",
         base: BINARY_BASE,
@@ -110,7 +110,7 @@ function formatDiskAvailableSpace(options: {
     const minimumUnitIndex = options.totalBytes >= tebibyte && options.availableBytes < tebibyte
         ? 2
         : 3;
-    const formattedSpace = formatBytes({
+    const formattedSpace = formatByteCount({
         bytes: options.availableBytes,
         base: BINARY_BASE,
         maximumDisplayDigits: MAXIMUM_SPACE_DISPLAY_DIGITS,
@@ -124,13 +124,13 @@ function formatUsedAndTotalBytes(options: {
     usedBytes: number;
     totalBytes: number;
 }): string {
-    const formattedUsedBytes = formatBytes({
+    const formattedUsedBytes = formatByteCount({
         bytes: options.usedBytes,
         base: BINARY_BASE,
         maximumDisplayDigits: MAXIMUM_SPACE_DISPLAY_DIGITS,
         minimumUnitIndex: resolveMinimumSpaceUnitIndex(options.totalBytes),
     });
-    const formattedTotalBytes = formatBytes({
+    const formattedTotalBytes = formatByteCount({
         bytes: options.totalBytes,
         base: BINARY_BASE,
         maximumDisplayDigits: MAXIMUM_SPACE_DISPLAY_DIGITS,

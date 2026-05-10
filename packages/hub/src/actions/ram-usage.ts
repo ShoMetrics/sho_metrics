@@ -2,7 +2,7 @@ import { action, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import { metricStore } from "../runtime/metric-store";
 import { setSingleMetricDisplay } from "./single-metric-display";
-import { buildMemoryUsageWidgetData } from "../metrics/storage-display";
+import { buildMemoryUsageWidgetData } from "../metrics/storage-widget-data";
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import { RAM_TOTAL_METRIC_KEY, RAM_USED_METRIC_KEY } from "../runtime/metric-keys";

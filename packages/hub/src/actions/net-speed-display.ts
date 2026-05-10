@@ -16,7 +16,7 @@ import { buildGlobalChannelColorConfig } from "../settings/global-appearance";
 import {
     buildNetworkSpeedWidgetData,
     convertMegabitsPerSecondToBytesPerSecond,
-} from "../metrics/network-speed-display";
+} from "../metrics/network-speed-widget-data";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import {
     getNetworkDirectionStatusIcon,

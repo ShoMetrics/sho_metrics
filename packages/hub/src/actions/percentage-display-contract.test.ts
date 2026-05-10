@@ -3,7 +3,7 @@ import test from "node:test";
 import { renderMetricFrame } from "../rendering/metric-frame";
 import { renderSingleMetricBodyView } from "../rendering/single-metric-view";
 import type { WidgetData } from "../rendering/widget-data";
-import { buildDiskUsageWidgetData, buildMemoryUsageWidgetData } from "../metrics/storage-display";
+import { buildDiskUsageWidgetData, buildMemoryUsageWidgetData } from "../metrics/storage-widget-data";
 import { buildCpuUsageWidgetData } from "./cpu-usage";
 import { buildGpuUsageWidgetData, buildGpuVramWidgetData } from "./gpu-usage";
 

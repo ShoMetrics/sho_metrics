@@ -1,5 +1,5 @@
 import type { WidgetData } from "../rendering/widget-data";
-import { formatByteRate, type DataRateUnitBase } from "./byte-display";
+import { formatBytesPerSecond, type DataRateUnitBase } from "./byte-format";
 
 export type NetworkSpeedUnitBase = DataRateUnitBase;
 
@@ -19,7 +19,7 @@ const MINIMUM_PROGRESS_MAXIMUM_BYTES_PER_SECOND = SI_BASE;
 
 export function buildNetworkSpeedWidgetData(options: NetworkSpeedDisplayOptions): WidgetData {
     const safeBytesPerSecond = Math.max(0, options.bytesPerSecond);
-    const formattedSpeed = formatByteRate({
+    const formattedSpeed = formatBytesPerSecond({
         bytesPerSecond: safeBytesPerSecond,
         unitBase: options.unitBase,
         base: SI_BASE,

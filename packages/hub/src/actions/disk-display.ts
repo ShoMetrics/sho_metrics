@@ -7,7 +7,7 @@ import {
     getDiskVolumeMetricKey,
     type DiskThroughputDirection,
 } from "../runtime/disk-metric-keys";
-import { buildDiskThroughputWidgetData, buildDiskUsageWidgetData } from "../metrics/storage-display";
+import { buildDiskThroughputWidgetData, buildDiskUsageWidgetData } from "../metrics/storage-widget-data";
 import type {
     ResolvedGlobalSettings,
     ResolvedWidgetSettings,
