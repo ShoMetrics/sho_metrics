@@ -107,6 +107,28 @@ const restrictedConcreteActionSettingsImports = {
   ],
 };
 
+const restrictedActionDisplayBuilderImports = {
+  paths: [
+    {
+      name: './action-settings-resolver',
+      message: 'Display builders must receive resolved inputs from actions instead of reading stored settings.',
+    },
+    {
+      name: '../settings/codec',
+      message: 'Display builders must not parse persisted settings.',
+    },
+    {
+      name: '../settings/updates',
+      message: 'Display builders must not write persisted settings.',
+    },
+    {
+      name: '../settings/global-settings-store',
+      message: 'Display builders must receive resolved global settings from actions.',
+    },
+  ],
+  patterns: [...restrictedSchemaHardeningImports.patterns],
+};
+
 const restrictedRendererImportRules = {
   paths: [...restrictedSchemaHardeningImports.paths],
   patterns: [
@@ -196,6 +218,13 @@ export default tseslint.config(
         ...restrictedConcreteActionResolvedSettingsAliasSyntax,
         ...restrictedConcreteActionColorFallbackSyntax,
       ],
+    },
+  },
+  {
+    files: ['src/actions/{disk,net-speed}-display.ts'],
+    rules: {
+      'no-restricted-imports': ['error', restrictedActionDisplayBuilderImports],
+      'no-restricted-syntax': ['error', ...restrictedLegacySettingSyntax],
     },
   },
   {

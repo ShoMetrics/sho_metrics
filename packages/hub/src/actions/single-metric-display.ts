@@ -74,6 +74,15 @@ export function setDualMetricDisplay(options: DualMetricDisplayOptions): void {
     enqueueDisplayAction(displayActionState);
 }
 
+export function setMetricDisplay(options: MetricDisplayOptions): void {
+    if (isDualMetricDisplayOptions(options)) {
+        setDualMetricDisplay(options);
+        return;
+    }
+
+    setSingleMetricDisplay(options);
+}
+
 export function clearSingleMetricDisplayState(actionId: string): void {
     const displayActionState = displayActionStates.get(actionId);
 
