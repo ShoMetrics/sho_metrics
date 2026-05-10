@@ -9,6 +9,7 @@ import {
     serializeActionStoredSettings,
 } from "./action-settings-resolver";
 import type { ActionKind, ResolvedWidgetSettings, WidgetStoredSettings } from "../settings/widget-settings";
+import { updateWidgetRuntimeCache, type RuntimeStatePatch } from "../settings/updates";
 
 const log = logger.for("MetricAction");
 
@@ -100,14 +101,31 @@ export abstract class MetricAction extends SingletonAction {
         return this.resolveRawSettings(this.activeActionStates.get(event.action.id)!.rawSettings);
     }
 
-    protected readStoredSettings(event: WillAppearEvent): WidgetStoredSettings {
-        return readActionStoredSettings(this.activeActionStates.get(event.action.id)!.rawSettings);
+    protected updateRuntimeCache(event: WillAppearEvent, patch: RuntimeStatePatch): Promise<void> {
+        return this.updateStoredSettings(event, storedSettings => {
+            if (isRuntimeCachePatchUnchanged(storedSettings.runtimeCache, patch)) {
+                return storedSettings;
+            }
+
+            return updateWidgetRuntimeCache(storedSettings, patch);
+        });
     }
 
-    protected writeStoredSettings(event: WillAppearEvent, storedSettings: WidgetStoredSettings): Promise<void> {
-        const rawSettings = serializeActionStoredSettings(storedSettings);
+    private updateStoredSettings(
+        event: WillAppearEvent,
+        update: (storedSettings: WidgetStoredSettings) => WidgetStoredSettings,
+    ): Promise<void> {
+        const activeActionState = this.activeActionStates.get(event.action.id)!;
+        const currentSettings = readActionStoredSettings(activeActionState.rawSettings);
+        const nextSettings = update(currentSettings);
 
-        this.activeActionStates.get(event.action.id)!.rawSettings = rawSettings;
+        if (nextSettings === currentSettings) {
+            return Promise.resolve();
+        }
+
+        const rawSettings = serializeActionStoredSettings(nextSettings);
+
+        activeActionState.rawSettings = rawSettings;
 
         return event.action.setSettings(rawSettings);
     }
@@ -192,4 +210,30 @@ function formatSettingValue(value: unknown): string {
     }
 
     return "unset";
+}
+
+function isRuntimeCachePatchUnchanged(
+    runtimeCache: WidgetStoredSettings["runtimeCache"],
+    patch: RuntimeStatePatch,
+): boolean {
+    for (const key of Object.keys(patch) as Array<keyof RuntimeStatePatch>) {
+        const currentValue = runtimeCache?.[key];
+        const nextValue = patch[key];
+
+        if (Array.isArray(currentValue) || Array.isArray(nextValue)) {
+            // TODO(settings-contract): Temporary pre-proto/pre-Zod deep compare. Move this to the codec/schema layer
+            // when persisted settings get a real contract.
+            if (JSON.stringify(currentValue ?? []) !== JSON.stringify(nextValue ?? [])) {
+                return false;
+            }
+
+            continue;
+        }
+
+        if (currentValue !== nextValue) {
+            return false;
+        }
+    }
+
+    return true;
 }

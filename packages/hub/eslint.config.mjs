@@ -31,7 +31,7 @@ const restrictedMetricVisualAliasSyntax = [
 const restrictedConcreteActionRawSettingsSyntax = [
   {
     selector: 'MemberExpression[object.type="MemberExpression"][object.property.name="payload"][property.name="settings"]',
-    message: 'Concrete actions must read stored settings through action-settings-resolver helpers.',
+    message: 'Concrete actions must use resolved settings from MetricAction, not raw SDK payload settings.',
   },
 ];
 
@@ -91,8 +91,12 @@ const restrictedRendererSettingsImports = {
 const restrictedConcreteActionSettingsImports = {
   paths: [
     {
+      name: './action-settings-resolver',
+      message: 'Concrete actions must read/write stored settings through MetricAction ownership helpers.',
+    },
+    {
       name: '../settings/codec',
-      message: 'Concrete actions must read and write settings through action-settings-resolver helpers.',
+      message: 'Concrete actions must read/write persisted settings through MetricAction ownership helpers.',
     },
     {
       name: '../settings/resolver',
@@ -128,6 +132,13 @@ const restrictedActionDisplayBuilderImports = {
   ],
   patterns: [...restrictedSchemaHardeningImports.patterns],
 };
+
+const restrictedConcreteActionSettingsWriteSyntax = [
+  {
+    selector: 'CallExpression[callee.type="MemberExpression"][callee.property.name="setSettings"]',
+    message: 'Concrete actions must write persisted settings through MetricAction ownership helpers.',
+  },
+];
 
 const restrictedRendererImportRules = {
   paths: [...restrictedSchemaHardeningImports.paths],
@@ -217,6 +228,7 @@ export default tseslint.config(
         ...restrictedConcreteActionVisualFallbackSyntax,
         ...restrictedConcreteActionResolvedSettingsAliasSyntax,
         ...restrictedConcreteActionColorFallbackSyntax,
+        ...restrictedConcreteActionSettingsWriteSyntax,
       ],
     },
   },

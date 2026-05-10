@@ -12,7 +12,6 @@ import {
 } from "../runtime/disk-metric-keys";
 import { resolveDiskMetricSubscriptionKeys } from "./disk-metric-subscriptions";
 import type { ResolvedWidgetSettings } from "../settings/widget-settings";
-import { updateWidgetRuntimeCache } from "../settings/updates";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
     buildDiskDisplayOptions,
@@ -76,17 +75,9 @@ export class Disk extends MetricAction {
     private publishDiskVolumeOptions(event: WillAppearEvent): void {
         const availableDiskVolumes = [...diskVolumeRegistry.getOptions()];
 
-        const storedSettings = this.readStoredSettings(event);
-
-        // TODO(settings-contract): Temporary pre-proto/pre-Zod deep compare. Move this to the codec/schema layer
-        // when persisted settings get a real contract.
-        if (JSON.stringify(storedSettings.runtimeCache?.availableDiskVolumes ?? []) === JSON.stringify(availableDiskVolumes)) {
-            return;
-        }
-
-        this.writeStoredSettings(event, updateWidgetRuntimeCache(storedSettings, {
+        this.updateRuntimeCache(event, {
             availableDiskVolumes,
-        })).catch(error => {
+        }).catch(error => {
             log.error(() => `Failed to publish disk volumes: ${String(error)}`);
         });
     }
@@ -116,19 +107,10 @@ export class Disk extends MetricAction {
             observedBytesPerSecond: metricStore.getWidgetData(getDiskThroughputMetricKey("write"), "WRIT", "B/s").current,
         });
 
-        const storedSettings = this.readStoredSettings(event);
-
-        if (
-            storedSettings.runtimeCache?.learnedMaximumDiskReadThroughputMebibytesPerSecond === nextReadMaximum
-            && storedSettings.runtimeCache?.learnedMaximumDiskWriteThroughputMebibytesPerSecond === nextWriteMaximum
-        ) {
-            return;
-        }
-
-        this.writeStoredSettings(event, updateWidgetRuntimeCache(storedSettings, {
+        this.updateRuntimeCache(event, {
             learnedMaximumDiskReadThroughputMebibytesPerSecond: nextReadMaximum,
             learnedMaximumDiskWriteThroughputMebibytesPerSecond: nextWriteMaximum,
-        })).catch(error => {
+        }).catch(error => {
             log.error(() => `Failed to publish learned disk throughput scale: ${String(error)}`);
         });
     }

@@ -11,7 +11,6 @@ import {
 } from "../runtime/network-metric-keys";
 import { resolveNetSpeedMetricSubscriptionKeys } from "./net-speed-metric-subscriptions";
 import type { ResolvedWidgetSettings } from "../settings/widget-settings";
-import { updateWidgetRuntimeCache } from "../settings/updates";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
     buildNetworkDisplayUpdate,
@@ -71,17 +70,9 @@ export class NetSpeed extends MetricAction {
     private publishNetworkInterfaceOptions(event: WillAppearEvent): void {
         const availableNetworkInterfaces = [...networkInterfaceRegistry.getOptions()];
 
-        const storedSettings = this.readStoredSettings(event);
-
-        // TODO(settings-contract): Temporary pre-proto/pre-Zod deep compare. Move this to the codec/schema layer
-        // when persisted settings get a real contract.
-        if (JSON.stringify(storedSettings.runtimeCache?.availableNetworkInterfaces ?? []) === JSON.stringify(availableNetworkInterfaces)) {
-            return;
-        }
-
-        this.writeStoredSettings(event, updateWidgetRuntimeCache(storedSettings, {
+        this.updateRuntimeCache(event, {
             availableNetworkInterfaces,
-        })).catch(error => {
+        }).catch(error => {
             log.error(() => `Failed to publish network interfaces: ${String(error)}`);
         });
     }
@@ -112,19 +103,10 @@ export class NetSpeed extends MetricAction {
             observedBytesPerSecond: metricStore.getWidgetData(uploadMetricKey, "UP", "B/s").current,
         });
 
-        const storedSettings = this.readStoredSettings(event);
-
-        if (
-            storedSettings.runtimeCache?.learnedMaximumDownloadSpeedMbps === nextDownloadMaximum
-            && storedSettings.runtimeCache?.learnedMaximumUploadSpeedMbps === nextUploadMaximum
-        ) {
-            return;
-        }
-
-        this.writeStoredSettings(event, updateWidgetRuntimeCache(storedSettings, {
+        this.updateRuntimeCache(event, {
             learnedMaximumDownloadSpeedMbps: nextDownloadMaximum,
             learnedMaximumUploadSpeedMbps: nextUploadMaximum,
-        })).catch(error => {
+        }).catch(error => {
             log.error(() => `Failed to publish learned network scale: ${String(error)}`);
         });
     }
