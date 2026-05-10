@@ -1,6 +1,6 @@
 import type { DiskVolumeOption } from "../runtime/disk-volumes";
 import type { NetworkInterfaceOption } from "../runtime/network-interfaces";
-import type { SelectOption, VisibilityContext } from "./types";
+import type { SelectOption, VisibilityContext } from "./inspector/types";
 
 export function resolveNetworkInterfaceOptions(context: VisibilityContext): SelectOption[] {
     return buildNetworkInterfaceOptions(context.settings.runtimeCache?.availableNetworkInterfaces ?? []);

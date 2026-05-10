@@ -1,9 +1,9 @@
-import { resolveWidgetSettings } from "../settings/resolver";
+import { resolveWidgetSettings } from "../../settings/resolver";
 import type {
     GlobalSettings,
     SettingsContext,
     WidgetStoredSettings,
-} from "../settings/widget-settings";
+} from "../../settings/widget-settings";
 import type { VisibilityContext } from "./types";
 
 export function buildPropertyInspectorContext(options: {

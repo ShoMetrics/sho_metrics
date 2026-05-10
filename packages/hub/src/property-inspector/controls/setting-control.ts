@@ -1,4 +1,4 @@
-import type { SelectOption, SelectOptionValue } from "../types";
+import type { SelectOption, SelectOptionValue } from "../inspector/types";
 
 export interface SettingControlProps {
     disabled?: boolean;

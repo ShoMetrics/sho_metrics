@@ -1,4 +1,4 @@
-import type { AppearanceSettingsOverride, GlobalSettings } from "../settings/widget-settings";
+import type { AppearanceSettingsOverride, GlobalSettings } from "../../settings/widget-settings";
 
 export function applyGlobalSettingsPatch(settings: GlobalSettings, patch: GlobalSettings): GlobalSettings {
     return {

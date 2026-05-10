@@ -3,7 +3,7 @@ import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { WidgetSettingsTab } from "./panels/WidgetSettingsTab";
-import type { ActionKind } from "./settings";
+import type { ActionKind } from "./inspector/action-kind";
 import { buildVisibilityContext, type InspectorTestSettings } from "./test-context";
 
 test("disk usage linear settings render label controls without usage-mode controls", () => {

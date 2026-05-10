@@ -358,7 +358,7 @@ export function resolveStreamDeckClient(): StreamDeckPropertyInspectorClient {
 }
 
 /**
- * Installs the Stream Deck global callback used to bootstrap the PI websocket.
+ * Installs the Stream Deck global callback used to bootstrap the Property Inspector websocket.
  */
 export function installStreamDeckPropertyInspectorBridge(targetWindow: Window): void {
     targetWindow.connectElgatoStreamDeckSocket = (

@@ -1,5 +1,5 @@
 import { InspectorItem } from "../components/InspectorItem";
-import type { SelectOption } from "../types";
+import type { SelectOption } from "../inspector/types";
 import {
     isOptionDisabled,
     resolveSelectedOptionValue,

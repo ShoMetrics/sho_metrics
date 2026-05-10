@@ -1,4 +1,4 @@
-import type { SelectOption } from "../types";
+import type { SelectOption } from "../inspector/types";
 
 export const pollingFrequencyOptionList = [
     { value: 1, label: "1s" },

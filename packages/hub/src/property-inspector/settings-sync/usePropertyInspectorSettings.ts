@@ -3,8 +3,8 @@ import {
     type GlobalSettings,
     type WidgetSettings,
     type WidgetStoredSettings,
-} from "../settings/widget-settings";
-import { mergeWidgetSettingsPatch } from "../settings/updates";
+} from "../../settings/widget-settings";
+import { mergeWidgetSettingsPatch } from "../../settings/updates";
 import {
     classifyRawWidgetSettings,
     readGlobalSettings,
@@ -12,19 +12,19 @@ import {
     writeGlobalSettings,
     writeWidgetSettings,
     type RawWidgetSettingsClassification,
-} from "../settings/codec";
-import { resolveGlobalSettings } from "../settings/resolver";
-import { buildPropertyInspectorContext } from "./inspector-context";
+} from "../../settings/codec";
+import { resolveGlobalSettings } from "../../settings/resolver";
+import { buildPropertyInspectorContext } from "../inspector/context";
 import { applyGlobalSettingsPatch } from "./plugin-settings-updates";
 import {
     readActionUuid,
     resolveIsWindowsPropertyInspector,
     type StreamDeckPropertyInspectorClient,
-} from "./stream-deck/stream-deck-client";
+} from "../stream-deck/stream-deck-client";
 import {
     resolveActionKind,
     type ActionKind,
-} from "./settings";
+} from "../inspector/action-kind";
 
 interface SettingsSyncState {
     actionKind: ActionKind;

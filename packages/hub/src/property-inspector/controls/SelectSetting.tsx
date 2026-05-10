@@ -1,13 +1,13 @@
 import { useId } from "react";
 import { InspectorItem } from "../components/InspectorItem";
-import type { SelectOption } from "../types";
+import type { SelectOption } from "../inspector/types";
 import {
     isOptionDisabled,
     readSelectedOptionValue,
     resolveSelectedOptionValue,
     type SettingControlProps,
 } from "./setting-control";
-import type { SelectOptionValue } from "../types";
+import type { SelectOptionValue } from "../inspector/types";
 
 interface SelectSettingProps<TValue extends SelectOptionValue> extends SettingControlProps {
     label: string;

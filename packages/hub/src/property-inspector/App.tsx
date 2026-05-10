@@ -5,7 +5,7 @@ import { WidgetSettingsTab } from "./panels/WidgetSettingsTab";
 import {
     usePropertyInspectorSettings,
     type SettingsNotice,
-} from "./usePropertyInspectorSettings";
+} from "./settings-sync/usePropertyInspectorSettings";
 import type { StreamDeckPropertyInspectorClient } from "./stream-deck/stream-deck-client";
 
 interface AppProps {
