@@ -11,12 +11,6 @@ import {
 } from "../settings/widget-settings";
 import { resolveWidgetSettings } from "../settings/resolver";
 
-interface ActionSettingsEvent {
-    payload: {
-        settings?: unknown;
-    };
-}
-
 export function resolveActionSettings(rawSettings: unknown, actionKind: ActionKind): ResolvedWidgetSettings {
     const context = {
         actionKind,
@@ -31,8 +25,8 @@ export function resolveActionSettings(rawSettings: unknown, actionKind: ActionKi
     });
 }
 
-export function readActionStoredSettings(event: ActionSettingsEvent): WidgetStoredSettings {
-    return readWidgetSettings(event.payload.settings);
+export function readActionStoredSettings(rawSettings: unknown): WidgetStoredSettings {
+    return readWidgetSettings(rawSettings);
 }
 
 export function serializeActionStoredSettings(storedSettings: WidgetStoredSettings): JsonObject {

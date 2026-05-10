@@ -11,10 +11,6 @@ import {
     type DiskThroughputDirection,
 } from "../runtime/disk-metric-keys";
 import { resolveDiskMetricSubscriptionKeys } from "./disk-metric-subscriptions";
-import {
-    readActionStoredSettings,
-    serializeActionStoredSettings,
-} from "./action-settings-resolver";
 import type { ResolvedWidgetSettings } from "../settings/widget-settings";
 import { updateWidgetRuntimeCache } from "../settings/updates";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
@@ -60,8 +56,8 @@ export class Disk extends MetricAction {
         const settings = this.resolveSettings(event);
         const selectedVolume = resolveSelectedDiskVolume(settings.metric.diskVolumeId);
 
-        publishDiskVolumeOptions(event);
-        publishDiskThroughputScaleLearning(event, settings, selectedVolume);
+        this.publishDiskVolumeOptions(event);
+        this.publishDiskThroughputScaleLearning(event, settings, selectedVolume);
 
         if (settings.metric.diskMetricKind === "throughput" && process.platform !== "darwin") {
             showDiskThroughputUnavailable(event);
@@ -76,6 +72,66 @@ export class Disk extends MetricAction {
             selectedVolume,
         }));
     }
+
+    private publishDiskVolumeOptions(event: WillAppearEvent): void {
+        const availableDiskVolumes = [...diskVolumeRegistry.getOptions()];
+
+        const storedSettings = this.readStoredSettings(event);
+
+        // TODO(settings-contract): Temporary pre-proto/pre-Zod deep compare. Move this to the codec/schema layer
+        // when persisted settings get a real contract.
+        if (JSON.stringify(storedSettings.runtimeCache?.availableDiskVolumes ?? []) === JSON.stringify(availableDiskVolumes)) {
+            return;
+        }
+
+        this.writeStoredSettings(event, updateWidgetRuntimeCache(storedSettings, {
+            availableDiskVolumes,
+        })).catch(error => {
+            log.error(() => `Failed to publish disk volumes: ${String(error)}`);
+        });
+    }
+
+    private publishDiskThroughputScaleLearning(
+        event: WillAppearEvent,
+        settings: ResolvedWidgetSettings,
+        selectedVolume: DiskVolumeOption | null,
+    ): void {
+        if (
+            settings.metric.diskMetricKind !== "throughput"
+            || settings.diskThroughput.diskThroughputScaleMode === "custom"
+        ) {
+            return;
+        }
+
+        const nextReadMaximum = resolveLearnedDiskMaximumThroughputMebibytesPerSecond({
+            direction: "read",
+            settings,
+            selectedVolume,
+            observedBytesPerSecond: metricStore.getWidgetData(getDiskThroughputMetricKey("read"), "READ", "B/s").current,
+        });
+        const nextWriteMaximum = resolveLearnedDiskMaximumThroughputMebibytesPerSecond({
+            direction: "write",
+            settings,
+            selectedVolume,
+            observedBytesPerSecond: metricStore.getWidgetData(getDiskThroughputMetricKey("write"), "WRIT", "B/s").current,
+        });
+
+        const storedSettings = this.readStoredSettings(event);
+
+        if (
+            storedSettings.runtimeCache?.learnedMaximumDiskReadThroughputMebibytesPerSecond === nextReadMaximum
+            && storedSettings.runtimeCache?.learnedMaximumDiskWriteThroughputMebibytesPerSecond === nextWriteMaximum
+        ) {
+            return;
+        }
+
+        this.writeStoredSettings(event, updateWidgetRuntimeCache(storedSettings, {
+            learnedMaximumDiskReadThroughputMebibytesPerSecond: nextReadMaximum,
+            learnedMaximumDiskWriteThroughputMebibytesPerSecond: nextWriteMaximum,
+        })).catch(error => {
+            log.error(() => `Failed to publish learned disk throughput scale: ${String(error)}`);
+        });
+    }
 }
 
 function resolveSelectedDiskVolume(value: string): DiskVolumeOption | null {
@@ -84,66 +140,6 @@ function resolveSelectedDiskVolume(value: string): DiskVolumeOption | null {
     }
 
     return diskVolumeRegistry.resolveDefaultSelection();
-}
-
-function publishDiskVolumeOptions(event: WillAppearEvent): void {
-    const availableDiskVolumes = [...diskVolumeRegistry.getOptions()];
-
-    const storedSettings = readActionStoredSettings(event);
-
-    // TODO(settings-contract): Temporary pre-proto/pre-Zod deep compare. Move this to the codec/schema layer
-    // when persisted settings get a real contract.
-    if (JSON.stringify(storedSettings.runtimeCache?.availableDiskVolumes ?? []) === JSON.stringify(availableDiskVolumes)) {
-        return;
-    }
-
-    event.action.setSettings(serializeActionStoredSettings(updateWidgetRuntimeCache(storedSettings, {
-        availableDiskVolumes,
-    }))).catch(error => {
-        log.error(() => `Failed to publish disk volumes: ${String(error)}`);
-    });
-}
-
-function publishDiskThroughputScaleLearning(
-    event: WillAppearEvent,
-    settings: ResolvedWidgetSettings,
-    selectedVolume: DiskVolumeOption | null,
-): void {
-    if (
-        settings.metric.diskMetricKind !== "throughput"
-        || settings.diskThroughput.diskThroughputScaleMode === "custom"
-    ) {
-        return;
-    }
-
-    const nextReadMaximum = resolveLearnedDiskMaximumThroughputMebibytesPerSecond({
-        direction: "read",
-        settings,
-        selectedVolume,
-        observedBytesPerSecond: metricStore.getWidgetData(getDiskThroughputMetricKey("read"), "READ", "B/s").current,
-    });
-    const nextWriteMaximum = resolveLearnedDiskMaximumThroughputMebibytesPerSecond({
-        direction: "write",
-        settings,
-        selectedVolume,
-        observedBytesPerSecond: metricStore.getWidgetData(getDiskThroughputMetricKey("write"), "WRIT", "B/s").current,
-    });
-
-    const storedSettings = readActionStoredSettings(event);
-
-    if (
-        storedSettings.runtimeCache?.learnedMaximumDiskReadThroughputMebibytesPerSecond === nextReadMaximum
-        && storedSettings.runtimeCache?.learnedMaximumDiskWriteThroughputMebibytesPerSecond === nextWriteMaximum
-    ) {
-        return;
-    }
-
-    event.action.setSettings(serializeActionStoredSettings(updateWidgetRuntimeCache(storedSettings, {
-        learnedMaximumDiskReadThroughputMebibytesPerSecond: nextReadMaximum,
-        learnedMaximumDiskWriteThroughputMebibytesPerSecond: nextWriteMaximum,
-    }))).catch(error => {
-        log.error(() => `Failed to publish learned disk throughput scale: ${String(error)}`);
-    });
 }
 
 function resolveLearnedDiskMaximumThroughputMebibytesPerSecond(options: {

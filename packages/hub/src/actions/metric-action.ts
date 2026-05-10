@@ -3,8 +3,12 @@ import { scheduler } from "../runtime/scheduler";
 import { clearMetricDisplayState } from "./metric-display-runner";
 import { logger } from "../logging/logger";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
-import { resolveActionSettings } from "./action-settings-resolver";
-import type { ActionKind, ResolvedWidgetSettings } from "../settings/widget-settings";
+import {
+    readActionStoredSettings,
+    resolveActionSettings,
+    serializeActionStoredSettings,
+} from "./action-settings-resolver";
+import type { ActionKind, ResolvedWidgetSettings, WidgetStoredSettings } from "../settings/widget-settings";
 
 const log = logger.for("MetricAction");
 
@@ -94,6 +98,18 @@ export abstract class MetricAction extends SingletonAction {
 
     protected resolveSettings(event: WillAppearEvent): ResolvedWidgetSettings {
         return this.resolveRawSettings(this.activeActionStates.get(event.action.id)!.rawSettings);
+    }
+
+    protected readStoredSettings(event: WillAppearEvent): WidgetStoredSettings {
+        return readActionStoredSettings(this.activeActionStates.get(event.action.id)!.rawSettings);
+    }
+
+    protected writeStoredSettings(event: WillAppearEvent, storedSettings: WidgetStoredSettings): Promise<void> {
+        const rawSettings = serializeActionStoredSettings(storedSettings);
+
+        this.activeActionStates.get(event.action.id)!.rawSettings = rawSettings;
+
+        return event.action.setSettings(rawSettings);
     }
 
     private subscribeAction(activeActionState: ActiveActionState): void {
