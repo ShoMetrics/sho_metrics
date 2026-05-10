@@ -1,4 +1,4 @@
-import { buildCircleStylePreviewUri } from "../circle-style-preview";
+import { buildCircleStylePreviewUri } from "../previews/circle-style-preview";
 import type { CircleStyle } from "../settings";
 import { PreviewOptionSetting } from "./PreviewOptionSetting";
 import type { SettingControlProps } from "./setting-control";

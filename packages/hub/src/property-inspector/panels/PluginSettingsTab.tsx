@@ -1,23 +1,23 @@
-import { CircleStyleSetting } from "./controls/CircleStyleSetting";
-import { ColorSetting } from "./controls/ColorSetting";
-import { GraphicTypeSetting } from "./controls/GraphicTypeSetting";
-import { NumberSetting } from "./controls/NumberSetting";
-import { SelectSetting } from "./controls/SelectSetting";
-import { InspectorItem } from "./components/InspectorItem";
-import { SettingsSection } from "./panels/SettingsSection";
+import { CircleStyleSetting } from "../controls/CircleStyleSetting";
+import { ColorSetting } from "../controls/ColorSetting";
+import { GraphicTypeSetting } from "../controls/GraphicTypeSetting";
+import { NumberSetting } from "../controls/NumberSetting";
+import { SelectSetting } from "../controls/SelectSetting";
+import { InspectorItem } from "../components/InspectorItem";
+import { SettingsSection } from "./SettingsSection";
 import {
     colorModeOptionList,
     graphicStyleOptionList,
     networkUnitBaseOptionList,
     scaleModeOptionList,
-} from "./panels/setting-options";
+} from "./setting-options";
 import {
     type AppearanceSettings,
     type DiskThroughputDefaultSettings,
     type GlobalSettings,
     type NetworkDefaultSettings,
     type ResolvedGlobalSettings,
-} from "../settings/widget-settings";
+} from "../../settings/widget-settings";
 
 interface PluginSettingsTabProps {
     resolvedSettings: ResolvedGlobalSettings;
