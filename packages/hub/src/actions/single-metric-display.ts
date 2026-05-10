@@ -15,7 +15,6 @@ import {
     type MetricDisplayRenderPlan,
     type MetricDisplayOptions,
     type SingleMetricDisplayOptions,
-    type TouchStripMetricLayout,
 } from "./single-metric-display-model";
 import {
     buildMetricVisualSettings,
@@ -23,6 +22,10 @@ import {
 } from "../settings/visual-adapter";
 import { logger } from "../logging/logger";
 import { DisplayUpdateQueue } from "./display-update-queue";
+import {
+    dispatchMetricDisplayImage,
+    type TouchStripMetricLayoutState,
+} from "./metric-display-dispatch";
 import {
     DisplayPerformanceStats,
     formatDisplayPerformanceSummary,
@@ -50,8 +53,7 @@ interface DisplayActionState {
     pendingRequestTimestampMilliseconds: number | null;
     pendingRequestReason: DisplayRequestReason;
     pendingSettingsSignature: string | null;
-    touchStripLayoutPromise: Promise<void> | null;
-    touchStripLayoutPath: string | null;
+    touchStripMetricLayoutState: TouchStripMetricLayoutState;
     lastRenderedSvg: string | null;
     lastRequestedSettingsSignature: string | null;
 }
@@ -108,8 +110,8 @@ export function clearSingleMetricDisplayState(actionId: string): void {
     displayActionState.pendingRequestTimestampMilliseconds = null;
     displayActionState.pendingRequestReason = "metric-tick";
     displayActionState.pendingSettingsSignature = null;
-    displayActionState.touchStripLayoutPromise = null;
-    displayActionState.touchStripLayoutPath = null;
+    displayActionState.touchStripMetricLayoutState.layoutPromise = null;
+    displayActionState.touchStripMetricLayoutState.layoutPath = null;
     displayActionQueue.remove(actionId);
     displayActionStates.delete(actionId);
 }
@@ -227,166 +229,63 @@ function renderAndSendSingleMetricDisplay(
         rasterizeDurationMilliseconds: rasterizeEndTimestampMilliseconds - composeEndTimestampMilliseconds,
     });
 
-    if (options.event.action.isDial()) {
-        const setFeedback = (): void => {
-            if (!displayActionState.active || !options.event.action.isDial()) {
-                finishDisplayUpdate(displayActionState);
+    dispatchMetricDisplayImage({
+        event: options.event,
+        pngDataUrl,
+        touchStripMetricLayout: renderPlan.touchStripMetricLayout,
+        touchStripMetricLayoutState: displayActionState.touchStripMetricLayoutState,
+        isActionActive: () => displayActionState.active,
+    })
+        .then(dispatchResult => {
+            if (dispatchResult.status === "inactive") {
                 return;
             }
 
-            const updateStartTimestampMilliseconds = Date.now();
-            options.event.action.setFeedback({ metricImage: pngDataUrl })
-                .then(() => {
-                    const updateEndTimestampMilliseconds = Date.now();
-                    displayActionState.lastRenderedSvg = svg;
-                    recordDisplayPerformanceSample({
-                        requestReason,
-                        displayKind,
-                        outcome: "rendered",
-                        titleClearRequested,
-                        requestTimestampMilliseconds,
-                        renderStartTimestampMilliseconds,
-                        composeEndTimestampMilliseconds,
-                        rasterizeEndTimestampMilliseconds,
-                        updateStartTimestampMilliseconds,
-                        updateEndTimestampMilliseconds,
-                    });
-                    logSettingsUpdateDoneInfo({
-                        requestReason,
-                        actionId: options.event.action.id,
-                        metricKey: options.metricKey,
-                        phase: "setFeedbackDone",
-                        graphicType: renderPlan.visualSettings.graphicType,
-                        requestTimestampMilliseconds,
-                        renderStartTimestampMilliseconds,
-                        composeEndTimestampMilliseconds,
-                        rasterizeEndTimestampMilliseconds,
-                        updateStartTimestampMilliseconds,
-                    });
-                    logUpdateDoneDebug({
-                        actionId: options.event.action.id,
-                        metricKey: options.metricKey,
-                        phase: "setFeedbackDone",
-                        sampleTimestampMilliseconds: resolveDisplaySampleTimestampMilliseconds(renderedMetricData),
-                        updateStartTimestampMilliseconds,
-                    });
-                })
-                .catch(error => {
-                    const updateEndTimestampMilliseconds = Date.now();
-                    recordDisplayPerformanceSample({
-                        requestReason,
-                        displayKind,
-                        outcome: "failed",
-                        titleClearRequested,
-                        requestTimestampMilliseconds,
-                        renderStartTimestampMilliseconds,
-                        composeEndTimestampMilliseconds,
-                        rasterizeEndTimestampMilliseconds,
-                        updateStartTimestampMilliseconds,
-                        updateEndTimestampMilliseconds,
-                    });
-                    log.error(() => `Failed to set touch strip feedback: ${error}`);
-                })
-                .finally(() => {
-                    finishDisplayUpdate(displayActionState);
-                });
-        };
-
-        ensureTouchStripSingleMetricLayout(displayActionState, options.event, renderPlan.touchStripMetricLayout)
-            .then(setFeedback)
-            .catch(error => {
-                const updateEndTimestampMilliseconds = Date.now();
-                recordDisplayPerformanceSample({
-                    requestReason,
-                    displayKind,
-                    outcome: "failed",
-                    titleClearRequested,
-                    requestTimestampMilliseconds,
-                    renderStartTimestampMilliseconds,
-                    composeEndTimestampMilliseconds,
-                    rasterizeEndTimestampMilliseconds,
-                    updateStartTimestampMilliseconds: null,
-                    updateEndTimestampMilliseconds,
-                });
-                log.error(() => `Failed to update touch strip metric image: ${error}`);
-                finishDisplayUpdate(displayActionState);
-            });
-        return;
-    }
-
-    if (options.event.action.isKey()) {
-        const updateStartTimestampMilliseconds = Date.now();
-        options.event.action.setImage(pngDataUrl)
-            .then(() => {
-                const updateEndTimestampMilliseconds = Date.now();
+            if (dispatchResult.status === "rendered") {
                 displayActionState.lastRenderedSvg = svg;
-                recordDisplayPerformanceSample({
-                    requestReason,
-                    displayKind,
-                    outcome: "rendered",
-                    titleClearRequested,
-                    requestTimestampMilliseconds,
-                    renderStartTimestampMilliseconds,
-                    composeEndTimestampMilliseconds,
-                    rasterizeEndTimestampMilliseconds,
-                    updateStartTimestampMilliseconds,
-                    updateEndTimestampMilliseconds,
-                });
-                logSettingsUpdateDoneInfo({
-                    requestReason,
-                    actionId: options.event.action.id,
-                    metricKey: options.metricKey,
-                    phase: "setImageDone",
-                    graphicType: renderPlan.visualSettings.graphicType,
-                    requestTimestampMilliseconds,
-                    renderStartTimestampMilliseconds,
-                    composeEndTimestampMilliseconds,
-                    rasterizeEndTimestampMilliseconds,
-                    updateStartTimestampMilliseconds,
-                });
-                logUpdateDoneDebug({
-                    actionId: options.event.action.id,
-                    metricKey: options.metricKey,
-                    phase: "setImageDone",
-                    sampleTimestampMilliseconds: resolveDisplaySampleTimestampMilliseconds(renderedMetricData),
-                    updateStartTimestampMilliseconds,
-                });
-            })
-            .catch(error => {
-                const updateEndTimestampMilliseconds = Date.now();
-                recordDisplayPerformanceSample({
-                    requestReason,
-                    displayKind,
-                    outcome: "failed",
-                    titleClearRequested,
-                    requestTimestampMilliseconds,
-                    renderStartTimestampMilliseconds,
-                    composeEndTimestampMilliseconds,
-                    rasterizeEndTimestampMilliseconds,
-                    updateStartTimestampMilliseconds,
-                    updateEndTimestampMilliseconds,
-                });
-                log.error(() => `Failed to set key image: ${error}`);
-            })
-            .finally(() => {
-                finishDisplayUpdate(displayActionState);
-            });
-        return;
-    }
+            }
 
-    recordDisplayPerformanceSample({
-        requestReason,
-        displayKind,
-        outcome: "failed",
-        titleClearRequested,
-        requestTimestampMilliseconds,
-        renderStartTimestampMilliseconds,
-        composeEndTimestampMilliseconds,
-        rasterizeEndTimestampMilliseconds,
-        updateStartTimestampMilliseconds: null,
-        updateEndTimestampMilliseconds: Date.now(),
-    });
-    finishDisplayUpdate(displayActionState);
+            recordDisplayPerformanceSample({
+                requestReason,
+                displayKind,
+                outcome: dispatchResult.status === "rendered" ? "rendered" : "failed",
+                titleClearRequested,
+                requestTimestampMilliseconds,
+                renderStartTimestampMilliseconds,
+                composeEndTimestampMilliseconds,
+                rasterizeEndTimestampMilliseconds,
+                updateStartTimestampMilliseconds: dispatchResult.updateStartTimestampMilliseconds,
+                updateEndTimestampMilliseconds: dispatchResult.updateEndTimestampMilliseconds,
+            });
+
+            if (dispatchResult.status === "failed") {
+                log.error(() => `${dispatchResult.failureMessage}: ${dispatchResult.error}`);
+                return;
+            }
+
+            logSettingsUpdateDoneInfo({
+                requestReason,
+                actionId: options.event.action.id,
+                metricKey: options.metricKey,
+                phase: dispatchResult.donePhase,
+                graphicType: renderPlan.visualSettings.graphicType,
+                requestTimestampMilliseconds,
+                renderStartTimestampMilliseconds,
+                composeEndTimestampMilliseconds,
+                rasterizeEndTimestampMilliseconds,
+                updateStartTimestampMilliseconds: dispatchResult.updateStartTimestampMilliseconds,
+            });
+            logUpdateDoneDebug({
+                actionId: options.event.action.id,
+                metricKey: options.metricKey,
+                phase: dispatchResult.donePhase,
+                sampleTimestampMilliseconds: resolveDisplaySampleTimestampMilliseconds(renderedMetricData),
+                updateStartTimestampMilliseconds: dispatchResult.updateStartTimestampMilliseconds,
+            });
+        })
+        .finally(() => {
+            finishDisplayUpdate(displayActionState);
+        });
 }
 
 function composeMetricDisplayFrame(options: {
@@ -490,8 +389,10 @@ function getOrCreateDisplayActionState(actionId: string): DisplayActionState {
         pendingRequestTimestampMilliseconds: null,
         pendingRequestReason: "metric-tick",
         pendingSettingsSignature: null,
-        touchStripLayoutPromise: null,
-        touchStripLayoutPath: null,
+        touchStripMetricLayoutState: {
+            layoutPromise: null,
+            layoutPath: null,
+        },
         lastRenderedSvg: null,
         lastRequestedSettingsSignature: null,
     };
@@ -611,39 +512,6 @@ function finishDisplayUpdate(displayActionState: DisplayActionState): void {
     }
 
     scheduleDisplayQueueDrain();
-}
-
-function ensureTouchStripSingleMetricLayout(
-    displayActionState: DisplayActionState,
-    event: WillAppearEvent,
-    touchStripMetricLayout: TouchStripMetricLayout | null,
-): Promise<void> {
-    if (!event.action.isDial()) {
-        return Promise.resolve();
-    }
-
-    if (!touchStripMetricLayout) {
-        return Promise.resolve();
-    }
-
-    if (
-        displayActionState.touchStripLayoutPromise
-        && displayActionState.touchStripLayoutPath === touchStripMetricLayout.layoutPath
-    ) {
-        return displayActionState.touchStripLayoutPromise;
-    }
-
-    displayActionState.touchStripLayoutPath = touchStripMetricLayout.layoutPath;
-    const layoutPromise = event.action.setFeedbackLayout(touchStripMetricLayout.layoutPath)
-        .catch(error => {
-            if (displayActionState.touchStripLayoutPath === touchStripMetricLayout.layoutPath) {
-                displayActionState.touchStripLayoutPromise = null;
-                displayActionState.touchStripLayoutPath = null;
-            }
-            throw error;
-        });
-    displayActionState.touchStripLayoutPromise = layoutPromise;
-    return layoutPromise;
 }
 
 function resolveDisplayPerformanceKind(event: WillAppearEvent): DisplayPerformanceKind {
