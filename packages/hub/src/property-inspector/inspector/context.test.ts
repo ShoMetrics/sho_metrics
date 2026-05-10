@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildVisibilityContext } from "./test-context";
+import { buildVisibilityContext } from "../testing/test-context";
 
 test("Property Inspector context reads resolved disk polling defaults without persisting them", () => {
     const context = buildVisibilityContext({
