@@ -2,7 +2,7 @@ import type { WidgetData } from "../rendering/widget-data";
 
 export type TemperatureUnit = "celsius" | "fahrenheit";
 
-export interface TemperatureDisplayOptions {
+interface TemperatureDisplayOptions {
     celsiusWidgetData: WidgetData;
     maximumCelsius: number;
     unit: TemperatureUnit;

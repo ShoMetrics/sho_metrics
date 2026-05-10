@@ -61,15 +61,6 @@ export function mergeWidgetSettingsPatch(settings: WidgetSettings, patch: Widget
     return output;
 }
 
-export function updateWidgetRuntimeCache(
-    settings: WidgetSettings,
-    patch: RuntimeStatePatch,
-): WidgetSettings {
-    return mergeWidgetSettingsPatch(settings, {
-        runtimeCache: patch,
-    });
-}
-
 const colorRampKeys: readonly AppearanceColorRampKey[] = [
     "usageColors",
     "downloadColors",

@@ -122,22 +122,6 @@ export function buildMetricDisplayRenderPlan(options: {
     };
 }
 
-export function resolveCircularCenterContent(options: {
-    graphicType: ResolvedMetricVisualSettings["graphicType"];
-    circleStyle: ResolvedMetricVisualSettings["circleStyle"];
-    circleStyleOverride: ResolvedMetricVisualSettings["circleStyle"] | undefined;
-}): "value" | "icon" {
-    if (options.graphicType !== "circular") {
-        return "value";
-    }
-
-    return resolveCircleStyle({
-        graphicType: options.graphicType,
-        circleStyle: options.circleStyle,
-        circleStyleOverride: options.circleStyleOverride,
-    }) === "compact" ? "icon" : "value";
-}
-
 export function resolveCircleStyle(options: {
     graphicType: ResolvedMetricVisualSettings["graphicType"];
     circleStyle: ResolvedMetricVisualSettings["circleStyle"];

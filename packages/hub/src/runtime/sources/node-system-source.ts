@@ -89,7 +89,7 @@ export interface NodeSystemDiskVolumeRegistry {
     update(options: readonly DiskVolumeOption[]): void;
 }
 
-export interface NodeSystemSourceDependencies {
+interface NodeSystemSourceDependencies {
     systemInformation?: NodeSystemInformationClient;
     networkRegistry?: NodeSystemNetworkInterfaceRegistry;
     diskRegistry?: NodeSystemDiskVolumeRegistry;

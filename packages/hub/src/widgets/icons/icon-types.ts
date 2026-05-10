@@ -1,6 +1,6 @@
 import type { IconNode } from "lucide";
 
-export type SvgIconSource = "lucide" | "custom";
+type SvgIconSource = "lucide" | "custom";
 
 export interface SvgViewBox {
     x: number;

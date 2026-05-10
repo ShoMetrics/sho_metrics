@@ -1,9 +1,9 @@
 import type { WidgetData } from "../rendering/widget-data";
 import { formatBytesPerSecond, type DataRateUnitBase } from "./byte-format";
 
-export type NetworkSpeedUnitBase = DataRateUnitBase;
+type NetworkSpeedUnitBase = DataRateUnitBase;
 
-export interface NetworkSpeedDisplayOptions {
+interface NetworkSpeedDisplayOptions {
     bytesPerSecond: number;
     historyBytesPerSecond: readonly number[];
     maximumBytesPerSecond: number;

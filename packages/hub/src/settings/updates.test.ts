@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { updateWidgetRuntimeCache, updateWidgetSettingsBranch } from "./updates";
+import { mergeWidgetSettingsPatch, updateWidgetSettingsBranch } from "./updates";
 import type { WidgetSettings } from "./model";
 
 test("updating runtime state preserves user preferences and overrides", () => {
@@ -21,15 +21,17 @@ test("updating runtime state preserves user preferences and overrides", () => {
         },
     };
 
-    const nextSettings = updateWidgetRuntimeCache(settings, {
-        availableNetworkInterfaces: [{
-            id: "eth0",
-            name: "Ethernet",
-            type: "wired",
-            isDefault: true,
-            speedMegabitsPerSecond: 1000,
-        }],
-        learnedMaximumDownloadSpeedMbps: 900,
+    const nextSettings = mergeWidgetSettingsPatch(settings, {
+        runtimeCache: {
+            availableNetworkInterfaces: [{
+                id: "eth0",
+                name: "Ethernet",
+                type: "wired",
+                isDefault: true,
+                speedMegabitsPerSecond: 1000,
+            }],
+            learnedMaximumDownloadSpeedMbps: 900,
+        },
     });
 
     assert.deepEqual(nextSettings.metric, settings.metric);
