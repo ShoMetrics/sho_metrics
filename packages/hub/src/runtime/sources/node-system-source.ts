@@ -2,13 +2,38 @@ import si, { type Systeminformation } from "systeminformation";
 import type { IMetricSource, IMetricSnapshot, IMetricValue } from "./source.interface";
 import { logger } from "../../logging/logger";
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../network-interfaces";
-import { getNetworkAggregateMetricKey, getNetworkInterfaceMetricKey, type NetworkDirection } from "../network-metric-keys";
+import {
+    getNetworkAggregateMetricKey,
+    getNetworkInterfaceMetricKey,
+    isNetworkMetricKey,
+    type NetworkDirection,
+} from "../network-metric-keys";
 import { diskVolumeRegistry, type DiskVolumeOption } from "../disk-volumes";
 import {
     getDefaultDiskUsageMetricKey,
     getDiskThroughputMetricKey,
     getDiskVolumeMetricKey,
+    isDiskMetricKey,
+    isDiskThroughputMetricKey,
+    isDiskUsageMetricKey,
 } from "../disk-metric-keys";
+import {
+    CPU_BASE_FREQUENCY_METRIC_KEY,
+    CPU_MODEL_METRIC_KEY,
+    CPU_USAGE_METRIC_KEY,
+    GPU_MODEL_METRIC_KEY,
+    GPU_POWER_LIMIT_METRIC_KEY,
+    GPU_POWER_METRIC_KEY,
+    GPU_TEMP_METRIC_KEY,
+    GPU_USAGE_METRIC_KEY,
+    GPU_VRAM_TOTAL_METRIC_KEY,
+    GPU_VRAM_USED_METRIC_KEY,
+    RAM_TOTAL_METRIC_KEY,
+    RAM_USED_METRIC_KEY,
+    isCpuMetricKey,
+    isGpuMetricKey,
+    isRamMetricKey,
+} from "../metric-keys";
 import { formatCpuModelText, isFinitePositiveNumber } from "./node-system-cpu";
 import {
     calculatePercent,
@@ -141,36 +166,36 @@ export class NodeSystemSource implements IMetricSource {
         Object.assign(metrics, cpuMetrics, memoryMetrics, diskMetrics, networkMetrics);
 
         if (gpu) {
-            metrics["gpu.usage_percent"] = {
+            metrics[GPU_USAGE_METRIC_KEY] = {
                 scalar: gpu.utilizationGpu ?? 0,
                 unit: "%",
                 progress: Math.min(Math.max((gpu.utilizationGpu ?? 0) / 100, 0), 1),
             };
             if (gpu.modelText) {
-                metrics["gpu.model"] = {
+                metrics[GPU_MODEL_METRIC_KEY] = {
                     text: gpu.modelText,
                 };
             }
-            metrics["gpu.temp"] = {
+            metrics[GPU_TEMP_METRIC_KEY] = {
                 scalar: gpu.temperatureGpu ?? 0,
                 unit: "°C",
             };
-            metrics["gpu.vram_used"] = {
+            metrics[GPU_VRAM_USED_METRIC_KEY] = {
                 scalar: gpu.memoryUsed ?? 0,
                 unit: "MB",
             };
-            metrics["gpu.vram_total"] = {
+            metrics[GPU_VRAM_TOTAL_METRIC_KEY] = {
                 scalar: gpu.memoryTotal ?? 0,
                 unit: "MB",
             };
             if (typeof gpu.powerDraw === "number" && Number.isFinite(gpu.powerDraw)) {
-                metrics["gpu.power"] = {
+                metrics[GPU_POWER_METRIC_KEY] = {
                     scalar: gpu.powerDraw,
                     unit: "W",
                 };
             }
             if (typeof gpu.powerLimit === "number" && Number.isFinite(gpu.powerLimit)) {
-                metrics["gpu.power_limit"] = {
+                metrics[GPU_POWER_LIMIT_METRIC_KEY] = {
                     scalar: gpu.powerLimit,
                     unit: "W",
                 };
@@ -189,11 +214,11 @@ export class NodeSystemSource implements IMetricSource {
             const memoryData = await this.systemInformation.mem();
 
             return {
-                "ram.used": {
+                [RAM_USED_METRIC_KEY]: {
                     scalar: memoryData.used,
                     unit: "B",
                 },
-                "ram.total": {
+                [RAM_TOTAL_METRIC_KEY]: {
                     scalar: memoryData.total,
                     unit: "B",
                 },
@@ -215,12 +240,8 @@ export class NodeSystemSource implements IMetricSource {
 
     private async pollDisk(metricKeys: readonly string[]): Promise<Record<string, IMetricValue>> {
         const metrics: Record<string, IMetricValue> = {};
-        const shouldPollUsage = metricKeys.length === 0 || metricKeys.some(metricKey =>
-            metricKey.startsWith("disk.usage.") || metricKey.startsWith("disk.volume."),
-        );
-        const shouldPollThroughput = metricKeys.length === 0 || metricKeys.some(metricKey =>
-            metricKey.startsWith("disk.throughput."),
-        );
+        const shouldPollUsage = metricKeys.length === 0 || metricKeys.some(isDiskUsageMetricKey);
+        const shouldPollThroughput = metricKeys.length === 0 || metricKeys.some(isDiskThroughputMetricKey);
 
         if (shouldPollUsage) {
             Object.assign(metrics, await this.pollDiskUsage());
@@ -299,7 +320,7 @@ export class NodeSystemSource implements IMetricSource {
         try {
             const load = await this.systemInformation.currentLoad();
             const metrics: Record<string, IMetricValue> = {
-                "cpu.usage_percent": {
+                [CPU_USAGE_METRIC_KEY]: {
                     scalar: load.currentLoad,
                     unit: "%",
                     progress: Math.min(Math.max(load.currentLoad / 100, 0), 1),
@@ -307,13 +328,13 @@ export class NodeSystemSource implements IMetricSource {
             };
 
             if (this.cachedCpuBaseFrequencyGigahertz != null) {
-                metrics["cpu.base_frequency"] = {
+                metrics[CPU_BASE_FREQUENCY_METRIC_KEY] = {
                     scalar: this.cachedCpuBaseFrequencyGigahertz,
                     unit: "GHz",
                 };
             }
             if (this.cachedCpuModelText) {
-                metrics["cpu.model"] = {
+                metrics[CPU_MODEL_METRIC_KEY] = {
                     text: this.cachedCpuModelText,
                 };
             }
@@ -623,27 +644,27 @@ export function resolveMetricGroups(metricKeys: readonly string[]): Set<NodeSyst
     const metricGroups = new Set<NodeSystemMetricGroup>();
 
     for (const metricKey of metricKeys) {
-        if (metricKey.startsWith("cpu.")) {
+        if (isCpuMetricKey(metricKey)) {
             metricGroups.add("cpu");
             continue;
         }
 
-        if (metricKey.startsWith("net.")) {
+        if (isNetworkMetricKey(metricKey)) {
             metricGroups.add("network");
             continue;
         }
 
-        if (metricKey.startsWith("ram.")) {
+        if (isRamMetricKey(metricKey)) {
             metricGroups.add("memory");
             continue;
         }
 
-        if (metricKey.startsWith("disk.")) {
+        if (isDiskMetricKey(metricKey)) {
             metricGroups.add("disk");
             continue;
         }
 
-        if (metricKey.startsWith("gpu.")) {
+        if (isGpuMetricKey(metricKey)) {
             metricGroups.add("gpu");
         }
     }

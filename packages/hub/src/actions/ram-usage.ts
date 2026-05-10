@@ -5,6 +5,7 @@ import { setSingleMetricDisplay } from "./single-metric-display";
 import { buildMemoryUsageWidgetData } from "../metrics/storage-display";
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
+import { RAM_TOTAL_METRIC_KEY, RAM_USED_METRIC_KEY } from "../runtime/metric-keys";
 
 @action({ UUID: "com.ez.sho-metrics.ram" })
 export class RamUsage extends MetricAction {
@@ -33,5 +34,3 @@ export class RamUsage extends MetricAction {
     }
 }
 
-const RAM_USED_METRIC_KEY = "ram.used";
-const RAM_TOTAL_METRIC_KEY = "ram.total";

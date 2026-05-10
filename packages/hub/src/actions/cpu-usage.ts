@@ -6,6 +6,7 @@ import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-label
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import type { WidgetData } from "../rendering/widget-data";
+import { CPU_MODEL_METRIC_KEY, CPU_USAGE_METRIC_KEY } from "../runtime/metric-keys";
 
 /**
  * CPU Usage action with full theming support.
@@ -39,9 +40,6 @@ export class CpuUsage extends MetricAction {
         });
     }
 }
-
-const CPU_USAGE_METRIC_KEY = "cpu.usage_percent";
-const CPU_MODEL_METRIC_KEY = "cpu.model";
 
 export function buildCpuUsageWidgetData(widgetData: WidgetData): WidgetData {
     return {

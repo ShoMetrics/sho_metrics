@@ -13,6 +13,16 @@ import {
 } from "../metrics/temperature-display";
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
+import {
+    GPU_METRIC_KEYS,
+    GPU_MODEL_METRIC_KEY,
+    GPU_POWER_LIMIT_METRIC_KEY,
+    GPU_POWER_METRIC_KEY,
+    GPU_TEMP_METRIC_KEY,
+    GPU_USAGE_METRIC_KEY,
+    GPU_VRAM_TOTAL_METRIC_KEY,
+    GPU_VRAM_USED_METRIC_KEY,
+} from "../runtime/metric-keys";
 
 /**
  * Base class for GPU-related actions.
@@ -144,23 +154,7 @@ export class GpuPower extends GpuBaseAction {
     }
 }
 
-const GPU_USAGE_METRIC_KEY = "gpu.usage_percent";
-const GPU_MODEL_METRIC_KEY = "gpu.model";
-const GPU_TEMP_METRIC_KEY = "gpu.temp";
-const GPU_VRAM_USED_METRIC_KEY = "gpu.vram_used";
-const GPU_VRAM_TOTAL_METRIC_KEY = "gpu.vram_total";
-const GPU_POWER_METRIC_KEY = "gpu.power";
-const GPU_POWER_LIMIT_METRIC_KEY = "gpu.power_limit";
 const GPU_SAMPLE_STALE_MS = 7000;
-const GPU_METRIC_KEYS = [
-    GPU_USAGE_METRIC_KEY,
-    GPU_MODEL_METRIC_KEY,
-    GPU_TEMP_METRIC_KEY,
-    GPU_VRAM_USED_METRIC_KEY,
-    GPU_VRAM_TOTAL_METRIC_KEY,
-    GPU_POWER_METRIC_KEY,
-    GPU_POWER_LIMIT_METRIC_KEY,
-];
 
 function isFreshGpuWidgetData(widgetData: WidgetData): boolean {
     if (widgetData.sampleTimestampMilliseconds == null) {
