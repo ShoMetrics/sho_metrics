@@ -1,8 +1,10 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
-import { composeDualChannelSvg, composeSvg } from "../rendering/composer";
+import { composeDualChannelSvg } from "../rendering/composer";
 import { rasterizeSvgToPngDataUrl } from "../rendering/rasterizer";
 import type { ColorConfig } from "../rendering/color-resolver";
 import type { DualChannelWidgetData, WidgetData } from "../rendering/widget-data";
+import { renderMetricFrame } from "../rendering/metric-frame";
+import { renderSingleMetricBodyView } from "../rendering/single-metric-view";
 import {
     buildMetricDisplayRenderPlan,
     buildRenderDualChannelWidgetData,
@@ -183,21 +185,22 @@ function renderAndSendSingleMetricDisplay(
             shouldRenderMutedIconPlaceholder: renderPlan.shouldRenderMutedIconPlaceholder,
         });
         renderedMetricData = renderSingleWidgetData;
-        svg = composeSvg(renderSingleWidgetData, {
-            ...renderPlan.visualSettings,
+        const bodySvg = renderSingleMetricBodyView({
+            data: renderSingleWidgetData,
+            visual: renderPlan.visualSettings,
+            renderSize: renderPlan.renderSize,
+            centerIcon: options.centerIconFragment,
+            footerIcon: options.footerIconFragment,
+            linearIcon: options.linearIconFragment,
+            statusIcon: options.statusIcon,
+            circleStyle: renderPlan.circleStyle,
+        });
+        svg = renderMetricFrame({
+            body: bodySvg,
+            graphicStyle: renderPlan.visualSettings.graphicStyle,
             muted: renderPlan.shouldRenderMutedIconPlaceholder,
-            configOverrides: buildSingleMetricConfigOverrides({
-                centerIconFragment: options.centerIconFragment,
-                footerIconFragment: options.footerIconFragment,
-                linearIconFragment: options.linearIconFragment,
-                statusIcon: options.statusIcon,
-                centerContent: renderPlan.centerContent,
-                circleStyle: renderPlan.circleStyle,
-                lineSmoothingPercent: renderPlan.visualSettings.lineSmoothingPercent,
-                gridLineVisibility: renderPlan.visualSettings.gridLineVisibility,
-                gridLineType: renderPlan.visualSettings.gridLineType,
-            }),
-        }, renderPlan.renderSize);
+            size: renderPlan.renderSize,
+        });
     }
     const composeEndTimestampMilliseconds = Date.now();
 
@@ -427,40 +430,6 @@ function renderAndSendSingleMetricDisplay(
         updateEndTimestampMilliseconds: Date.now(),
     });
     finishDisplayUpdate(displayActionState);
-}
-
-function buildSingleMetricConfigOverrides(options: {
-    centerIconFragment: string;
-    footerIconFragment: string | undefined;
-    linearIconFragment: string | undefined;
-    statusIcon: ArcGaugeStatusIcon;
-    centerContent: "value" | "icon";
-    circleStyle: ResolvedMetricVisualSettings["circleStyle"];
-    lineSmoothingPercent: number;
-    gridLineVisibility: ResolvedMetricVisualSettings["gridLineVisibility"];
-    gridLineType: ResolvedMetricVisualSettings["gridLineType"];
-}): {
-    centerContent?: "value" | "icon";
-    circleStyle?: ResolvedMetricVisualSettings["circleStyle"];
-    centerIconFragment?: string;
-    footerIconFragment?: string;
-    topIconFragment?: string;
-    statusIcon?: ArcGaugeStatusIcon;
-    lineSmoothingPercent?: number;
-    gridLineVisibility?: ResolvedMetricVisualSettings["gridLineVisibility"];
-    gridLineType?: ResolvedMetricVisualSettings["gridLineType"];
-} {
-    return {
-        centerContent: options.centerContent,
-        circleStyle: options.circleStyle,
-        centerIconFragment: options.centerIconFragment,
-        footerIconFragment: options.footerIconFragment,
-        topIconFragment: options.linearIconFragment ?? options.centerIconFragment,
-        statusIcon: options.statusIcon,
-        lineSmoothingPercent: options.lineSmoothingPercent,
-        gridLineVisibility: options.gridLineVisibility,
-        gridLineType: options.gridLineType,
-    };
 }
 
 function buildDualMetricConfigOverrides(options: {
