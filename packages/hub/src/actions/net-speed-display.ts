@@ -26,7 +26,7 @@ import {
 import {
     normalizeNetworkDisplayDirection,
     resolveSingleNetworkDirection,
-} from "./net-speed-metric-keys";
+} from "./net-speed-metric-subscriptions";
 import type { MetricDisplayOptions } from "./single-metric-display-model";
 import { buildColorConfigFromRamp } from "./channel-color-config";
 

@@ -10,7 +10,7 @@ const log = logger.for("MetricAction");
 
 interface ActiveMetricAction {
     cleanup: () => void;
-    metricKeySignature: string;
+    subscriptionKeySignature: string;
     pollingIntervalMilliseconds: number;
 }
 
@@ -87,7 +87,7 @@ export abstract class MetricAction extends SingletonAction {
      */
     protected abstract onMetricsUpdate(event: WillAppearEvent): void;
 
-    protected getMetricKeys(event: WillAppearEvent): readonly string[] {
+    protected getMetricSubscriptionKeys(event: WillAppearEvent): readonly string[] {
         void event;
         return [];
     }
@@ -101,8 +101,8 @@ export abstract class MetricAction extends SingletonAction {
         const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
             this.resolveSettings(event).local.pollingFrequencySeconds,
         );
-        const metricKeys = normalizeMetricKeys(this.getMetricKeys(event));
-        const metricKeySignature = metricKeys.join(",");
+        const subscriptionKeys = normalizeMetricSubscriptionKeys(this.getMetricSubscriptionKeys(event));
+        const subscriptionKeySignature = subscriptionKeys.join(",");
         const cleanup = scheduler.subscribe(() => {
             const currentActionState = this.activeActionStates.get(event.action.id);
 
@@ -110,13 +110,13 @@ export abstract class MetricAction extends SingletonAction {
                 this.onMetricsUpdate(currentActionState.event);
             }
         }, {
-            metricKeys,
+            metricKeys: subscriptionKeys,
             pollingIntervalMilliseconds,
         });
 
         this.activeMetricActions.set(event.action.id, {
             cleanup,
-            metricKeySignature,
+            subscriptionKeySignature,
             pollingIntervalMilliseconds,
         });
     }
@@ -127,12 +127,12 @@ export abstract class MetricAction extends SingletonAction {
         const nextPollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
             this.resolveSettings(event).local.pollingFrequencySeconds,
         );
-        const nextMetricKeys = normalizeMetricKeys(this.getMetricKeys(event));
-        const nextMetricKeySignature = nextMetricKeys.join(",");
+        const nextSubscriptionKeys = normalizeMetricSubscriptionKeys(this.getMetricSubscriptionKeys(event));
+        const nextSubscriptionKeySignature = nextSubscriptionKeys.join(",");
 
         if (
             activeMetricAction?.pollingIntervalMilliseconds === nextPollingIntervalMilliseconds
-            && activeMetricAction.metricKeySignature === nextMetricKeySignature
+            && activeMetricAction.subscriptionKeySignature === nextSubscriptionKeySignature
         ) {
             return;
         }
@@ -166,8 +166,8 @@ function resolvePollingIntervalMilliseconds(pollingFrequencySeconds: number): nu
 const DEFAULT_POLLING_FREQUENCY_SECONDS = 1;
 const ALLOWED_POLLING_FREQUENCY_SECONDS = new Set([1, 2, 3, 5, 10, 15, 30, 60]);
 
-function normalizeMetricKeys(metricKeys: readonly string[]): readonly string[] {
-    return Array.from(new Set(metricKeys)).sort();
+function normalizeMetricSubscriptionKeys(subscriptionKeys: readonly string[]): readonly string[] {
+    return Array.from(new Set(subscriptionKeys)).sort();
 }
 
 function formatSettingValue(value: unknown): string {

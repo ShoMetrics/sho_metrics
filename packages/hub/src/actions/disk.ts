@@ -10,7 +10,7 @@ import {
     getDiskVolumeMetricKey,
     type DiskThroughputDirection,
 } from "../runtime/disk-metric-keys";
-import { resolveDiskMetricKeys } from "./disk-metric-keys";
+import { resolveDiskMetricSubscriptionKeys } from "./disk-metric-subscriptions";
 import {
     readActionStoredSettings,
     serializeActionStoredSettings,
@@ -29,12 +29,12 @@ const log = logger.for("Action:Disk");
 export class Disk extends MetricAction {
     protected readonly actionKind = "disk";
 
-    protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
+    protected override getMetricSubscriptionKeys(event: WillAppearEvent): readonly string[] {
         const settings = this.resolveSettings(event);
         const metricKind = settings.metric.diskMetricKind;
 
         if (metricKind === "throughput") {
-            return resolveDiskMetricKeys({
+            return resolveDiskMetricSubscriptionKeys({
                 diskMetricKind: settings.metric.diskMetricKind,
                 graphicType: settings.appearance.graphicType,
                 diskThroughputDirection: settings.metric.diskThroughputDirection,
