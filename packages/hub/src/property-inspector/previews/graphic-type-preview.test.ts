@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildCircleStylePreviewUri } from "./circle-style-preview";
 import { buildGraphicTypePreviewUri } from "./graphic-type-preview";
-import type { CircleStyle, GraphicType } from "../settings";
+import type { CircleStyle, GraphicType } from "../inspector/action-kind";
 
-test("graphic type preview URIs render every PI graphic option without throwing", () => {
+test("graphic type preview URIs render every Property Inspector graphic option without throwing", () => {
     const graphicTypes: readonly GraphicType[] = ["circular", "text", "linear", "dashed-line"];
 
     for (const graphicType of graphicTypes) {
@@ -15,7 +15,7 @@ test("graphic type preview URIs render every PI graphic option without throwing"
     }
 });
 
-test("circle style preview URIs render every PI circle style without throwing", () => {
+test("circle style preview URIs render every Property Inspector circle style without throwing", () => {
     const circleStyles: readonly CircleStyle[] = ["value", "compact", "gauge"];
 
     for (const circleStyle of circleStyles) {

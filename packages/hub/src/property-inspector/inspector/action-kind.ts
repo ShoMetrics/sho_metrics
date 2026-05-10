@@ -1,4 +1,4 @@
-import type { ActionKind } from "../settings/widget-settings";
+import type { ActionKind } from "../../settings/widget-settings";
 
 export type {
     ActionKind,
@@ -16,7 +16,7 @@ export type {
     NetworkUnitBase,
     ScaleMode,
     TemperatureUnit,
-} from "../settings/widget-settings";
+} from "../../settings/widget-settings";
 
 export function resolveActionKind(actionUuid: string): ActionKind {
     const actionSuffix = actionUuid.split(".").pop();

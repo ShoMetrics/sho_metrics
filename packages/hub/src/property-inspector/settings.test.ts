@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildVisibilityContext } from "./test-context";
 
-test("PI context reads resolved disk polling defaults without persisting them", () => {
+test("Property Inspector context reads resolved disk polling defaults without persisting them", () => {
     const context = buildVisibilityContext({
         actionKind: "disk",
         settings: {
@@ -16,7 +16,7 @@ test("PI context reads resolved disk polling defaults without persisting them", 
     assert.equal(context.settings.local, undefined);
 });
 
-test("PI context uses resolver platform rules for scenario visibility", () => {
+test("Property Inspector context uses resolver platform rules for scenario visibility", () => {
     const context = buildVisibilityContext({
         actionKind: "disk",
         isWindows: true,

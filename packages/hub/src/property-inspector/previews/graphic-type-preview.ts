@@ -2,7 +2,7 @@ import { renderMetricFrame } from "../../rendering/metric-frame";
 import { renderSingleMetricBodyView } from "../../rendering/single-metric-view";
 import type { WidgetData } from "../../rendering/widget-data";
 import { WIDGET_LOGICAL_SIZE } from "../../rendering/widget-data";
-import type { GraphicType } from "../settings";
+import type { GraphicType } from "../inspector/action-kind";
 
 const previewData: WidgetData = {
     current: 68,
@@ -16,7 +16,7 @@ const previewData: WidgetData = {
 
 /**
  * Generates static preview art through the same widget renderer used by key
- * rendering. The PI consumes it as an image data URI so renderer-owned SVG is
+ * rendering. The Property Inspector consumes it as an image data URI so renderer-owned SVG is
  * not injected into the browser DOM.
  */
 export function buildGraphicTypePreviewUri(graphicType: GraphicType): string {

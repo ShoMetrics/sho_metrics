@@ -5,7 +5,7 @@ import { ColorBandSetting } from "../controls/ColorBandSetting";
 import { ColorSetting } from "../controls/ColorSetting";
 import { RangeSetting } from "../controls/RangeSetting";
 import { SelectSetting } from "../controls/SelectSetting";
-import type { VisibilityContext } from "../types";
+import type { VisibilityContext } from "../inspector/types";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import { colorModeOptionList } from "./setting-options";

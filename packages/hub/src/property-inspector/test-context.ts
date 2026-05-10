@@ -2,8 +2,8 @@ import {
     type ActionKind,
     type WidgetStoredSettings,
 } from "../settings/widget-settings";
-import type { VisibilityContext } from "./types";
-import { buildPropertyInspectorContext } from "./inspector-context";
+import type { VisibilityContext } from "./inspector/types";
+import { buildPropertyInspectorContext } from "./inspector/context";
 
 export type InspectorTestSettings = WidgetStoredSettings;
 

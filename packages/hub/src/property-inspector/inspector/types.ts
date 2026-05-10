@@ -3,7 +3,7 @@ import type {
     GlobalSettings,
     ResolvedWidgetSettings,
     WidgetStoredSettings,
-} from "../settings/widget-settings";
+} from "../../settings/widget-settings";
 
 export type InspectorControlValue = string | number | boolean | null | undefined;
 export type SelectOptionValue = string | number;
