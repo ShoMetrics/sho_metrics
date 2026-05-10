@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildCircleStylePreviewUri } from "./circle-style-preview";
 import { buildGraphicTypePreviewUri } from "./graphic-type-preview";
-import type { CircleStyle, GraphicType } from "./settings";
+import type { CircleStyle, GraphicType } from "../settings";
 
 test("graphic type preview URIs render every PI graphic option without throwing", () => {
     const graphicTypes: readonly GraphicType[] = ["circular", "text", "linear", "dashed-line"];

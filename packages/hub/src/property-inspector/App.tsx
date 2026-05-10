@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { InspectorItem } from "./components/InspectorItem";
-import { PluginSettingsTab } from "./PluginSettingsTab";
+import { PluginSettingsTab } from "./panels/PluginSettingsTab";
 import { WidgetSettingsTab } from "./panels/WidgetSettingsTab";
 import {
     usePropertyInspectorSettings,
