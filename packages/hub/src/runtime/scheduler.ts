@@ -9,7 +9,7 @@ export type MetricsSnapshot = IMetricSnapshot;
 
 export type MetricSubscriber = (metrics: MetricsSnapshot) => void;
 
-export interface SubscriptionOptions {
+interface SubscriptionOptions {
     pollingIntervalMilliseconds?: number;
     metricKeys?: readonly string[];
 }

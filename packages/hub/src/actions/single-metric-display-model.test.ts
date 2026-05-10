@@ -17,7 +17,6 @@ import {
     buildRenderDualChannelWidgetData,
     buildRenderWidgetData,
     hasMetricDisplayData,
-    resolveCircularCenterContent,
     resolveCircleStyle,
     resolveDisplayLogValue,
     resolveDisplaySampleTimestampMilliseconds,
@@ -161,11 +160,18 @@ test("display data helpers treat either dual-channel timestamp as available data
 });
 
 test("center content falls back to value outside circular graphics", () => {
-    assert.equal(resolveCircularCenterContent({
-        graphicType: "linear",
-        circleStyle: "compact",
-        circleStyleOverride: "compact",
-    }), "value");
+    const renderPlan = buildMetricDisplayRenderPlan({
+        displayOptions: buildSingleMetricDisplayOptions({
+            widgetData: buildWidgetData(),
+            resolvedSettings: {
+                graphicType: "linear",
+                circleStyle: "compact",
+            },
+        }),
+        isDial: false,
+    });
+
+    assert.equal(renderPlan.centerContent, "value");
 });
 
 test("circle style override wins for circular graphics", () => {
@@ -177,11 +183,18 @@ test("circle style override wins for circular graphics", () => {
 });
 
 test("compact circle style uses icon center content", () => {
-    assert.equal(resolveCircularCenterContent({
-        graphicType: "circular",
-        circleStyle: "compact",
-        circleStyleOverride: undefined,
-    }), "icon");
+    const renderPlan = buildMetricDisplayRenderPlan({
+        displayOptions: buildSingleMetricDisplayOptions({
+            widgetData: buildWidgetData(),
+            resolvedSettings: {
+                graphicType: "circular",
+                circleStyle: "compact",
+            },
+        }),
+        isDial: false,
+    });
+
+    assert.equal(renderPlan.centerContent, "icon");
 });
 
 test("key render plan uses keypad PNG dimensions and no touch strip layout", () => {

@@ -1,4 +1,4 @@
-export type DisplayPerformanceReason = "settings-change" | "metric-tick";
+type DisplayPerformanceReason = "settings-change" | "metric-tick";
 export type DisplayPerformanceKind = "key" | "dial" | "unknown";
 export type DisplayPerformanceOutcome = "rendered" | "skipped" | "failed";
 

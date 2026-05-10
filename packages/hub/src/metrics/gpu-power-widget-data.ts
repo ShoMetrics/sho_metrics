@@ -1,7 +1,7 @@
 import { clamp } from "../rendering/svg-utils";
 import type { WidgetData } from "../rendering/widget-data";
 
-export interface GpuPowerDisplayOptions {
+interface GpuPowerDisplayOptions {
     powerWidgetData: WidgetData;
     maximumPowerWatts: number;
 }

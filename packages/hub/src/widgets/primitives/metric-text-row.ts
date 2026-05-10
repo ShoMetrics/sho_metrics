@@ -7,7 +7,7 @@ import {
     type SvgTextFitOptions,
 } from "../../rendering/svg-utils";
 
-export interface MetricTextRowOptions {
+interface MetricTextRowOptions {
     id: string;
     valueText: string;
     unitText: string;

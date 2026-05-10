@@ -13,7 +13,7 @@ export interface Widget<TConfig extends WidgetBaseConfig = WidgetBaseConfig> {
     render(data: WidgetData, config: TConfig, keySize: KeySize): string;
 }
 
-export type GraphicPrimitiveType =
+type GraphicPrimitiveType =
     | "circular"
     | "text"
     | "linear"

@@ -16,19 +16,6 @@ export interface ColorConfig {
     thresholds: ColorThreshold[];
 }
 
-/** Default threshold config: green < 50, yellow 50–80, red > 80. */
-export const DEFAULT_THRESHOLDS: ColorThreshold[] = [
-    { min: 0, max: 50, color: "#22c55e" },
-    { min: 50, max: 80, color: "#eab308" },
-    { min: 80, max: 101, color: "#ef4444" },
-];
-
-export const DEFAULT_COLOR_CONFIG: ColorConfig = {
-    mode: "threshold",
-    solidColor: "#3b82f6",
-    thresholds: DEFAULT_THRESHOLDS,
-};
-
 /**
  * Resolves the renderer paint color for a metric threshold value.
  *
@@ -52,8 +39,8 @@ export function resolveColorForThresholdValue(thresholdValue: number, colorConfi
 /**
  * Builds SVG gradient stops for a sparkline where each data point
  * may have a different threshold color.
- * 
- * Returns an array of { offset (0–1), color } entries with paired stops
+ *
+ * Returns an array of { offset (0-1), color } entries with paired stops
  * for sharp color transitions.
  */
 export function buildGradientStops(

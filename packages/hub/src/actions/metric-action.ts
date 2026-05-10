@@ -3,13 +3,10 @@ import { scheduler } from "../runtime/scheduler";
 import { clearMetricDisplayState } from "./metric-display-runner";
 import { logger } from "../logging/logger";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
-import {
-    readActionStoredSettings,
-    resolveActionSettings,
-    serializeActionStoredSettings,
-} from "./action-settings-resolver";
+import { resolveActionSettings } from "./action-settings-resolver";
+import { readWidgetSettings, writeWidgetSettings } from "../settings/codec";
 import type { ActionKind, ResolvedWidgetSettings, WidgetStoredSettings } from "../settings/widget-settings";
-import { updateWidgetRuntimeCache, type RuntimeStatePatch } from "../settings/updates";
+import { mergeWidgetSettingsPatch, type RuntimeStatePatch } from "../settings/updates";
 
 const log = logger.for("MetricAction");
 
@@ -107,7 +104,7 @@ export abstract class MetricAction extends SingletonAction {
                 return storedSettings;
             }
 
-            return updateWidgetRuntimeCache(storedSettings, patch);
+            return mergeWidgetSettingsPatch(storedSettings, { runtimeCache: patch });
         });
     }
 
@@ -116,14 +113,14 @@ export abstract class MetricAction extends SingletonAction {
         update: (storedSettings: WidgetStoredSettings) => WidgetStoredSettings,
     ): Promise<void> {
         const activeActionState = this.activeActionStates.get(event.action.id)!;
-        const currentSettings = readActionStoredSettings(activeActionState.rawSettings);
+        const currentSettings = readWidgetSettings(activeActionState.rawSettings);
         const nextSettings = update(currentSettings);
 
         if (nextSettings === currentSettings) {
             return Promise.resolve();
         }
 
-        const rawSettings = serializeActionStoredSettings(nextSettings);
+        const rawSettings = writeWidgetSettings(nextSettings);
 
         activeActionState.rawSettings = rawSettings;
 

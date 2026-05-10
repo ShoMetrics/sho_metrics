@@ -43,7 +43,7 @@ export interface GetSettingsPayload {
     [key: string]: unknown;
 }
 
-export interface ActionPayload {
+interface ActionPayload {
     settings?: SettingsRecord;
     [key: string]: unknown;
 }
@@ -360,7 +360,7 @@ export function resolveStreamDeckClient(): StreamDeckPropertyInspectorClient {
 /**
  * Installs the Stream Deck global callback used to bootstrap the Property Inspector websocket.
  */
-export function installStreamDeckPropertyInspectorBridge(targetWindow: Window): void {
+function installStreamDeckPropertyInspectorBridge(targetWindow: Window): void {
     targetWindow.connectElgatoStreamDeckSocket = (
         port,
         propertyInspectorUuid,

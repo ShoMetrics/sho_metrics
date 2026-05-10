@@ -22,7 +22,7 @@ export type SparklineScale =
     | AdaptiveSparklineScale
     | FixedSparklineScale;
 
-export interface AdaptiveSparklineScale {
+interface AdaptiveSparklineScale {
     mode: "adaptive";
     minimumValue?: number;
 }
@@ -32,13 +32,13 @@ export interface AdaptiveSparklineScale {
  * when the metric has a user-meaningful domain maximum for line height, not
  * merely because another widget has a progress value.
  */
-export interface FixedSparklineScale {
+interface FixedSparklineScale {
     mode: "fixed";
     minimumValue: number;
     maximumValue: number;
 }
 
-export interface LinearChannelWidgetData {
+interface LinearChannelWidgetData {
     label: string;
     displayValue: string;
     unit: string;
