@@ -17,9 +17,9 @@ export type LogProvider = string | (() => string);
  * Prefer explicit string scopes in production call sites because minification
  * can rename class and function names.
  */
-type NamedContext = {
+interface NamedContext {
     readonly name: string;
-};
+}
 
 /**
  * Minimal subset of the Elgato logger that ShoMetrics depends on.
@@ -27,7 +27,7 @@ type NamedContext = {
  * Keeping this as a structural type makes the wrapper testable without pulling
  * the whole Stream Deck SDK into tests.
  */
-export type LoggerSink = {
+export interface LoggerSink {
     readonly level: LogLevel;
     setLevel(level?: LogLevel): LoggerSink;
     createScope(scope: string): LoggerSink;
@@ -36,7 +36,7 @@ export type LoggerSink = {
     info(...data: LogEntryData): LoggerSink;
     debug(...data: LogEntryData): LoggerSink;
     trace(...data: LogEntryData): LoggerSink;
-};
+}
 
 /**
  * Fluent builder for logs that need extra behavior, currently keyed throttling.
@@ -339,7 +339,8 @@ class ShoLoggerImpl implements ShoLogger {
 }
 
 const NO_OP_BUILDER = new NoOpLogBuilder();
-const maximumThrottleKeyCount = 128;
+const LOG_PROVIDER_FAILURE_MESSAGE = "Log provider failed";
+const MAXIMUM_THROTTLE_KEY_COUNT = 128;
 
 /**
  * Keeps throttle state bounded when callers accidentally use dynamic keys.
@@ -350,7 +351,7 @@ function rememberThrottleTimestamp(
     timestampMilliseconds: number,
     isNewKey: boolean,
 ): void {
-    if (isNewKey && lastWriteTimestampByKey.size >= maximumThrottleKeyCount) {
+    if (isNewKey && lastWriteTimestampByKey.size >= MAXIMUM_THROTTLE_KEY_COUNT) {
         const oldestThrottleKey = lastWriteTimestampByKey.keys().next().value;
         if (oldestThrottleKey != null) {
             lastWriteTimestampByKey.delete(oldestThrottleKey);
@@ -377,7 +378,12 @@ function resolveLogEntryData(data: LogEntryData, cause: Error | null): LogEntryD
 
     if (typeof firstLogValue === "function") {
         const messageProvider = firstLogValue as () => string;
-        resolvedData[0] = messageProvider();
+        try {
+            resolvedData[0] = messageProvider();
+        } catch (caughtError) {
+            resolvedData[0] = LOG_PROVIDER_FAILURE_MESSAGE;
+            resolvedData.splice(1, 0, caughtError);
+        }
     }
 
     if (cause) {

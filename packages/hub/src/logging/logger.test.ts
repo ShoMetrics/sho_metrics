@@ -60,6 +60,27 @@ test("enabled direct logs evaluate lazy first argument only when writing", () =>
     assert.deepEqual(sink.recordedEntries[0].entryData, ["render summary"]);
 });
 
+test("enabled direct logs capture lazy message failures without throwing", () => {
+    const sink = new RecordingLoggerSink("debug");
+    const log = createShoLogger(sink).for("Rasterizer");
+    const providerError = new Error("missing render summary");
+    const renderEntry = {
+        actionId: "action-1",
+    };
+
+    assert.doesNotThrow(() => {
+        log.debug(() => {
+            throw providerError;
+        }, renderEntry);
+    });
+
+    assert.deepEqual(sink.recordedEntries[0].entryData, [
+        "Log provider failed",
+        providerError,
+        renderEntry,
+    ]);
+});
+
 test("builder withCause appends the original Error object after entry data", () => {
     const sink = new RecordingLoggerSink("trace");
     const log = createShoLogger(sink).for("MetricDisplayRunner");
