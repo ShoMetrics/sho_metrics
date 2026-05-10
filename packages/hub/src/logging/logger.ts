@@ -285,7 +285,12 @@ class ScopedLoggerImpl implements ScopedLogger {
             return false;
         }
 
-        this.lastWriteTimestampByKey.set(key, currentTimestampMilliseconds);
+        rememberThrottleTimestamp(
+            this.lastWriteTimestampByKey,
+            key,
+            currentTimestampMilliseconds,
+            lastWriteTimestampMilliseconds == null,
+        );
         return true;
     }
 
@@ -334,6 +339,26 @@ class ShoLoggerImpl implements ShoLogger {
 }
 
 const NO_OP_BUILDER = new NoOpLogBuilder();
+const maximumThrottleKeyCount = 128;
+
+/**
+ * Keeps throttle state bounded when callers accidentally use dynamic keys.
+ */
+function rememberThrottleTimestamp(
+    lastWriteTimestampByKey: Map<string, number>,
+    key: string,
+    timestampMilliseconds: number,
+    isNewKey: boolean,
+): void {
+    if (isNewKey && lastWriteTimestampByKey.size >= maximumThrottleKeyCount) {
+        const oldestThrottleKey = lastWriteTimestampByKey.keys().next().value;
+        if (oldestThrottleKey != null) {
+            lastWriteTimestampByKey.delete(oldestThrottleKey);
+        }
+    }
+
+    lastWriteTimestampByKey.set(key, timestampMilliseconds);
+}
 
 /**
  * Converts lazy first arguments and builder causes into SDK logger arguments.
