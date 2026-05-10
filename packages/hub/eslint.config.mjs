@@ -35,6 +35,13 @@ const restrictedConcreteActionRawSettingsSyntax = [
   },
 ];
 
+const restrictedActionPayloadSettingsMutationSyntax = [
+  {
+    selector: 'AssignmentExpression[left.type="MemberExpression"][left.object.type="MemberExpression"][left.object.property.name="payload"][left.property.name="settings"]',
+    message: 'Actions must keep latest raw settings in explicit action state instead of mutating SDK event payloads.',
+  },
+];
+
 const restrictedConcreteActionVisualFallbackSyntax = [
   'normalizeThreshold',
   'resolveHexColor',
@@ -158,10 +165,21 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'error',
         ...restrictedLegacySettingSyntax,
+        ...restrictedActionPayloadSettingsMutationSyntax,
         {
           selector: 'MemberExpression[object.type="MemberExpression"][object.object.name="event"][object.property.name="payload"][property.name="settings"]',
           message: 'Display code must receive normalized resolvedSettings instead of reading event.payload.settings.',
         },
+      ],
+    },
+  },
+  {
+    files: ['src/actions/metric-action.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...restrictedLegacySettingSyntax,
+        ...restrictedActionPayloadSettingsMutationSyntax,
       ],
     },
   },
@@ -173,6 +191,7 @@ export default tseslint.config(
         'error',
         ...restrictedLegacySettingSyntax,
         ...restrictedConcreteActionRawSettingsSyntax,
+        ...restrictedActionPayloadSettingsMutationSyntax,
         ...restrictedConcreteActionVisualFallbackSyntax,
         ...restrictedConcreteActionResolvedSettingsAliasSyntax,
         ...restrictedConcreteActionColorFallbackSyntax,
