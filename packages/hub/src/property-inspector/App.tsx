@@ -6,7 +6,7 @@ import {
     usePropertyInspectorSettings,
     type SettingsNotice,
 } from "./usePropertyInspectorSettings";
-import type { StreamDeckPropertyInspectorClient } from "./stream-deck-client";
+import type { StreamDeckPropertyInspectorClient } from "./stream-deck/stream-deck-client";
 
 interface AppProps {
     client: StreamDeckPropertyInspectorClient;

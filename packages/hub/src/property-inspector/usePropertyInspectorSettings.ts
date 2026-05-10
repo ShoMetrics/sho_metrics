@@ -20,7 +20,7 @@ import {
     readActionUuid,
     resolveIsWindowsPropertyInspector,
     type StreamDeckPropertyInspectorClient,
-} from "./stream-deck-client";
+} from "./stream-deck/stream-deck-client";
 import {
     resolveActionKind,
     type ActionKind,

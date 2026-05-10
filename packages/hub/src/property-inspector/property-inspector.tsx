@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
-import { resolveStreamDeckClient } from "./stream-deck-client";
+import { resolveStreamDeckClient } from "./stream-deck/stream-deck-client";
 
 const rootElement = document.querySelector<HTMLElement>("#property-inspector-root");
 
