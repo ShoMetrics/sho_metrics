@@ -145,7 +145,7 @@ export class NetSpeed extends MetricAction {
             visualSettingsOverride: {
                 colorMode: settings.appearance.colorMode,
                 usageColors: {
-                    solidColor: settings.appearance.usageColors.solidColor || resolveNetworkChannelColor(direction, settings),
+                    solidColor: settings.appearance.usageColors.solidColor,
                 },
             },
         });
@@ -153,7 +153,7 @@ export class NetSpeed extends MetricAction {
 
     private updateDualNetworkCircularDisplay(options: {
         event: WillAppearEvent;
-        settings: NetworkSpeedSettings;
+        settings: ResolvedWidgetSettings;
         selectedNetworkInterface: NetworkInterfaceOption | null;
         isAutomaticNetworkInterface: boolean;
         dualGraphicType: "circular" | "text";
@@ -234,7 +234,7 @@ export class NetSpeed extends MetricAction {
 
     private updateDualNetworkSparklineDisplay(options: {
         event: WillAppearEvent;
-        settings: NetworkSpeedSettings;
+        settings: ResolvedWidgetSettings;
         selectedNetworkInterface: NetworkInterfaceOption | null;
         isAutomaticNetworkInterface: boolean;
     }): void {
@@ -307,7 +307,7 @@ export class NetSpeed extends MetricAction {
 
     private updateLinearNetworkDisplay(options: {
         event: WillAppearEvent;
-        settings: NetworkSpeedSettings;
+        settings: ResolvedWidgetSettings;
         selectedNetworkInterface: NetworkInterfaceOption | null;
         isAutomaticNetworkInterface: boolean;
     }): void {
@@ -397,7 +397,7 @@ export class NetSpeed extends MetricAction {
     }
 
     private logNetworkSpeedDebug(options: {
-        settings: NetworkSpeedSettings;
+        settings: ResolvedWidgetSettings;
         direction: NetworkDirection;
         selectedNetworkInterface: NetworkInterfaceOption | null;
         isAutomaticNetworkInterface: boolean;
@@ -426,7 +426,6 @@ export class NetSpeed extends MetricAction {
     }
 }
 
-type NetworkSpeedSettings = ResolvedWidgetSettings;
 const NETWORK_DIRECTION_ICON_COLOR = "rgba(255,255,255,0.88)";
 const DEFAULT_DOWNLOAD_MAXIMUM_SPEED_MEGABITS_PER_SECOND = 100;
 const DEFAULT_UPLOAD_MAXIMUM_SPEED_MEGABITS_PER_SECOND = 20;
@@ -447,7 +446,7 @@ function resolveNetworkInterface(value: string): NetworkInterfaceOption | null {
 function buildNetworkWidgetData(options: {
     rawWidgetData: WidgetData;
     direction: NetworkDirection;
-    settings: NetworkSpeedSettings;
+    settings: ResolvedWidgetSettings;
     selectedNetworkInterface: NetworkInterfaceOption | null;
     isAutomaticNetworkInterface: boolean;
 }): WidgetData {
@@ -469,7 +468,7 @@ function buildNetworkWidgetData(options: {
 
 function resolveMaximumBytesPerSecond(options: {
     direction: NetworkDirection;
-    settings: NetworkSpeedSettings;
+    settings: ResolvedWidgetSettings;
     selectedNetworkInterface: NetworkInterfaceOption | null;
     isAutomaticNetworkInterface: boolean;
 }): number {
@@ -478,7 +477,7 @@ function resolveMaximumBytesPerSecond(options: {
 
 function resolveMaximumMegabitsPerSecond(options: {
     direction: NetworkDirection;
-    settings: NetworkSpeedSettings;
+    settings: ResolvedWidgetSettings;
     selectedNetworkInterface: NetworkInterfaceOption | null;
     isAutomaticNetworkInterface: boolean;
 }): number {
@@ -523,15 +522,11 @@ function buildNetworkCenterIconFragment(options: {
     });
 }
 
-function resolveNetworkChannelColor(direction: NetworkDirection, settings: NetworkSpeedSettings): string {
-    return resolveColor(0, buildNetworkChannelColorConfig(direction, settings));
-}
-
-function resolveNetworkWidgetChannelColor(direction: NetworkDirection, settings: NetworkSpeedSettings, widgetData: WidgetData): string {
+function resolveNetworkWidgetChannelColor(direction: NetworkDirection, settings: ResolvedWidgetSettings, widgetData: WidgetData): string {
     return resolveColor(widgetData.progress * 100, buildNetworkChannelColorConfig(direction, settings));
 }
 
-function buildNetworkChannelColorConfig(direction: NetworkDirection, settings: NetworkSpeedSettings): ColorConfig {
+function buildNetworkChannelColorConfig(direction: NetworkDirection, settings: ResolvedWidgetSettings): ColorConfig {
     const globalSettings = pluginGlobalSettingsStore.getResolved();
     if (globalSettings.overrideWidgetAppearance) {
         return buildGlobalChannelColorConfig(direction === "download" ? "primary" : "secondary", globalSettings);
@@ -565,7 +560,7 @@ function buildNetworkChannelColorConfig(direction: NetworkDirection, settings: N
 }
 
 function buildChannelThresholds(options: {
-    settings: NetworkSpeedSettings;
+    settings: ResolvedWidgetSettings;
     lowColor: string;
     mediumColor: string;
     highColor: string;
@@ -613,7 +608,7 @@ function publishNetworkInterfaceOptions(event: WillAppearEvent): void {
 
 function publishNetworkScaleLearning(
     event: WillAppearEvent,
-    settings: NetworkSpeedSettings,
+    settings: ResolvedWidgetSettings,
     selectedNetworkInterface: NetworkInterfaceOption | null,
 ): void {
     if (settings.network.networkScaleMode === "custom") {
@@ -658,7 +653,7 @@ function publishNetworkScaleLearning(
 
 function resolveLearnedNetworkMaximumMegabitsPerSecond(options: {
     direction: NetworkDirection;
-    settings: NetworkSpeedSettings;
+    settings: ResolvedWidgetSettings;
     observedBytesPerSecond: number;
     selectedNetworkInterface: NetworkInterfaceOption | null;
 }): number {

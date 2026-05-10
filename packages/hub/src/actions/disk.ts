@@ -39,7 +39,7 @@ export class Disk extends MetricAction {
     protected readonly actionKind = "disk";
 
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
-        const settings = this.resolveSettings(event) as DiskSettings;
+        const settings = this.resolveSettings(event);
         const metricKind = settings.metric.diskMetricKind;
 
         if (metricKind === "throughput") {
@@ -66,7 +66,7 @@ export class Disk extends MetricAction {
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
-        const settings = this.resolveSettings(event) as DiskSettings;
+        const settings = this.resolveSettings(event);
         const metricKind = settings.metric.diskMetricKind;
 
         publishDiskVolumeOptions(event);
@@ -80,7 +80,7 @@ export class Disk extends MetricAction {
         this.updateUsageDisplay(event, settings);
     }
 
-    private updateUsageDisplay(event: WillAppearEvent, settings: DiskSettings): void {
+    private updateUsageDisplay(event: WillAppearEvent, settings: ResolvedWidgetSettings): void {
         const selectedVolume = resolveSelectedDiskVolume(settings.metric.diskVolumeId);
         const usedMetricKey = selectedVolume
             ? getDiskVolumeMetricKey("used", selectedVolume.id)
@@ -119,7 +119,7 @@ export class Disk extends MetricAction {
         });
     }
 
-    private updateThroughputDisplay(event: WillAppearEvent, settings: DiskSettings): void {
+    private updateThroughputDisplay(event: WillAppearEvent, settings: ResolvedWidgetSettings): void {
         if (process.platform !== "darwin") {
             showDiskThroughputUnavailable(event);
             return;
@@ -165,13 +165,13 @@ export class Disk extends MetricAction {
             visualSettingsOverride: {
                 colorMode: settings.appearance.colorMode,
                 usageColors: {
-                    solidColor: settings.appearance.usageColors.solidColor || DEFAULT_DISK_THROUGHPUT_COLOR,
+                    solidColor: settings.appearance.usageColors.solidColor,
                 },
             },
         });
     }
 
-    private updateDualThroughputDisplay(event: WillAppearEvent, settings: DiskSettings): void {
+    private updateDualThroughputDisplay(event: WillAppearEvent, settings: ResolvedWidgetSettings): void {
         const readMetricKey = getDiskThroughputMetricKey("read");
         const writeMetricKey = getDiskThroughputMetricKey("write");
         const effectiveGraphicType = settings.appearance.graphicType;
@@ -304,8 +304,6 @@ function buildDiskGaugeFooterIconFragment(diskVolume: DiskVolumeOption | null): 
     );
 }
 
-type DiskSettings = ResolvedWidgetSettings;
-
 const DEFAULT_HDD_READ_THROUGHPUT_MEBIBYTES_PER_SECOND = 220;
 const DEFAULT_HDD_WRITE_THROUGHPUT_MEBIBYTES_PER_SECOND = 180;
 const DEFAULT_SSD_READ_THROUGHPUT_MEBIBYTES_PER_SECOND = 1500;
@@ -313,7 +311,6 @@ const DEFAULT_SSD_WRITE_THROUGHPUT_MEBIBYTES_PER_SECOND = 1200;
 const DEFAULT_NETWORK_DISK_THROUGHPUT_MEBIBYTES_PER_SECOND = 125;
 const DEFAULT_UNKNOWN_READ_THROUGHPUT_MEBIBYTES_PER_SECOND = 1000;
 const DEFAULT_UNKNOWN_WRITE_THROUGHPUT_MEBIBYTES_PER_SECOND = 1000;
-const DEFAULT_DISK_THROUGHPUT_COLOR = "#38bdf8";
 const DISK_THROUGHPUT_DIRECTION_ICON_COLOR = "rgba(255,255,255,0.88)";
 const DISK_THROUGHPUT_DIRECTION_ICON_SIZE = 30;
 const DISK_GAUGE_FOOTER_ICON_SIZE = 25;
@@ -340,7 +337,7 @@ function buildDiskThroughputFooterIconFragment(direction: DiskThroughputDirectio
 
 function resolveDiskMaximumThroughputBytesPerSecond(
     direction: DiskThroughputDirection,
-    settings: DiskSettings,
+    settings: ResolvedWidgetSettings,
     selectedVolume: DiskVolumeOption | null,
 ): number {
     const maximumReadMebibytesPerSecond = resolveDiskMaximumThroughputMebibytesPerSecond("read", settings, selectedVolume);
@@ -356,7 +353,7 @@ function resolveDiskMaximumThroughputBytesPerSecond(
 
 function resolveDiskMaximumThroughputMebibytesPerSecond(
     direction: Exclude<DiskThroughputDirection, "both" | "total">,
-    settings: DiskSettings,
+    settings: ResolvedWidgetSettings,
     selectedVolume: DiskVolumeOption | null,
 ): number {
     const configuredMaximum = Number(direction === "read"
@@ -397,13 +394,13 @@ function resolveDefaultDiskMaximumThroughputMebibytesPerSecond(
 
 function resolveDiskWidgetChannelColor(
     direction: Exclude<DiskThroughputDirection, "total">,
-    settings: DiskSettings,
+    settings: ResolvedWidgetSettings,
     widgetData: { progress: number },
 ): string {
     return resolveColor(widgetData.progress * 100, buildDiskChannelColorConfig(direction, settings));
 }
 
-function buildDiskChannelColorConfig(direction: Exclude<DiskThroughputDirection, "total">, settings: DiskSettings): ColorConfig {
+function buildDiskChannelColorConfig(direction: Exclude<DiskThroughputDirection, "total">, settings: ResolvedWidgetSettings): ColorConfig {
     const globalSettings = pluginGlobalSettingsStore.getResolved();
     if (globalSettings.overrideWidgetAppearance) {
         return buildGlobalChannelColorConfig(direction === "read" ? "primary" : "secondary", globalSettings);
@@ -437,7 +434,7 @@ function buildDiskChannelColorConfig(direction: Exclude<DiskThroughputDirection,
 }
 
 function buildDiskChannelThresholds(options: {
-    settings: DiskSettings;
+    settings: ResolvedWidgetSettings;
     lowColor: string;
     mediumColor: string;
     highColor: string;
@@ -469,7 +466,7 @@ function publishDiskVolumeOptions(event: WillAppearEvent): void {
     });
 }
 
-function publishDiskThroughputScaleLearning(event: WillAppearEvent, settings: DiskSettings): void {
+function publishDiskThroughputScaleLearning(event: WillAppearEvent, settings: ResolvedWidgetSettings): void {
     if (
         settings.metric.diskMetricKind !== "throughput"
         || settings.diskThroughput.diskThroughputScaleMode === "custom"
@@ -510,7 +507,7 @@ function publishDiskThroughputScaleLearning(event: WillAppearEvent, settings: Di
 
 function resolveLearnedDiskMaximumThroughputMebibytesPerSecond(options: {
     direction: Exclude<DiskThroughputDirection, "both" | "total">;
-    settings: DiskSettings;
+    settings: ResolvedWidgetSettings;
     selectedVolume: DiskVolumeOption | null;
     observedBytesPerSecond: number;
 }): number {
