@@ -11,7 +11,7 @@ import { RAM_TOTAL_METRIC_KEY, RAM_USED_METRIC_KEY } from "../runtime/metric-key
 export class RamUsage extends MetricAction {
     protected readonly actionKind = "ram";
 
-    protected override getMetricKeys(): readonly string[] {
+    protected override getMetricSubscriptionKeys(): readonly string[] {
         return [RAM_USED_METRIC_KEY, RAM_TOTAL_METRIC_KEY];
     }
 

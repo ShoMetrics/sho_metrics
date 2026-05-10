@@ -23,7 +23,7 @@ import {
     isDualDiskThroughputDisplay,
     normalizeDiskThroughputDisplayDirection,
     resolveSingleDiskThroughputDirection,
-} from "./disk-metric-keys";
+} from "./disk-metric-subscriptions";
 import type { MetricDisplayOptions } from "./single-metric-display-model";
 import { buildColorConfigFromRamp } from "./channel-color-config";
 

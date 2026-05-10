@@ -29,7 +29,7 @@ import {
  * Treats missing and stale GPU samples as render-only no-data state.
  */
 abstract class GpuBaseAction extends MetricAction {
-    protected override getMetricKeys(): readonly string[] {
+    protected override getMetricSubscriptionKeys(): readonly string[] {
         return GPU_METRIC_KEYS;
     }
 

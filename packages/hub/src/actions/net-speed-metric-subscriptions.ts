@@ -6,7 +6,7 @@ import {
 } from "../runtime/network-metric-keys";
 import type { GraphicType } from "../settings/widget-settings";
 
-export interface NetworkSpeedMetricKeySettings {
+export interface NetSpeedMetricSubscriptionSettings {
     graphicType?: GraphicType;
     networkDirection?: NetworkDisplayDirection;
     networkInterfaceId?: string;
@@ -14,7 +14,7 @@ export interface NetworkSpeedMetricKeySettings {
 
 type NetworkDisplayDirection = NetworkDirection | "both";
 
-export function resolveNetSpeedMetricKeys(settings: NetworkSpeedMetricKeySettings): readonly string[] {
+export function resolveNetSpeedMetricSubscriptionKeys(settings: NetSpeedMetricSubscriptionSettings): readonly string[] {
     const selectedNetworkInterface = resolveNetworkInterface(settings.networkInterfaceId);
     const displayDirection = normalizeNetworkDisplayDirection(settings.networkDirection);
 
@@ -42,7 +42,7 @@ export function resolveNetSpeedMetricKeys(settings: NetworkSpeedMetricKeySetting
     ];
 }
 
-export function normalizeNetworkDisplayDirection(value: NetworkSpeedMetricKeySettings["networkDirection"]): NetworkDisplayDirection {
+export function normalizeNetworkDisplayDirection(value: NetSpeedMetricSubscriptionSettings["networkDirection"]): NetworkDisplayDirection {
     if (value === "download" || value === "upload") {
         return value;
     }

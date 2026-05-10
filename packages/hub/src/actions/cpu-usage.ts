@@ -17,7 +17,7 @@ import { CPU_MODEL_METRIC_KEY, CPU_USAGE_METRIC_KEY } from "../runtime/metric-ke
 export class CpuUsage extends MetricAction {
     protected readonly actionKind = "cpu-usage";
 
-    protected override getMetricKeys(): readonly string[] {
+    protected override getMetricSubscriptionKeys(): readonly string[] {
         return [CPU_USAGE_METRIC_KEY, CPU_MODEL_METRIC_KEY];
     }
 

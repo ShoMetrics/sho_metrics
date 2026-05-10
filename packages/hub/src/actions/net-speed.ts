@@ -9,7 +9,7 @@ import {
     getNetworkInterfaceMetricKey,
     type NetworkDirection,
 } from "../runtime/network-metric-keys";
-import { resolveNetSpeedMetricKeys } from "./net-speed-metric-keys";
+import { resolveNetSpeedMetricSubscriptionKeys } from "./net-speed-metric-subscriptions";
 import {
     readActionStoredSettings,
     serializeActionStoredSettings,
@@ -35,9 +35,9 @@ const log = logger.for("Action:NetSpeed");
 export class NetSpeed extends MetricAction {
     protected readonly actionKind = "net-speed";
 
-    protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
+    protected override getMetricSubscriptionKeys(event: WillAppearEvent): readonly string[] {
         const settings = this.resolveSettings(event);
-        return resolveNetSpeedMetricKeys({
+        return resolveNetSpeedMetricSubscriptionKeys({
             graphicType: settings.appearance.graphicType,
             networkDirection: settings.metric.networkDirection,
             networkInterfaceId: settings.metric.networkInterfaceId,

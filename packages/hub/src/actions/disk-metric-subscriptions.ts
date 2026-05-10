@@ -4,7 +4,7 @@ import {
 } from "../runtime/disk-metric-keys";
 import type { DiskMetricKind, GraphicType } from "../settings/widget-settings";
 
-export interface DiskMetricKeySettings {
+export interface DiskMetricSubscriptionSettings {
     diskMetricKind?: DiskMetricKind;
     graphicType?: GraphicType;
     diskThroughputDirection?: DiskThroughputDisplayDirection;
@@ -12,7 +12,7 @@ export interface DiskMetricKeySettings {
 
 export type DiskThroughputDisplayDirection = DiskThroughputDirection | "both";
 
-export function resolveDiskMetricKeys(settings: DiskMetricKeySettings): readonly string[] {
+export function resolveDiskMetricSubscriptionKeys(settings: DiskMetricSubscriptionSettings): readonly string[] {
     if (settings.diskMetricKind !== "throughput") {
         return [];
     }
@@ -30,7 +30,7 @@ export function resolveDiskMetricKeys(settings: DiskMetricKeySettings): readonly
 }
 
 export function normalizeDiskThroughputDisplayDirection(
-    value: DiskMetricKeySettings["diskThroughputDirection"],
+    value: DiskMetricSubscriptionSettings["diskThroughputDirection"],
 ): DiskThroughputDisplayDirection {
     if (value === "read" || value === "write" || value === "total") {
         return value;

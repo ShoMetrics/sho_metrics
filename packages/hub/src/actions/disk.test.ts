@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveDiskMetricKeys } from "./disk-metric-keys";
+import { resolveDiskMetricSubscriptionKeys } from "./disk-metric-subscriptions";
 
 test("disk throughput sparkline both mode subscribes to read and write", () => {
-    assert.deepEqual(resolveDiskMetricKeys({
+    assert.deepEqual(resolveDiskMetricSubscriptionKeys({
         diskMetricKind: "throughput",
         graphicType: "dashed-line",
         diskThroughputDirection: "both",
@@ -11,7 +11,7 @@ test("disk throughput sparkline both mode subscribes to read and write", () => {
 });
 
 test("disk throughput sparkline single mode subscribes to one direction", () => {
-    assert.deepEqual(resolveDiskMetricKeys({
+    assert.deepEqual(resolveDiskMetricSubscriptionKeys({
         diskMetricKind: "throughput",
         graphicType: "dashed-line",
         diskThroughputDirection: "read",
@@ -19,7 +19,7 @@ test("disk throughput sparkline single mode subscribes to one direction", () => 
 });
 
 test("disk throughput circular both mode subscribes to read and write", () => {
-    assert.deepEqual(resolveDiskMetricKeys({
+    assert.deepEqual(resolveDiskMetricSubscriptionKeys({
         diskMetricKind: "throughput",
         graphicType: "circular",
         diskThroughputDirection: "both",
@@ -27,7 +27,7 @@ test("disk throughput circular both mode subscribes to read and write", () => {
 });
 
 test("disk throughput text both mode subscribes to read and write", () => {
-    assert.deepEqual(resolveDiskMetricKeys({
+    assert.deepEqual(resolveDiskMetricSubscriptionKeys({
         diskMetricKind: "throughput",
         graphicType: "text",
         diskThroughputDirection: "both",
@@ -35,7 +35,7 @@ test("disk throughput text both mode subscribes to read and write", () => {
 });
 
 test("disk throughput linear both mode falls back to total", () => {
-    assert.deepEqual(resolveDiskMetricKeys({
+    assert.deepEqual(resolveDiskMetricSubscriptionKeys({
         diskMetricKind: "throughput",
         graphicType: "linear",
         diskThroughputDirection: "both",
