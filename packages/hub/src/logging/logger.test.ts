@@ -110,6 +110,26 @@ test("everyMs throttles matching keys without blocking different keys", () => {
     );
 });
 
+test("everyMs evicts the oldest key when throttle state reaches the fixed limit", () => {
+    const sink = new RecordingLoggerSink("debug");
+    const log = createShoLogger(sink).for("Action:NetSpeed");
+    const throttleKeyCountLimit = 128;
+
+    for (let keyIndex = 0; keyIndex < throttleKeyCountLimit; keyIndex += 1) {
+        log.atDebug().everyMs(`sample-${keyIndex}`, 60000).log(`sample ${keyIndex}`);
+    }
+
+    log.atDebug().everyMs("sample-0", 60000).log("suppressed oldest before eviction");
+    log.atDebug().everyMs("sample-128", 60000).log("evict oldest");
+    log.atDebug().everyMs("sample-0", 60000).log("oldest can write after eviction");
+
+    const messages = sink.recordedEntries.map(recordedEntry => recordedEntry.entryData[0]);
+    assert.equal(messages.length, throttleKeyCountLimit + 2);
+    assert.equal(messages.at(-2), "evict oldest");
+    assert.equal(messages.at(-1), "oldest can write after eviction");
+    assert.equal(messages.includes("suppressed oldest before eviction"), false);
+});
+
 class RecordingLoggerSink implements LoggerSink {
     public readonly recordedEntries: RecordedLogEntry[];
 
