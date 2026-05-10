@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { composeSvg } from "../rendering/composer";
+import { renderMetricFrame } from "../rendering/metric-frame";
+import { renderSingleMetricBodyView } from "../rendering/single-metric-view";
 import type { WidgetData } from "../rendering/widget-data";
 import { buildDiskUsageWidgetData, buildMemoryUsageWidgetData } from "../metrics/storage-display";
 import { buildCpuUsageWidgetData } from "./cpu-usage";
@@ -57,15 +58,34 @@ test("percentage metric builders expose integer display values for compact widge
 });
 
 test("percentage action display values are honored by sparkline rendering", () => {
-    const svg = composeSvg(buildGpuUsageWidgetData(buildWidgetData({
-        current: 1,
-        progress: 0.01,
-        history: [0, 1],
-        label: "GPU",
-    })), {
-        graphicType: "dashed-line",
+    const body = renderSingleMetricBodyView({
+        data: buildGpuUsageWidgetData(buildWidgetData({
+            current: 1,
+            progress: 0.01,
+            history: [0, 1],
+            label: "GPU",
+        })),
+        visual: {
+            graphicType: "dashed-line",
+            colorConfig: {
+                mode: "solid",
+                solidColor: "#3b82f6",
+                thresholds: [],
+            },
+            lineSmoothingPercent: 75,
+            gridLineVisibility: "adaptive",
+            gridLineType: "horizontal",
+        },
+        renderSize: { width: 144, height: 144 },
+        centerIcon: "",
+        circleStyle: "value",
+    });
+    const svg = renderMetricFrame({
+        body,
         graphicStyle: "flat",
-    }, { width: 144, height: 144 });
+        muted: false,
+        size: { width: 144, height: 144 },
+    });
 
     assert.match(svg, />1</);
     assert.doesNotMatch(svg, />1\.0</);

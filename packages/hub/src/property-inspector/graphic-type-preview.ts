@@ -1,7 +1,8 @@
-import { composeSvg } from "../rendering/composer";
+import { renderMetricFrame } from "../rendering/metric-frame";
+import { renderSingleMetricBodyView } from "../rendering/single-metric-view";
 import type { WidgetData } from "../rendering/widget-data";
 import { WIDGET_LOGICAL_SIZE } from "../rendering/widget-data";
-import type { GraphicType } from "../widgets/widget.interface";
+import type { GraphicType } from "./settings";
 
 const previewData: WidgetData = {
     current: 68,
@@ -19,21 +20,29 @@ const previewData: WidgetData = {
  * not injected into the browser DOM.
  */
 export function buildGraphicTypePreviewUri(graphicType: GraphicType): string {
-    const svg = composeSvg(previewData, {
-        graphicType,
-        graphicStyle: "flat",
-        colorConfig: {
-            mode: "solid",
-            solidColor: "#3b82f6",
-            thresholds: [],
-        },
-        configOverrides: {
-            circleStyle: "value",
+    const body = renderSingleMetricBodyView({
+        data: previewData,
+        visual: {
+            graphicType,
+            colorConfig: {
+                mode: "solid",
+                solidColor: "#3b82f6",
+                thresholds: [],
+            },
             lineSmoothingPercent: 75,
             gridLineVisibility: "adaptive",
             gridLineType: "horizontal",
         },
-    }, WIDGET_LOGICAL_SIZE);
+        renderSize: WIDGET_LOGICAL_SIZE,
+        centerIcon: "",
+        circleStyle: "value",
+    });
+    const svg = renderMetricFrame({
+        body,
+        graphicStyle: "flat",
+        muted: false,
+        size: WIDGET_LOGICAL_SIZE,
+    });
 
     return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }

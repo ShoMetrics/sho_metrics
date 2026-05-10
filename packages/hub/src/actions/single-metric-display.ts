@@ -1,8 +1,7 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
-import { composeDualChannelSvg } from "../rendering/composer";
 import { rasterizeSvgToPngDataUrl } from "../rendering/rasterizer";
-import type { ColorConfig } from "../rendering/color-resolver";
 import type { DualChannelWidgetData, WidgetData } from "../rendering/widget-data";
+import { renderDualMetricBodyView } from "../rendering/dual-metric-view";
 import { renderMetricFrame } from "../rendering/metric-frame";
 import { renderSingleMetricBodyView } from "../rendering/single-metric-view";
 import {
@@ -13,6 +12,7 @@ import {
     resolveDisplayLogValue,
     resolveDisplaySampleTimestampMilliseconds,
     type DualMetricDisplayOptions,
+    type MetricDisplayRenderPlan,
     type MetricDisplayOptions,
     type SingleMetricDisplayOptions,
     type TouchStripMetricLayout,
@@ -20,9 +20,7 @@ import {
 import {
     buildMetricVisualSettings,
     type MetricVisualSettings,
-    type ResolvedMetricVisualSettings,
 } from "../settings/visual-adapter";
-import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
 import { logger } from "../logging/logger";
 import { DisplayUpdateQueue } from "./display-update-queue";
 import {
@@ -59,6 +57,18 @@ interface DisplayActionState {
 }
 
 type DisplayRequestReason = "settings-change" | "metric-tick";
+
+interface ComposedMetricDisplayFrame {
+    readonly svg: string;
+    readonly renderedMetricData: WidgetData | DualChannelWidgetData;
+    readonly renderPlan: MetricDisplayRenderPlan;
+}
+
+interface RenderedMetricBody {
+    readonly svg: string;
+    readonly renderedMetricData: WidgetData | DualChannelWidgetData;
+    readonly muted: boolean;
+}
 
 export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): void {
     const displayActionState = getOrCreateDisplayActionState(options.event.action.id);
@@ -120,10 +130,13 @@ function renderAndSendSingleMetricDisplay(
     activeDisplayUpdateCount += 1;
 
     const renderStartTimestampMilliseconds = Date.now();
-    const renderPlan = buildMetricDisplayRenderPlan({
+    const frame = composeMetricDisplayFrame({
         displayOptions: options,
         isDial: options.event.action.isDial(),
     });
+    const renderPlan = frame.renderPlan;
+    const renderedMetricData = frame.renderedMetricData;
+    const svg = frame.svg;
     const displayKind = resolveDisplayPerformanceKind(options.event);
     const titleClearRequested = options.event.action.isKey();
 
@@ -146,62 +159,6 @@ function renderAndSendSingleMetricDisplay(
         });
     }
 
-    let renderedMetricData: WidgetData | DualChannelWidgetData;
-    let svg: string;
-
-    if (isDualMetricDisplayOptions(options)) {
-        const renderDualWidgetData = buildRenderDualChannelWidgetData({
-            widgetData: options.widgetData,
-            hasData: renderPlan.displayHasData,
-        });
-        renderedMetricData = renderDualWidgetData;
-        svg = composeDualChannelSvg(renderDualWidgetData, {
-            graphicType: options.dualGraphicType,
-            graphicStyle: renderPlan.visualSettings.graphicStyle,
-            muted: false,
-            configOverrides: buildDualMetricConfigOverrides({
-                positiveColor: options.positiveColor,
-                negativeColor: options.negativeColor,
-                positiveColorConfig: options.positiveColorConfig,
-                negativeColorConfig: options.negativeColorConfig,
-                titleText: options.titleText,
-                chartMode: options.chartMode ?? "overlay",
-                centerContent: renderPlan.centerContent,
-                circleStyle: renderPlan.circleStyle,
-                topIconFragment: options.centerIconFragment,
-                positiveIconFragment: options.positiveIconFragment,
-                negativeIconFragment: options.negativeIconFragment,
-                positiveStatusIcon: options.positiveStatusIcon,
-                negativeStatusIcon: options.negativeStatusIcon,
-                lineSmoothingPercent: renderPlan.visualSettings.lineSmoothingPercent,
-                gridLineVisibility: renderPlan.visualSettings.gridLineVisibility,
-                gridLineType: renderPlan.visualSettings.gridLineType,
-            }),
-        }, renderPlan.renderSize);
-    } else {
-        const renderSingleWidgetData = buildRenderWidgetData({
-            widgetData: options.widgetData,
-            hasData: renderPlan.displayHasData,
-            shouldRenderMutedIconPlaceholder: renderPlan.shouldRenderMutedIconPlaceholder,
-        });
-        renderedMetricData = renderSingleWidgetData;
-        const bodySvg = renderSingleMetricBodyView({
-            data: renderSingleWidgetData,
-            visual: renderPlan.visualSettings,
-            renderSize: renderPlan.renderSize,
-            centerIcon: options.centerIconFragment,
-            footerIcon: options.footerIconFragment,
-            linearIcon: options.linearIconFragment,
-            statusIcon: options.statusIcon,
-            circleStyle: renderPlan.circleStyle,
-        });
-        svg = renderMetricFrame({
-            body: bodySvg,
-            graphicStyle: renderPlan.visualSettings.graphicStyle,
-            muted: renderPlan.shouldRenderMutedIconPlaceholder,
-            size: renderPlan.renderSize,
-        });
-    }
     const composeEndTimestampMilliseconds = Date.now();
 
     if (svg === displayActionState.lastRenderedSvg) {
@@ -432,60 +389,88 @@ function renderAndSendSingleMetricDisplay(
     finishDisplayUpdate(displayActionState);
 }
 
-function buildDualMetricConfigOverrides(options: {
-    positiveColor: string;
-    negativeColor: string;
-    positiveColorConfig: ColorConfig | undefined;
-    negativeColorConfig: ColorConfig | undefined;
-    titleText: string;
-    chartMode: "overlay" | "mirrored";
-    centerContent: "value" | "icon";
-    circleStyle: ResolvedMetricVisualSettings["circleStyle"];
-    topIconFragment: string;
-    positiveIconFragment: string | undefined;
-    negativeIconFragment: string | undefined;
-    positiveStatusIcon: ArcGaugeStatusIcon | undefined;
-    negativeStatusIcon: ArcGaugeStatusIcon | undefined;
-    lineSmoothingPercent: number;
-    gridLineVisibility: ResolvedMetricVisualSettings["gridLineVisibility"];
-    gridLineType: ResolvedMetricVisualSettings["gridLineType"];
-}): {
-    positiveColor: string;
-    negativeColor: string;
-    positiveColorConfig?: ColorConfig;
-    negativeColorConfig?: ColorConfig;
-    titleText?: string;
-    chartMode?: "overlay" | "mirrored";
-    centerContent?: "value" | "icon";
-    circleStyle?: ResolvedMetricVisualSettings["circleStyle"];
-    centerIconFragment?: string;
-    topIconFragment?: string;
-    positiveIconFragment?: string;
-    negativeIconFragment?: string;
-    positiveStatusIcon?: ArcGaugeStatusIcon;
-    negativeStatusIcon?: ArcGaugeStatusIcon;
-    lineSmoothingPercent?: number;
-    gridLineVisibility?: ResolvedMetricVisualSettings["gridLineVisibility"];
-    gridLineType?: ResolvedMetricVisualSettings["gridLineType"];
-} {
+function composeMetricDisplayFrame(options: {
+    displayOptions: MetricDisplayOptions;
+    isDial: boolean;
+}): ComposedMetricDisplayFrame {
+    const renderPlan = buildMetricDisplayRenderPlan(options);
+    const body = isDualMetricDisplayOptions(options.displayOptions)
+        ? composeDualMetricBody(options.displayOptions, renderPlan)
+        : composeSingleMetricBody(options.displayOptions, renderPlan);
+
     return {
-        positiveColor: options.positiveColor,
-        negativeColor: options.negativeColor,
-        positiveColorConfig: options.positiveColorConfig,
-        negativeColorConfig: options.negativeColorConfig,
-        titleText: options.titleText,
-        chartMode: options.chartMode,
-        centerContent: options.centerContent,
-        circleStyle: options.circleStyle,
-        centerIconFragment: options.topIconFragment,
-        topIconFragment: options.topIconFragment,
-        positiveIconFragment: options.positiveIconFragment,
-        negativeIconFragment: options.negativeIconFragment,
-        positiveStatusIcon: options.positiveStatusIcon,
-        negativeStatusIcon: options.negativeStatusIcon,
-        lineSmoothingPercent: options.lineSmoothingPercent,
-        gridLineVisibility: options.gridLineVisibility,
-        gridLineType: options.gridLineType,
+        svg: renderMetricFrame({
+            body: body.svg,
+            graphicStyle: renderPlan.visualSettings.graphicStyle,
+            muted: body.muted,
+            size: renderPlan.renderSize,
+        }),
+        renderedMetricData: body.renderedMetricData,
+        renderPlan,
+    };
+}
+
+function composeSingleMetricBody(
+    options: SingleMetricDisplayOptions,
+    renderPlan: MetricDisplayRenderPlan,
+): RenderedMetricBody {
+    const renderedMetricData = buildRenderWidgetData({
+        widgetData: options.widgetData,
+        hasData: renderPlan.displayHasData,
+        shouldRenderMutedIconPlaceholder: renderPlan.shouldRenderMutedIconPlaceholder,
+    });
+
+    return {
+        svg: renderSingleMetricBodyView({
+            data: renderedMetricData,
+            visual: renderPlan.visualSettings,
+            renderSize: renderPlan.renderSize,
+            centerIcon: options.centerIconFragment,
+            footerIcon: options.footerIconFragment,
+            linearIcon: options.linearIconFragment,
+            statusIcon: options.statusIcon,
+            circleStyle: renderPlan.circleStyle,
+        }),
+        renderedMetricData,
+        muted: renderPlan.shouldRenderMutedIconPlaceholder,
+    };
+}
+
+function composeDualMetricBody(
+    options: DualMetricDisplayOptions,
+    renderPlan: MetricDisplayRenderPlan,
+): RenderedMetricBody {
+    const renderedMetricData = buildRenderDualChannelWidgetData({
+        widgetData: options.widgetData,
+        hasData: renderPlan.displayHasData,
+    });
+
+    return {
+        svg: renderDualMetricBodyView({
+            data: renderedMetricData,
+            visual: renderPlan.visualSettings,
+            graphicType: options.dualGraphicType ?? "dashed-line",
+            renderSize: renderPlan.renderSize,
+            titleText: options.titleText,
+            chartMode: options.chartMode ?? "overlay",
+            centerContent: renderPlan.centerContent,
+            circleStyle: renderPlan.circleStyle,
+            topIcon: options.centerIconFragment,
+            positive: {
+                color: options.positiveColor,
+                colorConfig: options.positiveColorConfig,
+                icon: options.positiveIconFragment,
+                statusIcon: options.positiveStatusIcon,
+            },
+            negative: {
+                color: options.negativeColor,
+                colorConfig: options.negativeColorConfig,
+                icon: options.negativeIconFragment,
+                statusIcon: options.negativeStatusIcon,
+            },
+        }),
+        renderedMetricData,
+        muted: false,
     };
 }
 
