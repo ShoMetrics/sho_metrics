@@ -12,7 +12,7 @@ import type {
     ResolvedGlobalSettings,
     ResolvedWidgetSettings,
 } from "../settings/widget-settings";
-import { resolveColor, type ColorConfig } from "../rendering/color-resolver";
+import { resolveColorForThresholdValue, type ColorConfig } from "../rendering/color-resolver";
 import { buildGlobalChannelColorConfig } from "../settings/global-appearance";
 import { getDiskIcon, getDiskIconFragment, renderCenteredHardwareIconFragment } from "../widgets/icons/hardware-icons";
 import { renderDiskThroughputDirectionIconFragment } from "../widgets/icons/catalog/disk";
@@ -332,7 +332,7 @@ function resolveDiskWidgetChannelColor(
     globalSettings: ResolvedGlobalSettings,
     widgetData: { progress: number },
 ): string {
-    return resolveColor(widgetData.progress * 100, buildDiskChannelColorConfig(direction, settings, globalSettings));
+    return resolveColorForThresholdValue(widgetData.progress * 100, buildDiskChannelColorConfig(direction, settings, globalSettings));
 }
 
 function buildDiskChannelColorConfig(

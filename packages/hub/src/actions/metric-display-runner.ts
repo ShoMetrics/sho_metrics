@@ -60,12 +60,6 @@ interface DisplayActionState {
 
 type DisplayUpdateReason = "settings-change" | "metric-tick";
 
-interface ComposedMetricDisplayFrame {
-    readonly svg: string;
-    readonly renderedMetricData: WidgetData | DualChannelWidgetData;
-    readonly renderPlan: MetricDisplayRenderPlan;
-}
-
 interface RenderedMetricBody {
     readonly svg: string;
     readonly renderedMetricData: WidgetData | DualChannelWidgetData;
@@ -291,7 +285,11 @@ function runMetricDisplayUpdate(
 function composeMetricDisplayFrame(options: {
     displayOptions: MetricDisplayOptions;
     isDial: boolean;
-}): ComposedMetricDisplayFrame {
+}): {
+    readonly svg: string;
+    readonly renderedMetricData: WidgetData | DualChannelWidgetData;
+    readonly renderPlan: MetricDisplayRenderPlan;
+} {
     const renderPlan = buildMetricDisplayRenderPlan(options);
     const body = isDualMetricDisplayOptions(options.displayOptions)
         ? composeDualMetricBody(options.displayOptions, renderPlan)

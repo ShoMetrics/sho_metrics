@@ -12,9 +12,6 @@ type WidgetSettingsBranch =
     | "networkOverrides"
     | "diskThroughputOverrides";
 
-type WidgetSettingsBranchPatch<TBranch extends WidgetSettingsBranch> =
-    NonNullable<WidgetSettings[TBranch]>;
-
 export interface RuntimeStatePatch {
     availableNetworkInterfaces?: WidgetRuntimeCache["availableNetworkInterfaces"];
     availableDiskVolumes?: WidgetRuntimeCache["availableDiskVolumes"];
@@ -27,7 +24,7 @@ export interface RuntimeStatePatch {
 export function updateWidgetSettingsBranch<TBranch extends WidgetSettingsBranch>(
     settings: WidgetSettings,
     branch: TBranch,
-    patch: WidgetSettingsBranchPatch<TBranch>,
+    patch: NonNullable<WidgetSettings[TBranch]>,
 ): WidgetSettings {
     return mergeWidgetSettingsPatch(settings, {
         [branch]: patch,

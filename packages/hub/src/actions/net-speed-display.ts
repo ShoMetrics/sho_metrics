@@ -7,7 +7,7 @@ import {
     type NetworkDirection,
 } from "../runtime/network-metric-keys";
 import type { WidgetData } from "../rendering/widget-data";
-import { resolveColor, type ColorConfig } from "../rendering/color-resolver";
+import { resolveColorForThresholdValue, type ColorConfig } from "../rendering/color-resolver";
 import type {
     ResolvedGlobalSettings,
     ResolvedWidgetSettings,
@@ -420,7 +420,7 @@ function resolveNetworkWidgetChannelColor(
     globalSettings: ResolvedGlobalSettings,
     widgetData: WidgetData,
 ): string {
-    return resolveColor(widgetData.progress * 100, buildNetworkChannelColorConfig(direction, settings, globalSettings));
+    return resolveColorForThresholdValue(widgetData.progress * 100, buildNetworkChannelColorConfig(direction, settings, globalSettings));
 }
 
 function buildNetworkChannelColorConfig(

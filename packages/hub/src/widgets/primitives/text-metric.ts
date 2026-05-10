@@ -1,5 +1,5 @@
 import type { DualChannelWidgetData, KeySize, WidgetData } from "../../rendering/widget-data";
-import { resolveColor } from "../../rendering/color-resolver";
+import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
     renderConstrainedSvgText,
 } from "../../rendering/svg-utils";
@@ -48,7 +48,7 @@ export const textMetric: Widget<TextMetricConfig> = {
         const centerXCoordinate = keySize.width / 2;
         const textWidth = Math.max(24, keySize.width - TEXT_LAYOUT.horizontalPadding * 2);
         const valueText = data.displayValue ?? data.current.toFixed(0);
-        const valueTextColor = resolveColor(data.current, config.colorConfig);
+        const valueTextColor = resolveColorForThresholdValue(data.current, config.colorConfig);
 
         return `
             ${renderConstrainedSvgText({

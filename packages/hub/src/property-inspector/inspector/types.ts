@@ -5,7 +5,6 @@ import type {
     WidgetStoredSettings,
 } from "../../settings/widget-settings";
 
-export type InspectorControlValue = string | number | boolean | null | undefined;
 export type SelectOptionValue = string | number;
 
 export interface SelectOption<TValue extends SelectOptionValue = string> {

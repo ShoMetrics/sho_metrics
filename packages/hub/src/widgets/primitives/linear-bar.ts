@@ -1,5 +1,5 @@
 import type { WidgetData, KeySize } from "../../rendering/widget-data";
-import { resolveColor } from "../../rendering/color-resolver";
+import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
     adjustHexColorBrightness,
     clamp,
@@ -176,7 +176,7 @@ function renderSingleBar(
     layoutPlan: LinearLayoutPlan,
 ): string {
     const fillWidth = Math.max(0, layoutPlan.singleBar.width * clamp(data.progress, 0, 1));
-    const barColor = resolveColor(data.current, config.colorConfig);
+    const barColor = resolveColorForThresholdValue(data.current, config.colorConfig);
     const barHeadColor = adjustHexColorBrightness(barColor, config.gradientHeadAdjustmentPercent ?? -15);
     const gradientId = `linear-progress-${Math.round(data.current * 10)}-${keySize.width}-${keySize.height}`;
     const valueText = data.linearDisplayValue ?? data.displayValue ?? data.current.toFixed(0);
