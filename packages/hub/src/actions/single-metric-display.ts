@@ -116,7 +116,7 @@ export function clearSingleMetricDisplayState(actionId: string): void {
     displayActionStates.delete(actionId);
 }
 
-function renderAndSendSingleMetricDisplay(
+function runMetricDisplayUpdate(
     displayActionState: DisplayActionState,
     options: MetricDisplayOptions,
 ): void {
@@ -486,7 +486,7 @@ function drainDisplayQueue(): void {
         }
 
         try {
-            renderAndSendSingleMetricDisplay(displayActionState, displayActionState.pendingOptions);
+            runMetricDisplayUpdate(displayActionState, displayActionState.pendingOptions);
         } catch (error) {
             log.error(() => `Render/update error: ${String(error)}`);
             finishDisplayUpdate(displayActionState);
