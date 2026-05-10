@@ -1,7 +1,7 @@
 import streamDeck from "@elgato/streamdeck";
 
-type LogLevel = "error" | "warn" | "info" | "debug" | "trace";
-type LogEntryData = unknown[] | [string, ...unknown[]];
+export type LogLevel = "error" | "warn" | "info" | "debug" | "trace";
+export type LogEntryData = unknown[] | [string, ...unknown[]];
 
 /**
  * Log message input.
@@ -27,7 +27,7 @@ type NamedContext = {
  * Keeping this as a structural type makes the wrapper testable without pulling
  * the whole Stream Deck SDK into tests.
  */
-type LoggerSink = {
+export type LoggerSink = {
     readonly level: LogLevel;
     setLevel(level?: LogLevel): LoggerSink;
     createScope(scope: string): LoggerSink;
@@ -43,6 +43,14 @@ type LoggerSink = {
  */
 export interface LogBuilder {
     /**
+     * Adds the original error object to the log entry.
+     *
+     * Keep the native Error object instead of stringifying it so the Stream Deck
+     * formatter can preserve the stack trace.
+     */
+    withCause(error: Error): LogBuilder;
+
+    /**
      * Rate-limits a log point by key.
      *
      * Limitation: the key is scoped to the current `ScopedLogger` instance, not
@@ -53,7 +61,8 @@ export interface LogBuilder {
     /**
      * Writes the message if the level is enabled and all builder constraints pass.
      */
-    log(message: LogProvider): void;
+    log(message: LogProvider, ...data: unknown[]): void;
+    log(...data: LogEntryData): void;
 }
 
 /**
@@ -63,27 +72,32 @@ export interface ScopedLogger {
     /**
      * Writes failures or exceptions that prevent the requested operation.
      */
-    error(message: LogProvider): void;
+    error(message: LogProvider, ...data: unknown[]): void;
+    error(...data: LogEntryData): void;
 
     /**
      * Writes recoverable failures or degraded behavior.
      */
-    warn(message: LogProvider): void;
+    warn(message: LogProvider, ...data: unknown[]): void;
+    warn(...data: LogEntryData): void;
 
     /**
      * Writes normal lifecycle events useful in production logs.
      */
-    info(message: LogProvider): void;
+    info(message: LogProvider, ...data: unknown[]): void;
+    info(...data: LogEntryData): void;
 
     /**
      * Writes development/debug details.
      */
-    debug(message: LogProvider): void;
+    debug(message: LogProvider, ...data: unknown[]): void;
+    debug(...data: LogEntryData): void;
 
     /**
      * Writes high-volume diagnostic details.
      */
-    trace(message: LogProvider): void;
+    trace(message: LogProvider, ...data: unknown[]): void;
+    trace(...data: LogEntryData): void;
 
     /**
      * Creates a fluent builder for an error-level log.
@@ -145,6 +159,10 @@ export interface ShoLogger {
  * Shared no-op builder returned when a level is disabled.
  */
 class NoOpLogBuilder implements LogBuilder {
+    public withCause(): LogBuilder {
+        return this;
+    }
+
     public everyMs(): LogBuilder {
         return this;
     }
@@ -158,6 +176,7 @@ class NoOpLogBuilder implements LogBuilder {
  * Mutable fluent builder used only when the requested level is enabled.
  */
 class ScopedLogBuilder implements LogBuilder {
+    private cause: Error | null = null;
     private throttleKey: string | null = null;
     private throttleMilliseconds = 0;
 
@@ -166,13 +185,20 @@ class ScopedLogBuilder implements LogBuilder {
         private readonly level: LogLevel,
     ) {}
 
+    public withCause(error: Error): LogBuilder {
+        this.cause = error;
+        return this;
+    }
+
     public everyMs(key: string, milliseconds: number): LogBuilder {
         this.throttleKey = key;
         this.throttleMilliseconds = milliseconds;
         return this;
     }
 
-    public log(message: LogProvider): void {
+    public log(message: LogProvider, ...data: unknown[]): void;
+    public log(...data: LogEntryData): void;
+    public log(...data: LogEntryData): void {
         if (
             this.throttleKey
             && !this.scopedLogger.shouldWriteThrottled(this.throttleKey, this.throttleMilliseconds)
@@ -180,7 +206,7 @@ class ScopedLogBuilder implements LogBuilder {
             return;
         }
 
-        this.scopedLogger.write(this.level, message);
+        this.scopedLogger.write(this.level, data, this.cause);
     }
 }
 
@@ -195,24 +221,34 @@ class ScopedLoggerImpl implements ScopedLogger {
         private readonly isLevelEnabled: (level: LogLevel) => boolean,
     ) {}
 
-    public error(message: LogProvider): void {
-        this.write("error", message);
+    public error(message: LogProvider, ...data: unknown[]): void;
+    public error(...data: LogEntryData): void;
+    public error(...data: LogEntryData): void {
+        this.write("error", data);
     }
 
-    public warn(message: LogProvider): void {
-        this.write("warn", message);
+    public warn(message: LogProvider, ...data: unknown[]): void;
+    public warn(...data: LogEntryData): void;
+    public warn(...data: LogEntryData): void {
+        this.write("warn", data);
     }
 
-    public info(message: LogProvider): void {
-        this.write("info", message);
+    public info(message: LogProvider, ...data: unknown[]): void;
+    public info(...data: LogEntryData): void;
+    public info(...data: LogEntryData): void {
+        this.write("info", data);
     }
 
-    public debug(message: LogProvider): void {
-        this.write("debug", message);
+    public debug(message: LogProvider, ...data: unknown[]): void;
+    public debug(...data: LogEntryData): void;
+    public debug(...data: LogEntryData): void {
+        this.write("debug", data);
     }
 
-    public trace(message: LogProvider): void {
-        this.write("trace", message);
+    public trace(message: LogProvider, ...data: unknown[]): void;
+    public trace(...data: LogEntryData): void;
+    public trace(...data: LogEntryData): void {
+        this.write("trace", data);
     }
 
     public atError(): LogBuilder {
@@ -256,12 +292,12 @@ class ScopedLoggerImpl implements ScopedLogger {
     /**
      * Writes one message after the global log level check.
      */
-    public write(level: LogLevel, message: LogProvider): void {
+    public write(level: LogLevel, data: LogEntryData, cause: Error | null = null): void {
         if (!this.isLevelEnabled(level)) {
             return;
         }
 
-        this.sink[level](typeof message === "function" ? message() : message);
+        this.sink[level](...resolveLogEntryData(data, cause));
     }
 
     private createBuilder(level: LogLevel): LogBuilder {
@@ -298,6 +334,33 @@ class ShoLoggerImpl implements ShoLogger {
 }
 
 const NO_OP_BUILDER = new NoOpLogBuilder();
+
+/**
+ * Converts lazy first arguments and builder causes into SDK logger arguments.
+ */
+function resolveLogEntryData(data: LogEntryData, cause: Error | null): LogEntryData {
+    if (data.length === 0) {
+        return cause ? [cause] : data;
+    }
+
+    const firstLogValue = data[0];
+    if (typeof firstLogValue !== "function" && cause == null) {
+        return data;
+    }
+
+    const resolvedData = [...data];
+
+    if (typeof firstLogValue === "function") {
+        const messageProvider = firstLogValue as () => string;
+        resolvedData[0] = messageProvider();
+    }
+
+    if (cause) {
+        resolvedData.push(cause);
+    }
+
+    return resolvedData;
+}
 
 /**
  * Resolves user-provided context into a stable Stream Deck logger scope.
@@ -341,4 +404,8 @@ function getLogLevelPriority(level: LogLevel): number {
     }
 }
 
-export const logger: ShoLogger = new ShoLoggerImpl(streamDeck.logger);
+export function createShoLogger(sink: LoggerSink): ShoLogger {
+    return new ShoLoggerImpl(sink);
+}
+
+export const logger: ShoLogger = createShoLogger(streamDeck.logger);
