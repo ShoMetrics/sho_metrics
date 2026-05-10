@@ -10,10 +10,6 @@ import {
     type NetworkDirection,
 } from "../runtime/network-metric-keys";
 import { resolveNetSpeedMetricSubscriptionKeys } from "./net-speed-metric-subscriptions";
-import {
-    readActionStoredSettings,
-    serializeActionStoredSettings,
-} from "./action-settings-resolver";
 import type { ResolvedWidgetSettings } from "../settings/widget-settings";
 import { updateWidgetRuntimeCache } from "../settings/updates";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
@@ -49,8 +45,8 @@ export class NetSpeed extends MetricAction {
         const isAutomaticNetworkInterface = settings.metric.networkInterfaceId.length === 0;
         const selectedNetworkInterface = resolveNetworkInterface(settings.metric.networkInterfaceId);
 
-        publishNetworkInterfaceOptions(event);
-        publishNetworkScaleLearning(event, settings, selectedNetworkInterface);
+        this.publishNetworkInterfaceOptions(event);
+        this.publishNetworkScaleLearning(event, settings, selectedNetworkInterface);
 
         const displayUpdate = buildNetworkDisplayUpdate({
             event,
@@ -70,6 +66,67 @@ export class NetSpeed extends MetricAction {
         }
 
         setMetricDisplay(displayUpdate.displayOptions);
+    }
+
+    private publishNetworkInterfaceOptions(event: WillAppearEvent): void {
+        const availableNetworkInterfaces = [...networkInterfaceRegistry.getOptions()];
+
+        const storedSettings = this.readStoredSettings(event);
+
+        // TODO(settings-contract): Temporary pre-proto/pre-Zod deep compare. Move this to the codec/schema layer
+        // when persisted settings get a real contract.
+        if (JSON.stringify(storedSettings.runtimeCache?.availableNetworkInterfaces ?? []) === JSON.stringify(availableNetworkInterfaces)) {
+            return;
+        }
+
+        this.writeStoredSettings(event, updateWidgetRuntimeCache(storedSettings, {
+            availableNetworkInterfaces,
+        })).catch(error => {
+            log.error(() => `Failed to publish network interfaces: ${String(error)}`);
+        });
+    }
+
+    private publishNetworkScaleLearning(
+        event: WillAppearEvent,
+        settings: ResolvedWidgetSettings,
+        selectedNetworkInterface: NetworkInterfaceOption | null,
+    ): void {
+        if (settings.network.networkScaleMode === "custom") {
+            return;
+        }
+
+        const downloadMetricKey = selectedNetworkInterface
+            ? getNetworkInterfaceMetricKey("download", selectedNetworkInterface.id)
+            : getNetworkAggregateMetricKey("download");
+        const uploadMetricKey = selectedNetworkInterface
+            ? getNetworkInterfaceMetricKey("upload", selectedNetworkInterface.id)
+            : getNetworkAggregateMetricKey("upload");
+        const nextDownloadMaximum = resolveLearnedNetworkMaximumMegabitsPerSecond({
+            direction: "download",
+            settings,
+            observedBytesPerSecond: metricStore.getWidgetData(downloadMetricKey, "DOWN", "B/s").current,
+        });
+        const nextUploadMaximum = resolveLearnedNetworkMaximumMegabitsPerSecond({
+            direction: "upload",
+            settings,
+            observedBytesPerSecond: metricStore.getWidgetData(uploadMetricKey, "UP", "B/s").current,
+        });
+
+        const storedSettings = this.readStoredSettings(event);
+
+        if (
+            storedSettings.runtimeCache?.learnedMaximumDownloadSpeedMbps === nextDownloadMaximum
+            && storedSettings.runtimeCache?.learnedMaximumUploadSpeedMbps === nextUploadMaximum
+        ) {
+            return;
+        }
+
+        this.writeStoredSettings(event, updateWidgetRuntimeCache(storedSettings, {
+            learnedMaximumDownloadSpeedMbps: nextDownloadMaximum,
+            learnedMaximumUploadSpeedMbps: nextUploadMaximum,
+        })).catch(error => {
+            log.error(() => `Failed to publish learned network scale: ${String(error)}`);
+        });
     }
 }
 
@@ -118,67 +175,6 @@ function formatNetworkInterfaceDebugValue(networkInterface: NetworkInterfaceOpti
         type: networkInterface.type,
         isDefault: networkInterface.isDefault,
         speedMegabitsPerSecond: networkInterface.speedMegabitsPerSecond,
-    });
-}
-
-function publishNetworkInterfaceOptions(event: WillAppearEvent): void {
-    const availableNetworkInterfaces = [...networkInterfaceRegistry.getOptions()];
-
-    const storedSettings = readActionStoredSettings(event);
-
-    // TODO(settings-contract): Temporary pre-proto/pre-Zod deep compare. Move this to the codec/schema layer
-    // when persisted settings get a real contract.
-    if (JSON.stringify(storedSettings.runtimeCache?.availableNetworkInterfaces ?? []) === JSON.stringify(availableNetworkInterfaces)) {
-        return;
-    }
-
-    event.action.setSettings(serializeActionStoredSettings(updateWidgetRuntimeCache(storedSettings, {
-        availableNetworkInterfaces,
-    }))).catch(error => {
-        log.error(() => `Failed to publish network interfaces: ${String(error)}`);
-    });
-}
-
-function publishNetworkScaleLearning(
-    event: WillAppearEvent,
-    settings: ResolvedWidgetSettings,
-    selectedNetworkInterface: NetworkInterfaceOption | null,
-): void {
-    if (settings.network.networkScaleMode === "custom") {
-        return;
-    }
-
-    const downloadMetricKey = selectedNetworkInterface
-        ? getNetworkInterfaceMetricKey("download", selectedNetworkInterface.id)
-        : getNetworkAggregateMetricKey("download");
-    const uploadMetricKey = selectedNetworkInterface
-        ? getNetworkInterfaceMetricKey("upload", selectedNetworkInterface.id)
-        : getNetworkAggregateMetricKey("upload");
-    const nextDownloadMaximum = resolveLearnedNetworkMaximumMegabitsPerSecond({
-        direction: "download",
-        settings,
-        observedBytesPerSecond: metricStore.getWidgetData(downloadMetricKey, "DOWN", "B/s").current,
-    });
-    const nextUploadMaximum = resolveLearnedNetworkMaximumMegabitsPerSecond({
-        direction: "upload",
-        settings,
-        observedBytesPerSecond: metricStore.getWidgetData(uploadMetricKey, "UP", "B/s").current,
-    });
-
-    const storedSettings = readActionStoredSettings(event);
-
-    if (
-        storedSettings.runtimeCache?.learnedMaximumDownloadSpeedMbps === nextDownloadMaximum
-        && storedSettings.runtimeCache?.learnedMaximumUploadSpeedMbps === nextUploadMaximum
-    ) {
-        return;
-    }
-
-    event.action.setSettings(serializeActionStoredSettings(updateWidgetRuntimeCache(storedSettings, {
-        learnedMaximumDownloadSpeedMbps: nextDownloadMaximum,
-        learnedMaximumUploadSpeedMbps: nextUploadMaximum,
-    }))).catch(error => {
-        log.error(() => `Failed to publish learned network scale: ${String(error)}`);
     });
 }
 
