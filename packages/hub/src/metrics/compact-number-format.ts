@@ -1,4 +1,4 @@
-export function clampDisplayValue(value: number, fractionDigits: number, maximumDisplayDigits: number): string {
+export function formatCompactNumber(value: number, fractionDigits: number, maximumDisplayDigits: number): string {
     const formattedValue = value.toFixed(fractionDigits);
 
     if (countNumericDisplayDigits(formattedValue) <= maximumDisplayDigits) {

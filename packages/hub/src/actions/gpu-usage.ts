@@ -3,14 +3,14 @@ import { MetricAction } from "./metric-action";
 import { metricStore } from "../runtime/metric-store";
 import { setSingleMetricDisplay } from "./single-metric-display";
 import type { WidgetData } from "../rendering/widget-data";
-import { formatBytes } from "../metrics/byte-display";
-import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-label";
-import { buildGpuPowerWidgetData, resolveMaximumGpuPowerWatts } from "../metrics/gpu-power-display";
+import { formatByteCount } from "../metrics/byte-format";
+import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-format";
+import { buildGpuPowerWidgetData, resolveMaximumGpuPowerWatts } from "../metrics/gpu-power-widget-data";
 import {
     buildTemperatureWidgetData,
     resolveMaximumTemperatureCelsius,
     resolveTemperatureUnit,
-} from "../metrics/temperature-display";
+} from "../metrics/temperature-widget-data";
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import {
@@ -201,13 +201,13 @@ function formatUsedAndTotalMegabytes(usedMegabytes: number, totalMegabytes: numb
     const binaryBase = 1024;
     const usedBytes = usedMegabytes * binaryBase * binaryBase;
     const totalBytes = totalMegabytes * binaryBase * binaryBase;
-    const formattedUsedBytes = formatBytes({
+    const formattedUsedBytes = formatByteCount({
         bytes: usedBytes,
         base: binaryBase,
         maximumDisplayDigits: 3,
         minimumUnitIndex: 3,
     });
-    const formattedTotalBytes = formatBytes({
+    const formattedTotalBytes = formatByteCount({
         bytes: totalBytes,
         base: binaryBase,
         maximumDisplayDigits: 3,

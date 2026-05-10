@@ -1,4 +1,4 @@
-import { clampDisplayValue } from "./display-number";
+import { formatCompactNumber } from "./compact-number-format";
 
 export type DataRateUnitBase = "byte" | "bit";
 
@@ -10,7 +10,7 @@ export interface FormattedByteValue {
 const BITS_PER_BYTE = 8;
 const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB", "PB"] as const;
 
-export function formatByteRate(options: {
+export function formatBytesPerSecond(options: {
     bytesPerSecond: number;
     unitBase: DataRateUnitBase;
     base: number;
@@ -26,14 +26,14 @@ export function formatByteRate(options: {
 
     if (safeBytesPerSecond < options.base ** 2) {
         return {
-            value: clampDisplayValue((safeBytesPerSecond * unitMultiplier) / options.base, 0, options.maximumDisplayDigits),
+            value: formatCompactNumber((safeBytesPerSecond * unitMultiplier) / options.base, 0, options.maximumDisplayDigits),
             unit: `K${unitCharacter}/s`,
         };
     }
 
     if (safeBytesPerSecond < 100 * options.base ** 2) {
         return {
-            value: clampDisplayValue(
+            value: formatCompactNumber(
                 (safeBytesPerSecond * unitMultiplier) / (options.base ** 2),
                 1,
                 options.maximumDisplayDigits,
@@ -44,7 +44,7 @@ export function formatByteRate(options: {
 
     if (safeBytesPerSecond < options.base ** 3) {
         return {
-            value: clampDisplayValue(
+            value: formatCompactNumber(
                 (safeBytesPerSecond * unitMultiplier) / (options.base ** 2),
                 0,
                 options.maximumDisplayDigits,
@@ -54,7 +54,7 @@ export function formatByteRate(options: {
     }
 
     return {
-        value: clampDisplayValue(
+        value: formatCompactNumber(
             (safeBytesPerSecond * unitMultiplier) / (options.base ** 3),
             1,
             options.maximumDisplayDigits,
@@ -63,7 +63,7 @@ export function formatByteRate(options: {
     };
 }
 
-export function formatBytes(options: {
+export function formatByteCount(options: {
     bytes: number;
     base: number;
     maximumDisplayDigits: number;
@@ -85,7 +85,7 @@ export function formatBytes(options: {
     const fractionDigits = value < 10 && unitIndex > 0 ? 1 : 0;
 
     return {
-        value: clampDisplayValue(value, fractionDigits, options.maximumDisplayDigits),
+        value: formatCompactNumber(value, fractionDigits, options.maximumDisplayDigits),
         unit: BYTE_UNITS[unitIndex],
     };
 }
