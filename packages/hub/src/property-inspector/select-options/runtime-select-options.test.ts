@@ -5,9 +5,9 @@ import {
     resolveDiskVolumeOptions,
     resolveNetworkInterfaceOptions,
     resolveSelectedDiskVolumeLabel,
-} from "./options";
-import type { DiskVolumeOption } from "../runtime/disk-volumes";
-import { buildVisibilityContext, type InspectorTestSettings } from "./test-context";
+} from "./runtime-select-options";
+import type { DiskVolumeOption } from "../../runtime/disk-volumes";
+import { buildVisibilityContext, type InspectorTestSettings } from "../test-context";
 
 test("network interface options include automatic and formatted interfaces", () => {
     const context = buildContext({

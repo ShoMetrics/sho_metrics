@@ -1,7 +1,7 @@
 import { InspectorItem } from "../components/InspectorItem";
 import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
-import { resolveNetworkInterfaceOptions } from "../options";
+import { resolveNetworkInterfaceOptions } from "../select-options/runtime-select-options";
 import {
     NetworkChannelColorSettings,
     StandardColorSettings,

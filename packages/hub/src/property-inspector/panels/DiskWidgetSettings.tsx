@@ -3,7 +3,11 @@ import { SectionHeading } from "../components/SectionHeading";
 import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { TextSetting } from "../controls/TextSetting";
-import { resolveDiskAutoLinearLabel, resolveDiskVolumeOptions, resolveSelectedDiskVolumeLabel } from "../options";
+import {
+    resolveDiskAutoLinearLabel,
+    resolveDiskVolumeOptions,
+    resolveSelectedDiskVolumeLabel,
+} from "../select-options/runtime-select-options";
 import {
     DiskThroughputChannelColorSettings,
     StandardColorSettings,
