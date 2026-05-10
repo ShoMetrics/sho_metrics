@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { DidReceiveSettingsEvent, WillAppearEvent, WillDisappearEvent } from "@elgato/streamdeck";
 import { scheduler } from "../runtime/scheduler";
-import { updateWidgetRuntimeCache } from "../settings/updates";
 import type { WidgetStoredSettings } from "../settings/widget-settings";
 import { MetricAction } from "./metric-action";
 
@@ -69,8 +68,8 @@ class TestMetricAction extends MetricAction {
     }
 
     publishRuntimeCacheForTest(event: WillAppearEvent): Promise<void> {
-        return this.writeStoredSettings(event, updateWidgetRuntimeCache(this.readStoredSettings(event), {
+        return this.updateRuntimeCache(event, {
             learnedMaximumDownloadSpeedMbps: 123,
-        }));
+        });
     }
 }
