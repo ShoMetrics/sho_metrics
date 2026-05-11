@@ -11,7 +11,7 @@ import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 
 /**
  * CPU Usage action with full theming support.
- * User can choose graphic type (circular, dashed-line, linear),
+ * User can choose graphic type (circular, sparkline, linear),
  * style (flat, cupertino-glass), and color mode (solid, threshold).
  */
 @action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND["cpu-usage"] })

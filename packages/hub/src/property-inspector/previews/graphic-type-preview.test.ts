@@ -5,7 +5,7 @@ import { buildGraphicTypePreviewUri } from "./graphic-type-preview";
 import type { CircleStyle, GraphicType } from "../inspector/settings-types";
 
 test("graphic type preview URIs render every Property Inspector graphic option without throwing", () => {
-    const graphicTypes: readonly GraphicType[] = ["circular", "text", "linear", "dashed-line"];
+    const graphicTypes: readonly GraphicType[] = ["circular", "text", "linear", "sparkline"];
 
     for (const graphicType of graphicTypes) {
         const previewUri = buildGraphicTypePreviewUri(graphicType);

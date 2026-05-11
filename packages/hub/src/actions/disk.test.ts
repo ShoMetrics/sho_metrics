@@ -5,7 +5,7 @@ import { resolveDiskMetricSubscriptionKeys } from "./disk/metric-subscriptions";
 test("disk throughput sparkline both mode subscribes to read and write", () => {
     const subscriptionKeys = resolveDiskMetricSubscriptionKeys({
         diskMetricKind: "throughput",
-        graphicType: "dashed-line",
+        graphicType: "sparkline",
         diskThroughputDirection: "both",
     });
 
@@ -15,7 +15,7 @@ test("disk throughput sparkline both mode subscribes to read and write", () => {
 test("disk throughput sparkline single mode subscribes to one direction", () => {
     const subscriptionKeys = resolveDiskMetricSubscriptionKeys({
         diskMetricKind: "throughput",
-        graphicType: "dashed-line",
+        graphicType: "sparkline",
         diskThroughputDirection: "read",
     });
 

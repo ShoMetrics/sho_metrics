@@ -66,7 +66,7 @@ test("percentage action display values are honored by sparkline rendering", () =
             label: "GPU",
         })),
         visual: {
-            graphicType: "dashed-line",
+            graphicType: "sparkline",
             colorConfig: {
                 mode: "solid",
                 solidColor: "#3b82f6",

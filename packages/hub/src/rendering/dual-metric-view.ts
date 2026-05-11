@@ -20,7 +20,7 @@ import type {
     SparklineGridLineVisibility,
 } from "../widgets/primitives/sparkline";
 
-type DualMetricGraphicType = "circular" | "text" | "dashed-line";
+type DualMetricGraphicType = "circular" | "text" | "sparkline";
 
 interface DualMetricChannelViewProps {
     color: string;
@@ -53,7 +53,7 @@ export function renderDualMetricBodyView(options: DualMetricBodyViewProps): stri
             return renderDualCircularMetric(options);
         case "text":
             return renderDualTextMetricView(options);
-        case "dashed-line":
+        case "sparkline":
             return renderDualSparklineMetric(options);
     }
 }

@@ -21,7 +21,7 @@ import {
     type SparklineGridLineVisibility,
 } from "../widgets/primitives/sparkline";
 
-type SingleMetricGraphicType = "circular" | "text" | "linear" | "dashed-line";
+type SingleMetricGraphicType = "circular" | "text" | "linear" | "sparkline";
 
 export interface SingleMetricBodyViewProps {
     data: WidgetData;
@@ -48,7 +48,7 @@ export function renderSingleMetricBodyView(options: SingleMetricBodyViewProps): 
             return renderSingleTextMetric(options);
         case "linear":
             return renderSingleLinearMetric(options);
-        case "dashed-line":
+        case "sparkline":
             return renderSingleSparklineMetric(options);
     }
 }

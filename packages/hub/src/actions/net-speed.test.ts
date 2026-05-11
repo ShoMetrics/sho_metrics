@@ -4,7 +4,7 @@ import { resolveNetSpeedMetricSubscriptionKeys } from "./network/metric-subscrip
 
 test("network sparkline both mode subscribes to upload and download", () => {
     const subscriptionKeys = resolveNetSpeedMetricSubscriptionKeys({
-        graphicType: "dashed-line",
+        graphicType: "sparkline",
         networkDirection: "both",
         networkInterfaceId: "",
     });
@@ -14,7 +14,7 @@ test("network sparkline both mode subscribes to upload and download", () => {
 
 test("network sparkline single mode subscribes to one direction", () => {
     const subscriptionKeys = resolveNetSpeedMetricSubscriptionKeys({
-        graphicType: "dashed-line",
+        graphicType: "sparkline",
         networkDirection: "upload",
         networkInterfaceId: "",
     });

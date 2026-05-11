@@ -15,7 +15,7 @@ export function SparklineSettings({
     context,
     onSettingsPatch,
 }: WidgetSettingsPanelProps): React.JSX.Element | null {
-    if (context.resolved.appearance.graphicType !== "dashed-line") {
+    if (context.resolved.appearance.graphicType !== "sparkline") {
         return null;
     }
 

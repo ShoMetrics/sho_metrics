@@ -22,7 +22,6 @@ const restrictedLegacySettingSyntax = [
 const restrictedMetricVisualAliasSyntax = [
   'arc-gauge',
   'linear-bar',
-  'sparkline',
 ].map(value => ({
   selector: `Literal[value="${value}"]`,
   message: `${value} is a renderer/widget alias and must not be accepted as visual settings input.`,

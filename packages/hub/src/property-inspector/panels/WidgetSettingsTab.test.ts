@@ -102,7 +102,7 @@ test("network mirrored trend disables grid controls in the panel", () => {
         actionKind: "net-speed",
         settings: {
             appearanceOverrides: {
-                graphicType: "dashed-line",
+                graphicType: "sparkline",
             },
             metric: {
                 networkDirection: "both",
