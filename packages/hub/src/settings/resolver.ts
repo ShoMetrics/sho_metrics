@@ -5,8 +5,8 @@ import {
     defaultMetricSettings,
     defaultNetworkSettings,
     defaultResolvedGlobalSettings,
-    defaultRuntimeCache,
 } from "./defaults";
+import { emptyWidgetRuntimeCache, type WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
 import type {
     AppearanceSettings,
     AppearanceSettingsOverride,
@@ -20,7 +20,6 @@ import type {
     ResolvedWidgetSettings,
     SettingsContext,
     WidgetLocalSettings,
-    WidgetRuntimeCache,
     WidgetSettings,
 } from "./model";
 
@@ -28,6 +27,7 @@ export function resolveWidgetSettings(options: {
     storedSettings: WidgetSettings;
     globalSettings: GlobalSettings;
     context: SettingsContext;
+    runtimeCache?: WidgetRuntimeCachePatch;
 }): ResolvedWidgetSettings {
     const globalSettings = resolveGlobalSettings(options.globalSettings);
     const metric = resolveMetricSettings(options.storedSettings.metric, options.context);
@@ -36,8 +36,8 @@ export function resolveWidgetSettings(options: {
         defaultAppearanceSettings,
         options.storedSettings.appearanceOverrides,
     );
-    const network = resolveNetworkSettings(options.storedSettings, globalSettings);
-    const diskThroughput = resolveDiskThroughputSettings(options.storedSettings, globalSettings);
+    const network = resolveNetworkSettings(options.storedSettings, globalSettings, options.runtimeCache);
+    const diskThroughput = resolveDiskThroughputSettings(options.storedSettings, globalSettings, options.runtimeCache);
 
     return {
         metric,
@@ -134,8 +134,9 @@ function resolveLocalSettings(
 function resolveNetworkSettings(
     storedSettings: WidgetSettings,
     globalSettings: ResolvedGlobalSettings,
+    runtimeCachePatch: WidgetRuntimeCachePatch | undefined,
 ): NetworkDefaultSettings {
-    const runtimeCache = resolveRuntimeCache(storedSettings.runtimeCache);
+    const runtimeCache = resolveRuntimeCache(runtimeCachePatch);
     const network = {
         ...defaultNetworkSettings,
         ...globalSettings.networkDefaults,
@@ -162,8 +163,9 @@ function resolveNetworkSettings(
 function resolveDiskThroughputSettings(
     storedSettings: WidgetSettings,
     globalSettings: ResolvedGlobalSettings,
+    runtimeCachePatch: WidgetRuntimeCachePatch | undefined,
 ): DiskThroughputDefaultSettings {
-    const runtimeCache = resolveRuntimeCache(storedSettings.runtimeCache);
+    const runtimeCache = resolveRuntimeCache(runtimeCachePatch);
     const diskThroughput = {
         ...defaultDiskThroughputSettings,
         ...globalSettings.diskThroughputDefaults,
@@ -187,9 +189,9 @@ function resolveDiskThroughputSettings(
     return diskThroughput;
 }
 
-function resolveRuntimeCache(runtimeCache: Partial<WidgetRuntimeCache> | undefined): WidgetRuntimeCache {
+function resolveRuntimeCache(runtimeCache: WidgetRuntimeCachePatch | undefined) {
     return {
-        ...defaultRuntimeCache,
+        ...emptyWidgetRuntimeCache,
         ...runtimeCache,
     };
 }

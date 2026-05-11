@@ -7,6 +7,7 @@ import {
     resolveSelectedDiskVolumeLabel,
 } from "./runtime-select-options";
 import type { DiskVolumeOption } from "../../runtime/disk-volumes";
+import type { WidgetRuntimeCachePatch } from "../../runtime/widget-runtime-cache";
 import { buildVisibilityContext, type InspectorTestSettings } from "../testing/test-context";
 
 test("network interface options include automatic and formatted interfaces", () => {
@@ -56,8 +57,10 @@ test("disk volume options include automatic and compact capacity labels", () => 
 
 test("selected disk labels prefer explicit selection then root fallback", () => {
     const context = buildContext({
-        metric: {
-            diskVolumeId: "D:\\Games",
+        settings: {
+            metric: {
+                diskVolumeId: "D:\\Games",
+            },
         },
         runtimeCache: {
             availableDiskVolumes: [
@@ -68,7 +71,7 @@ test("selected disk labels prefer explicit selection then root fallback", () => 
     });
     const automaticContext = buildContext({
         runtimeCache: {
-            availableDiskVolumes: context.settings.runtimeCache?.availableDiskVolumes,
+            availableDiskVolumes: context.runtimeCache.availableDiskVolumes,
         },
     });
 
@@ -86,12 +89,14 @@ test("selected disk label returns dash when no valid disk is available", () => {
     assert.equal(diskAutoLinearLabel, "Auto");
 });
 
-function buildContext(settings: InspectorTestSettings = {}) {
+function buildContext(options: {
+    settings?: InspectorTestSettings;
+    runtimeCache?: WidgetRuntimeCachePatch;
+} = {}) {
     return buildVisibilityContext({
         actionKind: "disk",
-        settings: {
-            ...settings,
-        },
+        settings: options.settings,
+        runtimeCache: options.runtimeCache,
     });
 }
 

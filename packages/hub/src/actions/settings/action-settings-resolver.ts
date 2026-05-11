@@ -5,8 +5,13 @@ import {
     type ResolvedWidgetSettings,
 } from "../../settings/widget-settings";
 import { resolveWidgetSettings } from "../../settings/resolver";
+import type { WidgetRuntimeCachePatch } from "../../runtime/widget-runtime-cache";
 
-export function resolveActionSettings(rawSettings: unknown, actionKind: ActionKind): ResolvedWidgetSettings {
+export function resolveActionSettings(
+    rawSettings: unknown,
+    actionKind: ActionKind,
+    runtimeCache?: WidgetRuntimeCachePatch,
+): ResolvedWidgetSettings {
     const context = {
         actionKind,
         isWindows: process.platform === "win32",
@@ -17,5 +22,6 @@ export function resolveActionSettings(rawSettings: unknown, actionKind: ActionKi
         storedSettings,
         globalSettings: pluginGlobalSettingsStore.get(),
         context,
+        runtimeCache,
     });
 }

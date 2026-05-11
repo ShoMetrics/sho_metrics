@@ -5,7 +5,6 @@ export {
     defaultMetricSettings,
     defaultNetworkSettings,
     defaultResolvedGlobalSettings,
-    defaultRuntimeCache,
 } from "./defaults";
 
 export type {
@@ -38,7 +37,6 @@ export type {
     SettingsContext,
     TemperatureUnit,
     WidgetLocalSettings,
-    WidgetRuntimeCache,
     WidgetSettings,
     WidgetStoredSettings,
 } from "./model";

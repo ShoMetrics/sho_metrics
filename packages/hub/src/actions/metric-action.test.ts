@@ -1,18 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { DidReceiveSettingsEvent, WillAppearEvent, WillDisappearEvent } from "@elgato/streamdeck";
+import type {
+    DidReceiveSettingsEvent,
+    PropertyInspectorDidAppearEvent,
+    WillAppearEvent,
+    WillDisappearEvent,
+} from "@elgato/streamdeck";
 import { scheduler } from "../runtime/scheduler";
-import type { WidgetStoredSettings } from "../settings/widget-settings";
 import { MetricAction } from "./metric-action";
+import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
 
-test("runtime cache writes merge into the latest received settings", async () => {
+test("runtime cache publishes to Property Inspector without writing settings", async () => {
     const originalSubscribe = scheduler.subscribe;
     scheduler.subscribe = (() => () => undefined) as typeof scheduler.subscribe;
 
-    const setSettingsCalls: WidgetStoredSettings[] = [];
+    const setSettingsCalls: unknown[] = [];
     const streamDeckAction = {
         id: "action-1",
-        setSettings: (settings: WidgetStoredSettings) => {
+        setSettings: (settings: unknown) => {
             setSettingsCalls.push(settings);
             return Promise.resolve();
         },
@@ -44,14 +49,12 @@ test("runtime cache writes merge into the latest received settings", async () =>
 
         await action.publishRuntimeCacheForTest(willAppearEvent);
 
-        assert.deepEqual(setSettingsCalls.at(-1), {
-            appearanceOverrides: {
-                graphicType: "sparkline",
-            },
-            runtimeCache: {
+        assert.deepEqual(setSettingsCalls, []);
+        assert.deepEqual(action.runtimeCachePatchList, [
+            {
                 learnedMaximumDownloadSpeedMbps: 123,
             },
-        });
+        ]);
     } finally {
         action.onWillDisappear({
             action: streamDeckAction,
@@ -62,6 +65,7 @@ test("runtime cache writes merge into the latest received settings", async () =>
 
 class TestMetricAction extends MetricAction {
     protected readonly actionKind = "net-speed";
+    readonly runtimeCachePatchList: WidgetRuntimeCachePatch[] = [];
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
         this.resolveSettings(event);
@@ -71,5 +75,14 @@ class TestMetricAction extends MetricAction {
         return this.updateRuntimeCache(event, {
             learnedMaximumDownloadSpeedMbps: 123,
         });
+    }
+
+    protected override sendRuntimeCachePatchToPropertyInspector(
+        event: WillAppearEvent | PropertyInspectorDidAppearEvent,
+        patch: WidgetRuntimeCachePatch,
+    ): Promise<void> {
+        void event;
+        this.runtimeCachePatchList.push(patch);
+        return Promise.resolve();
     }
 }

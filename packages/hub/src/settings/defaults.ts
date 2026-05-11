@@ -5,7 +5,6 @@ import type {
     NetworkDefaultSettings,
     ResolvedGlobalSettings,
     WidgetLocalSettings,
-    WidgetRuntimeCache,
 } from "./model";
 
 export const defaultAppearanceSettings: AppearanceSettings = {
@@ -79,15 +78,6 @@ export const defaultLocalSettings: WidgetLocalSettings = {
     maximumTemperatureCelsius: 100,
     maximumGpuPowerWatts: undefined,
     temperatureUnit: "celsius",
-};
-
-export const defaultRuntimeCache: WidgetRuntimeCache = {
-    availableNetworkInterfaces: [],
-    availableDiskVolumes: [],
-    learnedMaximumDownloadSpeedMbps: undefined,
-    learnedMaximumUploadSpeedMbps: undefined,
-    learnedMaximumDiskReadThroughputMebibytesPerSecond: undefined,
-    learnedMaximumDiskWriteThroughputMebibytesPerSecond: undefined,
 };
 
 export const defaultResolvedGlobalSettings: ResolvedGlobalSettings = {
