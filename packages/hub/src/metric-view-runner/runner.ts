@@ -15,24 +15,24 @@ import {
     type MetricDisplayRenderPlan,
     type MetricDisplayOptions,
     type SingleMetricDisplayOptions,
-} from "./single-metric-display-model";
+} from "./display-model";
 import {
     buildMetricVisualSettings,
     type MetricVisualSettings,
 } from "../settings/visual-adapter";
 import { logger } from "../logging/logger";
-import { DisplayUpdateQueue } from "./display-update-queue";
+import { DisplayUpdateQueue } from "./update-queue";
 import {
     dispatchMetricDisplayImage,
     type TouchStripMetricLayoutState,
-} from "./metric-display-dispatch";
+} from "./dispatch";
 import {
     DisplayPerformanceStats,
     formatDisplayPerformanceSummary,
     shouldWarnDisplayPerformanceSummary,
     type DisplayPerformanceKind,
     type DisplayPerformanceOutcome,
-} from "./display-performance-stats";
+} from "./performance-stats";
 
 const log = logger.for("MetricDisplayRunner");
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveNetSpeedMetricSubscriptionKeys } from "./net-speed-metric-subscriptions";
+import { resolveNetSpeedMetricSubscriptionKeys } from "./network/metric-subscriptions";
 
 test("network sparkline both mode subscribes to upload and download", () => {
     assert.deepEqual(resolveNetSpeedMetricSubscriptionKeys({

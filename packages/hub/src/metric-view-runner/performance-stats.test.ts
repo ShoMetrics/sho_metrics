@@ -4,7 +4,7 @@ import {
     DisplayPerformanceStats,
     formatDisplayPerformanceSummary,
     shouldWarnDisplayPerformanceSummary,
-} from "./display-performance-stats";
+} from "./performance-stats";
 
 // These tests use synthetic durations. Real performance baselines belong in
 // platform-specific benchmarks, not hermetic unit tests.

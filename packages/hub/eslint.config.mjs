@@ -156,6 +156,20 @@ const restrictedConcreteActionImportRules = {
   patterns: [...restrictedSchemaHardeningImports.patterns],
 };
 
+const sourceSafetyRules = {
+  'no-console': 'error',
+  'no-eval': 'error',
+  '@typescript-eslint/no-non-null-assertion': 'error',
+};
+
+const typeAwareSourceSafetyRules = {
+  '@typescript-eslint/no-unsafe-argument': 'error',
+  '@typescript-eslint/no-unsafe-assignment': 'error',
+  '@typescript-eslint/no-unsafe-call': 'error',
+  '@typescript-eslint/no-unsafe-member-access': 'error',
+  '@typescript-eslint/no-unsafe-return': 'error',
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -181,8 +195,16 @@ export default tseslint.config(
     files: ['src/**/*.{ts,tsx}'],
     ignores: ['src/**/*.test.ts'],
     rules: {
+      ...sourceSafetyRules,
+      ...typeAwareSourceSafetyRules,
       'no-restricted-imports': ['error', restrictedSchemaHardeningImports],
       'no-restricted-syntax': ['error', ...restrictedLegacySettingSyntax],
+    },
+  },
+  {
+    files: ['src/**/*.test.ts'],
+    rules: {
+      ...sourceSafetyRules,
     },
   },
   {
@@ -192,7 +214,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/actions/single-metric-display*.ts'],
+    files: ['src/metric-view-runner/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': ['error', restrictedConcreteActionImportRules],
       'no-restricted-syntax': [
@@ -233,7 +255,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/actions/{disk,net-speed}-display.ts'],
+    files: ['src/actions/{disk,network}/view-builder.ts'],
     rules: {
       'no-restricted-imports': ['error', restrictedActionDisplayBuilderImports],
       'no-restricted-syntax': ['error', ...restrictedLegacySettingSyntax],

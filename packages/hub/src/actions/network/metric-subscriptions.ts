@@ -1,10 +1,10 @@
-import { networkInterfaceRegistry } from "../runtime/network-interfaces";
+import { networkInterfaceRegistry } from "../../runtime/network-interfaces";
 import {
     getNetworkAggregateMetricKey,
     getNetworkInterfaceMetricKey,
     type NetworkDirection,
-} from "../runtime/network-metric-keys";
-import type { GraphicType } from "../settings/widget-settings";
+} from "../../runtime/network-metric-keys";
+import type { GraphicType } from "../../settings/widget-settings";
 
 export interface NetSpeedMetricSubscriptionSettings {
     graphicType?: GraphicType;

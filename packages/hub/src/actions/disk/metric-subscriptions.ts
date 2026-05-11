@@ -1,8 +1,8 @@
 import {
     getDiskThroughputMetricKey,
     type DiskThroughputDirection,
-} from "../runtime/disk-metric-keys";
-import type { DiskMetricKind, GraphicType } from "../settings/widget-settings";
+} from "../../runtime/disk-metric-keys";
+import type { DiskMetricKind, GraphicType } from "../../settings/widget-settings";
 
 export interface DiskMetricSubscriptionSettings {
     diskMetricKind?: DiskMetricKind;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveDiskMetricSubscriptionKeys } from "./disk-metric-subscriptions";
+import { resolveDiskMetricSubscriptionKeys } from "./disk/metric-subscriptions";
 
 test("disk throughput sparkline both mode subscribes to read and write", () => {
     assert.deepEqual(resolveDiskMetricSubscriptionKeys({

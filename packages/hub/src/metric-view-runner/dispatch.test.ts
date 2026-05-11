@@ -4,8 +4,8 @@ import type { WillAppearEvent } from "@elgato/streamdeck";
 import {
     dispatchMetricDisplayImage,
     type TouchStripMetricLayoutState,
-} from "./metric-display-dispatch";
-import type { TouchStripMetricLayout } from "./single-metric-display-model";
+} from "./dispatch";
+import type { TouchStripMetricLayout } from "./display-model";
 
 test("dispatch sends key images through setImage", async () => {
     const action = new FakeKeyAction();
