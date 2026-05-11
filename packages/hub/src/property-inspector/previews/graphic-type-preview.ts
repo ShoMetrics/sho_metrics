@@ -2,7 +2,7 @@ import { renderMetricFrame } from "../../rendering/metric-frame";
 import { renderSingleMetricBodyView } from "../../rendering/single-metric-view";
 import type { WidgetData } from "../../rendering/widget-data";
 import { WIDGET_LOGICAL_SIZE } from "../../rendering/widget-data";
-import type { GraphicType } from "../inspector/action-kind";
+import type { GraphicType } from "../inspector/settings-types";
 
 const previewData: WidgetData = {
     current: 68,

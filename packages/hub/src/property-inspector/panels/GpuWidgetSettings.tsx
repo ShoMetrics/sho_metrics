@@ -1,6 +1,6 @@
 import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
-import type { ActionKind } from "../inspector/action-kind";
+import type { ActionKind } from "../inspector/settings-types";
 import { StandardColorSettings } from "./ColorSettings";
 import { LayoutSettings } from "./LayoutSettings";
 import { PollingSettings } from "./PollingSettings";

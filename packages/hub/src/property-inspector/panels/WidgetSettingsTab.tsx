@@ -1,7 +1,7 @@
 import { InspectorItem } from "../components/InspectorItem";
 import type { WidgetSettings } from "../../settings/widget-settings";
 import type { VisibilityContext } from "../inspector/types";
-import type { ActionKind } from "../inspector/action-kind";
+import type { ActionKind } from "../inspector/settings-types";
 import { DefaultWidgetSettings } from "./DefaultWidgetSettings";
 import { DiskWidgetSettings } from "./DiskWidgetSettings";
 import { GpuWidgetSettings } from "./GpuWidgetSettings";

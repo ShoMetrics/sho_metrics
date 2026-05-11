@@ -17,10 +17,11 @@ import {
     buildDiskDisplayOptions,
     resolveDiskMaximumThroughputMebibytesPerSecond,
 } from "./disk/view-builder";
+import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 
 const log = logger.for("Action:Disk");
 
-@action({ UUID: "com.ez.sho-metrics.disk" })
+@action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.disk })
 export class Disk extends MetricAction {
     protected readonly actionKind = "disk";
 

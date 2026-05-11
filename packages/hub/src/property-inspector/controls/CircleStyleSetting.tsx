@@ -1,5 +1,5 @@
 import { buildCircleStylePreviewUri } from "../previews/circle-style-preview";
-import type { CircleStyle } from "../inspector/action-kind";
+import type { CircleStyle } from "../inspector/settings-types";
 import { PreviewOptionSetting } from "./PreviewOptionSetting";
 import type { SettingControlProps } from "./setting-control";
 

@@ -19,6 +19,7 @@ import {
     GPU_VRAM_TOTAL_METRIC_KEY,
     GPU_VRAM_USED_METRIC_KEY,
 } from "../runtime/metric-keys";
+import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 
 /**
  * Base class for GPU-related actions.
@@ -62,7 +63,7 @@ abstract class GpuBaseAction extends MetricAction {
     protected abstract updateGpuDisplay(event: WillAppearEvent): void;
 }
 
-@action({ UUID: "com.ez.sho-metrics.gpu-usage" })
+@action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND["gpu-usage"] })
 export class GpuUsage extends GpuBaseAction {
     protected readonly actionKind = "gpu-usage";
 
@@ -85,7 +86,7 @@ export class GpuUsage extends GpuBaseAction {
     }
 }
 
-@action({ UUID: "com.ez.sho-metrics.gpu-temp" })
+@action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND["gpu-temp"] })
 export class GpuTemp extends GpuBaseAction {
     protected readonly actionKind = "gpu-temp";
 
@@ -108,7 +109,7 @@ export class GpuTemp extends GpuBaseAction {
     }
 }
 
-@action({ UUID: "com.ez.sho-metrics.gpu-vram" })
+@action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND["gpu-vram"] })
 export class GpuVram extends GpuBaseAction {
     protected readonly actionKind = "gpu-vram";
 
@@ -127,7 +128,7 @@ export class GpuVram extends GpuBaseAction {
     }
 }
 
-@action({ UUID: "com.ez.sho-metrics.gpu-power" })
+@action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND["gpu-power"] })
 export class GpuPower extends GpuBaseAction {
     protected readonly actionKind = "gpu-power";
 
