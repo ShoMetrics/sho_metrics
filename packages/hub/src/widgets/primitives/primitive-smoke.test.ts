@@ -207,63 +207,75 @@ test("gauge circle style keeps the range track uncolored while data is unavailab
 });
 
 test("gauge marker uses a conservative visual range without changing true endpoints", () => {
-    assert.equal(roundMarkerProgress(resolveGaugeMarkerRenderProgress({
+    const startProgress = roundMarkerProgress(resolveGaugeMarkerRenderProgress({
         progress: 0,
         gapLength: 4,
         visibleLength: 100,
-    })), 0);
-    assert.equal(roundMarkerProgress(resolveGaugeMarkerRenderProgress({
+    }));
+    const nearStartProgress = roundMarkerProgress(resolveGaugeMarkerRenderProgress({
         progress: 0.01,
         gapLength: 4,
         visibleLength: 100,
-    })), 0.1274);
-    assert.equal(roundMarkerProgress(resolveGaugeMarkerRenderProgress({
+    }));
+    const middleProgress = roundMarkerProgress(resolveGaugeMarkerRenderProgress({
         progress: 0.5,
         gapLength: 4,
         visibleLength: 100,
-    })), 0.49);
-    assert.equal(roundMarkerProgress(resolveGaugeMarkerRenderProgress({
+    }));
+    const nearEndProgress = roundMarkerProgress(resolveGaugeMarkerRenderProgress({
         progress: 0.96,
         gapLength: 4,
         visibleLength: 100,
-    })), 0.8304);
-    assert.equal(roundMarkerProgress(resolveGaugeMarkerRenderProgress({
+    }));
+    const endProgress = roundMarkerProgress(resolveGaugeMarkerRenderProgress({
         progress: 1,
         gapLength: 4,
         visibleLength: 100,
-    })), 1);
+    }));
+
+    assert.equal(startProgress, 0);
+    assert.equal(nearStartProgress, 0.1274);
+    assert.equal(middleProgress, 0.49);
+    assert.equal(nearEndProgress, 0.8304);
+    assert.equal(endProgress, 1);
 });
 
 test("gauge marker visual range still honors the minimum geometric gap", () => {
-    assert.equal(roundMarkerProgress(resolveGaugeMarkerRenderProgress({
+    const markerProgress = roundMarkerProgress(resolveGaugeMarkerRenderProgress({
         progress: 0.01,
         gapLength: 20,
         visibleLength: 100,
-    })), 0.2842);
+    }));
+
+    assert.equal(markerProgress, 0.2842);
 });
 
 test("gauge marker gap only cuts the marker travel domain for non-endpoint values", () => {
-    assert.deepEqual(roundMarkerGap(resolveGaugeMarkerGap({
+    const nearEndMarkerGap = roundMarkerGap(resolveGaugeMarkerGap({
         progress: 0.8304,
         gapLength: 4,
         visibleLength: 100,
-    })), {
-        startProgress: 0.7904,
-        endProgress: 0.8704,
-    });
-    assert.deepEqual(roundMarkerGap(resolveGaugeMarkerGap({
+    }));
+    const nearStartMarkerGap = roundMarkerGap(resolveGaugeMarkerGap({
         progress: 0.1274,
         gapLength: 4,
         visibleLength: 100,
-    })), {
-        startProgress: 0.0874,
-        endProgress: 0.1674,
-    });
-    assert.deepEqual(roundMarkerGap(resolveGaugeMarkerGap({
+    }));
+    const endpointMarkerGap = roundMarkerGap(resolveGaugeMarkerGap({
         progress: 1,
         gapLength: 4,
         visibleLength: 100,
-    })), {
+    }));
+
+    assert.deepEqual(nearEndMarkerGap, {
+        startProgress: 0.7904,
+        endProgress: 0.8704,
+    });
+    assert.deepEqual(nearStartMarkerGap, {
+        startProgress: 0.0874,
+        endProgress: 0.1674,
+    });
+    assert.deepEqual(endpointMarkerGap, {
         startProgress: 0.96,
         endProgress: 1,
     });

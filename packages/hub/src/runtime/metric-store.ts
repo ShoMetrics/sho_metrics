@@ -3,16 +3,13 @@ import type { WidgetData } from "../rendering/widget-data";
 import type { IMetricSnapshot } from "./sources/source.interface";
 
 /**
- * Centralized metric history store.
- * Ingests IMetricSnapshot from the Scheduler and maintains per-key RingBuffers.
- * Actions query this for WidgetData.
+ * Maintains per-metric scalar history and latest text values for renderers.
  */
 export class MetricStore {
     private store = new Map<string, MetricRecord>();
 
     private static readonly HISTORY_SIZE = 60;
 
-    /** Ingest an entire snapshot, recording scalar history and latest text values. */
     ingest(snapshot: IMetricSnapshot): void {
         if (!snapshot.metrics) return;
 
@@ -56,7 +53,6 @@ export class MetricStore {
         metricRecord.timestampMilliseconds = timestampMilliseconds;
     }
 
-    /** Build a WidgetData for a specific metric key. */
     getWidgetData(key: string, label: string, unit: string, maxValue = 100): WidgetData {
         const metricRecord = this.store.get(key);
         const current = metricRecord?.buffer.latest ?? 0;
@@ -86,5 +82,4 @@ interface MetricRecord {
     text?: string;
 }
 
-/** Singleton MetricStore instance. */
 export const metricStore = new MetricStore();

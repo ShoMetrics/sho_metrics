@@ -27,7 +27,6 @@ interface ActiveActionState {
  * Subclasses implement `onMetricsUpdate` which is called on every tick.
  */
 export abstract class MetricAction extends SingletonAction {
-    /** Track active action state per action instance ID without mutating SDK event payloads. */
     private activeActionStates = new Map<string, ActiveActionState>();
     private activeMetricActions = new Map<string, ActiveMetricAction>();
 

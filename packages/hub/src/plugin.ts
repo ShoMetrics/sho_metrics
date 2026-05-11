@@ -24,7 +24,6 @@ streamDeck.actions.registerAction(new GpuTemp());
 streamDeck.actions.registerAction(new GpuVram());
 streamDeck.actions.registerAction(new GpuPower());
 
-// Finally, connect to the Stream Deck.
 streamDeck.connect()
     .then(() => streamDeck.settings.getGlobalSettings())
     .then(settings => {

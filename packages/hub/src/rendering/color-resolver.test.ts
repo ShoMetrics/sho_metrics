@@ -17,11 +17,13 @@ const thresholdConfig: ColorConfig = {
 };
 
 test("solid color mode ignores thresholds", () => {
-    assert.equal(resolveColorForThresholdValue(95, {
+    const color = resolveColorForThresholdValue(95, {
         ...thresholdConfig,
         mode: "solid",
         solidColor: "#123456",
-    }), "#123456");
+    });
+
+    assert.equal(color, "#123456");
 });
 
 test("threshold color mode uses inclusive lower and exclusive upper bounds", () => {
@@ -31,15 +33,21 @@ test("threshold color mode uses inclusive lower and exclusive upper bounds", () 
 });
 
 test("threshold color mode falls back to the last threshold color", () => {
-    assert.equal(resolveColorForThresholdValue(200, thresholdConfig), "#ff0000");
-    assert.equal(
-        resolveColorForThresholdValue(200, { mode: "threshold", solidColor: "#123456", thresholds: [] }),
-        "#123456",
-    );
+    const highColor = resolveColorForThresholdValue(200, thresholdConfig);
+    const emptyThresholdColor = resolveColorForThresholdValue(200, {
+        mode: "threshold",
+        solidColor: "#123456",
+        thresholds: [],
+    });
+
+    assert.equal(highColor, "#ff0000");
+    assert.equal(emptyThresholdColor, "#123456");
 });
 
 test("gradient stops produce paired stops at threshold transitions", () => {
-    assert.deepEqual(buildGradientStops([10, 60, 90], thresholdConfig), [
+    const gradientStops = buildGradientStops([10, 60, 90], thresholdConfig);
+
+    assert.deepEqual(gradientStops, [
         { offset: 0, color: "#00ff00" },
         { offset: 0.5, color: "#00ff00" },
         { offset: 0.5, color: "#ffff00" },
@@ -50,13 +58,16 @@ test("gradient stops produce paired stops at threshold transitions", () => {
 });
 
 test("solid gradient stops span the whole graph", () => {
-    assert.deepEqual(buildGradientStops([10, 60], {
+    const solidGradientStops = buildGradientStops([10, 60], {
         ...thresholdConfig,
         mode: "solid",
         solidColor: "#abcdef",
-    }), [
+    });
+    const emptyGradientStops = buildGradientStops([], thresholdConfig);
+
+    assert.deepEqual(solidGradientStops, [
         { offset: 0, color: "#abcdef" },
         { offset: 1, color: "#abcdef" },
     ]);
-    assert.deepEqual(buildGradientStops([], thresholdConfig), []);
+    assert.deepEqual(emptyGradientStops, []);
 });

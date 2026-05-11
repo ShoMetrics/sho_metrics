@@ -19,7 +19,6 @@ export class RingBuffer<T> {
         }
     }
 
-    /** Returns all stored values in chronological order (oldest first). */
     toArray(): T[] {
         if (this.count === 0) return [];
         const result = Array<T>(this.count);

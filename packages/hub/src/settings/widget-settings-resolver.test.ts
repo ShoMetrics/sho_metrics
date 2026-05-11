@@ -139,22 +139,25 @@ test("runtime cache participates only in auto scale resolution", () => {
         },
     };
 
-    assert.equal(resolveWidgetSettings({
+    const autoResolvedSettings = resolveWidgetSettings({
         storedSettings: autoStoredSettings,
         globalSettings,
         context: {
             actionKind: "net-speed",
             isWindows: false,
         },
-    }).network.maximumDownloadSpeedMbps, 800);
-    assert.equal(resolveWidgetSettings({
+    });
+    const customResolvedSettings = resolveWidgetSettings({
         storedSettings: customStoredSettings,
         globalSettings,
         context: {
             actionKind: "net-speed",
             isWindows: false,
         },
-    }).network.maximumDownloadSpeedMbps, 300);
+    });
+
+    assert.equal(autoResolvedSettings.network.maximumDownloadSpeedMbps, 800);
+    assert.equal(customResolvedSettings.network.maximumDownloadSpeedMbps, 300);
 });
 
 test("disk usage resolved settings default to slow polling", () => {

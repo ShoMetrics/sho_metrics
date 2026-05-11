@@ -53,10 +53,11 @@ test("tint channel derivation keeps the selected color as primary and creates st
 });
 
 test("tint channel derivation fails when the resolved tint color is invalid", () => {
-    assert.throws(
-        () => deriveTintChannelColors("not-a-color"),
-        /Expected a valid hex color/,
-    );
+    const deriveInvalidTintChannels = (): void => {
+        deriveTintChannelColors("not-a-color");
+    };
+
+    assert.throws(deriveInvalidTintChannels, /Expected a valid hex color/);
 });
 
 test("global channel color config maps primary to one channel and secondary to the other", () => {

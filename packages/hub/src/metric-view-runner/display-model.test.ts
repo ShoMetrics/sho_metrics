@@ -78,12 +78,13 @@ test("single widget with data keeps the original render data", () => {
         displayValue: "7",
         sampleTimestampMilliseconds: 1000,
     });
-
-    assert.equal(buildRenderWidgetData({
+    const renderWidgetData = buildRenderWidgetData({
         widgetData,
         hasData: true,
         shouldRenderMutedIconPlaceholder: false,
-    }), widgetData);
+    });
+
+    assert.equal(renderWidgetData, widgetData);
 });
 
 test("placeholder rendering does not overwrite metric display values when data is present", () => {
@@ -147,16 +148,19 @@ test("display data helpers treat either dual-channel timestamp as available data
         positive: buildWidgetData({ current: 3 }),
         negative: buildWidgetData({ current: 7, sampleTimestampMilliseconds: 2000 }),
     });
-
-    assert.equal(hasMetricDisplayData({
+    const hasDisplayData = hasMetricDisplayData({
         ...buildSingleMetricDisplayOptions({ widgetData: buildWidgetData() }),
         widgetData: dualWidgetData,
         titleText: "Traffic",
         positiveColor: "#00ff00",
         negativeColor: "#ff0000",
-    }), true);
-    assert.equal(resolveDisplayLogValue(dualWidgetData), 10);
-    assert.equal(resolveDisplaySampleTimestampMilliseconds(dualWidgetData), 2000);
+    });
+    const displayLogValue = resolveDisplayLogValue(dualWidgetData);
+    const sampleTimestampMilliseconds = resolveDisplaySampleTimestampMilliseconds(dualWidgetData);
+
+    assert.equal(hasDisplayData, true);
+    assert.equal(displayLogValue, 10);
+    assert.equal(sampleTimestampMilliseconds, 2000);
 });
 
 test("center content falls back to value outside circular graphics", () => {
@@ -175,11 +179,13 @@ test("center content falls back to value outside circular graphics", () => {
 });
 
 test("circle style override wins for circular graphics", () => {
-    assert.equal(resolveCircleStyle({
+    const circleStyle = resolveCircleStyle({
         graphicType: "circular",
         circleStyle: "value",
         circleStyleOverride: "gauge",
-    }), "gauge");
+    });
+
+    assert.equal(circleStyle, "gauge");
 });
 
 test("compact circle style uses icon center content", () => {

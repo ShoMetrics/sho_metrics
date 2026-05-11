@@ -8,10 +8,7 @@ import {
 } from "./svg-utils";
 
 test("SVG text escaping covers XML-sensitive characters", () => {
-    assert.equal(
-        escapeSvgText(`CPU <GPU> "hot" & 'fast'`),
-        "CPU &lt;GPU&gt; &quot;hot&quot; &amp; &apos;fast&apos;",
-    );
+    assert.equal(escapeSvgText(`CPU <GPU> "hot" & 'fast'`), "CPU &lt;GPU&gt; &quot;hot&quot; &amp; &apos;fast&apos;");
 });
 
 test("clamp constrains values inside the inclusive range", () => {

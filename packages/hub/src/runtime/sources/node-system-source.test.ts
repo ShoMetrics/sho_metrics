@@ -369,13 +369,15 @@ test("node system source maps injected GPU telemetry without polling systeminfor
 });
 
 test("first network counter sample produces a zero rate", () => {
-    assert.deepEqual(calculateNetworkRate({
+    const networkRate = calculateNetworkRate({
         interfaceId: "en0",
         direction: "download",
         currentBytes: 1000,
         currentTimestampMilliseconds: 2000,
         previousSample: undefined,
-    }), {
+    });
+
+    assert.deepEqual(networkRate, {
         interfaceId: "en0",
         direction: "download",
         currentBytes: 1000,
@@ -388,7 +390,7 @@ test("first network counter sample produces a zero rate", () => {
 });
 
 test("network counter delta is converted to bytes per second", () => {
-    assert.deepEqual(calculateNetworkRate({
+    const networkRate = calculateNetworkRate({
         interfaceId: "en0",
         direction: "upload",
         currentBytes: 3000,
@@ -397,7 +399,9 @@ test("network counter delta is converted to bytes per second", () => {
             bytes: 1000,
             timestampMilliseconds: 1000,
         },
-    }), {
+    });
+
+    assert.deepEqual(networkRate, {
         interfaceId: "en0",
         direction: "upload",
         currentBytes: 3000,
@@ -434,38 +438,55 @@ test("usable network interfaces exclude internal virtual down and unnamed interf
 });
 
 test("usable network interfaces exclude macOS system interfaces", () => {
-    assert.equal(isUsableNetworkInterface(buildNetworkInterface({
+    const normalMacInterfaceIsUsable = isUsableNetworkInterface(buildNetworkInterface({
         iface: "en0",
         ifaceName: "en0",
         type: "wireless",
         speed: 168.7,
-    }), "darwin"), true);
-    assert.equal(isUsableNetworkInterface(buildNetworkInterface({ iface: "awdl0", ifaceName: "awdl0" }), "darwin"), false);
-    assert.equal(isUsableNetworkInterface(buildNetworkInterface({ iface: "llw0", ifaceName: "llw0" }), "darwin"), false);
-    assert.equal(isUsableNetworkInterface(buildNetworkInterface({ iface: "utun4", ifaceName: "utun4" }), "darwin"), false);
-    assert.equal(isUsableNetworkInterface(buildNetworkInterface({ iface: "bridge0", ifaceName: "bridge0" }), "darwin"), false);
-    assert.equal(isUsableNetworkInterface(buildNetworkInterface({ iface: "ap1", ifaceName: "ap1" }), "darwin"), false);
-    assert.equal(isSystemNetworkInterface("en0", "darwin"), false);
-    assert.equal(isSystemNetworkInterface("awdl0", "darwin"), true);
-    assert.equal(isSystemNetworkInterface("bridge0", "win32"), false);
-    assert.equal(isUsableNetworkInterface(buildNetworkInterface({ iface: "bridge0", ifaceName: "bridge0" }), "win32"), true);
+    }), "darwin");
+    const awdlInterfaceIsUsable = isUsableNetworkInterface(buildNetworkInterface({ iface: "awdl0", ifaceName: "awdl0" }), "darwin");
+    const llwInterfaceIsUsable = isUsableNetworkInterface(buildNetworkInterface({ iface: "llw0", ifaceName: "llw0" }), "darwin");
+    const utunInterfaceIsUsable = isUsableNetworkInterface(buildNetworkInterface({ iface: "utun4", ifaceName: "utun4" }), "darwin");
+    const bridgeMacInterfaceIsUsable = isUsableNetworkInterface(buildNetworkInterface({ iface: "bridge0", ifaceName: "bridge0" }), "darwin");
+    const apInterfaceIsUsable = isUsableNetworkInterface(buildNetworkInterface({ iface: "ap1", ifaceName: "ap1" }), "darwin");
+    const en0IsSystemInterface = isSystemNetworkInterface("en0", "darwin");
+    const awdlIsSystemInterface = isSystemNetworkInterface("awdl0", "darwin");
+    const bridgeIsWindowsSystemInterface = isSystemNetworkInterface("bridge0", "win32");
+    const bridgeWindowsInterfaceIsUsable = isUsableNetworkInterface(
+        buildNetworkInterface({ iface: "bridge0", ifaceName: "bridge0" }),
+        "win32",
+    );
+
+    assert.equal(normalMacInterfaceIsUsable, true);
+    assert.equal(awdlInterfaceIsUsable, false);
+    assert.equal(llwInterfaceIsUsable, false);
+    assert.equal(utunInterfaceIsUsable, false);
+    assert.equal(bridgeMacInterfaceIsUsable, false);
+    assert.equal(apInterfaceIsUsable, false);
+    assert.equal(en0IsSystemInterface, false);
+    assert.equal(awdlIsSystemInterface, true);
+    assert.equal(bridgeIsWindowsSystemInterface, false);
+    assert.equal(bridgeWindowsInterfaceIsUsable, true);
 });
 
 test("network interface options normalize display fields and speed", () => {
-    assert.deepEqual(toNetworkInterfaceOption(buildNetworkInterface({
+    const networkInterfaceOption = toNetworkInterfaceOption(buildNetworkInterface({
         iface: "en0",
         ifaceName: "Wi-Fi",
         type: "wireless",
         default: true,
         speed: 1200,
-    })), {
+    }));
+    const unknownInterfaceType = normalizeNetworkInterfaceType("loopback");
+
+    assert.deepEqual(networkInterfaceOption, {
         id: "en0",
         name: "Wi-Fi",
         type: "wireless",
         isDefault: true,
         speedMegabitsPerSecond: 1200,
     });
-    assert.equal(normalizeNetworkInterfaceType("loopback"), "unknown");
+    assert.equal(unknownInterfaceType, "unknown");
 });
 
 test("nvidia-smi numeric and text parsing handles normal values and N/A", () => {
@@ -477,7 +498,9 @@ test("nvidia-smi numeric and text parsing handles normal values and N/A", () => 
 });
 
 test("nvidia-smi telemetry line maps all supported fields", () => {
-    assert.deepEqual(parseNvidiaSmiTelemetryLine("87, NVIDIA RTX 4090, 68, 12000, 24576, 310.5, 450"), {
+    const telemetryData = parseNvidiaSmiTelemetryLine("87, NVIDIA RTX 4090, 68, 12000, 24576, 310.5, 450");
+
+    assert.deepEqual(telemetryData, {
         utilizationGpu: 87,
         modelText: "NVIDIA RTX 4090",
         temperatureGpu: 68,
@@ -489,22 +512,28 @@ test("nvidia-smi telemetry line maps all supported fields", () => {
 });
 
 test("nvidia-smi telemetry line returns null when every field is absent", () => {
-    assert.equal(parseNvidiaSmiTelemetryLine("N/A, N/A, N/A, N/A, N/A, N/A, N/A"), null);
+    const telemetryData = parseNvidiaSmiTelemetryLine("N/A, N/A, N/A, N/A, N/A, N/A, N/A");
+
+    assert.equal(telemetryData, null);
 });
 
 test("CPU model text combines manufacturer and brand while dropping empty parts", () => {
-    assert.equal(formatCpuModelText(buildCpuData({
+    const fullModelText = formatCpuModelText(buildCpuData({
         manufacturer: "AMD",
         brand: "Ryzen 9",
-    })), "AMD Ryzen 9");
-    assert.equal(formatCpuModelText(buildCpuData({
+    }));
+    const brandOnlyModelText = formatCpuModelText(buildCpuData({
         manufacturer: "",
         brand: "Ryzen 9",
-    })), "Ryzen 9");
-    assert.equal(formatCpuModelText(buildCpuData({
+    }));
+    const absentModelText = formatCpuModelText(buildCpuData({
         manufacturer: "",
         brand: "",
-    })), null);
+    }));
+
+    assert.equal(fullModelText, "AMD Ryzen 9");
+    assert.equal(brandOnlyModelText, "Ryzen 9");
+    assert.equal(absentModelText, null);
 });
 
 test("file system usability requires positive size, mount, and non-negative usage numbers", () => {
@@ -518,7 +547,7 @@ test("file system usability requires positive size, mount, and non-negative usag
 });
 
 test("disk volume option maps file system block device and physical disk metadata", () => {
-    assert.deepEqual(toDiskVolumeOption(
+    const diskVolumeOption = toDiskVolumeOption(
         buildFileSystem({ fs: "C:", mount: "C:", size: 1000, used: 400, available: 600 }),
         [buildBlockDevice({
             name: "C:",
@@ -529,7 +558,9 @@ test("disk volume option maps file system block device and physical disk metadat
             size: "1000",
         })],
         [buildDiskLayout({ name: "SKHynix NVMe", type: "NVMe", size: 2000 })],
-    ), {
+    );
+
+    assert.deepEqual(diskVolumeOption, {
         id: "C:",
         fs: "C:",
         mount: "C:",
@@ -543,7 +574,7 @@ test("disk volume option maps file system block device and physical disk metadat
 });
 
 test("disk volume option identifies macOS SMB volumes as network volumes", () => {
-    assert.deepEqual(toDiskVolumeOption(
+    const diskVolumeOption = toDiskVolumeOption(
         buildFileSystem({
             fs: "//shiori@fixture-server._smb._tcp.local/media",
             type: "HFS",
@@ -558,7 +589,10 @@ test("disk volume option identifies macOS SMB volumes as network volumes", () =>
             type: "NVMe",
             name: "Fixture Internal Disk",
         })],
-    ), {
+    );
+    const isNetwork = isNetworkFileSystem(buildFileSystem({ fs: "smb://fixture-server/media" }));
+
+    assert.deepEqual(diskVolumeOption, {
         id: "/Volumes/media",
         fs: "//shiori@fixture-server._smb._tcp.local/media",
         mount: "/Volumes/media",
@@ -569,7 +603,7 @@ test("disk volume option identifies macOS SMB volumes as network volumes", () =>
         diskName: "//shiori@fixture-server._smb._tcp.local/media",
         volumeLabel: "",
     });
-    assert.equal(isNetworkFileSystem(buildFileSystem({ fs: "smb://fixture-server/media" })), true);
+    assert.equal(isNetwork, true);
 });
 
 test("physical disk resolution prefers device match then matching disk name then size fallback", () => {
@@ -582,7 +616,7 @@ test("physical disk resolution prefers device match then matching disk name then
         size: 4000,
     });
 
-    assert.equal(resolvePhysicalDisk(
+    const deviceResolvedDisk = resolvePhysicalDisk(
         fileSystem,
         buildBlockDevice({
             device: "\\\\.\\PHYSICALDRIVE7",
@@ -591,8 +625,8 @@ test("physical disk resolution prefers device match then matching disk name then
             physical: "Local",
         }),
         [smallDisk, deviceMatchedDisk],
-    ), deviceMatchedDisk);
-    assert.equal(resolvePhysicalDisk(
+    );
+    const nameResolvedDisk = resolvePhysicalDisk(
         fileSystem,
         buildBlockDevice({
             device: "/dev/disk0",
@@ -605,13 +639,18 @@ test("physical disk resolution prefers device match then matching disk name then
             name: "Fixture Internal Disk",
             size: 500277792768,
         })],
-    )?.name, "Fixture Internal Disk");
-    assert.equal(resolvePhysicalDisk(
+    );
+    const sizeResolvedDisk = resolvePhysicalDisk(
         fileSystem,
         buildBlockDevice({ device: "/dev/disk-large", name: "partition", model: "model" }),
         [smallDisk, largeDisk],
-    ), largeDisk);
-    assert.equal(resolvePhysicalDisk(fileSystem, undefined, [smallDisk, largeDisk]), largeDisk);
+    );
+    const fallbackResolvedDisk = resolvePhysicalDisk(fileSystem, undefined, [smallDisk, largeDisk]);
+
+    assert.equal(deviceResolvedDisk, deviceMatchedDisk);
+    assert.equal(nameResolvedDisk?.name, "Fixture Internal Disk");
+    assert.equal(sizeResolvedDisk, largeDisk);
+    assert.equal(fallbackResolvedDisk, largeDisk);
 });
 
 test("disk storage kind resolves local disk types and network block devices", () => {

@@ -7,7 +7,7 @@ export interface WidgetBaseConfig {
     gradientHeadAdjustmentPercent?: number;
 }
 
-/** A widget primitive renders WidgetData + config into an SVG fragment string. */
+/** Renders WidgetData plus primitive config into an SVG fragment string. */
 export interface Widget<TConfig extends WidgetBaseConfig = WidgetBaseConfig> {
     readonly widgetId: string;
     render(data: WidgetData, config: TConfig, keySize: KeySize): string;
@@ -23,10 +23,8 @@ type GraphicPrimitiveType =
     | "linear-bar"
     | "mirrored-traffic";
 
-/**
- * Current settings still persist this as `graphicType`; the type name makes the
- * primitive/theme split explicit for upcoming theme work.
- */
+// Current settings still persist this as `graphicType`; the type name makes the
+// primitive/theme split explicit for upcoming theme work.
 export type GraphicType = GraphicPrimitiveType;
 
 export type GraphicThemePresetName = "flat" | "cupertino-glass";

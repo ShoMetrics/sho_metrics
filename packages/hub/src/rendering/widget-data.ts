@@ -1,13 +1,9 @@
-/**
- * Universal data contract between Data Layer and Rendering Layer.
- * All single-channel widget primitives consume this shape.
- */
 export interface WidgetData {
     current: number;
-    progress: number;              // 0.0–1.0 normalized
-    history: readonly number[];    // Last N samples (oldest first)
-    unit: string;                  // "%", "°C", "MB/s"
-    label: string;                 // "CPU Usage", "GPU Temp"
+    progress: number;              // 0.0-1.0 normalized.
+    history: readonly number[];    // Last N samples, oldest first.
+    unit: string;                  // Examples: "%", "deg C", "MB/s".
+    label: string;                 // Examples: "CPU Usage", "GPU Temp".
     displayValue?: string;         // Optional preformatted value for compact metric-specific displays.
     secondaryDisplayValue?: string;
     linearLabel?: string;

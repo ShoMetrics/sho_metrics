@@ -24,7 +24,9 @@ test("network interface options include automatic and formatted interfaces", () 
         },
     });
 
-    assert.deepEqual(resolveNetworkInterfaceOptions(context), [
+    const optionList = resolveNetworkInterfaceOptions(context);
+
+    assert.deepEqual(optionList, [
         { value: "", label: "Automatic" },
         { value: "eth0", label: "Ethernet (default, wired, eth0, 2500 Mbps)" },
     ]);
@@ -44,7 +46,9 @@ test("disk volume options include automatic and compact capacity labels", () => 
         },
     });
 
-    assert.deepEqual(resolveDiskVolumeOptions(context), [
+    const optionList = resolveDiskVolumeOptions(context);
+
+    assert.deepEqual(optionList, [
         { value: "", label: "Automatic" },
         { value: "C:\\", label: "C: (1.0 GB, System)" },
     ]);
@@ -74,8 +78,12 @@ test("selected disk labels prefer explicit selection then root fallback", () => 
 });
 
 test("selected disk label returns dash when no valid disk is available", () => {
-    assert.equal(resolveSelectedDiskVolumeLabel(buildContext()), "-");
-    assert.equal(resolveDiskAutoLinearLabel(buildContext()), "Auto");
+    const context = buildContext();
+    const selectedDiskVolumeLabel = resolveSelectedDiskVolumeLabel(context);
+    const diskAutoLinearLabel = resolveDiskAutoLinearLabel(context);
+
+    assert.equal(selectedDiskVolumeLabel, "-");
+    assert.equal(diskAutoLinearLabel, "Auto");
 });
 
 function buildContext(settings: InspectorTestSettings = {}) {
