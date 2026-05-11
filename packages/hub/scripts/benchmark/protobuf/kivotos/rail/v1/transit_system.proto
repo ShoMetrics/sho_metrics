@@ -1,0 +1,181 @@
+syntax = "proto3";
+
+package kivotos.rail.v1;
+
+enum TransitLineGrade {
+  TRANSIT_LINE_GRADE_UNSPECIFIED = 0;
+  TRANSIT_LINE_GRADE_LOCAL = 1;
+  TRANSIT_LINE_GRADE_EXPRESS = 2;
+  TRANSIT_LINE_GRADE_RAPID = 3;
+  TRANSIT_LINE_GRADE_NIGHT = 4;
+  TRANSIT_LINE_GRADE_EVENT = 5;
+}
+
+enum TransitLineName {
+  TRANSIT_LINE_NAME_UNSPECIFIED = 0;
+  TRANSIT_LINE_NAME_AOBA = 1;
+  TRANSIT_LINE_NAME_SAKURAGAOKA = 2;
+  TRANSIT_LINE_NAME_HOSHIMI = 3;
+  TRANSIT_LINE_NAME_SEIRAN = 4;
+  TRANSIT_LINE_NAME_AKATSUKI = 5;
+  TRANSIT_LINE_NAME_SHIRATORI = 6;
+}
+
+enum SchoolDistrict {
+  SCHOOL_DISTRICT_UNSPECIFIED = 0;
+  SCHOOL_DISTRICT_AOBA = 1;
+  SCHOOL_DISTRICT_SHIRATORI = 2;
+  SCHOOL_DISTRICT_KISARAGI = 3;
+  SCHOOL_DISTRICT_SEIRAN = 4;
+  SCHOOL_DISTRICT_MOMIJI = 5;
+  SCHOOL_DISTRICT_TSUKIKAGE = 6;
+  SCHOOL_DISTRICT_HOSHIHARA = 7;
+}
+
+enum TrainFormation {
+  TRAIN_FORMATION_UNSPECIFIED = 0;
+  TRAIN_FORMATION_STANDARD = 1;
+  TRAIN_FORMATION_MAGLEV = 2;
+  TRAIN_FORMATION_AUTONOMOUS = 3;
+  TRAIN_FORMATION_CARGO = 4;
+  TRAIN_FORMATION_MAINTENANCE = 5;
+}
+
+enum ServiceStatus {
+  SERVICE_STATUS_UNSPECIFIED = 0;
+  SERVICE_STATUS_NORMAL = 1;
+  SERVICE_STATUS_DELAYED = 2;
+  SERVICE_STATUS_SUSPENDED = 3;
+  SERVICE_STATUS_INSPECTION = 4;
+}
+
+message RouteColorScheme {
+  optional string primary_color = 1;
+  optional string secondary_color = 2;
+  optional string accent_color = 3;
+  optional string warning_color = 4;
+}
+
+message DelayBand {
+  optional uint32 minor_delay_seconds = 1;
+  optional uint32 major_delay_seconds = 2;
+  optional RouteColorScheme colors = 3;
+}
+
+message LinePresentation {
+  optional TransitLineGrade grade = 1;
+  optional string map_style = 2;
+  optional RouteColorScheme local_colors = 3;
+  optional RouteColorScheme express_colors = 4;
+  optional RouteColorScheme event_colors = 5;
+  optional RouteColorScheme maintenance_colors = 6;
+  optional DelayBand delay_band = 7;
+  optional uint32 transition_smoothing_percent = 8;
+  optional bool show_transfer_grid = 9;
+}
+
+message PlatformReading {
+  optional string platform_id = 1;
+  optional string label = 2;
+  optional double crowding_score = 3;
+  optional double route_progress = 4;
+  optional uint32 next_arrival_seconds = 5;
+  optional bool safety_barrier_online = 6;
+  repeated double wait_history_seconds = 7;
+}
+
+message StationFacility {
+  optional string facility_id = 1;
+  optional string label = 2;
+  optional string level = 3;
+  optional bool open = 4;
+  map<string, string> tags = 5;
+}
+
+message StationNode {
+  optional string station_id = 1;
+  optional SchoolDistrict district = 2;
+  optional string display_name = 3;
+  optional int32 latitude_microdegrees = 4;
+  optional int32 longitude_microdegrees = 5;
+  repeated PlatformReading platforms = 6;
+  repeated StationFacility facilities = 7;
+  map<string, string> labels = 8;
+  optional bytes station_icon_png = 9;
+  optional uint64 last_inspection_at_ms = 10;
+  optional bool active = 11;
+  optional int32 route_order = 12;
+}
+
+message TrainCarriage {
+  optional string carriage_id = 1;
+  optional uint32 seat_count = 2;
+  optional double occupancy_ratio = 3;
+  optional double cabin_temperature_celsius = 4;
+  repeated string fault_codes = 5;
+}
+
+message TrainSet {
+  optional string train_id = 1;
+  optional TrainFormation formation = 2;
+  optional string line_id = 3;
+  optional string current_station_id = 4;
+  optional string next_station_id = 5;
+  optional string destination_station_id = 6;
+  optional ServiceStatus service_status = 7;
+  optional double speed_kph = 8;
+  optional double route_progress = 9;
+  repeated TrainCarriage carriages = 10;
+  repeated double telemetry_history = 11;
+  map<string, string> labels = 12;
+  optional bytes beacon_payload = 13;
+  optional uint64 observed_at_ms = 14;
+}
+
+message LineOverride {
+  optional TransitLineGrade grade = 1;
+  optional RouteColorScheme colors = 2;
+  optional uint32 transition_smoothing_percent = 3;
+}
+
+message LineOperation {
+  optional string line_id = 1;
+  optional TransitLineName line_name = 2;
+  optional string display_name = 3;
+  optional TransitLineGrade grade = 4;
+  repeated string station_ids = 5;
+  optional string inbound_terminal_station_id = 6;
+  optional string outbound_terminal_station_id = 7;
+  repeated TrainSet trains = 8;
+  optional uint32 headway_seconds = 9;
+  optional uint64 timetable_revision = 10;
+  optional LineOverride presentation_override = 11;
+}
+
+message ControlRoomMemo {
+  optional string memo_key = 1;
+  optional uint64 observed_at_ms = 2;
+  optional double learned_headway_seconds = 3;
+  repeated string alerts = 4;
+}
+
+message TransitOperator {
+  optional string operator_id = 1;
+  optional string display_name = 2;
+  optional string preferred_control_room = 3;
+  optional uint32 maximum_open_incidents = 4;
+}
+
+message TransitSystem {
+  optional string system_id = 1;
+  optional uint32 schema_version = 2;
+  optional LinePresentation presentation = 3;
+  repeated LineOperation lines = 4;
+  map<string, StationNode> station_index = 5;
+  map<string, ControlRoomMemo> control_room_memos = 6;
+  optional TransitOperator operator = 7;
+  optional bool shared_presentation_override = 8;
+  optional uint64 applied_timetable_epoch = 9;
+  optional bytes opaque_state = 10;
+  repeated string disabled_service_flags = 11;
+}

@@ -5,7 +5,7 @@ import { performance } from "node:perf_hooks";
 import { Resvg } from "@resvg/resvg-js";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
-const hubDirectory = resolve(scriptDirectory, "..");
+const hubDirectory = resolve(scriptDirectory, "../..");
 const sampleDirectory = join(hubDirectory, "tmp", "resvg-bench-samples");
 const iterationCount = Number.parseInt(process.argv[2] ?? "30", 10);
 const resolvedIterationCount = Number.isFinite(iterationCount) && iterationCount > 0

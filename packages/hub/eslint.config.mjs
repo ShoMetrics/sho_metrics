@@ -178,6 +178,7 @@ export default tseslint.config(
       '**/.test-dist/**',
       '**/package-lock.json',
       'src/generated/**',
+      'scripts/benchmark/protobuf/generated/**',
       '**/*.sdPlugin/**', // Exclude the Stream Deck plugin output folder
     ],
   },
