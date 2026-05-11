@@ -8,7 +8,7 @@ export class RingBuffer<T> {
     private count = 0;
 
     constructor(readonly capacity: number) {
-        this.buffer = new Array(capacity);
+        this.buffer = Array<T | undefined>(capacity);
     }
 
     push(value: T): void {
@@ -22,7 +22,7 @@ export class RingBuffer<T> {
     /** Returns all stored values in chronological order (oldest first). */
     toArray(): T[] {
         if (this.count === 0) return [];
-        const result: T[] = new Array(this.count);
+        const result = Array<T>(this.count);
         const start = (this.head - this.count + this.capacity) % this.capacity;
         for (let index = 0; index < this.count; index++) {
             result[index] = this.buffer[(start + index) % this.capacity] as T;

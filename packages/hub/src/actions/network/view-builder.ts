@@ -1,34 +1,34 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
-import type { MetricStore } from "../runtime/metric-store";
-import type { NetworkInterfaceOption } from "../runtime/network-interfaces";
+import type { MetricStore } from "../../runtime/metric-store";
+import type { NetworkInterfaceOption } from "../../runtime/network-interfaces";
 import {
     getNetworkAggregateMetricKey,
     getNetworkInterfaceMetricKey,
     type NetworkDirection,
-} from "../runtime/network-metric-keys";
-import type { WidgetData } from "../rendering/widget-data";
-import { resolveColorForThresholdValue, type ColorConfig } from "../rendering/color-resolver";
+} from "../../runtime/network-metric-keys";
+import type { WidgetData } from "../../rendering/widget-data";
+import { resolveColorForThresholdValue, type ColorConfig } from "../../rendering/color-resolver";
 import type {
     ResolvedGlobalSettings,
     ResolvedWidgetSettings,
-} from "../settings/widget-settings";
-import { buildGlobalChannelColorConfig } from "../settings/global-appearance";
+} from "../../settings/widget-settings";
+import { buildGlobalChannelColorConfig } from "../../settings/global-appearance";
 import {
     buildNetworkSpeedWidgetData,
     convertMegabitsPerSecondToBytesPerSecond,
-} from "../metrics/network-speed-widget-data";
-import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
+} from "../../metrics/network-speed-widget-data";
+import { ARC_GAUGE_LABELS } from "../../widgets/primitives/arc-gauge-label";
 import {
     getNetworkDirectionStatusIcon,
     renderNetworkDirectionIconFragment,
     renderNetworkInterfaceIconFragment,
-} from "../widgets/icons/catalog/network";
+} from "../../widgets/icons/catalog/network";
 import {
     normalizeNetworkDisplayDirection,
     resolveSingleNetworkDirection,
-} from "./net-speed-metric-subscriptions";
-import type { MetricDisplayOptions } from "./single-metric-display-model";
-import { buildColorConfigFromRamp } from "./channel-color-config";
+} from "./metric-subscriptions";
+import type { MetricDisplayOptions } from "../../metric-view-runner/display-model";
+import { buildColorConfigFromRamp } from "../shared/channel-color-config";
 
 export interface NetworkDisplayUpdate {
     displayOptions: MetricDisplayOptions;

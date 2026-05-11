@@ -22,7 +22,7 @@ import {
     resolveDisplaySampleTimestampMilliseconds,
     resolveTouchStripMetricLayout,
     type SingleMetricDisplayOptions,
-} from "./single-metric-display-model";
+} from "./display-model";
 
 test("single value-capable widget without data renders an N/A placeholder copy", () => {
     const widgetData = buildWidgetData({

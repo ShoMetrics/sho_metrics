@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DisplayUpdateQueue } from "./display-update-queue";
+import { DisplayUpdateQueue } from "./update-queue";
 
 test("settings changes are dequeued before ordinary metric ticks", () => {
     const queue = new DisplayUpdateQueue();

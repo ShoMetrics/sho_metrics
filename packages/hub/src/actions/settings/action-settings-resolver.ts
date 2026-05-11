@@ -1,10 +1,10 @@
-import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
-import { readWidgetSettings } from "../settings/codec";
+import { pluginGlobalSettingsStore } from "../../settings/global-settings-store";
+import { readWidgetSettings } from "../../settings/codec";
 import {
     type ActionKind,
     type ResolvedWidgetSettings,
-} from "../settings/widget-settings";
-import { resolveWidgetSettings } from "../settings/resolver";
+} from "../../settings/widget-settings";
+import { resolveWidgetSettings } from "../../settings/resolver";
 
 export function resolveActionSettings(rawSettings: unknown, actionKind: ActionKind): ResolvedWidgetSettings {
     const context = {

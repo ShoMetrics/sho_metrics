@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { renderMetricFrame } from "../rendering/metric-frame";
-import { renderSingleMetricBodyView } from "../rendering/single-metric-view";
-import type { WidgetData } from "../rendering/widget-data";
-import { buildDiskUsageWidgetData, buildMemoryUsageWidgetData } from "../metrics/storage-widget-data";
-import { buildCpuUsageWidgetData } from "./cpu-usage";
-import { buildGpuUsageWidgetData, buildGpuVramWidgetData } from "./gpu-usage";
+import { renderMetricFrame } from "../../rendering/metric-frame";
+import { renderSingleMetricBodyView } from "../../rendering/single-metric-view";
+import type { WidgetData } from "../../rendering/widget-data";
+import { buildDiskUsageWidgetData, buildMemoryUsageWidgetData } from "../../metrics/storage-widget-data";
+import { buildCpuUsageWidgetData } from "../cpu-usage";
+import { buildGpuUsageWidgetData, buildGpuVramWidgetData } from "../gpu-usage";
 
 test("percentage metric builders expose integer display values for compact widgets", () => {
     const testCases: ReadonlyArray<{

@@ -1,9 +1,9 @@
 import { SingletonAction, WillAppearEvent, WillDisappearEvent, DidReceiveSettingsEvent } from "@elgato/streamdeck";
 import { scheduler } from "../runtime/scheduler";
-import { clearMetricDisplayState } from "./metric-display-runner";
+import { clearMetricDisplayState } from "../metric-view-runner/runner";
 import { logger } from "../logging/logger";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
-import { resolveActionSettings } from "./action-settings-resolver";
+import { resolveActionSettings } from "./settings/action-settings-resolver";
 import { readWidgetSettings, writeWidgetSettings } from "../settings/codec";
 import type { ActionKind, ResolvedWidgetSettings, WidgetStoredSettings } from "../settings/widget-settings";
 import { mergeWidgetSettingsPatch, type RuntimeStatePatch } from "../settings/updates";
@@ -95,7 +95,12 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     protected resolveSettings(event: WillAppearEvent): ResolvedWidgetSettings {
-        return this.resolveRawSettings(this.activeActionStates.get(event.action.id)!.rawSettings);
+        const activeActionState = this.activeActionStates.get(event.action.id);
+        if (!activeActionState) {
+            throw new Error(`Action ${event.action.id} is not active; cannot resolve settings.`);
+        }
+
+        return this.resolveRawSettings(activeActionState.rawSettings);
     }
 
     protected updateRuntimeCache(event: WillAppearEvent, patch: RuntimeStatePatch): Promise<void> {
@@ -112,7 +117,11 @@ export abstract class MetricAction extends SingletonAction {
         event: WillAppearEvent,
         update: (storedSettings: WidgetStoredSettings) => WidgetStoredSettings,
     ): Promise<void> {
-        const activeActionState = this.activeActionStates.get(event.action.id)!;
+        const activeActionState = this.activeActionStates.get(event.action.id);
+        if (!activeActionState) {
+            throw new Error(`Action ${event.action.id} is not active; cannot update settings.`);
+        }
+
         const currentSettings = readWidgetSettings(activeActionState.rawSettings);
         const nextSettings = update(currentSettings);
 

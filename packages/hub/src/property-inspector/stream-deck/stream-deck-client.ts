@@ -214,7 +214,7 @@ export class StreamDeckClient implements StreamDeckPropertyInspectorClient {
         }
 
         const webSocket = new WebSocket(`ws://localhost:${port}`);
-        webSocket.onmessage = (event) => this.handleMessageEvent(event);
+        webSocket.onmessage = (event: MessageEvent<unknown>) => this.handleMessageEvent(event);
         webSocket.onerror = () => {
             this.connection.reject(new Error("Stream Deck Property Inspector websocket failed."));
         };
@@ -332,7 +332,11 @@ export class StreamDeckClient implements StreamDeckPropertyInspectorClient {
         currentConnection.send(JSON.stringify(outboundMessage));
     }
 
-    private handleMessageEvent(event: MessageEvent<string>): void {
+    private handleMessageEvent(event: MessageEvent<unknown>): void {
+        if (typeof event.data !== "string") {
+            throw new Error("Stream Deck message data was not a string.");
+        }
+
         const message = parseStreamDeckMessage(event.data);
 
         switch (message.event) {

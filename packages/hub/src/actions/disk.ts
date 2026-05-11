@@ -1,7 +1,7 @@
 import { action, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import { metricStore } from "../runtime/metric-store";
-import { setMetricDisplay } from "./metric-display-runner";
+import { setMetricDisplay } from "../metric-view-runner/runner";
 import { logger } from "../logging/logger";
 import { diskVolumeRegistry, type DiskVolumeOption } from "../runtime/disk-volumes";
 import {
@@ -10,13 +10,13 @@ import {
     getDiskVolumeMetricKey,
     type DiskThroughputDirection,
 } from "../runtime/disk-metric-keys";
-import { resolveDiskMetricSubscriptionKeys } from "./disk-metric-subscriptions";
+import { resolveDiskMetricSubscriptionKeys } from "./disk/metric-subscriptions";
 import type { ResolvedWidgetSettings } from "../settings/widget-settings";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
     buildDiskDisplayOptions,
     resolveDiskMaximumThroughputMebibytesPerSecond,
-} from "./disk-display";
+} from "./disk/view-builder";
 
 const log = logger.for("Action:Disk");
 

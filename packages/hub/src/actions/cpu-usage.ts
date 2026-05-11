@@ -1,7 +1,7 @@
 import { action, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import { metricStore } from "../runtime/metric-store";
-import { setSingleMetricDisplay } from "./metric-display-runner";
+import { setSingleMetricDisplay } from "../metric-view-runner/runner";
 import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-format";
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";

@@ -1,8 +1,8 @@
-import type { ColorConfig } from "../rendering/color-resolver";
+import type { ColorConfig } from "../../rendering/color-resolver";
 import type {
     ColorMode,
     ColorRamp,
-} from "../settings/widget-settings";
+} from "../../settings/widget-settings";
 
 export function buildColorConfigFromRamp(options: {
     colorMode: ColorMode;

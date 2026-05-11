@@ -1,31 +1,31 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
-import type { MetricStore } from "../runtime/metric-store";
-import type { DiskVolumeOption } from "../runtime/disk-volumes";
+import type { MetricStore } from "../../runtime/metric-store";
+import type { DiskVolumeOption } from "../../runtime/disk-volumes";
 import {
     getDefaultDiskUsageMetricKey,
     getDiskThroughputMetricKey,
     getDiskVolumeMetricKey,
     type DiskThroughputDirection,
-} from "../runtime/disk-metric-keys";
-import { buildDiskThroughputWidgetData, buildDiskUsageWidgetData } from "../metrics/storage-widget-data";
+} from "../../runtime/disk-metric-keys";
+import { buildDiskThroughputWidgetData, buildDiskUsageWidgetData } from "../../metrics/storage-widget-data";
 import type {
     ResolvedGlobalSettings,
     ResolvedWidgetSettings,
-} from "../settings/widget-settings";
-import { resolveColorForThresholdValue, type ColorConfig } from "../rendering/color-resolver";
-import { buildGlobalChannelColorConfig } from "../settings/global-appearance";
-import { getDiskIcon, getDiskIconFragment, renderCenteredHardwareIconFragment } from "../widgets/icons/hardware-icons";
-import { renderDiskThroughputDirectionIconFragment } from "../widgets/icons/catalog/disk";
-import { getMetricStatusIcon } from "../widgets/icons/metric-status-icons";
-import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
-import { escapeSvgText } from "../rendering/svg-utils";
+} from "../../settings/widget-settings";
+import { resolveColorForThresholdValue, type ColorConfig } from "../../rendering/color-resolver";
+import { buildGlobalChannelColorConfig } from "../../settings/global-appearance";
+import { getDiskIcon, getDiskIconFragment, renderCenteredHardwareIconFragment } from "../../widgets/icons/hardware-icons";
+import { renderDiskThroughputDirectionIconFragment } from "../../widgets/icons/catalog/disk";
+import { getMetricStatusIcon } from "../../widgets/icons/metric-status-icons";
+import { ARC_GAUGE_LABELS } from "../../widgets/primitives/arc-gauge-label";
+import { escapeSvgText } from "../../rendering/svg-utils";
 import {
     isDualDiskThroughputDisplay,
     normalizeDiskThroughputDisplayDirection,
     resolveSingleDiskThroughputDirection,
-} from "./disk-metric-subscriptions";
-import type { MetricDisplayOptions } from "./single-metric-display-model";
-import { buildColorConfigFromRamp } from "./channel-color-config";
+} from "./metric-subscriptions";
+import type { MetricDisplayOptions } from "../../metric-view-runner/display-model";
+import { buildColorConfigFromRamp } from "../shared/channel-color-config";
 
 interface BuildDiskDisplayOptions {
     event: WillAppearEvent;

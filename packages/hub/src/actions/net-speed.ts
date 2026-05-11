@@ -1,7 +1,7 @@
 import { action, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import { metricStore } from "../runtime/metric-store";
-import { setMetricDisplay } from "./metric-display-runner";
+import { setMetricDisplay } from "../metric-view-runner/runner";
 import { logger } from "../logging/logger";
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../runtime/network-interfaces";
 import {
@@ -9,7 +9,7 @@ import {
     getNetworkInterfaceMetricKey,
     type NetworkDirection,
 } from "../runtime/network-metric-keys";
-import { resolveNetSpeedMetricSubscriptionKeys } from "./net-speed-metric-subscriptions";
+import { resolveNetSpeedMetricSubscriptionKeys } from "./network/metric-subscriptions";
 import type { ResolvedWidgetSettings } from "../settings/widget-settings";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
@@ -17,7 +17,7 @@ import {
     resolveNetworkMaximumBytesPerSecond,
     resolveNetworkMaximumMegabitsPerSecond,
     type NetworkDisplayDebugInfo,
-} from "./net-speed-display";
+} from "./network/view-builder";
 
 const log = logger.for("Action:NetSpeed");
 
