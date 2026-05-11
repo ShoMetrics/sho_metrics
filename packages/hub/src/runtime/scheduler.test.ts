@@ -71,6 +71,41 @@ test("unsupported polling intervals still poll the requested metric keys", async
     }
 });
 
+test("later same-group subscribers do not join an in-flight initial poll", async () => {
+    const source = new DeferredMetricSource();
+    const snapshotStore = new FakeMetricSnapshotStore();
+    const scheduler = new Scheduler(source, snapshotStore);
+    const firstSubscriberSnapshots: IMetricSnapshot[] = [];
+    const secondSubscriberSnapshots: IMetricSnapshot[] = [];
+    let unsubscribeSecond: (() => void) | undefined;
+
+    const unsubscribeFirst = scheduler.subscribe(snapshot => {
+        firstSubscriberSnapshots.push(snapshot);
+    }, {
+        metricKeys: ["cpu.usage_percent"],
+    });
+
+    try {
+        await waitForCondition(() => source.pendingPollCount === 1);
+
+        unsubscribeSecond = scheduler.subscribe(snapshot => {
+            secondSubscriberSnapshots.push(snapshot);
+        }, {
+            metricKeys: ["cpu.usage_percent"],
+        });
+
+        source.resolveNextPoll();
+        await waitForCondition(() => firstSubscriberSnapshots.length === 1);
+
+        assert.deepEqual(source.polledMetricKeyListList, [["cpu.usage_percent"]]);
+        assert.deepEqual(firstSubscriberSnapshots, [source.snapshot]);
+        assert.deepEqual(secondSubscriberSnapshots, []);
+    } finally {
+        unsubscribeSecond?.();
+        unsubscribeFirst();
+    }
+});
+
 class FakeMetricSource implements IMetricSource {
     readonly sourceId = "fake-source";
     readonly snapshot: IMetricSnapshot = {
@@ -89,6 +124,42 @@ class FakeMetricSource implements IMetricSource {
     async pollMetrics(metricKeys: readonly string[]): Promise<IMetricSnapshot> {
         (this.polledMetricKeyListList as string[][]).push([...metricKeys]);
         return this.snapshot;
+    }
+}
+
+class DeferredMetricSource implements IMetricSource {
+    readonly sourceId = "deferred-source";
+    readonly snapshot: IMetricSnapshot = {
+        sourceId: this.sourceId,
+        timestampMs: 1000,
+        metrics: {
+            "cpu.usage_percent": { scalar: 42, unit: "%" },
+        },
+    };
+    readonly polledMetricKeyListList: string[][] = [];
+    private readonly pendingPollResolvers: Array<(snapshot: IMetricSnapshot) => void> = [];
+
+    get pendingPollCount(): number {
+        return this.pendingPollResolvers.length;
+    }
+
+    poll(): Promise<IMetricSnapshot> {
+        return this.pollMetrics([]);
+    }
+
+    pollMetrics(metricKeys: readonly string[]): Promise<IMetricSnapshot> {
+        this.polledMetricKeyListList.push([...metricKeys]);
+
+        return new Promise(resolve => {
+            this.pendingPollResolvers.push(resolve);
+        });
+    }
+
+    resolveNextPoll(): void {
+        const resolve = this.pendingPollResolvers.shift();
+
+        assert.ok(resolve, "Expected a pending poll.");
+        resolve(this.snapshot);
     }
 }
 

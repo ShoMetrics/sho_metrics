@@ -58,6 +58,13 @@ export class Scheduler {
         this.source = source;
     }
 
+    /**
+     * Subscribes a metric consumer to one polling group.
+     *
+     * Pass every metric key the consumer needs in one subscription. A subscriber
+     * added after a poll starts is scheduled for a later tick; it is not appended
+     * to the in-flight poll.
+     */
     subscribe(callback: MetricSubscriber, options: SubscriptionOptions = {}): () => void {
         const pollingIntervalMilliseconds = Scheduler.normalizePollingIntervalMilliseconds(
             options.pollingIntervalMilliseconds,
