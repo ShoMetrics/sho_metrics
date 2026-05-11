@@ -194,16 +194,16 @@ export abstract class MetricAction extends SingletonAction {
     }
 }
 
+const DEFAULT_POLLING_INTERVAL_MILLISECONDS = 1000;
+const ALLOWED_POLLING_FREQUENCY_SECONDS = new Set([1, 2, 3, 5, 10, 15, 30, 60]);
+
 function resolvePollingIntervalMilliseconds(pollingFrequencySeconds: number): number {
     if (ALLOWED_POLLING_FREQUENCY_SECONDS.has(pollingFrequencySeconds)) {
         return pollingFrequencySeconds * 1000;
     }
 
-    return DEFAULT_POLLING_FREQUENCY_SECONDS * 1000;
+    return DEFAULT_POLLING_INTERVAL_MILLISECONDS;
 }
-
-const DEFAULT_POLLING_FREQUENCY_SECONDS = 1;
-const ALLOWED_POLLING_FREQUENCY_SECONDS = new Set([1, 2, 3, 5, 10, 15, 30, 60]);
 
 function normalizeMetricSubscriptionKeys(subscriptionKeys: readonly string[]): readonly string[] {
     return Array.from(new Set(subscriptionKeys)).sort();
