@@ -1,4 +1,3 @@
-import type { WillAppearEvent } from "@elgato/streamdeck";
 import { rasterizeSvgToPngDataUrl } from "../rendering/rasterizer";
 import type { DualChannelWidgetData, WidgetData } from "../rendering/widget-data";
 import { renderDualMetricBodyView } from "../rendering/dual-metric-view";
@@ -16,23 +15,20 @@ import {
     type MetricDisplayOptions,
     type SingleMetricDisplayOptions,
 } from "./display-model";
-import {
-    buildMetricVisualSettings,
-    type MetricVisualSettings,
-} from "../settings/visual-adapter";
 import { logger } from "../logging/logger";
-import { DisplayUpdateQueue } from "./update-queue";
+import { DisplayUpdateQueue, type DisplayUpdatePriority } from "./update-queue";
 import {
     dispatchMetricDisplayImage,
     type TouchStripMetricLayoutState,
 } from "./dispatch";
 import {
-    DisplayPerformanceStats,
-    formatDisplayPerformanceSummary,
-    shouldWarnDisplayPerformanceSummary,
-    type DisplayPerformanceKind,
-    type DisplayPerformanceOutcome,
-} from "./performance-stats";
+    recordDisplayPerformanceSample,
+} from "./display-update-observability";
+import {
+    buildMetricVisualSettings,
+    type MetricVisualSettings,
+    type ResolvedMetricVisualSettings,
+} from "../settings/visual-adapter";
 
 const log = logger.for("MetricDisplayRunner");
 
@@ -40,7 +36,6 @@ const MAX_CONCURRENT_DISPLAY_UPDATES = 1;
 
 const displayActionStates = new Map<string, DisplayActionState>();
 const displayActionQueue = new DisplayUpdateQueue();
-const displayPerformanceStats = new DisplayPerformanceStats();
 let activeDisplayUpdateCount = 0;
 let isDisplayQueueDrainScheduled = false;
 
@@ -51,14 +46,12 @@ interface DisplayActionState {
     active: boolean;
     pendingOptions: MetricDisplayOptions | null;
     pendingUpdateTimestampMilliseconds: number | null;
-    pendingUpdateReason: DisplayUpdateReason;
+    pendingUpdateReason: DisplayUpdatePriority;
     pendingSettingsSignature: string | null;
     touchStripMetricLayoutState: TouchStripMetricLayoutState;
     lastRenderedSvg: string | null;
     lastScheduledSettingsSignature: string | null;
 }
-
-type DisplayUpdateReason = "settings-change" | "metric-tick";
 
 interface RenderedMetricBody {
     readonly svg: string;
@@ -129,7 +122,6 @@ function runMetricDisplayUpdate(
     const renderPlan = frame.renderPlan;
     const renderedMetricData = frame.renderedMetricData;
     const svg = frame.svg;
-    const displayKind = resolveDisplayPerformanceKind(options.event);
     const titleClearRequested = options.event.action.isKey();
 
     if (updateReason === "settings-change") {
@@ -166,15 +158,16 @@ function runMetricDisplayUpdate(
             ].join(" "));
         }
 
-        logDisplaySkippedDebug({
-            actionId: options.event.action.id,
-            metricKey: options.metricKey,
-            renderStartTimestampMilliseconds,
-            composeDurationMilliseconds: composeEndTimestampMilliseconds - renderStartTimestampMilliseconds,
-        });
+        log.debug(() => [
+            "skippedUnchanged",
+            `actionId=${options.event.action.id}`,
+            `metricKey=${options.metricKey}`,
+            `composeMs=${composeEndTimestampMilliseconds - renderStartTimestampMilliseconds}`,
+            `renderToSkipMs=${Date.now() - renderStartTimestampMilliseconds}`,
+        ].join(" "));
         recordDisplayPerformanceSample({
+            event: options.event,
             updateReason,
-            displayKind,
             outcome: "skipped",
             titleClearRequested,
             updateTimestampMilliseconds,
@@ -183,6 +176,8 @@ function runMetricDisplayUpdate(
             rasterizeEndTimestampMilliseconds: null,
             updateStartTimestampMilliseconds: null,
             updateEndTimestampMilliseconds: composeEndTimestampMilliseconds,
+            queueLength: displayActionQueue.length,
+            activeActionCount: displayActionStates.size,
         });
         finishDisplayUpdate(displayActionState);
         return;
@@ -193,8 +188,8 @@ function runMetricDisplayUpdate(
 
     if (!pngDataUrl) {
         recordDisplayPerformanceSample({
+            event: options.event,
             updateReason,
-            displayKind,
             outcome: "failed",
             titleClearRequested,
             updateTimestampMilliseconds,
@@ -203,20 +198,28 @@ function runMetricDisplayUpdate(
             rasterizeEndTimestampMilliseconds,
             updateStartTimestampMilliseconds: null,
             updateEndTimestampMilliseconds: rasterizeEndTimestampMilliseconds,
+            queueLength: displayActionQueue.length,
+            activeActionCount: displayActionStates.size,
         });
         finishDisplayUpdate(displayActionState);
         return;
     }
 
-    logDisplayDebug({
-        actionId: options.event.action.id,
-        metricKey: options.metricKey,
-        phase: "rendered",
-        value: resolveDisplayLogValue(renderedMetricData),
-        sampleTimestampMilliseconds: resolveDisplaySampleTimestampMilliseconds(renderedMetricData),
-        renderStartTimestampMilliseconds,
-        composeDurationMilliseconds: composeEndTimestampMilliseconds - renderStartTimestampMilliseconds,
-        rasterizeDurationMilliseconds: rasterizeEndTimestampMilliseconds - composeEndTimestampMilliseconds,
+    log.debug(() => {
+        const currentTimestampMilliseconds = Date.now();
+        return [
+            "rendered",
+            `actionId=${options.event.action.id}`,
+            `metricKey=${options.metricKey}`,
+            `value=${resolveDisplayLogValue(renderedMetricData).toFixed(2)}`,
+            `sampleAgeMs=${formatAgeMilliseconds(
+                resolveDisplaySampleTimestampMilliseconds(renderedMetricData),
+                currentTimestampMilliseconds,
+            )}`,
+            `composeMs=${composeEndTimestampMilliseconds - renderStartTimestampMilliseconds}`,
+            `rasterizeMs=${rasterizeEndTimestampMilliseconds - composeEndTimestampMilliseconds}`,
+            `renderToEnqueueMs=${currentTimestampMilliseconds - renderStartTimestampMilliseconds}`,
+        ].join(" ");
     });
 
     dispatchMetricDisplayImage({
@@ -236,8 +239,8 @@ function runMetricDisplayUpdate(
             }
 
             recordDisplayPerformanceSample({
+                event: options.event,
                 updateReason,
-                displayKind,
                 outcome: dispatchResult.status === "rendered" ? "rendered" : "failed",
                 titleClearRequested,
                 updateTimestampMilliseconds,
@@ -246,6 +249,8 @@ function runMetricDisplayUpdate(
                 rasterizeEndTimestampMilliseconds,
                 updateStartTimestampMilliseconds: dispatchResult.updateStartTimestampMilliseconds,
                 updateEndTimestampMilliseconds: dispatchResult.updateEndTimestampMilliseconds,
+                queueLength: displayActionQueue.length,
+                activeActionCount: displayActionStates.size,
             });
 
             if (dispatchResult.status === "failed") {
@@ -253,24 +258,36 @@ function runMetricDisplayUpdate(
                 return;
             }
 
-            logSettingsUpdateDoneInfo({
-                updateReason,
-                actionId: options.event.action.id,
-                metricKey: options.metricKey,
-                phase: dispatchResult.donePhase,
-                graphicType: renderPlan.visualSettings.graphicType,
-                updateTimestampMilliseconds,
-                renderStartTimestampMilliseconds,
-                composeEndTimestampMilliseconds,
-                rasterizeEndTimestampMilliseconds,
-                updateStartTimestampMilliseconds: dispatchResult.updateStartTimestampMilliseconds,
-            });
-            logUpdateDoneDebug({
-                actionId: options.event.action.id,
-                metricKey: options.metricKey,
-                phase: dispatchResult.donePhase,
-                sampleTimestampMilliseconds: resolveDisplaySampleTimestampMilliseconds(renderedMetricData),
-                updateStartTimestampMilliseconds: dispatchResult.updateStartTimestampMilliseconds,
+            if (updateReason === "settings-change") {
+                log.info(() => {
+                    const currentTimestampMilliseconds = Date.now();
+                    return [
+                        "settingsDisplayUpdateDone",
+                        `phase=${dispatchResult.donePhase}`,
+                        `actionId=${options.event.action.id}`,
+                        `metricKey=${options.metricKey}`,
+                        `graphicType=${renderPlan.visualSettings.graphicType}`,
+                        `queuedMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, renderStartTimestampMilliseconds)}`,
+                        `composeMs=${composeEndTimestampMilliseconds - renderStartTimestampMilliseconds}`,
+                        `rasterizeMs=${rasterizeEndTimestampMilliseconds - composeEndTimestampMilliseconds}`,
+                        `sdkPromiseMs=${currentTimestampMilliseconds - dispatchResult.updateStartTimestampMilliseconds}`,
+                        `totalMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, currentTimestampMilliseconds)}`,
+                    ].join(" ");
+                });
+            }
+
+            log.debug(() => {
+                const currentTimestampMilliseconds = Date.now();
+                return [
+                    dispatchResult.donePhase,
+                    `actionId=${options.event.action.id}`,
+                    `metricKey=${options.metricKey}`,
+                    `sampleAgeMs=${formatAgeMilliseconds(
+                        resolveDisplaySampleTimestampMilliseconds(renderedMetricData),
+                        currentTimestampMilliseconds,
+                    )}`,
+                    `sdkPromiseMs=${currentTimestampMilliseconds - dispatchResult.updateStartTimestampMilliseconds}`,
+                ].join(" ");
             });
         })
         .finally(() => {
@@ -395,12 +412,12 @@ function getOrCreateDisplayActionState(actionId: string): DisplayActionState {
 }
 
 function recordDisplayUpdate(displayActionState: DisplayActionState, options: MetricDisplayOptions): void {
-    const settingsSignature = buildSettingsSignature(options.resolvedSettings);
+    const settingsSignature = buildMetricDisplaySettingsSignature(options.resolvedSettings);
     const isSettingsChange = displayActionState.lastScheduledSettingsSignature !== null
-        && displayActionState.lastScheduledSettingsSignature !== settingsSignature;
+        && displayActionState.lastScheduledSettingsSignature !== settingsSignature.signature;
     const updateTimestampMilliseconds = Date.now();
 
-    displayActionState.lastScheduledSettingsSignature = settingsSignature;
+    displayActionState.lastScheduledSettingsSignature = settingsSignature.signature;
 
     if (!isSettingsChange && displayActionState.pendingUpdateReason === "settings-change") {
         return;
@@ -408,26 +425,46 @@ function recordDisplayUpdate(displayActionState: DisplayActionState, options: Me
 
     displayActionState.pendingUpdateTimestampMilliseconds = updateTimestampMilliseconds;
     displayActionState.pendingUpdateReason = isSettingsChange ? "settings-change" : "metric-tick";
-    displayActionState.pendingSettingsSignature = settingsSignature;
+    displayActionState.pendingSettingsSignature = settingsSignature.signature;
 
     if (!isSettingsChange) {
         return;
     }
 
-    const visualSettings = buildMetricVisualSettings(options.resolvedSettings);
-
     log.info(() => [
         "settingsDisplayScheduled",
         `actionId=${options.event.action.id}`,
         `metricKey=${options.metricKey}`,
-        `graphicType=${visualSettings.graphicType}`,
+        `graphicType=${settingsSignature.graphicType}`,
         `displayKind=${isDualMetricDisplayOptions(options) ? "dual" : "single"}`,
         `isRenderInFlight=${displayActionState.isRenderInFlight}`,
         `isQueued=${displayActionState.isQueued}`,
         `activeUpdates=${activeDisplayUpdateCount}`,
         `queueLength=${displayActionQueue.length}`,
-        `signature=${settingsSignature}`,
+        `signature=${settingsSignature.signature}`,
     ].join(" "));
+}
+
+function buildMetricDisplaySettingsSignature(settings: MetricVisualSettings): {
+    readonly graphicType: ResolvedMetricVisualSettings["graphicType"];
+    readonly signature: string;
+} {
+    const visualSettings = buildMetricVisualSettings(settings);
+
+    return {
+        graphicType: visualSettings.graphicType,
+        signature: [
+            `graphicType=${visualSettings.graphicType}`,
+            `circleStyle=${visualSettings.circleStyle}`,
+            `graphicStyle=${visualSettings.graphicStyle}`,
+            `colorMode=${visualSettings.colorConfig.mode}`,
+            `solidColor=${visualSettings.colorConfig.solidColor}`,
+            `thresholds=${visualSettings.colorConfig.thresholds.map(threshold => threshold.color).join(",")}`,
+            `lineSmoothingPercent=${visualSettings.lineSmoothingPercent}`,
+            `gridLineVisibility=${visualSettings.gridLineVisibility}`,
+            `gridLineType=${visualSettings.gridLineType}`,
+        ].join(";"),
+    };
 }
 
 function enqueueDisplayAction(displayActionState: DisplayActionState): void {
@@ -508,156 +545,6 @@ function finishDisplayUpdate(displayActionState: DisplayActionState): void {
     scheduleDisplayQueueDrain();
 }
 
-function resolveDisplayPerformanceKind(event: WillAppearEvent): DisplayPerformanceKind {
-    if (event.action.isKey()) {
-        return "key";
-    }
-
-    if (event.action.isDial()) {
-        return "dial";
-    }
-
-    return "unknown";
-}
-
-function recordDisplayPerformanceSample(options: {
-    updateReason: DisplayUpdateReason;
-    displayKind: DisplayPerformanceKind;
-    outcome: DisplayPerformanceOutcome;
-    titleClearRequested: boolean;
-    updateTimestampMilliseconds: number | null;
-    renderStartTimestampMilliseconds: number;
-    composeEndTimestampMilliseconds: number;
-    rasterizeEndTimestampMilliseconds: number | null;
-    updateStartTimestampMilliseconds: number | null;
-    updateEndTimestampMilliseconds: number;
-}): void {
-    const summary = displayPerformanceStats.record({
-        requestReason: options.updateReason,
-        displayKind: options.displayKind,
-        outcome: options.outcome,
-        queuedMilliseconds: calculateElapsedMilliseconds(
-            options.updateTimestampMilliseconds,
-            options.renderStartTimestampMilliseconds,
-        ),
-        composeMilliseconds: options.composeEndTimestampMilliseconds - options.renderStartTimestampMilliseconds,
-        rasterizeMilliseconds: calculateStepMilliseconds(
-            options.composeEndTimestampMilliseconds,
-            options.rasterizeEndTimestampMilliseconds,
-        ),
-        sdkPromiseMilliseconds: calculateStepMilliseconds(
-            options.updateStartTimestampMilliseconds,
-            options.updateEndTimestampMilliseconds,
-        ),
-        totalMilliseconds: calculateElapsedMilliseconds(
-            options.updateTimestampMilliseconds,
-            options.updateEndTimestampMilliseconds,
-        ) ?? Math.max(0, options.updateEndTimestampMilliseconds - options.renderStartTimestampMilliseconds),
-        queueLength: displayActionQueue.length,
-        activeActionCount: displayActionStates.size,
-        titleClearRequested: options.titleClearRequested,
-    }, options.updateEndTimestampMilliseconds);
-
-    if (summary) {
-        if (shouldWarnDisplayPerformanceSummary(summary)) {
-            log.atWarn()
-                .everyMs("display-performance-warning", 60000)
-                .log(() => formatDisplayPerformanceSummary(summary));
-            return;
-        }
-
-        log.debug(() => formatDisplayPerformanceSummary(summary));
-    }
-}
-
-function logDisplayDebug(options: {
-    actionId: string;
-    metricKey: string;
-    phase: string;
-    value: number;
-    sampleTimestampMilliseconds: number | undefined;
-    renderStartTimestampMilliseconds: number;
-    composeDurationMilliseconds: number;
-    rasterizeDurationMilliseconds: number;
-}): void {
-    const currentTimestampMilliseconds = Date.now();
-    log.debug(() => [
-        options.phase,
-        `actionId=${options.actionId}`,
-        `metricKey=${options.metricKey}`,
-        `value=${options.value.toFixed(2)}`,
-        `sampleAgeMs=${formatAgeMilliseconds(options.sampleTimestampMilliseconds, currentTimestampMilliseconds)}`,
-        `composeMs=${options.composeDurationMilliseconds}`,
-        `rasterizeMs=${options.rasterizeDurationMilliseconds}`,
-        `renderToEnqueueMs=${currentTimestampMilliseconds - options.renderStartTimestampMilliseconds}`,
-    ].join(" "));
-}
-
-function logUpdateDoneDebug(options: {
-    actionId: string;
-    metricKey: string;
-    phase: string;
-    sampleTimestampMilliseconds: number | undefined;
-    updateStartTimestampMilliseconds: number;
-}): void {
-    const currentTimestampMilliseconds = Date.now();
-    log.debug(() => [
-        options.phase,
-        `actionId=${options.actionId}`,
-        `metricKey=${options.metricKey}`,
-        `sampleAgeMs=${formatAgeMilliseconds(options.sampleTimestampMilliseconds, currentTimestampMilliseconds)}`,
-        `sdkPromiseMs=${currentTimestampMilliseconds - options.updateStartTimestampMilliseconds}`,
-    ].join(" "));
-}
-
-function logSettingsUpdateDoneInfo(options: {
-    updateReason: DisplayUpdateReason;
-    actionId: string;
-    metricKey: string;
-    phase: string;
-    graphicType: string;
-    updateTimestampMilliseconds: number | null;
-    renderStartTimestampMilliseconds: number;
-    composeEndTimestampMilliseconds: number;
-    rasterizeEndTimestampMilliseconds: number;
-    updateStartTimestampMilliseconds: number;
-}): void {
-    if (options.updateReason !== "settings-change") {
-        return;
-    }
-
-    const currentTimestampMilliseconds = Date.now();
-
-    log.info(() => [
-        "settingsDisplayUpdateDone",
-        `phase=${options.phase}`,
-        `actionId=${options.actionId}`,
-        `metricKey=${options.metricKey}`,
-        `graphicType=${options.graphicType}`,
-        `queuedMs=${formatElapsedMilliseconds(options.updateTimestampMilliseconds, options.renderStartTimestampMilliseconds)}`,
-        `composeMs=${options.composeEndTimestampMilliseconds - options.renderStartTimestampMilliseconds}`,
-        `rasterizeMs=${options.rasterizeEndTimestampMilliseconds - options.composeEndTimestampMilliseconds}`,
-        `sdkPromiseMs=${currentTimestampMilliseconds - options.updateStartTimestampMilliseconds}`,
-        `totalMs=${formatElapsedMilliseconds(options.updateTimestampMilliseconds, currentTimestampMilliseconds)}`,
-    ].join(" "));
-}
-
-function logDisplaySkippedDebug(options: {
-    actionId: string;
-    metricKey: string;
-    renderStartTimestampMilliseconds: number;
-    composeDurationMilliseconds: number;
-}): void {
-    const currentTimestampMilliseconds = Date.now();
-    log.debug(() => [
-        "skippedUnchanged",
-        `actionId=${options.actionId}`,
-        `metricKey=${options.metricKey}`,
-        `composeMs=${options.composeDurationMilliseconds}`,
-        `renderToSkipMs=${currentTimestampMilliseconds - options.renderStartTimestampMilliseconds}`,
-    ].join(" "));
-}
-
 function formatAgeMilliseconds(
     sampleTimestampMilliseconds: number | undefined,
     currentTimestampMilliseconds: number,
@@ -669,56 +556,14 @@ function formatAgeMilliseconds(
     return String(currentTimestampMilliseconds - sampleTimestampMilliseconds);
 }
 
-function buildSettingsSignature(settings: MetricVisualSettings): string {
-    const visualSettings = buildMetricVisualSettings(settings);
-
-    return [
-        `graphicType=${visualSettings.graphicType}`,
-        `circleStyle=${visualSettings.circleStyle}`,
-        `graphicStyle=${visualSettings.graphicStyle}`,
-        `colorMode=${visualSettings.colorConfig.mode}`,
-        `solidColor=${visualSettings.colorConfig.solidColor}`,
-        `thresholds=${visualSettings.colorConfig.thresholds.map(threshold => threshold.color).join(",")}`,
-        `lineSmoothingPercent=${visualSettings.lineSmoothingPercent}`,
-        `gridLineVisibility=${visualSettings.gridLineVisibility}`,
-        `gridLineType=${visualSettings.gridLineType}`,
-    ].join(";");
-}
-
 function formatElapsedMilliseconds(
     startTimestampMilliseconds: number | null,
     endTimestampMilliseconds: number,
 ): string {
-    const elapsedMilliseconds = calculateElapsedMilliseconds(
-        startTimestampMilliseconds,
-        endTimestampMilliseconds,
-    );
-
-    if (elapsedMilliseconds == null) {
+    if (startTimestampMilliseconds == null) {
         return "unknown";
     }
 
-    return String(elapsedMilliseconds);
+    return String(Math.max(0, endTimestampMilliseconds - startTimestampMilliseconds));
 }
 
-function calculateElapsedMilliseconds(
-    startTimestampMilliseconds: number | null,
-    endTimestampMilliseconds: number,
-): number | null {
-    if (startTimestampMilliseconds == null) {
-        return null;
-    }
-
-    return Math.max(0, endTimestampMilliseconds - startTimestampMilliseconds);
-}
-
-function calculateStepMilliseconds(
-    startTimestampMilliseconds: number | null,
-    endTimestampMilliseconds: number | null,
-): number | null {
-    if (startTimestampMilliseconds == null || endTimestampMilliseconds == null) {
-        return null;
-    }
-
-    return Math.max(0, endTimestampMilliseconds - startTimestampMilliseconds);
-}
