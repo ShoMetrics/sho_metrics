@@ -23,10 +23,6 @@ import {
     renderNetworkDirectionIconFragment,
     renderNetworkInterfaceIconFragment,
 } from "../../widgets/icons/catalog/network";
-import {
-    normalizeNetworkDisplayDirection,
-    resolveSingleNetworkDirection,
-} from "./metric-subscriptions";
 import type { MetricDisplayOptions } from "../../metric-view-runner/display-model";
 import { buildColorConfigFromRamp } from "../shared/channel-color-config";
 
@@ -52,7 +48,7 @@ interface BuildNetworkDisplayOptions {
 
 export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): NetworkDisplayUpdate {
     const effectiveGraphicType = options.settings.appearance.graphicType;
-    const displayDirection = normalizeNetworkDisplayDirection(options.settings.metric.networkDirection);
+    const displayDirection = options.settings.metric.networkDirection;
 
     if (effectiveGraphicType === "linear") {
         return {
@@ -75,16 +71,15 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
         };
     }
 
-    const direction = resolveSingleNetworkDirection(displayDirection);
-    const networkMetricKey = getNetworkMetricKey(direction, options.selectedNetworkInterface);
+    const networkMetricKey = getNetworkMetricKey(displayDirection, options.selectedNetworkInterface);
     const sourceWidgetData = options.metricStore.getWidgetData(
         networkMetricKey,
-        getNetworkDirectionLabel(direction),
+        getNetworkDirectionLabel(displayDirection),
         "B/s",
     );
     const displayWidgetData = buildNetworkWidgetData({
         sourceWidgetData,
-        direction,
+        direction: displayDirection,
         settings: options.settings,
     });
     const circleStyle = options.settings.appearance.circleStyle;
@@ -101,18 +96,18 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
             widgetData: renderedWidgetData,
             centerIconFragment: buildNetworkCenterIconFragment({
                 circleStyle,
-                direction,
+                direction: displayDirection,
                 selectedNetworkInterface: options.selectedNetworkInterface,
             }),
             footerIconFragment: shouldRenderGaugeFooter
                 ? renderNetworkDirectionIconFragment({
-                    direction,
+                    direction: displayDirection,
                     color: NETWORK_DIRECTION_ICON_COLOR,
                     size: NETWORK_FOOTER_ICON_SIZE,
                 })
                 : undefined,
             statusIcon: getNetworkDirectionStatusIcon({
-                direction,
+                direction: displayDirection,
                 color: NETWORK_DIRECTION_ICON_COLOR,
             }),
             circleStyleOverride: circleStyle,
@@ -124,7 +119,7 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
             },
         },
         debugInfo: {
-            direction,
+            direction: displayDirection,
             networkMetricKey,
             sourceWidgetData,
             displayWidgetData,
