@@ -1,0 +1,8 @@
+version: v2
+inputs:
+  - directory: scripts/benchmark/protobuf
+plugins:
+  - local: protoc-gen-es
+    out: scripts/benchmark/protobuf/generated
+    opt:
+      - target=js
