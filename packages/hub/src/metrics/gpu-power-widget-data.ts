@@ -30,13 +30,11 @@ export function buildGpuPowerWidgetData(options: GpuPowerDisplayOptions): Widget
 }
 
 export function resolveMaximumGpuPowerWatts(options: {
-    customMaximumPowerWatts: number | string | boolean | null | undefined;
+    customMaximumPowerWatts: number | undefined;
     automaticMaximumPowerWatts: number;
 }): number {
-    const customMaximumPowerWatts = Number(options.customMaximumPowerWatts);
-
-    if (Number.isFinite(customMaximumPowerWatts) && customMaximumPowerWatts > 0) {
-        return customMaximumPowerWatts;
+    if (options.customMaximumPowerWatts !== undefined && options.customMaximumPowerWatts > 0) {
+        return options.customMaximumPowerWatts;
     }
 
     if (Number.isFinite(options.automaticMaximumPowerWatts) && options.automaticMaximumPowerWatts > 0) {

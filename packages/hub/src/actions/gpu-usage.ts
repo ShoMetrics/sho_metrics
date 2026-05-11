@@ -6,11 +6,7 @@ import type { WidgetData } from "../rendering/widget-data";
 import { formatByteCount } from "../metrics/byte-format";
 import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-format";
 import { buildGpuPowerWidgetData, resolveMaximumGpuPowerWatts } from "../metrics/gpu-power-widget-data";
-import {
-    buildTemperatureWidgetData,
-    resolveMaximumTemperatureCelsius,
-    resolveTemperatureUnit,
-} from "../metrics/temperature-widget-data";
+import { buildTemperatureWidgetData } from "../metrics/temperature-widget-data";
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import {
@@ -98,8 +94,8 @@ export class GpuTemp extends GpuBaseAction {
         const celsiusWidgetData = this.getGpuWidgetData(GPU_TEMP_METRIC_KEY, ARC_GAUGE_LABELS.gpu, "C");
         const widgetData = buildTemperatureWidgetData({
             celsiusWidgetData,
-            maximumCelsius: resolveMaximumTemperatureCelsius(settings.local.maximumTemperatureCelsius),
-            unit: resolveTemperatureUnit(settings.local.temperatureUnit),
+            maximumCelsius: settings.local.maximumTemperatureCelsius,
+            unit: settings.local.temperatureUnit,
         });
 
         setSingleMetricDisplay({

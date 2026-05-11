@@ -58,11 +58,11 @@ export function resolveDiskMaximumThroughputMebibytesPerSecond(
     settings: ResolvedWidgetSettings,
     selectedVolume: DiskVolumeOption | null,
 ): number {
-    const configuredMaximum = Number(direction === "read"
+    const configuredMaximum = direction === "read"
         ? settings.diskThroughput.maximumDiskReadThroughputMebibytesPerSecond
-        : settings.diskThroughput.maximumDiskWriteThroughputMebibytesPerSecond);
+        : settings.diskThroughput.maximumDiskWriteThroughputMebibytesPerSecond;
 
-    if (Number.isFinite(configuredMaximum) && configuredMaximum > 0) {
+    if (configuredMaximum !== undefined && configuredMaximum > 0) {
         return configuredMaximum;
     }
 

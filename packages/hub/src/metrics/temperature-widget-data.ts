@@ -8,8 +8,6 @@ interface TemperatureDisplayOptions {
     unit: TemperatureUnit;
 }
 
-const DEFAULT_MAXIMUM_CELSIUS = 100;
-
 export function buildTemperatureWidgetData(options: TemperatureDisplayOptions): WidgetData {
     const displayTemperature = options.unit === "fahrenheit"
         ? convertCelsiusToFahrenheit(options.celsiusWidgetData.current)
@@ -26,20 +24,6 @@ export function buildTemperatureWidgetData(options: TemperatureDisplayOptions): 
             maximumValue: options.maximumCelsius,
         },
     };
-}
-
-export function resolveMaximumTemperatureCelsius(value: unknown): number {
-    const numericValue = Number(value);
-
-    if (!Number.isFinite(numericValue) || numericValue <= 0) {
-        return DEFAULT_MAXIMUM_CELSIUS;
-    }
-
-    return numericValue;
-}
-
-export function resolveTemperatureUnit(value: unknown): TemperatureUnit {
-    return value === "fahrenheit" ? "fahrenheit" : "celsius";
 }
 
 function convertCelsiusToFahrenheit(celsius: number): number {
