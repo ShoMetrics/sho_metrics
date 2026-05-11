@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     type GlobalSettings,
     type WidgetSettings,
@@ -53,6 +53,16 @@ export function usePropertyInspectorSettings(
     client: StreamDeckPropertyInspectorClient,
 ) {
     const [state, setState] = useState<SettingsSyncState>(initialState);
+    const stateRef = useRef<SettingsSyncState>(initialState);
+    const commitState = useCallback((
+        buildNextState: (currentState: SettingsSyncState) => SettingsSyncState,
+    ): SettingsSyncState => {
+        const nextState = buildNextState(stateRef.current);
+        stateRef.current = nextState;
+        setState(nextState);
+
+        return nextState;
+    }, []);
     const resolvedGlobalSettings = useMemo(
         () => resolveGlobalSettings(state.globalSettings),
         [state.globalSettings],
@@ -65,34 +75,27 @@ export function usePropertyInspectorSettings(
     }), [state.storedSettings, state.globalSettings, state.actionKind, state.isWindows]);
 
     const updateWidgetSettings = (patch: WidgetSettings): void => {
-        setState((currentState) => {
+        const nextState = commitState((currentState) => {
             const nextStoredSettings = mergeWidgetSettingsPatch(currentState.storedSettings, patch);
-
-            client.setSettings(writeWidgetSettings(nextStoredSettings)).catch((error: Error) => {
-                setState((errorState) => ({
-                    ...errorState,
-                    loadError: `Failed to save settings: ${error.message}`,
-                }));
-            });
 
             return {
                 ...currentState,
                 storedSettings: nextStoredSettings,
                 loadError: null,
             };
+        });
+
+        client.setSettings(writeWidgetSettings(nextState.storedSettings)).catch((error: Error) => {
+            commitState((errorState) => ({
+                ...errorState,
+                loadError: `Failed to save settings: ${error.message}`,
+            }));
         });
     };
 
     const resetWidgetSettings = (): void => {
-        setState((currentState) => {
+        const nextState = commitState((currentState) => {
             const nextStoredSettings: WidgetStoredSettings = {};
-
-            client.setSettings(writeWidgetSettings(nextStoredSettings)).catch((error: Error) => {
-                setState((errorState) => ({
-                    ...errorState,
-                    loadError: `Failed to save settings: ${error.message}`,
-                }));
-            });
 
             return {
                 ...currentState,
@@ -100,24 +103,31 @@ export function usePropertyInspectorSettings(
                 loadError: null,
             };
         });
+
+        client.setSettings(writeWidgetSettings(nextState.storedSettings)).catch((error: Error) => {
+            commitState((errorState) => ({
+                ...errorState,
+                loadError: `Failed to save settings: ${error.message}`,
+            }));
+        });
     };
 
     const updateGlobalSettings = (patch: GlobalSettings): void => {
-        setState((currentState) => {
+        const nextState = commitState((currentState) => {
             const nextGlobalSettings = applyGlobalSettingsPatch(currentState.globalSettings, patch);
-
-            client.setGlobalSettings(writeGlobalSettings(nextGlobalSettings)).catch((error: Error) => {
-                setState((errorState) => ({
-                    ...errorState,
-                    loadError: `Failed to save global settings: ${error.message}`,
-                }));
-            });
 
             return {
                 ...currentState,
                 globalSettings: nextGlobalSettings,
                 loadError: null,
             };
+        });
+
+        client.setGlobalSettings(writeGlobalSettings(nextState.globalSettings)).catch((error: Error) => {
+            commitState((errorState) => ({
+                ...errorState,
+                loadError: `Failed to save global settings: ${error.message}`,
+            }));
         });
     };
 
@@ -134,7 +144,7 @@ export function usePropertyInspectorSettings(
                 return;
             }
 
-            setState((currentState) => ({
+            commitState((currentState) => ({
                 ...currentState,
                 actionKind,
                 isWindows,
@@ -159,7 +169,7 @@ export function usePropertyInspectorSettings(
                 return;
             }
 
-            setState((currentState) => {
+            commitState((currentState) => {
                 const nextState: SettingsSyncState = {
                     ...currentState,
                     loadError: null,
@@ -196,7 +206,7 @@ export function usePropertyInspectorSettings(
                 return;
             }
 
-            setState((currentState) => {
+            commitState((currentState) => {
                 const refreshedSettings = readWidgetSettingsResult(event.payload.settings);
 
                 return {
@@ -214,10 +224,9 @@ export function usePropertyInspectorSettings(
                 return;
             }
 
-            setState((currentState) => ({
+            commitState((currentState) => ({
                 ...currentState,
                 globalSettings: readGlobalSettings(event.payload.settings),
-                settingsNotice: currentState.settingsNotice,
             }));
         });
 
@@ -226,7 +235,7 @@ export function usePropertyInspectorSettings(
                 return;
             }
 
-            setState((currentState) => ({
+            commitState((currentState) => ({
                 ...currentState,
                 loadError: `Failed to load settings: ${error.message}`,
             }));
@@ -237,7 +246,7 @@ export function usePropertyInspectorSettings(
             unsubscribeSettings();
             unsubscribeGlobalSettings();
         };
-    }, [client]);
+    }, [client, commitState]);
 
     return {
         actionKind: state.actionKind,
