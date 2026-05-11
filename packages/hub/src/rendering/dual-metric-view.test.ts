@@ -5,7 +5,7 @@ import type { DualChannelWidgetData, WidgetData } from "./widget-data";
 
 test("dual metric view renders the requested primitive branch", () => {
     const testCases = [
-        { graphicType: "dashed-line" as const, expected: /dual-sparkline-positive-row/ },
+        { graphicType: "sparkline" as const, expected: /dual-sparkline-positive-row/ },
         { graphicType: "circular" as const, expected: /dual-arc-positive-row/ },
         { graphicType: "text" as const, expected: /text-metric-positive-value/ },
     ];

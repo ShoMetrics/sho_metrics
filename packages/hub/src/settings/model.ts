@@ -9,7 +9,7 @@ export type ActionKind =
     | "gpu-power"
     | "unknown";
 
-export type GraphicType = "circular" | "text" | "linear" | "dashed-line";
+export type GraphicType = "circular" | "text" | "linear" | "sparkline";
 export type CircleStyle = "value" | "compact" | "gauge";
 export type GraphicStyle = "flat" | "cupertino-glass";
 export type ColorMode = "threshold" | "solid";

@@ -359,7 +359,7 @@ function composeDualMetricBody(
         svg: renderDualMetricBodyView({
             data: renderedMetricData,
             visual: renderPlan.visualSettings,
-            graphicType: options.dualGraphicType ?? "dashed-line",
+            graphicType: options.dualGraphicType ?? "sparkline",
             renderSize: renderPlan.renderSize,
             titleText: options.titleText,
             chartMode: options.chartMode ?? "overlay",

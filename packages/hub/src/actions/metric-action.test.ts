@@ -36,7 +36,7 @@ test("runtime cache writes merge into the latest received settings", async () =>
             payload: {
                 settings: {
                     appearanceOverrides: {
-                        graphicType: "dashed-line",
+                        graphicType: "sparkline",
                     },
                 },
             },
@@ -46,7 +46,7 @@ test("runtime cache writes merge into the latest received settings", async () =>
 
         assert.deepEqual(setSettingsCalls.at(-1), {
             appearanceOverrides: {
-                graphicType: "dashed-line",
+                graphicType: "sparkline",
             },
             runtimeCache: {
                 learnedMaximumDownloadSpeedMbps: 123,

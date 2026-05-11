@@ -7,7 +7,7 @@ const graphicTypeOptionList = [
     { value: "circular", label: "Circle" },
     { value: "text", label: "Text" },
     { value: "linear", label: "Bar" },
-    { value: "dashed-line", label: "Trend" },
+    { value: "sparkline", label: "Trend" },
 ] as const;
 
 interface GraphicTypeSettingProps extends SettingControlProps {

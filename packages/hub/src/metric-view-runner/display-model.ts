@@ -38,7 +38,7 @@ export interface SingleMetricDisplayOptions extends BaseMetricDisplayOptions {
 export interface DualMetricDisplayOptions extends BaseMetricDisplayOptions {
     widgetData: DualChannelWidgetData;
     titleText: string;
-    dualGraphicType?: "circular" | "text" | "dashed-line";
+    dualGraphicType?: "circular" | "text" | "sparkline";
     chartMode?: "overlay" | "mirrored";
     positiveColor: string;
     negativeColor: string;

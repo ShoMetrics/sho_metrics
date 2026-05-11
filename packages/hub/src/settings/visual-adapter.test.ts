@@ -9,11 +9,11 @@ import {
 test("graphic type maps resolved appearance settings to renderer names", () => {
     const circularSettings = buildMetricVisualSettings(buildAppearanceSettings({ graphicType: "circular" }));
     const linearSettings = buildMetricVisualSettings(buildAppearanceSettings({ graphicType: "linear" }));
-    const sparklineSettings = buildMetricVisualSettings(buildAppearanceSettings({ graphicType: "dashed-line" }));
+    const sparklineSettings = buildMetricVisualSettings(buildAppearanceSettings({ graphicType: "sparkline" }));
 
     assert.equal(circularSettings.graphicType, "circular");
     assert.equal(linearSettings.graphicType, "linear");
-    assert.equal(sparklineSettings.graphicType, "dashed-line");
+    assert.equal(sparklineSettings.graphicType, "sparkline");
 });
 
 test("circle style maps resolved appearance settings to renderer presets", () => {

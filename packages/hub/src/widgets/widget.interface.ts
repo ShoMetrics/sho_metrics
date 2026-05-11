@@ -17,7 +17,6 @@ type GraphicPrimitiveType =
     | "circular"
     | "text"
     | "linear"
-    | "dashed-line"
     | "arc-gauge"
     | "sparkline"
     | "linear-bar"

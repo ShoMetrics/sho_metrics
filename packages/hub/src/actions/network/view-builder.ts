@@ -56,7 +56,7 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
         };
     }
 
-    if (effectiveGraphicType === "dashed-line" && displayDirection === "both") {
+    if (effectiveGraphicType === "sparkline" && displayDirection === "both") {
         return {
             displayOptions: buildDualNetworkSparklineDisplayOptions(options),
         };

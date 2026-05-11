@@ -237,7 +237,7 @@ test("touch strip layout uses square rendering for circular graphics", () => {
 
 test("touch strip layout uses wide rendering for non-circular graphics", () => {
     const touchStripMetricLayout = resolveTouchStripMetricLayout({
-        graphicType: "dashed-line",
+        graphicType: "sparkline",
         circleStyle: "value",
         graphicStyle: "flat",
         colorConfig: {
