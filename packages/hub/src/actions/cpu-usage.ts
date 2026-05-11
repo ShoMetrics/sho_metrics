@@ -7,13 +7,14 @@ import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import type { WidgetData } from "../rendering/widget-data";
 import { CPU_MODEL_METRIC_KEY, CPU_USAGE_METRIC_KEY } from "../runtime/metric-keys";
+import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 
 /**
  * CPU Usage action with full theming support.
  * User can choose graphic type (circular, dashed-line, linear),
  * style (flat, cupertino-glass), and color mode (solid, threshold).
  */
-@action({ UUID: "com.ez.sho-metrics.cpu-usage" })
+@action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND["cpu-usage"] })
 export class CpuUsage extends MetricAction {
     protected readonly actionKind = "cpu-usage";
 

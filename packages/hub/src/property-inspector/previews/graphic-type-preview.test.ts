@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildCircleStylePreviewUri } from "./circle-style-preview";
 import { buildGraphicTypePreviewUri } from "./graphic-type-preview";
-import type { CircleStyle, GraphicType } from "../inspector/action-kind";
+import type { CircleStyle, GraphicType } from "../inspector/settings-types";
 
 test("graphic type preview URIs render every Property Inspector graphic option without throwing", () => {
     const graphicTypes: readonly GraphicType[] = ["circular", "text", "linear", "dashed-line"];

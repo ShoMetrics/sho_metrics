@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { ActionKind } from "../inspector/action-kind";
+import type { ActionKind } from "../inspector/settings-types";
 import { buildVisibilityContext, type InspectorTestSettings } from "../testing/test-context";
 import { WidgetSettingsTab } from "./WidgetSettingsTab";
 

@@ -6,8 +6,9 @@ import { buildMemoryUsageWidgetData } from "../metrics/storage-widget-data";
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import { RAM_TOTAL_METRIC_KEY, RAM_USED_METRIC_KEY } from "../runtime/metric-keys";
+import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 
-@action({ UUID: "com.ez.sho-metrics.ram" })
+@action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.ram })
 export class RamUsage extends MetricAction {
     protected readonly actionKind = "ram";
 

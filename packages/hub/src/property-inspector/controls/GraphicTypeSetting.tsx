@@ -1,5 +1,5 @@
 import { buildGraphicTypePreviewUri } from "../previews/graphic-type-preview";
-import type { GraphicType } from "../inspector/action-kind";
+import type { GraphicType } from "../inspector/settings-types";
 import { PreviewOptionSetting } from "./PreviewOptionSetting";
 import type { SettingControlProps } from "./setting-control";
 

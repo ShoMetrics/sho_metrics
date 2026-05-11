@@ -21,10 +21,8 @@ import {
     resolveIsWindowsPropertyInspector,
     type StreamDeckPropertyInspectorClient,
 } from "../stream-deck/stream-deck-client";
-import {
-    resolveActionKind,
-    type ActionKind,
-} from "../inspector/action-kind";
+import { resolveStreamDeckActionKind } from "../../shared/stream-deck-actions";
+import type { ActionKind } from "../inspector/settings-types";
 
 interface SettingsSyncState {
     actionKind: ActionKind;
@@ -136,7 +134,7 @@ export function usePropertyInspectorSettings(
 
         async function loadSettings(): Promise<void> {
             const connectionInfo = await client.getConnectionInfo();
-            const actionKind = resolveActionKind(readActionUuid(connectionInfo));
+            const actionKind = resolveStreamDeckActionKind(readActionUuid(connectionInfo));
             const isWindows = resolveIsWindowsPropertyInspector(connectionInfo);
             const initialSettings = readWidgetSettingsResult(connectionInfo.actionInfo?.payload?.settings);
 

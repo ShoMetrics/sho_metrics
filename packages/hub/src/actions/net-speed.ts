@@ -18,6 +18,7 @@ import {
     resolveNetworkMaximumMegabitsPerSecond,
     type NetworkDisplayDebugInfo,
 } from "./network/view-builder";
+import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 
 const log = logger.for("Action:NetSpeed");
 
@@ -26,7 +27,7 @@ const log = logger.for("Action:NetSpeed");
  * Circle, linear, and sparkline visuals all support either one network
  * direction or combined download/upload telemetry.
  */
-@action({ UUID: "com.ez.sho-metrics.net-speed" })
+@action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND["net-speed"] })
 export class NetSpeed extends MetricAction {
     protected readonly actionKind = "net-speed";
 

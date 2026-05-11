@@ -4,7 +4,7 @@ import type { WidgetData } from "../../rendering/widget-data";
 import { WIDGET_LOGICAL_SIZE } from "../../rendering/widget-data";
 import { getHardwareIconFragment } from "../../widgets/icons/hardware-icons";
 import { getMetricStatusIcon } from "../../widgets/icons/metric-status-icons";
-import type { CircleStyle } from "../inspector/action-kind";
+import type { CircleStyle } from "../inspector/settings-types";
 
 const previewData: WidgetData = {
     current: 68,
