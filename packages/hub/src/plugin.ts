@@ -30,5 +30,5 @@ streamDeck.connect()
         pluginGlobalSettingsStore.update(settings);
     })
     .catch(error => {
-        log.warn(() => `Failed to connect or load global settings: ${String(error)}`);
+        log.warn("Failed to connect or load global settings", error);
     });
