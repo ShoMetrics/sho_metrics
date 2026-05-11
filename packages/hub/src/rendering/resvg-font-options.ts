@@ -116,10 +116,10 @@ function resolveFontFiles(
         return cachedFontFiles;
     }
 
-    const fontFiles = filterExistingFontFiles([
+    const fontFiles = Array.from(new Set([
         ...resolvePrimaryFontFileCandidates(environment),
         ...scriptList.flatMap(fontScript => resolveFontFileCandidatesForScript(fontScript, environment.platform)),
-    ], environment.fileExists);
+    ])).filter(fontFile => environment.fileExists(fontFile));
 
     fontFileCacheByKey.set(cacheKey, fontFiles);
     return fontFiles;
@@ -238,15 +238,6 @@ function resolvePrimaryFontFamily(platform: NodeJS.Platform): string {
     }
 }
 
-function filterExistingFontFiles(
-    fontFileCandidates: readonly string[],
-    fileExists: (fontFile: string) => boolean,
-): readonly string[] {
-    const fontFileList = Array.from(new Set(fontFileCandidates));
-
-    return fontFileList.filter(fontFile => fileExists(fontFile));
-}
-
 function decodeXmlText(text: string): string {
     return text
         .replace(/&#x([0-9a-f]+);/gi, (_, codePointHexadecimal: string) => {
@@ -272,15 +263,12 @@ function decodeCodePoint(codePoint: number): string {
 
 function resolveBundledInterFontFile(): string {
     const executableDirectory = path.dirname(process.argv[1] ?? process.cwd());
-
-    return firstExistingFontFile([
+    const bundledInterFontFile = [
         path.resolve(process.cwd(), "assets", "fonts", "inter", "InterVariable.ttf"),
         path.resolve(process.cwd(), "com.ez.sho-metrics.sdPlugin", "assets", "fonts", "inter", "InterVariable.ttf"),
         path.resolve(executableDirectory, "..", "assets", "fonts", "inter", "InterVariable.ttf"),
         path.resolve(executableDirectory, "..", "..", "assets", "fonts", "inter", "InterVariable.ttf"),
-    ]) ?? path.resolve(process.cwd(), "assets", "fonts", "inter", "InterVariable.ttf");
-}
+    ].find(fontFile => existsSync(fontFile));
 
-function firstExistingFontFile(fontFiles: readonly string[]): string | undefined {
-    return fontFiles.find(fontFile => existsSync(fontFile));
+    return bundledInterFontFile ?? path.resolve(process.cwd(), "assets", "fonts", "inter", "InterVariable.ttf");
 }

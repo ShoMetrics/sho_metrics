@@ -45,7 +45,7 @@ export function resolveSparklineGridLineOpacity(options: {
 
     if (options.gridLineVisibility === "always") {
         return {
-            opacity: resolveAlwaysGuideOpacity(options.gridLineType),
+            opacity: options.gridLineType === "vertical" ? VERTICAL_GUIDE_LINE_OPACITY : HORIZONTAL_GUIDE_LINE_OPACITY,
             activity: 0,
             verticalRange: 0,
             averageStep: 0,
@@ -54,10 +54,6 @@ export function resolveSparklineGridLineOpacity(options: {
     }
 
     return resolveAdaptiveGuideMetrics(options.points, options.plotLayout, options.gridLineType);
-}
-
-function resolveAlwaysGuideOpacity(gridLineType: SparklineGridLineType): number {
-    return gridLineType === "vertical" ? VERTICAL_GUIDE_LINE_OPACITY : HORIZONTAL_GUIDE_LINE_OPACITY;
 }
 
 function resolveAdaptiveGuideMetrics(
@@ -89,23 +85,19 @@ function resolveAdaptiveGuideMetrics(
         ADAPTIVE_GUIDE_ACTIVE_ACTIVITY,
         activityMetrics.activity,
     );
+    const steadyOpacity = resolveAdaptiveSteadyGuideOpacity(gridLineType);
+    const activeOpacity = gridLineType === "vertical"
+        ? ADAPTIVE_VERTICAL_GUIDE_ACTIVE_OPACITY
+        : ADAPTIVE_GUIDE_ACTIVE_OPACITY;
 
     return {
         ...activityMetrics,
-        opacity: lerp(
-            resolveAdaptiveSteadyGuideOpacity(gridLineType),
-            resolveAdaptiveActiveGuideOpacity(gridLineType),
-            progress,
-        ),
+        opacity: steadyOpacity + (activeOpacity - steadyOpacity) * progress,
     };
 }
 
 function resolveAdaptiveSteadyGuideOpacity(gridLineType: SparklineGridLineType): number {
     return gridLineType === "vertical" ? ADAPTIVE_VERTICAL_GUIDE_STEADY_OPACITY : ADAPTIVE_GUIDE_STEADY_OPACITY;
-}
-
-function resolveAdaptiveActiveGuideOpacity(gridLineType: SparklineGridLineType): number {
-    return gridLineType === "vertical" ? ADAPTIVE_VERTICAL_GUIDE_ACTIVE_OPACITY : ADAPTIVE_GUIDE_ACTIVE_OPACITY;
 }
 
 function calculateSparklineActivityMetrics(
@@ -157,10 +149,6 @@ function normalizePointVerticalProgress(
     plotLayout: SparklineGridLineLayout,
 ): number {
     return clamp(1 - (point.yCoordinate - plotLayout.yCoordinate) / plotLayout.height, 0, 1);
-}
-
-function lerp(startValue: number, endValue: number, progress: number): number {
-    return startValue + (endValue - startValue) * progress;
 }
 
 function smoothStep(edgeStart: number, edgeEnd: number, value: number): number {

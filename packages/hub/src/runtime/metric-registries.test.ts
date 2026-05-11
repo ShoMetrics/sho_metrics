@@ -32,6 +32,9 @@ test("network interface automatic selection prefers maximum speed then display s
         ]);
 
         assert.equal(networkInterfaceRegistry.resolveAutomaticSelection()?.id, "fast-eth");
+        assert.equal(networkInterfaceRegistry.resolveSelection("")?.id, "fast-eth");
+        assert.equal(networkInterfaceRegistry.resolveSelection("fast-wifi")?.name, "Wi-Fi");
+        assert.equal(networkInterfaceRegistry.resolveSelection("missing"), null);
         assert.equal(networkInterfaceRegistry.resolveMaximumAutomaticSpeedMegabitsPerSecond(), 2400);
         assert.equal(networkInterfaceRegistry.findById("fast-wifi")?.name, "Wi-Fi");
         assert.equal(networkInterfaceRegistry.findById(null), null);

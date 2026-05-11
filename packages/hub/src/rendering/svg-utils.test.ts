@@ -5,6 +5,7 @@ import {
     clamp,
     escapeSvgText,
     renderConstrainedSvgText,
+    sanitizeSvgId,
 } from "./svg-utils";
 
 test("SVG text escaping covers XML-sensitive characters", () => {
@@ -15,6 +16,12 @@ test("clamp constrains values inside the inclusive range", () => {
     assert.equal(clamp(-1, 0, 10), 0);
     assert.equal(clamp(5, 0, 10), 5);
     assert.equal(clamp(11, 0, 10), 10);
+});
+
+test("SVG id sanitization preserves caller fallback ids", () => {
+    assert.equal(sanitizeSvgId("disk label:root", "fallback-id"), "disk-label-root");
+    assert.equal(sanitizeSvgId(":::", "fallback-id"), "---");
+    assert.equal(sanitizeSvgId("", "fallback-id"), "fallback-id");
 });
 
 test("constrained SVG text sanitizes ids, escapes text attributes, and preserves clip bounds", () => {

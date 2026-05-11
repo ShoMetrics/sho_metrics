@@ -391,8 +391,7 @@ export function resolveIsWindowsPropertyInspector(connectionInfo: ConnectionInfo
     const platformValue = String(
         connectionInfo.application?.platform
             ?? connectionInfo.info?.application?.platform
-            ?? readNavigatorPlatform()
-            ?? "",
+            ?? (typeof navigator === "undefined" ? "" : navigator.platform),
     ).toLowerCase();
 
     return platformValue.includes("win");
@@ -439,10 +438,6 @@ function isStreamDeckMessage(value: unknown): value is StreamDeckMessage {
             && !Array.isArray(value)
             && typeof (value as { event?: unknown }).event === "string",
     );
-}
-
-function readNavigatorPlatform(): string {
-    return typeof navigator === "undefined" ? "" : navigator.platform;
 }
 
 if (typeof window !== "undefined") {

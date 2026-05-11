@@ -12,7 +12,7 @@ export interface NetSpeedMetricSubscriptionSettings {
 }
 
 export function resolveNetSpeedMetricSubscriptionKeys(settings: NetSpeedMetricSubscriptionSettings): readonly string[] {
-    const selectedNetworkInterface = resolveNetworkInterface(settings.networkInterfaceId);
+    const selectedNetworkInterface = networkInterfaceRegistry.resolveSelection(settings.networkInterfaceId);
     const displayDirection = settings.networkDirection;
 
     if (
@@ -35,12 +35,4 @@ export function resolveNetSpeedMetricSubscriptionKeys(settings: NetSpeedMetricSu
             ? getNetworkInterfaceMetricKey(displayDirection, selectedNetworkInterface.id)
             : getNetworkAggregateMetricKey(displayDirection),
     ];
-}
-
-function resolveNetworkInterface(value: string) {
-    if (value.length > 0) {
-        return networkInterfaceRegistry.findById(value);
-    }
-
-    return networkInterfaceRegistry.resolveAutomaticSelection();
 }
