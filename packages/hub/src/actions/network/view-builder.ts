@@ -143,14 +143,12 @@ export function resolveNetworkMaximumMegabitsPerSecond(
     direction: NetworkDirection,
     settings: ResolvedWidgetSettings,
 ): number {
-    const customMaximumMegabitsPerSecond = Number(
-        direction === "download"
-            ? settings.network.maximumDownloadSpeedMbps
-            : settings.network.maximumUploadSpeedMbps,
-    );
+    const customMaximumMegabitsPerSecond = direction === "download"
+        ? settings.network.maximumDownloadSpeedMbps
+        : settings.network.maximumUploadSpeedMbps;
 
     if (
-        Number.isFinite(customMaximumMegabitsPerSecond)
+        customMaximumMegabitsPerSecond !== undefined
         && customMaximumMegabitsPerSecond > 0
     ) {
         return customMaximumMegabitsPerSecond;
