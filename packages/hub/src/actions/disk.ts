@@ -57,7 +57,7 @@ export class Disk extends MetricAction {
         const selectedVolume = resolveSelectedDiskVolume(settings.metric.diskVolumeId);
 
         this.publishDiskVolumeOptions(event);
-        this.publishDiskThroughputScaleLearning(event, settings, selectedVolume);
+        this.publishDiskThroughputRuntimeMaximum(event, settings, selectedVolume);
 
         if (settings.metric.diskMetricKind === "throughput" && process.platform !== "darwin") {
             showDiskThroughputUnavailable(event);
@@ -83,7 +83,7 @@ export class Disk extends MetricAction {
         });
     }
 
-    private publishDiskThroughputScaleLearning(
+    private publishDiskThroughputRuntimeMaximum(
         event: WillAppearEvent,
         settings: ResolvedWidgetSettings,
         selectedVolume: DiskVolumeOption | null,
@@ -95,13 +95,13 @@ export class Disk extends MetricAction {
             return;
         }
 
-        const nextReadMaximum = resolveLearnedDiskMaximumThroughputMebibytesPerSecond({
+        const nextReadMaximum = resolveRuntimeDiskMaximumThroughputMebibytesPerSecond({
             direction: "read",
             settings,
             selectedVolume,
             observedBytesPerSecond: metricStore.getWidgetData(getDiskThroughputMetricKey("read"), "READ", "B/s").current,
         });
-        const nextWriteMaximum = resolveLearnedDiskMaximumThroughputMebibytesPerSecond({
+        const nextWriteMaximum = resolveRuntimeDiskMaximumThroughputMebibytesPerSecond({
             direction: "write",
             settings,
             selectedVolume,
@@ -109,10 +109,10 @@ export class Disk extends MetricAction {
         });
 
         this.updateRuntimeCache(event, {
-            learnedMaximumDiskReadThroughputMebibytesPerSecond: nextReadMaximum,
-            learnedMaximumDiskWriteThroughputMebibytesPerSecond: nextWriteMaximum,
+            runtimeMaximumDiskReadThroughputMebibytesPerSecond: nextReadMaximum,
+            runtimeMaximumDiskWriteThroughputMebibytesPerSecond: nextWriteMaximum,
         }).catch(error => {
-            log.error(() => `Failed to publish learned disk throughput scale: ${String(error)}`);
+            log.error(() => `Failed to publish runtime disk throughput maximum: ${String(error)}`);
         });
     }
 }
@@ -125,7 +125,7 @@ function resolveSelectedDiskVolume(value: string): DiskVolumeOption | null {
     return diskVolumeRegistry.resolveDefaultSelection();
 }
 
-function resolveLearnedDiskMaximumThroughputMebibytesPerSecond(options: {
+function resolveRuntimeDiskMaximumThroughputMebibytesPerSecond(options: {
     direction: Exclude<DiskThroughputDirection, "both" | "total">;
     settings: ResolvedWidgetSettings;
     selectedVolume: DiskVolumeOption | null;
@@ -137,9 +137,9 @@ function resolveLearnedDiskMaximumThroughputMebibytesPerSecond(options: {
         options.selectedVolume,
     );
     const observedMebibytesPerSecond = Math.max(0, options.observedBytesPerSecond) / 1024 / 1024;
-    const learnedMaximum = Math.ceil(observedMebibytesPerSecond * 1.1);
+    const runtimeMaximum = Math.ceil(observedMebibytesPerSecond * 1.1);
 
-    return Math.max(currentMaximum, learnedMaximum);
+    return Math.max(currentMaximum, runtimeMaximum);
 }
 
 function showDiskThroughputUnavailable(event: WillAppearEvent): void {

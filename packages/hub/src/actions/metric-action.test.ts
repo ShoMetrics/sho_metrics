@@ -52,7 +52,7 @@ test("runtime cache publishes to Property Inspector without writing settings", a
         assert.deepEqual(setSettingsCalls, []);
         assert.deepEqual(action.runtimeCachePatchList, [
             {
-                learnedMaximumDownloadSpeedMbps: 123,
+                runtimeMaximumDownloadSpeedMbps: 123,
             },
         ]);
     } finally {
@@ -73,7 +73,7 @@ class TestMetricAction extends MetricAction {
 
     publishRuntimeCacheForTest(event: WillAppearEvent): Promise<void> {
         return this.updateRuntimeCache(event, {
-            learnedMaximumDownloadSpeedMbps: 123,
+            runtimeMaximumDownloadSpeedMbps: 123,
         });
     }
 
