@@ -40,8 +40,11 @@ test("area path closes to the configured baseline", () => {
 });
 
 test("empty paths are safe", () => {
-    assert.equal(buildSparklineLinePath({ points: [], lineSmoothingPercent: 75 }), "");
-    assert.equal(buildSparklineAreaPath({ points: [], baselineYCoordinate: 40, lineSmoothingPercent: 75 }), "");
+    const linePath = buildSparklineLinePath({ points: [], lineSmoothingPercent: 75 });
+    const areaPath = buildSparklineAreaPath({ points: [], baselineYCoordinate: 40, lineSmoothingPercent: 75 });
+
+    assert.equal(linePath, "");
+    assert.equal(areaPath, "");
 });
 
 function buildExamplePoints(): readonly SparklinePathPoint[] {

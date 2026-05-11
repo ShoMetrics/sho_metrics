@@ -32,7 +32,6 @@ export function resolveColorForThresholdValue(thresholdValue: number, colorConfi
             return threshold.color;
         }
     }
-    // Fallback: last threshold or solid color
     return colorConfig.thresholds[colorConfig.thresholds.length - 1]?.color ?? colorConfig.solidColor;
 }
 
@@ -64,7 +63,7 @@ export function buildGradientStops(
         const offset = index / (values.length - 1);
 
         if (currentColor !== previousColor) {
-            // Sharp transition: end previous color, start new color at same offset
+            // Paired stops at the same offset create a sharp color transition.
             stops.push({ offset, color: previousColor });
             stops.push({ offset, color: currentColor });
             previousColor = currentColor;

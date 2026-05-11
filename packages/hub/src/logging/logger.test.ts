@@ -145,6 +145,7 @@ test("everyMs evicts the oldest key when throttle state reaches the fixed limit"
     log.atDebug().everyMs("sample-0", 60000).log("oldest can write after eviction");
 
     const messages = sink.recordedEntries.map(recordedEntry => recordedEntry.entryData[0]);
+
     assert.equal(messages.length, throttleKeyCountLimit + 2);
     assert.equal(messages.at(-2), "evict oldest");
     assert.equal(messages.at(-1), "oldest can write after eviction");

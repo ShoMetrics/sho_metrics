@@ -174,13 +174,14 @@ test("getSettings sends the current action request and waits for the matching se
             },
         },
     });
+    const receivedSettings = await settingsPromise;
 
     assert.deepEqual(readSentMessage(socket, 1), {
         event: "getSettings",
         context: "pi-uuid",
         action: "com.example.action",
     });
-    assert.deepEqual(await settingsPromise, {
+    assert.deepEqual(receivedSettings, {
         settings: {
             graphicType: "linear",
         },
@@ -203,6 +204,7 @@ test("getGlobalSettings returns the received settings payload", async () => {
             },
         },
     });
+    const receivedGlobalSettings = await globalSettingsPromise;
 
     assert.deepEqual(readSentMessage(socket, 1), {
         event: "getGlobalSettings",
@@ -211,7 +213,7 @@ test("getGlobalSettings returns the received settings payload", async () => {
     });
     // SDPIComponents returns raw global settings here. The local client returns
     // the payload shape App already consumes, so this deviation is intentional.
-    assert.deepEqual(await globalSettingsPromise, {
+    assert.deepEqual(receivedGlobalSettings, {
         settings: {
             overrideWidgetAppearance: true,
         },

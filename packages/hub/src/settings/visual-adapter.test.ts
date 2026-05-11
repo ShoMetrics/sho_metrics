@@ -7,32 +7,45 @@ import {
 } from "./widget-settings";
 
 test("graphic type maps resolved appearance settings to renderer names", () => {
-    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({ graphicType: "circular" })).graphicType, "circular");
-    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({ graphicType: "linear" })).graphicType, "linear");
-    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({ graphicType: "dashed-line" })).graphicType, "dashed-line");
+    const circularSettings = buildMetricVisualSettings(buildAppearanceSettings({ graphicType: "circular" }));
+    const linearSettings = buildMetricVisualSettings(buildAppearanceSettings({ graphicType: "linear" }));
+    const sparklineSettings = buildMetricVisualSettings(buildAppearanceSettings({ graphicType: "dashed-line" }));
+
+    assert.equal(circularSettings.graphicType, "circular");
+    assert.equal(linearSettings.graphicType, "linear");
+    assert.equal(sparklineSettings.graphicType, "dashed-line");
 });
 
 test("circle style maps resolved appearance settings to renderer presets", () => {
-    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({ circleStyle: "compact" })).circleStyle, "compact");
-    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({ circleStyle: "gauge" })).circleStyle, "gauge");
-    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({ circleStyle: "value" })).circleStyle, "value");
+    const compactSettings = buildMetricVisualSettings(buildAppearanceSettings({ circleStyle: "compact" }));
+    const gaugeSettings = buildMetricVisualSettings(buildAppearanceSettings({ circleStyle: "gauge" }));
+    const valueSettings = buildMetricVisualSettings(buildAppearanceSettings({ circleStyle: "value" }));
+
+    assert.equal(compactSettings.circleStyle, "compact");
+    assert.equal(gaugeSettings.circleStyle, "gauge");
+    assert.equal(valueSettings.circleStyle, "value");
 });
 
 test("graphic style maps resolved appearance settings to theme preset names", () => {
-    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({
+    const cupertinoGlassSettings = buildMetricVisualSettings(buildAppearanceSettings({
         graphicStyle: "cupertino-glass",
-    })).graphicStyle, "cupertino-glass");
-    assert.equal(buildMetricVisualSettings(buildAppearanceSettings()).graphicStyle, "flat");
+    }));
+    const defaultSettings = buildMetricVisualSettings(buildAppearanceSettings());
+
+    assert.equal(cupertinoGlassSettings.graphicStyle, "cupertino-glass");
+    assert.equal(defaultSettings.graphicStyle, "flat");
 });
 
 test("solid color mode uses resolved appearance color", () => {
-    assert.equal(buildMetricVisualSettings(buildAppearanceSettings({
+    const visualSettings = buildMetricVisualSettings(buildAppearanceSettings({
         colorMode: "solid",
         usageColors: {
             ...defaultAppearanceSettings.usageColors,
             solidColor: "#123456",
         },
-    })).colorConfig.solidColor, "#123456");
+    }));
+
+    assert.equal(visualSettings.colorConfig.solidColor, "#123456");
 });
 
 test("threshold values build renderer color bands", () => {

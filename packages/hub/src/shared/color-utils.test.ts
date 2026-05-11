@@ -45,9 +45,14 @@ test("readable text color picks the higher contrast foreground", () => {
 });
 
 test("relative luminance follows WCAG channel weighting", () => {
-    assert.equal(resolveRelativeLuminance({ red: 0, green: 0, blue: 0 }), 0);
-    assert.equal(resolveRelativeLuminance({ red: 255, green: 255, blue: 255 }), 1);
-    assert.ok(resolveRelativeLuminance({ red: 0, green: 255, blue: 0 }) > resolveRelativeLuminance({ red: 255, green: 0, blue: 0 }));
+    const blackLuminance = resolveRelativeLuminance({ red: 0, green: 0, blue: 0 });
+    const whiteLuminance = resolveRelativeLuminance({ red: 255, green: 255, blue: 255 });
+    const greenLuminance = resolveRelativeLuminance({ red: 0, green: 255, blue: 0 });
+    const redLuminance = resolveRelativeLuminance({ red: 255, green: 0, blue: 0 });
+
+    assert.equal(blackLuminance, 0);
+    assert.equal(whiteLuminance, 1);
+    assert.ok(greenLuminance > redLuminance);
 });
 
 test("rgb and hsl conversion round trips primary colors", () => {
