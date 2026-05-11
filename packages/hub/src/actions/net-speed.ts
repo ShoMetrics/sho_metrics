@@ -46,7 +46,7 @@ export class NetSpeed extends MetricAction {
         const selectedNetworkInterface = networkInterfaceRegistry.resolveSelection(settings.metric.networkInterfaceId);
 
         this.publishNetworkInterfaceOptions(event);
-        this.publishNetworkScaleLearning(event, settings, selectedNetworkInterface);
+        this.publishNetworkRuntimeMaximum(event, settings, selectedNetworkInterface);
 
         const displayUpdate = buildNetworkDisplayUpdate({
             event,
@@ -78,7 +78,7 @@ export class NetSpeed extends MetricAction {
         });
     }
 
-    private publishNetworkScaleLearning(
+    private publishNetworkRuntimeMaximum(
         event: WillAppearEvent,
         settings: ResolvedWidgetSettings,
         selectedNetworkInterface: NetworkInterfaceOption | null,
@@ -93,22 +93,22 @@ export class NetSpeed extends MetricAction {
         const uploadMetricKey = selectedNetworkInterface
             ? getNetworkInterfaceMetricKey("upload", selectedNetworkInterface.id)
             : getNetworkAggregateMetricKey("upload");
-        const nextDownloadMaximum = resolveLearnedNetworkMaximumMegabitsPerSecond({
+        const nextDownloadMaximum = resolveRuntimeNetworkMaximumMegabitsPerSecond({
             direction: "download",
             settings,
             observedBytesPerSecond: metricStore.getWidgetData(downloadMetricKey, "DOWN", "B/s").current,
         });
-        const nextUploadMaximum = resolveLearnedNetworkMaximumMegabitsPerSecond({
+        const nextUploadMaximum = resolveRuntimeNetworkMaximumMegabitsPerSecond({
             direction: "upload",
             settings,
             observedBytesPerSecond: metricStore.getWidgetData(uploadMetricKey, "UP", "B/s").current,
         });
 
         this.updateRuntimeCache(event, {
-            learnedMaximumDownloadSpeedMbps: nextDownloadMaximum,
-            learnedMaximumUploadSpeedMbps: nextUploadMaximum,
+            runtimeMaximumDownloadSpeedMbps: nextDownloadMaximum,
+            runtimeMaximumUploadSpeedMbps: nextUploadMaximum,
         }).catch(error => {
-            log.error(() => `Failed to publish learned network scale: ${String(error)}`);
+            log.error(() => `Failed to publish runtime network maximum: ${String(error)}`);
         });
     }
 }
@@ -153,14 +153,14 @@ function formatNetworkInterfaceDebugValue(networkInterface: NetworkInterfaceOpti
     });
 }
 
-function resolveLearnedNetworkMaximumMegabitsPerSecond(options: {
+function resolveRuntimeNetworkMaximumMegabitsPerSecond(options: {
     direction: NetworkDirection;
     settings: ResolvedWidgetSettings;
     observedBytesPerSecond: number;
 }): number {
     const currentMaximum = resolveNetworkMaximumMegabitsPerSecond(options.direction, options.settings);
     const observedMegabitsPerSecond = (Math.max(0, options.observedBytesPerSecond) * 8) / 1_000_000;
-    const learnedMaximum = Math.ceil(observedMegabitsPerSecond * 1.1);
+    const runtimeMaximum = Math.ceil(observedMegabitsPerSecond * 1.1);
 
-    return Math.max(currentMaximum, learnedMaximum);
+    return Math.max(currentMaximum, runtimeMaximum);
 }

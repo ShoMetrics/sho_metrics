@@ -11,10 +11,10 @@ import type { NetworkInterfaceOption } from "./network-interfaces";
 export interface WidgetRuntimeCache {
     availableNetworkInterfaces: NetworkInterfaceOption[];
     availableDiskVolumes: DiskVolumeOption[];
-    learnedMaximumDownloadSpeedMbps: number | undefined;
-    learnedMaximumUploadSpeedMbps: number | undefined;
-    learnedMaximumDiskReadThroughputMebibytesPerSecond: number | undefined;
-    learnedMaximumDiskWriteThroughputMebibytesPerSecond: number | undefined;
+    runtimeMaximumDownloadSpeedMbps: number | undefined;
+    runtimeMaximumUploadSpeedMbps: number | undefined;
+    runtimeMaximumDiskReadThroughputMebibytesPerSecond: number | undefined;
+    runtimeMaximumDiskWriteThroughputMebibytesPerSecond: number | undefined;
 }
 
 export type WidgetRuntimeCachePatch = Partial<WidgetRuntimeCache>;
@@ -22,10 +22,10 @@ export type WidgetRuntimeCachePatch = Partial<WidgetRuntimeCache>;
 export const emptyWidgetRuntimeCache: WidgetRuntimeCache = {
     availableNetworkInterfaces: [],
     availableDiskVolumes: [],
-    learnedMaximumDownloadSpeedMbps: undefined,
-    learnedMaximumUploadSpeedMbps: undefined,
-    learnedMaximumDiskReadThroughputMebibytesPerSecond: undefined,
-    learnedMaximumDiskWriteThroughputMebibytesPerSecond: undefined,
+    runtimeMaximumDownloadSpeedMbps: undefined,
+    runtimeMaximumUploadSpeedMbps: undefined,
+    runtimeMaximumDiskReadThroughputMebibytesPerSecond: undefined,
+    runtimeMaximumDiskWriteThroughputMebibytesPerSecond: undefined,
 };
 
 export const WIDGET_RUNTIME_CACHE_MESSAGE_TYPE = "widget-runtime-cache";

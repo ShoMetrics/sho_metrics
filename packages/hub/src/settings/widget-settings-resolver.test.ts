@@ -132,7 +132,7 @@ test("runtime cache participates only in auto scale resolution", () => {
         },
     };
     const runtimeCache = {
-        learnedMaximumDownloadSpeedMbps: 800,
+        runtimeMaximumDownloadSpeedMbps: 800,
     };
 
     const autoResolvedSettings = resolveWidgetSettings({

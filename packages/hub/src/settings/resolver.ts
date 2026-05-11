@@ -148,11 +148,11 @@ function resolveNetworkSettings(
             ...network,
             maximumDownloadSpeedMbps: maxOptionalPositiveNumber(
                 network.maximumDownloadSpeedMbps,
-                runtimeCache.learnedMaximumDownloadSpeedMbps,
+                runtimeCache.runtimeMaximumDownloadSpeedMbps,
             ),
             maximumUploadSpeedMbps: maxOptionalPositiveNumber(
                 network.maximumUploadSpeedMbps,
-                runtimeCache.learnedMaximumUploadSpeedMbps,
+                runtimeCache.runtimeMaximumUploadSpeedMbps,
             ),
         };
     }
@@ -177,11 +177,11 @@ function resolveDiskThroughputSettings(
             ...diskThroughput,
             maximumDiskReadThroughputMebibytesPerSecond: maxOptionalPositiveNumber(
                 diskThroughput.maximumDiskReadThroughputMebibytesPerSecond,
-                runtimeCache.learnedMaximumDiskReadThroughputMebibytesPerSecond,
+                runtimeCache.runtimeMaximumDiskReadThroughputMebibytesPerSecond,
             ),
             maximumDiskWriteThroughputMebibytesPerSecond: maxOptionalPositiveNumber(
                 diskThroughput.maximumDiskWriteThroughputMebibytesPerSecond,
-                runtimeCache.learnedMaximumDiskWriteThroughputMebibytesPerSecond,
+                runtimeCache.runtimeMaximumDiskWriteThroughputMebibytesPerSecond,
             ),
         };
     }
