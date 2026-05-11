@@ -27,6 +27,14 @@ class NetworkInterfaceRegistry {
             ?? null;
     }
 
+    resolveSelection(networkInterfaceId: string): NetworkInterfaceOption | null {
+        if (networkInterfaceId.length > 0) {
+            return this.findById(networkInterfaceId);
+        }
+
+        return this.resolveAutomaticSelection();
+    }
+
     resolveMaximumAutomaticSpeedMegabitsPerSecond(): number | null {
         return this.options.reduce<number | null>((maximumSpeed, networkInterface) => {
             if (!networkInterface.speedMegabitsPerSecond) {

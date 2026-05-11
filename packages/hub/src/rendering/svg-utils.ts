@@ -76,7 +76,7 @@ export function renderConstrainedSvgText(options: ConstrainedSvgTextOptions): st
     const clipYCoordinate = dominantBaseline === "middle"
         ? options.yCoordinate - clipHeight / 2
         : options.yCoordinate - fontSize;
-    const clipPathId = sanitizeSvgId(options.id);
+    const clipPathId = sanitizeSvgId(options.id, "constrained-svg-text");
     const extraAttributes = options.extraAttributes?.length
         ? ` ${options.extraAttributes.join(" ")}`
         : "";
@@ -212,10 +212,10 @@ function estimateSvgCharacterWidthRatio(character: string): number {
     return 0.52;
 }
 
-function sanitizeSvgId(id: string): string {
+export function sanitizeSvgId(id: string, fallbackId: string): string {
     const sanitizedId = id.replace(/[^A-Za-z0-9_-]/g, "-");
 
-    return sanitizedId.length > 0 ? sanitizedId : "constrained-svg-text";
+    return sanitizedId.length > 0 ? sanitizedId : fallbackId;
 }
 
 function formatSvgNumber(value: number): string {

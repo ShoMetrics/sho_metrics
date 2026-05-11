@@ -176,7 +176,7 @@ export const sparkline: Widget<SparklineConfig> = {
             ${renderMetricTextRow({
                 id: "sparkline-current-value",
                 valueText,
-                unitText: formatCurrentUnit(data.unit),
+                unitText: data.unit,
                 xCoordinate: layoutPlan.value.xCoordinate,
                 yCoordinate: layoutPlan.value.yCoordinate,
                 width: layoutPlan.value.maxWidth,
@@ -507,10 +507,6 @@ function renderLatestPointGlow(point: SparklinePoint, color: string, filterId: s
         <circle cx="${formatSvgNumber(point.xCoordinate)}" cy="${formatSvgNumber(point.yCoordinate)}"
             r="5.5" fill="${color}" opacity="0.34" filter="url(#${filterId})" />
     `;
-}
-
-function formatCurrentUnit(unit: string): string {
-    return unit;
 }
 
 function formatSvgNumber(value: number): string {

@@ -35,9 +35,5 @@ function formatMaximumTemperature(maximumCelsius: number, unit: TemperatureUnit)
         ? convertCelsiusToFahrenheit(maximumCelsius)
         : maximumCelsius;
 
-    return `${maximumTemperature.toFixed(0)} ${formatTemperatureDisplayUnit(unit)}`;
-}
-
-function formatTemperatureDisplayUnit(unit: TemperatureUnit): string {
-    return unit === "fahrenheit" ? "°F" : "°C";
+    return `${maximumTemperature.toFixed(0)} ${unit === "fahrenheit" ? "°F" : "°C"}`;
 }

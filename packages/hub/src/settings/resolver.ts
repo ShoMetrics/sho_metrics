@@ -114,9 +114,12 @@ function resolveLocalSettings(
     context: SettingsContext,
     diskMetricKind: DiskMetricKind,
 ): WidgetLocalSettings {
+    const defaultPollingFrequencySeconds = context.actionKind === "disk" && diskMetricKind === "usage"
+        ? 60
+        : defaultLocalSettings.pollingFrequencySeconds;
+
     return {
-        pollingFrequencySeconds: local?.pollingFrequencySeconds
-            ?? resolveDefaultPollingFrequencySeconds(context, diskMetricKind),
+        pollingFrequencySeconds: local?.pollingFrequencySeconds ?? defaultPollingFrequencySeconds,
         networkTrafficDisplayMode: local?.networkTrafficDisplayMode
             ?? defaultLocalSettings.networkTrafficDisplayMode,
         diskUsageDisplayMode: local?.diskUsageDisplayMode ?? defaultLocalSettings.diskUsageDisplayMode,
@@ -189,12 +192,6 @@ function resolveRuntimeCache(runtimeCache: Partial<WidgetRuntimeCache> | undefin
         ...defaultRuntimeCache,
         ...runtimeCache,
     };
-}
-
-function resolveDefaultPollingFrequencySeconds(context: SettingsContext, diskMetricKind: DiskMetricKind): number {
-    return context.actionKind === "disk" && diskMetricKind === "usage"
-        ? 60
-        : defaultLocalSettings.pollingFrequencySeconds;
 }
 
 function maxOptionalPositiveNumber(

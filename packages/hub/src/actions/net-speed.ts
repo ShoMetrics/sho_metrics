@@ -42,7 +42,7 @@ export class NetSpeed extends MetricAction {
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event);
         const isAutomaticNetworkInterface = settings.metric.networkInterfaceId.length === 0;
-        const selectedNetworkInterface = resolveNetworkInterface(settings.metric.networkInterfaceId);
+        const selectedNetworkInterface = networkInterfaceRegistry.resolveSelection(settings.metric.networkInterfaceId);
 
         this.publishNetworkInterfaceOptions(event);
         this.publishNetworkScaleLearning(event, settings, selectedNetworkInterface);
@@ -113,14 +113,6 @@ export class NetSpeed extends MetricAction {
 }
 
 const DEBUG_LOG_INTERVAL_MILLISECONDS = 5000;
-
-function resolveNetworkInterface(value: string): NetworkInterfaceOption | null {
-    if (value.length > 0) {
-        return networkInterfaceRegistry.findById(value);
-    }
-
-    return networkInterfaceRegistry.resolveAutomaticSelection();
-}
 
 function logNetworkSpeedDebug(options: {
     settings: ResolvedWidgetSettings;

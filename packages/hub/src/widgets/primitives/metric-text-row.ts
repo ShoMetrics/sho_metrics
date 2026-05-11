@@ -3,6 +3,7 @@ import {
     escapeSvgText,
     formatSvgTextFitAttributes,
     resolveSvgTextFit,
+    sanitizeSvgId,
     type SvgTextAnchor,
     type SvgTextFitOptions,
 } from "../../rendering/svg-utils";
@@ -63,7 +64,7 @@ export function renderMetricTextRow(options: MetricTextRowOptions): string {
     const unitGap = unitTier.gap * textFit.fontScale;
     const clipHeight = options.clipHeight
         ?? Math.max(valueFontSize, unitFontSize) * 1.45;
-    const clipPathId = sanitizeSvgId(options.id);
+    const clipPathId = sanitizeSvgId(options.id, "metric-text-row");
     const clipXCoordinate = resolveClipXCoordinate(options.xCoordinate, width, textAnchor);
     const clipYCoordinate = options.yCoordinate - clipHeight / 2;
     const valueAttributes = options.valueExtraAttributes?.length
@@ -126,12 +127,6 @@ function resolveClipXCoordinate(xCoordinate: number, width: number, textAnchor: 
     }
 
     return xCoordinate;
-}
-
-function sanitizeSvgId(id: string): string {
-    const sanitizedId = id.replace(/[^A-Za-z0-9_-]/g, "-");
-
-    return sanitizedId.length > 0 ? sanitizedId : "metric-text-row";
 }
 
 function formatSvgNumber(value: number): string {
