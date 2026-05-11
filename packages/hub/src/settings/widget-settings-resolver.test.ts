@@ -124,19 +124,15 @@ test("runtime cache participates only in auto scale resolution", () => {
             maximumDownloadSpeedMbps: 100,
         },
     };
-    const autoStoredSettings: WidgetStoredSettings = {
-        runtimeCache: {
-            learnedMaximumDownloadSpeedMbps: 800,
-        },
-    };
+    const autoStoredSettings: WidgetStoredSettings = {};
     const customStoredSettings: WidgetStoredSettings = {
         networkOverrides: {
             networkScaleMode: "custom",
             maximumDownloadSpeedMbps: 300,
         },
-        runtimeCache: {
-            learnedMaximumDownloadSpeedMbps: 800,
-        },
+    };
+    const runtimeCache = {
+        learnedMaximumDownloadSpeedMbps: 800,
     };
 
     const autoResolvedSettings = resolveWidgetSettings({
@@ -146,6 +142,7 @@ test("runtime cache participates only in auto scale resolution", () => {
             actionKind: "net-speed",
             isWindows: false,
         },
+        runtimeCache,
     });
     const customResolvedSettings = resolveWidgetSettings({
         storedSettings: customStoredSettings,
@@ -154,6 +151,7 @@ test("runtime cache participates only in auto scale resolution", () => {
             actionKind: "net-speed",
             isWindows: false,
         },
+        runtimeCache,
     });
 
     assert.equal(autoResolvedSettings.network.maximumDownloadSpeedMbps, 800);

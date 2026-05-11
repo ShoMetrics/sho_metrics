@@ -1,7 +1,6 @@
 import type {
     AppearanceColorRampKey,
     AppearanceSettingsOverride,
-    WidgetRuntimeCache,
     WidgetSettings,
 } from "./model";
 
@@ -11,15 +10,6 @@ type WidgetSettingsBranch =
     | "appearanceOverrides"
     | "networkOverrides"
     | "diskThroughputOverrides";
-
-export interface RuntimeStatePatch {
-    availableNetworkInterfaces?: WidgetRuntimeCache["availableNetworkInterfaces"];
-    availableDiskVolumes?: WidgetRuntimeCache["availableDiskVolumes"];
-    learnedMaximumDownloadSpeedMbps?: number;
-    learnedMaximumUploadSpeedMbps?: number;
-    learnedMaximumDiskReadThroughputMebibytesPerSecond?: number;
-    learnedMaximumDiskWriteThroughputMebibytesPerSecond?: number;
-}
 
 export function updateWidgetSettingsBranch<TBranch extends WidgetSettingsBranch>(
     settings: WidgetSettings,
@@ -52,10 +42,6 @@ export function mergeWidgetSettingsPatch(settings: WidgetSettings, patch: Widget
 
     if (patch.diskThroughputOverrides) {
         output.diskThroughputOverrides = { ...settings.diskThroughputOverrides, ...patch.diskThroughputOverrides };
-    }
-
-    if (patch.runtimeCache) {
-        output.runtimeCache = { ...settings.runtimeCache, ...patch.runtimeCache };
     }
 
     return output;

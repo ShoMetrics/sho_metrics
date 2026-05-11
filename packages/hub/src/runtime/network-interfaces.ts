@@ -1,6 +1,10 @@
-import type { NetworkInterfaceCacheItem } from "../settings/model";
-
-export type NetworkInterfaceOption = NetworkInterfaceCacheItem;
+export interface NetworkInterfaceOption {
+    id: string;
+    name: string;
+    type: "wired" | "wireless" | "unknown";
+    isDefault: boolean;
+    speedMegabitsPerSecond: number | null;
+}
 
 class NetworkInterfaceRegistry {
     private options: NetworkInterfaceOption[] = [];

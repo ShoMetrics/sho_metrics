@@ -60,10 +60,6 @@ export function writeWidgetSettings(settings: WidgetSettings): JsonObject {
         output.diskThroughputOverrides = { ...settings.diskThroughputOverrides } as JsonObject;
     }
 
-    if (settings.runtimeCache) {
-        output.runtimeCache = { ...settings.runtimeCache } as JsonObject;
-    }
-
     return output;
 }
 

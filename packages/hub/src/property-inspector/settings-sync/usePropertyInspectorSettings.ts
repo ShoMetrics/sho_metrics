@@ -14,6 +14,14 @@ import {
     type RawWidgetSettingsClassification,
 } from "../../settings/codec";
 import { resolveGlobalSettings } from "../../settings/resolver";
+import {
+    emptyWidgetRuntimeCache,
+    mergeWidgetRuntimeCache,
+    WIDGET_RUNTIME_CACHE_MESSAGE_TYPE,
+    type WidgetRuntimeCache,
+    type WidgetRuntimeCacheMessage,
+    type WidgetRuntimeCachePatch,
+} from "../../runtime/widget-runtime-cache";
 import { buildPropertyInspectorContext } from "../inspector/context";
 import { applyGlobalSettingsPatch } from "./plugin-settings-updates";
 import {
@@ -28,6 +36,7 @@ interface SettingsSyncState {
     actionKind: ActionKind;
     isWindows: boolean;
     storedSettings: WidgetStoredSettings;
+    runtimeCache: WidgetRuntimeCache;
     globalSettings: GlobalSettings;
     settingsNotice: SettingsNotice | null;
     loadError: string | null;
@@ -42,6 +51,7 @@ const initialState: SettingsSyncState = {
     actionKind: "unknown",
     isWindows: false,
     storedSettings: {},
+    runtimeCache: { ...emptyWidgetRuntimeCache },
     globalSettings: {},
     settingsNotice: null,
     loadError: null,
@@ -68,9 +78,10 @@ export function usePropertyInspectorSettings(
     const visibilityContext = useMemo(() => buildPropertyInspectorContext({
         storedSettings: state.storedSettings,
         globalSettings: state.globalSettings,
+        runtimeCache: state.runtimeCache,
         actionKind: state.actionKind,
         isWindows: state.isWindows,
-    }), [state.storedSettings, state.globalSettings, state.actionKind, state.isWindows]);
+    }), [state.storedSettings, state.globalSettings, state.runtimeCache, state.actionKind, state.isWindows]);
 
     const updateWidgetSettings = (patch: WidgetSettings): void => {
         const nextState = commitState((currentState) => {
@@ -227,6 +238,21 @@ export function usePropertyInspectorSettings(
                 globalSettings: readGlobalSettings(event.payload.settings),
             }));
         });
+        const unsubscribeRuntimeCache = client.sendToPropertyInspector.subscribe((event) => {
+            if (isDisposed) {
+                return;
+            }
+
+            const runtimeCachePatch = readWidgetRuntimeCachePatch(event.payload);
+            if (!runtimeCachePatch) {
+                return;
+            }
+
+            commitState((currentState) => ({
+                ...currentState,
+                runtimeCache: mergeWidgetRuntimeCache(currentState.runtimeCache, runtimeCachePatch),
+            }));
+        });
 
         loadSettings().catch((error: Error) => {
             if (isDisposed) {
@@ -243,6 +269,7 @@ export function usePropertyInspectorSettings(
             isDisposed = true;
             unsubscribeSettings();
             unsubscribeGlobalSettings();
+            unsubscribeRuntimeCache();
         };
     }, [client, commitState]);
 
@@ -256,6 +283,19 @@ export function usePropertyInspectorSettings(
         resetWidgetSettings,
         updateGlobalSettings,
     };
+}
+
+function readWidgetRuntimeCachePatch(payload: unknown): WidgetRuntimeCachePatch | null {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+        return null;
+    }
+
+    const message = payload as Partial<WidgetRuntimeCacheMessage>;
+    if (message.type !== WIDGET_RUNTIME_CACHE_MESSAGE_TYPE || !message.patch) {
+        return null;
+    }
+
+    return message.patch;
 }
 
 function readWidgetSettingsResult(rawSettings: unknown): {

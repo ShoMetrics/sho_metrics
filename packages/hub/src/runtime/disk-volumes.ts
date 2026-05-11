@@ -1,7 +1,16 @@
-import type { DiskVolumeCacheItem } from "../settings/model";
+export type DiskStorageKind = "ssd" | "hdd" | "network" | "unknown";
 
-export type { DiskStorageKind } from "../settings/model";
-export type DiskVolumeOption = DiskVolumeCacheItem;
+export interface DiskVolumeOption {
+    id: string;
+    fs: string;
+    mount: string;
+    sizeBytes: number;
+    usedBytes: number;
+    availableBytes: number;
+    storageKind: DiskStorageKind;
+    diskName: string;
+    volumeLabel: string;
+}
 
 class DiskVolumeRegistry {
     private options: DiskVolumeOption[] = [];

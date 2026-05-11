@@ -1,12 +1,24 @@
-import { SingletonAction, WillAppearEvent, WillDisappearEvent, DidReceiveSettingsEvent } from "@elgato/streamdeck";
+import streamDeck, {
+    SingletonAction,
+    WillAppearEvent,
+    WillDisappearEvent,
+    DidReceiveSettingsEvent,
+    PropertyInspectorDidAppearEvent,
+} from "@elgato/streamdeck";
 import { scheduler } from "../runtime/scheduler";
 import { clearMetricDisplayState } from "../metric-view-runner/runner";
 import { logger } from "../logging/logger";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import { resolveActionSettings } from "./settings/action-settings-resolver";
-import { readWidgetSettings, writeWidgetSettings } from "../settings/codec";
-import type { ActionKind, ResolvedWidgetSettings, WidgetStoredSettings } from "../settings/widget-settings";
-import { mergeWidgetSettingsPatch, type RuntimeStatePatch } from "../settings/updates";
+import type { ActionKind, ResolvedWidgetSettings } from "../settings/widget-settings";
+import {
+    emptyWidgetRuntimeCache,
+    mergeWidgetRuntimeCache,
+    WIDGET_RUNTIME_CACHE_MESSAGE_TYPE,
+    type WidgetRuntimeCache,
+    type WidgetRuntimeCacheMessage,
+    type WidgetRuntimeCachePatch,
+} from "../runtime/widget-runtime-cache";
 
 const log = logger.for("MetricAction");
 
@@ -19,6 +31,7 @@ interface ActiveMetricAction {
 interface ActiveActionState {
     event: WillAppearEvent;
     rawSettings: unknown;
+    runtimeCache: WidgetRuntimeCache;
 }
 
 /**
@@ -46,6 +59,7 @@ export abstract class MetricAction extends SingletonAction {
         const activeActionState = {
             event,
             rawSettings: event.payload.settings,
+            runtimeCache: { ...emptyWidgetRuntimeCache },
         };
 
         this.activeActionStates.set(event.action.id, activeActionState);
@@ -57,7 +71,7 @@ export abstract class MetricAction extends SingletonAction {
         const activeActionState = this.activeActionStates.get(event.action.id);
         if (activeActionState) {
             const previousSettings = this.resolveSettings(activeActionState.event);
-            const nextSettings = this.resolveRawSettings(event.payload.settings);
+            const nextSettings = this.resolveRawSettings(event.payload.settings, activeActionState.runtimeCache);
 
             log.info(() => [
                 "settingsReceived",
@@ -82,6 +96,17 @@ export abstract class MetricAction extends SingletonAction {
         clearMetricDisplayState(event.action.id);
     }
 
+    override onPropertyInspectorDidAppear(event: PropertyInspectorDidAppearEvent): void {
+        const activeActionState = this.activeActionStates.get(event.action.id);
+        if (!activeActionState) {
+            return;
+        }
+
+        this.sendRuntimeCachePatchToPropertyInspector(event, activeActionState.runtimeCache).catch(error => {
+            log.error(() => `Failed to publish runtime cache to Property Inspector: ${String(error)}`);
+        });
+    }
+
     /**
      * Called on every scheduler tick. Actions query MetricStore themselves
      * for the specific WidgetData they need.
@@ -99,40 +124,22 @@ export abstract class MetricAction extends SingletonAction {
             throw new Error(`Action ${event.action.id} is not active; cannot resolve settings.`);
         }
 
-        return this.resolveRawSettings(activeActionState.rawSettings);
+        return this.resolveRawSettings(activeActionState.rawSettings, activeActionState.runtimeCache);
     }
 
-    protected updateRuntimeCache(event: WillAppearEvent, patch: RuntimeStatePatch): Promise<void> {
-        return this.updateStoredSettings(event, storedSettings => {
-            if (isRuntimeCachePatchUnchanged(storedSettings.runtimeCache, patch)) {
-                return storedSettings;
-            }
-
-            return mergeWidgetSettingsPatch(storedSettings, { runtimeCache: patch });
-        });
-    }
-
-    private updateStoredSettings(
-        event: WillAppearEvent,
-        update: (storedSettings: WidgetStoredSettings) => WidgetStoredSettings,
-    ): Promise<void> {
+    protected updateRuntimeCache(event: WillAppearEvent, patch: WidgetRuntimeCachePatch): Promise<void> {
         const activeActionState = this.activeActionStates.get(event.action.id);
         if (!activeActionState) {
-            throw new Error(`Action ${event.action.id} is not active; cannot update settings.`);
+            throw new Error(`Action ${event.action.id} is not active; cannot update runtime cache.`);
         }
 
-        const currentSettings = readWidgetSettings(activeActionState.rawSettings);
-        const nextSettings = update(currentSettings);
-
-        if (nextSettings === currentSettings) {
+        if (isRuntimeCachePatchUnchanged(activeActionState.runtimeCache, patch)) {
             return Promise.resolve();
         }
 
-        const rawSettings = writeWidgetSettings(nextSettings);
+        activeActionState.runtimeCache = mergeWidgetRuntimeCache(activeActionState.runtimeCache, patch);
 
-        activeActionState.rawSettings = rawSettings;
-
-        return event.action.setSettings(rawSettings);
+        return this.sendRuntimeCachePatchToPropertyInspector(event, patch);
     }
 
     private subscribeAction(activeActionState: ActiveActionState): void {
@@ -189,8 +196,26 @@ export abstract class MetricAction extends SingletonAction {
         }
     }
 
-    private resolveRawSettings(rawSettings: unknown): ResolvedWidgetSettings {
-        return resolveActionSettings(rawSettings, this.actionKind);
+    protected sendRuntimeCachePatchToPropertyInspector(
+        event: WillAppearEvent | PropertyInspectorDidAppearEvent,
+        patch: WidgetRuntimeCachePatch,
+    ): Promise<void> {
+        if (streamDeck.ui.action?.id !== event.action.id) {
+            return Promise.resolve();
+        }
+
+        const message: WidgetRuntimeCacheMessage = {
+            type: WIDGET_RUNTIME_CACHE_MESSAGE_TYPE,
+            patch,
+        };
+
+        return streamDeck.ui.sendToPropertyInspector(
+            message as unknown as Parameters<typeof streamDeck.ui.sendToPropertyInspector>[0],
+        );
+    }
+
+    private resolveRawSettings(rawSettings: unknown, runtimeCache: WidgetRuntimeCache): ResolvedWidgetSettings {
+        return resolveActionSettings(rawSettings, this.actionKind, runtimeCache);
     }
 }
 
@@ -218,16 +243,16 @@ function formatSettingValue(value: unknown): string {
 }
 
 function isRuntimeCachePatchUnchanged(
-    runtimeCache: WidgetStoredSettings["runtimeCache"],
-    patch: RuntimeStatePatch,
+    runtimeCache: WidgetRuntimeCache,
+    patch: WidgetRuntimeCachePatch,
 ): boolean {
-    for (const key of Object.keys(patch) as Array<keyof RuntimeStatePatch>) {
-        const currentValue = runtimeCache?.[key];
+    for (const key of Object.keys(patch) as Array<keyof WidgetRuntimeCachePatch>) {
+        const currentValue = runtimeCache[key];
         const nextValue = patch[key];
 
         if (Array.isArray(currentValue) || Array.isArray(nextValue)) {
-            // TODO(settings-contract): Temporary pre-proto/pre-Zod deep compare. Move this to the codec/schema layer
-            // when persisted settings get a real contract.
+            // Runtime cache is ephemeral; this only avoids sending duplicate
+            // Property Inspector messages for unchanged option lists.
             if (JSON.stringify(currentValue ?? []) !== JSON.stringify(nextValue ?? [])) {
                 return false;
             }

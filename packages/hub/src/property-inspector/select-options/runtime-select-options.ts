@@ -3,11 +3,11 @@ import type { NetworkInterfaceOption } from "../../runtime/network-interfaces";
 import type { SelectOption, VisibilityContext } from "../inspector/types";
 
 export function resolveNetworkInterfaceOptions(context: VisibilityContext): SelectOption[] {
-    return buildNetworkInterfaceOptions(context.settings.runtimeCache?.availableNetworkInterfaces ?? []);
+    return buildNetworkInterfaceOptions(context.runtimeCache.availableNetworkInterfaces);
 }
 
 export function resolveDiskVolumeOptions(context: VisibilityContext): SelectOption[] {
-    return buildDiskVolumeOptions(context.settings.runtimeCache?.availableDiskVolumes ?? []);
+    return buildDiskVolumeOptions(context.runtimeCache.availableDiskVolumes);
 }
 
 function buildNetworkInterfaceOptions(networkInterfaces: readonly NetworkInterfaceOption[]): SelectOption[] {
@@ -56,7 +56,7 @@ export function resolveDiskAutoLinearLabel(context: VisibilityContext): string {
 }
 
 function resolveSelectedDiskVolume(context: VisibilityContext): DiskVolumeOption | null {
-    const diskVolumes = context.settings.runtimeCache?.availableDiskVolumes ?? [];
+    const diskVolumes = context.runtimeCache.availableDiskVolumes;
     const selectedDiskVolumeId = context.resolved.metric.diskVolumeId;
 
     if (selectedDiskVolumeId.length > 0) {
