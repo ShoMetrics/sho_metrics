@@ -21,8 +21,6 @@ import { ARC_GAUGE_LABELS } from "../../widgets/primitives/arc-gauge-label";
 import { escapeSvgText } from "../../rendering/svg-utils";
 import {
     isDualDiskThroughputDisplay,
-    normalizeDiskThroughputDisplayDirection,
-    resolveSingleDiskThroughputDirection,
 } from "./metric-subscriptions";
 import type { MetricDisplayOptions } from "../../metric-view-runner/display-model";
 import { buildColorConfigFromRamp } from "../shared/channel-color-config";
@@ -108,14 +106,14 @@ function buildDiskUsageDisplayOptions(options: BuildDiskDisplayOptions): MetricD
 }
 
 function buildDiskThroughputDisplayOptions(options: BuildDiskDisplayOptions): MetricDisplayOptions {
-    const throughputDirection = normalizeDiskThroughputDisplayDirection(options.settings.metric.diskThroughputDirection);
+    const throughputDirection = options.settings.metric.diskThroughputDirection;
     const effectiveGraphicType = options.settings.appearance.graphicType;
 
     if (isDualDiskThroughputDisplay(effectiveGraphicType, throughputDirection)) {
         return buildDualThroughputDisplayOptions(options);
     }
 
-    const singleThroughputDirection = resolveSingleDiskThroughputDirection(throughputDirection);
+    const singleThroughputDirection = throughputDirection === "both" ? "total" : throughputDirection;
     const throughputMetricKey = getDiskThroughputMetricKey(singleThroughputDirection);
     const throughputLabel = options.selectedVolume
         ? formatAsCompactDiskVolumeLabel(options.selectedVolume)

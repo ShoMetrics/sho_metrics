@@ -2,21 +2,18 @@ import { networkInterfaceRegistry } from "../../runtime/network-interfaces";
 import {
     getNetworkAggregateMetricKey,
     getNetworkInterfaceMetricKey,
-    type NetworkDirection,
 } from "../../runtime/network-metric-keys";
-import type { GraphicType } from "../../settings/widget-settings";
+import type { GraphicType, NetworkDirection as NetworkDisplayDirection } from "../../settings/widget-settings";
 
 export interface NetSpeedMetricSubscriptionSettings {
-    graphicType?: GraphicType;
-    networkDirection?: NetworkDisplayDirection;
-    networkInterfaceId?: string;
+    graphicType: GraphicType;
+    networkDirection: NetworkDisplayDirection;
+    networkInterfaceId: string;
 }
-
-type NetworkDisplayDirection = NetworkDirection | "both";
 
 export function resolveNetSpeedMetricSubscriptionKeys(settings: NetSpeedMetricSubscriptionSettings): readonly string[] {
     const selectedNetworkInterface = resolveNetworkInterface(settings.networkInterfaceId);
-    const displayDirection = normalizeNetworkDisplayDirection(settings.networkDirection);
+    const displayDirection = settings.networkDirection;
 
     if (
         settings.graphicType === "linear"
@@ -33,29 +30,15 @@ export function resolveNetSpeedMetricSubscriptionKeys(settings: NetSpeedMetricSu
             ];
     }
 
-    const direction = resolveSingleNetworkDirection(displayDirection);
-
     return [
         selectedNetworkInterface
-            ? getNetworkInterfaceMetricKey(direction, selectedNetworkInterface.id)
-            : getNetworkAggregateMetricKey(direction),
+            ? getNetworkInterfaceMetricKey(displayDirection, selectedNetworkInterface.id)
+            : getNetworkAggregateMetricKey(displayDirection),
     ];
 }
 
-export function normalizeNetworkDisplayDirection(value: NetSpeedMetricSubscriptionSettings["networkDirection"]): NetworkDisplayDirection {
-    if (value === "download" || value === "upload") {
-        return value;
-    }
-
-    return "both";
-}
-
-export function resolveSingleNetworkDirection(direction: NetworkDisplayDirection): NetworkDirection {
-    return direction === "upload" ? "upload" : "download";
-}
-
-function resolveNetworkInterface(value: string | undefined) {
-    if (value && value.length > 0) {
+function resolveNetworkInterface(value: string) {
+    if (value.length > 0) {
         return networkInterfaceRegistry.findById(value);
     }
 

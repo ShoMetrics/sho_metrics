@@ -52,6 +52,13 @@ test("tint channel derivation keeps the selected color as primary and creates st
     assert.ok(readRelativeLuminance(darkBlueChannels.secondaryColor) > readRelativeLuminance(darkBlueChannels.primaryColor));
 });
 
+test("tint channel derivation fails when the resolved tint color is invalid", () => {
+    assert.throws(
+        () => deriveTintChannelColors("not-a-color"),
+        /Expected a valid hex color/,
+    );
+});
+
 test("global channel color config maps primary to one channel and secondary to the other", () => {
     const settings = resolveGlobalSettings({
         overrideWidgetAppearance: true,

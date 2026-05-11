@@ -2,16 +2,12 @@ import type { ColorConfig, ColorThreshold } from "../rendering/color-resolver";
 import {
     formatHexColor,
     hslToRgb,
-    normalizeHexColor,
     parseHexColor,
     rgbToHsl,
     type RgbColor,
 } from "../shared/color-utils";
 import type { MetricVisualSettings } from "./visual-adapter";
-import {
-    defaultResolvedGlobalSettings,
-    type ResolvedGlobalSettings,
-} from "./widget-settings";
+import type { ResolvedGlobalSettings } from "./widget-settings";
 export { defaultResolvedGlobalSettings } from "./widget-settings";
 
 export interface TintChannelColors {
@@ -74,7 +70,7 @@ export function buildGlobalChannelColorConfig(
 }
 
 export function deriveTintChannelColors(tintColor: string): TintChannelColors {
-    const primaryColor = normalizeHexColor(tintColor, defaultResolvedGlobalSettings.appearanceDefaults.usageColors.solidColor);
+    const primaryColor = formatHexColor(readValidHexColor(tintColor));
     const primaryHslColor = rgbToHsl(readValidHexColor(primaryColor));
     const isPrimaryLight = primaryHslColor.lightness >= 0.55;
     const secondaryLightness = isPrimaryLight
@@ -99,7 +95,7 @@ export function buildTintThresholdColors(baseColor: string): {
     mediumColor: string;
     highColor: string;
 } {
-    const baseHslColor = rgbToHsl(readValidHexColor(normalizeHexColor(baseColor, defaultResolvedGlobalSettings.appearanceDefaults.usageColors.solidColor)));
+    const baseHslColor = rgbToHsl(readValidHexColor(baseColor));
     const isBaseLight = baseHslColor.lightness >= 0.55;
 
     return {
@@ -108,7 +104,7 @@ export function buildTintThresholdColors(baseColor: string): {
             saturation: Math.max(0.25, baseHslColor.saturation * 0.72),
             lightness: isBaseLight ? Math.min(0.9, baseHslColor.lightness + 0.12) : Math.min(0.78, baseHslColor.lightness + 0.28),
         })),
-        mediumColor: normalizeHexColor(baseColor, defaultResolvedGlobalSettings.appearanceDefaults.usageColors.solidColor),
+        mediumColor: formatHexColor(readValidHexColor(baseColor)),
         highColor: formatHexColor(hslToRgb({
             hue: baseHslColor.hue,
             saturation: Math.min(1, Math.max(0.5, baseHslColor.saturation + 0.16)),
@@ -138,11 +134,5 @@ function readValidHexColor(hexColor: string): RgbColor {
         return color;
     }
 
-    const fallbackColor = parseHexColor(defaultResolvedGlobalSettings.appearanceDefaults.usageColors.solidColor);
-
-    if (!fallbackColor) {
-        throw new Error("Default global appearance tint color must be a valid hex color.");
-    }
-
-    return fallbackColor;
+    throw new Error(`Expected a valid hex color, got ${hexColor}.`);
 }
