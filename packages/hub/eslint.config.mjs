@@ -7,8 +7,15 @@ const restrictedLegacySettingSyntax = [
   'PropertyInspectorSettings',
   'SingleMetricDisplaySettings',
   'SettingValue',
+  'RawWidgetSettingsClassification',
   'resolveFlatWidgetSettings',
   'flattenWidgetSettings',
+  'classifyRawWidgetSettings',
+  'readWidgetSettings',
+  'writeWidgetSettings',
+  'mergeWidgetSettingsPatch',
+  'updateWidgetSettingsBranch',
+  'resolveWidgetSettings',
   'APPEARANCE_COLOR_CONTROL_PATHS',
   'AppearanceColorControlKey',
   'GRAPHIC_TYPE_ALIASES',
@@ -16,8 +23,23 @@ const restrictedLegacySettingSyntax = [
   'colorMid',
 ].map(name => ({
   selector: `Identifier[name="${name}"]`,
-  message: `${name} is legacy settings plumbing. Use normalized widget settings instead.`,
+  message: `${name} is legacy settings plumbing. Use generated stored proto settings and resolved settings instead.`,
 }));
+
+const restrictedSettingsCompatibilitySyntax = [
+  {
+    selector: 'Identifier[name=/^normalize.*Settings$/]',
+    message: 'Do not add settings normalizers. Proto/protovalidate owns stored validation; the resolver owns defaults.',
+  },
+  {
+    selector: 'Identifier[name=/.*(SettingsCompatibility|CompatibilitySettings).*/]',
+    message: 'Do not add settings compatibility paths unless explicitly requested.',
+  },
+  {
+    selector: 'Identifier[name=/.*legacy.*Settings.*/i]',
+    message: 'Do not add legacy settings paths. Old settings compatibility is not required.',
+  },
+];
 
 const restrictedMetricVisualAliasSyntax = [
   'arc-gauge',
@@ -67,14 +89,44 @@ const restrictedSchemaHardeningImports = {
   paths: [
     {
       name: 'zod',
-      message: 'Do not introduce Zod before the pre-proto settings cleanup is complete.',
+      message: 'Do not add Zod beside the chosen settings proto path unless the decision is reopened.',
     },
   ],
   patterns: [
     {
-      group: ['**/generated/settings*'],
-      message: 'Generated settings contracts are not allowed before the codec boundary is ready.',
+      group: [
+        '**/settings/model',
+        '**/settings/model.js',
+        '**/settings/widget-settings',
+        '**/settings/widget-settings.js',
+        '**/settings/defaults',
+        '**/settings/defaults.js',
+        '**/settings/resolver',
+        '**/settings/resolver.js',
+        '**/settings/codec',
+        '**/settings/codec.js',
+        '**/settings/updates',
+        '**/settings/updates.js',
+      ],
+      message: 'The old hand-written settings model is deleted. Use settings/storage or settings/resolved-settings.',
     },
+  ],
+};
+
+const restrictedGeneratedSettingsProtoImports = {
+  patterns: [
+    {
+      group: ['**/generated/shometrics/v1/settings_pb', '**/generated/shometrics/v1/settings_pb.js'],
+      message: 'Generated settings proto may only be imported by settings/storage modules.',
+    },
+  ],
+};
+
+const restrictedNonStorageSchemaHardeningImports = {
+  paths: [...restrictedSchemaHardeningImports.paths],
+  patterns: [
+    ...restrictedSchemaHardeningImports.patterns,
+    ...restrictedGeneratedSettingsProtoImports.patterns,
   ],
 };
 
@@ -129,7 +181,7 @@ const restrictedActionDisplayBuilderImports = {
       message: 'Display builders must receive resolved global settings from actions.',
     },
   ],
-  patterns: [...restrictedSchemaHardeningImports.patterns],
+  patterns: [...restrictedNonStorageSchemaHardeningImports.patterns],
 };
 
 const restrictedConcreteActionSettingsWriteSyntax = [
@@ -140,19 +192,19 @@ const restrictedConcreteActionSettingsWriteSyntax = [
 ];
 
 const restrictedRendererImportRules = {
-  paths: [...restrictedSchemaHardeningImports.paths],
+  paths: [...restrictedNonStorageSchemaHardeningImports.paths],
   patterns: [
-    ...restrictedSchemaHardeningImports.patterns,
+    ...restrictedNonStorageSchemaHardeningImports.patterns,
     ...restrictedRendererSettingsImports.patterns,
   ],
 };
 
 const restrictedConcreteActionImportRules = {
   paths: [
-    ...restrictedSchemaHardeningImports.paths,
+    ...restrictedNonStorageSchemaHardeningImports.paths,
     ...restrictedConcreteActionSettingsImports.paths,
   ],
-  patterns: [...restrictedSchemaHardeningImports.patterns],
+  patterns: [...restrictedNonStorageSchemaHardeningImports.patterns],
 };
 
 const sourceSafetyRules = {
@@ -193,12 +245,28 @@ export default tseslint.config(
   },
   {
     files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', restrictedSchemaHardeningImports],
+    },
+  },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/settings/storage/**/*'],
+    rules: {
+      'no-restricted-imports': ['error', restrictedNonStorageSchemaHardeningImports],
+    },
+  },
+  {
+    files: ['src/**/*.{ts,tsx}'],
     ignores: ['src/**/*.test.ts'],
     rules: {
       ...sourceSafetyRules,
       ...typeAwareSourceSafetyRules,
-      'no-restricted-imports': ['error', restrictedSchemaHardeningImports],
-      'no-restricted-syntax': ['error', ...restrictedLegacySettingSyntax],
+      'no-restricted-syntax': [
+        'error',
+        ...restrictedLegacySettingSyntax,
+        ...restrictedSettingsCompatibilitySyntax,
+      ],
     },
   },
   {
@@ -220,10 +288,11 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'error',
         ...restrictedLegacySettingSyntax,
+        ...restrictedSettingsCompatibilitySyntax,
         ...restrictedActionPayloadSettingsMutationSyntax,
         {
           selector: 'MemberExpression[object.type="MemberExpression"][object.object.name="event"][object.property.name="payload"][property.name="settings"]',
-          message: 'Display code must receive normalized resolvedSettings instead of reading event.payload.settings.',
+          message: 'Display code must receive resolved settings instead of reading event.payload.settings.',
         },
       ],
     },
@@ -234,6 +303,7 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'error',
         ...restrictedLegacySettingSyntax,
+        ...restrictedSettingsCompatibilitySyntax,
         ...restrictedActionPayloadSettingsMutationSyntax,
       ],
     },
@@ -245,6 +315,7 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'error',
         ...restrictedLegacySettingSyntax,
+        ...restrictedSettingsCompatibilitySyntax,
         ...restrictedConcreteActionRawSettingsSyntax,
         ...restrictedActionPayloadSettingsMutationSyntax,
         ...restrictedConcreteActionVisualFallbackSyntax,
@@ -258,7 +329,11 @@ export default tseslint.config(
     files: ['src/actions/{disk,network}/view-builder.ts'],
     rules: {
       'no-restricted-imports': ['error', restrictedActionDisplayBuilderImports],
-      'no-restricted-syntax': ['error', ...restrictedLegacySettingSyntax],
+      'no-restricted-syntax': [
+        'error',
+        ...restrictedLegacySettingSyntax,
+        ...restrictedSettingsCompatibilitySyntax,
+      ],
     },
   },
   {
@@ -267,6 +342,7 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'error',
         ...restrictedLegacySettingSyntax,
+        ...restrictedSettingsCompatibilitySyntax,
         ...restrictedMetricVisualAliasSyntax,
       ],
     },
