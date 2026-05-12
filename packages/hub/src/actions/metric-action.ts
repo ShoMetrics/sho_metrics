@@ -5,6 +5,7 @@ import streamDeck, {
     DidReceiveSettingsEvent,
     PropertyInspectorDidAppearEvent,
 } from "@elgato/streamdeck";
+import { isDeepStrictEqual } from "node:util";
 import { scheduler } from "../runtime/scheduler";
 import { clearMetricDisplayState } from "../metric-view-runner/runner";
 import { logger } from "../logging/logger";
@@ -282,20 +283,9 @@ function isRuntimeCachePatchUnchanged(
     patch: WidgetRuntimeCachePatch,
 ): boolean {
     for (const key of Object.keys(patch) as Array<keyof WidgetRuntimeCachePatch>) {
-        const currentValue = runtimeCache[key];
-        const nextValue = patch[key];
-
-        if (Array.isArray(currentValue) || Array.isArray(nextValue)) {
-            // Runtime cache is ephemeral; this only avoids sending duplicate
-            // Property Inspector messages for unchanged option lists.
-            if (JSON.stringify(currentValue ?? []) !== JSON.stringify(nextValue ?? [])) {
-                return false;
-            }
-
-            continue;
-        }
-
-        if (currentValue !== nextValue) {
+        // Runtime cache is ephemeral; deep equality only avoids duplicate
+        // Property Inspector messages for unchanged option lists and maxima.
+        if (!isDeepStrictEqual(runtimeCache[key], patch[key])) {
             return false;
         }
     }
