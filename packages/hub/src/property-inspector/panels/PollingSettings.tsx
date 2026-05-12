@@ -11,10 +11,10 @@ export function PollingSettings({
         <SettingsSection title="Update">
             <SelectSetting
                 label="Polling Frequency"
-                value={context.resolved.local.pollingFrequencySeconds}
+                value={context.resolved.preferences.pollingFrequencySeconds}
                 optionList={pollingFrequencyOptionList}
                 onValueChange={(pollingFrequencySeconds) => onSettingsPatch({
-                    local: { pollingFrequencySeconds },
+                    preferences: { pollingFrequencySeconds },
                 })}
             />
         </SettingsSection>

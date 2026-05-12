@@ -9,9 +9,10 @@ import {
 } from "../../runtime/disk-metric-keys";
 import { buildDiskThroughputWidgetData, buildDiskUsageWidgetData } from "../../metrics/storage-widget-data";
 import type {
+    ResolvedDiskMetricTarget,
     ResolvedGlobalSettings,
     ResolvedWidgetSettings,
-} from "../../settings/widget-settings";
+} from "../../settings/resolved-settings";
 import { resolveColorForThresholdValue, type ColorConfig } from "../../rendering/color-resolver";
 import { buildGlobalChannelColorConfig } from "../../settings/global-appearance";
 import { getDiskIcon, getDiskIconFragment, renderCenteredHardwareIconFragment } from "../../widgets/icons/hardware-icons";
@@ -28,17 +29,27 @@ import { buildColorConfigFromRamp } from "../shared/channel-color-config";
 interface BuildDiskDisplayOptions {
     event: WillAppearEvent;
     settings: ResolvedWidgetSettings;
+    target: ResolvedDiskMetricTarget;
     globalSettings: ResolvedGlobalSettings;
     metricStore: MetricStore;
     selectedVolume: DiskVolumeOption | null;
 }
 
+type DiskUsageReading = Extract<ResolvedDiskMetricTarget["reading"], { readonly kind: "usage" }>;
+type DiskThroughputReading = Extract<ResolvedDiskMetricTarget["reading"], { readonly kind: "throughput" }>;
+
 export function buildDiskDisplayOptions(options: BuildDiskDisplayOptions): MetricDisplayOptions {
-    if (options.settings.metric.diskMetricKind === "throughput") {
-        return buildDiskThroughputDisplayOptions(options);
+    if (options.target.reading.kind === "throughput") {
+        return buildDiskThroughputDisplayOptions({
+            ...options,
+            reading: options.target.reading,
+        });
     }
 
-    return buildDiskUsageDisplayOptions(options);
+    return buildDiskUsageDisplayOptions({
+        ...options,
+        reading: options.target.reading,
+    });
 }
 
 export function formatAsCompactDiskVolumeLabel(diskVolume: DiskVolumeOption): string {
@@ -53,12 +64,12 @@ export function formatAsCompactDiskVolumeLabel(diskVolume: DiskVolumeOption): st
 
 export function resolveDiskMaximumThroughputMebibytesPerSecond(
     direction: Exclude<DiskThroughputDirection, "both" | "total">,
-    settings: ResolvedWidgetSettings,
+    reading: DiskThroughputReading,
     selectedVolume: DiskVolumeOption | null,
 ): number {
     const configuredMaximum = direction === "read"
-        ? settings.diskThroughput.maximumDiskReadThroughputMebibytesPerSecond
-        : settings.diskThroughput.maximumDiskWriteThroughputMebibytesPerSecond;
+        ? reading.display.maximumReadThroughputMebibytesPerSecond
+        : reading.display.maximumWriteThroughputMebibytesPerSecond;
 
     if (configuredMaximum !== undefined && configuredMaximum > 0) {
         return configuredMaximum;
@@ -67,7 +78,9 @@ export function resolveDiskMaximumThroughputMebibytesPerSecond(
     return resolveDefaultDiskMaximumThroughputMebibytesPerSecond(direction, selectedVolume);
 }
 
-function buildDiskUsageDisplayOptions(options: BuildDiskDisplayOptions): MetricDisplayOptions {
+function buildDiskUsageDisplayOptions(
+    options: BuildDiskDisplayOptions & { reading: DiskUsageReading },
+): MetricDisplayOptions {
     const usedMetricKey = options.selectedVolume
         ? getDiskVolumeMetricKey("used", options.selectedVolume.id)
         : getDefaultDiskUsageMetricKey("used");
@@ -81,21 +94,22 @@ function buildDiskUsageDisplayOptions(options: BuildDiskDisplayOptions): MetricD
     const usedBytesWidgetData = options.metricStore.getWidgetData(usedMetricKey, label, "B");
     const totalBytesWidgetData = options.metricStore.getWidgetData(totalMetricKey, label, "B");
     const availableBytesWidgetData = options.metricStore.getWidgetData(availableMetricKey, label, "B");
-    const effectiveGraphicType = options.settings.appearance.graphicType;
-    const circleStyle = options.settings.appearance.circleStyle;
+    const appearance = options.settings.widget.slot.appearance;
+    const effectiveGraphicType = appearance.viewLayout;
+    const circleStyle = appearance.circleStyle;
     const shouldRenderGauge = effectiveGraphicType === "circular" && circleStyle === "gauge";
 
     return {
         event: options.event,
-        resolvedSettings: options.settings.appearance,
+        resolvedSettings: appearance,
         metricKey: usedMetricKey,
         widgetData: buildDiskUsageWidgetData({
             usedBytesWidgetData,
             totalBytes: totalBytesWidgetData.current,
             availableBytes: availableBytesWidgetData.current,
-            displayMode: options.settings.local.diskUsageDisplayMode,
+            displayMode: options.reading.displayMode,
             label,
-            linearLabel: resolveDiskLinearLabel(options.settings.local.diskLinearLabel, options.selectedVolume, label),
+            linearLabel: resolveDiskLinearLabel(options.reading.linearLabel, options.selectedVolume, label),
         }),
         centerIconFragment: buildDiskCenterIconFragment(options.selectedVolume),
         footerIconFragment: shouldRenderGauge ? undefined : buildDiskGaugeFooterIconFragment(options.selectedVolume),
@@ -105,9 +119,12 @@ function buildDiskUsageDisplayOptions(options: BuildDiskDisplayOptions): MetricD
     };
 }
 
-function buildDiskThroughputDisplayOptions(options: BuildDiskDisplayOptions): MetricDisplayOptions {
-    const throughputDirection = options.settings.metric.diskThroughputDirection;
-    const effectiveGraphicType = options.settings.appearance.graphicType;
+function buildDiskThroughputDisplayOptions(
+    options: BuildDiskDisplayOptions & { reading: DiskThroughputReading },
+): MetricDisplayOptions {
+    const throughputDirection = options.reading.direction;
+    const appearance = options.settings.widget.slot.appearance;
+    const effectiveGraphicType = appearance.viewLayout;
 
     if (isDualDiskThroughputDisplay(effectiveGraphicType, throughputDirection)) {
         return buildDualThroughputDisplayOptions(options);
@@ -119,18 +136,18 @@ function buildDiskThroughputDisplayOptions(options: BuildDiskDisplayOptions): Me
         ? formatAsCompactDiskVolumeLabel(options.selectedVolume)
         : ARC_GAUGE_LABELS.disk;
     const bytesPerSecondWidgetData = options.metricStore.getWidgetData(throughputMetricKey, throughputLabel, "B/s");
-    const circleStyle = options.settings.appearance.circleStyle;
+    const circleStyle = appearance.circleStyle;
     const shouldRenderGaugeFooter = effectiveGraphicType === "circular" && circleStyle === "gauge";
 
     return {
         event: options.event,
-        resolvedSettings: options.settings.appearance,
+        resolvedSettings: appearance,
         metricKey: throughputMetricKey,
         widgetData: buildDiskThroughputWidgetData({
             bytesPerSecondWidgetData,
             maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond(
                 singleThroughputDirection,
-                options.settings,
+                options.reading,
                 options.selectedVolume,
             ),
             label: throughputLabel,
@@ -142,29 +159,32 @@ function buildDiskThroughputDisplayOptions(options: BuildDiskDisplayOptions): Me
         statusIcon: getMetricStatusIcon("percentage"),
         circleStyleOverride: circleStyle,
         visualSettingsOverride: {
-            colorMode: options.settings.appearance.colorMode,
+            colorMode: appearance.colorMode,
             usageColors: {
-                solidColor: options.settings.appearance.usageColors.solidColor,
+                solidColor: appearance.usageColors.solidColor,
             },
         },
     };
 }
 
-function buildDualThroughputDisplayOptions(options: BuildDiskDisplayOptions): MetricDisplayOptions {
+function buildDualThroughputDisplayOptions(
+    options: BuildDiskDisplayOptions & { reading: DiskThroughputReading },
+): MetricDisplayOptions {
     const readMetricKey = getDiskThroughputMetricKey("read");
     const writeMetricKey = getDiskThroughputMetricKey("write");
-    const effectiveGraphicType = options.settings.appearance.graphicType;
+    const appearance = options.settings.widget.slot.appearance;
+    const effectiveGraphicType = appearance.viewLayout;
     const dualGraphicType = effectiveGraphicType === "circular"
         ? "circular"
         : effectiveGraphicType === "text" ? "text" : undefined;
     const readWidgetData = buildDiskThroughputWidgetData({
         bytesPerSecondWidgetData: options.metricStore.getWidgetData(readMetricKey, "READ", "B/s"),
-        maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("read", options.settings, options.selectedVolume),
+        maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("read", options.reading, options.selectedVolume),
         label: "READ",
     });
     const writeWidgetData = buildDiskThroughputWidgetData({
         bytesPerSecondWidgetData: options.metricStore.getWidgetData(writeMetricKey, "WRIT", "B/s"),
-        maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("write", options.settings, options.selectedVolume),
+        maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("write", options.reading, options.selectedVolume),
         label: "WRIT",
     });
     const readColor = resolveDiskWidgetChannelColor("read", options.settings, options.globalSettings, readWidgetData);
@@ -174,7 +194,7 @@ function buildDualThroughputDisplayOptions(options: BuildDiskDisplayOptions): Me
 
     return {
         event: options.event,
-        resolvedSettings: options.settings.appearance,
+        resolvedSettings: appearance,
         metricKey: `${readMetricKey},${writeMetricKey}`,
         dualGraphicType,
         widgetData: {
@@ -185,7 +205,7 @@ function buildDualThroughputDisplayOptions(options: BuildDiskDisplayOptions): Me
         centerIconFragment: getDiskIconFragment("unknown"),
         statusIcon: getMetricStatusIcon("percentage"),
         circleStyleOverride: dualGraphicType === "circular"
-            ? options.settings.appearance.circleStyle
+            ? appearance.circleStyle
             : undefined,
         positiveColor: readColor,
         negativeColor: writeColor,
@@ -285,11 +305,11 @@ function buildDiskThroughputFooterIconFragment(direction: DiskThroughputDirectio
 
 function resolveDiskMaximumThroughputBytesPerSecond(
     direction: DiskThroughputDirection,
-    settings: ResolvedWidgetSettings,
+    reading: DiskThroughputReading,
     selectedVolume: DiskVolumeOption | null,
 ): number {
-    const maximumReadMebibytesPerSecond = resolveDiskMaximumThroughputMebibytesPerSecond("read", settings, selectedVolume);
-    const maximumWriteMebibytesPerSecond = resolveDiskMaximumThroughputMebibytesPerSecond("write", settings, selectedVolume);
+    const maximumReadMebibytesPerSecond = resolveDiskMaximumThroughputMebibytesPerSecond("read", reading, selectedVolume);
+    const maximumWriteMebibytesPerSecond = resolveDiskMaximumThroughputMebibytesPerSecond("write", reading, selectedVolume);
     const maximumMebibytesPerSecond = direction === "write"
         ? maximumWriteMebibytesPerSecond
         : direction === "total"
@@ -338,24 +358,26 @@ function buildDiskChannelColorConfig(
     settings: ResolvedWidgetSettings,
     globalSettings: ResolvedGlobalSettings,
 ): ColorConfig {
-    if (globalSettings.overrideWidgetAppearance) {
+    if (globalSettings.appearanceOverride) {
         return buildGlobalChannelColorConfig(direction === "read" ? "primary" : "secondary", globalSettings);
     }
 
     if (direction === "read") {
+        const appearance = settings.widget.slot.appearance;
         return buildColorConfigFromRamp({
-            colorMode: settings.appearance.colorMode,
-            colors: settings.appearance.diskReadColors,
-            lowThreshold: settings.appearance.lowThreshold,
-            highThreshold: settings.appearance.highThreshold,
+            colorMode: appearance.colorMode,
+            colors: appearance.diskReadColors,
+            lowThreshold: appearance.lowColorThresholdPercent,
+            highThreshold: appearance.highColorThresholdPercent,
         });
     }
 
+    const appearance = settings.widget.slot.appearance;
     return buildColorConfigFromRamp({
-        colorMode: settings.appearance.colorMode,
-        colors: settings.appearance.diskWriteColors,
-        lowThreshold: settings.appearance.lowThreshold,
-        highThreshold: settings.appearance.highThreshold,
+        colorMode: appearance.colorMode,
+        colors: appearance.diskWriteColors,
+        lowThreshold: appearance.lowColorThresholdPercent,
+        highThreshold: appearance.highColorThresholdPercent,
     });
 }
 

@@ -1,12 +1,12 @@
 import type { ColorConfig } from "../../rendering/color-resolver";
 import type {
     ColorMode,
-    ColorRamp,
-} from "../../settings/widget-settings";
+    ResolvedColorRamp,
+} from "../../settings/resolved-settings";
 
 export function buildColorConfigFromRamp(options: {
     colorMode: ColorMode;
-    colors: ColorRamp;
+    colors: ResolvedColorRamp;
     lowThreshold: number;
     highThreshold: number;
 }): ColorConfig {

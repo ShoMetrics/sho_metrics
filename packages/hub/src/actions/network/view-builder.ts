@@ -10,8 +10,9 @@ import type { WidgetData } from "../../rendering/widget-data";
 import { resolveColorForThresholdValue, type ColorConfig } from "../../rendering/color-resolver";
 import type {
     ResolvedGlobalSettings,
+    ResolvedNetworkMetricTarget,
     ResolvedWidgetSettings,
-} from "../../settings/widget-settings";
+} from "../../settings/resolved-settings";
 import { buildGlobalChannelColorConfig } from "../../settings/global-appearance";
 import {
     buildNetworkSpeedWidgetData,
@@ -41,14 +42,17 @@ export interface NetworkDisplayDebugInfo {
 interface BuildNetworkDisplayOptions {
     event: WillAppearEvent;
     settings: ResolvedWidgetSettings;
+    target: ResolvedNetworkMetricTarget;
     globalSettings: ResolvedGlobalSettings;
     metricStore: MetricStore;
     selectedNetworkInterface: NetworkInterfaceOption | null;
 }
 
 export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): NetworkDisplayUpdate {
-    const effectiveGraphicType = options.settings.appearance.graphicType;
-    const displayDirection = options.settings.metric.networkDirection;
+    const appearance = options.settings.widget.slot.appearance;
+    const networkReading = options.target.reading;
+    const effectiveGraphicType = appearance.viewLayout;
+    const displayDirection = networkReading.direction;
 
     if (effectiveGraphicType === "linear") {
         return {
@@ -80,18 +84,18 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
     const displayWidgetData = buildNetworkWidgetData({
         sourceWidgetData,
         direction: displayDirection,
-        settings: options.settings,
+        target: options.target,
     });
-    const circleStyle = options.settings.appearance.circleStyle;
+    const circleStyle = appearance.circleStyle;
     const shouldRenderGaugeFooter = effectiveGraphicType === "circular" && circleStyle === "gauge";
     const renderedWidgetData = shouldRenderGaugeFooter
         ? { ...displayWidgetData, label: ARC_GAUGE_LABELS.network }
         : displayWidgetData;
 
     return {
-        displayOptions: {
-            event: options.event,
-            resolvedSettings: options.settings.appearance,
+            displayOptions: {
+                event: options.event,
+            resolvedSettings: appearance,
             metricKey: networkMetricKey,
             widgetData: renderedWidgetData,
             centerIconFragment: buildNetworkCenterIconFragment({
@@ -112,9 +116,9 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
             }),
             circleStyleOverride: circleStyle,
             visualSettingsOverride: {
-                colorMode: options.settings.appearance.colorMode,
+                colorMode: appearance.colorMode,
                 usageColors: {
-                    solidColor: options.settings.appearance.usageColors.solidColor,
+                    solidColor: appearance.usageColors.solidColor,
                 },
             },
         },
@@ -129,18 +133,18 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
 
 export function resolveNetworkMaximumBytesPerSecond(
     direction: NetworkDirection,
-    settings: ResolvedWidgetSettings,
+    target: ResolvedNetworkMetricTarget,
 ): number {
-    return convertMegabitsPerSecondToBytesPerSecond(resolveNetworkMaximumMegabitsPerSecond(direction, settings));
+    return convertMegabitsPerSecondToBytesPerSecond(resolveNetworkMaximumMegabitsPerSecond(direction, target));
 }
 
 export function resolveNetworkMaximumMegabitsPerSecond(
     direction: NetworkDirection,
-    settings: ResolvedWidgetSettings,
+    target: ResolvedNetworkMetricTarget,
 ): number {
     const customMaximumMegabitsPerSecond = direction === "download"
-        ? settings.network.maximumDownloadSpeedMbps
-        : settings.network.maximumUploadSpeedMbps;
+        ? target.reading.display.maximumDownloadSpeedMegabitsPerSecond
+        : target.reading.display.maximumUploadSpeedMegabitsPerSecond;
 
     if (
         customMaximumMegabitsPerSecond !== undefined
@@ -162,22 +166,22 @@ function buildDualNetworkCircularDisplayOptions(
     const uploadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metricStore.getWidgetData(uploadMetricKey, "UP", "B/s"),
         direction: "upload",
-        settings: options.settings,
+        target: options.target,
     });
     const downloadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metricStore.getWidgetData(downloadMetricKey, "DOWN", "B/s"),
         direction: "download",
-        settings: options.settings,
+        target: options.target,
     });
     const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, options.globalSettings, uploadWidgetData);
     const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, options.globalSettings, downloadWidgetData);
     const uploadColorConfig = buildNetworkChannelColorConfig("upload", options.settings, options.globalSettings);
     const downloadColorConfig = buildNetworkChannelColorConfig("download", options.settings, options.globalSettings);
-    const circleStyle = options.settings.appearance.circleStyle;
+    const circleStyle = options.settings.widget.slot.appearance.circleStyle;
 
     return {
         event: options.event,
-        resolvedSettings: options.settings.appearance,
+        resolvedSettings: options.settings.widget.slot.appearance,
         metricKey: `${downloadMetricKey},${uploadMetricKey}`,
         dualGraphicType: options.dualGraphicType,
         widgetData: {
@@ -229,16 +233,16 @@ function buildDualNetworkSparklineDisplayOptions(options: BuildNetworkDisplayOpt
     const uploadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metricStore.getWidgetData(uploadMetricKey, "UP", "B/s"),
         direction: "upload",
-        settings: options.settings,
+        target: options.target,
     });
     const downloadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metricStore.getWidgetData(downloadMetricKey, "DOWN", "B/s"),
         direction: "download",
-        settings: options.settings,
+        target: options.target,
     });
     const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, options.globalSettings, uploadWidgetData);
     const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, options.globalSettings, downloadWidgetData);
-    const trafficDisplayMode = options.settings.local.networkTrafficDisplayMode;
+    const trafficDisplayMode = options.target.reading.trafficDisplayMode;
     const positiveDirection = trafficDisplayMode === "mirrored" ? "upload" : "download";
     const negativeDirection = trafficDisplayMode === "mirrored" ? "download" : "upload";
     const positiveWidgetData = trafficDisplayMode === "mirrored" ? uploadWidgetData : downloadWidgetData;
@@ -248,7 +252,7 @@ function buildDualNetworkSparklineDisplayOptions(options: BuildNetworkDisplayOpt
 
     return {
         event: options.event,
-        resolvedSettings: options.settings.appearance,
+        resolvedSettings: options.settings.widget.slot.appearance,
         metricKey: `${downloadMetricKey},${uploadMetricKey}`,
         widgetData: {
             positive: positiveWidgetData,
@@ -289,17 +293,17 @@ function buildLinearNetworkDisplayOptions(options: BuildNetworkDisplayOptions): 
     const uploadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metricStore.getWidgetData(uploadMetricKey, "UP", "B/s"),
         direction: "upload",
-        settings: options.settings,
+        target: options.target,
     });
     const downloadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metricStore.getWidgetData(downloadMetricKey, "DOWN", "B/s"),
         direction: "download",
-        settings: options.settings,
+        target: options.target,
     });
 
     return {
         event: options.event,
-        resolvedSettings: options.settings.appearance,
+        resolvedSettings: options.settings.widget.slot.appearance,
         metricKey: downloadMetricKey,
         widgetData: {
             current: downloadWidgetData.current,
@@ -362,14 +366,14 @@ function buildLinearNetworkDisplayOptions(options: BuildNetworkDisplayOptions): 
 function buildNetworkWidgetData(options: {
     sourceWidgetData: WidgetData;
     direction: NetworkDirection;
-    settings: ResolvedWidgetSettings;
+    target: ResolvedNetworkMetricTarget;
 }): WidgetData {
     return buildNetworkSpeedWidgetData({
         bytesPerSecond: options.sourceWidgetData.current,
         historyBytesPerSecond: options.sourceWidgetData.history,
-        maximumBytesPerSecond: resolveNetworkMaximumBytesPerSecond(options.direction, options.settings),
+        maximumBytesPerSecond: resolveNetworkMaximumBytesPerSecond(options.direction, options.target),
         label: getNetworkDirectionLabel(options.direction),
-        unitBase: options.settings.network.networkUnitBase,
+        unitBase: options.target.reading.display.unitBase,
         maximumDisplayDigits: NETWORK_SPEED_MAXIMUM_DISPLAY_DIGITS,
         sampleTimestampMilliseconds: options.sourceWidgetData.sampleTimestampMilliseconds,
     });
@@ -421,24 +425,26 @@ function buildNetworkChannelColorConfig(
     settings: ResolvedWidgetSettings,
     globalSettings: ResolvedGlobalSettings,
 ): ColorConfig {
-    if (globalSettings.overrideWidgetAppearance) {
+    if (globalSettings.appearanceOverride) {
         return buildGlobalChannelColorConfig(direction === "download" ? "primary" : "secondary", globalSettings);
     }
 
     if (direction === "download") {
+        const appearance = settings.widget.slot.appearance;
         return buildColorConfigFromRamp({
-            colorMode: settings.appearance.colorMode,
-            colors: settings.appearance.downloadColors,
-            lowThreshold: settings.appearance.lowThreshold,
-            highThreshold: settings.appearance.highThreshold,
+            colorMode: appearance.colorMode,
+            colors: appearance.downloadColors,
+            lowThreshold: appearance.lowColorThresholdPercent,
+            highThreshold: appearance.highColorThresholdPercent,
         });
     }
 
+    const appearance = settings.widget.slot.appearance;
     return buildColorConfigFromRamp({
-        colorMode: settings.appearance.colorMode,
-        colors: settings.appearance.uploadColors,
-        lowThreshold: settings.appearance.lowThreshold,
-        highThreshold: settings.appearance.highThreshold,
+        colorMode: appearance.colorMode,
+        colors: appearance.uploadColors,
+        lowThreshold: appearance.lowColorThresholdPercent,
+        highThreshold: appearance.highColorThresholdPercent,
     });
 }
 

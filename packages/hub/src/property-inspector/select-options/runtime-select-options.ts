@@ -57,7 +57,10 @@ export function resolveDiskAutoLinearLabel(context: VisibilityContext): string {
 
 function resolveSelectedDiskVolume(context: VisibilityContext): DiskVolumeOption | null {
     const diskVolumes = context.runtimeCache.availableDiskVolumes;
-    const selectedDiskVolumeId = context.resolved.metric.diskVolumeId;
+    const target = context.resolved.widget.slot.metric.target;
+    const selectedDiskVolumeId = target.domain === "disk"
+        ? target.volumeId ?? ""
+        : "";
 
     if (selectedDiskVolumeId.length > 0) {
         return diskVolumes.find(diskVolume => diskVolume.id === selectedDiskVolumeId) ?? null;

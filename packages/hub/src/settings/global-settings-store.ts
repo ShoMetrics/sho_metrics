@@ -1,28 +1,30 @@
-import { readGlobalSettings } from "./codec";
-import { resolveGlobalSettings } from "./resolver";
-import type { GlobalSettings, ResolvedGlobalSettings } from "./widget-settings";
+import type { ResolvedGlobalSettings } from "./resolved-settings";
+import { readStoredGlobalSettings } from "./storage/codec";
+import { resolveStoredGlobalSettings } from "./storage/resolver";
+
+type StoredGlobalSettings = ReturnType<typeof readStoredGlobalSettings>;
 
 class GlobalSettingsStore {
-    private settings: GlobalSettings = {};
-    private listeners = new Set<(settings: GlobalSettings) => void>();
+    private settings: StoredGlobalSettings = readStoredGlobalSettings(undefined);
+    private listeners = new Set<(settings: StoredGlobalSettings) => void>();
 
-    get(): GlobalSettings {
+    getStored(): StoredGlobalSettings {
         return this.settings;
     }
 
     getResolved(): ResolvedGlobalSettings {
-        return resolveGlobalSettings(this.settings);
+        return resolveStoredGlobalSettings(this.settings);
     }
 
-    update(rawSettings: unknown): GlobalSettings {
-        this.settings = readGlobalSettings(rawSettings);
+    update(rawSettings: unknown): StoredGlobalSettings {
+        this.settings = readStoredGlobalSettings(rawSettings);
         for (const listener of this.listeners) {
             listener(this.settings);
         }
         return this.settings;
     }
 
-    subscribe(listener: (settings: GlobalSettings) => void): () => void {
+    subscribe(listener: (settings: StoredGlobalSettings) => void): () => void {
         this.listeners.add(listener);
         return () => this.listeners.delete(listener);
     }

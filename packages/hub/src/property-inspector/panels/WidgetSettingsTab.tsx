@@ -1,22 +1,19 @@
 import { InspectorItem } from "../components/InspectorItem";
-import type { WidgetSettings } from "../../settings/widget-settings";
+import type { StoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
 import type { VisibilityContext } from "../inspector/types";
-import type { ActionKind } from "../inspector/settings-types";
 import { DefaultWidgetSettings } from "./DefaultWidgetSettings";
 import { DiskWidgetSettings } from "./DiskWidgetSettings";
 import { GpuWidgetSettings } from "./GpuWidgetSettings";
 import { NetworkWidgetSettings } from "./NetworkWidgetSettings";
 
 interface WidgetSettingsTabProps {
-    actionKind: ActionKind;
     context: VisibilityContext;
     isGlobalAppearanceOverrideEnabled: boolean;
-    onSettingsPatch: (patch: WidgetSettings) => void;
+    onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
     onResetWidgetSettings: () => void;
 }
 
 export function WidgetSettingsTab({
-    actionKind,
     context,
     isGlobalAppearanceOverrideEnabled,
     onSettingsPatch,
@@ -44,39 +41,30 @@ export function WidgetSettingsTab({
                     <p className="section-note">Some settings are disabled since global override is enabled.</p>
                 </InspectorItem>
             )}
-            {renderActionPanel(actionKind, panelProps)}
+            {renderMetricPanel(panelProps)}
         </>
     );
 }
 
-function renderActionPanel(
-    actionKind: ActionKind,
+function renderMetricPanel(
     panelProps: {
         context: VisibilityContext;
-        onSettingsPatch: (patch: WidgetSettings) => void;
+        onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
         appearanceDisabled: boolean;
     },
-): React.JSX.Element | null {
-    if (actionKind === "net-speed") {
-        return <NetworkWidgetSettings {...panelProps} />;
-    }
+): React.JSX.Element {
+    const target = panelProps.context.resolved.widget.slot.metric.target;
 
-    if (actionKind === "disk") {
-        return <DiskWidgetSettings {...panelProps} />;
+    switch (target.domain) {
+        case "network":
+            return <NetworkWidgetSettings {...panelProps} target={target} />;
+        case "disk":
+            return <DiskWidgetSettings {...panelProps} target={target} />;
+        case "gpu":
+            return <GpuWidgetSettings {...panelProps} />;
+        case "cpu":
+        case "memory":
+        case "catalog":
+            return <DefaultWidgetSettings {...panelProps} />;
     }
-
-    if (actionKind === "gpu-temp" || actionKind === "gpu-power") {
-        return <GpuWidgetSettings {...panelProps} actionKind={actionKind} />;
-    }
-
-    if (
-        actionKind === "cpu-usage"
-        || actionKind === "ram"
-        || actionKind === "gpu-usage"
-        || actionKind === "gpu-vram"
-    ) {
-        return <DefaultWidgetSettings {...panelProps} />;
-    }
-
-    return null;
 }

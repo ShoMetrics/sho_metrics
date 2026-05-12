@@ -11,13 +11,13 @@ import {
 import {
     DiskThroughputChannelColorSettings,
     StandardColorSettings,
-    usesDiskThroughputChannelColorSettings,
 } from "./ColorSettings";
 import { LayoutSettings } from "./LayoutSettings";
 import { PollingSettings } from "./PollingSettings";
 import { SparklineSettings } from "./SparklineSettings";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
+import type { ResolvedDiskMetricTarget } from "../../settings/resolved-settings";
 import {
     diskMetricKindOptionList,
     diskThroughputDirectionOptionList,
@@ -25,18 +25,28 @@ import {
     scaleModeOptionList,
 } from "./setting-options";
 
-export function DiskWidgetSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
-    const isThroughput = props.context.resolved.metric.diskMetricKind === "throughput";
+type DiskUsageReading = Extract<ResolvedDiskMetricTarget["reading"], { readonly kind: "usage" }>;
+type DiskThroughputReading = Extract<ResolvedDiskMetricTarget["reading"], { readonly kind: "throughput" }>;
+
+type DiskWidgetSettingsProps = WidgetSettingsPanelProps & {
+    target: ResolvedDiskMetricTarget;
+};
+
+export function DiskWidgetSettings(props: DiskWidgetSettingsProps): React.JSX.Element {
+    const reading = props.target.reading;
+    const usesThroughputChannelColors = reading.kind === "throughput"
+        && reading.direction === "both"
+        && props.context.resolved.widget.slot.appearance.viewLayout !== "linear";
 
     return (
         <>
             <LayoutSettings {...props} />
-            {isThroughput ? (
-                <DiskThroughputSettings {...props} />
+            {reading.kind === "throughput" ? (
+                <DiskThroughputSettings {...props} reading={reading} />
             ) : (
-                <DiskUsageSettings {...props} />
+                <DiskUsageSettings {...props} reading={reading} />
             )}
-            {usesDiskThroughputChannelColorSettings(props.context) ? (
+            {usesThroughputChannelColors ? (
                 <DiskThroughputChannelColorSettings {...props} />
             ) : (
                 <StandardColorSettings {...props} />
@@ -46,19 +56,21 @@ export function DiskWidgetSettings(props: WidgetSettingsPanelProps): React.JSX.E
     );
 }
 
-function DiskUsageSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
-    const graphicType = props.context.resolved.appearance.graphicType;
+function DiskUsageSettings(props: DiskWidgetSettingsProps & {
+    reading: DiskUsageReading;
+}): React.JSX.Element {
+    const graphicType = props.context.resolved.widget.slot.appearance.viewLayout;
 
     return (
         <>
             <SettingsSection title="Metric">
-                <DiskMetricKindSetting {...props} />
+                <DiskMetricKindSetting {...props} currentKind={props.reading.kind} />
                 <SelectSetting
                     label="Volume"
-                    value={props.context.resolved.metric.diskVolumeId}
+                    value={props.target.volumeId ?? ""}
                     optionList={resolveDiskVolumeOptions(props.context)}
-                    onValueChange={(diskVolumeId) => props.onSettingsPatch({
-                        metric: { diskVolumeId },
+                    onValueChange={(volumeId) => props.onSettingsPatch({
+                        disk: { volumeId },
                     })}
                 />
             </SettingsSection>
@@ -66,10 +78,10 @@ function DiskUsageSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
                 <SettingsSection title="Scale & Units">
                     <SelectSetting
                         label="Usage Display"
-                        value={props.context.resolved.local.diskUsageDisplayMode}
+                        value={props.reading.displayMode}
                         optionList={diskUsageDisplayModeOptionList}
-                        onValueChange={(diskUsageDisplayMode) => props.onSettingsPatch({
-                            local: { diskUsageDisplayMode },
+                        onValueChange={(usageDisplayMode) => props.onSettingsPatch({
+                            disk: { usageDisplayMode },
                         })}
                     />
                 </SettingsSection>
@@ -80,38 +92,41 @@ function DiskUsageSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
     );
 }
 
-function DiskThroughputSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
-    const isAutoScale = props.context.resolved.diskThroughput.diskThroughputScaleMode === "auto";
+function DiskThroughputSettings(props: DiskWidgetSettingsProps & {
+    reading: DiskThroughputReading;
+}): React.JSX.Element {
+    const display = props.reading.display;
+    const isAutoScale = display.scaleMode === "auto";
 
     return (
         <>
             <SettingsSection title="Metric">
-                <DiskMetricKindSetting {...props} />
+                <DiskMetricKindSetting {...props} currentKind={props.reading.kind} />
                 <SelectSetting
                     label="Direction"
-                    value={props.context.resolved.metric.diskThroughputDirection}
+                    value={props.reading.direction}
                     optionList={diskThroughputDirectionOptionList}
-                    onValueChange={(diskThroughputDirection) => props.onSettingsPatch({
-                        metric: { diskThroughputDirection },
+                    onValueChange={(throughputDirection) => props.onSettingsPatch({
+                        disk: { throughputDirection },
                     })}
                 />
             </SettingsSection>
             <SettingsSection title="Scale & Units">
                 <SelectSetting
                     label="Scale"
-                    value={props.context.resolved.diskThroughput.diskThroughputScaleMode}
+                    value={display.scaleMode}
                     optionList={scaleModeOptionList}
-                    onValueChange={(diskThroughputScaleMode) => props.onSettingsPatch({
-                        diskThroughputOverrides: { diskThroughputScaleMode },
+                    onValueChange={(scaleMode) => props.onSettingsPatch({
+                        disk: { scaleMode },
                     })}
                 />
                 <NumberSetting
                     label="Read Max (MiB/s)"
-                    value={props.context.resolved.diskThroughput.maximumDiskReadThroughputMebibytesPerSecond}
-                    onValueChange={(maximumDiskReadThroughputMebibytesPerSecond) => props.onSettingsPatch({
-                        diskThroughputOverrides: {
-                            diskThroughputScaleMode: "custom",
-                            maximumDiskReadThroughputMebibytesPerSecond,
+                    value={display.maximumReadThroughputMebibytesPerSecond}
+                    onValueChange={(maximumReadThroughputMebibytesPerSecond) => props.onSettingsPatch({
+                        disk: {
+                            scaleMode: "custom",
+                            maximumReadThroughputMebibytesPerSecond,
                         },
                     })}
                     minimum={1}
@@ -121,11 +136,11 @@ function DiskThroughputSettings(props: WidgetSettingsPanelProps): React.JSX.Elem
                 />
                 <NumberSetting
                     label="Write Max (MiB/s)"
-                    value={props.context.resolved.diskThroughput.maximumDiskWriteThroughputMebibytesPerSecond}
-                    onValueChange={(maximumDiskWriteThroughputMebibytesPerSecond) => props.onSettingsPatch({
-                        diskThroughputOverrides: {
-                            diskThroughputScaleMode: "custom",
-                            maximumDiskWriteThroughputMebibytesPerSecond,
+                    value={display.maximumWriteThroughputMebibytesPerSecond}
+                    onValueChange={(maximumWriteThroughputMebibytesPerSecond) => props.onSettingsPatch({
+                        disk: {
+                            scaleMode: "custom",
+                            maximumWriteThroughputMebibytesPerSecond,
                         },
                     })}
                     minimum={1}
@@ -141,8 +156,11 @@ function DiskThroughputSettings(props: WidgetSettingsPanelProps): React.JSX.Elem
 
 function DiskMetricKindSetting({
     context,
+    currentKind,
     onSettingsPatch,
-}: WidgetSettingsPanelProps): React.JSX.Element {
+}: WidgetSettingsPanelProps & {
+    currentKind: ResolvedDiskMetricTarget["reading"]["kind"];
+}): React.JSX.Element {
     const optionList = context.isWindows
         ? diskMetricKindOptionList.filter(option => option.value !== "throughput")
         : diskMetricKindOptionList;
@@ -150,10 +168,10 @@ function DiskMetricKindSetting({
     return (
         <SelectSetting
             label="Disk Metric"
-            value={context.resolved.metric.diskMetricKind}
+            value={currentKind}
             optionList={optionList}
-            onValueChange={(diskMetricKind) => onSettingsPatch({
-                metric: { diskMetricKind },
+            onValueChange={(kind) => onSettingsPatch({
+                disk: { kind },
             })}
         />
     );
@@ -161,10 +179,13 @@ function DiskMetricKindSetting({
 
 function DiskUsageLabelSettings({
     context,
+    reading,
     onSettingsPatch,
-}: WidgetSettingsPanelProps): React.JSX.Element {
+}: WidgetSettingsPanelProps & {
+    reading: DiskUsageReading;
+}): React.JSX.Element {
     const detectedLabel = resolveSelectedDiskVolumeLabel(context);
-    const currentLabel = context.resolved.local.diskLinearLabel;
+    const currentLabel = reading.linearLabel;
     const canUseDetectedLabel = detectedLabel.length > 0
         && detectedLabel !== "-"
         && currentLabel.trim() !== detectedLabel;
@@ -175,8 +196,8 @@ function DiskUsageLabelSettings({
             <TextSetting
                 label="Custom Label"
                 value={currentLabel}
-                onValueChange={(diskLinearLabel) => onSettingsPatch({
-                    local: { diskLinearLabel },
+                onValueChange={(linearLabel) => onSettingsPatch({
+                    disk: { linearLabel },
                 })}
                 placeholder={resolveDiskAutoLinearLabel(context)}
                 actionButton={(
@@ -187,7 +208,7 @@ function DiskUsageLabelSettings({
                         onClick={() => {
                             if (canUseDetectedLabel) {
                                 onSettingsPatch({
-                                    local: { diskLinearLabel: detectedLabel },
+                                    disk: { linearLabel: detectedLabel },
                                 });
                             }
                         }}

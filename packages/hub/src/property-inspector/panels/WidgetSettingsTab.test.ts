@@ -3,20 +3,25 @@ import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ActionKind } from "../inspector/settings-types";
+import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
+import {
+    writeStoredWidgetSettingsPatch,
+    type StoredWidgetSettingsPatch,
+} from "../../settings/storage/widget-settings-patch";
 import { buildVisibilityContext, type InspectorTestSettings } from "../testing/test-context";
 import { WidgetSettingsTab } from "./WidgetSettingsTab";
 
 test("disk usage linear settings render label controls without usage-mode controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",
-        settings: {
-            appearanceOverrides: {
-                graphicType: "linear",
+        settings: buildWidgetSettings("disk", {
+            appearance: {
+                viewLayout: "linear",
             },
-            metric: {
-                diskMetricKind: "usage",
+            disk: {
+                kind: "usage",
             },
-        },
+        }),
     });
 
     assert.match(markup, /Volume:/);
@@ -28,14 +33,14 @@ test("disk usage linear settings render label controls without usage-mode contro
 test("disk usage circular settings render usage display controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",
-        settings: {
-            appearanceOverrides: {
-                graphicType: "circular",
+        settings: buildWidgetSettings("disk", {
+            appearance: {
+                viewLayout: "circular",
             },
-            metric: {
-                diskMetricKind: "usage",
+            disk: {
+                kind: "usage",
             },
-        },
+        }),
     });
 
     assert.match(markup, /Usage Display:/);
@@ -46,14 +51,14 @@ test("windows disk settings use usage controls when throughput is unavailable", 
     const markup = renderWidgetSettings({
         actionKind: "disk",
         isWindows: true,
-        settings: {
-            appearanceOverrides: {
-                graphicType: "linear",
+        settings: buildWidgetSettings("disk", {
+            appearance: {
+                viewLayout: "linear",
             },
-            metric: {
-                diskMetricKind: "throughput",
+            disk: {
+                kind: "throughput",
             },
-        },
+        }),
     });
 
     assert.match(markup, /Disk Metric:/);
@@ -65,31 +70,40 @@ test("windows disk settings use usage controls when throughput is unavailable", 
 test("network dual-channel settings render channel colors instead of usage colors", () => {
     const markup = renderWidgetSettings({
         actionKind: "net-speed",
-        settings: {
-            appearanceOverrides: {
+        settings: buildWidgetSettings("net-speed", {
+            appearance: {
                 colorMode: "solid",
             },
-            metric: {
-                networkDirection: "both",
+            network: {
+                direction: "both",
             },
-        },
+        }),
     });
 
     assert.match(markup, /Color - Download/);
     assert.match(markup, /Color - Upload/);
 });
 
+test("network settings render from empty quick-start settings", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "net-speed",
+    });
+
+    assert.match(markup, /Network Metric/);
+    assert.match(markup, /Network Interface/);
+});
+
 test("network single-channel settings render standard usage colors", () => {
     const markup = renderWidgetSettings({
         actionKind: "net-speed",
-        settings: {
-            appearanceOverrides: {
+        settings: buildWidgetSettings("net-speed", {
+            appearance: {
                 colorMode: "solid",
             },
-            metric: {
-                networkDirection: "download",
+            network: {
+                direction: "download",
             },
-        },
+        }),
     });
 
     assert.match(markup, /Solid Color:/);
@@ -100,17 +114,15 @@ test("network single-channel settings render standard usage colors", () => {
 test("network mirrored trend disables grid controls in the panel", () => {
     const markup = renderWidgetSettings({
         actionKind: "net-speed",
-        settings: {
-            appearanceOverrides: {
-                graphicType: "sparkline",
+        settings: buildWidgetSettings("net-speed", {
+            appearance: {
+                viewLayout: "sparkline",
             },
-            metric: {
-                networkDirection: "both",
+            network: {
+                direction: "both",
+                trafficDisplayMode: "mirrored",
             },
-            local: {
-                networkTrafficDisplayMode: "mirrored",
-            },
-        },
+        }),
     });
 
     assert.match(markup, /Traffic Graph:/);
@@ -122,16 +134,16 @@ test("network mirrored trend disables grid controls in the panel", () => {
 test("disk throughput linear settings use standard colors", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",
-        settings: {
-            appearanceOverrides: {
+        settings: buildWidgetSettings("disk", {
+            appearance: {
                 colorMode: "solid",
-                graphicType: "linear",
+                viewLayout: "linear",
             },
-            metric: {
-                diskMetricKind: "throughput",
-                diskThroughputDirection: "both",
+            disk: {
+                kind: "throughput",
+                throughputDirection: "both",
             },
-        },
+        }),
     });
 
     assert.match(markup, /Solid Color:/);
@@ -142,20 +154,30 @@ test("disk throughput linear settings use standard colors", () => {
 test("disk throughput dual-channel settings render read/write colors", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",
-        settings: {
-            appearanceOverrides: {
+        settings: buildWidgetSettings("disk", {
+            appearance: {
                 colorMode: "solid",
-                graphicType: "circular",
+                viewLayout: "circular",
             },
-            metric: {
-                diskMetricKind: "throughput",
-                diskThroughputDirection: "both",
+            disk: {
+                kind: "throughput",
+                throughputDirection: "both",
             },
-        },
+        }),
     });
 
     assert.match(markup, sectionHeadingPattern("Read"));
     assert.match(markup, sectionHeadingPattern("Write"));
+});
+
+test("GPU settings panel follows the resolved reading instead of the action kind", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "gpu-temp",
+        settings: buildWidgetSettings("gpu-power", {}),
+    });
+
+    assert.match(markup, /Max Power/);
+    assert.doesNotMatch(markup, /Max Temp/);
 });
 
 function renderWidgetSettings(options: {
@@ -164,7 +186,6 @@ function renderWidgetSettings(options: {
     settings?: InspectorTestSettings;
 }): string {
     return renderToStaticMarkup(createElement(WidgetSettingsTab, {
-        actionKind: options.actionKind,
         context: buildVisibilityContext({
             actionKind: options.actionKind,
             isWindows: options.isWindows,
@@ -178,4 +199,14 @@ function renderWidgetSettings(options: {
 
 function sectionHeadingPattern(text: string): RegExp {
     return new RegExp(`class="section-heading"[^>]*>${text}<`);
+}
+
+function buildWidgetSettings(
+    actionKind: ActionKind,
+    patch: StoredWidgetSettingsPatch,
+): InspectorTestSettings {
+    return writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, actionKind).rawSettings,
+        patch,
+    );
 }

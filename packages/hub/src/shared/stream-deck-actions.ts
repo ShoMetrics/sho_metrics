@@ -1,4 +1,13 @@
-import type { ActionKind } from "../settings/widget-settings";
+export type ActionKind =
+    | "cpu-usage"
+    | "net-speed"
+    | "ram"
+    | "disk"
+    | "gpu-usage"
+    | "gpu-temp"
+    | "gpu-vram"
+    | "gpu-power"
+    | "unknown";
 
 export const STREAM_DECK_PLUGIN_UUID = "com.ez.sho-metrics";
 

@@ -7,8 +7,7 @@ import {
     type RgbColor,
 } from "../shared/color-utils";
 import type { MetricVisualSettings } from "./visual-adapter";
-import type { ResolvedGlobalSettings } from "./widget-settings";
-export { defaultResolvedGlobalSettings } from "./widget-settings";
+import type { ResolvedGlobalAppearanceOverride, ResolvedGlobalSettings } from "./resolved-settings";
 
 export interface TintChannelColors {
     primaryColor: string;
@@ -22,28 +21,28 @@ export function applyGlobalAppearanceToVisualSettings(
     widgetSettings: MetricVisualSettings,
     globalSettings: ResolvedGlobalSettings,
 ): MetricVisualSettings {
-    if (!globalSettings.overrideWidgetAppearance) {
+    if (!globalSettings.appearanceOverride) {
         return widgetSettings;
     }
 
-    const appearanceDefaults = globalSettings.appearanceDefaults;
-    const channelColors = deriveTintChannelColors(appearanceDefaults.usageColors.solidColor);
+    const appearanceOverride = globalSettings.appearanceOverride;
+    const channelColors = deriveTintChannelColors(appearanceOverride.tintColor);
     const thresholdColors = buildTintThresholdColors(channelColors.primaryColor);
 
     return {
         ...widgetSettings,
-        graphicType: appearanceDefaults.graphicType,
-        circleStyle: appearanceDefaults.circleStyle,
-        graphicStyle: appearanceDefaults.graphicStyle,
-        colorMode: appearanceDefaults.colorMode,
+        viewLayout: appearanceOverride.viewLayout,
+        circleStyle: appearanceOverride.circleStyle,
+        theme: appearanceOverride.theme,
+        colorMode: appearanceOverride.colorMode,
         usageColors: {
             solidColor: channelColors.primaryColor,
             lowColor: thresholdColors.lowColor,
             mediumColor: thresholdColors.mediumColor,
             highColor: thresholdColors.highColor,
         },
-        lowThreshold: appearanceDefaults.lowThreshold,
-        highThreshold: appearanceDefaults.highThreshold,
+        lowColorThresholdPercent: appearanceOverride.lowColorThresholdPercent,
+        highColorThresholdPercent: appearanceOverride.highColorThresholdPercent,
     };
 }
 
@@ -51,17 +50,17 @@ export function buildGlobalChannelColorConfig(
     channel: "primary" | "secondary",
     globalSettings: ResolvedGlobalSettings,
 ): ColorConfig {
-    const appearanceDefaults = globalSettings.appearanceDefaults;
-    const channelColors = deriveTintChannelColors(appearanceDefaults.usageColors.solidColor);
+    const appearanceOverride = readAppearanceOverride(globalSettings);
+    const channelColors = deriveTintChannelColors(appearanceOverride.tintColor);
     const channelColor = channel === "primary" ? channelColors.primaryColor : channelColors.secondaryColor;
     const thresholdColors = buildTintThresholdColors(channelColor);
 
     return {
-        mode: appearanceDefaults.colorMode,
+        mode: appearanceOverride.colorMode,
         solidColor: channelColor,
         thresholds: buildThresholds({
-            lowThreshold: appearanceDefaults.lowThreshold,
-            highThreshold: appearanceDefaults.highThreshold,
+            lowThreshold: appearanceOverride.lowColorThresholdPercent,
+            highThreshold: appearanceOverride.highColorThresholdPercent,
             lowColor: thresholdColors.lowColor,
             mediumColor: thresholdColors.mediumColor,
             highColor: thresholdColors.highColor,
@@ -125,6 +124,14 @@ function buildThresholds(options: {
         { min: options.lowThreshold, max: options.highThreshold, color: options.mediumColor },
         { min: options.highThreshold, max: MAXIMUM_THRESHOLD + 1, color: options.highColor },
     ];
+}
+
+function readAppearanceOverride(globalSettings: ResolvedGlobalSettings): ResolvedGlobalAppearanceOverride {
+    if (!globalSettings.appearanceOverride) {
+        throw new Error("Expected global appearance override.");
+    }
+
+    return globalSettings.appearanceOverride;
 }
 
 function readValidHexColor(hexColor: string): RgbColor {

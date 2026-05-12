@@ -10,7 +10,7 @@ import {
     type NetworkDirection,
 } from "../runtime/network-metric-keys";
 import { resolveNetSpeedMetricSubscriptionKeys } from "./network/metric-subscriptions";
-import type { ResolvedWidgetSettings } from "../settings/widget-settings";
+import type { ResolvedNetworkMetricTarget, ResolvedWidgetSettings } from "../settings/resolved-settings";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
     buildNetworkDisplayUpdate,
@@ -33,24 +33,28 @@ export class NetSpeed extends MetricAction {
 
     protected override getMetricSubscriptionKeys(event: WillAppearEvent): readonly string[] {
         const settings = this.resolveSettings(event);
+        const networkTarget = readNetworkTarget(settings);
         return resolveNetSpeedMetricSubscriptionKeys({
-            graphicType: settings.appearance.graphicType,
-            networkDirection: settings.metric.networkDirection,
-            networkInterfaceId: settings.metric.networkInterfaceId,
+            graphicType: settings.widget.slot.appearance.viewLayout,
+            networkDirection: networkTarget.reading.direction,
+            networkInterfaceId: networkTarget.interfaceId ?? "",
         });
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event);
-        const isAutomaticNetworkInterface = settings.metric.networkInterfaceId.length === 0;
-        const selectedNetworkInterface = networkInterfaceRegistry.resolveSelection(settings.metric.networkInterfaceId);
+        const networkTarget = readNetworkTarget(settings);
+        const networkInterfaceId = networkTarget.interfaceId ?? "";
+        const isAutomaticNetworkInterface = networkInterfaceId.length === 0;
+        const selectedNetworkInterface = networkInterfaceRegistry.resolveSelection(networkInterfaceId);
 
         this.publishNetworkInterfaceOptions(event);
-        this.publishNetworkRuntimeMaximum(event, settings, selectedNetworkInterface);
+        this.publishNetworkRuntimeMaximum(event, networkTarget, selectedNetworkInterface);
 
         const displayUpdate = buildNetworkDisplayUpdate({
             event,
             settings,
+            target: networkTarget,
             globalSettings: pluginGlobalSettingsStore.getResolved(),
             metricStore,
             selectedNetworkInterface,
@@ -58,7 +62,7 @@ export class NetSpeed extends MetricAction {
 
         if (displayUpdate.debugInfo) {
             logNetworkSpeedDebug({
-                settings,
+                target: networkTarget,
                 selectedNetworkInterface,
                 isAutomaticNetworkInterface,
                 debugInfo: displayUpdate.debugInfo,
@@ -80,10 +84,10 @@ export class NetSpeed extends MetricAction {
 
     private publishNetworkRuntimeMaximum(
         event: WillAppearEvent,
-        settings: ResolvedWidgetSettings,
+        target: ResolvedNetworkMetricTarget,
         selectedNetworkInterface: NetworkInterfaceOption | null,
     ): void {
-        if (settings.network.networkScaleMode === "custom") {
+        if (target.reading.display.scaleMode === "custom") {
             return;
         }
 
@@ -95,12 +99,12 @@ export class NetSpeed extends MetricAction {
             : getNetworkAggregateMetricKey("upload");
         const nextDownloadMaximum = resolveRuntimeNetworkMaximumMegabitsPerSecond({
             direction: "download",
-            settings,
+            target,
             observedBytesPerSecond: metricStore.getWidgetData(downloadMetricKey, "DOWN", "B/s").current,
         });
         const nextUploadMaximum = resolveRuntimeNetworkMaximumMegabitsPerSecond({
             direction: "upload",
-            settings,
+            target,
             observedBytesPerSecond: metricStore.getWidgetData(uploadMetricKey, "UP", "B/s").current,
         });
 
@@ -116,7 +120,7 @@ export class NetSpeed extends MetricAction {
 const DEBUG_LOG_INTERVAL_MILLISECONDS = 5000;
 
 function logNetworkSpeedDebug(options: {
-    settings: ResolvedWidgetSettings;
+    target: ResolvedNetworkMetricTarget;
     selectedNetworkInterface: NetworkInterfaceOption | null;
     isAutomaticNetworkInterface: boolean;
     debugInfo: NetworkDisplayDebugInfo;
@@ -126,17 +130,31 @@ function logNetworkSpeedDebug(options: {
         `metricKey=${options.debugInfo.networkMetricKey}`,
         `selectedInterface=${formatNetworkInterfaceDebugValue(options.selectedNetworkInterface)}`,
         `automaticInterface=${options.isAutomaticNetworkInterface}`,
-        `downloadMaxMbps=${String(options.settings.network.maximumDownloadSpeedMbps ?? "")}`,
-        `uploadMaxMbps=${String(options.settings.network.maximumUploadSpeedMbps ?? "")}`,
+        `downloadMaxMegabitsPerSecond=${String(
+            options.target.reading.display.maximumDownloadSpeedMegabitsPerSecond ?? "",
+        )}`,
+        `uploadMaxMegabitsPerSecond=${String(
+            options.target.reading.display.maximumUploadSpeedMegabitsPerSecond ?? "",
+        )}`,
         `resolvedMaxBytesPerSecond=${resolveNetworkMaximumBytesPerSecond(
             options.debugInfo.direction,
-            options.settings,
+            options.target,
         ).toFixed(0)}`,
         `detectedAutomaticMaxMbps=${String(networkInterfaceRegistry.resolveMaximumAutomaticSpeedMegabitsPerSecond() ?? "")}`,
         `currentBytesPerSecond=${options.debugInfo.sourceWidgetData.current.toFixed(0)}`,
         `progress=${options.debugInfo.displayWidgetData.progress.toFixed(4)}`,
         `availableInterfaces=${JSON.stringify(networkInterfaceRegistry.getOptions())}`,
     ].join(" "));
+}
+
+function readNetworkTarget(settings: ResolvedWidgetSettings): ResolvedNetworkMetricTarget {
+    const target = settings.widget.slot.metric.target;
+
+    if (target.domain !== "network") {
+        throw new Error("Expected network metric settings.");
+    }
+
+    return target;
 }
 
 function formatNetworkInterfaceDebugValue(networkInterface: NetworkInterfaceOption | null): string {
@@ -155,10 +173,10 @@ function formatNetworkInterfaceDebugValue(networkInterface: NetworkInterfaceOpti
 
 function resolveRuntimeNetworkMaximumMegabitsPerSecond(options: {
     direction: NetworkDirection;
-    settings: ResolvedWidgetSettings;
+    target: ResolvedNetworkMetricTarget;
     observedBytesPerSecond: number;
 }): number {
-    const currentMaximum = resolveNetworkMaximumMegabitsPerSecond(options.direction, options.settings);
+    const currentMaximum = resolveNetworkMaximumMegabitsPerSecond(options.direction, options.target);
     const observedMegabitsPerSecond = (Math.max(0, options.observedBytesPerSecond) * 8) / 1_000_000;
     const runtimeMaximum = Math.ceil(observedMegabitsPerSecond * 1.1);
 

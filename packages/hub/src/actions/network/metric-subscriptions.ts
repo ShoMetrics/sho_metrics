@@ -3,11 +3,11 @@ import {
     getNetworkAggregateMetricKey,
     getNetworkInterfaceMetricKey,
 } from "../../runtime/network-metric-keys";
-import type { GraphicType, NetworkDirection as NetworkDisplayDirection } from "../../settings/widget-settings";
+import type { NetworkDirection, SingleMetricViewLayout } from "../../settings/resolved-settings";
 
 export interface NetSpeedMetricSubscriptionSettings {
-    graphicType: GraphicType;
-    networkDirection: NetworkDisplayDirection;
+    graphicType: SingleMetricViewLayout;
+    networkDirection: NetworkDirection;
     networkInterfaceId: string;
 }
 
