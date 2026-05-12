@@ -56,9 +56,7 @@ export function writeStoredGlobalSettingsPatch(
     rawSettings: unknown,
     patch: StoredGlobalSettingsPatch,
 ): StoredSettingsJsonObject {
-    const settings = readStoredGlobalSettings(
-        writeStoredGlobalSettings(readStoredGlobalSettings(rawSettings)),
-    );
+    const settings = readStoredGlobalSettings(rawSettings).settings;
 
     settings.defaults ??= create(GlobalDefaultsSchema);
     settings.overrides ??= create(GlobalOverridesSchema);

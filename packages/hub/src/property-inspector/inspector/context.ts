@@ -19,8 +19,8 @@ export function buildPropertyInspectorContext(options: {
         isWindows: options.isWindows,
         runtimeCache: options.runtimeCache,
         resolved: resolveStoredWidgetSettings({
-            storedWidgetSettings: readStoredWidgetSettings(quickStartSettings.rawSettings),
-            storedGlobalSettings: readStoredGlobalSettings(options.rawGlobalSettings),
+            storedWidgetSettings: readStoredWidgetSettings(quickStartSettings.rawSettings).settings,
+            storedGlobalSettings: readStoredGlobalSettings(options.rawGlobalSettings).settings,
             runtime: {
                 isWindows: options.isWindows,
                 runtimeMaximumDownloadSpeedMegabitsPerSecond: options.runtimeCache.runtimeMaximumDownloadSpeedMbps,

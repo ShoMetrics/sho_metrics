@@ -106,9 +106,7 @@ export function writeStoredWidgetSettingsPatch(
     rawSettings: unknown,
     patch: StoredWidgetSettingsPatch,
 ): StoredSettingsJsonObject {
-    const nextSettings = readStoredWidgetSettings(
-        writeStoredWidgetSettings(readStoredWidgetSettings(rawSettings)),
-    );
+    const nextSettings = readStoredWidgetSettings(rawSettings).settings;
 
     applyPatch(nextSettings, patch);
 

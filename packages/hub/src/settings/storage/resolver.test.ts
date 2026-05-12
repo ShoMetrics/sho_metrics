@@ -13,7 +13,7 @@ import {
 describe("stored settings proto resolver", () => {
     it("resolves empty stored settings to a complete single CPU widget", () => {
         const settings = resolveStoredWidgetSettings({
-            storedWidgetSettings: readStoredWidgetSettings(undefined),
+            storedWidgetSettings: readStoredWidgetSettings(undefined).settings,
         });
 
         assert.equal(settings.widget.widgetKind, "singleMetric");
@@ -31,7 +31,7 @@ describe("stored settings proto resolver", () => {
                     maximumDownloadSpeedMegabitsPerSecond: 250,
                 },
             },
-        });
+        }).settings;
         const storedWidgetSettings = readStoredWidgetSettings({
             singleMetric: {
                 slot: {
@@ -53,7 +53,7 @@ describe("stored settings proto resolver", () => {
                     },
                 },
             },
-        });
+        }).settings;
 
         const settings = resolveStoredWidgetSettings({
             storedWidgetSettings,
@@ -86,7 +86,7 @@ describe("stored settings proto resolver", () => {
                     colorMode: "COLOR_MODE_SOLID",
                 },
             },
-        });
+        }).settings;
         const storedWidgetSettings = readStoredWidgetSettings({
             preferences: {
                 pollingFrequencySeconds: 15,
@@ -103,7 +103,7 @@ describe("stored settings proto resolver", () => {
                     },
                 },
             },
-        });
+        }).settings;
 
         const settings = resolveStoredWidgetSettings({
             storedWidgetSettings,
@@ -135,7 +135,7 @@ describe("stored settings proto resolver", () => {
                     },
                 },
             },
-        });
+        }).settings;
 
         const settings = resolveStoredWidgetSettings({
             storedWidgetSettings,
@@ -159,7 +159,7 @@ describe("stored settings proto resolver", () => {
                     },
                 },
             },
-        });
+        }).settings;
 
         const settings = resolveStoredWidgetSettings({
             storedWidgetSettings,
@@ -185,7 +185,7 @@ describe("stored settings proto resolver", () => {
                     },
                 },
             },
-        });
+        }).settings;
 
         const settings = resolveStoredWidgetSettings({
             storedWidgetSettings,
@@ -213,7 +213,7 @@ describe("stored settings proto resolver", () => {
                     },
                 },
             ],
-        }));
+        }).settings);
         const widgetSettings = resolveStoredWidgetSettings({
             storedWidgetSettings: readStoredWidgetSettings({
                 singleMetric: {
@@ -232,7 +232,7 @@ describe("stored settings proto resolver", () => {
                         },
                     },
                 },
-            }),
+            }).settings,
         });
 
         assert.equal(globalSettings.defaultSourceProfileId, "local");

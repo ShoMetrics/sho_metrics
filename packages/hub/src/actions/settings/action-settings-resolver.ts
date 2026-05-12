@@ -1,4 +1,5 @@
 import { pluginGlobalSettingsStore } from "../../settings/global-settings-store";
+import { logger } from "../../logging/logger";
 import type { ActionKind } from "../../shared/stream-deck-actions";
 import type { WidgetRuntimeCachePatch } from "../../runtime/widget-runtime-cache";
 import type { ResolvedWidgetSettings } from "../../settings/resolved-settings";
@@ -8,6 +9,8 @@ import {
     resolveStoredWidgetSettings,
     type ResolveStoredSettingsRuntimeContext,
 } from "../../settings/storage/resolver";
+
+const log = logger.for("ActionSettingsResolver");
 
 export interface ResolvedInitialActionSettings {
     readonly rawSettings: unknown;
@@ -32,10 +35,14 @@ export function resolveActionSettings(
     rawSettings: unknown,
     runtimeCache?: WidgetRuntimeCachePatch,
 ): ResolvedWidgetSettings {
-    const storedWidgetSettings = readStoredWidgetSettings(rawSettings);
+    const widgetSettingsRead = readStoredWidgetSettings(rawSettings);
+    const readWarning = widgetSettingsRead.warning;
+    if (readWarning) {
+        log.warn(() => `Widget settings read warning: ${readWarning.message}`);
+    }
 
     return resolveStoredWidgetSettings({
-        storedWidgetSettings,
+        storedWidgetSettings: widgetSettingsRead.settings,
         storedGlobalSettings: pluginGlobalSettingsStore.getStored(),
         runtime: resolveRuntimeContext(runtimeCache),
     });
