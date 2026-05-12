@@ -44,6 +44,24 @@ interface SettingsSyncState {
     pluginLoadError: string | null;
 }
 
+type CommitSettingsSyncState = (
+    buildNextState: (currentState: SettingsSyncState) => SettingsSyncState,
+) => SettingsSyncState;
+
+type SettingsScope = "widget" | "plugin";
+
+interface InspectorWidgetSettingsRead {
+    readonly rawSettings: unknown;
+    readonly notice: SettingsNotice | null;
+    readonly readWarning: StoredSettingsReadWarning | null;
+}
+
+interface InspectorPluginSettingsRead {
+    readonly rawGlobalSettings: StoredSettingsJsonObject;
+    readonly notice: SettingsNotice | null;
+    readonly readWarning: StoredSettingsReadWarning | null;
+}
+
 export interface SettingsNotice {
     kind: "loading" | "warning";
     text: string;
@@ -66,9 +84,7 @@ export function usePropertyInspectorSettings(
 ) {
     const [state, setState] = useState<SettingsSyncState>(initialState);
     const stateRef = useRef<SettingsSyncState>(initialState);
-    const commitState = useCallback((
-        buildNextState: (currentState: SettingsSyncState) => SettingsSyncState,
-    ): SettingsSyncState => {
+    const commitState = useCallback<CommitSettingsSyncState>((buildNextState) => {
         const nextState = buildNextState(stateRef.current);
         stateRef.current = nextState;
         setState(nextState);
@@ -166,134 +182,16 @@ export function usePropertyInspectorSettings(
     };
 
     useEffect(() => {
-        let isDisposed = false;
+        let hasDisposed = false;
+        const isDisposed = (): boolean => hasDisposed;
+        const unsubscribePropertyInspectorEvents = subscribePropertyInspectorEvents(
+            client,
+            commitState,
+            isDisposed,
+        );
 
-        async function loadSettings(): Promise<void> {
-            const connectionInfo = await client.getConnectionInfo();
-            const actionKind = resolveStreamDeckActionKind(readActionUuid(connectionInfo));
-            const isWindows = resolveIsWindowsPropertyInspector(connectionInfo);
-            if (isDisposed) {
-                return;
-            }
-
-            commitState((currentState) => {
-                const quickStartSettings = resolveQuickStartStoredWidgetSettings(
-                    connectionInfo.actionInfo?.payload?.settings ?? currentState.rawSettings,
-                    actionKind,
-                );
-                writeSettingsReadWarningLog(client, "widget", quickStartSettings.readWarning);
-
-                return {
-                    ...currentState,
-                    actionKind,
-                    isWindows,
-                    rawSettings: quickStartSettings.rawSettings,
-                    widgetSettingsNotice: readWarningNotice("widget", quickStartSettings.readWarning),
-                    widgetLoadError: null,
-                };
-            });
-
-            const [settingsResult, globalSettingsResult] = await Promise.allSettled([
-                client.getSettings(),
-                client.getGlobalSettings(),
-            ]);
-
-            if (isDisposed) {
-                return;
-            }
-
-            commitState((currentState) => {
-                const nextState: SettingsSyncState = {
-                    ...currentState,
-                    widgetLoadError: null,
-                    pluginLoadError: null,
-                };
-
-                if (settingsResult.status === "fulfilled") {
-                    const quickStartSettings = resolveQuickStartStoredWidgetSettings(
-                        settingsResult.value.settings,
-                        currentState.actionKind,
-                    );
-                    writeSettingsReadWarningLog(client, "widget", quickStartSettings.readWarning);
-                    nextState.rawSettings = quickStartSettings.rawSettings;
-                    nextState.widgetSettingsNotice = readWarningNotice("widget", quickStartSettings.readWarning);
-                } else {
-                    nextState.widgetSettingsNotice = {
-                        kind: "warning",
-                        text: "We couldn't load this widget's saved settings, so defaults are shown.",
-                    };
-                }
-
-                if (globalSettingsResult.status === "fulfilled") {
-                    const globalSettingsRead = readStoredGlobalSettings(globalSettingsResult.value.settings);
-                    writeSettingsReadWarningLog(client, "plugin", globalSettingsRead.warning);
-                    nextState.rawGlobalSettings = writeStoredGlobalSettings(globalSettingsRead.settings);
-                    nextState.pluginSettingsNotice = readWarningNotice("plugin", globalSettingsRead.warning);
-                } else {
-                    nextState.pluginSettingsNotice = {
-                        kind: "warning",
-                        text: "We couldn't load plugin settings, so defaults are shown.",
-                    };
-                }
-
-                return nextState;
-            });
-        }
-
-        const unsubscribeSettings = client.didReceiveSettings.subscribe((event) => {
-            if (isDisposed) {
-                return;
-            }
-
-            commitState((currentState) => {
-                const quickStartSettings = resolveQuickStartStoredWidgetSettings(
-                    event.payload.settings,
-                    currentState.actionKind,
-                );
-                writeSettingsReadWarningLog(client, "widget", quickStartSettings.readWarning);
-
-                return {
-                    ...currentState,
-                    rawSettings: quickStartSettings.rawSettings,
-                    widgetSettingsNotice: readWarningNotice("widget", quickStartSettings.readWarning),
-                };
-            });
-        });
-
-        const unsubscribeGlobalSettings = client.didReceiveGlobalSettings.subscribe((event) => {
-            if (isDisposed) {
-                return;
-            }
-
-            commitState((currentState) => {
-                const globalSettingsRead = readStoredGlobalSettings(event.payload.settings);
-                writeSettingsReadWarningLog(client, "plugin", globalSettingsRead.warning);
-
-                return {
-                    ...currentState,
-                    rawGlobalSettings: writeStoredGlobalSettings(globalSettingsRead.settings),
-                    pluginSettingsNotice: readWarningNotice("plugin", globalSettingsRead.warning),
-                };
-            });
-        });
-        const unsubscribeRuntimeCache = client.sendToPropertyInspector.subscribe((event) => {
-            if (isDisposed) {
-                return;
-            }
-
-            const runtimeCachePatch = readWidgetRuntimeCachePatch(event.payload);
-            if (!runtimeCachePatch) {
-                return;
-            }
-
-            commitState((currentState) => ({
-                ...currentState,
-                runtimeCache: mergeWidgetRuntimeCache(currentState.runtimeCache, runtimeCachePatch),
-            }));
-        });
-
-        loadSettings().catch((error: Error) => {
-            if (isDisposed) {
+        loadPropertyInspectorSettings(client, commitState, isDisposed).catch((error: Error) => {
+            if (isDisposed()) {
                 return;
             }
 
@@ -304,10 +202,8 @@ export function usePropertyInspectorSettings(
         });
 
         return () => {
-            isDisposed = true;
-            unsubscribeSettings();
-            unsubscribeGlobalSettings();
-            unsubscribeRuntimeCache();
+            hasDisposed = true;
+            unsubscribePropertyInspectorEvents();
         };
     }, [client, commitState]);
 
@@ -322,6 +218,171 @@ export function usePropertyInspectorSettings(
         updateWidgetSettings,
         resetWidgetSettings,
         updateGlobalSettings,
+    };
+}
+
+async function loadPropertyInspectorSettings(
+    client: StreamDeckPropertyInspectorClient,
+    commitState: CommitSettingsSyncState,
+    isDisposed: () => boolean,
+): Promise<void> {
+    const connectionInfo = await client.getConnectionInfo();
+    const actionKind = resolveStreamDeckActionKind(readActionUuid(connectionInfo));
+    const isWindows = resolveIsWindowsPropertyInspector(connectionInfo);
+    if (isDisposed()) {
+        return;
+    }
+
+    commitState((currentState) => {
+        const widgetSettingsRead = readInspectorWidgetSettings(
+            connectionInfo.actionInfo?.payload?.settings ?? currentState.rawSettings,
+            actionKind,
+        );
+        writeSettingsReadWarningLog(client, "widget", widgetSettingsRead.readWarning);
+
+        return {
+            ...currentState,
+            actionKind,
+            isWindows,
+            rawSettings: widgetSettingsRead.rawSettings,
+            widgetSettingsNotice: widgetSettingsRead.notice,
+            widgetLoadError: null,
+        };
+    });
+
+    const [settingsResult, globalSettingsResult] = await Promise.allSettled([
+        client.getSettings(),
+        client.getGlobalSettings(),
+    ]);
+
+    if (isDisposed()) {
+        return;
+    }
+
+    applyLoadedSettingsResults(client, commitState, actionKind, settingsResult, globalSettingsResult);
+}
+
+function applyLoadedSettingsResults(
+    client: StreamDeckPropertyInspectorClient,
+    commitState: CommitSettingsSyncState,
+    actionKind: ActionKind,
+    settingsResult: PromiseSettledResult<{ settings: unknown }>,
+    globalSettingsResult: PromiseSettledResult<{ settings: unknown }>,
+): void {
+    commitState((currentState) => {
+        const nextState: SettingsSyncState = {
+            ...currentState,
+            widgetLoadError: null,
+            pluginLoadError: null,
+        };
+
+        if (settingsResult.status === "fulfilled") {
+            const widgetSettingsRead = readInspectorWidgetSettings(settingsResult.value.settings, actionKind);
+            writeSettingsReadWarningLog(client, "widget", widgetSettingsRead.readWarning);
+            nextState.rawSettings = widgetSettingsRead.rawSettings;
+            nextState.widgetSettingsNotice = widgetSettingsRead.notice;
+        } else {
+            nextState.widgetSettingsNotice = settingsLoadFailureNotice("widget");
+        }
+
+        if (globalSettingsResult.status === "fulfilled") {
+            const pluginSettingsRead = readInspectorPluginSettings(globalSettingsResult.value.settings);
+            writeSettingsReadWarningLog(client, "plugin", pluginSettingsRead.readWarning);
+            nextState.rawGlobalSettings = pluginSettingsRead.rawGlobalSettings;
+            nextState.pluginSettingsNotice = pluginSettingsRead.notice;
+        } else {
+            nextState.pluginSettingsNotice = settingsLoadFailureNotice("plugin");
+        }
+
+        return nextState;
+    });
+}
+
+function subscribePropertyInspectorEvents(
+    client: StreamDeckPropertyInspectorClient,
+    commitState: CommitSettingsSyncState,
+    isDisposed: () => boolean,
+): () => void {
+    const unsubscribeSettings = client.didReceiveSettings.subscribe((event) => {
+        if (isDisposed()) {
+            return;
+        }
+
+        commitState((currentState) => {
+            const widgetSettingsRead = readInspectorWidgetSettings(
+                event.payload.settings,
+                currentState.actionKind,
+            );
+            writeSettingsReadWarningLog(client, "widget", widgetSettingsRead.readWarning);
+
+            return {
+                ...currentState,
+                rawSettings: widgetSettingsRead.rawSettings,
+                widgetSettingsNotice: widgetSettingsRead.notice,
+            };
+        });
+    });
+
+    const unsubscribeGlobalSettings = client.didReceiveGlobalSettings.subscribe((event) => {
+        if (isDisposed()) {
+            return;
+        }
+
+        commitState((currentState) => {
+            const pluginSettingsRead = readInspectorPluginSettings(event.payload.settings);
+            writeSettingsReadWarningLog(client, "plugin", pluginSettingsRead.readWarning);
+
+            return {
+                ...currentState,
+                rawGlobalSettings: pluginSettingsRead.rawGlobalSettings,
+                pluginSettingsNotice: pluginSettingsRead.notice,
+            };
+        });
+    });
+
+    const unsubscribeRuntimeCache = client.sendToPropertyInspector.subscribe((event) => {
+        if (isDisposed()) {
+            return;
+        }
+
+        const runtimeCachePatch = readWidgetRuntimeCachePatch(event.payload);
+        if (!runtimeCachePatch) {
+            return;
+        }
+
+        commitState((currentState) => ({
+            ...currentState,
+            runtimeCache: mergeWidgetRuntimeCache(currentState.runtimeCache, runtimeCachePatch),
+        }));
+    });
+
+    return () => {
+        unsubscribeSettings();
+        unsubscribeGlobalSettings();
+        unsubscribeRuntimeCache();
+    };
+}
+
+function readInspectorWidgetSettings(
+    rawSettings: unknown,
+    actionKind: ActionKind,
+): InspectorWidgetSettingsRead {
+    const quickStartSettings = resolveQuickStartStoredWidgetSettings(rawSettings, actionKind);
+
+    return {
+        rawSettings: quickStartSettings.rawSettings,
+        notice: readWarningNotice("widget", quickStartSettings.readWarning),
+        readWarning: quickStartSettings.readWarning,
+    };
+}
+
+function readInspectorPluginSettings(rawGlobalSettings: unknown): InspectorPluginSettingsRead {
+    const globalSettingsRead = readStoredGlobalSettings(rawGlobalSettings);
+
+    return {
+        rawGlobalSettings: writeStoredGlobalSettings(globalSettingsRead.settings),
+        notice: readWarningNotice("plugin", globalSettingsRead.warning),
+        readWarning: globalSettingsRead.warning,
     };
 }
 
@@ -342,7 +403,7 @@ function writeSettingsReadWarningLog(
 }
 
 function readWarningNotice(
-    settingsScope: "widget" | "plugin",
+    settingsScope: SettingsScope,
     warning: StoredSettingsReadWarning | null,
 ): SettingsNotice | null {
     if (!warning) {
@@ -365,6 +426,20 @@ function readWarningNotice(
         text:
             `${label} settings could not be read. Defaults are shown; ` +
             `saving ${settingsScope} settings will replace the unreadable settings.`,
+    };
+}
+
+function settingsLoadFailureNotice(settingsScope: SettingsScope): SettingsNotice {
+    if (settingsScope === "widget") {
+        return {
+            kind: "warning",
+            text: "We couldn't load this widget's saved settings, so defaults are shown.",
+        };
+    }
+
+    return {
+        kind: "warning",
+        text: "We couldn't load plugin settings, so defaults are shown.",
     };
 }
 
