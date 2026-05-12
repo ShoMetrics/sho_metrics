@@ -62,17 +62,16 @@ test("connect registers the property inspector and publishes initial action sett
         uuid: "pi-uuid",
     });
     assert.equal(receivedEventList.length, 1);
-    assert.deepEqual(receivedEventList[0]?.payload.settings, {
-        graphicType: "text",
-    });
+    assert.deepEqual(
+        receivedEventList[0]?.payload.settings,
+        buildWidgetSettings(30),
+    );
 });
 
 test("connect saves the Stream Deck registration metadata", async () => {
     const client = new StreamDeckClient();
     const registrationInfo = createRegistrationInfo();
-    const actionInfo = createActionInfo({
-        graphicType: "text",
-    });
+    const actionInfo = createActionInfo(buildWidgetSettings(30));
 
     await client.connect("1234", "pi-uuid", "registerPropertyInspector", registrationInfo, actionInfo);
     const connectionInfo = await client.getConnectionInfo();
@@ -92,9 +91,7 @@ test("websocket messages dispatch didReceiveGlobalSettings subscribers", async (
     const receivedEvent: DidReceiveGlobalSettingsEvent = {
         event: "didReceiveGlobalSettings",
         payload: {
-            settings: {
-                overrideWidgetAppearance: true,
-            },
+            settings: buildGlobalSettings(true),
         },
     };
 
@@ -115,9 +112,7 @@ test("websocket messages dispatch didReceiveSettings subscribers", async () => {
         context: "action-context",
         device: "device-id",
         payload: {
-            settings: {
-                graphicType: "linear",
-            },
+            settings: buildWidgetSettings(15),
         },
     };
 
@@ -158,9 +153,7 @@ test("getSettings sends the current action request and waits for the matching se
         context: "other-context",
         device: "device-id",
         payload: {
-            settings: {
-                graphicType: "text",
-            },
+            settings: buildWidgetSettings(30),
         },
     });
     socket.receive({
@@ -169,9 +162,7 @@ test("getSettings sends the current action request and waits for the matching se
         context: "action-context",
         device: "device-id",
         payload: {
-            settings: {
-                graphicType: "linear",
-            },
+            settings: buildWidgetSettings(15),
         },
     });
     const receivedSettings = await settingsPromise;
@@ -182,9 +173,7 @@ test("getSettings sends the current action request and waits for the matching se
         action: "com.example.action",
     });
     assert.deepEqual(receivedSettings, {
-        settings: {
-            graphicType: "linear",
-        },
+        settings: buildWidgetSettings(15),
     });
 });
 
@@ -199,9 +188,7 @@ test("getGlobalSettings returns the received settings payload", async () => {
     socket.receive({
         event: "didReceiveGlobalSettings",
         payload: {
-            settings: {
-                overrideWidgetAppearance: true,
-            },
+            settings: buildGlobalSettings(true),
         },
     });
     const receivedGlobalSettings = await globalSettingsPromise;
@@ -214,9 +201,7 @@ test("getGlobalSettings returns the received settings payload", async () => {
     // SDPIComponents returns raw global settings here. The local client returns
     // the payload shape App already consumes, so this deviation is intentional.
     assert.deepEqual(receivedGlobalSettings, {
-        settings: {
-            overrideWidgetAppearance: true,
-        },
+        settings: buildGlobalSettings(true),
     });
 });
 
@@ -225,24 +210,20 @@ test("setSettings and setGlobalSettings send Stream Deck command payloads", asyn
     await connectClient(client);
     const socket = readSingleSocket();
 
-    await client.setSettings({ graphicType: "circular" });
-    await client.setGlobalSettings({ overrideWidgetAppearance: true });
+    await client.setSettings(buildWidgetSettings(60));
+    await client.setGlobalSettings(buildGlobalSettings(true));
 
     assert.deepEqual(readSentMessage(socket, 1), {
         event: "setSettings",
         context: "pi-uuid",
         action: "com.example.action",
-        payload: {
-            graphicType: "circular",
-        },
+        payload: buildWidgetSettings(60),
     });
     assert.deepEqual(readSentMessage(socket, 2), {
         event: "setGlobalSettings",
         context: "pi-uuid",
         action: "com.example.action",
-        payload: {
-            overrideWidgetAppearance: true,
-        },
+        payload: buildGlobalSettings(true),
     });
 });
 
@@ -286,9 +267,7 @@ async function connectClient(client: StreamDeckClient): Promise<void> {
         "pi-uuid",
         "registerPropertyInspector",
         createRegistrationInfo(),
-        createActionInfo({
-            graphicType: "text",
-        }),
+        createActionInfo(buildWidgetSettings(30)),
     );
     readSingleSocket().open();
     await flushPromises();
@@ -309,6 +288,22 @@ function createActionInfo(settings: SettingsRecord): ActionInfo {
         device: "device-id",
         payload: {
             settings,
+        },
+    };
+}
+
+function buildWidgetSettings(pollingFrequencySeconds: number): SettingsRecord {
+    return {
+        preferences: {
+            pollingFrequencySeconds,
+        },
+    };
+}
+
+function buildGlobalSettings(isAppearanceOverrideEnabled: boolean): SettingsRecord {
+    return {
+        overrides: {
+            appearanceEnabled: isAppearanceOverrideEnabled,
         },
     };
 }

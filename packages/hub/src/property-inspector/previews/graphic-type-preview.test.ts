@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildCircleStylePreviewUri } from "./circle-style-preview";
 import { buildGraphicTypePreviewUri } from "./graphic-type-preview";
-import type { CircleStyle, GraphicType } from "../inspector/settings-types";
+import type { CircleStyle, SingleMetricViewLayout } from "../inspector/settings-types";
 
 test("graphic type preview URIs render every Property Inspector graphic option without throwing", () => {
-    const graphicTypes: readonly GraphicType[] = ["circular", "text", "linear", "sparkline"];
+    const graphicTypes: readonly SingleMetricViewLayout[] = ["circular", "text", "linear", "sparkline"];
 
     for (const graphicType of graphicTypes) {
         const previewUri = buildGraphicTypePreviewUri(graphicType);

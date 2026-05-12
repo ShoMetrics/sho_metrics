@@ -1,5 +1,5 @@
 import { buildGraphicTypePreviewUri } from "../previews/graphic-type-preview";
-import type { GraphicType } from "../inspector/settings-types";
+import type { SingleMetricViewLayout } from "../inspector/settings-types";
 import { PreviewOptionSetting } from "./PreviewOptionSetting";
 import type { SettingControlProps } from "./setting-control";
 
@@ -11,8 +11,8 @@ const graphicTypeOptionList = [
 ] as const;
 
 interface GraphicTypeSettingProps extends SettingControlProps {
-    value: GraphicType;
-    onValueChange: (value: GraphicType) => void;
+    value: SingleMetricViewLayout;
+    onValueChange: (value: SingleMetricViewLayout) => void;
 }
 
 export function GraphicTypeSetting(props: GraphicTypeSettingProps): React.JSX.Element {

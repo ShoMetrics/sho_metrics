@@ -1,5 +1,4 @@
 export type { ActionKind } from "../../shared/stream-deck-actions";
-import type { MetricTheme, SingleMetricViewLayout } from "../../settings/resolved-settings";
 export type {
     CircleStyle,
     ColorMode,
@@ -16,6 +15,4 @@ export type {
     TemperatureUnit,
 } from "../../settings/resolved-settings";
 
-export type GraphicType = SingleMetricViewLayout;
-export type GraphicStyle = MetricTheme;
 export type DiskMetricKind = "usage" | "throughput";
