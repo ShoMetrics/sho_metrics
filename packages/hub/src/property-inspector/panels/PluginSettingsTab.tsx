@@ -28,7 +28,7 @@ export function PluginSettingsTab({ resolvedSettings, onSettingsPatch }: PluginS
     return (
         <div>
             <OverrideSection
-                overrideWidgetAppearance={resolvedSettings.appearanceOverride !== undefined}
+                isAppearanceOverrideEnabled={resolvedSettings.appearanceOverride !== undefined}
                 onOverrideChange={(appearanceEnabled) => onSettingsPatch({ appearanceEnabled })}
             />
             {resolvedSettings.appearanceOverride && (
@@ -50,11 +50,11 @@ export function PluginSettingsTab({ resolvedSettings, onSettingsPatch }: PluginS
 }
 
 function OverrideSection({
-    overrideWidgetAppearance,
+    isAppearanceOverrideEnabled,
     onOverrideChange,
 }: {
-    overrideWidgetAppearance: boolean;
-    onOverrideChange: (overrideWidgetAppearance: boolean) => void;
+    isAppearanceOverrideEnabled: boolean;
+    onOverrideChange: (isAppearanceOverrideEnabled: boolean) => void;
 }): React.JSX.Element {
     return (
         <SettingsSection title="Override">
@@ -62,7 +62,7 @@ function OverrideSection({
                 <label className="override-toggle-row">
                     <input
                         type="checkbox"
-                        checked={overrideWidgetAppearance}
+                        checked={isAppearanceOverrideEnabled}
                         onChange={(event) => onOverrideChange(event.currentTarget.checked)}
                     />
                     <span className="override-toggle-title">Override Widgets</span>

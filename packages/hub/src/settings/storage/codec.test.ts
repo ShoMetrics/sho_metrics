@@ -48,7 +48,7 @@ describe("stored settings proto codec", () => {
     it("rejects unknown ProtoJSON fields", () => {
         assert.throws(
             () => readStoredWidgetSettings({
-                legacyGraphicType: "circular",
+                unknownProtoJsonField: "circular",
             }),
             StoredSettingsCodecError,
         );
