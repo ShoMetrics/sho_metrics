@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Scheduler, type MetricSnapshotStore } from "./scheduler";
-import type { IMetricSource, IMetricSnapshot } from "./sources/source.interface";
+import {
+    buildMetricSnapshot,
+    buildScalarMetricValue,
+    type IMetricSource,
+    type IMetricSnapshot,
+} from "./sources/source.interface";
 
 test("subscribe polls metric key groups with sorted unique keys", async () => {
     const source = new FakeMetricSource();
@@ -108,13 +113,7 @@ test("later same-group subscribers do not join an in-flight initial poll", async
 
 class FakeMetricSource implements IMetricSource {
     readonly sourceId = "fake-source";
-    readonly snapshot: IMetricSnapshot = {
-        sourceId: this.sourceId,
-        timestampMs: 1000,
-        metrics: {
-            "cpu.usage_percent": { scalar: 42, unit: "%" },
-        },
-    };
+    readonly snapshot: IMetricSnapshot = buildTestSnapshot(this.sourceId);
     readonly polledMetricKeyListList: readonly string[][] = [];
 
     async poll(): Promise<IMetricSnapshot> {
@@ -129,13 +128,7 @@ class FakeMetricSource implements IMetricSource {
 
 class DeferredMetricSource implements IMetricSource {
     readonly sourceId = "deferred-source";
-    readonly snapshot: IMetricSnapshot = {
-        sourceId: this.sourceId,
-        timestampMs: 1000,
-        metrics: {
-            "cpu.usage_percent": { scalar: 42, unit: "%" },
-        },
-    };
+    readonly snapshot: IMetricSnapshot = buildTestSnapshot(this.sourceId);
     readonly polledMetricKeyListList: string[][] = [];
     private readonly pendingPollResolvers: Array<(snapshot: IMetricSnapshot) => void> = [];
 
@@ -165,19 +158,23 @@ class DeferredMetricSource implements IMetricSource {
 
 class PollOnlyMetricSource implements IMetricSource {
     readonly sourceId = "poll-only-source";
-    readonly snapshot: IMetricSnapshot = {
-        sourceId: this.sourceId,
-        timestampMs: 1000,
-        metrics: {
-            "cpu.usage_percent": { scalar: 42, unit: "%" },
-        },
-    };
+    readonly snapshot: IMetricSnapshot = buildTestSnapshot(this.sourceId);
     pollCount = 0;
 
     async poll(): Promise<IMetricSnapshot> {
         this.pollCount += 1;
         return this.snapshot;
     }
+}
+
+function buildTestSnapshot(sourceId: string): IMetricSnapshot {
+    return buildMetricSnapshot({
+        sourceId,
+        timestampMilliseconds: 1000,
+        metrics: {
+            "cpu.usage_percent": buildScalarMetricValue(42, { unit: "%" }),
+        },
+    });
 }
 
 class FakeMetricSnapshotStore implements MetricSnapshotStore {

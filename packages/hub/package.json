@@ -1,20 +1,24 @@
 {
     "scripts": {
+        "prebuild": "node scripts/run-buf.mjs generate ../../contracts/proto --template scripts/proto/buf.gen.yaml",
         "build": "rollup -c",
         "test": "npm run test:unit",
+        "pretest:unit": "node scripts/run-buf.mjs generate ../../contracts/proto --template scripts/proto/buf.gen.yaml",
         "test:unit": "node scripts/clean-test-output.mjs && tsc -p tsconfig.test.json && node scripts/write-test-package.mjs && node --test --test-isolation=none .test-dist/src/**/*.test.js",
-        "benchmark:protobuf": "npm run generate:benchmark-proto && node scripts/benchmark/protobuf/protobuf-performance-benchmark.mjs",
+        "benchmark:protobuf": "node scripts/run-buf.mjs generate --template scripts/benchmark/protobuf/buf.gen.yaml && node scripts/benchmark/protobuf/protobuf-performance-benchmark.mjs",
         "benchmark:resvg": "node scripts/benchmark/resvg-minimal.mjs",
         "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart com.ez.sho-metrics\"",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
-        "generate:proto": "pbjs -t static-module -w es6 -o src/generated/snapshot.js ../../contracts/proto/shometrics/v1/snapshot.proto && pbts -o src/generated/snapshot.d.ts src/generated/snapshot.js",
-        "generate:benchmark-proto": "buf generate --template scripts/benchmark/protobuf/buf.gen.yaml"
+        "proto:format": "node scripts/run-buf.mjs format ../../contracts/proto -w",
+        "proto:lint": "node scripts/run-buf.mjs lint ../../contracts/proto",
+        "proto:build": "node scripts/run-buf.mjs build ../../contracts/proto",
+        "proto:dep:update": "node scripts/run-buf.mjs dep update ../../contracts/proto",
+        "generate:proto": "node scripts/run-buf.mjs generate ../../contracts/proto --template scripts/proto/buf.gen.yaml"
     },
     "type": "module",
     "devDependencies": {
         "@bufbuild/buf": "^1.69.0",
-        "@bufbuild/protobuf": "^2.12.0",
         "@bufbuild/protoc-gen-es": "^2.12.0",
         "@elgato/cli": "^1.7.4",
         "@eslint/js": "^9.39.4",
@@ -29,19 +33,19 @@
         "@types/react-dom": "^19.0.0",
         "eslint": "^9.39.4",
         "globals": "^17.5.0",
-        "protobufjs-cli": "^2.0.1",
         "rollup": "^4.0.2",
         "tslib": "^2.6.2",
         "typescript": "^5.2.2",
         "typescript-eslint": "^8.59.0"
     },
     "dependencies": {
+        "@bufbuild/protobuf": "^2.12.0",
+        "@bufbuild/protovalidate": "^1.2.0",
         "@elgato/streamdeck": "^2.0.0",
         "@resvg/resvg-js": "^2.6.2",
         "@types/d3-shape": "^3.1.8",
         "d3-shape": "^3.2.0",
         "lucide": "^1.11.0",
-        "protobufjs": "^8.0.1",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
         "systeminformation": "^5.31.5"
