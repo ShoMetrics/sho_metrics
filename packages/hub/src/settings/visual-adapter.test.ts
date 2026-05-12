@@ -1,15 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildMetricVisualSettings } from "./visual-adapter";
-import {
-    defaultAppearanceSettings,
-    type AppearanceSettings,
-} from "./widget-settings";
+import type { ResolvedAppearanceSettings } from "./resolved-settings";
 
 test("graphic type maps resolved appearance settings to renderer names", () => {
-    const circularSettings = buildMetricVisualSettings(buildAppearanceSettings({ graphicType: "circular" }));
-    const linearSettings = buildMetricVisualSettings(buildAppearanceSettings({ graphicType: "linear" }));
-    const sparklineSettings = buildMetricVisualSettings(buildAppearanceSettings({ graphicType: "sparkline" }));
+    const circularSettings = buildMetricVisualSettings(buildAppearanceSettings({ viewLayout: "circular" }));
+    const linearSettings = buildMetricVisualSettings(buildAppearanceSettings({ viewLayout: "linear" }));
+    const sparklineSettings = buildMetricVisualSettings(buildAppearanceSettings({ viewLayout: "sparkline" }));
 
     assert.equal(circularSettings.graphicType, "circular");
     assert.equal(linearSettings.graphicType, "linear");
@@ -28,7 +25,7 @@ test("circle style maps resolved appearance settings to renderer presets", () =>
 
 test("graphic style maps resolved appearance settings to theme preset names", () => {
     const cupertinoGlassSettings = buildMetricVisualSettings(buildAppearanceSettings({
-        graphicStyle: "cupertino-glass",
+        theme: "cupertino-glass",
     }));
     const defaultSettings = buildMetricVisualSettings(buildAppearanceSettings());
 
@@ -50,8 +47,8 @@ test("solid color mode uses resolved appearance color", () => {
 
 test("threshold values build renderer color bands", () => {
     const colorConfig = buildMetricVisualSettings(buildAppearanceSettings({
-        lowThreshold: 20,
-        highThreshold: 90,
+        lowColorThresholdPercent: 20,
+        highColorThresholdPercent: 90,
     })).colorConfig;
 
     assert.deepEqual(colorConfig.thresholds.map(threshold => ({
@@ -93,9 +90,51 @@ test("line smoothing and grid options pass through resolved appearance settings"
     assert.equal(visualSettings.gridLineType, "vertical");
 });
 
-function buildAppearanceSettings(overrides: Partial<AppearanceSettings> = {}): AppearanceSettings {
+function buildAppearanceSettings(overrides: Partial<ResolvedAppearanceSettings> = {}): ResolvedAppearanceSettings {
     return {
         ...defaultAppearanceSettings,
         ...overrides,
     };
 }
+
+const defaultAppearanceSettings: ResolvedAppearanceSettings = {
+    viewLayout: "circular",
+    circleStyle: "value",
+    theme: "flat",
+    colorMode: "threshold",
+    usageColors: {
+        solidColor: "#3b82f6",
+        lowColor: "#22c55e",
+        mediumColor: "#eab308",
+        highColor: "#ef4444",
+    },
+    downloadColors: {
+        solidColor: "#3b82f6",
+        lowColor: "#22c55e",
+        mediumColor: "#3b82f6",
+        highColor: "#60a5fa",
+    },
+    uploadColors: {
+        solidColor: "#ef4444",
+        lowColor: "#f97316",
+        mediumColor: "#ef4444",
+        highColor: "#f472b6",
+    },
+    diskReadColors: {
+        solidColor: "#38bdf8",
+        lowColor: "#22c55e",
+        mediumColor: "#38bdf8",
+        highColor: "#60a5fa",
+    },
+    diskWriteColors: {
+        solidColor: "#f472b6",
+        lowColor: "#f97316",
+        mediumColor: "#f472b6",
+        highColor: "#fb7185",
+    },
+    lowColorThresholdPercent: 30,
+    highColorThresholdPercent: 70,
+    lineSmoothingPercent: 75,
+    gridLineVisibility: "adaptive",
+    gridLineType: "horizontal",
+};

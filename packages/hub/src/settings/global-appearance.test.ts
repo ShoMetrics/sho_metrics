@@ -7,34 +7,34 @@ import {
 import {
     applyGlobalAppearanceToVisualSettings,
     buildGlobalChannelColorConfig,
-    defaultResolvedGlobalSettings,
     deriveTintChannelColors,
 } from "./global-appearance";
-import { resolveGlobalSettings } from "./resolver";
+import type {
+    ResolvedAppearanceSettings,
+    ResolvedGlobalAppearanceOverride,
+    ResolvedGlobalSettings,
+} from "./resolved-settings";
 
 test("global override replaces widget appearance without mutating non-appearance settings", () => {
     const settings = applyGlobalAppearanceToVisualSettings({
-        ...defaultResolvedGlobalSettings.appearanceDefaults,
-        graphicType: "linear",
+        ...defaultAppearanceSettings,
+        viewLayout: "linear",
         circleStyle: "compact",
-        graphicStyle: "flat",
+        theme: "flat",
         lineSmoothingPercent: 25,
-    }, resolveGlobalSettings({
-        overrideWidgetAppearance: true,
-        appearanceDefaults: {
-            graphicType: "circular",
+    }, buildResolvedGlobalSettings({
+        appearanceOverride: {
+            viewLayout: "circular",
             circleStyle: "gauge",
-            graphicStyle: "cupertino-glass",
-            usageColors: {
-                solidColor: "#111827",
-            },
+            theme: "cupertino-glass",
+            tintColor: "#111827",
             colorMode: "solid",
         },
     }));
 
-    assert.equal(settings.graphicType, "circular");
+    assert.equal(settings.viewLayout, "circular");
     assert.equal(settings.circleStyle, "gauge");
-    assert.equal(settings.graphicStyle, "cupertino-glass");
+    assert.equal(settings.theme, "cupertino-glass");
     assert.equal(settings.usageColors.solidColor, "#111827");
     assert.equal(settings.lineSmoothingPercent, 25);
 });
@@ -61,12 +61,9 @@ test("tint channel derivation fails when the resolved tint color is invalid", ()
 });
 
 test("global channel color config maps primary to one channel and secondary to the other", () => {
-    const settings = resolveGlobalSettings({
-        overrideWidgetAppearance: true,
-        appearanceDefaults: {
-            usageColors: {
-                solidColor: "#3b82f6",
-            },
+    const settings = buildResolvedGlobalSettings({
+        appearanceOverride: {
+            tintColor: "#3b82f6",
             colorMode: "threshold",
         },
     });
@@ -89,3 +86,79 @@ function readRelativeLuminance(hexColor: string): number {
 
     return resolveRelativeLuminance(color);
 }
+
+function buildResolvedGlobalSettings(options: {
+    appearanceOverride?: Partial<ResolvedGlobalAppearanceOverride>;
+} = {}): ResolvedGlobalSettings {
+    return {
+        defaults: {
+            network: {
+                scaleMode: "auto",
+                maximumDownloadSpeedMegabitsPerSecond: undefined,
+                maximumUploadSpeedMegabitsPerSecond: undefined,
+                unitBase: "byte",
+            },
+            diskThroughput: {
+                scaleMode: "auto",
+                maximumReadThroughputMebibytesPerSecond: undefined,
+                maximumWriteThroughputMebibytesPerSecond: undefined,
+            },
+        },
+        appearanceOverride: options.appearanceOverride
+            ? {
+                viewLayout: "circular",
+                circleStyle: "value",
+                theme: "flat",
+                tintColor: "#3b82f6",
+                colorMode: "solid",
+                lowColorThresholdPercent: 30,
+                highColorThresholdPercent: 70,
+                ...options.appearanceOverride,
+            }
+            : undefined,
+        sourceProfiles: [],
+        defaultSourceProfileId: undefined,
+    };
+}
+
+const defaultAppearanceSettings: ResolvedAppearanceSettings = {
+    viewLayout: "circular",
+    circleStyle: "value",
+    theme: "flat",
+    colorMode: "threshold",
+    usageColors: {
+        solidColor: "#3b82f6",
+        lowColor: "#22c55e",
+        mediumColor: "#eab308",
+        highColor: "#ef4444",
+    },
+    downloadColors: {
+        solidColor: "#3b82f6",
+        lowColor: "#22c55e",
+        mediumColor: "#3b82f6",
+        highColor: "#60a5fa",
+    },
+    uploadColors: {
+        solidColor: "#ef4444",
+        lowColor: "#f97316",
+        mediumColor: "#ef4444",
+        highColor: "#f472b6",
+    },
+    diskReadColors: {
+        solidColor: "#38bdf8",
+        lowColor: "#22c55e",
+        mediumColor: "#38bdf8",
+        highColor: "#60a5fa",
+    },
+    diskWriteColors: {
+        solidColor: "#f472b6",
+        lowColor: "#f97316",
+        mediumColor: "#f472b6",
+        highColor: "#fb7185",
+    },
+    lowColorThresholdPercent: 30,
+    highColorThresholdPercent: 70,
+    lineSmoothingPercent: 75,
+    gridLineVisibility: "adaptive",
+    gridLineType: "horizontal",
+};

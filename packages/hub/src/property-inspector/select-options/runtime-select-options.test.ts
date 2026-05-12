@@ -8,6 +8,8 @@ import {
 } from "./runtime-select-options";
 import type { DiskVolumeOption } from "../../runtime/disk-volumes";
 import type { WidgetRuntimeCachePatch } from "../../runtime/widget-runtime-cache";
+import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
+import { writeStoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
 import { buildVisibilityContext, type InspectorTestSettings } from "../testing/test-context";
 
 test("network interface options include automatic and formatted interfaces", () => {
@@ -57,11 +59,7 @@ test("disk volume options include automatic and compact capacity labels", () => 
 
 test("selected disk labels prefer explicit selection then root fallback", () => {
     const context = buildContext({
-        settings: {
-            metric: {
-                diskVolumeId: "D:\\Games",
-            },
-        },
+        settings: buildDiskSettings({ volumeId: "D:\\Games" }),
         runtimeCache: {
             availableDiskVolumes: [
                 buildDiskVolume({ id: "C:\\", mount: "C:\\", volumeLabel: "System", storageKind: "ssd" }),
@@ -95,9 +93,18 @@ function buildContext(options: {
 } = {}) {
     return buildVisibilityContext({
         actionKind: "disk",
-        settings: options.settings,
+        settings: options.settings ?? buildDiskSettings(),
         runtimeCache: options.runtimeCache,
     });
+}
+
+function buildDiskSettings(patch: NonNullable<Parameters<typeof writeStoredWidgetSettingsPatch>[1]>["disk"] = {}): InspectorTestSettings {
+    return writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings,
+        {
+            disk: patch,
+        },
+    );
 }
 
 function buildDiskVolume(overrides: Partial<DiskVolumeOption> = {}): DiskVolumeOption {

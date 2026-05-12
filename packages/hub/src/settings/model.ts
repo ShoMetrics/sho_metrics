@@ -1,13 +1,5 @@
-export type ActionKind =
-    | "cpu-usage"
-    | "net-speed"
-    | "ram"
-    | "disk"
-    | "gpu-usage"
-    | "gpu-temp"
-    | "gpu-vram"
-    | "gpu-power"
-    | "unknown";
+import type { ActionKind } from "../shared/stream-deck-actions";
+export type { ActionKind };
 
 export type GraphicType = "circular" | "text" | "linear" | "sparkline";
 export type CircleStyle = "value" | "compact" | "gauge";

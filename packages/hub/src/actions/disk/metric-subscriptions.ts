@@ -2,14 +2,13 @@ import {
     getDiskThroughputMetricKey,
 } from "../../runtime/disk-metric-keys";
 import type {
-    DiskMetricKind,
     DiskThroughputDirection as DiskThroughputDisplayDirection,
-    GraphicType,
-} from "../../settings/widget-settings";
+    SingleMetricViewLayout,
+} from "../../settings/resolved-settings";
 
 export interface DiskMetricSubscriptionSettings {
-    diskMetricKind: DiskMetricKind;
-    graphicType: GraphicType;
+    diskMetricKind: "usage" | "throughput";
+    graphicType: SingleMetricViewLayout;
     diskThroughputDirection: DiskThroughputDisplayDirection;
 }
 
@@ -31,7 +30,7 @@ export function resolveDiskMetricSubscriptionKeys(settings: DiskMetricSubscripti
 }
 
 export function isDualDiskThroughputDisplay(
-    graphicType: GraphicType | undefined,
+    graphicType: SingleMetricViewLayout | undefined,
     direction: DiskThroughputDisplayDirection,
 ): boolean {
     return direction === "both"

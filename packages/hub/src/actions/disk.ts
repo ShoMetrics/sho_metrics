@@ -11,7 +11,7 @@ import {
     type DiskThroughputDirection,
 } from "../runtime/disk-metric-keys";
 import { resolveDiskMetricSubscriptionKeys } from "./disk/metric-subscriptions";
-import type { ResolvedWidgetSettings } from "../settings/widget-settings";
+import type { ResolvedDiskMetricTarget, ResolvedWidgetSettings } from "../settings/resolved-settings";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
     buildDiskDisplayOptions,
@@ -27,17 +27,18 @@ export class Disk extends MetricAction {
 
     protected override getMetricSubscriptionKeys(event: WillAppearEvent): readonly string[] {
         const settings = this.resolveSettings(event);
-        const metricKind = settings.metric.diskMetricKind;
+        const diskTarget = readDiskTarget(settings);
+        const metricKind = diskTarget.reading.kind;
 
         if (metricKind === "throughput") {
             return resolveDiskMetricSubscriptionKeys({
-                diskMetricKind: settings.metric.diskMetricKind,
-                graphicType: settings.appearance.graphicType,
-                diskThroughputDirection: settings.metric.diskThroughputDirection,
+                diskMetricKind: metricKind,
+                graphicType: settings.widget.slot.appearance.viewLayout,
+                diskThroughputDirection: diskTarget.reading.direction,
             });
         }
 
-        const selectedVolume = resolveSelectedDiskVolume(settings.metric.diskVolumeId);
+        const selectedVolume = resolveSelectedDiskVolume(diskTarget.volumeId);
 
         return selectedVolume
             ? [
@@ -54,12 +55,13 @@ export class Disk extends MetricAction {
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event);
-        const selectedVolume = resolveSelectedDiskVolume(settings.metric.diskVolumeId);
+        const diskTarget = readDiskTarget(settings);
+        const selectedVolume = resolveSelectedDiskVolume(diskTarget.volumeId);
 
         this.publishDiskVolumeOptions(event);
-        this.publishDiskThroughputRuntimeMaximum(event, settings, selectedVolume);
+        this.publishDiskThroughputRuntimeMaximum(event, diskTarget, selectedVolume);
 
-        if (settings.metric.diskMetricKind === "throughput" && process.platform !== "darwin") {
+        if (diskTarget.reading.kind === "throughput" && process.platform !== "darwin") {
             showDiskThroughputUnavailable(event);
             return;
         }
@@ -67,6 +69,7 @@ export class Disk extends MetricAction {
         setMetricDisplay(buildDiskDisplayOptions({
             event,
             settings,
+            target: diskTarget,
             globalSettings: pluginGlobalSettingsStore.getResolved(),
             metricStore,
             selectedVolume,
@@ -85,25 +88,26 @@ export class Disk extends MetricAction {
 
     private publishDiskThroughputRuntimeMaximum(
         event: WillAppearEvent,
-        settings: ResolvedWidgetSettings,
+        diskTarget: ResolvedDiskMetricTarget,
         selectedVolume: DiskVolumeOption | null,
     ): void {
+        const diskReading = diskTarget.reading;
         if (
-            settings.metric.diskMetricKind !== "throughput"
-            || settings.diskThroughput.diskThroughputScaleMode === "custom"
+            diskReading.kind !== "throughput"
+            || diskReading.display.scaleMode === "custom"
         ) {
             return;
         }
 
         const nextReadMaximum = resolveRuntimeDiskMaximumThroughputMebibytesPerSecond({
             direction: "read",
-            settings,
+            reading: diskReading,
             selectedVolume,
             observedBytesPerSecond: metricStore.getWidgetData(getDiskThroughputMetricKey("read"), "READ", "B/s").current,
         });
         const nextWriteMaximum = resolveRuntimeDiskMaximumThroughputMebibytesPerSecond({
             direction: "write",
-            settings,
+            reading: diskReading,
             selectedVolume,
             observedBytesPerSecond: metricStore.getWidgetData(getDiskThroughputMetricKey("write"), "WRIT", "B/s").current,
         });
@@ -117,8 +121,18 @@ export class Disk extends MetricAction {
     }
 }
 
-function resolveSelectedDiskVolume(value: string): DiskVolumeOption | null {
-    if (value.length > 0) {
+function readDiskTarget(settings: ResolvedWidgetSettings): ResolvedDiskMetricTarget {
+    const target = settings.widget.slot.metric.target;
+
+    if (target.domain !== "disk") {
+        throw new Error("Expected disk metric settings.");
+    }
+
+    return target;
+}
+
+function resolveSelectedDiskVolume(value: string | undefined): DiskVolumeOption | null {
+    if (value && value.length > 0) {
         return diskVolumeRegistry.findById(value);
     }
 
@@ -127,13 +141,13 @@ function resolveSelectedDiskVolume(value: string): DiskVolumeOption | null {
 
 function resolveRuntimeDiskMaximumThroughputMebibytesPerSecond(options: {
     direction: Exclude<DiskThroughputDirection, "both" | "total">;
-    settings: ResolvedWidgetSettings;
+    reading: Extract<ResolvedDiskMetricTarget["reading"], { readonly kind: "throughput" }>;
     selectedVolume: DiskVolumeOption | null;
     observedBytesPerSecond: number;
 }): number {
     const currentMaximum = resolveDiskMaximumThroughputMebibytesPerSecond(
         options.direction,
-        options.settings,
+        options.reading,
         options.selectedVolume,
     );
     const observedMebibytesPerSecond = Math.max(0, options.observedBytesPerSecond) / 1024 / 1024;

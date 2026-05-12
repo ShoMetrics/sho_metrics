@@ -9,6 +9,8 @@ import type {
 import { scheduler } from "../runtime/scheduler";
 import { MetricAction } from "./metric-action";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
+import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
+import { writeStoredWidgetSettingsPatch } from "../settings/storage/widget-settings-patch";
 
 test("runtime cache publishes to Property Inspector without writing settings", async () => {
     const originalSubscribe = scheduler.subscribe;
@@ -23,14 +25,23 @@ test("runtime cache publishes to Property Inspector without writing settings", a
         },
     };
     const action = new TestMetricAction();
+    const circularNetworkSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "net-speed").rawSettings,
+        {
+            appearance: {
+                viewLayout: "circular",
+            },
+        },
+    );
+    const sparklineNetworkSettings = writeStoredWidgetSettingsPatch(circularNetworkSettings, {
+        appearance: {
+            viewLayout: "sparkline",
+        },
+    });
     const willAppearEvent = {
         action: streamDeckAction,
         payload: {
-            settings: {
-                appearanceOverrides: {
-                    graphicType: "circular",
-                },
-            },
+            settings: circularNetworkSettings,
         },
     } as unknown as WillAppearEvent;
 
@@ -39,11 +50,7 @@ test("runtime cache publishes to Property Inspector without writing settings", a
         action.onDidReceiveSettings({
             action: streamDeckAction,
             payload: {
-                settings: {
-                    appearanceOverrides: {
-                        graphicType: "sparkline",
-                    },
-                },
+                settings: sparklineNetworkSettings,
             },
         } as unknown as DidReceiveSettingsEvent);
 

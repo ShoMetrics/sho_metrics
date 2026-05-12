@@ -1,7 +1,4 @@
-import {
-    type ActionKind,
-    type WidgetStoredSettings,
-} from "../../settings/widget-settings";
+import type { ActionKind } from "../../shared/stream-deck-actions";
 import {
     emptyWidgetRuntimeCache,
     mergeWidgetRuntimeCache,
@@ -10,7 +7,7 @@ import {
 import { buildPropertyInspectorContext } from "../inspector/context";
 import type { VisibilityContext } from "../inspector/types";
 
-export type InspectorTestSettings = WidgetStoredSettings;
+export type InspectorTestSettings = unknown;
 
 export function buildVisibilityContext(options: {
     actionKind?: ActionKind;
@@ -18,11 +15,9 @@ export function buildVisibilityContext(options: {
     settings?: InspectorTestSettings;
     runtimeCache?: WidgetRuntimeCachePatch;
 } = {}): VisibilityContext {
-    const storedSettings = options.settings ?? {};
-
     return buildPropertyInspectorContext({
-        storedSettings,
-        globalSettings: {},
+        rawSettings: options.settings,
+        rawGlobalSettings: undefined,
         runtimeCache: mergeWidgetRuntimeCache(emptyWidgetRuntimeCache, options.runtimeCache ?? {}),
         actionKind: options.actionKind ?? "cpu-usage",
         isWindows: options.isWindows ?? false,

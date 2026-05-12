@@ -1,4 +1,4 @@
-import type { AppearanceColorRampKey, ColorRamp } from "../../settings/widget-settings";
+import type { ResolvedColorRamp } from "../../settings/resolved-settings";
 import { InspectorItem } from "../components/InspectorItem";
 import { SectionHeading } from "../components/SectionHeading";
 import { ColorBandSetting } from "../controls/ColorBandSetting";
@@ -12,7 +12,7 @@ import { colorModeOptionList } from "./setting-options";
 
 export function StandardColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
     const { context, appearanceDisabled = false } = props;
-    const isSolidColor = context.resolved.appearance.colorMode === "solid";
+    const isSolidColor = context.resolved.widget.slot.appearance.colorMode === "solid";
 
     return (
         <SettingsSection title="Colors">
@@ -56,18 +56,6 @@ export function DiskThroughputChannelColorSettings(props: WidgetSettingsPanelPro
     );
 }
 
-export function usesNetworkChannelColorSettings(context: VisibilityContext): boolean {
-    return context.actionKind === "net-speed"
-        && context.resolved.metric.networkDirection === "both";
-}
-
-export function usesDiskThroughputChannelColorSettings(context: VisibilityContext): boolean {
-    return context.actionKind === "disk"
-        && context.resolved.metric.diskMetricKind === "throughput"
-        && context.resolved.metric.diskThroughputDirection === "both"
-        && context.resolved.appearance.graphicType !== "linear";
-}
-
 function ColorModeSetting({
     context,
     onSettingsPatch,
@@ -76,10 +64,10 @@ function ColorModeSetting({
     return (
         <SelectSetting
             label="Color Mode"
-            value={context.resolved.appearance.colorMode}
+            value={context.resolved.widget.slot.appearance.colorMode}
             optionList={colorModeOptionList}
             onValueChange={(colorMode) => onSettingsPatch({
-                appearanceOverrides: { colorMode },
+                appearance: { colorMode },
             })}
             disabled={appearanceDisabled}
         />
@@ -88,8 +76,8 @@ function ColorModeSetting({
 
 function ThresholdColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
     const { context, appearanceDisabled = false } = props;
-    const lowThreshold = context.resolved.appearance.lowThreshold;
-    const highThreshold = context.resolved.appearance.highThreshold;
+    const lowThreshold = context.resolved.widget.slot.appearance.lowColorThresholdPercent;
+    const highThreshold = context.resolved.widget.slot.appearance.highColorThresholdPercent;
 
     return (
         <>
@@ -123,7 +111,7 @@ function ThresholdColorSettings(props: WidgetSettingsPanelProps): React.JSX.Elem
 }
 
 function ChannelThresholdControls(props: WidgetSettingsPanelProps): React.JSX.Element | null {
-    if (props.context.resolved.appearance.colorMode !== "threshold") {
+    if (props.context.resolved.widget.slot.appearance.colorMode !== "threshold") {
         return null;
     }
 
@@ -139,31 +127,39 @@ function ThresholdRangeSettings({
         <>
             <RangeSetting
                 label="Low Ends At"
-                value={context.resolved.appearance.lowThreshold}
+                value={context.resolved.widget.slot.appearance.lowColorThresholdPercent}
                 minimum={0}
                 maximum={100}
                 step={1}
-                onValueChange={(lowThreshold) => {
-                    const patch = lowThreshold > context.resolved.appearance.highThreshold
-                        ? { lowThreshold, highThreshold: lowThreshold }
-                        : { lowThreshold };
+                onValueChange={(lowColorThresholdPercent) => {
+                    const highThreshold = context.resolved.widget.slot.appearance.highColorThresholdPercent;
+                    const patch = lowColorThresholdPercent > highThreshold
+                        ? {
+                            lowColorThresholdPercent,
+                            highColorThresholdPercent: lowColorThresholdPercent,
+                        }
+                        : { lowColorThresholdPercent };
 
-                    onSettingsPatch({ appearanceOverrides: patch });
+                    onSettingsPatch({ appearance: patch });
                 }}
                 disabled={appearanceDisabled}
             />
             <RangeSetting
                 label="High Starts At"
-                value={context.resolved.appearance.highThreshold}
+                value={context.resolved.widget.slot.appearance.highColorThresholdPercent}
                 minimum={0}
                 maximum={100}
                 step={1}
-                onValueChange={(highThreshold) => {
-                    const patch = highThreshold < context.resolved.appearance.lowThreshold
-                        ? { lowThreshold: highThreshold, highThreshold }
-                        : { highThreshold };
+                onValueChange={(highColorThresholdPercent) => {
+                    const lowThreshold = context.resolved.widget.slot.appearance.lowColorThresholdPercent;
+                    const patch = highColorThresholdPercent < lowThreshold
+                        ? {
+                            lowColorThresholdPercent: highColorThresholdPercent,
+                            highColorThresholdPercent,
+                        }
+                        : { highColorThresholdPercent };
 
-                    onSettingsPatch({ appearanceOverrides: patch });
+                    onSettingsPatch({ appearance: patch });
                 }}
                 disabled={appearanceDisabled}
             />
@@ -217,7 +213,7 @@ function ChannelColorFields({
 }): React.JSX.Element {
     const props = { onSettingsPatch };
 
-    if (context.resolved.appearance.colorMode !== "threshold") {
+    if (context.resolved.widget.slot.appearance.colorMode !== "threshold") {
         return (
             <ColorSetting
                 label="Solid Color"
@@ -254,22 +250,29 @@ function ChannelColorFields({
 
 function readAppearanceColor(
     context: VisibilityContext,
-    rampKey: AppearanceColorRampKey,
-    colorKey: keyof ColorRamp,
+    rampKey: ColorRampKey,
+    colorKey: keyof ResolvedColorRamp,
 ): string {
-    return context.resolved.appearance[rampKey][colorKey];
+    return context.resolved.widget.slot.appearance[rampKey][colorKey];
 }
 
 function writeAppearanceColor(
     props: Pick<WidgetSettingsPanelProps, "onSettingsPatch">,
-    rampKey: AppearanceColorRampKey,
-    colorKey: keyof ColorRamp,
+    rampKey: ColorRampKey,
+    colorKey: keyof ResolvedColorRamp,
 ): (value: string) => void {
     return (value) => props.onSettingsPatch({
-        appearanceOverrides: {
+        appearance: {
             [rampKey]: {
                 [colorKey]: value,
             },
         },
     });
 }
+
+type ColorRampKey =
+    | "usageColors"
+    | "downloadColors"
+    | "uploadColors"
+    | "diskReadColors"
+    | "diskWriteColors";

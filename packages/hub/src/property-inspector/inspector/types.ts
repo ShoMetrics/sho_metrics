@@ -1,9 +1,5 @@
-import type {
-    ActionKind,
-    GlobalSettings,
-    ResolvedWidgetSettings,
-    WidgetStoredSettings,
-} from "../../settings/widget-settings";
+import type { ActionKind } from "../../shared/stream-deck-actions";
+import type { ResolvedWidgetSettings } from "../../settings/resolved-settings";
 import type { WidgetRuntimeCache } from "../../runtime/widget-runtime-cache";
 
 export type SelectOptionValue = string | number;
@@ -17,8 +13,6 @@ export interface SelectOption<TValue extends SelectOptionValue = string> {
 export interface VisibilityContext {
     actionKind: ActionKind;
     isWindows: boolean;
-    settings: WidgetStoredSettings;
     runtimeCache: WidgetRuntimeCache;
-    globalSettings: GlobalSettings;
     resolved: ResolvedWidgetSettings;
 }

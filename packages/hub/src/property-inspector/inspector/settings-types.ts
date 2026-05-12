@@ -1,17 +1,21 @@
+export type { ActionKind } from "../../shared/stream-deck-actions";
+import type { MetricTheme, SingleMetricViewLayout } from "../../settings/resolved-settings";
 export type {
-    ActionKind,
     CircleStyle,
     ColorMode,
-    DiskMetricKind,
     DiskThroughputDirection,
     DiskUsageDisplayMode,
-    GraphicStyle,
-    GraphicType,
     GridLineType,
     GridLineVisibility,
+    MetricTheme,
     NetworkDirection,
     NetworkTrafficDisplayMode,
     NetworkUnitBase,
     ScaleMode,
+    SingleMetricViewLayout,
     TemperatureUnit,
-} from "../../settings/widget-settings";
+} from "../../settings/resolved-settings";
+
+export type GraphicType = SingleMetricViewLayout;
+export type GraphicStyle = MetricTheme;
+export type DiskMetricKind = "usage" | "throughput";

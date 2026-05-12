@@ -1,34 +1,44 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
+import { readStoredWidgetSettings } from "../../settings/storage/codec";
+import { writeStoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
 import { buildVisibilityContext } from "../testing/test-context";
 
 test("Property Inspector context reads resolved disk polling defaults without persisting them", () => {
+    const diskSettings = resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings;
     const context = buildVisibilityContext({
         actionKind: "disk",
-        settings: {
-            metric: {
-                diskMetricKind: "usage",
-            },
-        },
+        settings: diskSettings,
     });
+    const storedSettings = readStoredWidgetSettings(diskSettings);
 
-    assert.equal(context.resolved.local.pollingFrequencySeconds, 60);
-    assert.equal(context.settings.local, undefined);
+    assert.equal(context.resolved.preferences.pollingFrequencySeconds, 60);
+    assert.equal(storedSettings.preferences, undefined);
 });
 
 test("Property Inspector context uses resolver platform rules for scenario visibility", () => {
+    const diskSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings,
+        {
+            appearance: {
+                viewLayout: "linear",
+            },
+            disk: {
+                kind: "throughput",
+            },
+        },
+    );
     const context = buildVisibilityContext({
         actionKind: "disk",
         isWindows: true,
-        settings: {
-            appearanceOverrides: {
-                graphicType: "linear",
-            },
-            metric: {
-                diskMetricKind: "throughput",
-            },
-        },
+        settings: diskSettings,
     });
 
-    assert.equal(context.resolved.metric.diskMetricKind, "usage");
+    const target = context.resolved.widget.slot.metric.target;
+    assert.equal(target.domain, "disk");
+
+    if (target.domain === "disk") {
+        assert.equal(target.reading.kind, "usage");
+    }
 });

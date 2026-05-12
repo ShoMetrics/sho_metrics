@@ -28,7 +28,7 @@ export class CpuUsage extends MetricAction {
 
         setSingleMetricDisplay({
             event,
-            resolvedSettings: settings.appearance,
+            resolvedSettings: settings.widget.slot.appearance,
             metricKey: CPU_USAGE_METRIC_KEY,
             widgetData: {
                 ...buildCpuUsageWidgetData(widgetData),

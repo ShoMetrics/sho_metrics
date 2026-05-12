@@ -2,17 +2,21 @@ import type { ColorConfig, ColorThreshold } from "../rendering/color-resolver";
 import type { GraphicThemePresetName } from "../widgets/widget.interface";
 import type { ArcGaugeStyle } from "../widgets/primitives/arc-gauge";
 import type { SparklineGridLineType, SparklineGridLineVisibility } from "../widgets/primitives/sparkline";
-import {
-    type AppearanceSettings,
-    type AppearanceSettingsOverride,
-    type ColorRamp,
-} from "./widget-settings";
+import type { ResolvedAppearanceSettings, ResolvedColorRamp } from "./resolved-settings";
 
-export type MetricVisualSettings = AppearanceSettings;
-export type MetricVisualSettingsOverride = AppearanceSettingsOverride;
+export type MetricVisualSettings = ResolvedAppearanceSettings;
+export type AppearanceColorRampKey =
+    | "usageColors"
+    | "downloadColors"
+    | "uploadColors"
+    | "diskReadColors"
+    | "diskWriteColors";
+export type MetricVisualSettingsOverride =
+    Partial<Omit<ResolvedAppearanceSettings, AppearanceColorRampKey>>
+    & Partial<Record<AppearanceColorRampKey, Partial<ResolvedColorRamp>>>;
 
 export interface ResolvedMetricVisualSettings {
-    graphicType: AppearanceSettings["graphicType"];
+    graphicType: ResolvedAppearanceSettings["viewLayout"];
     circleStyle: ArcGaugeStyle;
     graphicStyle: GraphicThemePresetName;
     colorConfig: ColorConfig;
@@ -25,12 +29,12 @@ const MINIMUM_THRESHOLD = 0;
 const MAXIMUM_THRESHOLD = 100;
 
 export function buildMetricVisualSettings(
-    settings: AppearanceSettings,
+    settings: ResolvedAppearanceSettings,
 ): ResolvedMetricVisualSettings {
     return {
-        graphicType: settings.graphicType,
+        graphicType: settings.viewLayout,
         circleStyle: settings.circleStyle,
-        graphicStyle: settings.graphicStyle,
+        graphicStyle: settings.theme,
         colorConfig: buildColorConfig(settings),
         lineSmoothingPercent: settings.lineSmoothingPercent,
         gridLineVisibility: settings.gridLineVisibility,
@@ -57,15 +61,15 @@ export function mergeMetricVisualSettings(
     };
 }
 
-function buildColorConfig(settings: AppearanceSettings): ColorConfig {
+function buildColorConfig(settings: ResolvedAppearanceSettings): ColorConfig {
     const colors = settings.usageColors;
 
     return {
         mode: settings.colorMode,
         solidColor: colors.solidColor,
         thresholds: buildThresholds({
-            lowThreshold: settings.lowThreshold,
-            highThreshold: settings.highThreshold,
+            lowThreshold: settings.lowColorThresholdPercent,
+            highThreshold: settings.highColorThresholdPercent,
             lowColor: colors.lowColor,
             mediumColor: colors.mediumColor,
             highColor: colors.highColor,
@@ -73,7 +77,10 @@ function buildColorConfig(settings: AppearanceSettings): ColorConfig {
     };
 }
 
-function mergeColorRamp(colors: ColorRamp, override: Partial<ColorRamp> | undefined): ColorRamp {
+function mergeColorRamp(
+    colors: ResolvedColorRamp,
+    override: Partial<ResolvedColorRamp> | undefined,
+): ResolvedColorRamp {
     return {
         ...colors,
         ...override,

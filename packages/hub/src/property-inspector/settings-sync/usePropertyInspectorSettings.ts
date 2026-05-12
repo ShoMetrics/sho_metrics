@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    type GlobalSettings,
-    type WidgetSettings,
-    type WidgetStoredSettings,
-} from "../../settings/widget-settings";
-import { mergeWidgetSettingsPatch } from "../../settings/updates";
+    readStoredGlobalSettings,
+    type StoredSettingsJsonObject,
+} from "../../settings/storage/codec";
+import { resolveStoredGlobalSettings } from "../../settings/storage/resolver";
+import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import {
-    classifyRawWidgetSettings,
-    readGlobalSettings,
-    readWidgetSettings,
-    writeGlobalSettings,
-    writeWidgetSettings,
-    type RawWidgetSettingsClassification,
-} from "../../settings/codec";
-import { resolveGlobalSettings } from "../../settings/resolver";
+    writeStoredWidgetSettingsPatch,
+    type StoredWidgetSettingsPatch,
+} from "../../settings/storage/widget-settings-patch";
 import {
     emptyWidgetRuntimeCache,
     mergeWidgetRuntimeCache,
@@ -23,7 +18,6 @@ import {
     type WidgetRuntimeCachePatch,
 } from "../../runtime/widget-runtime-cache";
 import { buildPropertyInspectorContext } from "../inspector/context";
-import { applyGlobalSettingsPatch } from "./plugin-settings-updates";
 import {
     readActionUuid,
     resolveIsWindowsPropertyInspector,
@@ -31,13 +25,17 @@ import {
 } from "../stream-deck/stream-deck-client";
 import { resolveStreamDeckActionKind } from "../../shared/stream-deck-actions";
 import type { ActionKind } from "../inspector/settings-types";
+import {
+    writeStoredGlobalSettingsPatch,
+    type StoredGlobalSettingsPatch,
+} from "../../settings/storage/global-settings-patch";
 
 interface SettingsSyncState {
     actionKind: ActionKind;
     isWindows: boolean;
-    storedSettings: WidgetStoredSettings;
+    rawSettings: unknown;
     runtimeCache: WidgetRuntimeCache;
-    globalSettings: GlobalSettings;
+    rawGlobalSettings: unknown;
     settingsNotice: SettingsNotice | null;
     loadError: string | null;
 }
@@ -50,9 +48,9 @@ export interface SettingsNotice {
 const initialState: SettingsSyncState = {
     actionKind: "unknown",
     isWindows: false,
-    storedSettings: {},
+    rawSettings: undefined,
     runtimeCache: { ...emptyWidgetRuntimeCache },
-    globalSettings: {},
+    rawGlobalSettings: undefined,
     settingsNotice: null,
     loadError: null,
 };
@@ -72,29 +70,36 @@ export function usePropertyInspectorSettings(
         return nextState;
     }, []);
     const resolvedGlobalSettings = useMemo(
-        () => resolveGlobalSettings(state.globalSettings),
-        [state.globalSettings],
+        () => resolveStoredGlobalSettings(readStoredGlobalSettings(state.rawGlobalSettings)),
+        [state.rawGlobalSettings],
     );
     const visibilityContext = useMemo(() => buildPropertyInspectorContext({
-        storedSettings: state.storedSettings,
-        globalSettings: state.globalSettings,
+        rawSettings: state.rawSettings,
+        rawGlobalSettings: state.rawGlobalSettings,
         runtimeCache: state.runtimeCache,
         actionKind: state.actionKind,
         isWindows: state.isWindows,
-    }), [state.storedSettings, state.globalSettings, state.runtimeCache, state.actionKind, state.isWindows]);
+    }), [state.rawSettings, state.rawGlobalSettings, state.runtimeCache, state.actionKind, state.isWindows]);
 
-    const updateWidgetSettings = (patch: WidgetSettings): void => {
+    const updateWidgetSettings = (patch: StoredWidgetSettingsPatch): void => {
+        let settingsJsonToPersist: StoredSettingsJsonObject | undefined;
         const nextState = commitState((currentState) => {
-            const nextStoredSettings = mergeWidgetSettingsPatch(currentState.storedSettings, patch);
+            const quickStartSettings = resolveQuickStartStoredWidgetSettings(
+                currentState.rawSettings,
+                currentState.actionKind,
+            );
+            const nextRawSettings = writeStoredWidgetSettingsPatch(quickStartSettings.rawSettings, patch);
+            settingsJsonToPersist = nextRawSettings;
 
             return {
                 ...currentState,
-                storedSettings: nextStoredSettings,
+                rawSettings: nextRawSettings,
                 loadError: null,
             };
         });
 
-        client.setSettings(writeWidgetSettings(nextState.storedSettings)).catch((error: Error) => {
+        void nextState;
+        client.setSettings(settingsJsonToPersist ?? {}).catch((error: Error) => {
             commitState((errorState) => ({
                 ...errorState,
                 loadError: `Failed to save settings: ${error.message}`,
@@ -103,17 +108,21 @@ export function usePropertyInspectorSettings(
     };
 
     const resetWidgetSettings = (): void => {
+        let settingsJsonToPersist: StoredSettingsJsonObject | undefined;
         const nextState = commitState((currentState) => {
-            const nextStoredSettings: WidgetStoredSettings = {};
+            const quickStartSettings = resolveQuickStartStoredWidgetSettings(undefined, currentState.actionKind);
+            const nextRawSettings = quickStartSettings.settingsJsonToPersist ?? {};
+            settingsJsonToPersist = nextRawSettings;
 
             return {
                 ...currentState,
-                storedSettings: nextStoredSettings,
+                rawSettings: nextRawSettings,
                 loadError: null,
             };
         });
 
-        client.setSettings(writeWidgetSettings(nextState.storedSettings)).catch((error: Error) => {
+        void nextState;
+        client.setSettings(settingsJsonToPersist ?? {}).catch((error: Error) => {
             commitState((errorState) => ({
                 ...errorState,
                 loadError: `Failed to save settings: ${error.message}`,
@@ -121,18 +130,21 @@ export function usePropertyInspectorSettings(
         });
     };
 
-    const updateGlobalSettings = (patch: GlobalSettings): void => {
+    const updateGlobalSettings = (patch: StoredGlobalSettingsPatch): void => {
+        let settingsJsonToPersist: StoredSettingsJsonObject | undefined;
         const nextState = commitState((currentState) => {
-            const nextGlobalSettings = applyGlobalSettingsPatch(currentState.globalSettings, patch);
+            const nextRawGlobalSettings = writeStoredGlobalSettingsPatch(currentState.rawGlobalSettings, patch);
+            settingsJsonToPersist = nextRawGlobalSettings;
 
             return {
                 ...currentState,
-                globalSettings: nextGlobalSettings,
+                rawGlobalSettings: nextRawGlobalSettings,
                 loadError: null,
             };
         });
 
-        client.setGlobalSettings(writeGlobalSettings(nextState.globalSettings)).catch((error: Error) => {
+        void nextState;
+        client.setGlobalSettings(settingsJsonToPersist ?? {}).catch((error: Error) => {
             commitState((errorState) => ({
                 ...errorState,
                 loadError: `Failed to save global settings: ${error.message}`,
@@ -147,8 +159,6 @@ export function usePropertyInspectorSettings(
             const connectionInfo = await client.getConnectionInfo();
             const actionKind = resolveStreamDeckActionKind(readActionUuid(connectionInfo));
             const isWindows = resolveIsWindowsPropertyInspector(connectionInfo);
-            const initialSettings = readWidgetSettingsResult(connectionInfo.actionInfo?.payload?.settings);
-
             if (isDisposed) {
                 return;
             }
@@ -157,15 +167,11 @@ export function usePropertyInspectorSettings(
                 ...currentState,
                 actionKind,
                 isWindows,
-                storedSettings: initialSettings.classification === "present"
-                    ? initialSettings.storedSettings
-                    : currentState.storedSettings,
-                settingsNotice: initialSettings.classification === "missing"
-                    ? {
-                        kind: "loading",
-                        text: "Loading settings...",
-                    }
-                    : null,
+                rawSettings: resolveQuickStartStoredWidgetSettings(
+                    connectionInfo.actionInfo?.payload?.settings ?? currentState.rawSettings,
+                    actionKind,
+                ).rawSettings,
+                settingsNotice: null,
                 loadError: null,
             }));
 
@@ -185,10 +191,10 @@ export function usePropertyInspectorSettings(
                 };
 
                 if (settingsResult.status === "fulfilled") {
-                    const refreshedSettings = readWidgetSettingsResult(settingsResult.value.settings);
-                    if (refreshedSettings.classification === "present") {
-                        nextState.storedSettings = refreshedSettings.storedSettings;
-                    }
+                    nextState.rawSettings = resolveQuickStartStoredWidgetSettings(
+                        settingsResult.value.settings,
+                        currentState.actionKind,
+                    ).rawSettings;
                     nextState.settingsNotice = null;
                 } else {
                     nextState.settingsNotice = {
@@ -198,7 +204,7 @@ export function usePropertyInspectorSettings(
                 }
 
                 if (globalSettingsResult.status === "fulfilled") {
-                    nextState.globalSettings = readGlobalSettings(globalSettingsResult.value.settings);
+                    nextState.rawGlobalSettings = globalSettingsResult.value.settings;
                 } else {
                     nextState.settingsNotice = {
                         kind: "warning",
@@ -216,13 +222,12 @@ export function usePropertyInspectorSettings(
             }
 
             commitState((currentState) => {
-                const refreshedSettings = readWidgetSettingsResult(event.payload.settings);
-
                 return {
                     ...currentState,
-                    storedSettings: refreshedSettings.classification === "present"
-                        ? refreshedSettings.storedSettings
-                        : currentState.storedSettings,
+                    rawSettings: resolveQuickStartStoredWidgetSettings(
+                        event.payload.settings,
+                        currentState.actionKind,
+                    ).rawSettings,
                     settingsNotice: null,
                 };
             });
@@ -235,7 +240,7 @@ export function usePropertyInspectorSettings(
 
             commitState((currentState) => ({
                 ...currentState,
-                globalSettings: readGlobalSettings(event.payload.settings),
+                rawGlobalSettings: event.payload.settings,
             }));
         });
         const unsubscribeRuntimeCache = client.sendToPropertyInspector.subscribe((event) => {
@@ -296,18 +301,4 @@ function readWidgetRuntimeCachePatch(payload: unknown): WidgetRuntimeCachePatch 
     }
 
     return message.patch;
-}
-
-function readWidgetSettingsResult(rawSettings: unknown): {
-    classification: RawWidgetSettingsClassification;
-    storedSettings: WidgetStoredSettings;
-} {
-    const classification = classifyRawWidgetSettings(rawSettings);
-
-    return {
-        classification,
-        storedSettings: classification === "present"
-            ? readWidgetSettings(rawSettings)
-            : {},
-    };
 }

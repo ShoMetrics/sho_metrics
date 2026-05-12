@@ -9,8 +9,12 @@ import { scheduler } from "../runtime/scheduler";
 import { clearMetricDisplayState } from "../metric-view-runner/runner";
 import { logger } from "../logging/logger";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
-import { resolveActionSettings } from "./settings/action-settings-resolver";
-import type { ActionKind, ResolvedWidgetSettings } from "../settings/widget-settings";
+import {
+    resolveActionSettings,
+    resolveInitialActionSettings,
+} from "./settings/action-settings-resolver";
+import type { ResolvedWidgetSettings } from "../settings/resolved-settings";
+import type { ActionKind } from "../shared/stream-deck-actions";
 import {
     emptyWidgetRuntimeCache,
     mergeWidgetRuntimeCache,
@@ -31,6 +35,7 @@ interface ActiveMetricAction {
 interface ActiveActionState {
     event: WillAppearEvent;
     rawSettings: unknown;
+    resolvedSettings: ResolvedWidgetSettings;
     runtimeCache: WidgetRuntimeCache;
 }
 
@@ -56,13 +61,24 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     override onWillAppear(event: WillAppearEvent): void {
+        const initialSettings = resolveInitialActionSettings(
+            event.payload.settings,
+            this.actionKind,
+            emptyWidgetRuntimeCache,
+        );
         const activeActionState = {
             event,
-            rawSettings: event.payload.settings,
+            rawSettings: initialSettings.rawSettings,
+            resolvedSettings: initialSettings.resolvedSettings,
             runtimeCache: { ...emptyWidgetRuntimeCache },
         };
 
         this.activeActionStates.set(event.action.id, activeActionState);
+        if (initialSettings.settingsJsonToPersist) {
+            event.action.setSettings(initialSettings.settingsJsonToPersist).catch(error => {
+                log.error(() => `Failed to persist quick-start widget settings: ${String(error)}`);
+            });
+        }
         this.subscribeAction(activeActionState);
         this.onMetricsUpdate(event);
     }
@@ -71,18 +87,29 @@ export abstract class MetricAction extends SingletonAction {
         const activeActionState = this.activeActionStates.get(event.action.id);
         if (activeActionState) {
             const previousSettings = this.resolveSettings(activeActionState.event);
-            const nextSettings = this.resolveRawSettings(event.payload.settings, activeActionState.runtimeCache);
+            const nextInitialSettings = resolveInitialActionSettings(
+                event.payload.settings,
+                this.actionKind,
+                activeActionState.runtimeCache,
+            );
+            const nextSettings = nextInitialSettings.resolvedSettings;
 
             log.info(() => [
                 "settingsReceived",
                 `actionId=${event.action.id}`,
-                `previousGraphicType=${formatSettingValue(previousSettings.appearance.graphicType)}`,
-                `nextGraphicType=${formatSettingValue(nextSettings.appearance.graphicType)}`,
-                `previousPollingFrequencySeconds=${formatSettingValue(previousSettings.local.pollingFrequencySeconds)}`,
-                `nextPollingFrequencySeconds=${formatSettingValue(nextSettings.local.pollingFrequencySeconds)}`,
+                `previousViewLayout=${formatSettingValue(previousSettings.widget.slot.appearance.viewLayout)}`,
+                `nextViewLayout=${formatSettingValue(nextSettings.widget.slot.appearance.viewLayout)}`,
+                `previousPollingFrequencySeconds=${formatSettingValue(previousSettings.preferences.pollingFrequencySeconds)}`,
+                `nextPollingFrequencySeconds=${formatSettingValue(nextSettings.preferences.pollingFrequencySeconds)}`,
             ].join(" "));
 
-            activeActionState.rawSettings = event.payload.settings;
+            activeActionState.rawSettings = nextInitialSettings.rawSettings;
+            activeActionState.resolvedSettings = nextSettings;
+            if (nextInitialSettings.settingsJsonToPersist) {
+                event.action.setSettings(nextInitialSettings.settingsJsonToPersist).catch(error => {
+                    log.error(() => `Failed to persist quick-start widget settings: ${String(error)}`);
+                });
+            }
             this.resubscribeActionIfFrequencyChanged(activeActionState);
             // Force an immediate update for snappy UI feedback.
             this.onMetricsUpdate(activeActionState.event);
@@ -124,7 +151,7 @@ export abstract class MetricAction extends SingletonAction {
             throw new Error(`Action ${event.action.id} is not active; cannot resolve settings.`);
         }
 
-        return this.resolveRawSettings(activeActionState.rawSettings, activeActionState.runtimeCache);
+        return activeActionState.resolvedSettings;
     }
 
     protected updateRuntimeCache(event: WillAppearEvent, patch: WidgetRuntimeCachePatch): Promise<void> {
@@ -138,6 +165,10 @@ export abstract class MetricAction extends SingletonAction {
         }
 
         activeActionState.runtimeCache = mergeWidgetRuntimeCache(activeActionState.runtimeCache, patch);
+        activeActionState.resolvedSettings = this.resolveRawSettings(
+            activeActionState.rawSettings,
+            activeActionState.runtimeCache,
+        );
 
         return this.sendRuntimeCachePatchToPropertyInspector(event, patch);
     }
@@ -145,7 +176,7 @@ export abstract class MetricAction extends SingletonAction {
     private subscribeAction(activeActionState: ActiveActionState): void {
         const { event } = activeActionState;
         const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
-            this.resolveSettings(event).local.pollingFrequencySeconds,
+            this.resolveSettings(event).preferences.pollingFrequencySeconds,
         );
         const subscriptionKeys = normalizeMetricSubscriptionKeys(this.getMetricSubscriptionKeys(event));
         const subscriptionKeySignature = subscriptionKeys.join(",");
@@ -171,7 +202,7 @@ export abstract class MetricAction extends SingletonAction {
         const { event } = activeActionState;
         const activeMetricAction = this.activeMetricActions.get(event.action.id);
         const nextPollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
-            this.resolveSettings(event).local.pollingFrequencySeconds,
+            this.resolveSettings(event).preferences.pollingFrequencySeconds,
         );
         const nextSubscriptionKeys = normalizeMetricSubscriptionKeys(this.getMetricSubscriptionKeys(event));
         const nextSubscriptionKeySignature = nextSubscriptionKeys.join(",");
@@ -190,6 +221,10 @@ export abstract class MetricAction extends SingletonAction {
     private resubscribeAllActions(): void {
         for (const activeActionState of this.activeActionStates.values()) {
             const { event } = activeActionState;
+            activeActionState.resolvedSettings = this.resolveRawSettings(
+                activeActionState.rawSettings,
+                activeActionState.runtimeCache,
+            );
             this.activeMetricActions.get(event.action.id)?.cleanup();
             this.activeMetricActions.delete(event.action.id);
             this.subscribeAction(activeActionState);
@@ -215,7 +250,7 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     private resolveRawSettings(rawSettings: unknown, runtimeCache: WidgetRuntimeCache): ResolvedWidgetSettings {
-        return resolveActionSettings(rawSettings, this.actionKind, runtimeCache);
+        return resolveActionSettings(rawSettings, runtimeCache);
     }
 }
 

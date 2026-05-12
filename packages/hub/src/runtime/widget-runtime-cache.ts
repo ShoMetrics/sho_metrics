@@ -15,6 +15,7 @@ export interface WidgetRuntimeCache {
     runtimeMaximumUploadSpeedMbps: number | undefined;
     runtimeMaximumDiskReadThroughputMebibytesPerSecond: number | undefined;
     runtimeMaximumDiskWriteThroughputMebibytesPerSecond: number | undefined;
+    runtimeMaximumGpuPowerWatts: number | undefined;
 }
 
 export type WidgetRuntimeCachePatch = Partial<WidgetRuntimeCache>;
@@ -26,6 +27,7 @@ export const emptyWidgetRuntimeCache: WidgetRuntimeCache = {
     runtimeMaximumUploadSpeedMbps: undefined,
     runtimeMaximumDiskReadThroughputMebibytesPerSecond: undefined,
     runtimeMaximumDiskWriteThroughputMebibytesPerSecond: undefined,
+    runtimeMaximumGpuPowerWatts: undefined,
 };
 
 export const WIDGET_RUNTIME_CACHE_MESSAGE_TYPE = "widget-runtime-cache";

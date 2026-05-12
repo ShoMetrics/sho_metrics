@@ -15,7 +15,6 @@ interface AppProps {
 export function App({ client }: AppProps): React.JSX.Element {
     const [activeTab, setActiveTab] = useState<"widget" | "plugin">("widget");
     const {
-        actionKind,
         visibilityContext,
         resolvedGlobalSettings,
         settingsNotice,
@@ -54,9 +53,8 @@ export function App({ client }: AppProps): React.JSX.Element {
 
             {activeTab === "widget" ? (
                 <WidgetSettingsTab
-                    actionKind={actionKind}
                     context={visibilityContext}
-                    isGlobalAppearanceOverrideEnabled={resolvedGlobalSettings.overrideWidgetAppearance}
+                    isGlobalAppearanceOverrideEnabled={resolvedGlobalSettings.appearanceOverride !== undefined}
                     onSettingsPatch={updateWidgetSettings}
                     onResetWidgetSettings={resetWidgetSettings}
                 />

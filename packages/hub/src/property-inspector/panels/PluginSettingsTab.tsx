@@ -11,39 +11,39 @@ import {
     networkUnitBaseOptionList,
     scaleModeOptionList,
 } from "./setting-options";
-import {
-    type AppearanceSettings,
-    type DiskThroughputDefaultSettings,
-    type GlobalSettings,
-    type NetworkDefaultSettings,
-    type ResolvedGlobalSettings,
-} from "../../settings/widget-settings";
+import type {
+    ResolvedDiskThroughputDisplaySettings,
+    ResolvedGlobalAppearanceOverride,
+    ResolvedGlobalSettings,
+    ResolvedNetworkDisplaySettings,
+} from "../../settings/resolved-settings";
+import type { StoredGlobalSettingsPatch } from "../../settings/storage/global-settings-patch";
 
 interface PluginSettingsTabProps {
     resolvedSettings: ResolvedGlobalSettings;
-    onSettingsPatch: (patch: GlobalSettings) => void;
+    onSettingsPatch: (patch: StoredGlobalSettingsPatch) => void;
 }
 
 export function PluginSettingsTab({ resolvedSettings, onSettingsPatch }: PluginSettingsTabProps): React.JSX.Element {
     return (
         <div>
             <OverrideSection
-                overrideWidgetAppearance={resolvedSettings.overrideWidgetAppearance}
-                onOverrideChange={(overrideWidgetAppearance) => onSettingsPatch({ overrideWidgetAppearance })}
+                overrideWidgetAppearance={resolvedSettings.appearanceOverride !== undefined}
+                onOverrideChange={(appearanceEnabled) => onSettingsPatch({ appearanceEnabled })}
             />
-            {resolvedSettings.overrideWidgetAppearance && (
+            {resolvedSettings.appearanceOverride && (
                 <OverrideAppearanceSection
-                    appearance={resolvedSettings.appearanceDefaults}
-                    onAppearancePatch={(appearanceDefaults) => onSettingsPatch({ appearanceDefaults })}
+                    appearance={resolvedSettings.appearanceOverride}
+                    onAppearancePatch={(appearance) => onSettingsPatch({ appearance })}
                 />
             )}
             <NetworkDefaultsSection
-                network={resolvedSettings.networkDefaults}
-                onNetworkPatch={(networkDefaults) => onSettingsPatch({ networkDefaults })}
+                network={resolvedSettings.defaults.network}
+                onNetworkPatch={(network) => onSettingsPatch({ network })}
             />
             <DiskThroughputDefaultsSection
-                diskThroughput={resolvedSettings.diskThroughputDefaults}
-                onDiskThroughputPatch={(diskThroughputDefaults) => onSettingsPatch({ diskThroughputDefaults })}
+                diskThroughput={resolvedSettings.defaults.diskThroughput}
+                onDiskThroughputPatch={(diskThroughput) => onSettingsPatch({ diskThroughput })}
             />
         </div>
     );
@@ -79,30 +79,30 @@ function OverrideAppearanceSection({
     appearance,
     onAppearancePatch,
 }: {
-    appearance: AppearanceSettings;
-    onAppearancePatch: (patch: GlobalSettings["appearanceDefaults"]) => void;
+    appearance: ResolvedGlobalAppearanceOverride;
+    onAppearancePatch: (patch: NonNullable<StoredGlobalSettingsPatch["appearance"]>) => void;
 }): React.JSX.Element {
     return (
         <SettingsSection title="Override Appearance">
             <GraphicTypeSetting
-                value={appearance.graphicType}
-                onValueChange={(graphicType) => onAppearancePatch({ graphicType })}
+                value={appearance.viewLayout}
+                onValueChange={(viewLayout) => onAppearancePatch({ viewLayout })}
             />
             <CircleStyleSetting
                 value={appearance.circleStyle}
                 onValueChange={(circleStyle) => onAppearancePatch({ circleStyle })}
-                disabled={appearance.graphicType !== "circular"}
+                disabled={appearance.viewLayout !== "circular"}
             />
             <SelectSetting
                 label="Graphic Style"
-                value={appearance.graphicStyle}
+                value={appearance.theme}
                 optionList={graphicStyleOptionList}
-                onValueChange={(graphicStyle) => onAppearancePatch({ graphicStyle })}
+                onValueChange={(theme) => onAppearancePatch({ theme })}
             />
             <ColorSetting
                 label="Tint Color"
-                value={appearance.usageColors.solidColor}
-                onValueChange={(solidColor) => onAppearancePatch({ usageColors: { solidColor } })}
+                value={appearance.tintColor}
+                onValueChange={(tintColor) => onAppearancePatch({ tintColor })}
             />
             <SelectSetting
                 label="Color Mode"
@@ -114,21 +114,17 @@ function OverrideAppearanceSection({
                 <>
                     <NumberSetting
                         label="Low Threshold"
-                        value={appearance.lowThreshold}
+                        value={appearance.lowColorThresholdPercent}
                         minimum={0}
                         step={1}
-                        onValueChange={(value) => onAppearancePatch({
-                            lowThreshold: value,
-                        })}
+                        onValueChange={(lowColorThresholdPercent) => onAppearancePatch({ lowColorThresholdPercent })}
                     />
                     <NumberSetting
                         label="High Threshold"
-                        value={appearance.highThreshold}
+                        value={appearance.highColorThresholdPercent}
                         minimum={0}
                         step={1}
-                        onValueChange={(value) => onAppearancePatch({
-                            highThreshold: value,
-                        })}
+                        onValueChange={(highColorThresholdPercent) => onAppearancePatch({ highColorThresholdPercent })}
                     />
                 </>
             )}
@@ -140,46 +136,44 @@ function NetworkDefaultsSection({
     network,
     onNetworkPatch,
 }: {
-    network: NetworkDefaultSettings;
-    onNetworkPatch: (patch: GlobalSettings["networkDefaults"]) => void;
+    network: ResolvedNetworkDisplaySettings;
+    onNetworkPatch: (patch: NonNullable<StoredGlobalSettingsPatch["network"]>) => void;
 }): React.JSX.Element {
-    const isAutoScale = network.networkScaleMode === "auto";
+    const isAutoScale = network.scaleMode === "auto";
 
     return (
         <SettingsSection title="Network Defaults">
             <SelectSetting
                 label="Unit"
-                value={network.networkUnitBase}
+                value={network.unitBase}
                 optionList={networkUnitBaseOptionList}
-                onValueChange={(networkUnitBase) => onNetworkPatch({ networkUnitBase })}
+                onValueChange={(unitBase) => onNetworkPatch({ unitBase })}
             />
             <SelectSetting
                 label="Scale"
-                value={network.networkScaleMode}
+                value={network.scaleMode}
                 optionList={scaleModeOptionList}
-                onValueChange={(networkScaleMode) => onNetworkPatch({ networkScaleMode })}
+                onValueChange={(scaleMode) => onNetworkPatch({ scaleMode })}
             />
             <NumberSetting
                 label="Download Max"
-                value={network.maximumDownloadSpeedMbps}
+                value={network.maximumDownloadSpeedMegabitsPerSecond}
                 minimum={1}
                 step={1}
                 optional
                 disabled={isAutoScale}
-                onValueChange={(value) => onNetworkPatch({
-                    maximumDownloadSpeedMbps: value,
-                })}
+                onValueChange={(maximumDownloadSpeedMegabitsPerSecond) =>
+                    onNetworkPatch({ maximumDownloadSpeedMegabitsPerSecond })}
             />
             <NumberSetting
                 label="Upload Max"
-                value={network.maximumUploadSpeedMbps}
+                value={network.maximumUploadSpeedMegabitsPerSecond}
                 minimum={1}
                 step={1}
                 optional
                 disabled={isAutoScale}
-                onValueChange={(value) => onNetworkPatch({
-                    maximumUploadSpeedMbps: value,
-                })}
+                onValueChange={(maximumUploadSpeedMegabitsPerSecond) =>
+                    onNetworkPatch({ maximumUploadSpeedMegabitsPerSecond })}
             />
         </SettingsSection>
     );
@@ -189,40 +183,38 @@ function DiskThroughputDefaultsSection({
     diskThroughput,
     onDiskThroughputPatch,
 }: {
-    diskThroughput: DiskThroughputDefaultSettings;
-    onDiskThroughputPatch: (patch: GlobalSettings["diskThroughputDefaults"]) => void;
+    diskThroughput: ResolvedDiskThroughputDisplaySettings;
+    onDiskThroughputPatch: (patch: NonNullable<StoredGlobalSettingsPatch["diskThroughput"]>) => void;
 }): React.JSX.Element {
-    const isAutoScale = diskThroughput.diskThroughputScaleMode === "auto";
+    const isAutoScale = diskThroughput.scaleMode === "auto";
 
     return (
         <SettingsSection title="Disk Throughput Defaults">
             <SelectSetting
                 label="Scale"
-                value={diskThroughput.diskThroughputScaleMode}
+                value={diskThroughput.scaleMode}
                 optionList={scaleModeOptionList}
-                onValueChange={(diskThroughputScaleMode) => onDiskThroughputPatch({ diskThroughputScaleMode })}
+                onValueChange={(scaleMode) => onDiskThroughputPatch({ scaleMode })}
             />
             <NumberSetting
                 label="Read Max"
-                value={diskThroughput.maximumDiskReadThroughputMebibytesPerSecond}
+                value={diskThroughput.maximumReadThroughputMebibytesPerSecond}
                 minimum={1}
                 step={1}
                 optional
                 disabled={isAutoScale}
-                onValueChange={(value) => onDiskThroughputPatch({
-                    maximumDiskReadThroughputMebibytesPerSecond: value,
-                })}
+                onValueChange={(maximumReadThroughputMebibytesPerSecond) =>
+                    onDiskThroughputPatch({ maximumReadThroughputMebibytesPerSecond })}
             />
             <NumberSetting
                 label="Write Max"
-                value={diskThroughput.maximumDiskWriteThroughputMebibytesPerSecond}
+                value={diskThroughput.maximumWriteThroughputMebibytesPerSecond}
                 minimum={1}
                 step={1}
                 optional
                 disabled={isAutoScale}
-                onValueChange={(value) => onDiskThroughputPatch({
-                    maximumDiskWriteThroughputMebibytesPerSecond: value,
-                })}
+                onValueChange={(maximumWriteThroughputMebibytesPerSecond) =>
+                    onDiskThroughputPatch({ maximumWriteThroughputMebibytesPerSecond })}
             />
         </SettingsSection>
     );

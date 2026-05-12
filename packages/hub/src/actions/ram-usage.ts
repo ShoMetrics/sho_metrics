@@ -23,7 +23,7 @@ export class RamUsage extends MetricAction {
 
         setSingleMetricDisplay({
             event,
-            resolvedSettings: settings.appearance,
+            resolvedSettings: settings.widget.slot.appearance,
             metricKey: RAM_USED_METRIC_KEY,
             widgetData: buildMemoryUsageWidgetData({
                 usedBytesWidgetData,

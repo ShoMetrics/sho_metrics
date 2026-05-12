@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { WillAppearEvent } from "@elgato/streamdeck";
-import { defaultAppearanceSettings } from "../settings/widget-settings";
+import type { ResolvedAppearanceSettings } from "../settings/resolved-settings";
 import {
     KEYPAD_PNG_SIZE,
     TOUCH_STRIP_LOGICAL_SIZE,
@@ -53,7 +53,7 @@ test("single circular icon placeholder keeps source data and marks the render pl
     const displayOptions = buildSingleMetricDisplayOptions({
         widgetData: buildWidgetData(),
         resolvedSettings: {
-            graphicType: "circular",
+            viewLayout: "circular",
             circleStyle: "compact",
         },
     });
@@ -168,7 +168,7 @@ test("center content falls back to value outside circular graphics", () => {
         displayOptions: buildSingleMetricDisplayOptions({
             widgetData: buildWidgetData(),
             resolvedSettings: {
-                graphicType: "linear",
+                viewLayout: "linear",
                 circleStyle: "compact",
             },
         }),
@@ -193,7 +193,7 @@ test("compact circle style uses icon center content", () => {
         displayOptions: buildSingleMetricDisplayOptions({
             widgetData: buildWidgetData(),
             resolvedSettings: {
-                graphicType: "circular",
+                viewLayout: "circular",
                 circleStyle: "compact",
             },
         }),
@@ -208,7 +208,7 @@ test("key render plan uses keypad PNG dimensions and no touch strip layout", () 
         displayOptions: buildSingleMetricDisplayOptions({
             widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
             resolvedSettings: {
-                graphicType: "linear",
+                viewLayout: "linear",
             },
         }),
         isDial: false,
@@ -224,7 +224,7 @@ test("touch strip layout uses square rendering for circular graphics", () => {
         displayOptions: buildSingleMetricDisplayOptions({
             widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
             resolvedSettings: {
-                graphicType: "circular",
+                viewLayout: "circular",
             },
         }),
         isDial: true,
@@ -273,11 +273,53 @@ function buildSingleMetricDisplayOptions(options: {
         statusIcon: buildStatusIcon(),
         widgetData: options.widgetData,
         resolvedSettings: {
-            ...defaultAppearanceSettings,
+            ...defaultResolvedAppearanceSettings,
             ...options.resolvedSettings,
         },
     };
 }
+
+const defaultResolvedAppearanceSettings: ResolvedAppearanceSettings = {
+    viewLayout: "circular",
+    circleStyle: "value",
+    theme: "flat",
+    colorMode: "threshold",
+    usageColors: {
+        solidColor: "#3b82f6",
+        lowColor: "#22c55e",
+        mediumColor: "#eab308",
+        highColor: "#ef4444",
+    },
+    downloadColors: {
+        solidColor: "#3b82f6",
+        lowColor: "#22c55e",
+        mediumColor: "#3b82f6",
+        highColor: "#60a5fa",
+    },
+    uploadColors: {
+        solidColor: "#ef4444",
+        lowColor: "#f97316",
+        mediumColor: "#ef4444",
+        highColor: "#f472b6",
+    },
+    diskReadColors: {
+        solidColor: "#38bdf8",
+        lowColor: "#22c55e",
+        mediumColor: "#38bdf8",
+        highColor: "#60a5fa",
+    },
+    diskWriteColors: {
+        solidColor: "#f472b6",
+        lowColor: "#f97316",
+        mediumColor: "#f472b6",
+        highColor: "#fb7185",
+    },
+    lowColorThresholdPercent: 30,
+    highColorThresholdPercent: 70,
+    lineSmoothingPercent: 75,
+    gridLineVisibility: "adaptive",
+    gridLineType: "horizontal",
+};
 
 function buildDualChannelWidgetData(options: Partial<DualChannelWidgetData> = {}): DualChannelWidgetData {
     return {
