@@ -11,16 +11,16 @@ export class MetricStore {
     private static readonly HISTORY_SIZE = 60;
 
     ingest(snapshot: IMetricSnapshot): void {
-        if (!snapshot.metrics) return;
+        const sampleTimestampMilliseconds = Number(snapshot.timestampMs);
 
         for (const [key, value] of Object.entries(snapshot.metrics)) {
-            if (value.scalar != null) {
-                this.record(key, value.scalar, Number(snapshot.timestampMs ?? Date.now()));
+            if (value.data.case === "scalar") {
+                this.record(key, value.data.value, sampleTimestampMilliseconds);
                 continue;
             }
 
-            if (value.text != null) {
-                this.recordText(key, value.text, Number(snapshot.timestampMs ?? Date.now()));
+            if (value.data.case === "text") {
+                this.recordText(key, value.data.value, sampleTimestampMilliseconds);
             }
         }
     }

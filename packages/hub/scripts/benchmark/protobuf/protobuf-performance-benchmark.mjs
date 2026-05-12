@@ -1,11 +1,11 @@
 import { create, fromBinary, fromJson, toBinary, toJson } from "@bufbuild/protobuf";
-import protobuf from "protobufjs";
 import { Buffer } from "node:buffer";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { TransitSystemSchema } from "./generated/kivotos/rail/v1/transit_system_pb.js";
 
+const protobuf = await loadOptionalProtobufjs();
 const iterationCount = Number.parseInt(process.env.PROTO_BENCH_ITERATIONS ?? "20000", 10);
 const warmupCount = Math.min(2000, Math.max(100, Math.floor(iterationCount / 10)));
 const benchmarkDirectory = dirname(fileURLToPath(import.meta.url));
@@ -75,6 +75,22 @@ console.log(JSON.stringify({
     results,
 }, null, 2));
 
+async function loadOptionalProtobufjs() {
+    try {
+        const protobufjsModule = await import("protobufjs");
+        return protobufjsModule.default ?? protobufjsModule;
+    } catch (error) {
+        console.error([
+            "protobufjs is not installed in this project.",
+            "This benchmark intentionally keeps protobufjs out of package dependencies.",
+            "Install it temporarily to run the comparison:",
+            "  npm.cmd install --no-save protobufjs",
+            `Original error: ${String(error)}`,
+        ].join("\n"));
+        process.exit(1);
+    }
+}
+
 function measure(name, operation) {
     let checksum = 0;
 
@@ -125,7 +141,7 @@ function stringifyBigInts(value) {
     }
 
     if (Array.isArray(value)) {
-        return value.map((item) => stringifyBigInts(item));
+        return value.map(item => stringifyBigInts(item));
     }
 
     if (value instanceof Uint8Array) {

@@ -98,7 +98,7 @@ test("node system source polls only the requested CPU group and exposes cached C
         text: "AMD Ryzen 9",
     });
     assert.equal(firstSnapshot.sourceId, "node-system");
-    assert.equal(firstSnapshot.timestampMs, 1234);
+    assert.equal(Number(firstSnapshot.timestampMs), 1234);
     assert.equal(callCounts.currentLoad, 2);
     assert.equal(callCounts.cpu, 1);
     assert.equal(callCounts.mem, 0);
@@ -690,9 +690,26 @@ function assertMetricGroups(
     assert.deepEqual([...actualMetricGroups].sort(), [...expectedMetricGroups].sort());
 }
 
-function assertSnapshotMetrics(snapshot: IMetricSnapshot): Record<string, IMetricValue> {
-    assert.ok(snapshot.metrics);
-    return snapshot.metrics;
+function assertSnapshotMetrics(snapshot: IMetricSnapshot): Record<string, PlainMetricValue> {
+    return Object.fromEntries(
+        Object.entries(snapshot.metrics).map(([key, value]) => [key, toPlainMetricValue(value)]),
+    );
+}
+
+function toPlainMetricValue(value: IMetricValue): PlainMetricValue {
+    return {
+        ...(value.data.case === "scalar" ? { scalar: value.data.value } : {}),
+        ...(value.data.case === "text" ? { text: value.data.value } : {}),
+        ...(value.unit === "" ? {} : { unit: value.unit }),
+        ...(value.progress === 0 ? {} : { progress: value.progress }),
+    };
+}
+
+interface PlainMetricValue {
+    scalar?: number;
+    text?: string;
+    unit?: string;
+    progress?: number;
 }
 
 interface NodeSystemSourceCallCounts {

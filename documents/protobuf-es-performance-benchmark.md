@@ -25,6 +25,15 @@ Architecture: x64
 protobufjs: 8.0.1
 ```
 
+`protobufjs` is no longer a project dependency. Install it temporarily when you
+want to rerun this historical comparison:
+
+```powershell
+cd packages/hub
+npm.cmd install --no-save protobufjs
+npm.cmd run benchmark:protobuf
+```
+
 ## Benchmark Files
 
 ```txt
@@ -33,7 +42,7 @@ packages/hub/scripts/benchmark/protobuf/buf.gen.yaml
 packages/hub/scripts/benchmark/protobuf/protobuf-performance-benchmark.mjs
 ```
 
-Run:
+Run after temporarily installing `protobufjs`:
 
 ```powershell
 cd packages/hub
@@ -127,6 +136,6 @@ If the decision is purely runtime speed, this benchmark favors `protobufjs`.
 If the decision is production contract safety, the trade-off is different:
 
 - `protobuf-es` gives a modern generated TypeScript API, canonical ProtoJSON support, and stronger schema-governance ergonomics.
-- `protobufjs` is faster here and already exists in the repo, but its generated TypeScript workflow is less clean and its API is more conversion-oriented.
+- `protobufjs` is faster here, but its generated TypeScript workflow is less clean and its API is more conversion-oriented.
 
 For low-frequency persisted data, performance does not currently block using `protobuf-es`.
