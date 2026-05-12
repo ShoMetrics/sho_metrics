@@ -19,6 +19,7 @@ import {
 } from "../../generated/shometrics/v1/settings_pb.js";
 import {
     readStoredWidgetSettings,
+    type StoredSettingsReadWarning,
     writeStoredWidgetSettings,
     type StoredSettingsJsonObject,
 } from "./codec";
@@ -26,6 +27,7 @@ import {
 export interface QuickStartStoredWidgetSettings {
     readonly rawSettings: unknown;
     readonly settingsJsonToPersist: StoredSettingsJsonObject | null;
+    readonly readWarning: StoredSettingsReadWarning | null;
 }
 
 export function resolveQuickStartStoredWidgetSettings(
@@ -37,15 +39,19 @@ export function resolveQuickStartStoredWidgetSettings(
         return {
             rawSettings,
             settingsJsonToPersist: null,
+            readWarning: null,
         };
     }
 
-    const storedSettings = readStoredWidgetSettings(rawSettings);
+    const readResult = readStoredWidgetSettings(rawSettings);
+    const storedSettings = readResult.settings;
+    const readableSettingsJson = writeStoredWidgetSettings(storedSettings);
 
     if (hasStoredMetricTarget(storedSettings)) {
         return {
-            rawSettings,
+            rawSettings: readableSettingsJson,
             settingsJsonToPersist: null,
+            readWarning: readResult.warning,
         };
     }
 
@@ -53,6 +59,7 @@ export function resolveQuickStartStoredWidgetSettings(
     return {
         rawSettings: settingsJson,
         settingsJsonToPersist: settingsJson,
+        readWarning: readResult.warning,
     };
 }
 

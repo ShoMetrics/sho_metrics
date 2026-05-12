@@ -11,7 +11,7 @@ test("Property Inspector context reads resolved disk polling defaults without pe
         actionKind: "disk",
         settings: diskSettings,
     });
-    const storedSettings = readStoredWidgetSettings(diskSettings);
+    const storedSettings = readStoredWidgetSettings(diskSettings).settings;
 
     assert.equal(context.resolved.preferences.pollingFrequencySeconds, 60);
     assert.equal(storedSettings.preferences, undefined);

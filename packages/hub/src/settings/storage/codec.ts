@@ -20,11 +20,21 @@ export type StoredSettingsJsonObject = JsonObject;
 
 const storedSettingsValidator = createValidator();
 
-export class StoredSettingsCodecError extends Error {
+export interface StoredSettingsReadWarning {
+    readonly reason: "unknownFieldsDiscarded" | "invalidSettingsDefaulted";
+    readonly message: string;
+}
+
+export interface StoredSettingsReadResult<TSettings> {
+    readonly settings: TSettings;
+    readonly warning: StoredSettingsReadWarning | null;
+}
+
+class StoredSettingsCodecError extends Error {
     override readonly name = "StoredSettingsCodecError";
 }
 
-export class StoredSettingsValidationError extends Error {
+class StoredSettingsValidationError extends Error {
     override readonly name = "StoredSettingsValidationError";
 
     constructor(
@@ -35,8 +45,9 @@ export class StoredSettingsValidationError extends Error {
     }
 }
 
-export function readStoredWidgetSettings(rawSettings: unknown): StoredWidgetSettings {
-    return readStoredSettings(
+/** Reads widget settings and returns a warning when recovery was needed. */
+export function readStoredWidgetSettings(rawSettings: unknown): StoredSettingsReadResult<StoredWidgetSettings> {
+    return readRecoverableStoredSettings(
         StoredWidgetSettingsSchema,
         rawSettings,
         "StoredWidgetSettings",
@@ -51,8 +62,9 @@ export function writeStoredWidgetSettings(settings: StoredWidgetSettings): Store
     );
 }
 
-export function readStoredGlobalSettings(rawSettings: unknown): StoredGlobalSettings {
-    return readStoredSettings(
+/** Reads global settings and returns a warning when recovery was needed. */
+export function readStoredGlobalSettings(rawSettings: unknown): StoredSettingsReadResult<StoredGlobalSettings> {
+    return readRecoverableStoredSettings(
         StoredGlobalSettingsSchema,
         rawSettings,
         "StoredGlobalSettings",
@@ -67,7 +79,7 @@ export function writeStoredGlobalSettings(settings: StoredGlobalSettings): Store
     );
 }
 
-function readStoredSettings<Schema extends DescMessage>(
+function readStrictStoredSettings<Schema extends DescMessage>(
     schema: Schema,
     rawSettings: unknown,
     settingsName: string,
@@ -76,6 +88,46 @@ function readStoredSettings<Schema extends DescMessage>(
     validateStoredSettings(schema, decodedSettings, settingsName);
 
     return decodedSettings;
+}
+
+function readRecoverableStoredSettings<Schema extends DescMessage>(
+    schema: Schema,
+    rawSettings: unknown,
+    settingsName: string,
+): StoredSettingsReadResult<MessageShape<Schema>> {
+    try {
+        return {
+            settings: readStrictStoredSettings(schema, rawSettings, settingsName),
+            warning: null,
+        };
+    } catch {
+        try {
+            const settings = decodeStoredSettings(schema, rawSettings, settingsName, {
+                ignoreUnknownFields: true,
+            });
+            validateStoredSettings(schema, settings, settingsName);
+
+            return {
+                settings,
+                warning: {
+                    reason: "unknownFieldsDiscarded",
+                    message:
+                        `${settingsName} contains fields this version does not understand. ` +
+                        "They will be removed the next time settings are saved.",
+                },
+            };
+        } catch {
+            return {
+                settings: create(schema),
+                warning: {
+                    reason: "invalidSettingsDefaulted",
+                    message:
+                        `${settingsName} could not be read. Defaults are shown; ` +
+                        "saving will replace the unreadable settings.",
+                },
+            };
+        }
+    }
 }
 
 function writeStoredSettings<Schema extends DescMessage>(
@@ -98,13 +150,14 @@ function decodeStoredSettings<Schema extends DescMessage>(
     schema: Schema,
     rawSettings: unknown,
     settingsName: string,
+    options?: { readonly ignoreUnknownFields?: boolean },
 ): MessageShape<Schema> {
     if (rawSettings === undefined || rawSettings === null) {
         return create(schema);
     }
 
     try {
-        return fromJson(schema, rawSettings as JsonValue);
+        return fromJson(schema, rawSettings as JsonValue, options);
     } catch (error) {
         throw new StoredSettingsCodecError(
             `${settingsName} is not valid ProtoJSON: ${errorMessage(error)}`,

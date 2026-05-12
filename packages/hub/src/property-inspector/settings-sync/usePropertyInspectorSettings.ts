@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     readStoredGlobalSettings,
+    writeStoredGlobalSettings,
+    type StoredSettingsReadWarning,
     type StoredSettingsJsonObject,
 } from "../../settings/storage/codec";
 import { resolveStoredGlobalSettings } from "../../settings/storage/resolver";
@@ -36,8 +38,10 @@ interface SettingsSyncState {
     rawSettings: unknown;
     runtimeCache: WidgetRuntimeCache;
     rawGlobalSettings: unknown;
-    settingsNotice: SettingsNotice | null;
-    loadError: string | null;
+    widgetSettingsNotice: SettingsNotice | null;
+    pluginSettingsNotice: SettingsNotice | null;
+    widgetLoadError: string | null;
+    pluginLoadError: string | null;
 }
 
 export interface SettingsNotice {
@@ -51,8 +55,10 @@ const initialState: SettingsSyncState = {
     rawSettings: undefined,
     runtimeCache: { ...emptyWidgetRuntimeCache },
     rawGlobalSettings: undefined,
-    settingsNotice: null,
-    loadError: null,
+    widgetSettingsNotice: null,
+    pluginSettingsNotice: null,
+    widgetLoadError: null,
+    pluginLoadError: null,
 };
 
 export function usePropertyInspectorSettings(
@@ -70,7 +76,7 @@ export function usePropertyInspectorSettings(
         return nextState;
     }, []);
     const resolvedGlobalSettings = useMemo(
-        () => resolveStoredGlobalSettings(readStoredGlobalSettings(state.rawGlobalSettings)),
+        () => resolveStoredGlobalSettings(readStoredGlobalSettings(state.rawGlobalSettings).settings),
         [state.rawGlobalSettings],
     );
     const visibilityContext = useMemo(() => buildPropertyInspectorContext({
@@ -94,7 +100,8 @@ export function usePropertyInspectorSettings(
             return {
                 ...currentState,
                 rawSettings: nextRawSettings,
-                loadError: null,
+                widgetSettingsNotice: null,
+                widgetLoadError: null,
             };
         });
 
@@ -102,7 +109,7 @@ export function usePropertyInspectorSettings(
         client.setSettings(settingsJsonToPersist ?? {}).catch((error: Error) => {
             commitState((errorState) => ({
                 ...errorState,
-                loadError: `Failed to save settings: ${error.message}`,
+                widgetLoadError: `Failed to save widget settings: ${error.message}`,
             }));
         });
     };
@@ -117,7 +124,8 @@ export function usePropertyInspectorSettings(
             return {
                 ...currentState,
                 rawSettings: nextRawSettings,
-                loadError: null,
+                widgetSettingsNotice: null,
+                widgetLoadError: null,
             };
         });
 
@@ -125,7 +133,7 @@ export function usePropertyInspectorSettings(
         client.setSettings(settingsJsonToPersist ?? {}).catch((error: Error) => {
             commitState((errorState) => ({
                 ...errorState,
-                loadError: `Failed to save settings: ${error.message}`,
+                widgetLoadError: `Failed to save widget settings: ${error.message}`,
             }));
         });
     };
@@ -133,13 +141,18 @@ export function usePropertyInspectorSettings(
     const updateGlobalSettings = (patch: StoredGlobalSettingsPatch): void => {
         let settingsJsonToPersist: StoredSettingsJsonObject | undefined;
         const nextState = commitState((currentState) => {
-            const nextRawGlobalSettings = writeStoredGlobalSettingsPatch(currentState.rawGlobalSettings, patch);
+            const globalSettingsRead = readStoredGlobalSettings(currentState.rawGlobalSettings);
+            const nextRawGlobalSettings = writeStoredGlobalSettingsPatch(
+                writeStoredGlobalSettings(globalSettingsRead.settings),
+                patch,
+            );
             settingsJsonToPersist = nextRawGlobalSettings;
 
             return {
                 ...currentState,
                 rawGlobalSettings: nextRawGlobalSettings,
-                loadError: null,
+                pluginSettingsNotice: null,
+                pluginLoadError: null,
             };
         });
 
@@ -147,7 +160,7 @@ export function usePropertyInspectorSettings(
         client.setGlobalSettings(settingsJsonToPersist ?? {}).catch((error: Error) => {
             commitState((errorState) => ({
                 ...errorState,
-                loadError: `Failed to save global settings: ${error.message}`,
+                pluginLoadError: `Failed to save plugin settings: ${error.message}`,
             }));
         });
     };
@@ -163,17 +176,22 @@ export function usePropertyInspectorSettings(
                 return;
             }
 
-            commitState((currentState) => ({
-                ...currentState,
-                actionKind,
-                isWindows,
-                rawSettings: resolveQuickStartStoredWidgetSettings(
+            commitState((currentState) => {
+                const quickStartSettings = resolveQuickStartStoredWidgetSettings(
                     connectionInfo.actionInfo?.payload?.settings ?? currentState.rawSettings,
                     actionKind,
-                ).rawSettings,
-                settingsNotice: null,
-                loadError: null,
-            }));
+                );
+                writeSettingsReadWarningLog(client, "widget", quickStartSettings.readWarning);
+
+                return {
+                    ...currentState,
+                    actionKind,
+                    isWindows,
+                    rawSettings: quickStartSettings.rawSettings,
+                    widgetSettingsNotice: readWarningNotice("widget", quickStartSettings.readWarning),
+                    widgetLoadError: null,
+                };
+            });
 
             const [settingsResult, globalSettingsResult] = await Promise.allSettled([
                 client.getSettings(),
@@ -187,26 +205,32 @@ export function usePropertyInspectorSettings(
             commitState((currentState) => {
                 const nextState: SettingsSyncState = {
                     ...currentState,
-                    loadError: null,
+                    widgetLoadError: null,
+                    pluginLoadError: null,
                 };
 
                 if (settingsResult.status === "fulfilled") {
-                    nextState.rawSettings = resolveQuickStartStoredWidgetSettings(
+                    const quickStartSettings = resolveQuickStartStoredWidgetSettings(
                         settingsResult.value.settings,
                         currentState.actionKind,
-                    ).rawSettings;
-                    nextState.settingsNotice = null;
+                    );
+                    writeSettingsReadWarningLog(client, "widget", quickStartSettings.readWarning);
+                    nextState.rawSettings = quickStartSettings.rawSettings;
+                    nextState.widgetSettingsNotice = readWarningNotice("widget", quickStartSettings.readWarning);
                 } else {
-                    nextState.settingsNotice = {
+                    nextState.widgetSettingsNotice = {
                         kind: "warning",
                         text: "We couldn't load this widget's saved settings, so defaults are shown.",
                     };
                 }
 
                 if (globalSettingsResult.status === "fulfilled") {
-                    nextState.rawGlobalSettings = globalSettingsResult.value.settings;
+                    const globalSettingsRead = readStoredGlobalSettings(globalSettingsResult.value.settings);
+                    writeSettingsReadWarningLog(client, "plugin", globalSettingsRead.warning);
+                    nextState.rawGlobalSettings = writeStoredGlobalSettings(globalSettingsRead.settings);
+                    nextState.pluginSettingsNotice = readWarningNotice("plugin", globalSettingsRead.warning);
                 } else {
-                    nextState.settingsNotice = {
+                    nextState.pluginSettingsNotice = {
                         kind: "warning",
                         text: "We couldn't load plugin settings, so defaults are shown.",
                     };
@@ -222,13 +246,16 @@ export function usePropertyInspectorSettings(
             }
 
             commitState((currentState) => {
+                const quickStartSettings = resolveQuickStartStoredWidgetSettings(
+                    event.payload.settings,
+                    currentState.actionKind,
+                );
+                writeSettingsReadWarningLog(client, "widget", quickStartSettings.readWarning);
+
                 return {
                     ...currentState,
-                    rawSettings: resolveQuickStartStoredWidgetSettings(
-                        event.payload.settings,
-                        currentState.actionKind,
-                    ).rawSettings,
-                    settingsNotice: null,
+                    rawSettings: quickStartSettings.rawSettings,
+                    widgetSettingsNotice: readWarningNotice("widget", quickStartSettings.readWarning),
                 };
             });
         });
@@ -238,10 +265,16 @@ export function usePropertyInspectorSettings(
                 return;
             }
 
-            commitState((currentState) => ({
-                ...currentState,
-                rawGlobalSettings: event.payload.settings,
-            }));
+            commitState((currentState) => {
+                const globalSettingsRead = readStoredGlobalSettings(event.payload.settings);
+                writeSettingsReadWarningLog(client, "plugin", globalSettingsRead.warning);
+
+                return {
+                    ...currentState,
+                    rawGlobalSettings: writeStoredGlobalSettings(globalSettingsRead.settings),
+                    pluginSettingsNotice: readWarningNotice("plugin", globalSettingsRead.warning),
+                };
+            });
         });
         const unsubscribeRuntimeCache = client.sendToPropertyInspector.subscribe((event) => {
             if (isDisposed) {
@@ -266,7 +299,7 @@ export function usePropertyInspectorSettings(
 
             commitState((currentState) => ({
                 ...currentState,
-                loadError: `Failed to load settings: ${error.message}`,
+                widgetLoadError: `Failed to load settings: ${error.message}`,
             }));
         });
 
@@ -282,11 +315,56 @@ export function usePropertyInspectorSettings(
         actionKind: state.actionKind,
         visibilityContext,
         resolvedGlobalSettings,
-        settingsNotice: state.settingsNotice,
-        loadError: state.loadError,
+        widgetSettingsNotice: state.widgetSettingsNotice,
+        pluginSettingsNotice: state.pluginSettingsNotice,
+        widgetLoadError: state.widgetLoadError,
+        pluginLoadError: state.pluginLoadError,
         updateWidgetSettings,
         resetWidgetSettings,
         updateGlobalSettings,
+    };
+}
+
+function writeSettingsReadWarningLog(
+    client: StreamDeckPropertyInspectorClient,
+    settingsScope: "widget" | "plugin",
+    warning: StoredSettingsReadWarning | null,
+): void {
+    if (!warning) {
+        return;
+    }
+
+    client.send("logMessage", {
+        message: `[warn] Property Inspector ${settingsScope} settings read warning: ${warning.message}`,
+    }).catch(() => {
+        return;
+    });
+}
+
+function readWarningNotice(
+    settingsScope: "widget" | "plugin",
+    warning: StoredSettingsReadWarning | null,
+): SettingsNotice | null {
+    if (!warning) {
+        return null;
+    }
+
+    const label = settingsScope === "widget" ? "Widget" : "Plugin";
+
+    if (warning.reason === "unknownFieldsDiscarded") {
+        return {
+            kind: "warning",
+            text:
+                `${label} settings contain fields this version does not understand. ` +
+                `They will be removed the next time ${settingsScope} settings are saved.`,
+        };
+    }
+
+    return {
+        kind: "warning",
+        text:
+            `${label} settings could not be read. Defaults are shown; ` +
+            `saving ${settingsScope} settings will replace the unreadable settings.`,
     };
 }
 

@@ -17,8 +17,10 @@ export function App({ client }: AppProps): React.JSX.Element {
     const {
         visibilityContext,
         resolvedGlobalSettings,
-        settingsNotice,
-        loadError,
+        widgetSettingsNotice,
+        pluginSettingsNotice,
+        widgetLoadError,
+        pluginLoadError,
         updateWidgetSettings,
         resetWidgetSettings,
         updateGlobalSettings,
@@ -49,7 +51,10 @@ export function App({ client }: AppProps): React.JSX.Element {
                 </button>
             </div>
 
-            <SettingsNoticeSlot notice={settingsNotice} loadError={loadError} />
+            <SettingsNoticeSlot
+                notice={activeTab === "widget" ? widgetSettingsNotice : pluginSettingsNotice}
+                loadError={activeTab === "widget" ? widgetLoadError : pluginLoadError}
+            />
 
             {activeTab === "widget" ? (
                 <WidgetSettingsTab
