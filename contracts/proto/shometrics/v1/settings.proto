@@ -1,0 +1,471 @@
+syntax = "proto3";
+
+package shometrics.v1;
+
+import "buf/validate/validate.proto";
+
+// Persisted Stream Deck action settings.
+//
+// These messages are intended to be stored as plain ProtoJSON in the Stream
+// Deck SDK settings object. Do not wrap them in binary/base64 unless there is
+// a measured reason to give up readable exported profiles and logs.
+//
+// Stream Deck profiles are SDK-level layout snapshots that group actions.
+// They may embed this same JSON shape as per-action settings, but profile
+// layout itself is not modeled here.
+//
+// Stored settings are sparse. The application resolver owns defaults, global
+// cascade, controller/platform checks, and runtime-only facts.
+message StoredWidgetSettings {
+  // The stored widget identity is part of our contract. Stream Deck action
+  // UUIDs still route events to code, but they are not the only source of
+  // truth for what this instance displays. This keeps published action UUIDs
+  // stable while allowing future profile presets and internal refactors.
+  //
+  // New widget behavior gets a new oneof arm. Hardware quick-start actions
+  // should create one of these widget shapes with default slots; hardware
+  // identity is not the root widget type.
+  oneof widget {
+    SingleMetricWidget single_metric = 1;
+  }
+
+  WidgetPreferences preferences = 10;
+}
+
+message SingleMetricWidget {
+  optional MetricSlot slot = 1;
+}
+
+// A slot is one metric position inside a widget layout. SingleMetricWidget has
+// one slot; future multi-slot widgets should reuse this concept instead of
+// inventing a separate metric-selection shape.
+message MetricSlot {
+  optional MetricSelection metric = 1;
+
+  // Slot overrides stay with the metric they affect. This keeps future
+  // multi-slot widgets from sharing one ambiguous widget-level appearance,
+  // scale, or channel-color setting across unrelated metrics.
+  optional SlotOverrides overrides = 2;
+}
+
+message MetricSelection {
+  // Source profile choice is optional so existing local metrics can use the
+  // resolver's default source profile. Widgets reference profile IDs here;
+  // MetricSourceProfile.source_type_id names the registry-owned source type.
+  MetricSourcePolicy source_policy = 1;
+
+  // First-class targets are metrics ShoMetrics understands semantically and
+  // can tune precisely for rendering, defaults, labels, units, and presets.
+  //
+  // Catalog targets are for arbitrary readings exposed by a source, such as a
+  // deep hardware monitor or custom endpoint. Do not turn every catalog
+  // reading into a new enum value or message arm.
+  oneof target {
+    CpuMetricTarget cpu = 10;
+    MemoryMetricTarget memory = 11;
+    NetworkMetricTarget network = 12;
+    DiskMetricTarget disk = 13;
+    GpuMetricTarget gpu = 14;
+    CatalogMetricTarget catalog = 20;
+  }
+}
+
+message SlotOverrides {
+  AppearanceSettings appearance = 1;
+  NetworkDisplaySettings network = 2;
+  DiskThroughputDisplaySettings disk_throughput = 3;
+}
+
+message MetricSourcePolicy {
+  enum FailureMode {
+    FAILURE_MODE_UNSPECIFIED = 0;
+    FAILURE_MODE_SHOW_UNAVAILABLE = 1;
+    FAILURE_MODE_USE_FALLBACK = 2;
+  }
+
+  optional string primary_source_profile_id = 1 [(buf.validate.field).string.max_len = 128];
+  repeated string fallback_source_profile_ids = 2 [(buf.validate.field).repeated.items.string.max_len = 128];
+  optional FailureMode failure_mode = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}
+
+message CpuMetricTarget {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_USAGE = 1;
+  }
+
+  optional Kind kind = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+
+  // Future per-core CPU usage or CPU temperature settings belong here.
+}
+
+message MemoryMetricTarget {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_USAGE = 1;
+  }
+
+  optional Kind kind = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}
+
+message NetworkMetricTarget {
+  enum Direction {
+    DIRECTION_UNSPECIFIED = 0;
+    DIRECTION_BOTH = 1;
+    DIRECTION_DOWNLOAD = 2;
+    DIRECTION_UPLOAD = 3;
+  }
+
+  enum TrafficDisplayMode {
+    TRAFFIC_DISPLAY_MODE_UNSPECIFIED = 0;
+    TRAFFIC_DISPLAY_MODE_MIRRORED = 1;
+    TRAFFIC_DISPLAY_MODE_OVERLAY = 2;
+  }
+
+  optional Direction direction = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  optional string interface_id = 2 [(buf.validate.field).string.max_len = 256];
+  optional TrafficDisplayMode traffic_display_mode = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}
+
+message DiskMetricTarget {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_USAGE = 1;
+    KIND_THROUGHPUT = 2;
+  }
+
+  enum ThroughputDirection {
+    THROUGHPUT_DIRECTION_UNSPECIFIED = 0;
+    THROUGHPUT_DIRECTION_BOTH = 1;
+    THROUGHPUT_DIRECTION_TOTAL = 2;
+    THROUGHPUT_DIRECTION_READ = 3;
+    THROUGHPUT_DIRECTION_WRITE = 4;
+  }
+
+  enum UsageDisplayMode {
+    USAGE_DISPLAY_MODE_UNSPECIFIED = 0;
+    USAGE_DISPLAY_MODE_PERCENTAGE = 1;
+    USAGE_DISPLAY_MODE_SPACE = 2;
+  }
+
+  optional Kind kind = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  optional string volume_id = 2 [(buf.validate.field).string.max_len = 512];
+
+  // Fields below are kind-specific. throughput_direction is only meaningful
+  // for Kind.KIND_THROUGHPUT; usage_display_mode and linear_label are only
+  // meaningful for Kind.KIND_USAGE. If either branch grows further, split
+  // into oneof sub-messages together with the similar GpuMetricTarget cleanup.
+  optional ThroughputDirection throughput_direction = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  optional UsageDisplayMode usage_display_mode = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+
+  optional string linear_label = 5 [(buf.validate.field).string.max_len = 32];
+}
+
+message GpuMetricTarget {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_USAGE = 1;
+    KIND_TEMPERATURE = 2;
+    KIND_VRAM = 3;
+    KIND_POWER = 4;
+  }
+
+  optional Kind kind = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  optional string gpu_id = 2 [(buf.validate.field).string.max_len = 256];
+
+  // These display ceilings are meaningful only for the corresponding GPU
+  // metric kinds. Keeping them on the GPU target avoids one widget-level value
+  // being shared accidentally by future multi-slot widgets. If GPU target
+  // settings grow further, split kind-specific fields into oneof sub-messages
+  // together with the similar DiskMetricTarget cleanup.
+  optional uint32 maximum_temperature_celsius = 3 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 200
+  }];
+  optional uint32 maximum_power_watts = 4 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 2000
+  }];
+  optional TemperatureUnit temperature_unit = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}
+
+message CatalogMetricTarget {
+  // Source-scoped normalized metric id produced by a source adapter.
+  //
+  // Treat this as opaque in settings and resolver code. Do not parse path
+  // separators or assume a source-specific shape such as Windows PDH counter
+  // paths, Linux hwmon chip/feature/subfeature names, macOS SMC keys, or
+  // external hardware-monitor sensor paths. Each source adapter owns the
+  // mapping from its native identifiers into this id.
+  optional string metric_id = 1 [(buf.validate.field).string.max_len = 1024];
+
+  // Cached display hints keep exported profiles understandable when the source
+  // is offline. The resolver treats them as hints, not authoritative telemetry
+  // metadata.
+  optional string fallback_label = 2 [(buf.validate.field).string.max_len = 128];
+  optional string fallback_unit = 3 [(buf.validate.field).string.max_len = 32];
+}
+
+// WidgetPreferences holds behavior shared by the whole widget instance.
+// Metric-specific display parameters belong in their respective *MetricTarget
+// or SlotOverrides message so future multi-slot widgets stay unambiguous.
+message WidgetPreferences {
+  optional uint32 polling_frequency_seconds = 1 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 3600
+  }];
+}
+
+message StoredGlobalSettings {
+  optional GlobalDefaults defaults = 1;
+  optional GlobalOverrides overrides = 2;
+
+  // Source profiles are global because many widgets may read from the same
+  // local or remote machine. Widgets store only source profile IDs in
+  // MetricSourcePolicy.
+  repeated MetricSourceProfile source_profiles = 3;
+  optional string default_source_profile_id = 4 [(buf.validate.field).string.max_len = 128];
+}
+
+message MetricSourceProfile {
+  optional string id = 1 [(buf.validate.field).string.max_len = 128];
+  optional string display_name = 2 [(buf.validate.field).string.max_len = 128];
+
+  // Source type IDs are registry-owned strings, not enums. This lets the app
+  // add local probes, remote agents, and external catalog sources without
+  // changing persisted settings for every new implementation.
+  optional string source_type_id = 3 [(buf.validate.field).string.max_len = 128];
+
+  oneof connection {
+    HttpMetricSourceConnection http = 10;
+  }
+}
+
+message HttpMetricSourceConnection {
+  // Base URL for a source endpoint, for example a local native probe or a
+  // remote host agent. The resolver/source registry decides whether this field
+  // is required for a given source_type_id.
+  optional string base_url = 1 [(buf.validate.field).string.max_len = 2048];
+
+  // Do not store API tokens, passwords, cookies, or other secrets directly in
+  // Stream Deck settings. Future authenticated connections should store a
+  // credential reference here and keep the secret in the OS credential store.
+}
+
+message GlobalDefaults {
+  NetworkDisplaySettings network = 1;
+  DiskThroughputDisplaySettings disk_throughput = 2;
+}
+
+message GlobalOverrides {
+  optional bool appearance_enabled = 1;
+  GlobalAppearanceOverride appearance = 2;
+}
+
+// AppearanceSettings describes the visual presentation of one metric.
+// Multi-metric spatial layouts, such as a touch strip with two circular meters,
+// belong in a future StoredWidgetSettings widget arm, not in MetricViewLayout.
+//
+// Channel colors are named fields while the channel set is fixed. If channels
+// become user-defined, replace them with a map keyed by stable channel IDs.
+message AppearanceSettings {
+  enum GridLineVisibility {
+    GRID_LINE_VISIBILITY_UNSPECIFIED = 0;
+    GRID_LINE_VISIBILITY_ADAPTIVE = 1;
+    GRID_LINE_VISIBILITY_ALWAYS = 2;
+    GRID_LINE_VISIBILITY_NONE = 3;
+  }
+
+  enum GridLineType {
+    GRID_LINE_TYPE_UNSPECIFIED = 0;
+    GRID_LINE_TYPE_HORIZONTAL = 1;
+    GRID_LINE_TYPE_VERTICAL = 2;
+  }
+
+  option (buf.validate.message).cel = {
+    id: "color_threshold_order"
+    message: "low_color_threshold_percent must be less than or equal to high_color_threshold_percent"
+    expression:
+      "!has(this.low_color_threshold_percent) || !has(this.high_color_threshold_percent) || "
+      "this.low_color_threshold_percent <= this.high_color_threshold_percent"
+  };
+
+  // Single-metric view layout. Composite layouts, such as a touch strip with
+  // two circular meters, should be modeled as a future StoredWidgetSettings
+  // widget oneof arm instead of being added here.
+  optional SingleMetricViewLayout view_layout = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+
+  optional CircleStyle circle_style = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+
+  // Theme is a user-facing visual theme, not a renderer primitive name. New
+  // themes should be enum additions here and mapped to renderer contracts by
+  // the visual adapter.
+  optional MetricTheme theme = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+
+  optional ColorMode color_mode = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+
+  ColorRamp usage_colors = 5;
+  ColorRamp download_colors = 6;
+  ColorRamp upload_colors = 7;
+  ColorRamp disk_read_colors = 8;
+  ColorRamp disk_write_colors = 9;
+
+  // Color thresholds are normalized percentage stops for color ramp selection,
+  // not alert rules and not raw metric values such as Celsius, watts, or ms.
+  optional uint32 low_color_threshold_percent = 10 [(buf.validate.field).uint32.lte = 100];
+  optional uint32 high_color_threshold_percent = 11 [(buf.validate.field).uint32.lte = 100];
+
+  optional uint32 line_smoothing_percent = 12 [(buf.validate.field).uint32.lte = 100];
+  optional GridLineVisibility grid_line_visibility = 13 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  optional GridLineType grid_line_type = 14 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}
+
+message GlobalAppearanceOverride {
+  optional SingleMetricViewLayout view_layout = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  optional CircleStyle circle_style = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  optional MetricTheme theme = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+
+  // One user-selected color. Multi-channel widgets derive channel variants in
+  // application code so global settings stay simple.
+  optional string tint_color = 4 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+
+  optional ColorMode color_mode = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  optional uint32 low_color_threshold_percent = 6 [(buf.validate.field).uint32.lte = 100];
+  optional uint32 high_color_threshold_percent = 7 [(buf.validate.field).uint32.lte = 100];
+}
+
+message ColorRamp {
+  // Colors use "#RRGGBB". All fields may coexist even when the active color
+  // mode reads only one subset, so switching modes does not erase user input.
+  optional string solid_color = 1 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+  optional string low_color = 2 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+  optional string medium_color = 3 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+  optional string high_color = 4 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+}
+
+message NetworkDisplaySettings {
+  enum UnitBase {
+    UNIT_BASE_UNSPECIFIED = 0;
+    UNIT_BASE_BYTE = 1;
+    UNIT_BASE_BIT = 2;
+  }
+
+  optional ScaleMode scale_mode = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  optional uint32 maximum_download_speed_megabits_per_second = 2 [(buf.validate.field).uint32.gt = 0];
+  optional uint32 maximum_upload_speed_megabits_per_second = 3 [(buf.validate.field).uint32.gt = 0];
+  optional UnitBase unit_base = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}
+
+message DiskThroughputDisplaySettings {
+  optional ScaleMode scale_mode = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  optional uint32 maximum_read_throughput_mebibytes_per_second = 2 [(buf.validate.field).uint32.gt = 0];
+  optional uint32 maximum_write_throughput_mebibytes_per_second = 3 [(buf.validate.field).uint32.gt = 0];
+}
+
+enum SingleMetricViewLayout {
+  SINGLE_METRIC_VIEW_LAYOUT_UNSPECIFIED = 0;
+  SINGLE_METRIC_VIEW_LAYOUT_CIRCULAR = 1;
+  SINGLE_METRIC_VIEW_LAYOUT_TEXT = 2;
+  SINGLE_METRIC_VIEW_LAYOUT_LINEAR = 3;
+  SINGLE_METRIC_VIEW_LAYOUT_SPARKLINE = 4;
+}
+
+enum CircleStyle {
+  CIRCLE_STYLE_UNSPECIFIED = 0;
+  CIRCLE_STYLE_VALUE = 1;
+  CIRCLE_STYLE_COMPACT = 2;
+  CIRCLE_STYLE_GAUGE = 3;
+}
+
+enum MetricTheme {
+  METRIC_THEME_UNSPECIFIED = 0;
+  METRIC_THEME_FLAT = 1;
+  METRIC_THEME_CUPERTINO_GLASS = 2;
+}
+
+enum ColorMode {
+  COLOR_MODE_UNSPECIFIED = 0;
+  COLOR_MODE_THRESHOLD = 1;
+  COLOR_MODE_SOLID = 2;
+}
+
+enum ScaleMode {
+  SCALE_MODE_UNSPECIFIED = 0;
+  SCALE_MODE_AUTO = 1;
+  SCALE_MODE_CUSTOM = 2;
+}
+
+enum TemperatureUnit {
+  TEMPERATURE_UNIT_UNSPECIFIED = 0;
+  TEMPERATURE_UNIT_CELSIUS = 1;
+  TEMPERATURE_UNIT_FAHRENHEIT = 2;
+}
