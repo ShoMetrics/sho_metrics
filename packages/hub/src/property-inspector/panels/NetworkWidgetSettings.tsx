@@ -25,8 +25,8 @@ type NetworkWidgetSettingsProps = WidgetSettingsPanelProps & {
 export function NetworkWidgetSettings(props: NetworkWidgetSettingsProps): React.JSX.Element {
     return (
         <>
-            <LayoutSettings {...props} />
             <NetworkMetricSettings {...props} />
+            <LayoutSettings {...props} />
             <NetworkScaleSettings {...props} />
             <SparklineSettings {...props} />
             {props.target.reading.direction === "both" ? (

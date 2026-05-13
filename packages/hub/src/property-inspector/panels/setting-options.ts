@@ -74,6 +74,13 @@ export const diskThroughputDirectionOptionList = [
     { value: "write", label: "Write" },
 ] as const satisfies readonly SelectOption[];
 
+export const gpuMetricKindOptionList = [
+    { value: "usage", label: "Usage" },
+    { value: "temperature", label: "Temperature" },
+    { value: "vram", label: "VRAM" },
+    { value: "power", label: "Power" },
+] as const satisfies readonly SelectOption[];
+
 export const temperatureUnitOptionList = [
     { value: "celsius", label: "Celsius" },
     { value: "fahrenheit", label: "Fahrenheit" },

@@ -40,12 +40,12 @@ export function DiskWidgetSettings(props: DiskWidgetSettingsProps): React.JSX.El
 
     return (
         <>
-            <LayoutSettings {...props} />
             {reading.kind === "throughput" ? (
                 <DiskThroughputSettings {...props} reading={reading} />
             ) : (
                 <DiskUsageSettings {...props} reading={reading} />
             )}
+            <LayoutSettings {...props} />
             {usesThroughputChannelColors ? (
                 <DiskThroughputChannelColorSettings {...props} />
             ) : (
