@@ -11,7 +11,7 @@ describe("quick-start stored widget settings", () => {
                 pollingFrequencySeconds: 30,
             },
             unknownProtoJsonField: "future-value",
-        }, "net-speed");
+        }, "network");
         const storedSettings = readStoredWidgetSettings(quickStartSettings.rawSettings).settings;
 
         assert.equal(quickStartSettings.readWarning?.reason, "unknownFieldsDiscarded");
@@ -25,7 +25,7 @@ describe("quick-start stored widget settings", () => {
             preferences: {
                 pollingFrequencySeconds: 0,
             },
-        }, "ram");
+        }, "memory");
         const storedSettings = readStoredWidgetSettings(quickStartSettings.rawSettings).settings;
 
         assert.equal(quickStartSettings.readWarning?.reason, "invalidSettingsDefaulted");

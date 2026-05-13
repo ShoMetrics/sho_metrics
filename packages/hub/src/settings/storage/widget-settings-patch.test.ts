@@ -15,7 +15,7 @@ test("widget patch fails before quick-start metric initialization", () => {
 });
 
 test("widget patch fails when the patch domain does not match the current metric", () => {
-    const cpuSettings = resolveQuickStartStoredWidgetSettings(undefined, "cpu-usage").rawSettings;
+    const cpuSettings = resolveQuickStartStoredWidgetSettings(undefined, "cpu").rawSettings;
 
     assert.throws(
         () => writeStoredWidgetSettingsPatch(cpuSettings, {

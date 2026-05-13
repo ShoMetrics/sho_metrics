@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveNetSpeedMetricSubscriptionKeys } from "./network/metric-subscriptions";
+import { resolveNetworkMetricSubscriptionKeys } from "./network/metric-subscriptions";
 
 test("network sparkline both mode subscribes to upload and download", () => {
-    const subscriptionKeys = resolveNetSpeedMetricSubscriptionKeys({
+    const subscriptionKeys = resolveNetworkMetricSubscriptionKeys({
         graphicType: "sparkline",
         networkDirection: "both",
         networkInterfaceId: "",
@@ -13,7 +13,7 @@ test("network sparkline both mode subscribes to upload and download", () => {
 });
 
 test("network sparkline single mode subscribes to one direction", () => {
-    const subscriptionKeys = resolveNetSpeedMetricSubscriptionKeys({
+    const subscriptionKeys = resolveNetworkMetricSubscriptionKeys({
         graphicType: "sparkline",
         networkDirection: "upload",
         networkInterfaceId: "",
@@ -23,7 +23,7 @@ test("network sparkline single mode subscribes to one direction", () => {
 });
 
 test("network circular both mode subscribes to upload and download", () => {
-    const subscriptionKeys = resolveNetSpeedMetricSubscriptionKeys({
+    const subscriptionKeys = resolveNetworkMetricSubscriptionKeys({
         graphicType: "circular",
         networkDirection: "both",
         networkInterfaceId: "",
@@ -33,7 +33,7 @@ test("network circular both mode subscribes to upload and download", () => {
 });
 
 test("network text both mode subscribes to upload and download", () => {
-    const subscriptionKeys = resolveNetSpeedMetricSubscriptionKeys({
+    const subscriptionKeys = resolveNetworkMetricSubscriptionKeys({
         graphicType: "text",
         networkDirection: "both",
         networkInterfaceId: "",

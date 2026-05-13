@@ -69,8 +69,8 @@ test("windows disk settings use usage controls when throughput is unavailable", 
 
 test("network dual-channel settings render channel colors instead of usage colors", () => {
     const markup = renderWidgetSettings({
-        actionKind: "net-speed",
-        settings: buildWidgetSettings("net-speed", {
+        actionKind: "network",
+        settings: buildWidgetSettings("network", {
             appearance: {
                 colorMode: "solid",
             },
@@ -86,7 +86,7 @@ test("network dual-channel settings render channel colors instead of usage color
 
 test("network settings render from empty quick-start settings", () => {
     const markup = renderWidgetSettings({
-        actionKind: "net-speed",
+        actionKind: "network",
     });
 
     assert.match(markup, /Network Metric/);
@@ -95,8 +95,8 @@ test("network settings render from empty quick-start settings", () => {
 
 test("network single-channel settings render standard usage colors", () => {
     const markup = renderWidgetSettings({
-        actionKind: "net-speed",
-        settings: buildWidgetSettings("net-speed", {
+        actionKind: "network",
+        settings: buildWidgetSettings("network", {
             appearance: {
                 colorMode: "solid",
             },
@@ -113,8 +113,8 @@ test("network single-channel settings render standard usage colors", () => {
 
 test("network mirrored trend disables grid controls in the panel", () => {
     const markup = renderWidgetSettings({
-        actionKind: "net-speed",
-        settings: buildWidgetSettings("net-speed", {
+        actionKind: "network",
+        settings: buildWidgetSettings("network", {
             appearance: {
                 viewLayout: "sparkline",
             },
@@ -170,14 +170,12 @@ test("disk throughput dual-channel settings render read/write colors", () => {
     assert.match(markup, sectionHeadingPattern("Write"));
 });
 
-test("GPU settings panel follows the resolved reading instead of the action kind", () => {
+test("GPU settings panel renders from the GPU domain action", () => {
     const markup = renderWidgetSettings({
-        actionKind: "gpu-temp",
-        settings: buildWidgetSettings("gpu-power", {}),
+        actionKind: "gpu",
     });
 
-    assert.match(markup, /Max Power/);
-    assert.doesNotMatch(markup, /Max Temp/);
+    assert.match(markup, /Polling Frequency/);
 });
 
 function renderWidgetSettings(options: {

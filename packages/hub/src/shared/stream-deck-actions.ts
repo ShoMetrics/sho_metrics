@@ -1,12 +1,9 @@
 export type ActionKind =
-    | "cpu-usage"
-    | "net-speed"
-    | "ram"
+    | "cpu"
+    | "gpu"
+    | "memory"
     | "disk"
-    | "gpu-usage"
-    | "gpu-temp"
-    | "gpu-vram"
-    | "gpu-power"
+    | "network"
     | "unknown";
 
 export const STREAM_DECK_PLUGIN_UUID = "com.ez.sho-metrics";
@@ -14,14 +11,11 @@ export const STREAM_DECK_PLUGIN_UUID = "com.ez.sho-metrics";
 type StreamDeckActionKind = Exclude<ActionKind, "unknown">;
 
 export const STREAM_DECK_ACTION_UUID_BY_KIND = {
-    "cpu-usage": `${STREAM_DECK_PLUGIN_UUID}.cpu-usage`,
-    "net-speed": `${STREAM_DECK_PLUGIN_UUID}.net-speed`,
-    ram: `${STREAM_DECK_PLUGIN_UUID}.ram`,
+    cpu: `${STREAM_DECK_PLUGIN_UUID}.cpu`,
+    gpu: `${STREAM_DECK_PLUGIN_UUID}.gpu`,
+    memory: `${STREAM_DECK_PLUGIN_UUID}.memory`,
     disk: `${STREAM_DECK_PLUGIN_UUID}.disk`,
-    "gpu-usage": `${STREAM_DECK_PLUGIN_UUID}.gpu-usage`,
-    "gpu-temp": `${STREAM_DECK_PLUGIN_UUID}.gpu-temp`,
-    "gpu-vram": `${STREAM_DECK_PLUGIN_UUID}.gpu-vram`,
-    "gpu-power": `${STREAM_DECK_PLUGIN_UUID}.gpu-power`,
+    network: `${STREAM_DECK_PLUGIN_UUID}.network`,
 } as const satisfies Record<StreamDeckActionKind, string>;
 
 const actionKindByUuid: Readonly<Partial<Record<string, ActionKind>>> = Object.fromEntries(

@@ -65,17 +65,17 @@ export function resolveQuickStartStoredWidgetSettings(
 
 function buildQuickStartMetricTarget(actionKind: ActionKind): MetricSelection["target"] | null {
     switch (actionKind) {
-        case "cpu-usage":
+        case "cpu":
             return {
                 case: "cpu",
                 value: create(CpuMetricTargetSchema, { kind: StoredCpuMetricKind.USAGE }),
             };
-        case "ram":
+        case "memory":
             return {
                 case: "memory",
                 value: create(MemoryMetricTargetSchema, { kind: StoredMemoryMetricKind.USAGE }),
             };
-        case "net-speed":
+        case "network":
             return {
                 case: "network",
                 value: create(NetworkMetricTargetSchema, { direction: StoredNetworkDirection.BOTH }),
@@ -85,25 +85,10 @@ function buildQuickStartMetricTarget(actionKind: ActionKind): MetricSelection["t
                 case: "disk",
                 value: create(DiskMetricTargetSchema, { kind: StoredDiskMetricKind.USAGE }),
             };
-        case "gpu-usage":
+        case "gpu":
             return {
                 case: "gpu",
                 value: create(GpuMetricTargetSchema, { kind: StoredGpuMetricKind.USAGE }),
-            };
-        case "gpu-temp":
-            return {
-                case: "gpu",
-                value: create(GpuMetricTargetSchema, { kind: StoredGpuMetricKind.TEMPERATURE }),
-            };
-        case "gpu-vram":
-            return {
-                case: "gpu",
-                value: create(GpuMetricTargetSchema, { kind: StoredGpuMetricKind.VRAM }),
-            };
-        case "gpu-power":
-            return {
-                case: "gpu",
-                value: create(GpuMetricTargetSchema, { kind: StoredGpuMetricKind.POWER }),
             };
         case "unknown":
             return null;

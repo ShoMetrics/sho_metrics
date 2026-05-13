@@ -102,7 +102,7 @@ test("builder withCause appends the original Error object after entry data", () 
 
 test("disabled builders do not evaluate lazy messages", () => {
     const sink = new RecordingLoggerSink("info");
-    const log = createShoLogger(sink).for("Action:NetSpeed");
+    const log = createShoLogger(sink).for("Action:Network");
     let providerCallCount = 0;
 
     log.atDebug()
@@ -119,7 +119,7 @@ test("disabled builders do not evaluate lazy messages", () => {
 
 test("everyMs throttles matching keys without blocking different keys", () => {
     const sink = new RecordingLoggerSink("debug");
-    const log = createShoLogger(sink).for("Action:NetSpeed");
+    const log = createShoLogger(sink).for("Action:Network");
 
     log.atDebug().everyMs("speed-sample", 60000).log("first sample");
     log.atDebug().everyMs("speed-sample", 60000).log("second sample");
@@ -133,7 +133,7 @@ test("everyMs throttles matching keys without blocking different keys", () => {
 
 test("everyMs evicts the oldest key when throttle state reaches the fixed limit", () => {
     const sink = new RecordingLoggerSink("debug");
-    const log = createShoLogger(sink).for("Action:NetSpeed");
+    const log = createShoLogger(sink).for("Action:Network");
     const throttleKeyCountLimit = 128;
 
     for (let keyIndex = 0; keyIndex < throttleKeyCountLimit; keyIndex += 1) {

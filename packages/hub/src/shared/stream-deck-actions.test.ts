@@ -36,8 +36,8 @@ test("Stream Deck action UUID constants match the manifest", () => {
 
 test("Stream Deck action kind resolution requires an exact manifest UUID", () => {
     assert.equal(
-        resolveStreamDeckActionKind(STREAM_DECK_ACTION_UUID_BY_KIND["net-speed"]),
-        "net-speed",
+        resolveStreamDeckActionKind(STREAM_DECK_ACTION_UUID_BY_KIND.network),
+        "network",
     );
-    assert.equal(resolveStreamDeckActionKind("com.example.net-speed"), "unknown");
+    assert.equal(resolveStreamDeckActionKind("com.example.network"), "unknown");
 });

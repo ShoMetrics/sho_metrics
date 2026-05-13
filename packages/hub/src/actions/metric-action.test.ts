@@ -26,7 +26,7 @@ test("runtime cache publishes to Property Inspector without writing settings", a
     };
     const action = new TestMetricAction();
     const circularNetworkSettings = writeStoredWidgetSettingsPatch(
-        resolveQuickStartStoredWidgetSettings(undefined, "net-speed").rawSettings,
+        resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
         {
             appearance: {
                 viewLayout: "circular",
@@ -71,7 +71,7 @@ test("runtime cache publishes to Property Inspector without writing settings", a
 });
 
 class TestMetricAction extends MetricAction {
-    protected readonly actionKind = "net-speed";
+    protected readonly actionKind = "network";
     readonly runtimeCachePatchList: WidgetRuntimeCachePatch[] = [];
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
