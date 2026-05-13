@@ -31,12 +31,14 @@ import {
     writeStoredGlobalSettingsPatch,
     type StoredGlobalSettingsPatch,
 } from "../../settings/storage/global-settings-patch";
+import type { PropertyInspectorRuntimeCacheStatus } from "../inspector/types";
 
 interface SettingsSyncState {
     actionKind: ActionKind;
     isWindows: boolean;
     rawSettings: unknown;
     runtimeCache: WidgetRuntimeCache;
+    runtimeCacheStatus: PropertyInspectorRuntimeCacheStatus;
     rawGlobalSettings: unknown;
     widgetSettingsNotice: SettingsNotice | null;
     pluginSettingsNotice: SettingsNotice | null;
@@ -72,6 +74,9 @@ const initialState: SettingsSyncState = {
     isWindows: false,
     rawSettings: undefined,
     runtimeCache: { ...emptyWidgetRuntimeCache },
+    runtimeCacheStatus: {
+        hasReceivedDiskVolumeOptions: false,
+    },
     rawGlobalSettings: undefined,
     widgetSettingsNotice: null,
     pluginSettingsNotice: null,
@@ -99,9 +104,17 @@ export function usePropertyInspectorSettings(
         rawSettings: state.rawSettings,
         rawGlobalSettings: state.rawGlobalSettings,
         runtimeCache: state.runtimeCache,
+        runtimeCacheStatus: state.runtimeCacheStatus,
         actionKind: state.actionKind,
         isWindows: state.isWindows,
-    }), [state.rawSettings, state.rawGlobalSettings, state.runtimeCache, state.actionKind, state.isWindows]);
+    }), [
+        state.rawSettings,
+        state.rawGlobalSettings,
+        state.runtimeCache,
+        state.runtimeCacheStatus,
+        state.actionKind,
+        state.isWindows,
+    ]);
 
     const updateWidgetSettings = (patch: StoredWidgetSettingsPatch): void => {
         let settingsJsonToPersist: StoredSettingsJsonObject | undefined;
@@ -353,6 +366,10 @@ function subscribePropertyInspectorEvents(
         commitState((currentState) => ({
             ...currentState,
             runtimeCache: mergeWidgetRuntimeCache(currentState.runtimeCache, runtimeCachePatch),
+            runtimeCacheStatus: {
+                hasReceivedDiskVolumeOptions: currentState.runtimeCacheStatus.hasReceivedDiskVolumeOptions
+                    || "availableDiskVolumes" in runtimeCachePatch,
+            },
         }));
     });
 

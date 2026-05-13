@@ -10,6 +10,7 @@ import type { DiskVolumeOption } from "../../runtime/disk-volumes";
 import type { WidgetRuntimeCachePatch } from "../../runtime/widget-runtime-cache";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
+import type { PropertyInspectorRuntimeCacheStatus } from "../inspector/types";
 import { buildVisibilityContext, type InspectorTestSettings } from "../testing/test-context";
 
 test("network interface options include automatic and formatted interfaces", () => {
@@ -56,8 +57,22 @@ test("disk volume options include explicit volumes and compact capacity labels",
     ]);
 });
 
-test("disk volume options show a disabled empty state when no volumes are available", () => {
+test("disk volume options show loading before disk volume options arrive", () => {
     const context = buildContext();
+
+    const optionList = resolveDiskVolumeOptions(context);
+
+    assert.deepEqual(optionList, [
+        { value: "", label: "Loading volumes...", disabled: true },
+    ]);
+});
+
+test("disk volume options show an empty state after disk volume options arrive empty", () => {
+    const context = buildContext({
+        runtimeCacheStatus: {
+            hasReceivedDiskVolumeOptions: true,
+        },
+    });
 
     const optionList = resolveDiskVolumeOptions(context);
 
@@ -99,11 +114,13 @@ test("selected disk label returns dash when no valid disk is available", () => {
 function buildContext(options: {
     settings?: InspectorTestSettings;
     runtimeCache?: WidgetRuntimeCachePatch;
+    runtimeCacheStatus?: Partial<PropertyInspectorRuntimeCacheStatus>;
 } = {}) {
     return buildVisibilityContext({
         actionKind: "disk",
         settings: options.settings ?? buildDiskSettings(),
         runtimeCache: options.runtimeCache,
+        runtimeCacheStatus: options.runtimeCacheStatus,
     });
 }
 

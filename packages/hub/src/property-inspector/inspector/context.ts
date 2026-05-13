@@ -3,12 +3,13 @@ import { readStoredGlobalSettings, readStoredWidgetSettings } from "../../settin
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { resolveStoredWidgetSettings } from "../../settings/storage/resolver";
 import type { ActionKind } from "../../shared/stream-deck-actions";
-import type { VisibilityContext } from "./types";
+import type { PropertyInspectorRuntimeCacheStatus, VisibilityContext } from "./types";
 
 export function buildPropertyInspectorContext(options: {
     rawSettings: unknown;
     rawGlobalSettings: unknown;
     runtimeCache: WidgetRuntimeCache;
+    runtimeCacheStatus: PropertyInspectorRuntimeCacheStatus;
     actionKind: ActionKind;
     isWindows: boolean;
 }): VisibilityContext {
@@ -18,6 +19,7 @@ export function buildPropertyInspectorContext(options: {
         actionKind: options.actionKind,
         isWindows: options.isWindows,
         runtimeCache: options.runtimeCache,
+        runtimeCacheStatus: options.runtimeCacheStatus,
         resolved: resolveStoredWidgetSettings({
             storedWidgetSettings: readStoredWidgetSettings(quickStartSettings.rawSettings).settings,
             storedGlobalSettings: readStoredGlobalSettings(options.rawGlobalSettings).settings,

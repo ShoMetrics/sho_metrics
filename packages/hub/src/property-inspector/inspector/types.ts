@@ -14,5 +14,10 @@ export interface VisibilityContext {
     actionKind: ActionKind;
     isWindows: boolean;
     runtimeCache: WidgetRuntimeCache;
+    runtimeCacheStatus: PropertyInspectorRuntimeCacheStatus;
     resolved: ResolvedWidgetSettings;
+}
+
+export interface PropertyInspectorRuntimeCacheStatus {
+    hasReceivedDiskVolumeOptions: boolean;
 }
