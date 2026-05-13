@@ -19,7 +19,7 @@ export function buildVisibilityContext(options: {
         rawSettings: options.settings,
         rawGlobalSettings: undefined,
         runtimeCache: mergeWidgetRuntimeCache(emptyWidgetRuntimeCache, options.runtimeCache ?? {}),
-        actionKind: options.actionKind ?? "cpu-usage",
+        actionKind: options.actionKind ?? "cpu",
         isWindows: options.isWindows ?? false,
     });
 }

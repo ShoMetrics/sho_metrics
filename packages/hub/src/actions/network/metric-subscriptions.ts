@@ -5,13 +5,13 @@ import {
 } from "../../runtime/network-metric-keys";
 import type { NetworkDirection, SingleMetricViewLayout } from "../../settings/resolved-settings";
 
-export interface NetSpeedMetricSubscriptionSettings {
+export interface NetworkMetricSubscriptionSettings {
     graphicType: SingleMetricViewLayout;
     networkDirection: NetworkDirection;
     networkInterfaceId: string;
 }
 
-export function resolveNetSpeedMetricSubscriptionKeys(settings: NetSpeedMetricSubscriptionSettings): readonly string[] {
+export function resolveNetworkMetricSubscriptionKeys(settings: NetworkMetricSubscriptionSettings): readonly string[] {
     const selectedNetworkInterface = networkInterfaceRegistry.resolveSelection(settings.networkInterfaceId);
     const displayDirection = settings.networkDirection;
 

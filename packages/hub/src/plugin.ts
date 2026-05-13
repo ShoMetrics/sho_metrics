@@ -1,9 +1,9 @@
 import streamDeck from "@elgato/streamdeck";
 
-import { CpuUsage } from "./actions/cpu-usage";
-import { NetSpeed } from "./actions/net-speed";
-import { GpuUsage, GpuTemp, GpuVram, GpuPower } from "./actions/gpu-usage";
-import { RamUsage } from "./actions/ram-usage";
+import { Cpu } from "./actions/cpu";
+import { Network } from "./actions/network";
+import { Gpu } from "./actions/gpu";
+import { Memory } from "./actions/memory";
 import { Disk } from "./actions/disk";
 import { logger } from "./logging/logger";
 import { pluginGlobalSettingsStore } from "./settings/global-settings-store";
@@ -15,14 +15,11 @@ streamDeck.settings.onDidReceiveGlobalSettings(event => {
     pluginGlobalSettingsStore.update(event.settings);
 });
 
-streamDeck.actions.registerAction(new CpuUsage());
-streamDeck.actions.registerAction(new NetSpeed());
-streamDeck.actions.registerAction(new RamUsage());
+streamDeck.actions.registerAction(new Cpu());
+streamDeck.actions.registerAction(new Network());
+streamDeck.actions.registerAction(new Memory());
 streamDeck.actions.registerAction(new Disk());
-streamDeck.actions.registerAction(new GpuUsage());
-streamDeck.actions.registerAction(new GpuTemp());
-streamDeck.actions.registerAction(new GpuVram());
-streamDeck.actions.registerAction(new GpuPower());
+streamDeck.actions.registerAction(new Gpu());
 
 streamDeck.connect()
     .then(() => streamDeck.settings.getGlobalSettings())

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { WidgetData } from "../rendering/widget-data";
-import { buildGpuUsageWidgetData } from "./gpu-usage";
+import { buildGpuUsageWidgetData } from "./gpu";
 
 test("GPU usage display value renders as an integer percentage", () => {
     const widgetData = buildGpuUsageWidgetData(buildWidgetData({

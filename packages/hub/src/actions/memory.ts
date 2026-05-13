@@ -8,9 +8,9 @@ import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import { RAM_TOTAL_METRIC_KEY, RAM_USED_METRIC_KEY } from "../runtime/metric-keys";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 
-@action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.ram })
-export class RamUsage extends MetricAction {
-    protected readonly actionKind = "ram";
+@action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.memory })
+export class Memory extends MetricAction {
+    protected readonly actionKind = "memory";
 
     protected override getMetricSubscriptionKeys(): readonly string[] {
         return [RAM_USED_METRIC_KEY, RAM_TOTAL_METRIC_KEY];

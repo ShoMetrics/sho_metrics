@@ -4,10 +4,10 @@
 	"Author": "ez",
 	"Actions": [
 		{
-			"Name": "CPU Usage",
-			"UUID": "com.ez.sho-metrics.cpu-usage",
+			"Name": "CPU",
+			"UUID": "com.ez.sho-metrics.cpu",
 			"Icon": "imgs/actions/counter/icon",
-			"Tooltip": "Displays the current CPU usage percentage.",
+			"Tooltip": "Displays CPU metrics.",
 			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
 				"Keypad",
@@ -26,10 +26,10 @@
 			]
 		},
 		{
-			"Name": "Net Speed",
-			"UUID": "com.ez.sho-metrics.net-speed",
+			"Name": "GPU",
+			"UUID": "com.ez.sho-metrics.gpu",
 			"Icon": "imgs/actions/counter/icon",
-			"Tooltip": "Displays Down/Up network speed (MB/s).",
+			"Tooltip": "Displays GPU metrics.",
 			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
 				"Keypad",
@@ -48,10 +48,10 @@
 			]
 		},
 		{
-			"Name": "RAM",
-			"UUID": "com.ez.sho-metrics.ram",
+			"Name": "Memory",
+			"UUID": "com.ez.sho-metrics.memory",
 			"Icon": "imgs/actions/counter/icon",
-			"Tooltip": "Displays current RAM usage.",
+			"Tooltip": "Displays memory metrics.",
 			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
 				"Keypad",
@@ -73,7 +73,7 @@
 			"Name": "Disk",
 			"UUID": "com.ez.sho-metrics.disk",
 			"Icon": "imgs/actions/counter/icon",
-			"Tooltip": "Displays disk usage or macOS disk throughput.",
+			"Tooltip": "Displays disk metrics.",
 			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
 				"Keypad",
@@ -92,76 +92,10 @@
 			]
 		},
 		{
-			"Name": "GPU Usage",
-			"UUID": "com.ez.sho-metrics.gpu-usage",
+			"Name": "Network",
+			"UUID": "com.ez.sho-metrics.network",
 			"Icon": "imgs/actions/counter/icon",
-			"Tooltip": "Displays NVIDIA GPU usage percentage.",
-			"PropertyInspectorPath": "ui/property-inspector.html",
-			"Controllers": [
-				"Keypad",
-				"Encoder"
-			],
-			"Encoder": {
-				"layout": "$B1"
-			},
-			"UserTitleEnabled": false,
-			"States": [
-				{
-					"Image": "imgs/actions/counter/key",
-					"ShowTitle": false,
-					"TitleAlignment": "middle"
-				}
-			]
-		},
-		{
-			"Name": "GPU Temp",
-			"UUID": "com.ez.sho-metrics.gpu-temp",
-			"Icon": "imgs/actions/counter/icon",
-			"Tooltip": "Displays NVIDIA GPU temperature.",
-			"PropertyInspectorPath": "ui/property-inspector.html",
-			"Controllers": [
-				"Keypad",
-				"Encoder"
-			],
-			"Encoder": {
-				"layout": "$B1"
-			},
-			"UserTitleEnabled": false,
-			"States": [
-				{
-					"Image": "imgs/actions/counter/key",
-					"ShowTitle": false,
-					"TitleAlignment": "middle"
-				}
-			]
-		},
-		{
-			"Name": "GPU VRAM",
-			"UUID": "com.ez.sho-metrics.gpu-vram",
-			"Icon": "imgs/actions/counter/icon",
-			"Tooltip": "Displays NVIDIA GPU VRAM usage.",
-			"PropertyInspectorPath": "ui/property-inspector.html",
-			"Controllers": [
-				"Keypad",
-				"Encoder"
-			],
-			"Encoder": {
-				"layout": "$B1"
-			},
-			"UserTitleEnabled": false,
-			"States": [
-				{
-					"Image": "imgs/actions/counter/key",
-					"ShowTitle": false,
-					"TitleAlignment": "middle"
-				}
-			]
-		},
-		{
-			"Name": "GPU Power",
-			"UUID": "com.ez.sho-metrics.gpu-power",
-			"Icon": "imgs/actions/counter/icon",
-			"Tooltip": "Displays NVIDIA GPU power draw.",
+			"Tooltip": "Displays network metrics.",
 			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
 				"Keypad",

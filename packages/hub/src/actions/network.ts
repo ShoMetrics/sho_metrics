@@ -9,7 +9,7 @@ import {
     getNetworkInterfaceMetricKey,
     type NetworkDirection,
 } from "../runtime/network-metric-keys";
-import { resolveNetSpeedMetricSubscriptionKeys } from "./network/metric-subscriptions";
+import { resolveNetworkMetricSubscriptionKeys } from "./network/metric-subscriptions";
 import type { ResolvedNetworkMetricTarget, ResolvedWidgetSettings } from "../settings/resolved-settings";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
@@ -20,21 +20,21 @@ import {
 } from "./network/view-builder";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 
-const log = logger.for("Action:NetSpeed");
+const log = logger.for("Action:Network");
 
 /**
- * Network Speed action.
+ * Network action.
  * Circle, linear, and sparkline visuals all support either one network
  * direction or combined download/upload telemetry.
  */
-@action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND["net-speed"] })
-export class NetSpeed extends MetricAction {
-    protected readonly actionKind = "net-speed";
+@action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.network })
+export class Network extends MetricAction {
+    protected readonly actionKind = "network";
 
     protected override getMetricSubscriptionKeys(event: WillAppearEvent): readonly string[] {
         const settings = this.resolveSettings(event);
         const networkTarget = readNetworkTarget(settings);
-        return resolveNetSpeedMetricSubscriptionKeys({
+        return resolveNetworkMetricSubscriptionKeys({
             graphicType: settings.widget.slot.appearance.viewLayout,
             networkDirection: networkTarget.reading.direction,
             networkInterfaceId: networkTarget.interfaceId ?? "",

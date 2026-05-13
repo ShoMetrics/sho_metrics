@@ -113,7 +113,7 @@ returned new values.
 Important caveat:
 
 - PI `connectionInfo.actionInfo.action` / `uuid` identifies the manifest action
-  type, for example `com.ez.sho-metrics.cpu-usage`.
+  type, for example `com.ez.sho-metrics.cpu`.
 - It is not the action instance id used by plugin runtime events.
 - Therefore PI should not use that value as a cache key for a plugin-side widget
   settings store.
