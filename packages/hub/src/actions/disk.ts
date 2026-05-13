@@ -11,13 +11,14 @@ import {
     type DiskThroughputDirection,
 } from "../runtime/disk-metric-keys";
 import { resolveDiskMetricSubscriptionKeys } from "./disk/metric-subscriptions";
-import type { ResolvedDiskMetricTarget, ResolvedWidgetSettings } from "../settings/resolved-settings";
+import type { ResolvedDiskMetricTarget } from "../settings/resolved-settings";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
     buildDiskDisplayOptions,
     resolveDiskMaximumThroughputMebibytesPerSecond,
 } from "./disk/view-builder";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
+import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 
 const log = logger.for("Action:Disk");
 
@@ -27,7 +28,7 @@ export class Disk extends MetricAction {
 
     protected override getMetricSubscriptionKeys(event: WillAppearEvent): readonly string[] {
         const settings = this.resolveSettings(event);
-        const diskTarget = readDiskTarget(settings);
+        const diskTarget = readResolvedMetricTarget(settings, "disk");
         const metricKind = diskTarget.reading.kind;
 
         if (metricKind === "throughput") {
@@ -55,7 +56,7 @@ export class Disk extends MetricAction {
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event);
-        const diskTarget = readDiskTarget(settings);
+        const diskTarget = readResolvedMetricTarget(settings, "disk");
         const selectedVolume = resolveSelectedDiskVolume(diskTarget.volumeId);
 
         this.publishDiskVolumeOptions(event);
@@ -119,16 +120,6 @@ export class Disk extends MetricAction {
             log.error(() => `Failed to publish runtime disk throughput maximum: ${String(error)}`);
         });
     }
-}
-
-function readDiskTarget(settings: ResolvedWidgetSettings): ResolvedDiskMetricTarget {
-    const target = settings.widget.slot.metric.target;
-
-    if (target.domain !== "disk") {
-        throw new Error("Expected disk metric settings.");
-    }
-
-    return target;
 }
 
 function resolveSelectedDiskVolume(value: string | undefined): DiskVolumeOption | null {

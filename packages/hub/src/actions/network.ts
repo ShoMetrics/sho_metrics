@@ -10,7 +10,7 @@ import {
     type NetworkDirection,
 } from "../runtime/network-metric-keys";
 import { resolveNetworkMetricSubscriptionKeys } from "./network/metric-subscriptions";
-import type { ResolvedNetworkMetricTarget, ResolvedWidgetSettings } from "../settings/resolved-settings";
+import type { ResolvedNetworkMetricTarget } from "../settings/resolved-settings";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
     buildNetworkDisplayUpdate,
@@ -19,6 +19,7 @@ import {
     type NetworkDisplayDebugInfo,
 } from "./network/view-builder";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
+import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 
 const log = logger.for("Action:Network");
 
@@ -33,7 +34,7 @@ export class Network extends MetricAction {
 
     protected override getMetricSubscriptionKeys(event: WillAppearEvent): readonly string[] {
         const settings = this.resolveSettings(event);
-        const networkTarget = readNetworkTarget(settings);
+        const networkTarget = readResolvedMetricTarget(settings, "network");
         return resolveNetworkMetricSubscriptionKeys({
             graphicType: settings.widget.slot.appearance.viewLayout,
             networkDirection: networkTarget.reading.direction,
@@ -43,7 +44,7 @@ export class Network extends MetricAction {
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event);
-        const networkTarget = readNetworkTarget(settings);
+        const networkTarget = readResolvedMetricTarget(settings, "network");
         const networkInterfaceId = networkTarget.interfaceId ?? "";
         const isAutomaticNetworkInterface = networkInterfaceId.length === 0;
         const selectedNetworkInterface = networkInterfaceRegistry.resolveSelection(networkInterfaceId);
@@ -145,16 +146,6 @@ function logNetworkSpeedDebug(options: {
         `progress=${options.debugInfo.displayWidgetData.progress.toFixed(4)}`,
         `availableInterfaces=${JSON.stringify(networkInterfaceRegistry.getOptions())}`,
     ].join(" "));
-}
-
-function readNetworkTarget(settings: ResolvedWidgetSettings): ResolvedNetworkMetricTarget {
-    const target = settings.widget.slot.metric.target;
-
-    if (target.domain !== "network") {
-        throw new Error("Expected network metric settings.");
-    }
-
-    return target;
 }
 
 function formatNetworkInterfaceDebugValue(networkInterface: NetworkInterfaceOption | null): string {
