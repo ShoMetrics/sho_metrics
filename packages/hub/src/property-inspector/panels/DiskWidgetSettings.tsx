@@ -6,6 +6,7 @@ import { TextSetting } from "../controls/TextSetting";
 import {
     resolveDiskAutoLinearLabel,
     resolveDiskVolumeOptions,
+    resolveSelectedDiskVolume,
     resolveSelectedDiskVolumeLabel,
 } from "../select-options/runtime-select-options";
 import {
@@ -60,6 +61,7 @@ function DiskUsageSettings(props: DiskWidgetSettingsProps & {
     reading: DiskUsageReading;
 }): React.JSX.Element {
     const graphicType = props.context.resolved.widget.slot.appearance.viewLayout;
+    const selectedDiskVolumeId = resolveSelectedDiskVolume(props.context)?.id ?? "";
 
     return (
         <>
@@ -67,7 +69,7 @@ function DiskUsageSettings(props: DiskWidgetSettingsProps & {
                 <DiskMetricKindSetting {...props} currentKind={props.reading.kind} />
                 <SelectSetting
                     label="Volume"
-                    value={props.target.volumeId ?? ""}
+                    value={selectedDiskVolumeId}
                     optionList={resolveDiskVolumeOptions(props.context)}
                     onValueChange={(volumeId) => props.onSettingsPatch({
                         disk: { volumeId },
