@@ -7,7 +7,7 @@ export function resolveNetworkInterfaceOptions(context: VisibilityContext): Sele
 }
 
 export function resolveDiskVolumeOptions(context: VisibilityContext): SelectOption[] {
-    return buildDiskVolumeOptions(context.runtimeCache.availableDiskVolumes);
+    return buildDiskVolumeOptions(context);
 }
 
 function buildNetworkInterfaceOptions(networkInterfaces: readonly NetworkInterfaceOption[]): SelectOption[] {
@@ -28,9 +28,17 @@ function buildNetworkInterfaceOptions(networkInterfaces: readonly NetworkInterfa
     ];
 }
 
-function buildDiskVolumeOptions(diskVolumes: readonly DiskVolumeOption[]): SelectOption[] {
+function buildDiskVolumeOptions(context: VisibilityContext): SelectOption[] {
+    const diskVolumes = context.runtimeCache.availableDiskVolumes;
+
     if (diskVolumes.length === 0) {
-        return [{ value: "", label: "No detected volumes", disabled: true }];
+        return [{
+            value: "",
+            label: context.runtimeCacheStatus.hasReceivedDiskVolumeOptions
+                ? "No detected volumes"
+                : "Loading volumes...",
+            disabled: true,
+        }];
     }
 
     return diskVolumes.map((diskVolume) => ({
