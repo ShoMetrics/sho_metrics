@@ -82,7 +82,9 @@ describe("stored settings proto resolver", () => {
                     viewLayout: "SINGLE_METRIC_VIEW_LAYOUT_LINEAR",
                     circleStyle: "CIRCLE_STYLE_GAUGE",
                     theme: "METRIC_THEME_CUPERTINO_GLASS",
-                    tintColor: "#111111",
+                    colors: {
+                        solidColor: "#111111",
+                    },
                     colorMode: "COLOR_MODE_SOLID",
                 },
             },

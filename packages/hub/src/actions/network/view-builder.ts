@@ -13,7 +13,7 @@ import type {
     ResolvedNetworkMetricTarget,
     ResolvedWidgetSettings,
 } from "../../settings/resolved-settings";
-import { buildGlobalChannelColorConfig } from "../../settings/global-appearance";
+import { buildGlobalColorConfig } from "../../settings/global-appearance";
 import {
     buildNetworkSpeedWidgetData,
     convertMegabitsPerSecondToBytesPerSecond,
@@ -426,7 +426,7 @@ function buildNetworkChannelColorConfig(
     globalSettings: ResolvedGlobalSettings,
 ): ColorConfig {
     if (globalSettings.appearanceOverride) {
-        return buildGlobalChannelColorConfig(direction === "download" ? "primary" : "secondary", globalSettings);
+        return buildGlobalColorConfig(globalSettings.appearanceOverride);
     }
 
     if (direction === "download") {

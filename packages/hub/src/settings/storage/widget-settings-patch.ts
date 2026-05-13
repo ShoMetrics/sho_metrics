@@ -25,7 +25,6 @@ import type {
     NetworkDirection,
     NetworkTrafficDisplayMode,
     NetworkUnitBase,
-    ResolvedColorRamp,
     ResolvedGpuReading,
     ScaleMode,
     SingleMetricViewLayout,
@@ -36,6 +35,7 @@ import {
     writeStoredWidgetSettings,
     type StoredSettingsJsonObject,
 } from "./codec";
+import { applyColorRampPatch, type ColorRampPatch } from "./color-ramp-patch";
 import {
     storedCircleStyleByResolved,
     storedColorModeByResolved,
@@ -60,8 +60,6 @@ type ColorRampKey =
     | "uploadColors"
     | "diskReadColors"
     | "diskWriteColors";
-
-type ColorRampPatch = Partial<ResolvedColorRamp>;
 
 export interface StoredWidgetSettingsPatch {
     readonly preferences?: {
@@ -181,14 +179,14 @@ function applyAppearancePatch(
         appearance.gridLineType = storedGridLineTypeByResolved[patch.gridLineType];
     }
 
-    applyColorRampPatch(appearance, "usageColors", patch.usageColors);
-    applyColorRampPatch(appearance, "downloadColors", patch.downloadColors);
-    applyColorRampPatch(appearance, "uploadColors", patch.uploadColors);
-    applyColorRampPatch(appearance, "diskReadColors", patch.diskReadColors);
-    applyColorRampPatch(appearance, "diskWriteColors", patch.diskWriteColors);
+    applyAppearanceColorRampPatch(appearance, "usageColors", patch.usageColors);
+    applyAppearanceColorRampPatch(appearance, "downloadColors", patch.downloadColors);
+    applyAppearanceColorRampPatch(appearance, "uploadColors", patch.uploadColors);
+    applyAppearanceColorRampPatch(appearance, "diskReadColors", patch.diskReadColors);
+    applyAppearanceColorRampPatch(appearance, "diskWriteColors", patch.diskWriteColors);
 }
 
-function applyColorRampPatch(
+function applyAppearanceColorRampPatch(
     appearance: StoredAppearanceSettings,
     rampKey: ColorRampKey,
     patch: ColorRampPatch | undefined,
@@ -200,10 +198,7 @@ function applyColorRampPatch(
     const colors = appearance[rampKey] ?? create(ColorRampSchema);
     appearance[rampKey] = colors;
 
-    applyDefinedValue(colors, "solidColor", patch.solidColor);
-    applyDefinedValue(colors, "lowColor", patch.lowColor);
-    applyDefinedValue(colors, "mediumColor", patch.mediumColor);
-    applyDefinedValue(colors, "highColor", patch.highColor);
+    applyColorRampPatch(colors, patch);
 }
 
 function applyNetworkPatch(

@@ -1,5 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import {
+    ColorRampSchema,
     GlobalAppearanceOverrideSchema,
     GlobalDefaultsSchema,
     GlobalOverridesSchema,
@@ -19,6 +20,7 @@ import {
     writeStoredGlobalSettings,
     type StoredSettingsJsonObject,
 } from "./codec";
+import { applyColorRampPatch, type ColorRampPatch } from "./color-ramp-patch";
 import {
     storedCircleStyleByResolved,
     storedColorModeByResolved,
@@ -34,7 +36,7 @@ export interface StoredGlobalSettingsPatch {
         readonly viewLayout: SingleMetricViewLayout;
         readonly circleStyle: CircleStyle;
         readonly theme: MetricTheme;
-        readonly tintColor: string;
+        readonly colors: ColorRampPatch;
         readonly colorMode: ColorMode;
         readonly lowColorThresholdPercent: number;
         readonly highColorThresholdPercent: number;
@@ -75,8 +77,9 @@ export function writeStoredGlobalSettingsPatch(
         if (patch.appearance.theme !== undefined) {
             appearance.theme = storedThemeByResolved[patch.appearance.theme];
         }
-        if (patch.appearance.tintColor !== undefined) {
-            appearance.tintColor = patch.appearance.tintColor;
+        if (patch.appearance.colors !== undefined) {
+            appearance.colors ??= create(ColorRampSchema);
+            applyColorRampPatch(appearance.colors, patch.appearance.colors);
         }
         if (patch.appearance.colorMode !== undefined) {
             appearance.colorMode = storedColorModeByResolved[patch.appearance.colorMode];

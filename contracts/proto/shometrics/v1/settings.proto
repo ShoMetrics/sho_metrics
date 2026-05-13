@@ -382,9 +382,10 @@ message GlobalAppearanceOverride {
     not_in: [0]
   }];
 
-  // One user-selected color. Multi-channel widgets derive channel variants in
-  // application code so global settings stay simple.
-  optional string tint_color = 4 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+  // One global color ramp applied to every widget channel. This keeps global
+  // override behavior consistent with per-widget solid and dynamic color
+  // settings without adding per-domain channel settings to the global layer.
+  ColorRamp colors = 4;
 
   optional ColorMode color_mode = 5 [(buf.validate.field).enum = {
     defined_only: true

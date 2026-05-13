@@ -1,13 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-    parseHexColor,
-    resolveRelativeLuminance,
-} from "../shared/color-utils";
-import {
     applyGlobalAppearanceToVisualSettings,
-    buildGlobalChannelColorConfig,
-    deriveTintChannelColors,
+    buildGlobalColorConfig,
 } from "./global-appearance";
 import type {
     ResolvedAppearanceSettings,
@@ -27,7 +22,10 @@ test("global override replaces widget appearance without mutating non-appearance
             viewLayout: "circular",
             circleStyle: "gauge",
             theme: "cupertino-glass",
-            tintColor: "#111827",
+            colors: {
+                ...defaultGlobalColors,
+                solidColor: "#111827",
+            },
             colorMode: "solid",
         },
     }));
@@ -39,53 +37,32 @@ test("global override replaces widget appearance without mutating non-appearance
     assert.equal(settings.lineSmoothingPercent, 25);
 });
 
-test("tint channel derivation keeps the selected color as primary and creates strong contrast", () => {
-    const lightBlueChannels = deriveTintChannelColors("#93c5fd");
-    const darkBlueChannels = deriveTintChannelColors("#1e3a8a");
-
-    assert.equal(lightBlueChannels.primaryColor, "#93c5fd");
-    assert.notEqual(lightBlueChannels.secondaryColor, lightBlueChannels.primaryColor);
-    assert.ok(readRelativeLuminance(lightBlueChannels.secondaryColor) < readRelativeLuminance(lightBlueChannels.primaryColor));
-
-    assert.equal(darkBlueChannels.primaryColor, "#1e3a8a");
-    assert.notEqual(darkBlueChannels.secondaryColor, darkBlueChannels.primaryColor);
-    assert.ok(readRelativeLuminance(darkBlueChannels.secondaryColor) > readRelativeLuminance(darkBlueChannels.primaryColor));
-});
-
-test("tint channel derivation fails when the resolved tint color is invalid", () => {
-    const deriveInvalidTintChannels = (): void => {
-        deriveTintChannelColors("not-a-color");
+test("global color config uses the configured color ramp", () => {
+    const appearanceOverride: ResolvedGlobalAppearanceOverride = {
+        viewLayout: "circular",
+        circleStyle: "value",
+        theme: "flat",
+        colors: {
+            solidColor: "#3b82f6",
+            lowColor: "#22c55e",
+            mediumColor: "#eab308",
+            highColor: "#ef4444",
+        },
+        colorMode: "threshold",
+        lowColorThresholdPercent: 30,
+        highColorThresholdPercent: 70,
     };
 
-    assert.throws(deriveInvalidTintChannels, /Expected a valid hex color/);
+    const colorConfig = buildGlobalColorConfig(appearanceOverride);
+
+    assert.equal(colorConfig.mode, "threshold");
+    assert.equal(colorConfig.solidColor, "#3b82f6");
+    assert.deepEqual(colorConfig.thresholds.map((threshold) => threshold.color), [
+        "#22c55e",
+        "#eab308",
+        "#ef4444",
+    ]);
 });
-
-test("global channel color config maps primary to one channel and secondary to the other", () => {
-    const settings = buildResolvedGlobalSettings({
-        appearanceOverride: {
-            tintColor: "#3b82f6",
-            colorMode: "threshold",
-        },
-    });
-    const primaryConfig = buildGlobalChannelColorConfig("primary", settings);
-    const secondaryConfig = buildGlobalChannelColorConfig("secondary", settings);
-
-    assert.equal(primaryConfig.mode, "threshold");
-    assert.equal(primaryConfig.solidColor, "#3b82f6");
-    assert.notEqual(secondaryConfig.solidColor, primaryConfig.solidColor);
-    assert.equal(primaryConfig.thresholds.length, 3);
-    assert.equal(secondaryConfig.thresholds.length, 3);
-});
-
-function readRelativeLuminance(hexColor: string): number {
-    const color = parseHexColor(hexColor);
-
-    if (!color) {
-        throw new Error(`Expected a valid hex color, got ${hexColor}.`);
-    }
-
-    return resolveRelativeLuminance(color);
-}
 
 function buildResolvedGlobalSettings(options: {
     appearanceOverride?: Partial<ResolvedGlobalAppearanceOverride>;
@@ -109,7 +86,7 @@ function buildResolvedGlobalSettings(options: {
                 viewLayout: "circular",
                 circleStyle: "value",
                 theme: "flat",
-                tintColor: "#3b82f6",
+                colors: defaultGlobalColors,
                 colorMode: "solid",
                 lowColorThresholdPercent: 30,
                 highColorThresholdPercent: 70,
@@ -120,6 +97,13 @@ function buildResolvedGlobalSettings(options: {
         defaultSourceProfileId: undefined,
     };
 }
+
+const defaultGlobalColors = {
+    solidColor: "#3b82f6",
+    lowColor: "#22c55e",
+    mediumColor: "#eab308",
+    highColor: "#ef4444",
+};
 
 const defaultAppearanceSettings: ResolvedAppearanceSettings = {
     viewLayout: "circular",

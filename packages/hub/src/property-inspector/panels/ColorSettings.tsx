@@ -1,4 +1,4 @@
-import type { ResolvedColorRamp } from "../../settings/resolved-settings";
+import type { ColorMode, ResolvedAppearanceSettings, ResolvedColorRamp } from "../../settings/resolved-settings";
 import { InspectorItem } from "../components/InspectorItem";
 import { SectionHeading } from "../components/SectionHeading";
 import { ColorBandSetting } from "../controls/ColorBandSetting";
@@ -12,23 +12,79 @@ import { colorModeOptionList } from "./setting-options";
 
 export function StandardColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
     const { context, appearanceDisabled = false } = props;
-    const isSolidColor = context.resolved.widget.slot.appearance.colorMode === "solid";
+    const appearance = context.resolved.widget.slot.appearance;
 
     return (
         <SettingsSection title="Colors">
             <SectionHeading text="Color Settings" />
-            <ColorModeSetting {...props} />
-            {isSolidColor ? (
+            <ColorRampSettings
+                colorMode={appearance.colorMode}
+                colors={appearance.usageColors}
+                lowColorThresholdPercent={appearance.lowColorThresholdPercent}
+                highColorThresholdPercent={appearance.highColorThresholdPercent}
+                onColorModeChange={(colorMode) => props.onSettingsPatch({
+                    appearance: { colorMode },
+                })}
+                onColorRampPatch={(usageColors) => props.onSettingsPatch({
+                    appearance: { usageColors },
+                })}
+                onThresholdPatch={(appearancePatch) => props.onSettingsPatch({
+                    appearance: appearancePatch,
+                })}
+                disabled={appearanceDisabled}
+            />
+        </SettingsSection>
+    );
+}
+
+interface ColorRampSettingsProps {
+    readonly colorMode: ColorMode;
+    readonly colors: ResolvedColorRamp;
+    readonly lowColorThresholdPercent: number;
+    readonly highColorThresholdPercent: number;
+    readonly onColorModeChange: (colorMode: ColorMode) => void;
+    readonly onColorRampPatch: (patch: Partial<ResolvedColorRamp>) => void;
+    readonly onThresholdPatch: (patch: ColorThresholdPatch) => void;
+    readonly disabled?: boolean | undefined;
+}
+
+export function ColorRampSettings({
+    colorMode,
+    colors,
+    lowColorThresholdPercent,
+    highColorThresholdPercent,
+    onColorModeChange,
+    onColorRampPatch,
+    onThresholdPatch,
+    disabled = false,
+}: ColorRampSettingsProps): React.JSX.Element {
+    return (
+        <>
+            <SelectSetting
+                label="Color Mode"
+                value={colorMode}
+                optionList={colorModeOptionList}
+                onValueChange={onColorModeChange}
+                disabled={disabled}
+            />
+            {colorMode === "solid" ? (
                 <ColorSetting
                     label="Solid Color"
-                    value={readAppearanceColor(context, "usageColors", "solidColor")}
-                    onValueChange={writeAppearanceColor(props, "usageColors", "solidColor")}
-                    disabled={appearanceDisabled}
+                    value={colors.solidColor}
+                    onValueChange={(solidColor) => onColorRampPatch({ solidColor })}
+                    disabled={disabled}
                 />
             ) : (
-                <ThresholdColorSettings {...props} />
+                <ThresholdColorSettings
+                    colors={colors}
+                    lowColorThresholdPercent={lowColorThresholdPercent}
+                    highColorThresholdPercent={highColorThresholdPercent}
+                    onColorRampPatch={onColorRampPatch}
+                    onThresholdPatch={onThresholdPatch}
+                    disabled={disabled}
+                />
             )}
-        </SettingsSection>
+        </>
     );
 }
 
@@ -74,94 +130,124 @@ function ColorModeSetting({
     );
 }
 
-function ThresholdColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
-    const { context, appearanceDisabled = false } = props;
-    const lowThreshold = context.resolved.widget.slot.appearance.lowColorThresholdPercent;
-    const highThreshold = context.resolved.widget.slot.appearance.highColorThresholdPercent;
-
+function ThresholdColorSettings({
+    colors,
+    lowColorThresholdPercent,
+    highColorThresholdPercent,
+    onColorRampPatch,
+    onThresholdPatch,
+    disabled = false,
+}: {
+    readonly colors: ResolvedColorRamp;
+    readonly lowColorThresholdPercent: number;
+    readonly highColorThresholdPercent: number;
+    readonly onColorRampPatch: (patch: Partial<ResolvedColorRamp>) => void;
+    readonly onThresholdPatch: (patch: ColorThresholdPatch) => void;
+    readonly disabled?: boolean | undefined;
+}): React.JSX.Element {
     return (
         <>
             <InspectorItem className="note-item note-item-default">
-                <p className="section-note">Set the usage ranges that choose low, medium, or high color.</p>
+                <p className="section-note">Set the percentage ranges that choose low, medium, or high color.</p>
             </InspectorItem>
-            <ThresholdRangeSettings {...props} />
-            <ColorBandSetting
-                label="Low Usage Color"
-                value={readAppearanceColor(context, "usageColors", "lowColor")}
-                onValueChange={writeAppearanceColor(props, "usageColors", "lowColor")}
-                bandText={`0-${lowThreshold}%`}
-                disabled={appearanceDisabled}
+            <ThresholdRangeSettings
+                lowColorThresholdPercent={lowColorThresholdPercent}
+                highColorThresholdPercent={highColorThresholdPercent}
+                onThresholdPatch={onThresholdPatch}
+                disabled={disabled}
             />
             <ColorBandSetting
-                label="Medium Usage Color"
-                value={readAppearanceColor(context, "usageColors", "mediumColor")}
-                onValueChange={writeAppearanceColor(props, "usageColors", "mediumColor")}
-                bandText={`${lowThreshold}-${highThreshold}%`}
-                disabled={appearanceDisabled}
+                label="Low Color"
+                value={colors.lowColor}
+                onValueChange={(lowColor) => onColorRampPatch({ lowColor })}
+                bandText={`0-${lowColorThresholdPercent}%`}
+                disabled={disabled}
             />
             <ColorBandSetting
-                label="High Usage Color"
-                value={readAppearanceColor(context, "usageColors", "highColor")}
-                onValueChange={writeAppearanceColor(props, "usageColors", "highColor")}
-                bandText={`${highThreshold}-100%`}
-                disabled={appearanceDisabled}
+                label="Medium Color"
+                value={colors.mediumColor}
+                onValueChange={(mediumColor) => onColorRampPatch({ mediumColor })}
+                bandText={`${lowColorThresholdPercent}-${highColorThresholdPercent}%`}
+                disabled={disabled}
+            />
+            <ColorBandSetting
+                label="High Color"
+                value={colors.highColor}
+                onValueChange={(highColor) => onColorRampPatch({ highColor })}
+                bandText={`${highColorThresholdPercent}-100%`}
+                disabled={disabled}
             />
         </>
     );
 }
 
 function ChannelThresholdControls(props: WidgetSettingsPanelProps): React.JSX.Element | null {
-    if (props.context.resolved.widget.slot.appearance.colorMode !== "threshold") {
+    const appearance = props.context.resolved.widget.slot.appearance;
+
+    if (appearance.colorMode !== "threshold") {
         return null;
     }
 
-    return <ThresholdRangeSettings {...props} />;
+    return (
+        <ThresholdRangeSettings
+            lowColorThresholdPercent={appearance.lowColorThresholdPercent}
+            highColorThresholdPercent={appearance.highColorThresholdPercent}
+            onThresholdPatch={(appearancePatch) => props.onSettingsPatch({
+                appearance: appearancePatch,
+            })}
+            disabled={props.appearanceDisabled}
+        />
+    );
 }
 
 function ThresholdRangeSettings({
-    context,
-    onSettingsPatch,
-    appearanceDisabled = false,
-}: WidgetSettingsPanelProps): React.JSX.Element {
+    lowColorThresholdPercent,
+    highColorThresholdPercent,
+    onThresholdPatch,
+    disabled = false,
+}: {
+    readonly lowColorThresholdPercent: number;
+    readonly highColorThresholdPercent: number;
+    readonly onThresholdPatch: (patch: ColorThresholdPatch) => void;
+    readonly disabled?: boolean | undefined;
+}): React.JSX.Element {
     return (
         <>
             <RangeSetting
                 label="Low Ends At"
-                value={context.resolved.widget.slot.appearance.lowColorThresholdPercent}
+                value={lowColorThresholdPercent}
                 minimum={0}
                 maximum={100}
                 step={1}
                 onValueChange={(lowColorThresholdPercent) => {
-                    const highThreshold = context.resolved.widget.slot.appearance.highColorThresholdPercent;
-                    const patch = lowColorThresholdPercent > highThreshold
+                    const patch = lowColorThresholdPercent > highColorThresholdPercent
                         ? {
                             lowColorThresholdPercent,
                             highColorThresholdPercent: lowColorThresholdPercent,
                         }
                         : { lowColorThresholdPercent };
 
-                    onSettingsPatch({ appearance: patch });
+                    onThresholdPatch(patch);
                 }}
-                disabled={appearanceDisabled}
+                disabled={disabled}
             />
             <RangeSetting
                 label="High Starts At"
-                value={context.resolved.widget.slot.appearance.highColorThresholdPercent}
+                value={highColorThresholdPercent}
                 minimum={0}
                 maximum={100}
                 step={1}
                 onValueChange={(highColorThresholdPercent) => {
-                    const lowThreshold = context.resolved.widget.slot.appearance.lowColorThresholdPercent;
-                    const patch = highColorThresholdPercent < lowThreshold
+                    const patch = highColorThresholdPercent < lowColorThresholdPercent
                         ? {
                             lowColorThresholdPercent: highColorThresholdPercent,
                             highColorThresholdPercent,
                         }
                         : { highColorThresholdPercent };
 
-                    onSettingsPatch({ appearance: patch });
+                    onThresholdPatch(patch);
                 }}
-                disabled={appearanceDisabled}
+                disabled={disabled}
             />
         </>
     );
@@ -276,3 +362,8 @@ type ColorRampKey =
     | "uploadColors"
     | "diskReadColors"
     | "diskWriteColors";
+
+type ColorThresholdPatch = Partial<Pick<
+    ResolvedAppearanceSettings,
+    "lowColorThresholdPercent" | "highColorThresholdPercent"
+>>;
