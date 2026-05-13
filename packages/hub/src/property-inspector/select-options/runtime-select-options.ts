@@ -29,13 +29,14 @@ function buildNetworkInterfaceOptions(networkInterfaces: readonly NetworkInterfa
 }
 
 function buildDiskVolumeOptions(diskVolumes: readonly DiskVolumeOption[]): SelectOption[] {
-    return [
-        { value: "", label: "Automatic" },
-        ...diskVolumes.map((diskVolume) => ({
-            value: diskVolume.id,
-            label: formatDiskVolumeOptionLabel(diskVolume),
-        })),
-    ];
+    if (diskVolumes.length === 0) {
+        return [{ value: "", label: "No detected volumes", disabled: true }];
+    }
+
+    return diskVolumes.map((diskVolume) => ({
+        value: diskVolume.id,
+        label: formatDiskVolumeOptionLabel(diskVolume),
+    }));
 }
 
 export function resolveSelectedDiskVolumeLabel(context: VisibilityContext): string {
@@ -55,7 +56,7 @@ export function resolveDiskAutoLinearLabel(context: VisibilityContext): string {
     return `Auto: ${resolveCompactDiskStorageLabel(diskVolume)} (${formatDiskVolumeDisplayLabel(diskVolume)})`;
 }
 
-function resolveSelectedDiskVolume(context: VisibilityContext): DiskVolumeOption | null {
+export function resolveSelectedDiskVolume(context: VisibilityContext): DiskVolumeOption | null {
     const diskVolumes = context.runtimeCache.availableDiskVolumes;
     const target = context.resolved.widget.slot.metric.target;
     const selectedDiskVolumeId = target.domain === "disk"

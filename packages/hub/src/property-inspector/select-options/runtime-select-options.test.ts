@@ -35,7 +35,7 @@ test("network interface options include automatic and formatted interfaces", () 
     ]);
 });
 
-test("disk volume options include automatic and compact capacity labels", () => {
+test("disk volume options include explicit volumes and compact capacity labels", () => {
     const context = buildContext({
         runtimeCache: {
             availableDiskVolumes: [
@@ -52,8 +52,17 @@ test("disk volume options include automatic and compact capacity labels", () => 
     const optionList = resolveDiskVolumeOptions(context);
 
     assert.deepEqual(optionList, [
-        { value: "", label: "Automatic" },
         { value: "C:\\", label: "C: (1.0 GB, System)" },
+    ]);
+});
+
+test("disk volume options show a disabled empty state when no volumes are available", () => {
+    const context = buildContext();
+
+    const optionList = resolveDiskVolumeOptions(context);
+
+    assert.deepEqual(optionList, [
+        { value: "", label: "No detected volumes", disabled: true },
     ]);
 });
 
