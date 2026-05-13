@@ -189,6 +189,14 @@ test("domain action does not render a mismatched stored target panel", () => {
     assert.doesNotMatch(markup, /GPU Metric:/);
 });
 
+test("widget settings waits for action kind before rendering recovery UI", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "unknown",
+    });
+
+    assert.equal(markup, "");
+});
+
 test("widget settings keep warnings first and reset in advanced controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
