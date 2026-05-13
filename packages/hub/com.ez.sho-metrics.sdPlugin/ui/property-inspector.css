@@ -181,6 +181,7 @@ body {
 .native-checkbox-row {
     align-items: center;
     display: flex;
+    gap: 8px;
     min-height: 28px;
 }
 
@@ -190,26 +191,7 @@ body {
     width: 16px;
 }
 
-.override-toggle-item {
-    margin-bottom: 8px;
-}
-
-.override-toggle-row {
-    align-items: center;
-    display: flex;
-    gap: 8px;
-    min-height: 28px;
-    width: 100%;
-}
-
-.override-toggle-row input {
-    flex: 0 0 auto;
-    height: 16px;
-    margin: 0;
-    width: 16px;
-}
-
-.override-toggle-title {
+.native-checkbox-row span {
     color: #efefef;
     flex: 0 0 auto;
     font-size: 12px;
@@ -217,11 +199,8 @@ body {
     white-space: nowrap;
 }
 
-.override-toggle-note {
-    color: #b8b8b8;
-    font-size: 12px;
-    line-height: 1.25;
-    min-width: 0;
+.override-toggle-control .section-note {
+    margin-top: 2px;
 }
 
 .section-title {

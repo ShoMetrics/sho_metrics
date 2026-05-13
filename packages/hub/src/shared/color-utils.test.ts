@@ -4,13 +4,11 @@ import test from "node:test";
 import {
     adjustHexColorBrightness,
     formatHexColor,
-    hslToRgb,
     interpolateHexColor,
     normalizeHexColor,
     parseHexColor,
     resolveReadableTextColor,
     resolveRelativeLuminance,
-    rgbToHsl,
 } from "./color-utils";
 
 test("hex color parsing and formatting handle valid colors", () => {
@@ -53,10 +51,4 @@ test("relative luminance follows WCAG channel weighting", () => {
     assert.equal(blackLuminance, 0);
     assert.equal(whiteLuminance, 1);
     assert.ok(greenLuminance > redLuminance);
-});
-
-test("rgb and hsl conversion round trips primary colors", () => {
-    assert.deepEqual(formatHexColor(hslToRgb(rgbToHsl({ red: 255, green: 0, blue: 0 }))), "#ff0000");
-    assert.deepEqual(formatHexColor(hslToRgb(rgbToHsl({ red: 0, green: 255, blue: 0 }))), "#00ff00");
-    assert.deepEqual(formatHexColor(hslToRgb(rgbToHsl({ red: 0, green: 0, blue: 255 }))), "#0000ff");
 });

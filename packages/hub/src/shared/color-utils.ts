@@ -7,15 +7,6 @@ export interface RgbColor {
     blue: number;
 }
 
-/**
- * HSL color channels using degrees for hue and 0-1 ratios for saturation and lightness.
- */
-export interface HslColor {
-    hue: number;
-    saturation: number;
-    lightness: number;
-}
-
 const MINIMUM_COLOR_CHANNEL = 0;
 const MAXIMUM_COLOR_CHANNEL = 255;
 
@@ -138,62 +129,6 @@ export function resolveRelativeLuminance(color: RgbColor): number {
         + 0.0722 * resolveLinearColorChannel(color.blue);
 }
 
-/**
- * Converts RGB channels into HSL.
- *
- * Hue is returned in degrees; saturation and lightness are returned as 0-1
- * ratios. This is intended for deterministic tint derivation, not color science
- * grade perceptual adjustments.
- */
-export function rgbToHsl(color: RgbColor): HslColor {
-    const red = color.red / MAXIMUM_COLOR_CHANNEL;
-    const green = color.green / MAXIMUM_COLOR_CHANNEL;
-    const blue = color.blue / MAXIMUM_COLOR_CHANNEL;
-    const maximum = Math.max(red, green, blue);
-    const minimum = Math.min(red, green, blue);
-    const delta = maximum - minimum;
-    const lightness = (maximum + minimum) / 2;
-    const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * lightness - 1));
-    let hue = 0;
-
-    if (delta !== 0) {
-        if (maximum === red) {
-            hue = 60 * (((green - blue) / delta) % 6);
-        } else if (maximum === green) {
-            hue = 60 * ((blue - red) / delta + 2);
-        } else {
-            hue = 60 * ((red - green) / delta + 4);
-        }
-    }
-
-    return {
-        hue: hue < 0 ? hue + 360 : hue,
-        saturation,
-        lightness,
-    };
-}
-
-/**
- * Converts HSL channels into RGB.
- *
- * Hue uses degrees; saturation and lightness use 0-1 ratios. Returned RGB
- * channels may be fractional and should be passed through `formatHexColor` when
- * a serialized hex color is needed.
- */
-export function hslToRgb(color: HslColor): RgbColor {
-    const chroma = (1 - Math.abs(2 * color.lightness - 1)) * color.saturation;
-    const huePrime = color.hue / 60;
-    const secondary = chroma * (1 - Math.abs((huePrime % 2) - 1));
-    const match = color.lightness - chroma / 2;
-    const [redPrime, greenPrime, bluePrime] = resolveRgbPrime(huePrime, chroma, secondary);
-
-    return {
-        red: (redPrime + match) * MAXIMUM_COLOR_CHANNEL,
-        green: (greenPrime + match) * MAXIMUM_COLOR_CHANNEL,
-        blue: (bluePrime + match) * MAXIMUM_COLOR_CHANNEL,
-    };
-}
-
 function adjustColorChannel(channelValue: number, adjustmentRatio: number): number {
     if (adjustmentRatio >= 0) {
         return Math.round(channelValue + (MAXIMUM_COLOR_CHANNEL - channelValue) * adjustmentRatio);
@@ -217,30 +152,6 @@ function resolveLinearColorChannel(channelValue: number): number {
     return normalizedValue <= 0.03928
         ? normalizedValue / 12.92
         : ((normalizedValue + 0.055) / 1.055) ** 2.4;
-}
-
-function resolveRgbPrime(huePrime: number, chroma: number, secondary: number): readonly [number, number, number] {
-    if (huePrime < 1) {
-        return [chroma, secondary, 0];
-    }
-
-    if (huePrime < 2) {
-        return [secondary, chroma, 0];
-    }
-
-    if (huePrime < 3) {
-        return [0, chroma, secondary];
-    }
-
-    if (huePrime < 4) {
-        return [0, secondary, chroma];
-    }
-
-    if (huePrime < 5) {
-        return [secondary, 0, chroma];
-    }
-
-    return [chroma, 0, secondary];
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {

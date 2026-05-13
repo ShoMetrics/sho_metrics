@@ -207,9 +207,7 @@ export interface ResolvedGlobalAppearanceOverride {
     readonly viewLayout: SingleMetricViewLayout;
     readonly circleStyle: CircleStyle;
     readonly theme: MetricTheme;
-    // Resolver fills this from the global appearance fallback tint when the
-    // stored override omits tint_color.
-    readonly tintColor: string;
+    readonly colors: ResolvedColorRamp;
     readonly colorMode: ColorMode;
     readonly lowColorThresholdPercent: number;
     readonly highColorThresholdPercent: number;

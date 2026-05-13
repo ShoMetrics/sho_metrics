@@ -1,12 +1,11 @@
 import { CircleStyleSetting } from "../controls/CircleStyleSetting";
-import { ColorSetting } from "../controls/ColorSetting";
 import { GraphicTypeSetting } from "../controls/GraphicTypeSetting";
 import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { InspectorItem } from "../components/InspectorItem";
+import { ColorRampSettings } from "./ColorSettings";
 import { SettingsSection } from "./SettingsSection";
 import {
-    colorModeOptionList,
     graphicStyleOptionList,
     networkUnitBaseOptionList,
     scaleModeOptionList,
@@ -58,18 +57,20 @@ function OverrideSection({
 }): React.JSX.Element {
     return (
         <SettingsSection title="Override">
-            <InspectorItem className="override-toggle-item">
-                <label className="override-toggle-row">
-                    <input
-                        type="checkbox"
-                        checked={isAppearanceOverrideEnabled}
-                        onChange={(event) => onOverrideChange(event.currentTarget.checked)}
-                    />
-                    <span className="override-toggle-title">Override Widgets</span>
-                    <span className="override-toggle-note">
-                        When enabled, widget appearance settings are disabled but kept.
-                    </span>
-                </label>
+            <InspectorItem label="Widgets">
+                <div className="override-toggle-control">
+                    <label className="native-checkbox-row">
+                        <input
+                            type="checkbox"
+                            checked={isAppearanceOverrideEnabled}
+                            onChange={(event) => onOverrideChange(event.currentTarget.checked)}
+                        />
+                        <span>Override appearance</span>
+                    </label>
+                    <p className="section-note">
+                        Widget appearance settings are disabled while the override is enabled.
+                    </p>
+                </div>
             </InspectorItem>
         </SettingsSection>
     );
@@ -99,35 +100,15 @@ function OverrideAppearanceSection({
                 optionList={graphicStyleOptionList}
                 onValueChange={(theme) => onAppearancePatch({ theme })}
             />
-            <ColorSetting
-                label="Tint Color"
-                value={appearance.tintColor}
-                onValueChange={(tintColor) => onAppearancePatch({ tintColor })}
+            <ColorRampSettings
+                colorMode={appearance.colorMode}
+                colors={appearance.colors}
+                lowColorThresholdPercent={appearance.lowColorThresholdPercent}
+                highColorThresholdPercent={appearance.highColorThresholdPercent}
+                onColorModeChange={(colorMode) => onAppearancePatch({ colorMode })}
+                onColorRampPatch={(colors) => onAppearancePatch({ colors })}
+                onThresholdPatch={onAppearancePatch}
             />
-            <SelectSetting
-                label="Color Mode"
-                value={appearance.colorMode}
-                optionList={colorModeOptionList}
-                onValueChange={(colorMode) => onAppearancePatch({ colorMode })}
-            />
-            {appearance.colorMode === "threshold" && (
-                <>
-                    <NumberSetting
-                        label="Low Threshold"
-                        value={appearance.lowColorThresholdPercent}
-                        minimum={0}
-                        step={1}
-                        onValueChange={(lowColorThresholdPercent) => onAppearancePatch({ lowColorThresholdPercent })}
-                    />
-                    <NumberSetting
-                        label="High Threshold"
-                        value={appearance.highColorThresholdPercent}
-                        minimum={0}
-                        step={1}
-                        onValueChange={(highColorThresholdPercent) => onAppearancePatch({ highColorThresholdPercent })}
-                    />
-                </>
-            )}
         </SettingsSection>
     );
 }

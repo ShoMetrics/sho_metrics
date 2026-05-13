@@ -575,7 +575,7 @@ function resolveGlobalAppearanceOverride(
             DEFAULT_APPEARANCE_SETTINGS.circleStyle,
         ),
         theme: resolveStoredEnum(storedAppearance?.theme, metricThemeByProto, DEFAULT_APPEARANCE_SETTINGS.theme),
-        tintColor: storedAppearance?.tintColor ?? DEFAULT_APPEARANCE_SETTINGS.usageColors.solidColor,
+        colors: mergeColorRamp(DEFAULT_APPEARANCE_SETTINGS.usageColors, storedAppearance?.colors),
         colorMode: resolveStoredEnum(storedAppearance?.colorMode, colorModeByProto, "solid"),
         lowColorThresholdPercent: storedAppearance?.lowColorThresholdPercent
             ?? DEFAULT_APPEARANCE_SETTINGS.lowColorThresholdPercent,
@@ -641,19 +641,17 @@ function applyGlobalAppearanceOverride(
     appearance: ResolvedAppearanceSettings,
     globalAppearance: ResolvedGlobalAppearanceOverride,
 ): ResolvedAppearanceSettings {
-    const globalColorRamp = colorRampFromTint(globalAppearance.tintColor);
-
     return {
         ...appearance,
         viewLayout: globalAppearance.viewLayout,
         circleStyle: globalAppearance.circleStyle,
         theme: globalAppearance.theme,
         colorMode: globalAppearance.colorMode,
-        usageColors: globalColorRamp,
-        downloadColors: globalColorRamp,
-        uploadColors: globalColorRamp,
-        diskReadColors: globalColorRamp,
-        diskWriteColors: globalColorRamp,
+        usageColors: globalAppearance.colors,
+        downloadColors: globalAppearance.colors,
+        uploadColors: globalAppearance.colors,
+        diskReadColors: globalAppearance.colors,
+        diskWriteColors: globalAppearance.colors,
         lowColorThresholdPercent: globalAppearance.lowColorThresholdPercent,
         highColorThresholdPercent: globalAppearance.highColorThresholdPercent,
     };
@@ -668,15 +666,6 @@ function mergeColorRamp(
         lowColor: storedColorRamp?.lowColor ?? defaults.lowColor,
         mediumColor: storedColorRamp?.mediumColor ?? defaults.mediumColor,
         highColor: storedColorRamp?.highColor ?? defaults.highColor,
-    };
-}
-
-function colorRampFromTint(tintColor: string): ResolvedColorRamp {
-    return {
-        solidColor: tintColor,
-        lowColor: tintColor,
-        mediumColor: tintColor,
-        highColor: tintColor,
     };
 }
 

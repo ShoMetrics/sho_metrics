@@ -14,7 +14,7 @@ import type {
     ResolvedWidgetSettings,
 } from "../../settings/resolved-settings";
 import { resolveColorForThresholdValue, type ColorConfig } from "../../rendering/color-resolver";
-import { buildGlobalChannelColorConfig } from "../../settings/global-appearance";
+import { buildGlobalColorConfig } from "../../settings/global-appearance";
 import { getDiskIcon, getDiskIconFragment, renderCenteredHardwareIconFragment } from "../../widgets/icons/hardware-icons";
 import { renderDiskThroughputDirectionIconFragment } from "../../widgets/icons/catalog/disk";
 import { getMetricStatusIcon } from "../../widgets/icons/metric-status-icons";
@@ -359,7 +359,7 @@ function buildDiskChannelColorConfig(
     globalSettings: ResolvedGlobalSettings,
 ): ColorConfig {
     if (globalSettings.appearanceOverride) {
-        return buildGlobalChannelColorConfig(direction === "read" ? "primary" : "secondary", globalSettings);
+        return buildGlobalColorConfig(globalSettings.appearanceOverride);
     }
 
     if (direction === "read") {
