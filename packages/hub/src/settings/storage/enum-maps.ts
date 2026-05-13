@@ -6,6 +6,7 @@ import {
     DiskMetricTarget_Kind as StoredDiskMetricKind,
     DiskMetricTarget_ThroughputDirection as StoredDiskThroughputDirection,
     DiskMetricTarget_UsageDisplayMode as StoredDiskUsageDisplayMode,
+    GpuMetricTarget_Kind as StoredGpuMetricKind,
     MetricTheme as StoredMetricTheme,
     NetworkDisplaySettings_UnitBase as StoredNetworkUnitBase,
     NetworkMetricTarget_Direction as StoredNetworkDirection,
@@ -19,6 +20,7 @@ import type {
     ColorMode,
     DiskThroughputDirection,
     DiskUsageDisplayMode,
+    ResolvedGpuReading,
     GridLineType,
     GridLineVisibility,
     MetricTheme,
@@ -101,6 +103,13 @@ export const storedDiskUsageDisplayModeByResolved = {
     percentage: StoredDiskUsageDisplayMode.PERCENTAGE,
     space: StoredDiskUsageDisplayMode.SPACE,
 } satisfies Record<DiskUsageDisplayMode, StoredDiskUsageDisplayMode>;
+
+export const storedGpuMetricKindByResolved = {
+    usage: StoredGpuMetricKind.USAGE,
+    temperature: StoredGpuMetricKind.TEMPERATURE,
+    vram: StoredGpuMetricKind.VRAM,
+    power: StoredGpuMetricKind.POWER,
+} satisfies Record<ResolvedGpuReading["kind"], StoredGpuMetricKind>;
 
 export const storedTemperatureUnitByResolved = {
     celsius: StoredTemperatureUnit.CELSIUS,

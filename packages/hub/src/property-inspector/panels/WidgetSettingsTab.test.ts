@@ -175,12 +175,36 @@ test("GPU settings panel renders from the GPU domain action", () => {
         actionKind: "gpu",
     });
 
+    assert.match(markup, /GPU Metric:/);
     assert.match(markup, /Polling Frequency/);
+});
+
+test("domain action does not render a mismatched stored target panel", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "gpu",
+        settings: buildWidgetSettings("cpu", {}),
+    });
+
+    assert.match(markup, /Stored metric settings do not match this action/);
+    assert.doesNotMatch(markup, /GPU Metric:/);
+});
+
+test("widget settings keep warnings first and reset in advanced controls", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "gpu",
+        isGlobalAppearanceOverrideEnabled: true,
+    });
+
+    assertTextOrder(markup, "Some settings are disabled", "GPU Metric:");
+    assertTextOrder(markup, "GPU Metric:", "Layout");
+    assertTextOrder(markup, "Polling Frequency", "Advanced");
+    assertTextOrder(markup, "Advanced", "Reset Widget Settings");
 });
 
 function renderWidgetSettings(options: {
     actionKind: ActionKind;
     isWindows?: boolean;
+    isGlobalAppearanceOverrideEnabled?: boolean;
     settings?: InspectorTestSettings;
 }): string {
     return renderToStaticMarkup(createElement(WidgetSettingsTab, {
@@ -189,10 +213,19 @@ function renderWidgetSettings(options: {
             isWindows: options.isWindows,
             settings: options.settings,
         }),
-        isGlobalAppearanceOverrideEnabled: false,
+        isGlobalAppearanceOverrideEnabled: options.isGlobalAppearanceOverrideEnabled ?? false,
         onSettingsPatch: () => undefined,
         onResetWidgetSettings: () => undefined,
     }));
+}
+
+function assertTextOrder(markup: string, earlierText: string, laterText: string): void {
+    const earlierIndex = markup.indexOf(earlierText);
+    const laterIndex = markup.indexOf(laterText);
+
+    assert.notEqual(earlierIndex, -1, earlierText);
+    assert.notEqual(laterIndex, -1, laterText);
+    assert.equal(earlierIndex < laterIndex, true, `${earlierText} should appear before ${laterText}`);
 }
 
 function sectionHeadingPattern(text: string): RegExp {

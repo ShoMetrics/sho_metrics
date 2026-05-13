@@ -5,6 +5,7 @@ import { DefaultWidgetSettings } from "./DefaultWidgetSettings";
 import { DiskWidgetSettings } from "./DiskWidgetSettings";
 import { GpuWidgetSettings } from "./GpuWidgetSettings";
 import { NetworkWidgetSettings } from "./NetworkWidgetSettings";
+import { SettingsSection } from "./SettingsSection";
 
 interface WidgetSettingsTabProps {
     context: VisibilityContext;
@@ -27,21 +28,23 @@ export function WidgetSettingsTab({
 
     return (
         <>
-            <InspectorItem className="widget-reset-item">
-                <button
-                    className="inline-action-button"
-                    type="button"
-                    onClick={onResetWidgetSettings}
-                >
-                    Reset Widget Settings
-                </button>
-            </InspectorItem>
             {isGlobalAppearanceOverrideEnabled && (
                 <InspectorItem className="note-item note-item-caption">
                     <p className="section-note">Some settings are disabled since global override is enabled.</p>
                 </InspectorItem>
             )}
             {renderMetricPanel(panelProps)}
+            <SettingsSection title="Advanced">
+                <InspectorItem className="widget-reset-item">
+                    <button
+                        className="inline-action-button"
+                        type="button"
+                        onClick={onResetWidgetSettings}
+                    >
+                        Reset Widget Settings
+                    </button>
+                </InspectorItem>
+            </SettingsSection>
         </>
     );
 }
@@ -53,7 +56,12 @@ function renderMetricPanel(
         appearanceDisabled: boolean;
     },
 ): React.JSX.Element {
+    const actionKind = panelProps.context.actionKind;
     const target = panelProps.context.resolved.widget.slot.metric.target;
+
+    if (actionKind === "unknown" || actionKind !== target.domain) {
+        return <DomainMismatchNotice />;
+    }
 
     switch (target.domain) {
         case "network":
@@ -61,10 +69,19 @@ function renderMetricPanel(
         case "disk":
             return <DiskWidgetSettings {...panelProps} target={target} />;
         case "gpu":
-            return <GpuWidgetSettings {...panelProps} />;
+            return <GpuWidgetSettings {...panelProps} target={target} />;
         case "cpu":
         case "memory":
-        case "catalog":
             return <DefaultWidgetSettings {...panelProps} />;
     }
+}
+
+function DomainMismatchNotice(): React.JSX.Element {
+    return (
+        <InspectorItem className="note-item note-item-caption">
+            <p className="section-note">
+                Stored metric settings do not match this action. Reset widget settings to continue.
+            </p>
+        </InspectorItem>
+    );
 }

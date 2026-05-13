@@ -1,35 +1,64 @@
 import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
-import type { ResolvedGpuReading } from "../../settings/resolved-settings";
+import type { ResolvedGpuMetricTarget, ResolvedGpuReading } from "../../settings/resolved-settings";
 import { StandardColorSettings } from "./ColorSettings";
 import { LayoutSettings } from "./LayoutSettings";
 import { PollingSettings } from "./PollingSettings";
 import { SparklineSettings } from "./SparklineSettings";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
-import { temperatureUnitOptionList } from "./setting-options";
+import {
+    gpuMetricKindOptionList,
+    temperatureUnitOptionList,
+} from "./setting-options";
 
-export function GpuWidgetSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
-    const reading = readGpuReading(props.context);
+type GpuTemperatureReading = Extract<ResolvedGpuReading, { readonly kind: "temperature" }>;
+type GpuPowerReading = Extract<ResolvedGpuReading, { readonly kind: "power" }>;
+
+type GpuWidgetSettingsProps = WidgetSettingsPanelProps & {
+    target: ResolvedGpuMetricTarget;
+};
+
+export function GpuWidgetSettings(props: GpuWidgetSettingsProps): React.JSX.Element {
+    const reading = props.target.reading;
 
     return (
         <>
+            <GpuMetricSettings {...props} />
             <LayoutSettings {...props} />
             <SparklineSettings {...props} />
-            {reading.kind === "temperature" && <GpuTemperatureScaleSettings {...props} />}
-            {reading.kind === "power" && <GpuPowerScaleSettings {...props} />}
+            {reading.kind === "temperature" && <GpuTemperatureScaleSettings {...props} reading={reading} />}
+            {reading.kind === "power" && <GpuPowerScaleSettings {...props} reading={reading} />}
             <StandardColorSettings {...props} />
             <PollingSettings {...props} />
         </>
     );
 }
 
-function GpuTemperatureScaleSettings({
-    context,
+function GpuMetricSettings({
+    target,
     onSettingsPatch,
-}: WidgetSettingsPanelProps): React.JSX.Element {
-    const reading = readGpuTemperatureReading(context);
+}: GpuWidgetSettingsProps): React.JSX.Element {
+    return (
+        <SettingsSection title="Metric">
+            <SelectSetting
+                label="GPU Metric"
+                value={target.reading.kind}
+                optionList={gpuMetricKindOptionList}
+                onValueChange={(kind) => onSettingsPatch({
+                    gpu: { kind },
+                })}
+            />
+        </SettingsSection>
+    );
+}
 
+function GpuTemperatureScaleSettings({
+    reading,
+    onSettingsPatch,
+}: GpuWidgetSettingsProps & {
+    reading: GpuTemperatureReading;
+}): React.JSX.Element {
     return (
         <SettingsSection title="Scale & Units">
             <SelectSetting
@@ -54,11 +83,11 @@ function GpuTemperatureScaleSettings({
 }
 
 function GpuPowerScaleSettings({
-    context,
+    reading,
     onSettingsPatch,
-}: WidgetSettingsPanelProps): React.JSX.Element {
-    const reading = readGpuPowerReading(context);
-
+}: GpuWidgetSettingsProps & {
+    reading: GpuPowerReading;
+}): React.JSX.Element {
     return (
         <SettingsSection title="Scale & Units">
             <NumberSetting
@@ -73,38 +102,4 @@ function GpuPowerScaleSettings({
             />
         </SettingsSection>
     );
-}
-
-function readGpuTemperatureReading(
-    context: WidgetSettingsPanelProps["context"],
-): Extract<ResolvedGpuReading, { kind: "temperature" }> {
-    const reading = readGpuReading(context);
-
-    if (reading.kind !== "temperature") {
-        throw new Error("Expected temperature GPU metric settings.");
-    }
-
-    return reading;
-}
-
-function readGpuPowerReading(
-    context: WidgetSettingsPanelProps["context"],
-): Extract<ResolvedGpuReading, { kind: "power" }> {
-    const reading = readGpuReading(context);
-
-    if (reading.kind !== "power") {
-        throw new Error("Expected power GPU metric settings.");
-    }
-
-    return reading;
-}
-
-function readGpuReading(context: WidgetSettingsPanelProps["context"]): ResolvedGpuReading {
-    const target = context.resolved.widget.slot.metric.target;
-
-    if (target.domain !== "gpu") {
-        throw new Error("Expected GPU metric settings.");
-    }
-
-    return target.reading;
 }

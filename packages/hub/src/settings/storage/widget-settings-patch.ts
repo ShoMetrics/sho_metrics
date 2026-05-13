@@ -26,6 +26,7 @@ import type {
     NetworkTrafficDisplayMode,
     NetworkUnitBase,
     ResolvedColorRamp,
+    ResolvedGpuReading,
     ScaleMode,
     SingleMetricViewLayout,
     TemperatureUnit,
@@ -41,6 +42,7 @@ import {
     storedDiskMetricKindByResolved,
     storedDiskThroughputDirectionByResolved,
     storedDiskUsageDisplayModeByResolved,
+    storedGpuMetricKindByResolved,
     storedGridLineTypeByResolved,
     storedGridLineVisibilityByResolved,
     storedNetworkDirectionByResolved,
@@ -96,6 +98,7 @@ export interface StoredWidgetSettingsPatch {
         readonly maximumWriteThroughputMebibytesPerSecond: number | undefined;
     }>;
     readonly gpu?: Partial<{
+        readonly kind: ResolvedGpuReading["kind"];
         readonly temperatureUnit: TemperatureUnit;
         readonly maximumTemperatureCelsius: number;
         readonly maximumPowerWatts: number | undefined;
@@ -266,6 +269,9 @@ function applyGpuPatch(
     target: StoredGpuMetricTarget,
     patch: NonNullable<StoredWidgetSettingsPatch["gpu"]>,
 ): void {
+    if (patch.kind !== undefined) {
+        target.kind = storedGpuMetricKindByResolved[patch.kind];
+    }
     if (patch.temperatureUnit !== undefined) {
         target.temperatureUnit = storedTemperatureUnitByResolved[patch.temperatureUnit];
     }
