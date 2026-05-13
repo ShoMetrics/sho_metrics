@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { InspectorItem } from "../components/InspectorItem";
 import type { StoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
 import type { VisibilityContext } from "../inspector/types";
@@ -14,12 +15,42 @@ interface WidgetSettingsTabProps {
     onResetWidgetSettings: () => void;
 }
 
+const WIDGET_SETTINGS_PENDING_NOTICE_DELAY_MS = 1000;
+
 export function WidgetSettingsTab({
     context,
     isGlobalAppearanceOverrideEnabled,
     onSettingsPatch,
     onResetWidgetSettings,
 }: WidgetSettingsTabProps): React.JSX.Element {
+    const [canShowPendingNotice, setCanShowPendingNotice] = useState(false);
+    const isSettingsPending = context.actionKind === "unknown";
+
+    useEffect(() => {
+        if (!isSettingsPending) {
+            setCanShowPendingNotice(false);
+            return;
+        }
+
+        const timeoutId = globalThis.setTimeout(() => {
+            setCanShowPendingNotice(true);
+        }, WIDGET_SETTINGS_PENDING_NOTICE_DELAY_MS);
+
+        return () => {
+            globalThis.clearTimeout(timeoutId);
+        };
+    }, [isSettingsPending]);
+
+    if (isSettingsPending) {
+        return canShowPendingNotice
+            ? (
+                <InspectorItem className="note-item note-item-caption">
+                    <p className="section-note">Loading widget settings...</p>
+                </InspectorItem>
+            )
+            : <></>;
+    }
+
     const panelProps = {
         context,
         onSettingsPatch,
@@ -59,7 +90,7 @@ function renderMetricPanel(
     const actionKind = panelProps.context.actionKind;
     const target = panelProps.context.resolved.widget.slot.metric.target;
 
-    if (actionKind === "unknown" || actionKind !== target.domain) {
+    if (actionKind !== target.domain) {
         return <DomainMismatchNotice />;
     }
 
