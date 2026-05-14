@@ -178,10 +178,17 @@ Current decision:
   cold-start flash.
 - Keep runtime option lists in runtime cache and refresh them asynchronously
   when Property Inspector opens.
-- Spend the next disk runtime-option work on explicit stale selection handling:
-  if a saved hot-plugged disk is no longer present, the widget and PI must show
-  that saved disk as unavailable instead of silently falling back to another
-  disk.
+- Keep explicit stale selection handling: if a saved hot-plugged disk is no
+  longer present, the widget and PI show that saved disk as unavailable instead
+  of silently falling back to another disk.
+
+Runtime option list invariant:
+
+```txt
+runtime option list = readiness status + cached snapshot + stale selected value preservation
+pending must not render as empty
+runtime facts must not be persisted as settings
+```
 
 Disk widget hot-plug visibility has a separate polling-limit trade-off:
 
@@ -201,6 +208,43 @@ Current decision:
 - If hot-plug immediacy becomes important across disks, network interfaces,
   GPU devices, audio devices, or other runtime hardware lists, design one shared
   runtime device registry/watch layer instead of solving it per widget.
+
+## Handoff: Runtime Device Lists
+
+Current behavior:
+
+- Device lists are runtime facts owned by actions/runtime, not settings.
+- Property Inspector consumes cached runtime snapshots plus readiness status.
+- Disk preserves a saved selection that is absent from the current snapshot and
+  shows it as unavailable.
+- Disk widget hot-plug detection follows the disk polling interval. A 60-second
+  polling interval can mean up to 60 seconds before the widget reflects a plug
+  or unplug event.
+- Property Inspector open triggers an asynchronous refresh, but it does not
+  create a separate device watcher or persistent device-list store.
+
+Optimizable behavior:
+
+- A runtime device-list owner can poll only while it has subscribers.
+- A new subscriber can receive the latest cached snapshot immediately, then get
+  later updates as they arrive.
+- The same lifecycle owner can serve disk volumes, network interfaces, GPU
+  devices, audio devices, and future source availability.
+- Hot-plug detection can become independent from metric polling frequency.
+
+Simple path when this becomes worth doing:
+
+1. Keep the current invariant: readiness status plus cached snapshot plus stale
+   selected value preservation.
+2. Add one shared runtime device-list owner only after at least two device-list
+   domains need it.
+3. Give the owner explicit subscribe/unsubscribe lifecycle; start polling on the
+   first subscriber and stop after the last subscriber.
+4. Push the cached snapshot immediately on subscribe, then refresh in the
+   background.
+5. Keep discovered devices out of settings. Settings store selected IDs only.
+6. Do not add disk-only timers, watchers, or alternate cache fields as a
+   shortcut.
 
 ## Missing Settings
 
