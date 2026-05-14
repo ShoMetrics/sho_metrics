@@ -316,32 +316,30 @@ const isGlobalAppearanceOverrideEnabled =
     isGlobalSettingsReady && resolvedGlobalSettings.appearanceOverride !== undefined;
 ```
 
-Pass both values:
+Pass only the derived override state to the widget tab:
 
 ```tsx
 <WidgetSettingsTab
     context={visibilityContext}
-    isGlobalSettingsReady={isGlobalSettingsReady}
     isGlobalAppearanceOverrideEnabled={isGlobalAppearanceOverrideEnabled}
     onSettingsPatch={updateWidgetSettings}
     onResetWidgetSettings={resetWidgetSettings}
 />
 ```
 
-`isGlobalSettingsReady` means the UI can trust global-derived state.
-
 `isGlobalAppearanceOverrideEnabled` means global settings are ready and the
 stored override is actually enabled.
 
-## Step 9: Gate Widget Settings Rendering On Global Readiness
+## Step 9: Gate Widget Settings Rendering Only On Widget Readiness
 
-`WidgetSettingsTab` should not render final settings UI while action kind or
-global settings readiness is pending.
+`WidgetSettingsTab` should not render final widget settings UI while action kind
+is still unknown. It should not block the whole tab on global settings readiness.
+Global readiness only controls global-owned state such as appearance override
+notices and appearance-control disabling.
 
 ```ts
 interface WidgetSettingsTabProps {
     context: VisibilityContext;
-    isGlobalSettingsReady: boolean;
     isGlobalAppearanceOverrideEnabled: boolean;
     onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
     onResetWidgetSettings: () => void;
@@ -349,7 +347,7 @@ interface WidgetSettingsTabProps {
 ```
 
 ```tsx
-const isSettingsPending = context.actionKind === "unknown" || !isGlobalSettingsReady;
+const isSettingsPending = context.actionKind === "unknown";
 ```
 
 Keep the existing delayed notice pattern to avoid short blank-to-loading flicker:
@@ -366,7 +364,7 @@ if (isSettingsPending) {
 }
 ```
 
-Only after settings are ready:
+After widget settings are ready:
 
 ```ts
 const panelProps = {
@@ -389,8 +387,11 @@ const panelProps = {
 Expected behavior:
 
 ```txt
+action/widget pending:
+  no final widget controls, no mismatch/reset flash
+
 global pending:
-  no final widget controls, no override-off UI, no mismatch/reset flash
+  widget controls render; appearance controls are treated as not globally disabled
 
 global ready + override off:
   editable widget controls
@@ -450,16 +451,14 @@ Tests should assert readiness invariants, not implementation details.
 Global settings pending:
 
 ```ts
-test("widget settings waits for global settings before rendering appearance controls", () => {
+test("widget settings renders widget controls before global settings load", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",
-        isGlobalSettingsReady: false,
         isGlobalAppearanceOverrideEnabled: false,
     });
 
     assert.doesNotMatch(markup, /Some settings are disabled/);
-    assert.doesNotMatch(markup, /Color Settings/);
-    assert.doesNotMatch(markup, /Stored metric settings do not match/);
+    assert.match(markup, /Disk Metric/);
 });
 ```
 
@@ -469,7 +468,6 @@ Global settings ready and override enabled:
 test("widget settings disables appearance after global override is loaded enabled", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",
-        isGlobalSettingsReady: true,
         isGlobalAppearanceOverrideEnabled: true,
     });
 
@@ -484,7 +482,6 @@ Global settings ready and override disabled:
 test("widget settings renders normally after global override is loaded disabled", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",
-        isGlobalSettingsReady: true,
         isGlobalAppearanceOverrideEnabled: false,
     });
 

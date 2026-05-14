@@ -197,31 +197,30 @@ test("widget settings waits for action kind before rendering recovery UI", () =>
     assert.equal(markup, "");
 });
 
-test("widget settings waits for global settings before rendering final controls", () => {
+test("widget settings renders widget controls before global settings load", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
-        isGlobalSettingsReady: false,
         isGlobalAppearanceOverrideEnabled: false,
     });
 
-    assert.equal(markup, "");
+    assert.match(markup, /GPU Metric:/);
+    assert.doesNotMatch(markup, /Some settings are disabled/);
 });
 
-test("widget settings waits for global settings before rendering mismatch recovery", () => {
+test("widget settings renders mismatch recovery before global settings load", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
-        isGlobalSettingsReady: false,
         isGlobalAppearanceOverrideEnabled: false,
         settings: buildWidgetSettings("cpu", {}),
     });
 
-    assert.equal(markup, "");
+    assert.match(markup, /Stored metric settings do not match this action/);
+    assert.doesNotMatch(markup, /Some settings are disabled/);
 });
 
 test("widget settings renders normally after global settings load without override", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
-        isGlobalSettingsReady: true,
         isGlobalAppearanceOverrideEnabled: false,
     });
 
@@ -244,7 +243,6 @@ test("widget settings keep warnings first and reset in advanced controls", () =>
 function renderWidgetSettings(options: {
     actionKind: ActionKind;
     isWindows?: boolean;
-    isGlobalSettingsReady?: boolean;
     isGlobalAppearanceOverrideEnabled?: boolean;
     settings?: InspectorTestSettings;
 }): string {
@@ -254,7 +252,6 @@ function renderWidgetSettings(options: {
             isWindows: options.isWindows,
             settings: options.settings,
         }),
-        isGlobalSettingsReady: options.isGlobalSettingsReady ?? true,
         isGlobalAppearanceOverrideEnabled: options.isGlobalAppearanceOverrideEnabled ?? false,
         onSettingsPatch: () => undefined,
         onResetWidgetSettings: () => undefined,

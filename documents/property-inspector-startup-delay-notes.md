@@ -63,14 +63,8 @@ This will confirm whether the ~300ms is WebSocket open time, registration timing
 1. Set `actionKind` and `isWindows` immediately after `getConnectionInfo()` resolves.
 2. Prefer `connectionInfo.actionInfo.payload.settings` as first paint widget settings when available.
 3. Render editable controls immediately. Show the lightweight loading notice only when no initial widget settings were available from `actionInfo`.
-4. Fetch widget settings and global settings in parallel after connection info:
-
-   ```ts
-   const [payload, globalPayload] = await Promise.all([
-       client.getSettings(),
-       client.getGlobalSettings(),
-   ]);
-   ```
+4. Refresh widget settings and global settings independently after connection
+   info. Do not wait for both requests before applying whichever one returns.
 
 5. Use `getSettings()` as an always-run refresh so stale actionInfo/cache values do not become authoritative.
 6. If settings cannot be loaded because the refresh request fails, keep the UI editable and show a one-time top notice:
@@ -124,6 +118,39 @@ Current conclusion:
 - Keep `getSettings()` as a refresh/guard, not as a first-paint blocker.
 - Do not build a PI -> plugin settings cache bridge unless a real action
   instance id is available in the PI context.
+
+## Follow-up Observation: Global Readiness Scope
+
+After the proto settings refactor, temporary diagnostics measured this repeated
+pattern while opening CPU, GPU, and Disk widgets:
+
+```txt
+0ms      settings session started
+0ms      hasInitialWidgetSettings=true
+302-320ms global settings refresh ready
+326-357ms widget settings refresh ready
+340-355ms runtime cache patch received
+```
+
+The important detail is that widget first-paint data is available immediately,
+but global settings still arrive around 300ms later. Blocking the whole Widget
+tab on `globalSettingsStatus === "ready"` makes every user pay that delay even
+though most settings are action-local and many users never enable global
+appearance override.
+
+UI decision:
+
+- Action-local widget controls render from initial widget settings immediately.
+- `getSettings()` remains an always-run refresh and is not a first-paint gate.
+- `getGlobalSettings()` remains the source of truth for plugin/global settings.
+- Global readiness must only affect UI owned by global settings, such as global
+  appearance override notices and appearance-control disabling.
+- It is acceptable for appearance controls to render enabled, then become
+  disabled when global settings arrive and override is enabled. This local
+  state change is less harmful than delaying the entire Widget tab.
+- Do not introduce a PI global-settings mirror, localStorage cache, or plugin
+  runtime seed bridge unless measured evidence shows the localized global
+  readiness delay is still unacceptable.
 
 ## Missing Settings
 
