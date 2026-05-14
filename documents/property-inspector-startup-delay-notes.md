@@ -167,84 +167,11 @@ the UI can briefly show "No detected volumes"
 the background runtime refresh then replaces it with the real list
 ```
 
-This is a P4 issue. It is reproducible only around plugin cold start before the
-first runtime snapshot, and it self-corrects after the background refresh.
-Stream Deck normally starts with the system, and cold start also means the
-hardware UI itself is still warming up.
+Disk widget hot-plug visibility also has a polling-limit trade-off: the disk
+polling interval is the worst-case widget-side disk hot-plug detection latency.
 
-Current decision:
-
-- Do not add a separate "published runtime cache keys" mechanism only for this
-  cold-start flash.
-- Keep runtime option lists in runtime cache and refresh them asynchronously
-  when Property Inspector opens.
-- Keep explicit stale selection handling: if a saved hot-plugged disk is no
-  longer present, the widget and PI show that saved disk as unavailable instead
-  of silently falling back to another disk.
-
-Runtime option list invariant:
-
-```txt
-runtime option list = readiness status + cached snapshot + stale selected value preservation
-pending must not render as empty
-runtime facts must not be persisted as settings
-```
-
-Disk widget hot-plug visibility has a separate polling-limit trade-off:
-
-```txt
-disk polling interval = worst-case widget-side disk hot-plug detection latency
-```
-
-The widget learns that a selected disk disappeared from the next successful
-disk metrics poll, because that poll refreshes the disk volume registry. If the
-user sets disk polling to 60 seconds, the widget may show the previous state for
-up to 60 seconds before switching to the unavailable/N/A state.
-
-Current decision:
-
-- Accept this as the polling-only MVP behavior.
-- Do not add a disk-only timer, watcher, or one-off device refresh loop.
-- If hot-plug immediacy becomes important across disks, network interfaces,
-  GPU devices, audio devices, or other runtime hardware lists, design one shared
-  runtime device registry/watch layer instead of solving it per widget.
-
-## Handoff: Runtime Device Lists
-
-Current behavior:
-
-- Device lists are runtime facts owned by actions/runtime, not settings.
-- Property Inspector consumes cached runtime snapshots plus readiness status.
-- Disk preserves a saved selection that is absent from the current snapshot and
-  shows it as unavailable.
-- Disk widget hot-plug detection follows the disk polling interval. A 60-second
-  polling interval can mean up to 60 seconds before the widget reflects a plug
-  or unplug event.
-- Property Inspector open triggers an asynchronous refresh, but it does not
-  create a separate device watcher or persistent device-list store.
-
-Optimizable behavior:
-
-- A runtime device-list owner can poll only while it has subscribers.
-- A new subscriber can receive the latest cached snapshot immediately, then get
-  later updates as they arrive.
-- The same lifecycle owner can serve disk volumes, network interfaces, GPU
-  devices, audio devices, and future source availability.
-- Hot-plug detection can become independent from metric polling frequency.
-
-Simple path when this becomes worth doing:
-
-1. Keep the current invariant: readiness status plus cached snapshot plus stale
-   selected value preservation.
-2. Add one shared runtime device-list owner only after at least two device-list
-   domains need it.
-3. Give the owner explicit subscribe/unsubscribe lifecycle; start polling on the
-   first subscriber and stop after the last subscriber.
-4. Push the cached snapshot immediately on subscribe, then refresh in the
-   background.
-5. Keep discovered devices out of settings. Settings store selected IDs only.
-6. Do not add disk-only timers, watchers, or alternate cache fields as a
-   shortcut.
+The current decisions and future runtime device-list handoff live in
+`.agents/skills/technical-deisn-doc/references/next_refactor.md`.
 
 ## Missing Settings
 
