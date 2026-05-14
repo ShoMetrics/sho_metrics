@@ -130,9 +130,13 @@ export abstract class MetricAction extends SingletonAction {
             return;
         }
 
-        this.sendRuntimeCachePatchToPropertyInspector(event, activeActionState.runtimeCache).catch(error => {
-            log.error(() => `Failed to publish runtime cache to Property Inspector: ${String(error)}`);
-        });
+        this.sendRuntimeCachePatchToPropertyInspector(event, activeActionState.runtimeCache)
+            .catch(error => {
+                log.error(() => `Failed to publish runtime cache to Property Inspector: ${String(error)}`);
+            })
+            .finally(() => {
+                this.refreshRuntimeCacheForPropertyInspector(event);
+            });
     }
 
     /**
@@ -155,7 +159,10 @@ export abstract class MetricAction extends SingletonAction {
         return activeActionState.resolvedSettings;
     }
 
-    protected updateRuntimeCache(event: WillAppearEvent, patch: WidgetRuntimeCachePatch): Promise<void> {
+    protected updateRuntimeCache(
+        event: WillAppearEvent | PropertyInspectorDidAppearEvent,
+        patch: WidgetRuntimeCachePatch,
+    ): Promise<void> {
         const activeActionState = this.activeActionStates.get(event.action.id);
         if (!activeActionState) {
             throw new Error(`Action ${event.action.id} is not active; cannot update runtime cache.`);
@@ -172,6 +179,10 @@ export abstract class MetricAction extends SingletonAction {
         );
 
         return this.sendRuntimeCachePatchToPropertyInspector(event, patch);
+    }
+
+    protected refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
+        void event;
     }
 
     private subscribeAction(activeActionState: ActiveActionState): void {

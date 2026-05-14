@@ -89,6 +89,22 @@ export class Scheduler {
         };
     }
 
+    /**
+     * Polls one metric set outside the subscriber schedule and ingests it.
+     *
+     * This is for low-frequency lifecycle refreshes, such as refreshing runtime
+     * option lists when Property Inspector opens. It does not notify
+     * subscribers; scheduled polling remains the owner of regular updates.
+     */
+    async refreshMetrics(metricKeys: readonly string[]): Promise<MetricsSnapshot> {
+        const normalizedMetricKeys = Scheduler.normalizeMetricKeys(metricKeys);
+        const snapshot = await this.pollSource(normalizedMetricKeys);
+
+        this.snapshotStore.ingest(snapshot);
+
+        return snapshot;
+    }
+
     private start(): void {
         if (this.intervalId) {
             return;

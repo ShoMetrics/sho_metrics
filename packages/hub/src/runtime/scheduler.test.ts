@@ -76,6 +76,18 @@ test("unsupported polling intervals still poll the requested metric keys", async
     }
 });
 
+test("refreshMetrics polls and ingests requested metric keys without subscribers", async () => {
+    const source = new FakeMetricSource();
+    const snapshotStore = new FakeMetricSnapshotStore();
+    const scheduler = new Scheduler(source, snapshotStore);
+
+    const snapshot = await scheduler.refreshMetrics(["net.down", "cpu.usage_percent", "net.down"]);
+
+    assert.equal(snapshot, source.snapshot);
+    assert.deepEqual(source.polledMetricKeyListList, [["cpu.usage_percent", "net.down"]]);
+    assert.deepEqual(snapshotStore.ingestedSnapshots, [source.snapshot]);
+});
+
 test("later same-group subscribers do not join an in-flight initial poll", async () => {
     const source = new DeferredMetricSource();
     const snapshotStore = new FakeMetricSnapshotStore();
