@@ -197,6 +197,16 @@ test("widget settings waits for action kind before rendering recovery UI", () =>
     assert.equal(markup, "");
 });
 
+test("widget settings waits for global settings before rendering final controls", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "gpu",
+        isGlobalSettingsReady: false,
+        isGlobalAppearanceOverrideEnabled: false,
+    });
+
+    assert.equal(markup, "");
+});
+
 test("widget settings keep warnings first and reset in advanced controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
@@ -212,6 +222,7 @@ test("widget settings keep warnings first and reset in advanced controls", () =>
 function renderWidgetSettings(options: {
     actionKind: ActionKind;
     isWindows?: boolean;
+    isGlobalSettingsReady?: boolean;
     isGlobalAppearanceOverrideEnabled?: boolean;
     settings?: InspectorTestSettings;
 }): string {
@@ -221,6 +232,7 @@ function renderWidgetSettings(options: {
             isWindows: options.isWindows,
             settings: options.settings,
         }),
+        isGlobalSettingsReady: options.isGlobalSettingsReady ?? true,
         isGlobalAppearanceOverrideEnabled: options.isGlobalAppearanceOverrideEnabled ?? false,
         onSettingsPatch: () => undefined,
         onResetWidgetSettings: () => undefined,
