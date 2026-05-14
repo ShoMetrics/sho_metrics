@@ -10,7 +10,6 @@ import { SettingsSection } from "./SettingsSection";
 
 interface WidgetSettingsTabProps {
     context: VisibilityContext;
-    isGlobalSettingsReady: boolean;
     isGlobalAppearanceOverrideEnabled: boolean;
     onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
     onResetWidgetSettings: () => void;
@@ -20,13 +19,12 @@ const WIDGET_SETTINGS_PENDING_NOTICE_DELAY_MS = 1000;
 
 export function WidgetSettingsTab({
     context,
-    isGlobalSettingsReady,
     isGlobalAppearanceOverrideEnabled,
     onSettingsPatch,
     onResetWidgetSettings,
 }: WidgetSettingsTabProps): React.JSX.Element {
     const [canShowPendingNotice, setCanShowPendingNotice] = useState(false);
-    const isSettingsPending = context.actionKind === "unknown" || !isGlobalSettingsReady;
+    const isSettingsPending = context.actionKind === "unknown";
 
     useEffect(() => {
         if (!isSettingsPending) {

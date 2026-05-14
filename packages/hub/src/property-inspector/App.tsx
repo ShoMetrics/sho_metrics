@@ -60,7 +60,6 @@ export function App({ client }: AppProps): React.JSX.Element {
             {activeTab === "widget" ? (
                 <WidgetSettingsTab
                     context={visibilityContext}
-                    isGlobalSettingsReady={isGlobalSettingsReady}
                     isGlobalAppearanceOverrideEnabled={isGlobalAppearanceOverrideEnabled}
                     onSettingsPatch={updateWidgetSettings}
                     onResetWidgetSettings={resetWidgetSettings}
