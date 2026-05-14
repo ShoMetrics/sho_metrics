@@ -34,7 +34,7 @@ function buildDiskVolumeOptions(context: VisibilityContext): SelectOption[] {
     if (diskVolumes.length === 0) {
         return [{
             value: "",
-            label: context.runtimeCacheStatus.hasReceivedDiskVolumeOptions
+            label: context.runtimeCacheStatus.diskVolumeOptionsStatus === "ready"
                 ? "No detected volumes"
                 : "Loading volumes...",
             disabled: true,

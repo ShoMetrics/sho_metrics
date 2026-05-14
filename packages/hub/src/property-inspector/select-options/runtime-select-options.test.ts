@@ -70,7 +70,7 @@ test("disk volume options show loading before disk volume options arrive", () =>
 test("disk volume options show an empty state after disk volume options arrive empty", () => {
     const context = buildContext({
         runtimeCacheStatus: {
-            hasReceivedDiskVolumeOptions: true,
+            diskVolumeOptionsStatus: "ready",
         },
     });
 

@@ -2,14 +2,20 @@ import type { ActionKind } from "../../shared/stream-deck-actions";
 import type { ResolvedWidgetSettings } from "../../settings/resolved-settings";
 import type { WidgetRuntimeCache } from "../../runtime/widget-runtime-cache";
 
+/** Primitive value accepted by Property Inspector select controls. */
 export type SelectOptionValue = string | number;
 
+/** Readiness of an external Property Inspector input, not stored/resolved settings validity. */
+export type LoadStatus = "pending" | "ready" | "failed";
+
+/** Option rendered by Property Inspector select controls. */
 export interface SelectOption<TValue extends SelectOptionValue = string> {
     value: TValue;
     label: string;
     disabled?: boolean;
 }
 
+/** Resolved widget and runtime context consumed by Property Inspector panels. */
 export interface VisibilityContext {
     actionKind: ActionKind;
     isWindows: boolean;
@@ -18,6 +24,7 @@ export interface VisibilityContext {
     resolved: ResolvedWidgetSettings;
 }
 
+/** Readiness for runtime-only option lists delivered to Property Inspector through plugin IPC. */
 export interface PropertyInspectorRuntimeCacheStatus {
-    hasReceivedDiskVolumeOptions: boolean;
+    diskVolumeOptionsStatus: LoadStatus;
 }

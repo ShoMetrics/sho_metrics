@@ -31,19 +31,19 @@ import {
     writeStoredGlobalSettingsPatch,
     type StoredGlobalSettingsPatch,
 } from "../../settings/storage/global-settings-patch";
-import type { PropertyInspectorRuntimeCacheStatus } from "../inspector/types";
+import type { LoadStatus, PropertyInspectorRuntimeCacheStatus } from "../inspector/types";
 
 interface SettingsSyncState {
     actionKind: ActionKind;
     isWindows: boolean;
     rawSettings: unknown;
+    widgetSettingsStatus: LoadStatus;
     runtimeCache: WidgetRuntimeCache;
     runtimeCacheStatus: PropertyInspectorRuntimeCacheStatus;
     rawGlobalSettings: unknown;
+    globalSettingsStatus: LoadStatus;
     widgetSettingsNotice: SettingsNotice | null;
     pluginSettingsNotice: SettingsNotice | null;
-    widgetLoadError: string | null;
-    pluginLoadError: string | null;
 }
 
 type CommitSettingsSyncState = (
@@ -73,15 +73,15 @@ const initialState: SettingsSyncState = {
     actionKind: "unknown",
     isWindows: false,
     rawSettings: undefined,
+    widgetSettingsStatus: "pending",
     runtimeCache: { ...emptyWidgetRuntimeCache },
     runtimeCacheStatus: {
-        hasReceivedDiskVolumeOptions: false,
+        diskVolumeOptionsStatus: "pending",
     },
     rawGlobalSettings: undefined,
+    globalSettingsStatus: "pending",
     widgetSettingsNotice: null,
     pluginSettingsNotice: null,
-    widgetLoadError: null,
-    pluginLoadError: null,
 };
 
 export function usePropertyInspectorSettings(
@@ -129,8 +129,8 @@ export function usePropertyInspectorSettings(
             return {
                 ...currentState,
                 rawSettings: nextRawSettings,
+                widgetSettingsStatus: "ready",
                 widgetSettingsNotice: null,
-                widgetLoadError: null,
             };
         });
 
@@ -138,7 +138,10 @@ export function usePropertyInspectorSettings(
         client.setSettings(settingsJsonToPersist ?? {}).catch((error: Error) => {
             commitState((errorState) => ({
                 ...errorState,
-                widgetLoadError: `Failed to save widget settings: ${error.message}`,
+                widgetSettingsNotice: {
+                    kind: "warning",
+                    text: `Failed to save widget settings: ${error.message}`,
+                },
             }));
         });
     };
@@ -153,8 +156,8 @@ export function usePropertyInspectorSettings(
             return {
                 ...currentState,
                 rawSettings: nextRawSettings,
+                widgetSettingsStatus: "ready",
                 widgetSettingsNotice: null,
-                widgetLoadError: null,
             };
         });
 
@@ -162,7 +165,10 @@ export function usePropertyInspectorSettings(
         client.setSettings(settingsJsonToPersist ?? {}).catch((error: Error) => {
             commitState((errorState) => ({
                 ...errorState,
-                widgetLoadError: `Failed to save widget settings: ${error.message}`,
+                widgetSettingsNotice: {
+                    kind: "warning",
+                    text: `Failed to save widget settings: ${error.message}`,
+                },
             }));
         });
     };
@@ -180,8 +186,8 @@ export function usePropertyInspectorSettings(
             return {
                 ...currentState,
                 rawGlobalSettings: nextRawGlobalSettings,
+                globalSettingsStatus: "ready",
                 pluginSettingsNotice: null,
-                pluginLoadError: null,
             };
         });
 
@@ -189,7 +195,10 @@ export function usePropertyInspectorSettings(
         client.setGlobalSettings(settingsJsonToPersist ?? {}).catch((error: Error) => {
             commitState((errorState) => ({
                 ...errorState,
-                pluginLoadError: `Failed to save plugin settings: ${error.message}`,
+                pluginSettingsNotice: {
+                    kind: "warning",
+                    text: `Failed to save plugin settings: ${error.message}`,
+                },
             }));
         });
     };
@@ -210,7 +219,11 @@ export function usePropertyInspectorSettings(
 
             commitState((currentState) => ({
                 ...currentState,
-                widgetLoadError: `Failed to load settings: ${error.message}`,
+                widgetSettingsStatus: "failed",
+                widgetSettingsNotice: {
+                    kind: "warning",
+                    text: `Failed to load settings: ${error.message}`,
+                },
             }));
         });
 
@@ -224,10 +237,10 @@ export function usePropertyInspectorSettings(
         actionKind: state.actionKind,
         visibilityContext,
         resolvedGlobalSettings,
+        widgetSettingsStatus: state.widgetSettingsStatus,
+        globalSettingsStatus: state.globalSettingsStatus,
         widgetSettingsNotice: state.widgetSettingsNotice,
         pluginSettingsNotice: state.pluginSettingsNotice,
-        widgetLoadError: state.widgetLoadError,
-        pluginLoadError: state.pluginLoadError,
         updateWidgetSettings,
         resetWidgetSettings,
         updateGlobalSettings,
@@ -258,57 +271,84 @@ async function loadPropertyInspectorSettings(
             actionKind,
             isWindows,
             rawSettings: widgetSettingsRead.rawSettings,
+            widgetSettingsStatus: "ready",
             widgetSettingsNotice: widgetSettingsRead.notice,
-            widgetLoadError: null,
         };
     });
 
-    const [settingsResult, globalSettingsResult] = await Promise.allSettled([
-        client.getSettings(),
-        client.getGlobalSettings(),
-    ]);
-
-    if (isDisposed()) {
-        return;
-    }
-
-    applyLoadedSettingsResults(client, commitState, actionKind, settingsResult, globalSettingsResult);
+    void refreshWidgetSettings(client, commitState, actionKind, isDisposed);
+    void refreshGlobalSettings(client, commitState, isDisposed);
 }
 
-function applyLoadedSettingsResults(
+async function refreshWidgetSettings(
     client: StreamDeckPropertyInspectorClient,
     commitState: CommitSettingsSyncState,
     actionKind: ActionKind,
-    settingsResult: PromiseSettledResult<{ settings: unknown }>,
-    globalSettingsResult: PromiseSettledResult<{ settings: unknown }>,
-): void {
-    commitState((currentState) => {
-        const nextState: SettingsSyncState = {
-            ...currentState,
-            widgetLoadError: null,
-            pluginLoadError: null,
-        };
+    isDisposed: () => boolean,
+): Promise<void> {
+    try {
+        const payload = await client.getSettings();
+        if (isDisposed()) {
+            return;
+        }
 
-        if (settingsResult.status === "fulfilled") {
-            const widgetSettingsRead = readInspectorWidgetSettings(settingsResult.value.settings, actionKind);
+        commitState((currentState) => {
+            const widgetSettingsRead = readInspectorWidgetSettings(payload.settings, actionKind);
             writeSettingsReadWarningLog(client, "widget", widgetSettingsRead.readWarning);
-            nextState.rawSettings = widgetSettingsRead.rawSettings;
-            nextState.widgetSettingsNotice = widgetSettingsRead.notice;
-        } else {
-            nextState.widgetSettingsNotice = settingsLoadFailureNotice("widget");
+
+            return {
+                ...currentState,
+                rawSettings: widgetSettingsRead.rawSettings,
+                widgetSettingsStatus: "ready",
+                widgetSettingsNotice: widgetSettingsRead.notice,
+            };
+        });
+    } catch {
+        if (isDisposed()) {
+            return;
         }
 
-        if (globalSettingsResult.status === "fulfilled") {
-            const pluginSettingsRead = readInspectorPluginSettings(globalSettingsResult.value.settings);
+        commitState((currentState) => ({
+            ...currentState,
+            widgetSettingsStatus: "failed",
+            widgetSettingsNotice: settingsLoadFailureNotice("widget"),
+        }));
+    }
+}
+
+async function refreshGlobalSettings(
+    client: StreamDeckPropertyInspectorClient,
+    commitState: CommitSettingsSyncState,
+    isDisposed: () => boolean,
+): Promise<void> {
+    try {
+        const payload = await client.getGlobalSettings();
+        if (isDisposed()) {
+            return;
+        }
+
+        commitState((currentState) => {
+            const pluginSettingsRead = readInspectorPluginSettings(payload.settings);
             writeSettingsReadWarningLog(client, "plugin", pluginSettingsRead.readWarning);
-            nextState.rawGlobalSettings = pluginSettingsRead.rawGlobalSettings;
-            nextState.pluginSettingsNotice = pluginSettingsRead.notice;
-        } else {
-            nextState.pluginSettingsNotice = settingsLoadFailureNotice("plugin");
+
+            return {
+                ...currentState,
+                rawGlobalSettings: pluginSettingsRead.rawGlobalSettings,
+                globalSettingsStatus: "ready",
+                pluginSettingsNotice: pluginSettingsRead.notice,
+            };
+        });
+    } catch {
+        if (isDisposed()) {
+            return;
         }
 
-        return nextState;
-    });
+        commitState((currentState) => ({
+            ...currentState,
+            globalSettingsStatus: "failed",
+            pluginSettingsNotice: settingsLoadFailureNotice("plugin"),
+        }));
+    }
 }
 
 function subscribePropertyInspectorEvents(
@@ -331,6 +371,7 @@ function subscribePropertyInspectorEvents(
             return {
                 ...currentState,
                 rawSettings: widgetSettingsRead.rawSettings,
+                widgetSettingsStatus: "ready",
                 widgetSettingsNotice: widgetSettingsRead.notice,
             };
         });
@@ -348,6 +389,7 @@ function subscribePropertyInspectorEvents(
             return {
                 ...currentState,
                 rawGlobalSettings: pluginSettingsRead.rawGlobalSettings,
+                globalSettingsStatus: "ready",
                 pluginSettingsNotice: pluginSettingsRead.notice,
             };
         });
@@ -367,8 +409,9 @@ function subscribePropertyInspectorEvents(
             ...currentState,
             runtimeCache: mergeWidgetRuntimeCache(currentState.runtimeCache, runtimeCachePatch),
             runtimeCacheStatus: {
-                hasReceivedDiskVolumeOptions: currentState.runtimeCacheStatus.hasReceivedDiskVolumeOptions
-                    || "availableDiskVolumes" in runtimeCachePatch,
+                diskVolumeOptionsStatus: "availableDiskVolumes" in runtimeCachePatch
+                    ? "ready"
+                    : currentState.runtimeCacheStatus.diskVolumeOptionsStatus,
             },
         }));
     });

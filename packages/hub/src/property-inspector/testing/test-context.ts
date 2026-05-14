@@ -21,7 +21,7 @@ export function buildVisibilityContext(options: {
         rawGlobalSettings: undefined,
         runtimeCache: mergeWidgetRuntimeCache(emptyWidgetRuntimeCache, options.runtimeCache ?? {}),
         runtimeCacheStatus: {
-            hasReceivedDiskVolumeOptions: options.runtimeCacheStatus?.hasReceivedDiskVolumeOptions ?? false,
+            diskVolumeOptionsStatus: options.runtimeCacheStatus?.diskVolumeOptionsStatus ?? "pending",
         },
         actionKind: options.actionKind ?? "cpu",
         isWindows: options.isWindows ?? false,
