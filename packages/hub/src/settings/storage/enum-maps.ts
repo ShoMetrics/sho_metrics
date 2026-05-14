@@ -53,6 +53,7 @@ export const storedThemeByResolved = {
 export const storedColorModeByResolved = {
     threshold: StoredColorMode.THRESHOLD,
     solid: StoredColorMode.SOLID,
+    "black-white": StoredColorMode.BLACK_WHITE,
 } satisfies Record<ColorMode, StoredColorMode>;
 
 export const storedGridLineVisibilityByResolved = {

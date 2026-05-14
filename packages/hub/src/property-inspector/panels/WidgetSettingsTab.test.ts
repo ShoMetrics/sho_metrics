@@ -214,7 +214,8 @@ test("widget settings waits for action kind before rendering recovery UI", () =>
 test("widget settings renders widget controls before global settings load", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
-        isGlobalAppearanceOverrideEnabled: false,
+        isGlobalLayoutStyleOverrideEnabled: false,
+        isGlobalColorOverrideEnabled: false,
     });
 
     assert.match(markup, /GPU Metric:/);
@@ -224,7 +225,8 @@ test("widget settings renders widget controls before global settings load", () =
 test("widget settings renders mismatch recovery before global settings load", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
-        isGlobalAppearanceOverrideEnabled: false,
+        isGlobalLayoutStyleOverrideEnabled: false,
+        isGlobalColorOverrideEnabled: false,
         settings: buildWidgetSettings("cpu", {}),
     });
 
@@ -235,7 +237,8 @@ test("widget settings renders mismatch recovery before global settings load", ()
 test("widget settings renders normally after global settings load without override", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
-        isGlobalAppearanceOverrideEnabled: false,
+        isGlobalLayoutStyleOverrideEnabled: false,
+        isGlobalColorOverrideEnabled: false,
     });
 
     assert.match(markup, /GPU Metric:/);
@@ -245,7 +248,7 @@ test("widget settings renders normally after global settings load without overri
 test("widget settings keep warnings first and reset in advanced controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
-        isGlobalAppearanceOverrideEnabled: true,
+        isGlobalLayoutStyleOverrideEnabled: true,
     });
 
     assertTextOrder(markup, "Some settings are disabled", "GPU Metric:");
@@ -257,7 +260,8 @@ test("widget settings keep warnings first and reset in advanced controls", () =>
 function renderWidgetSettings(options: {
     actionKind: ActionKind;
     isWindows?: boolean;
-    isGlobalAppearanceOverrideEnabled?: boolean;
+    isGlobalLayoutStyleOverrideEnabled?: boolean;
+    isGlobalColorOverrideEnabled?: boolean;
     settings?: InspectorTestSettings;
 }): string {
     return renderToStaticMarkup(createElement(WidgetSettingsTab, {
@@ -266,7 +270,8 @@ function renderWidgetSettings(options: {
             isWindows: options.isWindows,
             settings: options.settings,
         }),
-        isGlobalAppearanceOverrideEnabled: options.isGlobalAppearanceOverrideEnabled ?? false,
+        isGlobalLayoutStyleOverrideEnabled: options.isGlobalLayoutStyleOverrideEnabled ?? false,
+        isGlobalColorOverrideEnabled: options.isGlobalColorOverrideEnabled ?? false,
         onSettingsPatch: () => undefined,
         onResetWidgetSettings: () => undefined,
     }));

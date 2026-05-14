@@ -5,8 +5,6 @@ import { MetricStore } from "../../runtime/metric-store";
 import { getDiskVolumeMetricKey } from "../../runtime/disk-metric-keys";
 import { buildMetricSnapshot, buildScalarMetricValue } from "../../runtime/sources/source.interface";
 import { buildMetricDisplayRenderPlan, buildRenderWidgetData } from "../../metric-view-runner/display-model";
-import { readStoredGlobalSettings } from "../../settings/storage/codec";
-import { resolveStoredGlobalSettings } from "../../settings/storage/resolver";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
 import { resolveInitialActionSettings } from "../settings/action-settings-resolver";
@@ -48,7 +46,6 @@ test("disk usage display keeps explicit unavailable volume instead of falling ba
         event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
         settings,
         target,
-        globalSettings: resolveStoredGlobalSettings(readStoredGlobalSettings(undefined).settings),
         metricStore,
         volumeSelection: { kind: "unavailable", volumeId: "E:\\" },
     });

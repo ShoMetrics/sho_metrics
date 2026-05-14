@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { WillAppearEvent } from "@elgato/streamdeck";
 import type { ResolvedAppearanceSettings } from "../settings/resolved-settings";
+import { buildMetricVisualSettings } from "../settings/visual-adapter";
 import {
     KEYPAD_PNG_SIZE,
     TOUCH_STRIP_LOGICAL_SIZE,
@@ -236,19 +237,10 @@ test("touch strip layout uses square rendering for circular graphics", () => {
 });
 
 test("touch strip layout uses wide rendering for non-circular graphics", () => {
-    const touchStripMetricLayout = resolveTouchStripMetricLayout({
-        graphicType: "sparkline",
-        circleStyle: "value",
-        graphicStyle: "flat",
-        colorConfig: {
-            mode: "solid",
-            solidColor: "#ffffff",
-            thresholds: [],
-        },
-        lineSmoothingPercent: 75,
-        gridLineVisibility: "adaptive",
-        gridLineType: "horizontal",
-    });
+    const touchStripMetricLayout = resolveTouchStripMetricLayout(buildMetricVisualSettings({
+        ...defaultResolvedAppearanceSettings,
+        viewLayout: "sparkline",
+    }));
 
     assert.equal(touchStripMetricLayout.kind, "wide");
     assert.deepEqual(touchStripMetricLayout.renderSize, TOUCH_STRIP_LOGICAL_SIZE);

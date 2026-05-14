@@ -78,6 +78,20 @@ test("threshold colors use resolved appearance colors", () => {
     ]);
 });
 
+test("black-white color mode lowers renderer paint to neutral colors", () => {
+    const visualSettings = buildMetricVisualSettings(buildAppearanceSettings({
+        colorMode: "black-white",
+    }));
+
+    assert.equal(visualSettings.paintConstraint, "black-white");
+    assert.deepEqual(visualSettings.colorConfig, {
+        mode: "solid",
+        solidColor: "#e6e6e6",
+        thresholds: [],
+    });
+    assert.equal(visualSettings.paints.metricPrimary.solidColor, "#e6e6e6");
+});
+
 test("line smoothing and grid options pass through resolved appearance settings", () => {
     const visualSettings = buildMetricVisualSettings(buildAppearanceSettings({
         lineSmoothingPercent: 95,

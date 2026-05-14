@@ -8,7 +8,7 @@ import { graphicStyleOptionList } from "./setting-options";
 export function LayoutSettings({
     context,
     onSettingsPatch,
-    appearanceDisabled = false,
+    layoutStyleDisabled = false,
 }: WidgetSettingsPanelProps): React.JSX.Element {
     const appearance = context.resolved.widget.slot.appearance;
 
@@ -19,7 +19,7 @@ export function LayoutSettings({
                 onValueChange={(viewLayout) => onSettingsPatch({
                     appearance: { viewLayout },
                 })}
-                disabled={appearanceDisabled}
+                disabled={layoutStyleDisabled}
             />
             <SelectSetting
                 label="Graphic Style"
@@ -28,7 +28,7 @@ export function LayoutSettings({
                 onValueChange={(theme) => onSettingsPatch({
                     appearance: { theme },
                 })}
-                disabled={appearanceDisabled}
+                disabled={layoutStyleDisabled}
             />
             {appearance.viewLayout === "circular" && (
                 <CircleStyleSetting
@@ -36,7 +36,7 @@ export function LayoutSettings({
                     onValueChange={(circleStyle) => onSettingsPatch({
                         appearance: { circleStyle },
                     })}
-                    disabled={appearanceDisabled}
+                    disabled={layoutStyleDisabled}
                 />
             )}
         </SettingsSection>

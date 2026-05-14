@@ -5,13 +5,19 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ResolvedGlobalSettings } from "../../settings/resolved-settings";
 import { PluginSettingsTab } from "./PluginSettingsTab";
 
-test("plugin appearance override uses the same dynamic color controls as widget settings", () => {
+test("plugin global override groups layout style and color controls under the master switch", () => {
     const markup = renderToStaticMarkup(createElement(PluginSettingsTab, {
         resolvedSettings: buildGlobalSettings(),
         onSettingsPatch: () => undefined,
     }));
 
-    assert.match(markup, /Override appearance/);
+    assert.match(markup, /Global override/);
+    assert.match(markup, /Layout &amp; Style Override/);
+    assert.match(markup, /Override layout and style/);
+    assert.match(markup, /Color Override/);
+    assert.match(markup, /Override color/);
+    assert.doesNotMatch(markup, /Global Color Mode:/);
+    assert.match(markup, /B&amp;W/);
     assert.match(markup, /Color Mode:/);
     assert.match(markup, /Low Ends At:/);
     assert.match(markup, /High Starts At:/);
@@ -36,10 +42,13 @@ function buildGlobalSettings(): ResolvedGlobalSettings {
                 maximumWriteThroughputMebibytesPerSecond: undefined,
             },
         },
-        appearanceOverride: {
+        globalOverrideEnabled: true,
+        layoutStyleOverride: {
             viewLayout: "circular",
             circleStyle: "value",
             theme: "flat",
+        },
+        colorOverride: {
             colors: {
                 solidColor: "#3b82f6",
                 lowColor: "#22c55e",

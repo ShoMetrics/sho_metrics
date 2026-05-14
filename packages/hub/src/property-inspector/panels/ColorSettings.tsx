@@ -1,4 +1,8 @@
-import type { ColorMode, ResolvedAppearanceSettings, ResolvedColorRamp } from "../../settings/resolved-settings";
+import type {
+    ColorMode,
+    ResolvedAppearanceSettings,
+    ResolvedColorRamp,
+} from "../../settings/resolved-settings";
 import { InspectorItem } from "../components/InspectorItem";
 import { SectionHeading } from "../components/SectionHeading";
 import { ColorBandSetting } from "../controls/ColorBandSetting";
@@ -11,7 +15,7 @@ import type { WidgetSettingsPanelProps } from "./panel-props";
 import { colorModeOptionList } from "./setting-options";
 
 export function StandardColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
-    const { context, appearanceDisabled = false } = props;
+    const { context, colorDisabled = false } = props;
     const appearance = context.resolved.widget.slot.appearance;
 
     return (
@@ -31,7 +35,7 @@ export function StandardColorSettings(props: WidgetSettingsPanelProps): React.JS
                 onThresholdPatch={(appearancePatch) => props.onSettingsPatch({
                     appearance: appearancePatch,
                 })}
-                disabled={appearanceDisabled}
+                disabled={colorDisabled}
             />
         </SettingsSection>
     );
@@ -67,7 +71,7 @@ export function ColorRampSettings({
                 onValueChange={onColorModeChange}
                 disabled={disabled}
             />
-            {colorMode === "solid" ? (
+            {colorMode === "black-white" ? null : colorMode === "solid" ? (
                 <ColorSetting
                     label="Solid Color"
                     value={colors.solidColor}
@@ -89,25 +93,37 @@ export function ColorRampSettings({
 }
 
 export function NetworkChannelColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
+    const shouldShowChannelColors = props.context.resolved.widget.slot.appearance.colorMode !== "black-white";
+
     return (
         <SettingsSection title="Colors">
             <SectionHeading text="Color Settings" />
             <ColorModeSetting {...props} />
             <ChannelThresholdControls {...props} />
-            <NetworkDownloadColorSettings {...props} />
-            <NetworkUploadColorSettings {...props} />
+            {shouldShowChannelColors ? (
+                <>
+                    <NetworkDownloadColorSettings {...props} />
+                    <NetworkUploadColorSettings {...props} />
+                </>
+            ) : null}
         </SettingsSection>
     );
 }
 
 export function DiskThroughputChannelColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
+    const shouldShowChannelColors = props.context.resolved.widget.slot.appearance.colorMode !== "black-white";
+
     return (
         <SettingsSection title="Colors">
             <SectionHeading text="Color Settings" />
             <ColorModeSetting {...props} />
             <ChannelThresholdControls {...props} />
-            <DiskReadColorSettings {...props} />
-            <DiskWriteColorSettings {...props} />
+            {shouldShowChannelColors ? (
+                <>
+                    <DiskReadColorSettings {...props} />
+                    <DiskWriteColorSettings {...props} />
+                </>
+            ) : null}
         </SettingsSection>
     );
 }
@@ -115,7 +131,7 @@ export function DiskThroughputChannelColorSettings(props: WidgetSettingsPanelPro
 function ColorModeSetting({
     context,
     onSettingsPatch,
-    appearanceDisabled = false,
+    colorDisabled = false,
 }: WidgetSettingsPanelProps): React.JSX.Element {
     return (
         <SelectSetting
@@ -125,7 +141,7 @@ function ColorModeSetting({
             onValueChange={(colorMode) => onSettingsPatch({
                 appearance: { colorMode },
             })}
-            disabled={appearanceDisabled}
+            disabled={colorDisabled}
         />
     );
 }
@@ -195,7 +211,7 @@ function ChannelThresholdControls(props: WidgetSettingsPanelProps): React.JSX.El
             onThresholdPatch={(appearancePatch) => props.onSettingsPatch({
                 appearance: appearancePatch,
             })}
-            disabled={props.appearanceDisabled}
+            disabled={props.colorDisabled}
         />
     );
 }
@@ -293,7 +309,7 @@ function ChannelColorFields({
     rampKey,
     context,
     onSettingsPatch,
-    appearanceDisabled = false,
+    colorDisabled = false,
 }: WidgetSettingsPanelProps & {
     rampKey: "downloadColors" | "uploadColors" | "diskReadColors" | "diskWriteColors";
 }): React.JSX.Element {
@@ -305,7 +321,7 @@ function ChannelColorFields({
                 label="Solid Color"
                 value={readAppearanceColor(context, rampKey, "solidColor")}
                 onValueChange={writeAppearanceColor(props, rampKey, "solidColor")}
-                disabled={appearanceDisabled}
+                disabled={colorDisabled}
             />
         );
     }
@@ -316,19 +332,19 @@ function ChannelColorFields({
                 label="Low Color"
                 value={readAppearanceColor(context, rampKey, "lowColor")}
                 onValueChange={writeAppearanceColor(props, rampKey, "lowColor")}
-                disabled={appearanceDisabled}
+                disabled={colorDisabled}
             />
             <ColorSetting
                 label="Medium Color"
                 value={readAppearanceColor(context, rampKey, "mediumColor")}
                 onValueChange={writeAppearanceColor(props, rampKey, "mediumColor")}
-                disabled={appearanceDisabled}
+                disabled={colorDisabled}
             />
             <ColorSetting
                 label="High Color"
                 value={readAppearanceColor(context, rampKey, "highColor")}
                 onValueChange={writeAppearanceColor(props, rampKey, "highColor")}
-                disabled={appearanceDisabled}
+                disabled={colorDisabled}
             />
         </>
     );

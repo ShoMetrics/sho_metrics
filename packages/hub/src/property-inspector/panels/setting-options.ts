@@ -19,6 +19,7 @@ export const graphicStyleOptionList = [
 export const colorModeOptionList = [
     { value: "threshold", label: "Dynamic (By Percentage)" },
     { value: "solid", label: "Solid Color" },
+    { value: "black-white", label: "B&W" },
 ] as const satisfies readonly SelectOption[];
 
 export const gridLineVisibilityOptionList = [

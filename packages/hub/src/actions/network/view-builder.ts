@@ -9,11 +9,9 @@ import {
 import type { WidgetData } from "../../rendering/widget-data";
 import { resolveColorForThresholdValue, type ColorConfig } from "../../rendering/color-resolver";
 import type {
-    ResolvedGlobalSettings,
     ResolvedNetworkMetricTarget,
     ResolvedWidgetSettings,
 } from "../../settings/resolved-settings";
-import { buildGlobalColorConfig } from "../../settings/global-appearance";
 import {
     buildNetworkSpeedWidgetData,
     convertMegabitsPerSecondToBytesPerSecond,
@@ -25,7 +23,7 @@ import {
     renderNetworkInterfaceIconFragment,
 } from "../../widgets/icons/catalog/network";
 import type { MetricDisplayOptions } from "../../metric-view-runner/display-model";
-import { buildColorConfigFromRamp } from "../shared/channel-color-config";
+import { buildColorConfigFromRamp, resolveSolidVisualOverrideColorMode } from "../../settings/visual-adapter";
 
 export interface NetworkDisplayUpdate {
     displayOptions: MetricDisplayOptions;
@@ -43,7 +41,6 @@ interface BuildNetworkDisplayOptions {
     event: WillAppearEvent;
     settings: ResolvedWidgetSettings;
     target: ResolvedNetworkMetricTarget;
-    globalSettings: ResolvedGlobalSettings;
     metricStore: MetricStore;
     selectedNetworkInterface: NetworkInterfaceOption | null;
 }
@@ -93,8 +90,8 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
         : displayWidgetData;
 
     return {
-            displayOptions: {
-                event: options.event,
+        displayOptions: {
+            event: options.event,
             resolvedSettings: appearance,
             metricKey: networkMetricKey,
             widgetData: renderedWidgetData,
@@ -173,11 +170,13 @@ function buildDualNetworkCircularDisplayOptions(
         direction: "download",
         target: options.target,
     });
-    const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, options.globalSettings, uploadWidgetData);
-    const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, options.globalSettings, downloadWidgetData);
-    const uploadColorConfig = buildNetworkChannelColorConfig("upload", options.settings, options.globalSettings);
-    const downloadColorConfig = buildNetworkChannelColorConfig("download", options.settings, options.globalSettings);
-    const circleStyle = options.settings.widget.slot.appearance.circleStyle;
+    const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData);
+    const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
+    const uploadColorConfig = buildNetworkChannelColorConfig("upload", options.settings);
+    const downloadColorConfig = buildNetworkChannelColorConfig("download", options.settings);
+    const appearance = options.settings.widget.slot.appearance;
+    const circleStyle = appearance.circleStyle;
+    const solidVisualOverrideColorMode = resolveSolidVisualOverrideColorMode(appearance.colorMode);
 
     return {
         event: options.event,
@@ -221,7 +220,7 @@ function buildDualNetworkCircularDisplayOptions(
             color: downloadColor,
         }),
         visualSettingsOverride: {
-            colorMode: "solid",
+            colorMode: solidVisualOverrideColorMode,
             usageColors: { solidColor: uploadColor },
         },
     };
@@ -240,8 +239,8 @@ function buildDualNetworkSparklineDisplayOptions(options: BuildNetworkDisplayOpt
         direction: "download",
         target: options.target,
     });
-    const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, options.globalSettings, uploadWidgetData);
-    const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, options.globalSettings, downloadWidgetData);
+    const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData);
+    const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
     const trafficDisplayMode = options.target.reading.trafficDisplayMode;
     const positiveDirection = trafficDisplayMode === "mirrored" ? "upload" : "download";
     const negativeDirection = trafficDisplayMode === "mirrored" ? "download" : "upload";
@@ -249,6 +248,8 @@ function buildDualNetworkSparklineDisplayOptions(options: BuildNetworkDisplayOpt
     const negativeWidgetData = trafficDisplayMode === "mirrored" ? downloadWidgetData : uploadWidgetData;
     const positiveColor = positiveDirection === "download" ? downloadColor : uploadColor;
     const negativeColor = negativeDirection === "download" ? downloadColor : uploadColor;
+    const appearance = options.settings.widget.slot.appearance;
+    const solidVisualOverrideColorMode = resolveSolidVisualOverrideColorMode(appearance.colorMode);
 
     return {
         event: options.event,
@@ -281,7 +282,7 @@ function buildDualNetworkSparklineDisplayOptions(options: BuildNetworkDisplayOpt
             size: NETWORK_TOP_ICON_SIZE,
         }),
         visualSettingsOverride: {
-            colorMode: "solid",
+            colorMode: solidVisualOverrideColorMode,
             usageColors: { solidColor: downloadColor },
         },
     };
@@ -318,7 +319,7 @@ function buildLinearNetworkDisplayOptions(options: BuildNetworkDisplayOptions): 
                     displayValue: downloadWidgetData.displayValue ?? downloadWidgetData.current.toFixed(0),
                     unit: downloadWidgetData.unit,
                     progress: downloadWidgetData.progress,
-                    color: resolveNetworkWidgetChannelColor("download", options.settings, options.globalSettings, downloadWidgetData),
+                    color: resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData),
                     iconFragment: renderNetworkDirectionIconFragment({
                         direction: "download",
                         color: NETWORK_DIRECTION_ICON_COLOR,
@@ -330,7 +331,7 @@ function buildLinearNetworkDisplayOptions(options: BuildNetworkDisplayOptions): 
                     displayValue: uploadWidgetData.displayValue ?? uploadWidgetData.current.toFixed(0),
                     unit: uploadWidgetData.unit,
                     progress: uploadWidgetData.progress,
-                    color: resolveNetworkWidgetChannelColor("upload", options.settings, options.globalSettings, uploadWidgetData),
+                    color: resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData),
                     iconFragment: renderNetworkDirectionIconFragment({
                         direction: "upload",
                         color: NETWORK_DIRECTION_ICON_COLOR,
@@ -355,9 +356,9 @@ function buildLinearNetworkDisplayOptions(options: BuildNetworkDisplayOptions): 
             color: NETWORK_DIRECTION_ICON_COLOR,
         }),
         visualSettingsOverride: {
-            colorMode: "solid",
+            colorMode: resolveSolidVisualOverrideColorMode(options.settings.widget.slot.appearance.colorMode),
             usageColors: {
-                solidColor: resolveNetworkWidgetChannelColor("download", options.settings, options.globalSettings, downloadWidgetData),
+                solidColor: resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData),
             },
         },
     };
@@ -414,21 +415,15 @@ function buildNetworkCenterIconFragment(options: {
 function resolveNetworkWidgetChannelColor(
     direction: NetworkDirection,
     settings: ResolvedWidgetSettings,
-    globalSettings: ResolvedGlobalSettings,
     widgetData: WidgetData,
 ): string {
-    return resolveColorForThresholdValue(widgetData.progress * 100, buildNetworkChannelColorConfig(direction, settings, globalSettings));
+    return resolveColorForThresholdValue(widgetData.progress * 100, buildNetworkChannelColorConfig(direction, settings));
 }
 
 function buildNetworkChannelColorConfig(
     direction: NetworkDirection,
     settings: ResolvedWidgetSettings,
-    globalSettings: ResolvedGlobalSettings,
 ): ColorConfig {
-    if (globalSettings.appearanceOverride) {
-        return buildGlobalColorConfig(globalSettings.appearanceOverride);
-    }
-
     if (direction === "download") {
         const appearance = settings.widget.slot.appearance;
         return buildColorConfigFromRamp({

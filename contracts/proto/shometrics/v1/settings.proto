@@ -288,8 +288,12 @@ message GlobalDefaults {
 }
 
 message GlobalOverrides {
-  optional bool appearance_enabled = 1;
-  GlobalAppearanceOverride appearance = 2;
+  // Main switch for global override. When enabled, omitted subsection
+  // enabled fields resolve to enabled so one click applies both layout/style
+  // and color overrides.
+  optional bool enabled = 1;
+  GlobalLayoutStyleOverride layout_style = 2;
+  GlobalColorOverride color = 3;
 }
 
 // AppearanceSettings describes the visual presentation of one metric.
@@ -368,31 +372,40 @@ message AppearanceSettings {
   }];
 }
 
-message GlobalAppearanceOverride {
-  optional SingleMetricViewLayout view_layout = 1 [(buf.validate.field).enum = {
+message GlobalLayoutStyleOverride {
+  // When unset and global override is enabled, the resolver treats this
+  // subsection as enabled.
+  optional bool enabled = 1;
+  optional SingleMetricViewLayout view_layout = 2 [(buf.validate.field).enum = {
     defined_only: true
     not_in: [0]
   }];
-  optional CircleStyle circle_style = 2 [(buf.validate.field).enum = {
+  optional CircleStyle circle_style = 3 [(buf.validate.field).enum = {
     defined_only: true
     not_in: [0]
   }];
-  optional MetricTheme theme = 3 [(buf.validate.field).enum = {
+  optional MetricTheme theme = 4 [(buf.validate.field).enum = {
     defined_only: true
     not_in: [0]
   }];
+}
+
+message GlobalColorOverride {
+  // When unset and global override is enabled, the resolver treats this
+  // subsection as enabled.
+  optional bool enabled = 1;
 
   // One global color ramp applied to every widget channel. This keeps global
   // override behavior consistent with per-widget solid and dynamic color
   // settings without adding per-domain channel settings to the global layer.
-  ColorRamp colors = 4;
+  ColorRamp colors = 2;
 
-  optional ColorMode color_mode = 5 [(buf.validate.field).enum = {
+  optional ColorMode color_mode = 3 [(buf.validate.field).enum = {
     defined_only: true
     not_in: [0]
   }];
-  optional uint32 low_color_threshold_percent = 6 [(buf.validate.field).uint32.lte = 100];
-  optional uint32 high_color_threshold_percent = 7 [(buf.validate.field).uint32.lte = 100];
+  optional uint32 low_color_threshold_percent = 4 [(buf.validate.field).uint32.lte = 100];
+  optional uint32 high_color_threshold_percent = 5 [(buf.validate.field).uint32.lte = 100];
 }
 
 message ColorRamp {
@@ -457,6 +470,7 @@ enum ColorMode {
   COLOR_MODE_UNSPECIFIED = 0;
   COLOR_MODE_THRESHOLD = 1;
   COLOR_MODE_SOLID = 2;
+  COLOR_MODE_BLACK_WHITE = 3;
 }
 
 enum ScaleMode {
