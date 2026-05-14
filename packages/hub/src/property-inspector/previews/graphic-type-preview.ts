@@ -2,6 +2,8 @@ import { renderMetricFrame } from "../../rendering/metric-frame";
 import { renderSingleMetricBodyView } from "../../rendering/single-metric-view";
 import type { WidgetData } from "../../rendering/widget-data";
 import { WIDGET_LOGICAL_SIZE } from "../../rendering/widget-data";
+import { buildSampleResolvedAppearanceSettings } from "../../settings/sample-appearance-settings";
+import { buildMetricVisualSettings } from "../../settings/visual-adapter";
 import type { SingleMetricViewLayout } from "../inspector/settings-types";
 
 const previewData: WidgetData = {
@@ -20,27 +22,22 @@ const previewData: WidgetData = {
  * not injected into the browser DOM.
  */
 export function buildGraphicTypePreviewUri(graphicType: SingleMetricViewLayout): string {
+    const visualSettings = buildMetricVisualSettings(buildSampleResolvedAppearanceSettings({
+        viewLayout: graphicType,
+        colorMode: "solid",
+    }));
     const body = renderSingleMetricBodyView({
         data: previewData,
-        visual: {
-            graphicType,
-            colorConfig: {
-                mode: "solid",
-                solidColor: "#3b82f6",
-                thresholds: [],
-            },
-            lineSmoothingPercent: 75,
-            gridLineVisibility: "adaptive",
-            gridLineType: "horizontal",
-        },
+        visual: visualSettings,
         renderSize: WIDGET_LOGICAL_SIZE,
         centerIcon: "",
         circleStyle: "value",
     });
     const svg = renderMetricFrame({
         body,
-        graphicStyle: "flat",
+        graphicStyle: visualSettings.graphicStyle,
         muted: false,
+        paints: visualSettings.paints,
         size: WIDGET_LOGICAL_SIZE,
     });
 

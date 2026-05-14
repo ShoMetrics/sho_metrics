@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildMetricVisualSettings } from "./visual-adapter";
-import type { ResolvedAppearanceSettings } from "./resolved-settings";
+import { buildSampleResolvedAppearanceSettings as buildAppearanceSettings } from "./sample-appearance-settings";
 
 test("graphic type maps resolved appearance settings to renderer names", () => {
     const circularSettings = buildMetricVisualSettings(buildAppearanceSettings({ viewLayout: "circular" }));
@@ -37,21 +37,21 @@ test("solid color mode uses resolved appearance color", () => {
     const visualSettings = buildMetricVisualSettings(buildAppearanceSettings({
         colorMode: "solid",
         usageColors: {
-            ...defaultAppearanceSettings.usageColors,
+            ...buildAppearanceSettings().usageColors,
             solidColor: "#123456",
         },
     }));
 
-    assert.equal(visualSettings.colorConfig.solidColor, "#123456");
+    assert.equal(visualSettings.paints.primaryMetric.solidColor, "#123456");
 });
 
 test("threshold values build renderer color bands", () => {
-    const colorConfig = buildMetricVisualSettings(buildAppearanceSettings({
+    const primaryMetric = buildMetricVisualSettings(buildAppearanceSettings({
         lowColorThresholdPercent: 20,
         highColorThresholdPercent: 90,
-    })).colorConfig;
+    })).paints.primaryMetric;
 
-    assert.deepEqual(colorConfig.thresholds.map(threshold => ({
+    assert.deepEqual(primaryMetric.thresholds.map(threshold => ({
         min: threshold.min,
         max: threshold.max,
     })), [
@@ -62,16 +62,16 @@ test("threshold values build renderer color bands", () => {
 });
 
 test("threshold colors use resolved appearance colors", () => {
-    const colorConfig = buildMetricVisualSettings(buildAppearanceSettings({
+    const primaryMetric = buildMetricVisualSettings(buildAppearanceSettings({
         usageColors: {
-            ...defaultAppearanceSettings.usageColors,
+            ...buildAppearanceSettings().usageColors,
             lowColor: "#111111",
             mediumColor: "#222222",
             highColor: "#333333",
         },
-    })).colorConfig;
+    })).paints.primaryMetric;
 
-    assert.deepEqual(colorConfig.thresholds.map(threshold => threshold.color), [
+    assert.deepEqual(primaryMetric.thresholds.map(threshold => threshold.color), [
         "#111111",
         "#222222",
         "#333333",
@@ -84,12 +84,11 @@ test("black-white color mode lowers renderer paint to neutral colors", () => {
     }));
 
     assert.equal(visualSettings.paintConstraint, "black-white");
-    assert.deepEqual(visualSettings.colorConfig, {
+    assert.deepEqual(visualSettings.paints.primaryMetric, {
         mode: "solid",
         solidColor: "#e6e6e6",
         thresholds: [],
     });
-    assert.equal(visualSettings.paints.metricPrimary.solidColor, "#e6e6e6");
 });
 
 test("line smoothing and grid options pass through resolved appearance settings", () => {
@@ -103,52 +102,3 @@ test("line smoothing and grid options pass through resolved appearance settings"
     assert.equal(visualSettings.gridLineVisibility, "always");
     assert.equal(visualSettings.gridLineType, "vertical");
 });
-
-function buildAppearanceSettings(overrides: Partial<ResolvedAppearanceSettings> = {}): ResolvedAppearanceSettings {
-    return {
-        ...defaultAppearanceSettings,
-        ...overrides,
-    };
-}
-
-const defaultAppearanceSettings: ResolvedAppearanceSettings = {
-    viewLayout: "circular",
-    circleStyle: "value",
-    theme: "flat",
-    colorMode: "threshold",
-    usageColors: {
-        solidColor: "#3b82f6",
-        lowColor: "#22c55e",
-        mediumColor: "#eab308",
-        highColor: "#ef4444",
-    },
-    downloadColors: {
-        solidColor: "#3b82f6",
-        lowColor: "#22c55e",
-        mediumColor: "#3b82f6",
-        highColor: "#60a5fa",
-    },
-    uploadColors: {
-        solidColor: "#ef4444",
-        lowColor: "#f97316",
-        mediumColor: "#ef4444",
-        highColor: "#f472b6",
-    },
-    diskReadColors: {
-        solidColor: "#38bdf8",
-        lowColor: "#22c55e",
-        mediumColor: "#38bdf8",
-        highColor: "#60a5fa",
-    },
-    diskWriteColors: {
-        solidColor: "#f472b6",
-        lowColor: "#f97316",
-        mediumColor: "#f472b6",
-        highColor: "#fb7185",
-    },
-    lowColorThresholdPercent: 30,
-    highColorThresholdPercent: 70,
-    lineSmoothingPercent: 75,
-    gridLineVisibility: "adaptive",
-    gridLineType: "horizontal",
-};

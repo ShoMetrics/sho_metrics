@@ -35,7 +35,7 @@ interface LinearLayoutPlan {
     title: TextLineLayout;
     singleValue: ValueLineLayout;
     singleBar: BarLayout;
-    singleSecondary: TextLineLayout;
+    singleSecondaryText: TextLineLayout;
     channelValueFontSize: number;
     channelUnitFontSize: number;
     channelIconScale: number;
@@ -120,7 +120,7 @@ function buildLinearLayoutPlan(keySize: KeySize, config: LinearBarConfig): Linea
                 height: barHeight,
                 radius: barHeight / 2,
             },
-            singleSecondary: {
+            singleSecondaryText: {
                 xCoordinate: Math.round(keySize.width * 0.54),
                 yCoordinate: Math.round(keySize.height * 0.43),
                 fontSize: clamp(Math.round(keySize.height * 0.15), 12, 16),
@@ -156,7 +156,7 @@ function buildLinearLayoutPlan(keySize: KeySize, config: LinearBarConfig): Linea
             height: config.barHeight,
             radius: config.borderRadius,
         },
-        singleSecondary: {
+        singleSecondaryText: {
             xCoordinate: padding,
             yCoordinate: Math.round(keySize.height * 0.847),
             fontSize: clamp(Math.round(keySize.height * 0.11), 13, 16),
@@ -208,7 +208,7 @@ function renderSingleBar(
         ${renderFill(layoutPlan.singleBar, fillWidth, gradientId)}
         ${renderSecondaryText({
             text: data.secondaryDisplayValue,
-            layout: layoutPlan.singleSecondary,
+            layout: layoutPlan.singleSecondaryText,
             clipId: "linear-single-secondary",
         })}
     `;

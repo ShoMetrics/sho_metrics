@@ -6,6 +6,8 @@ import type { WidgetData } from "../../rendering/widget-data";
 import { buildDiskUsageWidgetData, buildMemoryUsageWidgetData } from "../../metrics/storage-widget-data";
 import { buildCpuUsageWidgetData } from "../cpu";
 import { buildGpuUsageWidgetData, buildGpuVramWidgetData } from "../gpu";
+import { buildSampleResolvedAppearanceSettings } from "../../settings/sample-appearance-settings";
+import { buildMetricVisualSettings } from "../../settings/visual-adapter";
 
 test("percentage metric builders expose integer display values for compact widgets", () => {
     const testCases: ReadonlyArray<{
@@ -58,6 +60,10 @@ test("percentage metric builders expose integer display values for compact widge
 });
 
 test("percentage action display values are honored by sparkline rendering", () => {
+    const visualSettings = buildMetricVisualSettings(buildSampleResolvedAppearanceSettings({
+        viewLayout: "sparkline",
+        colorMode: "solid",
+    }));
     const body = renderSingleMetricBodyView({
         data: buildGpuUsageWidgetData(buildWidgetData({
             current: 1,
@@ -65,17 +71,7 @@ test("percentage action display values are honored by sparkline rendering", () =
             history: [0, 1],
             label: "GPU",
         })),
-        visual: {
-            graphicType: "sparkline",
-            colorConfig: {
-                mode: "solid",
-                solidColor: "#3b82f6",
-                thresholds: [],
-            },
-            lineSmoothingPercent: 75,
-            gridLineVisibility: "adaptive",
-            gridLineType: "horizontal",
-        },
+        visual: visualSettings,
         renderSize: { width: 144, height: 144 },
         centerIcon: "",
         circleStyle: "value",
@@ -84,6 +80,7 @@ test("percentage action display values are honored by sparkline rendering", () =
         body,
         graphicStyle: "flat",
         muted: false,
+        paints: visualSettings.paints,
         size: { width: 144, height: 144 },
     });
 

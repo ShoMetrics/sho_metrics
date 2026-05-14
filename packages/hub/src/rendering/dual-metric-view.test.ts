@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderDualMetricBodyView } from "./dual-metric-view";
 import type { DualChannelWidgetData, WidgetData } from "./widget-data";
+import { buildSampleResolvedAppearanceSettings } from "../settings/sample-appearance-settings";
+import { buildMetricVisualSettings } from "../settings/visual-adapter";
 
 test("dual metric view renders the requested primitive branch", () => {
     const testCases = [
@@ -9,15 +11,12 @@ test("dual metric view renders the requested primitive branch", () => {
         { graphicType: "circular" as const, expected: /dual-arc-positive-row/ },
         { graphicType: "text" as const, expected: /text-metric-positive-value/ },
     ];
+    const visualSettings = buildMetricVisualSettings(buildSampleResolvedAppearanceSettings());
 
     for (const testCase of testCases) {
         const svg = renderDualMetricBodyView({
             data: buildDualChannelData(),
-            visual: {
-                lineSmoothingPercent: 75,
-                gridLineVisibility: "adaptive",
-                gridLineType: "horizontal",
-            },
+            visual: visualSettings,
             graphicType: testCase.graphicType,
             renderSize: { width: 144, height: 144 },
             titleText: "Network",
@@ -53,6 +52,7 @@ function buildDualChannelData(): DualChannelWidgetData {
         },
     };
 }
+
 
 function buildWidgetData(): WidgetData {
     return {
