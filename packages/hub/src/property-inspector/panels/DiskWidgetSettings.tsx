@@ -4,7 +4,7 @@ import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { TextSetting } from "../controls/TextSetting";
 import {
-    resolveDiskAutoLinearLabel,
+    resolveDiskLinearLabelPlaceholder,
     resolveDiskVolumeOptions,
     resolveSelectedDiskVolume,
     resolveSelectedDiskVolumeLabel,
@@ -61,7 +61,9 @@ function DiskUsageSettings(props: DiskWidgetSettingsProps & {
     reading: DiskUsageReading;
 }): React.JSX.Element {
     const graphicType = props.context.resolved.widget.slot.appearance.viewLayout;
-    const selectedDiskVolumeId = resolveSelectedDiskVolume(props.context)?.id ?? "";
+    const selectedDiskVolumeId = props.target.volumeId
+        ?? resolveSelectedDiskVolume(props.context)?.id
+        ?? "";
 
     return (
         <>
@@ -70,7 +72,7 @@ function DiskUsageSettings(props: DiskWidgetSettingsProps & {
                 <SelectSetting
                     label="Volume"
                     value={selectedDiskVolumeId}
-                    optionList={resolveDiskVolumeOptions(props.context)}
+                    optionList={resolveDiskVolumeOptions(props.context, selectedDiskVolumeId)}
                     onValueChange={(volumeId) => props.onSettingsPatch({
                         disk: { volumeId },
                     })}
@@ -201,7 +203,7 @@ function DiskUsageLabelSettings({
                 onValueChange={(linearLabel) => onSettingsPatch({
                     disk: { linearLabel },
                 })}
-                placeholder={resolveDiskAutoLinearLabel(context)}
+                placeholder={resolveDiskLinearLabelPlaceholder(context)}
                 actionButton={(
                     <button
                         className="inline-action-button"

@@ -47,6 +47,20 @@ test("disk usage circular settings render usage display controls", () => {
     assert.doesNotMatch(markup, /Custom Label:/);
 });
 
+test("disk usage settings preserve selected unavailable volume", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "disk",
+        settings: buildWidgetSettings("disk", {
+            disk: {
+                kind: "usage",
+                volumeId: "E:\\",
+            },
+        }),
+    });
+
+    assert.match(markup, /E: \(Unavailable\)/);
+});
+
 test("windows disk settings use usage controls when throughput is unavailable", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",

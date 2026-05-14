@@ -6,8 +6,11 @@ export function resolveNetworkInterfaceOptions(context: VisibilityContext): Sele
     return buildNetworkInterfaceOptions(context.runtimeCache.availableNetworkInterfaces);
 }
 
-export function resolveDiskVolumeOptions(context: VisibilityContext): SelectOption[] {
-    return buildDiskVolumeOptions(context);
+export function resolveDiskVolumeOptions(
+    context: VisibilityContext,
+    selectedDiskVolumeId = "",
+): SelectOption[] {
+    return buildDiskVolumeOptions(context, selectedDiskVolumeId);
 }
 
 function buildNetworkInterfaceOptions(networkInterfaces: readonly NetworkInterfaceOption[]): SelectOption[] {
@@ -28,34 +31,44 @@ function buildNetworkInterfaceOptions(networkInterfaces: readonly NetworkInterfa
     ];
 }
 
-function buildDiskVolumeOptions(context: VisibilityContext): SelectOption[] {
+function buildDiskVolumeOptions(context: VisibilityContext, selectedDiskVolumeId: string): SelectOption[] {
     const diskVolumes = context.runtimeCache.availableDiskVolumes;
-
-    if (diskVolumes.length === 0) {
-        let volumeOptionLabel: string;
-        switch (context.runtimeCacheStatus.diskVolumeOptionsStatus) {
-            case "pending":
-                volumeOptionLabel = "Loading volumes...";
-                break;
-            case "failed":
-                volumeOptionLabel = "Volumes unavailable";
-                break;
-            case "ready":
-                volumeOptionLabel = "No detected volumes";
-                break;
-        }
-
-        return [{
-            value: "",
-            label: volumeOptionLabel,
-            disabled: true,
-        }];
-    }
-
-    return diskVolumes.map((diskVolume) => ({
+    const diskVolumeOptions = diskVolumes.map((diskVolume) => ({
         value: diskVolume.id,
         label: formatDiskVolumeOptionLabel(diskVolume),
     }));
+    const hasSelectedDiskVolume = selectedDiskVolumeId.length > 0
+        && diskVolumeOptions.some(option => option.value === selectedDiskVolumeId);
+
+    if (selectedDiskVolumeId.length > 0 && !hasSelectedDiskVolume) {
+        diskVolumeOptions.unshift({
+            value: selectedDiskVolumeId,
+            label: `${formatDiskVolumeSelectionText(selectedDiskVolumeId)} (Unavailable)`,
+        });
+    }
+
+    if (diskVolumeOptions.length > 0) {
+        return diskVolumeOptions;
+    }
+
+    let volumeOptionLabel: string;
+    switch (context.runtimeCacheStatus.diskVolumeOptionsStatus) {
+        case "pending":
+            volumeOptionLabel = "Loading volumes...";
+            break;
+        case "failed":
+            volumeOptionLabel = "Volumes unavailable";
+            break;
+        case "ready":
+            volumeOptionLabel = "No detected volumes";
+            break;
+    }
+
+    return [{
+        value: "",
+        label: volumeOptionLabel,
+        disabled: true,
+    }];
 }
 
 export function resolveSelectedDiskVolumeLabel(context: VisibilityContext): string {
@@ -65,7 +78,7 @@ export function resolveSelectedDiskVolumeLabel(context: VisibilityContext): stri
     return volumeLabel && volumeLabel.length > 0 ? volumeLabel : "-";
 }
 
-export function resolveDiskAutoLinearLabel(context: VisibilityContext): string {
+export function resolveDiskLinearLabelPlaceholder(context: VisibilityContext): string {
     const diskVolume = resolveSelectedDiskVolume(context);
 
     if (!diskVolume) {
@@ -118,6 +131,12 @@ function formatDiskVolumeOptionLabel(diskVolume: DiskVolumeOption): string {
 
 function formatDiskVolumeSelectionLabel(diskVolume: DiskVolumeOption): string {
     const mountLabel = diskVolume.mount || diskVolume.fs || "Disk";
+
+    return formatDiskVolumeSelectionText(mountLabel);
+}
+
+function formatDiskVolumeSelectionText(value: string): string {
+    const mountLabel = value.trim();
     const windowsDriveMatch = /^([A-Z]):\\?$/i.exec(mountLabel);
 
     if (windowsDriveMatch) {

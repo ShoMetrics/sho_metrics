@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-    resolveDiskAutoLinearLabel,
+    resolveDiskLinearLabelPlaceholder,
     resolveDiskVolumeOptions,
     resolveNetworkInterfaceOptions,
     resolveSelectedDiskVolumeLabel,
@@ -67,6 +67,33 @@ test("disk volume options show loading before disk volume options arrive", () =>
     ]);
 });
 
+test("disk volume options preserve selected unavailable volume", () => {
+    const context = buildContext({
+        runtimeCache: {
+            availableDiskVolumes: [
+                buildDiskVolume({ id: "C:\\", mount: "C:\\", volumeLabel: "System" }),
+            ],
+        },
+    });
+
+    const optionList = resolveDiskVolumeOptions(context, "E:\\");
+
+    assert.deepEqual(optionList, [
+        { value: "E:\\", label: "E: (Unavailable)" },
+        { value: "C:\\", label: "C: (500 GB, System)" },
+    ]);
+});
+
+test("disk volume options show selected unavailable volume before volumes arrive", () => {
+    const context = buildContext();
+
+    const optionList = resolveDiskVolumeOptions(context, "E:\\");
+
+    assert.deepEqual(optionList, [
+        { value: "E:\\", label: "E: (Unavailable)" },
+    ]);
+});
+
 test("disk volume options show an empty state after disk volume options arrive empty", () => {
     const context = buildContext({
         runtimeCacheStatus: {
@@ -112,17 +139,17 @@ test("selected disk labels prefer explicit selection then root fallback", () => 
     });
 
     assert.equal(resolveSelectedDiskVolumeLabel(context), "Games");
-    assert.equal(resolveDiskAutoLinearLabel(context), "Auto: HDD (GAME)");
-    assert.equal(resolveDiskAutoLinearLabel(automaticContext), "Auto: SSD (C:)");
+    assert.equal(resolveDiskLinearLabelPlaceholder(context), "Auto: HDD (GAME)");
+    assert.equal(resolveDiskLinearLabelPlaceholder(automaticContext), "Auto: SSD (C:)");
 });
 
 test("selected disk label returns dash when no valid disk is available", () => {
     const context = buildContext();
     const selectedDiskVolumeLabel = resolveSelectedDiskVolumeLabel(context);
-    const diskAutoLinearLabel = resolveDiskAutoLinearLabel(context);
+    const diskLinearLabelPlaceholder = resolveDiskLinearLabelPlaceholder(context);
 
     assert.equal(selectedDiskVolumeLabel, "-");
-    assert.equal(diskAutoLinearLabel, "Auto");
+    assert.equal(diskLinearLabelPlaceholder, "Auto");
 });
 
 function buildContext(options: {

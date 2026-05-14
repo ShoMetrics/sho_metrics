@@ -18,11 +18,16 @@ import { buildGlobalColorConfig } from "../../settings/global-appearance";
 import { getDiskIcon, getDiskIconFragment, renderCenteredHardwareIconFragment } from "../../widgets/icons/hardware-icons";
 import { renderDiskThroughputDirectionIconFragment } from "../../widgets/icons/catalog/disk";
 import { getMetricStatusIcon } from "../../widgets/icons/metric-status-icons";
-import { ARC_GAUGE_LABELS } from "../../widgets/primitives/arc-gauge-label";
 import { escapeSvgText } from "../../rendering/svg-utils";
 import {
     isDualDiskThroughputDisplay,
 } from "./metric-subscriptions";
+import {
+    formatCompactDiskVolumeLabel,
+    resolveAvailableDiskVolume,
+    resolveDiskVolumeSelectionId,
+    type DiskVolumeSelection,
+} from "./volume-selection";
 import type { MetricDisplayOptions } from "../../metric-view-runner/display-model";
 import { buildColorConfigFromRamp } from "../shared/channel-color-config";
 
@@ -32,7 +37,7 @@ interface BuildDiskDisplayOptions {
     target: ResolvedDiskMetricTarget;
     globalSettings: ResolvedGlobalSettings;
     metricStore: MetricStore;
-    selectedVolume: DiskVolumeOption | null;
+    volumeSelection: DiskVolumeSelection;
 }
 
 type DiskUsageReading = Extract<ResolvedDiskMetricTarget["reading"], { readonly kind: "usage" }>;
@@ -50,16 +55,6 @@ export function buildDiskDisplayOptions(options: BuildDiskDisplayOptions): Metri
         ...options,
         reading: options.target.reading,
     });
-}
-
-export function formatAsCompactDiskVolumeLabel(diskVolume: DiskVolumeOption): string {
-    const mountLabel = diskVolume.mount || diskVolume.fs || ARC_GAUGE_LABELS.disk;
-
-    if (/^[A-Z]:\\?$/i.test(mountLabel)) {
-        return mountLabel.slice(0, 2).toUpperCase();
-    }
-
-    return mountLabel.slice(0, 4).toUpperCase();
 }
 
 export function resolveDiskMaximumThroughputMebibytesPerSecond(
@@ -81,16 +76,18 @@ export function resolveDiskMaximumThroughputMebibytesPerSecond(
 function buildDiskUsageDisplayOptions(
     options: BuildDiskDisplayOptions & { reading: DiskUsageReading },
 ): MetricDisplayOptions {
-    const usedMetricKey = options.selectedVolume
-        ? getDiskVolumeMetricKey("used", options.selectedVolume.id)
+    const selectedVolume = resolveAvailableDiskVolume(options.volumeSelection);
+    const selectedVolumeId = resolveDiskVolumeSelectionId(options.volumeSelection);
+    const usedMetricKey = selectedVolumeId
+        ? getDiskVolumeMetricKey("used", selectedVolumeId)
         : getDefaultDiskUsageMetricKey("used");
-    const totalMetricKey = options.selectedVolume
-        ? getDiskVolumeMetricKey("total", options.selectedVolume.id)
+    const totalMetricKey = selectedVolumeId
+        ? getDiskVolumeMetricKey("total", selectedVolumeId)
         : getDefaultDiskUsageMetricKey("total");
-    const availableMetricKey = options.selectedVolume
-        ? getDiskVolumeMetricKey("available", options.selectedVolume.id)
+    const availableMetricKey = selectedVolumeId
+        ? getDiskVolumeMetricKey("available", selectedVolumeId)
         : getDefaultDiskUsageMetricKey("available");
-    const label = options.selectedVolume ? formatAsCompactDiskVolumeLabel(options.selectedVolume) : ARC_GAUGE_LABELS.disk;
+    const label = formatCompactDiskVolumeLabel(options.volumeSelection);
     const usedBytesWidgetData = options.metricStore.getWidgetData(usedMetricKey, label, "B");
     const totalBytesWidgetData = options.metricStore.getWidgetData(totalMetricKey, label, "B");
     const availableBytesWidgetData = options.metricStore.getWidgetData(availableMetricKey, label, "B");
@@ -109,11 +106,11 @@ function buildDiskUsageDisplayOptions(
             availableBytes: availableBytesWidgetData.current,
             displayMode: options.reading.displayMode,
             label,
-            linearLabel: resolveDiskLinearLabel(options.reading.linearLabel, options.selectedVolume, label),
+            linearLabel: resolveDiskLinearLabel(options.reading.linearLabel, selectedVolume, label),
         }),
-        centerIconFragment: buildDiskCenterIconFragment(options.selectedVolume),
-        footerIconFragment: shouldRenderGauge ? undefined : buildDiskGaugeFooterIconFragment(options.selectedVolume),
-        linearIconFragment: getDiskIconFragment(options.selectedVolume?.storageKind ?? "unknown"),
+        centerIconFragment: buildDiskCenterIconFragment(options.volumeSelection),
+        footerIconFragment: shouldRenderGauge ? undefined : buildDiskGaugeFooterIconFragment(selectedVolume),
+        linearIconFragment: getDiskIconFragment(selectedVolume?.storageKind ?? "unknown"),
         statusIcon: getMetricStatusIcon("percentage"),
         circleStyleOverride: circleStyle,
     };
@@ -132,9 +129,10 @@ function buildDiskThroughputDisplayOptions(
 
     const singleThroughputDirection = throughputDirection === "both" ? "total" : throughputDirection;
     const throughputMetricKey = getDiskThroughputMetricKey(singleThroughputDirection);
-    const throughputLabel = options.selectedVolume
-        ? formatAsCompactDiskVolumeLabel(options.selectedVolume)
-        : ARC_GAUGE_LABELS.disk;
+    const selectedVolume = resolveAvailableDiskVolume(options.volumeSelection);
+    const throughputLabel = selectedVolume
+        ? formatCompactDiskVolumeLabel({ kind: "available", volume: selectedVolume })
+        : "DISK";
     const bytesPerSecondWidgetData = options.metricStore.getWidgetData(throughputMetricKey, throughputLabel, "B/s");
     const circleStyle = appearance.circleStyle;
     const shouldRenderGaugeFooter = effectiveGraphicType === "circular" && circleStyle === "gauge";
@@ -148,7 +146,7 @@ function buildDiskThroughputDisplayOptions(
             maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond(
                 singleThroughputDirection,
                 options.reading,
-                options.selectedVolume,
+                selectedVolume,
             ),
             label: throughputLabel,
         }),
@@ -177,14 +175,15 @@ function buildDualThroughputDisplayOptions(
     const dualGraphicType = effectiveGraphicType === "circular"
         ? "circular"
         : effectiveGraphicType === "text" ? "text" : undefined;
+    const selectedVolume = resolveAvailableDiskVolume(options.volumeSelection);
     const readWidgetData = buildDiskThroughputWidgetData({
         bytesPerSecondWidgetData: options.metricStore.getWidgetData(readMetricKey, "READ", "B/s"),
-        maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("read", options.reading, options.selectedVolume),
+        maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("read", options.reading, selectedVolume),
         label: "READ",
     });
     const writeWidgetData = buildDiskThroughputWidgetData({
         bytesPerSecondWidgetData: options.metricStore.getWidgetData(writeMetricKey, "WRIT", "B/s"),
-        maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("write", options.reading, options.selectedVolume),
+        maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("write", options.reading, selectedVolume),
         label: "WRIT",
     });
     const readColor = resolveDiskWidgetChannelColor("read", options.settings, options.globalSettings, readWidgetData);
@@ -234,7 +233,7 @@ function buildDiskLinearLabel(diskVolume: DiskVolumeOption | null, fallbackLabel
     }
 
     const storageKind = resolveCompactDiskStorageLabel(diskVolume);
-    const volumeLabel = formatAsCompactDiskVolumeLabel(diskVolume);
+    const volumeLabel = formatCompactDiskVolumeLabel({ kind: "available", volume: diskVolume });
 
     return `${storageKind} (${volumeLabel})`;
 }
@@ -269,9 +268,10 @@ function resolveCompactDiskStorageLabel(diskVolume: DiskVolumeOption): string {
     return "DSK";
 }
 
-function buildDiskCenterIconFragment(diskVolume: DiskVolumeOption | null): string {
+function buildDiskCenterIconFragment(volumeSelection: DiskVolumeSelection): string {
+    const diskVolume = resolveAvailableDiskVolume(volumeSelection);
     const icon = getDiskIcon(diskVolume?.storageKind ?? "unknown");
-    const volumeLabel = diskVolume ? formatAsCompactDiskVolumeLabel(diskVolume) : ARC_GAUGE_LABELS.disk;
+    const volumeLabel = formatCompactDiskVolumeLabel(volumeSelection);
 
     return `
         <g transform="translate(0 -10)">

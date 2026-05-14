@@ -152,6 +152,37 @@ UI decision:
   runtime seed bridge unless measured evidence shows the localized global
   readiness delay is still unacceptable.
 
+## Follow-up Observation: Runtime Option Lists
+
+Runtime option lists, such as disk volumes and network interfaces, are
+runtime-only facts. They must not be written into stored settings.
+
+Disk volume options have one known low-priority cold-start edge case:
+
+```txt
+plugin cold starts
+disk action state has the default empty runtime cache
+Property Inspector opens before the first real disk volume snapshot
+the UI can briefly show "No detected volumes"
+the background runtime refresh then replaces it with the real list
+```
+
+This is a P4 issue. It is reproducible only around plugin cold start before the
+first runtime snapshot, and it self-corrects after the background refresh.
+Stream Deck normally starts with the system, and cold start also means the
+hardware UI itself is still warming up.
+
+Current decision:
+
+- Do not add a separate "published runtime cache keys" mechanism only for this
+  cold-start flash.
+- Keep runtime option lists in runtime cache and refresh them asynchronously
+  when Property Inspector opens.
+- Spend the next disk runtime-option work on explicit stale selection handling:
+  if a saved hot-plugged disk is no longer present, the widget and PI must show
+  that saved disk as unavailable instead of silently falling back to another
+  disk.
+
 ## Missing Settings
 
 Missing settings are normal for a newly dragged widget. The UI should show defaults and no error.
