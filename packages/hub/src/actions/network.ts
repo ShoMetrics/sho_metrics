@@ -1,6 +1,7 @@
-import { action, WillAppearEvent } from "@elgato/streamdeck";
+import { action, PropertyInspectorDidAppearEvent, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import { metricStore } from "../runtime/metric-store";
+import { scheduler } from "../runtime/scheduler";
 import { setMetricDisplay } from "../metric-view-runner/runner";
 import { logger } from "../logging/logger";
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../runtime/network-interfaces";
@@ -22,6 +23,7 @@ import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 
 const log = logger.for("Action:Network");
+const NETWORK_INTERFACE_LIST_REFRESH_METRIC_KEYS = [getNetworkAggregateMetricKey("download")] as const;
 
 /**
  * Network action.
@@ -73,7 +75,17 @@ export class Network extends MetricAction {
         setMetricDisplay(displayUpdate.displayOptions);
     }
 
-    private publishNetworkInterfaceOptions(event: WillAppearEvent): void {
+    protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
+        scheduler.refreshMetrics(NETWORK_INTERFACE_LIST_REFRESH_METRIC_KEYS)
+            .then(() => {
+                this.publishNetworkInterfaceOptions(event);
+            })
+            .catch(error => {
+                log.error(() => `Failed to refresh network interfaces for Property Inspector: ${String(error)}`);
+            });
+    }
+
+    private publishNetworkInterfaceOptions(event: WillAppearEvent | PropertyInspectorDidAppearEvent): void {
         const availableNetworkInterfaces = [...networkInterfaceRegistry.getOptions()];
 
         this.updateRuntimeCache(event, {

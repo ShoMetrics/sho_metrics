@@ -1,6 +1,7 @@
-import { action, WillAppearEvent } from "@elgato/streamdeck";
+import { action, PropertyInspectorDidAppearEvent, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import { metricStore } from "../runtime/metric-store";
+import { scheduler } from "../runtime/scheduler";
 import { setMetricDisplay } from "../metric-view-runner/runner";
 import { logger } from "../logging/logger";
 import { diskVolumeRegistry, type DiskVolumeOption } from "../runtime/disk-volumes";
@@ -21,6 +22,7 @@ import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 
 const log = logger.for("Action:Disk");
+const DISK_VOLUME_LIST_REFRESH_METRIC_KEYS = [getDefaultDiskUsageMetricKey("used")] as const;
 
 @action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.disk })
 export class Disk extends MetricAction {
@@ -77,7 +79,17 @@ export class Disk extends MetricAction {
         }));
     }
 
-    private publishDiskVolumeOptions(event: WillAppearEvent): void {
+    protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
+        scheduler.refreshMetrics(DISK_VOLUME_LIST_REFRESH_METRIC_KEYS)
+            .then(() => {
+                this.publishDiskVolumeOptions(event);
+            })
+            .catch(error => {
+                log.error(() => `Failed to refresh disk volumes for Property Inspector: ${String(error)}`);
+            });
+    }
+
+    private publishDiskVolumeOptions(event: WillAppearEvent | PropertyInspectorDidAppearEvent): void {
         const availableDiskVolumes = [...diskVolumeRegistry.getOptions()];
 
         this.updateRuntimeCache(event, {
