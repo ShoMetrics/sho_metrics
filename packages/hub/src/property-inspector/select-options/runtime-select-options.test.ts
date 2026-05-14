@@ -81,6 +81,20 @@ test("disk volume options show an empty state after disk volume options arrive e
     ]);
 });
 
+test("disk volume options show unavailable when disk volume options fail", () => {
+    const context = buildContext({
+        runtimeCacheStatus: {
+            diskVolumeOptionsStatus: "failed",
+        },
+    });
+
+    const optionList = resolveDiskVolumeOptions(context);
+
+    assert.deepEqual(optionList, [
+        { value: "", label: "Volumes unavailable", disabled: true },
+    ]);
+});
+
 test("selected disk labels prefer explicit selection then root fallback", () => {
     const context = buildContext({
         settings: buildDiskSettings({ volumeId: "D:\\Games" }),

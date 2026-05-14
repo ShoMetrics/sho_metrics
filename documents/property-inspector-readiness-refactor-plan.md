@@ -495,6 +495,10 @@ test("widget settings renders normally after global override is loaded disabled"
 
 Global refresh must not wait for widget refresh:
 
+TODO: add this hook/App-level async order test after the Property Inspector has
+a real async render harness. Do not export hook internals or add a one-off
+testing framework only for this assertion.
+
 ```ts
 test("global settings update is applied without waiting for widget settings refresh", async () => {
     const client = createDeferredSettingsClient();

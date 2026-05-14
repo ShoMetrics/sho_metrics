@@ -207,6 +207,28 @@ test("widget settings waits for global settings before rendering final controls"
     assert.equal(markup, "");
 });
 
+test("widget settings waits for global settings before rendering mismatch recovery", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "gpu",
+        isGlobalSettingsReady: false,
+        isGlobalAppearanceOverrideEnabled: false,
+        settings: buildWidgetSettings("cpu", {}),
+    });
+
+    assert.equal(markup, "");
+});
+
+test("widget settings renders normally after global settings load without override", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "gpu",
+        isGlobalSettingsReady: true,
+        isGlobalAppearanceOverrideEnabled: false,
+    });
+
+    assert.match(markup, /GPU Metric:/);
+    assert.doesNotMatch(markup, /Some settings are disabled/);
+});
+
 test("widget settings keep warnings first and reset in advanced controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",

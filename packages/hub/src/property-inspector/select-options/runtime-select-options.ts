@@ -32,11 +32,22 @@ function buildDiskVolumeOptions(context: VisibilityContext): SelectOption[] {
     const diskVolumes = context.runtimeCache.availableDiskVolumes;
 
     if (diskVolumes.length === 0) {
+        let volumeOptionLabel: string;
+        switch (context.runtimeCacheStatus.diskVolumeOptionsStatus) {
+            case "pending":
+                volumeOptionLabel = "Loading volumes...";
+                break;
+            case "failed":
+                volumeOptionLabel = "Volumes unavailable";
+                break;
+            case "ready":
+                volumeOptionLabel = "No detected volumes";
+                break;
+        }
+
         return [{
             value: "",
-            label: context.runtimeCacheStatus.diskVolumeOptionsStatus === "ready"
-                ? "No detected volumes"
-                : "Loading volumes...",
+            label: volumeOptionLabel,
             disabled: true,
         }];
     }
