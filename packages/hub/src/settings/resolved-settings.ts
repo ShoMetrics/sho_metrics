@@ -18,7 +18,7 @@
 export type SingleMetricViewLayout = "circular" | "text" | "linear" | "sparkline";
 export type CircleStyle = "value" | "compact" | "gauge";
 export type MetricTheme = "flat" | "cupertino-glass";
-export type ColorMode = "threshold" | "solid";
+export type ColorMode = "threshold" | "solid" | "black-white";
 export type GridLineVisibility = "adaptive" | "always" | "none";
 export type GridLineType = "horizontal" | "vertical";
 export type ScaleMode = "auto" | "custom";
@@ -190,7 +190,9 @@ export interface ResolvedDiskThroughputDisplaySettings {
 
 export interface ResolvedGlobalSettings {
     readonly defaults: ResolvedGlobalDefaults;
-    readonly appearanceOverride: ResolvedGlobalAppearanceOverride | undefined;
+    readonly globalOverrideEnabled: boolean;
+    readonly layoutStyleOverride: ResolvedGlobalLayoutStyleOverride | undefined;
+    readonly colorOverride: ResolvedGlobalColorOverride | undefined;
     readonly sourceProfiles: readonly ResolvedMetricSourceProfile[];
     readonly defaultSourceProfileId: string | undefined;
 }
@@ -203,10 +205,13 @@ export interface ResolvedGlobalDefaults {
     readonly diskThroughput: ResolvedDiskThroughputDisplaySettings;
 }
 
-export interface ResolvedGlobalAppearanceOverride {
+export interface ResolvedGlobalLayoutStyleOverride {
     readonly viewLayout: SingleMetricViewLayout;
     readonly circleStyle: CircleStyle;
     readonly theme: MetricTheme;
+}
+
+export interface ResolvedGlobalColorOverride {
     readonly colors: ResolvedColorRamp;
     readonly colorMode: ColorMode;
     readonly lowColorThresholdPercent: number;

@@ -12,7 +12,6 @@ import {
 } from "../runtime/network-metric-keys";
 import { resolveNetworkMetricSubscriptionKeys } from "./network/metric-subscriptions";
 import type { ResolvedNetworkMetricTarget } from "../settings/resolved-settings";
-import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
     buildNetworkDisplayUpdate,
     resolveNetworkMaximumBytesPerSecond,
@@ -58,7 +57,6 @@ export class Network extends MetricAction {
             event,
             settings,
             target: networkTarget,
-            globalSettings: pluginGlobalSettingsStore.getResolved(),
             metricStore,
             selectedNetworkInterface,
         });

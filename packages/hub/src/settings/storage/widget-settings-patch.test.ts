@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+    ColorMode as StoredColorMode,
     GpuMetricTarget_Kind as StoredGpuMetricKind,
 } from "../../generated/shometrics/v1/settings_pb";
 import { readStoredWidgetSettings } from "./codec";
@@ -45,4 +46,17 @@ test("widget patch updates GPU reading within the GPU action domain", () => {
     if (target?.case === "gpu") {
         assert.equal(target.value.kind, StoredGpuMetricKind.POWER);
     }
+});
+
+test("widget patch writes black-white color mode", () => {
+    const cpuSettings = resolveQuickStartStoredWidgetSettings(undefined, "cpu").rawSettings;
+
+    const nextSettings = writeStoredWidgetSettingsPatch(cpuSettings, {
+        appearance: {
+            colorMode: "black-white",
+        },
+    });
+
+    const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
+    assert.equal(appearance?.colorMode, StoredColorMode.BLACK_WHITE);
 });

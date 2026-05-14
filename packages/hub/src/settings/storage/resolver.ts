@@ -22,7 +22,8 @@ import {
     type ColorRamp as StoredColorRamp,
     type DiskMetricTarget as StoredDiskMetricTarget,
     type DiskThroughputDisplaySettings as StoredDiskThroughputDisplaySettings,
-    type GlobalAppearanceOverride as StoredGlobalAppearanceOverride,
+    type GlobalColorOverride as StoredGlobalColorOverride,
+    type GlobalLayoutStyleOverride as StoredGlobalLayoutStyleOverride,
     type GpuMetricTarget as StoredGpuMetricTarget,
     type MetricSelection as StoredMetricSelection,
     type MetricSlot as StoredMetricSlot,
@@ -49,8 +50,9 @@ import type {
     ResolvedColorRamp,
     ResolvedDiskReading,
     ResolvedDiskThroughputDisplaySettings,
-    ResolvedGlobalAppearanceOverride,
+    ResolvedGlobalColorOverride,
     ResolvedGlobalDefaults,
+    ResolvedGlobalLayoutStyleOverride,
     ResolvedGlobalSettings,
     ResolvedGpuReading,
     ResolvedHttpMetricSourceConnection,
@@ -182,6 +184,7 @@ const colorModeByProto = {
     [StoredColorMode.UNSPECIFIED]: undefined,
     [StoredColorMode.THRESHOLD]: "threshold",
     [StoredColorMode.SOLID]: "solid",
+    [StoredColorMode.BLACK_WHITE]: "black-white",
 } satisfies Record<StoredColorMode, ColorMode | undefined>;
 
 const gridLineVisibilityByProto = {
@@ -281,10 +284,21 @@ export function resolveStoredWidgetSettings(
 export function resolveStoredGlobalSettings(
     storedGlobalSettings: StoredGlobalSettings | undefined,
 ): ResolvedGlobalSettings {
+    const storedOverrides = storedGlobalSettings?.overrides;
+    const globalOverrideEnabled = storedOverrides?.enabled === true;
+    const layoutStyleOverrideEnabled = globalOverrideEnabled
+        && (storedOverrides?.layoutStyle?.enabled ?? true);
+    const colorOverrideEnabled = globalOverrideEnabled
+        && (storedOverrides?.color?.enabled ?? true);
+
     return {
         defaults: resolveGlobalDefaults(storedGlobalSettings),
-        appearanceOverride: storedGlobalSettings?.overrides?.appearanceEnabled === true
-            ? resolveGlobalAppearanceOverride(storedGlobalSettings.overrides.appearance)
+        globalOverrideEnabled,
+        layoutStyleOverride: layoutStyleOverrideEnabled
+            ? resolveGlobalLayoutStyleOverride(storedOverrides?.layoutStyle)
+            : undefined,
+        colorOverride: colorOverrideEnabled
+            ? resolveGlobalColorOverride(storedOverrides?.color)
             : undefined,
         sourceProfiles: (storedGlobalSettings?.sourceProfiles ?? []).map(resolveMetricSourceProfile),
         defaultSourceProfileId: storedGlobalSettings?.defaultSourceProfileId,
@@ -319,6 +333,12 @@ function resolveMetricSlot(
         DEFAULT_APPEARANCE_SETTINGS,
         storedSlot?.overrides?.appearance,
     );
+    const appearanceWithLayoutStyleOverride = globalSettings.layoutStyleOverride
+        ? applyGlobalLayoutStyleOverride(slotAppearance, globalSettings.layoutStyleOverride)
+        : slotAppearance;
+    const appearance = globalSettings.colorOverride
+        ? applyGlobalColorOverride(appearanceWithLayoutStyleOverride, globalSettings.colorOverride)
+        : appearanceWithLayoutStyleOverride;
 
     return {
         metric: resolveMetricSelection(
@@ -327,9 +347,7 @@ function resolveMetricSlot(
             diskThroughputDisplay,
             runtime,
         ),
-        appearance: globalSettings.appearanceOverride
-            ? applyGlobalAppearanceOverride(slotAppearance, globalSettings.appearanceOverride)
-            : slotAppearance,
+        appearance,
     };
 }
 
@@ -560,26 +578,33 @@ function resolveGlobalDefaults(
     };
 }
 
-function resolveGlobalAppearanceOverride(
-    storedAppearance: StoredGlobalAppearanceOverride | undefined,
-): ResolvedGlobalAppearanceOverride {
+function resolveGlobalLayoutStyleOverride(
+    storedOverride: StoredGlobalLayoutStyleOverride | undefined,
+): ResolvedGlobalLayoutStyleOverride {
     return {
         viewLayout: resolveStoredEnum(
-            storedAppearance?.viewLayout,
+            storedOverride?.viewLayout,
             singleMetricViewLayoutByProto,
             DEFAULT_APPEARANCE_SETTINGS.viewLayout,
         ),
         circleStyle: resolveStoredEnum(
-            storedAppearance?.circleStyle,
+            storedOverride?.circleStyle,
             circleStyleByProto,
             DEFAULT_APPEARANCE_SETTINGS.circleStyle,
         ),
-        theme: resolveStoredEnum(storedAppearance?.theme, metricThemeByProto, DEFAULT_APPEARANCE_SETTINGS.theme),
-        colors: mergeColorRamp(DEFAULT_APPEARANCE_SETTINGS.usageColors, storedAppearance?.colors),
-        colorMode: resolveStoredEnum(storedAppearance?.colorMode, colorModeByProto, "solid"),
-        lowColorThresholdPercent: storedAppearance?.lowColorThresholdPercent
+        theme: resolveStoredEnum(storedOverride?.theme, metricThemeByProto, DEFAULT_APPEARANCE_SETTINGS.theme),
+    };
+}
+
+function resolveGlobalColorOverride(
+    storedOverride: StoredGlobalColorOverride | undefined,
+): ResolvedGlobalColorOverride {
+    return {
+        colors: mergeColorRamp(DEFAULT_APPEARANCE_SETTINGS.usageColors, storedOverride?.colors),
+        colorMode: resolveStoredEnum(storedOverride?.colorMode, colorModeByProto, "solid"),
+        lowColorThresholdPercent: storedOverride?.lowColorThresholdPercent
             ?? DEFAULT_APPEARANCE_SETTINGS.lowColorThresholdPercent,
-        highColorThresholdPercent: storedAppearance?.highColorThresholdPercent
+        highColorThresholdPercent: storedOverride?.highColorThresholdPercent
             ?? DEFAULT_APPEARANCE_SETTINGS.highColorThresholdPercent,
     };
 }
@@ -637,23 +662,32 @@ function mergeAppearanceSettings(
     };
 }
 
-function applyGlobalAppearanceOverride(
+function applyGlobalLayoutStyleOverride(
     appearance: ResolvedAppearanceSettings,
-    globalAppearance: ResolvedGlobalAppearanceOverride,
+    layoutStyleOverride: ResolvedGlobalLayoutStyleOverride,
 ): ResolvedAppearanceSettings {
     return {
         ...appearance,
-        viewLayout: globalAppearance.viewLayout,
-        circleStyle: globalAppearance.circleStyle,
-        theme: globalAppearance.theme,
-        colorMode: globalAppearance.colorMode,
-        usageColors: globalAppearance.colors,
-        downloadColors: globalAppearance.colors,
-        uploadColors: globalAppearance.colors,
-        diskReadColors: globalAppearance.colors,
-        diskWriteColors: globalAppearance.colors,
-        lowColorThresholdPercent: globalAppearance.lowColorThresholdPercent,
-        highColorThresholdPercent: globalAppearance.highColorThresholdPercent,
+        viewLayout: layoutStyleOverride.viewLayout,
+        circleStyle: layoutStyleOverride.circleStyle,
+        theme: layoutStyleOverride.theme,
+    };
+}
+
+function applyGlobalColorOverride(
+    appearance: ResolvedAppearanceSettings,
+    colorOverride: ResolvedGlobalColorOverride,
+): ResolvedAppearanceSettings {
+    return {
+        ...appearance,
+        colorMode: colorOverride.colorMode,
+        usageColors: colorOverride.colors,
+        downloadColors: colorOverride.colors,
+        uploadColors: colorOverride.colors,
+        diskReadColors: colorOverride.colors,
+        diskWriteColors: colorOverride.colors,
+        lowColorThresholdPercent: colorOverride.lowColorThresholdPercent,
+        highColorThresholdPercent: colorOverride.highColorThresholdPercent,
     };
 }
 

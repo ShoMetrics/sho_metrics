@@ -74,14 +74,16 @@ describe("stored settings proto resolver", () => {
         assert.equal(target.reading.display.maximumUploadSpeedMegabitsPerSecond, 50);
     });
 
-    it("applies global appearance override without changing non-appearance settings", () => {
+    it("applies global override without changing non-appearance settings", () => {
         const storedGlobalSettings = readStoredGlobalSettings({
             overrides: {
-                appearanceEnabled: true,
-                appearance: {
+                enabled: true,
+                layoutStyle: {
                     viewLayout: "SINGLE_METRIC_VIEW_LAYOUT_LINEAR",
                     circleStyle: "CIRCLE_STYLE_GAUGE",
                     theme: "METRIC_THEME_CUPERTINO_GLASS",
+                },
+                color: {
                     colors: {
                         solidColor: "#111111",
                     },
@@ -118,6 +120,66 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.slot.appearance.theme, "cupertino-glass");
         assert.equal(settings.widget.slot.appearance.colorMode, "solid");
         assert.equal(settings.widget.slot.appearance.usageColors.solidColor, "#111111");
+    });
+
+    it("resolves black-white as a user-facing color mode", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    overrides: {
+                        appearance: {
+                            colorMode: "COLOR_MODE_BLACK_WHITE",
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+        });
+
+        assert.equal(settings.widget.slot.appearance.colorMode, "black-white");
+    });
+
+    it("applies global color override without replacing widget layout and style", () => {
+        const storedGlobalSettings = readStoredGlobalSettings({
+            overrides: {
+                enabled: true,
+                layoutStyle: {
+                    enabled: false,
+                },
+                color: {
+                    colorMode: "COLOR_MODE_BLACK_WHITE",
+                },
+            },
+        }).settings;
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    overrides: {
+                        appearance: {
+                            viewLayout: "SINGLE_METRIC_VIEW_LAYOUT_SPARKLINE",
+                            theme: "METRIC_THEME_CUPERTINO_GLASS",
+                            colorMode: "COLOR_MODE_SOLID",
+                            usageColors: {
+                                solidColor: "#222222",
+                            },
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+            storedGlobalSettings,
+        });
+
+        assert.equal(settings.widget.slot.appearance.viewLayout, "sparkline");
+        assert.equal(settings.widget.slot.appearance.theme, "cupertino-glass");
+        assert.equal(settings.widget.slot.appearance.colorMode, "black-white");
+        assert.equal(settings.widget.slot.appearance.usageColors.solidColor, "#3b82f6");
     });
 
     it("uses kind switches for disk metric branches", () => {

@@ -303,7 +303,7 @@ function buildWidgetSettings(pollingFrequencySeconds: number): SettingsRecord {
 function buildGlobalSettings(isAppearanceOverrideEnabled: boolean): SettingsRecord {
     return {
         overrides: {
-            appearanceEnabled: isAppearanceOverrideEnabled,
+            enabled: isAppearanceOverrideEnabled,
         },
     };
 }

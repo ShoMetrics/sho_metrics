@@ -12,7 +12,8 @@ import {
 } from "./setting-options";
 import type {
     ResolvedDiskThroughputDisplaySettings,
-    ResolvedGlobalAppearanceOverride,
+    ResolvedGlobalColorOverride,
+    ResolvedGlobalLayoutStyleOverride,
     ResolvedGlobalSettings,
     ResolvedNetworkDisplaySettings,
 } from "../../settings/resolved-settings";
@@ -26,15 +27,27 @@ interface PluginSettingsTabProps {
 export function PluginSettingsTab({ resolvedSettings, onSettingsPatch }: PluginSettingsTabProps): React.JSX.Element {
     return (
         <div>
-            <OverrideSection
-                isAppearanceOverrideEnabled={resolvedSettings.appearanceOverride !== undefined}
-                onOverrideChange={(appearanceEnabled) => onSettingsPatch({ appearanceEnabled })}
+            <GlobalOverrideSection
+                isGlobalOverrideEnabled={resolvedSettings.globalOverrideEnabled}
+                onOverrideChange={(globalOverrideEnabled) => onSettingsPatch({ globalOverrideEnabled })}
             />
-            {resolvedSettings.appearanceOverride && (
-                <OverrideAppearanceSection
-                    appearance={resolvedSettings.appearanceOverride}
-                    onAppearancePatch={(appearance) => onSettingsPatch({ appearance })}
-                />
+            {resolvedSettings.globalOverrideEnabled && (
+                <>
+                    <LayoutStyleOverrideSection
+                        layoutStyleOverride={resolvedSettings.layoutStyleOverride}
+                        onOverrideChange={(layoutStyleOverrideEnabled) => onSettingsPatch({
+                            layoutStyleOverrideEnabled,
+                        })}
+                        onLayoutStylePatch={(layoutStyle) => onSettingsPatch({ layoutStyle })}
+                    />
+                    <ColorOverrideSection
+                        colorOverride={resolvedSettings.colorOverride}
+                        onOverrideChange={(colorOverrideEnabled) => onSettingsPatch({
+                            colorOverrideEnabled,
+                        })}
+                        onColorPatch={(color) => onSettingsPatch({ color })}
+                    />
+                </>
             )}
             <NetworkDefaultsSection
                 network={resolvedSettings.defaults.network}
@@ -48,12 +61,12 @@ export function PluginSettingsTab({ resolvedSettings, onSettingsPatch }: PluginS
     );
 }
 
-function OverrideSection({
-    isAppearanceOverrideEnabled,
+function GlobalOverrideSection({
+    isGlobalOverrideEnabled,
     onOverrideChange,
 }: {
-    isAppearanceOverrideEnabled: boolean;
-    onOverrideChange: (isAppearanceOverrideEnabled: boolean) => void;
+    isGlobalOverrideEnabled: boolean;
+    onOverrideChange: (isGlobalOverrideEnabled: boolean) => void;
 }): React.JSX.Element {
     return (
         <SettingsSection title="Override">
@@ -62,13 +75,13 @@ function OverrideSection({
                     <label className="native-checkbox-row">
                         <input
                             type="checkbox"
-                            checked={isAppearanceOverrideEnabled}
+                            checked={isGlobalOverrideEnabled}
                             onChange={(event) => onOverrideChange(event.currentTarget.checked)}
                         />
-                        <span>Override appearance</span>
+                        <span>Global override</span>
                     </label>
                     <p className="section-note">
-                        Widget appearance settings are disabled while the override is enabled.
+                        Apply selected layout, style, and color settings to every widget.
                     </p>
                 </div>
             </InspectorItem>
@@ -76,40 +89,96 @@ function OverrideSection({
     );
 }
 
-function OverrideAppearanceSection({
-    appearance,
-    onAppearancePatch,
+function LayoutStyleOverrideSection({
+    layoutStyleOverride,
+    onOverrideChange,
+    onLayoutStylePatch,
 }: {
-    appearance: ResolvedGlobalAppearanceOverride;
-    onAppearancePatch: (patch: NonNullable<StoredGlobalSettingsPatch["appearance"]>) => void;
+    layoutStyleOverride: ResolvedGlobalLayoutStyleOverride | undefined;
+    onOverrideChange: (isEnabled: boolean) => void;
+    onLayoutStylePatch: (patch: NonNullable<StoredGlobalSettingsPatch["layoutStyle"]>) => void;
 }): React.JSX.Element {
     return (
-        <SettingsSection title="Override Appearance">
-            <GraphicTypeSetting
-                value={appearance.viewLayout}
-                onValueChange={(viewLayout) => onAppearancePatch({ viewLayout })}
+        <SettingsSection title="Layout & Style Override">
+            <OverrideSubsectionToggle
+                label="Override layout and style"
+                isEnabled={layoutStyleOverride !== undefined}
+                onValueChange={onOverrideChange}
             />
-            <CircleStyleSetting
-                value={appearance.circleStyle}
-                onValueChange={(circleStyle) => onAppearancePatch({ circleStyle })}
-                disabled={appearance.viewLayout !== "circular"}
-            />
-            <SelectSetting
-                label="Graphic Style"
-                value={appearance.theme}
-                optionList={graphicStyleOptionList}
-                onValueChange={(theme) => onAppearancePatch({ theme })}
-            />
-            <ColorRampSettings
-                colorMode={appearance.colorMode}
-                colors={appearance.colors}
-                lowColorThresholdPercent={appearance.lowColorThresholdPercent}
-                highColorThresholdPercent={appearance.highColorThresholdPercent}
-                onColorModeChange={(colorMode) => onAppearancePatch({ colorMode })}
-                onColorRampPatch={(colors) => onAppearancePatch({ colors })}
-                onThresholdPatch={onAppearancePatch}
-            />
+            {layoutStyleOverride && (
+                <>
+                    <GraphicTypeSetting
+                        value={layoutStyleOverride.viewLayout}
+                        onValueChange={(viewLayout) => onLayoutStylePatch({ viewLayout })}
+                    />
+                    <CircleStyleSetting
+                        value={layoutStyleOverride.circleStyle}
+                        onValueChange={(circleStyle) => onLayoutStylePatch({ circleStyle })}
+                        disabled={layoutStyleOverride.viewLayout !== "circular"}
+                    />
+                    <SelectSetting
+                        label="Graphic Style"
+                        value={layoutStyleOverride.theme}
+                        optionList={graphicStyleOptionList}
+                        onValueChange={(theme) => onLayoutStylePatch({ theme })}
+                    />
+                </>
+            )}
         </SettingsSection>
+    );
+}
+
+function ColorOverrideSection({
+    colorOverride,
+    onOverrideChange,
+    onColorPatch,
+}: {
+    colorOverride: ResolvedGlobalColorOverride | undefined;
+    onOverrideChange: (isEnabled: boolean) => void;
+    onColorPatch: (patch: NonNullable<StoredGlobalSettingsPatch["color"]>) => void;
+}): React.JSX.Element {
+    return (
+        <SettingsSection title="Color Override">
+            <OverrideSubsectionToggle
+                label="Override color"
+                isEnabled={colorOverride !== undefined}
+                onValueChange={onOverrideChange}
+            />
+            {colorOverride && (
+                <ColorRampSettings
+                    colorMode={colorOverride.colorMode}
+                    colors={colorOverride.colors}
+                    lowColorThresholdPercent={colorOverride.lowColorThresholdPercent}
+                    highColorThresholdPercent={colorOverride.highColorThresholdPercent}
+                    onColorModeChange={(colorMode) => onColorPatch({ colorMode })}
+                    onColorRampPatch={(colors) => onColorPatch({ colors })}
+                    onThresholdPatch={onColorPatch}
+                />
+            )}
+        </SettingsSection>
+    );
+}
+
+function OverrideSubsectionToggle({
+    label,
+    isEnabled,
+    onValueChange,
+}: {
+    label: string;
+    isEnabled: boolean;
+    onValueChange: (isEnabled: boolean) => void;
+}): React.JSX.Element {
+    return (
+        <InspectorItem label="Enabled">
+            <label className="native-checkbox-row">
+                <input
+                    type="checkbox"
+                    checked={isEnabled}
+                    onChange={(event) => onValueChange(event.currentTarget.checked)}
+                />
+                <span>{label}</span>
+            </label>
+        </InspectorItem>
     );
 }
 

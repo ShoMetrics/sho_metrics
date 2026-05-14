@@ -10,7 +10,8 @@ import { SettingsSection } from "./SettingsSection";
 
 interface WidgetSettingsTabProps {
     context: VisibilityContext;
-    isGlobalAppearanceOverrideEnabled: boolean;
+    isGlobalLayoutStyleOverrideEnabled: boolean;
+    isGlobalColorOverrideEnabled: boolean;
     onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
     onResetWidgetSettings: () => void;
 }
@@ -19,7 +20,8 @@ const WIDGET_SETTINGS_PENDING_NOTICE_DELAY_MS = 1000;
 
 export function WidgetSettingsTab({
     context,
-    isGlobalAppearanceOverrideEnabled,
+    isGlobalLayoutStyleOverrideEnabled,
+    isGlobalColorOverrideEnabled,
     onSettingsPatch,
     onResetWidgetSettings,
 }: WidgetSettingsTabProps): React.JSX.Element {
@@ -54,12 +56,14 @@ export function WidgetSettingsTab({
     const panelProps = {
         context,
         onSettingsPatch,
-        appearanceDisabled: isGlobalAppearanceOverrideEnabled,
+        layoutStyleDisabled: isGlobalLayoutStyleOverrideEnabled,
+        colorDisabled: isGlobalColorOverrideEnabled,
     };
+    const hasGlobalOverride = isGlobalLayoutStyleOverrideEnabled || isGlobalColorOverrideEnabled;
 
     return (
         <>
-            {isGlobalAppearanceOverrideEnabled && (
+            {hasGlobalOverride && (
                 <InspectorItem className="note-item note-item-caption">
                     <p className="section-note">Some settings are disabled since global override is enabled.</p>
                 </InspectorItem>
@@ -84,7 +88,8 @@ function renderMetricPanel(
     panelProps: {
         context: VisibilityContext;
         onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
-        appearanceDisabled: boolean;
+        layoutStyleDisabled: boolean;
+        colorDisabled: boolean;
     },
 ): React.JSX.Element {
     const actionKind = panelProps.context.actionKind;

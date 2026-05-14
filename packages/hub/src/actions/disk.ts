@@ -12,7 +12,6 @@ import {
 } from "../runtime/disk-metric-keys";
 import { resolveDiskMetricSubscriptionKeys } from "./disk/metric-subscriptions";
 import type { ResolvedDiskMetricTarget } from "../settings/resolved-settings";
-import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
     buildDiskDisplayOptions,
     resolveDiskMaximumThroughputMebibytesPerSecond,
@@ -68,7 +67,6 @@ export class Disk extends MetricAction {
             event,
             settings,
             target: diskTarget,
-            globalSettings: pluginGlobalSettingsStore.getResolved(),
             metricStore,
             volumeSelection,
         }));

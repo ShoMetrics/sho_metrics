@@ -1,9 +1,10 @@
 import { create } from "@bufbuild/protobuf";
 import {
     ColorRampSchema,
-    GlobalAppearanceOverrideSchema,
-    GlobalDefaultsSchema,
+    GlobalColorOverrideSchema,
     GlobalOverridesSchema,
+    GlobalLayoutStyleOverrideSchema,
+    GlobalDefaultsSchema,
     NetworkDisplaySettingsSchema,
     DiskThroughputDisplaySettingsSchema,
 } from "../../generated/shometrics/v1/settings_pb.js";
@@ -31,11 +32,15 @@ import {
 } from "./enum-maps";
 
 export interface StoredGlobalSettingsPatch {
-    readonly appearanceEnabled?: boolean | undefined;
-    readonly appearance?: Partial<{
+    readonly globalOverrideEnabled?: boolean | undefined;
+    readonly layoutStyleOverrideEnabled?: boolean | undefined;
+    readonly colorOverrideEnabled?: boolean | undefined;
+    readonly layoutStyle?: Partial<{
         readonly viewLayout: SingleMetricViewLayout;
         readonly circleStyle: CircleStyle;
         readonly theme: MetricTheme;
+    }> | undefined;
+    readonly color?: Partial<{
         readonly colors: ColorRampPatch;
         readonly colorMode: ColorMode;
         readonly lowColorThresholdPercent: number;
@@ -63,34 +68,52 @@ export function writeStoredGlobalSettingsPatch(
     settings.defaults ??= create(GlobalDefaultsSchema);
     settings.overrides ??= create(GlobalOverridesSchema);
 
-    if (patch.appearanceEnabled !== undefined) {
-        settings.overrides.appearanceEnabled = patch.appearanceEnabled;
+    const overrides = settings.overrides;
+    const layoutStylePatch = patch.layoutStyle;
+    const colorPatch = patch.color;
+
+    if (patch.globalOverrideEnabled !== undefined) {
+        overrides.enabled = patch.globalOverrideEnabled;
     }
-    if (patch.appearance) {
-        const appearance = settings.overrides.appearance ??= create(GlobalAppearanceOverrideSchema);
-        if (patch.appearance.viewLayout !== undefined) {
-            appearance.viewLayout = storedSingleMetricViewLayoutByResolved[patch.appearance.viewLayout];
+
+    if (patch.layoutStyleOverrideEnabled !== undefined || layoutStylePatch !== undefined) {
+        const layoutStyle = overrides.layoutStyle ??= create(GlobalLayoutStyleOverrideSchema);
+
+        if (patch.layoutStyleOverrideEnabled !== undefined) {
+            layoutStyle.enabled = patch.layoutStyleOverrideEnabled;
         }
-        if (patch.appearance.circleStyle !== undefined) {
-            appearance.circleStyle = storedCircleStyleByResolved[patch.appearance.circleStyle];
+        if (layoutStylePatch?.viewLayout !== undefined) {
+            layoutStyle.viewLayout = storedSingleMetricViewLayoutByResolved[layoutStylePatch.viewLayout];
         }
-        if (patch.appearance.theme !== undefined) {
-            appearance.theme = storedThemeByResolved[patch.appearance.theme];
+        if (layoutStylePatch?.circleStyle !== undefined) {
+            layoutStyle.circleStyle = storedCircleStyleByResolved[layoutStylePatch.circleStyle];
         }
-        if (patch.appearance.colors !== undefined) {
-            appearance.colors ??= create(ColorRampSchema);
-            applyColorRampPatch(appearance.colors, patch.appearance.colors);
-        }
-        if (patch.appearance.colorMode !== undefined) {
-            appearance.colorMode = storedColorModeByResolved[patch.appearance.colorMode];
-        }
-        if (patch.appearance.lowColorThresholdPercent !== undefined) {
-            appearance.lowColorThresholdPercent = patch.appearance.lowColorThresholdPercent;
-        }
-        if (patch.appearance.highColorThresholdPercent !== undefined) {
-            appearance.highColorThresholdPercent = patch.appearance.highColorThresholdPercent;
+        if (layoutStylePatch?.theme !== undefined) {
+            layoutStyle.theme = storedThemeByResolved[layoutStylePatch.theme];
         }
     }
+
+    if (patch.colorOverrideEnabled !== undefined || colorPatch !== undefined) {
+        const color = overrides.color ??= create(GlobalColorOverrideSchema);
+
+        if (patch.colorOverrideEnabled !== undefined) {
+            color.enabled = patch.colorOverrideEnabled;
+        }
+        if (colorPatch?.colors !== undefined) {
+            color.colors ??= create(ColorRampSchema);
+            applyColorRampPatch(color.colors, colorPatch.colors);
+        }
+        if (colorPatch?.colorMode !== undefined) {
+            color.colorMode = storedColorModeByResolved[colorPatch.colorMode];
+        }
+        if (colorPatch?.lowColorThresholdPercent !== undefined) {
+            color.lowColorThresholdPercent = colorPatch.lowColorThresholdPercent;
+        }
+        if (colorPatch?.highColorThresholdPercent !== undefined) {
+            color.highColorThresholdPercent = colorPatch.highColorThresholdPercent;
+        }
+    }
+
     if (patch.network) {
         const network = settings.defaults.network ??= create(NetworkDisplaySettingsSchema);
         if (patch.network.scaleMode !== undefined) {
@@ -106,6 +129,7 @@ export function writeStoredGlobalSettingsPatch(
             network.unitBase = storedNetworkUnitBaseByResolved[patch.network.unitBase];
         }
     }
+
     if (patch.diskThroughput) {
         const diskThroughput = settings.defaults.diskThroughput ??= create(DiskThroughputDisplaySettingsSchema);
         if (patch.diskThroughput.scaleMode !== undefined) {

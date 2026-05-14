@@ -10,11 +10,9 @@ import {
 import { buildDiskThroughputWidgetData, buildDiskUsageWidgetData } from "../../metrics/storage-widget-data";
 import type {
     ResolvedDiskMetricTarget,
-    ResolvedGlobalSettings,
     ResolvedWidgetSettings,
 } from "../../settings/resolved-settings";
 import { resolveColorForThresholdValue, type ColorConfig } from "../../rendering/color-resolver";
-import { buildGlobalColorConfig } from "../../settings/global-appearance";
 import { getDiskIcon, getDiskIconFragment, renderCenteredHardwareIconFragment } from "../../widgets/icons/hardware-icons";
 import { renderDiskThroughputDirectionIconFragment } from "../../widgets/icons/catalog/disk";
 import { getMetricStatusIcon } from "../../widgets/icons/metric-status-icons";
@@ -30,13 +28,12 @@ import {
     type DiskVolumeSelection,
 } from "./volume-selection";
 import type { MetricDisplayOptions } from "../../metric-view-runner/display-model";
-import { buildColorConfigFromRamp } from "../shared/channel-color-config";
+import { buildColorConfigFromRamp, resolveSolidVisualOverrideColorMode } from "../../settings/visual-adapter";
 
 interface BuildDiskDisplayOptions {
     event: WillAppearEvent;
     settings: ResolvedWidgetSettings;
     target: ResolvedDiskMetricTarget;
-    globalSettings: ResolvedGlobalSettings;
     metricStore: MetricStore;
     volumeSelection: DiskVolumeSelection;
 }
@@ -199,10 +196,11 @@ function buildDualThroughputDisplayOptions(
         maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("write", options.reading, selectedVolume),
         label: "WRIT",
     });
-    const readColor = resolveDiskWidgetChannelColor("read", options.settings, options.globalSettings, readWidgetData);
-    const writeColor = resolveDiskWidgetChannelColor("write", options.settings, options.globalSettings, writeWidgetData);
-    const readColorConfig = buildDiskChannelColorConfig("read", options.settings, options.globalSettings);
-    const writeColorConfig = buildDiskChannelColorConfig("write", options.settings, options.globalSettings);
+    const readColor = resolveDiskWidgetChannelColor("read", options.settings, readWidgetData);
+    const writeColor = resolveDiskWidgetChannelColor("write", options.settings, writeWidgetData);
+    const readColorConfig = buildDiskChannelColorConfig("read", options.settings);
+    const writeColorConfig = buildDiskChannelColorConfig("write", options.settings);
+    const solidVisualOverrideColorMode = resolveSolidVisualOverrideColorMode(appearance.colorMode);
 
     return {
         event: options.event,
@@ -234,7 +232,7 @@ function buildDualThroughputDisplayOptions(
             size: DISK_THROUGHPUT_DIRECTION_ICON_SIZE,
         }),
         visualSettingsOverride: {
-            colorMode: "solid",
+            colorMode: solidVisualOverrideColorMode,
             usageColors: { solidColor: readColor },
         },
     };
@@ -360,21 +358,15 @@ function resolveDefaultDiskMaximumThroughputMebibytesPerSecond(
 function resolveDiskWidgetChannelColor(
     direction: Exclude<DiskThroughputDirection, "both" | "total">,
     settings: ResolvedWidgetSettings,
-    globalSettings: ResolvedGlobalSettings,
     widgetData: { progress: number },
 ): string {
-    return resolveColorForThresholdValue(widgetData.progress * 100, buildDiskChannelColorConfig(direction, settings, globalSettings));
+    return resolveColorForThresholdValue(widgetData.progress * 100, buildDiskChannelColorConfig(direction, settings));
 }
 
 function buildDiskChannelColorConfig(
     direction: Exclude<DiskThroughputDirection, "both" | "total">,
     settings: ResolvedWidgetSettings,
-    globalSettings: ResolvedGlobalSettings,
 ): ColorConfig {
-    if (globalSettings.appearanceOverride) {
-        return buildGlobalColorConfig(globalSettings.appearanceOverride);
-    }
-
     if (direction === "read") {
         const appearance = settings.widget.slot.appearance;
         return buildColorConfigFromRamp({
