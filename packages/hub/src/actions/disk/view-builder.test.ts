@@ -3,6 +3,7 @@ import test from "node:test";
 import type { WillAppearEvent } from "@elgato/streamdeck";
 import { MetricStore } from "../../runtime/metric-store";
 import { getDiskVolumeMetricKey } from "../../runtime/disk-metric-keys";
+import { buildMetricSnapshot, buildScalarMetricValue } from "../../runtime/sources/source.interface";
 import { buildMetricDisplayRenderPlan, buildRenderWidgetData } from "../../metric-view-runner/display-model";
 import { readStoredGlobalSettings } from "../../settings/storage/codec";
 import { resolveStoredGlobalSettings } from "../../settings/storage/resolver";
@@ -32,12 +33,23 @@ test("disk usage display keeps explicit unavailable volume instead of falling ba
         assert.fail("Expected disk target.");
     }
 
+    const metricStore = new MetricStore();
+    metricStore.ingest(buildMetricSnapshot({
+        sourceId: "test",
+        timestampMilliseconds: 1000,
+        metrics: {
+            [getDiskVolumeMetricKey("used", "E:\\")]: buildScalarMetricValue(40, { unit: "B" }),
+            [getDiskVolumeMetricKey("total", "E:\\")]: buildScalarMetricValue(100, { unit: "B" }),
+            [getDiskVolumeMetricKey("available", "E:\\")]: buildScalarMetricValue(60, { unit: "B" }),
+        },
+    }));
+
     const displayOptions = buildDiskDisplayOptions({
         event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
         settings,
         target,
         globalSettings: resolveStoredGlobalSettings(readStoredGlobalSettings(undefined).settings),
-        metricStore: new MetricStore(),
+        metricStore,
         volumeSelection: { kind: "unavailable", volumeId: "E:\\" },
     });
 
