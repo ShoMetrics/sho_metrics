@@ -19,6 +19,7 @@ import { getDiskIcon, getDiskIconFragment, renderCenteredHardwareIconFragment } 
 import { renderDiskThroughputDirectionIconFragment } from "../../widgets/icons/catalog/disk";
 import { getMetricStatusIcon } from "../../widgets/icons/metric-status-icons";
 import { escapeSvgText } from "../../rendering/svg-utils";
+import type { WidgetData } from "../../rendering/widget-data";
 import {
     isDualDiskThroughputDisplay,
 } from "./metric-subscriptions";
@@ -88,7 +89,9 @@ function buildDiskUsageDisplayOptions(
         ? getDiskVolumeMetricKey("available", selectedVolumeId)
         : getDefaultDiskUsageMetricKey("available");
     const label = formatCompactDiskVolumeLabel(options.volumeSelection);
-    const usedBytesWidgetData = options.metricStore.getWidgetData(usedMetricKey, label, "B");
+    const usedBytesWidgetData = options.volumeSelection.kind === "unavailable"
+        ? buildUnavailableDiskBytesWidgetData(label)
+        : options.metricStore.getWidgetData(usedMetricKey, label, "B");
     const totalBytesWidgetData = options.metricStore.getWidgetData(totalMetricKey, label, "B");
     const availableBytesWidgetData = options.metricStore.getWidgetData(availableMetricKey, label, "B");
     const appearance = options.settings.widget.slot.appearance;
@@ -113,6 +116,16 @@ function buildDiskUsageDisplayOptions(
         linearIconFragment: getDiskIconFragment(selectedVolume?.storageKind ?? "unknown"),
         statusIcon: getMetricStatusIcon("percentage"),
         circleStyleOverride: circleStyle,
+    };
+}
+
+function buildUnavailableDiskBytesWidgetData(label: string): WidgetData {
+    return {
+        current: 0,
+        progress: 0,
+        history: [],
+        unit: "B",
+        label,
     };
 }
 

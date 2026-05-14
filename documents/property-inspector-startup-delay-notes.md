@@ -183,6 +183,25 @@ Current decision:
   that saved disk as unavailable instead of silently falling back to another
   disk.
 
+Disk widget hot-plug visibility has a separate polling-limit trade-off:
+
+```txt
+disk polling interval = worst-case widget-side disk hot-plug detection latency
+```
+
+The widget learns that a selected disk disappeared from the next successful
+disk metrics poll, because that poll refreshes the disk volume registry. If the
+user sets disk polling to 60 seconds, the widget may show the previous state for
+up to 60 seconds before switching to the unavailable/N/A state.
+
+Current decision:
+
+- Accept this as the polling-only MVP behavior.
+- Do not add a disk-only timer, watcher, or one-off device refresh loop.
+- If hot-plug immediacy becomes important across disks, network interfaces,
+  GPU devices, audio devices, or other runtime hardware lists, design one shared
+  runtime device registry/watch layer instead of solving it per widget.
+
 ## Missing Settings
 
 Missing settings are normal for a newly dragged widget. The UI should show defaults and no error.

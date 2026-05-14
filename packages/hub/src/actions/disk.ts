@@ -8,7 +8,6 @@ import { diskVolumeRegistry, type DiskVolumeOption } from "../runtime/disk-volum
 import {
     getDefaultDiskUsageMetricKey,
     getDiskThroughputMetricKey,
-    getDiskVolumeMetricKey,
     type DiskThroughputDirection,
 } from "../runtime/disk-metric-keys";
 import { resolveDiskMetricSubscriptionKeys } from "./disk/metric-subscriptions";
@@ -20,14 +19,17 @@ import {
 } from "./disk/view-builder";
 import {
     resolveAvailableDiskVolume,
-    resolveDiskVolumeSelectionId,
     type DiskVolumeSelection,
 } from "./disk/volume-selection";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 
 const log = logger.for("Action:Disk");
-const DISK_VOLUME_LIST_REFRESH_METRIC_KEYS = [getDefaultDiskUsageMetricKey("used")] as const;
+const DISK_USAGE_REFRESH_METRIC_KEYS = [
+    getDefaultDiskUsageMetricKey("used"),
+    getDefaultDiskUsageMetricKey("total"),
+    getDefaultDiskUsageMetricKey("available"),
+] as const;
 
 @action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.disk })
 export class Disk extends MetricAction {
@@ -46,21 +48,7 @@ export class Disk extends MetricAction {
             });
         }
 
-        const volumeSelection = resolveDiskVolumeSelection(diskTarget.volumeId);
-
-        const selectedVolumeId = resolveDiskVolumeSelectionId(volumeSelection);
-
-        return selectedVolumeId
-            ? [
-                getDiskVolumeMetricKey("used", selectedVolumeId),
-                getDiskVolumeMetricKey("total", selectedVolumeId),
-                getDiskVolumeMetricKey("available", selectedVolumeId),
-            ]
-            : [
-                getDefaultDiskUsageMetricKey("used"),
-                getDefaultDiskUsageMetricKey("total"),
-                getDefaultDiskUsageMetricKey("available"),
-            ];
+        return DISK_USAGE_REFRESH_METRIC_KEYS;
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
@@ -87,7 +75,7 @@ export class Disk extends MetricAction {
     }
 
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
-        scheduler.refreshMetrics(DISK_VOLUME_LIST_REFRESH_METRIC_KEYS)
+        scheduler.refreshMetrics(DISK_USAGE_REFRESH_METRIC_KEYS)
             .then(() => {
                 this.publishDiskVolumeOptions(event);
             })
