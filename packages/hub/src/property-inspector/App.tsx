@@ -17,12 +17,16 @@ export function App({ client }: AppProps): React.JSX.Element {
     const {
         visibilityContext,
         resolvedGlobalSettings,
+        globalSettingsStatus,
         widgetSettingsNotice,
         pluginSettingsNotice,
         updateWidgetSettings,
         resetWidgetSettings,
         updateGlobalSettings,
     } = usePropertyInspectorSettings(client);
+    const isGlobalSettingsReady = globalSettingsStatus === "ready";
+    const isGlobalAppearanceOverrideEnabled =
+        isGlobalSettingsReady && resolvedGlobalSettings.appearanceOverride !== undefined;
 
     return (
         <div>
@@ -56,7 +60,8 @@ export function App({ client }: AppProps): React.JSX.Element {
             {activeTab === "widget" ? (
                 <WidgetSettingsTab
                     context={visibilityContext}
-                    isGlobalAppearanceOverrideEnabled={resolvedGlobalSettings.appearanceOverride !== undefined}
+                    isGlobalSettingsReady={isGlobalSettingsReady}
+                    isGlobalAppearanceOverrideEnabled={isGlobalAppearanceOverrideEnabled}
                     onSettingsPatch={updateWidgetSettings}
                     onResetWidgetSettings={resetWidgetSettings}
                 />
