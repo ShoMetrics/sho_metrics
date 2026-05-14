@@ -1,5 +1,6 @@
 import type { ColorConfig } from "./color-resolver";
 import type { DualChannelWidgetData, KeySize } from "./widget-data";
+import type { RenderPaintTokens } from "../settings/visual-adapter";
 import type { ArcGaugeStatusIcon, ArcGaugeStyle } from "../widgets/primitives/arc-gauge";
 import {
     DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG,
@@ -32,6 +33,7 @@ interface DualMetricChannelViewProps {
 export interface DualMetricBodyViewProps {
     data: DualChannelWidgetData;
     visual: {
+        paints: RenderPaintTokens;
         lineSmoothingPercent: number;
         gridLineVisibility: SparklineGridLineVisibility;
         gridLineType: SparklineGridLineType;
@@ -61,6 +63,10 @@ export function renderDualMetricBodyView(options: DualMetricBodyViewProps): stri
 function renderDualCircularMetric(options: DualMetricBodyViewProps): string {
     return renderDualChannelArcGauge(options.data, {
         ...DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG,
+        trackColor: options.visual.paints.track,
+        valueTextColor: options.visual.paints.primaryText,
+        unitTextColor: options.visual.paints.secondaryText,
+        dividerColor: options.visual.paints.divider,
         positiveColor: options.positive.color,
         negativeColor: options.negative.color,
         positiveColorConfig: options.positive.colorConfig,
@@ -79,6 +85,9 @@ function renderDualCircularMetric(options: DualMetricBodyViewProps): string {
 function renderDualTextMetricView(options: DualMetricBodyViewProps): string {
     return renderDualTextMetric(options.data, {
         ...DEFAULT_TEXT_METRIC_CONFIG,
+        labelTextColor: options.visual.paints.secondaryText,
+        unitTextColor: options.visual.paints.secondaryText,
+        secondaryTextColor: options.visual.paints.mutedText,
         positiveColor: options.positive.color,
         negativeColor: options.negative.color,
     }, options.renderSize);

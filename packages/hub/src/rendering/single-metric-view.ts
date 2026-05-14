@@ -1,5 +1,5 @@
-import type { ColorConfig } from "./color-resolver";
 import type { KeySize, WidgetData } from "./widget-data";
+import type { RenderPaintTokens } from "../settings/visual-adapter";
 import {
     arcGauge,
     DEFAULT_ARC_GAUGE_CONFIG,
@@ -27,7 +27,7 @@ export interface SingleMetricBodyViewProps {
     data: WidgetData;
     visual: {
         graphicType: SingleMetricGraphicType;
-        colorConfig: ColorConfig;
+        paints: RenderPaintTokens;
         lineSmoothingPercent: number;
         gridLineVisibility: SparklineGridLineVisibility;
         gridLineType: SparklineGridLineType;
@@ -56,7 +56,11 @@ export function renderSingleMetricBodyView(options: SingleMetricBodyViewProps): 
 function renderSingleCircularMetric(options: SingleMetricBodyViewProps): string {
     return arcGauge.render(options.data, {
         ...DEFAULT_ARC_GAUGE_CONFIG,
-        colorConfig: options.visual.colorConfig,
+        colorConfig: options.visual.paints.primaryMetric,
+        trackColor: options.visual.paints.track,
+        labelTextColor: options.visual.paints.secondaryText,
+        valueTextColor: options.visual.paints.primaryText,
+        unitTextColor: options.visual.paints.secondaryText,
         circleStyle: options.circleStyle,
         centerIconFragment: options.centerIcon,
         footerIconFragment: options.footerIcon,
@@ -67,14 +71,18 @@ function renderSingleCircularMetric(options: SingleMetricBodyViewProps): string 
 function renderSingleTextMetric(options: SingleMetricBodyViewProps): string {
     return textMetric.render(options.data, {
         ...DEFAULT_TEXT_METRIC_CONFIG,
-        colorConfig: options.visual.colorConfig,
+        colorConfig: options.visual.paints.primaryMetric,
+        labelTextColor: options.visual.paints.secondaryText,
+        unitTextColor: options.visual.paints.secondaryText,
+        secondaryTextColor: options.visual.paints.mutedText,
     }, options.renderSize);
 }
 
 function renderSingleLinearMetric(options: SingleMetricBodyViewProps): string {
     return linearBar.render(options.data, {
         ...DEFAULT_LINEAR_BAR_CONFIG,
-        colorConfig: options.visual.colorConfig,
+        colorConfig: options.visual.paints.primaryMetric,
+        trackColor: options.visual.paints.track,
         topIconFragment: options.linearIcon ?? options.centerIcon,
     }, options.renderSize);
 }
@@ -82,7 +90,7 @@ function renderSingleLinearMetric(options: SingleMetricBodyViewProps): string {
 function renderSingleSparklineMetric(options: SingleMetricBodyViewProps): string {
     return sparkline.render(options.data, {
         ...DEFAULT_SPARKLINE_CONFIG,
-        colorConfig: options.visual.colorConfig,
+        colorConfig: options.visual.paints.primaryMetric,
         lineSmoothingPercent: options.visual.lineSmoothingPercent,
         gridLineVisibility: options.visual.gridLineVisibility,
         gridLineType: options.visual.gridLineType,

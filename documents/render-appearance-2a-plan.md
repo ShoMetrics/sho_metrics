@@ -113,11 +113,11 @@ interface RenderAppearance {
 interface RenderPaintTokens {
     readonly background: string;
     readonly surface: string;
-    readonly textPrimary: string;
-    readonly textSecondary: string;
-    readonly textMuted: string;
+    readonly primaryText: string;
+    readonly secondaryText: string;
+    readonly mutedText: string;
     readonly icon: string;
-    readonly metricPrimary: ColorConfig;
+    readonly primaryMetric: ColorConfig;
     readonly track: string;
     readonly grid: string;
     readonly divider: string;
@@ -211,11 +211,11 @@ Good token names:
 
 - `background`
 - `surface`
-- `textPrimary`
-- `textSecondary`
-- `textMuted`
+- `primaryText`
+- `secondaryText`
+- `mutedText`
 - `icon`
-- `metricPrimary`
+- `primaryMetric`
 - `track`
 - `grid`
 - `divider`

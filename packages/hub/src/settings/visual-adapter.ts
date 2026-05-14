@@ -20,11 +20,11 @@ export type RenderPaintConstraint = "none" | "black-white";
 export interface RenderPaintTokens {
     readonly background: string;
     readonly surface: string;
-    readonly textPrimary: string;
-    readonly textSecondary: string;
-    readonly textMuted: string;
+    readonly primaryText: string;
+    readonly secondaryText: string;
+    readonly mutedText: string;
     readonly icon: string;
-    readonly metricPrimary: ColorConfig;
+    readonly primaryMetric: ColorConfig;
     readonly track: string;
     readonly grid: string;
     readonly divider: string;
@@ -34,10 +34,8 @@ export interface ResolvedMetricVisualSettings {
     graphicType: ResolvedAppearanceSettings["viewLayout"];
     circleStyle: ArcGaugeStyle;
     graphicStyle: GraphicThemePresetName;
-    colorMode: ColorMode;
     paintConstraint: RenderPaintConstraint;
     paints: RenderPaintTokens;
-    colorConfig: ColorConfig;
     lineSmoothingPercent: number;
     gridLineVisibility: SparklineGridLineVisibility;
     gridLineType: SparklineGridLineType;
@@ -61,10 +59,8 @@ export function buildMetricVisualSettings(
         graphicType: settings.viewLayout,
         circleStyle: settings.circleStyle,
         graphicStyle: settings.theme,
-        colorMode: settings.colorMode,
         paintConstraint: settings.colorMode === "black-white" ? "black-white" : "none",
         paints: buildRenderPaintTokens(colorConfig),
-        colorConfig,
         lineSmoothingPercent: settings.lineSmoothingPercent,
         gridLineVisibility: settings.gridLineVisibility,
         gridLineType: settings.gridLineType,
@@ -128,15 +124,15 @@ function lowerColorConfigForColorMode(colorMode: ColorMode, colorConfig: ColorCo
     };
 }
 
-function buildRenderPaintTokens(metricPrimary: ColorConfig): RenderPaintTokens {
+function buildRenderPaintTokens(primaryMetric: ColorConfig): RenderPaintTokens {
     return {
         background: "#0f0f0f",
         surface: "rgba(255,255,255,0.08)",
-        textPrimary: "rgba(255,255,255,0.94)",
-        textSecondary: "rgba(255,255,255,0.72)",
-        textMuted: "rgba(255,255,255,0.48)",
+        primaryText: "rgba(255,255,255,0.94)",
+        secondaryText: "rgba(255,255,255,0.72)",
+        mutedText: "rgba(255,255,255,0.48)",
         icon: "rgba(255,255,255,0.88)",
-        metricPrimary,
+        primaryMetric,
         track: "rgba(255,255,255,0.14)",
         grid: "rgba(255,255,255,0.18)",
         divider: "rgba(255,255,255,0.18)",

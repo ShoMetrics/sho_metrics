@@ -1,5 +1,5 @@
 import type { KeySize } from "../../rendering/widget-data";
-import type { GraphicStyle } from "./style.interface";
+import type { GraphicStyle, GraphicStylePaints } from "./style.interface";
 
 /**
  * Cupertino Glass style: frosted translucent background with specular highlight
@@ -34,14 +34,14 @@ export const cupertinoGlassStyle: GraphicStyle = {
         `;
     },
 
-    renderBackground(keySize: KeySize): string {
+    renderBackground(keySize: KeySize, paints: GraphicStylePaints): string {
         const inset = 2;
         const radius = 18;
         return `
             <!-- Glass: frosted background -->
             <rect x="${inset}" y="${inset}"
                 width="${keySize.width - inset * 2}" height="${keySize.height - inset * 2}"
-                rx="${radius}" fill="rgba(30,30,50,0.65)"
+                rx="${radius}" fill="${paints.surface}"
                 stroke="url(#glass-border)" stroke-width="1" />
         `;
     },

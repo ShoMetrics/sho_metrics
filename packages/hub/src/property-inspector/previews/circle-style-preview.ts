@@ -2,6 +2,8 @@ import { renderMetricFrame } from "../../rendering/metric-frame";
 import { renderSingleMetricBodyView } from "../../rendering/single-metric-view";
 import type { WidgetData } from "../../rendering/widget-data";
 import { WIDGET_LOGICAL_SIZE } from "../../rendering/widget-data";
+import { buildSampleResolvedAppearanceSettings } from "../../settings/sample-appearance-settings";
+import { buildMetricVisualSettings } from "../../settings/visual-adapter";
 import { getHardwareIconFragment } from "../../widgets/icons/hardware-icons";
 import { getMetricStatusIcon } from "../../widgets/icons/metric-status-icons";
 import type { CircleStyle } from "../inspector/settings-types";
@@ -17,28 +19,23 @@ const previewData: WidgetData = {
 };
 
 export function buildCircleStylePreviewUri(circleStyle: CircleStyle): string {
+    const visualSettings = buildMetricVisualSettings(buildSampleResolvedAppearanceSettings({
+        circleStyle,
+        colorMode: "solid",
+    }));
     const body = renderSingleMetricBodyView({
         data: previewData,
-        visual: {
-            graphicType: "circular",
-            colorConfig: {
-                mode: "solid",
-                solidColor: "#3b82f6",
-                thresholds: [],
-            },
-            lineSmoothingPercent: 75,
-            gridLineVisibility: "adaptive",
-            gridLineType: "horizontal",
-        },
+        visual: visualSettings,
         renderSize: WIDGET_LOGICAL_SIZE,
         centerIcon: getHardwareIconFragment("memory"),
         statusIcon: getMetricStatusIcon("percentage"),
-        circleStyle,
+        circleStyle: visualSettings.circleStyle,
     });
     const svg = renderMetricFrame({
         body,
-        graphicStyle: "flat",
+        graphicStyle: visualSettings.graphicStyle,
         muted: false,
+        paints: visualSettings.paints,
         size: WIDGET_LOGICAL_SIZE,
     });
 
