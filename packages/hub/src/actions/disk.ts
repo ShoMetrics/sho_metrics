@@ -18,6 +18,11 @@ import {
     buildDiskDisplayOptions,
     resolveDiskMaximumThroughputMebibytesPerSecond,
 } from "./disk/view-builder";
+import {
+    resolveAvailableDiskVolume,
+    resolveDiskVolumeSelectionId,
+    type DiskVolumeSelection,
+} from "./disk/volume-selection";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 
@@ -41,13 +46,15 @@ export class Disk extends MetricAction {
             });
         }
 
-        const selectedVolume = resolveSelectedDiskVolume(diskTarget.volumeId);
+        const volumeSelection = resolveDiskVolumeSelection(diskTarget.volumeId);
 
-        return selectedVolume
+        const selectedVolumeId = resolveDiskVolumeSelectionId(volumeSelection);
+
+        return selectedVolumeId
             ? [
-                getDiskVolumeMetricKey("used", selectedVolume.id),
-                getDiskVolumeMetricKey("total", selectedVolume.id),
-                getDiskVolumeMetricKey("available", selectedVolume.id),
+                getDiskVolumeMetricKey("used", selectedVolumeId),
+                getDiskVolumeMetricKey("total", selectedVolumeId),
+                getDiskVolumeMetricKey("available", selectedVolumeId),
             ]
             : [
                 getDefaultDiskUsageMetricKey("used"),
@@ -59,10 +66,10 @@ export class Disk extends MetricAction {
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event);
         const diskTarget = readResolvedMetricTarget(settings, "disk");
-        const selectedVolume = resolveSelectedDiskVolume(diskTarget.volumeId);
+        const volumeSelection = resolveDiskVolumeSelection(diskTarget.volumeId);
 
         this.publishDiskVolumeOptions(event);
-        this.publishDiskThroughputRuntimeMaximum(event, diskTarget, selectedVolume);
+        this.publishDiskThroughputRuntimeMaximum(event, diskTarget, volumeSelection);
 
         if (diskTarget.reading.kind === "throughput" && process.platform !== "darwin") {
             showDiskThroughputUnavailable(event);
@@ -75,7 +82,7 @@ export class Disk extends MetricAction {
             target: diskTarget,
             globalSettings: pluginGlobalSettingsStore.getResolved(),
             metricStore,
-            selectedVolume,
+            volumeSelection,
         }));
     }
 
@@ -102,7 +109,7 @@ export class Disk extends MetricAction {
     private publishDiskThroughputRuntimeMaximum(
         event: WillAppearEvent,
         diskTarget: ResolvedDiskMetricTarget,
-        selectedVolume: DiskVolumeOption | null,
+        volumeSelection: DiskVolumeSelection,
     ): void {
         const diskReading = diskTarget.reading;
         if (
@@ -112,6 +119,7 @@ export class Disk extends MetricAction {
             return;
         }
 
+        const selectedVolume = resolveAvailableDiskVolume(volumeSelection);
         const nextReadMaximum = resolveRuntimeDiskMaximumThroughputMebibytesPerSecond({
             direction: "read",
             reading: diskReading,
@@ -134,12 +142,20 @@ export class Disk extends MetricAction {
     }
 }
 
-function resolveSelectedDiskVolume(value: string | undefined): DiskVolumeOption | null {
-    if (value && value.length > 0) {
-        return diskVolumeRegistry.findById(value);
+function resolveDiskVolumeSelection(volumeId: string | undefined): DiskVolumeSelection {
+    if (volumeId && volumeId.length > 0) {
+        const selectedVolume = diskVolumeRegistry.findById(volumeId);
+
+        return selectedVolume
+            ? { kind: "available", volume: selectedVolume }
+            : { kind: "unavailable", volumeId };
     }
 
-    return diskVolumeRegistry.resolveDefaultSelection();
+    const defaultVolume = diskVolumeRegistry.resolveDefaultSelection();
+
+    return defaultVolume
+        ? { kind: "available", volume: defaultVolume }
+        : { kind: "none" };
 }
 
 function resolveRuntimeDiskMaximumThroughputMebibytesPerSecond(options: {
