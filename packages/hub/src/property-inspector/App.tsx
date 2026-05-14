@@ -19,8 +19,6 @@ export function App({ client }: AppProps): React.JSX.Element {
         resolvedGlobalSettings,
         widgetSettingsNotice,
         pluginSettingsNotice,
-        widgetLoadError,
-        pluginLoadError,
         updateWidgetSettings,
         resetWidgetSettings,
         updateGlobalSettings,
@@ -53,7 +51,6 @@ export function App({ client }: AppProps): React.JSX.Element {
 
             <SettingsNoticeSlot
                 notice={activeTab === "widget" ? widgetSettingsNotice : pluginSettingsNotice}
-                loadError={activeTab === "widget" ? widgetLoadError : pluginLoadError}
             />
 
             {activeTab === "widget" ? (
@@ -75,20 +72,12 @@ export function App({ client }: AppProps): React.JSX.Element {
 
 function SettingsNoticeSlot(options: {
     notice: SettingsNotice | null;
-    loadError: string | null;
 }): React.JSX.Element | null {
-    const notice = options.loadError
-        ? {
-            kind: "warning" as const,
-            text: options.loadError,
-        }
-        : options.notice;
-
-    if (!notice) {
+    if (!options.notice) {
         return null;
     }
 
-    return <SettingsNoticeView notice={notice} />;
+    return <SettingsNoticeView notice={options.notice} />;
 }
 
 function SettingsNoticeView({ notice }: { notice: SettingsNotice }): React.JSX.Element {
