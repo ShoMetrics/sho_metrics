@@ -2,22 +2,24 @@ import { create } from "@bufbuild/protobuf";
 import {
     AppearanceGraphSettingsSchema,
     AppearanceThemeSettingsSchema,
-    ColorFilledMultiColorSettingsSchema,
-    ColorFilledSolidSettingsSchema,
-    ColorFilledThemeSettingsSchema,
+    ColorFilledMultiColorPaintSettingsSchema,
+    ColorFilledPaintSettingsSchema,
+    ColorFilledSolidPaintSettingsSchema,
     DiskThroughputDisplaySettingsSchema,
-    GlobalColorOverrideSchema,
     GlobalDefaultsSchema,
     GlobalGraphOverrideSchema,
-    GlobalMultiColorSettingsSchema,
     GlobalOverridesSchema,
-    GlobalSolidColorSettingsSchema,
+    GlobalMultiColorPaintSettingsSchema,
+    GlobalPaintOverrideSchema,
+    GlobalMetricPaintSettingsSchema,
+    GlobalSolidPaintSettingsSchema,
     GlobalThemeOverrideSchema,
     MultiColorSetSchema,
     NetworkDisplaySettingsSchema,
     type AppearanceThemeSettings as StoredAppearanceThemeSettings,
-    type ColorFilledThemeSettings as StoredColorFilledThemeSettings,
+    type ColorFilledPaintSettings as StoredColorFilledPaintSettings,
     type GlobalDefaults as StoredGlobalDefaults,
+    type GlobalMetricPaintSettings as StoredGlobalMetricPaintSettings,
     type GlobalOverrides as StoredGlobalOverrides,
     type MultiColorSet as StoredMultiColorSet,
 } from "../../generated/shometrics/v1/settings_pb.js";
@@ -26,13 +28,12 @@ import type {
     MetricTheme,
     NetworkUnitBase,
     ResolvedAppearanceGraphSettings,
-    ResolvedGlobalMultiColorSettings,
-    ResolvedGlobalSolidColorSettings,
+    ResolvedGlobalMultiColorPaintSettings,
+    ResolvedGlobalSolidPaintSettings,
     ScaleMode,
 } from "../resolved-settings";
 import type {
-    ResolvedColorFilledMultiColorSettingsOverride,
-    ResolvedColorFilledSolidSettingsOverride,
+    ResolvedColorFilledPaintSettingsOverride,
     ResolvedMultiColorSetOverride,
 } from "../appearance-overrides";
 import {
@@ -53,10 +54,10 @@ export interface StoredGlobalSettingsPatch {
     readonly globalOverrideEnabled?: boolean | undefined;
     readonly graphOverrideEnabled?: boolean | undefined;
     readonly themeOverrideEnabled?: boolean | undefined;
-    readonly colorOverrideEnabled?: boolean | undefined;
+    readonly paintOverrideEnabled?: boolean | undefined;
     readonly graph?: Partial<ResolvedAppearanceGraphSettings> | undefined;
     readonly theme?: GlobalThemeSettingsPatch | undefined;
-    readonly color?: GlobalColorSettingsPatch | undefined;
+    readonly paint?: GlobalPaintSettingsPatch | undefined;
     readonly network?: Partial<{
         readonly scaleMode: ScaleMode;
         readonly maximumDownloadSpeedMegabitsPerSecond: number | undefined;
@@ -70,34 +71,31 @@ export interface StoredGlobalSettingsPatch {
     }> | undefined;
 }
 
-export interface GlobalThemeSettingsPatch {
+interface GlobalThemeSettingsPatch {
     readonly selectedTheme?: MetricTheme | undefined;
-    readonly colorFilled?: ColorFilledThemeSettingsPatch | undefined;
 }
 
-export interface ColorFilledThemeSettingsPatch {
-    readonly solid?: ResolvedColorFilledSolidSettingsOverride | undefined;
-    readonly multiColor?: ColorFilledMultiColorSettingsPatch | undefined;
+interface GlobalPaintSettingsPatch {
+    readonly metric?: GlobalMetricPaintSettingsPatch | undefined;
+    readonly colorFilled?: ResolvedColorFilledPaintSettingsOverride | undefined;
 }
 
-export type ColorFilledMultiColorSettingsPatch = ResolvedColorFilledMultiColorSettingsOverride;
-
-export interface GlobalColorSettingsPatch {
+interface GlobalMetricPaintSettingsPatch {
     readonly colorMode?: ColorMode | undefined;
-    readonly solid?: GlobalSolidColorSettingsPatch | undefined;
-    readonly multiColor?: GlobalMultiColorSettingsPatch | undefined;
+    readonly solid?: GlobalSolidPaintSettingsPatch | undefined;
+    readonly multiColor?: GlobalMultiColorPaintSettingsPatch | undefined;
 }
 
-export interface GlobalSolidColorSettingsPatch {
-    readonly color?: ResolvedGlobalSolidColorSettings["color"] | undefined;
-    readonly isGradientEnabled?: ResolvedGlobalSolidColorSettings["isGradientEnabled"] | undefined;
+interface GlobalSolidPaintSettingsPatch {
+    readonly color?: ResolvedGlobalSolidPaintSettings["color"] | undefined;
+    readonly isGradientEnabled?: ResolvedGlobalSolidPaintSettings["isGradientEnabled"] | undefined;
 }
 
-export interface GlobalMultiColorSettingsPatch {
+interface GlobalMultiColorPaintSettingsPatch {
     readonly colors?: ResolvedMultiColorSetOverride | undefined;
-    readonly lowThresholdPercent?: ResolvedGlobalMultiColorSettings["lowThresholdPercent"] | undefined;
-    readonly highThresholdPercent?: ResolvedGlobalMultiColorSettings["highThresholdPercent"] | undefined;
-    readonly isGradientEnabled?: ResolvedGlobalMultiColorSettings["isGradientEnabled"] | undefined;
+    readonly lowThresholdPercent?: ResolvedGlobalMultiColorPaintSettings["lowThresholdPercent"] | undefined;
+    readonly highThresholdPercent?: ResolvedGlobalMultiColorPaintSettings["highThresholdPercent"] | undefined;
+    readonly isGradientEnabled?: ResolvedGlobalMultiColorPaintSettings["isGradientEnabled"] | undefined;
 }
 
 export function writeStoredGlobalSettingsPatch(
@@ -115,7 +113,7 @@ export function writeStoredGlobalSettingsPatch(
 
     applyGraphOverridePatch(settings.overrides, patch);
     applyThemeOverridePatch(settings.overrides, patch);
-    applyColorOverridePatch(settings.overrides, patch);
+    applyPaintOverridePatch(settings.overrides, patch);
     applyNetworkDefaultsPatch(settings.defaults, patch.network);
     applyDiskThroughputDefaultsPatch(settings.defaults, patch.diskThroughput);
 
@@ -177,17 +175,17 @@ function applyThemeSettingsPatch(
     if (patch.selectedTheme !== undefined) {
         theme.selectedTheme = storedThemeByResolved[patch.selectedTheme];
     }
-    if (patch.colorFilled !== undefined) {
-        applyColorFilledThemePatch(theme.colorFilled ??= create(ColorFilledThemeSettingsSchema), patch.colorFilled);
-    }
 }
 
-function applyColorFilledThemePatch(
-    colorFilled: StoredColorFilledThemeSettings,
-    patch: ColorFilledThemeSettingsPatch,
+function applyColorFilledPaintPatch(
+    colorFilled: StoredColorFilledPaintSettings,
+    patch: ResolvedColorFilledPaintSettingsOverride,
 ): void {
+    if (patch.colorMode !== undefined) {
+        colorFilled.colorMode = storedColorModeByResolved[patch.colorMode];
+    }
     if (patch.solid !== undefined) {
-        const solid = colorFilled.solid ??= create(ColorFilledSolidSettingsSchema);
+        const solid = colorFilled.solid ??= create(ColorFilledSolidPaintSettingsSchema);
         if (patch.solid.color !== undefined) {
             solid.color = patch.solid.color;
         }
@@ -197,7 +195,7 @@ function applyColorFilledThemePatch(
     }
 
     if (patch.multiColor !== undefined) {
-        const multiColor = colorFilled.multiColor ??= create(ColorFilledMultiColorSettingsSchema);
+        const multiColor = colorFilled.multiColor ??= create(ColorFilledMultiColorPaintSettingsSchema);
         applyMultiColorSetPatch(multiColor.colors ??= create(MultiColorSetSchema), patch.multiColor.colors);
         if (patch.multiColor.isGradientEnabled !== undefined) {
             multiColor.gradientEnabled = patch.multiColor.isGradientEnabled;
@@ -205,47 +203,62 @@ function applyColorFilledThemePatch(
     }
 }
 
-function applyColorOverridePatch(
+function applyPaintOverridePatch(
     overrides: StoredGlobalOverrides,
     patch: StoredGlobalSettingsPatch,
 ): void {
-    if (patch.colorOverrideEnabled === undefined && patch.color === undefined) {
+    if (patch.paintOverrideEnabled === undefined && patch.paint === undefined) {
         return;
     }
 
-    const color = overrides.color ??= create(GlobalColorOverrideSchema);
+    const paint = overrides.paint ??= create(GlobalPaintOverrideSchema);
 
-    if (patch.colorOverrideEnabled !== undefined) {
-        color.enabled = patch.colorOverrideEnabled;
+    if (patch.paintOverrideEnabled !== undefined) {
+        paint.enabled = patch.paintOverrideEnabled;
     }
 
-    if (patch.color === undefined) {
+    if (patch.paint === undefined) {
         return;
     }
 
-    if (patch.color.colorMode !== undefined) {
-        color.colorMode = storedColorModeByResolved[patch.color.colorMode];
+    if (patch.paint.metric !== undefined) {
+        applyGlobalMetricPaintPatch(paint.metric ??= create(GlobalMetricPaintSettingsSchema), patch.paint.metric);
     }
-    if (patch.color.solid !== undefined) {
-        const solid = color.solid ??= create(GlobalSolidColorSettingsSchema);
-        if (patch.color.solid.color !== undefined) {
-            solid.color = patch.color.solid.color;
+    if (patch.paint.colorFilled !== undefined) {
+        applyColorFilledPaintPatch(
+            paint.colorFilled ??= create(ColorFilledPaintSettingsSchema),
+            patch.paint.colorFilled,
+        );
+    }
+}
+
+function applyGlobalMetricPaintPatch(
+    metric: StoredGlobalMetricPaintSettings,
+    patch: GlobalMetricPaintSettingsPatch,
+): void {
+    if (patch.colorMode !== undefined) {
+        metric.colorMode = storedColorModeByResolved[patch.colorMode];
+    }
+    if (patch.solid !== undefined) {
+        const solid = metric.solid ??= create(GlobalSolidPaintSettingsSchema);
+        if (patch.solid.color !== undefined) {
+            solid.color = patch.solid.color;
         }
-        if (patch.color.solid.isGradientEnabled !== undefined) {
-            solid.gradientEnabled = patch.color.solid.isGradientEnabled;
+        if (patch.solid.isGradientEnabled !== undefined) {
+            solid.gradientEnabled = patch.solid.isGradientEnabled;
         }
     }
-    if (patch.color.multiColor !== undefined) {
-        const multiColor = color.multiColor ??= create(GlobalMultiColorSettingsSchema);
-        applyMultiColorSetPatch(multiColor.colors ??= create(MultiColorSetSchema), patch.color.multiColor.colors);
-        if (patch.color.multiColor.lowThresholdPercent !== undefined) {
-            multiColor.lowThresholdPercent = patch.color.multiColor.lowThresholdPercent;
+    if (patch.multiColor !== undefined) {
+        const multiColor = metric.multiColor ??= create(GlobalMultiColorPaintSettingsSchema);
+        applyMultiColorSetPatch(multiColor.colors ??= create(MultiColorSetSchema), patch.multiColor.colors);
+        if (patch.multiColor.lowThresholdPercent !== undefined) {
+            multiColor.lowThresholdPercent = patch.multiColor.lowThresholdPercent;
         }
-        if (patch.color.multiColor.highThresholdPercent !== undefined) {
-            multiColor.highThresholdPercent = patch.color.multiColor.highThresholdPercent;
+        if (patch.multiColor.highThresholdPercent !== undefined) {
+            multiColor.highThresholdPercent = patch.multiColor.highThresholdPercent;
         }
-        if (patch.color.multiColor.isGradientEnabled !== undefined) {
-            multiColor.gradientEnabled = patch.color.multiColor.isGradientEnabled;
+        if (patch.multiColor.isGradientEnabled !== undefined) {
+            multiColor.gradientEnabled = patch.multiColor.isGradientEnabled;
         }
     }
 }

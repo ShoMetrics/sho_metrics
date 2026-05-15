@@ -44,7 +44,35 @@ export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
     },
     theme: {
         selectedTheme: "flat",
+    },
+    paint: {
+        metric: {
+            colorMode: "multi-color",
+            solid: {
+                isGradientEnabled: true,
+                colors: {
+                    usageColor: "#3b82f6",
+                    downloadColor: "#3b82f6",
+                    uploadColor: "#ef4444",
+                    diskReadColor: "#38bdf8",
+                    diskWriteColor: "#f472b6",
+                },
+            },
+            multiColor: {
+                lowThresholdPercent: 30,
+                highThresholdPercent: 70,
+                isGradientEnabled: true,
+                colors: {
+                    usage: DEFAULT_USAGE_MULTI_COLOR_SET,
+                    download: DEFAULT_DOWNLOAD_MULTI_COLOR_SET,
+                    upload: DEFAULT_UPLOAD_MULTI_COLOR_SET,
+                    diskRead: DEFAULT_DISK_READ_MULTI_COLOR_SET,
+                    diskWrite: DEFAULT_DISK_WRITE_MULTI_COLOR_SET,
+                },
+            },
+        },
         colorFilled: {
+            colorMode: "multi-color",
             solid: {
                 color: "#3b82f6",
                 isGradientEnabled: true,
@@ -52,31 +80,6 @@ export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
             multiColor: {
                 colors: DEFAULT_USAGE_MULTI_COLOR_SET,
                 isGradientEnabled: true,
-            },
-        },
-    },
-    metricColor: {
-        colorMode: "multi-color",
-        solid: {
-            isGradientEnabled: true,
-            colors: {
-                usageColor: "#3b82f6",
-                downloadColor: "#3b82f6",
-                uploadColor: "#ef4444",
-                diskReadColor: "#38bdf8",
-                diskWriteColor: "#f472b6",
-            },
-        },
-        multiColor: {
-            lowThresholdPercent: 30,
-            highThresholdPercent: 70,
-            isGradientEnabled: true,
-            colors: {
-                usage: DEFAULT_USAGE_MULTI_COLOR_SET,
-                download: DEFAULT_DOWNLOAD_MULTI_COLOR_SET,
-                upload: DEFAULT_UPLOAD_MULTI_COLOR_SET,
-                diskRead: DEFAULT_DISK_READ_MULTI_COLOR_SET,
-                diskWrite: DEFAULT_DISK_WRITE_MULTI_COLOR_SET,
             },
         },
     },

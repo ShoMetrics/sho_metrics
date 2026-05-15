@@ -54,37 +54,40 @@ function buildGlobalSettings(): ResolvedGlobalSettings {
         themeOverride: {
             theme: {
                 selectedTheme: "flat",
-                colorFilled: {
-                    solid: {
-                        color: "#3b82f6",
-                        isGradientEnabled: true,
-                    },
-                    multiColor: {
-                        colors: {
-                            lowColor: "#22c55e",
-                            mediumColor: "#eab308",
-                            highColor: "#ef4444",
-                        },
-                        isGradientEnabled: true,
-                    },
-                },
             },
         },
-        colorOverride: {
-            colorMode: "multi-color",
-            solid: {
-                color: "#3b82f6",
-                isGradientEnabled: true,
-            },
-            multiColor: {
-                colors: {
-                    lowColor: "#22c55e",
-                    mediumColor: "#eab308",
-                    highColor: "#ef4444",
+        paintOverride: {
+            metric: {
+                colorMode: "multi-color",
+                solid: {
+                    color: "#3b82f6",
+                    isGradientEnabled: true,
                 },
-                lowThresholdPercent: 30,
-                highThresholdPercent: 70,
-                isGradientEnabled: true,
+                multiColor: {
+                    colors: {
+                        lowColor: "#22c55e",
+                        mediumColor: "#eab308",
+                        highColor: "#ef4444",
+                    },
+                    lowThresholdPercent: 30,
+                    highThresholdPercent: 70,
+                    isGradientEnabled: true,
+                },
+            },
+            colorFilled: {
+                colorMode: "multi-color",
+                solid: {
+                    color: "#3b82f6",
+                    isGradientEnabled: true,
+                },
+                multiColor: {
+                    colors: {
+                        lowColor: "#22c55e",
+                        mediumColor: "#eab308",
+                        highColor: "#ef4444",
+                    },
+                    isGradientEnabled: true,
+                },
             },
         },
         sourceProfiles: [],

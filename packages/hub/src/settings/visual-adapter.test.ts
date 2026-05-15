@@ -39,10 +39,12 @@ test("graphic style maps resolved appearance settings to theme preset names", ()
 
 test("solid color mode uses resolved appearance color", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
-        metricColor: {
-            colorMode: "solid",
-            solid: {
-                colors: { usageColor: "#123456" },
+        paint: {
+            metric: {
+                colorMode: "solid",
+                solid: {
+                    colors: { usageColor: "#123456" },
+                },
             },
         },
     }));
@@ -52,10 +54,12 @@ test("solid color mode uses resolved appearance color", () => {
 
 test("threshold values build renderer color bands", () => {
     const primaryMetric = buildMetricRenderAppearance(buildAppearanceSettings({
-        metricColor: {
-            multiColor: {
-                lowThresholdPercent: 20,
-                highThresholdPercent: 90,
+        paint: {
+            metric: {
+                multiColor: {
+                    lowThresholdPercent: 20,
+                    highThresholdPercent: 90,
+                },
             },
         },
     })).paints.primaryMetric;
@@ -72,13 +76,15 @@ test("threshold values build renderer color bands", () => {
 
 test("threshold colors use resolved appearance colors", () => {
     const primaryMetric = buildMetricRenderAppearance(buildAppearanceSettings({
-        metricColor: {
-            multiColor: {
-                colors: {
-                    usage: {
-                        lowColor: "#111111",
-                        mediumColor: "#222222",
-                        highColor: "#333333",
+        paint: {
+            metric: {
+                multiColor: {
+                    colors: {
+                        usage: {
+                            lowColor: "#111111",
+                            mediumColor: "#222222",
+                            highColor: "#333333",
+                        },
                     },
                 },
             },
@@ -94,7 +100,9 @@ test("threshold colors use resolved appearance colors", () => {
 
 test("black-white color mode lowers renderer paint to neutral colors", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
-        metricColor: { colorMode: "black-white" },
+        paint: {
+            metric: { colorMode: "black-white" },
+        },
     }));
 
     assert.equal(visualSettings.paintConstraint, "black-white");
@@ -110,13 +118,16 @@ test("color filled solid mode uses theme background color and neutral foreground
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         theme: {
             selectedTheme: "color-filled",
+        },
+        paint: {
+            metric: {
+                colorMode: "solid",
+                solid: { colors: { usageColor: "#ef4444" } },
+            },
             colorFilled: {
+                colorMode: "solid",
                 solid: { color: "#123456" },
             },
-        },
-        metricColor: {
-            colorMode: "solid",
-            solid: { colors: { usageColor: "#ef4444" } },
         },
     }));
 
@@ -137,7 +148,16 @@ test("color filled multi-color mode uses soft triangle colors without threshold 
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         theme: {
             selectedTheme: "color-filled",
+        },
+        paint: {
+            metric: {
+                multiColor: {
+                    lowThresholdPercent: 10,
+                    highThresholdPercent: 90,
+                },
+            },
             colorFilled: {
+                colorMode: "multi-color",
                 multiColor: {
                     colors: {
                         lowColor: "#111111",
@@ -146,12 +166,6 @@ test("color filled multi-color mode uses soft triangle colors without threshold 
                     },
                     isGradientEnabled: false,
                 },
-            },
-        },
-        metricColor: {
-            multiColor: {
-                lowThresholdPercent: 10,
-                highThresholdPercent: 90,
             },
         },
     }));

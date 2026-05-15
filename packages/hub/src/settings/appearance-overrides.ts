@@ -4,7 +4,7 @@ import type {
     ResolvedAppearanceGraphSettings,
     ResolvedAppearanceSettings,
     ResolvedMetricMultiColorChannelColors,
-    ResolvedMetricMultiColorSettings,
+    ResolvedMetricMultiColorPaintSettings,
     ResolvedMultiColorSet,
     ResolvedSparklineAppearanceSettings,
 } from "./resolved-settings";
@@ -14,7 +14,7 @@ export type MetricColorChannel = keyof ResolvedMetricMultiColorChannelColors;
 export interface ResolvedAppearanceSettingsOverride {
     readonly graph?: ResolvedAppearanceGraphSettingsOverride | undefined;
     readonly theme?: ResolvedAppearanceThemeSettingsOverride | undefined;
-    readonly metricColor?: ResolvedMetricColorSettingsOverride | undefined;
+    readonly paint?: ResolvedAppearancePaintSettingsOverride | undefined;
     readonly sparkline?: ResolvedSparklineAppearanceSettingsOverride | undefined;
 }
 
@@ -25,31 +25,20 @@ export interface ResolvedAppearanceGraphSettingsOverride {
 
 export interface ResolvedAppearanceThemeSettingsOverride {
     readonly selectedTheme?: MetricTheme | undefined;
-    readonly colorFilled?: ResolvedColorFilledThemeSettingsOverride | undefined;
 }
 
-export interface ResolvedColorFilledThemeSettingsOverride {
-    readonly solid?: ResolvedColorFilledSolidSettingsOverride | undefined;
-    readonly multiColor?: ResolvedColorFilledMultiColorSettingsOverride | undefined;
+export interface ResolvedAppearancePaintSettingsOverride {
+    readonly metric?: ResolvedMetricPaintSettingsOverride | undefined;
+    readonly colorFilled?: ResolvedColorFilledPaintSettingsOverride | undefined;
 }
 
-export interface ResolvedColorFilledSolidSettingsOverride {
-    readonly color?: string | undefined;
-    readonly isGradientEnabled?: boolean | undefined;
-}
-
-export interface ResolvedColorFilledMultiColorSettingsOverride {
-    readonly colors?: ResolvedMultiColorSetOverride | undefined;
-    readonly isGradientEnabled?: boolean | undefined;
-}
-
-export interface ResolvedMetricColorSettingsOverride {
+export interface ResolvedMetricPaintSettingsOverride {
     readonly colorMode?: ColorMode | undefined;
-    readonly solid?: ResolvedMetricSolidColorSettingsOverride | undefined;
-    readonly multiColor?: ResolvedMetricMultiColorSettingsOverride | undefined;
+    readonly solid?: ResolvedMetricSolidPaintSettingsOverride | undefined;
+    readonly multiColor?: ResolvedMetricMultiColorPaintSettingsOverride | undefined;
 }
 
-export interface ResolvedMetricSolidColorSettingsOverride {
+export interface ResolvedMetricSolidPaintSettingsOverride {
     readonly colors?: ResolvedMetricSolidChannelColorsOverride | undefined;
     readonly isGradientEnabled?: boolean | undefined;
 }
@@ -62,7 +51,7 @@ export interface ResolvedMetricSolidChannelColorsOverride {
     readonly diskWriteColor?: string | undefined;
 }
 
-export interface ResolvedMetricMultiColorSettingsOverride {
+export interface ResolvedMetricMultiColorPaintSettingsOverride {
     readonly colors?: ResolvedMetricMultiColorChannelColorsOverride | undefined;
     readonly lowThresholdPercent?: number | undefined;
     readonly highThresholdPercent?: number | undefined;
@@ -75,6 +64,22 @@ export interface ResolvedMetricMultiColorChannelColorsOverride {
     readonly upload?: ResolvedMultiColorSetOverride | undefined;
     readonly diskRead?: ResolvedMultiColorSetOverride | undefined;
     readonly diskWrite?: ResolvedMultiColorSetOverride | undefined;
+}
+
+export interface ResolvedColorFilledPaintSettingsOverride {
+    readonly colorMode?: ColorMode | undefined;
+    readonly solid?: ResolvedColorFilledSolidPaintSettingsOverride | undefined;
+    readonly multiColor?: ResolvedColorFilledMultiColorPaintSettingsOverride | undefined;
+}
+
+export interface ResolvedColorFilledSolidPaintSettingsOverride {
+    readonly color?: string | undefined;
+    readonly isGradientEnabled?: boolean | undefined;
+}
+
+export interface ResolvedColorFilledMultiColorPaintSettingsOverride {
+    readonly colors?: ResolvedMultiColorSetOverride | undefined;
+    readonly isGradientEnabled?: boolean | undefined;
 }
 
 export interface ResolvedMultiColorSetOverride {
@@ -105,41 +110,8 @@ export function mergeResolvedAppearanceSettings(
         theme: {
             ...settings.theme,
             selectedTheme: override.theme?.selectedTheme ?? settings.theme.selectedTheme,
-            colorFilled: {
-                solid: {
-                    ...settings.theme.colorFilled.solid,
-                    ...override.theme?.colorFilled?.solid,
-                },
-                multiColor: {
-                    ...settings.theme.colorFilled.multiColor,
-                    ...override.theme?.colorFilled?.multiColor,
-                    colors: {
-                        ...settings.theme.colorFilled.multiColor.colors,
-                        ...override.theme?.colorFilled?.multiColor?.colors,
-                    },
-                },
-            },
         },
-        metricColor: {
-            ...settings.metricColor,
-            ...override.metricColor,
-            solid: {
-                ...settings.metricColor.solid,
-                ...override.metricColor?.solid,
-                colors: {
-                    ...settings.metricColor.solid.colors,
-                    ...override.metricColor?.solid?.colors,
-                },
-            },
-            multiColor: {
-                ...settings.metricColor.multiColor,
-                ...override.metricColor?.multiColor,
-                colors: mergeMetricMultiColorChannelColors(
-                    settings.metricColor.multiColor.colors,
-                    override.metricColor?.multiColor?.colors,
-                ),
-            },
-        },
+        paint: mergeAppearancePaintSettings(settings.paint, override.paint),
         sparkline: {
             ...settings.sparkline,
             ...override.sparkline,
@@ -147,10 +119,54 @@ export function mergeResolvedAppearanceSettings(
     };
 }
 
+function mergeAppearancePaintSettings(
+    paint: ResolvedAppearanceSettings["paint"],
+    override: ResolvedAppearancePaintSettingsOverride | undefined,
+): ResolvedAppearanceSettings["paint"] {
+    return {
+        metric: {
+            ...paint.metric,
+            ...override?.metric,
+            solid: {
+                ...paint.metric.solid,
+                ...override?.metric?.solid,
+                colors: {
+                    ...paint.metric.solid.colors,
+                    ...override?.metric?.solid?.colors,
+                },
+            },
+            multiColor: {
+                ...paint.metric.multiColor,
+                ...override?.metric?.multiColor,
+                colors: mergeMetricMultiColorChannelColors(
+                    paint.metric.multiColor.colors,
+                    override?.metric?.multiColor?.colors,
+                ),
+            },
+        },
+        colorFilled: {
+            ...paint.colorFilled,
+            ...override?.colorFilled,
+            solid: {
+                ...paint.colorFilled.solid,
+                ...override?.colorFilled?.solid,
+            },
+            multiColor: {
+                ...paint.colorFilled.multiColor,
+                ...override?.colorFilled?.multiColor,
+                colors: {
+                    ...paint.colorFilled.multiColor.colors,
+                    ...override?.colorFilled?.multiColor?.colors,
+                },
+            },
+        },
+    };
+}
+
 function mergeMetricMultiColorChannelColors(
-    colors: ResolvedMetricMultiColorSettings["colors"],
-    override: ResolvedMetricMultiColorSettingsOverride["colors"] | undefined,
-): ResolvedMetricMultiColorSettings["colors"] {
+    colors: ResolvedMetricMultiColorPaintSettings["colors"],
+    override: ResolvedMetricMultiColorPaintSettingsOverride["colors"] | undefined,
+): ResolvedMetricMultiColorPaintSettings["colors"] {
     return {
         usage: mergeMultiColorSet(colors.usage, override?.usage),
         download: mergeMultiColorSet(colors.download, override?.download),

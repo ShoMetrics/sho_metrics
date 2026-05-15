@@ -167,11 +167,13 @@ function buildDiskThroughputDisplayOptions(
         statusIcon: getMetricStatusIcon("percentage"),
         circleStyleOverride: circleStyle,
         appearanceOverride: {
-            metricColor: {
-                colorMode: appearance.metricColor.colorMode,
-                solid: {
-                    colors: {
-                        usageColor: appearance.metricColor.solid.colors.usageColor,
+            paint: {
+                metric: {
+                    colorMode: appearance.paint.metric.colorMode,
+                    solid: {
+                        colors: {
+                            usageColor: appearance.paint.metric.solid.colors.usageColor,
+                        },
                     },
                 },
             },
@@ -205,7 +207,7 @@ function buildDualThroughputDisplayOptions(
     const writeColor = resolveDiskWidgetChannelColor("write", options.settings, writeWidgetData);
     const readColorConfig = buildDiskChannelColorConfig("read", options.settings);
     const writeColorConfig = buildDiskChannelColorConfig("write", options.settings);
-    const solidMetricColorMode = resolveSolidMetricColorMode(appearance.metricColor.colorMode);
+    const solidMetricColorMode = resolveSolidMetricColorMode(appearance.paint.metric.colorMode);
 
     return {
         event: options.event,
@@ -237,9 +239,11 @@ function buildDualThroughputDisplayOptions(
             size: DISK_THROUGHPUT_DIRECTION_ICON_SIZE,
         }),
         appearanceOverride: {
-            metricColor: {
-                colorMode: solidMetricColorMode,
-                solid: { colors: { usageColor: readColor } },
+            paint: {
+                metric: {
+                    colorMode: solidMetricColorMode,
+                    solid: { colors: { usageColor: readColor } },
+                },
             },
         },
     };

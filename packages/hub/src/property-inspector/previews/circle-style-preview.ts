@@ -21,7 +21,9 @@ const previewData: WidgetData = {
 export function buildCircleStylePreviewUri(circleStyle: CircleStyle): string {
     const visualSettings = buildMetricRenderAppearance(buildDefaultAppearanceSettings({
         graph: { circleStyle },
-        metricColor: { colorMode: "solid" },
+        paint: {
+            metric: { colorMode: "solid" },
+        },
     }));
     const body = renderSingleMetricBodyView({
         data: previewData,

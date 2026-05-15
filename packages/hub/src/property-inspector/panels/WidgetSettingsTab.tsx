@@ -12,7 +12,7 @@ interface WidgetSettingsTabProps {
     context: VisibilityContext;
     isGlobalGraphOverrideEnabled: boolean;
     isGlobalThemeOverrideEnabled: boolean;
-    isGlobalColorOverrideEnabled: boolean;
+    isGlobalPaintOverrideEnabled: boolean;
     onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
     onResetWidgetSettings: () => void;
 }
@@ -23,7 +23,7 @@ export function WidgetSettingsTab({
     context,
     isGlobalGraphOverrideEnabled,
     isGlobalThemeOverrideEnabled,
-    isGlobalColorOverrideEnabled,
+    isGlobalPaintOverrideEnabled,
     onSettingsPatch,
     onResetWidgetSettings,
 }: WidgetSettingsTabProps): React.JSX.Element {
@@ -60,11 +60,11 @@ export function WidgetSettingsTab({
         onSettingsPatch,
         graphDisabled: isGlobalGraphOverrideEnabled,
         themeDisabled: isGlobalThemeOverrideEnabled,
-        colorDisabled: isGlobalColorOverrideEnabled,
+        colorDisabled: isGlobalPaintOverrideEnabled,
     };
     const hasGlobalOverride = isGlobalGraphOverrideEnabled
         || isGlobalThemeOverrideEnabled
-        || isGlobalColorOverrideEnabled;
+        || isGlobalPaintOverrideEnabled;
 
     return (
         <>

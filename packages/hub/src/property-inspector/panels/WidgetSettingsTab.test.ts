@@ -86,7 +86,7 @@ test("network dual-channel settings render channel colors instead of usage color
         actionKind: "network",
         settings: buildWidgetSettings("network", {
             appearance: {
-                metricColor: { colorMode: "solid" },
+                paint: { metric: { colorMode: "solid" } },
             },
             network: {
                 direction: "both",
@@ -112,7 +112,7 @@ test("network single-channel settings render standard usage colors", () => {
         actionKind: "network",
         settings: buildWidgetSettings("network", {
             appearance: {
-                metricColor: { colorMode: "solid" },
+                paint: { metric: { colorMode: "solid" } },
             },
             network: {
                 direction: "download",
@@ -131,7 +131,9 @@ test("color filled theme renders color mix without range controls", () => {
         settings: buildWidgetSettings("network", {
             appearance: {
                 theme: { selectedTheme: "color-filled" },
-                metricColor: { colorMode: "multi-color" },
+                paint: {
+                    colorFilled: { colorMode: "multi-color" },
+                },
             },
             network: {
                 direction: "download",
@@ -174,7 +176,7 @@ test("disk throughput linear settings use standard colors", () => {
         settings: buildWidgetSettings("disk", {
             appearance: {
                 graph: { viewLayout: "linear" },
-                metricColor: { colorMode: "solid" },
+                paint: { metric: { colorMode: "solid" } },
             },
             disk: {
                 kind: "throughput",
@@ -194,7 +196,7 @@ test("disk throughput dual-channel settings render read/write colors", () => {
         settings: buildWidgetSettings("disk", {
             appearance: {
                 graph: { viewLayout: "circular" },
-                metricColor: { colorMode: "solid" },
+                paint: { metric: { colorMode: "solid" } },
             },
             disk: {
                 kind: "throughput",
@@ -239,7 +241,7 @@ test("widget settings renders widget controls before global settings load", () =
         actionKind: "gpu",
         isGlobalGraphOverrideEnabled: false,
         isGlobalThemeOverrideEnabled: false,
-        isGlobalColorOverrideEnabled: false,
+        isGlobalPaintOverrideEnabled: false,
     });
 
     assert.match(markup, /GPU Metric:/);
@@ -251,7 +253,7 @@ test("widget settings renders mismatch recovery before global settings load", ()
         actionKind: "gpu",
         isGlobalGraphOverrideEnabled: false,
         isGlobalThemeOverrideEnabled: false,
-        isGlobalColorOverrideEnabled: false,
+        isGlobalPaintOverrideEnabled: false,
         settings: buildWidgetSettings("cpu", {}),
     });
 
@@ -264,7 +266,7 @@ test("widget settings renders normally after global settings load without overri
         actionKind: "gpu",
         isGlobalGraphOverrideEnabled: false,
         isGlobalThemeOverrideEnabled: false,
-        isGlobalColorOverrideEnabled: false,
+        isGlobalPaintOverrideEnabled: false,
     });
 
     assert.match(markup, /GPU Metric:/);
@@ -288,7 +290,7 @@ function renderWidgetSettings(options: {
     isWindows?: boolean;
     isGlobalGraphOverrideEnabled?: boolean;
     isGlobalThemeOverrideEnabled?: boolean;
-    isGlobalColorOverrideEnabled?: boolean;
+    isGlobalPaintOverrideEnabled?: boolean;
     settings?: InspectorTestSettings;
 }): string {
     return renderToStaticMarkup(createElement(WidgetSettingsTab, {
@@ -299,7 +301,7 @@ function renderWidgetSettings(options: {
         }),
         isGlobalGraphOverrideEnabled: options.isGlobalGraphOverrideEnabled ?? false,
         isGlobalThemeOverrideEnabled: options.isGlobalThemeOverrideEnabled ?? false,
-        isGlobalColorOverrideEnabled: options.isGlobalColorOverrideEnabled ?? false,
+        isGlobalPaintOverrideEnabled: options.isGlobalPaintOverrideEnabled ?? false,
         onSettingsPatch: () => undefined,
         onResetWidgetSettings: () => undefined,
     }));

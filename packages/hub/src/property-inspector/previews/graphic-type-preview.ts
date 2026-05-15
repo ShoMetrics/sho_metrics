@@ -24,7 +24,9 @@ const previewData: WidgetData = {
 export function buildGraphicTypePreviewUri(graphicType: SingleMetricViewLayout): string {
     const visualSettings = buildMetricRenderAppearance(buildDefaultAppearanceSettings({
         graph: { viewLayout: graphicType },
-        metricColor: { colorMode: "solid" },
+        paint: {
+            metric: { colorMode: "solid" },
+        },
     }));
     const body = renderSingleMetricBodyView({
         data: previewData,

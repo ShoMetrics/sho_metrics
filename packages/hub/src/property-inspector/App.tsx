@@ -29,8 +29,8 @@ export function App({ client }: AppProps): React.JSX.Element {
         isGlobalSettingsReady && resolvedGlobalSettings.graphOverride !== undefined;
     const isGlobalThemeOverrideEnabled =
         isGlobalSettingsReady && resolvedGlobalSettings.themeOverride !== undefined;
-    const isGlobalColorOverrideEnabled =
-        isGlobalSettingsReady && resolvedGlobalSettings.colorOverride !== undefined;
+    const isGlobalPaintOverrideEnabled =
+        isGlobalSettingsReady && resolvedGlobalSettings.paintOverride !== undefined;
 
     return (
         <div>
@@ -66,7 +66,7 @@ export function App({ client }: AppProps): React.JSX.Element {
                     context={visibilityContext}
                     isGlobalGraphOverrideEnabled={isGlobalGraphOverrideEnabled}
                     isGlobalThemeOverrideEnabled={isGlobalThemeOverrideEnabled}
-                    isGlobalColorOverrideEnabled={isGlobalColorOverrideEnabled}
+                    isGlobalPaintOverrideEnabled={isGlobalPaintOverrideEnabled}
                     onSettingsPatch={updateWidgetSettings}
                     onResetWidgetSettings={resetWidgetSettings}
                 />

@@ -151,7 +151,7 @@ export interface ResolvedCatalogMetricTarget {
 export interface ResolvedAppearanceSettings {
     readonly graph: ResolvedAppearanceGraphSettings;
     readonly theme: ResolvedAppearanceThemeSettings;
-    readonly metricColor: ResolvedMetricColorSettings;
+    readonly paint: ResolvedAppearancePaintSettings;
     readonly sparkline: ResolvedSparklineAppearanceSettings;
 }
 
@@ -162,31 +162,20 @@ export interface ResolvedAppearanceGraphSettings {
 
 export interface ResolvedAppearanceThemeSettings {
     readonly selectedTheme: MetricTheme;
-    readonly colorFilled: ResolvedColorFilledThemeSettings;
 }
 
-export interface ResolvedColorFilledThemeSettings {
-    readonly solid: ResolvedColorFilledSolidSettings;
-    readonly multiColor: ResolvedColorFilledMultiColorSettings;
+export interface ResolvedAppearancePaintSettings {
+    readonly metric: ResolvedMetricPaintSettings;
+    readonly colorFilled: ResolvedColorFilledPaintSettings;
 }
 
-export interface ResolvedColorFilledSolidSettings {
-    readonly color: string;
-    readonly isGradientEnabled: boolean;
-}
-
-export interface ResolvedColorFilledMultiColorSettings {
-    readonly colors: ResolvedMultiColorSet;
-    readonly isGradientEnabled: boolean;
-}
-
-export interface ResolvedMetricColorSettings {
+export interface ResolvedMetricPaintSettings {
     readonly colorMode: ColorMode;
-    readonly solid: ResolvedMetricSolidColorSettings;
-    readonly multiColor: ResolvedMetricMultiColorSettings;
+    readonly solid: ResolvedMetricSolidPaintSettings;
+    readonly multiColor: ResolvedMetricMultiColorPaintSettings;
 }
 
-export interface ResolvedMetricSolidColorSettings {
+export interface ResolvedMetricSolidPaintSettings {
     readonly colors: ResolvedMetricSolidChannelColors;
     readonly isGradientEnabled: boolean;
 }
@@ -199,7 +188,7 @@ export interface ResolvedMetricSolidChannelColors {
     readonly diskWriteColor: string;
 }
 
-export interface ResolvedMetricMultiColorSettings {
+export interface ResolvedMetricMultiColorPaintSettings {
     readonly colors: ResolvedMetricMultiColorChannelColors;
     readonly lowThresholdPercent: number;
     readonly highThresholdPercent: number;
@@ -218,6 +207,22 @@ export interface ResolvedMultiColorSet {
     readonly lowColor: string;
     readonly mediumColor: string;
     readonly highColor: string;
+}
+
+export interface ResolvedColorFilledPaintSettings {
+    readonly colorMode: ColorMode;
+    readonly solid: ResolvedColorFilledSolidPaintSettings;
+    readonly multiColor: ResolvedColorFilledMultiColorPaintSettings;
+}
+
+export interface ResolvedColorFilledSolidPaintSettings {
+    readonly color: string;
+    readonly isGradientEnabled: boolean;
+}
+
+export interface ResolvedColorFilledMultiColorPaintSettings {
+    readonly colors: ResolvedMultiColorSet;
+    readonly isGradientEnabled: boolean;
 }
 
 export interface ResolvedSparklineAppearanceSettings {
@@ -244,7 +249,7 @@ export interface ResolvedGlobalSettings {
     readonly globalOverrideEnabled: boolean;
     readonly graphOverride: ResolvedGlobalGraphOverride | undefined;
     readonly themeOverride: ResolvedGlobalThemeOverride | undefined;
-    readonly colorOverride: ResolvedGlobalColorOverride | undefined;
+    readonly paintOverride: ResolvedGlobalPaintOverride | undefined;
     readonly sourceProfiles: readonly ResolvedMetricSourceProfile[];
     readonly defaultSourceProfileId: string | undefined;
 }
@@ -265,18 +270,23 @@ export interface ResolvedGlobalThemeOverride {
     readonly theme: ResolvedAppearanceThemeSettings;
 }
 
-export interface ResolvedGlobalColorOverride {
-    readonly colorMode: ColorMode;
-    readonly solid: ResolvedGlobalSolidColorSettings;
-    readonly multiColor: ResolvedGlobalMultiColorSettings;
+export interface ResolvedGlobalPaintOverride {
+    readonly metric: ResolvedGlobalMetricPaintSettings;
+    readonly colorFilled: ResolvedColorFilledPaintSettings;
 }
 
-export interface ResolvedGlobalSolidColorSettings {
+export interface ResolvedGlobalMetricPaintSettings {
+    readonly colorMode: ColorMode;
+    readonly solid: ResolvedGlobalSolidPaintSettings;
+    readonly multiColor: ResolvedGlobalMultiColorPaintSettings;
+}
+
+export interface ResolvedGlobalSolidPaintSettings {
     readonly color: string;
     readonly isGradientEnabled: boolean;
 }
 
-export interface ResolvedGlobalMultiColorSettings {
+export interface ResolvedGlobalMultiColorPaintSettings {
     readonly colors: ResolvedMultiColorSet;
     readonly lowThresholdPercent: number;
     readonly highThresholdPercent: number;
