@@ -61,6 +61,7 @@ function renderSingleCircularMetric(options: SingleMetricBodyViewProps): string 
         labelTextColor: options.visual.paints.secondaryText,
         valueTextColor: options.visual.paints.primaryText,
         unitTextColor: options.visual.paints.secondaryText,
+        iconColor: options.visual.paints.icon,
         circleStyle: options.circleStyle,
         centerIconFragment: options.centerIcon,
         footerIconFragment: options.footerIcon,
@@ -83,6 +84,11 @@ function renderSingleLinearMetric(options: SingleMetricBodyViewProps): string {
         ...DEFAULT_LINEAR_BAR_CONFIG,
         colorConfig: options.visual.paints.primaryMetric,
         trackColor: options.visual.paints.track,
+        titleTextColor: options.visual.paints.linearTitleText,
+        valueTextColor: options.visual.paints.linearValueText,
+        unitTextColor: options.visual.paints.linearUnitText,
+        secondaryTextColor: options.visual.paints.linearSecondaryText,
+        iconColor: options.visual.paints.icon,
         topIconFragment: options.linearIcon ?? options.centerIcon,
     }, options.renderSize);
 }
@@ -94,6 +100,16 @@ function renderSingleSparklineMetric(options: SingleMetricBodyViewProps): string
         lineSmoothingPercent: options.visual.lineSmoothingPercent,
         gridLineVisibility: options.visual.gridLineVisibility,
         gridLineType: options.visual.gridLineType,
+        titleTextColor: options.visual.paints.secondaryText,
+        valueTextColor: options.visual.paints.primaryText,
+        unitTextColor: options.visual.paints.secondaryText,
+        iconColor: options.visual.paints.icon,
+        horizontalGuideLineColor: options.visual.paints.grid,
+        chartPanelFill: options.visual.paints.surface,
+        chartPanelStroke: options.visual.paints.divider,
+        timeGuideLineColor: options.visual.paints.grid,
+        baselineColor: options.visual.paints.grid,
+        timeLabelColor: options.visual.paints.mutedText,
         topIconFragment: options.linearIcon ?? options.centerIcon,
     }, options.renderSize);
 }

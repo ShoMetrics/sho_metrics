@@ -3,7 +3,7 @@ import { escapeSvgText } from "../../../rendering/svg-utils";
 import type { LucideIconOptions, SvgIconDefinition } from "../icon-types";
 
 const LUCIDE_VIEW_BOX = { x: 0, y: 0, width: 24, height: 24 } as const;
-const DEFAULT_LUCIDE_COLOR = "rgba(255,255,255,0.88)";
+const DEFAULT_LUCIDE_COLOR = "currentColor";
 const DEFAULT_LUCIDE_STROKE_WIDTH = 2.2;
 
 export function createLucideIconDefinition(options: LucideIconOptions): SvgIconDefinition {

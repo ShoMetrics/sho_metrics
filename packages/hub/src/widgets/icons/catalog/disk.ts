@@ -5,7 +5,7 @@ import type { DiskThroughputDirection } from "../../../runtime/disk-metric-keys"
 
 export function renderDiskThroughputDirectionIconFragment(options: {
     direction: Exclude<DiskThroughputDirection, "total">;
-    color: string;
+    color?: string;
     size: number;
 }): string {
     const iconDefinition = createLucideIconDefinition({

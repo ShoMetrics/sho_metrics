@@ -13,6 +13,10 @@ export interface RenderPaintTokens {
     readonly secondaryText: string;
     readonly mutedText: string;
     readonly icon: string;
+    readonly linearTitleText: string;
+    readonly linearValueText: string;
+    readonly linearUnitText: string;
+    readonly linearSecondaryText: string;
     readonly primaryMetric: ColorConfig;
     readonly track: string;
     readonly grid: string;

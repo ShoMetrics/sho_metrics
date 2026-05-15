@@ -30,6 +30,13 @@ export interface DualChannelSparklineConfig extends WidgetBaseConfig {
     timeGuideTickCount: number;
     historyWindowSeconds: number;
     sparklineScale?: SparklineScale;
+    titleTextColor: string;
+    valueTextColor: string;
+    unitTextColor: string;
+    iconColor: string;
+    horizontalGuideLineColor: string;
+    timeGuideLineColor: string;
+    baselineColor: string;
 }
 
 export type DualChannelSparklineMode = "overlay" | "mirrored";
@@ -48,14 +55,17 @@ export const DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG: DualChannelSparklineConfig =
     timeGuideTickCount: 5,
     historyWindowSeconds: 60,
     sparklineScale: { mode: "adaptive", minimumValue: 0 },
+    titleTextColor: "rgba(255,255,255,0.88)",
+    valueTextColor: "rgba(255,255,255,0.96)",
+    unitTextColor: "rgba(255,255,255,0.76)",
+    iconColor: "rgba(255,255,255,0.88)",
+    horizontalGuideLineColor: "rgba(255,255,255,1)",
+    timeGuideLineColor: "rgba(255,255,255,0.24)",
+    baselineColor: "rgba(255,255,255,0.24)",
 };
 
 const DUAL_SPARKLINE_FONT_FAMILY = "'Inter','SF Pro Display','Segoe UI',sans-serif";
 const CHART_PLOT_TOP_INSET = 2;
-const HORIZONTAL_GUIDE_LINE_COLOR = "rgba(255,255,255,1)";
-const TIME_GUIDE_LINE_COLOR = "rgba(255,255,255,0.24)";
-const BASELINE_COLOR = "rgba(255,255,255,0.24)";
-const CHANNEL_UNIT_FILL = "rgba(255,255,255,0.76)";
 
 interface DualSparklineLayoutPlan {
     title: DualSparklineTitleLayout;
@@ -136,6 +146,9 @@ export function renderDualChannelSparkline(
             gridLineVisibility: config.gridLineVisibility,
             gridLineType: config.gridLineType,
             timeGuideTickCount: config.timeGuideTickCount,
+            horizontalGuideLineColor: config.horizontalGuideLineColor,
+            timeGuideLineColor: config.timeGuideLineColor,
+            baselineColor: config.baselineColor,
         });
 
     return `
@@ -158,6 +171,8 @@ export function renderDualChannelSparkline(
             layout: layoutPlan.title,
             iconScale: layoutPlan.titleIconScale,
             iconGap: layoutPlan.titleIconGap,
+            textColor: config.titleTextColor,
+            iconColor: config.iconColor,
         })}
         ${renderChannelRow({
             layout: resolveRowLayout(layoutPlan, chartLayout, config.chartMode, "positive"),
@@ -167,6 +182,8 @@ export function renderDualChannelSparkline(
             unitText: data.positive.unit,
             rowId: "dual-sparkline-positive-row",
             showIcon: config.chartMode !== "mirrored",
+            valueTextColor: config.valueTextColor,
+            unitTextColor: config.unitTextColor,
         })}
         ${renderChannelRow({
             layout: resolveRowLayout(layoutPlan, chartLayout, config.chartMode, "negative"),
@@ -176,9 +193,11 @@ export function renderDualChannelSparkline(
             unitText: data.negative.unit,
             rowId: "dual-sparkline-negative-row",
             showIcon: config.chartMode !== "mirrored",
+            valueTextColor: config.valueTextColor,
+            unitTextColor: config.unitTextColor,
         })}
         ${gridLineSvg}
-        ${config.chartMode === "mirrored" ? renderMirroredBaseline(plotLayout) : ""}
+        ${config.chartMode === "mirrored" ? renderMirroredBaseline(plotLayout, config.baselineColor) : ""}
         ${renderChannelPathGroup({
             model: positiveModel,
             linePaint: config.colorConfig.isGradientEnabled ? `url(#${positiveLineGradientId})` : config.positiveColor,
@@ -398,13 +417,15 @@ function renderTitle(options: {
     layout: DualSparklineTitleLayout;
     iconScale: number;
     iconGap: number;
+    textColor: string;
+    iconColor: string;
 }): string {
     const titleXCoordinate = options.iconFragment
         ? options.layout.xCoordinate + options.iconGap
         : options.layout.xCoordinate;
     const titleMaxWidth = Math.max(1, options.layout.maxWidth - (titleXCoordinate - options.layout.xCoordinate));
     const iconSvg = options.iconFragment
-        ? `<g transform="translate(${options.layout.xCoordinate + 9} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})">${options.iconFragment}</g>`
+        ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 9} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})">${options.iconFragment}</g>`
         : "";
 
     return `
@@ -418,7 +439,7 @@ function renderTitle(options: {
             fontSize: options.layout.fontSize,
             fontFamily: DUAL_SPARKLINE_FONT_FAMILY,
             fontWeight: 850,
-            fill: "rgba(255,255,255,0.88)",
+            fill: options.textColor,
         })}
     `;
 }
@@ -463,11 +484,13 @@ function renderChannelRow(options: {
     unitText: string;
     rowId: string;
     showIcon: boolean;
+    valueTextColor: string;
+    unitTextColor: string;
 }): string {
     const iconSvg = !options.showIcon
         ? ""
         : options.iconFragment
-        ? `<g transform="translate(${formatSvgNumber(options.layout.iconXCoordinate)} ${formatSvgNumber(options.layout.iconYCoordinate)}) scale(${formatSvgNumber(options.layout.iconScale)})">${options.iconFragment}</g>`
+        ? `<g color="${options.color}" transform="translate(${formatSvgNumber(options.layout.iconXCoordinate)} ${formatSvgNumber(options.layout.iconYCoordinate)}) scale(${formatSvgNumber(options.layout.iconScale)})">${options.iconFragment}</g>`
         : `<circle cx="${formatSvgNumber(options.layout.iconXCoordinate)}" cy="${formatSvgNumber(options.layout.iconYCoordinate)}" r="4" fill="${options.color}" />`;
 
     return `
@@ -484,8 +507,8 @@ function renderChannelRow(options: {
             fontFamily: DUAL_SPARKLINE_FONT_FAMILY,
             valueFontWeight: 900,
             unitFontWeight: 780,
-            valueFill: "rgba(255,255,255,0.96)",
-            unitFill: CHANNEL_UNIT_FILL,
+            valueFill: options.valueTextColor,
+            unitFill: options.unitTextColor,
             unitBaselineOffset: 2,
             valueExtraAttributes: ["font-variant-numeric=\"tabular-nums\""],
         })}
@@ -524,6 +547,9 @@ function renderGridLines(options: {
     gridLineVisibility: SparklineGridLineVisibility;
     gridLineType: SparklineGridLineType;
     timeGuideTickCount: number;
+    horizontalGuideLineColor: string;
+    timeGuideLineColor: string;
+    baselineColor: string;
 }): string {
     if (options.gridLineVisibility === "none") {
         return "";
@@ -545,18 +571,22 @@ function renderGridLines(options: {
             plotLayout: options.plotLayout,
             opacity: gridLineMetrics.opacity,
             timeGuideTickCount: options.timeGuideTickCount,
+            timeGuideLineColor: options.timeGuideLineColor,
+            baselineColor: options.baselineColor,
         });
     }
 
     return renderHorizontalGuides({
         plotLayout: options.plotLayout,
         opacity: gridLineMetrics.opacity,
+        horizontalGuideLineColor: options.horizontalGuideLineColor,
     });
 }
 
 function renderHorizontalGuides(options: {
     plotLayout: DualSparklineChartLayout;
     opacity: number;
+    horizontalGuideLineColor: string;
 }): string {
     const guideList = [1, 0.5, 0].map(progress => {
         const yCoordinate = options.plotLayout.yCoordinate + options.plotLayout.height * (1 - progress);
@@ -565,7 +595,7 @@ function renderHorizontalGuides(options: {
             <line x1="${formatSvgNumber(options.plotLayout.xCoordinate)}" y1="${formatSvgNumber(yCoordinate)}"
                 x2="${formatSvgNumber(options.plotLayout.xCoordinate + options.plotLayout.width)}"
                 y2="${formatSvgNumber(yCoordinate)}"
-                stroke="${HORIZONTAL_GUIDE_LINE_COLOR}" stroke-opacity="${formatSvgNumber(options.opacity)}" stroke-width="1"
+                stroke="${options.horizontalGuideLineColor}" stroke-opacity="${formatSvgNumber(options.opacity)}" stroke-width="1"
                 stroke-dasharray="4 4" stroke-linecap="round" />
         `;
     });
@@ -577,6 +607,8 @@ function renderVerticalGuides(options: {
     plotLayout: DualSparklineChartLayout;
     opacity: number;
     timeGuideTickCount: number;
+    timeGuideLineColor: string;
+    baselineColor: string;
 }): string {
     const safeTickCount = Math.max(2, Math.round(options.timeGuideTickCount));
     const baselineYCoordinate = options.plotLayout.yCoordinate + options.plotLayout.height;
@@ -587,7 +619,7 @@ function renderVerticalGuides(options: {
         return `
             <line x1="${formatSvgNumber(xCoordinate)}" y1="${formatSvgNumber(options.plotLayout.yCoordinate)}"
                 x2="${formatSvgNumber(xCoordinate)}" y2="${formatSvgNumber(baselineYCoordinate)}"
-                stroke="${TIME_GUIDE_LINE_COLOR}" stroke-width="1.1" stroke-linecap="round" />
+                stroke="${options.timeGuideLineColor}" stroke-width="1.1" stroke-linecap="round" />
         `;
     });
 
@@ -597,19 +629,19 @@ function renderVerticalGuides(options: {
             <line x1="${formatSvgNumber(options.plotLayout.xCoordinate)}" y1="${formatSvgNumber(baselineYCoordinate)}"
                 x2="${formatSvgNumber(options.plotLayout.xCoordinate + options.plotLayout.width)}"
                 y2="${formatSvgNumber(baselineYCoordinate)}"
-                stroke="${BASELINE_COLOR}" stroke-width="1" stroke-dasharray="4 4" stroke-linecap="round" />
+                stroke="${options.baselineColor}" stroke-width="1" stroke-dasharray="4 4" stroke-linecap="round" />
         </g>
     `;
 }
 
-function renderMirroredBaseline(plotLayout: DualSparklineChartLayout): string {
+function renderMirroredBaseline(plotLayout: DualSparklineChartLayout, baselineColor: string): string {
     const baselineYCoordinate = plotLayout.yCoordinate + plotLayout.height / 2;
 
     return `
         <line x1="${formatSvgNumber(plotLayout.xCoordinate)}" y1="${formatSvgNumber(baselineYCoordinate)}"
             x2="${formatSvgNumber(plotLayout.xCoordinate + plotLayout.width)}"
             y2="${formatSvgNumber(baselineYCoordinate)}"
-            stroke="${BASELINE_COLOR}" stroke-width="1.15" stroke-linecap="round" />
+            stroke="${baselineColor}" stroke-width="1.15" stroke-linecap="round" />
     `;
 }
 

@@ -16,6 +16,7 @@ export interface DualChannelArcGaugeConfig extends WidgetBaseConfig {
     valueTextColor: string;
     unitTextColor: string;
     dividerColor: string;
+    iconColor: string;
     centerContent: DualChannelArcGaugeCenterContent;
     circleStyle: ArcGaugeStyle;
     titleText?: string;
@@ -37,6 +38,7 @@ export const DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG: DualChannelArcGaugeConfig = 
     valueTextColor: "white",
     unitTextColor: "rgba(255,255,255,0.74)",
     dividerColor: "rgba(255,255,255,0.18)",
+    iconColor: "rgba(255,255,255,0.88)",
     centerContent: "value",
     circleStyle: "value",
     titleText: "",
@@ -297,6 +299,7 @@ function renderNotchIcon(options: {
             <svg x="${formatSvgNumber(iconCenter.xCoordinate - iconSize / 2)}"
                 y="${formatSvgNumber(iconCenter.yCoordinate - iconSize / 2)}"
                 width="${formatSvgNumber(iconSize)}" height="${formatSvgNumber(iconSize)}"
+                color="${options.channel.color}"
                 viewBox="${options.channel.statusIcon.viewBox.x} ${options.channel.statusIcon.viewBox.y} ${options.channel.statusIcon.viewBox.width} ${options.channel.statusIcon.viewBox.height}">
                 ${options.channel.statusIcon.fragment}
             </svg>
@@ -304,7 +307,7 @@ function renderNotchIcon(options: {
     }
 
     return `
-        <g transform="translate(${formatSvgNumber(iconCenter.xCoordinate)} ${formatSvgNumber(iconCenter.yCoordinate)}) scale(${formatSvgNumber(iconSize / ARC_LAYOUT.inlineIconSourceSize)})">
+        <g color="${options.channel.color}" transform="translate(${formatSvgNumber(iconCenter.xCoordinate)} ${formatSvgNumber(iconCenter.yCoordinate)}) scale(${formatSvgNumber(iconSize / ARC_LAYOUT.inlineIconSourceSize)})">
             ${options.channel.iconFragment}
         </g>
     `;
@@ -319,6 +322,7 @@ function renderCenterContent(options: {
         return renderCenterIcon({
             centerIconFragment: options.config.centerIconFragment,
             geometry: options.geometry,
+            iconColor: options.config.iconColor,
         });
     }
 
@@ -332,13 +336,14 @@ function renderCenterContent(options: {
 function renderCenterIcon(options: {
     centerIconFragment: string | undefined;
     geometry: RingGeometry;
+    iconColor: string;
 }): string {
     if (!options.centerIconFragment) {
         return "";
     }
 
     return `
-        <g transform="translate(${formatSvgNumber(options.geometry.centerXCoordinate)} ${formatSvgNumber(options.geometry.centerYCoordinate)}) scale(${formatSvgNumber(ARC_LAYOUT.centerIconScale)})">
+        <g color="${options.iconColor}" transform="translate(${formatSvgNumber(options.geometry.centerXCoordinate)} ${formatSvgNumber(options.geometry.centerYCoordinate)}) scale(${formatSvgNumber(ARC_LAYOUT.centerIconScale)})">
             ${options.centerIconFragment}
         </g>
     `;
@@ -695,7 +700,7 @@ function renderInlineIcon(options: {
         const iconScale = ARC_LAYOUT.inlineIconSize / ARC_LAYOUT.inlineIconSourceSize;
 
         return `
-            <g transform="translate(${formatSvgNumber(options.xCoordinate)} ${formatSvgNumber(yCoordinate)}) scale(${formatSvgNumber(iconScale)})">
+            <g color="${options.color}" transform="translate(${formatSvgNumber(options.xCoordinate)} ${formatSvgNumber(yCoordinate)}) scale(${formatSvgNumber(iconScale)})">
                 ${options.iconFragment}
             </g>
         `;

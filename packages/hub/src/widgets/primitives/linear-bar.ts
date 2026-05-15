@@ -12,6 +12,11 @@ export interface LinearBarConfig extends WidgetBaseConfig {
     trackColor: string;
     barHeight: number;
     borderRadius: number;
+    titleTextColor: string;
+    valueTextColor: string;
+    unitTextColor: string;
+    secondaryTextColor: string;
+    iconColor: string;
     topIconFragment?: string;
 }
 
@@ -24,6 +29,11 @@ export const DEFAULT_LINEAR_BAR_CONFIG: LinearBarConfig = {
     trackColor: "rgba(255,255,255,0.08)",
     barHeight: 14,
     borderRadius: 7,
+    titleTextColor: "rgba(255,255,255,0.88)",
+    valueTextColor: "white",
+    unitTextColor: "rgba(255,255,255,0.76)",
+    secondaryTextColor: "rgba(255,255,255,0.78)",
+    iconColor: "rgba(255,255,255,0.88)",
     gradientHeadAdjustmentPercent: -15,
 };
 
@@ -198,12 +208,16 @@ function renderSingleBar(
             iconScale: layoutPlan.mode === "wide" ? 0.3 : 0.34,
             iconGap: layoutPlan.mode === "wide" ? 25 : 27,
             clipId: "linear-single-title",
+            textColor: config.titleTextColor,
+            iconColor: config.iconColor,
         })}
         ${renderValueWithUnit({
             clipId: "linear-single-value",
             valueText,
             unitText: formatLinearUnit(unitText),
             layout: layoutPlan.singleValue,
+            valueTextColor: config.valueTextColor,
+            unitTextColor: config.unitTextColor,
         })}
         ${renderTrack(layoutPlan.singleBar, config.trackColor)}
         ${renderFill(layoutPlan.singleBar, fillWidth, fillPaint)}
@@ -211,6 +225,7 @@ function renderSingleBar(
             text: data.secondaryDisplayValue,
             layout: layoutPlan.singleSecondaryText,
             clipId: "linear-single-secondary",
+            textColor: config.secondaryTextColor,
         })}
     `;
 }
@@ -232,6 +247,8 @@ function renderChannelBars(
             iconScale: layoutPlan.mode === "wide" ? 0.3 : 0.34,
             iconGap: layoutPlan.mode === "wide" ? 25 : 27,
             clipId: "linear-channel-title",
+            textColor: config.titleTextColor,
+            iconColor: config.iconColor,
         })}
         ${channels.slice(0, 2).map((channel, channelIndex) => {
             const channelLayout = buildChannelLayout({
@@ -251,7 +268,7 @@ function renderChannelBars(
                         <stop offset="100%" stop-color="${headColor}" />
                     </linearGradient>
                 </defs>` : ""}
-                <g transform="translate(${channelLayout.iconCenterXCoordinate} ${channelLayout.iconCenterYCoordinate}) scale(${layoutPlan.channelIconScale})">
+                <g color="${channel.color}" transform="translate(${channelLayout.iconCenterXCoordinate} ${channelLayout.iconCenterYCoordinate}) scale(${layoutPlan.channelIconScale})">
                     ${channel.iconFragment}
                 </g>
                 ${renderValueWithUnit({
@@ -259,6 +276,8 @@ function renderChannelBars(
                     valueText: channel.displayValue,
                     unitText: channel.unit,
                     layout: channelLayout.value,
+                    valueTextColor: config.valueTextColor,
+                    unitTextColor: config.unitTextColor,
                 })}
                 ${renderTrack(channelLayout.bar, config.trackColor)}
                 ${renderFill(channelLayout.bar, fillWidth, fillPaint)}
@@ -333,13 +352,15 @@ function renderTitle(options: {
     iconScale: number;
     iconGap: number;
     clipId: string;
+    textColor: string;
+    iconColor: string;
 }): string {
     const titleXCoordinate = options.iconFragment
         ? options.layout.xCoordinate + options.iconGap
         : options.layout.xCoordinate;
     const titleMaxWidth = Math.max(1, options.layout.maxWidth - (titleXCoordinate - options.layout.xCoordinate));
     const iconSvg = options.iconFragment
-        ? `<g transform="translate(${options.layout.xCoordinate + 10} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})">${options.iconFragment}</g>`
+        ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 10} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})">${options.iconFragment}</g>`
         : "";
 
     return `
@@ -353,7 +374,7 @@ function renderTitle(options: {
             fontSize: options.layout.fontSize,
             fontFamily: LINEAR_TEXT_FONT_FAMILY,
             fontWeight: 850,
-            fill: "rgba(255,255,255,0.88)",
+            fill: options.textColor,
         })}
     `;
 }
@@ -363,6 +384,8 @@ function renderValueWithUnit(options: {
     valueText: string;
     unitText: string;
     layout: ValueLineLayout;
+    valueTextColor: string;
+    unitTextColor: string;
 }): string {
     return renderMetricTextRow({
         id: options.clipId,
@@ -376,8 +399,8 @@ function renderValueWithUnit(options: {
         fontFamily: LINEAR_TEXT_FONT_FAMILY,
         valueFontWeight: 900,
         unitFontWeight: 800,
-        valueFill: "white",
-        unitFill: "rgba(255,255,255,0.76)",
+        valueFill: options.valueTextColor,
+        unitFill: options.unitTextColor,
         unitBaselineOffset: 2,
         valueExtraAttributes: ["font-variant-numeric=\"tabular-nums\""],
     });
@@ -387,6 +410,7 @@ function renderSecondaryText(options: {
     text: string | undefined;
     layout: TextLineLayout;
     clipId: string;
+    textColor: string;
 }): string {
     if (!options.text) {
         return "";
@@ -401,7 +425,7 @@ function renderSecondaryText(options: {
         fontSize: options.layout.fontSize,
         fontFamily: LINEAR_TEXT_FONT_FAMILY,
         fontWeight: 750,
-        fill: "rgba(255,255,255,0.78)",
+        fill: options.textColor,
     });
 }
 

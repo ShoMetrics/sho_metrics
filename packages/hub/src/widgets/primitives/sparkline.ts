@@ -28,6 +28,16 @@ export interface SparklineConfig extends WidgetBaseConfig {
     historyWindowSeconds: number;
     showDots: boolean;
     dashPattern: string;
+    titleTextColor: string;
+    valueTextColor: string;
+    unitTextColor: string;
+    iconColor: string;
+    horizontalGuideLineColor: string;
+    chartPanelFill: string;
+    chartPanelStroke: string;
+    timeGuideLineColor: string;
+    baselineColor: string;
+    timeLabelColor: string;
     topIconFragment?: string;
 }
 
@@ -46,6 +56,16 @@ export const DEFAULT_SPARKLINE_CONFIG: SparklineConfig = {
     historyWindowSeconds: 60,
     showDots: false,
     dashPattern: "",
+    titleTextColor: "rgba(255,255,255,0.88)",
+    valueTextColor: "rgba(255,255,255,0.96)",
+    unitTextColor: "rgba(255,255,255,0.75)",
+    iconColor: "rgba(255,255,255,0.88)",
+    horizontalGuideLineColor: "rgba(255,255,255,1)",
+    chartPanelFill: "rgba(255,255,255,0.07)",
+    chartPanelStroke: "rgba(255,255,255,0.05)",
+    timeGuideLineColor: "rgba(255,255,255,0.28)",
+    baselineColor: "rgba(255,255,255,0.30)",
+    timeLabelColor: "rgba(255,255,255,0.34)",
     gradientHeadAdjustmentPercent: 28,
 };
 
@@ -54,17 +74,11 @@ const MINIMUM_VISIBLE_RANGE = 1;
 const MINIMUM_AREA_PROGRESS = 0.09;
 const ADAPTIVE_SCALE_HEADROOM_RATIO = 1.18;
 const CHART_PLOT_TOP_INSET = 2;
-const HORIZONTAL_GUIDE_LINE_COLOR = "rgba(255,255,255,1)";
-const CHART_PANEL_FILL = "rgba(255,255,255,0.07)";
-const CHART_PANEL_STROKE = "rgba(255,255,255,0.05)";
 const CHART_PANEL_RADIUS = 7;
 const CHART_LABEL_BAND_HEIGHT = 14;
 const CHART_PLOT_SIDE_INSET = 1;
-const TIME_GUIDE_LINE_COLOR = "rgba(255,255,255,0.28)";
 const TIME_GUIDE_LINE_WIDTH = 1.15;
 const TIME_GUIDE_TICK_HEIGHT = 5;
-const BASELINE_COLOR = "rgba(255,255,255,0.30)";
-const TIME_LABEL_COLOR = "rgba(255,255,255,0.34)";
 
 interface SparklineLayoutPlan {
     title: TextLineLayout;
@@ -139,6 +153,12 @@ export const sparkline: Widget<SparklineConfig> = {
             gridLineType: config.gridLineType,
             timeGuideTickCount: config.timeGuideTickCount,
             historyWindowSeconds: config.historyWindowSeconds,
+            horizontalGuideLineColor: config.horizontalGuideLineColor,
+            chartPanelFill: config.chartPanelFill,
+            chartPanelStroke: config.chartPanelStroke,
+            timeGuideLineColor: config.timeGuideLineColor,
+            baselineColor: config.baselineColor,
+            timeLabelColor: config.timeLabelColor,
         });
         const latestPoint = points[points.length - 1];
         const latestPointGlowSvg = config.gridLineVisibility !== "none" && config.gridLineType === "vertical" && latestPoint
@@ -179,6 +199,8 @@ export const sparkline: Widget<SparklineConfig> = {
                 layout: layoutPlan.title,
                 iconScale: layoutPlan.iconScale,
                 iconGap: layoutPlan.iconGap,
+                textColor: config.titleTextColor,
+                iconColor: config.iconColor,
             })}
             ${renderMetricTextRow({
                 id: "sparkline-current-value",
@@ -192,8 +214,8 @@ export const sparkline: Widget<SparklineConfig> = {
                 fontFamily: SPARKLINE_TEXT_FONT_FAMILY,
                 valueFontWeight: 900,
                 unitFontWeight: 780,
-                valueFill: "rgba(255,255,255,0.96)",
-                unitFill: "rgba(255,255,255,0.75)",
+                valueFill: config.valueTextColor,
+                unitFill: config.unitTextColor,
                 unitBaselineOffset: 2,
                 textAnchor: layoutPlan.value.textAnchor,
                 valueExtraAttributes: ["font-variant-numeric=\"tabular-nums\""],
@@ -277,13 +299,15 @@ function renderTitle(options: {
     layout: TextLineLayout;
     iconScale: number;
     iconGap: number;
+    textColor: string;
+    iconColor: string;
 }): string {
     const titleXCoordinate = options.iconFragment
         ? options.layout.xCoordinate + options.iconGap
         : options.layout.xCoordinate;
     const titleMaxWidth = Math.max(1, options.layout.maxWidth - (titleXCoordinate - options.layout.xCoordinate));
     const iconSvg = options.iconFragment
-        ? `<g transform="translate(${options.layout.xCoordinate + 9} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})">${options.iconFragment}</g>`
+        ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 9} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})">${options.iconFragment}</g>`
         : "";
 
     return `
@@ -297,7 +321,7 @@ function renderTitle(options: {
             fontSize: options.layout.fontSize,
             fontFamily: SPARKLINE_TEXT_FONT_FAMILY,
             fontWeight: 850,
-            fill: "rgba(255,255,255,0.88)",
+            fill: options.textColor,
         })}
     `;
 }
@@ -411,6 +435,12 @@ function renderGridLines(options: {
     gridLineType: SparklineGridLineType;
     timeGuideTickCount: number;
     historyWindowSeconds: number;
+    horizontalGuideLineColor: string;
+    chartPanelFill: string;
+    chartPanelStroke: string;
+    timeGuideLineColor: string;
+    baselineColor: string;
+    timeLabelColor: string;
 }): string {
     if (options.gridLineVisibility === "none") {
         return "";
@@ -431,12 +461,17 @@ function renderGridLines(options: {
         return renderVerticalGridLines({ ...options, opacity: gridLineMetrics.opacity });
     }
 
-    return renderHorizontalGuides({ plotLayout: options.plotLayout, opacity: gridLineMetrics.opacity });
+    return renderHorizontalGuides({
+        plotLayout: options.plotLayout,
+        opacity: gridLineMetrics.opacity,
+        horizontalGuideLineColor: options.horizontalGuideLineColor,
+    });
 }
 
 function renderHorizontalGuides(options: {
     plotLayout: ChartLayout;
     opacity: number;
+    horizontalGuideLineColor: string;
 }): string {
     const guideList = [1, 0.5, 0].map(progress => {
         const yCoordinate = options.plotLayout.yCoordinate + options.plotLayout.height * (1 - progress);
@@ -445,7 +480,7 @@ function renderHorizontalGuides(options: {
             <line x1="${formatSvgNumber(options.plotLayout.xCoordinate)}" y1="${formatSvgNumber(yCoordinate)}"
                 x2="${formatSvgNumber(options.plotLayout.xCoordinate + options.plotLayout.width)}"
                 y2="${formatSvgNumber(yCoordinate)}"
-                stroke="${HORIZONTAL_GUIDE_LINE_COLOR}" stroke-opacity="${formatSvgNumber(options.opacity)}" stroke-width="1"
+                stroke="${options.horizontalGuideLineColor}" stroke-opacity="${formatSvgNumber(options.opacity)}" stroke-width="1"
                 stroke-dasharray="4 4" stroke-linecap="round" />
         `;
     });
@@ -463,6 +498,11 @@ function renderVerticalGridLines(options: {
     timeGuideTickCount: number;
     historyWindowSeconds: number;
     opacity: number;
+    chartPanelFill: string;
+    chartPanelStroke: string;
+    timeGuideLineColor: string;
+    baselineColor: string;
+    timeLabelColor: string;
 }): string {
     const safeTickCount = Math.max(2, Math.round(options.timeGuideTickCount));
     const baselineYCoordinate = options.plotLayout.yCoordinate + options.plotLayout.height;
@@ -474,11 +514,11 @@ function renderVerticalGridLines(options: {
         return `
             <line x1="${formatSvgNumber(xCoordinate)}" y1="${formatSvgNumber(options.plotLayout.yCoordinate)}"
                 x2="${formatSvgNumber(xCoordinate)}" y2="${formatSvgNumber(baselineYCoordinate)}"
-                stroke="${TIME_GUIDE_LINE_COLOR}" stroke-width="${TIME_GUIDE_LINE_WIDTH}"
+                stroke="${options.timeGuideLineColor}" stroke-width="${TIME_GUIDE_LINE_WIDTH}"
                 stroke-linecap="round" />
             <line x1="${formatSvgNumber(xCoordinate)}" y1="${formatSvgNumber(baselineYCoordinate)}"
                 x2="${formatSvgNumber(xCoordinate)}" y2="${formatSvgNumber(baselineYCoordinate + TIME_GUIDE_TICK_HEIGHT)}"
-                stroke="${TIME_GUIDE_LINE_COLOR}" stroke-width="${TIME_GUIDE_LINE_WIDTH}"
+                stroke="${options.timeGuideLineColor}" stroke-width="${TIME_GUIDE_LINE_WIDTH}"
                 stroke-linecap="round" />
             ${renderConstrainedSvgText({
                 id: `sparkline-time-${tickIndex}`,
@@ -489,7 +529,7 @@ function renderVerticalGridLines(options: {
                 fontSize: 10,
                 fontFamily: SPARKLINE_TEXT_FONT_FAMILY,
                 fontWeight: 750,
-                fill: TIME_LABEL_COLOR,
+                fill: options.timeLabelColor,
                 textAnchor: "middle",
             })}
         `;
@@ -499,12 +539,12 @@ function renderVerticalGridLines(options: {
         <g opacity="${formatSvgNumber(options.opacity)}">
             <rect x="${formatSvgNumber(options.chartLayout.xCoordinate)}" y="${formatSvgNumber(options.chartLayout.yCoordinate)}"
                 width="${formatSvgNumber(options.chartLayout.width)}" height="${formatSvgNumber(options.chartLayout.height)}"
-                rx="${CHART_PANEL_RADIUS}" fill="${CHART_PANEL_FILL}" stroke="${CHART_PANEL_STROKE}" stroke-width="1" />
+                rx="${CHART_PANEL_RADIUS}" fill="${options.chartPanelFill}" stroke="${options.chartPanelStroke}" stroke-width="1" />
             ${internalGuideList.join("")}
             <line x1="${formatSvgNumber(options.plotLayout.xCoordinate)}" y1="${formatSvgNumber(baselineYCoordinate)}"
                 x2="${formatSvgNumber(options.plotLayout.xCoordinate + options.plotLayout.width)}"
                 y2="${formatSvgNumber(baselineYCoordinate)}"
-                stroke="${BASELINE_COLOR}" stroke-width="1" stroke-dasharray="4 4" stroke-linecap="round" />
+                stroke="${options.baselineColor}" stroke-width="1" stroke-dasharray="4 4" stroke-linecap="round" />
         </g>
     `;
 }

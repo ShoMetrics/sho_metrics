@@ -22,7 +22,7 @@ const CPU_USAGE_WIDGET_DATA: WidgetData = {
     sampleTimestampMilliseconds: 1,
 };
 
-interface OldCrtVisualWidgetTestCase {
+interface DefaultThemeVisualWidgetTestCase {
     readonly snapshotName: string;
     readonly appearance: ResolvedAppearanceSettingsOverride;
     readonly data: WidgetData;
@@ -31,18 +31,10 @@ interface OldCrtVisualWidgetTestCase {
     readonly linearIcon?: string;
 }
 
-const OLD_CRT_VISUAL_TEST_CASES: readonly OldCrtVisualWidgetTestCase[] = [
+const DEFAULT_THEME_VISUAL_TEST_CASES: readonly DefaultThemeVisualWidgetTestCase[] = [
     {
-        snapshotName: "old-crt-single-circular-value-fixed-phosphor-screen",
-        appearance: buildOldCrtAppearanceOverride({
-            graphType: "circular",
-            circleStyle: "value",
-        }),
-        data: CPU_USAGE_WIDGET_DATA,
-    },
-    {
-        snapshotName: "old-crt-single-circular-minimal-icon-fixed-phosphor-screen",
-        appearance: buildOldCrtAppearanceOverride({
+        snapshotName: "default-theme-single-circular-minimal-icon-cpu-usage-multi-color",
+        appearance: buildDefaultThemeAppearanceOverride({
             graphType: "circular",
             circleStyle: "compact",
         }),
@@ -50,16 +42,16 @@ const OLD_CRT_VISUAL_TEST_CASES: readonly OldCrtVisualWidgetTestCase[] = [
         centerIcon: CPU_ICON_FRAGMENT,
     },
     {
-        snapshotName: "old-crt-single-circular-gauge-fixed-phosphor-screen",
-        appearance: buildOldCrtAppearanceOverride({
+        snapshotName: "default-theme-single-circular-gauge-cpu-usage-multi-color",
+        appearance: buildDefaultThemeAppearanceOverride({
             graphType: "circular",
             circleStyle: "gauge",
         }),
         data: CPU_USAGE_WIDGET_DATA,
     },
     {
-        snapshotName: "old-crt-single-linear-progress-fixed-phosphor-screen",
-        appearance: buildOldCrtAppearanceOverride({
+        snapshotName: "default-theme-single-linear-progress-cpu-usage-multi-color",
+        appearance: buildDefaultThemeAppearanceOverride({
             graphType: "linear",
             circleStyle: "value",
         }),
@@ -72,8 +64,8 @@ const OLD_CRT_VISUAL_TEST_CASES: readonly OldCrtVisualWidgetTestCase[] = [
         linearIcon: CPU_ICON_FRAGMENT,
     },
     {
-        snapshotName: "old-crt-single-sparkline-fixed-phosphor-screen",
-        appearance: buildOldCrtAppearanceOverride({
+        snapshotName: "default-theme-single-sparkline-cpu-usage-multi-color",
+        appearance: buildDefaultThemeAppearanceOverride({
             graphType: "sparkline",
             circleStyle: "value",
         }),
@@ -83,7 +75,7 @@ const OLD_CRT_VISUAL_TEST_CASES: readonly OldCrtVisualWidgetTestCase[] = [
     },
 ];
 
-for (const testCase of OLD_CRT_VISUAL_TEST_CASES) {
+for (const testCase of DEFAULT_THEME_VISUAL_TEST_CASES) {
     test(`renders ${testCase.snapshotName}`, () => {
         const svg = renderSingleMetricWidgetSvg({
             appearance: testCase.appearance,
@@ -99,7 +91,7 @@ for (const testCase of OLD_CRT_VISUAL_TEST_CASES) {
     });
 }
 
-function buildOldCrtAppearanceOverride(options: {
+function buildDefaultThemeAppearanceOverride(options: {
     graphType: "circular" | "text" | "linear" | "sparkline";
     circleStyle: "value" | "compact" | "gauge";
 }): ResolvedAppearanceSettingsOverride {
@@ -107,17 +99,6 @@ function buildOldCrtAppearanceOverride(options: {
         graph: {
             viewLayout: options.graphType,
             circleStyle: options.circleStyle,
-        },
-        theme: {
-            selectedTheme: "old-crt",
-        },
-        paint: {
-            metric: {
-                colorMode: "solid",
-                solid: {
-                    colors: { usageColor: "#ef4444" },
-                },
-            },
         },
     };
 }
