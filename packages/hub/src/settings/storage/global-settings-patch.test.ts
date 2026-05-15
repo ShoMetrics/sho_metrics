@@ -17,22 +17,24 @@ test("global settings patch writes global master override", () => {
     assert.equal(settings.overrides?.enabled, true);
     assert.equal(settings.overrides?.graph, undefined);
     assert.equal(settings.overrides?.theme, undefined);
-    assert.equal(settings.overrides?.color, undefined);
+    assert.equal(settings.overrides?.paint, undefined);
 });
 
-test("global settings patch writes nested graph theme and color overrides", () => {
+test("global settings patch writes nested graph theme and paint overrides", () => {
     const nextSettings = writeStoredGlobalSettingsPatch(undefined, {
         graphOverrideEnabled: false,
         themeOverrideEnabled: true,
-        colorOverrideEnabled: true,
+        paintOverrideEnabled: true,
         graph: {
             viewLayout: "linear",
         },
         theme: {
             selectedTheme: "color-filled",
         },
-        color: {
-            colorMode: "black-white",
+        paint: {
+            metric: {
+                colorMode: "black-white",
+            },
         },
     });
 
@@ -43,6 +45,6 @@ test("global settings patch writes nested graph theme and color overrides", () =
     assert.equal(overrides?.graph?.graph?.viewLayout, StoredSingleMetricViewLayout.LINEAR);
     assert.equal(overrides?.theme?.enabled, true);
     assert.equal(overrides?.theme?.theme?.selectedTheme, StoredMetricTheme.COLOR_FILLED);
-    assert.equal(overrides?.color?.enabled, true);
-    assert.equal(overrides?.color?.colorMode, StoredColorMode.BLACK_WHITE);
+    assert.equal(overrides?.paint?.enabled, true);
+    assert.equal(overrides?.paint?.metric?.colorMode, StoredColorMode.BLACK_WHITE);
 });

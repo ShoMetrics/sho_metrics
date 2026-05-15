@@ -113,11 +113,13 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
             }),
             circleStyleOverride: circleStyle,
             appearanceOverride: {
-                metricColor: {
-                    colorMode: appearance.metricColor.colorMode,
-                    solid: {
-                        colors: {
-                            usageColor: appearance.metricColor.solid.colors.usageColor,
+                paint: {
+                    metric: {
+                        colorMode: appearance.paint.metric.colorMode,
+                        solid: {
+                            colors: {
+                                usageColor: appearance.paint.metric.solid.colors.usageColor,
+                            },
                         },
                     },
                 },
@@ -180,7 +182,7 @@ function buildDualNetworkCircularDisplayOptions(
     const downloadColorConfig = buildNetworkChannelColorConfig("download", options.settings);
     const appearance = options.settings.widget.slot.appearance;
     const circleStyle = appearance.graph.circleStyle;
-    const solidMetricColorMode = resolveSolidMetricColorMode(appearance.metricColor.colorMode);
+    const solidMetricColorMode = resolveSolidMetricColorMode(appearance.paint.metric.colorMode);
 
     return {
         event: options.event,
@@ -224,9 +226,11 @@ function buildDualNetworkCircularDisplayOptions(
             color: downloadColor,
         }),
         appearanceOverride: {
-            metricColor: {
-                colorMode: solidMetricColorMode,
-                solid: { colors: { usageColor: uploadColor } },
+            paint: {
+                metric: {
+                    colorMode: solidMetricColorMode,
+                    solid: { colors: { usageColor: uploadColor } },
+                },
             },
         },
     };
@@ -255,7 +259,7 @@ function buildDualNetworkSparklineDisplayOptions(options: BuildNetworkDisplayOpt
     const positiveColor = positiveDirection === "download" ? downloadColor : uploadColor;
     const negativeColor = negativeDirection === "download" ? downloadColor : uploadColor;
     const appearance = options.settings.widget.slot.appearance;
-    const solidMetricColorMode = resolveSolidMetricColorMode(appearance.metricColor.colorMode);
+    const solidMetricColorMode = resolveSolidMetricColorMode(appearance.paint.metric.colorMode);
 
     return {
         event: options.event,
@@ -288,9 +292,11 @@ function buildDualNetworkSparklineDisplayOptions(options: BuildNetworkDisplayOpt
             size: NETWORK_TOP_ICON_SIZE,
         }),
         appearanceOverride: {
-            metricColor: {
-                colorMode: solidMetricColorMode,
-                solid: { colors: { usageColor: downloadColor } },
+            paint: {
+                metric: {
+                    colorMode: solidMetricColorMode,
+                    solid: { colors: { usageColor: downloadColor } },
+                },
             },
         },
     };
@@ -364,13 +370,15 @@ function buildLinearNetworkDisplayOptions(options: BuildNetworkDisplayOptions): 
             color: NETWORK_DIRECTION_ICON_COLOR,
         }),
         appearanceOverride: {
-            metricColor: {
-                colorMode: resolveSolidMetricColorMode(
-                    options.settings.widget.slot.appearance.metricColor.colorMode,
-                ),
-                solid: {
-                    colors: {
-                        usageColor: resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData),
+            paint: {
+                metric: {
+                    colorMode: resolveSolidMetricColorMode(
+                        options.settings.widget.slot.appearance.paint.metric.colorMode,
+                    ),
+                    solid: {
+                        colors: {
+                            usageColor: resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData),
+                        },
                     },
                 },
             },

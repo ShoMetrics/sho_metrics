@@ -289,21 +289,21 @@ message GlobalDefaults {
 
 message GlobalOverrides {
   // Main switch for global override. When enabled, omitted subsection enabled
-  // fields resolve to enabled so one click applies graph, theme, and color
+  // fields resolve to enabled so one click applies graph, theme, and paint
   // overrides.
   optional bool enabled = 1;
   GlobalGraphOverride graph = 2;
   GlobalThemeOverride theme = 3;
-  GlobalColorOverride color = 4;
+  GlobalPaintOverride paint = 4;
 }
 
 // AppearanceSettings describes the visual presentation of one metric. It is
-// grouped by user-facing domains instead of flattening graph, theme, color, and
+// grouped by user-facing domains instead of flattening graph, theme, paint, and
 // sparkline settings into one broad message.
 message AppearanceSettings {
   AppearanceGraphSettings graph = 1;
   AppearanceThemeSettings theme = 2;
-  MetricColorSettings metric_color = 3;
+  AppearancePaintSettings paint = 3;
   SparklineAppearanceSettings sparkline = 4;
 }
 
@@ -330,35 +330,21 @@ message AppearanceThemeSettings {
     defined_only: true
     not_in: [0]
   }];
-
-  ColorFilledThemeSettings color_filled = 2;
 }
 
-message ColorFilledThemeSettings {
-  // Color Filled theme colors are background fill intent. They are independent
-  // from metric colors so switching themes does not rewrite ordinary metric
+message AppearancePaintSettings {
+  // Metric paint is used by ordinary themes. It stays independent from
+  // Color Filled paint so switching themes does not rewrite the user's metric
   // paint preferences.
-  ColorFilledSolidSettings solid = 1;
-  ColorFilledMultiColorSettings multi_color = 2;
+  MetricPaintSettings metric = 1;
+
+  // Color Filled paint is active only when the selected theme is Color Filled.
+  // It owns its own color mode because its solid and multi-color branches
+  // describe background fill, not metric value paint.
+  ColorFilledPaintSettings color_filled = 2;
 }
 
-message ColorFilledSolidSettings {
-  optional string color = 1 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
-
-  // When unset, the resolver enables smooth gradients for the filled
-  // background.
-  optional bool gradient_enabled = 2;
-}
-
-message ColorFilledMultiColorSettings {
-  MultiColorSet colors = 1;
-
-  // When unset, the resolver enables smooth gradients for the filled
-  // background.
-  optional bool gradient_enabled = 2;
-}
-
-message MetricColorSettings {
+message MetricPaintSettings {
   // User-facing metric color treatment. Multi-color means value-driven metric
   // color bands for ordinary metric graphics; B&W is a final paint constraint
   // applied by the visual adapter.
@@ -367,11 +353,11 @@ message MetricColorSettings {
     not_in: [0]
   }];
 
-  MetricSolidColorSettings solid = 2;
-  MetricMultiColorSettings multi_color = 3;
+  MetricSolidPaintSettings solid = 2;
+  MetricMultiColorPaintSettings multi_color = 3;
 }
 
-message MetricSolidColorSettings {
+message MetricSolidPaintSettings {
   MetricSolidChannelColors colors = 1;
 
   // When unset, the resolver enables smooth gradients for solid metric paint.
@@ -389,7 +375,7 @@ message MetricSolidChannelColors {
   optional string disk_write_color = 5 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
 }
 
-message MetricMultiColorSettings {
+message MetricMultiColorPaintSettings {
   option (buf.validate.message).cel = {
     id: "multi_color_threshold_order"
     message: "low_threshold_percent must be less than or equal to high_threshold_percent"
@@ -422,6 +408,34 @@ message MultiColorSet {
   optional string low_color = 1 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
   optional string medium_color = 2 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
   optional string high_color = 3 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+}
+
+message ColorFilledPaintSettings {
+  // In Color Filled, solid and multi-color choose the widget background fill
+  // branch instead of ordinary metric paint.
+  optional ColorMode color_mode = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+
+  ColorFilledSolidPaintSettings solid = 2;
+  ColorFilledMultiColorPaintSettings multi_color = 3;
+}
+
+message ColorFilledSolidPaintSettings {
+  optional string color = 1 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+
+  // When unset, the resolver enables smooth gradients for the filled
+  // background.
+  optional bool gradient_enabled = 2;
+}
+
+message ColorFilledMultiColorPaintSettings {
+  MultiColorSet colors = 1;
+
+  // When unset, the resolver enables smooth gradients for the filled
+  // background.
+  optional bool gradient_enabled = 2;
 }
 
 message SparklineAppearanceSettings {
@@ -463,31 +477,41 @@ message GlobalThemeOverride {
   AppearanceThemeSettings theme = 2;
 }
 
-message GlobalColorOverride {
+message GlobalPaintOverride {
   // When unset and global override is enabled, the resolver treats this
   // subsection as enabled.
   optional bool enabled = 1;
 
-  optional ColorMode color_mode = 2 [(buf.validate.field).enum = {
+  // Global metric colors apply the same ordinary metric paint behavior to
+  // every widget channel.
+  GlobalMetricPaintSettings metric = 2;
+
+  // Global Color Filled paint applies when a widget is rendered with the Color
+  // Filled theme.
+  ColorFilledPaintSettings color_filled = 3;
+}
+
+message GlobalMetricPaintSettings {
+  // Global metric paint intentionally uses one solid color and one multi-color
+  // set for every metric channel. Widget-level metric paint remains
+  // per-channel for fine-grained tuning.
+  optional ColorMode color_mode = 1 [(buf.validate.field).enum = {
     defined_only: true
     not_in: [0]
   }];
 
-  // Global solid applies the same solid paint behavior to every metric channel.
-  GlobalSolidColorSettings solid = 3;
-
-  // Global multi-color applies the same color bands to every metric channel.
-  GlobalMultiColorSettings multi_color = 4;
+  GlobalSolidPaintSettings solid = 2;
+  GlobalMultiColorPaintSettings multi_color = 3;
 }
 
-message GlobalSolidColorSettings {
+message GlobalSolidPaintSettings {
   optional string color = 1 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
 
   // When unset, the resolver enables smooth gradients for solid metric paint.
   optional bool gradient_enabled = 2;
 }
 
-message GlobalMultiColorSettings {
+message GlobalMultiColorPaintSettings {
   option (buf.validate.message).cel = {
     id: "global_multi_color_threshold_order"
     message: "low_threshold_percent must be less than or equal to high_threshold_percent"

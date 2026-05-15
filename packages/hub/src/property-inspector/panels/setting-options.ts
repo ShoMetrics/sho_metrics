@@ -17,7 +17,7 @@ export const graphicStyleOptionList = [
     { value: "color-filled", label: "Color Filled" },
 ] as const satisfies readonly SelectOption[];
 
-export const metricColorModeOptionList = [
+export const metricPaintColorModeOptionList = [
     { value: "multi-color", label: "Range Colors" },
     { value: "solid", label: "Solid Color" },
     { value: "black-white", label: "Black & White" },

@@ -1,31 +1,32 @@
 import { create } from "@bufbuild/protobuf";
 import {
     AppearanceGraphSettingsSchema,
+    AppearancePaintSettingsSchema,
     AppearanceSettingsSchema,
     AppearanceThemeSettingsSchema,
-    ColorFilledMultiColorSettingsSchema,
-    ColorFilledSolidSettingsSchema,
-    ColorFilledThemeSettingsSchema,
+    ColorFilledMultiColorPaintSettingsSchema,
+    ColorFilledPaintSettingsSchema,
+    ColorFilledSolidPaintSettingsSchema,
     DiskThroughputDisplaySettingsSchema,
-    MetricColorSettingsSchema,
     MetricMultiColorChannelColorsSchema,
-    MetricMultiColorSettingsSchema,
+    MetricMultiColorPaintSettingsSchema,
+    MetricPaintSettingsSchema,
     MetricSolidChannelColorsSchema,
-    MetricSolidColorSettingsSchema,
+    MetricSolidPaintSettingsSchema,
     MultiColorSetSchema,
     NetworkDisplaySettingsSchema,
     SlotOverridesSchema,
     SparklineAppearanceSettingsSchema,
     WidgetPreferencesSchema,
     type AppearanceSettings as StoredAppearanceSettings,
-    type ColorFilledThemeSettings as StoredColorFilledThemeSettings,
+    type ColorFilledPaintSettings as StoredColorFilledPaintSettings,
     type DiskMetricTarget as StoredDiskMetricTarget,
     type GpuMetricTarget as StoredGpuMetricTarget,
-    type MetricColorSettings as StoredMetricColorSettings,
-    type MetricMultiColorSettings as StoredMetricMultiColorSettings,
+    type MetricPaintSettings as StoredMetricPaintSettings,
+    type MetricMultiColorPaintSettings as StoredMetricMultiColorPaintSettings,
     type MetricSelection as StoredMetricSelection,
     type MetricSlot as StoredMetricSlot,
-    type MetricSolidColorSettings as StoredMetricSolidColorSettings,
+    type MetricSolidPaintSettings as StoredMetricSolidPaintSettings,
     type MultiColorSet as StoredMultiColorSet,
     type NetworkMetricTarget as StoredNetworkMetricTarget,
     type SlotOverrides as StoredSlotOverrides,
@@ -43,12 +44,8 @@ import type {
 } from "../resolved-settings";
 import type {
     ResolvedAppearanceSettingsOverride,
-    ResolvedAppearanceThemeSettingsOverride,
-    ResolvedColorFilledMultiColorSettingsOverride,
-    ResolvedColorFilledThemeSettingsOverride,
-    ResolvedMetricColorSettingsOverride,
-    ResolvedMetricMultiColorSettingsOverride,
-    ResolvedMetricSolidColorSettingsOverride,
+    ResolvedColorFilledPaintSettingsOverride,
+    ResolvedMetricPaintSettingsOverride,
     ResolvedMultiColorSetOverride,
 } from "../appearance-overrides";
 import {
@@ -78,7 +75,7 @@ export interface StoredWidgetSettingsPatch {
     readonly preferences?: {
         readonly pollingFrequencySeconds?: number | undefined;
     } | undefined;
-    readonly appearance?: AppearanceSettingsPatch | undefined;
+    readonly appearance?: ResolvedAppearanceSettingsOverride | undefined;
     readonly network?: Partial<{
         readonly direction: NetworkDirection;
         readonly interfaceId: string;
@@ -105,14 +102,6 @@ export interface StoredWidgetSettingsPatch {
         readonly maximumPowerWatts: number | undefined;
     }>;
 }
-
-export type AppearanceSettingsPatch = ResolvedAppearanceSettingsOverride;
-export type AppearanceThemeSettingsPatch = ResolvedAppearanceThemeSettingsOverride;
-export type ColorFilledThemeSettingsPatch = ResolvedColorFilledThemeSettingsOverride;
-export type ColorFilledMultiColorSettingsPatch = ResolvedColorFilledMultiColorSettingsOverride;
-export type MetricColorSettingsPatch = ResolvedMetricColorSettingsOverride;
-export type MetricSolidColorSettingsPatch = ResolvedMetricSolidColorSettingsOverride;
-export type MetricMultiColorSettingsPatch = ResolvedMetricMultiColorSettingsOverride;
 
 export function writeStoredWidgetSettingsPatch(
     rawSettings: unknown,
@@ -158,7 +147,7 @@ function applyPreferencesPatch(
     settings.preferences.pollingFrequencySeconds = patch.pollingFrequencySeconds;
 }
 
-function applyAppearancePatch(appearance: StoredAppearanceSettings, patch: AppearanceSettingsPatch): void {
+function applyAppearancePatch(appearance: StoredAppearanceSettings, patch: ResolvedAppearanceSettingsOverride): void {
     if (patch.graph !== undefined) {
         const graph = appearance.graph ??= create(AppearanceGraphSettingsSchema);
         if (patch.graph.viewLayout !== undefined) {
@@ -173,8 +162,8 @@ function applyAppearancePatch(appearance: StoredAppearanceSettings, patch: Appea
         applyAppearanceThemePatch(appearance.theme ??= create(AppearanceThemeSettingsSchema), patch.theme);
     }
 
-    if (patch.metricColor !== undefined) {
-        applyMetricColorPatch(appearance.metricColor ??= create(MetricColorSettingsSchema), patch.metricColor);
+    if (patch.paint !== undefined) {
+        applyAppearancePaintPatch(appearance.paint ??= create(AppearancePaintSettingsSchema), patch.paint);
     }
 
     if (patch.sparkline !== undefined) {
@@ -193,22 +182,37 @@ function applyAppearancePatch(appearance: StoredAppearanceSettings, patch: Appea
 
 function applyAppearanceThemePatch(
     theme: NonNullable<StoredAppearanceSettings["theme"]>,
-    patch: AppearanceThemeSettingsPatch,
+    patch: NonNullable<ResolvedAppearanceSettingsOverride["theme"]>,
 ): void {
     if (patch.selectedTheme !== undefined) {
         theme.selectedTheme = storedThemeByResolved[patch.selectedTheme];
     }
+}
+
+function applyAppearancePaintPatch(
+    paint: NonNullable<StoredAppearanceSettings["paint"]>,
+    patch: NonNullable<ResolvedAppearanceSettingsOverride["paint"]>,
+): void {
+    if (patch.metric !== undefined) {
+        applyMetricPaintPatch(paint.metric ??= create(MetricPaintSettingsSchema), patch.metric);
+    }
     if (patch.colorFilled !== undefined) {
-        applyColorFilledThemePatch(theme.colorFilled ??= create(ColorFilledThemeSettingsSchema), patch.colorFilled);
+        applyColorFilledPaintPatch(
+            paint.colorFilled ??= create(ColorFilledPaintSettingsSchema),
+            patch.colorFilled,
+        );
     }
 }
 
-function applyColorFilledThemePatch(
-    colorFilled: StoredColorFilledThemeSettings,
-    patch: ColorFilledThemeSettingsPatch,
+function applyColorFilledPaintPatch(
+    colorFilled: StoredColorFilledPaintSettings,
+    patch: ResolvedColorFilledPaintSettingsOverride,
 ): void {
+    if (patch.colorMode !== undefined) {
+        colorFilled.colorMode = storedColorModeByResolved[patch.colorMode];
+    }
     if (patch.solid !== undefined) {
-        const solid = colorFilled.solid ??= create(ColorFilledSolidSettingsSchema);
+        const solid = colorFilled.solid ??= create(ColorFilledSolidPaintSettingsSchema);
         if (patch.solid.color !== undefined) {
             solid.color = patch.solid.color;
         }
@@ -217,7 +221,7 @@ function applyColorFilledThemePatch(
         }
     }
     if (patch.multiColor !== undefined) {
-        const multiColor = colorFilled.multiColor ??= create(ColorFilledMultiColorSettingsSchema);
+        const multiColor = colorFilled.multiColor ??= create(ColorFilledMultiColorPaintSettingsSchema);
         applyMultiColorSetPatch(multiColor.colors ??= create(MultiColorSetSchema), patch.multiColor.colors);
         if (patch.multiColor.isGradientEnabled !== undefined) {
             multiColor.gradientEnabled = patch.multiColor.isGradientEnabled;
@@ -225,21 +229,24 @@ function applyColorFilledThemePatch(
     }
 }
 
-function applyMetricColorPatch(color: StoredMetricColorSettings, patch: MetricColorSettingsPatch): void {
+function applyMetricPaintPatch(metric: StoredMetricPaintSettings, patch: ResolvedMetricPaintSettingsOverride): void {
     if (patch.colorMode !== undefined) {
-        color.colorMode = storedColorModeByResolved[patch.colorMode];
+        metric.colorMode = storedColorModeByResolved[patch.colorMode];
     }
     if (patch.solid !== undefined) {
-        applyMetricSolidColorPatch(color.solid ??= create(MetricSolidColorSettingsSchema), patch.solid);
+        applyMetricSolidPaintPatch(metric.solid ??= create(MetricSolidPaintSettingsSchema), patch.solid);
     }
     if (patch.multiColor !== undefined) {
-        applyMetricMultiColorPatch(color.multiColor ??= create(MetricMultiColorSettingsSchema), patch.multiColor);
+        applyMetricMultiColorPaintPatch(
+            metric.multiColor ??= create(MetricMultiColorPaintSettingsSchema),
+            patch.multiColor,
+        );
     }
 }
 
-function applyMetricSolidColorPatch(
-    solid: StoredMetricSolidColorSettings,
-    patch: MetricSolidColorSettingsPatch,
+function applyMetricSolidPaintPatch(
+    solid: StoredMetricSolidPaintSettings,
+    patch: NonNullable<ResolvedMetricPaintSettingsOverride["solid"]>,
 ): void {
     if (patch.colors !== undefined) {
         const colors = solid.colors ??= create(MetricSolidChannelColorsSchema);
@@ -264,9 +271,9 @@ function applyMetricSolidColorPatch(
     }
 }
 
-function applyMetricMultiColorPatch(
-    multiColor: StoredMetricMultiColorSettings,
-    patch: MetricMultiColorSettingsPatch,
+function applyMetricMultiColorPaintPatch(
+    multiColor: StoredMetricMultiColorPaintSettings,
+    patch: NonNullable<ResolvedMetricPaintSettingsOverride["multiColor"]>,
 ): void {
     if (patch.lowThresholdPercent !== undefined) {
         multiColor.lowThresholdPercent = patch.lowThresholdPercent;

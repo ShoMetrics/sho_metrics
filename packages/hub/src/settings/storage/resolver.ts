@@ -19,21 +19,24 @@ import {
     TemperatureUnit as StoredTemperatureUnit,
     type AppearanceSettings as StoredAppearanceSettings,
     type AppearanceGraphSettings as StoredAppearanceGraphSettings,
+    type AppearancePaintSettings as StoredAppearancePaintSettings,
     type AppearanceThemeSettings as StoredAppearanceThemeSettings,
     type CatalogMetricTarget as StoredCatalogMetricTarget,
-    type ColorFilledMultiColorSettings as StoredColorFilledMultiColorSettings,
-    type ColorFilledSolidSettings as StoredColorFilledSolidSettings,
+    type ColorFilledMultiColorPaintSettings as StoredColorFilledMultiColorPaintSettings,
+    type ColorFilledPaintSettings as StoredColorFilledPaintSettings,
+    type ColorFilledSolidPaintSettings as StoredColorFilledSolidPaintSettings,
     type DiskMetricTarget as StoredDiskMetricTarget,
     type DiskThroughputDisplaySettings as StoredDiskThroughputDisplaySettings,
-    type GlobalColorOverride as StoredGlobalColorOverride,
     type GlobalGraphOverride as StoredGlobalGraphOverride,
-    type GlobalMultiColorSettings as StoredGlobalMultiColorSettings,
-    type GlobalSolidColorSettings as StoredGlobalSolidColorSettings,
+    type GlobalMetricPaintSettings as StoredGlobalMetricPaintSettings,
+    type GlobalMultiColorPaintSettings as StoredGlobalMultiColorPaintSettings,
+    type GlobalPaintOverride as StoredGlobalPaintOverride,
+    type GlobalSolidPaintSettings as StoredGlobalSolidPaintSettings,
     type GlobalThemeOverride as StoredGlobalThemeOverride,
     type GpuMetricTarget as StoredGpuMetricTarget,
-    type MetricColorSettings as StoredMetricColorSettings,
-    type MetricMultiColorSettings as StoredMetricMultiColorSettings,
-    type MetricSolidColorSettings as StoredMetricSolidColorSettings,
+    type MetricPaintSettings as StoredMetricPaintSettings,
+    type MetricMultiColorPaintSettings as StoredMetricMultiColorPaintSettings,
+    type MetricSolidPaintSettings as StoredMetricSolidPaintSettings,
     type MultiColorSet as StoredMultiColorSet,
     type MetricSelection as StoredMetricSelection,
     type MetricSlot as StoredMetricSlot,
@@ -58,24 +61,27 @@ import type {
     ResolvedAppearanceSettings,
     ResolvedCatalogMetricTarget,
     ResolvedAppearanceGraphSettings,
+    ResolvedAppearancePaintSettings,
     ResolvedAppearanceThemeSettings,
-    ResolvedColorFilledMultiColorSettings,
-    ResolvedColorFilledSolidSettings,
+    ResolvedColorFilledMultiColorPaintSettings,
+    ResolvedColorFilledPaintSettings,
+    ResolvedColorFilledSolidPaintSettings,
     ResolvedDiskReading,
     ResolvedDiskThroughputDisplaySettings,
-    ResolvedGlobalColorOverride,
     ResolvedGlobalDefaults,
     ResolvedGlobalGraphOverride,
     ResolvedGlobalSettings,
     ResolvedGlobalThemeOverride,
-    ResolvedGlobalMultiColorSettings,
-    ResolvedGlobalSolidColorSettings,
+    ResolvedGlobalMetricPaintSettings,
+    ResolvedGlobalMultiColorPaintSettings,
+    ResolvedGlobalPaintOverride,
+    ResolvedGlobalSolidPaintSettings,
     ResolvedGpuReading,
     ResolvedHttpMetricSourceConnection,
     ResolvedMemoryReading,
-    ResolvedMetricColorSettings,
-    ResolvedMetricMultiColorSettings,
-    ResolvedMetricSolidColorSettings,
+    ResolvedMetricPaintSettings,
+    ResolvedMetricMultiColorPaintSettings,
+    ResolvedMetricSolidPaintSettings,
     ResolvedMetric,
     ResolvedMetricSlot,
     ResolvedMetricSourceConnection,
@@ -269,8 +275,8 @@ export function resolveStoredGlobalSettings(
         && (storedOverrides?.graph?.enabled ?? true);
     const themeOverrideEnabled = globalOverrideEnabled
         && (storedOverrides?.theme?.enabled ?? true);
-    const colorOverrideEnabled = globalOverrideEnabled
-        && (storedOverrides?.color?.enabled ?? true);
+    const paintOverrideEnabled = globalOverrideEnabled
+        && (storedOverrides?.paint?.enabled ?? true);
 
     return {
         defaults: resolveGlobalDefaults(storedGlobalSettings),
@@ -281,8 +287,8 @@ export function resolveStoredGlobalSettings(
         themeOverride: themeOverrideEnabled
             ? resolveGlobalThemeOverride(storedOverrides?.theme)
             : undefined,
-        colorOverride: colorOverrideEnabled
-            ? resolveGlobalColorOverride(storedOverrides?.color)
+        paintOverride: paintOverrideEnabled
+            ? resolveGlobalPaintOverride(storedOverrides?.paint)
             : undefined,
         sourceProfiles: (storedGlobalSettings?.sourceProfiles ?? []).map(resolveMetricSourceProfile),
         defaultSourceProfileId: storedGlobalSettings?.defaultSourceProfileId,
@@ -323,8 +329,8 @@ function resolveMetricSlot(
     const appearanceWithThemeOverride = globalSettings.themeOverride
         ? applyGlobalThemeOverride(appearanceWithGraphOverride, globalSettings.themeOverride)
         : appearanceWithGraphOverride;
-    const appearance = globalSettings.colorOverride
-        ? applyGlobalColorOverride(appearanceWithThemeOverride, globalSettings.colorOverride)
+    const appearance = globalSettings.paintOverride
+        ? applyGlobalPaintOverride(appearanceWithThemeOverride, globalSettings.paintOverride)
         : appearanceWithThemeOverride;
 
     return {
@@ -581,13 +587,25 @@ function resolveGlobalThemeOverride(
     };
 }
 
-function resolveGlobalColorOverride(
-    storedOverride: StoredGlobalColorOverride | undefined,
-): ResolvedGlobalColorOverride {
+function resolveGlobalPaintOverride(
+    storedOverride: StoredGlobalPaintOverride | undefined,
+): ResolvedGlobalPaintOverride {
     return {
-        colorMode: resolveStoredEnum(storedOverride?.colorMode, colorModeByProto, "solid"),
-        solid: resolveGlobalSolidColorSettings(storedOverride?.solid),
-        multiColor: resolveGlobalMultiColorSettings(storedOverride?.multiColor),
+        metric: resolveGlobalMetricPaintSettings(storedOverride?.metric),
+        colorFilled: resolveColorFilledPaintSettings(
+            DEFAULT_APPEARANCE_SETTINGS.paint.colorFilled,
+            storedOverride?.colorFilled,
+        ),
+    };
+}
+
+function resolveGlobalMetricPaintSettings(
+    storedMetric: StoredGlobalMetricPaintSettings | undefined,
+): ResolvedGlobalMetricPaintSettings {
+    return {
+        colorMode: resolveStoredEnum(storedMetric?.colorMode, colorModeByProto, "solid"),
+        solid: resolveGlobalSolidPaintSettings(storedMetric?.solid),
+        multiColor: resolveGlobalMultiColorPaintSettings(storedMetric?.multiColor),
     };
 }
 
@@ -623,7 +641,7 @@ function mergeAppearanceSettings(
     return {
         graph: resolveAppearanceGraphSettings(defaults.graph, storedAppearance?.graph),
         theme: resolveAppearanceThemeSettings(defaults.theme, storedAppearance?.theme),
-        metricColor: resolveMetricColorSettings(defaults.metricColor, storedAppearance?.metricColor),
+        paint: resolveAppearancePaintSettings(defaults.paint, storedAppearance?.paint),
         sparkline: resolveSparklineAppearanceSettings(defaults.sparkline, storedAppearance?.sparkline),
     };
 }
@@ -644,51 +662,65 @@ function resolveAppearanceThemeSettings(
 ): ResolvedAppearanceThemeSettings {
     return {
         selectedTheme: resolveStoredEnum(storedTheme?.selectedTheme, metricThemeByProto, defaults.selectedTheme),
-        colorFilled: {
-            solid: resolveColorFilledSolidSettings(defaults.colorFilled.solid, storedTheme?.colorFilled?.solid),
-            multiColor: resolveColorFilledMultiColorSettings(
-                defaults.colorFilled.multiColor,
-                storedTheme?.colorFilled?.multiColor,
-            ),
-        },
     };
 }
 
-function resolveColorFilledSolidSettings(
-    defaults: ResolvedColorFilledSolidSettings,
-    storedSolid: StoredColorFilledSolidSettings | undefined,
-): ResolvedColorFilledSolidSettings {
+function resolveAppearancePaintSettings(
+    defaults: ResolvedAppearancePaintSettings,
+    storedPaint: StoredAppearancePaintSettings | undefined,
+): ResolvedAppearancePaintSettings {
+    return {
+        metric: resolveMetricPaintSettings(defaults.metric, storedPaint?.metric),
+        colorFilled: resolveColorFilledPaintSettings(defaults.colorFilled, storedPaint?.colorFilled),
+    };
+}
+
+function resolveColorFilledPaintSettings(
+    defaults: ResolvedColorFilledPaintSettings,
+    storedPaint: StoredColorFilledPaintSettings | undefined,
+): ResolvedColorFilledPaintSettings {
+    return {
+        colorMode: resolveStoredEnum(storedPaint?.colorMode, colorModeByProto, defaults.colorMode),
+        solid: resolveColorFilledSolidPaintSettings(defaults.solid, storedPaint?.solid),
+        multiColor: resolveColorFilledMultiColorPaintSettings(defaults.multiColor, storedPaint?.multiColor),
+    };
+}
+
+function resolveColorFilledSolidPaintSettings(
+    defaults: ResolvedColorFilledSolidPaintSettings,
+    storedSolid: StoredColorFilledSolidPaintSettings | undefined,
+): ResolvedColorFilledSolidPaintSettings {
     return {
         color: storedSolid?.color ?? defaults.color,
         isGradientEnabled: storedSolid?.gradientEnabled ?? defaults.isGradientEnabled,
     };
 }
 
-function resolveColorFilledMultiColorSettings(
-    defaults: ResolvedColorFilledMultiColorSettings,
-    storedMultiColor: StoredColorFilledMultiColorSettings | undefined,
-): ResolvedColorFilledMultiColorSettings {
+function resolveColorFilledMultiColorPaintSettings(
+    defaults: ResolvedColorFilledMultiColorPaintSettings,
+    storedMultiColor: StoredColorFilledMultiColorPaintSettings | undefined,
+): ResolvedColorFilledMultiColorPaintSettings {
     return {
         colors: resolveMultiColorSet(defaults.colors, storedMultiColor?.colors),
         isGradientEnabled: storedMultiColor?.gradientEnabled ?? defaults.isGradientEnabled,
     };
 }
 
-function resolveMetricColorSettings(
-    defaults: ResolvedMetricColorSettings,
-    storedMetricColor: StoredMetricColorSettings | undefined,
-): ResolvedMetricColorSettings {
+function resolveMetricPaintSettings(
+    defaults: ResolvedMetricPaintSettings,
+    storedMetricPaint: StoredMetricPaintSettings | undefined,
+): ResolvedMetricPaintSettings {
     return {
-        colorMode: resolveStoredEnum(storedMetricColor?.colorMode, colorModeByProto, defaults.colorMode),
-        solid: resolveMetricSolidColorSettings(defaults.solid, storedMetricColor?.solid),
-        multiColor: resolveMetricMultiColorSettings(defaults.multiColor, storedMetricColor?.multiColor),
+        colorMode: resolveStoredEnum(storedMetricPaint?.colorMode, colorModeByProto, defaults.colorMode),
+        solid: resolveMetricSolidPaintSettings(defaults.solid, storedMetricPaint?.solid),
+        multiColor: resolveMetricMultiColorPaintSettings(defaults.multiColor, storedMetricPaint?.multiColor),
     };
 }
 
-function resolveMetricSolidColorSettings(
-    defaults: ResolvedMetricSolidColorSettings,
-    storedSolid: StoredMetricSolidColorSettings | undefined,
-): ResolvedMetricSolidColorSettings {
+function resolveMetricSolidPaintSettings(
+    defaults: ResolvedMetricSolidPaintSettings,
+    storedSolid: StoredMetricSolidPaintSettings | undefined,
+): ResolvedMetricSolidPaintSettings {
     const storedColors = storedSolid?.colors;
 
     return {
@@ -703,10 +735,10 @@ function resolveMetricSolidColorSettings(
     };
 }
 
-function resolveMetricMultiColorSettings(
-    defaults: ResolvedMetricMultiColorSettings,
-    storedMultiColor: StoredMetricMultiColorSettings | undefined,
-): ResolvedMetricMultiColorSettings {
+function resolveMetricMultiColorPaintSettings(
+    defaults: ResolvedMetricMultiColorPaintSettings,
+    storedMultiColor: StoredMetricMultiColorPaintSettings | undefined,
+): ResolvedMetricMultiColorPaintSettings {
     const storedColors = storedMultiColor?.colors;
 
     return {
@@ -738,19 +770,20 @@ function resolveSparklineAppearanceSettings(
     };
 }
 
-function resolveGlobalSolidColorSettings(
-    storedSolid: StoredGlobalSolidColorSettings | undefined,
-): ResolvedGlobalSolidColorSettings {
+function resolveGlobalSolidPaintSettings(
+    storedSolid: StoredGlobalSolidPaintSettings | undefined,
+): ResolvedGlobalSolidPaintSettings {
     return {
-        color: storedSolid?.color ?? DEFAULT_APPEARANCE_SETTINGS.metricColor.solid.colors.usageColor,
-        isGradientEnabled: storedSolid?.gradientEnabled ?? DEFAULT_APPEARANCE_SETTINGS.metricColor.solid.isGradientEnabled,
+        color: storedSolid?.color ?? DEFAULT_APPEARANCE_SETTINGS.paint.metric.solid.colors.usageColor,
+        isGradientEnabled: storedSolid?.gradientEnabled
+            ?? DEFAULT_APPEARANCE_SETTINGS.paint.metric.solid.isGradientEnabled,
     };
 }
 
-function resolveGlobalMultiColorSettings(
-    storedMultiColor: StoredGlobalMultiColorSettings | undefined,
-): ResolvedGlobalMultiColorSettings {
-    const defaults = DEFAULT_APPEARANCE_SETTINGS.metricColor.multiColor;
+function resolveGlobalMultiColorPaintSettings(
+    storedMultiColor: StoredGlobalMultiColorPaintSettings | undefined,
+): ResolvedGlobalMultiColorPaintSettings {
+    const defaults = DEFAULT_APPEARANCE_SETTINGS.paint.metric.multiColor;
 
     return {
         colors: resolveMultiColorSet(defaults.colors.usage, storedMultiColor?.colors),
@@ -780,36 +813,39 @@ function applyGlobalThemeOverride(
     };
 }
 
-function applyGlobalColorOverride(
+function applyGlobalPaintOverride(
     appearance: ResolvedAppearanceSettings,
-    colorOverride: ResolvedGlobalColorOverride,
+    paintOverride: ResolvedGlobalPaintOverride,
 ): ResolvedAppearanceSettings {
     return {
         ...appearance,
-        metricColor: {
-            colorMode: colorOverride.colorMode,
-            solid: {
-                isGradientEnabled: colorOverride.solid.isGradientEnabled,
-                colors: {
-                    usageColor: colorOverride.solid.color,
-                    downloadColor: colorOverride.solid.color,
-                    uploadColor: colorOverride.solid.color,
-                    diskReadColor: colorOverride.solid.color,
-                    diskWriteColor: colorOverride.solid.color,
+        paint: {
+            metric: {
+                colorMode: paintOverride.metric.colorMode,
+                solid: {
+                    isGradientEnabled: paintOverride.metric.solid.isGradientEnabled,
+                    colors: {
+                        usageColor: paintOverride.metric.solid.color,
+                        downloadColor: paintOverride.metric.solid.color,
+                        uploadColor: paintOverride.metric.solid.color,
+                        diskReadColor: paintOverride.metric.solid.color,
+                        diskWriteColor: paintOverride.metric.solid.color,
+                    },
+                },
+                multiColor: {
+                    lowThresholdPercent: paintOverride.metric.multiColor.lowThresholdPercent,
+                    highThresholdPercent: paintOverride.metric.multiColor.highThresholdPercent,
+                    isGradientEnabled: paintOverride.metric.multiColor.isGradientEnabled,
+                    colors: {
+                        usage: paintOverride.metric.multiColor.colors,
+                        download: paintOverride.metric.multiColor.colors,
+                        upload: paintOverride.metric.multiColor.colors,
+                        diskRead: paintOverride.metric.multiColor.colors,
+                        diskWrite: paintOverride.metric.multiColor.colors,
+                    },
                 },
             },
-            multiColor: {
-                lowThresholdPercent: colorOverride.multiColor.lowThresholdPercent,
-                highThresholdPercent: colorOverride.multiColor.highThresholdPercent,
-                isGradientEnabled: colorOverride.multiColor.isGradientEnabled,
-                colors: {
-                    usage: colorOverride.multiColor.colors,
-                    download: colorOverride.multiColor.colors,
-                    upload: colorOverride.multiColor.colors,
-                    diskRead: colorOverride.multiColor.colors,
-                    diskWrite: colorOverride.multiColor.colors,
-                },
-            },
+            colorFilled: paintOverride.colorFilled,
         },
     };
 }

@@ -1,18 +1,16 @@
 import type {
     ColorMode,
-    ResolvedColorFilledThemeSettings,
+    ResolvedColorFilledPaintSettings,
     ResolvedMetricSolidChannelColors,
     ResolvedMultiColorSet,
 } from "../../settings/resolved-settings";
 import type {
-    ResolvedColorFilledMultiColorSettingsOverride,
-    ResolvedColorFilledSolidSettingsOverride,
+    ResolvedColorFilledPaintSettingsOverride,
+    ResolvedColorFilledMultiColorPaintSettingsOverride,
+    ResolvedColorFilledSolidPaintSettingsOverride,
+    ResolvedMetricPaintSettingsOverride,
     ResolvedMultiColorSetOverride,
 } from "../../settings/appearance-overrides";
-import type {
-    ColorFilledThemeSettingsPatch,
-    MetricColorSettingsPatch,
-} from "../../settings/storage/widget-settings-patch";
 import { InspectorItem } from "../components/InspectorItem";
 import { SectionHeading } from "../components/SectionHeading";
 import { ColorBandSetting } from "../controls/ColorBandSetting";
@@ -23,7 +21,7 @@ import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import {
     colorFilledColorModeOptionList,
-    metricColorModeOptionList,
+    metricPaintColorModeOptionList,
 } from "./setting-options";
 
 type MetricChannelKey = "usage" | "download" | "upload" | "diskRead" | "diskWrite";
@@ -43,18 +41,18 @@ const solidColorKeyByChannel = {
     diskWrite: "diskWriteColor",
 } satisfies Record<MetricChannelKey, SolidColorKey>;
 
-function patchMetricColorSettings(
+function patchMetricPaintSettings(
     onSettingsPatch: WidgetSettingsPanelProps["onSettingsPatch"],
-    metricColor: MetricColorSettingsPatch,
+    metric: ResolvedMetricPaintSettingsOverride,
 ): void {
-    onSettingsPatch({ appearance: { metricColor } });
+    onSettingsPatch({ appearance: { paint: { metric } } });
 }
 
-function patchColorFilledThemeSettings(
+function patchColorFilledPaintSettings(
     onSettingsPatch: WidgetSettingsPanelProps["onSettingsPatch"],
-    colorFilled: ColorFilledThemeSettingsPatch,
+    colorFilled: ResolvedColorFilledPaintSettingsOverride,
 ): void {
-    onSettingsPatch({ appearance: { theme: { colorFilled } } });
+    onSettingsPatch({ appearance: { paint: { colorFilled } } });
 }
 
 export function StandardColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
@@ -69,27 +67,27 @@ export function StandardColorSettings(props: WidgetSettingsPanelProps): React.JS
         <SettingsSection title="Colors">
             <SectionHeading text="Color Settings" />
             <MetricColorControls
-                colorMode={appearance.metricColor.colorMode}
-                solidColor={appearance.metricColor.solid.colors.usageColor}
-                multiColor={appearance.metricColor.multiColor.colors.usage}
-                lowThresholdPercent={appearance.metricColor.multiColor.lowThresholdPercent}
-                highThresholdPercent={appearance.metricColor.multiColor.highThresholdPercent}
-                isSolidGradientEnabled={appearance.metricColor.solid.isGradientEnabled}
-                isMultiColorGradientEnabled={appearance.metricColor.multiColor.isGradientEnabled}
-                onColorModeChange={(colorMode) => patchMetricColorSettings(props.onSettingsPatch, { colorMode })}
-                onSolidColorChange={(usageColor) => patchMetricColorSettings(props.onSettingsPatch, {
+                colorMode={appearance.paint.metric.colorMode}
+                solidColor={appearance.paint.metric.solid.colors.usageColor}
+                multiColor={appearance.paint.metric.multiColor.colors.usage}
+                lowThresholdPercent={appearance.paint.metric.multiColor.lowThresholdPercent}
+                highThresholdPercent={appearance.paint.metric.multiColor.highThresholdPercent}
+                isSolidGradientEnabled={appearance.paint.metric.solid.isGradientEnabled}
+                isMultiColorGradientEnabled={appearance.paint.metric.multiColor.isGradientEnabled}
+                onColorModeChange={(colorMode) => patchMetricPaintSettings(props.onSettingsPatch, { colorMode })}
+                onSolidColorChange={(usageColor) => patchMetricPaintSettings(props.onSettingsPatch, {
                     solid: { colors: { usageColor } },
                 })}
-                onMultiColorPatch={(usage) => patchMetricColorSettings(props.onSettingsPatch, {
+                onMultiColorPatch={(usage) => patchMetricPaintSettings(props.onSettingsPatch, {
                     multiColor: { colors: { usage } },
                 })}
-                onThresholdPatch={(thresholdPatch) => patchMetricColorSettings(props.onSettingsPatch, {
+                onThresholdPatch={(thresholdPatch) => patchMetricPaintSettings(props.onSettingsPatch, {
                     multiColor: thresholdPatch,
                 })}
-                onSolidGradientChange={(isGradientEnabled) => patchMetricColorSettings(props.onSettingsPatch, {
+                onSolidGradientChange={(isGradientEnabled) => patchMetricPaintSettings(props.onSettingsPatch, {
                     solid: { isGradientEnabled },
                 })}
-                onMultiColorGradientChange={(isGradientEnabled) => patchMetricColorSettings(props.onSettingsPatch, {
+                onMultiColorGradientChange={(isGradientEnabled) => patchMetricPaintSettings(props.onSettingsPatch, {
                     multiColor: { isGradientEnabled },
                 })}
                 disabled={props.colorDisabled ?? false}
@@ -176,7 +174,7 @@ export function MetricColorControls({
             <SelectSetting
                 label="Color Mode"
                 value={colorMode}
-                optionList={metricColorModeOptionList}
+                optionList={metricPaintColorModeOptionList}
                 onValueChange={onColorModeChange}
                 disabled={disabled}
             />
@@ -191,7 +189,7 @@ export function NetworkChannelColorSettings(props: WidgetSettingsPanelProps): Re
     }
 
     const shouldShowChannelColors =
-        props.context.resolved.widget.slot.appearance.metricColor.colorMode !== "black-white";
+        props.context.resolved.widget.slot.appearance.paint.metric.colorMode !== "black-white";
 
     return (
         <SettingsSection title="Colors">
@@ -215,7 +213,7 @@ export function DiskThroughputChannelColorSettings(props: WidgetSettingsPanelPro
     }
 
     const shouldShowChannelColors =
-        props.context.resolved.widget.slot.appearance.metricColor.colorMode !== "black-white";
+        props.context.resolved.widget.slot.appearance.paint.metric.colorMode !== "black-white";
 
     return (
         <SettingsSection title="Colors">
@@ -241,9 +239,9 @@ function ColorModeSetting({
     return (
         <SelectSetting
             label="Color Mode"
-            value={context.resolved.widget.slot.appearance.metricColor.colorMode}
-            optionList={metricColorModeOptionList}
-            onValueChange={(colorMode) => patchMetricColorSettings(onSettingsPatch, { colorMode })}
+            value={context.resolved.widget.slot.appearance.paint.metric.colorMode}
+            optionList={metricPaintColorModeOptionList}
+            onValueChange={(colorMode) => patchMetricPaintSettings(onSettingsPatch, { colorMode })}
             disabled={colorDisabled}
         />
     );
@@ -307,42 +305,33 @@ function ColorFilledSettingsSection(props: WidgetSettingsPanelProps): React.JSX.
     return (
         <SettingsSection title="Colors">
             <SectionHeading text="Color Filled" />
-            <SelectSetting
-                label="Color Mode"
-                value={appearance.metricColor.colorMode}
-                optionList={colorFilledColorModeOptionList}
-                onValueChange={(colorMode) => patchMetricColorSettings(props.onSettingsPatch, { colorMode })}
-                disabled={props.colorDisabled ?? false}
-            />
-            <ColorFilledActiveColorControls
-                colorMode={appearance.metricColor.colorMode}
-                colorFilled={appearance.theme.colorFilled}
-                onSolidPatch={(solid) => patchColorFilledThemeSettings(props.onSettingsPatch, { solid })}
-                onMultiColorPatch={(multiColor) => patchColorFilledThemeSettings(props.onSettingsPatch, { multiColor })}
-                disabled={props.themeDisabled}
+            <ColorFilledPaintControls
+                colorFilled={appearance.paint.colorFilled}
+                onColorModeChange={(colorMode) => patchColorFilledPaintSettings(props.onSettingsPatch, { colorMode })}
+                onSolidPatch={(solid) => patchColorFilledPaintSettings(props.onSettingsPatch, { solid })}
+                onMultiColorPatch={(multiColor) => patchColorFilledPaintSettings(props.onSettingsPatch, { multiColor })}
+                disabled={(props.colorDisabled ?? false) || (props.themeDisabled ?? false)}
             />
         </SettingsSection>
     );
 }
 
 function ColorFilledActiveColorControls({
-    colorMode,
     colorFilled,
     onSolidPatch,
     onMultiColorPatch,
     disabled = false,
 }: {
-    readonly colorMode: ColorMode;
-    readonly colorFilled: ResolvedColorFilledThemeSettings;
-    readonly onSolidPatch: (patch: ResolvedColorFilledSolidSettingsOverride) => void;
-    readonly onMultiColorPatch: (patch: ResolvedColorFilledMultiColorSettingsOverride) => void;
+    readonly colorFilled: ResolvedColorFilledPaintSettings;
+    readonly onSolidPatch: (patch: ResolvedColorFilledSolidPaintSettingsOverride) => void;
+    readonly onMultiColorPatch: (patch: ResolvedColorFilledMultiColorPaintSettingsOverride) => void;
     readonly disabled?: boolean | undefined;
 }): React.JSX.Element | null {
-    if (colorMode === "black-white") {
+    if (colorFilled.colorMode === "black-white") {
         return null;
     }
 
-    if (colorMode === "solid") {
+    if (colorFilled.colorMode === "solid") {
         return (
             <>
                 <ColorSetting
@@ -377,40 +366,32 @@ function ColorFilledActiveColorControls({
     );
 }
 
-export function ColorFilledThemeControls({
+export function ColorFilledPaintControls({
     colorFilled,
+    onColorModeChange,
     onSolidPatch,
     onMultiColorPatch,
     disabled = false,
 }: {
-    readonly colorFilled: ResolvedColorFilledThemeSettings;
-    readonly onSolidPatch: (patch: ResolvedColorFilledSolidSettingsOverride) => void;
-    readonly onMultiColorPatch: (patch: ResolvedColorFilledMultiColorSettingsOverride) => void;
+    readonly colorFilled: ResolvedColorFilledPaintSettings;
+    readonly onColorModeChange: (colorMode: ColorMode) => void;
+    readonly onSolidPatch: (patch: ResolvedColorFilledSolidPaintSettingsOverride) => void;
+    readonly onMultiColorPatch: (patch: ResolvedColorFilledMultiColorPaintSettingsOverride) => void;
     readonly disabled?: boolean | undefined;
 }): React.JSX.Element {
     return (
         <>
-            <SectionHeading text="Solid Background" />
-            <ColorSetting
-                label="Background Color"
-                value={colorFilled.solid.color}
-                onValueChange={(color) => onSolidPatch({ color })}
+            <SelectSetting
+                label="Color Mode"
+                value={colorFilled.colorMode}
+                optionList={colorFilledColorModeOptionList}
+                onValueChange={onColorModeChange}
                 disabled={disabled}
             />
-            <GradientSetting
-                isEnabled={colorFilled.solid.isGradientEnabled}
-                onValueChange={(isGradientEnabled) => onSolidPatch({ isGradientEnabled })}
-                disabled={disabled}
-            />
-            <SectionHeading text="Color Mix" />
-            <SoftTriangleColorSettings
-                colors={colorFilled.multiColor.colors}
-                onColorPatch={(colors) => onMultiColorPatch({ colors })}
-                disabled={disabled}
-            />
-            <GradientSetting
-                isEnabled={colorFilled.multiColor.isGradientEnabled}
-                onValueChange={(isGradientEnabled) => onMultiColorPatch({ isGradientEnabled })}
+            <ColorFilledActiveColorControls
+                colorFilled={colorFilled}
+                onSolidPatch={onSolidPatch}
+                onMultiColorPatch={onMultiColorPatch}
                 disabled={disabled}
             />
         </>
@@ -478,9 +459,9 @@ function GradientSetting({
 }
 
 function ChannelThresholdControls(props: WidgetSettingsPanelProps): React.JSX.Element | null {
-    const metricColor = props.context.resolved.widget.slot.appearance.metricColor;
+    const metricPaint = props.context.resolved.widget.slot.appearance.paint.metric;
 
-    if (metricColor.colorMode !== "multi-color") {
+    if (metricPaint.colorMode !== "multi-color") {
         return null;
     }
 
@@ -488,9 +469,9 @@ function ChannelThresholdControls(props: WidgetSettingsPanelProps): React.JSX.El
         <>
             <SectionHeading text="Range Colors" />
             <ThresholdRangeSettings
-                lowThresholdPercent={metricColor.multiColor.lowThresholdPercent}
-                highThresholdPercent={metricColor.multiColor.highThresholdPercent}
-                onThresholdPatch={(thresholdPatch) => patchMetricColorSettings(props.onSettingsPatch, {
+                lowThresholdPercent={metricPaint.multiColor.lowThresholdPercent}
+                highThresholdPercent={metricPaint.multiColor.highThresholdPercent}
+                onThresholdPatch={(thresholdPatch) => patchMetricPaintSettings(props.onSettingsPatch, {
                     multiColor: thresholdPatch,
                 })}
                 disabled={props.colorDisabled ?? false}
@@ -500,17 +481,17 @@ function ChannelThresholdControls(props: WidgetSettingsPanelProps): React.JSX.El
 }
 
 function MetricGradientSetting(props: WidgetSettingsPanelProps): React.JSX.Element | null {
-    const metricColor = props.context.resolved.widget.slot.appearance.metricColor;
+    const metricPaint = props.context.resolved.widget.slot.appearance.paint.metric;
 
-    if (metricColor.colorMode === "black-white") {
+    if (metricPaint.colorMode === "black-white") {
         return null;
     }
 
-    if (metricColor.colorMode === "solid") {
+    if (metricPaint.colorMode === "solid") {
         return (
             <GradientSetting
-                isEnabled={metricColor.solid.isGradientEnabled}
-                onValueChange={(isGradientEnabled) => patchMetricColorSettings(props.onSettingsPatch, {
+                isEnabled={metricPaint.solid.isGradientEnabled}
+                onValueChange={(isGradientEnabled) => patchMetricPaintSettings(props.onSettingsPatch, {
                     solid: { isGradientEnabled },
                 })}
                 disabled={props.colorDisabled ?? false}
@@ -520,8 +501,8 @@ function MetricGradientSetting(props: WidgetSettingsPanelProps): React.JSX.Eleme
 
     return (
         <GradientSetting
-            isEnabled={metricColor.multiColor.isGradientEnabled}
-            onValueChange={(isGradientEnabled) => patchMetricColorSettings(props.onSettingsPatch, {
+            isEnabled={metricPaint.multiColor.isGradientEnabled}
+            onValueChange={(isGradientEnabled) => patchMetricPaintSettings(props.onSettingsPatch, {
                 multiColor: { isGradientEnabled },
             })}
             disabled={props.colorDisabled ?? false}
@@ -626,11 +607,11 @@ function ChannelColorFields({
 }: WidgetSettingsPanelProps & {
     channel: Exclude<MetricChannelKey, "usage">;
 }): React.JSX.Element {
-    const metricColor = context.resolved.widget.slot.appearance.metricColor;
+    const metricPaint = context.resolved.widget.slot.appearance.paint.metric;
     const solidColorKey = solidColorKeyByChannel[channel];
 
     function patchSolidChannelColor(color: string): void {
-        patchMetricColorSettings(onSettingsPatch, {
+        patchMetricPaintSettings(onSettingsPatch, {
             solid: {
                 colors: {
                     [solidColorKey]: color,
@@ -640,7 +621,7 @@ function ChannelColorFields({
     }
 
     function patchMultiColorChannel(colorKey: MultiColorKey, value: string): void {
-        patchMetricColorSettings(onSettingsPatch, {
+        patchMetricPaintSettings(onSettingsPatch, {
             multiColor: {
                 colors: {
                     [channel]: {
@@ -651,11 +632,11 @@ function ChannelColorFields({
         });
     }
 
-    if (metricColor.colorMode !== "multi-color") {
+    if (metricPaint.colorMode !== "multi-color") {
         return (
             <ColorSetting
                 label="Solid Color"
-                value={metricColor.solid.colors[solidColorKey]}
+                value={metricPaint.solid.colors[solidColorKey]}
                 onValueChange={patchSolidChannelColor}
                 disabled={colorDisabled}
             />
@@ -666,19 +647,19 @@ function ChannelColorFields({
         <>
             <ColorSetting
                 label="Low Color"
-                value={metricColor.multiColor.colors[channel].lowColor}
+                value={metricPaint.multiColor.colors[channel].lowColor}
                 onValueChange={(lowColor) => patchMultiColorChannel("lowColor", lowColor)}
                 disabled={colorDisabled}
             />
             <ColorSetting
                 label="Medium Color"
-                value={metricColor.multiColor.colors[channel].mediumColor}
+                value={metricPaint.multiColor.colors[channel].mediumColor}
                 onValueChange={(mediumColor) => patchMultiColorChannel("mediumColor", mediumColor)}
                 disabled={colorDisabled}
             />
             <ColorSetting
                 label="High Color"
-                value={metricColor.multiColor.colors[channel].highColor}
+                value={metricPaint.multiColor.colors[channel].highColor}
                 onValueChange={(highColor) => patchMultiColorChannel("highColor", highColor)}
                 disabled={colorDisabled}
             />

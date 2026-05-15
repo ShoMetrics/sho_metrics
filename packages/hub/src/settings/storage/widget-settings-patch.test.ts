@@ -53,12 +53,14 @@ test("widget patch writes black-white color mode", () => {
 
     const nextSettings = writeStoredWidgetSettingsPatch(cpuSettings, {
         appearance: {
-            metricColor: {
-                colorMode: "black-white",
+            paint: {
+                metric: {
+                    colorMode: "black-white",
+                },
             },
         },
     });
 
     const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
-    assert.equal(appearance?.metricColor?.colorMode, StoredColorMode.BLACK_WHITE);
+    assert.equal(appearance?.paint?.metric?.colorMode, StoredColorMode.BLACK_WHITE);
 });

@@ -8,7 +8,7 @@ import type {
 import type {
     ColorMode,
     ResolvedAppearanceSettings,
-    ResolvedMetricColorSettings,
+    ResolvedMetricPaintSettings,
     ResolvedMetricSolidChannelColors,
 } from "./resolved-settings";
 import type { MetricColorChannel } from "./appearance-overrides";
@@ -45,7 +45,7 @@ const solidColorKeyByChannel = {
 export function buildMetricRenderAppearance(
     settings: ResolvedAppearanceSettings,
 ): MetricRenderAppearance {
-    const paintConstraint = settings.metricColor.colorMode === "black-white" ? "black-white" : "none";
+    const paintConstraint = activePaintColorMode(settings) === "black-white" ? "black-white" : "none";
 
     return {
         graphicType: settings.graph.viewLayout,
@@ -59,22 +59,22 @@ export function buildMetricRenderAppearance(
     };
 }
 
-export function buildColorConfigFromMetricColor(
-    metricColor: ResolvedMetricColorSettings,
+function buildColorConfigFromMetricPaint(
+    metricPaint: ResolvedMetricPaintSettings,
     channel: MetricColorChannel,
 ): ColorConfig {
     const solidColorKey = solidColorKeyByChannel[channel];
-    const colorConfigMode = metricColor.colorMode === "solid" ? "solid" : "threshold";
-    const multiColor = metricColor.multiColor.colors[channel];
-    const isGradientEnabled = metricColor.colorMode === "solid"
-        ? metricColor.solid.isGradientEnabled
-        : metricColor.multiColor.isGradientEnabled;
+    const colorConfigMode = metricPaint.colorMode === "solid" ? "solid" : "threshold";
+    const multiColor = metricPaint.multiColor.colors[channel];
+    const isGradientEnabled = metricPaint.colorMode === "solid"
+        ? metricPaint.solid.isGradientEnabled
+        : metricPaint.multiColor.isGradientEnabled;
     const baseColorConfig: ColorConfig = {
         mode: colorConfigMode,
-        solidColor: metricColor.solid.colors[solidColorKey],
+        solidColor: metricPaint.solid.colors[solidColorKey],
         thresholds: buildThresholds({
-            lowThreshold: metricColor.multiColor.lowThresholdPercent,
-            highThreshold: metricColor.multiColor.highThresholdPercent,
+            lowThreshold: metricPaint.multiColor.lowThresholdPercent,
+            highThreshold: metricPaint.multiColor.highThresholdPercent,
             lowColor: multiColor.lowColor,
             mediumColor: multiColor.mediumColor,
             highColor: multiColor.highColor,
@@ -82,14 +82,14 @@ export function buildColorConfigFromMetricColor(
         isGradientEnabled,
     };
 
-    return lowerColorConfigForColorMode(metricColor.colorMode, baseColorConfig);
+    return lowerColorConfigForColorMode(metricPaint.colorMode, baseColorConfig);
 }
 
 export function buildColorConfigFromAppearance(
     appearance: ResolvedAppearanceSettings,
     channel: MetricColorChannel,
 ): ColorConfig {
-    const colorConfig = buildColorConfigFromMetricColor(appearance.metricColor, channel);
+    const colorConfig = buildColorConfigFromMetricPaint(appearance.paint.metric, channel);
 
     if (appearance.theme.selectedTheme !== "color-filled") {
         return colorConfig;
@@ -147,21 +147,31 @@ function buildRenderBackgroundFill(settings: ResolvedAppearanceSettings): Render
         return undefined;
     }
 
-    if (settings.metricColor.colorMode === "solid") {
+    const colorFilledPaint = settings.paint.colorFilled;
+
+    if (colorFilledPaint.colorMode === "solid") {
         return {
             fillKind: "solid",
-            color: settings.theme.colorFilled.solid.color,
-            isGradientEnabled: settings.theme.colorFilled.solid.isGradientEnabled,
+            color: colorFilledPaint.solid.color,
+            isGradientEnabled: colorFilledPaint.solid.isGradientEnabled,
         };
     }
 
     return {
         fillKind: "soft-triangle",
-        lowColor: settings.theme.colorFilled.multiColor.colors.lowColor,
-        mediumColor: settings.theme.colorFilled.multiColor.colors.mediumColor,
-        highColor: settings.theme.colorFilled.multiColor.colors.highColor,
-        isGradientEnabled: settings.theme.colorFilled.multiColor.isGradientEnabled,
+        lowColor: colorFilledPaint.multiColor.colors.lowColor,
+        mediumColor: colorFilledPaint.multiColor.colors.mediumColor,
+        highColor: colorFilledPaint.multiColor.colors.highColor,
+        isGradientEnabled: colorFilledPaint.multiColor.isGradientEnabled,
     };
+}
+
+function activePaintColorMode(settings: ResolvedAppearanceSettings): ColorMode {
+    if (settings.theme.selectedTheme === "color-filled") {
+        return settings.paint.colorFilled.colorMode;
+    }
+
+    return settings.paint.metric.colorMode;
 }
 
 function lowerBackgroundFillToBlackWhite(backgroundFill: RenderBackgroundFill | undefined): RenderBackgroundFill | undefined {

@@ -4,7 +4,7 @@ import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { InspectorItem } from "../components/InspectorItem";
 import {
-    ColorFilledThemeControls,
+    ColorFilledPaintControls,
     MetricColorControls,
 } from "./ColorSettings";
 import { SettingsSection } from "./SettingsSection";
@@ -14,9 +14,10 @@ import {
     scaleModeOptionList,
 } from "./setting-options";
 import type {
+    MetricTheme,
     ResolvedDiskThroughputDisplaySettings,
-    ResolvedGlobalColorOverride,
     ResolvedGlobalGraphOverride,
+    ResolvedGlobalPaintOverride,
     ResolvedGlobalSettings,
     ResolvedGlobalThemeOverride,
     ResolvedNetworkDisplaySettings,
@@ -51,12 +52,13 @@ export function PluginSettingsTab({ resolvedSettings, onSettingsPatch }: PluginS
                         })}
                         onThemePatch={(theme) => onSettingsPatch({ theme })}
                     />
-                    <ColorOverrideSection
-                        colorOverride={resolvedSettings.colorOverride}
-                        onOverrideChange={(colorOverrideEnabled) => onSettingsPatch({
-                            colorOverrideEnabled,
+                    <PaintOverrideSection
+                        selectedTheme={resolvedSettings.themeOverride?.theme.selectedTheme}
+                        paintOverride={resolvedSettings.paintOverride}
+                        onOverrideChange={(paintOverrideEnabled) => onSettingsPatch({
+                            paintOverrideEnabled,
                         })}
-                        onColorPatch={(color) => onSettingsPatch({ color })}
+                        onPaintPatch={(paint) => onSettingsPatch({ paint })}
                     />
                 </>
             )}
@@ -150,66 +152,86 @@ function ThemeOverrideSection({
                 onValueChange={onOverrideChange}
             />
             {themeOverride && (
-                <>
-                    <SelectSetting
-                        label="Graphic Style"
-                        value={themeOverride.theme.selectedTheme}
-                        optionList={graphicStyleOptionList}
-                        onValueChange={(selectedTheme) => onThemePatch({ selectedTheme })}
-                    />
-                    {themeOverride.theme.selectedTheme === "color-filled" && (
-                        <ColorFilledThemeControls
-                            colorFilled={themeOverride.theme.colorFilled}
-                            onSolidPatch={(solid) => onThemePatch({ colorFilled: { solid } })}
-                            onMultiColorPatch={(multiColor) => onThemePatch({ colorFilled: { multiColor } })}
-                        />
-                    )}
-                </>
+                <SelectSetting
+                    label="Graphic Style"
+                    value={themeOverride.theme.selectedTheme}
+                    optionList={graphicStyleOptionList}
+                    onValueChange={(selectedTheme) => onThemePatch({ selectedTheme })}
+                />
             )}
         </SettingsSection>
     );
 }
 
-function ColorOverrideSection({
-    colorOverride,
+function PaintOverrideSection({
+    selectedTheme,
+    paintOverride,
     onOverrideChange,
-    onColorPatch,
+    onPaintPatch,
 }: {
-    colorOverride: ResolvedGlobalColorOverride | undefined;
+    selectedTheme: MetricTheme | undefined;
+    paintOverride: ResolvedGlobalPaintOverride | undefined;
     onOverrideChange: (isEnabled: boolean) => void;
-    onColorPatch: (patch: NonNullable<StoredGlobalSettingsPatch["color"]>) => void;
+    onPaintPatch: (patch: NonNullable<StoredGlobalSettingsPatch["paint"]>) => void;
 }): React.JSX.Element {
     return (
         <SettingsSection title="Color Override">
             <OverrideSubsectionToggle
                 label="Override color"
-                isEnabled={colorOverride !== undefined}
+                isEnabled={paintOverride !== undefined}
                 onValueChange={onOverrideChange}
             />
-            {colorOverride && (
-                <MetricColorControls
-                    colorMode={colorOverride.colorMode}
-                    solidColor={colorOverride.solid.color}
-                    multiColor={colorOverride.multiColor.colors}
-                    lowThresholdPercent={colorOverride.multiColor.lowThresholdPercent}
-                    highThresholdPercent={colorOverride.multiColor.highThresholdPercent}
-                    isSolidGradientEnabled={colorOverride.solid.isGradientEnabled}
-                    isMultiColorGradientEnabled={colorOverride.multiColor.isGradientEnabled}
-                    onColorModeChange={(colorMode) => onColorPatch({ colorMode })}
-                    onSolidColorChange={(color) => onColorPatch({ solid: { color } })}
-                    onMultiColorPatch={(colors) => onColorPatch({ multiColor: { colors } })}
-                    onThresholdPatch={(thresholdPatch) => onColorPatch({
-                        multiColor: thresholdPatch,
-                    })}
-                    onSolidGradientChange={(isGradientEnabled) => onColorPatch({
-                        solid: { isGradientEnabled },
-                    })}
-                    onMultiColorGradientChange={(isGradientEnabled) => onColorPatch({
-                        multiColor: { isGradientEnabled },
-                    })}
+            {paintOverride ? (
+                <ActivePaintOverrideControls
+                    selectedTheme={selectedTheme}
+                    paintOverride={paintOverride}
+                    onPaintPatch={onPaintPatch}
                 />
-            )}
+            ) : null}
         </SettingsSection>
+    );
+}
+
+function ActivePaintOverrideControls({
+    selectedTheme,
+    paintOverride,
+    onPaintPatch,
+}: {
+    selectedTheme: MetricTheme | undefined;
+    paintOverride: ResolvedGlobalPaintOverride;
+    onPaintPatch: (patch: NonNullable<StoredGlobalSettingsPatch["paint"]>) => void;
+}): React.JSX.Element {
+    if (selectedTheme === "color-filled") {
+        return (
+            <ColorFilledPaintControls
+                colorFilled={paintOverride.colorFilled}
+                onColorModeChange={(colorMode) => onPaintPatch({ colorFilled: { colorMode } })}
+                onSolidPatch={(solid) => onPaintPatch({ colorFilled: { solid } })}
+                onMultiColorPatch={(multiColor) => onPaintPatch({ colorFilled: { multiColor } })}
+            />
+        );
+    }
+
+    return (
+        <MetricColorControls
+            colorMode={paintOverride.metric.colorMode}
+            solidColor={paintOverride.metric.solid.color}
+            multiColor={paintOverride.metric.multiColor.colors}
+            lowThresholdPercent={paintOverride.metric.multiColor.lowThresholdPercent}
+            highThresholdPercent={paintOverride.metric.multiColor.highThresholdPercent}
+            isSolidGradientEnabled={paintOverride.metric.solid.isGradientEnabled}
+            isMultiColorGradientEnabled={paintOverride.metric.multiColor.isGradientEnabled}
+            onColorModeChange={(colorMode) => onPaintPatch({ metric: { colorMode } })}
+            onSolidColorChange={(color) => onPaintPatch({ metric: { solid: { color } } })}
+            onMultiColorPatch={(colors) => onPaintPatch({ metric: { multiColor: { colors } } })}
+            onThresholdPatch={(thresholdPatch) => onPaintPatch({ metric: { multiColor: thresholdPatch } })}
+            onSolidGradientChange={(isGradientEnabled) => onPaintPatch({
+                metric: { solid: { isGradientEnabled } },
+            })}
+            onMultiColorGradientChange={(isGradientEnabled) => onPaintPatch({
+                metric: { multiColor: { isGradientEnabled } },
+            })}
+        />
     );
 }
 
