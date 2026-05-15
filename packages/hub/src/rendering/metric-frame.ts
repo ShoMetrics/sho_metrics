@@ -3,6 +3,7 @@ import type { GraphicThemePresetName } from "../widgets/widget.interface";
 import { colorFilledStyle } from "../widgets/styles/color-filled";
 import { cupertinoGlassStyle } from "../widgets/styles/cupertino-glass";
 import { flatStyle } from "../widgets/styles/flat";
+import { oldCrtStyle } from "../widgets/styles/old-crt";
 import type { GraphicStylePaints } from "../widgets/styles/style.interface";
 
 export function renderMetricFrame(options: {
@@ -46,5 +47,7 @@ function resolveGraphicStyle(graphicStyle: GraphicThemePresetName) {
             return cupertinoGlassStyle;
         case "flat":
             return flatStyle;
+        case "old-crt":
+            return oldCrtStyle;
     }
 }

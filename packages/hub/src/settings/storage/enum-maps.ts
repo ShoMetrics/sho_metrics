@@ -49,6 +49,7 @@ export const storedThemeByResolved = {
     flat: StoredMetricTheme.FLAT,
     "cupertino-glass": StoredMetricTheme.CUPERTINO_GLASS,
     "color-filled": StoredMetricTheme.COLOR_FILLED,
+    "old-crt": StoredMetricTheme.OLD_CRT,
 } satisfies Record<MetricTheme, StoredMetricTheme>;
 
 export const storedColorModeByResolved = {

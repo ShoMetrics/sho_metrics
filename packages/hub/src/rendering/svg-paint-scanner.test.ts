@@ -117,6 +117,13 @@ test("black-white representative final SVG outputs contain no chromatic paint", 
             }),
         },
         {
+            name: "old crt circular value",
+            svg: renderSingleFinalSvg({
+                viewLayout: "circular",
+                theme: "old-crt",
+            }),
+        },
+        {
             name: "flat dual circular gauge",
             svg: renderDualFinalSvg({
                 theme: "flat",

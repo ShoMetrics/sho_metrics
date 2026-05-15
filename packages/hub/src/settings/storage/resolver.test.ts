@@ -168,6 +168,28 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "black-white");
     });
 
+    it("resolves old crt as a user-facing theme", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    overrides: {
+                        appearance: {
+                            theme: {
+                                selectedTheme: "METRIC_THEME_OLD_CRT",
+                            },
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+        });
+
+        assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "old-crt");
+    });
+
     it("applies global paint override without replacing widget layout and style", () => {
         const storedGlobalSettings = readStoredGlobalSettings({
             overrides: {

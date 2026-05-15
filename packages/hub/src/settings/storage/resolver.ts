@@ -163,6 +163,7 @@ const metricThemeByProto = {
     [StoredMetricTheme.FLAT]: "flat",
     [StoredMetricTheme.CUPERTINO_GLASS]: "cupertino-glass",
     [StoredMetricTheme.COLOR_FILLED]: "color-filled",
+    [StoredMetricTheme.OLD_CRT]: "old-crt",
 } satisfies Record<StoredMetricTheme, MetricTheme | undefined>;
 
 const colorModeByProto = {

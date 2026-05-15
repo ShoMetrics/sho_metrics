@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { ResolvedGlobalSettings } from "../../settings/resolved-settings";
+import type { MetricTheme, ResolvedGlobalSettings } from "../../settings/resolved-settings";
 import { PluginSettingsTab } from "./PluginSettingsTab";
 
 test("plugin global override groups graph theme and color controls under the master switch", () => {
@@ -29,7 +29,18 @@ test("plugin global override groups graph theme and color controls under the mas
     assert.doesNotMatch(markup, /Tint/);
 });
 
-function buildGlobalSettings(): ResolvedGlobalSettings {
+test("plugin global override hides color controls for old crt theme", () => {
+    const markup = renderToStaticMarkup(createElement(PluginSettingsTab, {
+        resolvedSettings: buildGlobalSettings("old-crt"),
+        onSettingsPatch: () => undefined,
+    }));
+
+    assert.match(markup, /Old CRT/);
+    assert.doesNotMatch(markup, /Color Override/);
+    assert.doesNotMatch(markup, /Color Mode:/);
+});
+
+function buildGlobalSettings(selectedTheme: MetricTheme = "flat"): ResolvedGlobalSettings {
     return {
         defaults: {
             network: {
@@ -53,7 +64,7 @@ function buildGlobalSettings(): ResolvedGlobalSettings {
         },
         themeOverride: {
             theme: {
-                selectedTheme: "flat",
+                selectedTheme,
             },
         },
         paintOverride: {

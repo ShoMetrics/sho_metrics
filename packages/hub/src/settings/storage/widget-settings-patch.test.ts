@@ -3,6 +3,7 @@ import test from "node:test";
 import {
     ColorMode as StoredColorMode,
     GpuMetricTarget_Kind as StoredGpuMetricKind,
+    MetricTheme as StoredMetricTheme,
 } from "../../generated/shometrics/v1/settings_pb";
 import { readStoredWidgetSettings } from "./codec";
 import { resolveQuickStartStoredWidgetSettings } from "./quick-start-widget-settings";
@@ -63,4 +64,19 @@ test("widget patch writes black-white color mode", () => {
 
     const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
     assert.equal(appearance?.paint?.metric?.colorMode, StoredColorMode.BLACK_WHITE);
+});
+
+test("widget patch writes old crt theme", () => {
+    const cpuSettings = resolveQuickStartStoredWidgetSettings(undefined, "cpu").rawSettings;
+
+    const nextSettings = writeStoredWidgetSettingsPatch(cpuSettings, {
+        appearance: {
+            theme: {
+                selectedTheme: "old-crt",
+            },
+        },
+    });
+
+    const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
+    assert.equal(appearance?.theme?.selectedTheme, StoredMetricTheme.OLD_CRT);
 });

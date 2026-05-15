@@ -30,10 +30,14 @@ test("graphic style maps resolved appearance settings to theme preset names", ()
     const colorFilledSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         theme: { selectedTheme: "color-filled" },
     }));
+    const oldCrtSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: { selectedTheme: "old-crt" },
+    }));
     const defaultSettings = buildMetricRenderAppearance(buildAppearanceSettings());
 
     assert.equal(cupertinoGlassSettings.graphicStyle, "cupertino-glass");
     assert.equal(colorFilledSettings.graphicStyle, "color-filled");
+    assert.equal(oldCrtSettings.graphicStyle, "old-crt");
     assert.equal(defaultSettings.graphicStyle, "flat");
 });
 
@@ -112,6 +116,31 @@ test("black-white color mode lowers renderer paint to neutral colors", () => {
         thresholds: [],
         isGradientEnabled: false,
     });
+});
+
+test("old crt theme uses fixed phosphor paint unless black-white mode is active", () => {
+    const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: { selectedTheme: "old-crt" },
+        paint: {
+            metric: {
+                colorMode: "solid",
+                solid: { colors: { usageColor: "#ef4444" } },
+            },
+        },
+    }));
+    const blackWhiteSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: { selectedTheme: "old-crt" },
+        paint: {
+            metric: { colorMode: "black-white" },
+        },
+    }));
+
+    assert.equal(visualSettings.paints.primaryMetric.solidColor, "#b4ff63");
+    assert.equal(visualSettings.paints.primaryText, "#b4ff63");
+    assert.equal(visualSettings.paints.background, "#020501");
+    assert.equal(blackWhiteSettings.paintConstraint, "black-white");
+    assert.equal(blackWhiteSettings.paints.primaryMetric.solidColor, "#e6e6e6");
+    assert.equal(blackWhiteSettings.paints.primaryText, "rgba(255,255,255,0.94)");
 });
 
 test("color filled solid mode uses theme background color and neutral foreground paint", () => {

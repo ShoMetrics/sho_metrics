@@ -63,6 +63,10 @@ export function StandardColorSettings(props: WidgetSettingsPanelProps): React.JS
         return <ColorFilledSettingsSection {...props} />;
     }
 
+    if (appearance.theme.selectedTheme === "old-crt") {
+        return <></>;
+    }
+
     return (
         <SettingsSection title="Colors">
             <SectionHeading text="Color Settings" />
@@ -188,6 +192,10 @@ export function NetworkChannelColorSettings(props: WidgetSettingsPanelProps): Re
         return <ColorFilledSettingsSection {...props} />;
     }
 
+    if (props.context.resolved.widget.slot.appearance.theme.selectedTheme === "old-crt") {
+        return <></>;
+    }
+
     const shouldShowChannelColors =
         props.context.resolved.widget.slot.appearance.paint.metric.colorMode !== "black-white";
 
@@ -210,6 +218,10 @@ export function NetworkChannelColorSettings(props: WidgetSettingsPanelProps): Re
 export function DiskThroughputChannelColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
     if (props.context.resolved.widget.slot.appearance.theme.selectedTheme === "color-filled") {
         return <ColorFilledSettingsSection {...props} />;
+    }
+
+    if (props.context.resolved.widget.slot.appearance.theme.selectedTheme === "old-crt") {
+        return <></>;
     }
 
     const shouldShowChannelColors =

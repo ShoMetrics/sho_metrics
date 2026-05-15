@@ -174,6 +174,10 @@ function PaintOverrideSection({
     onOverrideChange: (isEnabled: boolean) => void;
     onPaintPatch: (patch: NonNullable<StoredGlobalSettingsPatch["paint"]>) => void;
 }): React.JSX.Element {
+    if (selectedTheme === "old-crt") {
+        return <></>;
+    }
+
     return (
         <SettingsSection title="Color Override">
             <OverrideSubsectionToggle
@@ -201,6 +205,10 @@ function ActivePaintOverrideControls({
     paintOverride: ResolvedGlobalPaintOverride;
     onPaintPatch: (patch: NonNullable<StoredGlobalSettingsPatch["paint"]>) => void;
 }): React.JSX.Element {
+    if (selectedTheme === "old-crt") {
+        return <></>;
+    }
+
     if (selectedTheme === "color-filled") {
         return (
             <ColorFilledPaintControls

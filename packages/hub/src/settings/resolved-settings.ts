@@ -17,7 +17,7 @@
 
 export type SingleMetricViewLayout = "circular" | "text" | "linear" | "sparkline";
 export type CircleStyle = "value" | "compact" | "gauge";
-export type MetricTheme = "flat" | "cupertino-glass" | "color-filled";
+export type MetricTheme = "flat" | "cupertino-glass" | "color-filled" | "old-crt";
 export type ColorMode = "multi-color" | "solid" | "black-white";
 export type GridLineVisibility = "adaptive" | "always" | "none";
 export type GridLineType = "horizontal" | "vertical";

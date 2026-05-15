@@ -13,4 +13,4 @@ export interface Widget<TConfig extends WidgetBaseConfig = WidgetBaseConfig> {
     render(data: WidgetData, config: TConfig, keySize: KeySize): string;
 }
 
-export type GraphicThemePresetName = "flat" | "cupertino-glass" | "color-filled";
+export type GraphicThemePresetName = "flat" | "cupertino-glass" | "color-filled" | "old-crt";
