@@ -153,3 +153,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Playwright visual test output
+test-results/
+playwright-report/
