@@ -5,7 +5,7 @@ import {
     buildDefaultAppearanceSettings,
 } from "../settings/default-appearance-settings";
 import type { ResolvedAppearanceSettingsOverride } from "../settings/appearance-overrides";
-import { buildMetricRenderAppearance } from "../settings/visual-adapter";
+import { buildMetricRenderAppearance } from "../settings/render-appearance-builder";
 import {
     KEYPAD_PNG_SIZE,
     TOUCH_STRIP_LOGICAL_SIZE,

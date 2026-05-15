@@ -26,7 +26,7 @@ import {
 import {
     recordDisplayPerformanceSample,
 } from "./display-update-observability";
-import { buildMetricRenderAppearance } from "../settings/visual-adapter";
+import { buildMetricRenderAppearance } from "../settings/render-appearance-builder";
 
 const log = logger.for("MetricDisplayRunner");
 

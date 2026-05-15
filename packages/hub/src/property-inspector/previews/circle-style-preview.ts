@@ -3,7 +3,7 @@ import { renderSingleMetricBodyView } from "../../rendering/single-metric-view";
 import type { WidgetData } from "../../rendering/widget-data";
 import { WIDGET_LOGICAL_SIZE } from "../../rendering/widget-data";
 import { buildDefaultAppearanceSettings } from "../../settings/default-appearance-settings";
-import { buildMetricRenderAppearance } from "../../settings/visual-adapter";
+import { buildMetricRenderAppearance } from "../../settings/render-appearance-builder";
 import { getHardwareIconFragment } from "../../widgets/icons/hardware-icons";
 import { getMetricStatusIcon } from "../../widgets/icons/metric-status-icons";
 import type { CircleStyle } from "../inspector/settings-types";

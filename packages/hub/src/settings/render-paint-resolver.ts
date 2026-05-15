@@ -1,17 +1,16 @@
 import type { ColorConfig, ColorThreshold } from "../rendering/color-resolver";
 import type {
-    MetricRenderAppearance,
     RenderBackgroundFill,
     RenderPaintConstraint,
     RenderPaintTokens,
 } from "../rendering/render-appearance";
+import type { MetricColorChannel } from "./appearance-overrides";
 import type {
     ColorMode,
     ResolvedAppearanceSettings,
     ResolvedMetricPaintSettings,
     ResolvedMetricSolidChannelColors,
 } from "./resolved-settings";
-import type { MetricColorChannel } from "./appearance-overrides";
 
 const MINIMUM_THRESHOLD = 0;
 const MAXIMUM_THRESHOLD = 100;
@@ -42,21 +41,38 @@ const solidColorKeyByChannel = {
     diskWrite: "diskWriteColor",
 } satisfies Record<MetricColorChannel, keyof ResolvedMetricSolidChannelColors>;
 
-export function buildMetricRenderAppearance(
-    settings: ResolvedAppearanceSettings,
-): MetricRenderAppearance {
+export function resolveRenderPaint(settings: ResolvedAppearanceSettings): {
+    readonly paintConstraint: RenderPaintConstraint;
+    readonly paintTokens: RenderPaintTokens;
+} {
     const paintConstraint = activePaintColorMode(settings) === "black-white" ? "black-white" : "none";
 
     return {
-        graphicType: settings.graph.viewLayout,
-        circleStyle: settings.graph.circleStyle,
-        graphicStyle: settings.theme.selectedTheme,
         paintConstraint,
-        paints: buildRenderPaintTokens(settings, paintConstraint),
-        lineSmoothingPercent: settings.sparkline.lineSmoothingPercent,
-        gridLineVisibility: settings.sparkline.gridLineVisibility,
-        gridLineType: settings.sparkline.gridLineType,
+        paintTokens: buildRenderPaintTokens(settings, paintConstraint),
     };
+}
+
+export function buildColorConfigFromAppearance(
+    appearance: ResolvedAppearanceSettings,
+    channel: MetricColorChannel,
+): ColorConfig {
+    const colorConfig = buildColorConfigFromMetricPaint(appearance.paint.metric, channel);
+
+    if (appearance.theme.selectedTheme !== "color-filled") {
+        return colorConfig;
+    }
+
+    return {
+        mode: "solid",
+        solidColor: BLACK_WHITE_PAINT,
+        thresholds: [],
+        isGradientEnabled: false,
+    };
+}
+
+export function resolveSolidMetricColorMode(colorMode: ColorMode): ColorMode {
+    return colorMode === "black-white" ? "black-white" : "solid";
 }
 
 function buildColorConfigFromMetricPaint(
@@ -83,28 +99,6 @@ function buildColorConfigFromMetricPaint(
     };
 
     return lowerColorConfigForColorMode(metricPaint.colorMode, baseColorConfig);
-}
-
-export function buildColorConfigFromAppearance(
-    appearance: ResolvedAppearanceSettings,
-    channel: MetricColorChannel,
-): ColorConfig {
-    const colorConfig = buildColorConfigFromMetricPaint(appearance.paint.metric, channel);
-
-    if (appearance.theme.selectedTheme !== "color-filled") {
-        return colorConfig;
-    }
-
-    return {
-        mode: "solid",
-        solidColor: BLACK_WHITE_PAINT,
-        thresholds: [],
-        isGradientEnabled: false,
-    };
-}
-
-export function resolveSolidMetricColorMode(colorMode: ColorMode): ColorMode {
-    return colorMode === "black-white" ? "black-white" : "solid";
 }
 
 function lowerColorConfigForColorMode(colorMode: ColorMode, colorConfig: ColorConfig): ColorConfig {

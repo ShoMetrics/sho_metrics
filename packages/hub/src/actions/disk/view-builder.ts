@@ -28,7 +28,7 @@ import {
     type DiskVolumeSelection,
 } from "./volume-selection";
 import type { MetricDisplayOptions } from "../../metric-view-runner/display-model";
-import { buildColorConfigFromAppearance, resolveSolidMetricColorMode } from "../../settings/visual-adapter";
+import { buildColorConfigFromAppearance, resolveSolidMetricColorMode } from "../../settings/render-paint-resolver";
 
 interface BuildDiskDisplayOptions {
     event: WillAppearEvent;

@@ -7,7 +7,7 @@ import { buildDiskUsageWidgetData, buildMemoryUsageWidgetData } from "../../metr
 import { buildCpuUsageWidgetData } from "../cpu";
 import { buildGpuUsageWidgetData, buildGpuVramWidgetData } from "../gpu";
 import { buildDefaultAppearanceSettings } from "../../settings/default-appearance-settings";
-import { buildMetricRenderAppearance } from "../../settings/visual-adapter";
+import { buildMetricRenderAppearance } from "../../settings/render-appearance-builder";
 
 test("percentage metric builders expose integer display values for compact widgets", () => {
     const testCases: ReadonlyArray<{

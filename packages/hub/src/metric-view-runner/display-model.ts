@@ -17,7 +17,7 @@ import {
     mergeResolvedAppearanceSettings,
     type ResolvedAppearanceSettingsOverride,
 } from "../settings/appearance-overrides";
-import { buildMetricRenderAppearance } from "../settings/visual-adapter";
+import { buildMetricRenderAppearance } from "../settings/render-appearance-builder";
 
 interface BaseMetricDisplayOptions {
     event: WillAppearEvent;
