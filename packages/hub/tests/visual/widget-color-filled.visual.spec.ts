@@ -6,7 +6,7 @@ import { renderSingleMetricBodyView } from "../../src/rendering/single-metric-vi
 import { WIDGET_LOGICAL_SIZE, type KeySize, type WidgetData } from "../../src/rendering/widget-data";
 import type { ResolvedAppearanceSettingsOverride } from "../../src/settings/appearance-overrides";
 import { buildDefaultAppearanceSettings } from "../../src/settings/default-appearance-settings";
-import { buildMetricRenderAppearance } from "../../src/settings/visual-adapter";
+import { buildMetricRenderAppearance } from "../../src/settings/render-appearance-builder";
 
 const INTER_FONT_FILE = path.resolve(process.cwd(), "assets", "fonts", "inter", "InterVariable.ttf");
 

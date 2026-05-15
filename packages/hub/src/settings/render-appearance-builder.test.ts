@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildMetricRenderAppearance } from "./visual-adapter";
+import { buildMetricRenderAppearance } from "./render-appearance-builder";
 import { buildDefaultAppearanceSettings as buildAppearanceSettings } from "./default-appearance-settings";
 
 test("graphic type maps resolved appearance settings to renderer names", () => {

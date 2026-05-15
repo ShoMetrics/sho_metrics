@@ -3,7 +3,7 @@ import { renderSingleMetricBodyView } from "../../rendering/single-metric-view";
 import type { WidgetData } from "../../rendering/widget-data";
 import { WIDGET_LOGICAL_SIZE } from "../../rendering/widget-data";
 import { buildDefaultAppearanceSettings } from "../../settings/default-appearance-settings";
-import { buildMetricRenderAppearance } from "../../settings/visual-adapter";
+import { buildMetricRenderAppearance } from "../../settings/render-appearance-builder";
 import type { SingleMetricViewLayout } from "../inspector/settings-types";
 
 const previewData: WidgetData = {

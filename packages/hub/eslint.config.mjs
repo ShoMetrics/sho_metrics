@@ -337,7 +337,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/settings/visual-adapter*.ts'],
+    files: ['src/settings/{render-appearance-builder,render-paint-resolver}*.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',
