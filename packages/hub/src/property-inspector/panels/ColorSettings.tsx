@@ -410,13 +410,6 @@ function SoftTriangleColorSettings({
     return (
         <>
             <ColorBandSetting
-                label="Top Color"
-                value={colors.mediumColor}
-                onValueChange={(mediumColor) => onColorPatch({ mediumColor })}
-                bandText="Top"
-                disabled={disabled}
-            />
-            <ColorBandSetting
                 label="Left Color"
                 value={colors.lowColor}
                 onValueChange={(lowColor) => onColorPatch({ lowColor })}
@@ -425,9 +418,16 @@ function SoftTriangleColorSettings({
             />
             <ColorBandSetting
                 label="Right Color"
+                value={colors.mediumColor}
+                onValueChange={(mediumColor) => onColorPatch({ mediumColor })}
+                bandText="Right"
+                disabled={disabled}
+            />
+            <ColorBandSetting
+                label="Bottom Color"
                 value={colors.highColor}
                 onValueChange={(highColor) => onColorPatch({ highColor })}
-                bandText="Right"
+                bandText="Bottom"
                 disabled={disabled}
             />
         </>
