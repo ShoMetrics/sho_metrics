@@ -2,8 +2,23 @@ import type { KeySize } from "../../rendering/widget-data";
 
 export interface GraphicStylePaints {
     readonly background: string;
+    readonly backgroundFill: GraphicBackgroundFill | undefined;
     readonly surface: string;
 }
+
+export type GraphicBackgroundFill =
+    | {
+        readonly fillKind: "solid";
+        readonly color: string;
+        readonly isGradientEnabled: boolean;
+    }
+    | {
+        readonly fillKind: "soft-triangle";
+        readonly lowColor: string;
+        readonly mediumColor: string;
+        readonly highColor: string;
+        readonly isGradientEnabled: boolean;
+    };
 
 /**
  * A graphic style applies visual treatment (background, overlay, filters)

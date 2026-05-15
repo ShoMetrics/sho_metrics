@@ -8,35 +8,36 @@ import { graphicStyleOptionList } from "./setting-options";
 export function LayoutSettings({
     context,
     onSettingsPatch,
-    layoutStyleDisabled = false,
+    graphDisabled = false,
+    themeDisabled = false,
 }: WidgetSettingsPanelProps): React.JSX.Element {
     const appearance = context.resolved.widget.slot.appearance;
 
     return (
         <SettingsSection title="Layout">
             <GraphicTypeSetting
-                value={appearance.viewLayout}
+                value={appearance.graph.viewLayout}
                 onValueChange={(viewLayout) => onSettingsPatch({
-                    appearance: { viewLayout },
+                    appearance: { graph: { viewLayout } },
                 })}
-                disabled={layoutStyleDisabled}
+                disabled={graphDisabled}
             />
             <SelectSetting
                 label="Graphic Style"
-                value={appearance.theme}
+                value={appearance.theme.selectedTheme}
                 optionList={graphicStyleOptionList}
-                onValueChange={(theme) => onSettingsPatch({
-                    appearance: { theme },
+                onValueChange={(selectedTheme) => onSettingsPatch({
+                    appearance: { theme: { selectedTheme } },
                 })}
-                disabled={layoutStyleDisabled}
+                disabled={themeDisabled}
             />
-            {appearance.viewLayout === "circular" && (
+            {appearance.graph.viewLayout === "circular" && (
                 <CircleStyleSetting
-                    value={appearance.circleStyle}
+                    value={appearance.graph.circleStyle}
                     onValueChange={(circleStyle) => onSettingsPatch({
-                        appearance: { circleStyle },
+                        appearance: { graph: { circleStyle } },
                     })}
-                    disabled={layoutStyleDisabled}
+                    disabled={graphDisabled}
                 />
             )}
         </SettingsSection>

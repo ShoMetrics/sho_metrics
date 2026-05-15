@@ -1,5 +1,7 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
 import type { ColorConfig } from "../rendering/color-resolver";
+import type { MetricRenderAppearance } from "../rendering/render-appearance";
+import type { ResolvedAppearanceSettings } from "../settings/resolved-settings";
 import {
     KEYPAD_PNG_SIZE,
     TOUCH_STRIP_LOGICAL_SIZE,
@@ -12,12 +14,10 @@ import {
 } from "../rendering/widget-data";
 import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
 import {
-    buildMetricVisualSettings,
-    mergeMetricVisualSettings,
-    type MetricVisualSettings,
-    type MetricVisualSettingsOverride,
-    type ResolvedMetricVisualSettings,
-} from "../settings/visual-adapter";
+    mergeResolvedAppearanceSettings,
+    type ResolvedAppearanceSettingsOverride,
+} from "../settings/appearance-overrides";
+import { buildMetricRenderAppearance } from "../settings/visual-adapter";
 
 interface BaseMetricDisplayOptions {
     event: WillAppearEvent;
@@ -26,9 +26,9 @@ interface BaseMetricDisplayOptions {
     footerIconFragment?: string;
     linearIconFragment?: string;
     statusIcon: ArcGaugeStatusIcon;
-    circleStyleOverride?: ResolvedMetricVisualSettings["circleStyle"];
-    visualSettingsOverride?: MetricVisualSettingsOverride;
-    resolvedSettings: MetricVisualSettings;
+    circleStyleOverride?: MetricRenderAppearance["circleStyle"];
+    appearanceOverride?: ResolvedAppearanceSettingsOverride;
+    resolvedSettings: ResolvedAppearanceSettings;
 }
 
 export interface SingleMetricDisplayOptions extends BaseMetricDisplayOptions {
@@ -62,9 +62,9 @@ export interface TouchStripMetricLayout {
 }
 
 export interface MetricDisplayRenderPlan {
-    visualSettings: ResolvedMetricVisualSettings;
+    renderAppearance: MetricRenderAppearance;
     centerContent: "value" | "icon";
-    circleStyle: ResolvedMetricVisualSettings["circleStyle"];
+    circleStyle: MetricRenderAppearance["circleStyle"];
     displayHasData: boolean;
     shouldRenderMutedIconPlaceholder: boolean;
     touchStripMetricLayout: TouchStripMetricLayout | null;
@@ -91,27 +91,28 @@ export function buildMetricDisplayRenderPlan(options: {
     displayOptions: MetricDisplayOptions;
     isDial: boolean;
 }): MetricDisplayRenderPlan {
-    const visualSettings = buildMetricVisualSettings(mergeMetricVisualSettings(
+    const resolvedAppearance = mergeResolvedAppearanceSettings(
         options.displayOptions.resolvedSettings,
-        options.displayOptions.visualSettingsOverride,
-    ));
+        options.displayOptions.appearanceOverride,
+    );
+    const renderAppearance = buildMetricRenderAppearance(resolvedAppearance);
     const circleStyle = resolveCircleStyle({
-        graphicType: visualSettings.graphicType,
-        circleStyle: visualSettings.circleStyle,
+        graphicType: renderAppearance.graphicType,
+        circleStyle: renderAppearance.circleStyle,
         circleStyleOverride: options.displayOptions.circleStyleOverride,
     });
     const centerContent = circleStyle === "compact" ? "icon" : "value";
     const displayHasData = hasMetricDisplayData(options.displayOptions);
     const shouldRenderMutedIconPlaceholder = !displayHasData
         && !isDualMetricDisplayOptions(options.displayOptions)
-        && visualSettings.graphicType === "circular"
+        && renderAppearance.graphicType === "circular"
         && circleStyle === "compact";
     const touchStripMetricLayout = options.isDial
-        ? resolveTouchStripMetricLayout(visualSettings)
+        ? resolveTouchStripMetricLayout(renderAppearance)
         : null;
 
     return {
-        visualSettings,
+        renderAppearance,
         centerContent,
         circleStyle,
         displayHasData,
@@ -123,10 +124,10 @@ export function buildMetricDisplayRenderPlan(options: {
 }
 
 export function resolveCircleStyle(options: {
-    graphicType: ResolvedMetricVisualSettings["graphicType"];
-    circleStyle: ResolvedMetricVisualSettings["circleStyle"];
-    circleStyleOverride: ResolvedMetricVisualSettings["circleStyle"] | undefined;
-}): ResolvedMetricVisualSettings["circleStyle"] {
+    graphicType: MetricRenderAppearance["graphicType"];
+    circleStyle: MetricRenderAppearance["circleStyle"];
+    circleStyleOverride: MetricRenderAppearance["circleStyle"] | undefined;
+}): MetricRenderAppearance["circleStyle"] {
     if (options.graphicType !== "circular") {
         return "value";
     }
@@ -204,7 +205,7 @@ export function resolveDisplaySampleTimestampMilliseconds(widgetData: WidgetData
     return widgetData.sampleTimestampMilliseconds;
 }
 
-export function resolveTouchStripMetricLayout(settings: ResolvedMetricVisualSettings): TouchStripMetricLayout {
+export function resolveTouchStripMetricLayout(settings: MetricRenderAppearance): TouchStripMetricLayout {
     if (settings.graphicType === "circular") {
         return TOUCH_STRIP_METRIC_LAYOUTS.square;
     }

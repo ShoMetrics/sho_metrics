@@ -37,7 +37,7 @@ export function DiskWidgetSettings(props: DiskWidgetSettingsProps): React.JSX.El
     const reading = props.target.reading;
     const usesThroughputChannelColors = reading.kind === "throughput"
         && reading.direction === "both"
-        && props.context.resolved.widget.slot.appearance.viewLayout !== "linear";
+        && props.context.resolved.widget.slot.appearance.graph.viewLayout !== "linear";
 
     return (
         <>
@@ -60,7 +60,7 @@ export function DiskWidgetSettings(props: DiskWidgetSettingsProps): React.JSX.El
 function DiskUsageSettings(props: DiskWidgetSettingsProps & {
     reading: DiskUsageReading;
 }): React.JSX.Element {
-    const graphicType = props.context.resolved.widget.slot.appearance.viewLayout;
+    const graphicType = props.context.resolved.widget.slot.appearance.graph.viewLayout;
     const selectedDiskVolumeId = props.target.volumeId
         ?? resolveSelectedDiskVolume(props.context)?.id
         ?? "";

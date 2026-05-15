@@ -22,7 +22,7 @@ test("Property Inspector context uses resolver platform rules for scenario visib
         resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings,
         {
             appearance: {
-                viewLayout: "linear",
+                graph: { viewLayout: "linear" },
             },
             disk: {
                 kind: "throughput",

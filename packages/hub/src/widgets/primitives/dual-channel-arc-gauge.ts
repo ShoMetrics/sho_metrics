@@ -31,7 +31,7 @@ export interface DualChannelArcGaugeConfig extends WidgetBaseConfig {
 }
 
 export const DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG: DualChannelArcGaugeConfig = {
-    colorConfig: { mode: "solid", solidColor: "#3b82f6", thresholds: [] },
+    colorConfig: { mode: "solid", solidColor: "#3b82f6", thresholds: [], isGradientEnabled: true },
     trackColor: "rgba(255,255,255,0.14)",
     strokeWidth: 11,
     valueTextColor: "white",
@@ -251,6 +251,7 @@ function buildSolidChannelColorConfig(color: string): ColorConfig {
         mode: "solid",
         solidColor: color,
         thresholds: [],
+        isGradientEnabled: true,
     };
 }
 

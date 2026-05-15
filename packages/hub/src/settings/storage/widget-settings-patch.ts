@@ -1,41 +1,61 @@
 import { create } from "@bufbuild/protobuf";
 import {
+    AppearanceGraphSettingsSchema,
     AppearanceSettingsSchema,
-    ColorRampSchema,
+    AppearanceThemeSettingsSchema,
+    ColorFilledMultiColorSettingsSchema,
+    ColorFilledSolidSettingsSchema,
+    ColorFilledThemeSettingsSchema,
     DiskThroughputDisplaySettingsSchema,
+    MetricColorSettingsSchema,
+    MetricMultiColorChannelColorsSchema,
+    MetricMultiColorSettingsSchema,
+    MetricSolidChannelColorsSchema,
+    MetricSolidColorSettingsSchema,
+    MultiColorSetSchema,
     NetworkDisplaySettingsSchema,
     SlotOverridesSchema,
+    SparklineAppearanceSettingsSchema,
     WidgetPreferencesSchema,
     type AppearanceSettings as StoredAppearanceSettings,
+    type ColorFilledThemeSettings as StoredColorFilledThemeSettings,
     type DiskMetricTarget as StoredDiskMetricTarget,
     type GpuMetricTarget as StoredGpuMetricTarget,
+    type MetricColorSettings as StoredMetricColorSettings,
+    type MetricMultiColorSettings as StoredMetricMultiColorSettings,
     type MetricSelection as StoredMetricSelection,
     type MetricSlot as StoredMetricSlot,
+    type MetricSolidColorSettings as StoredMetricSolidColorSettings,
+    type MultiColorSet as StoredMultiColorSet,
     type NetworkMetricTarget as StoredNetworkMetricTarget,
+    type SlotOverrides as StoredSlotOverrides,
     type StoredWidgetSettings,
 } from "../../generated/shometrics/v1/settings_pb.js";
 import type {
-    CircleStyle,
-    ColorMode,
     DiskThroughputDirection,
     DiskUsageDisplayMode,
-    GridLineType,
-    GridLineVisibility,
-    MetricTheme,
     NetworkDirection,
     NetworkTrafficDisplayMode,
     NetworkUnitBase,
     ResolvedGpuReading,
     ScaleMode,
-    SingleMetricViewLayout,
     TemperatureUnit,
 } from "../resolved-settings";
+import type {
+    ResolvedAppearanceSettingsOverride,
+    ResolvedAppearanceThemeSettingsOverride,
+    ResolvedColorFilledMultiColorSettingsOverride,
+    ResolvedColorFilledThemeSettingsOverride,
+    ResolvedMetricColorSettingsOverride,
+    ResolvedMetricMultiColorSettingsOverride,
+    ResolvedMetricSolidColorSettingsOverride,
+    ResolvedMultiColorSetOverride,
+} from "../appearance-overrides";
 import {
     readStoredWidgetSettings,
     writeStoredWidgetSettings,
     type StoredSettingsJsonObject,
 } from "./codec";
-import { applyColorRampPatch, type ColorRampPatch } from "./color-ramp-patch";
 import {
     storedCircleStyleByResolved,
     storedColorModeByResolved,
@@ -54,28 +74,11 @@ import {
     storedThemeByResolved,
 } from "./enum-maps";
 
-type ColorRampKey =
-    | "usageColors"
-    | "downloadColors"
-    | "uploadColors"
-    | "diskReadColors"
-    | "diskWriteColors";
-
 export interface StoredWidgetSettingsPatch {
     readonly preferences?: {
         readonly pollingFrequencySeconds?: number | undefined;
     } | undefined;
-    readonly appearance?: Partial<{
-        readonly viewLayout: SingleMetricViewLayout;
-        readonly circleStyle: CircleStyle;
-        readonly theme: MetricTheme;
-        readonly colorMode: ColorMode;
-        readonly lowColorThresholdPercent: number;
-        readonly highColorThresholdPercent: number;
-        readonly lineSmoothingPercent: number;
-        readonly gridLineVisibility: GridLineVisibility;
-        readonly gridLineType: GridLineType;
-    }> & Partial<Record<ColorRampKey, ColorRampPatch>>;
+    readonly appearance?: AppearanceSettingsPatch | undefined;
     readonly network?: Partial<{
         readonly direction: NetworkDirection;
         readonly interfaceId: string;
@@ -102,6 +105,14 @@ export interface StoredWidgetSettingsPatch {
         readonly maximumPowerWatts: number | undefined;
     }>;
 }
+
+export type AppearanceSettingsPatch = ResolvedAppearanceSettingsOverride;
+export type AppearanceThemeSettingsPatch = ResolvedAppearanceThemeSettingsOverride;
+export type ColorFilledThemeSettingsPatch = ResolvedColorFilledThemeSettingsOverride;
+export type ColorFilledMultiColorSettingsPatch = ResolvedColorFilledMultiColorSettingsOverride;
+export type MetricColorSettingsPatch = ResolvedMetricColorSettingsOverride;
+export type MetricSolidColorSettingsPatch = ResolvedMetricSolidColorSettingsOverride;
+export type MetricMultiColorSettingsPatch = ResolvedMetricMultiColorSettingsOverride;
 
 export function writeStoredWidgetSettingsPatch(
     rawSettings: unknown,
@@ -147,63 +158,150 @@ function applyPreferencesPatch(
     settings.preferences.pollingFrequencySeconds = patch.pollingFrequencySeconds;
 }
 
-function applyAppearancePatch(
-    appearance: StoredAppearanceSettings,
-    patch: NonNullable<StoredWidgetSettingsPatch["appearance"]>,
-): void {
-    if (patch.viewLayout !== undefined) {
-        appearance.viewLayout = storedSingleMetricViewLayoutByResolved[patch.viewLayout];
-    }
-    if (patch.circleStyle !== undefined) {
-        appearance.circleStyle = storedCircleStyleByResolved[patch.circleStyle];
-    }
-    if (patch.theme !== undefined) {
-        appearance.theme = storedThemeByResolved[patch.theme];
-    }
-    if (patch.colorMode !== undefined) {
-        appearance.colorMode = storedColorModeByResolved[patch.colorMode];
-    }
-    if (patch.lowColorThresholdPercent !== undefined) {
-        appearance.lowColorThresholdPercent = patch.lowColorThresholdPercent;
-    }
-    if (patch.highColorThresholdPercent !== undefined) {
-        appearance.highColorThresholdPercent = patch.highColorThresholdPercent;
-    }
-    if (patch.lineSmoothingPercent !== undefined) {
-        appearance.lineSmoothingPercent = patch.lineSmoothingPercent;
-    }
-    if (patch.gridLineVisibility !== undefined) {
-        appearance.gridLineVisibility = storedGridLineVisibilityByResolved[patch.gridLineVisibility];
-    }
-    if (patch.gridLineType !== undefined) {
-        appearance.gridLineType = storedGridLineTypeByResolved[patch.gridLineType];
+function applyAppearancePatch(appearance: StoredAppearanceSettings, patch: AppearanceSettingsPatch): void {
+    if (patch.graph !== undefined) {
+        const graph = appearance.graph ??= create(AppearanceGraphSettingsSchema);
+        if (patch.graph.viewLayout !== undefined) {
+            graph.viewLayout = storedSingleMetricViewLayoutByResolved[patch.graph.viewLayout];
+        }
+        if (patch.graph.circleStyle !== undefined) {
+            graph.circleStyle = storedCircleStyleByResolved[patch.graph.circleStyle];
+        }
     }
 
-    applyAppearanceColorRampPatch(appearance, "usageColors", patch.usageColors);
-    applyAppearanceColorRampPatch(appearance, "downloadColors", patch.downloadColors);
-    applyAppearanceColorRampPatch(appearance, "uploadColors", patch.uploadColors);
-    applyAppearanceColorRampPatch(appearance, "diskReadColors", patch.diskReadColors);
-    applyAppearanceColorRampPatch(appearance, "diskWriteColors", patch.diskWriteColors);
+    if (patch.theme !== undefined) {
+        applyAppearanceThemePatch(appearance.theme ??= create(AppearanceThemeSettingsSchema), patch.theme);
+    }
+
+    if (patch.metricColor !== undefined) {
+        applyMetricColorPatch(appearance.metricColor ??= create(MetricColorSettingsSchema), patch.metricColor);
+    }
+
+    if (patch.sparkline !== undefined) {
+        const sparkline = appearance.sparkline ??= create(SparklineAppearanceSettingsSchema);
+        if (patch.sparkline.lineSmoothingPercent !== undefined) {
+            sparkline.lineSmoothingPercent = patch.sparkline.lineSmoothingPercent;
+        }
+        if (patch.sparkline.gridLineVisibility !== undefined) {
+            sparkline.gridLineVisibility = storedGridLineVisibilityByResolved[patch.sparkline.gridLineVisibility];
+        }
+        if (patch.sparkline.gridLineType !== undefined) {
+            sparkline.gridLineType = storedGridLineTypeByResolved[patch.sparkline.gridLineType];
+        }
+    }
 }
 
-function applyAppearanceColorRampPatch(
-    appearance: StoredAppearanceSettings,
-    rampKey: ColorRampKey,
-    patch: ColorRampPatch | undefined,
+function applyAppearanceThemePatch(
+    theme: NonNullable<StoredAppearanceSettings["theme"]>,
+    patch: AppearanceThemeSettingsPatch,
 ): void {
-    if (!patch) {
-        return;
+    if (patch.selectedTheme !== undefined) {
+        theme.selectedTheme = storedThemeByResolved[patch.selectedTheme];
     }
+    if (patch.colorFilled !== undefined) {
+        applyColorFilledThemePatch(theme.colorFilled ??= create(ColorFilledThemeSettingsSchema), patch.colorFilled);
+    }
+}
 
-    const colors = appearance[rampKey] ?? create(ColorRampSchema);
-    appearance[rampKey] = colors;
+function applyColorFilledThemePatch(
+    colorFilled: StoredColorFilledThemeSettings,
+    patch: ColorFilledThemeSettingsPatch,
+): void {
+    if (patch.solid !== undefined) {
+        const solid = colorFilled.solid ??= create(ColorFilledSolidSettingsSchema);
+        if (patch.solid.color !== undefined) {
+            solid.color = patch.solid.color;
+        }
+        if (patch.solid.isGradientEnabled !== undefined) {
+            solid.gradientEnabled = patch.solid.isGradientEnabled;
+        }
+    }
+    if (patch.multiColor !== undefined) {
+        const multiColor = colorFilled.multiColor ??= create(ColorFilledMultiColorSettingsSchema);
+        applyMultiColorSetPatch(multiColor.colors ??= create(MultiColorSetSchema), patch.multiColor.colors);
+        if (patch.multiColor.isGradientEnabled !== undefined) {
+            multiColor.gradientEnabled = patch.multiColor.isGradientEnabled;
+        }
+    }
+}
 
-    applyColorRampPatch(colors, patch);
+function applyMetricColorPatch(color: StoredMetricColorSettings, patch: MetricColorSettingsPatch): void {
+    if (patch.colorMode !== undefined) {
+        color.colorMode = storedColorModeByResolved[patch.colorMode];
+    }
+    if (patch.solid !== undefined) {
+        applyMetricSolidColorPatch(color.solid ??= create(MetricSolidColorSettingsSchema), patch.solid);
+    }
+    if (patch.multiColor !== undefined) {
+        applyMetricMultiColorPatch(color.multiColor ??= create(MetricMultiColorSettingsSchema), patch.multiColor);
+    }
+}
+
+function applyMetricSolidColorPatch(
+    solid: StoredMetricSolidColorSettings,
+    patch: MetricSolidColorSettingsPatch,
+): void {
+    if (patch.colors !== undefined) {
+        const colors = solid.colors ??= create(MetricSolidChannelColorsSchema);
+        if (patch.colors.usageColor !== undefined) {
+            colors.usageColor = patch.colors.usageColor;
+        }
+        if (patch.colors.downloadColor !== undefined) {
+            colors.downloadColor = patch.colors.downloadColor;
+        }
+        if (patch.colors.uploadColor !== undefined) {
+            colors.uploadColor = patch.colors.uploadColor;
+        }
+        if (patch.colors.diskReadColor !== undefined) {
+            colors.diskReadColor = patch.colors.diskReadColor;
+        }
+        if (patch.colors.diskWriteColor !== undefined) {
+            colors.diskWriteColor = patch.colors.diskWriteColor;
+        }
+    }
+    if (patch.isGradientEnabled !== undefined) {
+        solid.gradientEnabled = patch.isGradientEnabled;
+    }
+}
+
+function applyMetricMultiColorPatch(
+    multiColor: StoredMetricMultiColorSettings,
+    patch: MetricMultiColorSettingsPatch,
+): void {
+    if (patch.lowThresholdPercent !== undefined) {
+        multiColor.lowThresholdPercent = patch.lowThresholdPercent;
+    }
+    if (patch.highThresholdPercent !== undefined) {
+        multiColor.highThresholdPercent = patch.highThresholdPercent;
+    }
+    if (patch.isGradientEnabled !== undefined) {
+        multiColor.gradientEnabled = patch.isGradientEnabled;
+    }
+    if (patch.colors !== undefined) {
+        const colors = multiColor.colors ??= create(MetricMultiColorChannelColorsSchema);
+        applyMultiColorSetPatch(colors.usage ??= create(MultiColorSetSchema), patch.colors.usage);
+        applyMultiColorSetPatch(colors.download ??= create(MultiColorSetSchema), patch.colors.download);
+        applyMultiColorSetPatch(colors.upload ??= create(MultiColorSetSchema), patch.colors.upload);
+        applyMultiColorSetPatch(colors.diskRead ??= create(MultiColorSetSchema), patch.colors.diskRead);
+        applyMultiColorSetPatch(colors.diskWrite ??= create(MultiColorSetSchema), patch.colors.diskWrite);
+    }
+}
+
+function applyMultiColorSetPatch(colors: StoredMultiColorSet, patch: ResolvedMultiColorSetOverride | undefined): void {
+    if (patch?.lowColor !== undefined) {
+        colors.lowColor = patch.lowColor;
+    }
+    if (patch?.mediumColor !== undefined) {
+        colors.mediumColor = patch.mediumColor;
+    }
+    if (patch?.highColor !== undefined) {
+        colors.highColor = patch.highColor;
+    }
 }
 
 function applyNetworkPatch(
     target: StoredNetworkMetricTarget,
-    overrides: ReturnType<typeof ensureSlotOverrides>,
+    overrides: StoredSlotOverrides,
     patch: NonNullable<StoredWidgetSettingsPatch["network"]>,
 ): void {
     if (patch.direction !== undefined) {
@@ -232,7 +330,7 @@ function applyNetworkPatch(
 
 function applyDiskPatch(
     target: StoredDiskMetricTarget,
-    overrides: ReturnType<typeof ensureSlotOverrides>,
+    overrides: StoredSlotOverrides,
     patch: NonNullable<StoredWidgetSettingsPatch["disk"]>,
 ): void {
     if (patch.kind !== undefined) {
@@ -288,7 +386,7 @@ function requireSingleMetricSlot(settings: StoredWidgetSettings): StoredMetricSl
     return settings.widget.value.slot;
 }
 
-function ensureSlotOverrides(slot: StoredMetricSlot) {
+function ensureSlotOverrides(slot: StoredMetricSlot): StoredSlotOverrides {
     slot.overrides ??= create(SlotOverridesSchema);
     return slot.overrides;
 }

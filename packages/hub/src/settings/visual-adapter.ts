@@ -1,114 +1,109 @@
 import type { ColorConfig, ColorThreshold } from "../rendering/color-resolver";
-import type { GraphicThemePresetName } from "../widgets/widget.interface";
-import type { ArcGaugeStyle } from "../widgets/primitives/arc-gauge";
-import type { SparklineGridLineType, SparklineGridLineVisibility } from "../widgets/primitives/sparkline";
-import type { ColorMode, ResolvedAppearanceSettings, ResolvedColorRamp } from "./resolved-settings";
-
-export type MetricVisualSettings = ResolvedAppearanceSettings;
-export type AppearanceColorRampKey =
-    | "usageColors"
-    | "downloadColors"
-    | "uploadColors"
-    | "diskReadColors"
-    | "diskWriteColors";
-export type MetricVisualSettingsOverride =
-    Partial<Omit<ResolvedAppearanceSettings, AppearanceColorRampKey>>
-    & Partial<Record<AppearanceColorRampKey, Partial<ResolvedColorRamp>>>;
-
-export type RenderPaintConstraint = "none" | "black-white";
-
-export interface RenderPaintTokens {
-    readonly background: string;
-    readonly surface: string;
-    readonly primaryText: string;
-    readonly secondaryText: string;
-    readonly mutedText: string;
-    readonly icon: string;
-    readonly primaryMetric: ColorConfig;
-    readonly track: string;
-    readonly grid: string;
-    readonly divider: string;
-}
-
-export interface ResolvedMetricVisualSettings {
-    graphicType: ResolvedAppearanceSettings["viewLayout"];
-    circleStyle: ArcGaugeStyle;
-    graphicStyle: GraphicThemePresetName;
-    paintConstraint: RenderPaintConstraint;
-    paints: RenderPaintTokens;
-    lineSmoothingPercent: number;
-    gridLineVisibility: SparklineGridLineVisibility;
-    gridLineType: SparklineGridLineType;
-}
+import type {
+    MetricRenderAppearance,
+    RenderBackgroundFill,
+    RenderPaintConstraint,
+    RenderPaintTokens,
+} from "../rendering/render-appearance";
+import type {
+    ColorMode,
+    ResolvedAppearanceSettings,
+    ResolvedMetricColorSettings,
+    ResolvedMetricSolidChannelColors,
+} from "./resolved-settings";
+import type { MetricColorChannel } from "./appearance-overrides";
 
 const MINIMUM_THRESHOLD = 0;
 const MAXIMUM_THRESHOLD = 100;
 const BLACK_WHITE_PAINT = "#e6e6e6";
+const DEFAULT_BACKGROUND_PAINT = "#0f0f0f";
+const BLACK_WHITE_SOLID_BACKGROUND_PAINT = "#222222";
+const BLACK_WHITE_SOFT_TRIANGLE_LOW_PAINT = "#161616";
+const BLACK_WHITE_SOFT_TRIANGLE_MEDIUM_PAINT = "#2c2c2c";
+const BLACK_WHITE_SOFT_TRIANGLE_HIGH_PAINT = "#444444";
 
-export function buildMetricVisualSettings(
+const DEFAULT_RENDER_PAINT_TOKENS = {
+    background: DEFAULT_BACKGROUND_PAINT,
+    surface: "rgba(255,255,255,0.08)",
+    primaryText: "rgba(255,255,255,0.94)",
+    secondaryText: "rgba(255,255,255,0.72)",
+    mutedText: "rgba(255,255,255,0.48)",
+    icon: "rgba(255,255,255,0.88)",
+    track: "rgba(255,255,255,0.14)",
+    grid: "rgba(255,255,255,0.18)",
+    divider: "rgba(255,255,255,0.18)",
+} satisfies Omit<RenderPaintTokens, "backgroundFill" | "primaryMetric">;
+
+const solidColorKeyByChannel = {
+    usage: "usageColor",
+    download: "downloadColor",
+    upload: "uploadColor",
+    diskRead: "diskReadColor",
+    diskWrite: "diskWriteColor",
+} satisfies Record<MetricColorChannel, keyof ResolvedMetricSolidChannelColors>;
+
+export function buildMetricRenderAppearance(
     settings: ResolvedAppearanceSettings,
-): ResolvedMetricVisualSettings {
-    const colorConfig = buildColorConfigFromRamp({
-        colorMode: settings.colorMode,
-        colors: settings.usageColors,
-        lowThreshold: settings.lowColorThresholdPercent,
-        highThreshold: settings.highColorThresholdPercent,
-    });
+): MetricRenderAppearance {
+    const paintConstraint = settings.metricColor.colorMode === "black-white" ? "black-white" : "none";
 
     return {
-        graphicType: settings.viewLayout,
-        circleStyle: settings.circleStyle,
-        graphicStyle: settings.theme,
-        paintConstraint: settings.colorMode === "black-white" ? "black-white" : "none",
-        paints: buildRenderPaintTokens(colorConfig),
-        lineSmoothingPercent: settings.lineSmoothingPercent,
-        gridLineVisibility: settings.gridLineVisibility,
-        gridLineType: settings.gridLineType,
+        graphicType: settings.graph.viewLayout,
+        circleStyle: settings.graph.circleStyle,
+        graphicStyle: settings.theme.selectedTheme,
+        paintConstraint,
+        paints: buildRenderPaintTokens(settings, paintConstraint),
+        lineSmoothingPercent: settings.sparkline.lineSmoothingPercent,
+        gridLineVisibility: settings.sparkline.gridLineVisibility,
+        gridLineType: settings.sparkline.gridLineType,
     };
 }
 
-export function mergeMetricVisualSettings(
-    settings: MetricVisualSettings,
-    override: MetricVisualSettingsOverride | undefined,
-): MetricVisualSettings {
-    if (!override) {
-        return settings;
+export function buildColorConfigFromMetricColor(
+    metricColor: ResolvedMetricColorSettings,
+    channel: MetricColorChannel,
+): ColorConfig {
+    const solidColorKey = solidColorKeyByChannel[channel];
+    const colorConfigMode = metricColor.colorMode === "solid" ? "solid" : "threshold";
+    const multiColor = metricColor.multiColor.colors[channel];
+    const isGradientEnabled = metricColor.colorMode === "solid"
+        ? metricColor.solid.isGradientEnabled
+        : metricColor.multiColor.isGradientEnabled;
+    const baseColorConfig: ColorConfig = {
+        mode: colorConfigMode,
+        solidColor: metricColor.solid.colors[solidColorKey],
+        thresholds: buildThresholds({
+            lowThreshold: metricColor.multiColor.lowThresholdPercent,
+            highThreshold: metricColor.multiColor.highThresholdPercent,
+            lowColor: multiColor.lowColor,
+            mediumColor: multiColor.mediumColor,
+            highColor: multiColor.highColor,
+        }),
+        isGradientEnabled,
+    };
+
+    return lowerColorConfigForColorMode(metricColor.colorMode, baseColorConfig);
+}
+
+export function buildColorConfigFromAppearance(
+    appearance: ResolvedAppearanceSettings,
+    channel: MetricColorChannel,
+): ColorConfig {
+    const colorConfig = buildColorConfigFromMetricColor(appearance.metricColor, channel);
+
+    if (appearance.theme.selectedTheme !== "color-filled") {
+        return colorConfig;
     }
 
     return {
-        ...settings,
-        ...override,
-        usageColors: mergeColorRamp(settings.usageColors, override.usageColors),
-        downloadColors: mergeColorRamp(settings.downloadColors, override.downloadColors),
-        uploadColors: mergeColorRamp(settings.uploadColors, override.uploadColors),
-        diskReadColors: mergeColorRamp(settings.diskReadColors, override.diskReadColors),
-        diskWriteColors: mergeColorRamp(settings.diskWriteColors, override.diskWriteColors),
+        mode: "solid",
+        solidColor: BLACK_WHITE_PAINT,
+        thresholds: [],
+        isGradientEnabled: false,
     };
 }
 
-export function buildColorConfigFromRamp(options: {
-    readonly colorMode: ColorMode;
-    readonly colors: ResolvedColorRamp;
-    readonly lowThreshold: number;
-    readonly highThreshold: number;
-}): ColorConfig {
-    const colorConfigMode = options.colorMode === "solid" ? "solid" : "threshold";
-    const baseColorConfig: ColorConfig = {
-        mode: colorConfigMode,
-        solidColor: options.colors.solidColor,
-        thresholds: buildThresholds({
-            lowThreshold: options.lowThreshold,
-            highThreshold: options.highThreshold,
-            lowColor: options.colors.lowColor,
-            mediumColor: options.colors.mediumColor,
-            highColor: options.colors.highColor,
-        }),
-    };
-
-    return lowerColorConfigForColorMode(options.colorMode, baseColorConfig);
-}
-
-export function resolveSolidVisualOverrideColorMode(colorMode: ColorMode): ColorMode {
+export function resolveSolidMetricColorMode(colorMode: ColorMode): ColorMode {
     return colorMode === "black-white" ? "black-white" : "solid";
 }
 
@@ -121,31 +116,71 @@ function lowerColorConfigForColorMode(colorMode: ColorMode, colorConfig: ColorCo
         mode: "solid",
         solidColor: BLACK_WHITE_PAINT,
         thresholds: [],
+        isGradientEnabled: false,
     };
 }
 
-function buildRenderPaintTokens(primaryMetric: ColorConfig): RenderPaintTokens {
+function buildRenderPaintTokens(
+    settings: ResolvedAppearanceSettings,
+    paintConstraint: RenderPaintConstraint,
+): RenderPaintTokens {
+    const primaryMetric = buildColorConfigFromAppearance(settings, "usage");
+    const backgroundFill = buildRenderBackgroundFill(settings);
+
+    if (paintConstraint === "black-white") {
+        return {
+            ...DEFAULT_RENDER_PAINT_TOKENS,
+            backgroundFill: lowerBackgroundFillToBlackWhite(backgroundFill),
+            primaryMetric,
+        };
+    }
+
     return {
-        background: "#0f0f0f",
-        surface: "rgba(255,255,255,0.08)",
-        primaryText: "rgba(255,255,255,0.94)",
-        secondaryText: "rgba(255,255,255,0.72)",
-        mutedText: "rgba(255,255,255,0.48)",
-        icon: "rgba(255,255,255,0.88)",
+        ...DEFAULT_RENDER_PAINT_TOKENS,
+        backgroundFill,
         primaryMetric,
-        track: "rgba(255,255,255,0.14)",
-        grid: "rgba(255,255,255,0.18)",
-        divider: "rgba(255,255,255,0.18)",
     };
 }
 
-function mergeColorRamp(
-    colors: ResolvedColorRamp,
-    override: Partial<ResolvedColorRamp> | undefined,
-): ResolvedColorRamp {
+function buildRenderBackgroundFill(settings: ResolvedAppearanceSettings): RenderBackgroundFill | undefined {
+    if (settings.theme.selectedTheme !== "color-filled") {
+        return undefined;
+    }
+
+    if (settings.metricColor.colorMode === "solid") {
+        return {
+            fillKind: "solid",
+            color: settings.theme.colorFilled.solid.color,
+            isGradientEnabled: settings.theme.colorFilled.solid.isGradientEnabled,
+        };
+    }
+
     return {
-        ...colors,
-        ...override,
+        fillKind: "soft-triangle",
+        lowColor: settings.theme.colorFilled.multiColor.colors.lowColor,
+        mediumColor: settings.theme.colorFilled.multiColor.colors.mediumColor,
+        highColor: settings.theme.colorFilled.multiColor.colors.highColor,
+        isGradientEnabled: settings.theme.colorFilled.multiColor.isGradientEnabled,
+    };
+}
+
+function lowerBackgroundFillToBlackWhite(backgroundFill: RenderBackgroundFill | undefined): RenderBackgroundFill | undefined {
+    if (!backgroundFill) {
+        return undefined;
+    }
+
+    if (backgroundFill.fillKind === "solid") {
+        return {
+            ...backgroundFill,
+            color: BLACK_WHITE_SOLID_BACKGROUND_PAINT,
+        };
+    }
+
+    return {
+        ...backgroundFill,
+        lowColor: BLACK_WHITE_SOFT_TRIANGLE_LOW_PAINT,
+        mediumColor: BLACK_WHITE_SOFT_TRIANGLE_MEDIUM_PAINT,
+        highColor: BLACK_WHITE_SOFT_TRIANGLE_HIGH_PAINT,
     };
 }
 

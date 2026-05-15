@@ -4,6 +4,7 @@ import type { VisibilityContext } from "../inspector/types";
 export interface WidgetSettingsPanelProps {
     context: VisibilityContext;
     onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
-    layoutStyleDisabled?: boolean | undefined;
+    graphDisabled?: boolean | undefined;
+    themeDisabled?: boolean | undefined;
     colorDisabled?: boolean | undefined;
 }

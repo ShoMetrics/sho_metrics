@@ -1,4 +1,5 @@
 import { rasterizeSvgToPngDataUrl } from "../rendering/rasterizer";
+import type { MetricRenderAppearance } from "../rendering/render-appearance";
 import type { DualChannelWidgetData, WidgetData } from "../rendering/widget-data";
 import { renderDualMetricBodyView } from "../rendering/dual-metric-view";
 import { renderMetricFrame } from "../rendering/metric-frame";
@@ -16,6 +17,7 @@ import {
     type SingleMetricDisplayOptions,
 } from "./display-model";
 import { logger } from "../logging/logger";
+import type { ResolvedAppearanceSettings } from "../settings/resolved-settings";
 import { DisplayUpdateQueue, type DisplayUpdatePriority } from "./update-queue";
 import {
     dispatchMetricDisplayImage,
@@ -24,11 +26,7 @@ import {
 import {
     recordDisplayPerformanceSample,
 } from "./display-update-observability";
-import {
-    buildMetricVisualSettings,
-    type MetricVisualSettings,
-    type ResolvedMetricVisualSettings,
-} from "../settings/visual-adapter";
+import { buildMetricRenderAppearance } from "../settings/visual-adapter";
 
 const log = logger.for("MetricDisplayRunner");
 
@@ -129,7 +127,7 @@ function runMetricDisplayUpdate(
             "settingsDisplayRenderStart",
             `actionId=${options.event.action.id}`,
             `metricKey=${options.metricKey}`,
-            `graphicType=${renderPlan.visualSettings.graphicType}`,
+            `graphicType=${renderPlan.renderAppearance.graphicType}`,
             `queuedMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, renderStartTimestampMilliseconds)}`,
             `activeUpdates=${activeDisplayUpdateCount}`,
             `queueLength=${displayActionQueue.length}`,
@@ -151,7 +149,7 @@ function runMetricDisplayUpdate(
                 "settingsDisplaySkippedUnchanged",
                 `actionId=${options.event.action.id}`,
                 `metricKey=${options.metricKey}`,
-                `graphicType=${renderPlan.visualSettings.graphicType}`,
+                `graphicType=${renderPlan.renderAppearance.graphicType}`,
                 `queuedMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, renderStartTimestampMilliseconds)}`,
                 `composeMs=${composeEndTimestampMilliseconds - renderStartTimestampMilliseconds}`,
                 `totalMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, composeEndTimestampMilliseconds)}`,
@@ -266,7 +264,7 @@ function runMetricDisplayUpdate(
                         `phase=${dispatchResult.donePhase}`,
                         `actionId=${options.event.action.id}`,
                         `metricKey=${options.metricKey}`,
-                        `graphicType=${renderPlan.visualSettings.graphicType}`,
+                        `graphicType=${renderPlan.renderAppearance.graphicType}`,
                         `queuedMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, renderStartTimestampMilliseconds)}`,
                         `composeMs=${composeEndTimestampMilliseconds - renderStartTimestampMilliseconds}`,
                         `rasterizeMs=${rasterizeEndTimestampMilliseconds - composeEndTimestampMilliseconds}`,
@@ -311,9 +309,9 @@ function composeMetricDisplayFrame(options: {
     return {
         svg: renderMetricFrame({
             body: body.svg,
-            graphicStyle: renderPlan.visualSettings.graphicStyle,
+            graphicStyle: renderPlan.renderAppearance.graphicStyle,
             muted: body.muted,
-            paints: renderPlan.visualSettings.paints,
+            paints: renderPlan.renderAppearance.paints,
             size: renderPlan.renderSize,
         }),
         renderedMetricData: body.renderedMetricData,
@@ -334,7 +332,7 @@ function composeSingleMetricBody(
     return {
         svg: renderSingleMetricBodyView({
             data: renderedMetricData,
-            visual: renderPlan.visualSettings,
+            visual: renderPlan.renderAppearance,
             renderSize: renderPlan.renderSize,
             centerIcon: options.centerIconFragment,
             footerIcon: options.footerIconFragment,
@@ -359,7 +357,7 @@ function composeDualMetricBody(
     return {
         svg: renderDualMetricBodyView({
             data: renderedMetricData,
-            visual: renderPlan.visualSettings,
+            visual: renderPlan.renderAppearance,
             graphicType: options.dualGraphicType ?? "sparkline",
             renderSize: renderPlan.renderSize,
             titleText: options.titleText,
@@ -446,34 +444,34 @@ function recordDisplayUpdate(displayActionState: DisplayActionState, options: Me
     ].join(" "));
 }
 
-function buildMetricDisplaySettingsSignature(settings: MetricVisualSettings): {
-    readonly graphicType: ResolvedMetricVisualSettings["graphicType"];
+function buildMetricDisplaySettingsSignature(settings: ResolvedAppearanceSettings): {
+    readonly graphicType: MetricRenderAppearance["graphicType"];
     readonly signature: string;
 } {
-    const visualSettings = buildMetricVisualSettings(settings);
+    const renderAppearance = buildMetricRenderAppearance(settings);
 
     return {
-        graphicType: visualSettings.graphicType,
+        graphicType: renderAppearance.graphicType,
         signature: [
-            `graphicType=${visualSettings.graphicType}`,
-            `circleStyle=${visualSettings.circleStyle}`,
-            `graphicStyle=${visualSettings.graphicStyle}`,
-            `paintConstraint=${visualSettings.paintConstraint}`,
-            `background=${visualSettings.paints.background}`,
-            `surface=${visualSettings.paints.surface}`,
-            `primaryText=${visualSettings.paints.primaryText}`,
-            `secondaryText=${visualSettings.paints.secondaryText}`,
-            `mutedText=${visualSettings.paints.mutedText}`,
-            `icon=${visualSettings.paints.icon}`,
-            `track=${visualSettings.paints.track}`,
-            `grid=${visualSettings.paints.grid}`,
-            `divider=${visualSettings.paints.divider}`,
-            `metricPaintMode=${visualSettings.paints.primaryMetric.mode}`,
-            `metricSolidPaint=${visualSettings.paints.primaryMetric.solidColor}`,
-            `metricThresholdPaints=${visualSettings.paints.primaryMetric.thresholds.map(threshold => threshold.color).join(",")}`,
-            `lineSmoothingPercent=${visualSettings.lineSmoothingPercent}`,
-            `gridLineVisibility=${visualSettings.gridLineVisibility}`,
-            `gridLineType=${visualSettings.gridLineType}`,
+            `graphicType=${renderAppearance.graphicType}`,
+            `circleStyle=${renderAppearance.circleStyle}`,
+            `graphicStyle=${renderAppearance.graphicStyle}`,
+            `paintConstraint=${renderAppearance.paintConstraint}`,
+            `background=${renderAppearance.paints.background}`,
+            `surface=${renderAppearance.paints.surface}`,
+            `primaryText=${renderAppearance.paints.primaryText}`,
+            `secondaryText=${renderAppearance.paints.secondaryText}`,
+            `mutedText=${renderAppearance.paints.mutedText}`,
+            `icon=${renderAppearance.paints.icon}`,
+            `track=${renderAppearance.paints.track}`,
+            `grid=${renderAppearance.paints.grid}`,
+            `divider=${renderAppearance.paints.divider}`,
+            `metricPaintMode=${renderAppearance.paints.primaryMetric.mode}`,
+            `metricSolidPaint=${renderAppearance.paints.primaryMetric.solidColor}`,
+            `metricThresholdPaints=${renderAppearance.paints.primaryMetric.thresholds.map(threshold => threshold.color).join(",")}`,
+            `lineSmoothingPercent=${renderAppearance.lineSmoothingPercent}`,
+            `gridLineVisibility=${renderAppearance.gridLineVisibility}`,
+            `gridLineType=${renderAppearance.gridLineType}`,
         ].join(";"),
     };
 }

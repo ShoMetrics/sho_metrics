@@ -14,12 +14,19 @@ export const pollingFrequencyOptionList = [
 export const graphicStyleOptionList = [
     { value: "flat", label: "Default" },
     { value: "cupertino-glass", label: "Cupertino Glass Style" },
+    { value: "color-filled", label: "Color Filled" },
 ] as const satisfies readonly SelectOption[];
 
-export const colorModeOptionList = [
-    { value: "threshold", label: "Dynamic (By Percentage)" },
+export const metricColorModeOptionList = [
+    { value: "multi-color", label: "Range Colors" },
     { value: "solid", label: "Solid Color" },
-    { value: "black-white", label: "B&W" },
+    { value: "black-white", label: "Black & White" },
+] as const satisfies readonly SelectOption[];
+
+export const colorFilledColorModeOptionList = [
+    { value: "multi-color", label: "Color Mix" },
+    { value: "solid", label: "Solid Color" },
+    { value: "black-white", label: "Black & White" },
 ] as const satisfies readonly SelectOption[];
 
 export const gridLineVisibilityOptionList = [

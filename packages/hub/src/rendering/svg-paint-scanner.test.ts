@@ -3,22 +3,22 @@ import test from "node:test";
 import { resolveColorForThresholdValue } from "./color-resolver";
 import { renderDualMetricBodyView } from "./dual-metric-view";
 import { renderMetricFrame } from "./metric-frame";
+import type { MetricRenderAppearance } from "./render-appearance";
 import { renderSingleMetricBodyView } from "./single-metric-view";
 import {
     scanChromaticSvgPaintValues,
 } from "./svg-paint-scanner";
 import type { DualChannelWidgetData, WidgetData } from "./widget-data";
 import { WIDGET_LOGICAL_SIZE } from "./widget-data";
-import type { ResolvedAppearanceSettings } from "../settings/resolved-settings";
-import { buildSampleResolvedAppearanceSettings } from "../settings/sample-appearance-settings";
-import {
-    buildMetricVisualSettings,
-    type ResolvedMetricVisualSettings,
-} from "../settings/visual-adapter";
 import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
 import { getHardwareIconFragment } from "../widgets/icons/hardware-icons";
 import { getMetricStatusIcon } from "../widgets/icons/metric-status-icons";
 import { renderNetworkDirectionIconFragment } from "../widgets/icons/catalog/network";
+
+type TestCircleStyle = MetricRenderAppearance["circleStyle"];
+type TestGraphicStyle = MetricRenderAppearance["graphicStyle"];
+type TestGridLineType = MetricRenderAppearance["gridLineType"];
+type TestSingleGraphicType = MetricRenderAppearance["graphicType"];
 
 test("SVG paint scanner rejects chromatic paint values without scanning SVG ids", () => {
     const findings = scanChromaticSvgPaintValues(`
@@ -109,6 +109,14 @@ test("black-white representative final SVG outputs contain no chromatic paint", 
             }),
         },
         {
+            name: "color filled soft triangle",
+            svg: renderSingleFinalSvg({
+                viewLayout: "circular",
+                theme: "color-filled",
+                centerIcon: getHardwareIconFragment("cpu"),
+            }),
+        },
+        {
             name: "flat dual circular gauge",
             svg: renderDualFinalSvg({
                 theme: "flat",
@@ -131,19 +139,19 @@ test("black-white representative final SVG outputs contain no chromatic paint", 
 });
 
 function renderSingleFinalSvg(options: {
-    viewLayout: ResolvedAppearanceSettings["viewLayout"];
-    theme: ResolvedAppearanceSettings["theme"];
-    circleStyle?: ResolvedAppearanceSettings["circleStyle"];
-    gridLineType?: ResolvedAppearanceSettings["gridLineType"];
+    viewLayout: TestSingleGraphicType;
+    theme: TestGraphicStyle;
+    circleStyle?: TestCircleStyle;
+    gridLineType?: TestGridLineType;
     data?: WidgetData;
     centerIcon?: string;
     footerIcon?: string;
     linearIcon?: string;
     statusIcon?: ArcGaugeStatusIcon;
 }): string {
-    const visualSettings = buildBlackWhiteVisualSettings({
-        viewLayout: options.viewLayout,
-        theme: options.theme,
+    const visualSettings = buildBlackWhiteRenderAppearance({
+        graphicType: options.viewLayout,
+        graphicStyle: options.theme,
         circleStyle: options.circleStyle ?? "value",
         gridLineType: options.gridLineType ?? "horizontal",
     });
@@ -168,13 +176,13 @@ function renderSingleFinalSvg(options: {
 }
 
 function renderDualFinalSvg(options: {
-    theme: ResolvedAppearanceSettings["theme"];
+    theme: TestGraphicStyle;
     graphicType: "circular" | "text" | "sparkline";
-    circleStyle?: ResolvedAppearanceSettings["circleStyle"];
+    circleStyle?: TestCircleStyle;
 }): string {
-    const visualSettings = buildBlackWhiteVisualSettings({
-        viewLayout: options.graphicType === "text" ? "text" : options.graphicType,
-        theme: options.theme,
+    const visualSettings = buildBlackWhiteRenderAppearance({
+        graphicType: options.graphicType,
+        graphicStyle: options.theme,
         circleStyle: options.circleStyle ?? "value",
     });
     const channelColor = resolveColorForThresholdValue(50, visualSettings.paints.primaryMetric);
@@ -217,13 +225,47 @@ function renderDualFinalSvg(options: {
     });
 }
 
-function buildBlackWhiteVisualSettings(
-    overrides: Partial<ResolvedAppearanceSettings>,
-): ResolvedMetricVisualSettings {
-    return buildMetricVisualSettings(buildSampleResolvedAppearanceSettings({
-        ...overrides,
-        colorMode: "black-white",
-    }));
+function buildBlackWhiteRenderAppearance(options: {
+    graphicType: TestSingleGraphicType;
+    graphicStyle: TestGraphicStyle;
+    circleStyle: TestCircleStyle;
+    gridLineType?: TestGridLineType | undefined;
+}): MetricRenderAppearance {
+    return {
+        graphicType: options.graphicType,
+        circleStyle: options.circleStyle,
+        graphicStyle: options.graphicStyle,
+        paintConstraint: "black-white",
+        paints: {
+            background: "#0f0f0f",
+            backgroundFill: options.graphicStyle === "color-filled"
+                ? {
+                    fillKind: "soft-triangle",
+                    lowColor: "#161616",
+                    mediumColor: "#2c2c2c",
+                    highColor: "#444444",
+                    isGradientEnabled: true,
+                }
+                : undefined,
+            surface: "rgba(255,255,255,0.08)",
+            primaryText: "rgba(255,255,255,0.94)",
+            secondaryText: "rgba(255,255,255,0.72)",
+            mutedText: "rgba(255,255,255,0.48)",
+            icon: "rgba(255,255,255,0.88)",
+            primaryMetric: {
+                mode: "solid",
+                solidColor: "#e6e6e6",
+                thresholds: [],
+                isGradientEnabled: false,
+            },
+            track: "rgba(255,255,255,0.14)",
+            grid: "rgba(255,255,255,0.18)",
+            divider: "rgba(255,255,255,0.18)",
+        },
+        lineSmoothingPercent: 75,
+        gridLineVisibility: "adaptive",
+        gridLineType: options.gridLineType ?? "horizontal",
+    };
 }
 
 function buildDualChannelData(): DualChannelWidgetData {

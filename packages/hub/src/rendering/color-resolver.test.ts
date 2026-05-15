@@ -14,6 +14,7 @@ const thresholdConfig: ColorConfig = {
         { min: 50, max: 80, color: "#ffff00" },
         { min: 80, max: 101, color: "#ff0000" },
     ],
+    isGradientEnabled: true,
 };
 
 test("solid color mode ignores thresholds", () => {
@@ -38,6 +39,7 @@ test("threshold color mode falls back to the last threshold color", () => {
         mode: "threshold",
         solidColor: "#123456",
         thresholds: [],
+        isGradientEnabled: true,
     });
 
     assert.equal(highColor, "#ff0000");
@@ -53,6 +55,18 @@ test("gradient stops produce paired stops at threshold transitions", () => {
         { offset: 0.5, color: "#ffff00" },
         { offset: 1, color: "#ffff00" },
         { offset: 1, color: "#ff0000" },
+        { offset: 1, color: "#ff0000" },
+    ]);
+});
+
+test("disabled gradient stops use the latest threshold color as a flat paint", () => {
+    const gradientStops = buildGradientStops([10, 60, 90], {
+        ...thresholdConfig,
+        isGradientEnabled: false,
+    });
+
+    assert.deepEqual(gradientStops, [
+        { offset: 0, color: "#ff0000" },
         { offset: 1, color: "#ff0000" },
     ]);
 });

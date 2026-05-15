@@ -36,7 +36,7 @@ export const DEFAULT_SPARKLINE_CONFIG: SparklineConfig = {
         { min: 0, max: 50, color: "#22c55e" },
         { min: 50, max: 80, color: "#eab308" },
         { min: 80, max: 101, color: "#ef4444" },
-    ]},
+    ], isGradientEnabled: true },
     lineWidth: 2,
     fillOpacity: 0.58,
     lineSmoothingPercent: 75,
@@ -109,8 +109,12 @@ export const sparkline: Widget<SparklineConfig> = {
         const rawValues = buildRenderableValues(data);
         const visualValues = smoothSparklineValues(rawValues, config.lineSmoothingPercent);
         const currentColor = resolveColorForThresholdValue(data.current, config.colorConfig);
-        const lineHeadColor = adjustHexColorBrightness(currentColor, config.gradientHeadAdjustmentPercent ?? 28);
-        const lineTailColor = adjustHexColorBrightness(currentColor, -18);
+        const lineHeadColor = config.colorConfig.isGradientEnabled
+            ? adjustHexColorBrightness(currentColor, config.gradientHeadAdjustmentPercent ?? 28)
+            : currentColor;
+        const lineTailColor = config.colorConfig.isGradientEnabled
+            ? adjustHexColorBrightness(currentColor, -18)
+            : currentColor;
         const gradientIdSuffix = `${keySize.width}-${keySize.height}-${Math.round(data.current * 10)}-${rawValues.length}`;
         const lineGradientId = `sparkline-line-${gradientIdSuffix}`;
         const areaGradientId = `sparkline-area-${gradientIdSuffix}`;
@@ -144,10 +148,13 @@ export const sparkline: Widget<SparklineConfig> = {
         const dotSvg = config.showDots && latestPoint
             ? `<circle cx="${formatSvgNumber(latestPoint.xCoordinate)}" cy="${formatSvgNumber(latestPoint.yCoordinate)}" r="2.8" fill="${lineHeadColor}" />`
             : "";
+        const linePaint = config.colorConfig.isGradientEnabled ? `url(#${lineGradientId})` : currentColor;
+        const areaPaint = config.colorConfig.isGradientEnabled ? `url(#${areaGradientId})` : currentColor;
+        const areaOpacity = config.colorConfig.isGradientEnabled ? "" : ` opacity="${config.fillOpacity}"`;
 
         return `
             <defs>
-                <linearGradient id="${lineGradientId}" x1="0%" y1="100%" x2="100%" y2="0%">
+                ${config.colorConfig.isGradientEnabled ? `<linearGradient id="${lineGradientId}" x1="0%" y1="100%" x2="100%" y2="0%">
                     <stop offset="0%" stop-color="${lineTailColor}" />
                     <stop offset="72%" stop-color="${currentColor}" />
                     <stop offset="100%" stop-color="${lineHeadColor}" />
@@ -156,7 +163,7 @@ export const sparkline: Widget<SparklineConfig> = {
                     <stop offset="0%" stop-color="${lineHeadColor}" stop-opacity="${config.fillOpacity}" />
                     <stop offset="48%" stop-color="${currentColor}" stop-opacity="${config.fillOpacity * 0.48}" />
                     <stop offset="100%" stop-color="${currentColor}" stop-opacity="${config.fillOpacity * 0.14}" />
-                </linearGradient>
+                </linearGradient>` : ""}
                 <filter id="${glowFilterId}" x="-10%" y="-30%" width="120%" height="160%">
                     <feGaussianBlur in="SourceGraphic" stdDeviation="1.7" result="blurredLine" />
                     <feColorMatrix in="blurredLine" type="matrix"
@@ -191,13 +198,13 @@ export const sparkline: Widget<SparklineConfig> = {
                 textAnchor: layoutPlan.value.textAnchor,
                 valueExtraAttributes: ["font-variant-numeric=\"tabular-nums\""],
             })}
-            <path d="${areaPath}" fill="url(#${areaGradientId})" />
+            <path d="${areaPath}" fill="${areaPaint}"${areaOpacity} />
             ${gridLineSvg}
             ${latestPointGlowSvg}
-            <path d="${linePath}" fill="none" stroke="url(#${lineGradientId})"
+            <path d="${linePath}" fill="none" stroke="${linePaint}"
                 stroke-width="${Math.max(1, config.lineWidth + 1.4)}" stroke-linejoin="round"
                 stroke-linecap="round" filter="url(#${glowFilterId})" opacity="0.55" />
-            <path d="${linePath}" fill="none" stroke="url(#${lineGradientId})"
+            <path d="${linePath}" fill="none" stroke="${linePaint}"
                 stroke-width="${config.lineWidth}" stroke-linejoin="round" stroke-linecap="round"
                 stroke-dasharray="${config.dashPattern}" />
             ${dotSvg}

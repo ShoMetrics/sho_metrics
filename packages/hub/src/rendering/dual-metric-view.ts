@@ -1,6 +1,6 @@
 import type { ColorConfig } from "./color-resolver";
+import type { RenderPaintTokens } from "./render-appearance";
 import type { DualChannelWidgetData, KeySize } from "./widget-data";
-import type { RenderPaintTokens } from "../settings/visual-adapter";
 import type { ArcGaugeStatusIcon, ArcGaugeStyle } from "../widgets/primitives/arc-gauge";
 import {
     DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG,
@@ -96,6 +96,7 @@ function renderDualTextMetricView(options: DualMetricBodyViewProps): string {
 function renderDualSparklineMetric(options: DualMetricBodyViewProps): string {
     return renderDualChannelSparkline(options.data, {
         ...DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG,
+        colorConfig: options.visual.paints.primaryMetric,
         positiveColor: options.positive.color,
         negativeColor: options.negative.color,
         titleText: options.titleText,

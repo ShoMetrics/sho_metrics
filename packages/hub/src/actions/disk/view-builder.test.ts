@@ -15,7 +15,7 @@ test("disk usage display keeps explicit unavailable volume instead of falling ba
         resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings,
         {
             appearance: {
-                viewLayout: "linear",
+                graph: { viewLayout: "linear" },
             },
             disk: {
                 kind: "usage",

@@ -1,5 +1,5 @@
+import type { RenderPaintTokens } from "./render-appearance";
 import type { KeySize, WidgetData } from "./widget-data";
-import type { RenderPaintTokens } from "../settings/visual-adapter";
 import {
     arcGauge,
     DEFAULT_ARC_GAUGE_CONFIG,

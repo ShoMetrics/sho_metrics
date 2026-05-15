@@ -18,7 +18,7 @@ export function SparklineSettings({
     const appearance = context.resolved.widget.slot.appearance;
     const target = context.resolved.widget.slot.metric.target;
 
-    if (appearance.viewLayout !== "sparkline") {
+    if (appearance.graph.viewLayout !== "sparkline") {
         return null;
     }
 
@@ -41,12 +41,12 @@ export function SparklineSettings({
             <SectionHeading text="Visual Guides" />
             <RangeSetting
                 label="Trend Line Smoothing"
-                value={appearance.lineSmoothingPercent}
+                value={appearance.sparkline.lineSmoothingPercent}
                 minimum={0}
                 maximum={100}
                 step={5}
                 onValueChange={(lineSmoothingPercent) => onSettingsPatch({
-                    appearance: { lineSmoothingPercent },
+                    appearance: { sparkline: { lineSmoothingPercent } },
                 })}
             />
             {isMirroredNetworkTraffic ? (
@@ -56,7 +56,7 @@ export function SparklineSettings({
                         value="none"
                         optionList={disabledGridLineVisibilityOptionList}
                         onValueChange={(gridLineVisibility) => onSettingsPatch({
-                            appearance: { gridLineVisibility },
+                            appearance: { sparkline: { gridLineVisibility } },
                         })}
                         disabled
                     />
@@ -65,10 +65,10 @@ export function SparklineSettings({
                     </InspectorItem>
                     <SelectSetting
                         label="Grid Line Type"
-                        value={appearance.gridLineType}
+                        value={appearance.sparkline.gridLineType}
                         optionList={gridLineTypeOptionList}
                         onValueChange={(gridLineType) => onSettingsPatch({
-                            appearance: { gridLineType },
+                            appearance: { sparkline: { gridLineType } },
                         })}
                         disabled
                     />
@@ -77,10 +77,10 @@ export function SparklineSettings({
                 <>
                     <SelectSetting
                         label="Grid Line Visibility"
-                        value={appearance.gridLineVisibility}
+                        value={appearance.sparkline.gridLineVisibility}
                         optionList={gridLineVisibilityOptionList}
                         onValueChange={(gridLineVisibility) => onSettingsPatch({
-                            appearance: { gridLineVisibility },
+                            appearance: { sparkline: { gridLineVisibility } },
                         })}
                     />
                     <InspectorItem className="note-item note-item-caption">
@@ -88,12 +88,12 @@ export function SparklineSettings({
                     </InspectorItem>
                     <SelectSetting
                         label="Grid Line Type"
-                        value={appearance.gridLineType}
+                        value={appearance.sparkline.gridLineType}
                         optionList={gridLineTypeOptionList}
                         onValueChange={(gridLineType) => onSettingsPatch({
-                            appearance: { gridLineType },
+                            appearance: { sparkline: { gridLineType } },
                         })}
-                        disabled={appearance.gridLineVisibility === "none"}
+                        disabled={appearance.sparkline.gridLineVisibility === "none"}
                     />
                 </>
             )}

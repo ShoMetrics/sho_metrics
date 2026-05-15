@@ -19,8 +19,8 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.widgetKind, "singleMetric");
         assert.equal(settings.widget.slot.metric.target.domain, "cpu");
         assert.equal(settings.preferences.pollingFrequencySeconds, 1);
-        assert.equal(settings.widget.slot.appearance.viewLayout, "circular");
-        assert.equal(settings.widget.slot.appearance.usageColors.solidColor, "#3b82f6");
+        assert.equal(settings.widget.slot.appearance.graph.viewLayout, "circular");
+        assert.equal(settings.widget.slot.appearance.metricColor.solid.colors.usageColor, "#3b82f6");
     });
 
     it("cascades global defaults widget overrides and runtime maxima", () => {
@@ -43,8 +43,12 @@ describe("stored settings proto resolver", () => {
                     },
                     overrides: {
                         appearance: {
-                            usageColors: {
-                                solidColor: "#222222",
+                            metricColor: {
+                                solid: {
+                                    colors: {
+                                        usageColor: "#222222",
+                                    },
+                                },
                             },
                         },
                         network: {
@@ -64,7 +68,7 @@ describe("stored settings proto resolver", () => {
         });
         const target = settings.widget.slot.metric.target;
 
-        assert.equal(settings.widget.slot.appearance.usageColors.solidColor, "#222222");
+        assert.equal(settings.widget.slot.appearance.metricColor.solid.colors.usageColor, "#222222");
         assert.equal(target.domain, "network");
         assert.equal(target.reading.kind, "traffic");
         assert.equal(target.reading.direction, "download");
@@ -78,16 +82,22 @@ describe("stored settings proto resolver", () => {
         const storedGlobalSettings = readStoredGlobalSettings({
             overrides: {
                 enabled: true,
-                layoutStyle: {
-                    viewLayout: "SINGLE_METRIC_VIEW_LAYOUT_LINEAR",
-                    circleStyle: "CIRCLE_STYLE_GAUGE",
-                    theme: "METRIC_THEME_CUPERTINO_GLASS",
+                graph: {
+                    graph: {
+                        viewLayout: "SINGLE_METRIC_VIEW_LAYOUT_LINEAR",
+                        circleStyle: "CIRCLE_STYLE_GAUGE",
+                    },
+                },
+                theme: {
+                    theme: {
+                        selectedTheme: "METRIC_THEME_CUPERTINO_GLASS",
+                    },
                 },
                 color: {
-                    colors: {
-                        solidColor: "#111111",
-                    },
                     colorMode: "COLOR_MODE_SOLID",
+                    solid: {
+                        color: "#111111",
+                    },
                 },
             },
         }).settings;
@@ -99,9 +109,15 @@ describe("stored settings proto resolver", () => {
                 slot: {
                     overrides: {
                         appearance: {
-                            viewLayout: "SINGLE_METRIC_VIEW_LAYOUT_SPARKLINE",
-                            usageColors: {
-                                solidColor: "#222222",
+                            graph: {
+                                viewLayout: "SINGLE_METRIC_VIEW_LAYOUT_SPARKLINE",
+                            },
+                            metricColor: {
+                                solid: {
+                                    colors: {
+                                        usageColor: "#222222",
+                                    },
+                                },
                             },
                         },
                     },
@@ -115,11 +131,11 @@ describe("stored settings proto resolver", () => {
         });
 
         assert.equal(settings.preferences.pollingFrequencySeconds, 15);
-        assert.equal(settings.widget.slot.appearance.viewLayout, "linear");
-        assert.equal(settings.widget.slot.appearance.circleStyle, "gauge");
-        assert.equal(settings.widget.slot.appearance.theme, "cupertino-glass");
-        assert.equal(settings.widget.slot.appearance.colorMode, "solid");
-        assert.equal(settings.widget.slot.appearance.usageColors.solidColor, "#111111");
+        assert.equal(settings.widget.slot.appearance.graph.viewLayout, "linear");
+        assert.equal(settings.widget.slot.appearance.graph.circleStyle, "gauge");
+        assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "cupertino-glass");
+        assert.equal(settings.widget.slot.appearance.metricColor.colorMode, "solid");
+        assert.equal(settings.widget.slot.appearance.metricColor.solid.colors.usageColor, "#111111");
     });
 
     it("resolves black-white as a user-facing color mode", () => {
@@ -128,7 +144,9 @@ describe("stored settings proto resolver", () => {
                 slot: {
                     overrides: {
                         appearance: {
-                            colorMode: "COLOR_MODE_BLACK_WHITE",
+                            metricColor: {
+                                colorMode: "COLOR_MODE_BLACK_WHITE",
+                            },
                         },
                     },
                 },
@@ -139,14 +157,17 @@ describe("stored settings proto resolver", () => {
             storedWidgetSettings,
         });
 
-        assert.equal(settings.widget.slot.appearance.colorMode, "black-white");
+        assert.equal(settings.widget.slot.appearance.metricColor.colorMode, "black-white");
     });
 
     it("applies global color override without replacing widget layout and style", () => {
         const storedGlobalSettings = readStoredGlobalSettings({
             overrides: {
                 enabled: true,
-                layoutStyle: {
+                graph: {
+                    enabled: false,
+                },
+                theme: {
                     enabled: false,
                 },
                 color: {
@@ -159,11 +180,19 @@ describe("stored settings proto resolver", () => {
                 slot: {
                     overrides: {
                         appearance: {
-                            viewLayout: "SINGLE_METRIC_VIEW_LAYOUT_SPARKLINE",
-                            theme: "METRIC_THEME_CUPERTINO_GLASS",
-                            colorMode: "COLOR_MODE_SOLID",
-                            usageColors: {
-                                solidColor: "#222222",
+                            graph: {
+                                viewLayout: "SINGLE_METRIC_VIEW_LAYOUT_SPARKLINE",
+                            },
+                            theme: {
+                                selectedTheme: "METRIC_THEME_CUPERTINO_GLASS",
+                            },
+                            metricColor: {
+                                colorMode: "COLOR_MODE_SOLID",
+                                solid: {
+                                    colors: {
+                                        usageColor: "#222222",
+                                    },
+                                },
                             },
                         },
                     },
@@ -176,10 +205,10 @@ describe("stored settings proto resolver", () => {
             storedGlobalSettings,
         });
 
-        assert.equal(settings.widget.slot.appearance.viewLayout, "sparkline");
-        assert.equal(settings.widget.slot.appearance.theme, "cupertino-glass");
-        assert.equal(settings.widget.slot.appearance.colorMode, "black-white");
-        assert.equal(settings.widget.slot.appearance.usageColors.solidColor, "#3b82f6");
+        assert.equal(settings.widget.slot.appearance.graph.viewLayout, "sparkline");
+        assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "cupertino-glass");
+        assert.equal(settings.widget.slot.appearance.metricColor.colorMode, "black-white");
+        assert.equal(settings.widget.slot.appearance.metricColor.solid.colors.usageColor, "#3b82f6");
     });
 
     it("uses kind switches for disk metric branches", () => {

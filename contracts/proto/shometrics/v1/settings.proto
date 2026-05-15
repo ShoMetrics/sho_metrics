@@ -288,21 +288,143 @@ message GlobalDefaults {
 }
 
 message GlobalOverrides {
-  // Main switch for global override. When enabled, omitted subsection
-  // enabled fields resolve to enabled so one click applies both layout/style
-  // and color overrides.
+  // Main switch for global override. When enabled, omitted subsection enabled
+  // fields resolve to enabled so one click applies graph, theme, and color
+  // overrides.
   optional bool enabled = 1;
-  GlobalLayoutStyleOverride layout_style = 2;
-  GlobalColorOverride color = 3;
+  GlobalGraphOverride graph = 2;
+  GlobalThemeOverride theme = 3;
+  GlobalColorOverride color = 4;
 }
 
-// AppearanceSettings describes the visual presentation of one metric.
-// Multi-metric spatial layouts, such as a touch strip with two circular meters,
-// belong in a future StoredWidgetSettings widget arm, not in MetricViewLayout.
-//
-// Channel colors are named fields while the channel set is fixed. If channels
-// become user-defined, replace them with a map keyed by stable channel IDs.
+// AppearanceSettings describes the visual presentation of one metric. It is
+// grouped by user-facing domains instead of flattening graph, theme, color, and
+// sparkline settings into one broad message.
 message AppearanceSettings {
+  AppearanceGraphSettings graph = 1;
+  AppearanceThemeSettings theme = 2;
+  MetricColorSettings metric_color = 3;
+  SparklineAppearanceSettings sparkline = 4;
+}
+
+message AppearanceGraphSettings {
+  // Single-metric view layout. Composite layouts, such as a touch strip with
+  // two circular meters, should be modeled as a future StoredWidgetSettings
+  // widget oneof arm instead of being added here.
+  optional SingleMetricViewLayout view_layout = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+
+  optional CircleStyle circle_style = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}
+
+message AppearanceThemeSettings {
+  // Theme is a user-facing visual theme, not a renderer primitive name. New
+  // themes should be enum additions here and mapped to renderer contracts by
+  // the visual adapter.
+  optional MetricTheme selected_theme = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+
+  ColorFilledThemeSettings color_filled = 2;
+}
+
+message ColorFilledThemeSettings {
+  // Color Filled theme colors are background fill intent. They are independent
+  // from metric colors so switching themes does not rewrite ordinary metric
+  // paint preferences.
+  ColorFilledSolidSettings solid = 1;
+  ColorFilledMultiColorSettings multi_color = 2;
+}
+
+message ColorFilledSolidSettings {
+  optional string color = 1 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+
+  // When unset, the resolver enables smooth gradients for the filled
+  // background.
+  optional bool gradient_enabled = 2;
+}
+
+message ColorFilledMultiColorSettings {
+  MultiColorSet colors = 1;
+
+  // When unset, the resolver enables smooth gradients for the filled
+  // background.
+  optional bool gradient_enabled = 2;
+}
+
+message MetricColorSettings {
+  // User-facing metric color treatment. Multi-color means value-driven metric
+  // color bands for ordinary metric graphics; B&W is a final paint constraint
+  // applied by the visual adapter.
+  optional ColorMode color_mode = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+
+  MetricSolidColorSettings solid = 2;
+  MetricMultiColorSettings multi_color = 3;
+}
+
+message MetricSolidColorSettings {
+  MetricSolidChannelColors colors = 1;
+
+  // When unset, the resolver enables smooth gradients for solid metric paint.
+  optional bool gradient_enabled = 2;
+}
+
+message MetricSolidChannelColors {
+  // Channel colors are named fields while the channel set is fixed. If
+  // channels become user-defined, replace them with a repeated message keyed
+  // by stable channel IDs.
+  optional string usage_color = 1 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+  optional string download_color = 2 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+  optional string upload_color = 3 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+  optional string disk_read_color = 4 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+  optional string disk_write_color = 5 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+}
+
+message MetricMultiColorSettings {
+  option (buf.validate.message).cel = {
+    id: "multi_color_threshold_order"
+    message: "low_threshold_percent must be less than or equal to high_threshold_percent"
+    expression:
+      "!has(this.low_threshold_percent) || !has(this.high_threshold_percent) || "
+      "this.low_threshold_percent <= this.high_threshold_percent"
+  };
+
+  MetricMultiColorChannelColors colors = 1;
+
+  // Color thresholds are normalized percentage stops for multi-color band selection,
+  // not alert rules and not raw metric values such as Celsius, watts, or ms.
+  optional uint32 low_threshold_percent = 2 [(buf.validate.field).uint32.lte = 100];
+  optional uint32 high_threshold_percent = 3 [(buf.validate.field).uint32.lte = 100];
+
+  // When unset, the resolver enables smooth gradients for multi-color metric
+  // paint.
+  optional bool gradient_enabled = 4;
+}
+
+message MetricMultiColorChannelColors {
+  MultiColorSet usage = 1;
+  MultiColorSet download = 2;
+  MultiColorSet upload = 3;
+  MultiColorSet disk_read = 4;
+  MultiColorSet disk_write = 5;
+}
+
+message MultiColorSet {
+  optional string low_color = 1 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+  optional string medium_color = 2 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+  optional string high_color = 3 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+}
+
+message SparklineAppearanceSettings {
   enum GridLineVisibility {
     GRID_LINE_VISIBILITY_UNSPECIFIED = 0;
     GRID_LINE_VISIBILITY_ADAPTIVE = 1;
@@ -316,78 +438,29 @@ message AppearanceSettings {
     GRID_LINE_TYPE_VERTICAL = 2;
   }
 
-  option (buf.validate.message).cel = {
-    id: "color_threshold_order"
-    message: "low_color_threshold_percent must be less than or equal to high_color_threshold_percent"
-    expression:
-      "!has(this.low_color_threshold_percent) || !has(this.high_color_threshold_percent) || "
-      "this.low_color_threshold_percent <= this.high_color_threshold_percent"
-  };
-
-  // Single-metric view layout. Composite layouts, such as a touch strip with
-  // two circular meters, should be modeled as a future StoredWidgetSettings
-  // widget oneof arm instead of being added here.
-  optional SingleMetricViewLayout view_layout = 1 [(buf.validate.field).enum = {
+  optional uint32 line_smoothing_percent = 1 [(buf.validate.field).uint32.lte = 100];
+  optional GridLineVisibility grid_line_visibility = 2 [(buf.validate.field).enum = {
     defined_only: true
     not_in: [0]
   }];
-
-  optional CircleStyle circle_style = 2 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
-
-  // Theme is a user-facing visual theme, not a renderer primitive name. New
-  // themes should be enum additions here and mapped to renderer contracts by
-  // the visual adapter.
-  optional MetricTheme theme = 3 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
-
-  optional ColorMode color_mode = 4 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
-
-  ColorRamp usage_colors = 5;
-  ColorRamp download_colors = 6;
-  ColorRamp upload_colors = 7;
-  ColorRamp disk_read_colors = 8;
-  ColorRamp disk_write_colors = 9;
-
-  // Color thresholds are normalized percentage stops for color ramp selection,
-  // not alert rules and not raw metric values such as Celsius, watts, or ms.
-  optional uint32 low_color_threshold_percent = 10 [(buf.validate.field).uint32.lte = 100];
-  optional uint32 high_color_threshold_percent = 11 [(buf.validate.field).uint32.lte = 100];
-
-  optional uint32 line_smoothing_percent = 12 [(buf.validate.field).uint32.lte = 100];
-  optional GridLineVisibility grid_line_visibility = 13 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
-  optional GridLineType grid_line_type = 14 [(buf.validate.field).enum = {
+  optional GridLineType grid_line_type = 3 [(buf.validate.field).enum = {
     defined_only: true
     not_in: [0]
   }];
 }
 
-message GlobalLayoutStyleOverride {
+message GlobalGraphOverride {
   // When unset and global override is enabled, the resolver treats this
   // subsection as enabled.
   optional bool enabled = 1;
-  optional SingleMetricViewLayout view_layout = 2 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
-  optional CircleStyle circle_style = 3 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
-  optional MetricTheme theme = 4 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
+  AppearanceGraphSettings graph = 2;
+}
+
+message GlobalThemeOverride {
+  // When unset and global override is enabled, the resolver treats this
+  // subsection as enabled.
+  optional bool enabled = 1;
+  AppearanceThemeSettings theme = 2;
 }
 
 message GlobalColorOverride {
@@ -395,26 +468,44 @@ message GlobalColorOverride {
   // subsection as enabled.
   optional bool enabled = 1;
 
-  // One global color ramp applied to every widget channel. This keeps global
-  // override behavior consistent with per-widget solid and dynamic color
-  // settings without adding per-domain channel settings to the global layer.
-  ColorRamp colors = 2;
-
-  optional ColorMode color_mode = 3 [(buf.validate.field).enum = {
+  optional ColorMode color_mode = 2 [(buf.validate.field).enum = {
     defined_only: true
     not_in: [0]
   }];
-  optional uint32 low_color_threshold_percent = 4 [(buf.validate.field).uint32.lte = 100];
-  optional uint32 high_color_threshold_percent = 5 [(buf.validate.field).uint32.lte = 100];
+
+  // Global solid applies the same solid paint behavior to every metric channel.
+  GlobalSolidColorSettings solid = 3;
+
+  // Global multi-color applies the same color bands to every metric channel.
+  GlobalMultiColorSettings multi_color = 4;
 }
 
-message ColorRamp {
-  // Colors use "#RRGGBB". All fields may coexist even when the active color
-  // mode reads only one subset, so switching modes does not erase user input.
-  optional string solid_color = 1 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
-  optional string low_color = 2 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
-  optional string medium_color = 3 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
-  optional string high_color = 4 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+message GlobalSolidColorSettings {
+  optional string color = 1 [(buf.validate.field).string.pattern = "^#[0-9a-fA-F]{6}$"];
+
+  // When unset, the resolver enables smooth gradients for solid metric paint.
+  optional bool gradient_enabled = 2;
+}
+
+message GlobalMultiColorSettings {
+  option (buf.validate.message).cel = {
+    id: "global_multi_color_threshold_order"
+    message: "low_threshold_percent must be less than or equal to high_threshold_percent"
+    expression:
+      "!has(this.low_threshold_percent) || !has(this.high_threshold_percent) || "
+      "this.low_threshold_percent <= this.high_threshold_percent"
+  };
+
+  MultiColorSet colors = 1;
+
+  // Color thresholds are normalized percentage stops for multi-color band selection,
+  // not alert rules and not raw metric values such as Celsius, watts, or ms.
+  optional uint32 low_threshold_percent = 2 [(buf.validate.field).uint32.lte = 100];
+  optional uint32 high_threshold_percent = 3 [(buf.validate.field).uint32.lte = 100];
+
+  // When unset, the resolver enables smooth gradients for multi-color metric
+  // paint.
+  optional bool gradient_enabled = 4;
 }
 
 message NetworkDisplaySettings {
@@ -464,11 +555,12 @@ enum MetricTheme {
   METRIC_THEME_UNSPECIFIED = 0;
   METRIC_THEME_FLAT = 1;
   METRIC_THEME_CUPERTINO_GLASS = 2;
+  METRIC_THEME_COLOR_FILLED = 3;
 }
 
 enum ColorMode {
   COLOR_MODE_UNSPECIFIED = 0;
-  COLOR_MODE_THRESHOLD = 1;
+  COLOR_MODE_MULTI_COLOR = 1;
   COLOR_MODE_SOLID = 2;
   COLOR_MODE_BLACK_WHITE = 3;
 }

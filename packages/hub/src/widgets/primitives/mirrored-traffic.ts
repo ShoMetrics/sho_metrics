@@ -9,8 +9,8 @@ export interface MirroredTrafficConfig {
 }
 
 export const DEFAULT_MIRRORED_TRAFFIC_CONFIG: MirroredTrafficConfig = {
-    positiveColorConfig: { mode: "solid", solidColor: "#22c55e", thresholds: [] },
-    negativeColorConfig: { mode: "solid", solidColor: "#ef4444", thresholds: [] },
+    positiveColorConfig: { mode: "solid", solidColor: "#22c55e", thresholds: [], isGradientEnabled: true },
+    negativeColorConfig: { mode: "solid", solidColor: "#ef4444", thresholds: [], isGradientEnabled: true },
     lineWidth: 2,
     fillOpacity: 0.2,
 };
@@ -48,6 +48,9 @@ export function renderMirroredTraffic(
         const polyline = points.map(point => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
         const gradientId = `mirrored-${channelId}-${Date.now()}`;
         const stops = buildGradientStops(values, colorConfig);
+        const channelPaint = colorConfig.isGradientEnabled
+            ? `url(#${gradientId})`
+            : stops[stops.length - 1]?.color ?? colorConfig.solidColor;
         const gradientStops = stops
             .map(stop => `<stop offset="${(stop.offset * 100).toFixed(1)}%" stop-color="${stop.color}" />`)
             .join("\n            ");
@@ -59,14 +62,14 @@ export function renderMirroredTraffic(
             ` L ${lastPoint.x},${centerY} Z`;
 
         return `
-            <defs>
+            ${colorConfig.isGradientEnabled ? `<defs>
                 <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="0%">
                     ${gradientStops}
                 </linearGradient>
-            </defs>
-            <path d="${areaPath}" fill="url(#${gradientId})" opacity="${config.fillOpacity}" />
+            </defs>` : ""}
+            <path d="${areaPath}" fill="${channelPaint}" opacity="${config.fillOpacity}" />
             <polyline points="${polyline}" fill="none"
-                stroke="url(#${gradientId})" stroke-width="${config.lineWidth}"
+                stroke="${channelPaint}" stroke-width="${config.lineWidth}"
                 stroke-linejoin="round" stroke-linecap="round" />
         `;
     };

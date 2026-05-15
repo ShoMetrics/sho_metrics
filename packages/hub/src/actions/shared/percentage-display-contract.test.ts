@@ -6,8 +6,8 @@ import type { WidgetData } from "../../rendering/widget-data";
 import { buildDiskUsageWidgetData, buildMemoryUsageWidgetData } from "../../metrics/storage-widget-data";
 import { buildCpuUsageWidgetData } from "../cpu";
 import { buildGpuUsageWidgetData, buildGpuVramWidgetData } from "../gpu";
-import { buildSampleResolvedAppearanceSettings } from "../../settings/sample-appearance-settings";
-import { buildMetricVisualSettings } from "../../settings/visual-adapter";
+import { buildDefaultAppearanceSettings } from "../../settings/default-appearance-settings";
+import { buildMetricRenderAppearance } from "../../settings/visual-adapter";
 
 test("percentage metric builders expose integer display values for compact widgets", () => {
     const testCases: ReadonlyArray<{
@@ -60,9 +60,9 @@ test("percentage metric builders expose integer display values for compact widge
 });
 
 test("percentage action display values are honored by sparkline rendering", () => {
-    const visualSettings = buildMetricVisualSettings(buildSampleResolvedAppearanceSettings({
-        viewLayout: "sparkline",
-        colorMode: "solid",
+    const visualSettings = buildMetricRenderAppearance(buildDefaultAppearanceSettings({
+        graph: { viewLayout: "sparkline" },
+        metricColor: { colorMode: "solid" },
     }));
     const body = renderSingleMetricBodyView({
         data: buildGpuUsageWidgetData(buildWidgetData({

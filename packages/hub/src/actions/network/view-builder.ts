@@ -23,7 +23,7 @@ import {
     renderNetworkInterfaceIconFragment,
 } from "../../widgets/icons/catalog/network";
 import type { MetricDisplayOptions } from "../../metric-view-runner/display-model";
-import { buildColorConfigFromRamp, resolveSolidVisualOverrideColorMode } from "../../settings/visual-adapter";
+import { buildColorConfigFromAppearance, resolveSolidMetricColorMode } from "../../settings/visual-adapter";
 
 export interface NetworkDisplayUpdate {
     displayOptions: MetricDisplayOptions;
@@ -48,7 +48,7 @@ interface BuildNetworkDisplayOptions {
 export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): NetworkDisplayUpdate {
     const appearance = options.settings.widget.slot.appearance;
     const networkReading = options.target.reading;
-    const effectiveGraphicType = appearance.viewLayout;
+    const effectiveGraphicType = appearance.graph.viewLayout;
     const displayDirection = networkReading.direction;
 
     if (effectiveGraphicType === "linear") {
@@ -83,7 +83,7 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
         direction: displayDirection,
         target: options.target,
     });
-    const circleStyle = appearance.circleStyle;
+    const circleStyle = appearance.graph.circleStyle;
     const shouldRenderGaugeFooter = effectiveGraphicType === "circular" && circleStyle === "gauge";
     const renderedWidgetData = shouldRenderGaugeFooter
         ? { ...displayWidgetData, label: ARC_GAUGE_LABELS.network }
@@ -112,10 +112,14 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
                 color: NETWORK_DIRECTION_ICON_COLOR,
             }),
             circleStyleOverride: circleStyle,
-            visualSettingsOverride: {
-                colorMode: appearance.colorMode,
-                usageColors: {
-                    solidColor: appearance.usageColors.solidColor,
+            appearanceOverride: {
+                metricColor: {
+                    colorMode: appearance.metricColor.colorMode,
+                    solid: {
+                        colors: {
+                            usageColor: appearance.metricColor.solid.colors.usageColor,
+                        },
+                    },
                 },
             },
         },
@@ -175,8 +179,8 @@ function buildDualNetworkCircularDisplayOptions(
     const uploadColorConfig = buildNetworkChannelColorConfig("upload", options.settings);
     const downloadColorConfig = buildNetworkChannelColorConfig("download", options.settings);
     const appearance = options.settings.widget.slot.appearance;
-    const circleStyle = appearance.circleStyle;
-    const solidVisualOverrideColorMode = resolveSolidVisualOverrideColorMode(appearance.colorMode);
+    const circleStyle = appearance.graph.circleStyle;
+    const solidMetricColorMode = resolveSolidMetricColorMode(appearance.metricColor.colorMode);
 
     return {
         event: options.event,
@@ -219,9 +223,11 @@ function buildDualNetworkCircularDisplayOptions(
             direction: "download",
             color: downloadColor,
         }),
-        visualSettingsOverride: {
-            colorMode: solidVisualOverrideColorMode,
-            usageColors: { solidColor: uploadColor },
+        appearanceOverride: {
+            metricColor: {
+                colorMode: solidMetricColorMode,
+                solid: { colors: { usageColor: uploadColor } },
+            },
         },
     };
 }
@@ -249,7 +255,7 @@ function buildDualNetworkSparklineDisplayOptions(options: BuildNetworkDisplayOpt
     const positiveColor = positiveDirection === "download" ? downloadColor : uploadColor;
     const negativeColor = negativeDirection === "download" ? downloadColor : uploadColor;
     const appearance = options.settings.widget.slot.appearance;
-    const solidVisualOverrideColorMode = resolveSolidVisualOverrideColorMode(appearance.colorMode);
+    const solidMetricColorMode = resolveSolidMetricColorMode(appearance.metricColor.colorMode);
 
     return {
         event: options.event,
@@ -281,9 +287,11 @@ function buildDualNetworkSparklineDisplayOptions(options: BuildNetworkDisplayOpt
             color: negativeColor,
             size: NETWORK_TOP_ICON_SIZE,
         }),
-        visualSettingsOverride: {
-            colorMode: solidVisualOverrideColorMode,
-            usageColors: { solidColor: downloadColor },
+        appearanceOverride: {
+            metricColor: {
+                colorMode: solidMetricColorMode,
+                solid: { colors: { usageColor: downloadColor } },
+            },
         },
     };
 }
@@ -355,10 +363,16 @@ function buildLinearNetworkDisplayOptions(options: BuildNetworkDisplayOptions): 
             direction: "download",
             color: NETWORK_DIRECTION_ICON_COLOR,
         }),
-        visualSettingsOverride: {
-            colorMode: resolveSolidVisualOverrideColorMode(options.settings.widget.slot.appearance.colorMode),
-            usageColors: {
-                solidColor: resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData),
+        appearanceOverride: {
+            metricColor: {
+                colorMode: resolveSolidMetricColorMode(
+                    options.settings.widget.slot.appearance.metricColor.colorMode,
+                ),
+                solid: {
+                    colors: {
+                        usageColor: resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData),
+                    },
+                },
             },
         },
     };
@@ -425,22 +439,10 @@ function buildNetworkChannelColorConfig(
     settings: ResolvedWidgetSettings,
 ): ColorConfig {
     if (direction === "download") {
-        const appearance = settings.widget.slot.appearance;
-        return buildColorConfigFromRamp({
-            colorMode: appearance.colorMode,
-            colors: appearance.downloadColors,
-            lowThreshold: appearance.lowColorThresholdPercent,
-            highThreshold: appearance.highColorThresholdPercent,
-        });
+        return buildColorConfigFromAppearance(settings.widget.slot.appearance, "download");
     }
 
-    const appearance = settings.widget.slot.appearance;
-    return buildColorConfigFromRamp({
-        colorMode: appearance.colorMode,
-        colors: appearance.uploadColors,
-        lowThreshold: appearance.lowColorThresholdPercent,
-        highThreshold: appearance.highColorThresholdPercent,
-    });
+    return buildColorConfigFromAppearance(settings.widget.slot.appearance, "upload");
 }
 
 const NETWORK_DIRECTION_ICON_COLOR = "rgba(255,255,255,0.88)";
