@@ -67,6 +67,7 @@ function renderDualCircularMetric(options: DualMetricBodyViewProps): string {
         valueTextColor: options.visual.paints.primaryText,
         unitTextColor: options.visual.paints.secondaryText,
         dividerColor: options.visual.paints.divider,
+        iconColor: options.visual.paints.icon,
         positiveColor: options.positive.color,
         negativeColor: options.negative.color,
         positiveColorConfig: options.positive.colorConfig,
@@ -107,5 +108,12 @@ function renderDualSparklineMetric(options: DualMetricBodyViewProps): string {
         lineSmoothingPercent: options.visual.lineSmoothingPercent,
         gridLineVisibility: options.visual.gridLineVisibility,
         gridLineType: options.visual.gridLineType,
+        titleTextColor: options.visual.paints.secondaryText,
+        valueTextColor: options.visual.paints.primaryText,
+        unitTextColor: options.visual.paints.secondaryText,
+        iconColor: options.visual.paints.icon,
+        horizontalGuideLineColor: options.visual.paints.grid,
+        timeGuideLineColor: options.visual.paints.grid,
+        baselineColor: options.visual.paints.grid,
     }, options.renderSize);
 }

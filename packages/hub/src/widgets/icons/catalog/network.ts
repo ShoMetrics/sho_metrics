@@ -11,7 +11,7 @@ const NETWORK_DIRECTION_STATUS_OPTICAL_Y_OFFSET_RATIO = 0.55;
 
 export function renderNetworkDirectionIconFragment(options: {
     direction: NetworkDirection;
-    color: string;
+    color?: string;
     size: number;
 }): string {
     const iconDefinition = createLucideIconDefinition({
@@ -27,7 +27,7 @@ export function renderNetworkDirectionIconFragment(options: {
 
 export function getNetworkDirectionStatusIcon(options: {
     direction: NetworkDirection;
-    color: string;
+    color?: string;
 }): ArcGaugeStatusIcon {
     return {
         ...createLucideIconDefinition({

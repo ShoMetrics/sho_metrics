@@ -40,6 +40,7 @@ export interface ArcGaugeConfig extends WidgetBaseConfig {
     labelTextColor: string;
     valueTextColor: string;
     unitTextColor: string;
+    iconColor: string;
     innerTextScale: number;
     circleStyle: ArcGaugeStyle;
     gaugeRangeBlendProgress: number;
@@ -59,6 +60,7 @@ export const DEFAULT_ARC_GAUGE_CONFIG: ArcGaugeConfig = {
     labelTextColor: "rgba(255,255,255,0.78)",
     valueTextColor: "white",
     unitTextColor: "rgba(255,255,255,0.74)",
+    iconColor: "rgba(255,255,255,0.88)",
     gradientHeadAdjustmentPercent: -42,
     innerTextScale: 1,
     circleStyle: "value",
@@ -266,8 +268,18 @@ function renderCenterContent(options: {
 }): string {
     if (options.circleStyle === "compact") {
         return `
-            ${renderStatusIcon(options.statusIcon, options.centerXCoordinate, options.statusNotchGeometry)}
-            ${renderCenterIcon(options.centerIconFragment, options.centerXCoordinate, options.centerYCoordinate)}
+            ${renderStatusIcon(
+                options.statusIcon,
+                options.centerXCoordinate,
+                options.statusNotchGeometry,
+                options.config.iconColor,
+            )}
+            ${renderCenterIcon(
+                options.centerIconFragment,
+                options.centerXCoordinate,
+                options.centerYCoordinate,
+                options.config.iconColor,
+            )}
         `;
     }
 
@@ -285,6 +297,7 @@ function renderStatusIcon(
     statusIcon: ArcGaugeStatusIcon | undefined,
     centerXCoordinate: number,
     statusNotchGeometry: StatusNotchGeometry | null,
+    iconColor: string,
 ): string {
     if (!statusIcon || !statusNotchGeometry) {
         return "";
@@ -294,6 +307,7 @@ function renderStatusIcon(
         <svg x="${centerXCoordinate - statusNotchGeometry.iconSize / 2}"
             y="${statusNotchGeometry.iconCenterYCoordinate - statusNotchGeometry.iconSize / 2}"
             width="${statusNotchGeometry.iconSize}" height="${statusNotchGeometry.iconSize}"
+            color="${iconColor}"
             viewBox="${statusIcon.viewBox.x} ${statusIcon.viewBox.y} ${statusIcon.viewBox.width} ${statusIcon.viewBox.height}">
             ${statusIcon.fragment}
         </svg>
@@ -434,24 +448,26 @@ function renderCenterIcon(
     centerIconFragment: string | undefined,
     centerXCoordinate: number,
     centerYCoordinate: number,
+    iconColor: string,
 ): string {
     if (!centerIconFragment) {
         return "";
     }
 
-    return `<g transform="translate(${centerXCoordinate} ${centerYCoordinate})">${centerIconFragment}</g>`;
+    return `<g color="${iconColor}" transform="translate(${centerXCoordinate} ${centerYCoordinate})">${centerIconFragment}</g>`;
 }
 
 function renderGaugeInlineIcon(options: {
     iconFragment: string | undefined;
     xCoordinate: number;
     yCoordinate: number;
+    iconColor: string;
 }): string {
     if (!options.iconFragment) {
         return "";
     }
 
-    return `<g transform="translate(${formatSvgNumber(options.xCoordinate)} ${formatSvgNumber(options.yCoordinate)}) scale(${formatSvgNumber(ARC_LAYOUT.gaugeBottomLabel.iconScale)})">${options.iconFragment}</g>`;
+    return `<g color="${options.iconColor}" transform="translate(${formatSvgNumber(options.xCoordinate)} ${formatSvgNumber(options.yCoordinate)}) scale(${formatSvgNumber(ARC_LAYOUT.gaugeBottomLabel.iconScale)})">${options.iconFragment}</g>`;
 }
 
 function renderGaugeValueContent(options: {
@@ -672,6 +688,7 @@ function renderGaugeBottomLabel(options: {
             iconFragment: options.iconFragment,
             xCoordinate: iconXCoordinate,
             yCoordinate: options.yCoordinate,
+            iconColor: options.config.iconColor,
         })}
     `;
 }
@@ -731,6 +748,7 @@ function renderCenterValue(options: {
             options.footerIconFragment,
             options.centerXCoordinate,
             options.centerYCoordinate + ARC_LAYOUT.footerIcon.yOffset,
+            options.config.iconColor,
         )}
     `;
 }

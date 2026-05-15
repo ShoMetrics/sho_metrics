@@ -302,7 +302,7 @@ function buildDiskCenterIconFragment(volumeSelection: DiskVolumeSelection): stri
         <text x="0" y="34" text-anchor="middle"
             dominant-baseline="middle"
             font-family="'Inter','SF Pro Display','Segoe UI',sans-serif"
-            font-size="26" font-weight="850" fill="rgba(255,255,255,0.94)">${escapeSvgText(volumeLabel)}</text>
+            font-size="26" font-weight="850" fill="currentColor">${escapeSvgText(volumeLabel)}</text>
     `;
 }
 
@@ -320,7 +320,6 @@ function buildDiskThroughputFooterIconFragment(direction: DiskThroughputDirectio
 
     return renderDiskThroughputDirectionIconFragment({
         direction,
-        color: DISK_THROUGHPUT_DIRECTION_ICON_COLOR,
         size: DISK_THROUGHPUT_DIRECTION_ICON_SIZE,
     });
 }
@@ -392,6 +391,5 @@ const DEFAULT_SSD_WRITE_THROUGHPUT_MEBIBYTES_PER_SECOND = 1200;
 const DEFAULT_NETWORK_DISK_THROUGHPUT_MEBIBYTES_PER_SECOND = 125;
 const DEFAULT_UNKNOWN_READ_THROUGHPUT_MEBIBYTES_PER_SECOND = 1000;
 const DEFAULT_UNKNOWN_WRITE_THROUGHPUT_MEBIBYTES_PER_SECOND = 1000;
-const DISK_THROUGHPUT_DIRECTION_ICON_COLOR = "rgba(255,255,255,0.88)";
 const DISK_THROUGHPUT_DIRECTION_ICON_SIZE = 30;
 const DISK_GAUGE_FOOTER_ICON_SIZE = 25;

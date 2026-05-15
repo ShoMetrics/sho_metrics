@@ -103,13 +103,11 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
             footerIconFragment: shouldRenderGaugeFooter
                 ? renderNetworkDirectionIconFragment({
                     direction: displayDirection,
-                    color: NETWORK_DIRECTION_ICON_COLOR,
                     size: NETWORK_FOOTER_ICON_SIZE,
                 })
                 : undefined,
             statusIcon: getNetworkDirectionStatusIcon({
                 direction: displayDirection,
-                color: NETWORK_DIRECTION_ICON_COLOR,
             }),
             circleStyleOverride: circleStyle,
             appearanceOverride: {
@@ -200,7 +198,6 @@ function buildDualNetworkCircularDisplayOptions(
         }),
         statusIcon: getNetworkDirectionStatusIcon({
             direction: "download",
-            color: NETWORK_DIRECTION_ICON_COLOR,
         }),
         circleStyleOverride: circleStyle,
         positiveColor: uploadColor,
@@ -277,7 +274,6 @@ function buildDualNetworkSparklineDisplayOptions(options: BuildNetworkDisplayOpt
         }),
         statusIcon: getNetworkDirectionStatusIcon({
             direction: "download",
-            color: NETWORK_DIRECTION_ICON_COLOR,
         }),
         positiveColor,
         negativeColor,
@@ -315,6 +311,8 @@ function buildLinearNetworkDisplayOptions(options: BuildNetworkDisplayOptions): 
         direction: "download",
         target: options.target,
     });
+    const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
+    const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData);
 
     return {
         event: options.event,
@@ -333,10 +331,9 @@ function buildLinearNetworkDisplayOptions(options: BuildNetworkDisplayOptions): 
                     displayValue: downloadWidgetData.displayValue ?? downloadWidgetData.current.toFixed(0),
                     unit: downloadWidgetData.unit,
                     progress: downloadWidgetData.progress,
-                    color: resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData),
+                    color: downloadColor,
                     iconFragment: renderNetworkDirectionIconFragment({
                         direction: "download",
-                        color: NETWORK_DIRECTION_ICON_COLOR,
                         size: NETWORK_TOP_ICON_SIZE,
                     }),
                 },
@@ -345,10 +342,9 @@ function buildLinearNetworkDisplayOptions(options: BuildNetworkDisplayOptions): 
                     displayValue: uploadWidgetData.displayValue ?? uploadWidgetData.current.toFixed(0),
                     unit: uploadWidgetData.unit,
                     progress: uploadWidgetData.progress,
-                    color: resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData),
+                    color: uploadColor,
                     iconFragment: renderNetworkDirectionIconFragment({
                         direction: "upload",
-                        color: NETWORK_DIRECTION_ICON_COLOR,
                         size: NETWORK_TOP_ICON_SIZE,
                     }),
                 },
@@ -367,7 +363,6 @@ function buildLinearNetworkDisplayOptions(options: BuildNetworkDisplayOptions): 
         }),
         statusIcon: getNetworkDirectionStatusIcon({
             direction: "download",
-            color: NETWORK_DIRECTION_ICON_COLOR,
         }),
         appearanceOverride: {
             paint: {
@@ -377,7 +372,7 @@ function buildLinearNetworkDisplayOptions(options: BuildNetworkDisplayOptions): 
                     ),
                     solid: {
                         colors: {
-                            usageColor: resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData),
+                            usageColor: downloadColor,
                         },
                     },
                 },
@@ -429,7 +424,6 @@ function buildNetworkCenterIconFragment(options: {
 
     return renderNetworkDirectionIconFragment({
         direction: options.direction,
-        color: NETWORK_DIRECTION_ICON_COLOR,
         size: NETWORK_TOP_ICON_SIZE,
     });
 }
@@ -453,7 +447,6 @@ function buildNetworkChannelColorConfig(
     return buildColorConfigFromAppearance(settings.widget.slot.appearance, "upload");
 }
 
-const NETWORK_DIRECTION_ICON_COLOR = "rgba(255,255,255,0.88)";
 const DEFAULT_DOWNLOAD_MAXIMUM_SPEED_MEGABITS_PER_SECOND = 100;
 const DEFAULT_UPLOAD_MAXIMUM_SPEED_MEGABITS_PER_SECOND = 20;
 const NETWORK_SPEED_MAXIMUM_DISPLAY_DIGITS = 3;

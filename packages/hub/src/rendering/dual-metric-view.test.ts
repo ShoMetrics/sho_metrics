@@ -45,6 +45,10 @@ function buildMetricRenderAppearance(): MetricRenderAppearance {
             secondaryText: "rgba(255,255,255,0.72)",
             mutedText: "rgba(255,255,255,0.48)",
             icon: "rgba(255,255,255,0.88)",
+            linearTitleText: "rgba(255,255,255,0.88)",
+            linearValueText: "white",
+            linearUnitText: "rgba(255,255,255,0.76)",
+            linearSecondaryText: "rgba(255,255,255,0.78)",
             primaryMetric: {
                 mode: "solid",
                 solidColor: "#3b82f6",
