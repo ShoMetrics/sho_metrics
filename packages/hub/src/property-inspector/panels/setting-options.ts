@@ -15,6 +15,7 @@ export const graphicStyleOptionList = [
     { value: "flat", label: "Default" },
     { value: "cupertino-glass", label: "Cupertino Glass Style" },
     { value: "color-filled", label: "Color Filled" },
+    { value: "old-crt", label: "Old CRT" },
 ] as const satisfies readonly SelectOption[];
 
 export const metricPaintColorModeOptionList = [

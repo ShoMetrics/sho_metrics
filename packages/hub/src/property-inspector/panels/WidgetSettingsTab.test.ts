@@ -150,6 +150,25 @@ test("color filled theme renders color mix without range controls", () => {
     assert.doesNotMatch(markup, /High Starts At:/);
 });
 
+test("old crt theme uses fixed paint without color controls", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "network",
+        settings: buildWidgetSettings("network", {
+            appearance: {
+                theme: { selectedTheme: "old-crt" },
+            },
+            network: {
+                direction: "both",
+            },
+        }),
+    });
+
+    assert.match(markup, /Old CRT/);
+    assert.doesNotMatch(markup, /Color Mode:/);
+    assert.doesNotMatch(markup, /Color - Download/);
+    assert.doesNotMatch(markup, /Color - Upload/);
+});
+
 test("network mirrored trend disables grid controls in the panel", () => {
     const markup = renderWidgetSettings({
         actionKind: "network",

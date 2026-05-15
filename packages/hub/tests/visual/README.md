@@ -17,7 +17,7 @@ npm.cmd run test:visual
 npm.cmd run test:visual:update
 ```
 
-Current widget visual coverage has 8 snapshots. On the Windows development
-machine used to add the suite, 5 consecutive runs averaged 1.814 seconds total,
-or 0.227 seconds per snapshot. Treat this as a rough local cost estimate; CI
-hardware can differ.
+Current widget visual coverage has 9 snapshots. On the Windows development
+machine used to add the suite, a run after adding the Old CRT snapshot took
+0.847 seconds total, or 0.094 seconds per snapshot. Treat this as a rough local
+cost estimate; CI hardware can differ.

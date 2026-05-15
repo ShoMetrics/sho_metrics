@@ -20,6 +20,7 @@ const BLACK_WHITE_SOLID_BACKGROUND_PAINT = "#222222";
 const BLACK_WHITE_SOFT_TRIANGLE_LOW_PAINT = "#161616";
 const BLACK_WHITE_SOFT_TRIANGLE_MEDIUM_PAINT = "#2c2c2c";
 const BLACK_WHITE_SOFT_TRIANGLE_HIGH_PAINT = "#444444";
+const OLD_CRT_PHOSPHOR_PAINT = "#b4ff63";
 
 const DEFAULT_RENDER_PAINT_TOKENS = {
     background: DEFAULT_BACKGROUND_PAINT,
@@ -32,6 +33,25 @@ const DEFAULT_RENDER_PAINT_TOKENS = {
     grid: "rgba(255,255,255,0.18)",
     divider: "rgba(255,255,255,0.18)",
 } satisfies Omit<RenderPaintTokens, "backgroundFill" | "primaryMetric">;
+
+const OLD_CRT_RENDER_PAINT_TOKENS = {
+    background: "#020501",
+    surface: "rgba(180,255,99,0.32)",
+    primaryText: OLD_CRT_PHOSPHOR_PAINT,
+    secondaryText: "rgba(180,255,99,0.78)",
+    mutedText: "rgba(180,255,99,0.46)",
+    icon: "rgba(180,255,99,0.88)",
+    track: "rgba(180,255,99,0.22)",
+    grid: "rgba(180,255,99,0.34)",
+    divider: "rgba(180,255,99,0.24)",
+} satisfies Omit<RenderPaintTokens, "backgroundFill" | "primaryMetric">;
+
+const OLD_CRT_COLOR_CONFIG = {
+    mode: "solid",
+    solidColor: OLD_CRT_PHOSPHOR_PAINT,
+    thresholds: [],
+    isGradientEnabled: false,
+} satisfies ColorConfig;
 
 const solidColorKeyByChannel = {
     usage: "usageColor",
@@ -60,6 +80,10 @@ export function buildColorConfigFromAppearance(
     const colorConfig = buildColorConfigFromMetricPaint(appearance.paint.metric, channel);
 
     if (appearance.theme.selectedTheme !== "color-filled") {
+        if (appearance.theme.selectedTheme === "old-crt") {
+            return lowerColorConfigForColorMode(appearance.paint.metric.colorMode, OLD_CRT_COLOR_CONFIG);
+        }
+
         return colorConfig;
     }
 
@@ -125,6 +149,14 @@ function buildRenderPaintTokens(
         return {
             ...DEFAULT_RENDER_PAINT_TOKENS,
             backgroundFill: lowerBackgroundFillToBlackWhite(backgroundFill),
+            primaryMetric,
+        };
+    }
+
+    if (settings.theme.selectedTheme === "old-crt") {
+        return {
+            ...OLD_CRT_RENDER_PAINT_TOKENS,
+            backgroundFill: undefined,
             primaryMetric,
         };
     }
