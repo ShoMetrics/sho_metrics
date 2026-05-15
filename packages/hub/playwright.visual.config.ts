@@ -3,6 +3,7 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
     testDir: "./tests/visual",
     testMatch: "**/*.visual.spec.ts",
+    snapshotPathTemplate: "{testDir}/__snapshots__/{testFilePath}/{arg}{ext}",
     outputDir: "test-results/visual",
     fullyParallel: false,
     forbidOnly: Boolean(process.env.CI),
