@@ -24,7 +24,7 @@
         "@bufbuild/protoc-gen-es": "^2.12.0",
         "@elgato/cli": "^1.7.4",
         "@eslint/js": "^9.39.4",
-        "@playwright/test": "1.59.1",
+        "@playwright/test": "^1.59.1",
         "@rollup/plugin-commonjs": "^29.0.2",
         "@rollup/plugin-json": "^6.1.0",
         "@rollup/plugin-node-resolve": "^15.2.2",
