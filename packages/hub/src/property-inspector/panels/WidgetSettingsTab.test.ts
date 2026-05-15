@@ -143,9 +143,9 @@ test("color filled theme renders color mix without range controls", () => {
 
     assert.match(markup, /Color Filled/);
     assert.match(markup, /Color Mix/);
-    assert.match(markup, /Top Color:/);
     assert.match(markup, /Left Color:/);
     assert.match(markup, /Right Color:/);
+    assert.match(markup, /Bottom Color:/);
     assert.doesNotMatch(markup, /Low Ends At:/);
     assert.doesNotMatch(markup, /High Starts At:/);
 });
