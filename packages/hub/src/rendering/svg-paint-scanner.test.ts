@@ -7,7 +7,7 @@ import type { MetricRenderAppearance } from "./render-appearance";
 import { renderSingleMetricBodyView } from "./single-metric-view";
 import {
     scanChromaticSvgPaintValues,
-} from "./svg-paint-scanner";
+} from "../../tests/support/svg-paint-scanner";
 import type { DualChannelWidgetData, WidgetData } from "./widget-data";
 import { WIDGET_LOGICAL_SIZE } from "./widget-data";
 import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
