@@ -98,8 +98,8 @@ export abstract class MetricAction extends SingletonAction {
             log.info(() => [
                 "settingsReceived",
                 `actionId=${event.action.id}`,
-                `previousViewLayout=${formatSettingValue(previousSettings.widget.slot.appearance.viewLayout)}`,
-                `nextViewLayout=${formatSettingValue(nextSettings.widget.slot.appearance.viewLayout)}`,
+                `previousViewLayout=${formatSettingValue(previousSettings.widget.slot.appearance.graph.viewLayout)}`,
+                `nextViewLayout=${formatSettingValue(nextSettings.widget.slot.appearance.graph.viewLayout)}`,
                 `previousPollingFrequencySeconds=${formatSettingValue(previousSettings.preferences.pollingFrequencySeconds)}`,
                 `nextPollingFrequencySeconds=${formatSettingValue(nextSettings.preferences.pollingFrequencySeconds)}`,
             ].join(" "));

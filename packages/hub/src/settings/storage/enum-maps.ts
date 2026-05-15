@@ -1,6 +1,4 @@
 import {
-    AppearanceSettings_GridLineType as StoredGridLineType,
-    AppearanceSettings_GridLineVisibility as StoredGridLineVisibility,
     CircleStyle as StoredCircleStyle,
     ColorMode as StoredColorMode,
     DiskMetricTarget_Kind as StoredDiskMetricKind,
@@ -13,6 +11,8 @@ import {
     NetworkMetricTarget_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
     ScaleMode as StoredScaleMode,
     SingleMetricViewLayout as StoredSingleMetricViewLayout,
+    SparklineAppearanceSettings_GridLineType as StoredGridLineType,
+    SparklineAppearanceSettings_GridLineVisibility as StoredGridLineVisibility,
     TemperatureUnit as StoredTemperatureUnit,
 } from "../../generated/shometrics/v1/settings_pb.js";
 import type {
@@ -48,10 +48,11 @@ export const storedCircleStyleByResolved = {
 export const storedThemeByResolved = {
     flat: StoredMetricTheme.FLAT,
     "cupertino-glass": StoredMetricTheme.CUPERTINO_GLASS,
+    "color-filled": StoredMetricTheme.COLOR_FILLED,
 } satisfies Record<MetricTheme, StoredMetricTheme>;
 
 export const storedColorModeByResolved = {
-    threshold: StoredColorMode.THRESHOLD,
+    "multi-color": StoredColorMode.MULTI_COLOR,
     solid: StoredColorMode.SOLID,
     "black-white": StoredColorMode.BLACK_WHITE,
 } satisfies Record<ColorMode, StoredColorMode>;

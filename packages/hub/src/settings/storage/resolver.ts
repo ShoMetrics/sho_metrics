@@ -1,6 +1,4 @@
 import {
-    AppearanceSettings_GridLineType as StoredGridLineType,
-    AppearanceSettings_GridLineVisibility as StoredGridLineVisibility,
     CircleStyle as StoredCircleStyle,
     ColorMode as StoredColorMode,
     CpuMetricTarget_Kind as StoredCpuMetricKind,
@@ -16,15 +14,27 @@ import {
     NetworkMetricTarget_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
     ScaleMode as StoredScaleMode,
     SingleMetricViewLayout as StoredSingleMetricViewLayout,
+    SparklineAppearanceSettings_GridLineType as StoredGridLineType,
+    SparklineAppearanceSettings_GridLineVisibility as StoredGridLineVisibility,
     TemperatureUnit as StoredTemperatureUnit,
     type AppearanceSettings as StoredAppearanceSettings,
+    type AppearanceGraphSettings as StoredAppearanceGraphSettings,
+    type AppearanceThemeSettings as StoredAppearanceThemeSettings,
     type CatalogMetricTarget as StoredCatalogMetricTarget,
-    type ColorRamp as StoredColorRamp,
+    type ColorFilledMultiColorSettings as StoredColorFilledMultiColorSettings,
+    type ColorFilledSolidSettings as StoredColorFilledSolidSettings,
     type DiskMetricTarget as StoredDiskMetricTarget,
     type DiskThroughputDisplaySettings as StoredDiskThroughputDisplaySettings,
     type GlobalColorOverride as StoredGlobalColorOverride,
-    type GlobalLayoutStyleOverride as StoredGlobalLayoutStyleOverride,
+    type GlobalGraphOverride as StoredGlobalGraphOverride,
+    type GlobalMultiColorSettings as StoredGlobalMultiColorSettings,
+    type GlobalSolidColorSettings as StoredGlobalSolidColorSettings,
+    type GlobalThemeOverride as StoredGlobalThemeOverride,
     type GpuMetricTarget as StoredGpuMetricTarget,
+    type MetricColorSettings as StoredMetricColorSettings,
+    type MetricMultiColorSettings as StoredMetricMultiColorSettings,
+    type MetricSolidColorSettings as StoredMetricSolidColorSettings,
+    type MultiColorSet as StoredMultiColorSet,
     type MetricSelection as StoredMetricSelection,
     type MetricSlot as StoredMetricSlot,
     type MetricSourcePolicy as StoredMetricSourcePolicy,
@@ -47,24 +57,35 @@ import type {
     NetworkUnitBase,
     ResolvedAppearanceSettings,
     ResolvedCatalogMetricTarget,
-    ResolvedColorRamp,
+    ResolvedAppearanceGraphSettings,
+    ResolvedAppearanceThemeSettings,
+    ResolvedColorFilledMultiColorSettings,
+    ResolvedColorFilledSolidSettings,
     ResolvedDiskReading,
     ResolvedDiskThroughputDisplaySettings,
     ResolvedGlobalColorOverride,
     ResolvedGlobalDefaults,
-    ResolvedGlobalLayoutStyleOverride,
+    ResolvedGlobalGraphOverride,
     ResolvedGlobalSettings,
+    ResolvedGlobalThemeOverride,
+    ResolvedGlobalMultiColorSettings,
+    ResolvedGlobalSolidColorSettings,
     ResolvedGpuReading,
     ResolvedHttpMetricSourceConnection,
     ResolvedMemoryReading,
+    ResolvedMetricColorSettings,
+    ResolvedMetricMultiColorSettings,
+    ResolvedMetricSolidColorSettings,
     ResolvedMetric,
     ResolvedMetricSlot,
     ResolvedMetricSourceConnection,
     ResolvedMetricSourcePolicy,
     ResolvedMetricSourceProfile,
     ResolvedMetricTarget,
+    ResolvedMultiColorSet,
     ResolvedNetworkDisplaySettings,
     ResolvedNetworkReading,
+    ResolvedSparklineAppearanceSettings,
     ResolvedWidgetPreferences,
     ResolvedWidgetSettings,
     ScaleMode,
@@ -72,6 +93,7 @@ import type {
     SourceFailureMode,
     TemperatureUnit,
 } from "../resolved-settings";
+import { DEFAULT_APPEARANCE_SETTINGS } from "../default-appearance-settings";
 
 export interface ResolveStoredWidgetSettingsOptions {
     readonly storedWidgetSettings: StoredWidgetSettings;
@@ -87,50 +109,6 @@ export interface ResolveStoredSettingsRuntimeContext {
     readonly runtimeMaximumDiskWriteThroughputMebibytesPerSecond?: number | undefined;
     readonly runtimeMaximumGpuPowerWatts?: number | undefined;
 }
-
-const DEFAULT_COLOR_RAMP: ResolvedColorRamp = {
-    solidColor: "#3b82f6",
-    lowColor: "#22c55e",
-    mediumColor: "#eab308",
-    highColor: "#ef4444",
-};
-
-const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
-    viewLayout: "circular",
-    circleStyle: "value",
-    theme: "flat",
-    colorMode: "threshold",
-    usageColors: DEFAULT_COLOR_RAMP,
-    downloadColors: {
-        solidColor: "#3b82f6",
-        lowColor: "#22c55e",
-        mediumColor: "#3b82f6",
-        highColor: "#60a5fa",
-    },
-    uploadColors: {
-        solidColor: "#ef4444",
-        lowColor: "#f97316",
-        mediumColor: "#ef4444",
-        highColor: "#f472b6",
-    },
-    diskReadColors: {
-        solidColor: "#38bdf8",
-        lowColor: "#22c55e",
-        mediumColor: "#38bdf8",
-        highColor: "#60a5fa",
-    },
-    diskWriteColors: {
-        solidColor: "#f472b6",
-        lowColor: "#f97316",
-        mediumColor: "#f472b6",
-        highColor: "#fb7185",
-    },
-    lowColorThresholdPercent: 30,
-    highColorThresholdPercent: 70,
-    lineSmoothingPercent: 75,
-    gridLineVisibility: "adaptive",
-    gridLineType: "horizontal",
-};
 
 const DEFAULT_NETWORK_DISPLAY_SETTINGS: ResolvedNetworkDisplaySettings = {
     scaleMode: "auto",
@@ -178,11 +156,12 @@ const metricThemeByProto = {
     [StoredMetricTheme.UNSPECIFIED]: undefined,
     [StoredMetricTheme.FLAT]: "flat",
     [StoredMetricTheme.CUPERTINO_GLASS]: "cupertino-glass",
+    [StoredMetricTheme.COLOR_FILLED]: "color-filled",
 } satisfies Record<StoredMetricTheme, MetricTheme | undefined>;
 
 const colorModeByProto = {
     [StoredColorMode.UNSPECIFIED]: undefined,
-    [StoredColorMode.THRESHOLD]: "threshold",
+    [StoredColorMode.MULTI_COLOR]: "multi-color",
     [StoredColorMode.SOLID]: "solid",
     [StoredColorMode.BLACK_WHITE]: "black-white",
 } satisfies Record<StoredColorMode, ColorMode | undefined>;
@@ -286,16 +265,21 @@ export function resolveStoredGlobalSettings(
 ): ResolvedGlobalSettings {
     const storedOverrides = storedGlobalSettings?.overrides;
     const globalOverrideEnabled = storedOverrides?.enabled === true;
-    const layoutStyleOverrideEnabled = globalOverrideEnabled
-        && (storedOverrides?.layoutStyle?.enabled ?? true);
+    const graphOverrideEnabled = globalOverrideEnabled
+        && (storedOverrides?.graph?.enabled ?? true);
+    const themeOverrideEnabled = globalOverrideEnabled
+        && (storedOverrides?.theme?.enabled ?? true);
     const colorOverrideEnabled = globalOverrideEnabled
         && (storedOverrides?.color?.enabled ?? true);
 
     return {
         defaults: resolveGlobalDefaults(storedGlobalSettings),
         globalOverrideEnabled,
-        layoutStyleOverride: layoutStyleOverrideEnabled
-            ? resolveGlobalLayoutStyleOverride(storedOverrides?.layoutStyle)
+        graphOverride: graphOverrideEnabled
+            ? resolveGlobalGraphOverride(storedOverrides?.graph)
+            : undefined,
+        themeOverride: themeOverrideEnabled
+            ? resolveGlobalThemeOverride(storedOverrides?.theme)
             : undefined,
         colorOverride: colorOverrideEnabled
             ? resolveGlobalColorOverride(storedOverrides?.color)
@@ -333,12 +317,15 @@ function resolveMetricSlot(
         DEFAULT_APPEARANCE_SETTINGS,
         storedSlot?.overrides?.appearance,
     );
-    const appearanceWithLayoutStyleOverride = globalSettings.layoutStyleOverride
-        ? applyGlobalLayoutStyleOverride(slotAppearance, globalSettings.layoutStyleOverride)
+    const appearanceWithGraphOverride = globalSettings.graphOverride
+        ? applyGlobalGraphOverride(slotAppearance, globalSettings.graphOverride)
         : slotAppearance;
+    const appearanceWithThemeOverride = globalSettings.themeOverride
+        ? applyGlobalThemeOverride(appearanceWithGraphOverride, globalSettings.themeOverride)
+        : appearanceWithGraphOverride;
     const appearance = globalSettings.colorOverride
-        ? applyGlobalColorOverride(appearanceWithLayoutStyleOverride, globalSettings.colorOverride)
-        : appearanceWithLayoutStyleOverride;
+        ? applyGlobalColorOverride(appearanceWithThemeOverride, globalSettings.colorOverride)
+        : appearanceWithThemeOverride;
 
     return {
         metric: resolveMetricSelection(
@@ -578,21 +565,19 @@ function resolveGlobalDefaults(
     };
 }
 
-function resolveGlobalLayoutStyleOverride(
-    storedOverride: StoredGlobalLayoutStyleOverride | undefined,
-): ResolvedGlobalLayoutStyleOverride {
+function resolveGlobalGraphOverride(
+    storedOverride: StoredGlobalGraphOverride | undefined,
+): ResolvedGlobalGraphOverride {
     return {
-        viewLayout: resolveStoredEnum(
-            storedOverride?.viewLayout,
-            singleMetricViewLayoutByProto,
-            DEFAULT_APPEARANCE_SETTINGS.viewLayout,
-        ),
-        circleStyle: resolveStoredEnum(
-            storedOverride?.circleStyle,
-            circleStyleByProto,
-            DEFAULT_APPEARANCE_SETTINGS.circleStyle,
-        ),
-        theme: resolveStoredEnum(storedOverride?.theme, metricThemeByProto, DEFAULT_APPEARANCE_SETTINGS.theme),
+        graph: resolveAppearanceGraphSettings(DEFAULT_APPEARANCE_SETTINGS.graph, storedOverride?.graph),
+    };
+}
+
+function resolveGlobalThemeOverride(
+    storedOverride: StoredGlobalThemeOverride | undefined,
+): ResolvedGlobalThemeOverride {
+    return {
+        theme: resolveAppearanceThemeSettings(DEFAULT_APPEARANCE_SETTINGS.theme, storedOverride?.theme),
     };
 }
 
@@ -600,12 +585,9 @@ function resolveGlobalColorOverride(
     storedOverride: StoredGlobalColorOverride | undefined,
 ): ResolvedGlobalColorOverride {
     return {
-        colors: mergeColorRamp(DEFAULT_APPEARANCE_SETTINGS.usageColors, storedOverride?.colors),
         colorMode: resolveStoredEnum(storedOverride?.colorMode, colorModeByProto, "solid"),
-        lowColorThresholdPercent: storedOverride?.lowColorThresholdPercent
-            ?? DEFAULT_APPEARANCE_SETTINGS.lowColorThresholdPercent,
-        highColorThresholdPercent: storedOverride?.highColorThresholdPercent
-            ?? DEFAULT_APPEARANCE_SETTINGS.highColorThresholdPercent,
+        solid: resolveGlobalSolidColorSettings(storedOverride?.solid),
+        multiColor: resolveGlobalMultiColorSettings(storedOverride?.multiColor),
     };
 }
 
@@ -639,38 +621,162 @@ function mergeAppearanceSettings(
     storedAppearance: StoredAppearanceSettings | undefined,
 ): ResolvedAppearanceSettings {
     return {
-        viewLayout: resolveStoredEnum(storedAppearance?.viewLayout, singleMetricViewLayoutByProto, defaults.viewLayout),
-        circleStyle: resolveStoredEnum(storedAppearance?.circleStyle, circleStyleByProto, defaults.circleStyle),
-        theme: resolveStoredEnum(storedAppearance?.theme, metricThemeByProto, defaults.theme),
-        colorMode: resolveStoredEnum(storedAppearance?.colorMode, colorModeByProto, defaults.colorMode),
-        usageColors: mergeColorRamp(defaults.usageColors, storedAppearance?.usageColors),
-        downloadColors: mergeColorRamp(defaults.downloadColors, storedAppearance?.downloadColors),
-        uploadColors: mergeColorRamp(defaults.uploadColors, storedAppearance?.uploadColors),
-        diskReadColors: mergeColorRamp(defaults.diskReadColors, storedAppearance?.diskReadColors),
-        diskWriteColors: mergeColorRamp(defaults.diskWriteColors, storedAppearance?.diskWriteColors),
-        lowColorThresholdPercent: storedAppearance?.lowColorThresholdPercent
-            ?? defaults.lowColorThresholdPercent,
-        highColorThresholdPercent: storedAppearance?.highColorThresholdPercent
-            ?? defaults.highColorThresholdPercent,
-        lineSmoothingPercent: storedAppearance?.lineSmoothingPercent ?? defaults.lineSmoothingPercent,
-        gridLineVisibility: resolveStoredEnum(
-            storedAppearance?.gridLineVisibility,
-            gridLineVisibilityByProto,
-            defaults.gridLineVisibility,
-        ),
-        gridLineType: resolveStoredEnum(storedAppearance?.gridLineType, gridLineTypeByProto, defaults.gridLineType),
+        graph: resolveAppearanceGraphSettings(defaults.graph, storedAppearance?.graph),
+        theme: resolveAppearanceThemeSettings(defaults.theme, storedAppearance?.theme),
+        metricColor: resolveMetricColorSettings(defaults.metricColor, storedAppearance?.metricColor),
+        sparkline: resolveSparklineAppearanceSettings(defaults.sparkline, storedAppearance?.sparkline),
     };
 }
 
-function applyGlobalLayoutStyleOverride(
+function resolveAppearanceGraphSettings(
+    defaults: ResolvedAppearanceGraphSettings,
+    storedGraph: StoredAppearanceGraphSettings | undefined,
+): ResolvedAppearanceGraphSettings {
+    return {
+        viewLayout: resolveStoredEnum(storedGraph?.viewLayout, singleMetricViewLayoutByProto, defaults.viewLayout),
+        circleStyle: resolveStoredEnum(storedGraph?.circleStyle, circleStyleByProto, defaults.circleStyle),
+    };
+}
+
+function resolveAppearanceThemeSettings(
+    defaults: ResolvedAppearanceThemeSettings,
+    storedTheme: StoredAppearanceThemeSettings | undefined,
+): ResolvedAppearanceThemeSettings {
+    return {
+        selectedTheme: resolveStoredEnum(storedTheme?.selectedTheme, metricThemeByProto, defaults.selectedTheme),
+        colorFilled: {
+            solid: resolveColorFilledSolidSettings(defaults.colorFilled.solid, storedTheme?.colorFilled?.solid),
+            multiColor: resolveColorFilledMultiColorSettings(
+                defaults.colorFilled.multiColor,
+                storedTheme?.colorFilled?.multiColor,
+            ),
+        },
+    };
+}
+
+function resolveColorFilledSolidSettings(
+    defaults: ResolvedColorFilledSolidSettings,
+    storedSolid: StoredColorFilledSolidSettings | undefined,
+): ResolvedColorFilledSolidSettings {
+    return {
+        color: storedSolid?.color ?? defaults.color,
+        isGradientEnabled: storedSolid?.gradientEnabled ?? defaults.isGradientEnabled,
+    };
+}
+
+function resolveColorFilledMultiColorSettings(
+    defaults: ResolvedColorFilledMultiColorSettings,
+    storedMultiColor: StoredColorFilledMultiColorSettings | undefined,
+): ResolvedColorFilledMultiColorSettings {
+    return {
+        colors: resolveMultiColorSet(defaults.colors, storedMultiColor?.colors),
+        isGradientEnabled: storedMultiColor?.gradientEnabled ?? defaults.isGradientEnabled,
+    };
+}
+
+function resolveMetricColorSettings(
+    defaults: ResolvedMetricColorSettings,
+    storedMetricColor: StoredMetricColorSettings | undefined,
+): ResolvedMetricColorSettings {
+    return {
+        colorMode: resolveStoredEnum(storedMetricColor?.colorMode, colorModeByProto, defaults.colorMode),
+        solid: resolveMetricSolidColorSettings(defaults.solid, storedMetricColor?.solid),
+        multiColor: resolveMetricMultiColorSettings(defaults.multiColor, storedMetricColor?.multiColor),
+    };
+}
+
+function resolveMetricSolidColorSettings(
+    defaults: ResolvedMetricSolidColorSettings,
+    storedSolid: StoredMetricSolidColorSettings | undefined,
+): ResolvedMetricSolidColorSettings {
+    const storedColors = storedSolid?.colors;
+
+    return {
+        isGradientEnabled: storedSolid?.gradientEnabled ?? defaults.isGradientEnabled,
+        colors: {
+            usageColor: storedColors?.usageColor ?? defaults.colors.usageColor,
+            downloadColor: storedColors?.downloadColor ?? defaults.colors.downloadColor,
+            uploadColor: storedColors?.uploadColor ?? defaults.colors.uploadColor,
+            diskReadColor: storedColors?.diskReadColor ?? defaults.colors.diskReadColor,
+            diskWriteColor: storedColors?.diskWriteColor ?? defaults.colors.diskWriteColor,
+        },
+    };
+}
+
+function resolveMetricMultiColorSettings(
+    defaults: ResolvedMetricMultiColorSettings,
+    storedMultiColor: StoredMetricMultiColorSettings | undefined,
+): ResolvedMetricMultiColorSettings {
+    const storedColors = storedMultiColor?.colors;
+
+    return {
+        lowThresholdPercent: storedMultiColor?.lowThresholdPercent ?? defaults.lowThresholdPercent,
+        highThresholdPercent: storedMultiColor?.highThresholdPercent ?? defaults.highThresholdPercent,
+        isGradientEnabled: storedMultiColor?.gradientEnabled ?? defaults.isGradientEnabled,
+        colors: {
+            usage: resolveMultiColorSet(defaults.colors.usage, storedColors?.usage),
+            download: resolveMultiColorSet(defaults.colors.download, storedColors?.download),
+            upload: resolveMultiColorSet(defaults.colors.upload, storedColors?.upload),
+            diskRead: resolveMultiColorSet(defaults.colors.diskRead, storedColors?.diskRead),
+            diskWrite: resolveMultiColorSet(defaults.colors.diskWrite, storedColors?.diskWrite),
+        },
+    };
+}
+
+function resolveSparklineAppearanceSettings(
+    defaults: ResolvedSparklineAppearanceSettings,
+    storedSparkline: StoredAppearanceSettings["sparkline"] | undefined,
+): ResolvedSparklineAppearanceSettings {
+    return {
+        lineSmoothingPercent: storedSparkline?.lineSmoothingPercent ?? defaults.lineSmoothingPercent,
+        gridLineVisibility: resolveStoredEnum(
+            storedSparkline?.gridLineVisibility,
+            gridLineVisibilityByProto,
+            defaults.gridLineVisibility,
+        ),
+        gridLineType: resolveStoredEnum(storedSparkline?.gridLineType, gridLineTypeByProto, defaults.gridLineType),
+    };
+}
+
+function resolveGlobalSolidColorSettings(
+    storedSolid: StoredGlobalSolidColorSettings | undefined,
+): ResolvedGlobalSolidColorSettings {
+    return {
+        color: storedSolid?.color ?? DEFAULT_APPEARANCE_SETTINGS.metricColor.solid.colors.usageColor,
+        isGradientEnabled: storedSolid?.gradientEnabled ?? DEFAULT_APPEARANCE_SETTINGS.metricColor.solid.isGradientEnabled,
+    };
+}
+
+function resolveGlobalMultiColorSettings(
+    storedMultiColor: StoredGlobalMultiColorSettings | undefined,
+): ResolvedGlobalMultiColorSettings {
+    const defaults = DEFAULT_APPEARANCE_SETTINGS.metricColor.multiColor;
+
+    return {
+        colors: resolveMultiColorSet(defaults.colors.usage, storedMultiColor?.colors),
+        lowThresholdPercent: storedMultiColor?.lowThresholdPercent ?? defaults.lowThresholdPercent,
+        highThresholdPercent: storedMultiColor?.highThresholdPercent ?? defaults.highThresholdPercent,
+        isGradientEnabled: storedMultiColor?.gradientEnabled ?? defaults.isGradientEnabled,
+    };
+}
+
+function applyGlobalGraphOverride(
     appearance: ResolvedAppearanceSettings,
-    layoutStyleOverride: ResolvedGlobalLayoutStyleOverride,
+    graphOverride: ResolvedGlobalGraphOverride,
 ): ResolvedAppearanceSettings {
     return {
         ...appearance,
-        viewLayout: layoutStyleOverride.viewLayout,
-        circleStyle: layoutStyleOverride.circleStyle,
-        theme: layoutStyleOverride.theme,
+        graph: graphOverride.graph,
+    };
+}
+
+function applyGlobalThemeOverride(
+    appearance: ResolvedAppearanceSettings,
+    themeOverride: ResolvedGlobalThemeOverride,
+): ResolvedAppearanceSettings {
+    return {
+        ...appearance,
+        theme: themeOverride.theme,
     };
 }
 
@@ -680,26 +786,42 @@ function applyGlobalColorOverride(
 ): ResolvedAppearanceSettings {
     return {
         ...appearance,
-        colorMode: colorOverride.colorMode,
-        usageColors: colorOverride.colors,
-        downloadColors: colorOverride.colors,
-        uploadColors: colorOverride.colors,
-        diskReadColors: colorOverride.colors,
-        diskWriteColors: colorOverride.colors,
-        lowColorThresholdPercent: colorOverride.lowColorThresholdPercent,
-        highColorThresholdPercent: colorOverride.highColorThresholdPercent,
+        metricColor: {
+            colorMode: colorOverride.colorMode,
+            solid: {
+                isGradientEnabled: colorOverride.solid.isGradientEnabled,
+                colors: {
+                    usageColor: colorOverride.solid.color,
+                    downloadColor: colorOverride.solid.color,
+                    uploadColor: colorOverride.solid.color,
+                    diskReadColor: colorOverride.solid.color,
+                    diskWriteColor: colorOverride.solid.color,
+                },
+            },
+            multiColor: {
+                lowThresholdPercent: colorOverride.multiColor.lowThresholdPercent,
+                highThresholdPercent: colorOverride.multiColor.highThresholdPercent,
+                isGradientEnabled: colorOverride.multiColor.isGradientEnabled,
+                colors: {
+                    usage: colorOverride.multiColor.colors,
+                    download: colorOverride.multiColor.colors,
+                    upload: colorOverride.multiColor.colors,
+                    diskRead: colorOverride.multiColor.colors,
+                    diskWrite: colorOverride.multiColor.colors,
+                },
+            },
+        },
     };
 }
 
-function mergeColorRamp(
-    defaults: ResolvedColorRamp,
-    storedColorRamp: StoredColorRamp | undefined,
-): ResolvedColorRamp {
+function resolveMultiColorSet(
+    defaults: ResolvedMultiColorSet,
+    storedColors: StoredMultiColorSet | undefined,
+): ResolvedMultiColorSet {
     return {
-        solidColor: storedColorRamp?.solidColor ?? defaults.solidColor,
-        lowColor: storedColorRamp?.lowColor ?? defaults.lowColor,
-        mediumColor: storedColorRamp?.mediumColor ?? defaults.mediumColor,
-        highColor: storedColorRamp?.highColor ?? defaults.highColor,
+        lowColor: storedColors?.lowColor ?? defaults.lowColor,
+        mediumColor: storedColors?.mediumColor ?? defaults.mediumColor,
+        highColor: storedColors?.highColor ?? defaults.highColor,
     };
 }
 

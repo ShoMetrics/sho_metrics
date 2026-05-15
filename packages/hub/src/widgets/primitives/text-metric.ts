@@ -16,7 +16,7 @@ export interface TextMetricConfig extends WidgetBaseConfig {
 }
 
 export const DEFAULT_TEXT_METRIC_CONFIG: TextMetricConfig = {
-    colorConfig: { mode: "solid", solidColor: "#3b82f6", thresholds: [] },
+    colorConfig: { mode: "solid", solidColor: "#3b82f6", thresholds: [], isGradientEnabled: true },
     labelTextColor: "rgba(255,255,255,0.70)",
     valueTextColor: "white",
     unitTextColor: "rgba(255,255,255,0.74)",

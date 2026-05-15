@@ -10,7 +10,8 @@ import { SettingsSection } from "./SettingsSection";
 
 interface WidgetSettingsTabProps {
     context: VisibilityContext;
-    isGlobalLayoutStyleOverrideEnabled: boolean;
+    isGlobalGraphOverrideEnabled: boolean;
+    isGlobalThemeOverrideEnabled: boolean;
     isGlobalColorOverrideEnabled: boolean;
     onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
     onResetWidgetSettings: () => void;
@@ -20,7 +21,8 @@ const WIDGET_SETTINGS_PENDING_NOTICE_DELAY_MS = 1000;
 
 export function WidgetSettingsTab({
     context,
-    isGlobalLayoutStyleOverrideEnabled,
+    isGlobalGraphOverrideEnabled,
+    isGlobalThemeOverrideEnabled,
     isGlobalColorOverrideEnabled,
     onSettingsPatch,
     onResetWidgetSettings,
@@ -56,10 +58,13 @@ export function WidgetSettingsTab({
     const panelProps = {
         context,
         onSettingsPatch,
-        layoutStyleDisabled: isGlobalLayoutStyleOverrideEnabled,
+        graphDisabled: isGlobalGraphOverrideEnabled,
+        themeDisabled: isGlobalThemeOverrideEnabled,
         colorDisabled: isGlobalColorOverrideEnabled,
     };
-    const hasGlobalOverride = isGlobalLayoutStyleOverrideEnabled || isGlobalColorOverrideEnabled;
+    const hasGlobalOverride = isGlobalGraphOverrideEnabled
+        || isGlobalThemeOverrideEnabled
+        || isGlobalColorOverrideEnabled;
 
     return (
         <>
@@ -88,7 +93,8 @@ function renderMetricPanel(
     panelProps: {
         context: VisibilityContext;
         onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
-        layoutStyleDisabled: boolean;
+        graphDisabled: boolean;
+        themeDisabled: boolean;
         colorDisabled: boolean;
     },
 ): React.JSX.Element {

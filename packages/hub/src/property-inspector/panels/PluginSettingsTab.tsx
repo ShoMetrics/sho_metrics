@@ -3,7 +3,10 @@ import { GraphicTypeSetting } from "../controls/GraphicTypeSetting";
 import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { InspectorItem } from "../components/InspectorItem";
-import { ColorRampSettings } from "./ColorSettings";
+import {
+    ColorFilledThemeControls,
+    MetricColorControls,
+} from "./ColorSettings";
 import { SettingsSection } from "./SettingsSection";
 import {
     graphicStyleOptionList,
@@ -13,8 +16,9 @@ import {
 import type {
     ResolvedDiskThroughputDisplaySettings,
     ResolvedGlobalColorOverride,
-    ResolvedGlobalLayoutStyleOverride,
+    ResolvedGlobalGraphOverride,
     ResolvedGlobalSettings,
+    ResolvedGlobalThemeOverride,
     ResolvedNetworkDisplaySettings,
 } from "../../settings/resolved-settings";
 import type { StoredGlobalSettingsPatch } from "../../settings/storage/global-settings-patch";
@@ -33,12 +37,19 @@ export function PluginSettingsTab({ resolvedSettings, onSettingsPatch }: PluginS
             />
             {resolvedSettings.globalOverrideEnabled && (
                 <>
-                    <LayoutStyleOverrideSection
-                        layoutStyleOverride={resolvedSettings.layoutStyleOverride}
-                        onOverrideChange={(layoutStyleOverrideEnabled) => onSettingsPatch({
-                            layoutStyleOverrideEnabled,
+                    <GraphOverrideSection
+                        graphOverride={resolvedSettings.graphOverride}
+                        onOverrideChange={(graphOverrideEnabled) => onSettingsPatch({
+                            graphOverrideEnabled,
                         })}
-                        onLayoutStylePatch={(layoutStyle) => onSettingsPatch({ layoutStyle })}
+                        onGraphPatch={(graph) => onSettingsPatch({ graph })}
+                    />
+                    <ThemeOverrideSection
+                        themeOverride={resolvedSettings.themeOverride}
+                        onOverrideChange={(themeOverrideEnabled) => onSettingsPatch({
+                            themeOverrideEnabled,
+                        })}
+                        onThemePatch={(theme) => onSettingsPatch({ theme })}
                     />
                     <ColorOverrideSection
                         colorOverride={resolvedSettings.colorOverride}
@@ -89,39 +100,70 @@ function GlobalOverrideSection({
     );
 }
 
-function LayoutStyleOverrideSection({
-    layoutStyleOverride,
+function GraphOverrideSection({
+    graphOverride,
     onOverrideChange,
-    onLayoutStylePatch,
+    onGraphPatch,
 }: {
-    layoutStyleOverride: ResolvedGlobalLayoutStyleOverride | undefined;
+    graphOverride: ResolvedGlobalGraphOverride | undefined;
     onOverrideChange: (isEnabled: boolean) => void;
-    onLayoutStylePatch: (patch: NonNullable<StoredGlobalSettingsPatch["layoutStyle"]>) => void;
+    onGraphPatch: (patch: NonNullable<StoredGlobalSettingsPatch["graph"]>) => void;
 }): React.JSX.Element {
     return (
-        <SettingsSection title="Layout & Style Override">
+        <SettingsSection title="Graph Override">
             <OverrideSubsectionToggle
-                label="Override layout and style"
-                isEnabled={layoutStyleOverride !== undefined}
+                label="Override graph"
+                isEnabled={graphOverride !== undefined}
                 onValueChange={onOverrideChange}
             />
-            {layoutStyleOverride && (
+            {graphOverride && (
                 <>
                     <GraphicTypeSetting
-                        value={layoutStyleOverride.viewLayout}
-                        onValueChange={(viewLayout) => onLayoutStylePatch({ viewLayout })}
+                        value={graphOverride.graph.viewLayout}
+                        onValueChange={(viewLayout) => onGraphPatch({ viewLayout })}
                     />
                     <CircleStyleSetting
-                        value={layoutStyleOverride.circleStyle}
-                        onValueChange={(circleStyle) => onLayoutStylePatch({ circleStyle })}
-                        disabled={layoutStyleOverride.viewLayout !== "circular"}
+                        value={graphOverride.graph.circleStyle}
+                        onValueChange={(circleStyle) => onGraphPatch({ circleStyle })}
+                        disabled={graphOverride.graph.viewLayout !== "circular"}
                     />
+                </>
+            )}
+        </SettingsSection>
+    );
+}
+
+function ThemeOverrideSection({
+    themeOverride,
+    onOverrideChange,
+    onThemePatch,
+}: {
+    themeOverride: ResolvedGlobalThemeOverride | undefined;
+    onOverrideChange: (isEnabled: boolean) => void;
+    onThemePatch: (patch: NonNullable<StoredGlobalSettingsPatch["theme"]>) => void;
+}): React.JSX.Element {
+    return (
+        <SettingsSection title="Theme Override">
+            <OverrideSubsectionToggle
+                label="Override theme"
+                isEnabled={themeOverride !== undefined}
+                onValueChange={onOverrideChange}
+            />
+            {themeOverride && (
+                <>
                     <SelectSetting
                         label="Graphic Style"
-                        value={layoutStyleOverride.theme}
+                        value={themeOverride.theme.selectedTheme}
                         optionList={graphicStyleOptionList}
-                        onValueChange={(theme) => onLayoutStylePatch({ theme })}
+                        onValueChange={(selectedTheme) => onThemePatch({ selectedTheme })}
                     />
+                    {themeOverride.theme.selectedTheme === "color-filled" && (
+                        <ColorFilledThemeControls
+                            colorFilled={themeOverride.theme.colorFilled}
+                            onSolidPatch={(solid) => onThemePatch({ colorFilled: { solid } })}
+                            onMultiColorPatch={(multiColor) => onThemePatch({ colorFilled: { multiColor } })}
+                        />
+                    )}
                 </>
             )}
         </SettingsSection>
@@ -145,14 +187,26 @@ function ColorOverrideSection({
                 onValueChange={onOverrideChange}
             />
             {colorOverride && (
-                <ColorRampSettings
+                <MetricColorControls
                     colorMode={colorOverride.colorMode}
-                    colors={colorOverride.colors}
-                    lowColorThresholdPercent={colorOverride.lowColorThresholdPercent}
-                    highColorThresholdPercent={colorOverride.highColorThresholdPercent}
+                    solidColor={colorOverride.solid.color}
+                    multiColor={colorOverride.multiColor.colors}
+                    lowThresholdPercent={colorOverride.multiColor.lowThresholdPercent}
+                    highThresholdPercent={colorOverride.multiColor.highThresholdPercent}
+                    isSolidGradientEnabled={colorOverride.solid.isGradientEnabled}
+                    isMultiColorGradientEnabled={colorOverride.multiColor.isGradientEnabled}
                     onColorModeChange={(colorMode) => onColorPatch({ colorMode })}
-                    onColorRampPatch={(colors) => onColorPatch({ colors })}
-                    onThresholdPatch={onColorPatch}
+                    onSolidColorChange={(color) => onColorPatch({ solid: { color } })}
+                    onMultiColorPatch={(colors) => onColorPatch({ multiColor: { colors } })}
+                    onThresholdPatch={(thresholdPatch) => onColorPatch({
+                        multiColor: thresholdPatch,
+                    })}
+                    onSolidGradientChange={(isGradientEnabled) => onColorPatch({
+                        solid: { isGradientEnabled },
+                    })}
+                    onMultiColorGradientChange={(isGradientEnabled) => onColorPatch({
+                        multiColor: { isGradientEnabled },
+                    })}
                 />
             )}
         </SettingsSection>

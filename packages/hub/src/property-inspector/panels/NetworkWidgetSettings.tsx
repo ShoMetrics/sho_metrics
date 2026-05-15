@@ -54,7 +54,7 @@ function NetworkMetricSettings({
                     network: { direction },
                 })}
             />
-            {context.resolved.widget.slot.appearance.viewLayout === "circular" && (
+            {context.resolved.widget.slot.appearance.graph.viewLayout === "circular" && (
                 <InspectorItem className="note-item note-item-default">
                     <p className="section-note">Download and upload split the circle into two halves.</p>
                 </InspectorItem>

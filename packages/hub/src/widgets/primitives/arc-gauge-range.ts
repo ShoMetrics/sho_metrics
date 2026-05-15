@@ -82,6 +82,28 @@ export function buildGaugeRangeColorPlan(options: {
     gradientHeadAdjustmentPercent: number;
     gaugeRangeBlendProgress: number;
 }): GaugeRangeColorPlan {
+    if (!options.colorConfig.isGradientEnabled) {
+        const paintSegments = options.circleStyle === "gauge" && options.colorConfig.mode === "threshold"
+            ? buildBlendedGaugeRangePaintSegments({
+                bands: buildThresholdGaugeRangeBands(options.colorConfig),
+                blendProgress: 0,
+            })
+            : [{
+                startProgress: 0,
+                endProgress: 1,
+                startColor: options.baseColor,
+                endColor: options.baseColor,
+            }];
+
+        return {
+            stops: buildGaugeRangeStops(paintSegments),
+            paintSegments,
+            markerFill: options.circleStyle === "gauge"
+                ? resolveGaugeRangePaintColor(clamp(options.progress, 0, 1), paintSegments)
+                : options.baseColor,
+        };
+    }
+
     if (options.circleStyle === "gauge" && options.colorConfig.mode === "threshold") {
         const blendProgress = clamp(options.gaugeRangeBlendProgress, 0, MAX_GAUGE_RANGE_BLEND_PROGRESS);
         const rangeBands = buildThresholdGaugeRangeBands(options.colorConfig);

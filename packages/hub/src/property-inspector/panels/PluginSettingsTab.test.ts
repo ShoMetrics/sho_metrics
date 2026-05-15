@@ -5,19 +5,21 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ResolvedGlobalSettings } from "../../settings/resolved-settings";
 import { PluginSettingsTab } from "./PluginSettingsTab";
 
-test("plugin global override groups layout style and color controls under the master switch", () => {
+test("plugin global override groups graph theme and color controls under the master switch", () => {
     const markup = renderToStaticMarkup(createElement(PluginSettingsTab, {
         resolvedSettings: buildGlobalSettings(),
         onSettingsPatch: () => undefined,
     }));
 
     assert.match(markup, /Global override/);
-    assert.match(markup, /Layout &amp; Style Override/);
-    assert.match(markup, /Override layout and style/);
+    assert.match(markup, /Graph Override/);
+    assert.match(markup, /Override graph/);
+    assert.match(markup, /Theme Override/);
+    assert.match(markup, /Override theme/);
     assert.match(markup, /Color Override/);
     assert.match(markup, /Override color/);
     assert.doesNotMatch(markup, /Global Color Mode:/);
-    assert.match(markup, /B&amp;W/);
+    assert.match(markup, /Black &amp; White/);
     assert.match(markup, /Color Mode:/);
     assert.match(markup, /Low Ends At:/);
     assert.match(markup, /High Starts At:/);
@@ -43,21 +45,47 @@ function buildGlobalSettings(): ResolvedGlobalSettings {
             },
         },
         globalOverrideEnabled: true,
-        layoutStyleOverride: {
-            viewLayout: "circular",
-            circleStyle: "value",
-            theme: "flat",
+        graphOverride: {
+            graph: {
+                viewLayout: "circular",
+                circleStyle: "value",
+            },
+        },
+        themeOverride: {
+            theme: {
+                selectedTheme: "flat",
+                colorFilled: {
+                    solid: {
+                        color: "#3b82f6",
+                        isGradientEnabled: true,
+                    },
+                    multiColor: {
+                        colors: {
+                            lowColor: "#22c55e",
+                            mediumColor: "#eab308",
+                            highColor: "#ef4444",
+                        },
+                        isGradientEnabled: true,
+                    },
+                },
+            },
         },
         colorOverride: {
-            colors: {
-                solidColor: "#3b82f6",
-                lowColor: "#22c55e",
-                mediumColor: "#eab308",
-                highColor: "#ef4444",
+            colorMode: "multi-color",
+            solid: {
+                color: "#3b82f6",
+                isGradientEnabled: true,
             },
-            colorMode: "threshold",
-            lowColorThresholdPercent: 30,
-            highColorThresholdPercent: 70,
+            multiColor: {
+                colors: {
+                    lowColor: "#22c55e",
+                    mediumColor: "#eab308",
+                    highColor: "#ef4444",
+                },
+                lowThresholdPercent: 30,
+                highThresholdPercent: 70,
+                isGradientEnabled: true,
+            },
         },
         sourceProfiles: [],
         defaultSourceProfileId: undefined,

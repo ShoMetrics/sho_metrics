@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { WillAppearEvent } from "@elgato/streamdeck";
-import { buildSampleResolvedAppearanceSettings } from "../settings/sample-appearance-settings";
-import { buildMetricVisualSettings } from "../settings/visual-adapter";
+import {
+    buildDefaultAppearanceSettings,
+} from "../settings/default-appearance-settings";
+import type { ResolvedAppearanceSettingsOverride } from "../settings/appearance-overrides";
+import { buildMetricRenderAppearance } from "../settings/visual-adapter";
 import {
     KEYPAD_PNG_SIZE,
     TOUCH_STRIP_LOGICAL_SIZE,
@@ -54,8 +57,10 @@ test("single circular icon placeholder keeps source data and marks the render pl
     const displayOptions = buildSingleMetricDisplayOptions({
         widgetData: buildWidgetData(),
         resolvedSettings: {
-            viewLayout: "circular",
-            circleStyle: "compact",
+            graph: {
+                viewLayout: "circular",
+                circleStyle: "compact",
+            },
         },
     });
 
@@ -169,8 +174,10 @@ test("center content falls back to value outside circular graphics", () => {
         displayOptions: buildSingleMetricDisplayOptions({
             widgetData: buildWidgetData(),
             resolvedSettings: {
-                viewLayout: "linear",
-                circleStyle: "compact",
+                graph: {
+                    viewLayout: "linear",
+                    circleStyle: "compact",
+                },
             },
         }),
         isDial: false,
@@ -194,8 +201,10 @@ test("compact circle style uses icon center content", () => {
         displayOptions: buildSingleMetricDisplayOptions({
             widgetData: buildWidgetData(),
             resolvedSettings: {
-                viewLayout: "circular",
-                circleStyle: "compact",
+                graph: {
+                    viewLayout: "circular",
+                    circleStyle: "compact",
+                },
             },
         }),
         isDial: false,
@@ -209,7 +218,7 @@ test("key render plan uses keypad PNG dimensions and no touch strip layout", () 
         displayOptions: buildSingleMetricDisplayOptions({
             widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
             resolvedSettings: {
-                viewLayout: "linear",
+                graph: { viewLayout: "linear" },
             },
         }),
         isDial: false,
@@ -225,7 +234,7 @@ test("touch strip layout uses square rendering for circular graphics", () => {
         displayOptions: buildSingleMetricDisplayOptions({
             widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
             resolvedSettings: {
-                viewLayout: "circular",
+                graph: { viewLayout: "circular" },
             },
         }),
         isDial: true,
@@ -237,10 +246,9 @@ test("touch strip layout uses square rendering for circular graphics", () => {
 });
 
 test("touch strip layout uses wide rendering for non-circular graphics", () => {
-    const touchStripMetricLayout = resolveTouchStripMetricLayout(buildMetricVisualSettings({
-        ...buildSampleResolvedAppearanceSettings(),
-        viewLayout: "sparkline",
-    }));
+    const touchStripMetricLayout = resolveTouchStripMetricLayout(buildMetricRenderAppearance(
+        buildDefaultAppearanceSettings({ graph: { viewLayout: "sparkline" } }),
+    ));
 
     assert.equal(touchStripMetricLayout.kind, "wide");
     assert.deepEqual(touchStripMetricLayout.renderSize, TOUCH_STRIP_LOGICAL_SIZE);
@@ -249,7 +257,7 @@ test("touch strip layout uses wide rendering for non-circular graphics", () => {
 
 function buildSingleMetricDisplayOptions(options: {
     widgetData: WidgetData;
-    resolvedSettings?: Partial<SingleMetricDisplayOptions["resolvedSettings"]>;
+    resolvedSettings?: ResolvedAppearanceSettingsOverride;
 }): SingleMetricDisplayOptions {
     return {
         event: {
@@ -264,10 +272,7 @@ function buildSingleMetricDisplayOptions(options: {
         centerIconFragment: "<path />",
         statusIcon: buildStatusIcon(),
         widgetData: options.widgetData,
-        resolvedSettings: {
-            ...buildSampleResolvedAppearanceSettings(),
-            ...options.resolvedSettings,
-        },
+        resolvedSettings: buildDefaultAppearanceSettings(options.resolvedSettings),
     };
 }
 

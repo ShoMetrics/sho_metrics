@@ -53,7 +53,7 @@ export const DEFAULT_ARC_GAUGE_CONFIG: ArcGaugeConfig = {
         { min: 0, max: 50, color: "#22c55e" },
         { min: 50, max: 80, color: "#eab308" },
         { min: 80, max: 101, color: "#ef4444" },
-    ]},
+    ], isGradientEnabled: true },
     trackColor: "rgba(255,255,255,0.14)",
     strokeWidth: 11,
     labelTextColor: "rgba(255,255,255,0.78)",
@@ -215,7 +215,8 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
 
         const shouldRenderFullRangeArc = circleStyle === "gauge" && valueText !== "N/A";
         const shouldRenderProgressRing = !shouldRenderFullRangeArc && data.progress > 0;
-        const progressGradientDefs = shouldRenderProgressRing
+        const shouldRenderProgressGradient = shouldRenderProgressRing && config.colorConfig.isGradientEnabled;
+        const progressGradientDefs = shouldRenderProgressGradient
             ? `
                 <defs>
                     <linearGradient id="${gradientId}" x1="5%" y1="95%" x2="95%" y2="5%">
@@ -231,7 +232,7 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
                 geometry,
                 progress: data.progress,
                 trackColor: config.trackColor,
-                progressStroke: `url(#${gradientId})`,
+                progressStroke: shouldRenderProgressGradient ? `url(#${gradientId})` : arcColor,
                 rangeColorPlan,
                 strokeWidth: config.strokeWidth,
                 notchGeometry: ringNotchGeometry,

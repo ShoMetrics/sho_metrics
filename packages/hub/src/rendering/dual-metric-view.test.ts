@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { renderDualMetricBodyView } from "./dual-metric-view";
+import type { MetricRenderAppearance } from "./render-appearance";
 import type { DualChannelWidgetData, WidgetData } from "./widget-data";
-import { buildSampleResolvedAppearanceSettings } from "../settings/sample-appearance-settings";
-import { buildMetricVisualSettings } from "../settings/visual-adapter";
 
 test("dual metric view renders the requested primitive branch", () => {
     const testCases = [
@@ -11,7 +10,7 @@ test("dual metric view renders the requested primitive branch", () => {
         { graphicType: "circular" as const, expected: /dual-arc-positive-row/ },
         { graphicType: "text" as const, expected: /text-metric-positive-value/ },
     ];
-    const visualSettings = buildMetricVisualSettings(buildSampleResolvedAppearanceSettings());
+    const visualSettings = buildMetricRenderAppearance();
 
     for (const testCase of testCases) {
         const svg = renderDualMetricBodyView({
@@ -31,6 +30,36 @@ test("dual metric view renders the requested primitive branch", () => {
         assert.match(svg, testCase.expected);
     }
 });
+
+function buildMetricRenderAppearance(): MetricRenderAppearance {
+    return {
+        graphicType: "circular",
+        circleStyle: "value",
+        graphicStyle: "flat",
+        paintConstraint: "none",
+        paints: {
+            background: "#0f0f0f",
+            backgroundFill: undefined,
+            surface: "rgba(255,255,255,0.08)",
+            primaryText: "rgba(255,255,255,0.94)",
+            secondaryText: "rgba(255,255,255,0.72)",
+            mutedText: "rgba(255,255,255,0.48)",
+            icon: "rgba(255,255,255,0.88)",
+            primaryMetric: {
+                mode: "solid",
+                solidColor: "#3b82f6",
+                thresholds: [],
+                isGradientEnabled: true,
+            },
+            track: "rgba(255,255,255,0.14)",
+            grid: "rgba(255,255,255,0.18)",
+            divider: "rgba(255,255,255,0.18)",
+        },
+        lineSmoothingPercent: 75,
+        gridLineVisibility: "adaptive",
+        gridLineType: "horizontal",
+    };
+}
 
 function buildDualChannelData(): DualChannelWidgetData {
     return {

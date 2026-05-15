@@ -2,8 +2,8 @@ import { renderMetricFrame } from "../../rendering/metric-frame";
 import { renderSingleMetricBodyView } from "../../rendering/single-metric-view";
 import type { WidgetData } from "../../rendering/widget-data";
 import { WIDGET_LOGICAL_SIZE } from "../../rendering/widget-data";
-import { buildSampleResolvedAppearanceSettings } from "../../settings/sample-appearance-settings";
-import { buildMetricVisualSettings } from "../../settings/visual-adapter";
+import { buildDefaultAppearanceSettings } from "../../settings/default-appearance-settings";
+import { buildMetricRenderAppearance } from "../../settings/visual-adapter";
 import { getHardwareIconFragment } from "../../widgets/icons/hardware-icons";
 import { getMetricStatusIcon } from "../../widgets/icons/metric-status-icons";
 import type { CircleStyle } from "../inspector/settings-types";
@@ -19,9 +19,9 @@ const previewData: WidgetData = {
 };
 
 export function buildCircleStylePreviewUri(circleStyle: CircleStyle): string {
-    const visualSettings = buildMetricVisualSettings(buildSampleResolvedAppearanceSettings({
-        circleStyle,
-        colorMode: "solid",
+    const visualSettings = buildMetricRenderAppearance(buildDefaultAppearanceSettings({
+        graph: { circleStyle },
+        metricColor: { colorMode: "solid" },
     }));
     const body = renderSingleMetricBodyView({
         data: previewData,

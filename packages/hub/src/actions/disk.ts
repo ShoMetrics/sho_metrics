@@ -42,7 +42,7 @@ export class Disk extends MetricAction {
         if (metricKind === "throughput") {
             return resolveDiskMetricSubscriptionKeys({
                 diskMetricKind: metricKind,
-                graphicType: settings.widget.slot.appearance.viewLayout,
+                graphicType: settings.widget.slot.appearance.graph.viewLayout,
                 diskThroughputDirection: diskTarget.reading.direction,
             });
         }

@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildMetricVisualSettings } from "./visual-adapter";
-import { buildSampleResolvedAppearanceSettings as buildAppearanceSettings } from "./sample-appearance-settings";
+import { buildMetricRenderAppearance } from "./visual-adapter";
+import { buildDefaultAppearanceSettings as buildAppearanceSettings } from "./default-appearance-settings";
 
 test("graphic type maps resolved appearance settings to renderer names", () => {
-    const circularSettings = buildMetricVisualSettings(buildAppearanceSettings({ viewLayout: "circular" }));
-    const linearSettings = buildMetricVisualSettings(buildAppearanceSettings({ viewLayout: "linear" }));
-    const sparklineSettings = buildMetricVisualSettings(buildAppearanceSettings({ viewLayout: "sparkline" }));
+    const circularSettings = buildMetricRenderAppearance(buildAppearanceSettings({ graph: { viewLayout: "circular" } }));
+    const linearSettings = buildMetricRenderAppearance(buildAppearanceSettings({ graph: { viewLayout: "linear" } }));
+    const sparklineSettings = buildMetricRenderAppearance(buildAppearanceSettings({ graph: { viewLayout: "sparkline" } }));
 
     assert.equal(circularSettings.graphicType, "circular");
     assert.equal(linearSettings.graphicType, "linear");
@@ -14,9 +14,9 @@ test("graphic type maps resolved appearance settings to renderer names", () => {
 });
 
 test("circle style maps resolved appearance settings to renderer presets", () => {
-    const compactSettings = buildMetricVisualSettings(buildAppearanceSettings({ circleStyle: "compact" }));
-    const gaugeSettings = buildMetricVisualSettings(buildAppearanceSettings({ circleStyle: "gauge" }));
-    const valueSettings = buildMetricVisualSettings(buildAppearanceSettings({ circleStyle: "value" }));
+    const compactSettings = buildMetricRenderAppearance(buildAppearanceSettings({ graph: { circleStyle: "compact" } }));
+    const gaugeSettings = buildMetricRenderAppearance(buildAppearanceSettings({ graph: { circleStyle: "gauge" } }));
+    const valueSettings = buildMetricRenderAppearance(buildAppearanceSettings({ graph: { circleStyle: "value" } }));
 
     assert.equal(compactSettings.circleStyle, "compact");
     assert.equal(gaugeSettings.circleStyle, "gauge");
@@ -24,21 +24,26 @@ test("circle style maps resolved appearance settings to renderer presets", () =>
 });
 
 test("graphic style maps resolved appearance settings to theme preset names", () => {
-    const cupertinoGlassSettings = buildMetricVisualSettings(buildAppearanceSettings({
-        theme: "cupertino-glass",
+    const cupertinoGlassSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: { selectedTheme: "cupertino-glass" },
     }));
-    const defaultSettings = buildMetricVisualSettings(buildAppearanceSettings());
+    const colorFilledSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: { selectedTheme: "color-filled" },
+    }));
+    const defaultSettings = buildMetricRenderAppearance(buildAppearanceSettings());
 
     assert.equal(cupertinoGlassSettings.graphicStyle, "cupertino-glass");
+    assert.equal(colorFilledSettings.graphicStyle, "color-filled");
     assert.equal(defaultSettings.graphicStyle, "flat");
 });
 
 test("solid color mode uses resolved appearance color", () => {
-    const visualSettings = buildMetricVisualSettings(buildAppearanceSettings({
-        colorMode: "solid",
-        usageColors: {
-            ...buildAppearanceSettings().usageColors,
-            solidColor: "#123456",
+    const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        metricColor: {
+            colorMode: "solid",
+            solid: {
+                colors: { usageColor: "#123456" },
+            },
         },
     }));
 
@@ -46,9 +51,13 @@ test("solid color mode uses resolved appearance color", () => {
 });
 
 test("threshold values build renderer color bands", () => {
-    const primaryMetric = buildMetricVisualSettings(buildAppearanceSettings({
-        lowColorThresholdPercent: 20,
-        highColorThresholdPercent: 90,
+    const primaryMetric = buildMetricRenderAppearance(buildAppearanceSettings({
+        metricColor: {
+            multiColor: {
+                lowThresholdPercent: 20,
+                highThresholdPercent: 90,
+            },
+        },
     })).paints.primaryMetric;
 
     assert.deepEqual(primaryMetric.thresholds.map(threshold => ({
@@ -62,12 +71,17 @@ test("threshold values build renderer color bands", () => {
 });
 
 test("threshold colors use resolved appearance colors", () => {
-    const primaryMetric = buildMetricVisualSettings(buildAppearanceSettings({
-        usageColors: {
-            ...buildAppearanceSettings().usageColors,
-            lowColor: "#111111",
-            mediumColor: "#222222",
-            highColor: "#333333",
+    const primaryMetric = buildMetricRenderAppearance(buildAppearanceSettings({
+        metricColor: {
+            multiColor: {
+                colors: {
+                    usage: {
+                        lowColor: "#111111",
+                        mediumColor: "#222222",
+                        highColor: "#333333",
+                    },
+                },
+            },
         },
     })).paints.primaryMetric;
 
@@ -79,8 +93,8 @@ test("threshold colors use resolved appearance colors", () => {
 });
 
 test("black-white color mode lowers renderer paint to neutral colors", () => {
-    const visualSettings = buildMetricVisualSettings(buildAppearanceSettings({
-        colorMode: "black-white",
+    const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        metricColor: { colorMode: "black-white" },
     }));
 
     assert.equal(visualSettings.paintConstraint, "black-white");
@@ -88,14 +102,76 @@ test("black-white color mode lowers renderer paint to neutral colors", () => {
         mode: "solid",
         solidColor: "#e6e6e6",
         thresholds: [],
+        isGradientEnabled: false,
+    });
+});
+
+test("color filled solid mode uses theme background color and neutral foreground paint", () => {
+    const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: {
+            selectedTheme: "color-filled",
+            colorFilled: {
+                solid: { color: "#123456" },
+            },
+        },
+        metricColor: {
+            colorMode: "solid",
+            solid: { colors: { usageColor: "#ef4444" } },
+        },
+    }));
+
+    assert.deepEqual(visualSettings.paints.backgroundFill, {
+        fillKind: "solid",
+        color: "#123456",
+        isGradientEnabled: true,
+    });
+    assert.deepEqual(visualSettings.paints.primaryMetric, {
+        mode: "solid",
+        solidColor: "#e6e6e6",
+        thresholds: [],
+        isGradientEnabled: false,
+    });
+});
+
+test("color filled multi-color mode uses soft triangle colors without threshold positions", () => {
+    const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: {
+            selectedTheme: "color-filled",
+            colorFilled: {
+                multiColor: {
+                    colors: {
+                        lowColor: "#111111",
+                        mediumColor: "#222222",
+                        highColor: "#333333",
+                    },
+                    isGradientEnabled: false,
+                },
+            },
+        },
+        metricColor: {
+            multiColor: {
+                lowThresholdPercent: 10,
+                highThresholdPercent: 90,
+            },
+        },
+    }));
+
+    assert.deepEqual(visualSettings.paints.backgroundFill, {
+        fillKind: "soft-triangle",
+        lowColor: "#111111",
+        mediumColor: "#222222",
+        highColor: "#333333",
+        isGradientEnabled: false,
     });
 });
 
 test("line smoothing and grid options pass through resolved appearance settings", () => {
-    const visualSettings = buildMetricVisualSettings(buildAppearanceSettings({
-        lineSmoothingPercent: 95,
-        gridLineVisibility: "always",
-        gridLineType: "vertical",
+    const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        sparkline: {
+            lineSmoothingPercent: 95,
+            gridLineVisibility: "always",
+            gridLineType: "vertical",
+        },
     }));
 
     assert.equal(visualSettings.lineSmoothingPercent, 95);

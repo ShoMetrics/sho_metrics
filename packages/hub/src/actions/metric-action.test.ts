@@ -29,13 +29,13 @@ test("runtime cache publishes to Property Inspector without writing settings", a
         resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
         {
             appearance: {
-                viewLayout: "circular",
+                graph: { viewLayout: "circular" },
             },
         },
     );
     const sparklineNetworkSettings = writeStoredWidgetSettingsPatch(circularNetworkSettings, {
         appearance: {
-            viewLayout: "sparkline",
+            graph: { viewLayout: "sparkline" },
         },
     });
     const willAppearEvent = {

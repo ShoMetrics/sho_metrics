@@ -35,7 +35,7 @@ export interface DualChannelSparklineConfig extends WidgetBaseConfig {
 export type DualChannelSparklineMode = "overlay" | "mirrored";
 
 export const DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG: DualChannelSparklineConfig = {
-    colorConfig: { mode: "solid", solidColor: "#3b82f6", thresholds: [] },
+    colorConfig: { mode: "solid", solidColor: "#3b82f6", thresholds: [], isGradientEnabled: true },
     chartMode: "overlay",
     positiveColor: "#3b82f6",
     negativeColor: "#ef4444",
@@ -140,10 +140,12 @@ export function renderDualChannelSparkline(
 
     return `
         <defs>
-            ${renderLineGradient(positiveLineGradientId, config.positiveColor)}
-            ${renderAreaGradient(positiveAreaGradientId, config.positiveColor, config.fillOpacity)}
-            ${renderLineGradient(negativeLineGradientId, config.negativeColor)}
-            ${renderAreaGradient(negativeAreaGradientId, config.negativeColor, config.fillOpacity * 0.82)}
+            ${config.colorConfig.isGradientEnabled ? `
+                ${renderLineGradient(positiveLineGradientId, config.positiveColor)}
+                ${renderAreaGradient(positiveAreaGradientId, config.positiveColor, config.fillOpacity)}
+                ${renderLineGradient(negativeLineGradientId, config.negativeColor)}
+                ${renderAreaGradient(negativeAreaGradientId, config.negativeColor, config.fillOpacity * 0.82)}
+            ` : ""}
             <filter id="${glowFilterId}" x="-10%" y="-30%" width="120%" height="160%">
                 <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blurredLine" />
                 <feColorMatrix in="blurredLine" type="matrix"
@@ -179,15 +181,17 @@ export function renderDualChannelSparkline(
         ${config.chartMode === "mirrored" ? renderMirroredBaseline(plotLayout) : ""}
         ${renderChannelPathGroup({
             model: positiveModel,
-            lineGradientId: positiveLineGradientId,
-            areaGradientId: positiveAreaGradientId,
+            linePaint: config.colorConfig.isGradientEnabled ? `url(#${positiveLineGradientId})` : config.positiveColor,
+            areaPaint: config.colorConfig.isGradientEnabled ? `url(#${positiveAreaGradientId})` : config.positiveColor,
+            areaOpacity: config.colorConfig.isGradientEnabled ? undefined : config.fillOpacity,
             lineWidth: config.lineWidth,
             glowFilterId,
         })}
         ${renderChannelPathGroup({
             model: negativeModel,
-            lineGradientId: negativeLineGradientId,
-            areaGradientId: negativeAreaGradientId,
+            linePaint: config.colorConfig.isGradientEnabled ? `url(#${negativeLineGradientId})` : config.negativeColor,
+            areaPaint: config.colorConfig.isGradientEnabled ? `url(#${negativeAreaGradientId})` : config.negativeColor,
+            areaOpacity: config.colorConfig.isGradientEnabled ? undefined : config.fillOpacity * 0.82,
             lineWidth: config.lineWidth,
             glowFilterId,
         })}
@@ -490,8 +494,9 @@ function renderChannelRow(options: {
 
 function renderChannelPathGroup(options: {
     model: { linePath: string; areaPath: string } | undefined;
-    lineGradientId: string;
-    areaGradientId: string;
+    linePaint: string;
+    areaPaint: string;
+    areaOpacity: number | undefined;
     lineWidth: number;
     glowFilterId: string;
 }): string {
@@ -499,12 +504,16 @@ function renderChannelPathGroup(options: {
         return "";
     }
 
+    const areaOpacity = options.areaOpacity === undefined
+        ? ""
+        : ` opacity="${formatSvgNumber(options.areaOpacity)}"`;
+
     return `
-        <path d="${options.model.areaPath}" fill="url(#${options.areaGradientId})" />
-        <path d="${options.model.linePath}" fill="none" stroke="url(#${options.lineGradientId})"
+        <path d="${options.model.areaPath}" fill="${options.areaPaint}"${areaOpacity} />
+        <path d="${options.model.linePath}" fill="none" stroke="${options.linePaint}"
             stroke-width="${Math.max(1, options.lineWidth + 1.2)}" stroke-linejoin="round"
             stroke-linecap="round" filter="url(#${options.glowFilterId})" opacity="0.46" />
-        <path d="${options.model.linePath}" fill="none" stroke="url(#${options.lineGradientId})"
+        <path d="${options.model.linePath}" fill="none" stroke="${options.linePaint}"
             stroke-width="${options.lineWidth}" stroke-linejoin="round" stroke-linecap="round" />
     `;
 }

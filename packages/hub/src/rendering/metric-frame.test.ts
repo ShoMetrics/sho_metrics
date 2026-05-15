@@ -5,6 +5,7 @@ import type { GraphicStylePaints } from "../widgets/styles/style.interface";
 
 const framePaints: GraphicStylePaints = {
     background: "#101010",
+    backgroundFill: undefined,
     surface: "rgba(255,255,255,0.08)",
 };
 

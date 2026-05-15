@@ -16,7 +16,7 @@ test("disk usage linear settings render label controls without usage-mode contro
         actionKind: "disk",
         settings: buildWidgetSettings("disk", {
             appearance: {
-                viewLayout: "linear",
+                graph: { viewLayout: "linear" },
             },
             disk: {
                 kind: "usage",
@@ -35,7 +35,7 @@ test("disk usage circular settings render usage display controls", () => {
         actionKind: "disk",
         settings: buildWidgetSettings("disk", {
             appearance: {
-                viewLayout: "circular",
+                graph: { viewLayout: "circular" },
             },
             disk: {
                 kind: "usage",
@@ -67,7 +67,7 @@ test("windows disk settings use usage controls when throughput is unavailable", 
         isWindows: true,
         settings: buildWidgetSettings("disk", {
             appearance: {
-                viewLayout: "linear",
+                graph: { viewLayout: "linear" },
             },
             disk: {
                 kind: "throughput",
@@ -86,7 +86,7 @@ test("network dual-channel settings render channel colors instead of usage color
         actionKind: "network",
         settings: buildWidgetSettings("network", {
             appearance: {
-                colorMode: "solid",
+                metricColor: { colorMode: "solid" },
             },
             network: {
                 direction: "both",
@@ -112,7 +112,7 @@ test("network single-channel settings render standard usage colors", () => {
         actionKind: "network",
         settings: buildWidgetSettings("network", {
             appearance: {
-                colorMode: "solid",
+                metricColor: { colorMode: "solid" },
             },
             network: {
                 direction: "download",
@@ -125,12 +125,35 @@ test("network single-channel settings render standard usage colors", () => {
     assert.doesNotMatch(markup, /Color - Upload/);
 });
 
+test("color filled theme renders color mix without range controls", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "network",
+        settings: buildWidgetSettings("network", {
+            appearance: {
+                theme: { selectedTheme: "color-filled" },
+                metricColor: { colorMode: "multi-color" },
+            },
+            network: {
+                direction: "download",
+            },
+        }),
+    });
+
+    assert.match(markup, /Color Filled/);
+    assert.match(markup, /Color Mix/);
+    assert.match(markup, /Top Color:/);
+    assert.match(markup, /Left Color:/);
+    assert.match(markup, /Right Color:/);
+    assert.doesNotMatch(markup, /Low Ends At:/);
+    assert.doesNotMatch(markup, /High Starts At:/);
+});
+
 test("network mirrored trend disables grid controls in the panel", () => {
     const markup = renderWidgetSettings({
         actionKind: "network",
         settings: buildWidgetSettings("network", {
             appearance: {
-                viewLayout: "sparkline",
+                graph: { viewLayout: "sparkline" },
             },
             network: {
                 direction: "both",
@@ -150,8 +173,8 @@ test("disk throughput linear settings use standard colors", () => {
         actionKind: "disk",
         settings: buildWidgetSettings("disk", {
             appearance: {
-                colorMode: "solid",
-                viewLayout: "linear",
+                graph: { viewLayout: "linear" },
+                metricColor: { colorMode: "solid" },
             },
             disk: {
                 kind: "throughput",
@@ -170,8 +193,8 @@ test("disk throughput dual-channel settings render read/write colors", () => {
         actionKind: "disk",
         settings: buildWidgetSettings("disk", {
             appearance: {
-                colorMode: "solid",
-                viewLayout: "circular",
+                graph: { viewLayout: "circular" },
+                metricColor: { colorMode: "solid" },
             },
             disk: {
                 kind: "throughput",
@@ -214,7 +237,8 @@ test("widget settings waits for action kind before rendering recovery UI", () =>
 test("widget settings renders widget controls before global settings load", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
-        isGlobalLayoutStyleOverrideEnabled: false,
+        isGlobalGraphOverrideEnabled: false,
+        isGlobalThemeOverrideEnabled: false,
         isGlobalColorOverrideEnabled: false,
     });
 
@@ -225,7 +249,8 @@ test("widget settings renders widget controls before global settings load", () =
 test("widget settings renders mismatch recovery before global settings load", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
-        isGlobalLayoutStyleOverrideEnabled: false,
+        isGlobalGraphOverrideEnabled: false,
+        isGlobalThemeOverrideEnabled: false,
         isGlobalColorOverrideEnabled: false,
         settings: buildWidgetSettings("cpu", {}),
     });
@@ -237,7 +262,8 @@ test("widget settings renders mismatch recovery before global settings load", ()
 test("widget settings renders normally after global settings load without override", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
-        isGlobalLayoutStyleOverrideEnabled: false,
+        isGlobalGraphOverrideEnabled: false,
+        isGlobalThemeOverrideEnabled: false,
         isGlobalColorOverrideEnabled: false,
     });
 
@@ -248,7 +274,7 @@ test("widget settings renders normally after global settings load without overri
 test("widget settings keep warnings first and reset in advanced controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
-        isGlobalLayoutStyleOverrideEnabled: true,
+        isGlobalGraphOverrideEnabled: true,
     });
 
     assertTextOrder(markup, "Some settings are disabled", "GPU Metric:");
@@ -260,7 +286,8 @@ test("widget settings keep warnings first and reset in advanced controls", () =>
 function renderWidgetSettings(options: {
     actionKind: ActionKind;
     isWindows?: boolean;
-    isGlobalLayoutStyleOverrideEnabled?: boolean;
+    isGlobalGraphOverrideEnabled?: boolean;
+    isGlobalThemeOverrideEnabled?: boolean;
     isGlobalColorOverrideEnabled?: boolean;
     settings?: InspectorTestSettings;
 }): string {
@@ -270,7 +297,8 @@ function renderWidgetSettings(options: {
             isWindows: options.isWindows,
             settings: options.settings,
         }),
-        isGlobalLayoutStyleOverrideEnabled: options.isGlobalLayoutStyleOverrideEnabled ?? false,
+        isGlobalGraphOverrideEnabled: options.isGlobalGraphOverrideEnabled ?? false,
+        isGlobalThemeOverrideEnabled: options.isGlobalThemeOverrideEnabled ?? false,
         isGlobalColorOverrideEnabled: options.isGlobalColorOverrideEnabled ?? false,
         onSettingsPatch: () => undefined,
         onResetWidgetSettings: () => undefined,

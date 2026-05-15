@@ -17,8 +17,8 @@
 
 export type SingleMetricViewLayout = "circular" | "text" | "linear" | "sparkline";
 export type CircleStyle = "value" | "compact" | "gauge";
-export type MetricTheme = "flat" | "cupertino-glass";
-export type ColorMode = "threshold" | "solid" | "black-white";
+export type MetricTheme = "flat" | "cupertino-glass" | "color-filled";
+export type ColorMode = "multi-color" | "solid" | "black-white";
 export type GridLineVisibility = "adaptive" | "always" | "none";
 export type GridLineType = "horizontal" | "vertical";
 export type ScaleMode = "auto" | "custom";
@@ -149,30 +149,81 @@ export interface ResolvedCatalogMetricTarget {
 }
 
 export interface ResolvedAppearanceSettings {
-    readonly viewLayout: SingleMetricViewLayout;
-    readonly circleStyle: CircleStyle;
-    readonly theme: MetricTheme;
-    readonly colorMode: ColorMode;
-    readonly usageColors: ResolvedColorRamp;
-    readonly downloadColors: ResolvedColorRamp;
-    readonly uploadColors: ResolvedColorRamp;
-    readonly diskReadColors: ResolvedColorRamp;
-    readonly diskWriteColors: ResolvedColorRamp;
-    readonly lowColorThresholdPercent: number;
-    readonly highColorThresholdPercent: number;
-    readonly lineSmoothingPercent: number;
-    readonly gridLineVisibility: GridLineVisibility;
-    readonly gridLineType: GridLineType;
+    readonly graph: ResolvedAppearanceGraphSettings;
+    readonly theme: ResolvedAppearanceThemeSettings;
+    readonly metricColor: ResolvedMetricColorSettings;
+    readonly sparkline: ResolvedSparklineAppearanceSettings;
 }
 
-// If channels become user-defined in proto, replace the named color fields
-// above with a channel-color collection in both proto and resolved settings.
-// Do not make resolved settings diverge from the stored contract on its own.
-export interface ResolvedColorRamp {
-    readonly solidColor: string;
+export interface ResolvedAppearanceGraphSettings {
+    readonly viewLayout: SingleMetricViewLayout;
+    readonly circleStyle: CircleStyle;
+}
+
+export interface ResolvedAppearanceThemeSettings {
+    readonly selectedTheme: MetricTheme;
+    readonly colorFilled: ResolvedColorFilledThemeSettings;
+}
+
+export interface ResolvedColorFilledThemeSettings {
+    readonly solid: ResolvedColorFilledSolidSettings;
+    readonly multiColor: ResolvedColorFilledMultiColorSettings;
+}
+
+export interface ResolvedColorFilledSolidSettings {
+    readonly color: string;
+    readonly isGradientEnabled: boolean;
+}
+
+export interface ResolvedColorFilledMultiColorSettings {
+    readonly colors: ResolvedMultiColorSet;
+    readonly isGradientEnabled: boolean;
+}
+
+export interface ResolvedMetricColorSettings {
+    readonly colorMode: ColorMode;
+    readonly solid: ResolvedMetricSolidColorSettings;
+    readonly multiColor: ResolvedMetricMultiColorSettings;
+}
+
+export interface ResolvedMetricSolidColorSettings {
+    readonly colors: ResolvedMetricSolidChannelColors;
+    readonly isGradientEnabled: boolean;
+}
+
+export interface ResolvedMetricSolidChannelColors {
+    readonly usageColor: string;
+    readonly downloadColor: string;
+    readonly uploadColor: string;
+    readonly diskReadColor: string;
+    readonly diskWriteColor: string;
+}
+
+export interface ResolvedMetricMultiColorSettings {
+    readonly colors: ResolvedMetricMultiColorChannelColors;
+    readonly lowThresholdPercent: number;
+    readonly highThresholdPercent: number;
+    readonly isGradientEnabled: boolean;
+}
+
+export interface ResolvedMetricMultiColorChannelColors {
+    readonly usage: ResolvedMultiColorSet;
+    readonly download: ResolvedMultiColorSet;
+    readonly upload: ResolvedMultiColorSet;
+    readonly diskRead: ResolvedMultiColorSet;
+    readonly diskWrite: ResolvedMultiColorSet;
+}
+
+export interface ResolvedMultiColorSet {
     readonly lowColor: string;
     readonly mediumColor: string;
     readonly highColor: string;
+}
+
+export interface ResolvedSparklineAppearanceSettings {
+    readonly lineSmoothingPercent: number;
+    readonly gridLineVisibility: GridLineVisibility;
+    readonly gridLineType: GridLineType;
 }
 
 export interface ResolvedNetworkDisplaySettings {
@@ -191,7 +242,8 @@ export interface ResolvedDiskThroughputDisplaySettings {
 export interface ResolvedGlobalSettings {
     readonly defaults: ResolvedGlobalDefaults;
     readonly globalOverrideEnabled: boolean;
-    readonly layoutStyleOverride: ResolvedGlobalLayoutStyleOverride | undefined;
+    readonly graphOverride: ResolvedGlobalGraphOverride | undefined;
+    readonly themeOverride: ResolvedGlobalThemeOverride | undefined;
     readonly colorOverride: ResolvedGlobalColorOverride | undefined;
     readonly sourceProfiles: readonly ResolvedMetricSourceProfile[];
     readonly defaultSourceProfileId: string | undefined;
@@ -205,17 +257,30 @@ export interface ResolvedGlobalDefaults {
     readonly diskThroughput: ResolvedDiskThroughputDisplaySettings;
 }
 
-export interface ResolvedGlobalLayoutStyleOverride {
-    readonly viewLayout: SingleMetricViewLayout;
-    readonly circleStyle: CircleStyle;
-    readonly theme: MetricTheme;
+export interface ResolvedGlobalGraphOverride {
+    readonly graph: ResolvedAppearanceGraphSettings;
+}
+
+export interface ResolvedGlobalThemeOverride {
+    readonly theme: ResolvedAppearanceThemeSettings;
 }
 
 export interface ResolvedGlobalColorOverride {
-    readonly colors: ResolvedColorRamp;
     readonly colorMode: ColorMode;
-    readonly lowColorThresholdPercent: number;
-    readonly highColorThresholdPercent: number;
+    readonly solid: ResolvedGlobalSolidColorSettings;
+    readonly multiColor: ResolvedGlobalMultiColorSettings;
+}
+
+export interface ResolvedGlobalSolidColorSettings {
+    readonly color: string;
+    readonly isGradientEnabled: boolean;
+}
+
+export interface ResolvedGlobalMultiColorSettings {
+    readonly colors: ResolvedMultiColorSet;
+    readonly lowThresholdPercent: number;
+    readonly highThresholdPercent: number;
+    readonly isGradientEnabled: boolean;
 }
 
 export interface ResolvedMetricSourceProfile {

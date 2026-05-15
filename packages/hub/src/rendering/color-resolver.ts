@@ -14,6 +14,7 @@ export interface ColorConfig {
     mode: ColorMode;
     solidColor: string;
     thresholds: ColorThreshold[];
+    isGradientEnabled: boolean;
 }
 
 /**
@@ -46,11 +47,18 @@ export function buildGradientStops(
     values: readonly number[],
     config: ColorConfig,
 ): Array<{ offset: number; color: string }> {
-    if (values.length === 0) return [];
-    if (config.mode === "solid") {
+    if (values.length === 0) {
+        return [];
+    }
+
+    if (config.mode === "solid" || !config.isGradientEnabled) {
+        const color = config.mode === "solid"
+            ? config.solidColor
+            : resolveColorForThresholdValue(values[values.length - 1] ?? 0, config);
+
         return [
-            { offset: 0, color: config.solidColor },
-            { offset: 1, color: config.solidColor },
+            { offset: 0, color },
+            { offset: 1, color },
         ];
     }
 

@@ -37,7 +37,7 @@ export class Network extends MetricAction {
         const settings = this.resolveSettings(event);
         const networkTarget = readResolvedMetricTarget(settings, "network");
         return resolveNetworkMetricSubscriptionKeys({
-            graphicType: settings.widget.slot.appearance.viewLayout,
+            graphicType: settings.widget.slot.appearance.graph.viewLayout,
             networkDirection: networkTarget.reading.direction,
             networkInterfaceId: networkTarget.interfaceId ?? "",
         });

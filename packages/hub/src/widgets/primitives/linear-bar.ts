@@ -20,7 +20,7 @@ export const DEFAULT_LINEAR_BAR_CONFIG: LinearBarConfig = {
         { min: 0, max: 50, color: "#22c55e" },
         { min: 50, max: 80, color: "#eab308" },
         { min: 80, max: 101, color: "#ef4444" },
-    ]},
+    ], isGradientEnabled: true },
     trackColor: "rgba(255,255,255,0.08)",
     barHeight: 14,
     borderRadius: 7,
@@ -179,17 +179,18 @@ function renderSingleBar(
     const barColor = resolveColorForThresholdValue(data.current, config.colorConfig);
     const barHeadColor = adjustHexColorBrightness(barColor, config.gradientHeadAdjustmentPercent ?? -15);
     const gradientId = `linear-progress-${Math.round(data.current * 10)}-${keySize.width}-${keySize.height}`;
+    const fillPaint = config.colorConfig.isGradientEnabled ? `url(#${gradientId})` : barColor;
     const valueText = data.linearDisplayValue ?? data.displayValue ?? data.current.toFixed(0);
     const unitText = data.linearUnit ?? data.unit;
     const titleText = data.linearLabel ?? data.label;
 
     return `
-        <defs>
+        ${config.colorConfig.isGradientEnabled ? `<defs>
             <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stop-color="${barColor}" />
                 <stop offset="100%" stop-color="${barHeadColor}" />
             </linearGradient>
-        </defs>
+        </defs>` : ""}
         ${renderTitle({
             iconFragment: config.topIconFragment,
             titleText,
@@ -205,7 +206,7 @@ function renderSingleBar(
             layout: layoutPlan.singleValue,
         })}
         ${renderTrack(layoutPlan.singleBar, config.trackColor)}
-        ${renderFill(layoutPlan.singleBar, fillWidth, gradientId)}
+        ${renderFill(layoutPlan.singleBar, fillWidth, fillPaint)}
         ${renderSecondaryText({
             text: data.secondaryDisplayValue,
             layout: layoutPlan.singleSecondaryText,
@@ -241,14 +242,15 @@ function renderChannelBars(
             const fillWidth = Math.max(0, channelLayout.bar.width * clamp(channel.progress, 0, 1));
             const gradientId = `linear-channel-${channelIndex}-${Math.round(channel.progress * 1000)}-${keySize.width}-${keySize.height}`;
             const headColor = adjustHexColorBrightness(channel.color, config.gradientHeadAdjustmentPercent ?? -15);
+            const fillPaint = config.colorConfig.isGradientEnabled ? `url(#${gradientId})` : channel.color;
 
             return `
-                <defs>
+                ${config.colorConfig.isGradientEnabled ? `<defs>
                     <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="0%">
                         <stop offset="0%" stop-color="${channel.color}" />
                         <stop offset="100%" stop-color="${headColor}" />
                     </linearGradient>
-                </defs>
+                </defs>` : ""}
                 <g transform="translate(${channelLayout.iconCenterXCoordinate} ${channelLayout.iconCenterYCoordinate}) scale(${layoutPlan.channelIconScale})">
                     ${channel.iconFragment}
                 </g>
@@ -259,7 +261,7 @@ function renderChannelBars(
                     layout: channelLayout.value,
                 })}
                 ${renderTrack(channelLayout.bar, config.trackColor)}
-                ${renderFill(channelLayout.bar, fillWidth, gradientId)}
+                ${renderFill(channelLayout.bar, fillWidth, fillPaint)}
             `;
         }).join("")}
     `;
@@ -410,10 +412,10 @@ function renderTrack(layout: BarLayout, color: string): string {
     `;
 }
 
-function renderFill(layout: BarLayout, fillWidth: number, gradientId: string): string {
+function renderFill(layout: BarLayout, fillWidth: number, fillPaint: string): string {
     return `
         <rect x="${layout.xCoordinate}" y="${layout.yCoordinate}" width="${fillWidth}" height="${layout.height}"
-            rx="${layout.radius}" fill="url(#${gradientId})" />
+            rx="${layout.radius}" fill="${fillPaint}" />
     `;
 }
 

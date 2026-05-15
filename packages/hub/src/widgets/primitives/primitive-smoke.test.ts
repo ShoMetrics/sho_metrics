@@ -132,7 +132,7 @@ test("gauge circle style keeps value and unit in fixed regions", () => {
     assert.doesNotMatch(shortUnitTripleDigitFragment, /textLength=/);
 });
 
-test("gauge circle style uses semantic range bands for dynamic colors", () => {
+test("gauge circle style uses semantic range bands for range colors", () => {
     const svgFragment = arcGauge.render({
         ...buildWidgetData(),
         current: 50,
@@ -148,6 +148,7 @@ test("gauge circle style uses semantic range bands for dynamic colors", () => {
                 { min: 30, max: 70, color: "#ffff00" },
                 { min: 70, max: 101, color: "#ff0000" },
             ],
+            isGradientEnabled: true,
         },
     }, keySize);
 
@@ -159,7 +160,7 @@ test("gauge circle style uses semantic range bands for dynamic colors", () => {
     assert.match(svgFragment, /class="arc-gauge-marker"[^>]+fill="#ffff00"/);
 });
 
-test("gauge circle style moves blend ranges with custom dynamic thresholds", () => {
+test("gauge circle style moves blend ranges with custom range thresholds", () => {
     const colorPlan = buildGaugeRangeColorPlan({
         circleStyle: "gauge",
         baseColor: "#000000",
@@ -174,6 +175,7 @@ test("gauge circle style moves blend ranges with custom dynamic thresholds", () 
                 { min: 50, max: 70, color: "#777777" },
                 { min: 70, max: 101, color: "#eeeeee" },
             ],
+            isGradientEnabled: true,
         },
     });
 
@@ -311,6 +313,7 @@ test("dual-channel gauge style renders two full-color gauge lanes with marker do
                 { min: 30, max: 70, color: "#222222" },
                 { min: 70, max: 101, color: "#333333" },
             ],
+            isGradientEnabled: true,
         },
         negativeColorConfig: {
             mode: "threshold",
@@ -320,6 +323,7 @@ test("dual-channel gauge style renders two full-color gauge lanes with marker do
                 { min: 30, max: 70, color: "#ff8800" },
                 { min: 70, max: 101, color: "#00aaff" },
             ],
+            isGradientEnabled: true,
         },
         positiveIconFragment: "<path id=\"upload-icon\" />",
         negativeIconFragment: "<path id=\"download-icon\" />",

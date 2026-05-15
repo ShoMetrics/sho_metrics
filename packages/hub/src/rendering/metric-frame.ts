@@ -1,5 +1,6 @@
 import type { KeySize } from "./widget-data";
 import type { GraphicThemePresetName } from "../widgets/widget.interface";
+import { colorFilledStyle } from "../widgets/styles/color-filled";
 import { cupertinoGlassStyle } from "../widgets/styles/cupertino-glass";
 import { flatStyle } from "../widgets/styles/flat";
 import type { GraphicStylePaints } from "../widgets/styles/style.interface";
@@ -11,7 +12,7 @@ export function renderMetricFrame(options: {
     paints: GraphicStylePaints;
     size: KeySize;
 }): string {
-    const style = options.graphicStyle === "cupertino-glass" ? cupertinoGlassStyle : flatStyle;
+    const style = resolveGraphicStyle(options.graphicStyle);
     const filterId = `muted-widget-${options.size.width}-${options.size.height}`;
     const mutedDefs = options.muted
         ? `
@@ -35,4 +36,15 @@ export function renderMetricFrame(options: {
         ${body}
         ${style.renderOverlay(options.size, options.paints)}
     </svg>`;
+}
+
+function resolveGraphicStyle(graphicStyle: GraphicThemePresetName) {
+    switch (graphicStyle) {
+        case "color-filled":
+            return colorFilledStyle;
+        case "cupertino-glass":
+            return cupertinoGlassStyle;
+        case "flat":
+            return flatStyle;
+    }
 }
