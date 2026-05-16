@@ -49,17 +49,17 @@ export function buildTextMetricValue(value: string): IMetricValue {
 
 /**
  * Metric source interface.
- * All sources (built-in, native probes, push API) implement this contract.
+ * All sources (built-in, local helpers, push API) implement this contract.
  * The Scheduler consumes this interface, never a concrete implementation.
  */
 export interface IMetricSource {
-    /** Human-readable identifier, e.g. "node-system", "win-native" */
+    /** Human-readable identifier, e.g. "node-system", "windows-helper" */
     readonly sourceId: string;
 
     /** Fetch the latest metrics snapshot in the universal protobuf-defined format. */
     poll(): Promise<IMetricSnapshot>;
 
-    /** Fetch a subset of metrics when the source can avoid unrelated slow probes. */
+    /** Fetch a subset of metrics when the source can avoid unrelated slow reads. */
     pollMetrics?(metricKeys: readonly string[]): Promise<IMetricSnapshot>;
 
     /** Optional cleanup on shutdown. */

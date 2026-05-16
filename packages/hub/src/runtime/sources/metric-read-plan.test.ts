@@ -31,9 +31,9 @@ test("normalizeMetricReadPlan sorts unique metric keys and preserves source cand
             "gpu.temperature",
         ],
         sourceCandidates: [
-            { sourceId: "windows-native-helper" },
+            { sourceId: "windows-helper" },
             { sourceId: "node-system" },
-            { sourceId: "windows-native-helper" },
+            { sourceId: "windows-helper" },
         ],
         failureMode: "fallback",
     });
@@ -42,7 +42,7 @@ test("normalizeMetricReadPlan sorts unique metric keys and preserves source cand
         sourceScopeId: "local",
         metricKeys: ["cpu.usage_percent", "gpu.temperature"],
         sourceCandidates: [
-            { sourceId: "windows-native-helper" },
+            { sourceId: "windows-helper" },
             { sourceId: "node-system" },
         ],
         failureMode: "fallback",
@@ -54,7 +54,7 @@ test("buildMetricReadPlanKey is stable for equivalent normalized plans", () => {
         sourceScopeId: "local",
         metricKeys: ["net.up", "cpu.usage_percent", "net.up"],
         sourceCandidates: [
-            { sourceId: "windows-native-helper" },
+            { sourceId: "windows-helper" },
             { sourceId: "node-system" },
         ],
         failureMode: "fallback",
@@ -63,7 +63,7 @@ test("buildMetricReadPlanKey is stable for equivalent normalized plans", () => {
         sourceScopeId: "local",
         metricKeys: ["cpu.usage_percent", "net.up"],
         sourceCandidates: [
-            { sourceId: "windows-native-helper" },
+            { sourceId: "windows-helper" },
             { sourceId: "node-system" },
         ],
         failureMode: "fallback",
@@ -77,7 +77,7 @@ test("buildMetricReadPlanKey preserves source candidate priority", () => {
         sourceScopeId: "local",
         metricKeys: ["cpu.usage_percent"],
         sourceCandidates: [
-            { sourceId: "windows-native-helper" },
+            { sourceId: "windows-helper" },
             { sourceId: "node-system" },
         ],
         failureMode: "fallback",
@@ -87,7 +87,7 @@ test("buildMetricReadPlanKey preserves source candidate priority", () => {
         metricKeys: ["cpu.usage_percent"],
         sourceCandidates: [
             { sourceId: "node-system" },
-            { sourceId: "windows-native-helper" },
+            { sourceId: "windows-helper" },
         ],
         failureMode: "fallback",
     };

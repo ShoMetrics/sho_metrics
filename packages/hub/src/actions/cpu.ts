@@ -6,7 +6,6 @@ import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import type { WidgetData } from "../rendering/widget-data";
 import { CPU_MODEL_METRIC_KEY, CPU_USAGE_METRIC_KEY } from "../runtime/metric-keys";
-import type { MetricReadPlan } from "../runtime/sources/metric-read-plan";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 
@@ -15,8 +14,8 @@ import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 export class Cpu extends MetricAction {
     protected readonly actionKind = "cpu";
 
-    protected override getMetricReadPlan(): MetricReadPlan {
-        return this.buildMetricReadPlan([CPU_USAGE_METRIC_KEY, CPU_MODEL_METRIC_KEY]);
+    protected override getMetricKeys(): readonly string[] {
+        return [CPU_USAGE_METRIC_KEY, CPU_MODEL_METRIC_KEY];
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
