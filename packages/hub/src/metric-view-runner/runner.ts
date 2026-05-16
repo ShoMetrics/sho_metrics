@@ -1,21 +1,15 @@
+import type { WillAppearEvent } from "@elgato/streamdeck";
 import { rasterizeSvgToPngDataUrl } from "../rendering/rasterizer";
 import type { MetricRenderAppearance } from "../rendering/render-appearance";
-import type { DualChannelWidgetData, WidgetData } from "../rendering/widget-data";
-import { renderDualMetricBodyView } from "../rendering/dual-metric-view";
-import { renderMetricFrame } from "../rendering/metric-frame";
-import { renderSingleMetricBodyView } from "../rendering/single-metric-view";
 import {
-    buildMetricDisplayRenderPlan,
-    buildRenderDualChannelWidgetData,
-    buildRenderWidgetData,
-    isDualMetricDisplayOptions,
+    composeMetricDisplayFrame,
+    isDualMetricRenderOptions,
     resolveDisplayLogValue,
     resolveDisplaySampleTimestampMilliseconds,
-    type DualMetricDisplayOptions,
-    type MetricDisplayRenderPlan,
-    type MetricDisplayOptions,
-    type SingleMetricDisplayOptions,
-} from "./display-model";
+    type DualMetricRenderOptions,
+    type MetricRenderOptions,
+    type SingleMetricRenderOptions,
+} from "../metric-view-renderer/display-frame";
 import { logger } from "../logging/logger";
 import type { ResolvedAppearanceSettings } from "../settings/resolved-settings";
 import { DisplayUpdateQueue, type DisplayUpdatePriority } from "./update-queue";
@@ -37,6 +31,15 @@ const displayActionQueue = new DisplayUpdateQueue();
 let activeDisplayUpdateCount = 0;
 let isDisplayQueueDrainScheduled = false;
 
+interface MetricDisplayEvent {
+    event: WillAppearEvent;
+    metricKey: string;
+}
+
+export type SingleMetricDisplayOptions = SingleMetricRenderOptions & MetricDisplayEvent;
+export type DualMetricDisplayOptions = DualMetricRenderOptions & MetricDisplayEvent;
+export type MetricDisplayOptions = MetricRenderOptions & MetricDisplayEvent;
+
 interface DisplayActionState {
     actionId: string;
     isRenderInFlight: boolean;
@@ -49,12 +52,6 @@ interface DisplayActionState {
     touchStripMetricLayoutState: TouchStripMetricLayoutState;
     lastRenderedSvg: string | null;
     lastScheduledSettingsSignature: string | null;
-}
-
-interface RenderedMetricBody {
-    readonly svg: string;
-    readonly renderedMetricData: WidgetData | DualChannelWidgetData;
-    readonly muted: boolean;
 }
 
 export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): void {
@@ -97,6 +94,10 @@ export function clearMetricDisplayState(actionId: string): void {
     displayActionStates.delete(actionId);
 }
 
+function isDualMetricDisplayOptions(options: MetricDisplayOptions): options is DualMetricDisplayOptions {
+    return isDualMetricRenderOptions(options);
+}
+
 function runMetricDisplayUpdate(
     displayActionState: DisplayActionState,
     options: MetricDisplayOptions,
@@ -115,7 +116,7 @@ function runMetricDisplayUpdate(
     const renderStartTimestampMilliseconds = Date.now();
     const frame = composeMetricDisplayFrame({
         displayOptions: options,
-        isDial: options.event.action.isDial(),
+        renderTarget: options.event.action.isDial() ? "touch-strip" : "key",
     });
     const renderPlan = frame.renderPlan;
     const renderedMetricData = frame.renderedMetricData;
@@ -291,96 +292,6 @@ function runMetricDisplayUpdate(
         .finally(() => {
             finishDisplayUpdate(displayActionState);
         });
-}
-
-function composeMetricDisplayFrame(options: {
-    displayOptions: MetricDisplayOptions;
-    isDial: boolean;
-}): {
-    readonly svg: string;
-    readonly renderedMetricData: WidgetData | DualChannelWidgetData;
-    readonly renderPlan: MetricDisplayRenderPlan;
-} {
-    const renderPlan = buildMetricDisplayRenderPlan(options);
-    const body = isDualMetricDisplayOptions(options.displayOptions)
-        ? composeDualMetricBody(options.displayOptions, renderPlan)
-        : composeSingleMetricBody(options.displayOptions, renderPlan);
-
-    return {
-        svg: renderMetricFrame({
-            body: body.svg,
-            graphicStyle: renderPlan.renderAppearance.graphicStyle,
-            muted: body.muted,
-            paints: renderPlan.renderAppearance.paints,
-            size: renderPlan.renderSize,
-        }),
-        renderedMetricData: body.renderedMetricData,
-        renderPlan,
-    };
-}
-
-function composeSingleMetricBody(
-    options: SingleMetricDisplayOptions,
-    renderPlan: MetricDisplayRenderPlan,
-): RenderedMetricBody {
-    const renderedMetricData = buildRenderWidgetData({
-        widgetData: options.widgetData,
-        hasData: renderPlan.displayHasData,
-        shouldRenderMutedIconPlaceholder: renderPlan.shouldRenderMutedIconPlaceholder,
-    });
-
-    return {
-        svg: renderSingleMetricBodyView({
-            data: renderedMetricData,
-            visual: renderPlan.renderAppearance,
-            renderSize: renderPlan.renderSize,
-            centerIcon: options.centerIconFragment,
-            footerIcon: options.footerIconFragment,
-            linearIcon: options.linearIconFragment,
-            statusIcon: options.statusIcon,
-            circleStyle: renderPlan.circleStyle,
-        }),
-        renderedMetricData,
-        muted: renderPlan.shouldRenderMutedIconPlaceholder,
-    };
-}
-
-function composeDualMetricBody(
-    options: DualMetricDisplayOptions,
-    renderPlan: MetricDisplayRenderPlan,
-): RenderedMetricBody {
-    const renderedMetricData = buildRenderDualChannelWidgetData({
-        widgetData: options.widgetData,
-        hasData: renderPlan.displayHasData,
-    });
-
-    return {
-        svg: renderDualMetricBodyView({
-            data: renderedMetricData,
-            visual: renderPlan.renderAppearance,
-            graphicType: options.dualGraphicType ?? "sparkline",
-            renderSize: renderPlan.renderSize,
-            titleText: options.titleText,
-            chartMode: options.chartMode ?? "overlay",
-            centerContent: renderPlan.centerContent,
-            circleStyle: renderPlan.circleStyle,
-            topIcon: options.centerIconFragment,
-            positive: {
-                color: options.positiveColor,
-                colorConfig: options.positiveColorConfig,
-                icon: options.positiveIconFragment,
-                statusIcon: options.positiveStatusIcon,
-            },
-            negative: {
-                color: options.negativeColor,
-                colorConfig: options.negativeColorConfig,
-                icon: options.negativeIconFragment,
-                statusIcon: options.negativeStatusIcon,
-            },
-        }),
-        renderedMetricData,
-        muted: false,
-    };
 }
 
 function getOrCreateDisplayActionState(actionId: string): DisplayActionState {

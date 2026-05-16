@@ -12,7 +12,7 @@ export const pollingFrequencyOptionList = [
     { value: 60, label: "60s" },
 ] as const satisfies readonly SelectOption<number>[];
 
-export const graphicStyleOptionList = [
+export const themeOptionList = [
     { value: "flat", label: "Default" },
     { value: "cupertino-glass", label: "Cupertino Glass Style" },
     { value: "color-filled", label: "Color Filled" },

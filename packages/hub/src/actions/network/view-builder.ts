@@ -22,7 +22,7 @@ import {
     renderNetworkDirectionIconFragment,
     renderNetworkInterfaceIconFragment,
 } from "../../widgets/icons/catalog/network";
-import type { MetricDisplayOptions } from "../../metric-view-runner/display-model";
+import type { MetricDisplayOptions } from "../../metric-view-runner/runner";
 import { buildColorConfigFromAppearance, resolveSolidMetricColorMode } from "../../settings/render-paint-resolver";
 
 export interface NetworkDisplayUpdate {

@@ -1,5 +1,5 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
-import type { TouchStripMetricLayout } from "./display-model";
+import type { TouchStripMetricLayout } from "../metric-view-renderer/display-frame";
 
 export interface TouchStripMetricLayoutState {
     layoutPromise: Promise<void> | null;

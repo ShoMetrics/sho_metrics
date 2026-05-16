@@ -36,7 +36,7 @@ test("plugin global override hides color controls for terminal theme", () => {
     }));
 
     assert.match(markup, /Terminal/);
-    assert.match(markup, /Terminal Style:/);
+    assert.match(markup, /Theme Variant:/);
     assert.match(markup, /Clean/);
     assert.match(markup, /Vintage/);
     assert.doesNotMatch(markup, /Color Override/);

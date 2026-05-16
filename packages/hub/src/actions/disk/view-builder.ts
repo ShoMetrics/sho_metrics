@@ -27,7 +27,7 @@ import {
     resolveDiskVolumeSelectionId,
     type DiskVolumeSelection,
 } from "./volume-selection";
-import type { MetricDisplayOptions } from "../../metric-view-runner/display-model";
+import type { MetricDisplayOptions } from "../../metric-view-runner/runner";
 import { buildColorConfigFromAppearance, resolveSolidMetricColorMode } from "../../settings/render-paint-resolver";
 import { resolveRenderTextStyles } from "../../settings/render-text-style-resolver";
 

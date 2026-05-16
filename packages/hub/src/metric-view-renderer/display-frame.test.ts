@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { WillAppearEvent } from "@elgato/streamdeck";
 import {
     buildDefaultAppearanceSettings,
 } from "../settings/default-appearance-settings";
@@ -25,8 +24,8 @@ import {
     resolveDisplayLogValue,
     resolveDisplaySampleTimestampMilliseconds,
     resolveTouchStripMetricLayout,
-    type SingleMetricDisplayOptions,
-} from "./display-model";
+    type SingleMetricRenderOptions,
+} from "./display-frame";
 
 test("single value-capable widget without data renders an N/A placeholder copy", () => {
     const widgetData = buildWidgetData({
@@ -54,7 +53,7 @@ test("single value-capable widget without data renders an N/A placeholder copy",
 });
 
 test("single circular icon placeholder keeps source data and marks the render plan as muted", () => {
-    const displayOptions = buildSingleMetricDisplayOptions({
+    const displayOptions = buildSingleMetricRenderOptions({
         widgetData: buildWidgetData(),
         resolvedSettings: {
             graph: {
@@ -66,7 +65,7 @@ test("single circular icon placeholder keeps source data and marks the render pl
 
     const renderPlan = buildMetricDisplayRenderPlan({
         displayOptions,
-        isDial: false,
+        renderTarget: "key",
     });
     const renderWidgetData = buildRenderWidgetData({
         widgetData: displayOptions.widgetData,
@@ -155,7 +154,7 @@ test("display data helpers treat either dual-channel timestamp as available data
         negative: buildWidgetData({ current: 7, sampleTimestampMilliseconds: 2000 }),
     });
     const hasDisplayData = hasMetricDisplayData({
-        ...buildSingleMetricDisplayOptions({ widgetData: buildWidgetData() }),
+        ...buildSingleMetricRenderOptions({ widgetData: buildWidgetData() }),
         widgetData: dualWidgetData,
         titleText: "Traffic",
         positiveColor: "#00ff00",
@@ -171,7 +170,7 @@ test("display data helpers treat either dual-channel timestamp as available data
 
 test("center content falls back to value outside circular graphics", () => {
     const renderPlan = buildMetricDisplayRenderPlan({
-        displayOptions: buildSingleMetricDisplayOptions({
+        displayOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData(),
             resolvedSettings: {
                 graph: {
@@ -180,7 +179,7 @@ test("center content falls back to value outside circular graphics", () => {
                 },
             },
         }),
-        isDial: false,
+        renderTarget: "key",
     });
 
     assert.equal(renderPlan.centerContent, "value");
@@ -198,7 +197,7 @@ test("circle style override wins for circular graphics", () => {
 
 test("compact circle style uses icon center content", () => {
     const renderPlan = buildMetricDisplayRenderPlan({
-        displayOptions: buildSingleMetricDisplayOptions({
+        displayOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData(),
             resolvedSettings: {
                 graph: {
@@ -207,7 +206,7 @@ test("compact circle style uses icon center content", () => {
                 },
             },
         }),
-        isDial: false,
+        renderTarget: "key",
     });
 
     assert.equal(renderPlan.centerContent, "icon");
@@ -215,13 +214,13 @@ test("compact circle style uses icon center content", () => {
 
 test("key render plan uses keypad PNG dimensions and no touch strip layout", () => {
     const renderPlan = buildMetricDisplayRenderPlan({
-        displayOptions: buildSingleMetricDisplayOptions({
+        displayOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
             resolvedSettings: {
                 graph: { viewLayout: "linear" },
             },
         }),
-        isDial: false,
+        renderTarget: "key",
     });
 
     assert.equal(renderPlan.touchStripMetricLayout, null);
@@ -231,13 +230,13 @@ test("key render plan uses keypad PNG dimensions and no touch strip layout", () 
 
 test("touch strip layout uses square rendering for circular graphics", () => {
     const renderPlan = buildMetricDisplayRenderPlan({
-        displayOptions: buildSingleMetricDisplayOptions({
+        displayOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
             resolvedSettings: {
                 graph: { viewLayout: "circular" },
             },
         }),
-        isDial: true,
+        renderTarget: "touch-strip",
     });
 
     assert.equal(renderPlan.touchStripMetricLayout?.kind, "square");
@@ -255,20 +254,11 @@ test("touch strip layout uses wide rendering for non-circular graphics", () => {
     assert.deepEqual(touchStripMetricLayout.pngSize, TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE);
 });
 
-function buildSingleMetricDisplayOptions(options: {
+function buildSingleMetricRenderOptions(options: {
     widgetData: WidgetData;
     resolvedSettings?: ResolvedAppearanceSettingsOverride;
-}): SingleMetricDisplayOptions {
+}): SingleMetricRenderOptions {
     return {
-        event: {
-            action: {
-                id: "action-id",
-            },
-            payload: {
-                settings: {},
-            },
-        } as WillAppearEvent,
-        metricKey: "cpu.usage_percent",
         centerIconFragment: "<path />",
         statusIcon: buildStatusIcon(),
         widgetData: options.widgetData,
