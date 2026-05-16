@@ -4,104 +4,126 @@ import { Scheduler, type MetricSnapshotStore } from "./scheduler";
 import {
     buildMetricSnapshot,
     buildScalarMetricValue,
-    type IMetricSource,
     type IMetricSnapshot,
 } from "./sources/source.interface";
-import { LOCAL_SOURCE_SCOPE_ID } from "./sources/metric-read-plan";
+import {
+    buildLocalMetricReadPlan,
+    LOCAL_SOURCE_SCOPE_ID,
+    type MetricReadPlan,
+} from "./sources/metric-read-plan";
+import type { SourceRunner } from "./sources/source-runner";
 
-test("subscribe polls metric key groups with sorted unique keys", async () => {
-    const source = new FakeMetricSource();
+test("subscribe polls read plans with sorted unique metric keys", async () => {
+    const sourceRunner = new FakeSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
-    const scheduler = new Scheduler(source, snapshotStore);
+    const scheduler = new Scheduler(sourceRunner, snapshotStore);
     const receivedSnapshots: IMetricSnapshot[] = [];
 
     const unsubscribe = scheduler.subscribe(snapshot => {
         receivedSnapshots.push(snapshot);
     }, {
-        metricKeys: ["net.down", "cpu.usage_percent", "net.down"],
+        readPlan: buildLocalMetricReadPlan(["net.down", "cpu.usage_percent", "net.down"]),
     });
 
     try {
         await waitForCondition(() => receivedSnapshots.length === 1);
 
-        assert.deepEqual(source.polledMetricKeyListList, [["cpu.usage_percent", "net.down"]]);
+        assert.deepEqual(sourceRunner.polledReadPlans.map(readPlan => readPlan.metricKeys), [
+            ["cpu.usage_percent", "net.down"],
+        ]);
         assert.deepEqual(snapshotStore.ingestedSnapshots, [{
             sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
-            snapshot: source.snapshot,
+            snapshot: sourceRunner.snapshot,
         }]);
-        assert.deepEqual(receivedSnapshots, [source.snapshot]);
+        assert.deepEqual(receivedSnapshots, [sourceRunner.snapshot]);
     } finally {
         unsubscribe();
     }
 });
 
-test("scheduler falls back to poll when source has no pollMetrics implementation", async () => {
-    const source = new PollOnlyMetricSource();
+test("scheduler coalesces active subscribers with the same source plan", async () => {
+    const sourceRunner = new FakeSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
-    const scheduler = new Scheduler(source, snapshotStore);
-    let receivedSnapshot: IMetricSnapshot | null = null;
+    const scheduler = new Scheduler(sourceRunner, snapshotStore);
+    const firstSubscriberSnapshots: IMetricSnapshot[] = [];
+    const secondSubscriberSnapshots: IMetricSnapshot[] = [];
 
-    const unsubscribe = scheduler.subscribe(snapshot => {
-        receivedSnapshot = snapshot;
+    const unsubscribeFirst = scheduler.subscribe(snapshot => {
+        firstSubscriberSnapshots.push(snapshot);
     }, {
-        metricKeys: ["cpu.usage_percent"],
+        readPlan: buildLocalMetricReadPlan(["cpu.usage_percent"]),
     });
 
     try {
-        await waitForCondition(() => receivedSnapshot != null);
+        await waitForCondition(() => firstSubscriberSnapshots.length === 1);
 
-        assert.equal(source.pollCount, 1);
-        assert.deepEqual(snapshotStore.ingestedSnapshots, [{
-            sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
-            snapshot: source.snapshot,
-        }]);
-        assert.equal(receivedSnapshot, source.snapshot);
+        const unsubscribeSecond = scheduler.subscribe(snapshot => {
+            secondSubscriberSnapshots.push(snapshot);
+        }, {
+            readPlan: buildLocalMetricReadPlan(["net.down"]),
+        });
+
+        try {
+            await waitForCondition(() => sourceRunner.polledReadPlans.length === 2);
+
+            assert.deepEqual(sourceRunner.polledReadPlans[1]?.metricKeys, [
+                "cpu.usage_percent",
+                "net.down",
+            ]);
+            assert.equal(secondSubscriberSnapshots.length, 1);
+        } finally {
+            unsubscribeSecond();
+        }
     } finally {
-        unsubscribe();
+        unsubscribeFirst();
     }
 });
 
 test("unsupported polling intervals still poll the requested metric keys", async () => {
-    const source = new FakeMetricSource();
+    const sourceRunner = new FakeSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
-    const scheduler = new Scheduler(source, snapshotStore);
+    const scheduler = new Scheduler(sourceRunner, snapshotStore);
     let callbackCount = 0;
 
     const unsubscribe = scheduler.subscribe(() => {
         callbackCount += 1;
     }, {
-        metricKeys: ["cpu.usage_percent"],
+        readPlan: buildLocalMetricReadPlan(["cpu.usage_percent"]),
         pollingIntervalMilliseconds: 1234,
     });
 
     try {
         await waitForCondition(() => callbackCount === 1);
 
-        assert.deepEqual(source.polledMetricKeyListList, [["cpu.usage_percent"]]);
+        assert.deepEqual(sourceRunner.polledReadPlans.map(readPlan => readPlan.metricKeys), [["cpu.usage_percent"]]);
     } finally {
         unsubscribe();
     }
 });
 
 test("refreshMetrics polls and ingests requested metric keys without subscribers", async () => {
-    const source = new FakeMetricSource();
+    const sourceRunner = new FakeSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
-    const scheduler = new Scheduler(source, snapshotStore);
+    const scheduler = new Scheduler(sourceRunner, snapshotStore);
 
-    const snapshot = await scheduler.refreshMetrics(["net.down", "cpu.usage_percent", "net.down"]);
+    const snapshot = await scheduler.refreshMetrics(
+        buildLocalMetricReadPlan(["net.down", "cpu.usage_percent", "net.down"]),
+    );
 
-    assert.equal(snapshot, source.snapshot);
-    assert.deepEqual(source.polledMetricKeyListList, [["cpu.usage_percent", "net.down"]]);
+    assert.equal(snapshot, sourceRunner.snapshot);
+    assert.deepEqual(sourceRunner.polledReadPlans.map(readPlan => readPlan.metricKeys), [
+        ["cpu.usage_percent", "net.down"],
+    ]);
     assert.deepEqual(snapshotStore.ingestedSnapshots, [{
         sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
-        snapshot: source.snapshot,
+        snapshot: sourceRunner.snapshot,
     }]);
 });
 
 test("later same-group subscribers do not join an in-flight initial poll", async () => {
-    const source = new DeferredMetricSource();
+    const sourceRunner = new DeferredSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
-    const scheduler = new Scheduler(source, snapshotStore);
+    const scheduler = new Scheduler(sourceRunner, snapshotStore);
     const firstSubscriberSnapshots: IMetricSnapshot[] = [];
     const secondSubscriberSnapshots: IMetricSnapshot[] = [];
     let unsubscribeSecond: (() => void) | undefined;
@@ -109,23 +131,23 @@ test("later same-group subscribers do not join an in-flight initial poll", async
     const unsubscribeFirst = scheduler.subscribe(snapshot => {
         firstSubscriberSnapshots.push(snapshot);
     }, {
-        metricKeys: ["cpu.usage_percent"],
+        readPlan: buildLocalMetricReadPlan(["cpu.usage_percent"]),
     });
 
     try {
-        await waitForCondition(() => source.pendingPollCount === 1);
+        await waitForCondition(() => sourceRunner.pendingPollCount === 1);
 
         unsubscribeSecond = scheduler.subscribe(snapshot => {
             secondSubscriberSnapshots.push(snapshot);
         }, {
-            metricKeys: ["cpu.usage_percent"],
+            readPlan: buildLocalMetricReadPlan(["cpu.usage_percent"]),
         });
 
-        source.resolveNextPoll();
+        sourceRunner.resolveNextPoll();
         await waitForCondition(() => firstSubscriberSnapshots.length === 1);
 
-        assert.deepEqual(source.polledMetricKeyListList, [["cpu.usage_percent"]]);
-        assert.deepEqual(firstSubscriberSnapshots, [source.snapshot]);
+        assert.deepEqual(sourceRunner.polledReadPlans.map(readPlan => readPlan.metricKeys), [["cpu.usage_percent"]]);
+        assert.deepEqual(firstSubscriberSnapshots, [sourceRunner.snapshot]);
         assert.deepEqual(secondSubscriberSnapshots, []);
     } finally {
         unsubscribeSecond?.();
@@ -133,37 +155,33 @@ test("later same-group subscribers do not join an in-flight initial poll", async
     }
 });
 
-class FakeMetricSource implements IMetricSource {
+class FakeSourceRunner implements SourceRunner {
     readonly sourceId = "fake-source";
     readonly snapshot: IMetricSnapshot = buildTestSnapshot(this.sourceId);
-    readonly polledMetricKeyListList: readonly string[][] = [];
+    readonly polledReadPlans: MetricReadPlan[] = [];
 
-    async poll(): Promise<IMetricSnapshot> {
+    async poll(readPlan: MetricReadPlan): Promise<IMetricSnapshot> {
+        this.polledReadPlans.push(readPlan);
         return this.snapshot;
     }
 
-    async pollMetrics(metricKeys: readonly string[]): Promise<IMetricSnapshot> {
-        (this.polledMetricKeyListList as string[][]).push([...metricKeys]);
-        return this.snapshot;
+    dispose(): void {
+        return;
     }
 }
 
-class DeferredMetricSource implements IMetricSource {
+class DeferredSourceRunner implements SourceRunner {
     readonly sourceId = "deferred-source";
     readonly snapshot: IMetricSnapshot = buildTestSnapshot(this.sourceId);
-    readonly polledMetricKeyListList: string[][] = [];
+    readonly polledReadPlans: MetricReadPlan[] = [];
     private readonly pendingPollResolvers: Array<(snapshot: IMetricSnapshot) => void> = [];
 
     get pendingPollCount(): number {
         return this.pendingPollResolvers.length;
     }
 
-    poll(): Promise<IMetricSnapshot> {
-        return this.pollMetrics([]);
-    }
-
-    pollMetrics(metricKeys: readonly string[]): Promise<IMetricSnapshot> {
-        this.polledMetricKeyListList.push([...metricKeys]);
+    poll(readPlan: MetricReadPlan): Promise<IMetricSnapshot> {
+        this.polledReadPlans.push(readPlan);
 
         return new Promise(resolve => {
             this.pendingPollResolvers.push(resolve);
@@ -176,16 +194,9 @@ class DeferredMetricSource implements IMetricSource {
         assert.ok(resolve, "Expected a pending poll.");
         resolve(this.snapshot);
     }
-}
 
-class PollOnlyMetricSource implements IMetricSource {
-    readonly sourceId = "poll-only-source";
-    readonly snapshot: IMetricSnapshot = buildTestSnapshot(this.sourceId);
-    pollCount = 0;
-
-    async poll(): Promise<IMetricSnapshot> {
-        this.pollCount += 1;
-        return this.snapshot;
+    dispose(): void {
+        return;
     }
 }
 
@@ -211,14 +222,14 @@ class FakeMetricSnapshotStore implements MetricSnapshotStore {
 }
 
 async function waitForCondition(predicate: () => boolean): Promise<void> {
-    const maximumAttemptCount = 20;
+    const maximumAttemptCount = 80;
 
     for (let attemptIndex = 0; attemptIndex < maximumAttemptCount; attemptIndex++) {
         if (predicate()) {
             return;
         }
 
-        await new Promise(resolve => setImmediate(resolve));
+        await new Promise(resolve => setTimeout(resolve, 25));
     }
 
     assert.fail("Timed out waiting for scheduler condition.");

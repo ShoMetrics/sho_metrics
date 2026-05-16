@@ -1,4 +1,4 @@
-import type { IMetricSnapshot } from "./source.interface";
+import type { IMetricSource, IMetricSnapshot } from "./source.interface";
 
 /** Source-owned warning emitted while serving health, descriptor, or snapshot requests. */
 export interface SourceWarning {
@@ -73,4 +73,13 @@ export interface SourceClient {
 
     /** Releases resources owned by this source client. */
     dispose?(): void;
+}
+
+/** Adapts the current metric source contract into the SourceRunner client contract. */
+export function createMetricSourceClient(source: IMetricSource): SourceClient {
+    return {
+        sourceId: source.sourceId,
+        readSnapshot: metricKeys => source.pollMetrics ? source.pollMetrics(metricKeys) : source.poll(),
+        dispose: () => source.dispose?.(),
+    };
 }
