@@ -104,6 +104,13 @@ export class Scheduler {
         return snapshot;
     }
 
+    /** Stops scheduled polling and releases source resources owned by this scheduler. */
+    dispose(): void {
+        this.stop();
+        this.subscribers.clear();
+        this.sourceRunner.dispose();
+    }
+
     private start(): void {
         if (this.intervalId) {
             return;
@@ -249,6 +256,9 @@ export class Scheduler {
     private static buildGroupKey(pollingIntervalMilliseconds: number, readPlan: MetricReadPlan): string {
         const normalizedReadPlan = normalizeMetricReadPlan(readPlan);
 
+        // Metric keys are intentionally excluded. Subscribers with the same
+        // cadence and source plan share one poll whose metric keys are merged
+        // for that tick.
         return JSON.stringify([
             pollingIntervalMilliseconds,
             normalizedReadPlan.sourceScopeId,
