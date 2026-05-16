@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { DEFAULT_RENDER_TYPOGRAPHY_TOKENS } from "../rendering/render-typography";
 import { buildMetricRenderAppearance } from "./render-appearance-builder";
 import { buildDefaultAppearanceSettings as buildAppearanceSettings } from "./default-appearance-settings";
 
@@ -39,6 +40,12 @@ test("graphic style maps resolved appearance settings to theme preset names", ()
     assert.equal(colorFilledSettings.graphicStyle, "color-filled");
     assert.equal(oldCrtSettings.graphicStyle, "old-crt");
     assert.equal(defaultSettings.graphicStyle, "flat");
+});
+
+test("typography maps resolved appearance settings to renderer font tokens", () => {
+    const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings());
+
+    assert.deepEqual(visualSettings.typography, DEFAULT_RENDER_TYPOGRAPHY_TOKENS);
 });
 
 test("solid color mode uses resolved appearance color", () => {

@@ -27,6 +27,8 @@ test("single metric view passes foreground paint tokens into linear widgets", ()
     assert.match(svg, /fill="#linear-value-text-token"[\s\S]*42/);
     assert.match(svg, /fill="#linear-unit-text-token"[\s\S]*%/);
     assert.match(svg, /fill="#linear-secondary-text-token"[\s\S]*OK/);
+    assert.match(svg, /font-family="Test Label Font"/);
+    assert.match(svg, /font-family="Test Value Font"/);
 });
 
 test("single metric view passes foreground paint tokens into sparkline widgets", () => {
@@ -81,6 +83,10 @@ function buildMetricRenderAppearance(): MetricRenderAppearance {
             track: "#track-token",
             grid: "#grid-token",
             divider: "#divider-token",
+        },
+        typography: {
+            labelFontFamily: "Test Label Font",
+            valueFontFamily: "Test Value Font",
         },
         lineSmoothingPercent: 75,
         gridLineVisibility: "adaptive",
