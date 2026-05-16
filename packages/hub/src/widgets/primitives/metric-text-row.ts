@@ -17,7 +17,8 @@ interface MetricTextRowOptions {
     width: number;
     valueFontSize: number;
     unitFontSize: number;
-    fontFamily: string;
+    valueFontFamily: string;
+    unitFontFamily: string;
     valueFontWeight: number | string;
     unitFontWeight: number | string;
     valueFill: string;
@@ -76,13 +77,14 @@ export function renderMetricTextRow(options: MetricTextRowOptions): string {
         : "";
     const unitTspan = options.unitText.length > 0
         ? `<tspan dx="${formatSvgNumber(unitGap)}" dy="${formatSvgNumber(options.unitBaselineOffset ?? 0)}"
-                font-size="${formatSvgNumber(unitFontSize)}" font-weight="${escapeSvgText(String(options.unitFontWeight))}"
+                font-family="${escapeSvgText(options.unitFontFamily)}" font-size="${formatSvgNumber(unitFontSize)}"
+                font-weight="${escapeSvgText(String(options.unitFontWeight))}"
                 fill="${escapeSvgText(options.unitFill)}"${unitAttributes}>${escapeSvgText(options.unitText)}</tspan>`
         : "";
     const textFitAttributes = formatSvgTextFitAttributes(textFit);
     const textElement = `<text x="${formatSvgNumber(options.xCoordinate)}" y="${formatSvgNumber(options.yCoordinate)}"
-                text-anchor="${textAnchor}" dominant-baseline="middle"
-                font-family="${escapeSvgText(options.fontFamily)}"${textFitAttributes}><tspan font-size="${formatSvgNumber(valueFontSize)}"
+                text-anchor="${textAnchor}" dominant-baseline="middle"${textFitAttributes}><tspan
+                    font-family="${escapeSvgText(options.valueFontFamily)}" font-size="${formatSvgNumber(valueFontSize)}"
                     font-weight="${escapeSvgText(String(options.valueFontWeight))}"
                     fill="${escapeSvgText(options.valueFill)}"${valueAttributes}>${escapeSvgText(options.valueText)}</tspan>${unitTspan}</text>`;
 

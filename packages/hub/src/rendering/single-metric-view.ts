@@ -1,6 +1,6 @@
 import type { RenderPaintTokens } from "./render-appearance";
-import type { RenderForegroundEffectTokens } from "./render-foreground-effects";
-import type { RenderTypographyTokens } from "./render-typography";
+import type { RenderTextStyles } from "./render-text-style";
+import type { RenderGraphicEffectTokens } from "./render-svg-effects";
 import type { KeySize, WidgetData } from "./widget-data";
 import {
     arcGauge,
@@ -30,8 +30,8 @@ export interface SingleMetricBodyViewProps {
     visual: {
         graphicType: SingleMetricGraphicType;
         paints: RenderPaintTokens;
-        typography: RenderTypographyTokens;
-        foregroundEffects: RenderForegroundEffectTokens;
+        textStyles: RenderTextStyles;
+        graphicEffects: RenderGraphicEffectTokens;
         lineSmoothingPercent: number;
         gridLineVisibility: SparklineGridLineVisibility;
         gridLineType: SparklineGridLineType;
@@ -66,8 +66,8 @@ function renderSingleCircularMetric(options: SingleMetricBodyViewProps): string 
         valueTextColor: options.visual.paints.primaryText,
         unitTextColor: options.visual.paints.secondaryText,
         iconColor: options.visual.paints.icon,
-        typography: options.visual.typography,
-        foregroundEffects: options.visual.foregroundEffects,
+        textStyles: options.visual.textStyles,
+        graphicEffects: options.visual.graphicEffects,
         circleStyle: options.circleStyle,
         centerIconFragment: options.centerIcon,
         footerIconFragment: options.footerIcon,
@@ -82,8 +82,8 @@ function renderSingleTextMetric(options: SingleMetricBodyViewProps): string {
         labelTextColor: options.visual.paints.secondaryText,
         unitTextColor: options.visual.paints.secondaryText,
         secondaryTextColor: options.visual.paints.mutedText,
-        typography: options.visual.typography,
-        foregroundEffects: options.visual.foregroundEffects,
+        textStyles: options.visual.textStyles,
+        graphicEffects: options.visual.graphicEffects,
     }, options.renderSize);
 }
 
@@ -99,8 +99,8 @@ function renderSingleLinearMetric(options: SingleMetricBodyViewProps): string {
             icon: options.visual.paints.icon,
             track: options.visual.paints.track,
         },
-        typography: options.visual.typography,
-        foregroundEffects: options.visual.foregroundEffects,
+        textStyles: options.visual.textStyles,
+        graphicEffects: options.visual.graphicEffects,
         topIconFragment: options.linearIcon ?? options.centerIcon,
     }, options.renderSize);
 }
@@ -123,8 +123,8 @@ function renderSingleSparklineMetric(options: SingleMetricBodyViewProps): string
             grid: options.visual.paints.grid,
             baseline: options.visual.paints.grid,
         },
-        typography: options.visual.typography,
-        foregroundEffects: options.visual.foregroundEffects,
+        textStyles: options.visual.textStyles,
+        graphicEffects: options.visual.graphicEffects,
         topIconFragment: options.linearIcon ?? options.centerIcon,
     }, options.renderSize);
 }

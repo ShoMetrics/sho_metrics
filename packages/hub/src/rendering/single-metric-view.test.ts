@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderSingleMetricBodyView } from "./single-metric-view";
 import type { MetricRenderAppearance } from "./render-appearance";
-import { DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS } from "./render-foreground-effects";
+import { DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS } from "./render-svg-effects";
+import { DEFAULT_RENDER_TEXT_STYLES } from "./render-text-style";
 import type { WidgetData } from "./widget-data";
 
 test("single metric view passes foreground paint tokens into linear widgets", () => {
@@ -85,11 +86,26 @@ function buildMetricRenderAppearance(): MetricRenderAppearance {
             grid: "#grid-token",
             divider: "#divider-token",
         },
-        typography: {
-            labelFontFamily: "Test Label Font",
-            valueFontFamily: "Test Value Font",
+        textStyles: {
+            ...DEFAULT_RENDER_TEXT_STYLES,
+            value: {
+                ...DEFAULT_RENDER_TEXT_STYLES.value,
+                fontFamily: "Test Value Font",
+            },
+            unit: {
+                ...DEFAULT_RENDER_TEXT_STYLES.unit,
+                fontFamily: "Test Value Font",
+            },
+            label: {
+                ...DEFAULT_RENDER_TEXT_STYLES.label,
+                fontFamily: "Test Label Font",
+            },
+            smallLabel: {
+                ...DEFAULT_RENDER_TEXT_STYLES.smallLabel,
+                fontFamily: "Test Label Font",
+            },
         },
-        foregroundEffects: DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
+        graphicEffects: DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
         lineSmoothingPercent: 75,
         gridLineVisibility: "adaptive",
         gridLineType: "horizontal",

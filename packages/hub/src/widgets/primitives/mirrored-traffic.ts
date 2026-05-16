@@ -2,13 +2,14 @@ import type { DualChannelWidgetData, KeySize } from "../../rendering/widget-data
 import { buildGradientStops, type ColorConfig } from "../../rendering/color-resolver";
 import {
     buildSvgFilterAttributes,
-    DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
-    type RenderForegroundEffectTokens,
-} from "../../rendering/render-foreground-effects";
+    DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
+    type RenderGraphicEffectTokens,
+} from "../../rendering/render-svg-effects";
 import {
-    DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
-    type RenderTypographyTokens,
-} from "../../rendering/render-typography";
+    DEFAULT_RENDER_TEXT_STYLES,
+    resolveRenderTextStyleFontSize,
+    type RenderTextStyles,
+} from "../../rendering/render-text-style";
 import { escapeSvgText } from "../../rendering/svg-utils";
 
 export interface MirroredTrafficConfig {
@@ -18,8 +19,8 @@ export interface MirroredTrafficConfig {
     fillOpacity: number;
     labelTextColor: string;
     dividerColor: string;
-    typography: RenderTypographyTokens;
-    foregroundEffects: RenderForegroundEffectTokens;
+    textStyles: RenderTextStyles;
+    graphicEffects: RenderGraphicEffectTokens;
 }
 
 export const DEFAULT_MIRRORED_TRAFFIC_CONFIG: MirroredTrafficConfig = {
@@ -29,8 +30,8 @@ export const DEFAULT_MIRRORED_TRAFFIC_CONFIG: MirroredTrafficConfig = {
     fillOpacity: 0.2,
     labelTextColor: "rgba(255,255,255,0.5)",
     dividerColor: "rgba(255,255,255,0.15)",
-    typography: DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
-    foregroundEffects: DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
+    textStyles: DEFAULT_RENDER_TEXT_STYLES,
+    graphicEffects: DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
 };
 
 /**
@@ -85,24 +86,31 @@ export function renderMirroredTraffic(
                     ${gradientStops}
                 </linearGradient>
             </defs>` : ""}
-            <path d="${areaPath}" fill="${channelPaint}" opacity="${config.fillOpacity}" ${buildSvgFilterAttributes(config.foregroundEffects.subtleFilter).join(" ")} />
+            <path d="${areaPath}" fill="${channelPaint}" opacity="${config.fillOpacity}" ${buildSvgFilterAttributes(config.graphicEffects.subtleFilter).join(" ")} />
             <polyline points="${polyline}" fill="none"
                 stroke="${channelPaint}" stroke-width="${config.lineWidth}"
-                stroke-linejoin="round" stroke-linecap="round" ${buildSvgFilterAttributes(config.foregroundEffects.metricFilter).join(" ")} />
+                stroke-linejoin="round" stroke-linecap="round" ${buildSvgFilterAttributes(config.graphicEffects.metricFilter).join(" ")} />
         `;
     };
 
     const positiveLabel = `${data.positive.current.toFixed(1)} ${data.positive.unit}`;
     const negativeLabel = `${data.negative.current.toFixed(1)} ${data.negative.unit}`;
-    const labelFilterAttributes = buildSvgFilterAttributes(config.foregroundEffects.labelFilter);
-    const subtleFilterAttributes = buildSvgFilterAttributes(config.foregroundEffects.subtleFilter);
+    const labelTextStyle = config.textStyles.smallLabel;
+    const labelTextFilterAttributes = buildSvgFilterAttributes(labelTextStyle.filter);
+    const subtleFilterAttributes = buildSvgFilterAttributes(config.graphicEffects.subtleFilter);
 
     return `
         <!-- Mirrored Traffic: labels -->
-        <text x="10" y="14" font-family="${escapeSvgText(config.typography.labelFontFamily)}" font-size="11" fill="${config.labelTextColor}" ${labelFilterAttributes.join(" ")}>
+        <text x="10" y="14" font-family="${escapeSvgText(labelTextStyle.fontFamily)}"
+            font-size="${resolveRenderTextStyleFontSize(11, labelTextStyle)}"
+            font-weight="${escapeSvgText(String(labelTextStyle.fontWeight))}"
+            fill="${config.labelTextColor}" ${labelTextFilterAttributes.join(" ")}>
             ▼ ${escapeSvgText(positiveLabel)}</text>
         <text x="${keySize.width - 10}" y="14" text-anchor="end"
-            font-family="${escapeSvgText(config.typography.labelFontFamily)}" font-size="11" fill="${config.labelTextColor}" ${labelFilterAttributes.join(" ")}>
+            font-family="${escapeSvgText(labelTextStyle.fontFamily)}"
+            font-size="${resolveRenderTextStyleFontSize(11, labelTextStyle)}"
+            font-weight="${escapeSvgText(String(labelTextStyle.fontWeight))}"
+            fill="${config.labelTextColor}" ${labelTextFilterAttributes.join(" ")}>
             ▲ ${escapeSvgText(negativeLabel)}</text>
         <!-- Mirrored Traffic: center line -->
         <line x1="${padding.left}" y1="${centerY}" x2="${keySize.width - padding.right}" y2="${centerY}"

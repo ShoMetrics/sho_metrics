@@ -72,7 +72,7 @@ test("disk usage display keeps explicit unavailable volume instead of falling ba
     assert.equal(renderWidgetData.displayValue, "N/A");
 });
 
-test("disk compact center icon label uses theme typography", () => {
+test("disk compact center icon label uses theme label font family", () => {
     const rawSettings = writeStoredWidgetSettingsPatch(
         resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings,
         {

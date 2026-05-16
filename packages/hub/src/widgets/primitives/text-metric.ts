@@ -2,13 +2,14 @@ import type { DualChannelWidgetData, KeySize, WidgetData } from "../../rendering
 import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
     buildSvgFilterAttributes,
-    DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
-    type RenderForegroundEffectTokens,
-} from "../../rendering/render-foreground-effects";
+    DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
+    type RenderGraphicEffectTokens,
+} from "../../rendering/render-svg-effects";
 import {
-    DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
-    type RenderTypographyTokens,
-} from "../../rendering/render-typography";
+    DEFAULT_RENDER_TEXT_STYLES,
+    resolveRenderTextStyleFontSize,
+    type RenderTextStyles,
+} from "../../rendering/render-text-style";
 import {
     renderConstrainedSvgText,
 } from "../../rendering/svg-utils";
@@ -20,8 +21,8 @@ export interface TextMetricConfig extends WidgetBaseConfig {
     valueTextColor: string;
     unitTextColor: string;
     secondaryTextColor: string;
-    typography: RenderTypographyTokens;
-    foregroundEffects: RenderForegroundEffectTokens;
+    textStyles: RenderTextStyles;
+    graphicEffects: RenderGraphicEffectTokens;
     positiveColor?: string;
     negativeColor?: string;
 }
@@ -32,8 +33,8 @@ export const DEFAULT_TEXT_METRIC_CONFIG: TextMetricConfig = {
     valueTextColor: "white",
     unitTextColor: "rgba(255,255,255,0.74)",
     secondaryTextColor: "rgba(255,255,255,0.52)",
-    typography: DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
-    foregroundEffects: DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
+    textStyles: DEFAULT_RENDER_TEXT_STYLES,
+    graphicEffects: DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
 };
 
 const TEXT_LAYOUT = {
@@ -60,6 +61,9 @@ export const textMetric: Widget<TextMetricConfig> = {
         const textWidth = Math.max(24, keySize.width - TEXT_LAYOUT.horizontalPadding * 2);
         const valueText = data.displayValue ?? data.current.toFixed(0);
         const valueTextColor = resolveColorForThresholdValue(data.current, config.colorConfig);
+        const labelTextStyle = config.textStyles.label;
+        const valueTextStyle = config.textStyles.value;
+        const unitTextStyle = config.textStyles.unit;
 
         return `
             ${renderConstrainedSvgText({
@@ -68,12 +72,12 @@ export const textMetric: Widget<TextMetricConfig> = {
                 xCoordinate: centerXCoordinate,
                 yCoordinate: keySize.height * TEXT_LAYOUT.labelYRatio,
                 maxWidth: textWidth,
-                fontSize: TEXT_LAYOUT.labelFontSize,
-                fontFamily: config.typography.labelFontFamily,
-                fontWeight: 800,
+                fontSize: resolveRenderTextStyleFontSize(TEXT_LAYOUT.labelFontSize, labelTextStyle),
+                fontFamily: labelTextStyle.fontFamily,
+                fontWeight: labelTextStyle.fontWeight,
                 fill: config.labelTextColor,
                 textAnchor: "middle",
-                extraAttributes: buildSvgFilterAttributes(config.foregroundEffects.labelFilter),
+                extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
             })}
             ${renderMetricTextRow({
                 id: "text-metric-value",
@@ -82,19 +86,20 @@ export const textMetric: Widget<TextMetricConfig> = {
                 xCoordinate: centerXCoordinate,
                 yCoordinate: keySize.height * TEXT_LAYOUT.valueYRatio,
                 width: textWidth,
-                valueFontSize: TEXT_LAYOUT.valueFontSize,
-                unitFontSize: TEXT_LAYOUT.unitFontSize,
-                fontFamily: config.typography.valueFontFamily,
-                valueFontWeight: 900,
-                unitFontWeight: 800,
+                valueFontSize: resolveRenderTextStyleFontSize(TEXT_LAYOUT.valueFontSize, valueTextStyle),
+                unitFontSize: resolveRenderTextStyleFontSize(TEXT_LAYOUT.unitFontSize, unitTextStyle),
+                valueFontFamily: valueTextStyle.fontFamily,
+                unitFontFamily: unitTextStyle.fontFamily,
+                valueFontWeight: valueTextStyle.fontWeight,
+                unitFontWeight: unitTextStyle.fontWeight,
                 valueFill: valueTextColor,
                 unitFill: config.unitTextColor,
                 textAnchor: "middle",
                 valueExtraAttributes: [
                     "font-variant-numeric=\"tabular-nums\"",
-                    ...buildSvgFilterAttributes(config.foregroundEffects.valueFilter),
+                    ...buildSvgFilterAttributes(valueTextStyle.filter),
                 ],
-                unitExtraAttributes: buildSvgFilterAttributes(config.foregroundEffects.labelFilter),
+                unitExtraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
                 fitOptions: data.unit.length > 1
                     ? { minimumFontScale: 0.48, widthGuardRatio: 1.36 }
                     : undefined,
@@ -144,6 +149,7 @@ function renderSecondaryText(
     if (!secondaryDisplayValue) {
         return "";
     }
+    const textStyle = config.textStyles.smallLabel;
 
     return renderConstrainedSvgText({
         id: "text-metric-secondary",
@@ -151,12 +157,12 @@ function renderSecondaryText(
         xCoordinate: centerXCoordinate,
         yCoordinate: keySize.height * TEXT_LAYOUT.secondaryYRatio,
         maxWidth: textWidth,
-        fontSize: TEXT_LAYOUT.secondaryFontSize,
-        fontFamily: config.typography.labelFontFamily,
-        fontWeight: 720,
+        fontSize: resolveRenderTextStyleFontSize(TEXT_LAYOUT.secondaryFontSize, textStyle),
+        fontFamily: textStyle.fontFamily,
+        fontWeight: textStyle.fontWeight,
         fill: config.secondaryTextColor,
         textAnchor: "middle",
-        extraAttributes: buildSvgFilterAttributes(config.foregroundEffects.labelFilter),
+        extraAttributes: buildSvgFilterAttributes(textStyle.filter),
         fitOptions: { minimumFontScale: 0.58 },
     });
 }
@@ -172,6 +178,9 @@ function renderDualTextRow(options: {
 }): string {
     const labelYCoordinate = options.yCoordinate - TEXT_LAYOUT.dualValueFontSize * 0.64;
     const valueText = options.widgetData.displayValue ?? options.widgetData.current.toFixed(0);
+    const labelTextStyle = options.config.textStyles.label;
+    const valueTextStyle = options.config.textStyles.value;
+    const unitTextStyle = options.config.textStyles.unit;
 
     return `
         ${renderConstrainedSvgText({
@@ -180,12 +189,12 @@ function renderDualTextRow(options: {
             xCoordinate: options.centerXCoordinate,
             yCoordinate: labelYCoordinate,
             maxWidth: options.textWidth,
-            fontSize: TEXT_LAYOUT.dualLabelFontSize,
-            fontFamily: options.config.typography.labelFontFamily,
-            fontWeight: 800,
+            fontSize: resolveRenderTextStyleFontSize(TEXT_LAYOUT.dualLabelFontSize, labelTextStyle),
+            fontFamily: labelTextStyle.fontFamily,
+            fontWeight: labelTextStyle.fontWeight,
             fill: options.config.labelTextColor,
             textAnchor: "middle",
-            extraAttributes: buildSvgFilterAttributes(options.config.foregroundEffects.labelFilter),
+            extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
         ${renderMetricTextRow({
             id: `${options.rowId}-value`,
@@ -194,19 +203,20 @@ function renderDualTextRow(options: {
             xCoordinate: options.centerXCoordinate,
             yCoordinate: options.yCoordinate,
             width: options.textWidth,
-            valueFontSize: TEXT_LAYOUT.dualValueFontSize,
-            unitFontSize: TEXT_LAYOUT.dualUnitFontSize,
-            fontFamily: options.config.typography.valueFontFamily,
-            valueFontWeight: 900,
-            unitFontWeight: 800,
+            valueFontSize: resolveRenderTextStyleFontSize(TEXT_LAYOUT.dualValueFontSize, valueTextStyle),
+            unitFontSize: resolveRenderTextStyleFontSize(TEXT_LAYOUT.dualUnitFontSize, unitTextStyle),
+            valueFontFamily: valueTextStyle.fontFamily,
+            unitFontFamily: unitTextStyle.fontFamily,
+            valueFontWeight: valueTextStyle.fontWeight,
+            unitFontWeight: unitTextStyle.fontWeight,
             valueFill: options.valueFill,
             unitFill: options.config.unitTextColor,
             textAnchor: "middle",
             valueExtraAttributes: [
                 "font-variant-numeric=\"tabular-nums\"",
-                ...buildSvgFilterAttributes(options.config.foregroundEffects.valueFilter),
+                ...buildSvgFilterAttributes(valueTextStyle.filter),
             ],
-            unitExtraAttributes: buildSvgFilterAttributes(options.config.foregroundEffects.labelFilter),
+            unitExtraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
             fitOptions: options.widgetData.unit.length > 1
                 ? { minimumFontScale: 0.50, widthGuardRatio: 1.34 }
                 : undefined,

@@ -4,7 +4,7 @@ import {
     OLD_CRT_METRIC_GLOW_FILTER_ID,
     OLD_CRT_SUBTLE_GLOW_FILTER_ID,
     OLD_CRT_VALUE_GLOW_FILTER_ID,
-} from "../../rendering/render-foreground-effects";
+} from "../../rendering/render-svg-effects";
 import type { GraphicStyle } from "./style.interface";
 
 const OLD_CRT_RADIUS = 12;

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS } from "../../rendering/render-foreground-effects";
+import { DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS } from "../../rendering/render-svg-effects";
+import { DEFAULT_RENDER_TEXT_STYLES } from "../../rendering/render-text-style";
 import type { DualChannelWidgetData, WidgetData } from "../../rendering/widget-data";
 import { arcGauge, DEFAULT_ARC_GAUGE_CONFIG } from "./arc-gauge";
 import { buildGaugeRangeColorPlan, resolveGaugeMarkerGap, resolveGaugeMarkerRenderProgress } from "./arc-gauge-range";
@@ -433,7 +434,8 @@ test("metric text row escapes values and clamps non-finite coordinates", () => {
         width: -100,
         valueFontSize: 20,
         unitFontSize: 12,
-        fontFamily: `"Inter"`,
+        valueFontFamily: `"Inter"`,
+        unitFontFamily: `"Inter"`,
         valueFontWeight: 900,
         unitFontWeight: 700,
         valueFill: `#fff"`,
@@ -457,7 +459,8 @@ test("metric text row shrinks long values and units into the row width", () => {
         width: 48,
         valueFontSize: 24,
         unitFontSize: 14,
-        fontFamily: "Inter",
+        valueFontFamily: "Inter",
+        unitFontFamily: "Inter",
         valueFontWeight: 900,
         unitFontWeight: 800,
         valueFill: "white",
@@ -471,13 +474,16 @@ test("metric text row shrinks long values and units into the row width", () => {
 test("mirrored traffic renders labels, center line, and both channel graphs", () => {
     const svgFragment = renderMirroredTraffic(buildDualChannelData(), {
         ...DEFAULT_MIRRORED_TRAFFIC_CONFIG,
-        typography: {
-            labelFontFamily: "Traffic Label Font",
-            valueFontFamily: "Traffic Value Font",
+        textStyles: {
+            ...DEFAULT_RENDER_TEXT_STYLES,
+            smallLabel: {
+                ...DEFAULT_RENDER_TEXT_STYLES.smallLabel,
+                fontFamily: "Traffic Label Font",
+                filter: "url(#label-glow)",
+            },
         },
-        foregroundEffects: {
-            ...DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
-            labelFilter: "url(#label-glow)",
+        graphicEffects: {
+            ...DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
             metricFilter: "url(#metric-glow)",
             subtleFilter: "url(#subtle-glow)",
         },

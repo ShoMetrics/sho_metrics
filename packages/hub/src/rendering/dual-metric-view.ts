@@ -1,7 +1,7 @@
 import type { ColorConfig } from "./color-resolver";
 import type { RenderPaintTokens } from "./render-appearance";
-import type { RenderForegroundEffectTokens } from "./render-foreground-effects";
-import type { RenderTypographyTokens } from "./render-typography";
+import type { RenderTextStyles } from "./render-text-style";
+import type { RenderGraphicEffectTokens } from "./render-svg-effects";
 import type { DualChannelWidgetData, KeySize } from "./widget-data";
 import type { ArcGaugeStatusIcon, ArcGaugeStyle } from "../widgets/primitives/arc-gauge";
 import {
@@ -36,8 +36,8 @@ export interface DualMetricBodyViewProps {
     data: DualChannelWidgetData;
     visual: {
         paints: RenderPaintTokens;
-        typography: RenderTypographyTokens;
-        foregroundEffects: RenderForegroundEffectTokens;
+        textStyles: RenderTextStyles;
+        graphicEffects: RenderGraphicEffectTokens;
         lineSmoothingPercent: number;
         gridLineVisibility: SparklineGridLineVisibility;
         gridLineType: SparklineGridLineType;
@@ -72,8 +72,8 @@ function renderDualCircularMetric(options: DualMetricBodyViewProps): string {
         unitTextColor: options.visual.paints.secondaryText,
         dividerColor: options.visual.paints.divider,
         iconColor: options.visual.paints.icon,
-        typography: options.visual.typography,
-        foregroundEffects: options.visual.foregroundEffects,
+        textStyles: options.visual.textStyles,
+        graphicEffects: options.visual.graphicEffects,
         positiveColor: options.positive.color,
         negativeColor: options.negative.color,
         positiveColorConfig: options.positive.colorConfig,
@@ -95,8 +95,8 @@ function renderDualTextMetricView(options: DualMetricBodyViewProps): string {
         labelTextColor: options.visual.paints.secondaryText,
         unitTextColor: options.visual.paints.secondaryText,
         secondaryTextColor: options.visual.paints.mutedText,
-        typography: options.visual.typography,
-        foregroundEffects: options.visual.foregroundEffects,
+        textStyles: options.visual.textStyles,
+        graphicEffects: options.visual.graphicEffects,
         positiveColor: options.positive.color,
         negativeColor: options.negative.color,
     }, options.renderSize);
@@ -124,7 +124,7 @@ function renderDualSparklineMetric(options: DualMetricBodyViewProps): string {
             grid: options.visual.paints.grid,
             baseline: options.visual.paints.grid,
         },
-        typography: options.visual.typography,
-        foregroundEffects: options.visual.foregroundEffects,
+        textStyles: options.visual.textStyles,
+        graphicEffects: options.visual.graphicEffects,
     }, options.renderSize);
 }
