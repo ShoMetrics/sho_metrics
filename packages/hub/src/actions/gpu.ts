@@ -19,6 +19,7 @@ import {
     GPU_VRAM_TOTAL_METRIC_KEY,
     GPU_VRAM_USED_METRIC_KEY,
 } from "../runtime/metric-keys";
+import type { MetricReadPlan } from "../runtime/sources/metric-read-plan";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import type { ResolvedGpuMetricTarget, ResolvedWidgetSettings } from "../settings/resolved-settings";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
@@ -31,17 +32,18 @@ const log = logger.for("Action:GPU");
 export class Gpu extends MetricAction {
     protected readonly actionKind = "gpu";
 
-    protected override getMetricSubscriptionKeys(event: WillAppearEvent): readonly string[] {
+    protected override getMetricReadPlan(event: WillAppearEvent): MetricReadPlan {
         const settings = this.resolveSettings(event);
         const gpuTarget = readResolvedMetricTarget(settings, "gpu");
+        const metricKeys = resolveGpuMetricSubscriptionKeys(gpuTarget);
 
-        return resolveGpuMetricSubscriptionKeys(gpuTarget);
+        return this.buildMetricReadPlan(metricKeys);
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event);
         const gpuTarget = readResolvedMetricTarget(settings, "gpu");
-        const metrics = this.getMetricReader();
+        const metrics = this.getMetricReader(event);
 
         this.publishGpuPowerRuntimeMaximum(event, gpuTarget, metrics);
 

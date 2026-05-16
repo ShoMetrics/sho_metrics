@@ -5,6 +5,7 @@ import { buildMemoryUsageWidgetData } from "../metrics/storage-widget-data";
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import { RAM_TOTAL_METRIC_KEY, RAM_USED_METRIC_KEY } from "../runtime/metric-keys";
+import type { MetricReadPlan } from "../runtime/sources/metric-read-plan";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 
@@ -12,13 +13,13 @@ import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 export class Memory extends MetricAction {
     protected readonly actionKind = "memory";
 
-    protected override getMetricSubscriptionKeys(): readonly string[] {
-        return [RAM_USED_METRIC_KEY, RAM_TOTAL_METRIC_KEY];
+    protected override getMetricReadPlan(): MetricReadPlan {
+        return this.buildMetricReadPlan([RAM_USED_METRIC_KEY, RAM_TOTAL_METRIC_KEY]);
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event);
-        const metrics = this.getMetricReader();
+        const metrics = this.getMetricReader(event);
         readResolvedMetricTarget(settings, "memory");
 
         const usedBytesWidgetData = metrics.getWidgetData(
