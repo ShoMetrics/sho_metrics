@@ -330,6 +330,18 @@ message AppearanceThemeSettings {
     defined_only: true
     not_in: [0]
   }];
+
+  // Terminal owns its variants inside one theme so users can choose between a
+  // clean terminal look and the more opinionated vintage screen
+  // treatment without splitting them into separate themes.
+  TerminalThemeSettings terminal = 2;
+}
+
+message TerminalThemeSettings {
+  optional TerminalThemeVariant variant = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
 }
 
 message AppearancePaintSettings {
@@ -580,7 +592,13 @@ enum MetricTheme {
   METRIC_THEME_FLAT = 1;
   METRIC_THEME_CUPERTINO_GLASS = 2;
   METRIC_THEME_COLOR_FILLED = 3;
-  METRIC_THEME_OLD_CRT = 4;
+  METRIC_THEME_TERMINAL = 4;
+}
+
+enum TerminalThemeVariant {
+  TERMINAL_THEME_VARIANT_UNSPECIFIED = 0;
+  TERMINAL_THEME_VARIANT_CLEAN = 1;
+  TERMINAL_THEME_VARIANT_VINTAGE = 2;
 }
 
 enum ColorMode {

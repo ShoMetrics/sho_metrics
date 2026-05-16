@@ -44,6 +44,9 @@ export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
     },
     theme: {
         selectedTheme: "flat",
+        terminal: {
+            variant: "clean",
+        },
     },
     paint: {
         metric: {

@@ -1,5 +1,6 @@
 import { CircleStyleSetting } from "../controls/CircleStyleSetting";
 import { GraphicTypeSetting } from "../controls/GraphicTypeSetting";
+import { TerminalVariantSetting } from "../controls/TerminalVariantSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
@@ -31,6 +32,15 @@ export function LayoutSettings({
                 })}
                 disabled={themeDisabled}
             />
+            {appearance.theme.selectedTheme === "terminal" && (
+                <TerminalVariantSetting
+                    value={appearance.theme.terminal.variant}
+                    onValueChange={(variant) => onSettingsPatch({
+                        appearance: { theme: { terminal: { variant } } },
+                    })}
+                    disabled={themeDisabled}
+                />
+            )}
             {appearance.graph.viewLayout === "circular" && (
                 <CircleStyleSetting
                     value={appearance.graph.circleStyle}

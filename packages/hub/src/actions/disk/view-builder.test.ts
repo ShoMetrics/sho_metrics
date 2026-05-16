@@ -81,7 +81,7 @@ test("disk compact center icon label uses theme label font family", () => {
                     viewLayout: "circular",
                     circleStyle: "compact",
                 },
-                theme: { selectedTheme: "old-crt" },
+                theme: { selectedTheme: "terminal" },
             },
             disk: {
                 kind: "usage",

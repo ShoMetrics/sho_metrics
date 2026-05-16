@@ -4,6 +4,7 @@ import {
     ColorMode as StoredColorMode,
     GpuMetricTarget_Kind as StoredGpuMetricKind,
     MetricTheme as StoredMetricTheme,
+    TerminalThemeVariant as StoredTerminalThemeVariant,
 } from "../../generated/shometrics/v1/settings_pb";
 import { readStoredWidgetSettings } from "./codec";
 import { resolveQuickStartStoredWidgetSettings } from "./quick-start-widget-settings";
@@ -66,17 +67,35 @@ test("widget patch writes black-white color mode", () => {
     assert.equal(appearance?.paint?.metric?.colorMode, StoredColorMode.BLACK_WHITE);
 });
 
-test("widget patch writes old crt theme", () => {
+test("widget patch writes terminal theme", () => {
     const cpuSettings = resolveQuickStartStoredWidgetSettings(undefined, "cpu").rawSettings;
 
     const nextSettings = writeStoredWidgetSettingsPatch(cpuSettings, {
         appearance: {
             theme: {
-                selectedTheme: "old-crt",
+                selectedTheme: "terminal",
             },
         },
     });
 
     const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
-    assert.equal(appearance?.theme?.selectedTheme, StoredMetricTheme.OLD_CRT);
+    assert.equal(appearance?.theme?.selectedTheme, StoredMetricTheme.TERMINAL);
+});
+
+test("widget patch writes terminal variant", () => {
+    const cpuSettings = resolveQuickStartStoredWidgetSettings(undefined, "cpu").rawSettings;
+
+    const nextSettings = writeStoredWidgetSettingsPatch(cpuSettings, {
+        appearance: {
+            theme: {
+                selectedTheme: "terminal",
+                terminal: {
+                    variant: "vintage",
+                },
+            },
+        },
+    });
+
+    const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
+    assert.equal(appearance?.theme?.terminal?.variant, StoredTerminalThemeVariant.VINTAGE);
 });

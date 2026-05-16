@@ -22,7 +22,7 @@ test("font script detection keeps English SVG on primary fonts only", () => {
     assert.deepEqual(detectFontScriptsFromSvg(buildTextSvg("CPU 42%")), []);
 });
 
-test("bundled font family detection finds old CRT font-family usage", () => {
+test("bundled font family detection finds terminal font-family usage", () => {
     const svgString = [
         '<svg xmlns="http://www.w3.org/2000/svg">',
         '<text font-family="\'Share Tech Mono\',Inter">40%</text>',
@@ -83,7 +83,7 @@ test("font options disable system fonts and load bundled Inter on Windows", () =
     ]);
 });
 
-test("font options load old CRT bundled fonts before primary fonts when SVG asks for them", () => {
+test("font options load terminal bundled fonts before primary fonts when SVG asks for them", () => {
     const fontOptions = resolveResvgFontOptions(
         buildTextSvgWithFontFamily("CPU", "'Share Tech Mono','Inter'"),
         buildEnvironment({
@@ -178,7 +178,7 @@ test("font options use bundled Inter as the Linux primary font for visual tests"
     ]);
 });
 
-test("font options add old CRT fonts and bundled Inter on Linux", () => {
+test("font options add terminal fonts and bundled Inter on Linux", () => {
     const fontOptions = resolveResvgFontOptions(
         buildTextSvgWithFontFamily("CPU", "'Share Tech Mono','Inter'"),
         buildEnvironment({

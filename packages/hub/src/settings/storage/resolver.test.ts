@@ -21,6 +21,7 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.preferences.pollingFrequencySeconds, 1);
         assert.equal(settings.widget.slot.appearance.graph.viewLayout, "circular");
         assert.equal(settings.widget.slot.appearance.paint.metric.solid.colors.usageColor, "#3b82f6");
+        assert.equal(settings.widget.slot.appearance.theme.terminal.variant, "clean");
     });
 
     it("cascades global defaults widget overrides and runtime maxima", () => {
@@ -168,14 +169,14 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "black-white");
     });
 
-    it("resolves old crt as a user-facing theme", () => {
+    it("resolves terminal as a user-facing theme", () => {
         const storedWidgetSettings = readStoredWidgetSettings({
             singleMetric: {
                 slot: {
                     overrides: {
                         appearance: {
                             theme: {
-                                selectedTheme: "METRIC_THEME_OLD_CRT",
+                                selectedTheme: "METRIC_THEME_TERMINAL",
                             },
                         },
                     },
@@ -187,7 +188,34 @@ describe("stored settings proto resolver", () => {
             storedWidgetSettings,
         });
 
-        assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "old-crt");
+        assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "terminal");
+        assert.equal(settings.widget.slot.appearance.theme.terminal.variant, "clean");
+    });
+
+    it("resolves terminal vintage as a theme-owned variant", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    overrides: {
+                        appearance: {
+                            theme: {
+                                selectedTheme: "METRIC_THEME_TERMINAL",
+                                terminal: {
+                                    variant: "TERMINAL_THEME_VARIANT_VINTAGE",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+        });
+
+        assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "terminal");
+        assert.equal(settings.widget.slot.appearance.theme.terminal.variant, "vintage");
     });
 
     it("applies global paint override without replacing widget layout and style", () => {

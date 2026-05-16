@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
     DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
-    OLD_CRT_RENDER_GRAPHIC_EFFECT_TOKENS,
+    TERMINAL_CLEAN_RENDER_GRAPHIC_EFFECT_TOKENS,
+    TERMINAL_VINTAGE_RENDER_GRAPHIC_EFFECT_TOKENS,
 } from "../rendering/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
-    OLD_CRT_RENDER_TEXT_STYLES,
+    TERMINAL_CLEAN_RENDER_TEXT_STYLES,
+    TERMINAL_VINTAGE_RENDER_TEXT_STYLES,
 } from "../rendering/render-text-style";
 import { buildMetricRenderAppearance } from "./render-appearance-builder";
 import { buildDefaultAppearanceSettings as buildAppearanceSettings } from "./default-appearance-settings";
@@ -38,35 +40,47 @@ test("graphic style maps resolved appearance settings to theme preset names", ()
     const colorFilledSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         theme: { selectedTheme: "color-filled" },
     }));
-    const oldCrtSettings = buildMetricRenderAppearance(buildAppearanceSettings({
-        theme: { selectedTheme: "old-crt" },
+    const terminalCleanSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: { selectedTheme: "terminal" },
+    }));
+    const terminalVintageSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: { selectedTheme: "terminal", terminal: { variant: "vintage" } },
     }));
     const defaultSettings = buildMetricRenderAppearance(buildAppearanceSettings());
 
     assert.equal(cupertinoGlassSettings.graphicStyle, "cupertino-glass");
     assert.equal(colorFilledSettings.graphicStyle, "color-filled");
-    assert.equal(oldCrtSettings.graphicStyle, "old-crt");
+    assert.equal(terminalCleanSettings.graphicStyle, "terminal-clean");
+    assert.equal(terminalVintageSettings.graphicStyle, "terminal-vintage");
     assert.equal(defaultSettings.graphicStyle, "flat");
 });
 
 test("text styles map resolved appearance settings to renderer text roles", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings());
-    const oldCrtSettings = buildMetricRenderAppearance(buildAppearanceSettings({
-        theme: { selectedTheme: "old-crt" },
+    const terminalCleanSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: { selectedTheme: "terminal" },
+    }));
+    const terminalVintageSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: { selectedTheme: "terminal", terminal: { variant: "vintage" } },
     }));
 
     assert.deepEqual(visualSettings.textStyles, DEFAULT_RENDER_TEXT_STYLES);
-    assert.deepEqual(oldCrtSettings.textStyles, OLD_CRT_RENDER_TEXT_STYLES);
+    assert.deepEqual(terminalCleanSettings.textStyles, TERMINAL_CLEAN_RENDER_TEXT_STYLES);
+    assert.deepEqual(terminalVintageSettings.textStyles, TERMINAL_VINTAGE_RENDER_TEXT_STYLES);
 });
 
 test("graphic effects map resolved appearance settings to renderer effect tokens", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings());
-    const oldCrtSettings = buildMetricRenderAppearance(buildAppearanceSettings({
-        theme: { selectedTheme: "old-crt" },
+    const terminalCleanSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: { selectedTheme: "terminal" },
+    }));
+    const terminalVintageSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: { selectedTheme: "terminal", terminal: { variant: "vintage" } },
     }));
 
     assert.deepEqual(visualSettings.graphicEffects, DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS);
-    assert.deepEqual(oldCrtSettings.graphicEffects, OLD_CRT_RENDER_GRAPHIC_EFFECT_TOKENS);
+    assert.deepEqual(terminalCleanSettings.graphicEffects, TERMINAL_CLEAN_RENDER_GRAPHIC_EFFECT_TOKENS);
+    assert.deepEqual(terminalVintageSettings.graphicEffects, TERMINAL_VINTAGE_RENDER_GRAPHIC_EFFECT_TOKENS);
 });
 
 test("solid color mode uses resolved appearance color", () => {
@@ -146,9 +160,9 @@ test("black-white color mode lowers renderer paint to neutral colors", () => {
     });
 });
 
-test("old crt theme uses fixed phosphor paint unless black-white mode is active", () => {
+test("terminal clean theme uses fixed readable terminal paint unless black-white mode is active", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
-        theme: { selectedTheme: "old-crt" },
+        theme: { selectedTheme: "terminal" },
         paint: {
             metric: {
                 colorMode: "solid",
@@ -157,18 +171,28 @@ test("old crt theme uses fixed phosphor paint unless black-white mode is active"
         },
     }));
     const blackWhiteSettings = buildMetricRenderAppearance(buildAppearanceSettings({
-        theme: { selectedTheme: "old-crt" },
+        theme: { selectedTheme: "terminal" },
         paint: {
             metric: { colorMode: "black-white" },
         },
     }));
 
-    assert.equal(visualSettings.paints.primaryMetric.solidColor, "#10d82a");
-    assert.equal(visualSettings.paints.primaryText, "#46ff36");
-    assert.equal(visualSettings.paints.background, "#010301");
+    assert.equal(visualSettings.paints.primaryMetric.solidColor, "#25e84a");
+    assert.equal(visualSettings.paints.primaryText, "#67ff70");
+    assert.equal(visualSettings.paints.background, "#010705");
     assert.equal(blackWhiteSettings.paintConstraint, "black-white");
     assert.equal(blackWhiteSettings.paints.primaryMetric.solidColor, "#e6e6e6");
     assert.equal(blackWhiteSettings.paints.primaryText, "rgba(255,255,255,0.94)");
+});
+
+test("terminal vintage theme keeps the physical phosphor palette", () => {
+    const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: { selectedTheme: "terminal", terminal: { variant: "vintage" } },
+    }));
+
+    assert.equal(visualSettings.paints.primaryMetric.solidColor, "#10d82a");
+    assert.equal(visualSettings.paints.primaryText, "#46ff36");
+    assert.equal(visualSettings.paints.background, "#010301");
 });
 
 test("color filled solid mode uses theme background color and neutral foreground paint", () => {

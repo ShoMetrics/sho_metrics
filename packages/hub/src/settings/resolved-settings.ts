@@ -17,7 +17,8 @@
 
 export type SingleMetricViewLayout = "circular" | "text" | "linear" | "sparkline";
 export type CircleStyle = "value" | "compact" | "gauge";
-export type MetricTheme = "flat" | "cupertino-glass" | "color-filled" | "old-crt";
+export type MetricTheme = "flat" | "cupertino-glass" | "color-filled" | "terminal";
+export type TerminalThemeVariant = "clean" | "vintage";
 export type ColorMode = "multi-color" | "solid" | "black-white";
 export type GridLineVisibility = "adaptive" | "always" | "none";
 export type GridLineType = "horizontal" | "vertical";
@@ -162,6 +163,11 @@ export interface ResolvedAppearanceGraphSettings {
 
 export interface ResolvedAppearanceThemeSettings {
     readonly selectedTheme: MetricTheme;
+    readonly terminal: ResolvedTerminalThemeSettings;
+}
+
+export interface ResolvedTerminalThemeSettings {
+    readonly variant: TerminalThemeVariant;
 }
 
 export interface ResolvedAppearancePaintSettings {

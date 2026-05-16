@@ -12,6 +12,7 @@ import {
     NetworkDisplaySettings_UnitBase as StoredNetworkUnitBase,
     NetworkMetricTarget_Direction as StoredNetworkDirection,
     NetworkMetricTarget_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
+    TerminalThemeVariant as StoredTerminalThemeVariant,
     ScaleMode as StoredScaleMode,
     SingleMetricViewLayout as StoredSingleMetricViewLayout,
     SparklineAppearanceSettings_GridLineType as StoredGridLineType,
@@ -44,6 +45,7 @@ import {
     type MetricSourceProfile as StoredMetricSourceProfile,
     type NetworkDisplaySettings as StoredNetworkDisplaySettings,
     type NetworkMetricTarget as StoredNetworkMetricTarget,
+    type TerminalThemeSettings as StoredTerminalThemeSettings,
     type StoredGlobalSettings,
     type StoredWidgetSettings,
 } from "../../generated/shometrics/v1/settings_pb.js";
@@ -58,6 +60,7 @@ import type {
     NetworkDirection,
     NetworkTrafficDisplayMode,
     NetworkUnitBase,
+    TerminalThemeVariant,
     ResolvedAppearanceSettings,
     ResolvedCatalogMetricTarget,
     ResolvedAppearanceGraphSettings,
@@ -91,6 +94,7 @@ import type {
     ResolvedMultiColorSet,
     ResolvedNetworkDisplaySettings,
     ResolvedNetworkReading,
+    ResolvedTerminalThemeSettings,
     ResolvedSparklineAppearanceSettings,
     ResolvedWidgetPreferences,
     ResolvedWidgetSettings,
@@ -163,8 +167,14 @@ const metricThemeByProto = {
     [StoredMetricTheme.FLAT]: "flat",
     [StoredMetricTheme.CUPERTINO_GLASS]: "cupertino-glass",
     [StoredMetricTheme.COLOR_FILLED]: "color-filled",
-    [StoredMetricTheme.OLD_CRT]: "old-crt",
+    [StoredMetricTheme.TERMINAL]: "terminal",
 } satisfies Record<StoredMetricTheme, MetricTheme | undefined>;
+
+const terminalThemeVariantByProto = {
+    [StoredTerminalThemeVariant.UNSPECIFIED]: undefined,
+    [StoredTerminalThemeVariant.CLEAN]: "clean",
+    [StoredTerminalThemeVariant.VINTAGE]: "vintage",
+} satisfies Record<StoredTerminalThemeVariant, TerminalThemeVariant | undefined>;
 
 const colorModeByProto = {
     [StoredColorMode.UNSPECIFIED]: undefined,
@@ -663,6 +673,16 @@ function resolveAppearanceThemeSettings(
 ): ResolvedAppearanceThemeSettings {
     return {
         selectedTheme: resolveStoredEnum(storedTheme?.selectedTheme, metricThemeByProto, defaults.selectedTheme),
+        terminal: resolveTerminalThemeSettings(defaults.terminal, storedTheme?.terminal),
+    };
+}
+
+function resolveTerminalThemeSettings(
+    defaults: ResolvedTerminalThemeSettings,
+    storedTerminal: StoredTerminalThemeSettings | undefined,
+): ResolvedTerminalThemeSettings {
+    return {
+        variant: resolveStoredEnum(storedTerminal?.variant, terminalThemeVariantByProto, defaults.variant),
     };
 }
 

@@ -1,6 +1,7 @@
 import { CircleStyleSetting } from "../controls/CircleStyleSetting";
 import { GraphicTypeSetting } from "../controls/GraphicTypeSetting";
 import { NumberSetting } from "../controls/NumberSetting";
+import { TerminalVariantSetting } from "../controls/TerminalVariantSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { InspectorItem } from "../components/InspectorItem";
 import {
@@ -152,12 +153,20 @@ function ThemeOverrideSection({
                 onValueChange={onOverrideChange}
             />
             {themeOverride && (
-                <SelectSetting
-                    label="Graphic Style"
-                    value={themeOverride.theme.selectedTheme}
-                    optionList={graphicStyleOptionList}
-                    onValueChange={(selectedTheme) => onThemePatch({ selectedTheme })}
-                />
+                <>
+                    <SelectSetting
+                        label="Graphic Style"
+                        value={themeOverride.theme.selectedTheme}
+                        optionList={graphicStyleOptionList}
+                        onValueChange={(selectedTheme) => onThemePatch({ selectedTheme })}
+                    />
+                    {themeOverride.theme.selectedTheme === "terminal" && (
+                        <TerminalVariantSetting
+                            value={themeOverride.theme.terminal.variant}
+                            onValueChange={(variant) => onThemePatch({ terminal: { variant } })}
+                        />
+                    )}
+                </>
             )}
         </SettingsSection>
     );
@@ -174,7 +183,7 @@ function PaintOverrideSection({
     onOverrideChange: (isEnabled: boolean) => void;
     onPaintPatch: (patch: NonNullable<StoredGlobalSettingsPatch["paint"]>) => void;
 }): React.JSX.Element {
-    if (selectedTheme === "old-crt") {
+    if (selectedTheme === "terminal") {
         return <></>;
     }
 
@@ -205,7 +214,7 @@ function ActivePaintOverrideControls({
     paintOverride: ResolvedGlobalPaintOverride;
     onPaintPatch: (patch: NonNullable<StoredGlobalSettingsPatch["paint"]>) => void;
 }): React.JSX.Element {
-    if (selectedTheme === "old-crt") {
+    if (selectedTheme === "terminal") {
         return <></>;
     }
 

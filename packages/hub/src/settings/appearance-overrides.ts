@@ -1,6 +1,7 @@
 import type {
     ColorMode,
     MetricTheme,
+    TerminalThemeVariant,
     ResolvedAppearanceGraphSettings,
     ResolvedAppearanceSettings,
     ResolvedMetricMultiColorChannelColors,
@@ -25,6 +26,11 @@ export interface ResolvedAppearanceGraphSettingsOverride {
 
 export interface ResolvedAppearanceThemeSettingsOverride {
     readonly selectedTheme?: MetricTheme | undefined;
+    readonly terminal?: ResolvedTerminalThemeSettingsOverride | undefined;
+}
+
+export interface ResolvedTerminalThemeSettingsOverride {
+    readonly variant?: TerminalThemeVariant | undefined;
 }
 
 export interface ResolvedAppearancePaintSettingsOverride {
@@ -110,6 +116,10 @@ export function mergeResolvedAppearanceSettings(
         theme: {
             ...settings.theme,
             selectedTheme: override.theme?.selectedTheme ?? settings.theme.selectedTheme,
+            terminal: {
+                ...settings.theme.terminal,
+                ...override.theme?.terminal,
+            },
         },
         paint: mergeAppearancePaintSettings(settings.paint, override.paint),
         sparkline: {
