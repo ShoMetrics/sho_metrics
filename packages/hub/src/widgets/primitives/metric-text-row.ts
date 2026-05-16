@@ -9,26 +9,32 @@ import {
 } from "../../rendering/svg-utils";
 
 interface MetricTextRowOptions {
-    id: string;
-    valueText: string;
-    unitText: string;
-    xCoordinate: number;
-    yCoordinate: number;
-    width: number;
-    valueFontSize: number;
-    unitFontSize: number;
-    valueFontFamily: string;
-    unitFontFamily: string;
-    valueFontWeight: number | string;
-    unitFontWeight: number | string;
-    valueFill: string;
-    unitFill: string;
-    textAnchor?: SvgTextAnchor;
-    unitBaselineOffset?: number;
-    clipHeight?: number;
-    valueExtraAttributes?: readonly string[];
-    unitExtraAttributes?: readonly string[];
-    fitOptions?: SvgTextFitOptions;
+    readonly id: string;
+    readonly layout: MetricTextRowLayout;
+    readonly value: MetricTextSegment;
+    readonly unit: MetricTextUnitSegment;
+    readonly fitOptions?: SvgTextFitOptions;
+}
+
+interface MetricTextRowLayout {
+    readonly xCoordinate: number;
+    readonly yCoordinate: number;
+    readonly width: number;
+    readonly textAnchor?: SvgTextAnchor;
+    readonly clipHeight?: number;
+}
+
+interface MetricTextSegment {
+    readonly text: string;
+    readonly fontSize: number;
+    readonly fontFamily: string;
+    readonly fontWeight: number | string;
+    readonly fill: string;
+    readonly extraAttributes?: readonly string[];
+}
+
+interface MetricTextUnitSegment extends MetricTextSegment {
+    readonly baselineOffset?: number;
 }
 
 const MINIMUM_ROW_WIDTH = 1;
@@ -40,53 +46,53 @@ const MINIMUM_ROW_WIDTH = 1;
  * third-party font layout dependency is used.
  */
 export function renderMetricTextRow(options: MetricTextRowOptions): string {
-    const width = Math.max(MINIMUM_ROW_WIDTH, options.width);
-    const textAnchor = options.textAnchor ?? "start";
-    const unitTier = resolveUnitTier(options.unitText);
-    const rawUnitFontSize = options.unitFontSize * unitTier.fontScale;
+    const width = Math.max(MINIMUM_ROW_WIDTH, options.layout.width);
+    const textAnchor = options.layout.textAnchor ?? "start";
+    const unitTier = resolveUnitTier(options.unit.text);
+    const rawUnitFontSize = options.unit.fontSize * unitTier.fontScale;
     const textFit = resolveSvgTextFit({
         runs: [
             {
-                text: options.valueText,
-                fontSize: options.valueFontSize,
-                fontWeight: options.valueFontWeight,
+                text: options.value.text,
+                fontSize: options.value.fontSize,
+                fontWeight: options.value.fontWeight,
             },
             {
-                text: options.unitText,
+                text: options.unit.text,
                 fontSize: rawUnitFontSize,
-                fontWeight: options.unitFontWeight,
+                fontWeight: options.unit.fontWeight,
             },
         ],
         maxWidth: width,
-        extraWidth: options.unitText.length > 0 ? unitTier.gap : 0,
+        extraWidth: options.unit.text.length > 0 ? unitTier.gap : 0,
         fitOptions: options.fitOptions,
     });
-    const valueFontSize = options.valueFontSize * textFit.fontScale;
+    const valueFontSize = options.value.fontSize * textFit.fontScale;
     const unitFontSize = rawUnitFontSize * textFit.fontScale;
     const unitGap = unitTier.gap * textFit.fontScale;
-    const clipHeight = options.clipHeight
+    const clipHeight = options.layout.clipHeight
         ?? Math.max(valueFontSize, unitFontSize) * 1.45;
     const clipPathId = sanitizeSvgId(options.id, "metric-text-row");
-    const clipXCoordinate = resolveClipXCoordinate(options.xCoordinate, width, textAnchor);
-    const clipYCoordinate = options.yCoordinate - clipHeight / 2;
-    const valueAttributes = options.valueExtraAttributes?.length
-        ? ` ${options.valueExtraAttributes.join(" ")}`
+    const clipXCoordinate = resolveClipXCoordinate(options.layout.xCoordinate, width, textAnchor);
+    const clipYCoordinate = options.layout.yCoordinate - clipHeight / 2;
+    const valueAttributes = options.value.extraAttributes?.length
+        ? ` ${options.value.extraAttributes.join(" ")}`
         : "";
-    const unitAttributes = options.unitExtraAttributes?.length
-        ? ` ${options.unitExtraAttributes.join(" ")}`
+    const unitAttributes = options.unit.extraAttributes?.length
+        ? ` ${options.unit.extraAttributes.join(" ")}`
         : "";
-    const unitTspan = options.unitText.length > 0
-        ? `<tspan dx="${formatSvgNumber(unitGap)}" dy="${formatSvgNumber(options.unitBaselineOffset ?? 0)}"
-                font-family="${escapeSvgText(options.unitFontFamily)}" font-size="${formatSvgNumber(unitFontSize)}"
-                font-weight="${escapeSvgText(String(options.unitFontWeight))}"
-                fill="${escapeSvgText(options.unitFill)}"${unitAttributes}>${escapeSvgText(options.unitText)}</tspan>`
+    const unitTspan = options.unit.text.length > 0
+        ? `<tspan dx="${formatSvgNumber(unitGap)}" dy="${formatSvgNumber(options.unit.baselineOffset ?? 0)}"
+                font-family="${escapeSvgText(options.unit.fontFamily)}" font-size="${formatSvgNumber(unitFontSize)}"
+                font-weight="${escapeSvgText(String(options.unit.fontWeight))}"
+                fill="${escapeSvgText(options.unit.fill)}"${unitAttributes}>${escapeSvgText(options.unit.text)}</tspan>`
         : "";
     const textFitAttributes = formatSvgTextFitAttributes(textFit);
-    const textElement = `<text x="${formatSvgNumber(options.xCoordinate)}" y="${formatSvgNumber(options.yCoordinate)}"
+    const textElement = `<text x="${formatSvgNumber(options.layout.xCoordinate)}" y="${formatSvgNumber(options.layout.yCoordinate)}"
                 text-anchor="${textAnchor}" dominant-baseline="middle"${textFitAttributes}><tspan
-                    font-family="${escapeSvgText(options.valueFontFamily)}" font-size="${formatSvgNumber(valueFontSize)}"
-                    font-weight="${escapeSvgText(String(options.valueFontWeight))}"
-                    fill="${escapeSvgText(options.valueFill)}"${valueAttributes}>${escapeSvgText(options.valueText)}</tspan>${unitTspan}</text>`;
+                    font-family="${escapeSvgText(options.value.fontFamily)}" font-size="${formatSvgNumber(valueFontSize)}"
+                    font-weight="${escapeSvgText(String(options.value.fontWeight))}"
+                    fill="${escapeSvgText(options.value.fill)}"${valueAttributes}>${escapeSvgText(options.value.text)}</tspan>${unitTspan}</text>`;
 
     return `
         <defs>

@@ -773,25 +773,31 @@ function renderCenterValue(options: {
         })}
         ${renderMetricTextRow({
             id: "arc-value-unit",
-            valueText: options.valueText,
-            unitText: options.unitText,
-            xCoordinate: resolveValueRowXCoordinate(options.centerXCoordinate, options.footerIconFragment),
-            yCoordinate: options.valueCenterYCoordinate,
-            width: options.centerTextMaxWidth,
-            valueFontSize: resolveRenderTextStyleFontSize(options.valueFontSize, valueTextStyle),
-            unitFontSize: resolveRenderTextStyleFontSize(options.unitFontSize, unitTextStyle),
-            valueFontFamily: valueTextStyle.fontFamily,
-            unitFontFamily: unitTextStyle.fontFamily,
-            valueFontWeight: valueTextStyle.fontWeight,
-            unitFontWeight: unitTextStyle.fontWeight,
-            valueFill: options.config.valueTextColor,
-            unitFill: options.config.unitTextColor,
-            textAnchor: "middle",
-            valueExtraAttributes: [
-                "font-variant-numeric=\"tabular-nums\"",
-                ...buildSvgFilterAttributes(valueTextStyle.filter),
-            ],
-            unitExtraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
+            layout: {
+                xCoordinate: resolveValueRowXCoordinate(options.centerXCoordinate, options.footerIconFragment),
+                yCoordinate: options.valueCenterYCoordinate,
+                width: options.centerTextMaxWidth,
+                textAnchor: "middle",
+            },
+            value: {
+                text: options.valueText,
+                fontSize: resolveRenderTextStyleFontSize(options.valueFontSize, valueTextStyle),
+                fontFamily: valueTextStyle.fontFamily,
+                fontWeight: valueTextStyle.fontWeight,
+                fill: options.config.valueTextColor,
+                extraAttributes: [
+                    "font-variant-numeric=\"tabular-nums\"",
+                    ...buildSvgFilterAttributes(valueTextStyle.filter),
+                ],
+            },
+            unit: {
+                text: options.unitText,
+                fontSize: resolveRenderTextStyleFontSize(options.unitFontSize, unitTextStyle),
+                fontFamily: unitTextStyle.fontFamily,
+                fontWeight: unitTextStyle.fontWeight,
+                fill: options.config.unitTextColor,
+                extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
+            },
             fitOptions: options.unitText.length > 1
                 ? { minimumFontScale: 0.42, widthGuardRatio: 1.45 }
                 : undefined,
