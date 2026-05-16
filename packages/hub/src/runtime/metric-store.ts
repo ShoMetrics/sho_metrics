@@ -2,59 +2,104 @@ import { RingBuffer } from "./ring-buffer";
 import type { WidgetData } from "../rendering/widget-data";
 import type { IMetricSnapshot } from "./sources/source.interface";
 
+/** Read-only view of metric history bound to one source scope. */
+export interface MetricStoreReader {
+    /** Builds renderer-facing widget data for one metric in the bound source scope. */
+    getWidgetData(metricKey: string, label: string, unit: string, maxValue?: number): WidgetData;
+
+    /** Reads the latest text value for one metric in the bound source scope. */
+    getTextValue(metricKey: string): string | undefined;
+}
+
 /**
  * Maintains per-metric scalar history and latest text values for renderers.
  */
 export class MetricStore {
-    private store = new Map<string, MetricRecord>();
+    // Store layout is private to MetricStore:
+    // - outer key: runtime source scope id, for example "local" or a future "remote:nuc".
+    // - inner key: ShoMetrics metric id inside that source scope, for example "cpu.usage_percent" or "disk.throughput.read".
+    // No separator or escaped string format is reserved here; adapters own validation before values reach this store.
+    private store = new Map<string, SourceMetricStore>();
 
     private static readonly HISTORY_SIZE = 60;
 
-    ingest(snapshot: IMetricSnapshot): void {
-        const sampleTimestampMilliseconds = Number(snapshot.timestampMs);
+    /** Creates a read-only metric view bound to one runtime source scope. */
+    forScope(sourceScopeId: string): MetricStoreReader {
+        return {
+            getWidgetData: (metricKey, label, unit, maxValue) => this.readWidgetData(
+                sourceScopeId,
+                metricKey,
+                label,
+                unit,
+                maxValue,
+            ),
+            getTextValue: metricKey => this.readTextValue(sourceScopeId, metricKey),
+        };
+    }
 
-        for (const [key, value] of Object.entries(snapshot.metrics)) {
+    /** Ingests a snapshot into the history owned by one runtime source scope. */
+    ingest(sourceScopeId: string, snapshot: IMetricSnapshot): void {
+        const sampleTimestampMilliseconds = Number(snapshot.timestampMs);
+        const sourceStore = this.ensureSourceStore(sourceScopeId);
+
+        for (const [metricKey, value] of Object.entries(snapshot.metrics)) {
             if (value.data.case === "scalar") {
-                this.record(key, value.data.value, sampleTimestampMilliseconds);
+                this.record(sourceStore, metricKey, value.data.value, sampleTimestampMilliseconds);
                 continue;
             }
 
             if (value.data.case === "text") {
-                this.recordText(key, value.data.value, sampleTimestampMilliseconds);
+                this.recordText(sourceStore, metricKey, value.data.value, sampleTimestampMilliseconds);
             }
         }
     }
 
-    private record(key: string, value: number, timestampMilliseconds: number): void {
-        let metricRecord = this.store.get(key);
+    private record(
+        sourceStore: SourceMetricStore,
+        metricKey: string,
+        value: number,
+        timestampMilliseconds: number,
+    ): void {
+        let metricRecord = sourceStore.get(metricKey);
         if (!metricRecord) {
             metricRecord = {
                 buffer: new RingBuffer<number>(MetricStore.HISTORY_SIZE),
                 timestampMilliseconds,
             };
-            this.store.set(key, metricRecord);
+            sourceStore.set(metricKey, metricRecord);
         }
 
         metricRecord.buffer.push(value);
         metricRecord.timestampMilliseconds = timestampMilliseconds;
     }
 
-    private recordText(key: string, value: string, timestampMilliseconds: number): void {
-        let metricRecord = this.store.get(key);
+    private recordText(
+        sourceStore: SourceMetricStore,
+        metricKey: string,
+        value: string,
+        timestampMilliseconds: number,
+    ): void {
+        let metricRecord = sourceStore.get(metricKey);
         if (!metricRecord) {
             metricRecord = {
                 buffer: new RingBuffer<number>(MetricStore.HISTORY_SIZE),
                 timestampMilliseconds,
             };
-            this.store.set(key, metricRecord);
+            sourceStore.set(metricKey, metricRecord);
         }
 
         metricRecord.text = value;
         metricRecord.timestampMilliseconds = timestampMilliseconds;
     }
 
-    getWidgetData(key: string, label: string, unit: string, maxValue = 100): WidgetData {
-        const metricRecord = this.store.get(key);
+    private readWidgetData(
+        sourceScopeId: string,
+        metricKey: string,
+        label: string,
+        unit: string,
+        maxValue = 100,
+    ): WidgetData {
+        const metricRecord = this.readRecord(sourceScopeId, metricKey);
         const current = metricRecord?.buffer.latest ?? 0;
         return {
             current,
@@ -66,15 +111,31 @@ export class MetricStore {
         };
     }
 
-    getTextValue(key: string): string | undefined {
-        return this.store.get(key)?.text;
+    private readTextValue(sourceScopeId: string, metricKey: string): string | undefined {
+        return this.readRecord(sourceScopeId, metricKey)?.text;
     }
 
-    /** Clear all sampled metric history and text values. Intended for isolated tests and source resets. */
+    /** Clears all sampled metric history and text values. Intended for isolated tests and source resets. */
     clear(): void {
         this.store.clear();
     }
+
+    private ensureSourceStore(sourceScopeId: string): SourceMetricStore {
+        let sourceStore = this.store.get(sourceScopeId);
+        if (!sourceStore) {
+            sourceStore = new Map<string, MetricRecord>();
+            this.store.set(sourceScopeId, sourceStore);
+        }
+
+        return sourceStore;
+    }
+
+    private readRecord(sourceScopeId: string, metricKey: string): MetricRecord | undefined {
+        return this.store.get(sourceScopeId)?.get(metricKey);
+    }
 }
+
+type SourceMetricStore = Map<string, MetricRecord>;
 
 interface MetricRecord {
     buffer: RingBuffer<number>;
@@ -82,4 +143,5 @@ interface MetricRecord {
     text?: string;
 }
 
+/** Shared runtime metric store for the local plugin process. */
 export const metricStore = new MetricStore();

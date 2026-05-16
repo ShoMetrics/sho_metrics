@@ -1,6 +1,6 @@
 import { action, PropertyInspectorDidAppearEvent, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
-import { metricStore } from "../runtime/metric-store";
+import type { MetricStoreReader } from "../runtime/metric-store";
 import { scheduler } from "../runtime/scheduler";
 import { setMetricDisplay } from "../metric-view-runner/runner";
 import { logger } from "../logging/logger";
@@ -49,15 +49,16 @@ export class Network extends MetricAction {
         const networkInterfaceId = networkTarget.interfaceId ?? "";
         const isAutomaticNetworkInterface = networkInterfaceId.length === 0;
         const selectedNetworkInterface = networkInterfaceRegistry.resolveSelection(networkInterfaceId);
+        const metrics = this.getMetricReader();
 
         this.publishNetworkInterfaceOptions(event);
-        this.publishNetworkRuntimeMaximum(event, networkTarget, selectedNetworkInterface);
+        this.publishNetworkRuntimeMaximum(event, networkTarget, selectedNetworkInterface, metrics);
 
         const displayUpdate = buildNetworkDisplayUpdate({
             event,
             settings,
             target: networkTarget,
-            metricStore,
+            metrics,
             selectedNetworkInterface,
         });
 
@@ -97,6 +98,7 @@ export class Network extends MetricAction {
         event: WillAppearEvent,
         target: ResolvedNetworkMetricTarget,
         selectedNetworkInterface: NetworkInterfaceOption | null,
+        metrics: MetricStoreReader,
     ): void {
         if (target.reading.display.scaleMode === "custom") {
             return;
@@ -111,12 +113,20 @@ export class Network extends MetricAction {
         const nextDownloadMaximum = resolveRuntimeNetworkMaximumMegabitsPerSecond({
             direction: "download",
             target,
-            observedBytesPerSecond: metricStore.getWidgetData(downloadMetricKey, "DOWN", "B/s").current,
+            observedBytesPerSecond: metrics.getWidgetData(
+                downloadMetricKey,
+                "DOWN",
+                "B/s",
+            ).current,
         });
         const nextUploadMaximum = resolveRuntimeNetworkMaximumMegabitsPerSecond({
             direction: "upload",
             target,
-            observedBytesPerSecond: metricStore.getWidgetData(uploadMetricKey, "UP", "B/s").current,
+            observedBytesPerSecond: metrics.getWidgetData(
+                uploadMetricKey,
+                "UP",
+                "B/s",
+            ).current,
         });
 
         this.updateRuntimeCache(event, {

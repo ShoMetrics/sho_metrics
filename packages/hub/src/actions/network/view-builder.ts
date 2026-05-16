@@ -1,5 +1,5 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
-import type { MetricStore } from "../../runtime/metric-store";
+import type { MetricStoreReader } from "../../runtime/metric-store";
 import type { NetworkInterfaceOption } from "../../runtime/network-interfaces";
 import {
     getNetworkAggregateMetricKey,
@@ -41,7 +41,7 @@ interface BuildNetworkDisplayOptions {
     event: WillAppearEvent;
     settings: ResolvedWidgetSettings;
     target: ResolvedNetworkMetricTarget;
-    metricStore: MetricStore;
+    metrics: MetricStoreReader;
     selectedNetworkInterface: NetworkInterfaceOption | null;
 }
 
@@ -73,7 +73,7 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
     }
 
     const networkMetricKey = getNetworkMetricKey(displayDirection, options.selectedNetworkInterface);
-    const sourceWidgetData = options.metricStore.getWidgetData(
+    const sourceWidgetData = options.metrics.getWidgetData(
         networkMetricKey,
         getNetworkDirectionLabel(displayDirection),
         "B/s",
@@ -165,12 +165,20 @@ function buildDualNetworkCircularDisplayOptions(
     const uploadMetricKey = getNetworkMetricKey("upload", options.selectedNetworkInterface);
     const downloadMetricKey = getNetworkMetricKey("download", options.selectedNetworkInterface);
     const uploadWidgetData = buildNetworkWidgetData({
-        sourceWidgetData: options.metricStore.getWidgetData(uploadMetricKey, "UP", "B/s"),
+        sourceWidgetData: options.metrics.getWidgetData(
+            uploadMetricKey,
+            "UP",
+            "B/s",
+        ),
         direction: "upload",
         target: options.target,
     });
     const downloadWidgetData = buildNetworkWidgetData({
-        sourceWidgetData: options.metricStore.getWidgetData(downloadMetricKey, "DOWN", "B/s"),
+        sourceWidgetData: options.metrics.getWidgetData(
+            downloadMetricKey,
+            "DOWN",
+            "B/s",
+        ),
         direction: "download",
         target: options.target,
     });
@@ -237,12 +245,20 @@ function buildDualNetworkSparklineDisplayOptions(options: BuildNetworkDisplayOpt
     const uploadMetricKey = getNetworkMetricKey("upload", options.selectedNetworkInterface);
     const downloadMetricKey = getNetworkMetricKey("download", options.selectedNetworkInterface);
     const uploadWidgetData = buildNetworkWidgetData({
-        sourceWidgetData: options.metricStore.getWidgetData(uploadMetricKey, "UP", "B/s"),
+        sourceWidgetData: options.metrics.getWidgetData(
+            uploadMetricKey,
+            "UP",
+            "B/s",
+        ),
         direction: "upload",
         target: options.target,
     });
     const downloadWidgetData = buildNetworkWidgetData({
-        sourceWidgetData: options.metricStore.getWidgetData(downloadMetricKey, "DOWN", "B/s"),
+        sourceWidgetData: options.metrics.getWidgetData(
+            downloadMetricKey,
+            "DOWN",
+            "B/s",
+        ),
         direction: "download",
         target: options.target,
     });
@@ -302,12 +318,20 @@ function buildLinearNetworkDisplayOptions(options: BuildNetworkDisplayOptions): 
     const uploadMetricKey = getNetworkMetricKey("upload", options.selectedNetworkInterface);
     const downloadMetricKey = getNetworkMetricKey("download", options.selectedNetworkInterface);
     const uploadWidgetData = buildNetworkWidgetData({
-        sourceWidgetData: options.metricStore.getWidgetData(uploadMetricKey, "UP", "B/s"),
+        sourceWidgetData: options.metrics.getWidgetData(
+            uploadMetricKey,
+            "UP",
+            "B/s",
+        ),
         direction: "upload",
         target: options.target,
     });
     const downloadWidgetData = buildNetworkWidgetData({
-        sourceWidgetData: options.metricStore.getWidgetData(downloadMetricKey, "DOWN", "B/s"),
+        sourceWidgetData: options.metrics.getWidgetData(
+            downloadMetricKey,
+            "DOWN",
+            "B/s",
+        ),
         direction: "download",
         target: options.target,
     });

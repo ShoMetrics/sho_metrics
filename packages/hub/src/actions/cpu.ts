@@ -1,6 +1,5 @@
 import { action, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
-import { metricStore } from "../runtime/metric-store";
 import { setSingleMetricDisplay } from "../metric-view-runner/runner";
 import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-format";
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
@@ -21,9 +20,15 @@ export class Cpu extends MetricAction {
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event);
+        const metrics = this.getMetricReader();
         readResolvedMetricTarget(settings, "cpu");
 
-        const widgetData = metricStore.getWidgetData(CPU_USAGE_METRIC_KEY, ARC_GAUGE_LABELS.cpu, "%", 100);
+        const widgetData = metrics.getWidgetData(
+            CPU_USAGE_METRIC_KEY,
+            ARC_GAUGE_LABELS.cpu,
+            "%",
+            100,
+        );
 
         setSingleMetricDisplay({
             event,
@@ -32,7 +37,7 @@ export class Cpu extends MetricAction {
             widgetData: {
                 ...buildCpuUsageWidgetData(widgetData),
                 secondaryDisplayValue: formatCompactHardwareModelLabel(
-                    metricStore.getTextValue(CPU_MODEL_METRIC_KEY),
+                    metrics.getTextValue(CPU_MODEL_METRIC_KEY),
                     "cpu",
                 ),
             },
