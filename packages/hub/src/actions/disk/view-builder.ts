@@ -1,5 +1,5 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
-import type { MetricStore } from "../../runtime/metric-store";
+import type { MetricStoreReader } from "../../runtime/metric-store";
 import type { DiskVolumeOption } from "../../runtime/disk-volumes";
 import {
     getDefaultDiskUsageMetricKey,
@@ -35,7 +35,7 @@ interface BuildDiskDisplayOptions {
     event: WillAppearEvent;
     settings: ResolvedWidgetSettings;
     target: ResolvedDiskMetricTarget;
-    metricStore: MetricStore;
+    metrics: MetricStoreReader;
     volumeSelection: DiskVolumeSelection;
 }
 
@@ -89,9 +89,17 @@ function buildDiskUsageDisplayOptions(
     const label = formatCompactDiskVolumeLabel(options.volumeSelection);
     const usedBytesWidgetData = options.volumeSelection.kind === "unavailable"
         ? buildUnavailableDiskBytesWidgetData(label)
-        : options.metricStore.getWidgetData(usedMetricKey, label, "B");
-    const totalBytesWidgetData = options.metricStore.getWidgetData(totalMetricKey, label, "B");
-    const availableBytesWidgetData = options.metricStore.getWidgetData(availableMetricKey, label, "B");
+        : options.metrics.getWidgetData(usedMetricKey, label, "B");
+    const totalBytesWidgetData = options.metrics.getWidgetData(
+        totalMetricKey,
+        label,
+        "B",
+    );
+    const availableBytesWidgetData = options.metrics.getWidgetData(
+        availableMetricKey,
+        label,
+        "B",
+    );
     const appearance = options.settings.widget.slot.appearance;
     const effectiveGraphicType = appearance.graph.viewLayout;
     const circleStyle = appearance.graph.circleStyle;
@@ -147,7 +155,11 @@ function buildDiskThroughputDisplayOptions(
     const throughputLabel = selectedVolume
         ? formatCompactDiskVolumeLabel({ kind: "available", volume: selectedVolume })
         : "DISK";
-    const bytesPerSecondWidgetData = options.metricStore.getWidgetData(throughputMetricKey, throughputLabel, "B/s");
+    const bytesPerSecondWidgetData = options.metrics.getWidgetData(
+        throughputMetricKey,
+        throughputLabel,
+        "B/s",
+    );
     const circleStyle = appearance.graph.circleStyle;
     const shouldRenderGaugeFooter = effectiveGraphicType === "circular" && circleStyle === "gauge";
 
@@ -198,12 +210,20 @@ function buildDualThroughputDisplayOptions(
     }
     const selectedVolume = resolveAvailableDiskVolume(options.volumeSelection);
     const readWidgetData = buildDiskThroughputWidgetData({
-        bytesPerSecondWidgetData: options.metricStore.getWidgetData(readMetricKey, "READ", "B/s"),
+        bytesPerSecondWidgetData: options.metrics.getWidgetData(
+            readMetricKey,
+            "READ",
+            "B/s",
+        ),
         maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("read", options.reading, selectedVolume),
         label: "READ",
     });
     const writeWidgetData = buildDiskThroughputWidgetData({
-        bytesPerSecondWidgetData: options.metricStore.getWidgetData(writeMetricKey, "WRIT", "B/s"),
+        bytesPerSecondWidgetData: options.metrics.getWidgetData(
+            writeMetricKey,
+            "WRIT",
+            "B/s",
+        ),
         maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("write", options.reading, selectedVolume),
         label: "WRIT",
     });

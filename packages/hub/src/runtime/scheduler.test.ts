@@ -7,6 +7,7 @@ import {
     type IMetricSource,
     type IMetricSnapshot,
 } from "./sources/source.interface";
+import { LOCAL_SOURCE_SCOPE_ID } from "./sources/metric-read-plan";
 
 test("subscribe polls metric key groups with sorted unique keys", async () => {
     const source = new FakeMetricSource();
@@ -24,7 +25,10 @@ test("subscribe polls metric key groups with sorted unique keys", async () => {
         await waitForCondition(() => receivedSnapshots.length === 1);
 
         assert.deepEqual(source.polledMetricKeyListList, [["cpu.usage_percent", "net.down"]]);
-        assert.deepEqual(snapshotStore.ingestedSnapshots, [source.snapshot]);
+        assert.deepEqual(snapshotStore.ingestedSnapshots, [{
+            sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
+            snapshot: source.snapshot,
+        }]);
         assert.deepEqual(receivedSnapshots, [source.snapshot]);
     } finally {
         unsubscribe();
@@ -47,7 +51,10 @@ test("scheduler falls back to poll when source has no pollMetrics implementation
         await waitForCondition(() => receivedSnapshot != null);
 
         assert.equal(source.pollCount, 1);
-        assert.deepEqual(snapshotStore.ingestedSnapshots, [source.snapshot]);
+        assert.deepEqual(snapshotStore.ingestedSnapshots, [{
+            sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
+            snapshot: source.snapshot,
+        }]);
         assert.equal(receivedSnapshot, source.snapshot);
     } finally {
         unsubscribe();
@@ -85,7 +92,10 @@ test("refreshMetrics polls and ingests requested metric keys without subscribers
 
     assert.equal(snapshot, source.snapshot);
     assert.deepEqual(source.polledMetricKeyListList, [["cpu.usage_percent", "net.down"]]);
-    assert.deepEqual(snapshotStore.ingestedSnapshots, [source.snapshot]);
+    assert.deepEqual(snapshotStore.ingestedSnapshots, [{
+        sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
+        snapshot: source.snapshot,
+    }]);
 });
 
 test("later same-group subscribers do not join an in-flight initial poll", async () => {
@@ -190,10 +200,13 @@ function buildTestSnapshot(sourceId: string): IMetricSnapshot {
 }
 
 class FakeMetricSnapshotStore implements MetricSnapshotStore {
-    readonly ingestedSnapshots: IMetricSnapshot[] = [];
+    readonly ingestedSnapshots: Array<{
+        sourceScopeId: string;
+        snapshot: IMetricSnapshot;
+    }> = [];
 
-    ingest(snapshot: IMetricSnapshot): void {
-        this.ingestedSnapshots.push(snapshot);
+    ingest(sourceScopeId: string, snapshot: IMetricSnapshot): void {
+        this.ingestedSnapshots.push({ sourceScopeId, snapshot });
     }
 }
 

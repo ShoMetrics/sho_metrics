@@ -3,6 +3,7 @@ import test from "node:test";
 import type { WillAppearEvent } from "@elgato/streamdeck";
 import { MetricStore } from "../../runtime/metric-store";
 import { getDiskVolumeMetricKey } from "../../runtime/disk-metric-keys";
+import { LOCAL_SOURCE_SCOPE_ID } from "../../runtime/sources/metric-read-plan";
 import { buildMetricSnapshot, buildScalarMetricValue } from "../../runtime/sources/source.interface";
 import { buildMetricDisplayRenderPlan, buildRenderWidgetData } from "../../metric-view-renderer/display-frame";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
@@ -32,7 +33,7 @@ test("disk usage display keeps explicit unavailable volume instead of falling ba
     }
 
     const metricStore = new MetricStore();
-    metricStore.ingest(buildMetricSnapshot({
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
         sourceId: "test",
         timestampMilliseconds: 1000,
         metrics: {
@@ -46,7 +47,7 @@ test("disk usage display keeps explicit unavailable volume instead of falling ba
         event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
         settings,
         target,
-        metricStore,
+        metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
         volumeSelection: { kind: "unavailable", volumeId: "E:\\" },
     });
 
@@ -101,7 +102,7 @@ test("disk compact center icon label uses theme label font family", () => {
         event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
         settings,
         target,
-        metricStore: new MetricStore(),
+        metrics: new MetricStore().forScope(LOCAL_SOURCE_SCOPE_ID),
         volumeSelection: { kind: "unavailable", volumeId: "E:\\" },
     });
 

@@ -7,6 +7,8 @@ import streamDeck, {
 } from "@elgato/streamdeck";
 import { isDeepStrictEqual } from "node:util";
 import { scheduler } from "../runtime/scheduler";
+import { metricStore, type MetricStoreReader } from "../runtime/metric-store";
+import { LOCAL_SOURCE_SCOPE_ID } from "../runtime/sources/metric-read-plan";
 import { clearMetricDisplayState } from "../metric-view-runner/runner";
 import { logger } from "../logging/logger";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
@@ -48,6 +50,7 @@ interface ActiveActionState {
 export abstract class MetricAction extends SingletonAction {
     private activeActionStates = new Map<string, ActiveActionState>();
     private activeMetricActions = new Map<string, ActiveMetricAction>();
+    private readonly localMetricReader = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
     protected abstract readonly actionKind: ActionKind;
 
@@ -148,6 +151,10 @@ export abstract class MetricAction extends SingletonAction {
     protected getMetricSubscriptionKeys(event: WillAppearEvent): readonly string[] {
         void event;
         return [];
+    }
+
+    protected getMetricReader(): MetricStoreReader {
+        return this.localMetricReader;
     }
 
     protected resolveSettings(event: WillAppearEvent): ResolvedWidgetSettings {

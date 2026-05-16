@@ -1,6 +1,6 @@
 import { action, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
-import { metricStore } from "../runtime/metric-store";
+import type { MetricStoreReader } from "../runtime/metric-store";
 import { setSingleMetricDisplay } from "../metric-view-runner/runner";
 import type { WidgetData } from "../rendering/widget-data";
 import { formatByteCount } from "../metrics/byte-format";
@@ -41,22 +41,28 @@ export class Gpu extends MetricAction {
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event);
         const gpuTarget = readResolvedMetricTarget(settings, "gpu");
+        const metrics = this.getMetricReader();
 
-        this.publishGpuPowerRuntimeMaximum(event, gpuTarget);
+        this.publishGpuPowerRuntimeMaximum(event, gpuTarget, metrics);
 
         setSingleMetricDisplay(buildGpuDisplayOptions({
             event,
             settings,
             target: gpuTarget,
+            metrics,
         }));
     }
 
-    private publishGpuPowerRuntimeMaximum(event: WillAppearEvent, target: ResolvedGpuMetricTarget): void {
+    private publishGpuPowerRuntimeMaximum(
+        event: WillAppearEvent,
+        target: ResolvedGpuMetricTarget,
+        metrics: MetricStoreReader,
+    ): void {
         if (target.reading.kind !== "power") {
             return;
         }
 
-        const nextMaximum = resolveRuntimeGpuPowerMaximumWatts();
+        const nextMaximum = resolveRuntimeGpuPowerMaximumWatts(metrics);
         if (nextMaximum === undefined) {
             return;
         }
@@ -88,6 +94,7 @@ function buildGpuDisplayOptions(options: {
     event: WillAppearEvent;
     settings: ResolvedWidgetSettings;
     target: ResolvedGpuMetricTarget;
+    metrics: MetricStoreReader;
 }): SingleMetricDisplayOptions {
     const baseOptions = {
         event: options.event,
@@ -101,6 +108,7 @@ function buildGpuDisplayOptions(options: {
                 metricKey: GPU_TEMP_METRIC_KEY,
                 widgetData: buildTemperatureWidgetData({
                     celsiusWidgetData: getGpuWidgetData(
+                        options.metrics,
                         GPU_TEMP_METRIC_KEY,
                         ARC_GAUGE_LABELS.gpu,
                         "C",
@@ -116,8 +124,8 @@ function buildGpuDisplayOptions(options: {
                 ...baseOptions,
                 metricKey: GPU_VRAM_USED_METRIC_KEY,
                 widgetData: buildGpuVramWidgetData(
-                    getGpuWidgetData(GPU_VRAM_USED_METRIC_KEY, ARC_GAUGE_LABELS.vram, "MB"),
-                    getGpuWidgetData(GPU_VRAM_TOTAL_METRIC_KEY, ARC_GAUGE_LABELS.vram, "MB").current,
+                    getGpuWidgetData(options.metrics, GPU_VRAM_USED_METRIC_KEY, ARC_GAUGE_LABELS.vram, "MB"),
+                    getGpuWidgetData(options.metrics, GPU_VRAM_TOTAL_METRIC_KEY, ARC_GAUGE_LABELS.vram, "MB").current,
                 ),
                 ...buildMetricDisplayIcons({ hardware: "gpu", status: "memory" }),
             };
@@ -127,6 +135,7 @@ function buildGpuDisplayOptions(options: {
                 metricKey: GPU_POWER_METRIC_KEY,
                 widgetData: buildGpuPowerWidgetData({
                     powerWidgetData: getGpuWidgetData(
+                        options.metrics,
                         GPU_POWER_METRIC_KEY,
                         ARC_GAUGE_LABELS.gpu,
                         "W",
@@ -137,7 +146,7 @@ function buildGpuDisplayOptions(options: {
                 ...buildMetricDisplayIcons({ hardware: "gpu", status: "power" }),
             };
         case "usage": {
-            const data = getGpuWidgetData(GPU_USAGE_METRIC_KEY, ARC_GAUGE_LABELS.gpu, "%");
+            const data = getGpuWidgetData(options.metrics, GPU_USAGE_METRIC_KEY, ARC_GAUGE_LABELS.gpu, "%");
 
             return {
                 ...baseOptions,
@@ -145,7 +154,10 @@ function buildGpuDisplayOptions(options: {
                 widgetData: {
                     ...buildGpuUsageWidgetData(data),
                     secondaryDisplayValue: data.sampleTimestampMilliseconds != null
-                        ? formatCompactHardwareModelLabel(metricStore.getTextValue(GPU_MODEL_METRIC_KEY), "gpu")
+                        ? formatCompactHardwareModelLabel(
+                            options.metrics.getTextValue(GPU_MODEL_METRIC_KEY),
+                            "gpu",
+                        )
                         : undefined,
                 },
                 ...buildMetricDisplayIcons({ hardware: "gpu", status: "percentage" }),
@@ -154,8 +166,12 @@ function buildGpuDisplayOptions(options: {
     }
 }
 
-function resolveRuntimeGpuPowerMaximumWatts(): number | undefined {
-    const powerLimitWidgetData = metricStore.getWidgetData(GPU_POWER_LIMIT_METRIC_KEY, ARC_GAUGE_LABELS.gpu, "W");
+function resolveRuntimeGpuPowerMaximumWatts(metrics: MetricStoreReader): number | undefined {
+    const powerLimitWidgetData = metrics.getWidgetData(
+        GPU_POWER_LIMIT_METRIC_KEY,
+        ARC_GAUGE_LABELS.gpu,
+        "W",
+    );
 
     if (
         powerLimitWidgetData.sampleTimestampMilliseconds != null
@@ -164,7 +180,11 @@ function resolveRuntimeGpuPowerMaximumWatts(): number | undefined {
         return Math.ceil(powerLimitWidgetData.current);
     }
 
-    const powerWidgetData = metricStore.getWidgetData(GPU_POWER_METRIC_KEY, ARC_GAUGE_LABELS.gpu, "W");
+    const powerWidgetData = metrics.getWidgetData(
+        GPU_POWER_METRIC_KEY,
+        ARC_GAUGE_LABELS.gpu,
+        "W",
+    );
     if (
         powerWidgetData.sampleTimestampMilliseconds != null
         && powerWidgetData.current > 0
@@ -175,8 +195,19 @@ function resolveRuntimeGpuPowerMaximumWatts(): number | undefined {
     return undefined;
 }
 
-function getGpuWidgetData(metricKey: string, label: string, unit: string, maxValue = 100): WidgetData {
-    const widgetData = metricStore.getWidgetData(metricKey, label, unit, maxValue);
+function getGpuWidgetData(
+    metrics: MetricStoreReader,
+    metricKey: string,
+    label: string,
+    unit: string,
+    maxValue = 100,
+): WidgetData {
+    const widgetData = metrics.getWidgetData(
+        metricKey,
+        label,
+        unit,
+        maxValue,
+    );
 
     if (isFreshGpuWidgetData(widgetData)) {
         return widgetData;

@@ -1,6 +1,5 @@
 import { action, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
-import { metricStore } from "../runtime/metric-store";
 import { setSingleMetricDisplay } from "../metric-view-runner/runner";
 import { buildMemoryUsageWidgetData } from "../metrics/storage-widget-data";
 import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
@@ -19,10 +18,19 @@ export class Memory extends MetricAction {
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event);
+        const metrics = this.getMetricReader();
         readResolvedMetricTarget(settings, "memory");
 
-        const usedBytesWidgetData = metricStore.getWidgetData(RAM_USED_METRIC_KEY, ARC_GAUGE_LABELS.ram, "B");
-        const totalBytesWidgetData = metricStore.getWidgetData(RAM_TOTAL_METRIC_KEY, ARC_GAUGE_LABELS.ram, "B");
+        const usedBytesWidgetData = metrics.getWidgetData(
+            RAM_USED_METRIC_KEY,
+            ARC_GAUGE_LABELS.ram,
+            "B",
+        );
+        const totalBytesWidgetData = metrics.getWidgetData(
+            RAM_TOTAL_METRIC_KEY,
+            ARC_GAUGE_LABELS.ram,
+            "B",
+        );
 
         setSingleMetricDisplay({
             event,

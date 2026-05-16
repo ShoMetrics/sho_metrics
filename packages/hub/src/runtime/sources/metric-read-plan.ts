@@ -28,15 +28,6 @@ export interface MetricReadPlan {
     readonly failureMode: MetricReadPlanFailureMode;
 }
 
-/** Source-scoped identity for one metric inside MetricStore. */
-export interface MetricStoreKey {
-    /** Logical source scope that owns this metric history. */
-    readonly sourceScopeId: string;
-
-    /** ShoMetrics canonical metric key inside the source scope. */
-    readonly metricKey: string;
-}
-
 /** Builds the default local read plan backed by the built-in Node source. */
 export function buildLocalMetricReadPlan(metricKeys: readonly string[]): MetricReadPlan {
     return normalizeMetricReadPlan({

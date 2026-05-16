@@ -1,12 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { MetricStore } from "./metric-store";
+import { LOCAL_SOURCE_SCOPE_ID } from "./sources/metric-read-plan";
 import { buildMetricSnapshot, buildScalarMetricValue, buildTextMetricValue } from "./sources/source.interface";
 
 test("missing metric returns render-safe numeric defaults without a sample timestamp", () => {
     const metricStore = new MetricStore();
+    const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
-    assert.deepEqual(metricStore.getWidgetData("cpu.usage_percent", "CPU", "%"), {
+    assert.deepEqual(metrics.getWidgetData(
+        "cpu.usage_percent",
+        "CPU",
+        "%",
+    ), {
         current: 0,
         progress: 0,
         history: [],
@@ -18,15 +24,16 @@ test("missing metric returns render-safe numeric defaults without a sample times
 
 test("scalar samples keep history, latest value, progress, and timestamp", () => {
     const metricStore = new MetricStore();
+    const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
-    metricStore.ingest(buildMetricSnapshot({
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
         sourceId: "test-source",
         timestampMilliseconds: 1000,
         metrics: {
             "cpu.usage_percent": buildScalarMetricValue(25, { unit: "%", progress: 0.25 }),
         },
     }));
-    metricStore.ingest(buildMetricSnapshot({
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
         sourceId: "test-source",
         timestampMilliseconds: 2000,
         metrics: {
@@ -34,7 +41,12 @@ test("scalar samples keep history, latest value, progress, and timestamp", () =>
         },
     }));
 
-    assert.deepEqual(metricStore.getWidgetData("cpu.usage_percent", "CPU", "%", 100), {
+    assert.deepEqual(metrics.getWidgetData(
+        "cpu.usage_percent",
+        "CPU",
+        "%",
+        100,
+    ), {
         current: 50,
         progress: 0.5,
         history: [25, 50],
@@ -46,8 +58,9 @@ test("scalar samples keep history, latest value, progress, and timestamp", () =>
 
 test("widget progress is clamped to the render domain", () => {
     const metricStore = new MetricStore();
+    const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
-    metricStore.ingest(buildMetricSnapshot({
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
         sourceId: "test-source",
         timestampMilliseconds: 1000,
         metrics: {
@@ -56,14 +69,21 @@ test("widget progress is clamped to the render domain", () => {
         },
     }));
 
-    assert.equal(metricStore.getWidgetData("gpu.power", "Power", "W", 100).progress, 1);
-    assert.equal(metricStore.getWidgetData("gpu.temperature", "Temp", "°C", 100).progress, 0);
+    assert.equal(
+        metrics.getWidgetData("gpu.power", "Power", "W", 100).progress,
+        1,
+    );
+    assert.equal(
+        metrics.getWidgetData("gpu.temperature", "Temp", "°C", 100).progress,
+        0,
+    );
 });
 
 test("text samples are retrievable without numeric widget history", () => {
     const metricStore = new MetricStore();
+    const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
-    metricStore.ingest(buildMetricSnapshot({
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
         sourceId: "test-source",
         timestampMilliseconds: 1000,
         metrics: {
@@ -71,8 +91,8 @@ test("text samples are retrievable without numeric widget history", () => {
         },
     }));
 
-    assert.equal(metricStore.getTextValue("gpu.model"), "RTX 4090");
-    assert.deepEqual(metricStore.getWidgetData("gpu.model", "GPU", ""), {
+    assert.equal(metrics.getTextValue("gpu.model"), "RTX 4090");
+    assert.deepEqual(metrics.getWidgetData("gpu.model", "GPU", ""), {
         current: 0,
         progress: 0,
         history: [],
@@ -84,8 +104,9 @@ test("text samples are retrievable without numeric widget history", () => {
 
 test("clear removes scalar history and text values", () => {
     const metricStore = new MetricStore();
+    const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
-    metricStore.ingest(buildMetricSnapshot({
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
         sourceId: "test-source",
         timestampMilliseconds: 1000,
         metrics: {
@@ -96,7 +117,73 @@ test("clear removes scalar history and text values", () => {
 
     metricStore.clear();
 
-    assert.deepEqual(metricStore.getWidgetData("cpu.usage_percent", "CPU", "%").history, []);
-    assert.equal(metricStore.getWidgetData("cpu.usage_percent", "CPU", "%").sampleTimestampMilliseconds, undefined);
-    assert.equal(metricStore.getTextValue("cpu.model"), undefined);
+    assert.deepEqual(
+        metrics.getWidgetData("cpu.usage_percent", "CPU", "%").history,
+        [],
+    );
+    assert.equal(
+        metrics.getWidgetData("cpu.usage_percent", "CPU", "%").sampleTimestampMilliseconds,
+        undefined,
+    );
+    assert.equal(metrics.getTextValue("cpu.model"), undefined);
+});
+
+test("same metric keys keep separate history for different source scopes", () => {
+    const metricStore = new MetricStore();
+    const localMetrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
+    const remoteMetrics = metricStore.forScope("remote:nuc");
+
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        sourceId: "test-source",
+        timestampMilliseconds: 1000,
+        metrics: {
+            "cpu.usage_percent": buildScalarMetricValue(25, { unit: "%" }),
+        },
+    }));
+    metricStore.ingest("remote:nuc", buildMetricSnapshot({
+        sourceId: "remote-source",
+        timestampMilliseconds: 2000,
+        metrics: {
+            "cpu.usage_percent": buildScalarMetricValue(75, { unit: "%" }),
+        },
+    }));
+
+    assert.deepEqual(
+        localMetrics.getWidgetData("cpu.usage_percent", "CPU", "%").history,
+        [25],
+    );
+    assert.deepEqual(
+        remoteMetrics.getWidgetData("cpu.usage_percent", "CPU", "%").history,
+        [75],
+    );
+});
+
+test("source scope and metric key boundaries do not collide", () => {
+    const metricStore = new MetricStore();
+    const firstMetrics = metricStore.forScope("remote\0nuc");
+    const secondMetrics = metricStore.forScope("remote");
+
+    metricStore.ingest("remote\0nuc", buildMetricSnapshot({
+        sourceId: "first-source",
+        timestampMilliseconds: 1000,
+        metrics: {
+            "cpu.usage_percent": buildScalarMetricValue(25, { unit: "%" }),
+        },
+    }));
+    metricStore.ingest("remote", buildMetricSnapshot({
+        sourceId: "second-source",
+        timestampMilliseconds: 2000,
+        metrics: {
+            "nuc\0cpu.usage_percent": buildScalarMetricValue(75, { unit: "%" }),
+        },
+    }));
+
+    assert.deepEqual(
+        firstMetrics.getWidgetData("cpu.usage_percent", "CPU", "%").history,
+        [25],
+    );
+    assert.deepEqual(
+        secondMetrics.getWidgetData("nuc\0cpu.usage_percent", "CPU", "%").history,
+        [75],
+    );
 });

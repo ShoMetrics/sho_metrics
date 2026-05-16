@@ -2,6 +2,7 @@ import type { IMetricSource, IMetricSnapshot } from "./sources/source.interface"
 import { NodeSystemSource } from "./sources/node-system-source";
 import { metricStore } from "./metric-store";
 import { logger } from "../logging/logger";
+import { LOCAL_SOURCE_SCOPE_ID } from "./sources/metric-read-plan";
 
 const log = logger.for("Scheduler");
 
@@ -15,7 +16,7 @@ interface SubscriptionOptions {
 }
 
 export interface MetricSnapshotStore {
-    ingest(snapshot: IMetricSnapshot): void;
+    ingest(sourceScopeId: string, snapshot: IMetricSnapshot): void;
 }
 
 interface SubscriberRecord {
@@ -100,7 +101,7 @@ export class Scheduler {
         const normalizedMetricKeys = Scheduler.normalizeMetricKeys(metricKeys);
         const snapshot = await this.pollSource(normalizedMetricKeys);
 
-        this.snapshotStore.ingest(snapshot);
+        this.snapshotStore.ingest(LOCAL_SOURCE_SCOPE_ID, snapshot);
 
         return snapshot;
     }
@@ -201,7 +202,7 @@ export class Scheduler {
             ].join(" "));
 
             const snapshot = await this.pollSource(group.metricKeys);
-            this.snapshotStore.ingest(snapshot);
+            this.snapshotStore.ingest(LOCAL_SOURCE_SCOPE_ID, snapshot);
             const ingestTimestampMilliseconds = Date.now();
 
             log.debug(() => [

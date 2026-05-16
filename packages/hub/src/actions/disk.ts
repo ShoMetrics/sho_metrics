@@ -1,6 +1,6 @@
 import { action, PropertyInspectorDidAppearEvent, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
-import { metricStore } from "../runtime/metric-store";
+import type { MetricStoreReader } from "../runtime/metric-store";
 import { scheduler } from "../runtime/scheduler";
 import { setMetricDisplay } from "../metric-view-runner/runner";
 import { logger } from "../logging/logger";
@@ -54,9 +54,10 @@ export class Disk extends MetricAction {
         const settings = this.resolveSettings(event);
         const diskTarget = readResolvedMetricTarget(settings, "disk");
         const volumeSelection = resolveDiskVolumeSelection(diskTarget.volumeId);
+        const metrics = this.getMetricReader();
 
         this.publishDiskVolumeOptions(event);
-        this.publishDiskThroughputRuntimeMaximum(event, diskTarget, volumeSelection);
+        this.publishDiskThroughputRuntimeMaximum(event, diskTarget, volumeSelection, metrics);
 
         if (diskTarget.reading.kind === "throughput" && process.platform !== "darwin") {
             showDiskThroughputUnavailable(event);
@@ -67,7 +68,7 @@ export class Disk extends MetricAction {
             event,
             settings,
             target: diskTarget,
-            metricStore,
+            metrics,
             volumeSelection,
         }));
     }
@@ -96,6 +97,7 @@ export class Disk extends MetricAction {
         event: WillAppearEvent,
         diskTarget: ResolvedDiskMetricTarget,
         volumeSelection: DiskVolumeSelection,
+        metrics: MetricStoreReader,
     ): void {
         const diskReading = diskTarget.reading;
         if (
@@ -110,13 +112,21 @@ export class Disk extends MetricAction {
             direction: "read",
             reading: diskReading,
             selectedVolume,
-            observedBytesPerSecond: metricStore.getWidgetData(getDiskThroughputMetricKey("read"), "READ", "B/s").current,
+            observedBytesPerSecond: metrics.getWidgetData(
+                getDiskThroughputMetricKey("read"),
+                "READ",
+                "B/s",
+            ).current,
         });
         const nextWriteMaximum = resolveRuntimeDiskMaximumThroughputMebibytesPerSecond({
             direction: "write",
             reading: diskReading,
             selectedVolume,
-            observedBytesPerSecond: metricStore.getWidgetData(getDiskThroughputMetricKey("write"), "WRIT", "B/s").current,
+            observedBytesPerSecond: metrics.getWidgetData(
+                getDiskThroughputMetricKey("write"),
+                "WRIT",
+                "B/s",
+            ).current,
         });
 
         this.updateRuntimeCache(event, {
