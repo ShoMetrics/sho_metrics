@@ -31,10 +31,6 @@ export class DefaultSourceRunner implements SourceRunner {
         const normalizedReadPlan = normalizeMetricReadPlan(readPlan);
         const pollStartTimestampMilliseconds = Date.now();
 
-        if (normalizedReadPlan.metricKeys.length === 0) {
-            return this.pollFirstAvailableSnapshot(normalizedReadPlan, pollStartTimestampMilliseconds);
-        }
-
         const pendingMetricKeys = new Set(normalizedReadPlan.metricKeys);
         const metrics: Record<string, IMetricValue> = {};
         const sourceCandidates = resolveSourceCandidates(normalizedReadPlan);
@@ -73,37 +69,6 @@ export class DefaultSourceRunner implements SourceRunner {
 
     dispose(): void {
         this.sourceRegistry.dispose();
-    }
-
-    private async pollFirstAvailableSnapshot(
-        readPlan: MetricReadPlan,
-        fallbackTimestampMilliseconds: number,
-    ): Promise<IMetricSnapshot> {
-        for (const sourceCandidate of resolveSourceCandidates(readPlan)) {
-            const sourceClient = this.sourceRegistry.resolveSourceClient(sourceCandidate.sourceId);
-            if (!sourceClient) {
-                this.logFallback("missing-source", sourceCandidate.sourceId, readPlan);
-                continue;
-            }
-
-            try {
-                const snapshot = await sourceClient.readSnapshot([]);
-
-                return buildMetricSnapshot({
-                    sourceId: readPlan.sourceScopeId,
-                    timestampMilliseconds: fallbackTimestampMilliseconds,
-                    metrics: snapshot.metrics,
-                });
-            } catch (error) {
-                this.logFallback("source-error", sourceCandidate.sourceId, readPlan, error);
-            }
-        }
-
-        return buildMetricSnapshot({
-            sourceId: readPlan.sourceScopeId,
-            timestampMilliseconds: fallbackTimestampMilliseconds,
-            metrics: {},
-        });
     }
 
     private logFallback(

@@ -153,14 +153,7 @@ export abstract class MetricAction extends SingletonAction {
      */
     protected abstract onMetricsUpdate(event: WillAppearEvent): void;
 
-    protected getMetricReadPlan(event: WillAppearEvent): MetricReadPlan {
-        void event;
-        return this.buildMetricReadPlan([]);
-    }
-
-    protected buildMetricReadPlan(metricKeys: readonly string[]): MetricReadPlan {
-        return buildLocalMetricReadPlan(metricKeys);
-    }
+    protected abstract getMetricKeys(event: WillAppearEvent): readonly string[];
 
     protected getMetricReader(event: WillAppearEvent): MetricStoreReader {
         const readPlan = this.resolveMetricReadPlan(event);
@@ -171,6 +164,11 @@ export abstract class MetricAction extends SingletonAction {
         }
 
         return metricReader;
+    }
+
+    protected refreshMetricKeys(metricKeys: readonly string[]): Promise<void> {
+        return scheduler.refreshMetrics(this.buildMetricReadPlanForMetricKeys(metricKeys))
+            .then(() => undefined);
     }
 
     protected resolveSettings(event: WillAppearEvent): ResolvedWidgetSettings {
@@ -288,7 +286,15 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     private resolveMetricReadPlan(event: WillAppearEvent): MetricReadPlan {
-        return normalizeMetricReadPlan(this.getMetricReadPlan(event));
+        return this.buildMetricReadPlanForMetricKeys(this.getMetricKeys(event));
+    }
+
+    private buildMetricReadPlanForMetricKeys(metricKeys: readonly string[]): MetricReadPlan {
+        if (metricKeys.length === 0) {
+            throw new Error(`Action ${this.actionKind} returned no metric keys.`);
+        }
+
+        return normalizeMetricReadPlan(buildLocalMetricReadPlan(metricKeys));
     }
 }
 

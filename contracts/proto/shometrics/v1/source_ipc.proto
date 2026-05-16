@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package shometrics.v1;
+
+import "shometrics/v1/source_api.proto";
+
+// Local IPC envelope for transports that need method routing and correlation.
+message SourceIpcRequest {
+  string request_id = 1;
+
+  oneof payload {
+    GetSourceHealthRequest get_source_health = 2;
+    ListMetricDescriptorsRequest list_metric_descriptors = 3;
+    ReadMetricSnapshotRequest read_metric_snapshot = 4;
+  }
+}
+
+// Local IPC envelope for transports that need method routing and correlation.
+message SourceIpcResponse {
+  string request_id = 1;
+
+  oneof payload {
+    GetSourceHealthResponse get_source_health = 2;
+    ListMetricDescriptorsResponse list_metric_descriptors = 3;
+    ReadMetricSnapshotResponse read_metric_snapshot = 4;
+    SourceError error = 5;
+  }
+}

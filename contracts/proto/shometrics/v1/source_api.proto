@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package shometrics.v1;
+
+import "shometrics/v1/snapshot.proto";
+
+message GetSourceHealthRequest {}
+
+message GetSourceHealthResponse {
+  string source_id = 1;
+  string protocol_version = 2;
+  string helper_version = 3;
+  repeated SourceWarning warnings = 4;
+}
+
+message ListMetricDescriptorsRequest {
+  repeated string metric_ids = 1;
+}
+
+message ListMetricDescriptorsResponse {
+  repeated MetricDescriptor descriptors = 1;
+  repeated SourceWarning warnings = 2;
+}
+
+message ReadMetricSnapshotRequest {
+  repeated string metric_ids = 1;
+  bool include_descriptors = 2;
+}
+
+message ReadMetricSnapshotResponse {
+  MetricSnapshot snapshot = 1;
+  repeated MetricDescriptor descriptors = 2;
+  repeated SourceWarning warnings = 3;
+}
+
+message MetricDescriptor {
+  // ShoMetrics canonical metric key consumed by Node runtime code.
+  string metric_id = 1;
+
+  // Source-owned opaque sensor id. Node must not parse this value.
+  string source_sensor_id = 2;
+
+  string hardware_id = 3;
+  string hardware_name = 4;
+  string sensor_name = 5;
+  string sensor_type = 6;
+  string unit = 7;
+  bool is_dynamic = 8;
+}
+
+message SourceWarning {
+  string code = 1;
+  string message = 2;
+  optional string metric_id = 3;
+  optional string source_sensor_id = 4;
+}
+
+message SourceError {
+  string code = 1;
+  string message = 2;
+}

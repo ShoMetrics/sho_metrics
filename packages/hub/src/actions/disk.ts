@@ -1,7 +1,6 @@
 import { action, PropertyInspectorDidAppearEvent, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import type { MetricStoreReader } from "../runtime/metric-store";
-import { scheduler } from "../runtime/scheduler";
 import { setMetricDisplay } from "../metric-view-runner/runner";
 import { logger } from "../logging/logger";
 import { diskVolumeRegistry, type DiskVolumeOption } from "../runtime/disk-volumes";
@@ -10,7 +9,6 @@ import {
     getDiskThroughputMetricKey,
     type DiskThroughputDirection,
 } from "../runtime/disk-metric-keys";
-import type { MetricReadPlan } from "../runtime/sources/metric-read-plan";
 import { resolveDiskMetricSubscriptionKeys } from "./disk/metric-subscriptions";
 import type { ResolvedDiskMetricTarget } from "../settings/resolved-settings";
 import {
@@ -35,22 +33,20 @@ const DISK_USAGE_REFRESH_METRIC_KEYS = [
 export class Disk extends MetricAction {
     protected readonly actionKind = "disk";
 
-    protected override getMetricReadPlan(event: WillAppearEvent): MetricReadPlan {
+    protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
         const settings = this.resolveSettings(event);
         const diskTarget = readResolvedMetricTarget(settings, "disk");
         const metricKind = diskTarget.reading.kind;
 
         if (metricKind === "throughput") {
-            const metricKeys = resolveDiskMetricSubscriptionKeys({
+            return resolveDiskMetricSubscriptionKeys({
                 diskMetricKind: metricKind,
                 graphicType: settings.widget.slot.appearance.graph.viewLayout,
                 diskThroughputDirection: diskTarget.reading.direction,
             });
-
-            return this.buildMetricReadPlan(metricKeys);
         }
 
-        return this.buildMetricReadPlan(DISK_USAGE_REFRESH_METRIC_KEYS);
+        return DISK_USAGE_REFRESH_METRIC_KEYS;
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
@@ -77,7 +73,7 @@ export class Disk extends MetricAction {
     }
 
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
-        scheduler.refreshMetrics(this.buildMetricReadPlan(DISK_USAGE_REFRESH_METRIC_KEYS))
+        this.refreshMetricKeys(DISK_USAGE_REFRESH_METRIC_KEYS)
             .then(() => {
                 this.publishDiskVolumeOptions(event);
             })

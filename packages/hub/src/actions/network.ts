@@ -1,7 +1,6 @@
 import { action, PropertyInspectorDidAppearEvent, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import type { MetricStoreReader } from "../runtime/metric-store";
-import { scheduler } from "../runtime/scheduler";
 import { setMetricDisplay } from "../metric-view-runner/runner";
 import { logger } from "../logging/logger";
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../runtime/network-interfaces";
@@ -10,7 +9,6 @@ import {
     getNetworkInterfaceMetricKey,
     type NetworkDirection,
 } from "../runtime/network-metric-keys";
-import type { MetricReadPlan } from "../runtime/sources/metric-read-plan";
 import { resolveNetworkMetricSubscriptionKeys } from "./network/metric-subscriptions";
 import type { ResolvedNetworkMetricTarget } from "../settings/resolved-settings";
 import {
@@ -34,16 +32,14 @@ const NETWORK_INTERFACE_LIST_REFRESH_METRIC_KEYS = [getNetworkAggregateMetricKey
 export class Network extends MetricAction {
     protected readonly actionKind = "network";
 
-    protected override getMetricReadPlan(event: WillAppearEvent): MetricReadPlan {
+    protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
         const settings = this.resolveSettings(event);
         const networkTarget = readResolvedMetricTarget(settings, "network");
-        const metricKeys = resolveNetworkMetricSubscriptionKeys({
+        return resolveNetworkMetricSubscriptionKeys({
             graphicType: settings.widget.slot.appearance.graph.viewLayout,
             networkDirection: networkTarget.reading.direction,
             networkInterfaceId: networkTarget.interfaceId ?? "",
         });
-
-        return this.buildMetricReadPlan(metricKeys);
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
@@ -78,7 +74,7 @@ export class Network extends MetricAction {
     }
 
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
-        scheduler.refreshMetrics(this.buildMetricReadPlan(NETWORK_INTERFACE_LIST_REFRESH_METRIC_KEYS))
+        this.refreshMetricKeys(NETWORK_INTERFACE_LIST_REFRESH_METRIC_KEYS)
             .then(() => {
                 this.publishNetworkInterfaceOptions(event);
             })

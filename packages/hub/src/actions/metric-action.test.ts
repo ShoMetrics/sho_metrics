@@ -74,6 +74,10 @@ class TestMetricAction extends MetricAction {
     protected readonly actionKind = "network";
     readonly runtimeCachePatchList: WidgetRuntimeCachePatch[] = [];
 
+    protected getMetricKeys(): readonly string[] {
+        return ["net.down"];
+    }
+
     protected onMetricsUpdate(event: WillAppearEvent): void {
         this.resolveSettings(event);
     }

@@ -416,7 +416,7 @@ This is length-prefixed protobuf framing. It is not a different kind of protobuf
 Node transport adapter:
 
 ```txt
-packages/hub/src/runtime/sources/windows-pipe-source-client.ts
+packages/hub/src/runtime/sources/windows-helper-source-client.ts
 ```
 
 C# transport owner:
@@ -490,8 +490,7 @@ Add:
 packages/hub/src/runtime/sources/source-client.ts
 packages/hub/src/runtime/sources/source-runner.ts
 packages/hub/src/runtime/sources/source-registry.ts
-packages/hub/src/runtime/sources/windows-pipe-source-client.ts
-packages/hub/src/runtime/sources/native-probe-source.ts
+packages/hub/src/runtime/sources/windows-helper-source-client.ts
 ```
 
 Update:
@@ -511,7 +510,7 @@ Do not update Property Inspector or settings in the first local LHM landing step
 
 ## Node Runtime Refactor Implementation Steps
 
-The Node refactor must land before the Windows pipe client becomes the default source path. Do not make action classes branch on Windows helper availability.
+The Node refactor must land before the Windows helper client becomes the default source path. Do not make action classes branch on Windows helper availability.
 
 ### Step 1: Add Source-Scoped Runtime Types
 
@@ -633,13 +632,12 @@ Acceptance:
 - Unit tests cover primary success, primary partial result, primary failure, and all sources missing.
 - Logs for fallback are throttled at the `SourceRunner` boundary.
 
-### Step 5: Add Windows Pipe Client Behind Registry
+### Step 5: Add Windows Helper Client Behind Registry
 
 Add:
 
 ```txt
-packages/hub/src/runtime/sources/windows-pipe-source-client.ts
-packages/hub/src/runtime/sources/native-probe-source.ts
+packages/hub/src/runtime/sources/windows-helper-source-client.ts
 ```
 
 Rules:
@@ -659,7 +657,7 @@ Acceptance:
 Default local candidate order:
 
 ```txt
-windows-native-helper
+windows-helper
 node-system
 ```
 
@@ -671,7 +669,7 @@ Rules:
 
 Acceptance:
 
-- Adding `windows-native-helper` changes only registry/bootstrap and tests, not action classes.
+- Adding `windows-helper` changes only registry/bootstrap and tests, not action classes.
 
 ## C# Metric Mapping
 
@@ -759,7 +757,7 @@ Add unit tests for:
 - scheduler grouping by source scope and metric keys.
 - `MetricStore` source-scoped history.
 - `SourceRunner` per-metric fallback.
-- Windows pipe client frame encode/decode.
+- Windows helper pipe frame encode/decode.
 - Oversized frame rejection.
 - malformed protobuf rejection.
 - LHM descriptor and alias mapping.
