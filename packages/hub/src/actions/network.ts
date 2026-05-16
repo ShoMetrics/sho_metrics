@@ -78,7 +78,7 @@ export class Network extends MetricAction {
     }
 
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
-        scheduler.refreshMetrics(NETWORK_INTERFACE_LIST_REFRESH_METRIC_KEYS)
+        scheduler.refreshMetrics(this.buildMetricReadPlan(NETWORK_INTERFACE_LIST_REFRESH_METRIC_KEYS))
             .then(() => {
                 this.publishNetworkInterfaceOptions(event);
             })

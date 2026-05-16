@@ -222,7 +222,7 @@ export abstract class MetricAction extends SingletonAction {
                 this.onMetricsUpdate(currentActionState.event);
             }
         }, {
-            metricKeys: readPlan.metricKeys,
+            readPlan,
             pollingIntervalMilliseconds,
         });
 

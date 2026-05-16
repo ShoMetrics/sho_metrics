@@ -77,7 +77,7 @@ export class Disk extends MetricAction {
     }
 
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
-        scheduler.refreshMetrics(DISK_USAGE_REFRESH_METRIC_KEYS)
+        scheduler.refreshMetrics(this.buildMetricReadPlan(DISK_USAGE_REFRESH_METRIC_KEYS))
             .then(() => {
                 this.publishDiskVolumeOptions(event);
             })
