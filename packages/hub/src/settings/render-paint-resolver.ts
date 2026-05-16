@@ -21,9 +21,9 @@ const BLACK_WHITE_SOFT_TRIANGLE_LOW_PAINT = "#161616";
 const BLACK_WHITE_SOFT_TRIANGLE_MEDIUM_PAINT = "#2c2c2c";
 const BLACK_WHITE_SOFT_TRIANGLE_HIGH_PAINT = "#444444";
 const OLD_CRT_BLACK_GLASS_PAINT = "#010301";
-const OLD_CRT_BRIGHT_CORE_PAINT = "#e2ff98";
-const OLD_CRT_NORMAL_PHOSPHOR_PAINT = "#a7f53a";
-const OLD_CRT_DIM_PHOSPHOR_PAINT = "rgba(167,245,58,0.42)";
+const OLD_CRT_BRIGHT_CORE_PAINT = "#46ff36";
+const OLD_CRT_NORMAL_PHOSPHOR_PAINT = "#10d82a";
+const OLD_CRT_DIM_PHOSPHOR_PAINT = "rgba(1,174,31,0.44)";
 
 const DEFAULT_RENDER_PAINT_TOKENS = {
     background: DEFAULT_BACKGROUND_PAINT,
@@ -43,18 +43,18 @@ const DEFAULT_RENDER_PAINT_TOKENS = {
 
 const OLD_CRT_RENDER_PAINT_TOKENS = {
     background: OLD_CRT_BLACK_GLASS_PAINT,
-    surface: "rgba(167,245,58,0.24)",
+    surface: OLD_CRT_NORMAL_PHOSPHOR_PAINT,
     primaryText: OLD_CRT_BRIGHT_CORE_PAINT,
-    secondaryText: "rgba(167,245,58,0.76)",
+    secondaryText: "rgba(16,216,42,0.78)",
     mutedText: OLD_CRT_DIM_PHOSPHOR_PAINT,
-    icon: "rgba(167,245,58,0.82)",
-    linearTitleText: "rgba(167,245,58,0.74)",
+    icon: "rgba(16,216,42,0.84)",
+    linearTitleText: "rgba(16,216,42,0.76)",
     linearValueText: OLD_CRT_BRIGHT_CORE_PAINT,
-    linearUnitText: "rgba(167,245,58,0.70)",
+    linearUnitText: "rgba(16,216,42,0.72)",
     linearSecondaryText: OLD_CRT_DIM_PHOSPHOR_PAINT,
-    track: "rgba(167,245,58,0.16)",
-    grid: "rgba(167,245,58,0.26)",
-    divider: "rgba(167,245,58,0.22)",
+    track: "rgba(1,160,30,0.18)",
+    grid: "rgba(1,198,39,0.28)",
+    divider: "rgba(1,198,39,0.24)",
 } satisfies Omit<RenderPaintTokens, "backgroundFill" | "primaryMetric">;
 
 const OLD_CRT_COLOR_CONFIG = {

@@ -163,8 +163,8 @@ test("old crt theme uses fixed phosphor paint unless black-white mode is active"
         },
     }));
 
-    assert.equal(visualSettings.paints.primaryMetric.solidColor, "#a7f53a");
-    assert.equal(visualSettings.paints.primaryText, "#e2ff98");
+    assert.equal(visualSettings.paints.primaryMetric.solidColor, "#10d82a");
+    assert.equal(visualSettings.paints.primaryText, "#46ff36");
     assert.equal(visualSettings.paints.background, "#010301");
     assert.equal(blackWhiteSettings.paintConstraint, "black-white");
     assert.equal(blackWhiteSettings.paints.primaryMetric.solidColor, "#e6e6e6");
