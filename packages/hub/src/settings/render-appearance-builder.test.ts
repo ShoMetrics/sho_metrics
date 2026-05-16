@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_RENDER_TYPOGRAPHY_TOKENS } from "../rendering/render-typography";
+import {
+    DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
+    OLD_CRT_RENDER_FOREGROUND_EFFECT_TOKENS,
+} from "../rendering/render-foreground-effects";
+import {
+    DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
+    OLD_CRT_RENDER_TYPOGRAPHY_TOKENS,
+} from "../rendering/render-typography";
 import { buildMetricRenderAppearance } from "./render-appearance-builder";
 import { buildDefaultAppearanceSettings as buildAppearanceSettings } from "./default-appearance-settings";
 
@@ -44,8 +51,22 @@ test("graphic style maps resolved appearance settings to theme preset names", ()
 
 test("typography maps resolved appearance settings to renderer font tokens", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings());
+    const oldCrtSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: { selectedTheme: "old-crt" },
+    }));
 
     assert.deepEqual(visualSettings.typography, DEFAULT_RENDER_TYPOGRAPHY_TOKENS);
+    assert.deepEqual(oldCrtSettings.typography, OLD_CRT_RENDER_TYPOGRAPHY_TOKENS);
+});
+
+test("foreground effects map resolved appearance settings to renderer effect tokens", () => {
+    const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings());
+    const oldCrtSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: { selectedTheme: "old-crt" },
+    }));
+
+    assert.deepEqual(visualSettings.foregroundEffects, DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS);
+    assert.deepEqual(oldCrtSettings.foregroundEffects, OLD_CRT_RENDER_FOREGROUND_EFFECT_TOKENS);
 });
 
 test("solid color mode uses resolved appearance color", () => {
@@ -142,9 +163,9 @@ test("old crt theme uses fixed phosphor paint unless black-white mode is active"
         },
     }));
 
-    assert.equal(visualSettings.paints.primaryMetric.solidColor, "#b4ff63");
-    assert.equal(visualSettings.paints.primaryText, "#b4ff63");
-    assert.equal(visualSettings.paints.background, "#020501");
+    assert.equal(visualSettings.paints.primaryMetric.solidColor, "#a7f53a");
+    assert.equal(visualSettings.paints.primaryText, "#e2ff98");
+    assert.equal(visualSettings.paints.background, "#010301");
     assert.equal(blackWhiteSettings.paintConstraint, "black-white");
     assert.equal(blackWhiteSettings.paints.primaryMetric.solidColor, "#e6e6e6");
     assert.equal(blackWhiteSettings.paints.primaryText, "rgba(255,255,255,0.94)");

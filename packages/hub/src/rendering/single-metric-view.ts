@@ -1,4 +1,5 @@
 import type { RenderPaintTokens } from "./render-appearance";
+import type { RenderForegroundEffectTokens } from "./render-foreground-effects";
 import type { RenderTypographyTokens } from "./render-typography";
 import type { KeySize, WidgetData } from "./widget-data";
 import {
@@ -30,6 +31,7 @@ export interface SingleMetricBodyViewProps {
         graphicType: SingleMetricGraphicType;
         paints: RenderPaintTokens;
         typography: RenderTypographyTokens;
+        foregroundEffects: RenderForegroundEffectTokens;
         lineSmoothingPercent: number;
         gridLineVisibility: SparklineGridLineVisibility;
         gridLineType: SparklineGridLineType;
@@ -65,6 +67,7 @@ function renderSingleCircularMetric(options: SingleMetricBodyViewProps): string 
         unitTextColor: options.visual.paints.secondaryText,
         iconColor: options.visual.paints.icon,
         typography: options.visual.typography,
+        foregroundEffects: options.visual.foregroundEffects,
         circleStyle: options.circleStyle,
         centerIconFragment: options.centerIcon,
         footerIconFragment: options.footerIcon,
@@ -80,6 +83,7 @@ function renderSingleTextMetric(options: SingleMetricBodyViewProps): string {
         unitTextColor: options.visual.paints.secondaryText,
         secondaryTextColor: options.visual.paints.mutedText,
         typography: options.visual.typography,
+        foregroundEffects: options.visual.foregroundEffects,
     }, options.renderSize);
 }
 
@@ -96,6 +100,7 @@ function renderSingleLinearMetric(options: SingleMetricBodyViewProps): string {
             track: options.visual.paints.track,
         },
         typography: options.visual.typography,
+        foregroundEffects: options.visual.foregroundEffects,
         topIconFragment: options.linearIcon ?? options.centerIcon,
     }, options.renderSize);
 }
@@ -119,6 +124,7 @@ function renderSingleSparklineMetric(options: SingleMetricBodyViewProps): string
             baseline: options.visual.paints.grid,
         },
         typography: options.visual.typography,
+        foregroundEffects: options.visual.foregroundEffects,
         topIconFragment: options.linearIcon ?? options.centerIcon,
     }, options.renderSize);
 }

@@ -39,6 +39,9 @@ function copyRuntimeAssets() {
         ["assets/fonts/inter/InterVariable.ttf", `${sdPlugin}/assets/fonts/inter/InterVariable.ttf`],
         ["assets/fonts/inter/LICENSE.txt", `${sdPlugin}/assets/fonts/inter/LICENSE.txt`],
         ["assets/fonts/inter/README.md", `${sdPlugin}/assets/fonts/inter/README.md`],
+        ["assets/fonts/share-tech-mono/ShareTechMono-Regular.ttf", `${sdPlugin}/assets/fonts/share-tech-mono/ShareTechMono-Regular.ttf`],
+        ["assets/fonts/share-tech-mono/LICENSE.txt", `${sdPlugin}/assets/fonts/share-tech-mono/LICENSE.txt`],
+        ["assets/fonts/share-tech-mono/README.md", `${sdPlugin}/assets/fonts/share-tech-mono/README.md`],
     ];
 
     return {

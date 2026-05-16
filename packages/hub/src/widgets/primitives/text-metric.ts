@@ -1,6 +1,11 @@
 import type { DualChannelWidgetData, KeySize, WidgetData } from "../../rendering/widget-data";
 import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
+    buildSvgFilterAttributes,
+    DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
+    type RenderForegroundEffectTokens,
+} from "../../rendering/render-foreground-effects";
+import {
     DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
     type RenderTypographyTokens,
 } from "../../rendering/render-typography";
@@ -16,6 +21,7 @@ export interface TextMetricConfig extends WidgetBaseConfig {
     unitTextColor: string;
     secondaryTextColor: string;
     typography: RenderTypographyTokens;
+    foregroundEffects: RenderForegroundEffectTokens;
     positiveColor?: string;
     negativeColor?: string;
 }
@@ -27,6 +33,7 @@ export const DEFAULT_TEXT_METRIC_CONFIG: TextMetricConfig = {
     unitTextColor: "rgba(255,255,255,0.74)",
     secondaryTextColor: "rgba(255,255,255,0.52)",
     typography: DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
+    foregroundEffects: DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
 };
 
 const TEXT_LAYOUT = {
@@ -66,6 +73,7 @@ export const textMetric: Widget<TextMetricConfig> = {
                 fontWeight: 800,
                 fill: config.labelTextColor,
                 textAnchor: "middle",
+                extraAttributes: buildSvgFilterAttributes(config.foregroundEffects.labelFilter),
             })}
             ${renderMetricTextRow({
                 id: "text-metric-value",
@@ -82,7 +90,11 @@ export const textMetric: Widget<TextMetricConfig> = {
                 valueFill: valueTextColor,
                 unitFill: config.unitTextColor,
                 textAnchor: "middle",
-                valueExtraAttributes: ["font-variant-numeric=\"tabular-nums\""],
+                valueExtraAttributes: [
+                    "font-variant-numeric=\"tabular-nums\"",
+                    ...buildSvgFilterAttributes(config.foregroundEffects.valueFilter),
+                ],
+                unitExtraAttributes: buildSvgFilterAttributes(config.foregroundEffects.labelFilter),
                 fitOptions: data.unit.length > 1
                     ? { minimumFontScale: 0.48, widthGuardRatio: 1.36 }
                     : undefined,
@@ -144,6 +156,7 @@ function renderSecondaryText(
         fontWeight: 720,
         fill: config.secondaryTextColor,
         textAnchor: "middle",
+        extraAttributes: buildSvgFilterAttributes(config.foregroundEffects.labelFilter),
         fitOptions: { minimumFontScale: 0.58 },
     });
 }
@@ -172,6 +185,7 @@ function renderDualTextRow(options: {
             fontWeight: 800,
             fill: options.config.labelTextColor,
             textAnchor: "middle",
+            extraAttributes: buildSvgFilterAttributes(options.config.foregroundEffects.labelFilter),
         })}
         ${renderMetricTextRow({
             id: `${options.rowId}-value`,
@@ -188,7 +202,11 @@ function renderDualTextRow(options: {
             valueFill: options.valueFill,
             unitFill: options.config.unitTextColor,
             textAnchor: "middle",
-            valueExtraAttributes: ["font-variant-numeric=\"tabular-nums\""],
+            valueExtraAttributes: [
+                "font-variant-numeric=\"tabular-nums\"",
+                ...buildSvgFilterAttributes(options.config.foregroundEffects.valueFilter),
+            ],
+            unitExtraAttributes: buildSvgFilterAttributes(options.config.foregroundEffects.labelFilter),
             fitOptions: options.widgetData.unit.length > 1
                 ? { minimumFontScale: 0.50, widthGuardRatio: 1.34 }
                 : undefined,

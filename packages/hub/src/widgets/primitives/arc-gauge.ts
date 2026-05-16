@@ -1,6 +1,11 @@
 import type { WidgetData, KeySize } from "../../rendering/widget-data";
 import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
+    buildSvgFilterAttributes,
+    DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
+    type RenderForegroundEffectTokens,
+} from "../../rendering/render-foreground-effects";
+import {
     DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
     type RenderTypographyTokens,
 } from "../../rendering/render-typography";
@@ -46,6 +51,7 @@ export interface ArcGaugeConfig extends WidgetBaseConfig {
     unitTextColor: string;
     iconColor: string;
     typography: RenderTypographyTokens;
+    foregroundEffects: RenderForegroundEffectTokens;
     innerTextScale: number;
     circleStyle: ArcGaugeStyle;
     gaugeRangeBlendProgress: number;
@@ -67,6 +73,7 @@ export const DEFAULT_ARC_GAUGE_CONFIG: ArcGaugeConfig = {
     unitTextColor: "rgba(255,255,255,0.74)",
     iconColor: "rgba(255,255,255,0.88)",
     typography: DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
+    foregroundEffects: DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
     gradientHeadAdjustmentPercent: -42,
     innerTextScale: 1,
     circleStyle: "value",
@@ -245,6 +252,8 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
                 notchGeometry: ringNotchGeometry,
                 shouldRenderFullRangeArc,
                 shouldRenderMarker: circleStyle === "gauge" && valueText !== "N/A",
+                metricFilter: config.foregroundEffects.metricFilter,
+                subtleFilter: config.foregroundEffects.subtleFilter,
             })}
             ${centerContentFragment}
         `;
@@ -278,12 +287,14 @@ function renderCenterContent(options: {
                 options.centerXCoordinate,
                 options.statusNotchGeometry,
                 options.config.iconColor,
+                options.config.foregroundEffects.iconFilter,
             )}
             ${renderCenterIcon(
                 options.centerIconFragment,
                 options.centerXCoordinate,
                 options.centerYCoordinate,
                 options.config.iconColor,
+                options.config.foregroundEffects.iconFilter,
             )}
         `;
     }
@@ -303,6 +314,7 @@ function renderStatusIcon(
     centerXCoordinate: number,
     statusNotchGeometry: StatusNotchGeometry | null,
     iconColor: string,
+    iconFilter: string | undefined,
 ): string {
     if (!statusIcon || !statusNotchGeometry) {
         return "";
@@ -313,6 +325,7 @@ function renderStatusIcon(
             y="${statusNotchGeometry.iconCenterYCoordinate - statusNotchGeometry.iconSize / 2}"
             width="${statusNotchGeometry.iconSize}" height="${statusNotchGeometry.iconSize}"
             color="${iconColor}"
+            ${buildSvgFilterAttributes(iconFilter).join(" ")}
             viewBox="${statusIcon.viewBox.x} ${statusIcon.viewBox.y} ${statusIcon.viewBox.width} ${statusIcon.viewBox.height}">
             ${statusIcon.fragment}
         </svg>
@@ -365,6 +378,8 @@ function renderRing(options: {
     notchGeometry: RingNotchGeometry | null;
     shouldRenderFullRangeArc: boolean;
     shouldRenderMarker: boolean;
+    metricFilter: string | undefined;
+    subtleFilter: string | undefined;
 }): string {
     const progress = clamp(options.progress, 0, 1);
     const trackDashArray = options.notchGeometry
@@ -408,9 +423,12 @@ function renderRing(options: {
                 : `${options.geometry.circumference}`,
             dashOffset: options.notchGeometry ? 0 : options.geometry.circumference * (1 - progress),
             rotationDegrees,
+            filter: options.metricFilter,
         })
         : "";
-    const markerDotFragment = markerDot ? renderGaugeMarkerDot(markerDot) : "";
+    const markerDotFragment = markerDot
+        ? `<g ${buildSvgFilterAttributes(options.metricFilter).join(" ")}>${renderGaugeMarkerDot(markerDot)}</g>`
+        : "";
     const trackRing = options.shouldRenderFullRangeArc
         ? ""
         : renderRingCircle({
@@ -420,6 +438,7 @@ function renderRing(options: {
             dashArray: trackDashArray,
             dashOffset: 0,
             rotationDegrees,
+            filter: options.subtleFilter,
         });
 
     return `
@@ -438,13 +457,17 @@ function renderRingCircle(options: {
     dashArray: string;
     dashOffset: number;
     rotationDegrees: number;
+    filter: string | undefined;
 }): string {
+    const filterAttributes = buildSvgFilterAttributes(options.filter);
+
     return `
         <circle cx="${options.geometry.centerXCoordinate}" cy="${options.geometry.centerYCoordinate}" r="${options.geometry.radius}"
             fill="none" stroke="${options.stroke}" stroke-width="${options.strokeWidth}"
             stroke-dasharray="${options.dashArray}" stroke-dashoffset="${options.dashOffset}"
             stroke-linecap="round"
             transform="rotate(${options.rotationDegrees} ${options.geometry.centerXCoordinate} ${options.geometry.centerYCoordinate})"
+            ${filterAttributes.join(" ")}
             style="transition: stroke-dashoffset 0.3s ease;" />
     `;
 }
@@ -454,12 +477,13 @@ function renderCenterIcon(
     centerXCoordinate: number,
     centerYCoordinate: number,
     iconColor: string,
+    iconFilter: string | undefined,
 ): string {
     if (!centerIconFragment) {
         return "";
     }
 
-    return `<g color="${iconColor}" transform="translate(${centerXCoordinate} ${centerYCoordinate})">${centerIconFragment}</g>`;
+    return `<g color="${iconColor}" transform="translate(${centerXCoordinate} ${centerYCoordinate})" ${buildSvgFilterAttributes(iconFilter).join(" ")}>${centerIconFragment}</g>`;
 }
 
 function renderGaugeInlineIcon(options: {
@@ -467,12 +491,13 @@ function renderGaugeInlineIcon(options: {
     xCoordinate: number;
     yCoordinate: number;
     iconColor: string;
+    iconFilter: string | undefined;
 }): string {
     if (!options.iconFragment) {
         return "";
     }
 
-    return `<g color="${options.iconColor}" transform="translate(${formatSvgNumber(options.xCoordinate)} ${formatSvgNumber(options.yCoordinate)}) scale(${formatSvgNumber(ARC_LAYOUT.gaugeBottomLabel.iconScale)})">${options.iconFragment}</g>`;
+    return `<g color="${options.iconColor}" transform="translate(${formatSvgNumber(options.xCoordinate)} ${formatSvgNumber(options.yCoordinate)}) scale(${formatSvgNumber(ARC_LAYOUT.gaugeBottomLabel.iconScale)})" ${buildSvgFilterAttributes(options.iconFilter).join(" ")}>${options.iconFragment}</g>`;
 }
 
 function renderGaugeValueContent(options: {
@@ -528,7 +553,10 @@ function renderGaugeValueRow(options: {
             fontWeight: 900,
             fill: options.config.valueTextColor,
             textAnchor: "middle",
-            extraAttributes: ["font-variant-numeric=\"tabular-nums\""],
+            extraAttributes: [
+                "font-variant-numeric=\"tabular-nums\"",
+                ...buildSvgFilterAttributes(options.config.foregroundEffects.valueFilter),
+            ],
         });
     }
 
@@ -558,7 +586,10 @@ function renderGaugeValueRow(options: {
             fontWeight: 900,
             fill: options.config.valueTextColor,
             textAnchor: valuePlacement.textAnchor,
-            extraAttributes: ["font-variant-numeric=\"tabular-nums\""],
+            extraAttributes: [
+                "font-variant-numeric=\"tabular-nums\"",
+                ...buildSvgFilterAttributes(options.config.foregroundEffects.valueFilter),
+            ],
         })}
         ${renderConstrainedSvgText({
             id: "arc-gauge-unit",
@@ -571,6 +602,7 @@ function renderGaugeValueRow(options: {
             fontWeight: 800,
             fill: options.config.unitTextColor,
             textAnchor: "start",
+            extraAttributes: buildSvgFilterAttributes(options.config.foregroundEffects.labelFilter),
         })}
     `;
 }
@@ -688,12 +720,14 @@ function renderGaugeBottomLabel(options: {
             fontWeight: 850,
             fill: options.config.labelTextColor,
             textAnchor: "middle",
+            extraAttributes: buildSvgFilterAttributes(options.config.foregroundEffects.labelFilter),
         })}
         ${renderGaugeInlineIcon({
             iconFragment: options.iconFragment,
             xCoordinate: iconXCoordinate,
             yCoordinate: options.yCoordinate,
             iconColor: options.config.iconColor,
+            iconFilter: options.config.foregroundEffects.iconFilter,
         })}
     `;
 }
@@ -728,6 +762,7 @@ function renderCenterValue(options: {
             fontWeight: 800,
             fill: options.config.labelTextColor,
             textAnchor: "middle",
+            extraAttributes: buildSvgFilterAttributes(options.config.foregroundEffects.labelFilter),
         })}
         ${renderMetricTextRow({
             id: "arc-value-unit",
@@ -744,7 +779,11 @@ function renderCenterValue(options: {
             valueFill: options.config.valueTextColor,
             unitFill: options.config.unitTextColor,
             textAnchor: "middle",
-            valueExtraAttributes: ["font-variant-numeric=\"tabular-nums\""],
+            valueExtraAttributes: [
+                "font-variant-numeric=\"tabular-nums\"",
+                ...buildSvgFilterAttributes(options.config.foregroundEffects.valueFilter),
+            ],
+            unitExtraAttributes: buildSvgFilterAttributes(options.config.foregroundEffects.labelFilter),
             fitOptions: options.unitText.length > 1
                 ? { minimumFontScale: 0.42, widthGuardRatio: 1.45 }
                 : undefined,
@@ -754,6 +793,7 @@ function renderCenterValue(options: {
             options.centerXCoordinate,
             options.centerYCoordinate + ARC_LAYOUT.footerIcon.yOffset,
             options.config.iconColor,
+            options.config.foregroundEffects.iconFilter,
         )}
     `;
 }

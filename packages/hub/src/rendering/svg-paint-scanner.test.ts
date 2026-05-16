@@ -4,6 +4,7 @@ import { resolveColorForThresholdValue } from "./color-resolver";
 import { renderDualMetricBodyView } from "./dual-metric-view";
 import { renderMetricFrame } from "./metric-frame";
 import type { MetricRenderAppearance } from "./render-appearance";
+import { DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS } from "./render-foreground-effects";
 import { DEFAULT_RENDER_TYPOGRAPHY_TOKENS } from "./render-typography";
 import { renderSingleMetricBodyView } from "./single-metric-view";
 import {
@@ -275,6 +276,7 @@ function buildBlackWhiteRenderAppearance(options: {
             divider: "rgba(255,255,255,0.18)",
         },
         typography: DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
+        foregroundEffects: DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
         lineSmoothingPercent: 75,
         gridLineVisibility: "adaptive",
         gridLineType: options.gridLineType ?? "horizontal",

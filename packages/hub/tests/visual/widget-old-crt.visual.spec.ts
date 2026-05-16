@@ -1,7 +1,7 @@
-import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { Resvg } from "@resvg/resvg-js";
 import { renderMetricFrame } from "../../src/rendering/metric-frame";
+import { resolveResvgFontOptions } from "../../src/rendering/resvg-font-options";
 import { renderSingleMetricBodyView } from "../../src/rendering/single-metric-view";
 import { WIDGET_LOGICAL_SIZE, type KeySize, type WidgetData } from "../../src/rendering/widget-data";
 import type { ResolvedAppearanceSettingsOverride } from "../../src/settings/appearance-overrides";
@@ -9,7 +9,6 @@ import { buildDefaultAppearanceSettings } from "../../src/settings/default-appea
 import { buildMetricRenderAppearance } from "../../src/settings/render-appearance-builder";
 import { getHardwareIconFragment } from "../../src/widgets/icons/hardware-icons";
 
-const INTER_FONT_FILE = path.resolve(process.cwd(), "assets", "fonts", "inter", "InterVariable.ttf");
 const CPU_ICON_FRAGMENT = getHardwareIconFragment("cpu");
 
 const CPU_USAGE_WIDGET_DATA: WidgetData = {
@@ -156,12 +155,7 @@ function renderSvgToPngBuffer(svg: string, keySize: KeySize): Buffer {
             mode: "width",
             value: keySize.width,
         },
-        font: {
-            loadSystemFonts: false,
-            fontFiles: [INTER_FONT_FILE],
-            defaultFontFamily: "Inter",
-            sansSerifFamily: "Inter",
-        },
+        font: resolveResvgFontOptions(svg),
     }).render();
 
     return Buffer.from(renderedImage.asPng());

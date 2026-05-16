@@ -1,6 +1,11 @@
 import type { WidgetData, KeySize } from "../../rendering/widget-data";
 import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
+    buildSvgFilterAttributes,
+    DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
+    type RenderForegroundEffectTokens,
+} from "../../rendering/render-foreground-effects";
+import {
     DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
     type RenderTypographyTokens,
 } from "../../rendering/render-typography";
@@ -17,6 +22,7 @@ export interface LinearBarConfig extends WidgetBaseConfig {
     borderRadius: number;
     paints: LinearBarPaints;
     typography: RenderTypographyTokens;
+    foregroundEffects: RenderForegroundEffectTokens;
     topIconFragment?: string;
 }
 
@@ -46,6 +52,7 @@ export const DEFAULT_LINEAR_BAR_CONFIG: LinearBarConfig = {
         track: "rgba(255,255,255,0.08)",
     },
     typography: DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
+    foregroundEffects: DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
     gradientHeadAdjustmentPercent: -15,
 };
 
@@ -221,6 +228,7 @@ function renderSingleBar(
             textColor: config.paints.secondaryText,
             iconColor: config.paints.icon,
             typography: config.typography,
+            foregroundEffects: config.foregroundEffects,
         })}
         ${renderValueWithUnit({
             clipId: "linear-single-value",
@@ -230,15 +238,17 @@ function renderSingleBar(
             valueTextColor: config.paints.primaryText,
             unitTextColor: config.paints.supportingText,
             typography: config.typography,
+            foregroundEffects: config.foregroundEffects,
         })}
-        ${renderTrack(layoutPlan.singleBar, config.paints.track)}
-        ${renderFill(layoutPlan.singleBar, fillWidth, fillPaint)}
+        ${renderTrack(layoutPlan.singleBar, config.paints.track, config.foregroundEffects.subtleFilter)}
+        ${renderFill(layoutPlan.singleBar, fillWidth, fillPaint, config.foregroundEffects.metricFilter)}
         ${renderSecondaryText({
             text: data.secondaryDisplayValue,
             layout: layoutPlan.singleSecondaryText,
             clipId: "linear-single-secondary",
             textColor: config.paints.mutedText,
             typography: config.typography,
+            foregroundEffects: config.foregroundEffects,
         })}
     `;
 }
@@ -263,6 +273,7 @@ function renderChannelBars(
             textColor: config.paints.secondaryText,
             iconColor: config.paints.icon,
             typography: config.typography,
+            foregroundEffects: config.foregroundEffects,
         })}
         ${channels.slice(0, 2).map((channel, channelIndex) => {
             const channelLayout = buildChannelLayout({
@@ -282,7 +293,7 @@ function renderChannelBars(
                         <stop offset="100%" stop-color="${headColor}" />
                     </linearGradient>
                 </defs>` : ""}
-                <g color="${channel.color}" transform="translate(${channelLayout.iconCenterXCoordinate} ${channelLayout.iconCenterYCoordinate}) scale(${layoutPlan.channelIconScale})">
+                <g color="${channel.color}" transform="translate(${channelLayout.iconCenterXCoordinate} ${channelLayout.iconCenterYCoordinate}) scale(${layoutPlan.channelIconScale})" ${buildSvgFilterAttributes(config.foregroundEffects.iconFilter).join(" ")}>
                     ${channel.iconFragment}
                 </g>
                 ${renderValueWithUnit({
@@ -293,9 +304,10 @@ function renderChannelBars(
                     valueTextColor: config.paints.primaryText,
                     unitTextColor: config.paints.supportingText,
                     typography: config.typography,
+                    foregroundEffects: config.foregroundEffects,
                 })}
-                ${renderTrack(channelLayout.bar, config.paints.track)}
-                ${renderFill(channelLayout.bar, fillWidth, fillPaint)}
+                ${renderTrack(channelLayout.bar, config.paints.track, config.foregroundEffects.subtleFilter)}
+                ${renderFill(channelLayout.bar, fillWidth, fillPaint, config.foregroundEffects.metricFilter)}
             `;
         }).join("")}
     `;
@@ -370,13 +382,14 @@ function renderTitle(options: {
     textColor: string;
     iconColor: string;
     typography: RenderTypographyTokens;
+    foregroundEffects: RenderForegroundEffectTokens;
 }): string {
     const titleXCoordinate = options.iconFragment
         ? options.layout.xCoordinate + options.iconGap
         : options.layout.xCoordinate;
     const titleMaxWidth = Math.max(1, options.layout.maxWidth - (titleXCoordinate - options.layout.xCoordinate));
     const iconSvg = options.iconFragment
-        ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 10} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})">${options.iconFragment}</g>`
+        ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 10} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})" ${buildSvgFilterAttributes(options.foregroundEffects.iconFilter).join(" ")}>${options.iconFragment}</g>`
         : "";
 
     return `
@@ -391,6 +404,7 @@ function renderTitle(options: {
             fontFamily: options.typography.labelFontFamily,
             fontWeight: 850,
             fill: options.textColor,
+            extraAttributes: buildSvgFilterAttributes(options.foregroundEffects.labelFilter),
         })}
     `;
 }
@@ -403,6 +417,7 @@ function renderValueWithUnit(options: {
     valueTextColor: string;
     unitTextColor: string;
     typography: RenderTypographyTokens;
+    foregroundEffects: RenderForegroundEffectTokens;
 }): string {
     return renderMetricTextRow({
         id: options.clipId,
@@ -419,7 +434,11 @@ function renderValueWithUnit(options: {
         valueFill: options.valueTextColor,
         unitFill: options.unitTextColor,
         unitBaselineOffset: 2,
-        valueExtraAttributes: ["font-variant-numeric=\"tabular-nums\""],
+        valueExtraAttributes: [
+            "font-variant-numeric=\"tabular-nums\"",
+            ...buildSvgFilterAttributes(options.foregroundEffects.valueFilter),
+        ],
+        unitExtraAttributes: buildSvgFilterAttributes(options.foregroundEffects.labelFilter),
     });
 }
 
@@ -429,6 +448,7 @@ function renderSecondaryText(options: {
     clipId: string;
     textColor: string;
     typography: RenderTypographyTokens;
+    foregroundEffects: RenderForegroundEffectTokens;
 }): string {
     if (!options.text) {
         return "";
@@ -444,20 +464,21 @@ function renderSecondaryText(options: {
         fontFamily: options.typography.labelFontFamily,
         fontWeight: 750,
         fill: options.textColor,
+        extraAttributes: buildSvgFilterAttributes(options.foregroundEffects.labelFilter),
     });
 }
 
-function renderTrack(layout: BarLayout, color: string): string {
+function renderTrack(layout: BarLayout, color: string, filter: string | undefined): string {
     return `
         <rect x="${layout.xCoordinate}" y="${layout.yCoordinate}" width="${layout.width}" height="${layout.height}"
-            rx="${layout.radius}" fill="${color}" />
+            rx="${layout.radius}" fill="${color}" ${buildSvgFilterAttributes(filter).join(" ")} />
     `;
 }
 
-function renderFill(layout: BarLayout, fillWidth: number, fillPaint: string): string {
+function renderFill(layout: BarLayout, fillWidth: number, fillPaint: string, filter: string | undefined): string {
     return `
         <rect x="${layout.xCoordinate}" y="${layout.yCoordinate}" width="${fillWidth}" height="${layout.height}"
-            rx="${layout.radius}" fill="${fillPaint}" />
+            rx="${layout.radius}" fill="${fillPaint}" ${buildSvgFilterAttributes(filter).join(" ")} />
     `;
 }
 

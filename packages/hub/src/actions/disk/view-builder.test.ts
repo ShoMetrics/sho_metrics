@@ -71,3 +71,40 @@ test("disk usage display keeps explicit unavailable volume instead of falling ba
 
     assert.equal(renderWidgetData.displayValue, "N/A");
 });
+
+test("disk compact center icon label uses theme typography", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings,
+        {
+            appearance: {
+                graph: {
+                    viewLayout: "circular",
+                    circleStyle: "compact",
+                },
+                theme: { selectedTheme: "old-crt" },
+            },
+            disk: {
+                kind: "usage",
+                volumeId: "E:\\",
+            },
+        },
+    );
+    const settings = resolveInitialActionSettings(rawSettings, "disk").resolvedSettings;
+    const target = settings.widget.slot.metric.target;
+
+    assert.equal(target.domain, "disk");
+    if (target.domain !== "disk") {
+        assert.fail("Expected disk target.");
+    }
+
+    const displayOptions = buildDiskDisplayOptions({
+        event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
+        settings,
+        target,
+        metricStore: new MetricStore(),
+        volumeSelection: { kind: "unavailable", volumeId: "E:\\" },
+    });
+
+    assert.match(displayOptions.centerIconFragment, /Share Tech Mono/);
+    assert.doesNotMatch(displayOptions.centerIconFragment, /font-family="'Inter'/);
+});

@@ -3,17 +3,20 @@ import path from "node:path";
 import type { ResvgRenderOptions } from "@resvg/resvg-js";
 
 export type FontScript = "han" | "kana" | "hangul" | "symbol";
+export type BundledFontFamily = "share-tech-mono";
 
 export interface ResvgFontResolverEnvironment {
     platform: NodeJS.Platform;
     fileExists: (fontFile: string) => boolean;
     bundledInterFontFile?: string;
+    bundledShareTechMonoFontFile?: string;
 }
 
 const DEFAULT_FONT_RESOLVER_ENVIRONMENT: ResvgFontResolverEnvironment = {
     platform: process.platform,
     fileExists: existsSync,
-    bundledInterFontFile: resolveBundledInterFontFile(),
+    bundledInterFontFile: resolveBundledFontFile("inter", "InterVariable.ttf"),
+    bundledShareTechMonoFontFile: resolveBundledFontFile("share-tech-mono", "ShareTechMono-Regular.ttf"),
 };
 
 const fontFileCacheByKey = new Map<string, readonly string[]>();
@@ -28,18 +31,22 @@ const SYMBOL_FALLBACK_PATTERN = /[\u00b0\u03bc\u03a9\u2190-\u21ff\u2200-\u22ff]/
 /**
  * Builds resvg font options without system-wide font loading.
  *
- * Windows uses vendored Inter as the primary Latin UI font for stable small-screen
- * rendering. macOS uses SF system fonts as the primary UI font to match platform
- * expectations. CJK fallback fonts are added only when visible SVG text needs them.
+ * Windows and Linux use vendored Inter as the primary Latin UI font for stable
+ * small-screen rendering and CI snapshots. macOS uses SF system fonts as the
+ * primary UI font to match platform expectations. CJK fallback fonts are added
+ * only when visible SVG text needs them.
  */
 export function resolveResvgFontOptions(
     svgString: string,
     environment = DEFAULT_FONT_RESOLVER_ENVIRONMENT,
 ): NonNullable<ResvgRenderOptions["font"]> {
     const scriptList = detectFontScriptsFromSvg(svgString);
+    const bundledFontFamilyList = detectBundledFontFamiliesFromSvg(svgString);
     const cacheKey = [
         environment.platform,
         environment.bundledInterFontFile ?? "",
+        environment.bundledShareTechMonoFontFile ?? "",
+        ...bundledFontFamilyList,
         ...scriptList,
     ].join("|");
     const cachedFontOptions = fontOptionsCacheByKey.get(cacheKey);
@@ -48,7 +55,7 @@ export function resolveResvgFontOptions(
         return cachedFontOptions;
     }
 
-    const fontFiles = resolveFontFiles(scriptList, environment);
+    const fontFiles = resolveFontFiles(scriptList, bundledFontFamilyList, environment);
     const fontOptions: NonNullable<ResvgRenderOptions["font"]> = {
         loadSystemFonts: false,
         fontFiles: [...fontFiles],
@@ -83,6 +90,16 @@ export function detectFontScriptsFromSvg(svgString: string): readonly FontScript
     return scriptList;
 }
 
+export function detectBundledFontFamiliesFromSvg(svgString: string): readonly BundledFontFamily[] {
+    const bundledFontFamilyList: BundledFontFamily[] = [];
+
+    if (/\bShare Tech Mono\b/iu.test(svgString)) {
+        bundledFontFamilyList.push("share-tech-mono");
+    }
+
+    return bundledFontFamilyList;
+}
+
 export function clearResvgFontOptionsCacheForTests(): void {
     fontFileCacheByKey.clear();
     fontOptionsCacheByKey.clear();
@@ -103,11 +120,14 @@ export function extractVisibleSvgText(svgString: string): string {
 
 function resolveFontFiles(
     scriptList: readonly FontScript[],
+    bundledFontFamilyList: readonly BundledFontFamily[],
     environment: ResvgFontResolverEnvironment,
 ): readonly string[] {
     const cacheKey = [
         environment.platform,
         environment.bundledInterFontFile ?? "",
+        environment.bundledShareTechMonoFontFile ?? "",
+        ...bundledFontFamilyList,
         ...scriptList,
     ].join("|");
     const cachedFontFiles = fontFileCacheByKey.get(cacheKey);
@@ -117,6 +137,7 @@ function resolveFontFiles(
     }
 
     const fontFiles = Array.from(new Set([
+        ...bundledFontFamilyList.flatMap(fontFamily => resolveBundledFontFileCandidates(fontFamily, environment)),
         ...resolvePrimaryFontFileCandidates(environment),
         ...scriptList.flatMap(fontScript => resolveFontFileCandidatesForScript(fontScript, environment.platform)),
     ])).filter(fontFile => environment.fileExists(fontFile));
@@ -138,6 +159,17 @@ function resolveFontFileCandidatesForScript(fontScript: FontScript, platform: No
     }
 }
 
+function resolveBundledFontFileCandidates(
+    bundledFontFamily: BundledFontFamily,
+    environment: ResvgFontResolverEnvironment,
+): readonly string[] {
+    switch (bundledFontFamily) {
+        case "share-tech-mono":
+            return [environment.bundledShareTechMonoFontFile]
+                .filter((fontFile): fontFile is string => Boolean(fontFile));
+    }
+}
+
 function resolvePrimaryFontFileCandidates(environment: ResvgFontResolverEnvironment): readonly string[] {
     switch (environment.platform) {
         case "win32":
@@ -154,7 +186,8 @@ function resolvePrimaryFontFileCandidates(environment: ResvgFontResolverEnvironm
                 "/System/Library/Fonts/Supplemental/Arial.ttf",
             ];
         default:
-            return [];
+            return [environment.bundledInterFontFile]
+                .filter((fontFile): fontFile is string => Boolean(fontFile));
     }
 }
 
@@ -234,7 +267,7 @@ function resolvePrimaryFontFamily(platform: NodeJS.Platform): string {
         case "darwin":
             return "SF Pro Display";
         default:
-            return "Arial";
+            return "Inter";
     }
 }
 
@@ -261,14 +294,14 @@ function decodeCodePoint(codePoint: number): string {
     return String.fromCodePoint(codePoint);
 }
 
-function resolveBundledInterFontFile(): string {
+function resolveBundledFontFile(fontDirectory: string, fontFileName: string): string {
     const executableDirectory = path.dirname(process.argv[1] ?? process.cwd());
-    const bundledInterFontFile = [
-        path.resolve(process.cwd(), "assets", "fonts", "inter", "InterVariable.ttf"),
-        path.resolve(process.cwd(), "com.ez.sho-metrics.sdPlugin", "assets", "fonts", "inter", "InterVariable.ttf"),
-        path.resolve(executableDirectory, "..", "assets", "fonts", "inter", "InterVariable.ttf"),
-        path.resolve(executableDirectory, "..", "..", "assets", "fonts", "inter", "InterVariable.ttf"),
+    const bundledFontFile = [
+        path.resolve(process.cwd(), "assets", "fonts", fontDirectory, fontFileName),
+        path.resolve(process.cwd(), "com.ez.sho-metrics.sdPlugin", "assets", "fonts", fontDirectory, fontFileName),
+        path.resolve(executableDirectory, "..", "assets", "fonts", fontDirectory, fontFileName),
+        path.resolve(executableDirectory, "..", "..", "assets", "fonts", fontDirectory, fontFileName),
     ].find(fontFile => existsSync(fontFile));
 
-    return bundledInterFontFile ?? path.resolve(process.cwd(), "assets", "fonts", "inter", "InterVariable.ttf");
+    return bundledFontFile ?? path.resolve(process.cwd(), "assets", "fonts", fontDirectory, fontFileName);
 }

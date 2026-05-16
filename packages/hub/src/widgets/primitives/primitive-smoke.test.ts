@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS } from "../../rendering/render-foreground-effects";
 import type { DualChannelWidgetData, WidgetData } from "../../rendering/widget-data";
 import { arcGauge, DEFAULT_ARC_GAUGE_CONFIG } from "./arc-gauge";
 import { buildGaugeRangeColorPlan, resolveGaugeMarkerGap, resolveGaugeMarkerRenderProgress } from "./arc-gauge-range";
@@ -468,7 +469,19 @@ test("metric text row shrinks long values and units into the row width", () => {
 });
 
 test("mirrored traffic renders labels, center line, and both channel graphs", () => {
-    const svgFragment = renderMirroredTraffic(buildDualChannelData(), DEFAULT_MIRRORED_TRAFFIC_CONFIG, keySize);
+    const svgFragment = renderMirroredTraffic(buildDualChannelData(), {
+        ...DEFAULT_MIRRORED_TRAFFIC_CONFIG,
+        typography: {
+            labelFontFamily: "Traffic Label Font",
+            valueFontFamily: "Traffic Value Font",
+        },
+        foregroundEffects: {
+            ...DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
+            labelFilter: "url(#label-glow)",
+            metricFilter: "url(#metric-glow)",
+            subtleFilter: "url(#subtle-glow)",
+        },
+    }, keySize);
 
     assert.match(svgFragment, /Mirrored Traffic: labels/);
     assert.match(svgFragment, /Mirrored Traffic: center line/);
@@ -476,6 +489,10 @@ test("mirrored traffic renders labels, center line, and both channel graphs", ()
     assert.match(svgFragment, /Mirrored Traffic: negative/);
     assert.match(svgFragment, /mirrored-pos-/);
     assert.match(svgFragment, /mirrored-neg-/);
+    assert.match(svgFragment, /font-family="Traffic Label Font"/);
+    assert.match(svgFragment, /filter="url\(#label-glow\)"/);
+    assert.match(svgFragment, /filter="url\(#metric-glow\)"/);
+    assert.match(svgFragment, /filter="url\(#subtle-glow\)"/);
 });
 
 test("dual text metric renders two escaped value rows", () => {

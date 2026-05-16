@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test, { beforeEach } from "node:test";
 import {
     clearResvgFontOptionsCacheForTests,
+    detectBundledFontFamiliesFromSvg,
     detectFontScriptsFromSvg,
     extractVisibleSvgText,
     resolveResvgFontOptions,
@@ -9,6 +10,7 @@ import {
 } from "./resvg-font-options";
 
 const BUNDLED_INTER_FONT_FILE = "C:\\Plugin\\assets\\fonts\\inter\\InterVariable.ttf";
+const BUNDLED_SHARE_TECH_MONO_FONT_FILE = "C:\\Plugin\\assets\\fonts\\share-tech-mono\\ShareTechMono-Regular.ttf";
 
 // Keep these tests hermetic. They simulate Windows/macOS font availability
 // instead of reading real OS font files, whose presence and load cost vary by machine.
@@ -18,6 +20,16 @@ beforeEach(() => {
 
 test("font script detection keeps English SVG on primary fonts only", () => {
     assert.deepEqual(detectFontScriptsFromSvg(buildTextSvg("CPU 42%")), []);
+});
+
+test("bundled font family detection finds old CRT font-family usage", () => {
+    const svgString = [
+        '<svg xmlns="http://www.w3.org/2000/svg">',
+        '<text font-family="\'Share Tech Mono\',Inter">40%</text>',
+        "</svg>",
+    ].join("");
+
+    assert.deepEqual(detectBundledFontFamiliesFromSvg(svgString), ["share-tech-mono"]);
 });
 
 test("font script detection detects Han Kana Hangul and symbols from visible text", () => {
@@ -66,6 +78,28 @@ test("font options disable system fonts and load bundled Inter on Windows", () =
     assert.equal(fontOptions.loadSystemFonts, false);
     assert.equal(fontOptions.defaultFontFamily, "Inter");
     assert.deepEqual(fontOptions.fontFiles, [
+        BUNDLED_INTER_FONT_FILE,
+        "C:\\Windows\\Fonts\\seguisym.ttf",
+    ]);
+});
+
+test("font options load old CRT bundled fonts before primary fonts when SVG asks for them", () => {
+    const fontOptions = resolveResvgFontOptions(
+        buildTextSvgWithFontFamily("CPU", "'Share Tech Mono','Inter'"),
+        buildEnvironment({
+            platform: "win32",
+            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledShareTechMonoFontFile: BUNDLED_SHARE_TECH_MONO_FONT_FILE,
+            existingFontFiles: [
+                BUNDLED_INTER_FONT_FILE,
+                BUNDLED_SHARE_TECH_MONO_FONT_FILE,
+                "C:\\Windows\\Fonts\\seguisym.ttf",
+            ],
+        }),
+    );
+
+    assert.deepEqual(fontOptions.fontFiles, [
+        BUNDLED_SHARE_TECH_MONO_FONT_FILE,
         BUNDLED_INTER_FONT_FILE,
         "C:\\Windows\\Fonts\\seguisym.ttf",
     ]);
@@ -126,6 +160,41 @@ test("font options degrade safely when bundled Inter is missing on Windows", () 
     assert.equal(fontOptions.defaultFontFamily, "Inter");
     assert.deepEqual(fontOptions.fontFiles, [
         "C:\\Windows\\Fonts\\seguisym.ttf",
+    ]);
+});
+
+test("font options use bundled Inter as the Linux primary font for visual tests", () => {
+    const fontOptions = resolveResvgFontOptions(buildTextSvg("CPU"), buildEnvironment({
+        platform: "linux",
+        bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+        existingFontFiles: [
+            BUNDLED_INTER_FONT_FILE,
+        ],
+    }));
+
+    assert.equal(fontOptions.defaultFontFamily, "Inter");
+    assert.deepEqual(fontOptions.fontFiles, [
+        BUNDLED_INTER_FONT_FILE,
+    ]);
+});
+
+test("font options add old CRT fonts and bundled Inter on Linux", () => {
+    const fontOptions = resolveResvgFontOptions(
+        buildTextSvgWithFontFamily("CPU", "'Share Tech Mono','Inter'"),
+        buildEnvironment({
+            platform: "linux",
+            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledShareTechMonoFontFile: BUNDLED_SHARE_TECH_MONO_FONT_FILE,
+            existingFontFiles: [
+                BUNDLED_INTER_FONT_FILE,
+                BUNDLED_SHARE_TECH_MONO_FONT_FILE,
+            ],
+        }),
+    );
+
+    assert.deepEqual(fontOptions.fontFiles, [
+        BUNDLED_SHARE_TECH_MONO_FONT_FILE,
+        BUNDLED_INTER_FONT_FILE,
     ]);
 });
 
@@ -194,10 +263,19 @@ function buildTextSvg(text: string): string {
     ].join("");
 }
 
+function buildTextSvgWithFontFamily(text: string, fontFamily: string): string {
+    return [
+        '<svg xmlns="http://www.w3.org/2000/svg">',
+        `<text font-family="${fontFamily}">${text}</text>`,
+        "</svg>",
+    ].join("");
+}
+
 function buildEnvironment(options: {
     platform: NodeJS.Platform;
     existingFontFiles: readonly string[];
     bundledInterFontFile?: string;
+    bundledShareTechMonoFontFile?: string;
     onFileExists?: (fontFile: string) => void;
 }): ResvgFontResolverEnvironment {
     const existingFontFileSet = new Set(options.existingFontFiles);
@@ -205,6 +283,7 @@ function buildEnvironment(options: {
     return {
         platform: options.platform,
         bundledInterFontFile: options.bundledInterFontFile,
+        bundledShareTechMonoFontFile: options.bundledShareTechMonoFontFile,
         fileExists: (fontFile: string) => {
             options.onFileExists?.(fontFile);
             return existingFontFileSet.has(fontFile);

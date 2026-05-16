@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderSingleMetricBodyView } from "./single-metric-view";
 import type { MetricRenderAppearance } from "./render-appearance";
+import { DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS } from "./render-foreground-effects";
 import type { WidgetData } from "./widget-data";
 
 test("single metric view passes foreground paint tokens into linear widgets", () => {
@@ -88,6 +89,7 @@ function buildMetricRenderAppearance(): MetricRenderAppearance {
             labelFontFamily: "Test Label Font",
             valueFontFamily: "Test Value Font",
         },
+        foregroundEffects: DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
         lineSmoothingPercent: 75,
         gridLineVisibility: "adaptive",
         gridLineType: "horizontal",

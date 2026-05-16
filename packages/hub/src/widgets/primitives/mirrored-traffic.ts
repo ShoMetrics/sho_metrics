@@ -1,11 +1,25 @@
 import type { DualChannelWidgetData, KeySize } from "../../rendering/widget-data";
 import { buildGradientStops, type ColorConfig } from "../../rendering/color-resolver";
+import {
+    buildSvgFilterAttributes,
+    DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
+    type RenderForegroundEffectTokens,
+} from "../../rendering/render-foreground-effects";
+import {
+    DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
+    type RenderTypographyTokens,
+} from "../../rendering/render-typography";
+import { escapeSvgText } from "../../rendering/svg-utils";
 
 export interface MirroredTrafficConfig {
     positiveColorConfig: ColorConfig;
     negativeColorConfig: ColorConfig;
     lineWidth: number;
     fillOpacity: number;
+    labelTextColor: string;
+    dividerColor: string;
+    typography: RenderTypographyTokens;
+    foregroundEffects: RenderForegroundEffectTokens;
 }
 
 export const DEFAULT_MIRRORED_TRAFFIC_CONFIG: MirroredTrafficConfig = {
@@ -13,6 +27,10 @@ export const DEFAULT_MIRRORED_TRAFFIC_CONFIG: MirroredTrafficConfig = {
     negativeColorConfig: { mode: "solid", solidColor: "#ef4444", thresholds: [], isGradientEnabled: true },
     lineWidth: 2,
     fillOpacity: 0.2,
+    labelTextColor: "rgba(255,255,255,0.5)",
+    dividerColor: "rgba(255,255,255,0.15)",
+    typography: DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
+    foregroundEffects: DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
 };
 
 /**
@@ -67,26 +85,28 @@ export function renderMirroredTraffic(
                     ${gradientStops}
                 </linearGradient>
             </defs>` : ""}
-            <path d="${areaPath}" fill="${channelPaint}" opacity="${config.fillOpacity}" />
+            <path d="${areaPath}" fill="${channelPaint}" opacity="${config.fillOpacity}" ${buildSvgFilterAttributes(config.foregroundEffects.subtleFilter).join(" ")} />
             <polyline points="${polyline}" fill="none"
                 stroke="${channelPaint}" stroke-width="${config.lineWidth}"
-                stroke-linejoin="round" stroke-linecap="round" />
+                stroke-linejoin="round" stroke-linecap="round" ${buildSvgFilterAttributes(config.foregroundEffects.metricFilter).join(" ")} />
         `;
     };
 
     const positiveLabel = `${data.positive.current.toFixed(1)} ${data.positive.unit}`;
     const negativeLabel = `${data.negative.current.toFixed(1)} ${data.negative.unit}`;
+    const labelFilterAttributes = buildSvgFilterAttributes(config.foregroundEffects.labelFilter);
+    const subtleFilterAttributes = buildSvgFilterAttributes(config.foregroundEffects.subtleFilter);
 
     return `
         <!-- Mirrored Traffic: labels -->
-        <text x="10" y="14" font-family="'Inter',sans-serif" font-size="11" fill="rgba(255,255,255,0.5)">
-            ▼ ${positiveLabel}</text>
+        <text x="10" y="14" font-family="${escapeSvgText(config.typography.labelFontFamily)}" font-size="11" fill="${config.labelTextColor}" ${labelFilterAttributes.join(" ")}>
+            ▼ ${escapeSvgText(positiveLabel)}</text>
         <text x="${keySize.width - 10}" y="14" text-anchor="end"
-            font-family="'Inter',sans-serif" font-size="11" fill="rgba(255,255,255,0.5)">
-            ▲ ${negativeLabel}</text>
+            font-family="${escapeSvgText(config.typography.labelFontFamily)}" font-size="11" fill="${config.labelTextColor}" ${labelFilterAttributes.join(" ")}>
+            ▲ ${escapeSvgText(negativeLabel)}</text>
         <!-- Mirrored Traffic: center line -->
         <line x1="${padding.left}" y1="${centerY}" x2="${keySize.width - padding.right}" y2="${centerY}"
-            stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-dasharray="4,3" />
+            stroke="${config.dividerColor}" stroke-width="1" stroke-dasharray="4,3" ${subtleFilterAttributes.join(" ")} />
         <!-- Mirrored Traffic: positive (download/read) -->
         ${renderChannel(data.positive.history, config.positiveColorConfig, "up", "pos")}
         <!-- Mirrored Traffic: negative (upload/write) -->
