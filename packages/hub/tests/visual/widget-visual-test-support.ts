@@ -1,0 +1,339 @@
+import path from "node:path";
+import { Resvg } from "@resvg/resvg-js";
+import { renderDualMetricBodyView } from "../../src/rendering/dual-metric-view";
+import { renderMetricFrame } from "../../src/rendering/metric-frame";
+import { renderSingleMetricBodyView } from "../../src/rendering/single-metric-view";
+import type { ColorConfig } from "../../src/rendering/color-resolver";
+import type {
+    DualChannelWidgetData,
+    KeySize,
+    WidgetData,
+} from "../../src/rendering/widget-data";
+import { WIDGET_LOGICAL_SIZE } from "../../src/rendering/widget-data";
+import type { ResolvedAppearanceSettingsOverride } from "../../src/settings/appearance-overrides";
+import { buildDefaultAppearanceSettings } from "../../src/settings/default-appearance-settings";
+import { buildMetricRenderAppearance } from "../../src/settings/render-appearance-builder";
+import { getDiskIconFragment, getHardwareIconFragment } from "../../src/widgets/icons/hardware-icons";
+import {
+    getNetworkDirectionStatusIcon,
+    renderNetworkDirectionIconFragment,
+} from "../../src/widgets/icons/catalog/network";
+import type { ArcGaugeStatusIcon, ArcGaugeStyle } from "../../src/widgets/primitives/arc-gauge";
+import type { DualChannelArcGaugeCenterContent } from "../../src/widgets/primitives/dual-channel-arc-gauge";
+import type { DualChannelSparklineMode } from "../../src/widgets/primitives/dual-channel-sparkline";
+
+const INTER_FONT_FILE = path.resolve(process.cwd(), "assets", "fonts", "inter", "InterVariable.ttf");
+const NETWORK_DIRECTION_ICON_SIZE = 30;
+
+export const VISUAL_TEST_COLORS = {
+    colorFilledLeft: "#55ff7f",
+    colorFilledRight: "#55aaff",
+    colorFilledBottom: "#ff557f",
+    colorFilledSolidBackground: "#55aaff",
+    networkDownload: "#3b82f6",
+    networkUpload: "#ef4444",
+} as const;
+
+export const CPU_USAGE_WIDGET_DATA: WidgetData = {
+    current: 40,
+    progress: 0.4,
+    history: [12, 18, 28, 34, 40, 52, 48, 60, 55, 68, 62, 74, 70],
+    unit: "%",
+    label: "CPU",
+    displayValue: "40",
+    sampleTimestampMilliseconds: 1,
+};
+
+export const CPU_USAGE_NO_DATA_WIDGET_DATA: WidgetData = {
+    current: 0,
+    progress: 0,
+    history: [],
+    unit: "",
+    label: "CPU",
+    displayValue: "N/A",
+};
+
+export const CPU_USAGE_LINEAR_CHANNEL_WIDGET_DATA: WidgetData = {
+    ...CPU_USAGE_WIDGET_DATA,
+    linearLabel: "CPU Load",
+    linearDisplayValue: "40",
+    linearUnit: "%",
+};
+
+export const CPU_USAGE_TOUCH_STRIP_WIDGET_DATA: WidgetData = {
+    ...CPU_USAGE_LINEAR_CHANNEL_WIDGET_DATA,
+    history: [18, 22, 28, 38, 44, 42, 40, 46, 51, 48, 43, 40],
+};
+
+export const CPU_USAGE_SWINGING_HISTORY_WIDGET_DATA: WidgetData = {
+    current: 86,
+    progress: 0.86,
+    history: [12, 88, 18, 82, 22, 78, 16, 84, 24, 76, 20, 80, 14, 86],
+    unit: "%",
+    label: "CPU",
+    displayValue: "86",
+    sampleTimestampMilliseconds: 1,
+};
+
+export const NETWORK_DOWNLOAD_WIDGET_DATA: WidgetData = {
+    current: 87.4,
+    progress: 0.68,
+    history: [18, 22, 34, 48, 55, 68, 72, 64, 83, 77, 88, 81, 87],
+    unit: "MB/s",
+    label: "DOWN",
+    displayValue: "87.4",
+    sampleTimestampMilliseconds: 1,
+};
+
+export const NETWORK_UPLOAD_WIDGET_DATA: WidgetData = {
+    current: 16.2,
+    progress: 0.34,
+    history: [4, 6, 9, 14, 12, 16, 18, 15, 21, 19, 17, 15, 16],
+    unit: "MB/s",
+    label: "UP",
+    displayValue: "16.2",
+    sampleTimestampMilliseconds: 1,
+};
+
+export const NETWORK_NO_DATA_WIDGET_DATA: DualChannelWidgetData = {
+    positive: {
+        ...NETWORK_DOWNLOAD_WIDGET_DATA,
+        current: 0,
+        progress: 0,
+        history: [],
+        displayValue: "N/A",
+        unit: "",
+        sampleTimestampMilliseconds: undefined,
+    },
+    negative: {
+        ...NETWORK_UPLOAD_WIDGET_DATA,
+        current: 0,
+        progress: 0,
+        history: [],
+        displayValue: "N/A",
+        unit: "",
+        sampleTimestampMilliseconds: undefined,
+    },
+};
+
+export const NETWORK_DUAL_CHANNEL_WIDGET_DATA: DualChannelWidgetData = {
+    positive: NETWORK_DOWNLOAD_WIDGET_DATA,
+    negative: NETWORK_UPLOAD_WIDGET_DATA,
+};
+
+export const CPU_CENTER_ICON_FRAGMENT = getHardwareIconFragment("cpu");
+export const NETWORK_CENTER_ICON_FRAGMENT = getDiskIconFragment("network");
+export const NETWORK_DOWNLOAD_ICON_FRAGMENT = renderNetworkDirectionIconFragment({
+    direction: "download",
+    color: VISUAL_TEST_COLORS.networkDownload,
+    size: NETWORK_DIRECTION_ICON_SIZE,
+});
+export const NETWORK_UPLOAD_ICON_FRAGMENT = renderNetworkDirectionIconFragment({
+    direction: "upload",
+    color: VISUAL_TEST_COLORS.networkUpload,
+    size: NETWORK_DIRECTION_ICON_SIZE,
+});
+export const NETWORK_DOWNLOAD_STATUS_ICON = getNetworkDirectionStatusIcon({
+    direction: "download",
+    color: VISUAL_TEST_COLORS.networkDownload,
+});
+export const NETWORK_UPLOAD_STATUS_ICON = getNetworkDirectionStatusIcon({
+    direction: "upload",
+    color: VISUAL_TEST_COLORS.networkUpload,
+});
+
+export interface SingleMetricVisualTestCase {
+    readonly snapshotName: string;
+    readonly appearance: ResolvedAppearanceSettingsOverride;
+    readonly data: WidgetData;
+    readonly keySize?: KeySize;
+    readonly centerIcon?: string;
+    readonly footerIcon?: string;
+    readonly linearIcon?: string;
+    readonly statusIcon?: ArcGaugeStatusIcon;
+    readonly muted?: boolean;
+}
+
+export interface DualMetricVisualTestCase {
+    readonly snapshotName: string;
+    readonly appearance: ResolvedAppearanceSettingsOverride;
+    readonly data: DualChannelWidgetData;
+    readonly graphicType: "circular" | "text" | "sparkline";
+    readonly chartMode?: DualChannelSparklineMode;
+    readonly centerContent?: DualChannelArcGaugeCenterContent;
+    readonly circleStyle?: ArcGaugeStyle;
+    readonly muted?: boolean;
+}
+
+export function buildDefaultAppearanceOverride(options: {
+    graphicType: "circular" | "text" | "linear" | "sparkline";
+    circleStyle?: ArcGaugeStyle;
+    colorMode?: "multi-color" | "solid" | "black-white";
+    isGradientEnabled?: boolean;
+    gridLineType?: "horizontal" | "vertical" | "both";
+    gridLineVisibility?: "adaptive" | "always" | "none";
+    lineSmoothingPercent?: number;
+}): ResolvedAppearanceSettingsOverride {
+    const sparkline: NonNullable<ResolvedAppearanceSettingsOverride["sparkline"]> = {};
+
+    if (options.gridLineType !== undefined) {
+        sparkline.gridLineType = options.gridLineType;
+    }
+
+    if (options.gridLineVisibility !== undefined) {
+        sparkline.gridLineVisibility = options.gridLineVisibility;
+    }
+
+    if (options.lineSmoothingPercent !== undefined) {
+        sparkline.lineSmoothingPercent = options.lineSmoothingPercent;
+    }
+
+    return {
+        graph: {
+            viewLayout: options.graphicType,
+            circleStyle: options.circleStyle ?? "value",
+        },
+        theme: {
+            selectedTheme: "flat",
+        },
+        paint: {
+            metric: {
+                colorMode: options.colorMode ?? "multi-color",
+                solid: {
+                    isGradientEnabled: options.isGradientEnabled ?? true,
+                },
+            },
+        },
+        sparkline,
+    };
+}
+
+export function buildColorFilledAppearanceOverride(options: {
+    graphicType: "circular" | "text" | "linear" | "sparkline";
+    colorMode: "multi-color" | "solid" | "black-white";
+    circleStyle?: ArcGaugeStyle;
+    isGradientEnabled: boolean;
+}): ResolvedAppearanceSettingsOverride {
+    const colorFilledPaint = options.colorMode === "solid"
+        ? {
+            colorMode: "solid" as const,
+            solid: {
+                color: VISUAL_TEST_COLORS.colorFilledSolidBackground,
+                isGradientEnabled: options.isGradientEnabled,
+            },
+        }
+        : options.colorMode === "black-white"
+            ? {
+                colorMode: "black-white" as const,
+            }
+            : {
+                colorMode: "multi-color" as const,
+                multiColor: {
+                    colors: {
+                        lowColor: VISUAL_TEST_COLORS.colorFilledLeft,
+                        mediumColor: VISUAL_TEST_COLORS.colorFilledRight,
+                        highColor: VISUAL_TEST_COLORS.colorFilledBottom,
+                    },
+                    isGradientEnabled: options.isGradientEnabled,
+                },
+            };
+
+    return {
+        graph: {
+            viewLayout: options.graphicType,
+            circleStyle: options.circleStyle ?? "value",
+        },
+        theme: {
+            selectedTheme: "color-filled",
+        },
+        paint: {
+            colorFilled: colorFilledPaint,
+        },
+    };
+}
+
+export function renderSingleMetricWidgetPngBuffer(testCase: SingleMetricVisualTestCase): Buffer {
+    const keySize = testCase.keySize ?? WIDGET_LOGICAL_SIZE;
+    const visualSettings = buildMetricRenderAppearance(buildDefaultAppearanceSettings(testCase.appearance));
+    const body = renderSingleMetricBodyView({
+        data: testCase.data,
+        visual: visualSettings,
+        renderSize: keySize,
+        centerIcon: testCase.centerIcon ?? "",
+        footerIcon: testCase.footerIcon,
+        linearIcon: testCase.linearIcon,
+        statusIcon: testCase.statusIcon,
+        circleStyle: visualSettings.circleStyle,
+    });
+
+    return renderSvgToPngBuffer(renderMetricFrame({
+        body,
+        graphicStyle: visualSettings.graphicStyle,
+        muted: testCase.muted ?? false,
+        paints: visualSettings.paints,
+        size: keySize,
+    }), keySize);
+}
+
+export function renderDualMetricWidgetPngBuffer(testCase: DualMetricVisualTestCase): Buffer {
+    const visualSettings = buildMetricRenderAppearance(buildDefaultAppearanceSettings(testCase.appearance));
+    const positiveColorConfig = buildSolidColorConfig(VISUAL_TEST_COLORS.networkDownload);
+    const negativeColorConfig = buildSolidColorConfig(VISUAL_TEST_COLORS.networkUpload);
+    const body = renderDualMetricBodyView({
+        data: testCase.data,
+        visual: visualSettings,
+        graphicType: testCase.graphicType,
+        renderSize: WIDGET_LOGICAL_SIZE,
+        titleText: "NETWORK",
+        chartMode: testCase.chartMode ?? "overlay",
+        centerContent: testCase.centerContent ?? "value",
+        circleStyle: testCase.circleStyle ?? visualSettings.circleStyle,
+        topIcon: NETWORK_CENTER_ICON_FRAGMENT,
+        positive: {
+            color: VISUAL_TEST_COLORS.networkDownload,
+            colorConfig: positiveColorConfig,
+            icon: NETWORK_DOWNLOAD_ICON_FRAGMENT,
+            statusIcon: NETWORK_DOWNLOAD_STATUS_ICON,
+        },
+        negative: {
+            color: VISUAL_TEST_COLORS.networkUpload,
+            colorConfig: negativeColorConfig,
+            icon: NETWORK_UPLOAD_ICON_FRAGMENT,
+            statusIcon: NETWORK_UPLOAD_STATUS_ICON,
+        },
+    });
+
+    return renderSvgToPngBuffer(renderMetricFrame({
+        body,
+        graphicStyle: visualSettings.graphicStyle,
+        muted: testCase.muted ?? false,
+        paints: visualSettings.paints,
+        size: WIDGET_LOGICAL_SIZE,
+    }), WIDGET_LOGICAL_SIZE);
+}
+
+export function renderSvgToPngBuffer(svg: string, keySize: KeySize): Buffer {
+    const renderedImage = new Resvg(svg, {
+        fitTo: {
+            mode: "width",
+            value: keySize.width,
+        },
+        font: {
+            loadSystemFonts: false,
+            fontFiles: [INTER_FONT_FILE],
+            defaultFontFamily: "Inter",
+            sansSerifFamily: "Inter",
+        },
+    }).render();
+
+    return Buffer.from(renderedImage.asPng());
+}
+
+function buildSolidColorConfig(color: string): ColorConfig {
+    return {
+        mode: "solid",
+        solidColor: color,
+        thresholds: [],
+        isGradientEnabled: true,
+    };
+}
