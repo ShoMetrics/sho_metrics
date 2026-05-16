@@ -1,11 +1,19 @@
+import {
+    NODE_SYSTEM_SOURCE_ID,
+    WINDOWS_HELPER_SOURCE_ID,
+} from "./source-ids";
+
 /** Source scope used for telemetry collected from the current machine. */
 export const LOCAL_SOURCE_SCOPE_ID = "local";
 
-/** Source id for the built-in Node/systeminformation fallback source. */
-export const NODE_SYSTEM_SOURCE_ID = "node-system";
-
 /** How a read plan handles missing values after source candidates are tried. */
 export type MetricReadPlanFailureMode = "fallback" | "empty";
+
+/** Options for building the default local read plan. */
+export interface LocalMetricReadPlanOptions {
+    /** Platform used to choose local helper candidates. */
+    readonly platform?: NodeJS.Platform;
+}
 
 /** One source candidate in priority order for a metric read plan. */
 export interface SourceCandidate {
@@ -28,12 +36,15 @@ export interface MetricReadPlan {
     readonly failureMode: MetricReadPlanFailureMode;
 }
 
-/** Builds the default local read plan backed by the built-in Node source. */
-export function buildLocalMetricReadPlan(metricKeys: readonly string[]): MetricReadPlan {
+/** Builds the default local read plan for the current machine. */
+export function buildLocalMetricReadPlan(
+    metricKeys: readonly string[],
+    options: LocalMetricReadPlanOptions = {},
+): MetricReadPlan {
     return normalizeMetricReadPlan({
         sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
         metricKeys,
-        sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
+        sourceCandidates: resolveLocalSourceCandidates(options.platform ?? process.platform),
         failureMode: "fallback",
     });
 }
@@ -78,4 +89,15 @@ function normalizeSourceCandidates(sourceCandidates: readonly SourceCandidate[])
     }
 
     return normalizedSourceCandidates;
+}
+
+function resolveLocalSourceCandidates(platform: NodeJS.Platform): readonly SourceCandidate[] {
+    if (platform !== "win32") {
+        return [{ sourceId: NODE_SYSTEM_SOURCE_ID }];
+    }
+
+    return [
+        { sourceId: WINDOWS_HELPER_SOURCE_ID },
+        { sourceId: NODE_SYSTEM_SOURCE_ID },
+    ];
 }

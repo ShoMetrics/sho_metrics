@@ -19,14 +19,15 @@ import {
 import {
     decodeSourceIpcFrame,
     encodeSourceIpcFrame,
+    HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
     MAXIMUM_SOURCE_IPC_FRAME_BYTES,
     SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION,
     UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS,
-    WINDOWS_HELPER_SOURCE_ID,
     WindowsHelperSourceClient,
     type WindowsHelperPipeTransport,
     type WindowsHelperSourceClientOptions,
 } from "./windows-helper-source-client";
+import { WINDOWS_HELPER_SOURCE_ID } from "./source-ids";
 
 test("source IPC frame codec round-trips payload bytes", () => {
     const payload = new Uint8Array([1, 2, 3]);
@@ -148,6 +149,35 @@ test("windows helper source client cools down unsupported protocol retries", asy
     assert.equal(transport.requests.length, 2);
 });
 
+test("windows helper source client cools down unavailable helper retries", async () => {
+    let nowMilliseconds = 1000;
+    const transport = new RejectingTransport(new Error("pipe unavailable"));
+    const client = new WindowsHelperSourceClient({
+        transport,
+        now: () => nowMilliseconds,
+        requestIdFactory: createRequestIdFactory(),
+    });
+
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /pipe unavailable/u,
+    );
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /still inside retry cooldown/u,
+    );
+
+    assert.equal(transport.requestCount, 1);
+
+    nowMilliseconds += HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
+
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /pipe unavailable/u,
+    );
+    assert.equal(transport.requestCount, 2);
+});
+
 test("windows helper source client rejects source error responses", async () => {
     const transport = new FakeWindowsHelperPipeTransport(request => create(SourceIpcResponseSchema, {
         requestId: request.requestId,
@@ -205,6 +235,17 @@ class NeverResolvingTransport implements WindowsHelperPipeTransport {
 
     reject(error: Error): void {
         this.rejectRequest?.(error);
+    }
+}
+
+class RejectingTransport implements WindowsHelperPipeTransport {
+    requestCount = 0;
+
+    constructor(private readonly error: Error) {}
+
+    async send(): Promise<Uint8Array> {
+        this.requestCount += 1;
+        throw this.error;
     }
 }
 

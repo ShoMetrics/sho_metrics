@@ -1,5 +1,12 @@
 import { NodeSystemSource } from "./node-system-source";
 import { createMetricSourceClient, type SourceClient } from "./source-client";
+import { WindowsHelperSourceClient } from "./windows-helper-source-client";
+
+/** Options for default source registry creation. */
+export interface DefaultSourceRegistryOptions {
+    /** Platform used to choose local helper sources. */
+    readonly platform?: NodeJS.Platform;
+}
 
 /** Lookup boundary for runtime telemetry sources. */
 export interface SourceRegistry {
@@ -36,8 +43,15 @@ export class DefaultSourceRegistry implements SourceRegistry {
 }
 
 /** Creates the default local source registry for the Stream Deck plugin process. */
-export function createDefaultSourceRegistry(): SourceRegistry {
-    return new DefaultSourceRegistry([
-        createMetricSourceClient(new NodeSystemSource()),
-    ]);
+export function createDefaultSourceRegistry(options: DefaultSourceRegistryOptions = {}): SourceRegistry {
+    const platform = options.platform ?? process.platform;
+    const sourceClients: SourceClient[] = [];
+
+    if (platform === "win32") {
+        sourceClients.push(new WindowsHelperSourceClient());
+    }
+
+    sourceClients.push(createMetricSourceClient(new NodeSystemSource({ platform })));
+
+    return new DefaultSourceRegistry(sourceClients);
 }

@@ -6,18 +6,40 @@ import {
     normalizeMetricReadPlan,
     type MetricReadPlan,
 } from "./metric-read-plan";
+import {
+    NODE_SYSTEM_SOURCE_ID,
+    WINDOWS_HELPER_SOURCE_ID,
+} from "./source-ids";
 
-test("buildLocalMetricReadPlan creates a normalized fallback plan for the node system source", () => {
+test("buildLocalMetricReadPlan prefers the Windows helper before the node system source on Windows", () => {
     const readPlan = buildLocalMetricReadPlan([
         "net.down",
         "cpu.usage_percent",
         "net.down",
-    ]);
+    ], { platform: "win32" });
 
     assert.deepEqual(readPlan, {
         sourceScopeId: "local",
         metricKeys: ["cpu.usage_percent", "net.down"],
-        sourceCandidates: [{ sourceId: "node-system" }],
+        sourceCandidates: [
+            { sourceId: WINDOWS_HELPER_SOURCE_ID },
+            { sourceId: NODE_SYSTEM_SOURCE_ID },
+        ],
+        failureMode: "fallback",
+    });
+});
+
+test("buildLocalMetricReadPlan uses only the node system source outside Windows", () => {
+    const readPlan = buildLocalMetricReadPlan([
+        "net.down",
+        "cpu.usage_percent",
+        "net.down",
+    ], { platform: "darwin" });
+
+    assert.deepEqual(readPlan, {
+        sourceScopeId: "local",
+        metricKeys: ["cpu.usage_percent", "net.down"],
+        sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
         failureMode: "fallback",
     });
 });
@@ -31,9 +53,9 @@ test("normalizeMetricReadPlan sorts unique metric keys and preserves source cand
             "gpu.temperature",
         ],
         sourceCandidates: [
-            { sourceId: "windows-helper" },
-            { sourceId: "node-system" },
-            { sourceId: "windows-helper" },
+            { sourceId: WINDOWS_HELPER_SOURCE_ID },
+            { sourceId: NODE_SYSTEM_SOURCE_ID },
+            { sourceId: WINDOWS_HELPER_SOURCE_ID },
         ],
         failureMode: "fallback",
     });
@@ -42,8 +64,8 @@ test("normalizeMetricReadPlan sorts unique metric keys and preserves source cand
         sourceScopeId: "local",
         metricKeys: ["cpu.usage_percent", "gpu.temperature"],
         sourceCandidates: [
-            { sourceId: "windows-helper" },
-            { sourceId: "node-system" },
+            { sourceId: WINDOWS_HELPER_SOURCE_ID },
+            { sourceId: NODE_SYSTEM_SOURCE_ID },
         ],
         failureMode: "fallback",
     });
@@ -54,8 +76,8 @@ test("buildMetricReadPlanKey is stable for equivalent normalized plans", () => {
         sourceScopeId: "local",
         metricKeys: ["net.up", "cpu.usage_percent", "net.up"],
         sourceCandidates: [
-            { sourceId: "windows-helper" },
-            { sourceId: "node-system" },
+            { sourceId: WINDOWS_HELPER_SOURCE_ID },
+            { sourceId: NODE_SYSTEM_SOURCE_ID },
         ],
         failureMode: "fallback",
     };
@@ -63,8 +85,8 @@ test("buildMetricReadPlanKey is stable for equivalent normalized plans", () => {
         sourceScopeId: "local",
         metricKeys: ["cpu.usage_percent", "net.up"],
         sourceCandidates: [
-            { sourceId: "windows-helper" },
-            { sourceId: "node-system" },
+            { sourceId: WINDOWS_HELPER_SOURCE_ID },
+            { sourceId: NODE_SYSTEM_SOURCE_ID },
         ],
         failureMode: "fallback",
     };
@@ -77,8 +99,8 @@ test("buildMetricReadPlanKey preserves source candidate priority", () => {
         sourceScopeId: "local",
         metricKeys: ["cpu.usage_percent"],
         sourceCandidates: [
-            { sourceId: "windows-helper" },
-            { sourceId: "node-system" },
+            { sourceId: WINDOWS_HELPER_SOURCE_ID },
+            { sourceId: NODE_SYSTEM_SOURCE_ID },
         ],
         failureMode: "fallback",
     };
@@ -86,8 +108,8 @@ test("buildMetricReadPlanKey preserves source candidate priority", () => {
         sourceScopeId: "local",
         metricKeys: ["cpu.usage_percent"],
         sourceCandidates: [
-            { sourceId: "node-system" },
-            { sourceId: "windows-helper" },
+            { sourceId: NODE_SYSTEM_SOURCE_ID },
+            { sourceId: WINDOWS_HELPER_SOURCE_ID },
         ],
         failureMode: "fallback",
     };
