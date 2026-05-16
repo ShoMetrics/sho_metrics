@@ -1,6 +1,10 @@
 import type { DualChannelWidgetData, KeySize, WidgetData } from "../../rendering/widget-data";
 import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
+    DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
+    type RenderTypographyTokens,
+} from "../../rendering/render-typography";
+import {
     renderConstrainedSvgText,
 } from "../../rendering/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget.interface";
@@ -11,6 +15,7 @@ export interface TextMetricConfig extends WidgetBaseConfig {
     valueTextColor: string;
     unitTextColor: string;
     secondaryTextColor: string;
+    typography: RenderTypographyTokens;
     positiveColor?: string;
     negativeColor?: string;
 }
@@ -21,6 +26,7 @@ export const DEFAULT_TEXT_METRIC_CONFIG: TextMetricConfig = {
     valueTextColor: "white",
     unitTextColor: "rgba(255,255,255,0.74)",
     secondaryTextColor: "rgba(255,255,255,0.52)",
+    typography: DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
 };
 
 const TEXT_LAYOUT = {
@@ -39,8 +45,6 @@ const TEXT_LAYOUT = {
     dualLowerYRatio: 0.68,
 } as const;
 
-const TEXT_FONT_FAMILY = "'Inter','SF Pro Display','Segoe UI',sans-serif";
-
 export const textMetric: Widget<TextMetricConfig> = {
     widgetId: "text-metric",
 
@@ -58,7 +62,7 @@ export const textMetric: Widget<TextMetricConfig> = {
                 yCoordinate: keySize.height * TEXT_LAYOUT.labelYRatio,
                 maxWidth: textWidth,
                 fontSize: TEXT_LAYOUT.labelFontSize,
-                fontFamily: TEXT_FONT_FAMILY,
+                fontFamily: config.typography.labelFontFamily,
                 fontWeight: 800,
                 fill: config.labelTextColor,
                 textAnchor: "middle",
@@ -72,7 +76,7 @@ export const textMetric: Widget<TextMetricConfig> = {
                 width: textWidth,
                 valueFontSize: TEXT_LAYOUT.valueFontSize,
                 unitFontSize: TEXT_LAYOUT.unitFontSize,
-                fontFamily: TEXT_FONT_FAMILY,
+                fontFamily: config.typography.valueFontFamily,
                 valueFontWeight: 900,
                 unitFontWeight: 800,
                 valueFill: valueTextColor,
@@ -136,7 +140,7 @@ function renderSecondaryText(
         yCoordinate: keySize.height * TEXT_LAYOUT.secondaryYRatio,
         maxWidth: textWidth,
         fontSize: TEXT_LAYOUT.secondaryFontSize,
-        fontFamily: TEXT_FONT_FAMILY,
+        fontFamily: config.typography.labelFontFamily,
         fontWeight: 720,
         fill: config.secondaryTextColor,
         textAnchor: "middle",
@@ -164,7 +168,7 @@ function renderDualTextRow(options: {
             yCoordinate: labelYCoordinate,
             maxWidth: options.textWidth,
             fontSize: TEXT_LAYOUT.dualLabelFontSize,
-            fontFamily: TEXT_FONT_FAMILY,
+            fontFamily: options.config.typography.labelFontFamily,
             fontWeight: 800,
             fill: options.config.labelTextColor,
             textAnchor: "middle",
@@ -178,7 +182,7 @@ function renderDualTextRow(options: {
             width: options.textWidth,
             valueFontSize: TEXT_LAYOUT.dualValueFontSize,
             unitFontSize: TEXT_LAYOUT.dualUnitFontSize,
-            fontFamily: TEXT_FONT_FAMILY,
+            fontFamily: options.config.typography.valueFontFamily,
             valueFontWeight: 900,
             unitFontWeight: 800,
             valueFill: options.valueFill,

@@ -1,5 +1,9 @@
 import type { DualChannelWidgetData, KeySize, SparklineScale } from "../../rendering/widget-data";
 import { adjustHexColorBrightness, clamp, renderConstrainedSvgText } from "../../rendering/svg-utils";
+import {
+    DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
+    type RenderTypographyTokens,
+} from "../../rendering/render-typography";
 import type { WidgetBaseConfig } from "../widget.interface";
 import { renderMetricTextRow } from "./metric-text-row";
 import {
@@ -31,6 +35,7 @@ export interface DualChannelSparklineConfig extends WidgetBaseConfig {
     historyWindowSeconds: number;
     sparklineScale?: SparklineScale;
     paints: DualChannelSparklinePaints;
+    typography: RenderTypographyTokens;
 }
 
 // Dual-channel sparklines draw directly on the theme background, so they intentionally omit surface/divider paints.
@@ -67,9 +72,9 @@ export const DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG: DualChannelSparklineConfig =
         grid: "rgba(255,255,255,1)",
         baseline: "rgba(255,255,255,0.24)",
     },
+    typography: DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
 };
 
-const DUAL_SPARKLINE_FONT_FAMILY = "'Inter','SF Pro Display','Segoe UI',sans-serif";
 const CHART_PLOT_TOP_INSET = 2;
 
 interface DualSparklineLayoutPlan {
@@ -176,6 +181,7 @@ export function renderDualChannelSparkline(
             iconGap: layoutPlan.titleIconGap,
             textColor: config.paints.secondaryText,
             iconColor: config.paints.icon,
+            typography: config.typography,
         })}
         ${renderChannelRow({
             layout: resolveRowLayout(layoutPlan, chartLayout, config.chartMode, "positive"),
@@ -187,6 +193,7 @@ export function renderDualChannelSparkline(
             showIcon: config.chartMode !== "mirrored",
             valueTextColor: config.paints.primaryText,
             unitTextColor: config.paints.supportingText,
+            typography: config.typography,
         })}
         ${renderChannelRow({
             layout: resolveRowLayout(layoutPlan, chartLayout, config.chartMode, "negative"),
@@ -198,6 +205,7 @@ export function renderDualChannelSparkline(
             showIcon: config.chartMode !== "mirrored",
             valueTextColor: config.paints.primaryText,
             unitTextColor: config.paints.supportingText,
+            typography: config.typography,
         })}
         ${gridLineSvg}
         ${config.chartMode === "mirrored" ? renderMirroredBaseline(plotLayout, config.paints.baseline) : ""}
@@ -422,6 +430,7 @@ function renderTitle(options: {
     iconGap: number;
     textColor: string;
     iconColor: string;
+    typography: RenderTypographyTokens;
 }): string {
     const titleXCoordinate = options.iconFragment
         ? options.layout.xCoordinate + options.iconGap
@@ -440,7 +449,7 @@ function renderTitle(options: {
             yCoordinate: options.layout.yCoordinate,
             maxWidth: titleMaxWidth,
             fontSize: options.layout.fontSize,
-            fontFamily: DUAL_SPARKLINE_FONT_FAMILY,
+            fontFamily: options.typography.labelFontFamily,
             fontWeight: 850,
             fill: options.textColor,
         })}
@@ -489,6 +498,7 @@ function renderChannelRow(options: {
     showIcon: boolean;
     valueTextColor: string;
     unitTextColor: string;
+    typography: RenderTypographyTokens;
 }): string {
     const iconSvg = !options.showIcon
         ? ""
@@ -507,7 +517,7 @@ function renderChannelRow(options: {
             width: options.layout.valueWidth,
             valueFontSize: options.layout.valueFontSize,
             unitFontSize: options.layout.unitFontSize,
-            fontFamily: DUAL_SPARKLINE_FONT_FAMILY,
+            fontFamily: options.typography.valueFontFamily,
             valueFontWeight: 900,
             unitFontWeight: 780,
             valueFill: options.valueTextColor,

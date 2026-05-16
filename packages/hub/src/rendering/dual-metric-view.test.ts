@@ -59,6 +59,10 @@ function buildMetricRenderAppearance(): MetricRenderAppearance {
             grid: "rgba(255,255,255,0.18)",
             divider: "rgba(255,255,255,0.18)",
         },
+        typography: {
+            labelFontFamily: "Test Label Font",
+            valueFontFamily: "Test Value Font",
+        },
         lineSmoothingPercent: 75,
         gridLineVisibility: "adaptive",
         gridLineType: "horizontal",

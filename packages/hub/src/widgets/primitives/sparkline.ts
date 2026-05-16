@@ -1,6 +1,10 @@
 import type { WidgetData, KeySize, SparklineScale } from "../../rendering/widget-data";
 import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
+    DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
+    type RenderTypographyTokens,
+} from "../../rendering/render-typography";
+import {
     adjustHexColorBrightness,
     clamp,
     renderConstrainedSvgText,
@@ -29,6 +33,7 @@ export interface SparklineConfig extends WidgetBaseConfig {
     showDots: boolean;
     dashPattern: string;
     paints: SparklinePaints;
+    typography: RenderTypographyTokens;
     topIconFragment?: string;
 }
 
@@ -70,10 +75,10 @@ export const DEFAULT_SPARKLINE_CONFIG: SparklineConfig = {
         grid: "rgba(255,255,255,1)",
         baseline: "rgba(255,255,255,0.30)",
     },
+    typography: DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
     gradientHeadAdjustmentPercent: 28,
 };
 
-const SPARKLINE_TEXT_FONT_FAMILY = "'Inter','SF Pro Display','Segoe UI',sans-serif";
 const MINIMUM_VISIBLE_RANGE = 1;
 const MINIMUM_AREA_PROGRESS = 0.09;
 const ADAPTIVE_SCALE_HEADROOM_RATIO = 1.18;
@@ -158,6 +163,7 @@ export const sparkline: Widget<SparklineConfig> = {
             timeGuideTickCount: config.timeGuideTickCount,
             historyWindowSeconds: config.historyWindowSeconds,
             paints: config.paints,
+            typography: config.typography,
         });
         const latestPoint = points[points.length - 1];
         const latestPointGlowSvg = config.gridLineVisibility !== "none" && config.gridLineType === "vertical" && latestPoint
@@ -200,6 +206,7 @@ export const sparkline: Widget<SparklineConfig> = {
                 iconGap: layoutPlan.iconGap,
                 textColor: config.paints.secondaryText,
                 iconColor: config.paints.icon,
+                typography: config.typography,
             })}
             ${renderMetricTextRow({
                 id: "sparkline-current-value",
@@ -210,7 +217,7 @@ export const sparkline: Widget<SparklineConfig> = {
                 width: layoutPlan.value.maxWidth,
                 valueFontSize: layoutPlan.value.fontSize,
                 unitFontSize: layoutPlan.value.unitFontSize,
-                fontFamily: SPARKLINE_TEXT_FONT_FAMILY,
+                fontFamily: config.typography.valueFontFamily,
                 valueFontWeight: 900,
                 unitFontWeight: 780,
                 valueFill: config.paints.primaryText,
@@ -300,6 +307,7 @@ function renderTitle(options: {
     iconGap: number;
     textColor: string;
     iconColor: string;
+    typography: RenderTypographyTokens;
 }): string {
     const titleXCoordinate = options.iconFragment
         ? options.layout.xCoordinate + options.iconGap
@@ -318,7 +326,7 @@ function renderTitle(options: {
             yCoordinate: options.layout.yCoordinate,
             maxWidth: titleMaxWidth,
             fontSize: options.layout.fontSize,
-            fontFamily: SPARKLINE_TEXT_FONT_FAMILY,
+            fontFamily: options.typography.labelFontFamily,
             fontWeight: 850,
             fill: options.textColor,
         })}
@@ -435,6 +443,7 @@ function renderGridLines(options: {
     timeGuideTickCount: number;
     historyWindowSeconds: number;
     paints: SparklinePaints;
+    typography: RenderTypographyTokens;
 }): string {
     if (options.gridLineVisibility === "none") {
         return "";
@@ -459,6 +468,7 @@ function renderGridLines(options: {
             historyWindowSeconds: options.historyWindowSeconds,
             opacity: gridLineMetrics.opacity,
             paints: options.paints,
+            typography: options.typography,
         });
     }
 
@@ -500,6 +510,7 @@ function renderVerticalGridLines(options: {
     historyWindowSeconds: number;
     opacity: number;
     paints: SparklinePaints;
+    typography: RenderTypographyTokens;
 }): string {
     const safeTickCount = Math.max(2, Math.round(options.timeGuideTickCount));
     const baselineYCoordinate = options.plotLayout.yCoordinate + options.plotLayout.height;
@@ -524,7 +535,7 @@ function renderVerticalGridLines(options: {
                 yCoordinate: baselineYCoordinate + CHART_LABEL_BAND_HEIGHT - 2,
                 maxWidth: 24,
                 fontSize: 10,
-                fontFamily: SPARKLINE_TEXT_FONT_FAMILY,
+                fontFamily: options.typography.labelFontFamily,
                 fontWeight: 750,
                 fill: options.paints.mutedText,
                 textAnchor: "middle",

@@ -1,6 +1,10 @@
 import type { WidgetData, KeySize } from "../../rendering/widget-data";
 import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
+    DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
+    type RenderTypographyTokens,
+} from "../../rendering/render-typography";
+import {
     clamp,
     renderConstrainedSvgText,
     type SvgTextAnchor,
@@ -41,6 +45,7 @@ export interface ArcGaugeConfig extends WidgetBaseConfig {
     valueTextColor: string;
     unitTextColor: string;
     iconColor: string;
+    typography: RenderTypographyTokens;
     innerTextScale: number;
     circleStyle: ArcGaugeStyle;
     gaugeRangeBlendProgress: number;
@@ -61,6 +66,7 @@ export const DEFAULT_ARC_GAUGE_CONFIG: ArcGaugeConfig = {
     valueTextColor: "white",
     unitTextColor: "rgba(255,255,255,0.74)",
     iconColor: "rgba(255,255,255,0.88)",
+    typography: DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
     gradientHeadAdjustmentPercent: -42,
     innerTextScale: 1,
     circleStyle: "value",
@@ -127,7 +133,6 @@ const ARC_LAYOUT = {
     },
 } as const;
 
-const ARC_TEXT_FONT_FAMILY = "'Inter','SF Pro Display','Segoe UI',sans-serif";
 const GAUGE_INLINE_ICON_ASSUMED_SIZE = 30;
 
 interface StatusNotchGeometry {
@@ -519,7 +524,7 @@ function renderGaugeValueRow(options: {
             yCoordinate,
             maxWidth: options.centerTextMaxWidth,
             fontSize: options.valueFontSize,
-            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontFamily: options.config.typography.valueFontFamily,
             fontWeight: 900,
             fill: options.config.valueTextColor,
             textAnchor: "middle",
@@ -549,7 +554,7 @@ function renderGaugeValueRow(options: {
             yCoordinate,
             maxWidth: valuePlacement.maxWidth,
             fontSize: valuePlacement.fontSize,
-            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontFamily: options.config.typography.valueFontFamily,
             fontWeight: 900,
             fill: options.config.valueTextColor,
             textAnchor: valuePlacement.textAnchor,
@@ -562,7 +567,7 @@ function renderGaugeValueRow(options: {
             yCoordinate,
             maxWidth: isShortUnit ? layout.shortUnitMaxWidth : layout.longUnitMaxWidth,
             fontSize: unitFontSize,
-            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontFamily: options.config.typography.valueFontFamily,
             fontWeight: 800,
             fill: options.config.unitTextColor,
             textAnchor: "start",
@@ -679,7 +684,7 @@ function renderGaugeBottomLabel(options: {
             yCoordinate: options.yCoordinate,
             maxWidth: Math.max(12, options.maxWidth - iconSize - iconGap),
             fontSize,
-            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontFamily: options.config.typography.labelFontFamily,
             fontWeight: 850,
             fill: options.config.labelTextColor,
             textAnchor: "middle",
@@ -719,7 +724,7 @@ function renderCenterValue(options: {
             yCoordinate: options.labelYCoordinate,
             maxWidth: options.labelMaxWidth,
             fontSize: options.labelFontSize,
-            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontFamily: options.config.typography.labelFontFamily,
             fontWeight: 800,
             fill: options.config.labelTextColor,
             textAnchor: "middle",
@@ -733,7 +738,7 @@ function renderCenterValue(options: {
             width: options.centerTextMaxWidth,
             valueFontSize: options.valueFontSize,
             unitFontSize: options.unitFontSize,
-            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontFamily: options.config.typography.valueFontFamily,
             valueFontWeight: 900,
             unitFontWeight: 800,
             valueFill: options.config.valueTextColor,

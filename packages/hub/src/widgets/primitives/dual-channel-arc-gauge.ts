@@ -1,6 +1,10 @@
 import type { DualChannelWidgetData, KeySize } from "../../rendering/widget-data";
 import type { ColorConfig } from "../../rendering/color-resolver";
 import {
+    DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
+    type RenderTypographyTokens,
+} from "../../rendering/render-typography";
+import {
     clamp,
     renderConstrainedSvgText,
 } from "../../rendering/svg-utils";
@@ -17,6 +21,7 @@ export interface DualChannelArcGaugeConfig extends WidgetBaseConfig {
     unitTextColor: string;
     dividerColor: string;
     iconColor: string;
+    typography: RenderTypographyTokens;
     centerContent: DualChannelArcGaugeCenterContent;
     circleStyle: ArcGaugeStyle;
     titleText?: string;
@@ -39,6 +44,7 @@ export const DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG: DualChannelArcGaugeConfig = 
     unitTextColor: "rgba(255,255,255,0.74)",
     dividerColor: "rgba(255,255,255,0.18)",
     iconColor: "rgba(255,255,255,0.88)",
+    typography: DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
     centerContent: "value",
     circleStyle: "value",
     titleText: "",
@@ -92,8 +98,6 @@ const ARC_LAYOUT = {
     notchGapWidthRatio: 4.4,
     notchIconRadialInsetRatio: 0.72,
 } as const;
-
-const ARC_TEXT_FONT_FAMILY = "'Inter','SF Pro Display','Segoe UI',sans-serif";
 
 interface RingGeometry {
     centerXCoordinate: number;
@@ -436,7 +440,7 @@ function renderGaugeBottomLabel(options: {
         yCoordinate: options.geometry.centerYCoordinate + ARC_LAYOUT.gaugeBottomLabelYOffset,
         maxWidth: Math.max(24, options.geometry.radius * ARC_LAYOUT.gaugeBottomLabelMaxWidthRatio),
         fontSize: ARC_LAYOUT.gaugeBottomLabelFontSize,
-        fontFamily: ARC_TEXT_FONT_FAMILY,
+        fontFamily: options.config.typography.labelFontFamily,
         fontWeight: 850,
         fill: options.config.unitTextColor,
         textAnchor: "middle",
@@ -488,7 +492,7 @@ function renderGaugeChannelValueRow(options: {
                 yCoordinate: options.yCoordinate,
                 maxWidth: ARC_LAYOUT.gaugeUnavailableValueWidth,
                 fontSize: ARC_LAYOUT.gaugeUnavailableValueFontSize,
-                fontFamily: ARC_TEXT_FONT_FAMILY,
+                fontFamily: options.config.typography.valueFontFamily,
                 fontWeight: 900,
                 fill: options.config.valueTextColor,
                 textAnchor: "start",
@@ -513,7 +517,7 @@ function renderGaugeChannelValueRow(options: {
             yCoordinate: options.yCoordinate,
             maxWidth: ARC_LAYOUT.gaugeValueWidth,
             fontSize: resolveGaugeRowValueFontSize(valueDigitCount),
-            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontFamily: options.config.typography.valueFontFamily,
             fontWeight: 900,
             fill: options.config.valueTextColor,
             textAnchor: "end",
@@ -527,7 +531,7 @@ function renderGaugeChannelValueRow(options: {
             yCoordinate: options.yCoordinate,
             maxWidth: ARC_LAYOUT.gaugeUnitWidth,
             fontSize: ARC_LAYOUT.gaugeUnitFontSize,
-            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontFamily: options.config.typography.valueFontFamily,
             fontWeight: 780,
             fill: options.config.unitTextColor,
             textAnchor: "start",
@@ -646,7 +650,7 @@ function renderChannelValueBlock(options: {
             yCoordinate: options.layout.groupCenterYCoordinate,
             maxWidth: options.layout.textWidth,
             fontSize: ARC_LAYOUT.valueFontSize,
-            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontFamily: options.config.typography.valueFontFamily,
             fontWeight: 900,
             fill: options.config.valueTextColor,
             extraAttributes: ["font-variant-numeric=\"tabular-nums\""],
@@ -662,7 +666,7 @@ function renderChannelValueBlock(options: {
             yCoordinate: options.layout.valueYCoordinate,
             maxWidth: options.layout.textWidth,
             fontSize: ARC_LAYOUT.valueFontSize,
-            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontFamily: options.config.typography.valueFontFamily,
             fontWeight: 900,
             fill: options.config.valueTextColor,
             extraAttributes: ["font-variant-numeric=\"tabular-nums\""],
@@ -675,7 +679,7 @@ function renderChannelValueBlock(options: {
             yCoordinate: options.layout.unitYCoordinate,
             maxWidth: options.layout.textWidth,
             fontSize: ARC_LAYOUT.unitFontSize,
-            fontFamily: ARC_TEXT_FONT_FAMILY,
+            fontFamily: options.config.typography.valueFontFamily,
             fontWeight: 780,
             fill: options.config.unitTextColor,
             fitOptions: { minimumFontScale: 0.70 },

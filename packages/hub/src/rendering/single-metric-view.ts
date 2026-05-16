@@ -1,4 +1,5 @@
 import type { RenderPaintTokens } from "./render-appearance";
+import type { RenderTypographyTokens } from "./render-typography";
 import type { KeySize, WidgetData } from "./widget-data";
 import {
     arcGauge,
@@ -28,6 +29,7 @@ export interface SingleMetricBodyViewProps {
     visual: {
         graphicType: SingleMetricGraphicType;
         paints: RenderPaintTokens;
+        typography: RenderTypographyTokens;
         lineSmoothingPercent: number;
         gridLineVisibility: SparklineGridLineVisibility;
         gridLineType: SparklineGridLineType;
@@ -62,6 +64,7 @@ function renderSingleCircularMetric(options: SingleMetricBodyViewProps): string 
         valueTextColor: options.visual.paints.primaryText,
         unitTextColor: options.visual.paints.secondaryText,
         iconColor: options.visual.paints.icon,
+        typography: options.visual.typography,
         circleStyle: options.circleStyle,
         centerIconFragment: options.centerIcon,
         footerIconFragment: options.footerIcon,
@@ -76,6 +79,7 @@ function renderSingleTextMetric(options: SingleMetricBodyViewProps): string {
         labelTextColor: options.visual.paints.secondaryText,
         unitTextColor: options.visual.paints.secondaryText,
         secondaryTextColor: options.visual.paints.mutedText,
+        typography: options.visual.typography,
     }, options.renderSize);
 }
 
@@ -91,6 +95,7 @@ function renderSingleLinearMetric(options: SingleMetricBodyViewProps): string {
             icon: options.visual.paints.icon,
             track: options.visual.paints.track,
         },
+        typography: options.visual.typography,
         topIconFragment: options.linearIcon ?? options.centerIcon,
     }, options.renderSize);
 }
@@ -113,6 +118,7 @@ function renderSingleSparklineMetric(options: SingleMetricBodyViewProps): string
             grid: options.visual.paints.grid,
             baseline: options.visual.paints.grid,
         },
+        typography: options.visual.typography,
         topIconFragment: options.linearIcon ?? options.centerIcon,
     }, options.renderSize);
 }

@@ -1,6 +1,10 @@
 import type { WidgetData, KeySize } from "../../rendering/widget-data";
 import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
+    DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
+    type RenderTypographyTokens,
+} from "../../rendering/render-typography";
+import {
     adjustHexColorBrightness,
     clamp,
     renderConstrainedSvgText,
@@ -12,6 +16,7 @@ export interface LinearBarConfig extends WidgetBaseConfig {
     barHeight: number;
     borderRadius: number;
     paints: LinearBarPaints;
+    typography: RenderTypographyTokens;
     topIconFragment?: string;
 }
 
@@ -40,6 +45,7 @@ export const DEFAULT_LINEAR_BAR_CONFIG: LinearBarConfig = {
         icon: "rgba(255,255,255,0.88)",
         track: "rgba(255,255,255,0.08)",
     },
+    typography: DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
     gradientHeadAdjustmentPercent: -15,
 };
 
@@ -83,8 +89,6 @@ interface ChannelLayout {
     iconCenterXCoordinate: number;
     iconCenterYCoordinate: number;
 }
-
-const LINEAR_TEXT_FONT_FAMILY = "'Inter','SF Pro Display','Segoe UI',sans-serif";
 
 /**
  * Linear progress bar. Full width = 100%.
@@ -216,6 +220,7 @@ function renderSingleBar(
             clipId: "linear-single-title",
             textColor: config.paints.secondaryText,
             iconColor: config.paints.icon,
+            typography: config.typography,
         })}
         ${renderValueWithUnit({
             clipId: "linear-single-value",
@@ -224,6 +229,7 @@ function renderSingleBar(
             layout: layoutPlan.singleValue,
             valueTextColor: config.paints.primaryText,
             unitTextColor: config.paints.supportingText,
+            typography: config.typography,
         })}
         ${renderTrack(layoutPlan.singleBar, config.paints.track)}
         ${renderFill(layoutPlan.singleBar, fillWidth, fillPaint)}
@@ -232,6 +238,7 @@ function renderSingleBar(
             layout: layoutPlan.singleSecondaryText,
             clipId: "linear-single-secondary",
             textColor: config.paints.mutedText,
+            typography: config.typography,
         })}
     `;
 }
@@ -255,6 +262,7 @@ function renderChannelBars(
             clipId: "linear-channel-title",
             textColor: config.paints.secondaryText,
             iconColor: config.paints.icon,
+            typography: config.typography,
         })}
         ${channels.slice(0, 2).map((channel, channelIndex) => {
             const channelLayout = buildChannelLayout({
@@ -284,6 +292,7 @@ function renderChannelBars(
                     layout: channelLayout.value,
                     valueTextColor: config.paints.primaryText,
                     unitTextColor: config.paints.supportingText,
+                    typography: config.typography,
                 })}
                 ${renderTrack(channelLayout.bar, config.paints.track)}
                 ${renderFill(channelLayout.bar, fillWidth, fillPaint)}
@@ -360,6 +369,7 @@ function renderTitle(options: {
     clipId: string;
     textColor: string;
     iconColor: string;
+    typography: RenderTypographyTokens;
 }): string {
     const titleXCoordinate = options.iconFragment
         ? options.layout.xCoordinate + options.iconGap
@@ -378,7 +388,7 @@ function renderTitle(options: {
             yCoordinate: options.layout.yCoordinate,
             maxWidth: titleMaxWidth,
             fontSize: options.layout.fontSize,
-            fontFamily: LINEAR_TEXT_FONT_FAMILY,
+            fontFamily: options.typography.labelFontFamily,
             fontWeight: 850,
             fill: options.textColor,
         })}
@@ -392,6 +402,7 @@ function renderValueWithUnit(options: {
     layout: ValueLineLayout;
     valueTextColor: string;
     unitTextColor: string;
+    typography: RenderTypographyTokens;
 }): string {
     return renderMetricTextRow({
         id: options.clipId,
@@ -402,7 +413,7 @@ function renderValueWithUnit(options: {
         width: options.layout.maxWidth,
         valueFontSize: options.layout.fontSize,
         unitFontSize: options.layout.unitFontSize,
-        fontFamily: LINEAR_TEXT_FONT_FAMILY,
+        fontFamily: options.typography.valueFontFamily,
         valueFontWeight: 900,
         unitFontWeight: 800,
         valueFill: options.valueTextColor,
@@ -417,6 +428,7 @@ function renderSecondaryText(options: {
     layout: TextLineLayout;
     clipId: string;
     textColor: string;
+    typography: RenderTypographyTokens;
 }): string {
     if (!options.text) {
         return "";
@@ -429,7 +441,7 @@ function renderSecondaryText(options: {
         yCoordinate: options.layout.yCoordinate,
         maxWidth: options.layout.maxWidth,
         fontSize: options.layout.fontSize,
-        fontFamily: LINEAR_TEXT_FONT_FAMILY,
+        fontFamily: options.typography.labelFontFamily,
         fontWeight: 750,
         fill: options.textColor,
     });
