@@ -26,6 +26,7 @@ interface MetricTextRowOptions {
     unitBaselineOffset?: number;
     clipHeight?: number;
     valueExtraAttributes?: readonly string[];
+    unitExtraAttributes?: readonly string[];
     fitOptions?: SvgTextFitOptions;
 }
 
@@ -70,10 +71,13 @@ export function renderMetricTextRow(options: MetricTextRowOptions): string {
     const valueAttributes = options.valueExtraAttributes?.length
         ? ` ${options.valueExtraAttributes.join(" ")}`
         : "";
+    const unitAttributes = options.unitExtraAttributes?.length
+        ? ` ${options.unitExtraAttributes.join(" ")}`
+        : "";
     const unitTspan = options.unitText.length > 0
         ? `<tspan dx="${formatSvgNumber(unitGap)}" dy="${formatSvgNumber(options.unitBaselineOffset ?? 0)}"
                 font-size="${formatSvgNumber(unitFontSize)}" font-weight="${escapeSvgText(String(options.unitFontWeight))}"
-                fill="${escapeSvgText(options.unitFill)}">${escapeSvgText(options.unitText)}</tspan>`
+                fill="${escapeSvgText(options.unitFill)}"${unitAttributes}>${escapeSvgText(options.unitText)}</tspan>`
         : "";
     const textFitAttributes = formatSvgTextFitAttributes(textFit);
     const textElement = `<text x="${formatSvgNumber(options.xCoordinate)}" y="${formatSvgNumber(options.yCoordinate)}"

@@ -20,7 +20,10 @@ const BLACK_WHITE_SOLID_BACKGROUND_PAINT = "#222222";
 const BLACK_WHITE_SOFT_TRIANGLE_LOW_PAINT = "#161616";
 const BLACK_WHITE_SOFT_TRIANGLE_MEDIUM_PAINT = "#2c2c2c";
 const BLACK_WHITE_SOFT_TRIANGLE_HIGH_PAINT = "#444444";
-const OLD_CRT_PHOSPHOR_PAINT = "#b4ff63";
+const OLD_CRT_BLACK_GLASS_PAINT = "#010301";
+const OLD_CRT_BRIGHT_CORE_PAINT = "#e2ff98";
+const OLD_CRT_NORMAL_PHOSPHOR_PAINT = "#a7f53a";
+const OLD_CRT_DIM_PHOSPHOR_PAINT = "rgba(167,245,58,0.42)";
 
 const DEFAULT_RENDER_PAINT_TOKENS = {
     background: DEFAULT_BACKGROUND_PAINT,
@@ -39,24 +42,24 @@ const DEFAULT_RENDER_PAINT_TOKENS = {
 } satisfies Omit<RenderPaintTokens, "backgroundFill" | "primaryMetric">;
 
 const OLD_CRT_RENDER_PAINT_TOKENS = {
-    background: "#020501",
-    surface: "rgba(180,255,99,0.32)",
-    primaryText: OLD_CRT_PHOSPHOR_PAINT,
-    secondaryText: "rgba(180,255,99,0.78)",
-    mutedText: "rgba(180,255,99,0.46)",
-    icon: "rgba(180,255,99,0.88)",
-    linearTitleText: "rgba(180,255,99,0.78)",
-    linearValueText: OLD_CRT_PHOSPHOR_PAINT,
-    linearUnitText: "rgba(180,255,99,0.78)",
-    linearSecondaryText: "rgba(180,255,99,0.46)",
-    track: "rgba(180,255,99,0.22)",
-    grid: "rgba(180,255,99,0.34)",
-    divider: "rgba(180,255,99,0.24)",
+    background: OLD_CRT_BLACK_GLASS_PAINT,
+    surface: "rgba(167,245,58,0.24)",
+    primaryText: OLD_CRT_BRIGHT_CORE_PAINT,
+    secondaryText: "rgba(167,245,58,0.76)",
+    mutedText: OLD_CRT_DIM_PHOSPHOR_PAINT,
+    icon: "rgba(167,245,58,0.82)",
+    linearTitleText: "rgba(167,245,58,0.74)",
+    linearValueText: OLD_CRT_BRIGHT_CORE_PAINT,
+    linearUnitText: "rgba(167,245,58,0.70)",
+    linearSecondaryText: OLD_CRT_DIM_PHOSPHOR_PAINT,
+    track: "rgba(167,245,58,0.16)",
+    grid: "rgba(167,245,58,0.26)",
+    divider: "rgba(167,245,58,0.22)",
 } satisfies Omit<RenderPaintTokens, "backgroundFill" | "primaryMetric">;
 
 const OLD_CRT_COLOR_CONFIG = {
     mode: "solid",
-    solidColor: OLD_CRT_PHOSPHOR_PAINT,
+    solidColor: OLD_CRT_NORMAL_PHOSPHOR_PAINT,
     thresholds: [],
     isGradientEnabled: false,
 } satisfies ColorConfig;

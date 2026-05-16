@@ -1,7 +1,7 @@
-import path from "node:path";
 import { Resvg } from "@resvg/resvg-js";
 import { renderDualMetricBodyView } from "../../src/rendering/dual-metric-view";
 import { renderMetricFrame } from "../../src/rendering/metric-frame";
+import { resolveResvgFontOptions } from "../../src/rendering/resvg-font-options";
 import { renderSingleMetricBodyView } from "../../src/rendering/single-metric-view";
 import type { ColorConfig } from "../../src/rendering/color-resolver";
 import type {
@@ -22,7 +22,6 @@ import type { ArcGaugeStatusIcon, ArcGaugeStyle } from "../../src/widgets/primit
 import type { DualChannelArcGaugeCenterContent } from "../../src/widgets/primitives/dual-channel-arc-gauge";
 import type { DualChannelSparklineMode } from "../../src/widgets/primitives/dual-channel-sparkline";
 
-const INTER_FONT_FILE = path.resolve(process.cwd(), "assets", "fonts", "inter", "InterVariable.ttf");
 const NETWORK_DIRECTION_ICON_SIZE = 30;
 
 export const VISUAL_TEST_COLORS = {
@@ -318,12 +317,7 @@ export function renderSvgToPngBuffer(svg: string, keySize: KeySize): Buffer {
             mode: "width",
             value: keySize.width,
         },
-        font: {
-            loadSystemFonts: false,
-            fontFiles: [INTER_FONT_FILE],
-            defaultFontFamily: "Inter",
-            sansSerifFamily: "Inter",
-        },
+        font: resolveResvgFontOptions(svg),
     }).render();
 
     return Buffer.from(renderedImage.asPng());

@@ -1,4 +1,5 @@
 import type { ColorConfig } from "./color-resolver";
+import type { RenderForegroundEffectTokens } from "./render-foreground-effects";
 import type { RenderTypographyTokens } from "./render-typography";
 import type { ArcGaugeStyle } from "../widgets/primitives/arc-gauge";
 import type { SparklineGridLineType, SparklineGridLineVisibility } from "../widgets/primitives/sparkline";
@@ -45,6 +46,7 @@ export interface MetricRenderAppearance {
     readonly paintConstraint: RenderPaintConstraint;
     readonly paints: RenderPaintTokens;
     readonly typography: RenderTypographyTokens;
+    readonly foregroundEffects: RenderForegroundEffectTokens;
     readonly lineSmoothingPercent: number;
     readonly gridLineVisibility: SparklineGridLineVisibility;
     readonly gridLineType: SparklineGridLineType;

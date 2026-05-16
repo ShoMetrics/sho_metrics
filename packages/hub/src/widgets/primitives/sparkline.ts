@@ -1,6 +1,11 @@
 import type { WidgetData, KeySize, SparklineScale } from "../../rendering/widget-data";
 import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
+    buildSvgFilterAttributes,
+    DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
+    type RenderForegroundEffectTokens,
+} from "../../rendering/render-foreground-effects";
+import {
     DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
     type RenderTypographyTokens,
 } from "../../rendering/render-typography";
@@ -34,6 +39,7 @@ export interface SparklineConfig extends WidgetBaseConfig {
     dashPattern: string;
     paints: SparklinePaints;
     typography: RenderTypographyTokens;
+    foregroundEffects: RenderForegroundEffectTokens;
     topIconFragment?: string;
 }
 
@@ -76,6 +82,7 @@ export const DEFAULT_SPARKLINE_CONFIG: SparklineConfig = {
         baseline: "rgba(255,255,255,0.30)",
     },
     typography: DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
+    foregroundEffects: DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
     gradientHeadAdjustmentPercent: 28,
 };
 
@@ -164,6 +171,7 @@ export const sparkline: Widget<SparklineConfig> = {
             historyWindowSeconds: config.historyWindowSeconds,
             paints: config.paints,
             typography: config.typography,
+            foregroundEffects: config.foregroundEffects,
         });
         const latestPoint = points[points.length - 1];
         const latestPointGlowSvg = config.gridLineVisibility !== "none" && config.gridLineType === "vertical" && latestPoint
@@ -207,6 +215,7 @@ export const sparkline: Widget<SparklineConfig> = {
                 textColor: config.paints.secondaryText,
                 iconColor: config.paints.icon,
                 typography: config.typography,
+                foregroundEffects: config.foregroundEffects,
             })}
             ${renderMetricTextRow({
                 id: "sparkline-current-value",
@@ -224,9 +233,13 @@ export const sparkline: Widget<SparklineConfig> = {
                 unitFill: config.paints.supportingText,
                 unitBaselineOffset: 2,
                 textAnchor: layoutPlan.value.textAnchor,
-                valueExtraAttributes: ["font-variant-numeric=\"tabular-nums\""],
+                valueExtraAttributes: [
+                    "font-variant-numeric=\"tabular-nums\"",
+                    ...buildSvgFilterAttributes(config.foregroundEffects.valueFilter),
+                ],
+                unitExtraAttributes: buildSvgFilterAttributes(config.foregroundEffects.labelFilter),
             })}
-            <path d="${areaPath}" fill="${areaPaint}"${areaOpacity} />
+            <path d="${areaPath}" fill="${areaPaint}"${areaOpacity} ${buildSvgFilterAttributes(config.foregroundEffects.subtleFilter).join(" ")} />
             ${gridLineSvg}
             ${latestPointGlowSvg}
             <path d="${linePath}" fill="none" stroke="${linePaint}"
@@ -234,7 +247,7 @@ export const sparkline: Widget<SparklineConfig> = {
                 stroke-linecap="round" filter="url(#${glowFilterId})" opacity="0.55" />
             <path d="${linePath}" fill="none" stroke="${linePaint}"
                 stroke-width="${config.lineWidth}" stroke-linejoin="round" stroke-linecap="round"
-                stroke-dasharray="${config.dashPattern}" />
+                stroke-dasharray="${config.dashPattern}" ${buildSvgFilterAttributes(config.foregroundEffects.metricFilter).join(" ")} />
             ${dotSvg}
         `;
     },
@@ -308,13 +321,14 @@ function renderTitle(options: {
     textColor: string;
     iconColor: string;
     typography: RenderTypographyTokens;
+    foregroundEffects: RenderForegroundEffectTokens;
 }): string {
     const titleXCoordinate = options.iconFragment
         ? options.layout.xCoordinate + options.iconGap
         : options.layout.xCoordinate;
     const titleMaxWidth = Math.max(1, options.layout.maxWidth - (titleXCoordinate - options.layout.xCoordinate));
     const iconSvg = options.iconFragment
-        ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 9} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})">${options.iconFragment}</g>`
+        ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 9} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})" ${buildSvgFilterAttributes(options.foregroundEffects.iconFilter).join(" ")}>${options.iconFragment}</g>`
         : "";
 
     return `
@@ -329,6 +343,7 @@ function renderTitle(options: {
             fontFamily: options.typography.labelFontFamily,
             fontWeight: 850,
             fill: options.textColor,
+            extraAttributes: buildSvgFilterAttributes(options.foregroundEffects.labelFilter),
         })}
     `;
 }
@@ -444,6 +459,7 @@ function renderGridLines(options: {
     historyWindowSeconds: number;
     paints: SparklinePaints;
     typography: RenderTypographyTokens;
+    foregroundEffects: RenderForegroundEffectTokens;
 }): string {
     if (options.gridLineVisibility === "none") {
         return "";
@@ -469,6 +485,7 @@ function renderGridLines(options: {
             opacity: gridLineMetrics.opacity,
             paints: options.paints,
             typography: options.typography,
+            foregroundEffects: options.foregroundEffects,
         });
     }
 
@@ -476,6 +493,7 @@ function renderGridLines(options: {
         plotLayout: options.plotLayout,
         opacity: gridLineMetrics.opacity,
         gridColor: options.paints.grid,
+        foregroundEffects: options.foregroundEffects,
     });
 }
 
@@ -483,6 +501,7 @@ function renderHorizontalGuides(options: {
     plotLayout: ChartLayout;
     opacity: number;
     gridColor: string;
+    foregroundEffects: RenderForegroundEffectTokens;
 }): string {
     const guideList = [1, 0.5, 0].map(progress => {
         const yCoordinate = options.plotLayout.yCoordinate + options.plotLayout.height * (1 - progress);
@@ -492,7 +511,7 @@ function renderHorizontalGuides(options: {
                 x2="${formatSvgNumber(options.plotLayout.xCoordinate + options.plotLayout.width)}"
                 y2="${formatSvgNumber(yCoordinate)}"
                 stroke="${options.gridColor}" stroke-opacity="${formatSvgNumber(options.opacity)}" stroke-width="1"
-                stroke-dasharray="4 4" stroke-linecap="round" />
+                stroke-dasharray="4 4" stroke-linecap="round" ${buildSvgFilterAttributes(options.foregroundEffects.subtleFilter).join(" ")} />
         `;
     });
 
@@ -511,6 +530,7 @@ function renderVerticalGridLines(options: {
     opacity: number;
     paints: SparklinePaints;
     typography: RenderTypographyTokens;
+    foregroundEffects: RenderForegroundEffectTokens;
 }): string {
     const safeTickCount = Math.max(2, Math.round(options.timeGuideTickCount));
     const baselineYCoordinate = options.plotLayout.yCoordinate + options.plotLayout.height;
@@ -523,11 +543,11 @@ function renderVerticalGridLines(options: {
             <line x1="${formatSvgNumber(xCoordinate)}" y1="${formatSvgNumber(options.plotLayout.yCoordinate)}"
                 x2="${formatSvgNumber(xCoordinate)}" y2="${formatSvgNumber(baselineYCoordinate)}"
                 stroke="${options.paints.grid}" stroke-width="${TIME_GUIDE_LINE_WIDTH}"
-                stroke-linecap="round" />
+                stroke-linecap="round" ${buildSvgFilterAttributes(options.foregroundEffects.subtleFilter).join(" ")} />
             <line x1="${formatSvgNumber(xCoordinate)}" y1="${formatSvgNumber(baselineYCoordinate)}"
                 x2="${formatSvgNumber(xCoordinate)}" y2="${formatSvgNumber(baselineYCoordinate + TIME_GUIDE_TICK_HEIGHT)}"
                 stroke="${options.paints.grid}" stroke-width="${TIME_GUIDE_LINE_WIDTH}"
-                stroke-linecap="round" />
+                stroke-linecap="round" ${buildSvgFilterAttributes(options.foregroundEffects.subtleFilter).join(" ")} />
             ${renderConstrainedSvgText({
                 id: `sparkline-time-${tickIndex}`,
                 text: `${labelSeconds}s`,
@@ -539,6 +559,7 @@ function renderVerticalGridLines(options: {
                 fontWeight: 750,
                 fill: options.paints.mutedText,
                 textAnchor: "middle",
+                extraAttributes: buildSvgFilterAttributes(options.foregroundEffects.labelFilter),
             })}
         `;
     });
@@ -547,12 +568,12 @@ function renderVerticalGridLines(options: {
         <g opacity="${formatSvgNumber(options.opacity)}">
             <rect x="${formatSvgNumber(options.chartLayout.xCoordinate)}" y="${formatSvgNumber(options.chartLayout.yCoordinate)}"
                 width="${formatSvgNumber(options.chartLayout.width)}" height="${formatSvgNumber(options.chartLayout.height)}"
-                rx="${CHART_PANEL_RADIUS}" fill="${options.paints.surface}" stroke="${options.paints.divider}" stroke-width="1" />
+                rx="${CHART_PANEL_RADIUS}" fill="${options.paints.surface}" stroke="${options.paints.divider}" stroke-width="1" ${buildSvgFilterAttributes(options.foregroundEffects.subtleFilter).join(" ")} />
             ${internalGuideList.join("")}
             <line x1="${formatSvgNumber(options.plotLayout.xCoordinate)}" y1="${formatSvgNumber(baselineYCoordinate)}"
                 x2="${formatSvgNumber(options.plotLayout.xCoordinate + options.plotLayout.width)}"
                 y2="${formatSvgNumber(baselineYCoordinate)}"
-                stroke="${options.paints.baseline}" stroke-width="1" stroke-dasharray="4 4" stroke-linecap="round" />
+                stroke="${options.paints.baseline}" stroke-width="1" stroke-dasharray="4 4" stroke-linecap="round" ${buildSvgFilterAttributes(options.foregroundEffects.subtleFilter).join(" ")} />
         </g>
     `;
 }

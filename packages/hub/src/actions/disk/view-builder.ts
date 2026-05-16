@@ -29,6 +29,7 @@ import {
 } from "./volume-selection";
 import type { MetricDisplayOptions } from "../../metric-view-runner/display-model";
 import { buildColorConfigFromAppearance, resolveSolidMetricColorMode } from "../../settings/render-paint-resolver";
+import { resolveRenderTypography } from "../../settings/render-typography-resolver";
 
 interface BuildDiskDisplayOptions {
     event: WillAppearEvent;
@@ -108,7 +109,10 @@ function buildDiskUsageDisplayOptions(
             label,
             linearLabel: resolveDiskLinearLabel(options.reading.linearLabel, selectedVolume, label),
         }),
-        centerIconFragment: buildDiskCenterIconFragment(options.volumeSelection),
+        centerIconFragment: buildDiskCenterIconFragment(
+            options.volumeSelection,
+            resolveRenderTypography(appearance).labelFontFamily,
+        ),
         footerIconFragment: shouldRenderGauge ? undefined : buildDiskGaugeFooterIconFragment(selectedVolume),
         linearIconFragment: getDiskIconFragment(selectedVolume?.storageKind ?? "unknown"),
         statusIcon: getMetricStatusIcon("percentage"),
@@ -290,7 +294,7 @@ function resolveCompactDiskStorageLabel(diskVolume: DiskVolumeOption): string {
     return "DSK";
 }
 
-function buildDiskCenterIconFragment(volumeSelection: DiskVolumeSelection): string {
+function buildDiskCenterIconFragment(volumeSelection: DiskVolumeSelection, labelFontFamily: string): string {
     const diskVolume = resolveAvailableDiskVolume(volumeSelection);
     const icon = getDiskIcon(diskVolume?.storageKind ?? "unknown");
     const volumeLabel = formatCompactDiskVolumeLabel(volumeSelection);
@@ -301,7 +305,7 @@ function buildDiskCenterIconFragment(volumeSelection: DiskVolumeSelection): stri
         </g>
         <text x="0" y="34" text-anchor="middle"
             dominant-baseline="middle"
-            font-family="'Inter','SF Pro Display','Segoe UI',sans-serif"
+            font-family="${escapeSvgText(labelFontFamily)}"
             font-size="26" font-weight="850" fill="currentColor">${escapeSvgText(volumeLabel)}</text>
     `;
 }

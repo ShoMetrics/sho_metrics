@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderDualMetricBodyView } from "./dual-metric-view";
 import type { MetricRenderAppearance } from "./render-appearance";
+import { DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS } from "./render-foreground-effects";
 import type { DualChannelWidgetData, WidgetData } from "./widget-data";
 
 test("dual metric view renders the requested primitive branch", () => {
@@ -63,6 +64,7 @@ function buildMetricRenderAppearance(): MetricRenderAppearance {
             labelFontFamily: "Test Label Font",
             valueFontFamily: "Test Value Font",
         },
+        foregroundEffects: DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
         lineSmoothingPercent: 75,
         gridLineVisibility: "adaptive",
         gridLineType: "horizontal",
