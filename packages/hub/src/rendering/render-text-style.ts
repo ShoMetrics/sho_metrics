@@ -1,7 +1,7 @@
 import {
-    OLD_CRT_LABEL_GLOW_FILTER_ID,
-    OLD_CRT_SUBTLE_GLOW_FILTER_ID,
-    OLD_CRT_VALUE_GLOW_FILTER_ID,
+    TERMINAL_LABEL_GLOW_FILTER_ID,
+    TERMINAL_SUBTLE_GLOW_FILTER_ID,
+    TERMINAL_VALUE_GLOW_FILTER_ID,
 } from "./render-svg-effects";
 
 export interface RenderTextStyle {
@@ -22,7 +22,7 @@ export interface RenderTextStyles {
 const MINIMUM_TEXT_STYLE_FONT_SIZE_SCALE = 0.9;
 const MAXIMUM_TEXT_STYLE_FONT_SIZE_SCALE = 1.12;
 const DEFAULT_RENDER_FONT_FAMILY = "'Inter','SF Pro Display','Segoe UI',sans-serif";
-const OLD_CRT_FONT_FAMILY = "'Share Tech Mono','Inter','SF Pro Display','Segoe UI',monospace";
+const TERMINAL_FONT_FAMILY = "'Share Tech Mono','Inter','SF Pro Display','Segoe UI',monospace";
 
 export const DEFAULT_RENDER_TEXT_STYLES = {
     value: createRenderTextStyle({
@@ -57,33 +57,66 @@ export const DEFAULT_RENDER_TEXT_STYLES = {
     }),
 } satisfies RenderTextStyles;
 
-export const OLD_CRT_RENDER_TEXT_STYLES = {
+export const TERMINAL_CLEAN_RENDER_TEXT_STYLES = {
     value: createRenderTextStyle({
-        fontFamily: OLD_CRT_FONT_FAMILY,
-        fontWeight: 820,
-        fontSizeScale: 1,
-        filter: `url(#${OLD_CRT_VALUE_GLOW_FILTER_ID})`,
+        fontFamily: TERMINAL_FONT_FAMILY,
+        fontWeight: 760,
+        fontSizeScale: 1.02,
+        filter: `url(#${TERMINAL_VALUE_GLOW_FILTER_ID})`,
     }),
     unit: createRenderTextStyle({
-        fontFamily: OLD_CRT_FONT_FAMILY,
-        fontWeight: 680,
+        fontFamily: TERMINAL_FONT_FAMILY,
+        fontWeight: 700,
         fontSizeScale: 1.04,
-        filter: `url(#${OLD_CRT_SUBTLE_GLOW_FILTER_ID})`,
+        filter: `url(#${TERMINAL_SUBTLE_GLOW_FILTER_ID})`,
     }),
     title: createRenderTextStyle({
-        fontFamily: OLD_CRT_FONT_FAMILY,
+        fontFamily: TERMINAL_FONT_FAMILY,
         fontWeight: 760,
         fontSizeScale: 1,
-        filter: `url(#${OLD_CRT_LABEL_GLOW_FILTER_ID})`,
+        filter: `url(#${TERMINAL_SUBTLE_GLOW_FILTER_ID})`,
     }),
     label: createRenderTextStyle({
-        fontFamily: OLD_CRT_FONT_FAMILY,
+        fontFamily: TERMINAL_FONT_FAMILY,
         fontWeight: 760,
         fontSizeScale: 1,
-        filter: `url(#${OLD_CRT_LABEL_GLOW_FILTER_ID})`,
+        filter: `url(#${TERMINAL_SUBTLE_GLOW_FILTER_ID})`,
     }),
     smallLabel: createRenderTextStyle({
-        fontFamily: OLD_CRT_FONT_FAMILY,
+        fontFamily: TERMINAL_FONT_FAMILY,
+        fontWeight: 700,
+        fontSizeScale: 1.08,
+        filter: undefined,
+    }),
+} satisfies RenderTextStyles;
+
+export const TERMINAL_VINTAGE_RENDER_TEXT_STYLES = {
+    value: createRenderTextStyle({
+        fontFamily: TERMINAL_FONT_FAMILY,
+        fontWeight: 820,
+        fontSizeScale: 1,
+        filter: `url(#${TERMINAL_VALUE_GLOW_FILTER_ID})`,
+    }),
+    unit: createRenderTextStyle({
+        fontFamily: TERMINAL_FONT_FAMILY,
+        fontWeight: 680,
+        fontSizeScale: 1.04,
+        filter: `url(#${TERMINAL_SUBTLE_GLOW_FILTER_ID})`,
+    }),
+    title: createRenderTextStyle({
+        fontFamily: TERMINAL_FONT_FAMILY,
+        fontWeight: 760,
+        fontSizeScale: 1,
+        filter: `url(#${TERMINAL_LABEL_GLOW_FILTER_ID})`,
+    }),
+    label: createRenderTextStyle({
+        fontFamily: TERMINAL_FONT_FAMILY,
+        fontWeight: 760,
+        fontSizeScale: 1,
+        filter: `url(#${TERMINAL_LABEL_GLOW_FILTER_ID})`,
+    }),
+    smallLabel: createRenderTextStyle({
+        fontFamily: TERMINAL_FONT_FAMILY,
         fontWeight: 620,
         fontSizeScale: 1.08,
         filter: undefined,

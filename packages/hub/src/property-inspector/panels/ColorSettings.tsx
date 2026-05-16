@@ -63,7 +63,7 @@ export function StandardColorSettings(props: WidgetSettingsPanelProps): React.JS
         return <ColorFilledSettingsSection {...props} />;
     }
 
-    if (appearance.theme.selectedTheme === "old-crt") {
+    if (appearance.theme.selectedTheme === "terminal") {
         return <></>;
     }
 
@@ -192,7 +192,7 @@ export function NetworkChannelColorSettings(props: WidgetSettingsPanelProps): Re
         return <ColorFilledSettingsSection {...props} />;
     }
 
-    if (props.context.resolved.widget.slot.appearance.theme.selectedTheme === "old-crt") {
+    if (props.context.resolved.widget.slot.appearance.theme.selectedTheme === "terminal") {
         return <></>;
     }
 
@@ -220,7 +220,7 @@ export function DiskThroughputChannelColorSettings(props: WidgetSettingsPanelPro
         return <ColorFilledSettingsSection {...props} />;
     }
 
-    if (props.context.resolved.widget.slot.appearance.theme.selectedTheme === "old-crt") {
+    if (props.context.resolved.widget.slot.appearance.theme.selectedTheme === "terminal") {
         return <></>;
     }
 

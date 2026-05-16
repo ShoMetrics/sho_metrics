@@ -29,13 +29,16 @@ test("plugin global override groups graph theme and color controls under the mas
     assert.doesNotMatch(markup, /Tint/);
 });
 
-test("plugin global override hides color controls for old crt theme", () => {
+test("plugin global override hides color controls for terminal theme", () => {
     const markup = renderToStaticMarkup(createElement(PluginSettingsTab, {
-        resolvedSettings: buildGlobalSettings("old-crt"),
+        resolvedSettings: buildGlobalSettings("terminal"),
         onSettingsPatch: () => undefined,
     }));
 
-    assert.match(markup, /Old CRT/);
+    assert.match(markup, /Terminal/);
+    assert.match(markup, /Terminal Style:/);
+    assert.match(markup, /Clean/);
+    assert.match(markup, /Vintage/);
     assert.doesNotMatch(markup, /Color Override/);
     assert.doesNotMatch(markup, /Color Mode:/);
 });
@@ -65,6 +68,9 @@ function buildGlobalSettings(selectedTheme: MetricTheme = "flat"): ResolvedGloba
         themeOverride: {
             theme: {
                 selectedTheme,
+                terminal: {
+                    variant: "clean",
+                },
             },
         },
         paintOverride: {

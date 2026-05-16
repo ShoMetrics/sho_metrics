@@ -4,10 +4,10 @@ export interface RenderGraphicEffectTokens {
     readonly subtleFilter: string | undefined;
 }
 
-export const OLD_CRT_VALUE_GLOW_FILTER_ID = "old-crt-value-glow";
-export const OLD_CRT_LABEL_GLOW_FILTER_ID = "old-crt-label-glow";
-export const OLD_CRT_METRIC_GLOW_FILTER_ID = "old-crt-metric-glow";
-export const OLD_CRT_SUBTLE_GLOW_FILTER_ID = "old-crt-subtle-glow";
+export const TERMINAL_VALUE_GLOW_FILTER_ID = "terminal-value-glow";
+export const TERMINAL_LABEL_GLOW_FILTER_ID = "terminal-label-glow";
+export const TERMINAL_METRIC_GLOW_FILTER_ID = "terminal-metric-glow";
+export const TERMINAL_SUBTLE_GLOW_FILTER_ID = "terminal-subtle-glow";
 
 export const DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS = {
     iconFilter: undefined,
@@ -15,10 +15,16 @@ export const DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS = {
     subtleFilter: undefined,
 } satisfies RenderGraphicEffectTokens;
 
-export const OLD_CRT_RENDER_GRAPHIC_EFFECT_TOKENS = {
-    iconFilter: `url(#${OLD_CRT_LABEL_GLOW_FILTER_ID})`,
-    metricFilter: `url(#${OLD_CRT_METRIC_GLOW_FILTER_ID})`,
-    subtleFilter: `url(#${OLD_CRT_SUBTLE_GLOW_FILTER_ID})`,
+export const TERMINAL_CLEAN_RENDER_GRAPHIC_EFFECT_TOKENS = {
+    iconFilter: `url(#${TERMINAL_SUBTLE_GLOW_FILTER_ID})`,
+    metricFilter: `url(#${TERMINAL_SUBTLE_GLOW_FILTER_ID})`,
+    subtleFilter: undefined,
+} satisfies RenderGraphicEffectTokens;
+
+export const TERMINAL_VINTAGE_RENDER_GRAPHIC_EFFECT_TOKENS = {
+    iconFilter: `url(#${TERMINAL_LABEL_GLOW_FILTER_ID})`,
+    metricFilter: `url(#${TERMINAL_METRIC_GLOW_FILTER_ID})`,
+    subtleFilter: `url(#${TERMINAL_SUBTLE_GLOW_FILTER_ID})`,
 } satisfies RenderGraphicEffectTokens;
 
 export function buildSvgFilterAttributes(filter: string | undefined): readonly string[] {

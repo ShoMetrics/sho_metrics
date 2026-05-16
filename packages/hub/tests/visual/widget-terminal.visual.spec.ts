@@ -21,7 +21,7 @@ const CPU_USAGE_WIDGET_DATA: WidgetData = {
     sampleTimestampMilliseconds: 1,
 };
 
-interface OldCrtVisualWidgetTestCase {
+interface TerminalVisualWidgetTestCase {
     readonly snapshotName: string;
     readonly appearance: ResolvedAppearanceSettingsOverride;
     readonly data: WidgetData;
@@ -30,37 +30,41 @@ interface OldCrtVisualWidgetTestCase {
     readonly linearIcon?: string;
 }
 
-const OLD_CRT_VISUAL_TEST_CASES: readonly OldCrtVisualWidgetTestCase[] = [
+const TERMINAL_VISUAL_TEST_CASES: readonly TerminalVisualWidgetTestCase[] = [
     {
-        snapshotName: "old-crt-single-circular-value-fixed-phosphor-screen",
-        appearance: buildOldCrtAppearanceOverride({
+        snapshotName: "terminal-clean-single-circular-value-terminal-screen",
+        appearance: buildTerminalAppearanceOverride({
             graphType: "circular",
             circleStyle: "value",
+            variant: "clean",
         }),
         data: CPU_USAGE_WIDGET_DATA,
     },
     {
-        snapshotName: "old-crt-single-circular-minimal-icon-fixed-phosphor-screen",
-        appearance: buildOldCrtAppearanceOverride({
+        snapshotName: "terminal-clean-single-circular-minimal-icon-terminal-screen",
+        appearance: buildTerminalAppearanceOverride({
             graphType: "circular",
             circleStyle: "compact",
+            variant: "clean",
         }),
         data: CPU_USAGE_WIDGET_DATA,
         centerIcon: CPU_ICON_FRAGMENT,
     },
     {
-        snapshotName: "old-crt-single-circular-gauge-fixed-phosphor-screen",
-        appearance: buildOldCrtAppearanceOverride({
+        snapshotName: "terminal-clean-single-circular-gauge-terminal-screen",
+        appearance: buildTerminalAppearanceOverride({
             graphType: "circular",
             circleStyle: "gauge",
+            variant: "clean",
         }),
         data: CPU_USAGE_WIDGET_DATA,
     },
     {
-        snapshotName: "old-crt-single-linear-progress-fixed-phosphor-screen",
-        appearance: buildOldCrtAppearanceOverride({
+        snapshotName: "terminal-clean-single-linear-progress-terminal-screen",
+        appearance: buildTerminalAppearanceOverride({
             graphType: "linear",
             circleStyle: "value",
+            variant: "clean",
         }),
         data: {
             ...CPU_USAGE_WIDGET_DATA,
@@ -71,10 +75,65 @@ const OLD_CRT_VISUAL_TEST_CASES: readonly OldCrtVisualWidgetTestCase[] = [
         linearIcon: CPU_ICON_FRAGMENT,
     },
     {
-        snapshotName: "old-crt-single-sparkline-fixed-phosphor-screen",
-        appearance: buildOldCrtAppearanceOverride({
+        snapshotName: "terminal-clean-single-sparkline-terminal-screen",
+        appearance: buildTerminalAppearanceOverride({
             graphType: "sparkline",
             circleStyle: "value",
+            variant: "clean",
+        }),
+        data: CPU_USAGE_WIDGET_DATA,
+        centerIcon: CPU_ICON_FRAGMENT,
+        linearIcon: CPU_ICON_FRAGMENT,
+    },
+    {
+        snapshotName: "terminal-vintage-single-circular-value-fixed-phosphor-screen",
+        appearance: buildTerminalAppearanceOverride({
+            graphType: "circular",
+            circleStyle: "value",
+            variant: "vintage",
+        }),
+        data: CPU_USAGE_WIDGET_DATA,
+    },
+    {
+        snapshotName: "terminal-vintage-single-circular-minimal-icon-fixed-phosphor-screen",
+        appearance: buildTerminalAppearanceOverride({
+            graphType: "circular",
+            circleStyle: "compact",
+            variant: "vintage",
+        }),
+        data: CPU_USAGE_WIDGET_DATA,
+        centerIcon: CPU_ICON_FRAGMENT,
+    },
+    {
+        snapshotName: "terminal-vintage-single-circular-gauge-fixed-phosphor-screen",
+        appearance: buildTerminalAppearanceOverride({
+            graphType: "circular",
+            circleStyle: "gauge",
+            variant: "vintage",
+        }),
+        data: CPU_USAGE_WIDGET_DATA,
+    },
+    {
+        snapshotName: "terminal-vintage-single-linear-progress-fixed-phosphor-screen",
+        appearance: buildTerminalAppearanceOverride({
+            graphType: "linear",
+            circleStyle: "value",
+            variant: "vintage",
+        }),
+        data: {
+            ...CPU_USAGE_WIDGET_DATA,
+            linearLabel: "CPU Load",
+            secondaryDisplayValue: "OK",
+        },
+        centerIcon: CPU_ICON_FRAGMENT,
+        linearIcon: CPU_ICON_FRAGMENT,
+    },
+    {
+        snapshotName: "terminal-vintage-single-sparkline-fixed-phosphor-screen",
+        appearance: buildTerminalAppearanceOverride({
+            graphType: "sparkline",
+            circleStyle: "value",
+            variant: "vintage",
         }),
         data: CPU_USAGE_WIDGET_DATA,
         centerIcon: CPU_ICON_FRAGMENT,
@@ -82,7 +141,7 @@ const OLD_CRT_VISUAL_TEST_CASES: readonly OldCrtVisualWidgetTestCase[] = [
     },
 ];
 
-for (const testCase of OLD_CRT_VISUAL_TEST_CASES) {
+for (const testCase of TERMINAL_VISUAL_TEST_CASES) {
     test(`renders ${testCase.snapshotName}`, () => {
         const svg = renderSingleMetricWidgetSvg({
             appearance: testCase.appearance,
@@ -98,9 +157,10 @@ for (const testCase of OLD_CRT_VISUAL_TEST_CASES) {
     });
 }
 
-function buildOldCrtAppearanceOverride(options: {
+function buildTerminalAppearanceOverride(options: {
     graphType: "circular" | "text" | "linear" | "sparkline";
     circleStyle: "value" | "compact" | "gauge";
+    variant: "clean" | "vintage";
 }): ResolvedAppearanceSettingsOverride {
     return {
         graph: {
@@ -108,7 +168,10 @@ function buildOldCrtAppearanceOverride(options: {
             circleStyle: options.circleStyle,
         },
         theme: {
-            selectedTheme: "old-crt",
+            selectedTheme: "terminal",
+            terminal: {
+                variant: options.variant,
+            },
         },
         paint: {
             metric: {

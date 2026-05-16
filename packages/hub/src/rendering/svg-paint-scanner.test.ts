@@ -119,10 +119,10 @@ test("black-white representative final SVG outputs contain no chromatic paint", 
             }),
         },
         {
-            name: "old crt circular value",
+            name: "terminal circular value",
             svg: renderSingleFinalSvg({
                 viewLayout: "circular",
-                theme: "old-crt",
+                theme: "terminal-clean",
             }),
         },
         {

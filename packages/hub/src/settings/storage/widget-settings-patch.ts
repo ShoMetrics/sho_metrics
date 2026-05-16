@@ -15,6 +15,7 @@ import {
     MetricSolidPaintSettingsSchema,
     MultiColorSetSchema,
     NetworkDisplaySettingsSchema,
+    TerminalThemeSettingsSchema,
     SlotOverridesSchema,
     SparklineAppearanceSettingsSchema,
     WidgetPreferencesSchema,
@@ -65,6 +66,7 @@ import {
     storedNetworkDirectionByResolved,
     storedNetworkTrafficDisplayModeByResolved,
     storedNetworkUnitBaseByResolved,
+    storedTerminalThemeVariantByResolved,
     storedScaleModeByResolved,
     storedSingleMetricViewLayoutByResolved,
     storedTemperatureUnitByResolved,
@@ -186,6 +188,10 @@ function applyAppearanceThemePatch(
 ): void {
     if (patch.selectedTheme !== undefined) {
         theme.selectedTheme = storedThemeByResolved[patch.selectedTheme];
+    }
+    if (patch.terminal?.variant !== undefined) {
+        theme.terminal ??= create(TerminalThemeSettingsSchema);
+        theme.terminal.variant = storedTerminalThemeVariantByResolved[patch.terminal.variant];
     }
 }
 

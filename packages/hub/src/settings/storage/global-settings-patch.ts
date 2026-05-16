@@ -16,6 +16,7 @@ import {
     GlobalThemeOverrideSchema,
     MultiColorSetSchema,
     NetworkDisplaySettingsSchema,
+    TerminalThemeSettingsSchema,
     type AppearanceThemeSettings as StoredAppearanceThemeSettings,
     type ColorFilledPaintSettings as StoredColorFilledPaintSettings,
     type GlobalDefaults as StoredGlobalDefaults,
@@ -34,6 +35,7 @@ import type {
 } from "../resolved-settings";
 import type {
     ResolvedColorFilledPaintSettingsOverride,
+    ResolvedTerminalThemeSettingsOverride,
     ResolvedMultiColorSetOverride,
 } from "../appearance-overrides";
 import {
@@ -45,6 +47,7 @@ import {
     storedCircleStyleByResolved,
     storedColorModeByResolved,
     storedNetworkUnitBaseByResolved,
+    storedTerminalThemeVariantByResolved,
     storedScaleModeByResolved,
     storedSingleMetricViewLayoutByResolved,
     storedThemeByResolved,
@@ -73,6 +76,7 @@ export interface StoredGlobalSettingsPatch {
 
 interface GlobalThemeSettingsPatch {
     readonly selectedTheme?: MetricTheme | undefined;
+    readonly terminal?: ResolvedTerminalThemeSettingsOverride | undefined;
 }
 
 interface GlobalPaintSettingsPatch {
@@ -174,6 +178,10 @@ function applyThemeSettingsPatch(
 ): void {
     if (patch.selectedTheme !== undefined) {
         theme.selectedTheme = storedThemeByResolved[patch.selectedTheme];
+    }
+    if (patch.terminal?.variant !== undefined) {
+        theme.terminal ??= create(TerminalThemeSettingsSchema);
+        theme.terminal.variant = storedTerminalThemeVariantByResolved[patch.terminal.variant];
     }
 }
 

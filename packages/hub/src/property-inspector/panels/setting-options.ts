@@ -1,4 +1,5 @@
 import type { SelectOption } from "../inspector/types";
+import type { TerminalThemeVariant } from "../../settings/resolved-settings";
 
 export const pollingFrequencyOptionList = [
     { value: 1, label: "1s" },
@@ -15,8 +16,13 @@ export const graphicStyleOptionList = [
     { value: "flat", label: "Default" },
     { value: "cupertino-glass", label: "Cupertino Glass Style" },
     { value: "color-filled", label: "Color Filled" },
-    { value: "old-crt", label: "Old CRT" },
+    { value: "terminal", label: "Terminal" },
 ] as const satisfies readonly SelectOption[];
+
+export const terminalVariantOptionList = [
+    { value: "clean", label: "Clean" },
+    { value: "vintage", label: "Vintage" },
+] as const satisfies readonly SelectOption<TerminalThemeVariant>[];
 
 export const metricPaintColorModeOptionList = [
     { value: "multi-color", label: "Range Colors" },

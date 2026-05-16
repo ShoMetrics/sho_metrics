@@ -9,6 +9,7 @@ import {
     NetworkDisplaySettings_UnitBase as StoredNetworkUnitBase,
     NetworkMetricTarget_Direction as StoredNetworkDirection,
     NetworkMetricTarget_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
+    TerminalThemeVariant as StoredTerminalThemeVariant,
     ScaleMode as StoredScaleMode,
     SingleMetricViewLayout as StoredSingleMetricViewLayout,
     SparklineAppearanceSettings_GridLineType as StoredGridLineType,
@@ -27,6 +28,7 @@ import type {
     NetworkDirection,
     NetworkTrafficDisplayMode,
     NetworkUnitBase,
+    TerminalThemeVariant,
     ScaleMode,
     SingleMetricViewLayout,
     TemperatureUnit,
@@ -49,8 +51,13 @@ export const storedThemeByResolved = {
     flat: StoredMetricTheme.FLAT,
     "cupertino-glass": StoredMetricTheme.CUPERTINO_GLASS,
     "color-filled": StoredMetricTheme.COLOR_FILLED,
-    "old-crt": StoredMetricTheme.OLD_CRT,
+    "terminal": StoredMetricTheme.TERMINAL,
 } satisfies Record<MetricTheme, StoredMetricTheme>;
+
+export const storedTerminalThemeVariantByResolved = {
+    clean: StoredTerminalThemeVariant.CLEAN,
+    vintage: StoredTerminalThemeVariant.VINTAGE,
+} satisfies Record<TerminalThemeVariant, StoredTerminalThemeVariant>;
 
 export const storedColorModeByResolved = {
     "multi-color": StoredColorMode.MULTI_COLOR,

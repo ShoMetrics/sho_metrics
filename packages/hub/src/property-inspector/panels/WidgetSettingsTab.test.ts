@@ -150,12 +150,12 @@ test("color filled theme renders color mix without range controls", () => {
     assert.doesNotMatch(markup, /High Starts At:/);
 });
 
-test("old crt theme uses fixed paint without color controls", () => {
+test("terminal theme uses fixed paint without color controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "network",
         settings: buildWidgetSettings("network", {
             appearance: {
-                theme: { selectedTheme: "old-crt" },
+                theme: { selectedTheme: "terminal" },
             },
             network: {
                 direction: "both",
@@ -163,7 +163,10 @@ test("old crt theme uses fixed paint without color controls", () => {
         }),
     });
 
-    assert.match(markup, /Old CRT/);
+    assert.match(markup, /Terminal/);
+    assert.match(markup, /Terminal Style:/);
+    assert.match(markup, /Clean/);
+    assert.match(markup, /Vintage/);
     assert.doesNotMatch(markup, /Color Mode:/);
     assert.doesNotMatch(markup, /Color - Download/);
     assert.doesNotMatch(markup, /Color - Upload/);

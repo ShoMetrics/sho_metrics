@@ -20,10 +20,14 @@ const BLACK_WHITE_SOLID_BACKGROUND_PAINT = "#222222";
 const BLACK_WHITE_SOFT_TRIANGLE_LOW_PAINT = "#161616";
 const BLACK_WHITE_SOFT_TRIANGLE_MEDIUM_PAINT = "#2c2c2c";
 const BLACK_WHITE_SOFT_TRIANGLE_HIGH_PAINT = "#444444";
-const OLD_CRT_BLACK_GLASS_PAINT = "#010301";
-const OLD_CRT_BRIGHT_CORE_PAINT = "#46ff36";
-const OLD_CRT_NORMAL_PHOSPHOR_PAINT = "#10d82a";
-const OLD_CRT_DIM_PHOSPHOR_PAINT = "rgba(1,174,31,0.44)";
+const TERMINAL_CLEAN_BLACK_GLASS_PAINT = "#010705";
+const TERMINAL_CLEAN_BRIGHT_CORE_PAINT = "#67ff70";
+const TERMINAL_CLEAN_NORMAL_PHOSPHOR_PAINT = "#25e84a";
+const TERMINAL_CLEAN_DIM_PHOSPHOR_PAINT = "rgba(37,232,74,0.54)";
+const TERMINAL_VINTAGE_BLACK_GLASS_PAINT = "#010301";
+const TERMINAL_VINTAGE_BRIGHT_CORE_PAINT = "#46ff36";
+const TERMINAL_VINTAGE_NORMAL_PHOSPHOR_PAINT = "#10d82a";
+const TERMINAL_VINTAGE_DIM_PHOSPHOR_PAINT = "rgba(1,174,31,0.44)";
 
 const DEFAULT_RENDER_PAINT_TOKENS = {
     background: DEFAULT_BACKGROUND_PAINT,
@@ -41,25 +45,48 @@ const DEFAULT_RENDER_PAINT_TOKENS = {
     divider: "rgba(255,255,255,0.18)",
 } satisfies Omit<RenderPaintTokens, "backgroundFill" | "primaryMetric">;
 
-const OLD_CRT_RENDER_PAINT_TOKENS = {
-    background: OLD_CRT_BLACK_GLASS_PAINT,
-    surface: OLD_CRT_NORMAL_PHOSPHOR_PAINT,
-    primaryText: OLD_CRT_BRIGHT_CORE_PAINT,
+const TERMINAL_CLEAN_RENDER_PAINT_TOKENS = {
+    background: TERMINAL_CLEAN_BLACK_GLASS_PAINT,
+    surface: TERMINAL_CLEAN_NORMAL_PHOSPHOR_PAINT,
+    primaryText: TERMINAL_CLEAN_BRIGHT_CORE_PAINT,
+    secondaryText: "rgba(37,232,74,0.82)",
+    mutedText: TERMINAL_CLEAN_DIM_PHOSPHOR_PAINT,
+    icon: "rgba(37,232,74,0.88)",
+    linearTitleText: "rgba(37,232,74,0.80)",
+    linearValueText: TERMINAL_CLEAN_BRIGHT_CORE_PAINT,
+    linearUnitText: "rgba(37,232,74,0.78)",
+    linearSecondaryText: TERMINAL_CLEAN_DIM_PHOSPHOR_PAINT,
+    track: "rgba(37,232,74,0.17)",
+    grid: "rgba(37,232,74,0.18)",
+    divider: "rgba(37,232,74,0.18)",
+} satisfies Omit<RenderPaintTokens, "backgroundFill" | "primaryMetric">;
+
+const TERMINAL_VINTAGE_RENDER_PAINT_TOKENS = {
+    background: TERMINAL_VINTAGE_BLACK_GLASS_PAINT,
+    surface: TERMINAL_VINTAGE_NORMAL_PHOSPHOR_PAINT,
+    primaryText: TERMINAL_VINTAGE_BRIGHT_CORE_PAINT,
     secondaryText: "rgba(16,216,42,0.78)",
-    mutedText: OLD_CRT_DIM_PHOSPHOR_PAINT,
+    mutedText: TERMINAL_VINTAGE_DIM_PHOSPHOR_PAINT,
     icon: "rgba(16,216,42,0.84)",
     linearTitleText: "rgba(16,216,42,0.76)",
-    linearValueText: OLD_CRT_BRIGHT_CORE_PAINT,
+    linearValueText: TERMINAL_VINTAGE_BRIGHT_CORE_PAINT,
     linearUnitText: "rgba(16,216,42,0.72)",
-    linearSecondaryText: OLD_CRT_DIM_PHOSPHOR_PAINT,
+    linearSecondaryText: TERMINAL_VINTAGE_DIM_PHOSPHOR_PAINT,
     track: "rgba(1,160,30,0.18)",
     grid: "rgba(1,198,39,0.28)",
     divider: "rgba(1,198,39,0.24)",
 } satisfies Omit<RenderPaintTokens, "backgroundFill" | "primaryMetric">;
 
-const OLD_CRT_COLOR_CONFIG = {
+const TERMINAL_CLEAN_COLOR_CONFIG = {
     mode: "solid",
-    solidColor: OLD_CRT_NORMAL_PHOSPHOR_PAINT,
+    solidColor: TERMINAL_CLEAN_NORMAL_PHOSPHOR_PAINT,
+    thresholds: [],
+    isGradientEnabled: false,
+} satisfies ColorConfig;
+
+const TERMINAL_VINTAGE_COLOR_CONFIG = {
+    mode: "solid",
+    solidColor: TERMINAL_VINTAGE_NORMAL_PHOSPHOR_PAINT,
     thresholds: [],
     isGradientEnabled: false,
 } satisfies ColorConfig;
@@ -91,8 +118,11 @@ export function buildColorConfigFromAppearance(
     const colorConfig = buildColorConfigFromMetricPaint(appearance.paint.metric, channel);
 
     if (appearance.theme.selectedTheme !== "color-filled") {
-        if (appearance.theme.selectedTheme === "old-crt") {
-            return lowerColorConfigForColorMode(appearance.paint.metric.colorMode, OLD_CRT_COLOR_CONFIG);
+        if (appearance.theme.selectedTheme === "terminal") {
+            return lowerColorConfigForColorMode(
+                appearance.paint.metric.colorMode,
+                terminalColorConfigForVariant(appearance.theme.terminal.variant),
+            );
         }
 
         return colorConfig;
@@ -164,9 +194,9 @@ function buildRenderPaintTokens(
         };
     }
 
-    if (settings.theme.selectedTheme === "old-crt") {
+    if (settings.theme.selectedTheme === "terminal") {
         return {
-            ...OLD_CRT_RENDER_PAINT_TOKENS,
+            ...terminalRenderPaintTokensForVariant(settings.theme.terminal.variant),
             backgroundFill: undefined,
             primaryMetric,
         };
@@ -177,6 +207,18 @@ function buildRenderPaintTokens(
         backgroundFill,
         primaryMetric,
     };
+}
+
+function terminalColorConfigForVariant(
+    variant: ResolvedAppearanceSettings["theme"]["terminal"]["variant"],
+): ColorConfig {
+    return variant === "vintage" ? TERMINAL_VINTAGE_COLOR_CONFIG : TERMINAL_CLEAN_COLOR_CONFIG;
+}
+
+function terminalRenderPaintTokensForVariant(
+    variant: ResolvedAppearanceSettings["theme"]["terminal"]["variant"],
+): Omit<RenderPaintTokens, "backgroundFill" | "primaryMetric"> {
+    return variant === "vintage" ? TERMINAL_VINTAGE_RENDER_PAINT_TOKENS : TERMINAL_CLEAN_RENDER_PAINT_TOKENS;
 }
 
 function buildRenderBackgroundFill(settings: ResolvedAppearanceSettings): RenderBackgroundFill | undefined {
