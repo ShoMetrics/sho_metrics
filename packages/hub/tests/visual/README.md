@@ -17,7 +17,18 @@ npm.cmd run test:visual
 npm.cmd run test:visual:update
 ```
 
-Current widget visual coverage has 9 snapshots. On the Windows development
-machine used to add the suite, a run after adding the Old CRT snapshot took
-0.847 seconds total, or 0.094 seconds per snapshot. Treat this as a rough local
-cost estimate; CI hardware can differ.
+Current widget visual coverage has 41 snapshots. The baseline suite is grouped
+by rendering surface:
+
+- `widget-color-filled.visual.spec.ts`: original Color Filled smoke coverage.
+- `widget-single-baseline.visual.spec.ts`: broader single-metric widget coverage
+  generated from the first visual snapshot renderer baseline.
+- `widget-dual-baseline.visual.spec.ts`: dual-channel widget coverage generated
+  from the first visual snapshot renderer baseline.
+- `widget-default-theme.visual.spec.ts`: representative default-theme coverage
+  added after the baseline suite.
+- `widget-old-crt.visual.spec.ts`: Old CRT theme coverage.
+
+On the Windows development machine used to expand the suite, `npm.cmd run
+test:visual` reported 41 snapshots in 1.4 seconds, or roughly 0.034 seconds per
+snapshot. Treat this as a rough local cost estimate; CI hardware can differ.
