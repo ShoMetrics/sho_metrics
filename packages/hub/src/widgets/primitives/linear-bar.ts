@@ -385,7 +385,7 @@ function renderTitle(options: {
     textStyles: RenderTextStyles;
     graphicEffects: RenderGraphicEffectTokens;
 }): string {
-    const labelTextStyle = options.textStyles.label;
+    const titleTextStyle = options.textStyles.title;
     const titleXCoordinate = options.iconFragment
         ? options.layout.xCoordinate + options.iconGap
         : options.layout.xCoordinate;
@@ -402,11 +402,11 @@ function renderTitle(options: {
             xCoordinate: titleXCoordinate,
             yCoordinate: options.layout.yCoordinate,
             maxWidth: titleMaxWidth,
-            fontSize: resolveRenderTextStyleFontSize(options.layout.fontSize, labelTextStyle),
-            fontFamily: labelTextStyle.fontFamily,
-            fontWeight: labelTextStyle.fontWeight,
+            fontSize: resolveRenderTextStyleFontSize(options.layout.fontSize, titleTextStyle),
+            fontFamily: titleTextStyle.fontFamily,
+            fontWeight: titleTextStyle.fontWeight,
             fill: options.textColor,
-            extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
+            extraAttributes: buildSvgFilterAttributes(titleTextStyle.filter),
         })}
     `;
 }
@@ -426,25 +426,31 @@ function renderValueWithUnit(options: {
 
     return renderMetricTextRow({
         id: options.clipId,
-        valueText: options.valueText,
-        unitText: options.unitText,
-        xCoordinate: options.layout.xCoordinate,
-        yCoordinate: options.layout.yCoordinate,
-        width: options.layout.maxWidth,
-        valueFontSize: resolveRenderTextStyleFontSize(options.layout.fontSize, valueTextStyle),
-        unitFontSize: resolveRenderTextStyleFontSize(options.layout.unitFontSize, unitTextStyle),
-        valueFontFamily: valueTextStyle.fontFamily,
-        unitFontFamily: unitTextStyle.fontFamily,
-        valueFontWeight: valueTextStyle.fontWeight,
-        unitFontWeight: unitTextStyle.fontWeight,
-        valueFill: options.valueTextColor,
-        unitFill: options.unitTextColor,
-        unitBaselineOffset: 2,
-        valueExtraAttributes: [
-            "font-variant-numeric=\"tabular-nums\"",
-            ...buildSvgFilterAttributes(valueTextStyle.filter),
-        ],
-        unitExtraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
+        layout: {
+            xCoordinate: options.layout.xCoordinate,
+            yCoordinate: options.layout.yCoordinate,
+            width: options.layout.maxWidth,
+        },
+        value: {
+            text: options.valueText,
+            fontSize: resolveRenderTextStyleFontSize(options.layout.fontSize, valueTextStyle),
+            fontFamily: valueTextStyle.fontFamily,
+            fontWeight: valueTextStyle.fontWeight,
+            fill: options.valueTextColor,
+            extraAttributes: [
+                "font-variant-numeric=\"tabular-nums\"",
+                ...buildSvgFilterAttributes(valueTextStyle.filter),
+            ],
+        },
+        unit: {
+            text: options.unitText,
+            fontSize: resolveRenderTextStyleFontSize(options.layout.unitFontSize, unitTextStyle),
+            fontFamily: unitTextStyle.fontFamily,
+            fontWeight: unitTextStyle.fontWeight,
+            fill: options.unitTextColor,
+            baselineOffset: 2,
+            extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
+        },
     });
 }
 

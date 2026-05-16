@@ -220,26 +220,32 @@ export const sparkline: Widget<SparklineConfig> = {
             })}
             ${renderMetricTextRow({
                 id: "sparkline-current-value",
-                valueText,
-                unitText: data.unit,
-                xCoordinate: layoutPlan.value.xCoordinate,
-                yCoordinate: layoutPlan.value.yCoordinate,
-                width: layoutPlan.value.maxWidth,
-                valueFontSize: resolveRenderTextStyleFontSize(layoutPlan.value.fontSize, config.textStyles.value),
-                unitFontSize: resolveRenderTextStyleFontSize(layoutPlan.value.unitFontSize, config.textStyles.unit),
-                valueFontFamily: config.textStyles.value.fontFamily,
-                unitFontFamily: config.textStyles.unit.fontFamily,
-                valueFontWeight: config.textStyles.value.fontWeight,
-                unitFontWeight: config.textStyles.unit.fontWeight,
-                valueFill: config.paints.primaryText,
-                unitFill: config.paints.supportingText,
-                unitBaselineOffset: 2,
-                textAnchor: layoutPlan.value.textAnchor,
-                valueExtraAttributes: [
-                    "font-variant-numeric=\"tabular-nums\"",
-                    ...buildSvgFilterAttributes(config.textStyles.value.filter),
-                ],
-                unitExtraAttributes: buildSvgFilterAttributes(config.textStyles.unit.filter),
+                layout: {
+                    xCoordinate: layoutPlan.value.xCoordinate,
+                    yCoordinate: layoutPlan.value.yCoordinate,
+                    width: layoutPlan.value.maxWidth,
+                    textAnchor: layoutPlan.value.textAnchor,
+                },
+                value: {
+                    text: valueText,
+                    fontSize: resolveRenderTextStyleFontSize(layoutPlan.value.fontSize, config.textStyles.value),
+                    fontFamily: config.textStyles.value.fontFamily,
+                    fontWeight: config.textStyles.value.fontWeight,
+                    fill: config.paints.primaryText,
+                    extraAttributes: [
+                        "font-variant-numeric=\"tabular-nums\"",
+                        ...buildSvgFilterAttributes(config.textStyles.value.filter),
+                    ],
+                },
+                unit: {
+                    text: data.unit,
+                    fontSize: resolveRenderTextStyleFontSize(layoutPlan.value.unitFontSize, config.textStyles.unit),
+                    fontFamily: config.textStyles.unit.fontFamily,
+                    fontWeight: config.textStyles.unit.fontWeight,
+                    fill: config.paints.supportingText,
+                    baselineOffset: 2,
+                    extraAttributes: buildSvgFilterAttributes(config.textStyles.unit.filter),
+                },
             })}
             <path d="${areaPath}" fill="${areaPaint}"${areaOpacity} ${buildSvgFilterAttributes(config.graphicEffects.subtleFilter).join(" ")} />
             ${gridLineSvg}
@@ -325,7 +331,7 @@ function renderTitle(options: {
     textStyles: RenderTextStyles;
     graphicEffects: RenderGraphicEffectTokens;
 }): string {
-    const labelTextStyle = options.textStyles.label;
+    const titleTextStyle = options.textStyles.title;
     const titleXCoordinate = options.iconFragment
         ? options.layout.xCoordinate + options.iconGap
         : options.layout.xCoordinate;
@@ -342,11 +348,11 @@ function renderTitle(options: {
             xCoordinate: titleXCoordinate,
             yCoordinate: options.layout.yCoordinate,
             maxWidth: titleMaxWidth,
-            fontSize: resolveRenderTextStyleFontSize(options.layout.fontSize, labelTextStyle),
-            fontFamily: labelTextStyle.fontFamily,
-            fontWeight: labelTextStyle.fontWeight,
+            fontSize: resolveRenderTextStyleFontSize(options.layout.fontSize, titleTextStyle),
+            fontFamily: titleTextStyle.fontFamily,
+            fontWeight: titleTextStyle.fontWeight,
             fill: options.textColor,
-            extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
+            extraAttributes: buildSvgFilterAttributes(titleTextStyle.filter),
         })}
     `;
 }

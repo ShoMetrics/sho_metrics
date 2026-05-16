@@ -81,25 +81,31 @@ export const textMetric: Widget<TextMetricConfig> = {
             })}
             ${renderMetricTextRow({
                 id: "text-metric-value",
-                valueText,
-                unitText: data.unit,
-                xCoordinate: centerXCoordinate,
-                yCoordinate: keySize.height * TEXT_LAYOUT.valueYRatio,
-                width: textWidth,
-                valueFontSize: resolveRenderTextStyleFontSize(TEXT_LAYOUT.valueFontSize, valueTextStyle),
-                unitFontSize: resolveRenderTextStyleFontSize(TEXT_LAYOUT.unitFontSize, unitTextStyle),
-                valueFontFamily: valueTextStyle.fontFamily,
-                unitFontFamily: unitTextStyle.fontFamily,
-                valueFontWeight: valueTextStyle.fontWeight,
-                unitFontWeight: unitTextStyle.fontWeight,
-                valueFill: valueTextColor,
-                unitFill: config.unitTextColor,
-                textAnchor: "middle",
-                valueExtraAttributes: [
-                    "font-variant-numeric=\"tabular-nums\"",
-                    ...buildSvgFilterAttributes(valueTextStyle.filter),
-                ],
-                unitExtraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
+                layout: {
+                    xCoordinate: centerXCoordinate,
+                    yCoordinate: keySize.height * TEXT_LAYOUT.valueYRatio,
+                    width: textWidth,
+                    textAnchor: "middle",
+                },
+                value: {
+                    text: valueText,
+                    fontSize: resolveRenderTextStyleFontSize(TEXT_LAYOUT.valueFontSize, valueTextStyle),
+                    fontFamily: valueTextStyle.fontFamily,
+                    fontWeight: valueTextStyle.fontWeight,
+                    fill: valueTextColor,
+                    extraAttributes: [
+                        "font-variant-numeric=\"tabular-nums\"",
+                        ...buildSvgFilterAttributes(valueTextStyle.filter),
+                    ],
+                },
+                unit: {
+                    text: data.unit,
+                    fontSize: resolveRenderTextStyleFontSize(TEXT_LAYOUT.unitFontSize, unitTextStyle),
+                    fontFamily: unitTextStyle.fontFamily,
+                    fontWeight: unitTextStyle.fontWeight,
+                    fill: config.unitTextColor,
+                    extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
+                },
                 fitOptions: data.unit.length > 1
                     ? { minimumFontScale: 0.48, widthGuardRatio: 1.36 }
                     : undefined,
@@ -198,25 +204,31 @@ function renderDualTextRow(options: {
         })}
         ${renderMetricTextRow({
             id: `${options.rowId}-value`,
-            valueText,
-            unitText: options.widgetData.unit,
-            xCoordinate: options.centerXCoordinate,
-            yCoordinate: options.yCoordinate,
-            width: options.textWidth,
-            valueFontSize: resolveRenderTextStyleFontSize(TEXT_LAYOUT.dualValueFontSize, valueTextStyle),
-            unitFontSize: resolveRenderTextStyleFontSize(TEXT_LAYOUT.dualUnitFontSize, unitTextStyle),
-            valueFontFamily: valueTextStyle.fontFamily,
-            unitFontFamily: unitTextStyle.fontFamily,
-            valueFontWeight: valueTextStyle.fontWeight,
-            unitFontWeight: unitTextStyle.fontWeight,
-            valueFill: options.valueFill,
-            unitFill: options.config.unitTextColor,
-            textAnchor: "middle",
-            valueExtraAttributes: [
-                "font-variant-numeric=\"tabular-nums\"",
-                ...buildSvgFilterAttributes(valueTextStyle.filter),
-            ],
-            unitExtraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
+            layout: {
+                xCoordinate: options.centerXCoordinate,
+                yCoordinate: options.yCoordinate,
+                width: options.textWidth,
+                textAnchor: "middle",
+            },
+            value: {
+                text: valueText,
+                fontSize: resolveRenderTextStyleFontSize(TEXT_LAYOUT.dualValueFontSize, valueTextStyle),
+                fontFamily: valueTextStyle.fontFamily,
+                fontWeight: valueTextStyle.fontWeight,
+                fill: options.valueFill,
+                extraAttributes: [
+                    "font-variant-numeric=\"tabular-nums\"",
+                    ...buildSvgFilterAttributes(valueTextStyle.filter),
+                ],
+            },
+            unit: {
+                text: options.widgetData.unit,
+                fontSize: resolveRenderTextStyleFontSize(TEXT_LAYOUT.dualUnitFontSize, unitTextStyle),
+                fontFamily: unitTextStyle.fontFamily,
+                fontWeight: unitTextStyle.fontWeight,
+                fill: options.config.unitTextColor,
+                extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
+            },
             fitOptions: options.widgetData.unit.length > 1
                 ? { minimumFontScale: 0.50, widthGuardRatio: 1.34 }
                 : undefined,

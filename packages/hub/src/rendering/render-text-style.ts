@@ -14,6 +14,7 @@ export interface RenderTextStyle {
 export interface RenderTextStyles {
     readonly value: RenderTextStyle;
     readonly unit: RenderTextStyle;
+    readonly title: RenderTextStyle;
     readonly label: RenderTextStyle;
     readonly smallLabel: RenderTextStyle;
 }
@@ -33,6 +34,12 @@ export const DEFAULT_RENDER_TEXT_STYLES = {
     unit: createRenderTextStyle({
         fontFamily: DEFAULT_RENDER_FONT_FAMILY,
         fontWeight: 800,
+        fontSizeScale: 1,
+        filter: undefined,
+    }),
+    title: createRenderTextStyle({
+        fontFamily: DEFAULT_RENDER_FONT_FAMILY,
+        fontWeight: 850,
         fontSizeScale: 1,
         filter: undefined,
     }),
@@ -62,6 +69,12 @@ export const OLD_CRT_RENDER_TEXT_STYLES = {
         fontWeight: 680,
         fontSizeScale: 1.04,
         filter: `url(#${OLD_CRT_SUBTLE_GLOW_FILTER_ID})`,
+    }),
+    title: createRenderTextStyle({
+        fontFamily: OLD_CRT_FONT_FAMILY,
+        fontWeight: 760,
+        fontSizeScale: 1,
+        filter: `url(#${OLD_CRT_LABEL_GLOW_FILTER_ID})`,
     }),
     label: createRenderTextStyle({
         fontFamily: OLD_CRT_FONT_FAMILY,

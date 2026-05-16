@@ -427,19 +427,25 @@ test("linear bar renders at most two channel bars", () => {
 test("metric text row escapes values and clamps non-finite coordinates", () => {
     const svgFragment = renderMetricTextRow({
         id: "metric:value",
-        valueText: `<N/A>`,
-        unitText: `MB/s &`,
-        xCoordinate: Number.POSITIVE_INFINITY,
-        yCoordinate: Number.NaN,
-        width: -100,
-        valueFontSize: 20,
-        unitFontSize: 12,
-        valueFontFamily: `"Inter"`,
-        unitFontFamily: `"Inter"`,
-        valueFontWeight: 900,
-        unitFontWeight: 700,
-        valueFill: `#fff"`,
-        unitFill: "#aaa",
+        layout: {
+            xCoordinate: Number.POSITIVE_INFINITY,
+            yCoordinate: Number.NaN,
+            width: -100,
+        },
+        value: {
+            text: `<N/A>`,
+            fontSize: 20,
+            fontFamily: `"Inter"`,
+            fontWeight: 900,
+            fill: `#fff"`,
+        },
+        unit: {
+            text: `MB/s &`,
+            fontSize: 12,
+            fontFamily: `"Inter"`,
+            fontWeight: 700,
+            fill: "#aaa",
+        },
     });
 
     assert.match(svgFragment, /clipPath id="metric-value"/);
@@ -452,19 +458,25 @@ test("metric text row escapes values and clamps non-finite coordinates", () => {
 test("metric text row shrinks long values and units into the row width", () => {
     const svgFragment = renderMetricTextRow({
         id: "metric-long-value",
-        valueText: "999.9",
-        unitText: "MB/s",
-        xCoordinate: 16,
-        yCoordinate: 61,
-        width: 48,
-        valueFontSize: 24,
-        unitFontSize: 14,
-        valueFontFamily: "Inter",
-        unitFontFamily: "Inter",
-        valueFontWeight: 900,
-        unitFontWeight: 800,
-        valueFill: "white",
-        unitFill: "#aaa",
+        layout: {
+            xCoordinate: 16,
+            yCoordinate: 61,
+            width: 48,
+        },
+        value: {
+            text: "999.9",
+            fontSize: 24,
+            fontFamily: "Inter",
+            fontWeight: 900,
+            fill: "white",
+        },
+        unit: {
+            text: "MB/s",
+            fontSize: 14,
+            fontFamily: "Inter",
+            fontWeight: 800,
+            fill: "#aaa",
+        },
     });
 
     assert.match(svgFragment, /textLength="48" lengthAdjust="spacingAndGlyphs"/);
