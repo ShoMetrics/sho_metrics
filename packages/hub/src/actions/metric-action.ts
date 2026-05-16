@@ -8,7 +8,12 @@ import streamDeck, {
 import { isDeepStrictEqual } from "node:util";
 import { scheduler } from "../runtime/scheduler";
 import { metricStore, type MetricStoreReader } from "../runtime/metric-store";
-import { LOCAL_SOURCE_SCOPE_ID } from "../runtime/sources/metric-read-plan";
+import {
+    buildLocalMetricReadPlan,
+    buildMetricReadPlanKey,
+    normalizeMetricReadPlan,
+    type MetricReadPlan,
+} from "../runtime/sources/metric-read-plan";
 import { clearMetricDisplayState } from "../metric-view-runner/runner";
 import { logger } from "../logging/logger";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
@@ -31,7 +36,7 @@ const log = logger.for("MetricAction");
 
 interface ActiveMetricAction {
     cleanup: () => void;
-    subscriptionKeySignature: string;
+    readPlanSignature: string;
     pollingIntervalMilliseconds: number;
 }
 
@@ -50,7 +55,7 @@ interface ActiveActionState {
 export abstract class MetricAction extends SingletonAction {
     private activeActionStates = new Map<string, ActiveActionState>();
     private activeMetricActions = new Map<string, ActiveMetricAction>();
-    private readonly localMetricReader = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
+    private readonly metricReaderBySourceScopeId = new Map<string, MetricStoreReader>();
 
     protected abstract readonly actionKind: ActionKind;
 
@@ -114,7 +119,7 @@ export abstract class MetricAction extends SingletonAction {
                     log.error(() => `Failed to persist quick-start widget settings: ${String(error)}`);
                 });
             }
-            this.resubscribeActionIfFrequencyChanged(activeActionState);
+            this.resubscribeActionIfPollingPlanChanged(activeActionState);
             // Force an immediate update for snappy UI feedback.
             this.onMetricsUpdate(activeActionState.event);
         }
@@ -148,13 +153,24 @@ export abstract class MetricAction extends SingletonAction {
      */
     protected abstract onMetricsUpdate(event: WillAppearEvent): void;
 
-    protected getMetricSubscriptionKeys(event: WillAppearEvent): readonly string[] {
+    protected getMetricReadPlan(event: WillAppearEvent): MetricReadPlan {
         void event;
-        return [];
+        return this.buildMetricReadPlan([]);
     }
 
-    protected getMetricReader(): MetricStoreReader {
-        return this.localMetricReader;
+    protected buildMetricReadPlan(metricKeys: readonly string[]): MetricReadPlan {
+        return buildLocalMetricReadPlan(metricKeys);
+    }
+
+    protected getMetricReader(event: WillAppearEvent): MetricStoreReader {
+        const readPlan = this.resolveMetricReadPlan(event);
+        let metricReader = this.metricReaderBySourceScopeId.get(readPlan.sourceScopeId);
+        if (!metricReader) {
+            metricReader = metricStore.forScope(readPlan.sourceScopeId);
+            this.metricReaderBySourceScopeId.set(readPlan.sourceScopeId, metricReader);
+        }
+
+        return metricReader;
     }
 
     protected resolveSettings(event: WillAppearEvent): ResolvedWidgetSettings {
@@ -197,8 +213,8 @@ export abstract class MetricAction extends SingletonAction {
         const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
             this.resolveSettings(event).preferences.pollingFrequencySeconds,
         );
-        const subscriptionKeys = normalizeMetricSubscriptionKeys(this.getMetricSubscriptionKeys(event));
-        const subscriptionKeySignature = subscriptionKeys.join(",");
+        const readPlan = this.resolveMetricReadPlan(event);
+        const readPlanSignature = buildMetricReadPlanKey(readPlan);
         const cleanup = scheduler.subscribe(() => {
             const currentActionState = this.activeActionStates.get(event.action.id);
 
@@ -206,29 +222,28 @@ export abstract class MetricAction extends SingletonAction {
                 this.onMetricsUpdate(currentActionState.event);
             }
         }, {
-            metricKeys: subscriptionKeys,
+            metricKeys: readPlan.metricKeys,
             pollingIntervalMilliseconds,
         });
 
         this.activeMetricActions.set(event.action.id, {
             cleanup,
-            subscriptionKeySignature,
+            readPlanSignature,
             pollingIntervalMilliseconds,
         });
     }
 
-    private resubscribeActionIfFrequencyChanged(activeActionState: ActiveActionState): void {
+    private resubscribeActionIfPollingPlanChanged(activeActionState: ActiveActionState): void {
         const { event } = activeActionState;
         const activeMetricAction = this.activeMetricActions.get(event.action.id);
         const nextPollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
             this.resolveSettings(event).preferences.pollingFrequencySeconds,
         );
-        const nextSubscriptionKeys = normalizeMetricSubscriptionKeys(this.getMetricSubscriptionKeys(event));
-        const nextSubscriptionKeySignature = nextSubscriptionKeys.join(",");
+        const nextReadPlanSignature = buildMetricReadPlanKey(this.resolveMetricReadPlan(event));
 
         if (
             activeMetricAction?.pollingIntervalMilliseconds === nextPollingIntervalMilliseconds
-            && activeMetricAction.subscriptionKeySignature === nextSubscriptionKeySignature
+            && activeMetricAction.readPlanSignature === nextReadPlanSignature
         ) {
             return;
         }
@@ -271,6 +286,10 @@ export abstract class MetricAction extends SingletonAction {
     private resolveRawSettings(rawSettings: unknown, runtimeCache: WidgetRuntimeCache): ResolvedWidgetSettings {
         return resolveActionSettings(rawSettings, runtimeCache);
     }
+
+    private resolveMetricReadPlan(event: WillAppearEvent): MetricReadPlan {
+        return normalizeMetricReadPlan(this.getMetricReadPlan(event));
+    }
 }
 
 const DEFAULT_POLLING_INTERVAL_MILLISECONDS = 1000;
@@ -282,10 +301,6 @@ function resolvePollingIntervalMilliseconds(pollingFrequencySeconds: number): nu
     }
 
     return DEFAULT_POLLING_INTERVAL_MILLISECONDS;
-}
-
-function normalizeMetricSubscriptionKeys(subscriptionKeys: readonly string[]): readonly string[] {
-    return Array.from(new Set(subscriptionKeys)).sort();
 }
 
 function formatSettingValue(value: unknown): string {

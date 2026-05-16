@@ -10,6 +10,7 @@ import {
     getNetworkInterfaceMetricKey,
     type NetworkDirection,
 } from "../runtime/network-metric-keys";
+import type { MetricReadPlan } from "../runtime/sources/metric-read-plan";
 import { resolveNetworkMetricSubscriptionKeys } from "./network/metric-subscriptions";
 import type { ResolvedNetworkMetricTarget } from "../settings/resolved-settings";
 import {
@@ -33,14 +34,16 @@ const NETWORK_INTERFACE_LIST_REFRESH_METRIC_KEYS = [getNetworkAggregateMetricKey
 export class Network extends MetricAction {
     protected readonly actionKind = "network";
 
-    protected override getMetricSubscriptionKeys(event: WillAppearEvent): readonly string[] {
+    protected override getMetricReadPlan(event: WillAppearEvent): MetricReadPlan {
         const settings = this.resolveSettings(event);
         const networkTarget = readResolvedMetricTarget(settings, "network");
-        return resolveNetworkMetricSubscriptionKeys({
+        const metricKeys = resolveNetworkMetricSubscriptionKeys({
             graphicType: settings.widget.slot.appearance.graph.viewLayout,
             networkDirection: networkTarget.reading.direction,
             networkInterfaceId: networkTarget.interfaceId ?? "",
         });
+
+        return this.buildMetricReadPlan(metricKeys);
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
@@ -49,7 +52,7 @@ export class Network extends MetricAction {
         const networkInterfaceId = networkTarget.interfaceId ?? "";
         const isAutomaticNetworkInterface = networkInterfaceId.length === 0;
         const selectedNetworkInterface = networkInterfaceRegistry.resolveSelection(networkInterfaceId);
-        const metrics = this.getMetricReader();
+        const metrics = this.getMetricReader(event);
 
         this.publishNetworkInterfaceOptions(event);
         this.publishNetworkRuntimeMaximum(event, networkTarget, selectedNetworkInterface, metrics);
