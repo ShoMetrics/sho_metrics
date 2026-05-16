@@ -91,6 +91,33 @@ test("source runner does not try fallback candidates in empty failure mode", asy
     assert.deepEqual(fallbackSource.requestedMetricKeyListList, []);
 });
 
+test("source runner returns source-scoped snapshots for all-metric reads", async () => {
+    const primarySource = new FakeSourceClient("primary", {
+        "cpu.usage_percent": buildScalarMetricValue(42),
+    });
+    const sourceRunner = createSourceRunner(primarySource);
+
+    const snapshot = await sourceRunner.poll(buildReadPlan([]));
+
+    assert.equal(snapshot.sourceId, "local");
+    assert.equal(readScalarMetricValue(snapshot, "cpu.usage_percent"), 42);
+    assert.deepEqual(primarySource.requestedMetricKeyListList, [[]]);
+});
+
+test("source runner returns source-scoped snapshots after all-metric fallback", async () => {
+    const primarySource = new FailingSourceClient("primary");
+    const fallbackSource = new FakeSourceClient("fallback", {
+        "cpu.usage_percent": buildScalarMetricValue(84),
+    });
+    const sourceRunner = createSourceRunner(primarySource, fallbackSource);
+
+    const snapshot = await sourceRunner.poll(buildReadPlan([]));
+
+    assert.equal(snapshot.sourceId, "local");
+    assert.equal(readScalarMetricValue(snapshot, "cpu.usage_percent"), 84);
+    assert.deepEqual(fallbackSource.requestedMetricKeyListList, [[]]);
+});
+
 function createSourceRunner(...sourceClients: readonly SourceClient[]): DefaultSourceRunner {
     return new DefaultSourceRunner(new DefaultSourceRegistry(sourceClients));
 }

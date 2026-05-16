@@ -120,6 +120,24 @@ test("refreshMetrics polls and ingests requested metric keys without subscribers
     }]);
 });
 
+test("dispose stops polling and disposes the source runner", async () => {
+    const sourceRunner = new FakeSourceRunner();
+    const snapshotStore = new FakeMetricSnapshotStore();
+    const scheduler = new Scheduler(sourceRunner, snapshotStore);
+    let callbackCount = 0;
+
+    scheduler.subscribe(() => {
+        callbackCount += 1;
+    }, {
+        readPlan: buildLocalMetricReadPlan(["cpu.usage_percent"]),
+    });
+
+    await waitForCondition(() => callbackCount === 1);
+    scheduler.dispose();
+
+    assert.equal(sourceRunner.disposeCount, 1);
+});
+
 test("later same-group subscribers do not join an in-flight initial poll", async () => {
     const sourceRunner = new DeferredSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
@@ -159,6 +177,7 @@ class FakeSourceRunner implements SourceRunner {
     readonly sourceId = "fake-source";
     readonly snapshot: IMetricSnapshot = buildTestSnapshot(this.sourceId);
     readonly polledReadPlans: MetricReadPlan[] = [];
+    disposeCount = 0;
 
     async poll(readPlan: MetricReadPlan): Promise<IMetricSnapshot> {
         this.polledReadPlans.push(readPlan);
@@ -166,7 +185,7 @@ class FakeSourceRunner implements SourceRunner {
     }
 
     dispose(): void {
-        return;
+        this.disposeCount += 1;
     }
 }
 

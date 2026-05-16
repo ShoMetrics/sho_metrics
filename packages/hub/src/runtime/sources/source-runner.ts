@@ -59,9 +59,6 @@ export class DefaultSourceRunner implements SourceRunner {
                     pendingMetricKeys.delete(metricKey);
                 }
 
-                if (pendingMetricKeys.size > 0) {
-                    this.logFallback("partial-snapshot", sourceCandidate.sourceId, normalizedReadPlan);
-                }
             } catch (error) {
                 this.logFallback("source-error", sourceCandidate.sourceId, normalizedReadPlan, error);
             }
@@ -90,7 +87,13 @@ export class DefaultSourceRunner implements SourceRunner {
             }
 
             try {
-                return await sourceClient.readSnapshot([]);
+                const snapshot = await sourceClient.readSnapshot([]);
+
+                return buildMetricSnapshot({
+                    sourceId: readPlan.sourceScopeId,
+                    timestampMilliseconds: fallbackTimestampMilliseconds,
+                    metrics: snapshot.metrics,
+                });
             } catch (error) {
                 this.logFallback("source-error", sourceCandidate.sourceId, readPlan, error);
             }

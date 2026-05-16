@@ -7,6 +7,7 @@ import { Memory } from "./actions/memory";
 import { Disk } from "./actions/disk";
 import { logger } from "./logging/logger";
 import { pluginGlobalSettingsStore } from "./settings/global-settings-store";
+import { scheduler } from "./runtime/scheduler";
 
 logger.setLevel(__LOG_LEVEL__);
 const log = logger.for("Plugin");
@@ -20,6 +21,10 @@ streamDeck.actions.registerAction(new Network());
 streamDeck.actions.registerAction(new Memory());
 streamDeck.actions.registerAction(new Disk());
 streamDeck.actions.registerAction(new Gpu());
+
+process.once("exit", () => {
+    scheduler.dispose();
+});
 
 streamDeck.connect()
     .then(() => streamDeck.settings.getGlobalSettings())
