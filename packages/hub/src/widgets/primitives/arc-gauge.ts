@@ -2,13 +2,14 @@ import type { WidgetData, KeySize } from "../../rendering/widget-data";
 import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
     buildSvgFilterAttributes,
-    DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
-    type RenderForegroundEffectTokens,
-} from "../../rendering/render-foreground-effects";
+    DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
+    type RenderGraphicEffectTokens,
+} from "../../rendering/render-svg-effects";
 import {
-    DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
-    type RenderTypographyTokens,
-} from "../../rendering/render-typography";
+    DEFAULT_RENDER_TEXT_STYLES,
+    resolveRenderTextStyleFontSize,
+    type RenderTextStyles,
+} from "../../rendering/render-text-style";
 import {
     clamp,
     renderConstrainedSvgText,
@@ -50,8 +51,8 @@ export interface ArcGaugeConfig extends WidgetBaseConfig {
     valueTextColor: string;
     unitTextColor: string;
     iconColor: string;
-    typography: RenderTypographyTokens;
-    foregroundEffects: RenderForegroundEffectTokens;
+    textStyles: RenderTextStyles;
+    graphicEffects: RenderGraphicEffectTokens;
     innerTextScale: number;
     circleStyle: ArcGaugeStyle;
     gaugeRangeBlendProgress: number;
@@ -72,8 +73,8 @@ export const DEFAULT_ARC_GAUGE_CONFIG: ArcGaugeConfig = {
     valueTextColor: "white",
     unitTextColor: "rgba(255,255,255,0.74)",
     iconColor: "rgba(255,255,255,0.88)",
-    typography: DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
-    foregroundEffects: DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
+    textStyles: DEFAULT_RENDER_TEXT_STYLES,
+    graphicEffects: DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
     gradientHeadAdjustmentPercent: -42,
     innerTextScale: 1,
     circleStyle: "value",
@@ -252,8 +253,8 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
                 notchGeometry: ringNotchGeometry,
                 shouldRenderFullRangeArc,
                 shouldRenderMarker: circleStyle === "gauge" && valueText !== "N/A",
-                metricFilter: config.foregroundEffects.metricFilter,
-                subtleFilter: config.foregroundEffects.subtleFilter,
+                metricFilter: config.graphicEffects.metricFilter,
+                subtleFilter: config.graphicEffects.subtleFilter,
             })}
             ${centerContentFragment}
         `;
@@ -287,14 +288,14 @@ function renderCenterContent(options: {
                 options.centerXCoordinate,
                 options.statusNotchGeometry,
                 options.config.iconColor,
-                options.config.foregroundEffects.iconFilter,
+                options.config.graphicEffects.iconFilter,
             )}
             ${renderCenterIcon(
                 options.centerIconFragment,
                 options.centerXCoordinate,
                 options.centerYCoordinate,
                 options.config.iconColor,
-                options.config.foregroundEffects.iconFilter,
+                options.config.graphicEffects.iconFilter,
             )}
         `;
     }
@@ -540,6 +541,8 @@ function renderGaugeValueRow(options: {
     config: ArcGaugeConfig;
 }): string {
     const yCoordinate = options.centerYCoordinate + ARC_LAYOUT.gaugeValueYOffset;
+    const valueTextStyle = options.config.textStyles.value;
+    const unitTextStyle = options.config.textStyles.unit;
 
     if (options.unitText.length === 0) {
         return renderConstrainedSvgText({
@@ -548,14 +551,14 @@ function renderGaugeValueRow(options: {
             xCoordinate: options.centerXCoordinate,
             yCoordinate,
             maxWidth: options.centerTextMaxWidth,
-            fontSize: options.valueFontSize,
-            fontFamily: options.config.typography.valueFontFamily,
-            fontWeight: 900,
+            fontSize: resolveRenderTextStyleFontSize(options.valueFontSize, valueTextStyle),
+            fontFamily: valueTextStyle.fontFamily,
+            fontWeight: valueTextStyle.fontWeight,
             fill: options.config.valueTextColor,
             textAnchor: "middle",
             extraAttributes: [
                 "font-variant-numeric=\"tabular-nums\"",
-                ...buildSvgFilterAttributes(options.config.foregroundEffects.valueFilter),
+                ...buildSvgFilterAttributes(valueTextStyle.filter),
             ],
         });
     }
@@ -581,14 +584,14 @@ function renderGaugeValueRow(options: {
             xCoordinate: valuePlacement.xCoordinate,
             yCoordinate,
             maxWidth: valuePlacement.maxWidth,
-            fontSize: valuePlacement.fontSize,
-            fontFamily: options.config.typography.valueFontFamily,
-            fontWeight: 900,
+            fontSize: resolveRenderTextStyleFontSize(valuePlacement.fontSize, valueTextStyle),
+            fontFamily: valueTextStyle.fontFamily,
+            fontWeight: valueTextStyle.fontWeight,
             fill: options.config.valueTextColor,
             textAnchor: valuePlacement.textAnchor,
             extraAttributes: [
                 "font-variant-numeric=\"tabular-nums\"",
-                ...buildSvgFilterAttributes(options.config.foregroundEffects.valueFilter),
+                ...buildSvgFilterAttributes(valueTextStyle.filter),
             ],
         })}
         ${renderConstrainedSvgText({
@@ -597,12 +600,12 @@ function renderGaugeValueRow(options: {
             xCoordinate: unitXCoordinate,
             yCoordinate,
             maxWidth: isShortUnit ? layout.shortUnitMaxWidth : layout.longUnitMaxWidth,
-            fontSize: unitFontSize,
-            fontFamily: options.config.typography.valueFontFamily,
-            fontWeight: 800,
+            fontSize: resolveRenderTextStyleFontSize(unitFontSize, unitTextStyle),
+            fontFamily: unitTextStyle.fontFamily,
+            fontWeight: unitTextStyle.fontWeight,
             fill: options.config.unitTextColor,
             textAnchor: "start",
-            extraAttributes: buildSvgFilterAttributes(options.config.foregroundEffects.labelFilter),
+            extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
         })}
     `;
 }
@@ -697,6 +700,7 @@ function renderGaugeBottomLabel(options: {
     maxWidth: number;
     config: ArcGaugeConfig;
 }): string {
+    const labelTextStyle = options.config.textStyles.smallLabel;
     const fontSize = ARC_LAYOUT.gaugeBottomLabel.fontSize;
     const estimatedLabelWidth = Math.min(options.maxWidth, options.labelText.length * fontSize * 0.62);
     const iconSize = options.iconFragment
@@ -715,19 +719,19 @@ function renderGaugeBottomLabel(options: {
             xCoordinate: labelXCoordinate,
             yCoordinate: options.yCoordinate,
             maxWidth: Math.max(12, options.maxWidth - iconSize - iconGap),
-            fontSize,
-            fontFamily: options.config.typography.labelFontFamily,
-            fontWeight: 850,
+            fontSize: resolveRenderTextStyleFontSize(fontSize, labelTextStyle),
+            fontFamily: labelTextStyle.fontFamily,
+            fontWeight: labelTextStyle.fontWeight,
             fill: options.config.labelTextColor,
             textAnchor: "middle",
-            extraAttributes: buildSvgFilterAttributes(options.config.foregroundEffects.labelFilter),
+            extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
         ${renderGaugeInlineIcon({
             iconFragment: options.iconFragment,
             xCoordinate: iconXCoordinate,
             yCoordinate: options.yCoordinate,
             iconColor: options.config.iconColor,
-            iconFilter: options.config.foregroundEffects.iconFilter,
+            iconFilter: options.config.graphicEffects.iconFilter,
         })}
     `;
 }
@@ -749,6 +753,9 @@ function renderCenterValue(options: {
     config: ArcGaugeConfig;
 }): string {
     assertArcGaugeLabel(options.labelText);
+    const labelTextStyle = options.config.textStyles.label;
+    const valueTextStyle = options.config.textStyles.value;
+    const unitTextStyle = options.config.textStyles.unit;
 
     return `
         ${renderConstrainedSvgText({
@@ -757,12 +764,12 @@ function renderCenterValue(options: {
             xCoordinate: options.centerXCoordinate,
             yCoordinate: options.labelYCoordinate,
             maxWidth: options.labelMaxWidth,
-            fontSize: options.labelFontSize,
-            fontFamily: options.config.typography.labelFontFamily,
-            fontWeight: 800,
+            fontSize: resolveRenderTextStyleFontSize(options.labelFontSize, labelTextStyle),
+            fontFamily: labelTextStyle.fontFamily,
+            fontWeight: labelTextStyle.fontWeight,
             fill: options.config.labelTextColor,
             textAnchor: "middle",
-            extraAttributes: buildSvgFilterAttributes(options.config.foregroundEffects.labelFilter),
+            extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
         ${renderMetricTextRow({
             id: "arc-value-unit",
@@ -771,19 +778,20 @@ function renderCenterValue(options: {
             xCoordinate: resolveValueRowXCoordinate(options.centerXCoordinate, options.footerIconFragment),
             yCoordinate: options.valueCenterYCoordinate,
             width: options.centerTextMaxWidth,
-            valueFontSize: options.valueFontSize,
-            unitFontSize: options.unitFontSize,
-            fontFamily: options.config.typography.valueFontFamily,
-            valueFontWeight: 900,
-            unitFontWeight: 800,
+            valueFontSize: resolveRenderTextStyleFontSize(options.valueFontSize, valueTextStyle),
+            unitFontSize: resolveRenderTextStyleFontSize(options.unitFontSize, unitTextStyle),
+            valueFontFamily: valueTextStyle.fontFamily,
+            unitFontFamily: unitTextStyle.fontFamily,
+            valueFontWeight: valueTextStyle.fontWeight,
+            unitFontWeight: unitTextStyle.fontWeight,
             valueFill: options.config.valueTextColor,
             unitFill: options.config.unitTextColor,
             textAnchor: "middle",
             valueExtraAttributes: [
                 "font-variant-numeric=\"tabular-nums\"",
-                ...buildSvgFilterAttributes(options.config.foregroundEffects.valueFilter),
+                ...buildSvgFilterAttributes(valueTextStyle.filter),
             ],
-            unitExtraAttributes: buildSvgFilterAttributes(options.config.foregroundEffects.labelFilter),
+            unitExtraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
             fitOptions: options.unitText.length > 1
                 ? { minimumFontScale: 0.42, widthGuardRatio: 1.45 }
                 : undefined,
@@ -793,7 +801,7 @@ function renderCenterValue(options: {
             options.centerXCoordinate,
             options.centerYCoordinate + ARC_LAYOUT.footerIcon.yOffset,
             options.config.iconColor,
-            options.config.foregroundEffects.iconFilter,
+            options.config.graphicEffects.iconFilter,
         )}
     `;
 }

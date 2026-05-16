@@ -4,8 +4,8 @@ import { resolveColorForThresholdValue } from "./color-resolver";
 import { renderDualMetricBodyView } from "./dual-metric-view";
 import { renderMetricFrame } from "./metric-frame";
 import type { MetricRenderAppearance } from "./render-appearance";
-import { DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS } from "./render-foreground-effects";
-import { DEFAULT_RENDER_TYPOGRAPHY_TOKENS } from "./render-typography";
+import { DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS } from "./render-svg-effects";
+import { DEFAULT_RENDER_TEXT_STYLES } from "./render-text-style";
 import { renderSingleMetricBodyView } from "./single-metric-view";
 import {
     scanChromaticSvgPaintValues,
@@ -275,8 +275,8 @@ function buildBlackWhiteRenderAppearance(options: {
             grid: "rgba(255,255,255,0.18)",
             divider: "rgba(255,255,255,0.18)",
         },
-        typography: DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
-        foregroundEffects: DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
+        textStyles: DEFAULT_RENDER_TEXT_STYLES,
+        graphicEffects: DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
         lineSmoothingPercent: 75,
         gridLineVisibility: "adaptive",
         gridLineType: options.gridLineType ?? "horizontal",

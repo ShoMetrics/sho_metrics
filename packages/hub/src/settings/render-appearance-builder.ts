@@ -1,8 +1,8 @@
 import type { MetricRenderAppearance } from "../rendering/render-appearance";
 import type { ResolvedAppearanceSettings } from "./resolved-settings";
-import { resolveRenderForegroundEffects } from "./render-foreground-effects-resolver";
+import { resolveRenderGraphicEffects } from "./render-graphic-effects-resolver";
 import { resolveRenderPaint } from "./render-paint-resolver";
-import { resolveRenderTypography } from "./render-typography-resolver";
+import { resolveRenderTextStyles } from "./render-text-style-resolver";
 
 export function buildMetricRenderAppearance(
     settings: ResolvedAppearanceSettings,
@@ -15,8 +15,8 @@ export function buildMetricRenderAppearance(
         graphicStyle: settings.theme.selectedTheme,
         paintConstraint: renderPaint.paintConstraint,
         paints: renderPaint.paintTokens,
-        typography: resolveRenderTypography(settings),
-        foregroundEffects: resolveRenderForegroundEffects(settings),
+        textStyles: resolveRenderTextStyles(settings),
+        graphicEffects: resolveRenderGraphicEffects(settings),
         lineSmoothingPercent: settings.sparkline.lineSmoothingPercent,
         gridLineVisibility: settings.sparkline.gridLineVisibility,
         gridLineType: settings.sparkline.gridLineType,

@@ -2,13 +2,14 @@ import type { WidgetData, KeySize } from "../../rendering/widget-data";
 import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
     buildSvgFilterAttributes,
-    DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
-    type RenderForegroundEffectTokens,
-} from "../../rendering/render-foreground-effects";
+    DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
+    type RenderGraphicEffectTokens,
+} from "../../rendering/render-svg-effects";
 import {
-    DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
-    type RenderTypographyTokens,
-} from "../../rendering/render-typography";
+    DEFAULT_RENDER_TEXT_STYLES,
+    resolveRenderTextStyleFontSize,
+    type RenderTextStyles,
+} from "../../rendering/render-text-style";
 import {
     adjustHexColorBrightness,
     clamp,
@@ -21,8 +22,8 @@ export interface LinearBarConfig extends WidgetBaseConfig {
     barHeight: number;
     borderRadius: number;
     paints: LinearBarPaints;
-    typography: RenderTypographyTokens;
-    foregroundEffects: RenderForegroundEffectTokens;
+    textStyles: RenderTextStyles;
+    graphicEffects: RenderGraphicEffectTokens;
     topIconFragment?: string;
 }
 
@@ -51,8 +52,8 @@ export const DEFAULT_LINEAR_BAR_CONFIG: LinearBarConfig = {
         icon: "rgba(255,255,255,0.88)",
         track: "rgba(255,255,255,0.08)",
     },
-    typography: DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
-    foregroundEffects: DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
+    textStyles: DEFAULT_RENDER_TEXT_STYLES,
+    graphicEffects: DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
     gradientHeadAdjustmentPercent: -15,
 };
 
@@ -227,8 +228,8 @@ function renderSingleBar(
             clipId: "linear-single-title",
             textColor: config.paints.secondaryText,
             iconColor: config.paints.icon,
-            typography: config.typography,
-            foregroundEffects: config.foregroundEffects,
+            textStyles: config.textStyles,
+            graphicEffects: config.graphicEffects,
         })}
         ${renderValueWithUnit({
             clipId: "linear-single-value",
@@ -237,18 +238,18 @@ function renderSingleBar(
             layout: layoutPlan.singleValue,
             valueTextColor: config.paints.primaryText,
             unitTextColor: config.paints.supportingText,
-            typography: config.typography,
-            foregroundEffects: config.foregroundEffects,
+            textStyles: config.textStyles,
+            graphicEffects: config.graphicEffects,
         })}
-        ${renderTrack(layoutPlan.singleBar, config.paints.track, config.foregroundEffects.subtleFilter)}
-        ${renderFill(layoutPlan.singleBar, fillWidth, fillPaint, config.foregroundEffects.metricFilter)}
+        ${renderTrack(layoutPlan.singleBar, config.paints.track, config.graphicEffects.subtleFilter)}
+        ${renderFill(layoutPlan.singleBar, fillWidth, fillPaint, config.graphicEffects.metricFilter)}
         ${renderSecondaryText({
             text: data.secondaryDisplayValue,
             layout: layoutPlan.singleSecondaryText,
             clipId: "linear-single-secondary",
             textColor: config.paints.mutedText,
-            typography: config.typography,
-            foregroundEffects: config.foregroundEffects,
+            textStyles: config.textStyles,
+            graphicEffects: config.graphicEffects,
         })}
     `;
 }
@@ -272,8 +273,8 @@ function renderChannelBars(
             clipId: "linear-channel-title",
             textColor: config.paints.secondaryText,
             iconColor: config.paints.icon,
-            typography: config.typography,
-            foregroundEffects: config.foregroundEffects,
+            textStyles: config.textStyles,
+            graphicEffects: config.graphicEffects,
         })}
         ${channels.slice(0, 2).map((channel, channelIndex) => {
             const channelLayout = buildChannelLayout({
@@ -293,7 +294,7 @@ function renderChannelBars(
                         <stop offset="100%" stop-color="${headColor}" />
                     </linearGradient>
                 </defs>` : ""}
-                <g color="${channel.color}" transform="translate(${channelLayout.iconCenterXCoordinate} ${channelLayout.iconCenterYCoordinate}) scale(${layoutPlan.channelIconScale})" ${buildSvgFilterAttributes(config.foregroundEffects.iconFilter).join(" ")}>
+                <g color="${channel.color}" transform="translate(${channelLayout.iconCenterXCoordinate} ${channelLayout.iconCenterYCoordinate}) scale(${layoutPlan.channelIconScale})" ${buildSvgFilterAttributes(config.graphicEffects.iconFilter).join(" ")}>
                     ${channel.iconFragment}
                 </g>
                 ${renderValueWithUnit({
@@ -303,11 +304,11 @@ function renderChannelBars(
                     layout: channelLayout.value,
                     valueTextColor: config.paints.primaryText,
                     unitTextColor: config.paints.supportingText,
-                    typography: config.typography,
-                    foregroundEffects: config.foregroundEffects,
+                    textStyles: config.textStyles,
+                    graphicEffects: config.graphicEffects,
                 })}
-                ${renderTrack(channelLayout.bar, config.paints.track, config.foregroundEffects.subtleFilter)}
-                ${renderFill(channelLayout.bar, fillWidth, fillPaint, config.foregroundEffects.metricFilter)}
+                ${renderTrack(channelLayout.bar, config.paints.track, config.graphicEffects.subtleFilter)}
+                ${renderFill(channelLayout.bar, fillWidth, fillPaint, config.graphicEffects.metricFilter)}
             `;
         }).join("")}
     `;
@@ -381,15 +382,16 @@ function renderTitle(options: {
     clipId: string;
     textColor: string;
     iconColor: string;
-    typography: RenderTypographyTokens;
-    foregroundEffects: RenderForegroundEffectTokens;
+    textStyles: RenderTextStyles;
+    graphicEffects: RenderGraphicEffectTokens;
 }): string {
+    const labelTextStyle = options.textStyles.label;
     const titleXCoordinate = options.iconFragment
         ? options.layout.xCoordinate + options.iconGap
         : options.layout.xCoordinate;
     const titleMaxWidth = Math.max(1, options.layout.maxWidth - (titleXCoordinate - options.layout.xCoordinate));
     const iconSvg = options.iconFragment
-        ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 10} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})" ${buildSvgFilterAttributes(options.foregroundEffects.iconFilter).join(" ")}>${options.iconFragment}</g>`
+        ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 10} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})" ${buildSvgFilterAttributes(options.graphicEffects.iconFilter).join(" ")}>${options.iconFragment}</g>`
         : "";
 
     return `
@@ -400,11 +402,11 @@ function renderTitle(options: {
             xCoordinate: titleXCoordinate,
             yCoordinate: options.layout.yCoordinate,
             maxWidth: titleMaxWidth,
-            fontSize: options.layout.fontSize,
-            fontFamily: options.typography.labelFontFamily,
-            fontWeight: 850,
+            fontSize: resolveRenderTextStyleFontSize(options.layout.fontSize, labelTextStyle),
+            fontFamily: labelTextStyle.fontFamily,
+            fontWeight: labelTextStyle.fontWeight,
             fill: options.textColor,
-            extraAttributes: buildSvgFilterAttributes(options.foregroundEffects.labelFilter),
+            extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
     `;
 }
@@ -416,9 +418,12 @@ function renderValueWithUnit(options: {
     layout: ValueLineLayout;
     valueTextColor: string;
     unitTextColor: string;
-    typography: RenderTypographyTokens;
-    foregroundEffects: RenderForegroundEffectTokens;
+    textStyles: RenderTextStyles;
+    graphicEffects: RenderGraphicEffectTokens;
 }): string {
+    const valueTextStyle = options.textStyles.value;
+    const unitTextStyle = options.textStyles.unit;
+
     return renderMetricTextRow({
         id: options.clipId,
         valueText: options.valueText,
@@ -426,19 +431,20 @@ function renderValueWithUnit(options: {
         xCoordinate: options.layout.xCoordinate,
         yCoordinate: options.layout.yCoordinate,
         width: options.layout.maxWidth,
-        valueFontSize: options.layout.fontSize,
-        unitFontSize: options.layout.unitFontSize,
-        fontFamily: options.typography.valueFontFamily,
-        valueFontWeight: 900,
-        unitFontWeight: 800,
+        valueFontSize: resolveRenderTextStyleFontSize(options.layout.fontSize, valueTextStyle),
+        unitFontSize: resolveRenderTextStyleFontSize(options.layout.unitFontSize, unitTextStyle),
+        valueFontFamily: valueTextStyle.fontFamily,
+        unitFontFamily: unitTextStyle.fontFamily,
+        valueFontWeight: valueTextStyle.fontWeight,
+        unitFontWeight: unitTextStyle.fontWeight,
         valueFill: options.valueTextColor,
         unitFill: options.unitTextColor,
         unitBaselineOffset: 2,
         valueExtraAttributes: [
             "font-variant-numeric=\"tabular-nums\"",
-            ...buildSvgFilterAttributes(options.foregroundEffects.valueFilter),
+            ...buildSvgFilterAttributes(valueTextStyle.filter),
         ],
-        unitExtraAttributes: buildSvgFilterAttributes(options.foregroundEffects.labelFilter),
+        unitExtraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
     });
 }
 
@@ -447,12 +453,13 @@ function renderSecondaryText(options: {
     layout: TextLineLayout;
     clipId: string;
     textColor: string;
-    typography: RenderTypographyTokens;
-    foregroundEffects: RenderForegroundEffectTokens;
+    textStyles: RenderTextStyles;
+    graphicEffects: RenderGraphicEffectTokens;
 }): string {
     if (!options.text) {
         return "";
     }
+    const textStyle = options.textStyles.smallLabel;
 
     return renderConstrainedSvgText({
         id: options.clipId,
@@ -460,11 +467,11 @@ function renderSecondaryText(options: {
         xCoordinate: options.layout.xCoordinate,
         yCoordinate: options.layout.yCoordinate,
         maxWidth: options.layout.maxWidth,
-        fontSize: options.layout.fontSize,
-        fontFamily: options.typography.labelFontFamily,
-        fontWeight: 750,
+        fontSize: resolveRenderTextStyleFontSize(options.layout.fontSize, textStyle),
+        fontFamily: textStyle.fontFamily,
+        fontWeight: textStyle.fontWeight,
         fill: options.textColor,
-        extraAttributes: buildSvgFilterAttributes(options.foregroundEffects.labelFilter),
+        extraAttributes: buildSvgFilterAttributes(textStyle.filter),
     });
 }
 

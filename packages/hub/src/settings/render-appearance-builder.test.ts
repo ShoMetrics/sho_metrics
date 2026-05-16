@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-    DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
-    OLD_CRT_RENDER_FOREGROUND_EFFECT_TOKENS,
-} from "../rendering/render-foreground-effects";
+    DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
+    OLD_CRT_RENDER_GRAPHIC_EFFECT_TOKENS,
+} from "../rendering/render-svg-effects";
 import {
-    DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
-    OLD_CRT_RENDER_TYPOGRAPHY_TOKENS,
-} from "../rendering/render-typography";
+    DEFAULT_RENDER_TEXT_STYLES,
+    OLD_CRT_RENDER_TEXT_STYLES,
+} from "../rendering/render-text-style";
 import { buildMetricRenderAppearance } from "./render-appearance-builder";
 import { buildDefaultAppearanceSettings as buildAppearanceSettings } from "./default-appearance-settings";
 
@@ -49,24 +49,24 @@ test("graphic style maps resolved appearance settings to theme preset names", ()
     assert.equal(defaultSettings.graphicStyle, "flat");
 });
 
-test("typography maps resolved appearance settings to renderer font tokens", () => {
+test("text styles map resolved appearance settings to renderer text roles", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings());
     const oldCrtSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         theme: { selectedTheme: "old-crt" },
     }));
 
-    assert.deepEqual(visualSettings.typography, DEFAULT_RENDER_TYPOGRAPHY_TOKENS);
-    assert.deepEqual(oldCrtSettings.typography, OLD_CRT_RENDER_TYPOGRAPHY_TOKENS);
+    assert.deepEqual(visualSettings.textStyles, DEFAULT_RENDER_TEXT_STYLES);
+    assert.deepEqual(oldCrtSettings.textStyles, OLD_CRT_RENDER_TEXT_STYLES);
 });
 
-test("foreground effects map resolved appearance settings to renderer effect tokens", () => {
+test("graphic effects map resolved appearance settings to renderer effect tokens", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings());
     const oldCrtSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         theme: { selectedTheme: "old-crt" },
     }));
 
-    assert.deepEqual(visualSettings.foregroundEffects, DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS);
-    assert.deepEqual(oldCrtSettings.foregroundEffects, OLD_CRT_RENDER_FOREGROUND_EFFECT_TOKENS);
+    assert.deepEqual(visualSettings.graphicEffects, DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS);
+    assert.deepEqual(oldCrtSettings.graphicEffects, OLD_CRT_RENDER_GRAPHIC_EFFECT_TOKENS);
 });
 
 test("solid color mode uses resolved appearance color", () => {

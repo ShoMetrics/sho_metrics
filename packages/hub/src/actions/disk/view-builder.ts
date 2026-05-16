@@ -29,7 +29,7 @@ import {
 } from "./volume-selection";
 import type { MetricDisplayOptions } from "../../metric-view-runner/display-model";
 import { buildColorConfigFromAppearance, resolveSolidMetricColorMode } from "../../settings/render-paint-resolver";
-import { resolveRenderTypography } from "../../settings/render-typography-resolver";
+import { resolveRenderTextStyles } from "../../settings/render-text-style-resolver";
 
 interface BuildDiskDisplayOptions {
     event: WillAppearEvent;
@@ -111,7 +111,7 @@ function buildDiskUsageDisplayOptions(
         }),
         centerIconFragment: buildDiskCenterIconFragment(
             options.volumeSelection,
-            resolveRenderTypography(appearance).labelFontFamily,
+            resolveRenderTextStyles(appearance).label.fontFamily,
         ),
         footerIconFragment: shouldRenderGauge ? undefined : buildDiskGaugeFooterIconFragment(selectedVolume),
         linearIconFragment: getDiskIconFragment(selectedVolume?.storageKind ?? "unknown"),

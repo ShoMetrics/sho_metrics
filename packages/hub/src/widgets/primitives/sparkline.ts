@@ -2,13 +2,14 @@ import type { WidgetData, KeySize, SparklineScale } from "../../rendering/widget
 import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
     buildSvgFilterAttributes,
-    DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
-    type RenderForegroundEffectTokens,
-} from "../../rendering/render-foreground-effects";
+    DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
+    type RenderGraphicEffectTokens,
+} from "../../rendering/render-svg-effects";
 import {
-    DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
-    type RenderTypographyTokens,
-} from "../../rendering/render-typography";
+    DEFAULT_RENDER_TEXT_STYLES,
+    resolveRenderTextStyleFontSize,
+    type RenderTextStyles,
+} from "../../rendering/render-text-style";
 import {
     adjustHexColorBrightness,
     clamp,
@@ -38,8 +39,8 @@ export interface SparklineConfig extends WidgetBaseConfig {
     showDots: boolean;
     dashPattern: string;
     paints: SparklinePaints;
-    typography: RenderTypographyTokens;
-    foregroundEffects: RenderForegroundEffectTokens;
+    textStyles: RenderTextStyles;
+    graphicEffects: RenderGraphicEffectTokens;
     topIconFragment?: string;
 }
 
@@ -81,8 +82,8 @@ export const DEFAULT_SPARKLINE_CONFIG: SparklineConfig = {
         grid: "rgba(255,255,255,1)",
         baseline: "rgba(255,255,255,0.30)",
     },
-    typography: DEFAULT_RENDER_TYPOGRAPHY_TOKENS,
-    foregroundEffects: DEFAULT_RENDER_FOREGROUND_EFFECT_TOKENS,
+    textStyles: DEFAULT_RENDER_TEXT_STYLES,
+    graphicEffects: DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
     gradientHeadAdjustmentPercent: 28,
 };
 
@@ -170,8 +171,8 @@ export const sparkline: Widget<SparklineConfig> = {
             timeGuideTickCount: config.timeGuideTickCount,
             historyWindowSeconds: config.historyWindowSeconds,
             paints: config.paints,
-            typography: config.typography,
-            foregroundEffects: config.foregroundEffects,
+            textStyles: config.textStyles,
+            graphicEffects: config.graphicEffects,
         });
         const latestPoint = points[points.length - 1];
         const latestPointGlowSvg = config.gridLineVisibility !== "none" && config.gridLineType === "vertical" && latestPoint
@@ -214,8 +215,8 @@ export const sparkline: Widget<SparklineConfig> = {
                 iconGap: layoutPlan.iconGap,
                 textColor: config.paints.secondaryText,
                 iconColor: config.paints.icon,
-                typography: config.typography,
-                foregroundEffects: config.foregroundEffects,
+                textStyles: config.textStyles,
+                graphicEffects: config.graphicEffects,
             })}
             ${renderMetricTextRow({
                 id: "sparkline-current-value",
@@ -224,22 +225,23 @@ export const sparkline: Widget<SparklineConfig> = {
                 xCoordinate: layoutPlan.value.xCoordinate,
                 yCoordinate: layoutPlan.value.yCoordinate,
                 width: layoutPlan.value.maxWidth,
-                valueFontSize: layoutPlan.value.fontSize,
-                unitFontSize: layoutPlan.value.unitFontSize,
-                fontFamily: config.typography.valueFontFamily,
-                valueFontWeight: 900,
-                unitFontWeight: 780,
+                valueFontSize: resolveRenderTextStyleFontSize(layoutPlan.value.fontSize, config.textStyles.value),
+                unitFontSize: resolveRenderTextStyleFontSize(layoutPlan.value.unitFontSize, config.textStyles.unit),
+                valueFontFamily: config.textStyles.value.fontFamily,
+                unitFontFamily: config.textStyles.unit.fontFamily,
+                valueFontWeight: config.textStyles.value.fontWeight,
+                unitFontWeight: config.textStyles.unit.fontWeight,
                 valueFill: config.paints.primaryText,
                 unitFill: config.paints.supportingText,
                 unitBaselineOffset: 2,
                 textAnchor: layoutPlan.value.textAnchor,
                 valueExtraAttributes: [
                     "font-variant-numeric=\"tabular-nums\"",
-                    ...buildSvgFilterAttributes(config.foregroundEffects.valueFilter),
+                    ...buildSvgFilterAttributes(config.textStyles.value.filter),
                 ],
-                unitExtraAttributes: buildSvgFilterAttributes(config.foregroundEffects.labelFilter),
+                unitExtraAttributes: buildSvgFilterAttributes(config.textStyles.unit.filter),
             })}
-            <path d="${areaPath}" fill="${areaPaint}"${areaOpacity} ${buildSvgFilterAttributes(config.foregroundEffects.subtleFilter).join(" ")} />
+            <path d="${areaPath}" fill="${areaPaint}"${areaOpacity} ${buildSvgFilterAttributes(config.graphicEffects.subtleFilter).join(" ")} />
             ${gridLineSvg}
             ${latestPointGlowSvg}
             <path d="${linePath}" fill="none" stroke="${linePaint}"
@@ -247,7 +249,7 @@ export const sparkline: Widget<SparklineConfig> = {
                 stroke-linecap="round" filter="url(#${glowFilterId})" opacity="0.55" />
             <path d="${linePath}" fill="none" stroke="${linePaint}"
                 stroke-width="${config.lineWidth}" stroke-linejoin="round" stroke-linecap="round"
-                stroke-dasharray="${config.dashPattern}" ${buildSvgFilterAttributes(config.foregroundEffects.metricFilter).join(" ")} />
+                stroke-dasharray="${config.dashPattern}" ${buildSvgFilterAttributes(config.graphicEffects.metricFilter).join(" ")} />
             ${dotSvg}
         `;
     },
@@ -320,15 +322,16 @@ function renderTitle(options: {
     iconGap: number;
     textColor: string;
     iconColor: string;
-    typography: RenderTypographyTokens;
-    foregroundEffects: RenderForegroundEffectTokens;
+    textStyles: RenderTextStyles;
+    graphicEffects: RenderGraphicEffectTokens;
 }): string {
+    const labelTextStyle = options.textStyles.label;
     const titleXCoordinate = options.iconFragment
         ? options.layout.xCoordinate + options.iconGap
         : options.layout.xCoordinate;
     const titleMaxWidth = Math.max(1, options.layout.maxWidth - (titleXCoordinate - options.layout.xCoordinate));
     const iconSvg = options.iconFragment
-        ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 9} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})" ${buildSvgFilterAttributes(options.foregroundEffects.iconFilter).join(" ")}>${options.iconFragment}</g>`
+        ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 9} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})" ${buildSvgFilterAttributes(options.graphicEffects.iconFilter).join(" ")}>${options.iconFragment}</g>`
         : "";
 
     return `
@@ -339,11 +342,11 @@ function renderTitle(options: {
             xCoordinate: titleXCoordinate,
             yCoordinate: options.layout.yCoordinate,
             maxWidth: titleMaxWidth,
-            fontSize: options.layout.fontSize,
-            fontFamily: options.typography.labelFontFamily,
-            fontWeight: 850,
+            fontSize: resolveRenderTextStyleFontSize(options.layout.fontSize, labelTextStyle),
+            fontFamily: labelTextStyle.fontFamily,
+            fontWeight: labelTextStyle.fontWeight,
             fill: options.textColor,
-            extraAttributes: buildSvgFilterAttributes(options.foregroundEffects.labelFilter),
+            extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
     `;
 }
@@ -458,8 +461,8 @@ function renderGridLines(options: {
     timeGuideTickCount: number;
     historyWindowSeconds: number;
     paints: SparklinePaints;
-    typography: RenderTypographyTokens;
-    foregroundEffects: RenderForegroundEffectTokens;
+    textStyles: RenderTextStyles;
+    graphicEffects: RenderGraphicEffectTokens;
 }): string {
     if (options.gridLineVisibility === "none") {
         return "";
@@ -484,8 +487,8 @@ function renderGridLines(options: {
             historyWindowSeconds: options.historyWindowSeconds,
             opacity: gridLineMetrics.opacity,
             paints: options.paints,
-            typography: options.typography,
-            foregroundEffects: options.foregroundEffects,
+            textStyles: options.textStyles,
+            graphicEffects: options.graphicEffects,
         });
     }
 
@@ -493,7 +496,7 @@ function renderGridLines(options: {
         plotLayout: options.plotLayout,
         opacity: gridLineMetrics.opacity,
         gridColor: options.paints.grid,
-        foregroundEffects: options.foregroundEffects,
+        graphicEffects: options.graphicEffects,
     });
 }
 
@@ -501,7 +504,7 @@ function renderHorizontalGuides(options: {
     plotLayout: ChartLayout;
     opacity: number;
     gridColor: string;
-    foregroundEffects: RenderForegroundEffectTokens;
+    graphicEffects: RenderGraphicEffectTokens;
 }): string {
     const guideList = [1, 0.5, 0].map(progress => {
         const yCoordinate = options.plotLayout.yCoordinate + options.plotLayout.height * (1 - progress);
@@ -511,7 +514,7 @@ function renderHorizontalGuides(options: {
                 x2="${formatSvgNumber(options.plotLayout.xCoordinate + options.plotLayout.width)}"
                 y2="${formatSvgNumber(yCoordinate)}"
                 stroke="${options.gridColor}" stroke-opacity="${formatSvgNumber(options.opacity)}" stroke-width="1"
-                stroke-dasharray="4 4" stroke-linecap="round" ${buildSvgFilterAttributes(options.foregroundEffects.subtleFilter).join(" ")} />
+                stroke-dasharray="4 4" stroke-linecap="round" ${buildSvgFilterAttributes(options.graphicEffects.subtleFilter).join(" ")} />
         `;
     });
 
@@ -529,9 +532,10 @@ function renderVerticalGridLines(options: {
     historyWindowSeconds: number;
     opacity: number;
     paints: SparklinePaints;
-    typography: RenderTypographyTokens;
-    foregroundEffects: RenderForegroundEffectTokens;
+    textStyles: RenderTextStyles;
+    graphicEffects: RenderGraphicEffectTokens;
 }): string {
+    const smallLabelTextStyle = options.textStyles.smallLabel;
     const safeTickCount = Math.max(2, Math.round(options.timeGuideTickCount));
     const baselineYCoordinate = options.plotLayout.yCoordinate + options.plotLayout.height;
     const internalGuideList = Array.from({ length: Math.max(0, safeTickCount - 2) }, (ignoredValue, guideIndex) => {
@@ -543,23 +547,23 @@ function renderVerticalGridLines(options: {
             <line x1="${formatSvgNumber(xCoordinate)}" y1="${formatSvgNumber(options.plotLayout.yCoordinate)}"
                 x2="${formatSvgNumber(xCoordinate)}" y2="${formatSvgNumber(baselineYCoordinate)}"
                 stroke="${options.paints.grid}" stroke-width="${TIME_GUIDE_LINE_WIDTH}"
-                stroke-linecap="round" ${buildSvgFilterAttributes(options.foregroundEffects.subtleFilter).join(" ")} />
+                stroke-linecap="round" ${buildSvgFilterAttributes(options.graphicEffects.subtleFilter).join(" ")} />
             <line x1="${formatSvgNumber(xCoordinate)}" y1="${formatSvgNumber(baselineYCoordinate)}"
                 x2="${formatSvgNumber(xCoordinate)}" y2="${formatSvgNumber(baselineYCoordinate + TIME_GUIDE_TICK_HEIGHT)}"
                 stroke="${options.paints.grid}" stroke-width="${TIME_GUIDE_LINE_WIDTH}"
-                stroke-linecap="round" ${buildSvgFilterAttributes(options.foregroundEffects.subtleFilter).join(" ")} />
+                stroke-linecap="round" ${buildSvgFilterAttributes(options.graphicEffects.subtleFilter).join(" ")} />
             ${renderConstrainedSvgText({
                 id: `sparkline-time-${tickIndex}`,
                 text: `${labelSeconds}s`,
                 xCoordinate,
                 yCoordinate: baselineYCoordinate + CHART_LABEL_BAND_HEIGHT - 2,
                 maxWidth: 24,
-                fontSize: 10,
-                fontFamily: options.typography.labelFontFamily,
-                fontWeight: 750,
+                fontSize: resolveRenderTextStyleFontSize(10, smallLabelTextStyle),
+                fontFamily: smallLabelTextStyle.fontFamily,
+                fontWeight: smallLabelTextStyle.fontWeight,
                 fill: options.paints.mutedText,
                 textAnchor: "middle",
-                extraAttributes: buildSvgFilterAttributes(options.foregroundEffects.labelFilter),
+                extraAttributes: buildSvgFilterAttributes(smallLabelTextStyle.filter),
             })}
         `;
     });
@@ -568,12 +572,12 @@ function renderVerticalGridLines(options: {
         <g opacity="${formatSvgNumber(options.opacity)}">
             <rect x="${formatSvgNumber(options.chartLayout.xCoordinate)}" y="${formatSvgNumber(options.chartLayout.yCoordinate)}"
                 width="${formatSvgNumber(options.chartLayout.width)}" height="${formatSvgNumber(options.chartLayout.height)}"
-                rx="${CHART_PANEL_RADIUS}" fill="${options.paints.surface}" stroke="${options.paints.divider}" stroke-width="1" ${buildSvgFilterAttributes(options.foregroundEffects.subtleFilter).join(" ")} />
+                rx="${CHART_PANEL_RADIUS}" fill="${options.paints.surface}" stroke="${options.paints.divider}" stroke-width="1" ${buildSvgFilterAttributes(options.graphicEffects.subtleFilter).join(" ")} />
             ${internalGuideList.join("")}
             <line x1="${formatSvgNumber(options.plotLayout.xCoordinate)}" y1="${formatSvgNumber(baselineYCoordinate)}"
                 x2="${formatSvgNumber(options.plotLayout.xCoordinate + options.plotLayout.width)}"
                 y2="${formatSvgNumber(baselineYCoordinate)}"
-                stroke="${options.paints.baseline}" stroke-width="1" stroke-dasharray="4 4" stroke-linecap="round" ${buildSvgFilterAttributes(options.foregroundEffects.subtleFilter).join(" ")} />
+                stroke="${options.paints.baseline}" stroke-width="1" stroke-dasharray="4 4" stroke-linecap="round" ${buildSvgFilterAttributes(options.graphicEffects.subtleFilter).join(" ")} />
         </g>
     `;
 }
