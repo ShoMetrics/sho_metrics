@@ -4,7 +4,7 @@ import type { WillAppearEvent } from "@elgato/streamdeck";
 import { MetricStore } from "../../runtime/metric-store";
 import { getDiskVolumeMetricKey } from "../../runtime/disk-metric-keys";
 import { buildMetricSnapshot, buildScalarMetricValue } from "../../runtime/sources/source.interface";
-import { buildMetricDisplayRenderPlan, buildRenderWidgetData } from "../../metric-view-runner/display-model";
+import { buildMetricDisplayRenderPlan, buildRenderWidgetData } from "../../metric-view-renderer/display-frame";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
 import { resolveInitialActionSettings } from "../settings/action-settings-resolver";
@@ -61,7 +61,7 @@ test("disk usage display keeps explicit unavailable volume instead of falling ba
 
     const renderPlan = buildMetricDisplayRenderPlan({
         displayOptions,
-        isDial: false,
+        renderTarget: "key",
     });
     const renderWidgetData = buildRenderWidgetData({
         widgetData: displayOptions.widgetData,

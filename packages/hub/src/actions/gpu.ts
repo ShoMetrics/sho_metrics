@@ -22,7 +22,7 @@ import {
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import type { ResolvedGpuMetricTarget, ResolvedWidgetSettings } from "../settings/resolved-settings";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
-import type { SingleMetricDisplayOptions } from "../metric-view-runner/display-model";
+import type { SingleMetricDisplayOptions } from "../metric-view-runner/runner";
 
 const log = logger.for("Action:GPU");
 

@@ -1,23 +1,22 @@
 import type { TerminalThemeVariant } from "../../settings/resolved-settings";
-import { SelectSetting } from "./SelectSetting";
 import { terminalVariantOptionList } from "../panels/setting-options";
+import { buildTerminalVariantPreviewUri, type MetricPreviewInput } from "../previews/metric-option-preview";
+import { PreviewOptionSetting } from "./PreviewOptionSetting";
+import type { SettingControlProps } from "./setting-control";
 
-export function TerminalVariantSetting({
-    value,
-    disabled = false,
-    onValueChange,
-}: {
+interface TerminalVariantSettingProps extends SettingControlProps {
     readonly value: TerminalThemeVariant;
-    readonly disabled?: boolean | undefined;
+    readonly preview?: MetricPreviewInput | undefined;
     readonly onValueChange: (value: TerminalThemeVariant) => void;
-}): React.JSX.Element {
+}
+
+export function TerminalVariantSetting(props: TerminalVariantSettingProps): React.JSX.Element {
     return (
-        <SelectSetting
-            label="Terminal Style"
-            value={value}
+        <PreviewOptionSetting
+            {...props}
+            label="Theme Variant"
             optionList={terminalVariantOptionList}
-            onValueChange={onValueChange}
-            disabled={disabled}
+            buildPreviewUri={(variant) => buildTerminalVariantPreviewUri(variant, props.preview)}
         />
     );
 }

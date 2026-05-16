@@ -1,7 +1,8 @@
-import type { WillAppearEvent } from "@elgato/streamdeck";
 import type { ColorConfig } from "../rendering/color-resolver";
+import { renderDualMetricBodyView } from "../rendering/dual-metric-view";
+import { renderMetricFrame } from "../rendering/metric-frame";
 import type { MetricRenderAppearance } from "../rendering/render-appearance";
-import type { ResolvedAppearanceSettings } from "../settings/resolved-settings";
+import { renderSingleMetricBodyView } from "../rendering/single-metric-view";
 import {
     KEYPAD_PNG_SIZE,
     TOUCH_STRIP_LOGICAL_SIZE,
@@ -12,16 +13,15 @@ import {
     type KeySize,
     type WidgetData,
 } from "../rendering/widget-data";
-import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
 import {
     mergeResolvedAppearanceSettings,
     type ResolvedAppearanceSettingsOverride,
 } from "../settings/appearance-overrides";
 import { buildMetricRenderAppearance } from "../settings/render-appearance-builder";
+import type { ResolvedAppearanceSettings } from "../settings/resolved-settings";
+import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
 
-interface BaseMetricDisplayOptions {
-    event: WillAppearEvent;
-    metricKey: string;
+interface BaseMetricRenderOptions {
     centerIconFragment: string;
     footerIconFragment?: string;
     linearIconFragment?: string;
@@ -31,11 +31,11 @@ interface BaseMetricDisplayOptions {
     resolvedSettings: ResolvedAppearanceSettings;
 }
 
-export interface SingleMetricDisplayOptions extends BaseMetricDisplayOptions {
+export interface SingleMetricRenderOptions extends BaseMetricRenderOptions {
     widgetData: WidgetData;
 }
 
-export interface DualMetricDisplayOptions extends BaseMetricDisplayOptions {
+export interface DualMetricRenderOptions extends BaseMetricRenderOptions {
     widgetData: DualChannelWidgetData;
     titleText: string;
     dualGraphicType?: "circular" | "text" | "sparkline";
@@ -50,7 +50,8 @@ export interface DualMetricDisplayOptions extends BaseMetricDisplayOptions {
     negativeStatusIcon?: ArcGaugeStatusIcon;
 }
 
-export type MetricDisplayOptions = SingleMetricDisplayOptions | DualMetricDisplayOptions;
+export type MetricRenderOptions = SingleMetricRenderOptions | DualMetricRenderOptions;
+export type MetricRenderTarget = "key" | "touch-strip";
 
 export type TouchStripMetricLayoutKind = "square" | "wide";
 
@@ -72,6 +73,18 @@ export interface MetricDisplayRenderPlan {
     pngSize: KeySize;
 }
 
+export interface MetricDisplayFrame {
+    readonly svg: string;
+    readonly renderedMetricData: WidgetData | DualChannelWidgetData;
+    readonly renderPlan: MetricDisplayRenderPlan;
+}
+
+interface RenderedMetricBody {
+    readonly svg: string;
+    readonly renderedMetricData: WidgetData | DualChannelWidgetData;
+    readonly muted: boolean;
+}
+
 const TOUCH_STRIP_METRIC_LAYOUTS: Record<TouchStripMetricLayoutKind, TouchStripMetricLayout> = {
     square: {
         kind: "square",
@@ -87,9 +100,31 @@ const TOUCH_STRIP_METRIC_LAYOUTS: Record<TouchStripMetricLayoutKind, TouchStripM
     },
 };
 
+export function composeMetricDisplayFrame(options: {
+    displayOptions: MetricRenderOptions;
+    renderTarget: MetricRenderTarget;
+}): MetricDisplayFrame {
+    const renderPlan = buildMetricDisplayRenderPlan(options);
+    const body = isDualMetricRenderOptions(options.displayOptions)
+        ? composeDualMetricBody(options.displayOptions, renderPlan)
+        : composeSingleMetricBody(options.displayOptions, renderPlan);
+
+    return {
+        svg: renderMetricFrame({
+            body: body.svg,
+            graphicStyle: renderPlan.renderAppearance.graphicStyle,
+            muted: body.muted,
+            paints: renderPlan.renderAppearance.paints,
+            size: renderPlan.renderSize,
+        }),
+        renderedMetricData: body.renderedMetricData,
+        renderPlan,
+    };
+}
+
 export function buildMetricDisplayRenderPlan(options: {
-    displayOptions: MetricDisplayOptions;
-    isDial: boolean;
+    displayOptions: MetricRenderOptions;
+    renderTarget: MetricRenderTarget;
 }): MetricDisplayRenderPlan {
     const resolvedAppearance = mergeResolvedAppearanceSettings(
         options.displayOptions.resolvedSettings,
@@ -104,10 +139,10 @@ export function buildMetricDisplayRenderPlan(options: {
     const centerContent = circleStyle === "compact" ? "icon" : "value";
     const displayHasData = hasMetricDisplayData(options.displayOptions);
     const shouldRenderMutedIconPlaceholder = !displayHasData
-        && !isDualMetricDisplayOptions(options.displayOptions)
+        && !isDualMetricRenderOptions(options.displayOptions)
         && renderAppearance.graphicType === "circular"
         && circleStyle === "compact";
-    const touchStripMetricLayout = options.isDial
+    const touchStripMetricLayout = options.renderTarget === "touch-strip"
         ? resolveTouchStripMetricLayout(renderAppearance)
         : null;
 
@@ -175,12 +210,12 @@ export function buildRenderDualChannelWidgetData(options: {
     };
 }
 
-export function isDualMetricDisplayOptions(options: MetricDisplayOptions): options is DualMetricDisplayOptions {
+export function isDualMetricRenderOptions(options: MetricRenderOptions): options is DualMetricRenderOptions {
     return "positiveColor" in options;
 }
 
-export function hasMetricDisplayData(options: MetricDisplayOptions): boolean {
-    if (isDualMetricDisplayOptions(options)) {
+export function hasMetricDisplayData(options: MetricRenderOptions): boolean {
+    if (isDualMetricRenderOptions(options)) {
         return options.widgetData.positive.sampleTimestampMilliseconds != null
             || options.widgetData.negative.sampleTimestampMilliseconds != null;
     }
@@ -214,6 +249,70 @@ export function resolveTouchStripMetricLayout(settings: MetricRenderAppearance):
     // size. Add a new layout kind when a future visual needs a different contract,
     // for example two centered circles in one 200x100 touch strip region.
     return TOUCH_STRIP_METRIC_LAYOUTS.wide;
+}
+
+function composeSingleMetricBody(
+    options: SingleMetricRenderOptions,
+    renderPlan: MetricDisplayRenderPlan,
+): RenderedMetricBody {
+    const renderedMetricData = buildRenderWidgetData({
+        widgetData: options.widgetData,
+        hasData: renderPlan.displayHasData,
+        shouldRenderMutedIconPlaceholder: renderPlan.shouldRenderMutedIconPlaceholder,
+    });
+
+    return {
+        svg: renderSingleMetricBodyView({
+            data: renderedMetricData,
+            visual: renderPlan.renderAppearance,
+            renderSize: renderPlan.renderSize,
+            centerIcon: options.centerIconFragment,
+            footerIcon: options.footerIconFragment,
+            linearIcon: options.linearIconFragment,
+            statusIcon: options.statusIcon,
+            circleStyle: renderPlan.circleStyle,
+        }),
+        renderedMetricData,
+        muted: renderPlan.shouldRenderMutedIconPlaceholder,
+    };
+}
+
+function composeDualMetricBody(
+    options: DualMetricRenderOptions,
+    renderPlan: MetricDisplayRenderPlan,
+): RenderedMetricBody {
+    const renderedMetricData = buildRenderDualChannelWidgetData({
+        widgetData: options.widgetData,
+        hasData: renderPlan.displayHasData,
+    });
+
+    return {
+        svg: renderDualMetricBodyView({
+            data: renderedMetricData,
+            visual: renderPlan.renderAppearance,
+            graphicType: options.dualGraphicType ?? "sparkline",
+            renderSize: renderPlan.renderSize,
+            titleText: options.titleText,
+            chartMode: options.chartMode ?? "overlay",
+            centerContent: renderPlan.centerContent,
+            circleStyle: renderPlan.circleStyle,
+            topIcon: options.centerIconFragment,
+            positive: {
+                color: options.positiveColor,
+                colorConfig: options.positiveColorConfig,
+                icon: options.positiveIconFragment,
+                statusIcon: options.positiveStatusIcon,
+            },
+            negative: {
+                color: options.negativeColor,
+                colorConfig: options.negativeColorConfig,
+                icon: options.negativeIconFragment,
+                statusIcon: options.negativeStatusIcon,
+            },
+        }),
+        renderedMetricData,
+        muted: false,
+    };
 }
 
 function buildPlaceholderChannelWidgetData(widgetData: WidgetData, displayValue: string): WidgetData {

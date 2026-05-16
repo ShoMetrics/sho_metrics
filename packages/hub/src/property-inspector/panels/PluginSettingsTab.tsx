@@ -2,6 +2,7 @@ import { CircleStyleSetting } from "../controls/CircleStyleSetting";
 import { GraphicTypeSetting } from "../controls/GraphicTypeSetting";
 import { NumberSetting } from "../controls/NumberSetting";
 import { TerminalVariantSetting } from "../controls/TerminalVariantSetting";
+import { ThemeSetting } from "../controls/ThemeSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { InspectorItem } from "../components/InspectorItem";
 import {
@@ -10,7 +11,6 @@ import {
 } from "./ColorSettings";
 import { SettingsSection } from "./SettingsSection";
 import {
-    graphicStyleOptionList,
     networkUnitBaseOptionList,
     scaleModeOptionList,
 } from "./setting-options";
@@ -154,10 +154,8 @@ function ThemeOverrideSection({
             />
             {themeOverride && (
                 <>
-                    <SelectSetting
-                        label="Graphic Style"
+                    <ThemeSetting
                         value={themeOverride.theme.selectedTheme}
-                        optionList={graphicStyleOptionList}
                         onValueChange={(selectedTheme) => onThemePatch({ selectedTheme })}
                     />
                     {themeOverride.theme.selectedTheme === "terminal" && (

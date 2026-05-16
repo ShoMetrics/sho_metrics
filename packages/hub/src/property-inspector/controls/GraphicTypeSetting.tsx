@@ -1,5 +1,5 @@
-import { buildGraphicTypePreviewUri } from "../previews/graphic-type-preview";
 import type { SingleMetricViewLayout } from "../inspector/settings-types";
+import { buildGraphicTypePreviewUri, type MetricPreviewInput } from "../previews/metric-option-preview";
 import { PreviewOptionSetting } from "./PreviewOptionSetting";
 import type { SettingControlProps } from "./setting-control";
 
@@ -12,6 +12,7 @@ const graphicTypeOptionList = [
 
 interface GraphicTypeSettingProps extends SettingControlProps {
     value: SingleMetricViewLayout;
+    preview?: MetricPreviewInput | undefined;
     onValueChange: (value: SingleMetricViewLayout) => void;
 }
 
@@ -21,7 +22,7 @@ export function GraphicTypeSetting(props: GraphicTypeSettingProps): React.JSX.El
             {...props}
             label="Layout"
             optionList={graphicTypeOptionList}
-            buildPreviewUri={buildGraphicTypePreviewUri}
+            buildPreviewUri={(graphicType) => buildGraphicTypePreviewUri(graphicType, props.preview)}
         />
     );
 }

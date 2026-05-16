@@ -1,5 +1,5 @@
-import { buildCircleStylePreviewUri } from "../previews/circle-style-preview";
 import type { CircleStyle } from "../inspector/settings-types";
+import { buildCircleStylePreviewUri, type MetricPreviewInput } from "../previews/metric-option-preview";
 import { PreviewOptionSetting } from "./PreviewOptionSetting";
 import type { SettingControlProps } from "./setting-control";
 
@@ -11,6 +11,7 @@ const circleStyleOptionList = [
 
 interface CircleStyleSettingProps extends SettingControlProps {
     value: CircleStyle;
+    preview?: MetricPreviewInput | undefined;
     onValueChange: (value: CircleStyle) => void;
 }
 
@@ -18,9 +19,9 @@ export function CircleStyleSetting(props: CircleStyleSettingProps): React.JSX.El
     return (
         <PreviewOptionSetting
             {...props}
-            label="Circle Style"
+            label="Layout Variant"
             optionList={circleStyleOptionList}
-            buildPreviewUri={buildCircleStylePreviewUri}
+            buildPreviewUri={(circleStyle) => buildCircleStylePreviewUri(circleStyle, props.preview)}
         />
     );
 }

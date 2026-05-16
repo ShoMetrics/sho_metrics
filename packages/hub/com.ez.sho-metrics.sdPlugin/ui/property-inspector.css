@@ -283,7 +283,7 @@ body {
 .graphic-type-picker {
     display: grid;
     gap: var(--inspector-preview-gap);
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
     width: 100%;
 }
 

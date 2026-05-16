@@ -164,7 +164,7 @@ test("terminal theme uses fixed paint without color controls", () => {
     });
 
     assert.match(markup, /Terminal/);
-    assert.match(markup, /Terminal Style:/);
+    assert.match(markup, /Theme Variant:/);
     assert.match(markup, /Clean/);
     assert.match(markup, /Vintage/);
     assert.doesNotMatch(markup, /Color Mode:/);
@@ -305,6 +305,24 @@ test("widget settings keep warnings first and reset in advanced controls", () =>
     assertTextOrder(markup, "GPU Metric:", "Layout");
     assertTextOrder(markup, "Polling Frequency", "Advanced");
     assertTextOrder(markup, "Advanced", "Reset Widget Settings");
+});
+
+test("widget layout controls keep shape before theme order", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "gpu",
+        settings: buildWidgetSettings("gpu", {
+            appearance: {
+                graph: { viewLayout: "circular" },
+                theme: { selectedTheme: "terminal" },
+            },
+        }),
+    });
+
+    assertTextOrder(markup, "Layout:", "Layout Variant:");
+    assertTextOrder(markup, "Layout Variant:", "Theme:");
+    assertTextOrder(markup, "Theme:", "Theme Variant:");
+    assert.doesNotMatch(markup, /Graphic Style:/);
+    assert.doesNotMatch(markup, /Terminal Style:/);
 });
 
 function renderWidgetSettings(options: {
