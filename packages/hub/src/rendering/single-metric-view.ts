@@ -83,12 +83,14 @@ function renderSingleLinearMetric(options: SingleMetricBodyViewProps): string {
     return linearBar.render(options.data, {
         ...DEFAULT_LINEAR_BAR_CONFIG,
         colorConfig: options.visual.paints.primaryMetric,
-        trackColor: options.visual.paints.track,
-        titleTextColor: options.visual.paints.linearTitleText,
-        valueTextColor: options.visual.paints.linearValueText,
-        unitTextColor: options.visual.paints.linearUnitText,
-        secondaryTextColor: options.visual.paints.linearSecondaryText,
-        iconColor: options.visual.paints.icon,
+        paints: {
+            primaryText: options.visual.paints.linearValueText,
+            secondaryText: options.visual.paints.linearTitleText,
+            supportingText: options.visual.paints.linearUnitText,
+            mutedText: options.visual.paints.linearSecondaryText,
+            icon: options.visual.paints.icon,
+            track: options.visual.paints.track,
+        },
         topIconFragment: options.linearIcon ?? options.centerIcon,
     }, options.renderSize);
 }
@@ -100,16 +102,17 @@ function renderSingleSparklineMetric(options: SingleMetricBodyViewProps): string
         lineSmoothingPercent: options.visual.lineSmoothingPercent,
         gridLineVisibility: options.visual.gridLineVisibility,
         gridLineType: options.visual.gridLineType,
-        titleTextColor: options.visual.paints.secondaryText,
-        valueTextColor: options.visual.paints.primaryText,
-        unitTextColor: options.visual.paints.secondaryText,
-        iconColor: options.visual.paints.icon,
-        horizontalGuideLineColor: options.visual.paints.grid,
-        chartPanelFill: options.visual.paints.surface,
-        chartPanelStroke: options.visual.paints.divider,
-        timeGuideLineColor: options.visual.paints.grid,
-        baselineColor: options.visual.paints.grid,
-        timeLabelColor: options.visual.paints.mutedText,
+        paints: {
+            primaryText: options.visual.paints.primaryText,
+            secondaryText: options.visual.paints.secondaryText,
+            supportingText: options.visual.paints.secondaryText,
+            mutedText: options.visual.paints.mutedText,
+            icon: options.visual.paints.icon,
+            surface: options.visual.paints.surface,
+            divider: options.visual.paints.divider,
+            grid: options.visual.paints.grid,
+            baseline: options.visual.paints.grid,
+        },
         topIconFragment: options.linearIcon ?? options.centerIcon,
     }, options.renderSize);
 }

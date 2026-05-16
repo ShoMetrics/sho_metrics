@@ -108,12 +108,13 @@ function renderDualSparklineMetric(options: DualMetricBodyViewProps): string {
         lineSmoothingPercent: options.visual.lineSmoothingPercent,
         gridLineVisibility: options.visual.gridLineVisibility,
         gridLineType: options.visual.gridLineType,
-        titleTextColor: options.visual.paints.secondaryText,
-        valueTextColor: options.visual.paints.primaryText,
-        unitTextColor: options.visual.paints.secondaryText,
-        iconColor: options.visual.paints.icon,
-        horizontalGuideLineColor: options.visual.paints.grid,
-        timeGuideLineColor: options.visual.paints.grid,
-        baselineColor: options.visual.paints.grid,
+        paints: {
+            primaryText: options.visual.paints.primaryText,
+            secondaryText: options.visual.paints.secondaryText,
+            supportingText: options.visual.paints.secondaryText,
+            icon: options.visual.paints.icon,
+            grid: options.visual.paints.grid,
+            baseline: options.visual.paints.grid,
+        },
     }, options.renderSize);
 }

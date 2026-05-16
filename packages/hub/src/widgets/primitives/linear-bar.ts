@@ -9,15 +9,19 @@ import type { Widget, WidgetBaseConfig } from "../widget.interface";
 import { renderMetricTextRow } from "./metric-text-row";
 
 export interface LinearBarConfig extends WidgetBaseConfig {
-    trackColor: string;
     barHeight: number;
     borderRadius: number;
-    titleTextColor: string;
-    valueTextColor: string;
-    unitTextColor: string;
-    secondaryTextColor: string;
-    iconColor: string;
+    paints: LinearBarPaints;
     topIconFragment?: string;
+}
+
+export interface LinearBarPaints {
+    readonly primaryText: string;
+    readonly secondaryText: string;
+    readonly supportingText: string;
+    readonly mutedText: string;
+    readonly icon: string;
+    readonly track: string;
 }
 
 export const DEFAULT_LINEAR_BAR_CONFIG: LinearBarConfig = {
@@ -26,14 +30,16 @@ export const DEFAULT_LINEAR_BAR_CONFIG: LinearBarConfig = {
         { min: 50, max: 80, color: "#eab308" },
         { min: 80, max: 101, color: "#ef4444" },
     ], isGradientEnabled: true },
-    trackColor: "rgba(255,255,255,0.08)",
     barHeight: 14,
     borderRadius: 7,
-    titleTextColor: "rgba(255,255,255,0.88)",
-    valueTextColor: "white",
-    unitTextColor: "rgba(255,255,255,0.76)",
-    secondaryTextColor: "rgba(255,255,255,0.78)",
-    iconColor: "rgba(255,255,255,0.88)",
+    paints: {
+        primaryText: "white",
+        secondaryText: "rgba(255,255,255,0.88)",
+        supportingText: "rgba(255,255,255,0.76)",
+        mutedText: "rgba(255,255,255,0.78)",
+        icon: "rgba(255,255,255,0.88)",
+        track: "rgba(255,255,255,0.08)",
+    },
     gradientHeadAdjustmentPercent: -15,
 };
 
@@ -208,24 +214,24 @@ function renderSingleBar(
             iconScale: layoutPlan.mode === "wide" ? 0.3 : 0.34,
             iconGap: layoutPlan.mode === "wide" ? 25 : 27,
             clipId: "linear-single-title",
-            textColor: config.titleTextColor,
-            iconColor: config.iconColor,
+            textColor: config.paints.secondaryText,
+            iconColor: config.paints.icon,
         })}
         ${renderValueWithUnit({
             clipId: "linear-single-value",
             valueText,
             unitText: formatLinearUnit(unitText),
             layout: layoutPlan.singleValue,
-            valueTextColor: config.valueTextColor,
-            unitTextColor: config.unitTextColor,
+            valueTextColor: config.paints.primaryText,
+            unitTextColor: config.paints.supportingText,
         })}
-        ${renderTrack(layoutPlan.singleBar, config.trackColor)}
+        ${renderTrack(layoutPlan.singleBar, config.paints.track)}
         ${renderFill(layoutPlan.singleBar, fillWidth, fillPaint)}
         ${renderSecondaryText({
             text: data.secondaryDisplayValue,
             layout: layoutPlan.singleSecondaryText,
             clipId: "linear-single-secondary",
-            textColor: config.secondaryTextColor,
+            textColor: config.paints.mutedText,
         })}
     `;
 }
@@ -247,8 +253,8 @@ function renderChannelBars(
             iconScale: layoutPlan.mode === "wide" ? 0.3 : 0.34,
             iconGap: layoutPlan.mode === "wide" ? 25 : 27,
             clipId: "linear-channel-title",
-            textColor: config.titleTextColor,
-            iconColor: config.iconColor,
+            textColor: config.paints.secondaryText,
+            iconColor: config.paints.icon,
         })}
         ${channels.slice(0, 2).map((channel, channelIndex) => {
             const channelLayout = buildChannelLayout({
@@ -276,10 +282,10 @@ function renderChannelBars(
                     valueText: channel.displayValue,
                     unitText: channel.unit,
                     layout: channelLayout.value,
-                    valueTextColor: config.valueTextColor,
-                    unitTextColor: config.unitTextColor,
+                    valueTextColor: config.paints.primaryText,
+                    unitTextColor: config.paints.supportingText,
                 })}
-                ${renderTrack(channelLayout.bar, config.trackColor)}
+                ${renderTrack(channelLayout.bar, config.paints.track)}
                 ${renderFill(channelLayout.bar, fillWidth, fillPaint)}
             `;
         }).join("")}

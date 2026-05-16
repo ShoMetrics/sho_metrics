@@ -30,13 +30,17 @@ export interface DualChannelSparklineConfig extends WidgetBaseConfig {
     timeGuideTickCount: number;
     historyWindowSeconds: number;
     sparklineScale?: SparklineScale;
-    titleTextColor: string;
-    valueTextColor: string;
-    unitTextColor: string;
-    iconColor: string;
-    horizontalGuideLineColor: string;
-    timeGuideLineColor: string;
-    baselineColor: string;
+    paints: DualChannelSparklinePaints;
+}
+
+// Dual-channel sparklines draw directly on the theme background, so they intentionally omit surface/divider paints.
+export interface DualChannelSparklinePaints {
+    readonly primaryText: string;
+    readonly secondaryText: string;
+    readonly supportingText: string;
+    readonly icon: string;
+    readonly grid: string;
+    readonly baseline: string;
 }
 
 export type DualChannelSparklineMode = "overlay" | "mirrored";
@@ -55,13 +59,14 @@ export const DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG: DualChannelSparklineConfig =
     timeGuideTickCount: 5,
     historyWindowSeconds: 60,
     sparklineScale: { mode: "adaptive", minimumValue: 0 },
-    titleTextColor: "rgba(255,255,255,0.88)",
-    valueTextColor: "rgba(255,255,255,0.96)",
-    unitTextColor: "rgba(255,255,255,0.76)",
-    iconColor: "rgba(255,255,255,0.88)",
-    horizontalGuideLineColor: "rgba(255,255,255,1)",
-    timeGuideLineColor: "rgba(255,255,255,0.24)",
-    baselineColor: "rgba(255,255,255,0.24)",
+    paints: {
+        primaryText: "rgba(255,255,255,0.96)",
+        secondaryText: "rgba(255,255,255,0.88)",
+        supportingText: "rgba(255,255,255,0.76)",
+        icon: "rgba(255,255,255,0.88)",
+        grid: "rgba(255,255,255,1)",
+        baseline: "rgba(255,255,255,0.24)",
+    },
 };
 
 const DUAL_SPARKLINE_FONT_FAMILY = "'Inter','SF Pro Display','Segoe UI',sans-serif";
@@ -146,9 +151,7 @@ export function renderDualChannelSparkline(
             gridLineVisibility: config.gridLineVisibility,
             gridLineType: config.gridLineType,
             timeGuideTickCount: config.timeGuideTickCount,
-            horizontalGuideLineColor: config.horizontalGuideLineColor,
-            timeGuideLineColor: config.timeGuideLineColor,
-            baselineColor: config.baselineColor,
+            paints: config.paints,
         });
 
     return `
@@ -171,8 +174,8 @@ export function renderDualChannelSparkline(
             layout: layoutPlan.title,
             iconScale: layoutPlan.titleIconScale,
             iconGap: layoutPlan.titleIconGap,
-            textColor: config.titleTextColor,
-            iconColor: config.iconColor,
+            textColor: config.paints.secondaryText,
+            iconColor: config.paints.icon,
         })}
         ${renderChannelRow({
             layout: resolveRowLayout(layoutPlan, chartLayout, config.chartMode, "positive"),
@@ -182,8 +185,8 @@ export function renderDualChannelSparkline(
             unitText: data.positive.unit,
             rowId: "dual-sparkline-positive-row",
             showIcon: config.chartMode !== "mirrored",
-            valueTextColor: config.valueTextColor,
-            unitTextColor: config.unitTextColor,
+            valueTextColor: config.paints.primaryText,
+            unitTextColor: config.paints.supportingText,
         })}
         ${renderChannelRow({
             layout: resolveRowLayout(layoutPlan, chartLayout, config.chartMode, "negative"),
@@ -193,11 +196,11 @@ export function renderDualChannelSparkline(
             unitText: data.negative.unit,
             rowId: "dual-sparkline-negative-row",
             showIcon: config.chartMode !== "mirrored",
-            valueTextColor: config.valueTextColor,
-            unitTextColor: config.unitTextColor,
+            valueTextColor: config.paints.primaryText,
+            unitTextColor: config.paints.supportingText,
         })}
         ${gridLineSvg}
-        ${config.chartMode === "mirrored" ? renderMirroredBaseline(plotLayout, config.baselineColor) : ""}
+        ${config.chartMode === "mirrored" ? renderMirroredBaseline(plotLayout, config.paints.baseline) : ""}
         ${renderChannelPathGroup({
             model: positiveModel,
             linePaint: config.colorConfig.isGradientEnabled ? `url(#${positiveLineGradientId})` : config.positiveColor,
@@ -547,9 +550,7 @@ function renderGridLines(options: {
     gridLineVisibility: SparklineGridLineVisibility;
     gridLineType: SparklineGridLineType;
     timeGuideTickCount: number;
-    horizontalGuideLineColor: string;
-    timeGuideLineColor: string;
-    baselineColor: string;
+    paints: DualChannelSparklinePaints;
 }): string {
     if (options.gridLineVisibility === "none") {
         return "";
@@ -571,22 +572,22 @@ function renderGridLines(options: {
             plotLayout: options.plotLayout,
             opacity: gridLineMetrics.opacity,
             timeGuideTickCount: options.timeGuideTickCount,
-            timeGuideLineColor: options.timeGuideLineColor,
-            baselineColor: options.baselineColor,
+            gridColor: options.paints.grid,
+            baselineColor: options.paints.baseline,
         });
     }
 
     return renderHorizontalGuides({
         plotLayout: options.plotLayout,
         opacity: gridLineMetrics.opacity,
-        horizontalGuideLineColor: options.horizontalGuideLineColor,
+        gridColor: options.paints.grid,
     });
 }
 
 function renderHorizontalGuides(options: {
     plotLayout: DualSparklineChartLayout;
     opacity: number;
-    horizontalGuideLineColor: string;
+    gridColor: string;
 }): string {
     const guideList = [1, 0.5, 0].map(progress => {
         const yCoordinate = options.plotLayout.yCoordinate + options.plotLayout.height * (1 - progress);
@@ -595,7 +596,7 @@ function renderHorizontalGuides(options: {
             <line x1="${formatSvgNumber(options.plotLayout.xCoordinate)}" y1="${formatSvgNumber(yCoordinate)}"
                 x2="${formatSvgNumber(options.plotLayout.xCoordinate + options.plotLayout.width)}"
                 y2="${formatSvgNumber(yCoordinate)}"
-                stroke="${options.horizontalGuideLineColor}" stroke-opacity="${formatSvgNumber(options.opacity)}" stroke-width="1"
+                stroke="${options.gridColor}" stroke-opacity="${formatSvgNumber(options.opacity)}" stroke-width="1"
                 stroke-dasharray="4 4" stroke-linecap="round" />
         `;
     });
@@ -607,7 +608,7 @@ function renderVerticalGuides(options: {
     plotLayout: DualSparklineChartLayout;
     opacity: number;
     timeGuideTickCount: number;
-    timeGuideLineColor: string;
+    gridColor: string;
     baselineColor: string;
 }): string {
     const safeTickCount = Math.max(2, Math.round(options.timeGuideTickCount));
@@ -619,7 +620,7 @@ function renderVerticalGuides(options: {
         return `
             <line x1="${formatSvgNumber(xCoordinate)}" y1="${formatSvgNumber(options.plotLayout.yCoordinate)}"
                 x2="${formatSvgNumber(xCoordinate)}" y2="${formatSvgNumber(baselineYCoordinate)}"
-                stroke="${options.timeGuideLineColor}" stroke-width="1.1" stroke-linecap="round" />
+                stroke="${options.gridColor}" stroke-width="1.1" stroke-linecap="round" />
         `;
     });
 
