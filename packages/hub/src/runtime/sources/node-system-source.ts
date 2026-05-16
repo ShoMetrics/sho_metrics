@@ -71,6 +71,7 @@ import type {
     NodeSystemNetworkCounterSample,
     NodeSystemNetworkRateCalculation,
 } from "./node-system-source-types";
+import { NODE_SYSTEM_SOURCE_ID } from "./source-ids";
 
 const log = logger.for("Source:NodeSystem");
 const networkLog = logger.for("Source:NodeSystem:Network");
@@ -112,7 +113,7 @@ interface NodeSystemSourceDependencies {
  * Node.js runtime metric source backed by `systeminformation` and OS command helpers.
  */
 export class NodeSystemSource implements IMetricSource {
-    readonly sourceId = "node-system";
+    readonly sourceId = NODE_SYSTEM_SOURCE_ID;
 
     private readonly systemInformation: NodeSystemInformationClient;
     private readonly networkRegistry: NodeSystemNetworkInterfaceRegistry;

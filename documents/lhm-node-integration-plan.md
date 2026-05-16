@@ -654,7 +654,7 @@ Acceptance:
 
 ### Step 6: Enable Local Candidate Order
 
-Default local candidate order:
+Default Windows local candidate order:
 
 ```txt
 windows-helper
@@ -663,9 +663,10 @@ node-system
 
 Rules:
 
-- Candidate order is runtime configuration owned by source registry/bootstrap code.
+- Candidate order is runtime configuration owned by source read-plan/bootstrap code.
 - Actions and rendering code must not know this order.
-- Until the Windows service is implemented, registry may include only `node-system`.
+- The Windows registry includes `windows-helper` plus `node-system`; non-Windows registries include only `node-system` until their helpers exist.
+- When the Windows helper is absent, the helper client must fail quickly, apply a retry cooldown, and let `SourceRunner` fallback to `node-system`.
 
 Acceptance:
 

@@ -25,9 +25,7 @@ import type {
     SourceHealth,
     SourceWarning,
 } from "./source-client";
-
-/** Registry id for the installed Windows helper source. */
-export const WINDOWS_HELPER_SOURCE_ID = "windows-helper";
+import { WINDOWS_HELPER_SOURCE_ID } from "./source-ids";
 
 /** Named pipe path used by the Windows helper service. */
 export const DEFAULT_WINDOWS_HELPER_PIPE_PATH = "\\\\.\\pipe\\ShoMetrics.Source.Windows.v1";
@@ -40,6 +38,9 @@ export const MAXIMUM_SOURCE_IPC_FRAME_BYTES = 1024 * 1024;
 
 /** Minimum cooldown before retrying helper health after protocol incompatibility. */
 export const UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS = 60000;
+
+/** Minimum cooldown before retrying helper health after pipe or health failures. */
+export const HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS = 5000;
 
 const SOURCE_IPC_LENGTH_PREFIX_BYTES = 4;
 const DEFAULT_HEALTH_TIMEOUT_MILLISECONDS = 750;
@@ -120,6 +121,7 @@ export class WindowsHelperSourceClient implements SourceClient {
     private protocolCompatibility: "unknown" | "supported" = "unknown";
     private protocolCheckPromise: Promise<void> | undefined;
     private unsupportedProtocolRetryAfterMilliseconds = 0;
+    private helperUnavailableRetryAfterMilliseconds = 0;
 
     constructor(options: WindowsHelperSourceClientOptions = {}) {
         this.pipePath = options.pipePath ?? DEFAULT_WINDOWS_HELPER_PIPE_PATH;
@@ -204,6 +206,10 @@ export class WindowsHelperSourceClient implements SourceClient {
             throw new Error("Windows source protocol is unsupported and still inside retry cooldown.");
         }
 
+        if (nowMilliseconds < this.helperUnavailableRetryAfterMilliseconds) {
+            throw new Error("Windows helper is unavailable and still inside retry cooldown.");
+        }
+
         if (this.protocolCompatibility === "supported") {
             return;
         }
@@ -217,7 +223,14 @@ export class WindowsHelperSourceClient implements SourceClient {
     }
 
     private async readAndValidateHealth(): Promise<void> {
-        const health = await this.getHealth();
+        let health: SourceHealth;
+        try {
+            health = await this.getHealth();
+        } catch (error) {
+            this.helperUnavailableRetryAfterMilliseconds = this.now()
+                + HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
+            throw error;
+        }
 
         if (health.protocolVersion !== SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION) {
             this.protocolCompatibility = "unknown";
@@ -232,6 +245,7 @@ export class WindowsHelperSourceClient implements SourceClient {
 
         this.protocolCompatibility = "supported";
         this.unsupportedProtocolRetryAfterMilliseconds = 0;
+        this.helperUnavailableRetryAfterMilliseconds = 0;
     }
 
     private async sendSourceIpcRequest(
