@@ -28,13 +28,22 @@ export function renderMetricFrame(options: {
     const body = options.muted
         ? `<g filter="url(#${filterId})">${options.body}</g>`
         : options.body;
+    const panelAttributes = style.renderPanelAttributes?.(options.size, options.paints) ?? [];
+    const panelStart = panelAttributes.length === 0
+        ? ""
+        : `<g ${panelAttributes.join(" ")}>`;
+    const panelEnd = panelAttributes.length === 0 ? "" : "</g>";
+    const panelOverlay = style.renderPanelOverlay?.(options.size, options.paints) ?? "";
 
     return `<svg xmlns="http://www.w3.org/2000/svg"
         width="${options.size.width}" height="${options.size.height}"
         viewBox="0 0 ${options.size.width} ${options.size.height}">
         <defs>${style.renderDefs(options.size, options.paints)}${mutedDefs}</defs>
+        ${panelStart}
         ${style.renderBackground(options.size, options.paints)}
         ${body}
+        ${panelOverlay}
+        ${panelEnd}
         ${style.renderOverlay(options.size, options.paints)}
     </svg>`;
 }
