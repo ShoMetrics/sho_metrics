@@ -5,7 +5,7 @@ import {
     TERMINAL_SUBTLE_GLOW_FILTER_ID,
     TERMINAL_VALUE_GLOW_FILTER_ID,
 } from "../../rendering/render-svg-effects";
-import type { GraphicStyle, GraphicStylePaints } from "./style.interface";
+import type { ThemeStyle, ThemeStylePaints } from "./theme-style";
 
 const TERMINAL_RADIUS = 12;
 const TERMINAL_REFERENCE_SIZE = 144;
@@ -106,7 +106,7 @@ const VINTAGE_TERMINAL_GLOW_SETTINGS = {
     subtleOpacity: 0.22,
 } satisfies TerminalGlowSettings;
 
-export const terminalCleanStyle: GraphicStyle = {
+export const terminalCleanStyle: ThemeStyle = {
     styleId: "terminal-clean",
 
     renderDefs(keySize, paints) {
@@ -137,7 +137,7 @@ export const terminalCleanStyle: GraphicStyle = {
     },
 };
 
-export const terminalVintageStyle: GraphicStyle = {
+export const terminalVintageStyle: ThemeStyle = {
     styleId: "terminal-vintage",
 
     renderDefs(keySize, paints) {
@@ -188,7 +188,7 @@ export const terminalVintageStyle: GraphicStyle = {
     },
 };
 
-function renderTerminalBackground(keySize: KeySize, paints: GraphicStylePaints): string {
+function renderTerminalBackground(keySize: KeySize, paints: ThemeStylePaints): string {
     const idPrefix = terminalIdPrefix(keySize);
 
     return `
@@ -201,7 +201,7 @@ function renderTerminalBackground(keySize: KeySize, paints: GraphicStylePaints):
     `;
 }
 
-function renderCleanTerminalScreenGradients(idPrefix: string, paints: GraphicStylePaints): string {
+function renderCleanTerminalScreenGradients(idPrefix: string, paints: ThemeStylePaints): string {
     return `
         <radialGradient id="${idPrefix}-screen-wash" cx="52%" cy="43%" r="82%">
             <stop offset="0%" stop-color="${paints.surface}" stop-opacity="${CLEAN_TERMINAL_SCREEN_WASH_OPACITY}" />
@@ -225,7 +225,7 @@ function renderCleanTerminalScreenGradients(idPrefix: string, paints: GraphicSty
     `;
 }
 
-function renderTerminalScreenGradients(idPrefix: string, paints: GraphicStylePaints): string {
+function renderTerminalScreenGradients(idPrefix: string, paints: ThemeStylePaints): string {
     return `
         <radialGradient id="${idPrefix}-screen-wash" cx="52%" cy="43%" r="78%">
             <stop offset="0%" stop-color="${paints.surface}" stop-opacity="${TERMINAL_SCREEN_WASH_OPACITY}" />
@@ -251,7 +251,7 @@ function renderTerminalScreenGradients(idPrefix: string, paints: GraphicStylePai
     `;
 }
 
-function renderTerminalReflectionGradients(idPrefix: string, paints: GraphicStylePaints): string {
+function renderTerminalReflectionGradients(idPrefix: string, paints: ThemeStylePaints): string {
     return `
         <radialGradient id="${idPrefix}-main-reflection" cx="48%" cy="42%" r="70%">
             <stop offset="0%" stop-color="white" stop-opacity="0.26" />
@@ -267,7 +267,7 @@ function renderTerminalReflectionGradients(idPrefix: string, paints: GraphicStyl
     `;
 }
 
-function renderTerminalGlassGradients(idPrefix: string, paints: GraphicStylePaints): string {
+function renderTerminalGlassGradients(idPrefix: string, paints: ThemeStylePaints): string {
     return `
         <radialGradient id="${idPrefix}-curved-glass" cx="50%" cy="48%" r="112%">
             <stop offset="0%" stop-color="white" stop-opacity="${TERMINAL_CURVED_GLASS_CENTER_OPACITY}" />
@@ -283,7 +283,7 @@ function renderTerminalGlassGradients(idPrefix: string, paints: GraphicStylePain
     `;
 }
 
-function renderTerminalRasterPatterns(idPrefix: string, paints: GraphicStylePaints): string {
+function renderTerminalRasterPatterns(idPrefix: string, paints: ThemeStylePaints): string {
     return `
         <pattern id="${idPrefix}-scanlines" width="1" height="${TERMINAL_SCANLINE_PERIOD}" patternUnits="userSpaceOnUse">
             <rect y="${TERMINAL_SCANLINE_PERIOD - TERMINAL_SCANLINE_DARK_BAND_HEIGHT - 0.45}"
@@ -361,7 +361,7 @@ function renderTerminalGlowFilters(glow: TerminalGlowSettings): string {
     `;
 }
 
-function renderTerminalReflectionOverlay(keySize: KeySize, paints: GraphicStylePaints, idPrefix: string): string {
+function renderTerminalReflectionOverlay(keySize: KeySize, paints: ThemeStylePaints, idPrefix: string): string {
     const reflection = scaleTerminalRect(keySize, {
         x: TERMINAL_REFLECTION_X,
         y: TERMINAL_REFLECTION_Y,

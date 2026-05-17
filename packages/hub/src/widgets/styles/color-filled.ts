@@ -1,8 +1,8 @@
 import { adjustHexColorBrightness } from "../../rendering/svg-utils";
 import type { KeySize } from "../../rendering/widget-data";
-import type { GraphicBackgroundFill, GraphicStyle, GraphicStylePaints } from "./style.interface";
+import type { ThemeBackgroundFill, ThemeStyle, ThemeStylePaints } from "./theme-style";
 
-type SoftTriangleBackgroundFill = Extract<GraphicBackgroundFill, {
+type SoftTriangleBackgroundFill = Extract<ThemeBackgroundFill, {
     readonly fillKind: "soft-triangle";
 }>;
 
@@ -10,7 +10,7 @@ const SOFT_TRIANGLE_CENTER_X_RATIO = 0.5;
 const SOFT_TRIANGLE_CENTER_Y_RATIO = 0.46;
 const COLOR_FILLED_RADIUS = 12;
 
-export const colorFilledStyle: GraphicStyle = {
+export const colorFilledStyle: ThemeStyle = {
     styleId: "color-filled",
     renderDefs(keySize, paints) {
         return renderColorFilledDefs(keySize, paints.backgroundFill);
@@ -24,7 +24,7 @@ export const colorFilledStyle: GraphicStyle = {
     },
 };
 
-function renderColorFilledDefs(keySize: KeySize, backgroundFill: GraphicBackgroundFill | undefined): string {
+function renderColorFilledDefs(keySize: KeySize, backgroundFill: ThemeBackgroundFill | undefined): string {
     if (!backgroundFill?.isGradientEnabled) {
         return "";
     }
@@ -60,7 +60,7 @@ function renderColorFilledDefs(keySize: KeySize, backgroundFill: GraphicBackgrou
     `;
 }
 
-function renderColorFilledBackground(keySize: KeySize, paints: GraphicStylePaints): string {
+function renderColorFilledBackground(keySize: KeySize, paints: ThemeStylePaints): string {
     const backgroundFill = paints.backgroundFill;
 
     if (!backgroundFill) {

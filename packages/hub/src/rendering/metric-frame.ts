@@ -4,13 +4,13 @@ import { colorFilledStyle } from "../widgets/styles/color-filled";
 import { cupertinoGlassStyle } from "../widgets/styles/cupertino-glass";
 import { flatStyle } from "../widgets/styles/flat";
 import { terminalCleanStyle, terminalVintageStyle } from "../widgets/styles/terminal";
-import type { GraphicStylePaints } from "../widgets/styles/style.interface";
+import type { ThemeStylePaints } from "../widgets/styles/theme-style";
 
 export function renderMetricFrame(options: {
     body: string;
     themePreset: ThemePresetName;
     muted: boolean;
-    paints: GraphicStylePaints;
+    paints: ThemeStylePaints;
     size: KeySize;
 }): string {
     const style = resolveThemePreset(options.themePreset);

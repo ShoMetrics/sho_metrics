@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { renderMetricFrame } from "./metric-frame";
-import type { GraphicStylePaints } from "../widgets/styles/style.interface";
+import type { ThemeStylePaints } from "../widgets/styles/theme-style";
 
-const framePaints: GraphicStylePaints = {
+const framePaints: ThemeStylePaints = {
     background: "#101010",
     backgroundFill: undefined,
     surface: "rgba(255,255,255,0.08)",
