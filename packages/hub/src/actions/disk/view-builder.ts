@@ -2,11 +2,9 @@ import type { WillAppearEvent } from "@elgato/streamdeck";
 import type { MetricStoreReader } from "../../runtime/metric-store";
 import type { DiskVolumeOption } from "../../runtime/disk-volumes";
 import {
-    getDefaultDiskUsageMetricKey,
     getDiskThroughputMetricKey,
-    getDiskVolumeMetricKey,
+    resolveDiskUsageMetricKey,
     type DiskThroughputDirection,
-    type DiskUsageMetric,
 } from "../../runtime/disk-metric-keys";
 import { buildDiskThroughputWidgetData, buildDiskUsageWidgetData } from "../../metrics/storage-widget-data";
 import type {
@@ -77,9 +75,9 @@ function buildDiskUsageDisplayOptions(
     options: BuildDiskDisplayOptions & { reading: DiskUsageReading },
 ): MetricDisplayOptions {
     const selectedVolume = resolveAvailableDiskVolume(options.volumeSelection);
-    const usedMetricKey = resolveDiskUsageMetricKey("used", options.target);
-    const totalMetricKey = resolveDiskUsageMetricKey("total", options.target);
-    const availableMetricKey = resolveDiskUsageMetricKey("available", options.target);
+    const usedMetricKey = resolveDiskUsageMetricKey("used", options.target.volumeId);
+    const totalMetricKey = resolveDiskUsageMetricKey("total", options.target.volumeId);
+    const availableMetricKey = resolveDiskUsageMetricKey("available", options.target.volumeId);
     const label = formatCompactDiskVolumeLabel(options.volumeSelection);
     const usedBytesWidgetData = options.volumeSelection.kind === "unavailable"
         ? buildUnavailableDiskBytesWidgetData(label)
@@ -292,12 +290,6 @@ function resolveDiskBarLabel(
     }
 
     return buildDiskBarLabel(diskVolume, fallbackLabel);
-}
-
-function resolveDiskUsageMetricKey(metric: DiskUsageMetric, target: ResolvedDiskMetricTarget): string {
-    return target.volumeId && target.volumeId.length > 0
-        ? getDiskVolumeMetricKey(metric, target.volumeId)
-        : getDefaultDiskUsageMetricKey(metric);
 }
 
 function resolveCompactDiskStorageLabel(diskVolume: DiskVolumeOption): string {

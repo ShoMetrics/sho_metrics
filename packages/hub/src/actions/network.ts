@@ -6,7 +6,7 @@ import { logger } from "../logging/logger";
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../runtime/network-interfaces";
 import {
     getNetworkAggregateMetricKey,
-    getNetworkInterfaceMetricKey,
+    resolveNetworkMetricKey,
     type NetworkDirection,
 } from "../runtime/network-metric-keys";
 import { resolveNetworkMetricSubscriptionKeys } from "./network/metric-subscriptions";
@@ -38,7 +38,7 @@ export class Network extends MetricAction {
         return resolveNetworkMetricSubscriptionKeys({
             selectedView: settings.widget.slot.appearance.view.selectedView,
             networkDirection: networkTarget.reading.direction,
-            networkInterfaceId: networkTarget.interfaceId ?? "",
+            networkInterfaceId: networkTarget.interfaceId,
         });
     }
 
@@ -51,7 +51,7 @@ export class Network extends MetricAction {
         const metrics = this.getMetricReader(event);
 
         this.publishNetworkInterfaceOptions(event);
-        this.publishNetworkRuntimeMaximum(event, networkTarget, selectedNetworkInterface, metrics);
+        this.publishNetworkRuntimeMaximum(event, networkTarget, metrics);
 
         const displayUpdate = buildNetworkDisplayUpdate({
             event,
@@ -96,16 +96,14 @@ export class Network extends MetricAction {
     private publishNetworkRuntimeMaximum(
         event: WillAppearEvent,
         target: ResolvedNetworkMetricTarget,
-        selectedNetworkInterface: NetworkInterfaceOption | null,
         metrics: MetricStoreReader,
     ): void {
         if (target.reading.display.scaleMode === "custom") {
             return;
         }
 
-        const networkInterfaceId = target.interfaceId ?? "";
-        const downloadMetricKey = resolveNetworkMetricKey("download", networkInterfaceId);
-        const uploadMetricKey = resolveNetworkMetricKey("upload", networkInterfaceId);
+        const downloadMetricKey = resolveNetworkMetricKey("download", target.interfaceId);
+        const uploadMetricKey = resolveNetworkMetricKey("upload", target.interfaceId);
         const nextDownloadMaximum = resolveRuntimeNetworkMaximumMegabitsPerSecond({
             direction: "download",
             target,
@@ -132,15 +130,6 @@ export class Network extends MetricAction {
             log.error(() => `Failed to publish runtime network maximum: ${String(error)}`);
         });
     }
-}
-
-function resolveNetworkMetricKey(
-    direction: Exclude<NetworkDirection, "both">,
-    networkInterfaceId: string,
-): string {
-    return networkInterfaceId.length > 0
-        ? getNetworkInterfaceMetricKey(direction, networkInterfaceId)
-        : getNetworkAggregateMetricKey(direction);
 }
 
 const DEBUG_LOG_INTERVAL_MILLISECONDS = 5000;

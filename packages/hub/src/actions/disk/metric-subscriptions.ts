@@ -1,8 +1,6 @@
 import {
-    getDefaultDiskUsageMetricKey,
     getDiskThroughputMetricKey,
-    getDiskVolumeMetricKey,
-    type DiskUsageMetric,
+    resolveDiskUsageMetricKey,
 } from "../../runtime/disk-metric-keys";
 import type {
     DiskThroughputDirection as DiskThroughputDisplayDirection,
@@ -46,10 +44,4 @@ export function isDualDiskThroughputDisplay(
 ): boolean {
     return direction === "both"
         && (selectedView === "circle" || selectedView === "text" || selectedView === "line");
-}
-
-function resolveDiskUsageMetricKey(metric: DiskUsageMetric, volumeId: string | undefined): string {
-    return volumeId && volumeId.length > 0
-        ? getDiskVolumeMetricKey(metric, volumeId)
-        : getDefaultDiskUsageMetricKey(metric);
 }
