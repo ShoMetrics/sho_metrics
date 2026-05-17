@@ -61,8 +61,9 @@ export class MetricStore {
         timestampMilliseconds: number,
     ): void {
         let metricRecord = sourceStore.get(metricKey);
-        if (!metricRecord) {
+        if (metricRecord?.kind !== "scalar") {
             metricRecord = {
+                kind: "scalar",
                 buffer: new RingBuffer<number>(MetricStore.HISTORY_SIZE),
                 timestampMilliseconds,
             };
@@ -79,17 +80,11 @@ export class MetricStore {
         value: string,
         timestampMilliseconds: number,
     ): void {
-        let metricRecord = sourceStore.get(metricKey);
-        if (!metricRecord) {
-            metricRecord = {
-                buffer: new RingBuffer<number>(MetricStore.HISTORY_SIZE),
-                timestampMilliseconds,
-            };
-            sourceStore.set(metricKey, metricRecord);
-        }
-
-        metricRecord.text = value;
-        metricRecord.timestampMilliseconds = timestampMilliseconds;
+        sourceStore.set(metricKey, {
+            kind: "text",
+            text: value,
+            timestampMilliseconds,
+        });
     }
 
     private readWidgetData(
@@ -100,11 +95,12 @@ export class MetricStore {
         maxValue = 100,
     ): WidgetData {
         const metricRecord = this.readRecord(sourceScopeId, metricKey);
-        const current = metricRecord?.buffer.latest ?? 0;
+        const current = metricRecord?.kind === "scalar" ? metricRecord.buffer.latest ?? 0 : 0;
+
         return {
             current,
             progress: Math.min(Math.max(current / maxValue, 0), 1),
-            history: metricRecord?.buffer.toArray() ?? [],
+            history: metricRecord?.kind === "scalar" ? metricRecord.buffer.toArray() : [],
             unit,
             label,
             sampleTimestampMilliseconds: metricRecord?.timestampMilliseconds,
@@ -112,7 +108,8 @@ export class MetricStore {
     }
 
     private readTextValue(sourceScopeId: string, metricKey: string): string | undefined {
-        return this.readRecord(sourceScopeId, metricKey)?.text;
+        const metricRecord = this.readRecord(sourceScopeId, metricKey);
+        return metricRecord?.kind === "text" ? metricRecord.text : undefined;
     }
 
     /** Clears all sampled metric history and text values. Intended for isolated tests and source resets. */
@@ -137,10 +134,18 @@ export class MetricStore {
 
 type SourceMetricStore = Map<string, MetricRecord>;
 
-interface MetricRecord {
+type MetricRecord = ScalarMetricRecord | TextMetricRecord;
+
+interface ScalarMetricRecord {
+    kind: "scalar";
     buffer: RingBuffer<number>;
     timestampMilliseconds: number;
-    text?: string;
+}
+
+interface TextMetricRecord {
+    kind: "text";
+    text: string;
+    timestampMilliseconds: number;
 }
 
 /** Shared runtime metric store for the local plugin process. */
