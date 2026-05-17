@@ -98,6 +98,24 @@ test("network dual-channel settings render channel colors instead of usage color
     assert.match(markup, /Color - Upload/);
 });
 
+test("network black-white dual-channel settings hide channel colors", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "network",
+        settings: buildWidgetSettings("network", {
+            appearance: {
+                paint: { metric: { colorMode: "black-white" } },
+            },
+            network: {
+                direction: "both",
+            },
+        }),
+    });
+
+    assert.match(markup, /Color Mode:/);
+    assert.doesNotMatch(markup, /Color - Download/);
+    assert.doesNotMatch(markup, /Color - Upload/);
+});
+
 test("network settings render from empty quick-start settings", () => {
     const markup = renderWidgetSettings({
         actionKind: "network",

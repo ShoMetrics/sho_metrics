@@ -25,6 +25,7 @@ import {
 } from "./setting-options";
 
 type MetricChannelKey = "usage" | "download" | "upload" | "diskRead" | "diskWrite";
+type MetricColorChannelKey = Exclude<MetricChannelKey, "usage">;
 type SolidColorKey = keyof ResolvedMetricSolidChannelColors;
 type MultiColorKey = keyof ResolvedMultiColorSet;
 
@@ -40,6 +41,21 @@ const solidColorKeyByChannel = {
     diskRead: "diskReadColor",
     diskWrite: "diskWriteColor",
 } satisfies Record<MetricChannelKey, SolidColorKey>;
+
+const networkColorChannels = [
+    { channel: "download", heading: "Color - Download" },
+    { channel: "upload", heading: "Color - Upload" },
+] as const satisfies readonly ChannelColorSectionSettings[];
+
+const diskThroughputColorChannels = [
+    { channel: "diskRead", heading: "Read" },
+    { channel: "diskWrite", heading: "Write" },
+] as const satisfies readonly ChannelColorSectionSettings[];
+
+interface ChannelColorSectionSettings {
+    readonly channel: MetricColorChannelKey;
+    readonly heading: string;
+}
 
 function patchMetricPaintSettings(
     onSettingsPatch: WidgetSettingsPanelProps["onSettingsPatch"],
@@ -207,8 +223,14 @@ export function NetworkChannelColorSettings(props: WidgetSettingsPanelProps): Re
             <ChannelThresholdControls {...props} />
             {shouldShowChannelColors ? (
                 <>
-                    <NetworkDownloadColorSettings {...props} />
-                    <NetworkUploadColorSettings {...props} />
+                    {networkColorChannels.map(channelSettings => (
+                        <ChannelColorSection
+                            key={channelSettings.channel}
+                            {...props}
+                            channel={channelSettings.channel}
+                            heading={channelSettings.heading}
+                        />
+                    ))}
                 </>
             ) : null}
         </SettingsSection>
@@ -235,8 +257,14 @@ export function DiskThroughputChannelColorSettings(props: WidgetSettingsPanelPro
             <ChannelThresholdControls {...props} />
             {shouldShowChannelColors ? (
                 <>
-                    <DiskReadColorSettings {...props} />
-                    <DiskWriteColorSettings {...props} />
+                    {diskThroughputColorChannels.map(channelSettings => (
+                        <ChannelColorSection
+                            key={channelSettings.channel}
+                            {...props}
+                            channel={channelSettings.channel}
+                            heading={channelSettings.heading}
+                        />
+                    ))}
                 </>
             ) : null}
         </SettingsSection>
@@ -575,38 +603,15 @@ function ThresholdRangeSettings({
     );
 }
 
-function NetworkDownloadColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
+function ChannelColorSection({
+    channel,
+    heading,
+    ...props
+}: WidgetSettingsPanelProps & ChannelColorSectionSettings): React.JSX.Element {
     return (
         <>
-            <SectionHeading text="Color - Download" />
-            <ChannelColorFields {...props} channel="download" />
-        </>
-    );
-}
-
-function NetworkUploadColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
-    return (
-        <>
-            <SectionHeading text="Color - Upload" />
-            <ChannelColorFields {...props} channel="upload" />
-        </>
-    );
-}
-
-function DiskReadColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
-    return (
-        <>
-            <SectionHeading text="Read" />
-            <ChannelColorFields {...props} channel="diskRead" />
-        </>
-    );
-}
-
-function DiskWriteColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
-    return (
-        <>
-            <SectionHeading text="Write" />
-            <ChannelColorFields {...props} channel="diskWrite" />
+            <SectionHeading text={heading} />
+            <ChannelColorFields {...props} channel={channel} />
         </>
     );
 }
@@ -617,7 +622,7 @@ function ChannelColorFields({
     onSettingsPatch,
     colorDisabled = false,
 }: WidgetSettingsPanelProps & {
-    channel: Exclude<MetricChannelKey, "usage">;
+    channel: MetricColorChannelKey;
 }): React.JSX.Element {
     const metricPaint = context.resolved.widget.slot.appearance.paint.metric;
     const solidColorKey = solidColorKeyByChannel[channel];
