@@ -39,5 +39,15 @@ test("network text both mode subscribes to upload and download", () => {
         networkInterfaceId: "",
     });
 
+
+test("network explicit interface subscribes to interface keys without registry lookup", () => {
+    const subscriptionKeys = resolveNetworkMetricSubscriptionKeys({
+        graphicType: "sparkline",
+        networkDirection: "both",
+        networkInterfaceId: "Ethernet",
+    });
+
+    assert.deepEqual(subscriptionKeys, ["net.up.Ethernet", "net.down.Ethernet"]);
+});
     assert.deepEqual(subscriptionKeys, ["net.up", "net.down"]);
 });

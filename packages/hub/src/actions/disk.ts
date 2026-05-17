@@ -9,7 +9,10 @@ import {
     getDiskThroughputMetricKey,
     type DiskThroughputDirection,
 } from "../runtime/disk-metric-keys";
-import { resolveDiskMetricSubscriptionKeys } from "./disk/metric-subscriptions";
+import {
+    resolveDiskMetricSubscriptionKeys,
+    resolveDiskUsageMetricSubscriptionKeys,
+} from "./disk/metric-subscriptions";
 import type { ResolvedDiskMetricTarget } from "../settings/resolved-settings";
 import {
     buildDiskDisplayOptions,
@@ -46,7 +49,7 @@ export class Disk extends MetricAction {
             });
         }
 
-        return DISK_USAGE_REFRESH_METRIC_KEYS;
+        return resolveDiskUsageMetricSubscriptionKeys(diskTarget.volumeId);
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {

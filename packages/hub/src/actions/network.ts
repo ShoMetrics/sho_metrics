@@ -103,12 +103,9 @@ export class Network extends MetricAction {
             return;
         }
 
-        const downloadMetricKey = selectedNetworkInterface
-            ? getNetworkInterfaceMetricKey("download", selectedNetworkInterface.id)
-            : getNetworkAggregateMetricKey("download");
-        const uploadMetricKey = selectedNetworkInterface
-            ? getNetworkInterfaceMetricKey("upload", selectedNetworkInterface.id)
-            : getNetworkAggregateMetricKey("upload");
+        const networkInterfaceId = target.interfaceId ?? "";
+        const downloadMetricKey = resolveNetworkMetricKey("download", networkInterfaceId);
+        const uploadMetricKey = resolveNetworkMetricKey("upload", networkInterfaceId);
         const nextDownloadMaximum = resolveRuntimeNetworkMaximumMegabitsPerSecond({
             direction: "download",
             target,
@@ -135,6 +132,15 @@ export class Network extends MetricAction {
             log.error(() => `Failed to publish runtime network maximum: ${String(error)}`);
         });
     }
+}
+
+function resolveNetworkMetricKey(
+    direction: NetworkDirection,
+    networkInterfaceId: string,
+): string {
+    return networkInterfaceId.length > 0
+        ? getNetworkInterfaceMetricKey(direction, networkInterfaceId)
+        : getNetworkAggregateMetricKey(direction);
 }
 
 const DEBUG_LOG_INTERVAL_MILLISECONDS = 5000;
