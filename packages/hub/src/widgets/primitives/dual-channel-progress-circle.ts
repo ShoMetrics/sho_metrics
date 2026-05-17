@@ -14,7 +14,7 @@ import {
     clamp,
     renderConstrainedSvgText,
 } from "../../view-rendering/svg-utils";
-import type { WidgetBaseConfig } from "../widget.interface";
+import type { WidgetBaseConfig } from "../widget-contract";
 import type { ProgressCircleStatusIcon, CircleVariant } from "./progress-circle";
 import { renderDualGaugeRing } from "./dual-channel-gauge-ring";
 

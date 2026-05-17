@@ -10,7 +10,7 @@ import {
     resolveRenderTextStyleFontSize,
     type RenderTextStyles,
 } from "../../view-rendering/render-text-style";
-import type { WidgetBaseConfig } from "../widget.interface";
+import type { WidgetBaseConfig } from "../widget-contract";
 import { renderMetricTextRow } from "./metric-text-row";
 import {
     buildDualSparklineChannelModels,

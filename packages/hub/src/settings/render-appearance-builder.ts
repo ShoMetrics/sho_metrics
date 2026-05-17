@@ -1,5 +1,5 @@
 import type { MetricRenderAppearance } from "../view-rendering/render-appearance";
-import type { ThemePresetName } from "../widgets/widget.interface";
+import type { ThemePresetName } from "../widgets/widget-contract";
 import type {
     MetricView,
     ResolvedAppearanceSettings,

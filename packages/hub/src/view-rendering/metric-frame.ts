@@ -1,5 +1,5 @@
 import type { KeySize } from "./widget-data";
-import type { ThemePresetName } from "../widgets/widget.interface";
+import type { ThemePresetName } from "../widgets/widget-contract";
 import { colorFilledStyle } from "../widgets/styles/color-filled";
 import { cupertinoGlassStyle } from "../widgets/styles/cupertino-glass";
 import { flatStyle } from "../widgets/styles/flat";
