@@ -8,7 +8,7 @@ import streamDeck, {
 import { isDeepStrictEqual } from "node:util";
 import { scheduler } from "../runtime/scheduler";
 import { metricStore, type MetricStoreReader } from "../runtime/metric-store";
-import { buildMetricReadPlanKey, type MetricReadPlan } from "../runtime/sources/metric-read-plan";
+import type { MetricReadPlan } from "../runtime/sources/metric-read-plan";
 import { buildMetricReadPlanFromSourcePolicy } from "../runtime/sources/metric-read-plan-builder";
 import { clearMetricViewState } from "../view-updates/runner";
 import { logger } from "../logging/logger";
@@ -27,14 +27,9 @@ import {
     type WidgetRuntimeCacheMessage,
     type WidgetRuntimeCachePatch,
 } from "../runtime/widget-runtime-cache";
+import { SchedulerBinding } from "./shared/scheduler-binding";
 
 const log = logger.for("MetricAction");
-
-interface ActiveMetricAction {
-    cleanup: () => void;
-    readPlanSignature: string;
-    pollingIntervalMilliseconds: number;
-}
 
 interface ActiveActionState {
     event: WillAppearEvent;
@@ -50,7 +45,7 @@ interface ActiveActionState {
  */
 export abstract class MetricAction extends SingletonAction {
     private activeActionStates = new Map<string, ActiveActionState>();
-    private activeMetricActions = new Map<string, ActiveMetricAction>();
+    private schedulerBindings = new Map<string, SchedulerBinding>();
     private readonly metricReaderBySourceScopeId = new Map<string, MetricStoreReader>();
 
     protected abstract readonly actionKind: ActionKind;
@@ -84,7 +79,7 @@ export abstract class MetricAction extends SingletonAction {
                 log.error(() => `Failed to persist quick-start widget settings: ${String(error)}`);
             });
         }
-        this.subscribeAction(activeActionState);
+        this.refreshSubscription(activeActionState);
         this.onMetricsUpdate(event);
     }
 
@@ -115,15 +110,15 @@ export abstract class MetricAction extends SingletonAction {
                     log.error(() => `Failed to persist quick-start widget settings: ${String(error)}`);
                 });
             }
-            this.resubscribeActionIfPollingPlanChanged(activeActionState);
+            this.refreshSubscription(activeActionState);
             // Force an immediate update for snappy UI feedback.
             this.onMetricsUpdate(activeActionState.event);
         }
     }
 
     override onWillDisappear(event: WillDisappearEvent): void {
-        this.activeMetricActions.get(event.action.id)?.cleanup();
-        this.activeMetricActions.delete(event.action.id);
+        this.schedulerBindings.get(event.action.id)?.dispose();
+        this.schedulerBindings.delete(event.action.id);
         this.activeActionStates.delete(event.action.id);
         clearMetricViewState(event.action.id);
     }
@@ -205,63 +200,6 @@ export abstract class MetricAction extends SingletonAction {
         void event;
     }
 
-    private subscribeAction(activeActionState: ActiveActionState): void {
-        const { event } = activeActionState;
-        const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
-            this.resolveSettings(event).preferences.pollingFrequencySeconds,
-        );
-        const readPlan = this.resolveMetricReadPlan(event);
-        const readPlanSignature = buildMetricReadPlanKey(readPlan);
-        const cleanup = scheduler.subscribe(() => {
-            const currentActionState = this.activeActionStates.get(event.action.id);
-
-            if (currentActionState) {
-                this.onMetricsUpdate(currentActionState.event);
-            }
-        }, {
-            readPlan,
-            pollingIntervalMilliseconds,
-        });
-
-        this.activeMetricActions.set(event.action.id, {
-            cleanup,
-            readPlanSignature,
-            pollingIntervalMilliseconds,
-        });
-    }
-
-    private resubscribeActionIfPollingPlanChanged(activeActionState: ActiveActionState): void {
-        const { event } = activeActionState;
-        const activeMetricAction = this.activeMetricActions.get(event.action.id);
-        const nextPollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
-            this.resolveSettings(event).preferences.pollingFrequencySeconds,
-        );
-        const nextReadPlanSignature = buildMetricReadPlanKey(this.resolveMetricReadPlan(event));
-
-        if (
-            activeMetricAction?.pollingIntervalMilliseconds === nextPollingIntervalMilliseconds
-            && activeMetricAction.readPlanSignature === nextReadPlanSignature
-        ) {
-            return;
-        }
-
-        activeMetricAction?.cleanup();
-        this.subscribeAction(activeActionState);
-    }
-
-    private resubscribeAllActions(): void {
-        for (const activeActionState of this.activeActionStates.values()) {
-            const { event } = activeActionState;
-            activeActionState.resolvedSettings = this.resolveRawSettings(
-                activeActionState.rawSettings,
-                activeActionState.runtimeCache,
-            );
-            this.activeMetricActions.get(event.action.id)?.cleanup();
-            this.activeMetricActions.delete(event.action.id);
-            this.subscribeAction(activeActionState);
-        }
-    }
-
     protected sendRuntimeCachePatchToPropertyInspector(
         event: WillAppearEvent | PropertyInspectorDidAppearEvent,
         patch: WidgetRuntimeCachePatch,
@@ -278,6 +216,54 @@ export abstract class MetricAction extends SingletonAction {
         return streamDeck.ui.sendToPropertyInspector(
             message as unknown as Parameters<typeof streamDeck.ui.sendToPropertyInspector>[0],
         );
+    }
+
+    private refreshSubscription(activeActionState: ActiveActionState): void {
+        const { event } = activeActionState;
+        const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
+            this.resolveSettings(event).preferences.pollingFrequencySeconds,
+        );
+        const readPlan = this.resolveMetricReadPlan(event);
+        const schedulerBinding = this.getOrCreateSchedulerBinding(event.action.id);
+
+        schedulerBinding.refresh({
+            readPlan,
+            pollingIntervalMilliseconds,
+            onTick: () => {
+                const currentActionState = this.activeActionStates.get(event.action.id);
+
+                if (currentActionState) {
+                    this.onMetricsUpdate(currentActionState.event);
+                }
+            },
+        });
+    }
+
+    private getOrCreateSchedulerBinding(actionId: string): SchedulerBinding {
+        const existingSchedulerBinding = this.schedulerBindings.get(actionId);
+
+        if (existingSchedulerBinding) {
+            return existingSchedulerBinding;
+        }
+
+        const schedulerBinding = new SchedulerBinding();
+        this.schedulerBindings.set(actionId, schedulerBinding);
+        return schedulerBinding;
+    }
+
+    private resubscribeAllActions(): void {
+        for (const activeActionState of this.activeActionStates.values()) {
+            const { event } = activeActionState;
+            activeActionState.resolvedSettings = this.resolveRawSettings(
+                activeActionState.rawSettings,
+                activeActionState.runtimeCache,
+            );
+            // Force a fresh subscribe even when the read plan and polling
+            // interval are unchanged. Global settings can affect downstream
+            // source resolution without changing this action's plan signature.
+            this.schedulerBindings.get(event.action.id)?.dispose();
+            this.refreshSubscription(activeActionState);
+        }
     }
 
     private resolveRawSettings(rawSettings: unknown, runtimeCache: WidgetRuntimeCache): ResolvedWidgetSettings {
