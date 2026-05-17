@@ -159,6 +159,36 @@ test("global settings changes re-resolve settings resubscribe and force an immed
     }
 });
 
+test("global settings changes resubscribe even when the polling plan is unchanged", () => {
+    pluginGlobalSettingsStore.update(undefined);
+    const schedulerRecorder = installSchedulerSubscribeRecorder();
+    const action = new TestMetricAction();
+    const streamDeckAction = new FakeStreamDeckAction("global-same-plan-action");
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings({
+            appearance: {
+                view: { selectedView: "circle" },
+            },
+        })));
+        pluginGlobalSettingsStore.update(writeStoredGlobalSettingsPatch(undefined, {
+            network: {
+                maximumDownloadSpeedMegabitsPerSecond: 1000,
+            },
+        }));
+
+        assert.equal(schedulerRecorder.records.length, 2);
+        assert.equal(schedulerRecorder.records[0].cleanupCallCount, 1);
+        assert.deepEqual(schedulerRecorder.records[0].options.readPlan.metricKeys, ["net.down"]);
+        assert.deepEqual(schedulerRecorder.records[1].options.readPlan.metricKeys, ["net.down"]);
+        assert.deepEqual(action.metricsUpdateSnapshots.map(snapshot => snapshot.selectedView), ["circle", "circle"]);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+        schedulerRecorder.restore();
+        pluginGlobalSettingsStore.update(undefined);
+    }
+});
+
 test("onWillDisappear cleans subscription state and ignores later scheduler ticks", () => {
     const schedulerRecorder = installSchedulerSubscribeRecorder();
     const action = new TestMetricAction();
