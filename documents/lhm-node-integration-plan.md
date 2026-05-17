@@ -11,18 +11,20 @@ This plan describes how LibreHardwareMonitor data becomes ShoMetrics runtime tel
 - Local Windows helper transport is Windows named pipe + length-prefixed protobuf.
 - Remote monitoring is a separate transport concern. It will use gRPC over TLS with shared protobuf contracts.
 - The protobuf message contract is shared where possible. The transport adapters differ.
+- C# source API and IPC messages use `Google.Protobuf` generated classes from `contracts/proto`; do not hand-write mirrored DTOs.
 - Node pulls data from sources. Helpers do not push into the plugin.
 - Node owns polling cadence, timeout, fallback, history, and rendering.
 - The helper owns hardware access and raw-source normalization only. It does not own history.
 - Actions must not know whether telemetry came from LHM, systeminformation, a Windows service, or a remote agent.
 - Windows helper distribution uses a WiX/MSI installer. Do not ship a script-based portable installer as the product installation path.
 - Phase 1 Windows helper builds are unsigned. SmartScreen and security software warnings are accepted until the signing phase.
+- The first Windows service implementation is not NativeAOT/trimming-enabled. Publish-mode hardening happens after named pipe end-to-end validation.
 
 ## Not Decided Yet
 
-- Exact proto field numbers and final names. The semantic shape below is fixed; the implementation must still pass Buf lint/build.
 - Exact WiX/MSI upgrade codes, product codes, and UI flow.
 - Code signing release timing after unsigned alpha builds.
+- Final Windows helper production publish mode after dev-pipe end-to-end validation.
 
 ## Current State vs Target State
 
@@ -162,7 +164,7 @@ Proto generation:
 - TypeScript continues to use Buf + `protoc-gen-es` through `packages/hub/scripts/proto/buf.gen.yaml`, generated into `packages/hub/src/generated`.
 - C# uses the same proto files from `contracts/proto`; do not create hand-written mirrored DTOs for source API or IPC messages.
 - Generated TypeScript remains build output and is not committed unless the repo policy changes for all generated proto outputs.
-- Generated C# should be build output under `obj` when possible. If a generator requires checked-in files, document why before adding them.
+- Generated C# must stay build output under `obj`. If a generator cannot do this, stop and document the blocker before adding checked-in generated files.
 - New proto files must pass `npm.cmd run proto:format`, `npm.cmd run proto:lint`, and `npm.cmd run proto:build` from `packages/hub`.
 
 ## Runtime Refactor
@@ -399,9 +401,12 @@ Required service packages:
 
 - `Microsoft.Extensions.Hosting.WindowsServices` for Windows Service lifetime integration.
 - `Serilog.Extensions.Hosting` for `UseSerilog()`.
+- `Serilog.Sinks.Console` for dev pipe console diagnostics.
 - `Serilog.Sinks.EventLog` for Windows Event Log output.
 - `Serilog.Sinks.File` for `%ProgramData%` rolling file output.
-- A protobuf C# generator/runtime chosen during proto implementation. Do not hand-write source API DTOs if generation is blocked.
+- `Google.Protobuf` for generated protobuf message runtime.
+- `Grpc.Tools` with `GrpcServices="None"` for build-time C# message generation only.
+- `System.IO.Pipes.AccessControl` for named pipe ACL creation.
 
 Service executable modes:
 
@@ -424,13 +429,423 @@ Service logging:
 - Validation warnings must be throttled per metric or source sensor. A bad sensor must not flood logs.
 - Do not log complete protobuf payloads, full hardware dumps, arbitrary file paths, or other large/sensitive payloads. Prefer request id, metric id, source id, source sensor id, and error code.
 
-Windows installer:
+## C# Service Implementation Spec
+
+The current C# code has a Core snapshot reader and a one-shot Helper CLI. It does not yet have an implementation-level service spec. The rules below are the source of truth for the next C# implementation pass.
+
+### C# Step 1: Add Service Project
+
+Create:
+
+```txt
+packages/source-windows/ShoMetrics.Source.Windows.Service/
+```
+
+Add the project to:
+
+```txt
+packages/source-windows/ShoMetrics.Source.Windows.slnx
+```
+
+Project file requirements:
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ShoMetrics.Source.Windows.Core\ShoMetrics.Source.Windows.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="[PINNED_VERSION]" />
+    <PackageReference Include="Grpc.Tools" Version="[PINNED_VERSION]" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="[PINNED_VERSION]" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="[PINNED_VERSION]" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="[PINNED_VERSION]" />
+    <PackageReference Include="Serilog.Sinks.EventLog" Version="[PINNED_VERSION]" />
+    <PackageReference Include="Serilog.Sinks.File" Version="[PINNED_VERSION]" />
+    <PackageReference Include="System.IO.Pipes.AccessControl" Version="[PINNED_VERSION]" />
+  </ItemGroup>
+</Project>
+```
+
+Rules:
+
+- Do not enable NativeAOT or trimming in the first service project. Publish-mode hardening is a later step after the service passes end-to-end IPC validation.
+- Do not add gRPC server/client packages. `Grpc.Tools` is used only for protobuf message generation.
+- `[PINNED_VERSION]` is a placeholder in this spec, not a literal package version.
+- Replace every `[PINNED_VERSION]` with an exact bracketed version after checking NuGet metadata. Do not use floating versions and do not guess package versions.
+- Keep `packages.lock.json` updated. If NuGet metadata cannot be checked, stop and ask instead of committing guessed dependency versions.
+- Do not make the service executable install or uninstall itself.
+- Do not move ControlPanel or installer code into the service project.
+
+### C# Step 2: Generate Protobuf Contracts
+
+The service must generate C# messages from the same proto files used by Node:
+
+```txt
+contracts/proto/shometrics/v1/snapshot.proto
+contracts/proto/shometrics/v1/source_api.proto
+contracts/proto/shometrics/v1/source_ipc.proto
+```
+
+Add `csharp_namespace` options before generating C#:
+
+```proto
+option csharp_namespace = "ShoMetrics.Contracts.V1";
+```
+
+Project file protobuf items:
+
+```xml
+<ItemGroup>
+  <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\snapshot.proto"
+            ProtoRoot="..\..\..\contracts\proto"
+            GrpcServices="None" />
+  <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\source_api.proto"
+            ProtoRoot="..\..\..\contracts\proto"
+            GrpcServices="None" />
+  <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\source_ipc.proto"
+            ProtoRoot="..\..\..\contracts\proto"
+            GrpcServices="None" />
+</ItemGroup>
+```
+
+Rules:
+
+- `contracts/proto` remains the only source of truth.
+- Do not hand-write mirrored DTOs for `SourceIpcRequest`, `SourceIpcResponse`, `MetricSnapshot`, `MetricValue`, `MetricDescriptor`, `SourceWarning`, or `SourceError`.
+- Generated C# stays build output under `obj`; do not commit generated C# files.
+- If proto generation fails, fix generation. Do not introduce handwritten replacements.
+- After proto changes, run `npm.cmd run proto:format`, `npm.cmd run proto:lint`, and `npm.cmd run proto:build` from `packages/hub`.
+- After C# project changes, run `dotnet build .\packages\source-windows\ShoMetrics.Source.Windows.slnx --locked-mode`.
+
+### C# Step 3: Service Executable Modes
+
+Implement one entry point:
+
+```txt
+packages/source-windows/ShoMetrics.Source.Windows.Service/Program.cs
+```
+
+Supported modes:
+
+| Mode | Trigger | Behavior |
+|---|---|---|
+| Windows Service | launched by SCM | Runs the same Generic Host and pipe server with Windows Service lifetime. |
+| Dev pipe | `--dev-pipe` | Runs the same Generic Host and pipe server as a console process for elevated local testing. |
+| Help | `--help`, `-h` | Prints supported modes and exits `0`. |
+| Version | `--version` | Prints helper version and exits `0`. |
+
+Rules:
+
+- Unknown arguments exit `1` and do not touch LHM/PawnIO.
+- `--help` and `--version` must not initialize LHM/PawnIO or bind the named pipe.
+- `--dev-pipe` must use the same request handler, pipe server, protobuf mapping, and Core reader as Windows Service mode.
+- Use `Host.CreateDefaultBuilder(args)` so the host can call `UseWindowsService()` and Serilog `UseSerilog()` at the host boundary.
+- Use `UseWindowsService()` for service lifetime integration.
+- Do not replace `UseSerilog()` with only `ILoggingBuilder.AddSerilog()`.
+
+Required files:
+
+```txt
+Program.cs
+WindowsSourceWorker.cs
+WindowsPipeSourceServer.cs
+SourceRequestHandler.cs
+SourceProtocolMapper.cs
+SourceIpcFrameCodec.cs
+WindowsPipeSecurity.cs
+WindowsPipeClientVerifier.cs
+SourceServiceConstants.cs
+```
+
+Do not split further unless a file exceeds 800 lines or starts owning two unrelated responsibilities.
+
+### C# Step 4: Pipe Server
+
+`WindowsPipeSourceServer` owns the named pipe accept loop and per-connection request loop.
+
+Required constants:
+
+```csharp
+internal static class SourceServiceConstants
+{
+    public const string SourceId = "windows-helper";
+    public const string ProtocolVersion = "1";
+    public const string PipeName = "ShoMetrics.Source.Windows.v1";
+    public const int MaximumFrameBytes = 1024 * 1024;
+}
+```
+
+Pipe creation must use `NamedPipeServerStreamAcl.Create` with:
+
+```txt
+PipeDirection.InOut
+PipeTransmissionMode.Byte
+PipeOptions.Asynchronous
+NamedPipeServerStream.MaxAllowedServerInstances
+```
+
+Pipe ACL rules:
+
+| SID | Rights |
+|---|---|
+| `LocalSystem` | `FullControl` |
+| `BUILTIN\Administrators` | `FullControl` |
+| `BUILTIN\Users` | `ReadWrite` |
+
+Rules:
+
+- Do not use `PipeOptions.CurrentUserOnly`; the service runs as `LocalSystem` and must accept the non-admin Stream Deck plugin user.
+- Reject remote pipe clients after connection using `GetNamedPipeClientComputerNameW`. Accept only the local computer name.
+- If remote-client verification fails, close the connection without executing a request.
+- Each pipe connection is processed as ordered request/response pairs.
+- Do not implement request pipelining.
+- Server may accept multiple clients concurrently, but the hardware read path must be serialized.
+- Track active client tasks and stop accepting new clients during host shutdown.
+- On shutdown, cancel active request loops, dispose active pipe streams, and await client completion with a bounded timeout.
+
+### C# Step 5: Frame Codec
+
+`SourceIpcFrameCodec` owns length-prefixed protobuf framing.
+
+Read frame algorithm:
+
+```txt
+read exactly 4 bytes
+interpret as uint32 little-endian payload_length
+reject payload_length == 0
+reject payload_length > 1 MiB before allocating payload buffer
+read exactly payload_length bytes
+parse SourceIpcRequest
+```
+
+Write frame algorithm:
+
+```txt
+serialize SourceIpcResponse
+reject payload size == 0
+reject payload size > 1 MiB
+write uint32 little-endian payload_length
+write payload bytes
+flush pipe
+```
+
+Rules:
+
+- Use `BinaryPrimitives.ReadUInt32LittleEndian` and `BinaryPrimitives.WriteUInt32LittleEndian`.
+- Do not use JSON on the service IPC path.
+- Do not reuse the one-shot Helper CLI JSON serializer for service IPC.
+- Malformed protobuf responses are impossible on the server side; malformed requests must return `malformed_request` when a response can still be written, otherwise close the connection.
+- Oversized frames must close the connection; do not allocate the payload.
+
+### C# Step 6: Request Handler
+
+`SourceRequestHandler` owns command dispatch from `SourceIpcRequest` to source API responses.
+
+Target shape:
+
+```csharp
+internal sealed class SourceRequestHandler
+{
+    public Task<SourceIpcResponse> HandleAsync(SourceIpcRequest request, CancellationToken cancellationToken);
+}
+```
+
+Dispatch rules:
+
+| Request payload | Handler behavior |
+|---|---|
+| Empty payload | Return `SourceError` with `code="invalid_request"`. |
+| `get_source_health` | Return source id, protocol version, helper version, and warnings. Must not read a full LHM snapshot. |
+| `read_metric_snapshot` | Read Core snapshot, map requested metrics to proto `MetricSnapshot`, include descriptors only when requested. |
+| `list_metric_descriptors` | Return descriptors for requested metric ids, or all stable descriptors when request list is empty. |
+
+Timeout rules:
+
+| Operation | Service hard cap |
+|---|---:|
+| Health | 1 s |
+| Read snapshot | 3 s |
+| List descriptors | 8 s |
+
+Implementation rules:
+
+- Wrap each request with a linked `CancellationTokenSource` using the operation hard cap.
+- Return `SourceError` with `code="timeout"` when the operation exceeds the service hard cap.
+- Return `SourceError` with `code="source_unavailable"` when the Core reader cannot initialize LHM/PawnIO.
+- Return `SourceError` with `code="internal_error"` for unexpected exceptions after logging the exception.
+- Echo `request_id` from request to response.
+- Do not mutate settings, install drivers, execute commands, read arbitrary files, or load arbitrary DLLs.
+
+### C# Step 7: Core Reader Ownership
+
+The service must not create and dispose a LibreHardwareMonitor `Computer` for every 1 Hz read in production service mode.
+
+Add a Core-owned long-lived reader before wiring the service hot path:
+
+```txt
+packages/source-windows/ShoMetrics.Source.Windows.Core/LibreHardwareMonitorSession.cs
+packages/source-windows/ShoMetrics.Source.Windows.Core/HardwareMetricDescriptor.cs
+```
+
+Target shape:
+
+```csharp
+public sealed class LibreHardwareMonitorSession : IDisposable
+{
+    public Task<MetricSnapshot> ReadSnapshotAsync(
+        IReadOnlyCollection<string> metricIds,
+        CancellationToken cancellationToken);
+
+    public Task<IReadOnlyList<HardwareMetricDescriptor>> ListMetricDescriptorsAsync(
+        IReadOnlyCollection<string> metricIds,
+        CancellationToken cancellationToken);
+}
+```
+
+Rules:
+
+- The session owns the LHM `Computer` lifetime.
+- Open LHM once during session initialization.
+- Serialize LHM `Update()` and sensor traversal with `SemaphoreSlim`.
+- Do not expose LHM types outside Core.
+- `MetricSnapshot` in this step means `ShoMetrics.Source.Windows.Core.MetricSnapshot`, not the protobuf `MetricSnapshot`.
+- `HardwareMetricDescriptor` is a Core DTO with descriptor metadata only. It must not reference generated protobuf types.
+- The existing one-shot `ShoMetrics.Source.Windows.Helper` may keep using the existing CLI path until it is intentionally migrated.
+- If long-lived LHM session initialization fails, service health must report a warning and snapshot reads must return `source_unavailable`.
+
+### C# Step 8: Metric Mapping
+
+Service responses must use ShoMetrics canonical metric ids consumed by Node. The current C# POC metric ids such as `cpu.load.percent` and `cpu.package.temperature.celsius` are diagnostic-only and must not be returned by the service API unless Node also consumes them.
+
+Initial stable aliases required for service MVP:
+
+| Node metric id | C# source mapping |
+|---|---|
+| `cpu.usage_percent` | LHM CPU Total load |
+| `gpu.usage_percent` | LHM GPU Core load |
+| `gpu.temp` | LHM GPU Core temperature |
+| `gpu.power` | LHM GPU Package or GPU Power |
+| `gpu.vram_used` | LHM GPU Memory Used converted to bytes |
+| `gpu.vram_total` | LHM GPU Memory Total converted to bytes |
+| `ram.used` | LHM Memory Used converted to bytes |
+| `ram.total` | LHM Memory Used + Memory Available converted to bytes |
+| `net.down` | Aggregate LHM Download Speed |
+| `net.up` | Aggregate LHM Upload Speed |
+| `disk.throughput.read` | Aggregate LHM Read Rate |
+| `disk.throughput.write` | Aggregate LHM Write Rate |
+| `disk.throughput.total` | Read + write aggregate |
+
+Rules:
+
+- Units returned in proto must match Node expectations: `%`, `°C`, `W`, `B`, or `B/s`.
+- LHM `Data` values in GB must be converted to bytes before writing `MetricValue.scalar`.
+- Unknown requested metric ids are omitted from the snapshot and reported through `SourceWarning` with `code="metric_unavailable"`.
+- Semantically invalid values are omitted and reported through `SourceWarning`; do not clamp at the service boundary.
+- `0C` for normal CPU/GPU temperature is invalid and must be omitted.
+- Network and disk throughput may validly be `0`.
+- Dynamic LHM sensor descriptors may be listed later, but the first service MVP must not expose dynamic metric ids as widget values until Node has a selector UI for them.
+
+### C# Step 9: Proto Mapping
+
+`SourceProtocolMapper` owns conversion from Core models to protobuf messages.
+
+Rules:
+
+- Core must not reference generated protobuf types.
+- Service may reference generated protobuf types.
+- Service files that use both Core and protobuf snapshot types must alias at least one of them at the top of the file. Do not rely on ambiguous bare `MetricSnapshot` names.
+- `MetricSnapshot.source_id` must be `windows-helper`.
+- `MetricSnapshot.timestamp_ms` must use Unix time milliseconds from `MetricSnapshot.CapturedAt`.
+- `MetricValue.scalar` is used for numeric readings.
+- `MetricValue.text` is used only for model/name descriptors when Node requests text metrics in the future.
+- `MetricValue.progress` must be set for percentage values as `value / 100`. Non-percentage values must leave progress at proto default `0` because Node render adapters compute progress from metric-specific maxima.
+- Descriptors use:
+  - `metric_id` = ShoMetrics canonical metric id
+  - `source_sensor_id` = LHM sensor identifier
+  - `hardware_id` = LHM hardware identifier
+  - `hardware_name` = LHM hardware name
+  - `sensor_name` = LHM sensor name
+  - `sensor_type` = LHM sensor type
+  - `unit` = proto value unit
+  - `is_dynamic` = `false` for stable aliases
+
+### C# Step 10: Logging
+
+Logging owners:
+
+| Owner | Logs |
+|---|---|
+| `Program` | mode selection, startup failure |
+| `WindowsSourceWorker` | service start/stop |
+| `WindowsPipeSourceServer` | pipe bind, connection reject, malformed frame, oversized frame |
+| `SourceRequestHandler` | request timeout, source unavailable, unexpected handler exception |
+| `LibreHardwareMonitorSession` | LHM init failure, hardware update failure, validation warning throttles |
+
+Rules:
+
+- Do not log successful `ReadSnapshot` requests.
+- Do not log full sensor dumps or complete protobuf payloads.
+- Use request id, source id, metric id, source sensor id, and error code for diagnostics.
+- Validation warnings must be throttled per metric id or source sensor id.
+- Dev pipe mode may log to console in addition to file and Event Log.
+
+### C# Step 11: Service Acceptance Tests
+
+Before considering the service implementation complete, verify:
+
+```powershell
+dotnet build .\packages\source-windows\ShoMetrics.Source.Windows.slnx --locked-mode
+dotnet run --project .\packages\source-windows\ShoMetrics.Source.Windows.Service\ShoMetrics.Source.Windows.Service.csproj -- --help
+dotnet run --project .\packages\source-windows\ShoMetrics.Source.Windows.Service\ShoMetrics.Source.Windows.Service.csproj -- --version
+```
+
+Manual elevated test:
+
+```powershell
+dotnet run --project .\packages\source-windows\ShoMetrics.Source.Windows.Service\ShoMetrics.Source.Windows.Service.csproj -- --dev-pipe
+```
+
+Node-side validation while dev pipe is running:
+
+```powershell
+cd .\packages\hub
+npm.cmd run test:unit
+```
+
+Manual behavior acceptance:
+
+- Non-admin Node can connect to the elevated dev pipe.
+- Helper absent still falls back to `node-system`.
+- Helper present returns at least one requested metric on a machine where LHM can see sensors.
+- CPU/GPU temperature availability matches elevated LHM behavior.
+- Killing the dev pipe while widgets are active causes fallback without action recreation.
+- Restarting the dev pipe allows later helper reads without restarting the Stream Deck plugin process.
+
+## Windows Installer
 
 - Use WiX/MSI for the Windows helper installer from the first user-facing distribution.
 - The installer owns service registration, service account, service SID configuration, start/stop during install and uninstall, upgrade, repair, rollback, installation directory, and `%ProgramData%` log directory permissions.
-- The installer should also own the future WinUI 3 ControlPanel installation, shortcuts, and runtime prerequisites.
+- The installer owns the future WinUI 3 ControlPanel installation, shortcuts, and runtime prerequisites when ControlPanel becomes part of user-facing distribution.
 - The installer requires UAC. This does not change the non-admin requirement for the Stream Deck plugin process.
 - Do not make a portable zip plus PowerShell service installer the product path. Dev scripts may exist only for local engineering convenience.
+
+Installer usage rules:
+
+- Local service development must use `--dev-pipe`; do not require MSI reinstall for every C# code edit.
+- The MSI is required for user-facing distribution and installed-service upgrade testing.
+- End users install the MSI once. Later helper updates are delivered as MSI upgrades or repairs, not by asking users to manually replace binaries.
+- A developer does not reinstall the MSI for ordinary service/Core code edits. Reinstall or upgrade MSI only when validating installer behavior, service registration, service account/SID changes, install paths, log directory permissions, or the real installed-service upgrade path.
+- When testing the installed Windows Service path, every service binary change requires stopping/upgrading the installed service through MSI or an explicit dev-only service replacement step.
+- Do not let installer convenience change the runtime architecture. Node must work with either an installed service or an elevated `--dev-pipe` host exposing the same pipe protocol.
 
 ## Named Pipe Transport
 
@@ -736,22 +1151,26 @@ Acceptance:
 
 ## C# Metric Mapping
 
+This is the cross-platform mapping invariant. The implementation-level Windows service rules live in [C# Step 8: Metric Mapping](#c-step-8-metric-mapping).
+
 The C# side maps raw LHM readings into ShoMetrics output:
 
 ```txt
 LHM raw sensor
   -> MetricDescriptor
   -> stable alias if known
-  -> dynamic descriptor otherwise
+  -> optional dynamic descriptor later
   -> MetricSnapshot value
 ```
 
 Rules:
 
 - Stable aliases must cover existing UI metrics first.
-- Dynamic metrics must keep `source_sensor_id` opaque.
+- The first Windows service MVP returns stable aliases as metric values. Dynamic LHM sensors may be listed later as descriptors, but must not be emitted as widget metric values until Node has a selector UI for them.
+- Dynamic metrics must keep `source_sensor_id` opaque when they are introduced.
 - Node must not parse `/intelcpu/0/temperature/26` or other LHM identifiers.
 - New macOS/Linux helpers must emit the same stable aliases for the same UI metrics.
+- Existing C# POC metric ids such as `cpu.load.percent` are diagnostic ids and are not the service contract.
 
 Example mappings:
 
@@ -763,10 +1182,12 @@ Example mappings:
 | GPU Core temperature | `gpu.temp` |
 | GPU Power or GPU Package | `gpu.power` |
 | GPU Memory Used | `gpu.vram_used` |
+| GPU Memory Total | `gpu.vram_total` |
 | Download Speed aggregate | `net.down` |
 | Upload Speed aggregate | `net.up` |
 | Read Rate aggregate | `disk.throughput.read` |
 | Write Rate aggregate | `disk.throughput.write` |
+| Read + write aggregate | `disk.throughput.total` |
 
 ## Development Flow
 
@@ -779,16 +1200,37 @@ Before the Windows service exists:
 After the service project exists:
 
 - Elevated PowerShell runs the service host in dev mode.
-- Normal Node plugin connects to the named pipe.
+- Normal non-admin Stream Deck Node plugin connects to the named pipe.
 - Node must still fallback to `NodeSystemSource` when the pipe is absent.
 - Installer work is not required for local dev validation. The MSI is required for user-facing distribution.
+- The inner development loop is two processes: one elevated C# `--dev-pipe` process plus one normal Stream Deck plugin process.
+
+Manual developer operations:
+
+| Situation | Manual operation required | Notes |
+|---|---|---|
+| Validate admin-only LHM/PawnIO sensors before the service exists | Open an elevated PowerShell and run the one-shot Helper CLI. | Non-admin runs are still useful for sensors available without elevation. |
+| Run the service during local development | Open an elevated PowerShell and run the service executable with `--dev-pipe`. | This is required because the Stream Deck Node process must remain non-admin and cannot spawn an elevated helper. |
+| C# service/Core code changed while `--dev-pipe` is running | Stop the `--dev-pipe` process with `Ctrl+C`, rebuild if needed, then run it again. | Node should reconnect on a later poll; a Stream Deck restart and MSI reinstall should not be required for ordinary C# service edits. |
+| Proto contract changed | Regenerate/build Node proto, rebuild C#, restart `--dev-pipe`, and restart the Stream Deck plugin process. | Both sides must load the same wire contract. |
+| Node source client/runtime/rendering code changed | Run `npm.cmd run watch` from `packages/hub` for the normal Node loop, or run `npm.cmd run build` and restart the plugin manually. | The current watch script rebuilds and runs `streamdeck restart com.ez.sho-metrics` after each build. The C# `--dev-pipe` process can keep running if the pipe contract did not change. |
+| First helper/MSI install on a user machine | Run the MSI with UAC approval. | A Stream Deck/plugin restart is acceptable after installation so Node gets a fresh helper client. System reboot is only required if the driver stack or installer explicitly requires it. |
+| Test the real installed service path | Install or upgrade through MSI, then start the service from the installer or Service Control Manager. | This is slower than `--dev-pipe` and is not the inner dev loop. |
+
+Hot reload policy:
+
+- Do not design the service around hot reload.
+- The supported C# inner loop is build plus `--dev-pipe` process restart. Treat this as cheap process restart, not installer reinstall.
+- `dotnet watch run -- --dev-pipe` may be used as a personal convenience from an elevated PowerShell, but it is not a product requirement and tests must not depend on it.
+- The supported Node inner loop is `npm.cmd run watch` from `packages/hub`, which rebuilds and restarts the Stream Deck plugin process.
+- The service host, named pipe server, LHM session, and PawnIO/native dependencies must be written so process restart is clean and cheap.
 
 Example future commands:
 
 ```powershell
 dotnet run --project .\packages\source-windows\ShoMetrics.Source.Windows.Service\ShoMetrics.Source.Windows.Service.csproj -- --dev-pipe
 cd .\packages\hub
-npm.cmd run build
+npm.cmd run watch
 ```
 
 ## Remote Source Phase
