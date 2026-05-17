@@ -1,7 +1,7 @@
 import { action, PropertyInspectorDidAppearEvent, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import type { MetricStoreReader } from "../runtime/metric-store";
-import { setMetricDisplay } from "../metric-view-runner/runner";
+import { setMetricView } from "../metric-view-runner/runner";
 import { logger } from "../logging/logger";
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../runtime/network-interfaces";
 import {
@@ -12,10 +12,10 @@ import {
 import { resolveNetworkMetricSubscriptionKeys } from "./network/metric-subscriptions";
 import type { ResolvedNetworkMetricTarget } from "../settings/resolved-settings";
 import {
-    buildNetworkDisplayUpdate,
+    buildNetworkViewUpdate,
     resolveNetworkMaximumBytesPerSecond,
     resolveNetworkMaximumMegabitsPerSecond,
-    type NetworkDisplayDebugInfo,
+    type NetworkViewDebugInfo,
 } from "./network/view-builder";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
@@ -53,7 +53,7 @@ export class Network extends MetricAction {
         this.publishNetworkInterfaceOptions(event);
         this.publishNetworkRuntimeMaximum(event, networkTarget, metrics);
 
-        const displayUpdate = buildNetworkDisplayUpdate({
+        const viewUpdate = buildNetworkViewUpdate({
             event,
             settings,
             target: networkTarget,
@@ -61,16 +61,16 @@ export class Network extends MetricAction {
             selectedNetworkInterface,
         });
 
-        if (displayUpdate.debugInfo) {
+        if (viewUpdate.debugInfo) {
             logNetworkSpeedDebug({
                 target: networkTarget,
                 selectedNetworkInterface,
                 isAutomaticNetworkInterface,
-                debugInfo: displayUpdate.debugInfo,
+                debugInfo: viewUpdate.debugInfo,
             });
         }
 
-        setMetricDisplay(displayUpdate.displayOptions);
+        setMetricView(viewUpdate.viewOptions);
     }
 
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
@@ -138,7 +138,7 @@ function logNetworkSpeedDebug(options: {
     target: ResolvedNetworkMetricTarget;
     selectedNetworkInterface: NetworkInterfaceOption | null;
     isAutomaticNetworkInterface: boolean;
-    debugInfo: NetworkDisplayDebugInfo;
+    debugInfo: NetworkViewDebugInfo;
 }): void {
     log.atDebug().everyMs("speed-sample", DEBUG_LOG_INTERVAL_MILLISECONDS).log(() => [
         `direction=${options.debugInfo.direction}`,
@@ -157,7 +157,7 @@ function logNetworkSpeedDebug(options: {
         ).toFixed(0)}`,
         `detectedAutomaticMaxMbps=${String(networkInterfaceRegistry.resolveMaximumAutomaticSpeedMegabitsPerSecond() ?? "")}`,
         `currentBytesPerSecond=${options.debugInfo.sourceWidgetData.current.toFixed(0)}`,
-        `progress=${options.debugInfo.displayWidgetData.progress.toFixed(4)}`,
+        `progress=${options.debugInfo.viewWidgetData.progress.toFixed(4)}`,
         `availableInterfaces=${JSON.stringify(networkInterfaceRegistry.getOptions())}`,
     ].join(" "));
 }

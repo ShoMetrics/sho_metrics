@@ -1,7 +1,7 @@
 import { action, PropertyInspectorDidAppearEvent, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import type { MetricStoreReader } from "../runtime/metric-store";
-import { setMetricDisplay } from "../metric-view-runner/runner";
+import { setMetricView } from "../metric-view-runner/runner";
 import { logger } from "../logging/logger";
 import { diskVolumeRegistry, type DiskVolumeOption } from "../runtime/disk-volumes";
 import {
@@ -15,7 +15,7 @@ import {
 } from "./disk/metric-subscriptions";
 import type { ResolvedDiskMetricTarget } from "../settings/resolved-settings";
 import {
-    buildDiskDisplayOptions,
+    buildDiskViewOptions,
     resolveDiskMaximumThroughputMebibytesPerSecond,
 } from "./disk/view-builder";
 import {
@@ -66,7 +66,7 @@ export class Disk extends MetricAction {
             return;
         }
 
-        setMetricDisplay(buildDiskDisplayOptions({
+        setMetricView(buildDiskViewOptions({
             event,
             settings,
             target: diskTarget,

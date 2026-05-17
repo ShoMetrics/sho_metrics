@@ -18,18 +18,18 @@ import { getMetricStatusIcon } from "../../widgets/icons/metric-status-icons";
 import { escapeSvgText } from "../../rendering/svg-utils";
 import type { WidgetData } from "../../rendering/widget-data";
 import {
-    isDualDiskThroughputDisplay,
+    isDualDiskThroughputView,
 } from "./metric-subscriptions";
 import {
     formatCompactDiskVolumeLabel,
     resolveAvailableDiskVolume,
     type DiskVolumeSelection,
 } from "./volume-selection";
-import type { MetricDisplayOptions } from "../../metric-view-runner/runner";
+import type { MetricViewOptions } from "../../metric-view-runner/runner";
 import { buildColorConfigFromAppearance, resolveSolidMetricColorMode } from "../../settings/render-paint-resolver";
 import { resolveRenderTextStyles } from "../../settings/render-text-style-resolver";
 
-interface BuildDiskDisplayOptions {
+interface BuildDiskViewOptions {
     event: WillAppearEvent;
     settings: ResolvedWidgetSettings;
     target: ResolvedDiskMetricTarget;
@@ -40,15 +40,15 @@ interface BuildDiskDisplayOptions {
 type DiskUsageReading = Extract<ResolvedDiskMetricTarget["reading"], { readonly kind: "usage" }>;
 type DiskThroughputReading = Extract<ResolvedDiskMetricTarget["reading"], { readonly kind: "throughput" }>;
 
-export function buildDiskDisplayOptions(options: BuildDiskDisplayOptions): MetricDisplayOptions {
+export function buildDiskViewOptions(options: BuildDiskViewOptions): MetricViewOptions {
     if (options.target.reading.kind === "throughput") {
-        return buildDiskThroughputDisplayOptions({
+        return buildDiskThroughputViewOptions({
             ...options,
             reading: options.target.reading,
         });
     }
 
-    return buildDiskUsageDisplayOptions({
+    return buildDiskUsageViewOptions({
         ...options,
         reading: options.target.reading,
     });
@@ -70,9 +70,9 @@ export function resolveDiskMaximumThroughputMebibytesPerSecond(
     return resolveDefaultDiskMaximumThroughputMebibytesPerSecond(direction, selectedVolume);
 }
 
-function buildDiskUsageDisplayOptions(
-    options: BuildDiskDisplayOptions & { reading: DiskUsageReading },
-): MetricDisplayOptions {
+function buildDiskUsageViewOptions(
+    options: BuildDiskViewOptions & { reading: DiskUsageReading },
+): MetricViewOptions {
     const selectedVolume = resolveAvailableDiskVolume(options.volumeSelection);
     const usedMetricKey = resolveDiskUsageMetricKey("used", options.target.volumeId);
     const totalMetricKey = resolveDiskUsageMetricKey("total", options.target.volumeId);
@@ -129,15 +129,15 @@ function buildUnavailableDiskBytesWidgetData(label: string): WidgetData {
     };
 }
 
-function buildDiskThroughputDisplayOptions(
-    options: BuildDiskDisplayOptions & { reading: DiskThroughputReading },
-): MetricDisplayOptions {
+function buildDiskThroughputViewOptions(
+    options: BuildDiskViewOptions & { reading: DiskThroughputReading },
+): MetricViewOptions {
     const throughputDirection = options.reading.direction;
     const appearance = options.settings.widget.slot.appearance;
     const selectedView = appearance.view.selectedView;
 
-    if (isDualDiskThroughputDisplay(selectedView, throughputDirection)) {
-        return buildDualThroughputDisplayOptions(options);
+    if (isDualDiskThroughputView(selectedView, throughputDirection)) {
+        return buildDualThroughputViewOptions(options);
     }
 
     const singleThroughputDirection = throughputDirection === "both" ? "total" : throughputDirection;
@@ -188,9 +188,9 @@ function buildDiskThroughputDisplayOptions(
     };
 }
 
-function buildDualThroughputDisplayOptions(
-    options: BuildDiskDisplayOptions & { reading: DiskThroughputReading },
-): MetricDisplayOptions {
+function buildDualThroughputViewOptions(
+    options: BuildDiskViewOptions & { reading: DiskThroughputReading },
+): MetricViewOptions {
     const readMetricKey = getDiskThroughputMetricKey("read");
     const writeMetricKey = getDiskThroughputMetricKey("write");
     const appearance = options.settings.widget.slot.appearance;

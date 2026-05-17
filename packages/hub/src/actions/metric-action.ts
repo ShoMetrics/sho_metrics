@@ -10,7 +10,7 @@ import { scheduler } from "../runtime/scheduler";
 import { metricStore, type MetricStoreReader } from "../runtime/metric-store";
 import { buildMetricReadPlanKey, type MetricReadPlan } from "../runtime/sources/metric-read-plan";
 import { buildMetricReadPlanFromSourcePolicy } from "../runtime/sources/metric-read-plan-builder";
-import { clearMetricDisplayState } from "../metric-view-runner/runner";
+import { clearMetricViewState } from "../metric-view-runner/runner";
 import { logger } from "../logging/logger";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
@@ -125,7 +125,7 @@ export abstract class MetricAction extends SingletonAction {
         this.activeMetricActions.get(event.action.id)?.cleanup();
         this.activeMetricActions.delete(event.action.id);
         this.activeActionStates.delete(event.action.id);
-        clearMetricDisplayState(event.action.id);
+        clearMetricViewState(event.action.id);
     }
 
     override onPropertyInspectorDidAppear(event: PropertyInspectorDidAppearEvent): void {

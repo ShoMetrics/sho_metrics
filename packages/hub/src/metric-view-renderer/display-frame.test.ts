@@ -16,13 +16,13 @@ import {
 } from "../rendering/widget-data";
 import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
 import {
-    buildMetricDisplayRenderPlan,
+    buildMetricViewRenderPlan,
     buildRenderDualChannelWidgetData,
     buildRenderWidgetData,
-    hasMetricDisplayData,
+    hasMetricViewData,
     resolveEffectiveCircleVariant,
-    resolveDisplayLogValue,
-    resolveDisplaySampleTimestampMilliseconds,
+    resolveMetricViewLogValue,
+    resolveMetricViewSampleTimestampMilliseconds,
     resolveTouchStripMetricLayout,
     type SingleMetricRenderOptions,
 } from "./display-frame";
@@ -53,7 +53,7 @@ test("single value-capable widget without data renders an N/A placeholder copy",
 });
 
 test("single circle icon placeholder keeps source data and marks the render plan as muted", () => {
-    const displayOptions = buildSingleMetricRenderOptions({
+    const viewOptions = buildSingleMetricRenderOptions({
         widgetData: buildWidgetData(),
         resolvedSettings: {
             view: {
@@ -63,19 +63,19 @@ test("single circle icon placeholder keeps source data and marks the render plan
         },
     });
 
-    const renderPlan = buildMetricDisplayRenderPlan({
-        displayOptions,
+    const renderPlan = buildMetricViewRenderPlan({
+        viewOptions,
         renderTarget: "key",
     });
     const renderWidgetData = buildRenderWidgetData({
-        widgetData: displayOptions.widgetData,
-        hasData: renderPlan.displayHasData,
+        widgetData: viewOptions.widgetData,
+        hasData: renderPlan.viewHasData,
         shouldRenderMutedIconPlaceholder: renderPlan.shouldRenderMutedIconPlaceholder,
     });
 
-    assert.equal(renderPlan.displayHasData, false);
+    assert.equal(renderPlan.viewHasData, false);
     assert.equal(renderPlan.shouldRenderMutedIconPlaceholder, true);
-    assert.equal(renderWidgetData, displayOptions.widgetData);
+    assert.equal(renderWidgetData, viewOptions.widgetData);
 });
 
 test("single widget with data keeps the original render data", () => {
@@ -153,24 +153,24 @@ test("display data helpers treat either dual-channel timestamp as available data
         positive: buildWidgetData({ current: 3 }),
         negative: buildWidgetData({ current: 7, sampleTimestampMilliseconds: 2000 }),
     });
-    const hasDisplayData = hasMetricDisplayData({
+    const hasViewData = hasMetricViewData({
         ...buildSingleMetricRenderOptions({ widgetData: buildWidgetData() }),
         widgetData: dualWidgetData,
         titleText: "Traffic",
         positiveColor: "#00ff00",
         negativeColor: "#ff0000",
     });
-    const displayLogValue = resolveDisplayLogValue(dualWidgetData);
-    const sampleTimestampMilliseconds = resolveDisplaySampleTimestampMilliseconds(dualWidgetData);
+    const displayLogValue = resolveMetricViewLogValue(dualWidgetData);
+    const sampleTimestampMilliseconds = resolveMetricViewSampleTimestampMilliseconds(dualWidgetData);
 
-    assert.equal(hasDisplayData, true);
+    assert.equal(hasViewData, true);
     assert.equal(displayLogValue, 10);
     assert.equal(sampleTimestampMilliseconds, 2000);
 });
 
 test("center content falls back to value outside circle renderer branches", () => {
-    const renderPlan = buildMetricDisplayRenderPlan({
-        displayOptions: buildSingleMetricRenderOptions({
+    const renderPlan = buildMetricViewRenderPlan({
+        viewOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData(),
             resolvedSettings: {
                 view: {
@@ -196,8 +196,8 @@ test("circle variant override wins for circle renderer branches", () => {
 });
 
 test("minimal circle variant uses icon center content", () => {
-    const renderPlan = buildMetricDisplayRenderPlan({
-        displayOptions: buildSingleMetricRenderOptions({
+    const renderPlan = buildMetricViewRenderPlan({
+        viewOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData(),
             resolvedSettings: {
                 view: {
@@ -213,8 +213,8 @@ test("minimal circle variant uses icon center content", () => {
 });
 
 test("key render plan uses keypad PNG dimensions and no touch strip layout", () => {
-    const renderPlan = buildMetricDisplayRenderPlan({
-        displayOptions: buildSingleMetricRenderOptions({
+    const renderPlan = buildMetricViewRenderPlan({
+        viewOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
             resolvedSettings: {
                 view: { selectedView: "bar" },
@@ -229,8 +229,8 @@ test("key render plan uses keypad PNG dimensions and no touch strip layout", () 
 });
 
 test("touch strip layout uses square rendering for circle branches", () => {
-    const renderPlan = buildMetricDisplayRenderPlan({
-        displayOptions: buildSingleMetricRenderOptions({
+    const renderPlan = buildMetricViewRenderPlan({
+        viewOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
             resolvedSettings: {
                 view: { selectedView: "circle" },

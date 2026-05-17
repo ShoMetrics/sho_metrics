@@ -9,11 +9,11 @@ import {
 import type { DiskVolumeOption } from "../../runtime/disk-volumes";
 import { LOCAL_SOURCE_SCOPE_ID } from "../../runtime/sources/metric-read-plan";
 import { buildMetricSnapshot, buildScalarMetricValue } from "../../runtime/sources/source.interface";
-import { buildMetricDisplayRenderPlan, buildRenderWidgetData } from "../../metric-view-renderer/display-frame";
+import { buildMetricViewRenderPlan, buildRenderWidgetData } from "../../metric-view-renderer/display-frame";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
 import { resolveInitialActionSettings } from "../settings/action-settings-resolver";
-import { buildDiskDisplayOptions } from "./view-builder";
+import { buildDiskViewOptions } from "./view-builder";
 
 test("disk usage automatic volume reads default usage keys after registry selection", () => {
     const rawSettings = writeStoredWidgetSettingsPatch(
@@ -46,7 +46,7 @@ test("disk usage automatic volume reads default usage keys after registry select
         },
     }));
 
-    const displayOptions = buildDiskDisplayOptions({
+    const viewOptions = buildDiskViewOptions({
         event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
         settings,
         target,
@@ -54,12 +54,12 @@ test("disk usage automatic volume reads default usage keys after registry select
         volumeSelection: { kind: "available", volume: buildDiskVolumeOption("C:") },
     });
 
-    assert.equal(displayOptions.metricKey, getDefaultDiskUsageMetricKey("used"));
-    if ("positiveColor" in displayOptions) {
+    assert.equal(viewOptions.metricKey, getDefaultDiskUsageMetricKey("used"));
+    if ("positiveColor" in viewOptions) {
         assert.fail("Expected single metric disk display.");
     }
-    assert.equal(displayOptions.widgetData.sampleTimestampMilliseconds, 1000);
-    assert.equal(displayOptions.widgetData.displayValue, "40");
+    assert.equal(viewOptions.widgetData.sampleTimestampMilliseconds, 1000);
+    assert.equal(viewOptions.widgetData.displayValue, "40");
 });
 
 test("disk usage display keeps explicit unavailable volume instead of falling back to default disk", () => {
@@ -94,7 +94,7 @@ test("disk usage display keeps explicit unavailable volume instead of falling ba
         },
     }));
 
-    const displayOptions = buildDiskDisplayOptions({
+    const viewOptions = buildDiskViewOptions({
         event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
         settings,
         target,
@@ -102,22 +102,22 @@ test("disk usage display keeps explicit unavailable volume instead of falling ba
         volumeSelection: { kind: "unavailable", volumeId: "E:\\" },
     });
 
-    assert.equal(displayOptions.metricKey, getDiskVolumeMetricKey("used", "E:\\"));
-    if ("positiveColor" in displayOptions) {
+    assert.equal(viewOptions.metricKey, getDiskVolumeMetricKey("used", "E:\\"));
+    if ("positiveColor" in viewOptions) {
         assert.fail("Expected single metric disk display.");
     }
-    assert.equal(displayOptions.widgetData.label, "E:");
-    assert.equal(displayOptions.widgetData.displayValue, "0");
-    assert.equal(displayOptions.widgetData.barLabel, "E:");
-    assert.equal(displayOptions.widgetData.sampleTimestampMilliseconds, undefined);
+    assert.equal(viewOptions.widgetData.label, "E:");
+    assert.equal(viewOptions.widgetData.displayValue, "0");
+    assert.equal(viewOptions.widgetData.barLabel, "E:");
+    assert.equal(viewOptions.widgetData.sampleTimestampMilliseconds, undefined);
 
-    const renderPlan = buildMetricDisplayRenderPlan({
-        displayOptions,
+    const renderPlan = buildMetricViewRenderPlan({
+        viewOptions,
         renderTarget: "key",
     });
     const renderWidgetData = buildRenderWidgetData({
-        widgetData: displayOptions.widgetData,
-        hasData: renderPlan.displayHasData,
+        widgetData: viewOptions.widgetData,
+        hasData: renderPlan.viewHasData,
         shouldRenderMutedIconPlaceholder: renderPlan.shouldRenderMutedIconPlaceholder,
     });
 
@@ -149,7 +149,7 @@ test("disk compact center icon label uses theme label font family", () => {
         assert.fail("Expected disk target.");
     }
 
-    const displayOptions = buildDiskDisplayOptions({
+    const viewOptions = buildDiskViewOptions({
         event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
         settings,
         target,
@@ -157,8 +157,8 @@ test("disk compact center icon label uses theme label font family", () => {
         volumeSelection: { kind: "unavailable", volumeId: "E:\\" },
     });
 
-    assert.match(displayOptions.centerIconFragment, /Share Tech Mono/);
-    assert.doesNotMatch(displayOptions.centerIconFragment, /font-family="'Inter'/);
+    assert.match(viewOptions.centerIconFragment, /Share Tech Mono/);
+    assert.doesNotMatch(viewOptions.centerIconFragment, /font-family="'Inter'/);
 });
 
 function buildDiskVolumeOption(id: string): DiskVolumeOption {

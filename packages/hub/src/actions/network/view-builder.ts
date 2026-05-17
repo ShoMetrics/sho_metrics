@@ -21,22 +21,22 @@ import {
     renderNetworkDirectionIconFragment,
     renderNetworkInterfaceIconFragment,
 } from "../../widgets/icons/catalog/network";
-import type { MetricDisplayOptions } from "../../metric-view-runner/runner";
+import type { MetricViewOptions } from "../../metric-view-runner/runner";
 import { buildColorConfigFromAppearance, resolveSolidMetricColorMode } from "../../settings/render-paint-resolver";
 
-export interface NetworkDisplayUpdate {
-    displayOptions: MetricDisplayOptions;
-    debugInfo?: NetworkDisplayDebugInfo;
+export interface NetworkViewUpdate {
+    viewOptions: MetricViewOptions;
+    debugInfo?: NetworkViewDebugInfo;
 }
 
-export interface NetworkDisplayDebugInfo {
+export interface NetworkViewDebugInfo {
     direction: NetworkDirection;
     networkMetricKey: string;
     sourceWidgetData: WidgetData;
-    displayWidgetData: WidgetData;
+    viewWidgetData: WidgetData;
 }
 
-interface BuildNetworkDisplayOptions {
+interface BuildNetworkViewOptions {
     event: WillAppearEvent;
     settings: ResolvedWidgetSettings;
     target: ResolvedNetworkMetricTarget;
@@ -44,69 +44,69 @@ interface BuildNetworkDisplayOptions {
     selectedNetworkInterface: NetworkInterfaceOption | null;
 }
 
-export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): NetworkDisplayUpdate {
+export function buildNetworkViewUpdate(options: BuildNetworkViewOptions): NetworkViewUpdate {
     const appearance = options.settings.widget.slot.appearance;
     const networkReading = options.target.reading;
     const selectedView = appearance.view.selectedView;
-    const displayDirection = networkReading.direction;
+    const networkDirection = networkReading.direction;
 
     if (selectedView === "bar") {
         return {
-            displayOptions: buildBarNetworkDisplayOptions(options),
+            viewOptions: buildBarNetworkViewOptions(options),
         };
     }
 
-    if (selectedView === "line" && displayDirection === "both") {
+    if (selectedView === "line" && networkDirection === "both") {
         return {
-            displayOptions: buildDualNetworkLineDisplayOptions(options),
+            viewOptions: buildDualNetworkLineViewOptions(options),
         };
     }
 
-    if (displayDirection === "both") {
+    if (networkDirection === "both") {
         return {
-            displayOptions: buildDualNetworkCircleOrTextDisplayOptions({
+            viewOptions: buildDualNetworkCircleOrTextViewOptions({
                 ...options,
                 dualRenderPrimitive: selectedView === "text" ? "text" : "circle",
             }),
         };
     }
 
-    const networkMetricKey = resolveNetworkMetricKey(displayDirection, options.target.interfaceId);
+    const networkMetricKey = resolveNetworkMetricKey(networkDirection, options.target.interfaceId);
     const sourceWidgetData = options.metrics.getWidgetData(
         networkMetricKey,
-        getNetworkDirectionLabel(displayDirection),
+        getNetworkDirectionLabel(networkDirection),
         "B/s",
     );
-    const displayWidgetData = buildNetworkWidgetData({
+    const viewWidgetData = buildNetworkWidgetData({
         sourceWidgetData,
-        direction: displayDirection,
+        direction: networkDirection,
         target: options.target,
     });
     const circleVariant = appearance.view.circleVariant;
     const shouldRenderGaugeFooter = selectedView === "circle" && circleVariant === "gauge";
     const renderedWidgetData = shouldRenderGaugeFooter
-        ? { ...displayWidgetData, label: ARC_GAUGE_LABELS.network }
-        : displayWidgetData;
+        ? { ...viewWidgetData, label: ARC_GAUGE_LABELS.network }
+        : viewWidgetData;
 
     return {
-        displayOptions: {
+        viewOptions: {
             event: options.event,
             resolvedSettings: appearance,
             metricKey: networkMetricKey,
             widgetData: renderedWidgetData,
             centerIconFragment: buildNetworkCenterIconFragment({
                 circleVariant,
-                direction: displayDirection,
+                direction: networkDirection,
                 selectedNetworkInterface: options.selectedNetworkInterface,
             }),
             footerIconFragment: shouldRenderGaugeFooter
                 ? renderNetworkDirectionIconFragment({
-                    direction: displayDirection,
+                    direction: networkDirection,
                     size: NETWORK_FOOTER_ICON_SIZE,
                 })
                 : undefined,
             statusIcon: getNetworkDirectionStatusIcon({
-                direction: displayDirection,
+                direction: networkDirection,
             }),
             circleVariantOverride: circleVariant,
             appearanceOverride: {
@@ -123,10 +123,10 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
             },
         },
         debugInfo: {
-            direction: displayDirection,
+            direction: networkDirection,
             networkMetricKey,
             sourceWidgetData,
-            displayWidgetData,
+            viewWidgetData,
         },
     };
 }
@@ -158,9 +158,9 @@ export function resolveNetworkMaximumMegabitsPerSecond(
         : DEFAULT_UPLOAD_MAXIMUM_SPEED_MEGABITS_PER_SECOND;
 }
 
-function buildDualNetworkCircleOrTextDisplayOptions(
-    options: BuildNetworkDisplayOptions & { dualRenderPrimitive: "circle" | "text" },
-): MetricDisplayOptions {
+function buildDualNetworkCircleOrTextViewOptions(
+    options: BuildNetworkViewOptions & { dualRenderPrimitive: "circle" | "text" },
+): MetricViewOptions {
     const uploadMetricKey = resolveNetworkMetricKey("upload", options.target.interfaceId);
     const downloadMetricKey = resolveNetworkMetricKey("download", options.target.interfaceId);
     const uploadWidgetData = buildNetworkWidgetData({
@@ -240,7 +240,7 @@ function buildDualNetworkCircleOrTextDisplayOptions(
     };
 }
 
-function buildDualNetworkLineDisplayOptions(options: BuildNetworkDisplayOptions): MetricDisplayOptions {
+function buildDualNetworkLineViewOptions(options: BuildNetworkViewOptions): MetricViewOptions {
     const uploadMetricKey = resolveNetworkMetricKey("upload", options.target.interfaceId);
     const downloadMetricKey = resolveNetworkMetricKey("download", options.target.interfaceId);
     const uploadWidgetData = buildNetworkWidgetData({
@@ -313,7 +313,7 @@ function buildDualNetworkLineDisplayOptions(options: BuildNetworkDisplayOptions)
     };
 }
 
-function buildBarNetworkDisplayOptions(options: BuildNetworkDisplayOptions): MetricDisplayOptions {
+function buildBarNetworkViewOptions(options: BuildNetworkViewOptions): MetricViewOptions {
     const uploadMetricKey = resolveNetworkMetricKey("upload", options.target.interfaceId);
     const downloadMetricKey = resolveNetworkMetricKey("download", options.target.interfaceId);
     const uploadWidgetData = buildNetworkWidgetData({

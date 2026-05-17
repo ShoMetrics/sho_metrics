@@ -8,11 +8,11 @@ export interface NetworkMetricSubscriptionSettings {
 }
 
 export function resolveNetworkMetricSubscriptionKeys(settings: NetworkMetricSubscriptionSettings): readonly string[] {
-    const displayDirection = settings.networkDirection;
+    const networkDirection = settings.networkDirection;
 
     if (
         settings.selectedView === "bar"
-        || displayDirection === "both"
+        || networkDirection === "both"
     ) {
         return [
             resolveNetworkMetricKey("upload", settings.networkInterfaceId),
@@ -21,6 +21,6 @@ export function resolveNetworkMetricSubscriptionKeys(settings: NetworkMetricSubs
     }
 
     return [
-        resolveNetworkMetricKey(displayDirection, settings.networkInterfaceId),
+        resolveNetworkMetricKey(networkDirection, settings.networkInterfaceId),
     ];
 }

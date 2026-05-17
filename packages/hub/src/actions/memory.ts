@@ -1,8 +1,8 @@
 import { action, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
-import { setSingleMetricDisplay } from "../metric-view-runner/runner";
+import { setMetricView } from "../metric-view-runner/runner";
 import { buildMemoryUsageWidgetData } from "../metrics/storage-widget-data";
-import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
+import { buildMetricViewIcons } from "../widgets/icons/metric-view-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import { RAM_TOTAL_METRIC_KEY, RAM_USED_METRIC_KEY } from "../runtime/metric-keys";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
@@ -32,7 +32,7 @@ export class Memory extends MetricAction {
             "B",
         );
 
-        setSingleMetricDisplay({
+        setMetricView({
             event,
             resolvedSettings: settings.widget.slot.appearance,
             metricKey: RAM_USED_METRIC_KEY,
@@ -41,7 +41,7 @@ export class Memory extends MetricAction {
                 totalBytes: totalBytesWidgetData.current,
                 label: ARC_GAUGE_LABELS.ram,
             }),
-            ...buildMetricDisplayIcons({ hardware: "memory", status: "percentage" }),
+            ...buildMetricViewIcons({ hardware: "memory", status: "percentage" }),
         });
     }
 }

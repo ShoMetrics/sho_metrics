@@ -2,10 +2,10 @@ import type { WillAppearEvent } from "@elgato/streamdeck";
 import { rasterizeSvgToPngDataUrl } from "../rendering/rasterizer";
 import type { MetricRenderAppearance } from "../rendering/render-appearance";
 import {
-    composeMetricDisplayFrame,
+    composeMetricViewFrame,
     isDualMetricRenderOptions,
-    resolveDisplayLogValue,
-    resolveDisplaySampleTimestampMilliseconds,
+    resolveMetricViewLogValue,
+    resolveMetricViewSampleTimestampMilliseconds,
     type DualMetricRenderOptions,
     type MetricRenderOptions,
     type SingleMetricRenderOptions,
@@ -22,30 +22,30 @@ import {
 } from "./display-update-observability";
 import { buildMetricRenderAppearance } from "../settings/render-appearance-builder";
 
-const log = logger.for("MetricDisplayRunner");
+const log = logger.for("MetricViewRunner");
 
-const MAX_CONCURRENT_DISPLAY_UPDATES = 1;
+const MAX_CONCURRENT_METRIC_VIEW_UPDATES = 1;
 
-const displayActionStates = new Map<string, DisplayActionState>();
-const displayActionQueue = new DisplayUpdateQueue();
-let activeDisplayUpdateCount = 0;
-let isDisplayQueueDrainScheduled = false;
+const metricViewActionStates = new Map<string, MetricViewActionState>();
+const metricViewActionQueue = new DisplayUpdateQueue();
+let activeMetricViewUpdateCount = 0;
+let isMetricViewQueueDrainScheduled = false;
 
-interface MetricDisplayEvent {
+interface MetricViewEvent {
     event: WillAppearEvent;
     metricKey: string;
 }
 
-export type SingleMetricDisplayOptions = SingleMetricRenderOptions & MetricDisplayEvent;
-export type DualMetricDisplayOptions = DualMetricRenderOptions & MetricDisplayEvent;
-export type MetricDisplayOptions = MetricRenderOptions & MetricDisplayEvent;
+export type SingleMetricViewOptions = SingleMetricRenderOptions & MetricViewEvent;
+export type DualMetricViewOptions = DualMetricRenderOptions & MetricViewEvent;
+export type MetricViewOptions = MetricRenderOptions & MetricViewEvent;
 
-interface DisplayActionState {
+interface MetricViewActionState {
     actionId: string;
     isRenderInFlight: boolean;
     isQueued: boolean;
     active: boolean;
-    pendingOptions: MetricDisplayOptions | null;
+    pendingOptions: MetricViewOptions | null;
     pendingUpdateTimestampMilliseconds: number | null;
     pendingUpdateReason: DisplayUpdatePriority;
     pendingSettingsSignature: string | null;
@@ -54,68 +54,51 @@ interface DisplayActionState {
     lastScheduledSettingsSignature: string | null;
 }
 
-export function setSingleMetricDisplay(options: SingleMetricDisplayOptions): void {
-    const displayActionState = getOrCreateDisplayActionState(options.event.action.id);
+export function setMetricView(options: MetricViewOptions): void {
+    const metricViewActionState = getOrCreateMetricViewActionState(options.event.action.id);
 
-    recordDisplayUpdate(displayActionState, options);
-    displayActionState.pendingOptions = options;
-    enqueueDisplayAction(displayActionState);
+    recordMetricViewUpdate(metricViewActionState, options);
+    metricViewActionState.pendingOptions = options;
+    enqueueMetricViewAction(metricViewActionState);
 }
 
-export function setMetricDisplay(options: MetricDisplayOptions): void {
-    if (isDualMetricDisplayOptions(options)) {
-        const displayActionState = getOrCreateDisplayActionState(options.event.action.id);
+export function clearMetricViewState(actionId: string): void {
+    const metricViewActionState = metricViewActionStates.get(actionId);
 
-        recordDisplayUpdate(displayActionState, options);
-        displayActionState.pendingOptions = options;
-        enqueueDisplayAction(displayActionState);
+    if (!metricViewActionState) {
         return;
     }
 
-    setSingleMetricDisplay(options);
+    metricViewActionState.active = false;
+    metricViewActionState.isQueued = false;
+    metricViewActionState.pendingOptions = null;
+    metricViewActionState.pendingUpdateTimestampMilliseconds = null;
+    metricViewActionState.pendingUpdateReason = "metric-tick";
+    metricViewActionState.pendingSettingsSignature = null;
+    metricViewActionState.touchStripMetricLayoutState.layoutPromise = null;
+    metricViewActionState.touchStripMetricLayoutState.layoutPath = null;
+    metricViewActionQueue.remove(actionId);
+    metricViewActionStates.delete(actionId);
 }
 
-export function clearMetricDisplayState(actionId: string): void {
-    const displayActionState = displayActionStates.get(actionId);
-
-    if (!displayActionState) {
-        return;
-    }
-
-    displayActionState.active = false;
-    displayActionState.isQueued = false;
-    displayActionState.pendingOptions = null;
-    displayActionState.pendingUpdateTimestampMilliseconds = null;
-    displayActionState.pendingUpdateReason = "metric-tick";
-    displayActionState.pendingSettingsSignature = null;
-    displayActionState.touchStripMetricLayoutState.layoutPromise = null;
-    displayActionState.touchStripMetricLayoutState.layoutPath = null;
-    displayActionQueue.remove(actionId);
-    displayActionStates.delete(actionId);
-}
-
-function isDualMetricDisplayOptions(options: MetricDisplayOptions): options is DualMetricDisplayOptions {
-    return isDualMetricRenderOptions(options);
-}
-
-function runMetricDisplayUpdate(
-    displayActionState: DisplayActionState,
-    options: MetricDisplayOptions,
+function runMetricViewUpdate(
+    metricViewActionState: MetricViewActionState,
+    options: MetricViewOptions,
 ): void {
-    const updateTimestampMilliseconds = displayActionState.pendingUpdateTimestampMilliseconds;
-    const updateReason = displayActionState.pendingUpdateReason;
-    const settingsSignature = displayActionState.pendingSettingsSignature;
+    const updateTimestampMilliseconds = metricViewActionState.pendingUpdateTimestampMilliseconds;
+    const updateReason = metricViewActionState.pendingUpdateReason;
+    const settingsSignature = metricViewActionState.pendingSettingsSignature;
 
-    displayActionState.isRenderInFlight = true;
-    displayActionState.pendingOptions = null;
-    displayActionState.pendingUpdateTimestampMilliseconds = null;
-    displayActionState.pendingUpdateReason = "metric-tick";
-    displayActionState.pendingSettingsSignature = null;
-    activeDisplayUpdateCount += 1;
+    metricViewActionState.isRenderInFlight = true;
+    metricViewActionState.pendingOptions = null;
+    metricViewActionState.pendingUpdateTimestampMilliseconds = null;
+    metricViewActionState.pendingUpdateReason = "metric-tick";
+    metricViewActionState.pendingSettingsSignature = null;
+    activeMetricViewUpdateCount += 1;
 
     const renderStartTimestampMilliseconds = Date.now();
-    const frame = composeMetricDisplayFrame({
-        displayOptions: options,
+    const frame = composeMetricViewFrame({
+        viewOptions: options,
         renderTarget: options.event.action.isDial() ? "touch-strip" : "key",
     });
     const renderPlan = frame.renderPlan;
@@ -125,13 +108,13 @@ function runMetricDisplayUpdate(
 
     if (updateReason === "settings-change") {
         log.info(() => [
-            "settingsDisplayRenderStart",
+            "settingsViewRenderStart",
             `actionId=${options.event.action.id}`,
             `metricKey=${options.metricKey}`,
             `renderPrimitive=${renderPlan.renderAppearance.renderPrimitive}`,
             `queuedMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, renderStartTimestampMilliseconds)}`,
-            `activeUpdates=${activeDisplayUpdateCount}`,
-            `queueLength=${displayActionQueue.length}`,
+            `activeUpdates=${activeMetricViewUpdateCount}`,
+            `queueLength=${metricViewActionQueue.length}`,
             `signature=${settingsSignature ?? "unknown"}`,
         ].join(" "));
     }
@@ -144,10 +127,10 @@ function runMetricDisplayUpdate(
 
     const composeEndTimestampMilliseconds = Date.now();
 
-    if (svg === displayActionState.lastRenderedSvg) {
+    if (svg === metricViewActionState.lastRenderedSvg) {
         if (updateReason === "settings-change") {
             log.info(() => [
-                "settingsDisplaySkippedUnchanged",
+                "settingsViewSkippedUnchanged",
                 `actionId=${options.event.action.id}`,
                 `metricKey=${options.metricKey}`,
                 `renderPrimitive=${renderPlan.renderAppearance.renderPrimitive}`,
@@ -175,10 +158,10 @@ function runMetricDisplayUpdate(
             rasterizeEndTimestampMilliseconds: null,
             updateStartTimestampMilliseconds: null,
             updateEndTimestampMilliseconds: composeEndTimestampMilliseconds,
-            queueLength: displayActionQueue.length,
-            activeActionCount: displayActionStates.size,
+            queueLength: metricViewActionQueue.length,
+            activeActionCount: metricViewActionStates.size,
         });
-        finishDisplayUpdate(displayActionState);
+        finishMetricViewUpdate(metricViewActionState);
         return;
     }
 
@@ -197,10 +180,10 @@ function runMetricDisplayUpdate(
             rasterizeEndTimestampMilliseconds,
             updateStartTimestampMilliseconds: null,
             updateEndTimestampMilliseconds: rasterizeEndTimestampMilliseconds,
-            queueLength: displayActionQueue.length,
-            activeActionCount: displayActionStates.size,
+            queueLength: metricViewActionQueue.length,
+            activeActionCount: metricViewActionStates.size,
         });
-        finishDisplayUpdate(displayActionState);
+        finishMetricViewUpdate(metricViewActionState);
         return;
     }
 
@@ -210,9 +193,9 @@ function runMetricDisplayUpdate(
             "rendered",
             `actionId=${options.event.action.id}`,
             `metricKey=${options.metricKey}`,
-            `value=${resolveDisplayLogValue(renderedMetricData).toFixed(2)}`,
+            `value=${resolveMetricViewLogValue(renderedMetricData).toFixed(2)}`,
             `sampleAgeMs=${formatAgeMilliseconds(
-                resolveDisplaySampleTimestampMilliseconds(renderedMetricData),
+                resolveMetricViewSampleTimestampMilliseconds(renderedMetricData),
                 currentTimestampMilliseconds,
             )}`,
             `composeMs=${composeEndTimestampMilliseconds - renderStartTimestampMilliseconds}`,
@@ -225,8 +208,8 @@ function runMetricDisplayUpdate(
         event: options.event,
         pngDataUrl,
         touchStripMetricLayout: renderPlan.touchStripMetricLayout,
-        touchStripMetricLayoutState: displayActionState.touchStripMetricLayoutState,
-        isActionActive: () => displayActionState.active,
+        touchStripMetricLayoutState: metricViewActionState.touchStripMetricLayoutState,
+        isActionActive: () => metricViewActionState.active,
     })
         .then(dispatchResult => {
             if (dispatchResult.status === "inactive") {
@@ -234,7 +217,7 @@ function runMetricDisplayUpdate(
             }
 
             if (dispatchResult.status === "rendered") {
-                displayActionState.lastRenderedSvg = svg;
+                metricViewActionState.lastRenderedSvg = svg;
             }
 
             recordDisplayPerformanceSample({
@@ -248,8 +231,8 @@ function runMetricDisplayUpdate(
                 rasterizeEndTimestampMilliseconds,
                 updateStartTimestampMilliseconds: dispatchResult.updateStartTimestampMilliseconds,
                 updateEndTimestampMilliseconds: dispatchResult.updateEndTimestampMilliseconds,
-                queueLength: displayActionQueue.length,
-                activeActionCount: displayActionStates.size,
+                queueLength: metricViewActionQueue.length,
+                activeActionCount: metricViewActionStates.size,
             });
 
             if (dispatchResult.status === "failed") {
@@ -261,7 +244,7 @@ function runMetricDisplayUpdate(
                 log.info(() => {
                     const currentTimestampMilliseconds = Date.now();
                     return [
-                        "settingsDisplayUpdateDone",
+                        "settingsViewUpdateDone",
                         `phase=${dispatchResult.donePhase}`,
                         `actionId=${options.event.action.id}`,
                         `metricKey=${options.metricKey}`,
@@ -282,7 +265,7 @@ function runMetricDisplayUpdate(
                     `actionId=${options.event.action.id}`,
                     `metricKey=${options.metricKey}`,
                     `sampleAgeMs=${formatAgeMilliseconds(
-                        resolveDisplaySampleTimestampMilliseconds(renderedMetricData),
+                        resolveMetricViewSampleTimestampMilliseconds(renderedMetricData),
                         currentTimestampMilliseconds,
                     )}`,
                     `sdkPromiseMs=${currentTimestampMilliseconds - dispatchResult.updateStartTimestampMilliseconds}`,
@@ -290,18 +273,18 @@ function runMetricDisplayUpdate(
             });
         })
         .finally(() => {
-            finishDisplayUpdate(displayActionState);
+            finishMetricViewUpdate(metricViewActionState);
         });
 }
 
-function getOrCreateDisplayActionState(actionId: string): DisplayActionState {
-    const existingDisplayActionState = displayActionStates.get(actionId);
+function getOrCreateMetricViewActionState(actionId: string): MetricViewActionState {
+    const existingMetricViewActionState = metricViewActionStates.get(actionId);
 
-    if (existingDisplayActionState) {
-        return existingDisplayActionState;
+    if (existingMetricViewActionState) {
+        return existingMetricViewActionState;
     }
 
-    const displayActionState: DisplayActionState = {
+    const metricViewActionState: MetricViewActionState = {
         actionId,
         isRenderInFlight: false,
         isQueued: false,
@@ -317,45 +300,45 @@ function getOrCreateDisplayActionState(actionId: string): DisplayActionState {
         lastRenderedSvg: null,
         lastScheduledSettingsSignature: null,
     };
-    displayActionStates.set(actionId, displayActionState);
-    return displayActionState;
+    metricViewActionStates.set(actionId, metricViewActionState);
+    return metricViewActionState;
 }
 
-function recordDisplayUpdate(displayActionState: DisplayActionState, options: MetricDisplayOptions): void {
-    const settingsSignature = buildMetricDisplaySettingsSignature(options.resolvedSettings);
-    const isSettingsChange = displayActionState.lastScheduledSettingsSignature !== null
-        && displayActionState.lastScheduledSettingsSignature !== settingsSignature.signature;
+function recordMetricViewUpdate(metricViewActionState: MetricViewActionState, options: MetricViewOptions): void {
+    const settingsSignature = buildMetricViewSettingsSignature(options.resolvedSettings);
+    const isSettingsChange = metricViewActionState.lastScheduledSettingsSignature !== null
+        && metricViewActionState.lastScheduledSettingsSignature !== settingsSignature.signature;
     const updateTimestampMilliseconds = Date.now();
 
-    displayActionState.lastScheduledSettingsSignature = settingsSignature.signature;
+    metricViewActionState.lastScheduledSettingsSignature = settingsSignature.signature;
 
-    if (!isSettingsChange && displayActionState.pendingUpdateReason === "settings-change") {
+    if (!isSettingsChange && metricViewActionState.pendingUpdateReason === "settings-change") {
         return;
     }
 
-    displayActionState.pendingUpdateTimestampMilliseconds = updateTimestampMilliseconds;
-    displayActionState.pendingUpdateReason = isSettingsChange ? "settings-change" : "metric-tick";
-    displayActionState.pendingSettingsSignature = settingsSignature.signature;
+    metricViewActionState.pendingUpdateTimestampMilliseconds = updateTimestampMilliseconds;
+    metricViewActionState.pendingUpdateReason = isSettingsChange ? "settings-change" : "metric-tick";
+    metricViewActionState.pendingSettingsSignature = settingsSignature.signature;
 
     if (!isSettingsChange) {
         return;
     }
 
     log.info(() => [
-        "settingsDisplayScheduled",
+        "settingsViewScheduled",
         `actionId=${options.event.action.id}`,
         `metricKey=${options.metricKey}`,
         `renderPrimitive=${settingsSignature.renderPrimitive}`,
-        `displayKind=${isDualMetricDisplayOptions(options) ? "dual" : "single"}`,
-        `isRenderInFlight=${displayActionState.isRenderInFlight}`,
-        `isQueued=${displayActionState.isQueued}`,
-        `activeUpdates=${activeDisplayUpdateCount}`,
-        `queueLength=${displayActionQueue.length}`,
+        `viewKind=${isDualMetricRenderOptions(options) ? "dual" : "single"}`,
+        `isRenderInFlight=${metricViewActionState.isRenderInFlight}`,
+        `isQueued=${metricViewActionState.isQueued}`,
+        `activeUpdates=${activeMetricViewUpdateCount}`,
+        `queueLength=${metricViewActionQueue.length}`,
         `signature=${settingsSignature.signature}`,
     ].join(" "));
 }
 
-function buildMetricDisplaySettingsSignature(settings: ResolvedAppearanceSettings): {
+function buildMetricViewSettingsSignature(settings: ResolvedAppearanceSettings): {
     readonly renderPrimitive: MetricRenderAppearance["renderPrimitive"];
     readonly signature: string;
 } {
@@ -387,82 +370,82 @@ function buildMetricDisplaySettingsSignature(settings: ResolvedAppearanceSetting
     };
 }
 
-function enqueueDisplayAction(displayActionState: DisplayActionState): void {
+function enqueueMetricViewAction(metricViewActionState: MetricViewActionState): void {
     if (
-        !displayActionState.active
-        || displayActionState.isRenderInFlight
+        !metricViewActionState.active
+        || metricViewActionState.isRenderInFlight
     ) {
         return;
     }
 
-    displayActionQueue.enqueue(displayActionState.actionId, displayActionState.pendingUpdateReason);
-    displayActionState.isQueued = true;
-    scheduleDisplayQueueDrain();
+    metricViewActionQueue.enqueue(metricViewActionState.actionId, metricViewActionState.pendingUpdateReason);
+    metricViewActionState.isQueued = true;
+    scheduleMetricViewQueueDrain();
 }
 
-function scheduleDisplayQueueDrain(): void {
-    if (isDisplayQueueDrainScheduled) {
+function scheduleMetricViewQueueDrain(): void {
+    if (isMetricViewQueueDrainScheduled) {
         return;
     }
 
-    isDisplayQueueDrainScheduled = true;
-    setImmediate(drainDisplayQueue);
+    isMetricViewQueueDrainScheduled = true;
+    setImmediate(drainMetricViewQueue);
 }
 
-function drainDisplayQueue(): void {
-    isDisplayQueueDrainScheduled = false;
+function drainMetricViewQueue(): void {
+    isMetricViewQueueDrainScheduled = false;
 
     while (
-        activeDisplayUpdateCount < MAX_CONCURRENT_DISPLAY_UPDATES
-        && displayActionQueue.length > 0
+        activeMetricViewUpdateCount < MAX_CONCURRENT_METRIC_VIEW_UPDATES
+        && metricViewActionQueue.length > 0
     ) {
-        const actionId = displayActionQueue.dequeue();
+        const actionId = metricViewActionQueue.dequeue();
         if (!actionId) {
             continue;
         }
 
-        const displayActionState = displayActionStates.get(actionId);
-        if (!displayActionState) {
+        const metricViewActionState = metricViewActionStates.get(actionId);
+        if (!metricViewActionState) {
             continue;
         }
 
-        displayActionState.isQueued = false;
+        metricViewActionState.isQueued = false;
 
         if (
-            !displayActionState.active
-            || displayActionState.isRenderInFlight
-            || !displayActionState.pendingOptions
+            !metricViewActionState.active
+            || metricViewActionState.isRenderInFlight
+            || !metricViewActionState.pendingOptions
         ) {
             continue;
         }
 
         try {
-            runMetricDisplayUpdate(displayActionState, displayActionState.pendingOptions);
+            runMetricViewUpdate(metricViewActionState, metricViewActionState.pendingOptions);
         } catch (error) {
             log.error(() => `Render/update error: ${String(error)}`);
-            finishDisplayUpdate(displayActionState);
+            finishMetricViewUpdate(metricViewActionState);
         }
     }
 
-    if (displayActionQueue.length > 0 && activeDisplayUpdateCount < MAX_CONCURRENT_DISPLAY_UPDATES) {
-        scheduleDisplayQueueDrain();
+    if (metricViewActionQueue.length > 0 && activeMetricViewUpdateCount < MAX_CONCURRENT_METRIC_VIEW_UPDATES) {
+        scheduleMetricViewQueueDrain();
     }
 }
 
-function finishDisplayUpdate(displayActionState: DisplayActionState): void {
-    displayActionState.isRenderInFlight = false;
-    activeDisplayUpdateCount = Math.max(0, activeDisplayUpdateCount - 1);
+function finishMetricViewUpdate(metricViewActionState: MetricViewActionState): void {
+    metricViewActionState.isRenderInFlight = false;
+    activeMetricViewUpdateCount = Math.max(0, activeMetricViewUpdateCount - 1);
 
-    if (!displayActionState.active) {
-        scheduleDisplayQueueDrain();
+    if (!metricViewActionState.active) {
+        scheduleMetricViewQueueDrain();
         return;
     }
 
-    if (displayActionState.pendingOptions) {
-        enqueueDisplayAction(displayActionState);
+    if (metricViewActionState.pendingOptions) {
+        enqueueMetricViewAction(metricViewActionState);
     }
 
-    scheduleDisplayQueueDrain();
+    scheduleMetricViewQueueDrain();
 }
 
 function formatAgeMilliseconds(

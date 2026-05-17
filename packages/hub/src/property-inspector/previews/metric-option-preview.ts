@@ -1,4 +1,4 @@
-import { composeMetricDisplayFrame, type SingleMetricRenderOptions } from "../../metric-view-renderer/display-frame";
+import { composeMetricViewFrame, type SingleMetricRenderOptions } from "../../metric-view-renderer/display-frame";
 import type { WidgetData } from "../../rendering/widget-data";
 import { buildDefaultAppearanceSettings } from "../../settings/default-appearance-settings";
 import { mergeResolvedAppearanceSettings, type ResolvedAppearanceSettingsOverride } from "../../settings/appearance-overrides";
@@ -10,7 +10,7 @@ import type {
     ResolvedMetricTarget,
     TerminalThemeVariant,
 } from "../../settings/resolved-settings";
-import { buildMetricDisplayIcons } from "../../widgets/icons/metric-display-icons";
+import { buildMetricViewIcons } from "../../widgets/icons/metric-view-icons";
 import type { HardwareIconKind } from "../../widgets/icons/hardware-icons";
 import { getNetworkDirectionStatusIcon, renderNetworkDirectionIconFragment } from "../../widgets/icons/catalog/network";
 
@@ -98,9 +98,9 @@ function buildMetricPreviewUri(
     };
     const appearance = mergeResolvedAppearanceSettings(previewInput.appearance, appearanceOverride);
     const sample = buildMetricPreviewSample(previewInput.target);
-    const frame = composeMetricDisplayFrame({
+    const frame = composeMetricViewFrame({
         renderTarget: "key",
-        displayOptions: {
+        viewOptions: {
             resolvedSettings: appearance,
             widgetData: sample.widgetData,
             centerIconFragment: sample.centerIconFragment,
@@ -180,7 +180,7 @@ function buildNetworkPreviewSample(): MetricPreviewSample {
 }
 
 function buildHardwarePreviewSample(options: HardwarePreviewSampleOptions): MetricPreviewSample {
-    const icons = buildMetricDisplayIcons({
+    const icons = buildMetricViewIcons({
         hardware: options.hardware,
         status: "percentage",
     });
