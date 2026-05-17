@@ -1,3 +1,4 @@
+import { deepEqual } from "fast-equals";
 import type { DiskVolumeOption } from "./disk-volumes";
 import type { NetworkInterfaceOption } from "./network-interfaces";
 
@@ -37,6 +38,23 @@ export interface WidgetRuntimeCacheMessage {
     patch: WidgetRuntimeCachePatch;
 }
 
+export class WidgetRuntimeCacheStore {
+    private runtimeCache: WidgetRuntimeCache = { ...emptyWidgetRuntimeCache };
+
+    current(): WidgetRuntimeCache {
+        return this.runtimeCache;
+    }
+
+    update(patch: WidgetRuntimeCachePatch): boolean {
+        if (isWidgetRuntimeCachePatchUnchanged(this.runtimeCache, patch)) {
+            return false;
+        }
+
+        this.runtimeCache = mergeWidgetRuntimeCache(this.runtimeCache, patch);
+        return true;
+    }
+}
+
 export function mergeWidgetRuntimeCache(
     runtimeCache: WidgetRuntimeCache,
     patch: WidgetRuntimeCachePatch,
@@ -45,4 +63,13 @@ export function mergeWidgetRuntimeCache(
         ...runtimeCache,
         ...patch,
     };
+}
+
+function isWidgetRuntimeCachePatchUnchanged(
+    runtimeCache: WidgetRuntimeCache,
+    patch: WidgetRuntimeCachePatch,
+): boolean {
+    return (Object.keys(patch) as Array<keyof WidgetRuntimeCache>).every((key) => {
+        return deepEqual(runtimeCache[key], patch[key]);
+    });
 }

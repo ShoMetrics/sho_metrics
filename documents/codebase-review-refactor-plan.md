@@ -301,8 +301,8 @@ Runtime cache equality decision:
 
 - Do not keep `node:util.isDeepStrictEqual`; it is Node-only and blocks reuse from browser-safe code.
 - Do not use a vague shallow compare; option arrays contain objects.
-- Use domain-specific equality for this closed runtime cache shape. Compare scalar maxima directly, and compare `NetworkInterfaceOption[]` / `DiskVolumeOption[]` by explicit field equality.
-- Do not add `fast-deep-equal` in the first pass. A general deep-equality dependency can be reconsidered only if more runtime cache object fields are added and domain equality becomes noisy.
+- Use a browser-safe, zero-runtime-dependency deep equality library for patch field comparison. Current choice: `fast-equals`, because it has built-in TypeScript declarations, modern ESM/CJS exports, no runtime dependencies, no install script, and an npm release older than the configured 7-day minimum release age.
+- Do not use `fast-deep-equal` for this pass. It is still popular and zero-dependency, but its package shape and maintenance signal are weaker than `fast-equals` for this repo's safety-first dependency policy.
 
 PI publication decision:
 
@@ -314,6 +314,8 @@ PI publication decision:
 Sample target shape:
 
 ```ts
+import { deepEqual } from "fast-equals";
+
 export class WidgetRuntimeCacheStore {
     private runtimeCache: WidgetRuntimeCache = { ...emptyWidgetRuntimeCache };
 
@@ -356,74 +358,9 @@ function isWidgetRuntimeCachePatchUnchanged(
     runtimeCache: WidgetRuntimeCache,
     patch: WidgetRuntimeCachePatch,
 ): boolean {
-    if (
-        patch.runtimeMaximumDownloadSpeedMbps !== undefined
-        && runtimeCache.runtimeMaximumDownloadSpeedMbps !== patch.runtimeMaximumDownloadSpeedMbps
-    ) {
-        return false;
-    }
-
-    if (
-        patch.runtimeMaximumUploadSpeedMbps !== undefined
-        && runtimeCache.runtimeMaximumUploadSpeedMbps !== patch.runtimeMaximumUploadSpeedMbps
-    ) {
-        return false;
-    }
-
-    if (
-        patch.availableNetworkInterfaces !== undefined
-        && !areNetworkInterfaceOptionsEqual(
-            runtimeCache.availableNetworkInterfaces,
-            patch.availableNetworkInterfaces,
-        )
-    ) {
-        return false;
-    }
-
-    if (
-        patch.availableDiskVolumes !== undefined
-        && !areDiskVolumeOptionsEqual(runtimeCache.availableDiskVolumes, patch.availableDiskVolumes)
-    ) {
-        return false;
-    }
-
-    return true;
-}
-
-function areNetworkInterfaceOptionsEqual(
-    firstOptions: readonly NetworkInterfaceOption[],
-    secondOptions: readonly NetworkInterfaceOption[],
-): boolean {
-    return firstOptions.length === secondOptions.length
-        && firstOptions.every((firstOption, index) => {
-            const secondOption = secondOptions[index];
-            return secondOption !== undefined
-                && firstOption.id === secondOption.id
-                && firstOption.name === secondOption.name
-                && firstOption.type === secondOption.type
-                && firstOption.isDefault === secondOption.isDefault
-                && firstOption.speedMegabitsPerSecond === secondOption.speedMegabitsPerSecond;
-        });
-}
-
-function areDiskVolumeOptionsEqual(
-    firstOptions: readonly DiskVolumeOption[],
-    secondOptions: readonly DiskVolumeOption[],
-): boolean {
-    return firstOptions.length === secondOptions.length
-        && firstOptions.every((firstOption, index) => {
-            const secondOption = secondOptions[index];
-            return secondOption !== undefined
-                && firstOption.id === secondOption.id
-                && firstOption.fs === secondOption.fs
-                && firstOption.mount === secondOption.mount
-                && firstOption.sizeBytes === secondOption.sizeBytes
-                && firstOption.usedBytes === secondOption.usedBytes
-                && firstOption.availableBytes === secondOption.availableBytes
-                && firstOption.storageKind === secondOption.storageKind
-                && firstOption.diskName === secondOption.diskName
-                && firstOption.volumeLabel === secondOption.volumeLabel;
-        });
+    return (Object.keys(patch) as Array<keyof WidgetRuntimeCache>).every((key) => {
+        return deepEqual(runtimeCache[key], patch[key]);
+    });
 }
 ```
 
@@ -1160,7 +1097,7 @@ Runner track:
 
 1. Add `MetricAction` characterization tests only.
 2. Introduce `SchedulerBinding`.
-3. Introduce runtime cache ownership cleanup and domain-specific equality.
+3. Introduce runtime cache ownership cleanup and browser-safe deep equality.
 4. Remove `metricReaderBySourceScopeId`.
 
 Remaining low-coupling work:

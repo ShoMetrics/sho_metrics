@@ -5,7 +5,6 @@ import streamDeck, {
     DidReceiveSettingsEvent,
     PropertyInspectorDidAppearEvent,
 } from "@elgato/streamdeck";
-import { isDeepStrictEqual } from "node:util";
 import { scheduler } from "../runtime/scheduler";
 import { metricStore, type MetricStoreReader } from "../runtime/metric-store";
 import type { MetricReadPlan } from "../runtime/sources/metric-read-plan";
@@ -21,11 +20,11 @@ import type { ResolvedWidgetSettings } from "../settings/resolved-settings";
 import type { ActionKind } from "../shared/stream-deck-actions";
 import {
     emptyWidgetRuntimeCache,
-    mergeWidgetRuntimeCache,
     WIDGET_RUNTIME_CACHE_MESSAGE_TYPE,
     type WidgetRuntimeCache,
     type WidgetRuntimeCacheMessage,
     type WidgetRuntimeCachePatch,
+    WidgetRuntimeCacheStore,
 } from "../runtime/widget-runtime-cache";
 import { SchedulerBinding } from "./shared/scheduler-binding";
 
@@ -35,7 +34,7 @@ interface ActiveActionState {
     event: WillAppearEvent;
     rawSettings: unknown;
     resolvedSettings: ResolvedWidgetSettings;
-    runtimeCache: WidgetRuntimeCache;
+    runtimeCacheStore: WidgetRuntimeCacheStore;
 }
 
 /**
@@ -70,7 +69,7 @@ export abstract class MetricAction extends SingletonAction {
             event,
             rawSettings: initialSettings.rawSettings,
             resolvedSettings: initialSettings.resolvedSettings,
-            runtimeCache: { ...emptyWidgetRuntimeCache },
+            runtimeCacheStore: new WidgetRuntimeCacheStore(),
         };
 
         this.activeActionStates.set(event.action.id, activeActionState);
@@ -90,7 +89,7 @@ export abstract class MetricAction extends SingletonAction {
             const nextInitialSettings = resolveInitialActionSettings(
                 event.payload.settings,
                 this.actionKind,
-                activeActionState.runtimeCache,
+                activeActionState.runtimeCacheStore.current(),
             );
             const nextSettings = nextInitialSettings.resolvedSettings;
 
@@ -129,7 +128,7 @@ export abstract class MetricAction extends SingletonAction {
             return;
         }
 
-        this.sendRuntimeCachePatchToPropertyInspector(event, activeActionState.runtimeCache)
+        this.sendRuntimeCachePatchToPropertyInspector(event, activeActionState.runtimeCacheStore.current())
             .catch(error => {
                 log.error(() => `Failed to publish runtime cache to Property Inspector: ${String(error)}`);
             })
@@ -183,14 +182,13 @@ export abstract class MetricAction extends SingletonAction {
             throw new Error(`Action ${event.action.id} is not active; cannot update runtime cache.`);
         }
 
-        if (isRuntimeCachePatchUnchanged(activeActionState.runtimeCache, patch)) {
+        if (!activeActionState.runtimeCacheStore.update(patch)) {
             return Promise.resolve();
         }
 
-        activeActionState.runtimeCache = mergeWidgetRuntimeCache(activeActionState.runtimeCache, patch);
         activeActionState.resolvedSettings = this.resolveRawSettings(
             activeActionState.rawSettings,
-            activeActionState.runtimeCache,
+            activeActionState.runtimeCacheStore.current(),
         );
 
         return this.sendRuntimeCachePatchToPropertyInspector(event, patch);
@@ -256,7 +254,7 @@ export abstract class MetricAction extends SingletonAction {
             const { event } = activeActionState;
             activeActionState.resolvedSettings = this.resolveRawSettings(
                 activeActionState.rawSettings,
-                activeActionState.runtimeCache,
+                activeActionState.runtimeCacheStore.current(),
             );
             // Force a fresh subscribe even when the read plan and polling
             // interval are unchanged. Global settings can affect downstream
@@ -309,19 +307,4 @@ function formatSettingValue(value: unknown): string {
     }
 
     return "unset";
-}
-
-function isRuntimeCachePatchUnchanged(
-    runtimeCache: WidgetRuntimeCache,
-    patch: WidgetRuntimeCachePatch,
-): boolean {
-    for (const key of Object.keys(patch) as Array<keyof WidgetRuntimeCachePatch>) {
-        // Runtime cache is ephemeral; deep equality only avoids duplicate
-        // Property Inspector messages for unchanged option lists and maxima.
-        if (!isDeepStrictEqual(runtimeCache[key], patch[key])) {
-            return false;
-        }
-    }
-
-    return true;
 }
