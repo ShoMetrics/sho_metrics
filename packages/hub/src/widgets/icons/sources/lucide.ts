@@ -1,5 +1,5 @@
 import type { IconNode, SVGProps } from "lucide";
-import { escapeSvgText } from "../../../rendering/svg-utils";
+import { escapeSvgText } from "../../../view-rendering/svg-utils";
 import type { LucideIconOptions, SvgIconDefinition } from "../icon-types";
 
 const LUCIDE_VIEW_BOX = { x: 0, y: 0, width: 24, height: 24 } as const;

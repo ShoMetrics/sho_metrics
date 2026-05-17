@@ -1,5 +1,5 @@
-import type { WidgetData, KeySize } from "../rendering/widget-data";
-import type { ColorConfig } from "../rendering/color-resolver";
+import type { WidgetData, KeySize } from "../view-rendering/widget-data";
+import type { ColorConfig } from "../view-rendering/color-resolver";
 
 /** Base config shared by all widget primitives. */
 export interface WidgetBaseConfig {

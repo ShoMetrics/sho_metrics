@@ -54,7 +54,7 @@ test("network automatic interface reads aggregate keys after registry selection"
 
     assert.equal(viewUpdate.viewOptions.metricKey, getNetworkAggregateMetricKey("download"));
     if ("positive" in widgetData) {
-        assert.fail("Expected single metric network display.");
+        assert.fail("Expected single metric network view.");
     }
     assert.equal(widgetData.sampleTimestampMilliseconds, 1000);
     assert.equal(widgetData.current, 1234);
@@ -101,7 +101,7 @@ test("network explicit interface reads interface keys without registry selection
 
     assert.equal(viewUpdate.viewOptions.metricKey, getNetworkInterfaceMetricKey("download", "Ethernet"));
     if ("positive" in widgetData) {
-        assert.fail("Expected single metric network display.");
+        assert.fail("Expected single metric network view.");
     }
     assert.equal(widgetData.sampleTimestampMilliseconds, 1000);
     assert.equal(widgetData.current, 5678);

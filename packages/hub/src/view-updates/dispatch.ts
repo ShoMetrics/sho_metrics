@@ -1,12 +1,12 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
-import type { TouchStripMetricLayout } from "../metric-view-renderer/display-frame";
+import type { TouchStripMetricLayout } from "../view-rendering/metric-view-frame";
 
 export interface TouchStripMetricLayoutState {
     layoutPromise: Promise<void> | null;
     layoutPath: string | null;
 }
 
-export type MetricDisplayDispatchResult =
+export type MetricViewDispatchResult =
     | {
         readonly status: "rendered";
         readonly donePhase: "setFeedbackDone" | "setImageDone";
@@ -26,13 +26,13 @@ export type MetricDisplayDispatchResult =
         readonly updateEndTimestampMilliseconds: number;
     };
 
-export async function dispatchMetricDisplayImage(options: {
+export async function dispatchMetricViewImage(options: {
     readonly event: WillAppearEvent;
     readonly pngDataUrl: string;
     readonly touchStripMetricLayout: TouchStripMetricLayout | null;
     readonly touchStripMetricLayoutState: TouchStripMetricLayoutState;
     readonly isActionActive: () => boolean;
-}): Promise<MetricDisplayDispatchResult> {
+}): Promise<MetricViewDispatchResult> {
     if (options.event.action.isDial()) {
         return dispatchTouchStripMetricImage(options);
     }
@@ -56,7 +56,7 @@ async function dispatchTouchStripMetricImage(options: {
     readonly touchStripMetricLayout: TouchStripMetricLayout | null;
     readonly touchStripMetricLayoutState: TouchStripMetricLayoutState;
     readonly isActionActive: () => boolean;
-}): Promise<MetricDisplayDispatchResult> {
+}): Promise<MetricViewDispatchResult> {
     let updateStartTimestampMilliseconds: number | null = null;
 
     try {
@@ -95,7 +95,7 @@ async function dispatchTouchStripMetricImage(options: {
 async function dispatchKeyMetricImage(options: {
     readonly event: WillAppearEvent;
     readonly pngDataUrl: string;
-}): Promise<MetricDisplayDispatchResult> {
+}): Promise<MetricViewDispatchResult> {
     const updateStartTimestampMilliseconds = Date.now();
 
     try {

@@ -1,19 +1,19 @@
-export type DisplayUpdatePriority = "settings-change" | "metric-tick";
+export type MetricViewUpdatePriority = "settings-change" | "metric-tick";
 
 /**
- * Queue for display updates.
+ * Queue for metric view updates.
  *
  * Settings changes are user-visible control feedback, so they are allowed to
  * move ahead of ordinary metric ticks without increasing global render
  * concurrency. Each action id appears at most once; repeated requests collapse
  * into the latest pending options stored by the caller.
  */
-export class DisplayUpdateQueue {
+export class MetricViewUpdateQueue {
     private readonly settingsActionIds: string[] = [];
     private readonly metricActionIds: string[] = [];
-    private readonly priorityByActionId = new Map<string, DisplayUpdatePriority>();
+    private readonly priorityByActionId = new Map<string, MetricViewUpdatePriority>();
 
-    enqueue(actionId: string, priority: DisplayUpdatePriority): void {
+    enqueue(actionId: string, priority: MetricViewUpdatePriority): void {
         const existingPriority = this.priorityByActionId.get(actionId);
 
         if (existingPriority === "settings-change" || existingPriority === priority) {

@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { WillAppearEvent } from "@elgato/streamdeck";
 import {
-    dispatchMetricDisplayImage,
+    dispatchMetricViewImage,
     type TouchStripMetricLayoutState,
 } from "./dispatch";
-import type { TouchStripMetricLayout } from "../metric-view-renderer/display-frame";
+import type { TouchStripMetricLayout } from "../view-rendering/metric-view-frame";
 
 test("dispatch sends key images through setImage", async () => {
     const action = new FakeKeyAction();
-    const result = await dispatchMetricDisplayImage({
+    const result = await dispatchMetricViewImage({
         event: buildEvent(action),
         pngDataUrl: "data:image/png;base64,key",
         touchStripMetricLayout: null,
@@ -23,7 +23,7 @@ test("dispatch sends key images through setImage", async () => {
 
 test("dispatch applies touch strip layout before dial feedback", async () => {
     const action = new FakeDialAction();
-    const result = await dispatchMetricDisplayImage({
+    const result = await dispatchMetricViewImage({
         event: buildEvent(action),
         pngDataUrl: "data:image/png;base64,dial",
         touchStripMetricLayout: buildTouchStripMetricLayout(),
@@ -43,7 +43,7 @@ test("dispatch does not send dial feedback after the action becomes inactive", a
     const action = new FakeDialAction(() => {
         isActive = false;
     });
-    const result = await dispatchMetricDisplayImage({
+    const result = await dispatchMetricViewImage({
         event: buildEvent(action),
         pngDataUrl: "data:image/png;base64,dial",
         touchStripMetricLayout: buildTouchStripMetricLayout(),

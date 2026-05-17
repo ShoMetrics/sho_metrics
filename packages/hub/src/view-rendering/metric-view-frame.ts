@@ -1,8 +1,8 @@
-import type { ColorConfig } from "../rendering/color-resolver";
-import { renderDualMetricBodyView } from "../rendering/dual-metric-view";
-import { renderMetricFrame } from "../rendering/metric-frame";
-import type { MetricRenderAppearance } from "../rendering/render-appearance";
-import { renderSingleMetricBodyView } from "../rendering/single-metric-view";
+import type { ColorConfig } from "./color-resolver";
+import { renderDualMetricBodyView } from "./dual-metric-view";
+import { renderMetricFrame } from "./metric-frame";
+import type { MetricRenderAppearance } from "./render-appearance";
+import { renderSingleMetricBodyView } from "./single-metric-view";
 import {
     KEYPAD_PNG_SIZE,
     TOUCH_STRIP_LOGICAL_SIZE,
@@ -12,7 +12,7 @@ import {
     type DualChannelWidgetData,
     type KeySize,
     type WidgetData,
-} from "../rendering/widget-data";
+} from "./widget-data";
 import {
     mergeResolvedAppearanceSettings,
     type ResolvedAppearanceSettingsOverride,

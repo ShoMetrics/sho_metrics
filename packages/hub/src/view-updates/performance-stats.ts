@@ -1,11 +1,11 @@
-type DisplayPerformanceReason = "settings-change" | "metric-tick";
-export type DisplayPerformanceKind = "key" | "dial" | "unknown";
-export type DisplayPerformanceOutcome = "rendered" | "skipped" | "failed";
+type MetricViewPerformanceReason = "settings-change" | "metric-tick";
+export type MetricViewPerformanceActionKind = "key" | "dial" | "unknown";
+export type MetricViewPerformanceOutcome = "rendered" | "skipped" | "failed";
 
-export interface DisplayPerformanceSample {
-    requestReason: DisplayPerformanceReason;
-    displayKind: DisplayPerformanceKind;
-    outcome: DisplayPerformanceOutcome;
+export interface MetricViewPerformanceSample {
+    requestReason: MetricViewPerformanceReason;
+    actionKind: MetricViewPerformanceActionKind;
+    outcome: MetricViewPerformanceOutcome;
     queuedMilliseconds: number | null;
     composeMilliseconds: number;
     rasterizeMilliseconds: number | null;
@@ -22,7 +22,7 @@ export interface DurationSummary {
     maximumMilliseconds: number | null;
 }
 
-export interface DisplayPerformanceSummary {
+export interface MetricViewPerformanceSummary {
     windowMilliseconds: number;
     requestCount: number;
     renderedCount: number;
@@ -42,9 +42,9 @@ export interface DisplayPerformanceSummary {
     totalDuration: DurationSummary;
 }
 
-const DISPLAY_WARNING_MAXIMUM_QUEUED_MILLISECONDS = 500;
-const DISPLAY_WARNING_AVERAGE_QUEUED_MILLISECONDS = 250;
-const DISPLAY_WARNING_MAXIMUM_TOTAL_MILLISECONDS = 1000;
+const METRIC_VIEW_PERFORMANCE_WARNING_MAXIMUM_QUEUED_MILLISECONDS = 500;
+const METRIC_VIEW_PERFORMANCE_WARNING_AVERAGE_QUEUED_MILLISECONDS = 250;
+const METRIC_VIEW_PERFORMANCE_WARNING_MAXIMUM_TOTAL_MILLISECONDS = 1000;
 
 interface DurationAccumulator {
     count: number;
@@ -52,7 +52,7 @@ interface DurationAccumulator {
     maximumMilliseconds: number;
 }
 
-interface DisplayPerformanceWindow {
+interface MetricViewPerformanceWindow {
     startTimestampMilliseconds: number;
     requestCount: number;
     renderedCount: number;
@@ -73,40 +73,40 @@ interface DisplayPerformanceWindow {
 }
 
 /**
- * Aggregates high-frequency display render timings into low-frequency summaries.
+ * Aggregates high-frequency metric view render timings into low-frequency summaries.
  *
- * The display path can execute dozens of times per second on large Stream Deck
+ * The metric view path can execute dozens of times per second on large Stream Deck
  * profiles. Aggregating keeps production diagnostics useful without turning the
  * log itself into a performance bottleneck.
  */
-export class DisplayPerformanceStats {
-    private performanceWindow: DisplayPerformanceWindow | null = null;
+export class MetricViewPerformanceStats {
+    private performanceWindow: MetricViewPerformanceWindow | null = null;
 
-    public constructor(private readonly summaryIntervalMilliseconds = 5000) {}
+    constructor(private readonly summaryIntervalMilliseconds = 5000) {}
 
-    public record(
-        sample: DisplayPerformanceSample,
+    record(
+        sample: MetricViewPerformanceSample,
         timestampMilliseconds = Date.now(),
-    ): DisplayPerformanceSummary | null {
+    ): MetricViewPerformanceSummary | null {
         const performanceWindow = this.performanceWindow
-            ?? createDisplayPerformanceWindow(timestampMilliseconds);
+            ?? createMetricViewPerformanceWindow(timestampMilliseconds);
 
         this.performanceWindow = performanceWindow;
-        addDisplayPerformanceSample(performanceWindow, sample);
+        addMetricViewPerformanceSample(performanceWindow, sample);
 
         if (timestampMilliseconds - performanceWindow.startTimestampMilliseconds < this.summaryIntervalMilliseconds) {
             return null;
         }
 
-        const summary = buildDisplayPerformanceSummary(performanceWindow, timestampMilliseconds);
+        const summary = buildMetricViewPerformanceSummary(performanceWindow, timestampMilliseconds);
         this.performanceWindow = null;
         return summary;
     }
 }
 
-export function formatDisplayPerformanceSummary(summary: DisplayPerformanceSummary): string {
+export function formatMetricViewPerformanceSummary(summary: MetricViewPerformanceSummary): string {
     return [
-        "displayPerfSummary",
+        "metricViewPerfSummary",
         `windowMs=${summary.windowMilliseconds}`,
         `requests=${summary.requestCount}`,
         `rendered=${summary.renderedCount}`,
@@ -132,14 +132,20 @@ export function formatDisplayPerformanceSummary(summary: DisplayPerformanceSumma
     ].join(" ");
 }
 
-export function shouldWarnDisplayPerformanceSummary(summary: DisplayPerformanceSummary): boolean {
+export function shouldWarnMetricViewPerformanceSummary(summary: MetricViewPerformanceSummary): boolean {
     return summary.failedCount > 0
-        || exceedsDuration(summary.queuedDuration.maximumMilliseconds, DISPLAY_WARNING_MAXIMUM_QUEUED_MILLISECONDS)
-        || exceedsDuration(summary.queuedDuration.averageMilliseconds, DISPLAY_WARNING_AVERAGE_QUEUED_MILLISECONDS)
-        || exceedsDuration(summary.totalDuration.maximumMilliseconds, DISPLAY_WARNING_MAXIMUM_TOTAL_MILLISECONDS);
+        || exceedsDuration(
+            summary.queuedDuration.maximumMilliseconds,
+            METRIC_VIEW_PERFORMANCE_WARNING_MAXIMUM_QUEUED_MILLISECONDS,
+        )
+        || exceedsDuration(
+            summary.queuedDuration.averageMilliseconds,
+            METRIC_VIEW_PERFORMANCE_WARNING_AVERAGE_QUEUED_MILLISECONDS,
+        )
+        || exceedsDuration(summary.totalDuration.maximumMilliseconds, METRIC_VIEW_PERFORMANCE_WARNING_MAXIMUM_TOTAL_MILLISECONDS);
 }
 
-function createDisplayPerformanceWindow(startTimestampMilliseconds: number): DisplayPerformanceWindow {
+function createMetricViewPerformanceWindow(startTimestampMilliseconds: number): MetricViewPerformanceWindow {
     return {
         startTimestampMilliseconds,
         requestCount: 0,
@@ -161,9 +167,9 @@ function createDisplayPerformanceWindow(startTimestampMilliseconds: number): Dis
     };
 }
 
-function addDisplayPerformanceSample(
-    performanceWindow: DisplayPerformanceWindow,
-    sample: DisplayPerformanceSample,
+function addMetricViewPerformanceSample(
+    performanceWindow: MetricViewPerformanceWindow,
+    sample: MetricViewPerformanceSample,
 ): void {
     performanceWindow.requestCount += 1;
     performanceWindow.renderedCount += sample.outcome === "rendered" ? 1 : 0;
@@ -171,8 +177,8 @@ function addDisplayPerformanceSample(
     performanceWindow.failedCount += sample.outcome === "failed" ? 1 : 0;
     performanceWindow.settingsChangeCount += sample.requestReason === "settings-change" ? 1 : 0;
     performanceWindow.metricTickCount += sample.requestReason === "metric-tick" ? 1 : 0;
-    performanceWindow.keyCount += sample.displayKind === "key" ? 1 : 0;
-    performanceWindow.dialCount += sample.displayKind === "dial" ? 1 : 0;
+    performanceWindow.keyCount += sample.actionKind === "key" ? 1 : 0;
+    performanceWindow.dialCount += sample.actionKind === "dial" ? 1 : 0;
     performanceWindow.titleClearRequestCount += sample.titleClearRequested ? 1 : 0;
     performanceWindow.maximumQueueLength = Math.max(performanceWindow.maximumQueueLength, sample.queueLength);
     performanceWindow.maximumActiveActionCount = Math.max(
@@ -187,10 +193,10 @@ function addDisplayPerformanceSample(
     addDuration(performanceWindow.totalDuration, sample.totalMilliseconds);
 }
 
-function buildDisplayPerformanceSummary(
-    performanceWindow: DisplayPerformanceWindow,
+function buildMetricViewPerformanceSummary(
+    performanceWindow: MetricViewPerformanceWindow,
     endTimestampMilliseconds: number,
-): DisplayPerformanceSummary {
+): MetricViewPerformanceSummary {
     return {
         windowMilliseconds: Math.max(0, endTimestampMilliseconds - performanceWindow.startTimestampMilliseconds),
         requestCount: performanceWindow.requestCount,

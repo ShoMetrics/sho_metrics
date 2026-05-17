@@ -1,6 +1,6 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
-import { rasterizeSvgToPngDataUrl } from "../rendering/rasterizer";
-import type { MetricRenderAppearance } from "../rendering/render-appearance";
+import { rasterizeSvgToPngDataUrl } from "../view-rendering/rasterizer";
+import type { MetricRenderAppearance } from "../view-rendering/render-appearance";
 import {
     composeMetricViewFrame,
     isDualMetricRenderOptions,
@@ -9,17 +9,17 @@ import {
     type DualMetricRenderOptions,
     type MetricRenderOptions,
     type SingleMetricRenderOptions,
-} from "../metric-view-renderer/display-frame";
+} from "../view-rendering/metric-view-frame";
 import { logger } from "../logging/logger";
 import type { ResolvedAppearanceSettings } from "../settings/resolved-settings";
-import { DisplayUpdateQueue, type DisplayUpdatePriority } from "./update-queue";
+import { MetricViewUpdateQueue, type MetricViewUpdatePriority } from "./update-queue";
 import {
-    dispatchMetricDisplayImage,
+    dispatchMetricViewImage,
     type TouchStripMetricLayoutState,
 } from "./dispatch";
 import {
-    recordDisplayPerformanceSample,
-} from "./display-update-observability";
+    recordMetricViewPerformanceSample,
+} from "./view-update-observability";
 import { buildMetricRenderAppearance } from "../settings/render-appearance-builder";
 
 const log = logger.for("MetricViewRunner");
@@ -27,7 +27,7 @@ const log = logger.for("MetricViewRunner");
 const MAX_CONCURRENT_METRIC_VIEW_UPDATES = 1;
 
 const metricViewActionStates = new Map<string, MetricViewActionState>();
-const metricViewActionQueue = new DisplayUpdateQueue();
+const metricViewActionQueue = new MetricViewUpdateQueue();
 let activeMetricViewUpdateCount = 0;
 let isMetricViewQueueDrainScheduled = false;
 
@@ -47,7 +47,7 @@ interface MetricViewActionState {
     active: boolean;
     pendingOptions: MetricViewOptions | null;
     pendingUpdateTimestampMilliseconds: number | null;
-    pendingUpdateReason: DisplayUpdatePriority;
+    pendingUpdateReason: MetricViewUpdatePriority;
     pendingSettingsSignature: string | null;
     touchStripMetricLayoutState: TouchStripMetricLayoutState;
     lastRenderedSvg: string | null;
@@ -55,6 +55,15 @@ interface MetricViewActionState {
 }
 
 export function setMetricView(options: MetricViewOptions): void {
+    if (isDualMetricRenderOptions(options)) {
+        const metricViewActionState = getOrCreateMetricViewActionState(options.event.action.id);
+
+        recordMetricViewUpdate(metricViewActionState, options);
+        metricViewActionState.pendingOptions = options;
+        enqueueMetricViewAction(metricViewActionState);
+        return;
+    }
+
     const metricViewActionState = getOrCreateMetricViewActionState(options.event.action.id);
 
     recordMetricViewUpdate(metricViewActionState, options);
@@ -147,7 +156,7 @@ function runMetricViewUpdate(
             `composeMs=${composeEndTimestampMilliseconds - renderStartTimestampMilliseconds}`,
             `renderToSkipMs=${Date.now() - renderStartTimestampMilliseconds}`,
         ].join(" "));
-        recordDisplayPerformanceSample({
+        recordMetricViewPerformanceSample({
             event: options.event,
             updateReason,
             outcome: "skipped",
@@ -169,7 +178,7 @@ function runMetricViewUpdate(
     const rasterizeEndTimestampMilliseconds = Date.now();
 
     if (!pngDataUrl) {
-        recordDisplayPerformanceSample({
+        recordMetricViewPerformanceSample({
             event: options.event,
             updateReason,
             outcome: "failed",
@@ -204,7 +213,7 @@ function runMetricViewUpdate(
         ].join(" ");
     });
 
-    dispatchMetricDisplayImage({
+    dispatchMetricViewImage({
         event: options.event,
         pngDataUrl,
         touchStripMetricLayout: renderPlan.touchStripMetricLayout,
@@ -220,7 +229,7 @@ function runMetricViewUpdate(
                 metricViewActionState.lastRenderedSvg = svg;
             }
 
-            recordDisplayPerformanceSample({
+            recordMetricViewPerformanceSample({
                 event: options.event,
                 updateReason,
                 outcome: dispatchResult.status === "rendered" ? "rendered" : "failed",

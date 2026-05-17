@@ -1,18 +1,18 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
 import { logger } from "../logging/logger";
 import {
-    DisplayPerformanceStats,
-    formatDisplayPerformanceSummary,
-    shouldWarnDisplayPerformanceSummary,
-    type DisplayPerformanceKind,
-    type DisplayPerformanceOutcome,
+    MetricViewPerformanceStats,
+    formatMetricViewPerformanceSummary,
+    shouldWarnMetricViewPerformanceSummary,
+    type MetricViewPerformanceActionKind,
+    type MetricViewPerformanceOutcome,
 } from "./performance-stats";
-import type { DisplayUpdatePriority } from "./update-queue";
+import type { MetricViewUpdatePriority } from "./update-queue";
 
 const log = logger.for("MetricViewRunner");
-const displayPerformanceStats = new DisplayPerformanceStats();
+const metricViewPerformanceStats = new MetricViewPerformanceStats();
 
-function resolveDisplayPerformanceKind(event: WillAppearEvent): DisplayPerformanceKind {
+function resolveMetricViewPerformanceActionKind(event: WillAppearEvent): MetricViewPerformanceActionKind {
     if (event.action.isKey()) {
         return "key";
     }
@@ -24,10 +24,10 @@ function resolveDisplayPerformanceKind(event: WillAppearEvent): DisplayPerforman
     return "unknown";
 }
 
-export function recordDisplayPerformanceSample(options: {
+export function recordMetricViewPerformanceSample(options: {
     event: WillAppearEvent;
-    updateReason: DisplayUpdatePriority;
-    outcome: DisplayPerformanceOutcome;
+    updateReason: MetricViewUpdatePriority;
+    outcome: MetricViewPerformanceOutcome;
     titleClearRequested: boolean;
     updateTimestampMilliseconds: number | null;
     renderStartTimestampMilliseconds: number;
@@ -38,9 +38,9 @@ export function recordDisplayPerformanceSample(options: {
     queueLength: number;
     activeActionCount: number;
 }): void {
-    const summary = displayPerformanceStats.record({
+    const summary = metricViewPerformanceStats.record({
         requestReason: options.updateReason,
-        displayKind: resolveDisplayPerformanceKind(options.event),
+        actionKind: resolveMetricViewPerformanceActionKind(options.event),
         outcome: options.outcome,
         queuedMilliseconds: calculateElapsedMilliseconds(
             options.updateTimestampMilliseconds,
@@ -68,14 +68,14 @@ export function recordDisplayPerformanceSample(options: {
         return;
     }
 
-    if (shouldWarnDisplayPerformanceSummary(summary)) {
+    if (shouldWarnMetricViewPerformanceSummary(summary)) {
         log.atWarn()
-            .everyMs("display-performance-warning", 60000)
-            .log(() => formatDisplayPerformanceSummary(summary));
+            .everyMs("metric-view-performance-warning", 60000)
+            .log(() => formatMetricViewPerformanceSummary(summary));
         return;
     }
 
-    log.debug(() => formatDisplayPerformanceSummary(summary));
+    log.debug(() => formatMetricViewPerformanceSummary(summary));
 }
 
 function calculateElapsedMilliseconds(

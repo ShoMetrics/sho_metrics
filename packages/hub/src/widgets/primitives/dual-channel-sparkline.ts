@@ -1,15 +1,15 @@
-import type { DualChannelWidgetData, KeySize, SparklineScale } from "../../rendering/widget-data";
+import type { DualChannelWidgetData, KeySize, SparklineScale } from "../../view-rendering/widget-data";
 import {
     buildSvgFilterAttributes,
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     type RenderThemeEffectTokens,
-} from "../../rendering/render-svg-effects";
-import { adjustHexColorBrightness, clamp, renderConstrainedSvgText } from "../../rendering/svg-utils";
+} from "../../view-rendering/render-svg-effects";
+import { adjustHexColorBrightness, clamp, renderConstrainedSvgText } from "../../view-rendering/svg-utils";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
     resolveRenderTextStyleFontSize,
     type RenderTextStyles,
-} from "../../rendering/render-text-style";
+} from "../../view-rendering/render-text-style";
 import type { WidgetBaseConfig } from "../widget.interface";
 import { renderMetricTextRow } from "./metric-text-row";
 import {

@@ -64,15 +64,15 @@ interface RasterizerPerformanceWindow {
 /**
  * Aggregates rasterizer timings into periodic summaries.
  *
- * Rasterization is synchronous and can dominate the display update path, so the
+ * Rasterization is synchronous and can dominate the metric view update path, so the
  * breakdown separates resvg setup, SVG rendering, PNG encoding, and base64 work.
  */
 export class RasterizerPerformanceStats {
     private performanceWindow: RasterizerPerformanceWindow | null = null;
 
-    public constructor(private readonly summaryIntervalMilliseconds = 5000) {}
+    constructor(private readonly summaryIntervalMilliseconds = 5000) {}
 
-    public record(
+    record(
         sample: RasterizerPerformanceSample,
         timestampMilliseconds = Date.now(),
     ): RasterizerPerformanceSummary | null {

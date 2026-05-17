@@ -1,16 +1,16 @@
-import type { DualChannelWidgetData, KeySize } from "../../rendering/widget-data";
-import { buildGradientStops, type ColorConfig } from "../../rendering/color-resolver";
+import type { DualChannelWidgetData, KeySize } from "../../view-rendering/widget-data";
+import { buildGradientStops, type ColorConfig } from "../../view-rendering/color-resolver";
 import {
     buildSvgFilterAttributes,
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     type RenderThemeEffectTokens,
-} from "../../rendering/render-svg-effects";
+} from "../../view-rendering/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
     resolveRenderTextStyleFontSize,
     type RenderTextStyles,
-} from "../../rendering/render-text-style";
-import { escapeSvgText } from "../../rendering/svg-utils";
+} from "../../view-rendering/render-text-style";
+import { escapeSvgText } from "../../view-rendering/svg-utils";
 
 export interface MirroredTrafficConfig {
     positiveColorConfig: ColorConfig;

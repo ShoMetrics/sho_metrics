@@ -1,9 +1,9 @@
-﻿import {
+import {
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     TERMINAL_CLEAN_RENDER_THEME_EFFECT_TOKENS,
     TERMINAL_VINTAGE_RENDER_THEME_EFFECT_TOKENS,
     type RenderThemeEffectTokens,
-} from "../rendering/render-svg-effects";
+} from "../view-rendering/render-svg-effects";
 import type { ResolvedAppearanceSettings } from "./resolved-settings";
 
 export function resolveRenderThemeEffects(settings: ResolvedAppearanceSettings): RenderThemeEffectTokens {

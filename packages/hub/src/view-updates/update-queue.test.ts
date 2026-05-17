@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DisplayUpdateQueue } from "./update-queue";
+import { MetricViewUpdateQueue } from "./update-queue";
 
 test("settings changes are dequeued before ordinary metric ticks", () => {
-    const queue = new DisplayUpdateQueue();
+    const queue = new MetricViewUpdateQueue();
 
     queue.enqueue("metric-a", "metric-tick");
     queue.enqueue("metric-b", "metric-tick");
@@ -16,7 +16,7 @@ test("settings changes are dequeued before ordinary metric ticks", () => {
 });
 
 test("settings change promotes an already queued metric tick without duplicating it", () => {
-    const queue = new DisplayUpdateQueue();
+    const queue = new MetricViewUpdateQueue();
 
     queue.enqueue("action-a", "metric-tick");
     queue.enqueue("action-b", "metric-tick");
@@ -29,7 +29,7 @@ test("settings change promotes an already queued metric tick without duplicating
 });
 
 test("metric ticks do not demote an already queued settings change", () => {
-    const queue = new DisplayUpdateQueue();
+    const queue = new MetricViewUpdateQueue();
 
     queue.enqueue("action-a", "settings-change");
     queue.enqueue("action-b", "metric-tick");
@@ -41,7 +41,7 @@ test("metric ticks do not demote an already queued settings change", () => {
 });
 
 test("remove drops queued action ids from either priority lane", () => {
-    const queue = new DisplayUpdateQueue();
+    const queue = new MetricViewUpdateQueue();
 
     queue.enqueue("settings-a", "settings-change");
     queue.enqueue("metric-a", "metric-tick");

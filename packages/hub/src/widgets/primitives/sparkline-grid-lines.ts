@@ -1,4 +1,4 @@
-import { clamp } from "../../rendering/svg-utils";
+import { clamp } from "../../view-rendering/svg-utils";
 
 export type SparklineGridLineVisibility = "adaptive" | "always" | "none";
 export type SparklineGridLineType = "horizontal" | "vertical";

@@ -9,7 +9,7 @@ import {
 import type { DiskVolumeOption } from "../../runtime/disk-volumes";
 import { LOCAL_SOURCE_SCOPE_ID } from "../../runtime/sources/metric-read-plan";
 import { buildMetricSnapshot, buildScalarMetricValue } from "../../runtime/sources/source.interface";
-import { buildMetricViewRenderPlan, buildRenderWidgetData } from "../../metric-view-renderer/display-frame";
+import { buildMetricViewRenderPlan, buildRenderWidgetData } from "../../view-rendering/metric-view-frame";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
 import { resolveInitialActionSettings } from "../settings/action-settings-resolver";
@@ -56,7 +56,7 @@ test("disk usage automatic volume reads default usage keys after registry select
 
     assert.equal(viewOptions.metricKey, getDefaultDiskUsageMetricKey("used"));
     if ("positiveColor" in viewOptions) {
-        assert.fail("Expected single metric disk display.");
+        assert.fail("Expected single metric disk view.");
     }
     assert.equal(viewOptions.widgetData.sampleTimestampMilliseconds, 1000);
     assert.equal(viewOptions.widgetData.displayValue, "40");
@@ -104,7 +104,7 @@ test("disk usage display keeps explicit unavailable volume instead of falling ba
 
     assert.equal(viewOptions.metricKey, getDiskVolumeMetricKey("used", "E:\\"));
     if ("positiveColor" in viewOptions) {
-        assert.fail("Expected single metric disk display.");
+        assert.fail("Expected single metric disk view.");
     }
     assert.equal(viewOptions.widgetData.label, "E:");
     assert.equal(viewOptions.widgetData.displayValue, "0");

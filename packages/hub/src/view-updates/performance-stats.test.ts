@@ -1,19 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-    DisplayPerformanceStats,
-    formatDisplayPerformanceSummary,
-    shouldWarnDisplayPerformanceSummary,
+    MetricViewPerformanceStats,
+    formatMetricViewPerformanceSummary,
+    shouldWarnMetricViewPerformanceSummary,
 } from "./performance-stats";
 
 // These tests use synthetic durations. Real performance baselines belong in
 // platform-specific benchmarks, not hermetic unit tests.
-test("display performance stats aggregates render windows", () => {
-    const stats = new DisplayPerformanceStats(5000);
+test("metric view performance stats aggregates render windows", () => {
+    const stats = new MetricViewPerformanceStats(5000);
 
     const firstSummary = stats.record({
         requestReason: "metric-tick",
-        displayKind: "key",
+        actionKind: "key",
         outcome: "rendered",
         queuedMilliseconds: 100,
         composeMilliseconds: 2,
@@ -27,7 +27,7 @@ test("display performance stats aggregates render windows", () => {
 
     const secondSummary = stats.record({
         requestReason: "settings-change",
-        displayKind: "dial",
+        actionKind: "dial",
         outcome: "skipped",
         queuedMilliseconds: 0,
         composeMilliseconds: 1,
@@ -55,11 +55,11 @@ test("display performance stats aggregates render windows", () => {
     assert.equal(secondSummary.rasterizeDuration.maximumMilliseconds, 120);
 });
 
-test("display performance summary is log-friendly", () => {
-    const stats = new DisplayPerformanceStats(0);
+test("metric view performance summary is log-friendly", () => {
+    const stats = new MetricViewPerformanceStats(0);
     const summary = stats.record({
         requestReason: "metric-tick",
-        displayKind: "key",
+        actionKind: "key",
         outcome: "failed",
         queuedMilliseconds: 3,
         composeMilliseconds: 2,
@@ -73,9 +73,9 @@ test("display performance summary is log-friendly", () => {
 
     assert.ok(summary);
     assert.equal(
-        formatDisplayPerformanceSummary(summary),
+        formatMetricViewPerformanceSummary(summary),
         [
-            "displayPerfSummary",
+            "metricViewPerfSummary",
             "windowMs=0",
             "requests=1",
             "rendered=0",
@@ -102,10 +102,10 @@ test("display performance summary is log-friendly", () => {
     );
 });
 
-test("display performance summary warns only on degraded display windows", () => {
-    const fastSummary = new DisplayPerformanceStats(0).record({
+test("metric view performance summary warns only on degraded view update windows", () => {
+    const fastSummary = new MetricViewPerformanceStats(0).record({
         requestReason: "metric-tick",
-        displayKind: "key",
+        actionKind: "key",
         outcome: "rendered",
         queuedMilliseconds: 3,
         composeMilliseconds: 2,
@@ -116,9 +116,9 @@ test("display performance summary warns only on degraded display windows", () =>
         activeActionCount: 1,
         titleClearRequested: false,
     }, 2000);
-    const queuedSummary = new DisplayPerformanceStats(0).record({
+    const queuedSummary = new MetricViewPerformanceStats(0).record({
         requestReason: "metric-tick",
-        displayKind: "key",
+        actionKind: "key",
         outcome: "rendered",
         queuedMilliseconds: 501,
         composeMilliseconds: 2,
@@ -129,9 +129,9 @@ test("display performance summary warns only on degraded display windows", () =>
         activeActionCount: 48,
         titleClearRequested: false,
     }, 2000);
-    const failedSummary = new DisplayPerformanceStats(0).record({
+    const failedSummary = new MetricViewPerformanceStats(0).record({
         requestReason: "metric-tick",
-        displayKind: "key",
+        actionKind: "key",
         outcome: "failed",
         queuedMilliseconds: 3,
         composeMilliseconds: 2,
@@ -146,7 +146,7 @@ test("display performance summary warns only on degraded display windows", () =>
     assert.ok(fastSummary);
     assert.ok(queuedSummary);
     assert.ok(failedSummary);
-    assert.equal(shouldWarnDisplayPerformanceSummary(fastSummary), false);
-    assert.equal(shouldWarnDisplayPerformanceSummary(queuedSummary), true);
-    assert.equal(shouldWarnDisplayPerformanceSummary(failedSummary), true);
+    assert.equal(shouldWarnMetricViewPerformanceSummary(fastSummary), false);
+    assert.equal(shouldWarnMetricViewPerformanceSummary(queuedSummary), true);
+    assert.equal(shouldWarnMetricViewPerformanceSummary(failedSummary), true);
 });

@@ -1,4 +1,4 @@
-import type { MetricRenderAppearance } from "../rendering/render-appearance";
+import type { MetricRenderAppearance } from "../view-rendering/render-appearance";
 import type { ThemePresetName } from "../widgets/widget.interface";
 import type {
     MetricView,

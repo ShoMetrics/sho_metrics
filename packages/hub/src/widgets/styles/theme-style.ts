@@ -1,4 +1,4 @@
-import type { KeySize } from "../../rendering/widget-data";
+import type { KeySize } from "../../view-rendering/widget-data";
 
 export interface ThemeStylePaints {
     readonly background: string;

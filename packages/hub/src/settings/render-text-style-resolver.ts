@@ -3,7 +3,7 @@ import {
     TERMINAL_CLEAN_RENDER_TEXT_STYLES,
     TERMINAL_VINTAGE_RENDER_TEXT_STYLES,
     type RenderTextStyles,
-} from "../rendering/render-text-style";
+} from "../view-rendering/render-text-style";
 import type { ResolvedAppearanceSettings } from "./resolved-settings";
 
 export function resolveRenderTextStyles(settings: ResolvedAppearanceSettings): RenderTextStyles {

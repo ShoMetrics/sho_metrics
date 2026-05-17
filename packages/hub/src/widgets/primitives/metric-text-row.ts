@@ -6,7 +6,7 @@ import {
     sanitizeSvgId,
     type SvgTextAnchor,
     type SvgTextFitOptions,
-} from "../../rendering/svg-utils";
+} from "../../view-rendering/svg-utils";
 
 interface MetricTextRowOptions {
     readonly id: string;

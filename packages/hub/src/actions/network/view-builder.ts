@@ -5,8 +5,8 @@ import {
     resolveNetworkMetricKey,
     type NetworkDirection,
 } from "../../runtime/network-metric-keys";
-import type { WidgetData } from "../../rendering/widget-data";
-import { resolveColorForThresholdValue, type ColorConfig } from "../../rendering/color-resolver";
+import type { WidgetData } from "../../view-rendering/widget-data";
+import { resolveColorForThresholdValue, type ColorConfig } from "../../view-rendering/color-resolver";
 import type {
     ResolvedNetworkMetricTarget,
     ResolvedWidgetSettings,
@@ -21,7 +21,7 @@ import {
     renderNetworkDirectionIconFragment,
     renderNetworkInterfaceIconFragment,
 } from "../../widgets/icons/catalog/network";
-import type { MetricViewOptions } from "../../metric-view-runner/runner";
+import type { MetricViewOptions } from "../../view-updates/runner";
 import { buildColorConfigFromAppearance, resolveSolidMetricColorMode } from "../../settings/render-paint-resolver";
 
 export interface NetworkViewUpdate {

@@ -1,5 +1,5 @@
-import { adjustHexColorBrightness } from "../../rendering/svg-utils";
-import type { KeySize } from "../../rendering/widget-data";
+import { adjustHexColorBrightness } from "../../view-rendering/svg-utils";
+import type { KeySize } from "../../view-rendering/widget-data";
 import type { ThemeBackgroundFill, ThemeStyle, ThemeStylePaints } from "./theme-style";
 
 type SoftTriangleBackgroundFill = Extract<ThemeBackgroundFill, {

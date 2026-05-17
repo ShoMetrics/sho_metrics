@@ -1,5 +1,5 @@
 import { RingBuffer } from "./ring-buffer";
-import type { WidgetData } from "../rendering/widget-data";
+import type { WidgetData } from "../view-rendering/widget-data";
 import type { IMetricSnapshot } from "./sources/source.interface";
 
 /** Read-only view of metric history bound to one source scope. */
