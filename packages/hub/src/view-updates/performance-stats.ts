@@ -1,3 +1,11 @@
+import {
+    addDurationSample,
+    createDurationAccumulator,
+    summarizeDuration,
+    type DurationAccumulator,
+    type DurationSummary as SharedDurationSummary,
+} from "../shared/duration-accumulator";
+
 type MetricViewPerformanceReason = "settings-change" | "metric-tick";
 export type MetricViewPerformanceActionKind = "key" | "dial" | "unknown";
 export type MetricViewPerformanceOutcome = "rendered" | "skipped" | "failed";
@@ -16,11 +24,7 @@ export interface MetricViewPerformanceSample {
     titleClearRequested: boolean;
 }
 
-export interface DurationSummary {
-    count: number;
-    averageMilliseconds: number | null;
-    maximumMilliseconds: number | null;
-}
+export type DurationSummary = SharedDurationSummary;
 
 export interface MetricViewPerformanceSummary {
     windowMilliseconds: number;
@@ -45,12 +49,6 @@ export interface MetricViewPerformanceSummary {
 const METRIC_VIEW_PERFORMANCE_WARNING_MAXIMUM_QUEUED_MILLISECONDS = 500;
 const METRIC_VIEW_PERFORMANCE_WARNING_AVERAGE_QUEUED_MILLISECONDS = 250;
 const METRIC_VIEW_PERFORMANCE_WARNING_MAXIMUM_TOTAL_MILLISECONDS = 1000;
-
-interface DurationAccumulator {
-    count: number;
-    totalMilliseconds: number;
-    maximumMilliseconds: number;
-}
 
 interface MetricViewPerformanceWindow {
     startTimestampMilliseconds: number;
@@ -186,11 +184,11 @@ function addMetricViewPerformanceSample(
         sample.activeActionCount,
     );
 
-    addDuration(performanceWindow.queuedDuration, sample.queuedMilliseconds);
-    addDuration(performanceWindow.composeDuration, sample.composeMilliseconds);
-    addDuration(performanceWindow.rasterizeDuration, sample.rasterizeMilliseconds);
-    addDuration(performanceWindow.sdkPromiseDuration, sample.sdkPromiseMilliseconds);
-    addDuration(performanceWindow.totalDuration, sample.totalMilliseconds);
+    addDurationSample(performanceWindow.queuedDuration, sample.queuedMilliseconds);
+    addDurationSample(performanceWindow.composeDuration, sample.composeMilliseconds);
+    addDurationSample(performanceWindow.rasterizeDuration, sample.rasterizeMilliseconds);
+    addDurationSample(performanceWindow.sdkPromiseDuration, sample.sdkPromiseMilliseconds);
+    addDurationSample(performanceWindow.totalDuration, sample.totalMilliseconds);
 }
 
 function buildMetricViewPerformanceSummary(
@@ -215,43 +213,6 @@ function buildMetricViewPerformanceSummary(
         rasterizeDuration: summarizeDuration(performanceWindow.rasterizeDuration),
         sdkPromiseDuration: summarizeDuration(performanceWindow.sdkPromiseDuration),
         totalDuration: summarizeDuration(performanceWindow.totalDuration),
-    };
-}
-
-function createDurationAccumulator(): DurationAccumulator {
-    return {
-        count: 0,
-        totalMilliseconds: 0,
-        maximumMilliseconds: 0,
-    };
-}
-
-function addDuration(durationAccumulator: DurationAccumulator, durationMilliseconds: number | null): void {
-    if (durationMilliseconds == null) {
-        return;
-    }
-
-    durationAccumulator.count += 1;
-    durationAccumulator.totalMilliseconds += durationMilliseconds;
-    durationAccumulator.maximumMilliseconds = Math.max(
-        durationAccumulator.maximumMilliseconds,
-        durationMilliseconds,
-    );
-}
-
-function summarizeDuration(durationAccumulator: DurationAccumulator): DurationSummary {
-    if (durationAccumulator.count === 0) {
-        return {
-            count: 0,
-            averageMilliseconds: null,
-            maximumMilliseconds: null,
-        };
-    }
-
-    return {
-        count: durationAccumulator.count,
-        averageMilliseconds: durationAccumulator.totalMilliseconds / durationAccumulator.count,
-        maximumMilliseconds: durationAccumulator.maximumMilliseconds,
     };
 }
 
