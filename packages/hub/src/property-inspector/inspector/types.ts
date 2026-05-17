@@ -24,7 +24,7 @@ export interface VisibilityContext {
     resolved: ResolvedWidgetSettings;
 }
 
-/** Readiness for runtime-only option lists delivered to Property Inspector through plugin IPC. */
+/** Readiness for runtime-only option lists delivered to Property Inspector through Stream Deck SDK IPC. */
 export interface PropertyInspectorRuntimeCacheStatus {
     diskVolumeOptionsStatus: LoadStatus;
 }

@@ -3,10 +3,10 @@ import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { MetricTheme, ResolvedGlobalSettings } from "../../settings/resolved-settings";
-import { PluginSettingsTab } from "./PluginSettingsTab";
+import { GlobalSettingsTab } from "./GlobalSettingsTab";
 
-test("plugin global override groups view theme and color controls under the master switch", () => {
-    const markup = renderToStaticMarkup(createElement(PluginSettingsTab, {
+test("global override groups view theme and color controls under the master switch", () => {
+    const markup = renderToStaticMarkup(createElement(GlobalSettingsTab, {
         resolvedSettings: buildGlobalSettings(),
         onSettingsPatch: () => undefined,
     }));
@@ -29,8 +29,8 @@ test("plugin global override groups view theme and color controls under the mast
     assert.doesNotMatch(markup, /Tint/);
 });
 
-test("plugin global override hides color controls for terminal theme", () => {
-    const markup = renderToStaticMarkup(createElement(PluginSettingsTab, {
+test("global override hides color controls for terminal theme", () => {
+    const markup = renderToStaticMarkup(createElement(GlobalSettingsTab, {
         resolvedSettings: buildGlobalSettings("terminal"),
         onSettingsPatch: () => undefined,
     }));

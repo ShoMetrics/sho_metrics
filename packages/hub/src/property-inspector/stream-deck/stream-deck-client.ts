@@ -230,7 +230,7 @@ export class StreamDeckClient implements StreamDeckPropertyInspectorClient {
     }
 
     /**
-     * Gets plugin-wide settings and returns the payload shape consumed by App.
+     * Gets global settings and returns the payload shape consumed by App.
      */
     async getGlobalSettings(): Promise<GetSettingsPayload> {
         const response = await this.get<DidReceiveGlobalSettingsEvent>(
@@ -242,7 +242,7 @@ export class StreamDeckClient implements StreamDeckPropertyInspectorClient {
     }
 
     /**
-     * Writes plugin-wide settings.
+     * Writes global settings.
      */
     setGlobalSettings(settings: SettingsRecord): Promise<void> {
         return this.send("setGlobalSettings", settings);

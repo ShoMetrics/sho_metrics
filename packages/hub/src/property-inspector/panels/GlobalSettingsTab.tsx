@@ -25,12 +25,12 @@ import type {
 } from "../../settings/resolved-settings";
 import type { StoredGlobalSettingsPatch } from "../../settings/storage/global-settings-patch";
 
-interface PluginSettingsTabProps {
+interface GlobalSettingsTabProps {
     resolvedSettings: ResolvedGlobalSettings;
     onSettingsPatch: (patch: StoredGlobalSettingsPatch) => void;
 }
 
-export function PluginSettingsTab({ resolvedSettings, onSettingsPatch }: PluginSettingsTabProps): React.JSX.Element {
+export function GlobalSettingsTab({ resolvedSettings, onSettingsPatch }: GlobalSettingsTabProps): React.JSX.Element {
     return (
         <div>
             <GlobalOverrideSection

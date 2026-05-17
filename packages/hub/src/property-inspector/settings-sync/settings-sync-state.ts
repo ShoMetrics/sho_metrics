@@ -21,7 +21,7 @@ export interface SettingsSyncState {
     readonly rawGlobalSettings: unknown;
     readonly globalSettingsStatus: LoadStatus;
     readonly widgetSettingsNotice: SettingsNotice | null;
-    readonly pluginSettingsNotice: SettingsNotice | null;
+    readonly globalSettingsNotice: SettingsNotice | null;
 }
 
 export interface InspectorWidgetSettingsRead {
@@ -30,7 +30,7 @@ export interface InspectorWidgetSettingsRead {
     readonly readWarning: StoredSettingsReadWarning | null;
 }
 
-export interface InspectorPluginSettingsRead {
+export interface InspectorGlobalSettingsRead {
     readonly rawGlobalSettings: StoredSettingsJsonObject;
     readonly notice: SettingsNotice | null;
     readonly readWarning: StoredSettingsReadWarning | null;
@@ -53,8 +53,8 @@ export type SettingsSyncAction =
         readonly read: InspectorWidgetSettingsRead;
     }
     | {
-        readonly type: "pluginSettingsRead";
-        readonly read: InspectorPluginSettingsRead;
+        readonly type: "globalSettingsRead";
+        readonly read: InspectorGlobalSettingsRead;
     }
     | {
         readonly type: "runtimeCachePatch";
@@ -65,7 +65,7 @@ export type SettingsSyncAction =
         readonly rawSettings: StoredSettingsJsonObject;
     }
     | {
-        readonly type: "pluginSettingsPatched";
+        readonly type: "globalSettingsPatched";
         readonly rawGlobalSettings: StoredSettingsJsonObject;
     }
     | {
@@ -73,14 +73,14 @@ export type SettingsSyncAction =
         readonly errorMessage?: string | undefined;
     }
     | {
-        readonly type: "pluginLoadFailed";
+        readonly type: "globalLoadFailed";
     }
     | {
         readonly type: "widgetSaveFailed";
         readonly errorMessage: string;
     }
     | {
-        readonly type: "pluginSaveFailed";
+        readonly type: "globalSaveFailed";
         readonly errorMessage: string;
     };
 
@@ -98,7 +98,7 @@ export const initialSettingsSyncState: SettingsSyncState = {
     rawGlobalSettings: undefined,
     globalSettingsStatus: "pending",
     widgetSettingsNotice: null,
-    pluginSettingsNotice: null,
+    globalSettingsNotice: null,
 };
 
 export function settingsSyncReducer(
@@ -122,12 +122,12 @@ export function settingsSyncReducer(
                 widgetSettingsStatus: "ready",
                 widgetSettingsNotice: action.read.notice,
             };
-        case "pluginSettingsRead":
+        case "globalSettingsRead":
             return {
                 ...state,
                 rawGlobalSettings: action.read.rawGlobalSettings,
                 globalSettingsStatus: "ready",
-                pluginSettingsNotice: action.read.notice,
+                globalSettingsNotice: action.read.notice,
             };
         case "runtimeCachePatch":
             return {
@@ -142,12 +142,12 @@ export function settingsSyncReducer(
                 widgetSettingsStatus: "ready",
                 widgetSettingsNotice: null,
             };
-        case "pluginSettingsPatched":
+        case "globalSettingsPatched":
             return {
                 ...state,
                 rawGlobalSettings: action.rawGlobalSettings,
                 globalSettingsStatus: "ready",
-                pluginSettingsNotice: null,
+                globalSettingsNotice: null,
             };
         case "widgetLoadFailed":
             return {
@@ -157,11 +157,11 @@ export function settingsSyncReducer(
                     ? settingsLoadFailureNoticeWithError(action.errorMessage)
                     : settingsLoadFailureNotice("widget"),
             };
-        case "pluginLoadFailed":
+        case "globalLoadFailed":
             return {
                 ...state,
                 globalSettingsStatus: "failed",
-                pluginSettingsNotice: settingsLoadFailureNotice("plugin"),
+                globalSettingsNotice: settingsLoadFailureNotice("global"),
             };
         case "widgetSaveFailed":
             return {
@@ -171,12 +171,12 @@ export function settingsSyncReducer(
                     text: `Failed to save widget settings: ${action.errorMessage}`,
                 },
             };
-        case "pluginSaveFailed":
+        case "globalSaveFailed":
             return {
                 ...state,
-                pluginSettingsNotice: {
+                globalSettingsNotice: {
                     kind: "warning",
-                    text: `Failed to save plugin settings: ${action.errorMessage}`,
+                    text: `Failed to save global settings: ${action.errorMessage}`,
                 },
             };
         default:
@@ -195,7 +195,7 @@ function updateRuntimeCacheStatus(
     };
 }
 
-function settingsLoadFailureNotice(settingsScope: "widget" | "plugin"): SettingsNotice {
+function settingsLoadFailureNotice(settingsScope: "widget" | "global"): SettingsNotice {
     if (settingsScope === "widget") {
         return {
             kind: "warning",
@@ -205,7 +205,7 @@ function settingsLoadFailureNotice(settingsScope: "widget" | "plugin"): Settings
 
     return {
         kind: "warning",
-        text: "We couldn't load plugin settings, so defaults are shown.",
+        text: "We couldn't load global settings, so defaults are shown.",
     };
 }
 

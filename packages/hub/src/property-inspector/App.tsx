@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { InspectorItem } from "./components/InspectorItem";
-import { PluginSettingsTab } from "./panels/PluginSettingsTab";
+import { GlobalSettingsTab } from "./panels/GlobalSettingsTab";
 import { WidgetSettingsTab } from "./panels/WidgetSettingsTab";
 import {
     usePropertyInspectorSettings,
@@ -12,14 +12,21 @@ interface AppProps {
     client: StreamDeckPropertyInspectorClient;
 }
 
+const settingsTabs = [
+    { id: "widget", label: "Widget" },
+    { id: "global", label: "Global" },
+] as const;
+
+type SettingsTabId = typeof settingsTabs[number]["id"];
+
 export function App({ client }: AppProps): React.JSX.Element {
-    const [activeTab, setActiveTab] = useState<"widget" | "plugin">("widget");
+    const [activeTab, setActiveTab] = useState<SettingsTabId>("widget");
     const {
         visibilityContext,
         resolvedGlobalSettings,
         globalSettingsStatus,
         widgetSettingsNotice,
-        pluginSettingsNotice,
+        globalSettingsNotice,
         updateWidgetSettings,
         resetWidgetSettings,
         updateGlobalSettings,
@@ -35,30 +42,23 @@ export function App({ client }: AppProps): React.JSX.Element {
     return (
         <div>
             <div className="settings-tab-list" role="tablist" aria-label="Settings">
-                <button
-                    className="settings-tab"
-                    type="button"
-                    role="tab"
-                    aria-selected={activeTab === "widget"}
-                    data-selected={activeTab === "widget" ? "true" : "false"}
-                    onClick={() => setActiveTab("widget")}
-                >
-                    Widget
-                </button>
-                <button
-                    className="settings-tab"
-                    type="button"
-                    role="tab"
-                    aria-selected={activeTab === "plugin"}
-                    data-selected={activeTab === "plugin" ? "true" : "false"}
-                    onClick={() => setActiveTab("plugin")}
-                >
-                    Plugin
-                </button>
+                {settingsTabs.map((tab) => (
+                    <button
+                        key={tab.id}
+                        className="settings-tab"
+                        type="button"
+                        role="tab"
+                        aria-selected={activeTab === tab.id}
+                        data-selected={activeTab === tab.id ? "true" : "false"}
+                        onClick={() => setActiveTab(tab.id)}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
             </div>
 
             <SettingsNoticeSlot
-                notice={activeTab === "widget" ? widgetSettingsNotice : pluginSettingsNotice}
+                notice={activeTab === "widget" ? widgetSettingsNotice : globalSettingsNotice}
             />
 
             {activeTab === "widget" ? (
@@ -71,7 +71,7 @@ export function App({ client }: AppProps): React.JSX.Element {
                     onResetWidgetSettings={resetWidgetSettings}
                 />
             ) : (
-                <PluginSettingsTab
+                <GlobalSettingsTab
                     resolvedSettings={resolvedGlobalSettings}
                     onSettingsPatch={updateGlobalSettings}
                 />
