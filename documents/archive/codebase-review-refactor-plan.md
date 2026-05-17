@@ -2,7 +2,26 @@
 
 Date: 2026-05-17
 
-This document records the accepted and rejected items from the code review discussion, with the execution plan adjusted for the follow-up review and the recent naming/proto cleanup. It is an implementation plan, not a request to change the settings architecture.
+Status: completed and archived on 2026-05-17.
+
+This document records the accepted and rejected items from the code review discussion, with the execution plan adjusted for the follow-up review and the naming/proto cleanup that preceded the refactor work. It is an archived implementation plan, not a request to change the settings architecture.
+
+Completion commits:
+
+- `280b8e8` Add view update runner characterization tests
+- `b73b699` Introduce metric view update runner
+- `bd959af` Add metric action characterization tests
+- `016c93a` Cover global metric action resubscription
+- `45e5106` Introduce scheduler binding
+- `6744d0c` Introduce widget runtime cache store
+- `462585b` Remove metric reader cache
+- `5341656` Split metric store record types
+- `afc0c5b` Reuse quick-start stored settings
+- `6413a34` Simplify channel color sections
+- `15569fc` Refactor Property Inspector settings state
+- `4adcfcd` Rename Property Inspector global settings vocabulary
+- `56911d9` Cache scheduler group keys
+- `3ae06db` Consolidate duration performance stats
 
 Naming baseline: use `.agents/skills/naming-guidance/SKILL.md` as the source
 of truth for current vocabulary. Current code uses `view-updates`,
@@ -1088,31 +1107,34 @@ These can be handled opportunistically only if they are in the same touched file
 
 ## Execution Order
 
-Use small PRs. Characterization tests land before refactors.
+Status: completed.
+
+The completed work used small PRs. Characterization tests landed before
+refactors where behavior was not already covered.
 
 Runner and `MetricAction` are independent tracks as long as `setMetricView()` and `clearMetricViewState()` wrapper exports stay stable. Do not interleave implementation PRs within one track.
 
 Runner track:
 
-1. Add runner characterization tests against the existing module exports only.
-2. Introduce `MetricViewUpdateRunner` as a mechanical state move; runner tests stay green.
+1. Completed: add runner characterization tests against the existing module exports only.
+2. Completed: introduce `MetricViewUpdateRunner` as a mechanical state move; runner tests stay green.
 
 `MetricAction` track:
 
-1. Add `MetricAction` characterization tests only.
-2. Introduce `SchedulerBinding`.
-3. Introduce runtime cache ownership cleanup and browser-safe deep equality.
-4. Remove `metricReaderBySourceScopeId`.
+1. Completed: add `MetricAction` characterization tests only.
+2. Completed: introduce `SchedulerBinding`.
+3. Completed: introduce runtime cache ownership cleanup and browser-safe deep equality.
+4. Completed: remove `metricReaderBySourceScopeId`.
 
 Remaining low-coupling work:
 
-1. Fix `MetricStore` scalar/text record shape.
-2. Avoid PI context double decode.
-3. Clean up `ColorSettings.tsx` wrappers.
-4. Refactor `usePropertyInspectorSettings` to reducer state.
-5. Clean up `App.tsx` tab buttons.
-6. Cache scheduler group keys if still worthwhile.
-7. Consolidate performance duration accumulators.
+1. Completed: fix `MetricStore` scalar/text record shape.
+2. Completed: avoid PI context double decode.
+3. Completed: clean up `ColorSettings.tsx` wrappers.
+4. Completed: refactor `usePropertyInspectorSettings` to reducer state.
+5. Completed: clean up `App.tsx` tab buttons and align PI settings vocabulary on `Global`.
+6. Completed: cache scheduler group keys.
+7. Completed: consolidate performance duration accumulators.
 
 ## Verification
 
