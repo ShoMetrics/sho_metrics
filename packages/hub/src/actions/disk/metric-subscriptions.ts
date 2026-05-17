@@ -1,5 +1,7 @@
 import {
+    getDefaultDiskUsageMetricKey,
     getDiskThroughputMetricKey,
+    getDiskVolumeMetricKey,
 } from "../../runtime/disk-metric-keys";
 import type {
     DiskThroughputDirection as DiskThroughputDisplayDirection,
@@ -10,6 +12,18 @@ export interface DiskMetricSubscriptionSettings {
     diskMetricKind: "usage" | "throughput";
     graphicType: SingleMetricViewLayout;
     diskThroughputDirection: DiskThroughputDisplayDirection;
+}
+
+export function resolveDiskUsageMetricSubscriptionKeys(volumeId: string | undefined): readonly string[] {
+    if (volumeId && volumeId.length > 0) {
+        return [
+            getDiskVolumeMetricKey("used", volumeId),
+            getDiskVolumeMetricKey("total", volumeId),
+            getDiskVolumeMetricKey("available", volumeId),
+        ];
+    }
+
+    return [getDefaultDiskUsageMetricKey("used"), getDefaultDiskUsageMetricKey("total"), getDefaultDiskUsageMetricKey("available")];
 }
 
 export function resolveDiskMetricSubscriptionKeys(settings: DiskMetricSubscriptionSettings): readonly string[] {

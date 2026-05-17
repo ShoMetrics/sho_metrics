@@ -1,6 +1,29 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveDiskMetricSubscriptionKeys } from "./disk/metric-subscriptions";
+import {
+    resolveDiskMetricSubscriptionKeys,
+    resolveDiskUsageMetricSubscriptionKeys,
+} from "./disk/metric-subscriptions";
+
+test("disk usage automatic volume subscribes to default usage keys", () => {
+    const subscriptionKeys = resolveDiskUsageMetricSubscriptionKeys(undefined);
+
+    assert.deepEqual(subscriptionKeys, [
+        "disk.usage.used",
+        "disk.usage.total",
+        "disk.usage.available",
+    ]);
+});
+
+test("disk usage explicit volume subscribes to volume usage keys", () => {
+    const subscriptionKeys = resolveDiskUsageMetricSubscriptionKeys("E:\\");
+
+    assert.deepEqual(subscriptionKeys, [
+        "disk.volume.E%3A%5C.used",
+        "disk.volume.E%3A%5C.total",
+        "disk.volume.E%3A%5C.available",
+    ]);
+});
 
 test("disk throughput sparkline both mode subscribes to read and write", () => {
     const subscriptionKeys = resolveDiskMetricSubscriptionKeys({

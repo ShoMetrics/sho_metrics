@@ -1,4 +1,3 @@
-import { networkInterfaceRegistry } from "../../runtime/network-interfaces";
 import {
     getNetworkAggregateMetricKey,
     getNetworkInterfaceMetricKey,
@@ -12,27 +11,28 @@ export interface NetworkMetricSubscriptionSettings {
 }
 
 export function resolveNetworkMetricSubscriptionKeys(settings: NetworkMetricSubscriptionSettings): readonly string[] {
-    const selectedNetworkInterface = networkInterfaceRegistry.resolveSelection(settings.networkInterfaceId);
     const displayDirection = settings.networkDirection;
 
     if (
         settings.graphicType === "linear"
         || displayDirection === "both"
     ) {
-        return selectedNetworkInterface
-            ? [
-                getNetworkInterfaceMetricKey("upload", selectedNetworkInterface.id),
-                getNetworkInterfaceMetricKey("download", selectedNetworkInterface.id),
-            ]
-            : [
-                getNetworkAggregateMetricKey("upload"),
-                getNetworkAggregateMetricKey("download"),
-            ];
+        return [
+            resolveNetworkMetricKey("upload", settings.networkInterfaceId),
+            resolveNetworkMetricKey("download", settings.networkInterfaceId),
+        ];
     }
 
     return [
-        selectedNetworkInterface
-            ? getNetworkInterfaceMetricKey(displayDirection, selectedNetworkInterface.id)
-            : getNetworkAggregateMetricKey(displayDirection),
+        resolveNetworkMetricKey(displayDirection, settings.networkInterfaceId),
     ];
+}
+
+function resolveNetworkMetricKey(
+    direction: Exclude<NetworkDirection, "both">,
+    networkInterfaceId: string,
+): string {
+    return networkInterfaceId.length > 0
+        ? getNetworkInterfaceMetricKey(direction, networkInterfaceId)
+        : getNetworkAggregateMetricKey(direction);
 }

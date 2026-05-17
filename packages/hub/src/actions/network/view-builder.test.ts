@@ -1,0 +1,114 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import type { WillAppearEvent } from "@elgato/streamdeck";
+import { MetricStore } from "../../runtime/metric-store";
+import {
+    getNetworkAggregateMetricKey,
+    getNetworkInterfaceMetricKey,
+} from "../../runtime/network-metric-keys";
+import type { NetworkInterfaceOption } from "../../runtime/network-interfaces";
+import { LOCAL_SOURCE_SCOPE_ID } from "../../runtime/sources/metric-read-plan";
+import { buildMetricSnapshot, buildScalarMetricValue } from "../../runtime/sources/source.interface";
+import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
+import { writeStoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
+import { resolveInitialActionSettings } from "../settings/action-settings-resolver";
+import { buildNetworkDisplayUpdate } from "./view-builder";
+
+test("network automatic interface reads aggregate keys after registry selection", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
+        {
+            appearance: {
+                graph: { viewLayout: "sparkline" },
+            },
+            network: {
+                direction: "download",
+            },
+        },
+    );
+    const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
+    const target = settings.widget.slot.metric.target;
+
+    assert.equal(target.domain, "network");
+    if (target.domain !== "network") {
+        assert.fail("Expected network target.");
+    }
+
+    const metricStore = new MetricStore();
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        sourceId: "test",
+        timestampMilliseconds: 1000,
+        metrics: {
+            [getNetworkAggregateMetricKey("download")]: buildScalarMetricValue(1234, { unit: "B/s" }),
+        },
+    }));
+
+    const displayUpdate = buildNetworkDisplayUpdate({
+        event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
+        settings,
+        target,
+        metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
+        selectedNetworkInterface: buildNetworkInterfaceOption("Ethernet"),
+    });
+    const widgetData = displayUpdate.displayOptions.widgetData;
+
+    assert.equal(displayUpdate.displayOptions.metricKey, getNetworkAggregateMetricKey("download"));
+    if ("positive" in widgetData) {
+        assert.fail("Expected single metric network display.");
+    }
+    assert.equal(widgetData.sampleTimestampMilliseconds, 1000);
+    assert.equal(widgetData.current, 1234);
+});
+
+test("network explicit interface reads interface keys without registry selection", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
+        {
+            appearance: {
+                graph: { viewLayout: "sparkline" },
+            },
+            network: {
+                direction: "download",
+                interfaceId: "Ethernet",
+            },
+        },
+    );
+    const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
+    const target = settings.widget.slot.metric.target;
+
+    assert.equal(target.domain, "network");
+    if (target.domain !== "network") {
+        assert.fail("Expected network target.");
+    }
+
+    const metricStore = new MetricStore();
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        sourceId: "test",
+        timestampMilliseconds: 1000,
+        metrics: {
+            [getNetworkInterfaceMetricKey("download", "Ethernet")]: buildScalarMetricValue(5678, { unit: "B/s" }),
+        },
+    }));
+
+    const displayUpdate = buildNetworkDisplayUpdate({
+        event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
+        settings,
+        target,
+        metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
+        selectedNetworkInterface: null,
+    });
+    const widgetData = displayUpdate.displayOptions.widgetData;
+
+    assert.equal(displayUpdate.displayOptions.metricKey, getNetworkInterfaceMetricKey("download", "Ethernet"));
+    if ("positive" in widgetData) {
+        assert.fail("Expected single metric network display.");
+    }
+    assert.equal(widgetData.sampleTimestampMilliseconds, 1000);
+    assert.equal(widgetData.current, 5678);
+});
+
+function buildNetworkInterfaceOption(id: string): NetworkInterfaceOption {
+    return {
+        id,
+        name: id,
+        type: "wired",

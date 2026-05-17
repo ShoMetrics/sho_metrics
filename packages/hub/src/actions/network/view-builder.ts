@@ -72,7 +72,7 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
         };
     }
 
-    const networkMetricKey = getNetworkMetricKey(displayDirection, options.selectedNetworkInterface);
+    const networkMetricKey = getNetworkMetricKey(displayDirection, options.target.interfaceId);
     const sourceWidgetData = options.metrics.getWidgetData(
         networkMetricKey,
         getNetworkDirectionLabel(displayDirection),
@@ -162,8 +162,8 @@ export function resolveNetworkMaximumMegabitsPerSecond(
 function buildDualNetworkCircularDisplayOptions(
     options: BuildNetworkDisplayOptions & { dualGraphicType: "circular" | "text" },
 ): MetricDisplayOptions {
-    const uploadMetricKey = getNetworkMetricKey("upload", options.selectedNetworkInterface);
-    const downloadMetricKey = getNetworkMetricKey("download", options.selectedNetworkInterface);
+    const uploadMetricKey = getNetworkMetricKey("upload", options.target.interfaceId);
+    const downloadMetricKey = getNetworkMetricKey("download", options.target.interfaceId);
     const uploadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
             uploadMetricKey,
@@ -242,8 +242,8 @@ function buildDualNetworkCircularDisplayOptions(
 }
 
 function buildDualNetworkSparklineDisplayOptions(options: BuildNetworkDisplayOptions): MetricDisplayOptions {
-    const uploadMetricKey = getNetworkMetricKey("upload", options.selectedNetworkInterface);
-    const downloadMetricKey = getNetworkMetricKey("download", options.selectedNetworkInterface);
+    const uploadMetricKey = getNetworkMetricKey("upload", options.target.interfaceId);
+    const downloadMetricKey = getNetworkMetricKey("download", options.target.interfaceId);
     const uploadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
             uploadMetricKey,
@@ -315,8 +315,8 @@ function buildDualNetworkSparklineDisplayOptions(options: BuildNetworkDisplayOpt
 }
 
 function buildLinearNetworkDisplayOptions(options: BuildNetworkDisplayOptions): MetricDisplayOptions {
-    const uploadMetricKey = getNetworkMetricKey("upload", options.selectedNetworkInterface);
-    const downloadMetricKey = getNetworkMetricKey("download", options.selectedNetworkInterface);
+    const uploadMetricKey = getNetworkMetricKey("upload", options.target.interfaceId);
+    const downloadMetricKey = getNetworkMetricKey("download", options.target.interfaceId);
     const uploadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
             uploadMetricKey,
@@ -423,10 +423,10 @@ function buildNetworkWidgetData(options: {
 
 function getNetworkMetricKey(
     direction: NetworkDirection,
-    selectedNetworkInterface: NetworkInterfaceOption | null,
+    networkInterfaceId: string | undefined,
 ): string {
-    return selectedNetworkInterface
-        ? getNetworkInterfaceMetricKey(direction, selectedNetworkInterface.id)
+    return networkInterfaceId && networkInterfaceId.length > 0
+        ? getNetworkInterfaceMetricKey(direction, networkInterfaceId)
         : getNetworkAggregateMetricKey(direction);
 }
 

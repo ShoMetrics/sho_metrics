@@ -5,6 +5,7 @@ import {
     getDefaultDiskUsageMetricKey,
     getDiskThroughputMetricKey,
     getDiskVolumeMetricKey,
+    type DiskUsageMetric,
     type DiskThroughputDirection,
 } from "../../runtime/disk-metric-keys";
 import { buildDiskThroughputWidgetData, buildDiskUsageWidgetData } from "../../metrics/storage-widget-data";
@@ -24,7 +25,6 @@ import {
 import {
     formatCompactDiskVolumeLabel,
     resolveAvailableDiskVolume,
-    resolveDiskVolumeSelectionId,
     type DiskVolumeSelection,
 } from "./volume-selection";
 import type { MetricDisplayOptions } from "../../metric-view-runner/runner";
@@ -76,16 +76,9 @@ function buildDiskUsageDisplayOptions(
     options: BuildDiskDisplayOptions & { reading: DiskUsageReading },
 ): MetricDisplayOptions {
     const selectedVolume = resolveAvailableDiskVolume(options.volumeSelection);
-    const selectedVolumeId = resolveDiskVolumeSelectionId(options.volumeSelection);
-    const usedMetricKey = selectedVolumeId
-        ? getDiskVolumeMetricKey("used", selectedVolumeId)
-        : getDefaultDiskUsageMetricKey("used");
-    const totalMetricKey = selectedVolumeId
-        ? getDiskVolumeMetricKey("total", selectedVolumeId)
-        : getDefaultDiskUsageMetricKey("total");
-    const availableMetricKey = selectedVolumeId
-        ? getDiskVolumeMetricKey("available", selectedVolumeId)
-        : getDefaultDiskUsageMetricKey("available");
+    const usedMetricKey = resolveDiskUsageMetricKey("used", options.target);
+    const totalMetricKey = resolveDiskUsageMetricKey("total", options.target);
+    const availableMetricKey = resolveDiskUsageMetricKey("available", options.target);
     const label = formatCompactDiskVolumeLabel(options.volumeSelection);
     const usedBytesWidgetData = options.volumeSelection.kind === "unavailable"
         ? buildUnavailableDiskBytesWidgetData(label)
@@ -296,6 +289,12 @@ function resolveDiskLinearLabel(
     }
 
     return buildDiskLinearLabel(diskVolume, fallbackLabel);
+}
+
+function resolveDiskUsageMetricKey(metric: DiskUsageMetric, target: ResolvedDiskMetricTarget): string {
+    return target.volumeId && target.volumeId.length > 0
+        ? getDiskVolumeMetricKey(metric, target.volumeId)
+        : getDefaultDiskUsageMetricKey(metric);
 }
 
 function resolveCompactDiskStorageLabel(diskVolume: DiskVolumeOption): string {
