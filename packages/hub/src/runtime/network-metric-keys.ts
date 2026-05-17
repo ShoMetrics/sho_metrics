@@ -15,6 +15,15 @@ export function getNetworkInterfaceMetricKey(direction: NetworkDirection, interf
     return `${getNetworkAggregateMetricKey(direction)}.${encodeURIComponent(interfaceId)}`;
 }
 
+export function resolveNetworkMetricKey(
+    direction: Exclude<NetworkDirection, "both">,
+    interfaceId: string | undefined,
+): string {
+    return interfaceId && interfaceId.length > 0
+        ? getNetworkInterfaceMetricKey(direction, interfaceId)
+        : getNetworkAggregateMetricKey(direction);
+}
+
 export function isNetworkMetricKey(metricKey: string): boolean {
     return metricKey.startsWith(NETWORK_METRIC_PREFIX);
 }

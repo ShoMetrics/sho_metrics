@@ -14,6 +14,15 @@ export function getDiskVolumeMetricKey(metric: DiskUsageMetric, volumeId: string
     return `${DISK_VOLUME_PREFIX}.${encodeURIComponent(volumeId)}.${metric}`;
 }
 
+export function resolveDiskUsageMetricKey(
+    metric: DiskUsageMetric,
+    volumeId: string | undefined,
+): string {
+    return volumeId && volumeId.length > 0
+        ? getDiskVolumeMetricKey(metric, volumeId)
+        : getDefaultDiskUsageMetricKey(metric);
+}
+
 export function getDiskThroughputMetricKey(direction: DiskThroughputDirection): string {
     return `${DISK_THROUGHPUT_PREFIX}.${direction}`;
 }
