@@ -3,7 +3,7 @@ import type { MetricStoreReader } from "../../runtime/metric-store";
 import type { NetworkInterfaceOption } from "../../runtime/network-interfaces";
 import {
     resolveNetworkMetricKey,
-    type NetworkDirection,
+    type NetworkMetricDirection,
 } from "../../runtime/network-metric-keys";
 import type { WidgetData } from "../../view-rendering/widget-data";
 import { resolveColorForThresholdValue, type ColorConfig } from "../../view-rendering/color-resolver";
@@ -30,7 +30,7 @@ export interface NetworkViewUpdate {
 }
 
 export interface NetworkViewDebugInfo {
-    direction: NetworkDirection;
+    direction: NetworkMetricDirection;
     networkMetricKey: string;
     sourceWidgetData: WidgetData;
     viewWidgetData: WidgetData;
@@ -132,14 +132,14 @@ export function buildNetworkViewUpdate(options: BuildNetworkViewOptions): Networ
 }
 
 export function resolveNetworkMaximumBytesPerSecond(
-    direction: NetworkDirection,
+    direction: NetworkMetricDirection,
     target: ResolvedNetworkMetricTarget,
 ): number {
     return convertMegabitsPerSecondToBytesPerSecond(resolveNetworkMaximumMegabitsPerSecond(direction, target));
 }
 
 export function resolveNetworkMaximumMegabitsPerSecond(
-    direction: NetworkDirection,
+    direction: NetworkMetricDirection,
     target: ResolvedNetworkMetricTarget,
 ): number {
     const customMaximumMegabitsPerSecond = direction === "download"
@@ -406,7 +406,7 @@ function buildBarNetworkViewOptions(options: BuildNetworkViewOptions): MetricVie
 
 function buildNetworkWidgetData(options: {
     sourceWidgetData: WidgetData;
-    direction: NetworkDirection;
+    direction: NetworkMetricDirection;
     target: ResolvedNetworkMetricTarget;
 }): WidgetData {
     return buildNetworkSpeedWidgetData({
@@ -420,13 +420,13 @@ function buildNetworkWidgetData(options: {
     });
 }
 
-function getNetworkDirectionLabel(direction: NetworkDirection): string {
+function getNetworkDirectionLabel(direction: NetworkMetricDirection): string {
     return direction === "download" ? ARC_GAUGE_LABELS.download : ARC_GAUGE_LABELS.upload;
 }
 
 function buildNetworkCenterIconFragment(options: {
     circleVariant: "full-ring" | "minimal" | "gauge";
-    direction: NetworkDirection;
+    direction: NetworkMetricDirection;
     selectedNetworkInterface: NetworkInterfaceOption | null;
 }): string {
     if (options.circleVariant === "minimal") {
@@ -443,7 +443,7 @@ function buildNetworkCenterIconFragment(options: {
 }
 
 function resolveNetworkWidgetChannelColor(
-    direction: NetworkDirection,
+    direction: NetworkMetricDirection,
     settings: ResolvedWidgetSettings,
     widgetData: WidgetData,
 ): string {
@@ -451,7 +451,7 @@ function resolveNetworkWidgetChannelColor(
 }
 
 function buildNetworkChannelColorConfig(
-    direction: NetworkDirection,
+    direction: NetworkMetricDirection,
     settings: ResolvedWidgetSettings,
 ): ColorConfig {
     if (direction === "download") {

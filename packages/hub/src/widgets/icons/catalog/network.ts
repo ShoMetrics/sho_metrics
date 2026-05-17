@@ -2,7 +2,7 @@ import { ChevronsLeftRightEllipsis, Download, GlobeOff, Network, Upload, Wifi } 
 import type { IconNode } from "lucide";
 import type { ArcGaugeStatusIcon } from "../../primitives/arc-gauge";
 import type { NetworkInterfaceOption } from "../../../runtime/network-interfaces";
-import type { NetworkDirection } from "../../../runtime/network-metric-keys";
+import type { NetworkMetricDirection } from "../../../runtime/network-metric-keys";
 import { createLucideIconDefinition } from "../sources/lucide";
 import { renderCenteredIconFragment } from "../render-icon";
 
@@ -10,7 +10,7 @@ const NETWORK_DIRECTION_STATUS_SIZE_RATIO = 2.15;
 const NETWORK_DIRECTION_STATUS_OPTICAL_Y_OFFSET_RATIO = 0.55;
 
 export function renderNetworkDirectionIconFragment(options: {
-    direction: NetworkDirection;
+    direction: NetworkMetricDirection;
     color?: string;
     size: number;
 }): string {
@@ -26,7 +26,7 @@ export function renderNetworkDirectionIconFragment(options: {
 }
 
 export function getNetworkDirectionStatusIcon(options: {
-    direction: NetworkDirection;
+    direction: NetworkMetricDirection;
     color?: string;
 }): ArcGaugeStatusIcon {
     return {

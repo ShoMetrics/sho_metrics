@@ -13,6 +13,15 @@ DO treat these layers as separate owners:
   selects which SVG widget draws the metric, use `renderPrimitive`.
 - WidgetData Field: renderer input data consumed by renderer contracts.
 
+Stored settings and resolved settings are intentionally different contracts:
+
+- `Stored*`: sparse persisted user intent from proto/storage.
+- `Resolved*`: complete runtime settings after defaults, global overrides, and
+  runtime facts have been applied.
+
+`Resolved*` is not historical vocabulary. Do not rename it as part of metric
+view cleanup.
+
 ## Keyword Semantics
 
 - DO: Mandatory; there is almost never a valid reason to stray.
@@ -70,7 +79,7 @@ Currently allowed differences:
 | Theme + Theme Variant | `themePreset` | Renderer receives one concrete preset ID. Terminal `clean` / `vintage` variants are flattened to `terminal-clean` / `terminal-vintage` at the renderer boundary. |
 | Line runtime history scale | `sparklineScale` | Runtime renderer input data for the sparkline chart. It is not stored appearance intent and DON'T put it in proto/settings/resolved appearance settings. |
 | Two metric channels in one widget | `dual` | Renderer composition vocabulary for two channels, such as upload/download or read/write. It is not product/settings vocabulary unless a future product mode exposes it. |
-| Circle renderer branch | `arc-gauge` implementation owner | `circle` is the renderer contract value. `arc-gauge` is file/type vocabulary for the current SVG widget implementation and its helper modules, not a contract value. |
+| Circle renderer branch | `progress-circle` implementation owner | `circle` is the renderer contract value. `progress-circle` is file/type vocabulary for the concrete SVG widget implementation and its helper modules, not a contract value. |
 
 DON'T add another cross-boundary vocabulary difference without documenting the
 narrower or derived concept here first.
@@ -202,20 +211,20 @@ to the default renderer form.
 | Circle | `AppearanceViewSettings.selected_view = METRIC_VIEW_CIRCLE`; circle variants live under `circle_variant` | `appearance.view.selectedView = "circle"`; `appearance.view.circleVariant` | `renderPrimitive = "circle"` | No circle-only WidgetData field. Circle-specific behavior is renderer config, not metric data. |
 
 `bar` is a product concept and may appear in settings, resolved settings, and
-renderer contracts when the concept is the Bar family. `linear` is renderer
-geometry vocabulary and DON'T use it in product/settings.
+renderer contracts when the concept is the Bar family. The current concrete Bar
+widget implementation should use `progress-bar`, not `bar` or `linear-bar`.
+`bar` stays the family root; `progress-bar` names the concrete horizontal
+progress form; future concrete forms can use names such as `volume-bar`.
 
 `circle` is a product concept and the renderer branch name. The current
-implementation owner is `arc-gauge`, but that name is implementation-local
-vocabulary rather than the target renderer contract value. DON'T rename
-`arc-gauge.ts`, `ArcGauge*`, `arc-gauge-range.ts`, or
-`dual-channel-arc-gauge.ts` as part of the renderer contract rename. Revisit
-that owner separately only if the name leaks across renderer contract boundaries
-or remains misleading after `circleVariant` is fully aligned.
+concrete Circle widget implementation should use `progress-circle`, not
+`circle` or `arc-gauge`. `circle` stays the family root; `progress-circle`
+names the concrete progress-along-a-circular-path form; future concrete forms
+can use names such as `volume-circle` or `concentric-circle`.
 
-When adding a new SVG widget file in the Circle family, name it after its
-concrete visual form, such as `ring` or `square-progress`, not after the family
-root `circle`. The family root stays reserved for the renderer contract value.
+When adding a new SVG widget file in a Product View family, name it after its
+concrete form, not after the family root. The family root stays reserved for
+product/settings and the renderer branch value.
 
 ## Circle Variant Mapping
 
@@ -286,16 +295,16 @@ DO use these directory owners:
 PREFER adding new files to the nearest existing owner. DON'T create another
 top-level rendering or update directory unless the owner is genuinely new.
 
-## Remaining Implementation Owner Decisions
+## Pending Implementation Owner Renames
 
-These are real naming concerns, but they are implementation-owner questions,
-not direct product/settings/renderer contract renames. Do not execute them as
-part of a contract rename without a separate owner plan.
+These are implementation-owner renames, not product/settings/renderer contract
+renames. Execute them as separate small changes after the contract vocabulary is
+stable.
 
-| Current Name | Location | Problem | Decision Needed |
+| Current Name | Target Name | Location | Reason |
 |---|---|---|---|
-| `linear-bar` / `linearBar` primitive owner | `packages/hub/src/widgets/primitives/linear-bar.ts` | Implementation owner still uses `linear` for the Bar renderer branch. `linear` competes with the Line product view. | Decide whether the primitive owner uses the Bar root or stays as a lower-level geometry owner with an explicit boundary note after the renderer contract uses `renderPrimitive = "bar"`. |
-| `arc-gauge` / `ArcGauge*` primitive owner | `packages/hub/src/widgets/primitives/arc-gauge.ts` | Implementation owner differs from the Product and renderer branch name `circle`. `gauge` is one Circle variant, not the whole Circle family. | DON'T include this in the renderer contract rename. Treat it as implementation-owner vocabulary and revisit separately only if it leaks across contract boundaries or remains misleading after `circleVariant` is fully aligned. |
+| `linear-bar` / `linearBar` primitive owner | `progress-bar` / `progressBar` | `packages/hub/src/widgets/primitives/linear-bar.ts` | `linear` competes with the Line product view. `progress-bar` names the current concrete horizontal progress form while keeping `bar` for the family root. |
+| `arc-gauge` / `ArcGauge*` primitive owner | `progress-circle` / `ProgressCircle*` | `packages/hub/src/widgets/primitives/arc-gauge.ts` | `gauge` is one Circle variant, not the whole Circle family. `progress-circle` names the current concrete circular progress form while keeping `circle` for the family root. |
 
 ## Guardrails
 

@@ -13,7 +13,7 @@ import {
     getNetworkAggregateMetricKey,
     getNetworkInterfaceMetricKey,
     isNetworkMetricKey,
-    type NetworkDirection,
+    type NetworkMetricDirection,
 } from "../network-metric-keys";
 import { diskVolumeRegistry, type DiskVolumeOption } from "../disk-volumes";
 import {
@@ -437,7 +437,7 @@ export class NodeSystemSource implements MetricSource {
 
     private calculateNetworkRate(options: {
         interfaceId: string;
-        direction: NetworkDirection;
+        direction: NetworkMetricDirection;
         currentBytes: number;
         currentTimestampMilliseconds: number;
     }): NodeSystemNetworkRateCalculation {

@@ -7,7 +7,7 @@ import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../runtim
 import {
     getNetworkAggregateMetricKey,
     resolveNetworkMetricKey,
-    type NetworkDirection,
+    type NetworkMetricDirection,
 } from "../runtime/network-metric-keys";
 import { resolveNetworkMetricSubscriptionKeys } from "./network/metric-subscriptions";
 import type { ResolvedNetworkMetricTarget } from "../settings/resolved-settings";
@@ -177,7 +177,7 @@ function formatNetworkInterfaceDebugValue(networkInterface: NetworkInterfaceOpti
 }
 
 function resolveRuntimeNetworkMaximumMegabitsPerSecond(options: {
-    direction: NetworkDirection;
+    direction: NetworkMetricDirection;
     target: ResolvedNetworkMetricTarget;
     observedBytesPerSecond: number;
 }): number {

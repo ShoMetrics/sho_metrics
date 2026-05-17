@@ -1,6 +1,6 @@
 import type { Systeminformation } from "systeminformation";
 import { type NetworkInterfaceOption } from "../network-interfaces";
-import type { NetworkDirection } from "../network-metric-keys";
+import type { NetworkMetricDirection } from "../network-metric-keys";
 import type {
     NodeSystemNetworkCounterSample,
     NodeSystemNetworkRateCalculation,
@@ -30,7 +30,7 @@ interface NetworkStatDebug {
 
 interface NetworkRateCalculationDebug {
     interfaceId: string;
-    direction: NetworkDirection;
+    direction: NetworkMetricDirection;
     currentBytes: number;
     previousBytes: number | null;
     bytesDelta: number | null;
@@ -159,7 +159,7 @@ export function formatRawNetworkInterfaceDebug(
 
 export function calculateNetworkRate(options: {
     interfaceId: string;
-    direction: NetworkDirection;
+    direction: NetworkMetricDirection;
     currentBytes: number;
     currentTimestampMilliseconds: number;
     previousSample: NodeSystemNetworkCounterSample | undefined;
