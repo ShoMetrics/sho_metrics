@@ -30,13 +30,13 @@ import {
 import {
     initialSettingsSyncState,
     settingsSyncReducer,
-    type InspectorPluginSettingsRead,
+    type InspectorGlobalSettingsRead,
     type InspectorWidgetSettingsRead,
     type SettingsNotice,
     type SettingsSyncDispatch,
 } from "./settings-sync-state";
 
-type SettingsScope = "widget" | "plugin";
+type SettingsScope = "widget" | "global";
 
 interface SettingsInputSnapshot {
     readonly actionKind: ActionKind;
@@ -129,11 +129,11 @@ export function usePropertyInspectorSettings(
             patch,
         );
         updateSettingsInputSnapshot(settingsInputSnapshotRef, { rawGlobalSettings: nextRawGlobalSettings });
-        dispatchSettingsAction({ type: "pluginSettingsPatched", rawGlobalSettings: nextRawGlobalSettings });
+        dispatchSettingsAction({ type: "globalSettingsPatched", rawGlobalSettings: nextRawGlobalSettings });
 
         client.setGlobalSettings(nextRawGlobalSettings).catch((error: Error) => {
             dispatchSettingsAction({
-                type: "pluginSaveFailed",
+                type: "globalSaveFailed",
                 errorMessage: error.message,
             });
         });
@@ -178,7 +178,7 @@ export function usePropertyInspectorSettings(
         widgetSettingsStatus: state.widgetSettingsStatus,
         globalSettingsStatus: state.globalSettingsStatus,
         widgetSettingsNotice: state.widgetSettingsNotice,
-        pluginSettingsNotice: state.pluginSettingsNotice,
+        globalSettingsNotice: state.globalSettingsNotice,
         updateWidgetSettings,
         resetWidgetSettings,
         updateGlobalSettings,
@@ -259,21 +259,21 @@ async function refreshGlobalSettings(
             return;
         }
 
-        const pluginSettingsRead = readInspectorPluginSettings(payload.settings);
-        writeSettingsReadWarningLog(client, "plugin", pluginSettingsRead.readWarning);
+        const globalSettingsRead = readInspectorGlobalSettings(payload.settings);
+        writeSettingsReadWarningLog(client, "global", globalSettingsRead.readWarning);
         updateSettingsInputSnapshot(settingsInputSnapshotRef, {
-            rawGlobalSettings: pluginSettingsRead.rawGlobalSettings,
+            rawGlobalSettings: globalSettingsRead.rawGlobalSettings,
         });
         dispatchSettingsAction({
-            type: "pluginSettingsRead",
-            read: pluginSettingsRead,
+            type: "globalSettingsRead",
+            read: globalSettingsRead,
         });
     } catch {
         if (isDisposed()) {
             return;
         }
 
-        dispatchSettingsAction({ type: "pluginLoadFailed" });
+        dispatchSettingsAction({ type: "globalLoadFailed" });
     }
 }
 
@@ -305,14 +305,14 @@ function subscribePropertyInspectorEvents(
             return;
         }
 
-        const pluginSettingsRead = readInspectorPluginSettings(event.payload.settings);
-        writeSettingsReadWarningLog(client, "plugin", pluginSettingsRead.readWarning);
+        const globalSettingsRead = readInspectorGlobalSettings(event.payload.settings);
+        writeSettingsReadWarningLog(client, "global", globalSettingsRead.readWarning);
         updateSettingsInputSnapshot(settingsInputSnapshotRef, {
-            rawGlobalSettings: pluginSettingsRead.rawGlobalSettings,
+            rawGlobalSettings: globalSettingsRead.rawGlobalSettings,
         });
         dispatchSettingsAction({
-            type: "pluginSettingsRead",
-            read: pluginSettingsRead,
+            type: "globalSettingsRead",
+            read: globalSettingsRead,
         });
     });
 
@@ -352,12 +352,12 @@ function readInspectorWidgetSettings(
     };
 }
 
-function readInspectorPluginSettings(rawGlobalSettings: unknown): InspectorPluginSettingsRead {
+function readInspectorGlobalSettings(rawGlobalSettings: unknown): InspectorGlobalSettingsRead {
     const globalSettingsRead = readStoredGlobalSettings(rawGlobalSettings);
 
     return {
         rawGlobalSettings: writeStoredGlobalSettings(globalSettingsRead.settings),
-        notice: readWarningNotice("plugin", globalSettingsRead.warning),
+        notice: readWarningNotice("global", globalSettingsRead.warning),
         readWarning: globalSettingsRead.warning,
     };
 }
@@ -377,7 +377,7 @@ function updateSettingsInputSnapshot(
 
 function writeSettingsReadWarningLog(
     client: StreamDeckPropertyInspectorClient,
-    settingsScope: "widget" | "plugin",
+    settingsScope: SettingsScope,
     warning: StoredSettingsReadWarning | null,
 ): void {
     if (!warning) {
@@ -399,7 +399,7 @@ function readWarningNotice(
         return null;
     }
 
-    const label = settingsScope === "widget" ? "Widget" : "Plugin";
+    const label = settingsScope === "widget" ? "Widget" : "Global";
 
     if (warning.reason === "unknownFieldsDiscarded") {
         return {

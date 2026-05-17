@@ -700,8 +700,8 @@ type SettingsSyncAction =
         readonly read: InspectorWidgetSettingsRead;
     }
     | {
-        readonly type: "pluginSettingsRead";
-        readonly read: InspectorPluginSettingsRead;
+        readonly type: "globalSettingsRead";
+        readonly read: InspectorGlobalSettingsRead;
     }
     | {
         readonly type: "runtimeCachePatch";
@@ -711,14 +711,14 @@ type SettingsSyncAction =
         readonly type: "widgetLoadFailed";
     }
     | {
-        readonly type: "pluginLoadFailed";
+        readonly type: "globalLoadFailed";
     }
     | {
         readonly type: "widgetSaveFailed";
         readonly errorMessage: string;
     }
     | {
-        readonly type: "pluginSaveFailed";
+        readonly type: "globalSaveFailed";
         readonly errorMessage: string;
     };
 
@@ -743,12 +743,12 @@ function settingsSyncReducer(
                 widgetSettingsStatus: "ready",
                 widgetSettingsNotice: action.read.notice,
             };
-        case "pluginSettingsRead":
+        case "globalSettingsRead":
             return {
                 ...state,
                 rawGlobalSettings: action.read.rawGlobalSettings,
                 globalSettingsStatus: "ready",
-                pluginSettingsNotice: action.read.notice,
+                globalSettingsNotice: action.read.notice,
             };
         case "runtimeCachePatch":
             return {
@@ -766,11 +766,11 @@ function settingsSyncReducer(
                 widgetSettingsStatus: "failed",
                 widgetSettingsNotice: settingsLoadFailureNotice("widget"),
             };
-        case "pluginLoadFailed":
+        case "globalLoadFailed":
             return {
                 ...state,
                 globalSettingsStatus: "failed",
-                pluginSettingsNotice: settingsLoadFailureNotice("plugin"),
+                globalSettingsNotice: settingsLoadFailureNotice("global"),
             };
         case "widgetSaveFailed":
             return {
@@ -780,12 +780,12 @@ function settingsSyncReducer(
                     text: `Failed to save widget settings: ${action.errorMessage}`,
                 },
             };
-        case "pluginSaveFailed":
+        case "globalSaveFailed":
             return {
                 ...state,
-                pluginSettingsNotice: {
+                globalSettingsNotice: {
                     kind: "warning",
-                    text: `Failed to save plugin settings: ${action.errorMessage}`,
+                    text: `Failed to save global settings: ${action.errorMessage}`,
                 },
             };
         default:
@@ -829,7 +829,7 @@ Required tests:
 - async refresh updates state after first paint.
 - unmount before async refresh prevents dispatch.
 - `didReceiveSettings` updates widget state.
-- `didReceiveGlobalSettings` updates plugin state.
+- `didReceiveGlobalSettings` updates global settings state.
 - runtime cache IPC merges runtime state only.
 - save failure sets notice without rolling back optimistic UI state.
 - unknown runtime cache message is ignored.
@@ -846,12 +846,16 @@ Decision: accept as a low-risk cleanup.
 
 Target: replace duplicated button JSX with a typed tab list.
 
+Use `Widget` / `Global` as user-facing tab names. `Plugin` is an SDK/runtime
+identity term, while this tab edits global defaults and overrides that apply
+across widgets.
+
 Sample target shape:
 
 ```tsx
 const settingsTabs = [
     { id: "widget", label: "Widget" },
-    { id: "plugin", label: "Plugin" },
+    { id: "global", label: "Global" },
 ] as const;
 
 type SettingsTabId = typeof settingsTabs[number]["id"];
@@ -882,7 +886,7 @@ export function App({ client }: AppProps): React.JSX.Element {
 Required tests:
 
 - default active tab is widget.
-- clicking plugin activates plugin tab.
+- clicking global activates global tab.
 - `aria-selected` and `data-selected` remain correct.
 - active tab chooses the matching notice.
 

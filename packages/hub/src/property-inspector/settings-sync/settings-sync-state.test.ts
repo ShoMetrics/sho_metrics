@@ -4,7 +4,7 @@ import type { DiskVolumeOption } from "../../runtime/disk-volumes";
 import {
     initialSettingsSyncState,
     settingsSyncReducer,
-    type InspectorPluginSettingsRead,
+    type InspectorGlobalSettingsRead,
     type InspectorWidgetSettingsRead,
 } from "./settings-sync-state";
 
@@ -24,16 +24,16 @@ test("connectionLoaded sets action metadata and marks widget settings ready", ()
     assert.equal(nextState.widgetSettingsNotice, null);
 });
 
-test("pluginSettingsRead stores readable global settings", () => {
+test("globalSettingsRead stores readable global settings", () => {
     const rawGlobalSettings = { overrides: { enabled: true } };
     const nextState = settingsSyncReducer(initialSettingsSyncState, {
-        type: "pluginSettingsRead",
-        read: buildPluginSettingsRead({ rawGlobalSettings }),
+        type: "globalSettingsRead",
+        read: buildGlobalSettingsRead({ rawGlobalSettings }),
     });
 
     assert.equal(nextState.rawGlobalSettings, rawGlobalSettings);
     assert.equal(nextState.globalSettingsStatus, "ready");
-    assert.equal(nextState.pluginSettingsNotice, null);
+    assert.equal(nextState.globalSettingsNotice, null);
 });
 
 test("runtimeCachePatch merges runtime cache and marks disk volume options ready", () => {
@@ -74,8 +74,8 @@ test("load failures mark the matching settings scope failed", () => {
     const widgetFailedState = settingsSyncReducer(initialSettingsSyncState, {
         type: "widgetLoadFailed",
     });
-    const pluginFailedState = settingsSyncReducer(initialSettingsSyncState, {
-        type: "pluginLoadFailed",
+    const globalFailedState = settingsSyncReducer(initialSettingsSyncState, {
+        type: "globalLoadFailed",
     });
 
     assert.equal(widgetFailedState.widgetSettingsStatus, "failed");
@@ -83,10 +83,10 @@ test("load failures mark the matching settings scope failed", () => {
         widgetFailedState.widgetSettingsNotice?.text ?? "",
         /couldn't load this widget's saved settings/,
     );
-    assert.equal(pluginFailedState.globalSettingsStatus, "failed");
+    assert.equal(globalFailedState.globalSettingsStatus, "failed");
     assert.match(
-        pluginFailedState.pluginSettingsNotice?.text ?? "",
-        /couldn't load plugin settings/,
+        globalFailedState.globalSettingsNotice?.text ?? "",
+        /couldn't load global settings/,
     );
 });
 
@@ -100,9 +100,9 @@ function buildWidgetSettingsRead(
     };
 }
 
-function buildPluginSettingsRead(
-    options: Partial<InspectorPluginSettingsRead> = {},
-): InspectorPluginSettingsRead {
+function buildGlobalSettingsRead(
+    options: Partial<InspectorGlobalSettingsRead> = {},
+): InspectorGlobalSettingsRead {
     return {
         rawGlobalSettings: options.rawGlobalSettings ?? {},
         notice: options.notice ?? null,
