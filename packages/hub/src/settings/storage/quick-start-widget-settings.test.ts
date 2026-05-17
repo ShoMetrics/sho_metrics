@@ -10,10 +10,23 @@ import {
     type StoredWidgetSettings,
 } from "../../generated/shometrics/v1/settings_pb";
 import type { ActionKind } from "../../shared/stream-deck-actions";
-import { readStoredWidgetSettings } from "./codec";
 import { resolveQuickStartStoredWidgetSettings } from "./quick-start-widget-settings";
 
 describe("quick-start stored widget settings", () => {
+    it("preserves unknown action raw settings without requesting persistence", () => {
+        const rawSettings = {
+            preferences: {
+                pollingFrequencySeconds: 30,
+            },
+        };
+        const quickStartSettings = resolveQuickStartStoredWidgetSettings(rawSettings, "unknown");
+
+        assert.equal(quickStartSettings.rawSettings, rawSettings);
+        assert.equal(quickStartSettings.settingsJsonToPersist, null);
+        assert.equal(quickStartSettings.readWarning, null);
+        assert.equal(quickStartSettings.storedSettings.preferences?.pollingFrequencySeconds, 30);
+    });
+
     it("creates explicit default metric targets for domain actions", () => {
         const testCases: ReadonlyArray<{
             actionKind: Exclude<ActionKind, "unknown">;
@@ -73,11 +86,19 @@ describe("quick-start stored widget settings", () => {
 
         for (const testCase of testCases) {
             const quickStartSettings = resolveQuickStartStoredWidgetSettings(undefined, testCase.actionKind);
-            const storedSettings = readStoredWidgetSettings(quickStartSettings.rawSettings).settings;
 
             assert.equal(quickStartSettings.settingsJsonToPersist != null, true, testCase.actionKind);
-            testCase.verifyTarget(storedSettings);
+            testCase.verifyTarget(quickStartSettings.storedSettings);
         }
+    });
+
+    it("keeps existing metric targets without requesting persistence", () => {
+        const initialSettings = resolveQuickStartStoredWidgetSettings(undefined, "disk");
+        const quickStartSettings = resolveQuickStartStoredWidgetSettings(initialSettings.rawSettings, "network");
+
+        assert.equal(quickStartSettings.settingsJsonToPersist, null);
+        assert.equal(quickStartSettings.storedSettings.widget.case, "singleMetric");
+        assert.equal(quickStartSettings.storedSettings.widget.value.slot?.metric?.target.case, "disk");
     });
 
     it("keeps readable fields when unknown fields are discarded", () => {
@@ -87,12 +108,11 @@ describe("quick-start stored widget settings", () => {
             },
             unknownProtoJsonField: "future-value",
         }, "network");
-        const storedSettings = readStoredWidgetSettings(quickStartSettings.rawSettings).settings;
 
         assert.equal(quickStartSettings.readWarning?.reason, "unknownFieldsDiscarded");
-        assert.equal(storedSettings.preferences?.pollingFrequencySeconds, 30);
-        assert.equal(storedSettings.widget.case, "singleMetric");
-        assert.equal(storedSettings.widget.value.slot?.metric?.target.case, "network");
+        assert.equal(quickStartSettings.storedSettings.preferences?.pollingFrequencySeconds, 30);
+        assert.equal(quickStartSettings.storedSettings.widget.case, "singleMetric");
+        assert.equal(quickStartSettings.storedSettings.widget.value.slot?.metric?.target.case, "network");
     });
 
     it("loads quick-start defaults when settings cannot be read", () => {
@@ -101,11 +121,10 @@ describe("quick-start stored widget settings", () => {
                 pollingFrequencySeconds: 0,
             },
         }, "memory");
-        const storedSettings = readStoredWidgetSettings(quickStartSettings.rawSettings).settings;
 
         assert.equal(quickStartSettings.readWarning?.reason, "invalidSettingsDefaulted");
-        assert.equal(storedSettings.widget.case, "singleMetric");
-        assert.equal(storedSettings.widget.value.slot?.metric?.target.case, "memory");
+        assert.equal(quickStartSettings.storedSettings.widget.case, "singleMetric");
+        assert.equal(quickStartSettings.storedSettings.widget.value.slot?.metric?.target.case, "memory");
     });
 });
 
