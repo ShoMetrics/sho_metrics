@@ -1,5 +1,5 @@
 export type DiskUsageMetric = "used" | "total" | "available" | "percent";
-export type DiskThroughputDirection = "read" | "write" | "total";
+export type DiskThroughputMetricDirection = "read" | "write" | "total";
 
 const DEFAULT_DISK_USAGE_PREFIX = "disk.usage";
 const DISK_VOLUME_PREFIX = "disk.volume";
@@ -23,7 +23,7 @@ export function resolveDiskUsageMetricKey(
         : getDefaultDiskUsageMetricKey(metric);
 }
 
-export function getDiskThroughputMetricKey(direction: DiskThroughputDirection): string {
+export function getDiskThroughputMetricKey(direction: DiskThroughputMetricDirection): string {
     return `${DISK_THROUGHPUT_PREFIX}.${direction}`;
 }
 

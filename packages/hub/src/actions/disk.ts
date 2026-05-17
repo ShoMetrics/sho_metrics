@@ -7,7 +7,7 @@ import { diskVolumeRegistry, type DiskVolumeOption } from "../runtime/disk-volum
 import {
     getDefaultDiskUsageMetricKey,
     getDiskThroughputMetricKey,
-    type DiskThroughputDirection,
+    type DiskThroughputMetricDirection,
 } from "../runtime/disk-metric-keys";
 import {
     resolveDiskMetricSubscriptionKeys,
@@ -157,7 +157,7 @@ function resolveDiskVolumeSelection(volumeId: string | undefined): DiskVolumeSel
 }
 
 function resolveRuntimeDiskMaximumThroughputMebibytesPerSecond(options: {
-    direction: Exclude<DiskThroughputDirection, "both" | "total">;
+    direction: Exclude<DiskThroughputMetricDirection, "total">;
     reading: Extract<ResolvedDiskMetricTarget["reading"], { readonly kind: "throughput" }>;
     selectedVolume: DiskVolumeOption | null;
     observedBytesPerSecond: number;

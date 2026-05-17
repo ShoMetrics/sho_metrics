@@ -1,10 +1,10 @@
 import { HardDriveDownload, HardDriveUpload } from "lucide";
 import { createLucideIconDefinition } from "../sources/lucide";
 import { renderCenteredIconFragment } from "../render-icon";
-import type { DiskThroughputDirection } from "../../../runtime/disk-metric-keys";
+import type { DiskThroughputMetricDirection } from "../../../runtime/disk-metric-keys";
 
 export function renderDiskThroughputDirectionIconFragment(options: {
-    direction: Exclude<DiskThroughputDirection, "total">;
+    direction: Exclude<DiskThroughputMetricDirection, "total">;
     color?: string;
     size: number;
 }): string {
