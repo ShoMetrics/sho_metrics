@@ -2,14 +2,45 @@
 
 Date: 2026-05-17
 
-This document records the accepted and rejected items from the code review discussion, with the execution plan adjusted for the follow-up review. It is an implementation plan, not a request to change the settings architecture.
+This document records the accepted and rejected items from the code review discussion, with the execution plan adjusted for the follow-up review and the recent naming/proto cleanup. It is an implementation plan, not a request to change the settings architecture.
+
+Naming baseline: use `.agents/skills/naming-guidance/SKILL.md` as the source
+of truth for current vocabulary. Current code uses `view-updates`,
+`view-rendering`, `MetricView*` types, `setMetricView()` /
+`clearMetricViewState()`, `selectedView`, `circleVariant`, `renderPrimitive`,
+`themePreset`, `MetricSource`, and `widgets/widget-contract.ts`. Historical
+terms such as `display`, `metric-view-runner`, `rendering` as a directory name,
+`graphicType`, `layout` for user-selected appearance, `arc-gauge`, and
+`linear-bar` must not be copied into new code.
+
+## Recent 6h Commit Context
+
+The recent commit window contains broad naming and contract migrations. This
+plan has been updated around the new names, not the old review vocabulary.
+
+- Metric view appearance settings were renamed through the proto, storage,
+  resolver, PI, resolved settings, and renderer adapter path. The current
+  product/settings vocabulary is `MetricView`, `selectedView`, and
+  `circleVariant`; the renderer branch selector is `renderPrimitive`.
+- Metric view update APIs were renamed from `MetricDisplay*` style vocabulary
+  to `MetricView*`, including `setMetricView()` and `clearMetricViewState()`.
+- Directory boundaries moved from historical `metric-view-runner` and
+  `rendering` names to `view-updates` and `view-rendering`.
+- Runtime source contracts now use `MetricSource` in
+  `runtime/sources/metric-source.ts`, not `IMetricSource` in
+  `source.interface.ts`.
+- Widget primitive contracts now live in `widgets/widget-contract.ts`.
+- Widget primitive implementation names now use concrete forms such as
+  `progress-bar` and `progress-circle`.
+- Disk/network metric key resolver ownership was consolidated into runtime
+  metric-key modules.
 
 ## Boundary Invariants
 
 These changes may touch:
 
 - Action lifecycle, scheduler subscription, runtime cache, and Property Inspector IPC boundaries.
-- The metric view runner queue and render dispatch state boundary.
+- The metric view update queue and render dispatch state boundary.
 - The Property Inspector settings sync boundary.
 - Runtime metric record ownership inside `MetricStore`.
 
@@ -23,167 +54,64 @@ These changes must not change:
 
 Before each implementation PR, restate the touched invariant in the PR notes.
 
-## Current Follow-Up: Metric Key Identity Resolver Ownership
+## Recently Completed: Metric Key Identity Resolver Ownership
 
-Decision: accept the small helper consolidation; do not introduce a new
-`MetricKeyPlan` model.
+Status: completed by the recent metric key resolver consolidation.
+
+Decision retained: do not introduce a new `MetricKeyPlan` model.
 
 Touched invariant: aggregate vs per-instance metric key identity is owned by
 the runtime metric-key modules. Action subscription code, action runtime
 maximum code, and view builders must not each inline this decision.
 
-Implementation plan:
-
-- Move the three network copies into `runtime/network-metric-keys.ts` as:
-
-```ts
-export function resolveNetworkMetricKey(
-    direction: Exclude<NetworkDirection, "both">,
-    interfaceId: string | undefined,
-): string;
-```
-
-- This explicitly normalizes the view-builder-local `getNetworkMetricKey` name
-  to `resolveNetworkMetricKey`.
-- Move the two disk usage copies into `runtime/disk-metric-keys.ts` as:
-
-```ts
-export function resolveDiskUsageMetricKey(
-    metric: DiskUsageMetric,
-    volumeId: string | undefined,
-): string;
-```
-
-- Callers should pass `target.interfaceId` / `target.volumeId` directly. The
-  owner helper handles empty and missing ids.
-- Add owner-side unit tests next to the runtime metric-key modules for both
-  empty-id aggregate/default keys and explicit-id per-instance keys.
-- Keep existing subscription/display invariant tests; they guard against future
-  drift between read plans and display reads.
-
-Follow-up guardrail:
+Current guardrail:
 
 - Metric key identity decisions (aggregate/default vs per-instance) should go
   through `runtime/<domain>-metric-keys.ts` `resolve*MetricKey` helpers. Do not
   inline aggregate/per-instance branching in action classes or view builders.
   Keep the atomic key builders public for source adapters and low-level tests.
+- Keep owner-side unit tests next to the runtime metric-key modules for both
+  empty-id aggregate/default keys and explicit-id per-instance keys.
+- Keep subscription/view-read invariant tests; they guard against future drift
+  between read plans and metric view reads.
 
 ## Accepted Items
 
-### 1. Classify `metric-view-runner/runner.ts` Into `DisplayUpdateRunner`
+### 1. Classify `view-updates/runner.ts` Into A Metric View Update Runner
 
 Decision: accept.
 
 Current issue: `runner.ts` owns module-level mutable singleton state:
 
-- display action states
+- metric view action states
 - update queue
 - active update count
 - queue drain scheduling flag
 
-Target: move that mutable state into an instance. Production still exports the same top-level functions, but tests can create isolated runner instances.
-
-Sample target shape:
-
-```ts
-export interface DisplayUpdateRunnerOptions {
-    readonly maxConcurrentDisplayUpdates?: number;
-}
-
-export class DisplayUpdateRunner {
-    private readonly displayActionStates = new Map<string, DisplayActionState>();
-    private readonly displayActionQueue = new DisplayUpdateQueue();
-    private activeDisplayUpdateCount = 0;
-    private isDisplayQueueDrainScheduled = false;
-
-    constructor(private readonly options: DisplayUpdateRunnerOptions = {}) {}
-
-    setMetricDisplay(options: MetricDisplayOptions): void {
-        const displayActionState = this.getOrCreateDisplayActionState(options.event.action.id);
-
-        this.recordDisplayUpdate(displayActionState, options);
-        displayActionState.pendingOptions = options;
-        this.enqueueDisplayAction(displayActionState);
-    }
-
-    clearMetricDisplayState(actionId: string): void {
-        const displayActionState = this.displayActionStates.get(actionId);
-        if (!displayActionState) {
-            return;
-        }
-
-        displayActionState.active = false;
-        displayActionState.isQueued = false;
-        displayActionState.pendingOptions = null;
-        displayActionState.pendingUpdateTimestampMilliseconds = null;
-        displayActionState.pendingUpdateReason = "metric-tick";
-        displayActionState.pendingSettingsSignature = null;
-        displayActionState.touchStripMetricLayoutState.layoutPromise = null;
-        displayActionState.touchStripMetricLayoutState.layoutPath = null;
-
-        this.displayActionQueue.remove(actionId);
-        this.displayActionStates.delete(actionId);
-    }
-
-    private drainDisplayQueue(): void {
-        const maximumActiveUpdateCount = this.options.maxConcurrentDisplayUpdates ?? 1;
-
-        while (
-            this.activeDisplayUpdateCount < maximumActiveUpdateCount
-            && this.displayActionQueue.length > 0
-        ) {
-            const actionId = this.displayActionQueue.dequeue();
-            if (!actionId) {
-                continue;
-            }
-
-            const displayActionState = this.displayActionStates.get(actionId);
-            if (!displayActionState) {
-                continue;
-            }
-
-            displayActionState.isQueued = false;
-
-            if (
-                !displayActionState.active
-                || displayActionState.isRenderInFlight
-                || !displayActionState.pendingOptions
-            ) {
-                continue;
-            }
-
-            this.runMetricDisplayUpdate(displayActionState, displayActionState.pendingOptions);
-        }
-    }
-}
-
-export const displayUpdateRunner = new DisplayUpdateRunner();
-
-export function setMetricDisplay(options: MetricDisplayOptions): void {
-    displayUpdateRunner.setMetricDisplay(options);
-}
-
-export function clearMetricDisplayState(actionId: string): void {
-    displayUpdateRunner.clearMetricDisplayState(actionId);
-}
-```
+Target: move that mutable state into an instance, tentatively named
+`MetricViewUpdateRunner`. Production can keep stable top-level
+`setMetricView()` and `clearMetricViewState()` functions delegating to the
+singleton, while tests can create isolated runner instances.
 
 Do not remove the queue in this PR. Queue removal requires measurement because render/rasterize/update is a hot path.
 
 Required characterization tests before the refactor:
 
 - Repeated updates for the same action keep the latest pending options.
-- `clearMetricDisplayState()` removes queued work and prevents dispatch for inactive actions.
+- `clearMetricViewState()` removes queued work and prevents dispatch for inactive actions.
 - An update submitted while render is in flight is coalesced and rendered after the in-flight update finishes.
 - A pending `settings-change` priority is not overwritten by a normal metric tick.
 
 Required tests after the class is introduced:
 
-- Two `DisplayUpdateRunner` instances do not share state.
+- Two `MetricViewUpdateRunner` instances do not share state.
 
 Regression guard:
 
-- Keep `setMetricDisplay()` and `clearMetricDisplayState()` exports unchanged for callers.
+- Keep `setMetricView()` and `clearMetricViewState()` exports stable for callers.
+- If the class is named `MetricViewUpdateRunner`, update related logger scopes
+  from `MetricViewRunner` to `MetricViewUpdateRunner` in the same PR so class
+  names, logs, and grep results stay aligned.
 - Run `npm.cmd run test:unit`.
 - Run `npm.cmd run build`.
 
@@ -313,7 +241,7 @@ export abstract class MetricAction extends SingletonAction {
         this.schedulerBindings.get(event.action.id)?.dispose();
         this.schedulerBindings.delete(event.action.id);
         this.actionStates.delete(event.action.id);
-        clearMetricDisplayState(event.action.id);
+        clearMetricViewState(event.action.id);
     }
 
     protected getMetricReader(event: WillAppearEvent): MetricStoreReader {
@@ -321,6 +249,16 @@ export abstract class MetricAction extends SingletonAction {
     }
 }
 ```
+
+The constructor-level `pluginGlobalSettingsStore.subscribe(...)` hook stays
+unchanged in this PR. Per-action lifecycle does not own it; global override
+resubscribe remains dispatched from the singleton-action level. Reconsider this
+only if `SchedulerBinding` later needs to listen to global overrides directly.
+
+`refreshSubscription()` and `persistQuickStartSettings()` are private helpers
+introduced in this PR. `refreshSubscription()` wraps `SchedulerBinding.refresh`
+and read-plan/polling interval resolution. `persistQuickStartSettings()` wraps
+the existing quick-start `setSettings()` call and catch-handler.
 
 Also remove `metricReaderBySourceScopeId`. `metricStore.forScope()` creates a lightweight reader facade; caching that object in `MetricAction` does not buy meaningful performance and adds another state owner.
 
@@ -333,7 +271,9 @@ Required tests, added before the refactor:
 - polling interval changes resubscribe exactly once and cleanup the old subscription.
 - source policy changes resubscribe exactly once and cleanup the old subscription.
 - global settings changes re-resolve settings, resubscribe active actions, and trigger an immediate update.
-- `onWillDisappear` cleans subscription state, action state, and display runner state.
+- `onWillDisappear` cleans subscription state, action state, and calls
+  `clearMetricViewState()` to remove the action from the view update runner
+  state map.
 - PI open sends runtime cache only for the active PI action.
 
 Execution order:
@@ -804,6 +744,10 @@ Target: use a reducer so state transitions are explicit and testable.
 
 Do not replace `isDisposed()` with `AbortController` in the first pass. The Stream Deck client methods do not accept `AbortSignal`, so `AbortController` would still require manual checks after each await. A closure-scoped cancellation flag is sufficient unless a real cancellable API is introduced.
 
+The `useReducer` initial state preserves the existing `actionKind: "unknown"`
+and all load-status fields at `"pending"` until `connectionLoaded` or a refresh
+action fires.
+
 Sample target shape:
 
 ```ts
@@ -1070,7 +1014,7 @@ Regression guard:
 
 Decision: accept.
 
-Current issue: display performance and rasterizer performance have duplicate accumulator logic.
+Current issue: metric view performance and rasterizer performance have duplicate accumulator logic.
 
 Target: extract shared duration accumulation helpers. Do not remove observability, do not replace with `console.time`, and do not reduce warning coverage.
 
@@ -1126,7 +1070,7 @@ export function summarizeDuration(durationAccumulator: DurationAccumulator): Dur
 
 Required tests:
 
-- display performance summary fields stay unchanged.
+- metric view performance summary fields stay unchanged.
 - rasterizer performance summary fields stay unchanged.
 - warning threshold behavior stays unchanged.
 - null durations do not affect averages.
@@ -1183,14 +1127,14 @@ Reason:
 - The TDD has explicit performance budgets and observability requirements.
 - Consolidation is acceptable; deletion is not.
 
-### Do Not Remove The Display Queue Without Measurement
+### Do Not Remove The Metric View Queue Without Measurement
 
 Decision: reject for now.
 
 Reason:
 
 - Queue removal changes hot-path behavior.
-- The current safe step is state ownership cleanup through `DisplayUpdateRunner`.
+- The current safe step is state ownership cleanup through `MetricViewUpdateRunner`.
 - Any queue simplification needs timing evidence around compose, rasterize, SDK dispatch, queue length, and active action count.
 
 ## Nice-To-Have Items Not In Scope
@@ -1205,12 +1149,12 @@ These can be handled opportunistically only if they are in the same touched file
 
 Use small PRs. Characterization tests land before refactors.
 
-Runner and `MetricAction` are independent tracks as long as `setMetricDisplay()` and `clearMetricDisplayState()` wrapper exports stay unchanged. Do not interleave implementation PRs within one track.
+Runner and `MetricAction` are independent tracks as long as `setMetricView()` and `clearMetricViewState()` wrapper exports stay stable. Do not interleave implementation PRs within one track.
 
 Runner track:
 
 1. Add runner characterization tests against the existing module exports only.
-2. Introduce `DisplayUpdateRunner` as a mechanical state move; runner tests stay green.
+2. Introduce `MetricViewUpdateRunner` as a mechanical state move; runner tests stay green.
 
 `MetricAction` track:
 

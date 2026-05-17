@@ -6,16 +6,23 @@ This plan upgrades the SVG rendering appearance boundary enough to support a
 Black & White color mode and future visual complexity without jumping to a full
 typed SVG scene graph.
 
-The selected direction is **Option 2A: paint-token-first RenderAppearance**.
-It centralizes paint ownership, theme paint construction, and renderer-facing
-paint lowering while keeping the current string-based SVG primitives.
+The selected direction is **Option 2A: paint-token-first
+MetricRenderAppearance**. It centralizes paint ownership, theme paint
+construction, and renderer-facing paint lowering while keeping the current
+string-based SVG primitives.
+
+Naming note: this plan predates the metric view naming cleanup. It has been
+updated to use the current vocabulary: Product View, `renderPrimitive`,
+`circleVariant`, `view-updates`, and `view-rendering`. Do not copy older
+appearance terms such as graph type, layout, graphic type, or circle style into
+new code.
 
 ## Boundary Invariant
 
 ```txt
 stored settings express user intent
 resolved settings express app-level intent
-visual-adapter converts resolved settings into renderer-facing appearance
+render-appearance builder converts resolved settings into renderer-facing appearance
 renderer primitives consume already-lowered renderer paint data
 final SVG audit proves B&W is a whole-widget color-mode property
 ```
@@ -30,13 +37,12 @@ The current runtime rendering flow is:
 stored settings
 -> settings/storage/resolver.ts
 -> settings/resolved-settings.ts
--> settings/visual-adapter.ts
--> metric-view-runner/display-model.ts
--> metric-view-runner/runner.ts
--> rendering/single-metric-view.ts or rendering/dual-metric-view.ts
+-> settings/render-appearance-builder.ts
+-> view-updates/runner.ts
+-> view-rendering/single-metric-view.ts or view-rendering/dual-metric-view.ts
 -> widgets/primitives/*
--> rendering/metric-frame.ts
--> rendering/rasterizer.ts
+-> view-rendering/metric-frame.ts
+-> view-rendering/rasterizer.ts
 -> Stream Deck setImage() or setFeedback()
 ```
 
@@ -47,19 +53,19 @@ Current ownership:
 - `settings/storage/*` owns generated proto decoding, sparse patches,
   validation, and stored-to-resolved conversion.
 - `settings/resolved-settings.ts` owns the app-level resolved settings contract.
-- `settings/visual-adapter.ts` currently converts resolved appearance to a
-  renderer-facing contract, but that contract is still close to resolved
-  settings.
-- `metric-view-runner/*` owns render scheduling, display queueing, no-data
+- `settings/render-appearance-builder.ts` converts resolved appearance to the
+  renderer-facing appearance contract.
+- `view-updates/*` owns render scheduling, metric view queueing, no-data
   placeholder decisions, touch strip layout selection, and dispatch.
-- `rendering/*` composes single/dual metric views, wraps frames, and rasterizes.
+- `view-rendering/*` composes single/dual metric views, wraps frames, and
+  rasterizes.
 - `widgets/primitives/*` render SVG string fragments.
 - `widgets/styles/*` render frame style defs, background, and overlay.
 
 Current appearance shape before this refactor:
 
-- `ResolvedAppearanceSettings.colorMode` is `"threshold" | "solid"`.
-- `settings/visual-adapter.ts` builds one primary `ColorConfig`.
+- `ResolvedAppearanceSettings.colorMode` is `"multi-color" | "solid" | "black-white"`.
+- `settings/render-appearance-builder.ts` builds `MetricRenderAppearance`.
 - Single-metric primitives mostly receive `ColorConfig`.
 - Dual-channel render paths pass a mix of `ColorConfig`, `positiveColor`, and
   `negativeColor`.
@@ -83,28 +89,29 @@ The target flow after 2A is:
 ```txt
 stored settings
 -> resolved settings
--> visual-adapter builds RenderAppearance
--> metric-view-runner passes RenderAppearance
--> views/primitives consume semantic paint tokens and lowered ColorConfig
+-> render-appearance builder builds MetricRenderAppearance
+-> view-updates passes MetricRenderAppearance
+-> view-rendering primitives consume semantic paint tokens and lowered ColorConfig
 -> metric-frame consumes semantic paint tokens
 -> B&W SVG audit tests final SVG output
 -> rasterizer
 -> Stream Deck
 ```
 
-`RenderAppearance` is renderer-facing app data. It is not a second settings
+`MetricRenderAppearance` is renderer-facing app data. It is not a second settings
 model and it is not persisted.
 
 Conceptual shape:
 
 ```ts
-interface RenderAppearance {
-    readonly layout: "circular" | "text" | "linear" | "sparkline";
-    readonly circleStyle: "value" | "compact" | "gauge";
-    readonly theme: "flat" | "cupertino-glass" | "color-filled";
-    readonly colorMode: "threshold" | "solid" | "black-white";
+interface MetricRenderAppearance {
+    readonly renderPrimitive: "circle" | "text" | "bar" | "sparkline";
+    readonly circleVariant: "full-ring" | "minimal" | "gauge";
+    readonly themePreset: "flat" | "cupertino-glass" | "color-filled" | "terminal-clean" | "terminal-vintage";
     readonly paintConstraint: "none" | "black-white";
     readonly paints: RenderPaintTokens;
+    readonly textStyles: RenderTextStyles;
+    readonly themeEffects: RenderThemeEffectTokens;
     readonly lineSmoothingPercent: number;
     readonly gridLineVisibility: SparklineGridLineVisibility;
     readonly gridLineType: SparklineGridLineType;
@@ -133,23 +140,24 @@ lowering helper, but it should not guess `channelPositive` or `channelNegative`
 from a generic appearance object when only an action-specific view builder knows
 what those channels mean.
 
-`colorMode` is the user-facing color choice. It answers how the widget should
-use color:
+The resolved `colorMode` is the user-facing color choice. It answers how the
+widget should use color:
 
-- `threshold`: metric values choose dynamic colors.
+- `multi-color`: metric values choose dynamic colors.
 - `solid`: metric paint uses one selected color.
 - `black-white`: the whole widget renders with neutral paint.
 
 This replaces the older metric-only interpretation of color mode. B&W is a
-peer of threshold and solid in stored/resolved settings because that matches the
-Property Inspector control and user intent.
+peer of multi-color and solid in stored/resolved settings because that matches
+the Property Inspector control and user intent.
 
-`theme` answers the whole-widget visual preset. Current frame styles such as
-flat and glass are the first theme values. Future themes may change paint,
-shape, typography, frame chrome, or overlays.
+`selectedTheme` answers the whole-widget visual preset. Current themes such as
+flat, cupertino glass, color filled, and terminal are the first theme values.
+Future themes may change paint, shape, typography, frame chrome, or overlays.
 
 `paintConstraint` is a renderer-facing derived value. It answers the final color
-rule for the rendered SVG after the visual adapter has interpreted `colorMode`.
+rule for the rendered SVG after the render-appearance builder has interpreted
+`colorMode`.
 B&W becomes a paint constraint at the renderer boundary because it constrains
 theme paint, metric paint, text, icons, tracks, grids, dividers, gradients, and
 overlays. This derived value must not be persisted in settings proto.
@@ -158,50 +166,49 @@ This is an intentional boundary translation:
 
 ```txt
 stored/resolved colorMode: "black-white"
--> visual-adapter derives paintConstraint: "black-white"
+-> render-appearance builder derives paintConstraint: "black-white"
 -> renderer consumes neutral lowered paints
 ```
 
 Widget-level B&W constrains only that widget's final paint. Global B&W lives in
 the global color override section. It constrains every widget's final paint only
 when global override and its color subsection are enabled. It must not override
-each widget's layout, graph variant, shape style, or theme unless the separate
-global layout/style subsection is enabled.
+each widget's view, view variant, or theme unless the separate global
+view/theme subsection is enabled.
 
 The global override UX is a master switch with owned subsections:
 
 ```txt
 global override
--> layout/style override
+-> view/theme override
 -> color override
 ```
 
 When the master switch is enabled, omitted subsection switches resolve to
-enabled so one click applies both layout/style and color. Explicit subsection
+enabled so one click applies both view/theme and color. Explicit subsection
 `false` stores the user's choice to hide and skip that subsection. This
 presence-based default lives in the resolver; do not persist resolved `true`
 defaults only to make proto booleans look checked.
 
-`layout` plus `circleStyle` can remain during 2A because paint ownership does
-not require flattening graph variants. Before adding a new graph such as volume
-bars, revisit the renderer-facing contract and consider flattening it into a
-single `graphicVariant` enum:
+`selectedView` plus `circleVariant` is the current product/settings split.
+Before adding a new concrete view form such as volume bars, decide whether the
+user chooses it through a `XxxViewVariant` setting or whether the renderer
+chooses a narrower concrete primitive value from metric type, key size, or
+another non-user signal:
 
 ```ts
-type GraphicVariant =
-    | "circular-full"
-    | "circular-gauge"
-    | "circular-minimal-notch"
+type MetricViewRenderPrimitive =
+    | "circle"
     | "text"
-    | "progress-bar"
+    | "bar"
     | "sparkline"
-    | "volume-bars";
+    | "volume-bar";
 ```
 
 The Property Inspector may still display grouped controls. The renderer contract
-should express the final graph variant it needs to draw, not mirror the UI
+should express the final rendering branch it needs to draw, not mirror the UI
 grouping. This keeps later dispatch logic from growing around invalid
-combinations such as non-circular layouts carrying circular-only style fields.
+combinations such as non-circle views carrying circle-only variant fields.
 
 ## Paint Token Rules
 
@@ -289,7 +296,7 @@ product behavior simple and predictable:
 ```txt
 theme builds paint tokens and optional chrome
 colorMode builds metric ColorConfig or derives B&W paintConstraint
-visual-adapter lowers all renderer-facing paint
+render-appearance builder lowers all renderer-facing paint
 renderer primitives consume already-lowered paint
 ```
 
@@ -308,11 +315,11 @@ If product direction later requires multiple independent visual axes beyond a
 single color-mode dropdown, split the renderer-facing appearance deliberately:
 
 ```ts
-interface RenderAppearance {
+interface MetricRenderAppearance {
     readonly baseTheme: BaseVisualTheme;
     readonly paintConstraint: RenderPaintConstraint;
     readonly overlayPolicy: RenderOverlayPolicy;
-    readonly colorMode: "threshold" | "solid" | "black-white" | "tinted";
+    readonly colorMode: "multi-color" | "solid" | "black-white" | "tinted";
     readonly paints: RenderPaintTokens;
 }
 ```
@@ -323,11 +330,11 @@ policy axes. Until then, keep one theme field and one user-facing color mode.
 ## ColorConfig Lowering
 
 `ColorConfig` entering renderer primitives must already be lowered by
-`visual-adapter`.
+the render-appearance builder.
 
 Rules:
 
-- Threshold color mode lowers metric paint to a threshold `ColorConfig` with
+- Multi-color mode lowers metric paint to a threshold `ColorConfig` with
   user-selected colors.
 - Solid color mode lowers metric paint to a solid `ColorConfig` with the
   user-selected solid color.
@@ -405,13 +412,13 @@ This is one product slice, not several tiny type-only changes. It can include:
 - Add B&W to resolved `ColorMode`.
 - Add B&W to Property Inspector color mode options.
 - Update widget and global appearance patch paths to carry color mode.
-- Refactor global override into a master switch with layout/style and color
+- Refactor global override into a master switch with view/theme and color
   subsections.
 - Treat global B&W as part of the global color override subsection. It should
-  not force a global theme, layout, graph variant, or shape style.
-- Build `RenderAppearance` or the equivalent renderer-facing contract in
-  `settings/visual-adapter.ts` or a small file owned by the same adapter
-  boundary.
+  not force a global theme, view, or view variant.
+- Build `MetricRenderAppearance` or the equivalent renderer-facing contract in
+  `settings/render-appearance-builder.ts` or a small file owned by the same
+  adapter boundary.
 - Build semantic `RenderPaintTokens` from resolved appearance, theme, and the
   adapter-derived paint constraint.
 - Lower all renderer-facing `ColorConfig` values in the adapter.
@@ -432,7 +439,7 @@ Route the paint contract through the render path until final SVG audit passes.
 
 This can include:
 
-- Pass the renderer-facing appearance from `metric-view-runner` into
+- Pass the renderer-facing appearance from `view-updates` into
   `renderMetricFrame`, single-metric views, dual-metric views, and primitives.
 - Move frame background and overlay colors behind semantic paint tokens.
 - Move primary metric, channel, text, icon, track, grid, divider, glow/filter
@@ -444,11 +451,11 @@ This can include:
 - Test representative outputs across:
   - flat frame
   - cupertino glass frame
-  - circular
+  - circle
   - text
-  - linear
+  - bar
   - sparkline
-  - dual-channel circular or sparkline
+  - dual-channel circle or sparkline
   - icons that currently render inline SVG fragments
 
 The step is complete when the audit passes. It is not complete just because the
@@ -483,12 +490,12 @@ The following should stay stable during that future migration:
 
 - stored settings contract
 - resolved settings contract
-- `visual-adapter` ownership
-- `RenderAppearance`
+- render-appearance builder ownership
+- `MetricRenderAppearance`
 - semantic paint tokens
 - B&W color-mode-to-paint-constraint lowering location
 - B&W final SVG audit behavior
-- metric-view-runner scheduling and dispatch ownership
+- view-updates scheduling and dispatch ownership
 
 What Option 3 would replace later:
 
