@@ -5,8 +5,8 @@ import {
     getDefaultDiskUsageMetricKey,
     getDiskThroughputMetricKey,
     getDiskVolumeMetricKey,
-    type DiskUsageMetric,
     type DiskThroughputDirection,
+    type DiskUsageMetric,
 } from "../../runtime/disk-metric-keys";
 import { buildDiskThroughputWidgetData, buildDiskUsageWidgetData } from "../../metrics/storage-widget-data";
 import type {
@@ -29,6 +29,7 @@ import {
 } from "./volume-selection";
 import type { MetricDisplayOptions } from "../../metric-view-runner/runner";
 import { buildColorConfigFromAppearance, resolveSolidMetricColorMode } from "../../settings/render-paint-resolver";
+import { resolveArcGaugeStyle } from "../../settings/render-appearance-builder";
 import { resolveRenderTextStyles } from "../../settings/render-text-style-resolver";
 
 interface BuildDiskDisplayOptions {
@@ -94,9 +95,9 @@ function buildDiskUsageDisplayOptions(
         "B",
     );
     const appearance = options.settings.widget.slot.appearance;
-    const effectiveGraphicType = appearance.graph.viewLayout;
-    const circleStyle = appearance.graph.circleStyle;
-    const shouldRenderGauge = effectiveGraphicType === "circular" && circleStyle === "gauge";
+    const selectedView = appearance.view.selectedView;
+    const arcGaugeStyle = resolveArcGaugeStyle(appearance.view.circleVariant);
+    const shouldRenderGauge = selectedView === "circle" && arcGaugeStyle === "gauge";
 
     return {
         event: options.event,
@@ -108,7 +109,7 @@ function buildDiskUsageDisplayOptions(
             availableBytes: availableBytesWidgetData.current,
             displayMode: options.reading.displayMode,
             label,
-            linearLabel: resolveDiskLinearLabel(options.reading.linearLabel, selectedVolume, label),
+            barLabel: resolveDiskBarLabel(options.reading.barLabel, selectedVolume, label),
         }),
         centerIconFragment: buildDiskCenterIconFragment(
             options.volumeSelection,
@@ -117,7 +118,7 @@ function buildDiskUsageDisplayOptions(
         footerIconFragment: shouldRenderGauge ? undefined : buildDiskGaugeFooterIconFragment(selectedVolume),
         linearIconFragment: getDiskIconFragment(selectedVolume?.storageKind ?? "unknown"),
         statusIcon: getMetricStatusIcon("percentage"),
-        circleStyleOverride: circleStyle,
+        circleStyleOverride: arcGaugeStyle,
     };
 }
 
@@ -136,9 +137,9 @@ function buildDiskThroughputDisplayOptions(
 ): MetricDisplayOptions {
     const throughputDirection = options.reading.direction;
     const appearance = options.settings.widget.slot.appearance;
-    const effectiveGraphicType = appearance.graph.viewLayout;
+    const selectedView = appearance.view.selectedView;
 
-    if (isDualDiskThroughputDisplay(effectiveGraphicType, throughputDirection)) {
+    if (isDualDiskThroughputDisplay(selectedView, throughputDirection)) {
         return buildDualThroughputDisplayOptions(options);
     }
 
@@ -153,8 +154,8 @@ function buildDiskThroughputDisplayOptions(
         throughputLabel,
         "B/s",
     );
-    const circleStyle = appearance.graph.circleStyle;
-    const shouldRenderGaugeFooter = effectiveGraphicType === "circular" && circleStyle === "gauge";
+    const arcGaugeStyle = resolveArcGaugeStyle(appearance.view.circleVariant);
+    const shouldRenderGaugeFooter = selectedView === "circle" && arcGaugeStyle === "gauge";
 
     return {
         event: options.event,
@@ -174,7 +175,7 @@ function buildDiskThroughputDisplayOptions(
             ? buildDiskThroughputFooterIconFragment(singleThroughputDirection)
             : undefined,
         statusIcon: getMetricStatusIcon("percentage"),
-        circleStyleOverride: circleStyle,
+        circleStyleOverride: arcGaugeStyle,
         appearanceOverride: {
             paint: {
                 metric: {
@@ -196,10 +197,12 @@ function buildDualThroughputDisplayOptions(
     const readMetricKey = getDiskThroughputMetricKey("read");
     const writeMetricKey = getDiskThroughputMetricKey("write");
     const appearance = options.settings.widget.slot.appearance;
-    const effectiveGraphicType = appearance.graph.viewLayout;
+    const selectedView = appearance.view.selectedView;
     let dualGraphicType: "circular" | "text" | undefined;
-    if (effectiveGraphicType === "circular" || effectiveGraphicType === "text") {
-        dualGraphicType = effectiveGraphicType;
+    if (selectedView === "circle") {
+        dualGraphicType = "circular";
+    } else if (selectedView === "text") {
+        dualGraphicType = "text";
     }
     const selectedVolume = resolveAvailableDiskVolume(options.volumeSelection);
     const readWidgetData = buildDiskThroughputWidgetData({
@@ -239,7 +242,7 @@ function buildDualThroughputDisplayOptions(
         centerIconFragment: getDiskIconFragment("unknown"),
         statusIcon: getMetricStatusIcon("percentage"),
         circleStyleOverride: dualGraphicType === "circular"
-            ? appearance.graph.circleStyle
+            ? resolveArcGaugeStyle(appearance.view.circleVariant)
             : undefined,
         positiveColor: readColor,
         negativeColor: writeColor,
@@ -266,7 +269,7 @@ function buildDualThroughputDisplayOptions(
     };
 }
 
-function buildDiskLinearLabel(diskVolume: DiskVolumeOption | null, fallbackLabel: string): string {
+function buildDiskBarLabel(diskVolume: DiskVolumeOption | null, fallbackLabel: string): string {
     if (!diskVolume) {
         return fallbackLabel;
     }
@@ -277,18 +280,18 @@ function buildDiskLinearLabel(diskVolume: DiskVolumeOption | null, fallbackLabel
     return `${storageKind} (${volumeLabel})`;
 }
 
-function resolveDiskLinearLabel(
-    customLinearLabel: string,
+function resolveDiskBarLabel(
+    customBarLabel: string,
     diskVolume: DiskVolumeOption | null,
     fallbackLabel: string,
 ): string {
-    const normalizedLinearLabel = customLinearLabel.trim();
+    const normalizedBarLabel = customBarLabel.trim();
 
-    if (normalizedLinearLabel.length > 0) {
-        return normalizedLinearLabel;
+    if (normalizedBarLabel.length > 0) {
+        return normalizedBarLabel;
     }
 
-    return buildDiskLinearLabel(diskVolume, fallbackLabel);
+    return buildDiskBarLabel(diskVolume, fallbackLabel);
 }
 
 function resolveDiskUsageMetricKey(metric: DiskUsageMetric, target: ResolvedDiskMetricTarget): string {

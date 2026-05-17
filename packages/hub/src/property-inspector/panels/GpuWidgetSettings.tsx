@@ -2,9 +2,9 @@ import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import type { ResolvedGpuMetricTarget, ResolvedGpuReading } from "../../settings/resolved-settings";
 import { StandardColorSettings } from "./ColorSettings";
-import { LayoutSettings } from "./LayoutSettings";
+import { AppearanceSettings } from "./AppearanceSettings";
 import { PollingSettings } from "./PollingSettings";
-import { SparklineSettings } from "./SparklineSettings";
+import { LineSettings } from "./LineSettings";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import {
@@ -25,8 +25,8 @@ export function GpuWidgetSettings(props: GpuWidgetSettingsProps): React.JSX.Elem
     return (
         <>
             <GpuMetricSettings {...props} />
-            <LayoutSettings {...props} />
-            <SparklineSettings {...props} />
+            <AppearanceSettings {...props} />
+            <LineSettings {...props} />
             {reading.kind === "temperature" && <GpuTemperatureScaleSettings {...props} reading={reading} />}
             {reading.kind === "power" && <GpuPowerScaleSettings {...props} reading={reading} />}
             <StandardColorSettings {...props} />

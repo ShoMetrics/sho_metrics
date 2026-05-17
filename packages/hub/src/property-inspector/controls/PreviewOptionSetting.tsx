@@ -29,7 +29,7 @@ export function PreviewOptionSetting<TValue extends string>({
 
     return (
         <InspectorItem label={label}>
-            <div className="graphic-type-picker" role="radiogroup" aria-label={label}>
+            <div className="preview-option-picker" role="radiogroup" aria-label={label}>
                 {optionList.map((option) => {
                     const optionDisabled = disabled || isOptionDisabled(option);
 
@@ -37,7 +37,7 @@ export function PreviewOptionSetting<TValue extends string>({
                         <button
                             key={option.value}
                             type="button"
-                            className="graphic-type-option"
+                            className="preview-option-button"
                             data-selected={selectedValue === option.value ? "true" : "false"}
                             data-disabled={optionDisabled ? "true" : "false"}
                             disabled={optionDisabled}
@@ -46,12 +46,12 @@ export function PreviewOptionSetting<TValue extends string>({
                             onClick={() => onValueChange(option.value)}
                         >
                             <img
-                                className="graphic-type-preview"
+                                className="preview-option-preview"
                                 src={buildPreviewUri(option.value)}
                                 alt=""
                                 aria-hidden="true"
                             />
-                            <span className="graphic-type-label">{option.label}</span>
+                            <span className="preview-option-label">{option.label}</span>
                         </button>
                     );
                 })}

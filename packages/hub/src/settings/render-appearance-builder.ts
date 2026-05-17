@@ -1,6 +1,12 @@
 import type { MetricRenderAppearance } from "../rendering/render-appearance";
+import type { ArcGaugeStyle } from "../widgets/primitives/arc-gauge";
 import type { GraphicThemePresetName } from "../widgets/widget.interface";
-import type { ResolvedAppearanceSettings, ResolvedAppearanceThemeSettings } from "./resolved-settings";
+import type {
+    CircleViewVariant,
+    MetricView,
+    ResolvedAppearanceSettings,
+    ResolvedAppearanceThemeSettings,
+} from "./resolved-settings";
 import { resolveRenderGraphicEffects } from "./render-graphic-effects-resolver";
 import { resolveRenderPaint } from "./render-paint-resolver";
 import { resolveRenderTextStyles } from "./render-text-style-resolver";
@@ -11,20 +17,44 @@ export function buildMetricRenderAppearance(
     const renderPaint = resolveRenderPaint(settings);
 
     return {
-        graphicType: settings.graph.viewLayout,
-        circleStyle: settings.graph.circleStyle,
-        graphicStyle: resolveGraphicThemePresetName(settings.theme),
+        graphicType: resolveRenderPrimitive(settings.view.selectedView),
+        circleStyle: resolveArcGaugeStyle(settings.view.circleVariant),
+        graphicStyle: resolveThemePresetName(settings.theme),
         paintConstraint: renderPaint.paintConstraint,
         paints: renderPaint.paintTokens,
         textStyles: resolveRenderTextStyles(settings),
         graphicEffects: resolveRenderGraphicEffects(settings),
-        lineSmoothingPercent: settings.sparkline.lineSmoothingPercent,
-        gridLineVisibility: settings.sparkline.gridLineVisibility,
-        gridLineType: settings.sparkline.gridLineType,
+        lineSmoothingPercent: settings.line.lineSmoothingPercent,
+        gridLineVisibility: settings.line.gridLineVisibility,
+        gridLineType: settings.line.gridLineType,
     };
 }
 
-function resolveGraphicThemePresetName(theme: ResolvedAppearanceThemeSettings): GraphicThemePresetName {
+export function resolveRenderPrimitive(view: MetricView): MetricRenderAppearance["graphicType"] {
+    switch (view) {
+        case "circle":
+            return "circular";
+        case "text":
+            return "text";
+        case "bar":
+            return "linear";
+        case "line":
+            return "sparkline";
+    }
+}
+
+export function resolveArcGaugeStyle(variant: CircleViewVariant): ArcGaugeStyle {
+    switch (variant) {
+        case "full-ring":
+            return "value";
+        case "minimal":
+            return "compact";
+        case "gauge":
+            return "gauge";
+    }
+}
+
+function resolveThemePresetName(theme: ResolvedAppearanceThemeSettings): GraphicThemePresetName {
     switch (theme.selectedTheme) {
         case "terminal":
             return theme.terminal.variant === "vintage" ? "terminal-vintage" : "terminal-clean";

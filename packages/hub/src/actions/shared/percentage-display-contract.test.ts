@@ -59,9 +59,9 @@ test("percentage metric builders expose integer display values for compact widge
     }
 });
 
-test("percentage action display values are honored by sparkline rendering", () => {
+test("percentage action display values are honored by line view rendering", () => {
     const visualSettings = buildMetricRenderAppearance(buildDefaultAppearanceSettings({
-        graph: { viewLayout: "sparkline" },
+        view: { selectedView: "line" },
         paint: {
             metric: { colorMode: "solid" },
         },

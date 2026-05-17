@@ -1,5 +1,5 @@
-import { CircleStyleSetting } from "../controls/CircleStyleSetting";
-import { GraphicTypeSetting } from "../controls/GraphicTypeSetting";
+import { CircleVariantSetting } from "../controls/CircleVariantSetting";
+import { MetricViewSetting } from "../controls/MetricViewSetting";
 import { NumberSetting } from "../controls/NumberSetting";
 import { TerminalVariantSetting } from "../controls/TerminalVariantSetting";
 import { ThemeSetting } from "../controls/ThemeSetting";
@@ -17,10 +17,10 @@ import {
 import type {
     MetricTheme,
     ResolvedDiskThroughputDisplaySettings,
-    ResolvedGlobalGraphOverride,
     ResolvedGlobalPaintOverride,
     ResolvedGlobalSettings,
     ResolvedGlobalThemeOverride,
+    ResolvedGlobalViewOverride,
     ResolvedNetworkDisplaySettings,
 } from "../../settings/resolved-settings";
 import type { StoredGlobalSettingsPatch } from "../../settings/storage/global-settings-patch";
@@ -39,12 +39,12 @@ export function PluginSettingsTab({ resolvedSettings, onSettingsPatch }: PluginS
             />
             {resolvedSettings.globalOverrideEnabled && (
                 <>
-                    <GraphOverrideSection
-                        graphOverride={resolvedSettings.graphOverride}
-                        onOverrideChange={(graphOverrideEnabled) => onSettingsPatch({
-                            graphOverrideEnabled,
+                    <ViewOverrideSection
+                        viewOverride={resolvedSettings.viewOverride}
+                        onOverrideChange={(viewOverrideEnabled) => onSettingsPatch({
+                            viewOverrideEnabled,
                         })}
-                        onGraphPatch={(graph) => onSettingsPatch({ graph })}
+                        onViewPatch={(view) => onSettingsPatch({ view })}
                     />
                     <ThemeOverrideSection
                         themeOverride={resolvedSettings.themeOverride}
@@ -95,7 +95,7 @@ function GlobalOverrideSection({
                         <span>Global override</span>
                     </label>
                     <p className="section-note">
-                        Apply selected layout, style, and color settings to every widget.
+                        Apply selected view, theme, and color settings to every widget.
                     </p>
                 </div>
             </InspectorItem>
@@ -103,32 +103,32 @@ function GlobalOverrideSection({
     );
 }
 
-function GraphOverrideSection({
-    graphOverride,
+function ViewOverrideSection({
+    viewOverride,
     onOverrideChange,
-    onGraphPatch,
+    onViewPatch,
 }: {
-    graphOverride: ResolvedGlobalGraphOverride | undefined;
+    viewOverride: ResolvedGlobalViewOverride | undefined;
     onOverrideChange: (isEnabled: boolean) => void;
-    onGraphPatch: (patch: NonNullable<StoredGlobalSettingsPatch["graph"]>) => void;
+    onViewPatch: (patch: NonNullable<StoredGlobalSettingsPatch["view"]>) => void;
 }): React.JSX.Element {
     return (
-        <SettingsSection title="Graph Override">
+        <SettingsSection title="View Override">
             <OverrideSubsectionToggle
-                label="Override graph"
-                isEnabled={graphOverride !== undefined}
+                label="Override view"
+                isEnabled={viewOverride !== undefined}
                 onValueChange={onOverrideChange}
             />
-            {graphOverride && (
+            {viewOverride && (
                 <>
-                    <GraphicTypeSetting
-                        value={graphOverride.graph.viewLayout}
-                        onValueChange={(viewLayout) => onGraphPatch({ viewLayout })}
+                    <MetricViewSetting
+                        value={viewOverride.view.selectedView}
+                        onValueChange={(selectedView) => onViewPatch({ selectedView })}
                     />
-                    <CircleStyleSetting
-                        value={graphOverride.graph.circleStyle}
-                        onValueChange={(circleStyle) => onGraphPatch({ circleStyle })}
-                        disabled={graphOverride.graph.viewLayout !== "circular"}
+                    <CircleVariantSetting
+                        value={viewOverride.view.circleVariant}
+                        onValueChange={(circleVariant) => onViewPatch({ circleVariant })}
+                        disabled={viewOverride.view.selectedView !== "circle"}
                     />
                 </>
             )}

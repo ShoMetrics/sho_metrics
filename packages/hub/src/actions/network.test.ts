@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { resolveNetworkMetricSubscriptionKeys } from "./network/metric-subscriptions";
 
-test("network sparkline both mode subscribes to upload and download", () => {
+test("network line view both mode subscribes to upload and download", () => {
     const subscriptionKeys = resolveNetworkMetricSubscriptionKeys({
-        graphicType: "sparkline",
+        selectedView: "line",
         networkDirection: "both",
         networkInterfaceId: "",
     });
@@ -12,9 +12,9 @@ test("network sparkline both mode subscribes to upload and download", () => {
     assert.deepEqual(subscriptionKeys, ["net.up", "net.down"]);
 });
 
-test("network sparkline single mode subscribes to one direction", () => {
+test("network line view single mode subscribes to one direction", () => {
     const subscriptionKeys = resolveNetworkMetricSubscriptionKeys({
-        graphicType: "sparkline",
+        selectedView: "line",
         networkDirection: "upload",
         networkInterfaceId: "",
     });
@@ -22,9 +22,9 @@ test("network sparkline single mode subscribes to one direction", () => {
     assert.deepEqual(subscriptionKeys, ["net.up"]);
 });
 
-test("network circular both mode subscribes to upload and download", () => {
+test("network circle view both mode subscribes to upload and download", () => {
     const subscriptionKeys = resolveNetworkMetricSubscriptionKeys({
-        graphicType: "circular",
+        selectedView: "circle",
         networkDirection: "both",
         networkInterfaceId: "",
     });
@@ -32,22 +32,22 @@ test("network circular both mode subscribes to upload and download", () => {
     assert.deepEqual(subscriptionKeys, ["net.up", "net.down"]);
 });
 
-test("network text both mode subscribes to upload and download", () => {
+test("network text view both mode subscribes to upload and download", () => {
     const subscriptionKeys = resolveNetworkMetricSubscriptionKeys({
-        graphicType: "text",
+        selectedView: "text",
         networkDirection: "both",
         networkInterfaceId: "",
     });
 
+    assert.deepEqual(subscriptionKeys, ["net.up", "net.down"]);
+});
 
 test("network explicit interface subscribes to interface keys without registry lookup", () => {
     const subscriptionKeys = resolveNetworkMetricSubscriptionKeys({
-        graphicType: "sparkline",
+        selectedView: "bar",
         networkDirection: "both",
         networkInterfaceId: "Ethernet",
     });
 
     assert.deepEqual(subscriptionKeys, ["net.up.Ethernet", "net.down.Ethernet"]);
-});
-    assert.deepEqual(subscriptionKeys, ["net.up", "net.down"]);
 });

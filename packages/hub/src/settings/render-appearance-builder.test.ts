@@ -13,27 +13,27 @@ import {
 import { buildMetricRenderAppearance } from "./render-appearance-builder";
 import { buildDefaultAppearanceSettings as buildAppearanceSettings } from "./default-appearance-settings";
 
-test("graphic type maps resolved appearance settings to renderer names", () => {
-    const circularSettings = buildMetricRenderAppearance(buildAppearanceSettings({ graph: { viewLayout: "circular" } }));
-    const linearSettings = buildMetricRenderAppearance(buildAppearanceSettings({ graph: { viewLayout: "linear" } }));
-    const sparklineSettings = buildMetricRenderAppearance(buildAppearanceSettings({ graph: { viewLayout: "sparkline" } }));
+test("metric view maps resolved appearance settings to renderer branch values", () => {
+    const circleSettings = buildMetricRenderAppearance(buildAppearanceSettings({ view: { selectedView: "circle" } }));
+    const barSettings = buildMetricRenderAppearance(buildAppearanceSettings({ view: { selectedView: "bar" } }));
+    const lineSettings = buildMetricRenderAppearance(buildAppearanceSettings({ view: { selectedView: "line" } }));
 
-    assert.equal(circularSettings.graphicType, "circular");
-    assert.equal(linearSettings.graphicType, "linear");
-    assert.equal(sparklineSettings.graphicType, "sparkline");
+    assert.equal(circleSettings.graphicType, "circular");
+    assert.equal(barSettings.graphicType, "linear");
+    assert.equal(lineSettings.graphicType, "sparkline");
 });
 
-test("circle style maps resolved appearance settings to renderer presets", () => {
-    const compactSettings = buildMetricRenderAppearance(buildAppearanceSettings({ graph: { circleStyle: "compact" } }));
-    const gaugeSettings = buildMetricRenderAppearance(buildAppearanceSettings({ graph: { circleStyle: "gauge" } }));
-    const valueSettings = buildMetricRenderAppearance(buildAppearanceSettings({ graph: { circleStyle: "value" } }));
+test("circle variant maps resolved appearance settings to arc gauge style values", () => {
+    const compactSettings = buildMetricRenderAppearance(buildAppearanceSettings({ view: { circleVariant: "minimal" } }));
+    const gaugeSettings = buildMetricRenderAppearance(buildAppearanceSettings({ view: { circleVariant: "gauge" } }));
+    const valueSettings = buildMetricRenderAppearance(buildAppearanceSettings({ view: { circleVariant: "full-ring" } }));
 
     assert.equal(compactSettings.circleStyle, "compact");
     assert.equal(gaugeSettings.circleStyle, "gauge");
     assert.equal(valueSettings.circleStyle, "value");
 });
 
-test("graphic style maps resolved appearance settings to theme preset names", () => {
+test("theme maps resolved appearance settings to renderer theme presets", () => {
     const cupertinoGlassSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         theme: { selectedTheme: "cupertino-glass" },
     }));
@@ -262,7 +262,7 @@ test("color filled multi-color mode uses soft triangle colors without threshold 
 
 test("line smoothing and grid options pass through resolved appearance settings", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
-        sparkline: {
+        line: {
             lineSmoothingPercent: 95,
             gridLineVisibility: "always",
             gridLineType: "vertical",

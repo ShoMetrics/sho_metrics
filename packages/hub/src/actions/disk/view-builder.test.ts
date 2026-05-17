@@ -20,7 +20,7 @@ test("disk usage automatic volume reads default usage keys after registry select
         resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings,
         {
             appearance: {
-                graph: { viewLayout: "linear" },
+                view: { selectedView: "bar" },
             },
             disk: {
                 kind: "usage",
@@ -67,7 +67,7 @@ test("disk usage display keeps explicit unavailable volume instead of falling ba
         resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings,
         {
             appearance: {
-                graph: { viewLayout: "linear" },
+                view: { selectedView: "bar" },
             },
             disk: {
                 kind: "usage",
@@ -129,9 +129,9 @@ test("disk compact center icon label uses theme label font family", () => {
         resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings,
         {
             appearance: {
-                graph: {
-                    viewLayout: "circular",
-                    circleStyle: "compact",
+                view: {
+                    selectedView: "circle",
+                    circleVariant: "minimal",
                 },
                 theme: { selectedTheme: "terminal" },
             },

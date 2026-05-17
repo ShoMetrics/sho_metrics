@@ -19,7 +19,7 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.widgetKind, "singleMetric");
         assert.equal(settings.widget.slot.metric.target.domain, "cpu");
         assert.equal(settings.preferences.pollingFrequencySeconds, 1);
-        assert.equal(settings.widget.slot.appearance.graph.viewLayout, "circular");
+        assert.equal(settings.widget.slot.appearance.view.selectedView, "circle");
         assert.equal(settings.widget.slot.appearance.paint.metric.solid.colors.usageColor, "#3b82f6");
         assert.equal(settings.widget.slot.appearance.theme.terminal.variant, "clean");
     });
@@ -85,10 +85,10 @@ describe("stored settings proto resolver", () => {
         const storedGlobalSettings = readStoredGlobalSettings({
             overrides: {
                 enabled: true,
-                graph: {
-                    graph: {
-                        viewLayout: "SINGLE_METRIC_VIEW_LAYOUT_LINEAR",
-                        circleStyle: "CIRCLE_STYLE_GAUGE",
+                view: {
+                    view: {
+                        selectedView: "METRIC_VIEW_BAR",
+                        circleVariant: "CIRCLE_VIEW_VARIANT_GAUGE",
                     },
                 },
                 theme: {
@@ -114,8 +114,8 @@ describe("stored settings proto resolver", () => {
                 slot: {
                     overrides: {
                         appearance: {
-                            graph: {
-                                viewLayout: "SINGLE_METRIC_VIEW_LAYOUT_SPARKLINE",
+                            view: {
+                                selectedView: "METRIC_VIEW_LINE",
                             },
                             paint: {
                                 metric: {
@@ -138,8 +138,8 @@ describe("stored settings proto resolver", () => {
         });
 
         assert.equal(settings.preferences.pollingFrequencySeconds, 15);
-        assert.equal(settings.widget.slot.appearance.graph.viewLayout, "linear");
-        assert.equal(settings.widget.slot.appearance.graph.circleStyle, "gauge");
+        assert.equal(settings.widget.slot.appearance.view.selectedView, "bar");
+        assert.equal(settings.widget.slot.appearance.view.circleVariant, "gauge");
         assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "cupertino-glass");
         assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "solid");
         assert.equal(settings.widget.slot.appearance.paint.metric.solid.colors.usageColor, "#111111");
@@ -218,11 +218,11 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.slot.appearance.theme.terminal.variant, "vintage");
     });
 
-    it("applies global paint override without replacing widget layout and style", () => {
+    it("applies global paint override without replacing widget view and theme", () => {
         const storedGlobalSettings = readStoredGlobalSettings({
             overrides: {
                 enabled: true,
-                graph: {
+                view: {
                     enabled: false,
                 },
                 theme: {
@@ -240,8 +240,8 @@ describe("stored settings proto resolver", () => {
                 slot: {
                     overrides: {
                         appearance: {
-                            graph: {
-                                viewLayout: "SINGLE_METRIC_VIEW_LAYOUT_SPARKLINE",
+                            view: {
+                                selectedView: "METRIC_VIEW_LINE",
                             },
                             theme: {
                                 selectedTheme: "METRIC_THEME_CUPERTINO_GLASS",
@@ -267,7 +267,7 @@ describe("stored settings proto resolver", () => {
             storedGlobalSettings,
         });
 
-        assert.equal(settings.widget.slot.appearance.graph.viewLayout, "sparkline");
+        assert.equal(settings.widget.slot.appearance.view.selectedView, "line");
         assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "cupertino-glass");
         assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "black-white");
         assert.equal(settings.widget.slot.appearance.paint.metric.solid.colors.usageColor, "#3b82f6");

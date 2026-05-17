@@ -4,7 +4,7 @@ import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { TextSetting } from "../controls/TextSetting";
 import {
-    resolveDiskLinearLabelPlaceholder,
+    resolveDiskBarLabelPlaceholder,
     resolveDiskVolumeOptions,
     resolveSelectedDiskVolume,
     resolveSelectedDiskVolumeLabel,
@@ -13,9 +13,9 @@ import {
     DiskThroughputChannelColorSettings,
     StandardColorSettings,
 } from "./ColorSettings";
-import { LayoutSettings } from "./LayoutSettings";
+import { AppearanceSettings } from "./AppearanceSettings";
 import { PollingSettings } from "./PollingSettings";
-import { SparklineSettings } from "./SparklineSettings";
+import { LineSettings } from "./LineSettings";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import type { ResolvedDiskMetricTarget } from "../../settings/resolved-settings";
@@ -37,7 +37,7 @@ export function DiskWidgetSettings(props: DiskWidgetSettingsProps): React.JSX.El
     const reading = props.target.reading;
     const usesThroughputChannelColors = reading.kind === "throughput"
         && reading.direction === "both"
-        && props.context.resolved.widget.slot.appearance.graph.viewLayout !== "linear";
+        && props.context.resolved.widget.slot.appearance.view.selectedView !== "bar";
 
     return (
         <>
@@ -46,7 +46,7 @@ export function DiskWidgetSettings(props: DiskWidgetSettingsProps): React.JSX.El
             ) : (
                 <DiskUsageSettings {...props} reading={reading} />
             )}
-            <LayoutSettings {...props} />
+            <AppearanceSettings {...props} />
             {usesThroughputChannelColors ? (
                 <DiskThroughputChannelColorSettings {...props} />
             ) : (
@@ -60,7 +60,7 @@ export function DiskWidgetSettings(props: DiskWidgetSettingsProps): React.JSX.El
 function DiskUsageSettings(props: DiskWidgetSettingsProps & {
     reading: DiskUsageReading;
 }): React.JSX.Element {
-    const graphicType = props.context.resolved.widget.slot.appearance.graph.viewLayout;
+    const selectedView = props.context.resolved.widget.slot.appearance.view.selectedView;
     const selectedDiskVolumeId = props.target.volumeId
         ?? resolveSelectedDiskVolume(props.context)?.id
         ?? "";
@@ -78,7 +78,7 @@ function DiskUsageSettings(props: DiskWidgetSettingsProps & {
                     })}
                 />
             </SettingsSection>
-            {(graphicType === "circular" || graphicType === "text") && (
+            {(selectedView === "circle" || selectedView === "text") && (
                 <SettingsSection title="Scale & Units">
                     <SelectSetting
                         label="Usage Display"
@@ -90,8 +90,8 @@ function DiskUsageSettings(props: DiskWidgetSettingsProps & {
                     />
                 </SettingsSection>
             )}
-            {graphicType === "linear" && <DiskUsageLabelSettings {...props} />}
-            <SparklineSettings {...props} />
+            {selectedView === "bar" && <DiskUsageBarLabelSettings {...props} />}
+            <LineSettings {...props} />
         </>
     );
 }
@@ -153,7 +153,7 @@ function DiskThroughputSettings(props: DiskWidgetSettingsProps & {
                     disabled={isAutoScale}
                 />
             </SettingsSection>
-            <SparklineSettings {...props} />
+            <LineSettings {...props} />
         </>
     );
 }
@@ -181,7 +181,7 @@ function DiskMetricKindSetting({
     );
 }
 
-function DiskUsageLabelSettings({
+function DiskUsageBarLabelSettings({
     context,
     reading,
     onSettingsPatch,
@@ -189,7 +189,7 @@ function DiskUsageLabelSettings({
     reading: DiskUsageReading;
 }): React.JSX.Element {
     const detectedLabel = resolveSelectedDiskVolumeLabel(context);
-    const currentLabel = reading.linearLabel;
+    const currentLabel = reading.barLabel;
     const canUseDetectedLabel = detectedLabel.length > 0
         && detectedLabel !== "-"
         && currentLabel.trim() !== detectedLabel;
@@ -200,10 +200,10 @@ function DiskUsageLabelSettings({
             <TextSetting
                 label="Custom Label"
                 value={currentLabel}
-                onValueChange={(linearLabel) => onSettingsPatch({
-                    disk: { linearLabel },
+                onValueChange={(barLabel) => onSettingsPatch({
+                    disk: { barLabel },
                 })}
-                placeholder={resolveDiskLinearLabelPlaceholder(context)}
+                placeholder={resolveDiskBarLabelPlaceholder(context)}
                 actionButton={(
                     <button
                         className="inline-action-button"
@@ -212,7 +212,7 @@ function DiskUsageLabelSettings({
                         onClick={() => {
                             if (canUseDetectedLabel) {
                                 onSettingsPatch({
-                                    disk: { linearLabel: detectedLabel },
+                                    disk: { barLabel: detectedLabel },
                                 });
                             }
                         }}

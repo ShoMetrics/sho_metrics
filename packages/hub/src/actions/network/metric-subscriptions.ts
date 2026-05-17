@@ -2,10 +2,10 @@ import {
     getNetworkAggregateMetricKey,
     getNetworkInterfaceMetricKey,
 } from "../../runtime/network-metric-keys";
-import type { NetworkDirection, SingleMetricViewLayout } from "../../settings/resolved-settings";
+import type { MetricView, NetworkDirection } from "../../settings/resolved-settings";
 
 export interface NetworkMetricSubscriptionSettings {
-    graphicType: SingleMetricViewLayout;
+    selectedView: MetricView;
     networkDirection: NetworkDirection;
     networkInterfaceId: string;
 }
@@ -14,7 +14,7 @@ export function resolveNetworkMetricSubscriptionKeys(settings: NetworkMetricSubs
     const displayDirection = settings.networkDirection;
 
     if (
-        settings.graphicType === "linear"
+        settings.selectedView === "bar"
         || displayDirection === "both"
     ) {
         return [

@@ -5,7 +5,7 @@ const TRADEMARK_PATTERN = /\((?:r|tm|c)\)|[®™©]/gi;
 const SPACE_PATTERN = /\s+/g;
 
 /**
- * Produces short hardware model labels for constrained Stream Deck linear bars.
+ * Produces short hardware model labels for constrained Stream Deck bar views.
  * The formatter removes vendor boilerplate and marketing suffixes while keeping
  * the recognizable product family and SKU.
  */

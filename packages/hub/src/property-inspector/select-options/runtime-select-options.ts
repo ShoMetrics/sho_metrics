@@ -78,7 +78,7 @@ export function resolveSelectedDiskVolumeLabel(context: VisibilityContext): stri
     return volumeLabel && volumeLabel.length > 0 ? volumeLabel : "-";
 }
 
-export function resolveDiskLinearLabelPlaceholder(context: VisibilityContext): string {
+export function resolveDiskBarLabelPlaceholder(context: VisibilityContext): string {
     const diskVolume = resolveSelectedDiskVolume(context);
 
     if (!diskVolume) {

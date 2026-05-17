@@ -1,5 +1,5 @@
 import {
-    CircleStyle as StoredCircleStyle,
+    CircleViewVariant as StoredCircleViewVariant,
     ColorMode as StoredColorMode,
     CpuMetricTarget_Kind as StoredCpuMetricKind,
     DiskMetricTarget_Kind as StoredDiskMetricKind,
@@ -14,26 +14,26 @@ import {
     NetworkMetricTarget_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
     TerminalThemeVariant as StoredTerminalThemeVariant,
     ScaleMode as StoredScaleMode,
-    SingleMetricViewLayout as StoredSingleMetricViewLayout,
-    SparklineAppearanceSettings_GridLineType as StoredGridLineType,
-    SparklineAppearanceSettings_GridLineVisibility as StoredGridLineVisibility,
+    MetricView as StoredMetricView,
+    LineAppearanceSettings_GridLineType as StoredGridLineType,
+    LineAppearanceSettings_GridLineVisibility as StoredGridLineVisibility,
     TemperatureUnit as StoredTemperatureUnit,
     type AppearanceSettings as StoredAppearanceSettings,
-    type AppearanceGraphSettings as StoredAppearanceGraphSettings,
     type AppearancePaintSettings as StoredAppearancePaintSettings,
     type AppearanceThemeSettings as StoredAppearanceThemeSettings,
+    type AppearanceViewSettings as StoredAppearanceViewSettings,
     type CatalogMetricTarget as StoredCatalogMetricTarget,
     type ColorFilledMultiColorPaintSettings as StoredColorFilledMultiColorPaintSettings,
     type ColorFilledPaintSettings as StoredColorFilledPaintSettings,
     type ColorFilledSolidPaintSettings as StoredColorFilledSolidPaintSettings,
     type DiskMetricTarget as StoredDiskMetricTarget,
     type DiskThroughputDisplaySettings as StoredDiskThroughputDisplaySettings,
-    type GlobalGraphOverride as StoredGlobalGraphOverride,
     type GlobalMetricPaintSettings as StoredGlobalMetricPaintSettings,
     type GlobalMultiColorPaintSettings as StoredGlobalMultiColorPaintSettings,
     type GlobalPaintOverride as StoredGlobalPaintOverride,
     type GlobalSolidPaintSettings as StoredGlobalSolidPaintSettings,
     type GlobalThemeOverride as StoredGlobalThemeOverride,
+    type GlobalViewOverride as StoredGlobalViewOverride,
     type GpuMetricTarget as StoredGpuMetricTarget,
     type MetricPaintSettings as StoredMetricPaintSettings,
     type MetricMultiColorPaintSettings as StoredMetricMultiColorPaintSettings,
@@ -50,7 +50,7 @@ import {
     type StoredWidgetSettings,
 } from "../../generated/shometrics/v1/settings_pb.js";
 import type {
-    CircleStyle,
+    CircleViewVariant,
     ColorMode,
     DiskThroughputDirection,
     DiskUsageDisplayMode,
@@ -63,18 +63,18 @@ import type {
     TerminalThemeVariant,
     ResolvedAppearanceSettings,
     ResolvedCatalogMetricTarget,
-    ResolvedAppearanceGraphSettings,
     ResolvedAppearancePaintSettings,
     ResolvedAppearanceThemeSettings,
+    ResolvedAppearanceViewSettings,
     ResolvedColorFilledMultiColorPaintSettings,
     ResolvedColorFilledPaintSettings,
     ResolvedColorFilledSolidPaintSettings,
     ResolvedDiskReading,
     ResolvedDiskThroughputDisplaySettings,
     ResolvedGlobalDefaults,
-    ResolvedGlobalGraphOverride,
     ResolvedGlobalSettings,
     ResolvedGlobalThemeOverride,
+    ResolvedGlobalViewOverride,
     ResolvedGlobalMetricPaintSettings,
     ResolvedGlobalMultiColorPaintSettings,
     ResolvedGlobalPaintOverride,
@@ -95,11 +95,11 @@ import type {
     ResolvedNetworkDisplaySettings,
     ResolvedNetworkReading,
     ResolvedTerminalThemeSettings,
-    ResolvedSparklineAppearanceSettings,
+    ResolvedLineAppearanceSettings,
     ResolvedWidgetPreferences,
     ResolvedWidgetSettings,
     ScaleMode,
-    SingleMetricViewLayout,
+    MetricView,
     SourceFailureMode,
     TemperatureUnit,
 } from "../resolved-settings";
@@ -147,20 +147,20 @@ const sourceFailureModeByProto = {
     [StoredSourceFailureMode.USE_FALLBACK]: "useFallback",
 } satisfies Record<StoredSourceFailureMode, SourceFailureMode | undefined>;
 
-const singleMetricViewLayoutByProto = {
-    [StoredSingleMetricViewLayout.UNSPECIFIED]: undefined,
-    [StoredSingleMetricViewLayout.CIRCULAR]: "circular",
-    [StoredSingleMetricViewLayout.TEXT]: "text",
-    [StoredSingleMetricViewLayout.LINEAR]: "linear",
-    [StoredSingleMetricViewLayout.SPARKLINE]: "sparkline",
-} satisfies Record<StoredSingleMetricViewLayout, SingleMetricViewLayout | undefined>;
+const metricViewByProto = {
+    [StoredMetricView.UNSPECIFIED]: undefined,
+    [StoredMetricView.CIRCLE]: "circle",
+    [StoredMetricView.TEXT]: "text",
+    [StoredMetricView.BAR]: "bar",
+    [StoredMetricView.LINE]: "line",
+} satisfies Record<StoredMetricView, MetricView | undefined>;
 
-const circleStyleByProto = {
-    [StoredCircleStyle.UNSPECIFIED]: undefined,
-    [StoredCircleStyle.VALUE]: "value",
-    [StoredCircleStyle.COMPACT]: "compact",
-    [StoredCircleStyle.GAUGE]: "gauge",
-} satisfies Record<StoredCircleStyle, CircleStyle | undefined>;
+const circleViewVariantByProto = {
+    [StoredCircleViewVariant.UNSPECIFIED]: undefined,
+    [StoredCircleViewVariant.FULL_RING]: "full-ring",
+    [StoredCircleViewVariant.MINIMAL]: "minimal",
+    [StoredCircleViewVariant.GAUGE]: "gauge",
+} satisfies Record<StoredCircleViewVariant, CircleViewVariant | undefined>;
 
 const metricThemeByProto = {
     [StoredMetricTheme.UNSPECIFIED]: undefined,
@@ -282,8 +282,8 @@ export function resolveStoredGlobalSettings(
 ): ResolvedGlobalSettings {
     const storedOverrides = storedGlobalSettings?.overrides;
     const globalOverrideEnabled = storedOverrides?.enabled === true;
-    const graphOverrideEnabled = globalOverrideEnabled
-        && (storedOverrides?.graph?.enabled ?? true);
+    const viewOverrideEnabled = globalOverrideEnabled
+        && (storedOverrides?.view?.enabled ?? true);
     const themeOverrideEnabled = globalOverrideEnabled
         && (storedOverrides?.theme?.enabled ?? true);
     const paintOverrideEnabled = globalOverrideEnabled
@@ -292,8 +292,8 @@ export function resolveStoredGlobalSettings(
     return {
         defaults: resolveGlobalDefaults(storedGlobalSettings),
         globalOverrideEnabled,
-        graphOverride: graphOverrideEnabled
-            ? resolveGlobalGraphOverride(storedOverrides?.graph)
+        viewOverride: viewOverrideEnabled
+            ? resolveGlobalViewOverride(storedOverrides?.view)
             : undefined,
         themeOverride: themeOverrideEnabled
             ? resolveGlobalThemeOverride(storedOverrides?.theme)
@@ -334,12 +334,12 @@ function resolveMetricSlot(
         DEFAULT_APPEARANCE_SETTINGS,
         storedSlot?.overrides?.appearance,
     );
-    const appearanceWithGraphOverride = globalSettings.graphOverride
-        ? applyGlobalGraphOverride(slotAppearance, globalSettings.graphOverride)
+    const appearanceWithViewOverride = globalSettings.viewOverride
+        ? applyGlobalViewOverride(slotAppearance, globalSettings.viewOverride)
         : slotAppearance;
     const appearanceWithThemeOverride = globalSettings.themeOverride
-        ? applyGlobalThemeOverride(appearanceWithGraphOverride, globalSettings.themeOverride)
-        : appearanceWithGraphOverride;
+        ? applyGlobalThemeOverride(appearanceWithViewOverride, globalSettings.themeOverride)
+        : appearanceWithViewOverride;
     const appearance = globalSettings.paintOverride
         ? applyGlobalPaintOverride(appearanceWithThemeOverride, globalSettings.paintOverride)
         : appearanceWithThemeOverride;
@@ -485,7 +485,7 @@ function resolveDiskReading(
                     diskUsageDisplayModeByProto,
                     "percentage",
                 ),
-                linearLabel: storedTarget.linearLabel ?? "",
+                barLabel: storedTarget.barLabel ?? "",
             };
         case StoredDiskMetricKind.UNSPECIFIED:
             return throwUnexpectedStoredSettingsState("Unexpected disk metric kind after protovalidate.");
@@ -582,11 +582,11 @@ function resolveGlobalDefaults(
     };
 }
 
-function resolveGlobalGraphOverride(
-    storedOverride: StoredGlobalGraphOverride | undefined,
-): ResolvedGlobalGraphOverride {
+function resolveGlobalViewOverride(
+    storedOverride: StoredGlobalViewOverride | undefined,
+): ResolvedGlobalViewOverride {
     return {
-        graph: resolveAppearanceGraphSettings(DEFAULT_APPEARANCE_SETTINGS.graph, storedOverride?.graph),
+        view: resolveAppearanceViewSettings(DEFAULT_APPEARANCE_SETTINGS.view, storedOverride?.view),
     };
 }
 
@@ -650,20 +650,24 @@ function mergeAppearanceSettings(
     storedAppearance: StoredAppearanceSettings | undefined,
 ): ResolvedAppearanceSettings {
     return {
-        graph: resolveAppearanceGraphSettings(defaults.graph, storedAppearance?.graph),
+        view: resolveAppearanceViewSettings(defaults.view, storedAppearance?.view),
         theme: resolveAppearanceThemeSettings(defaults.theme, storedAppearance?.theme),
         paint: resolveAppearancePaintSettings(defaults.paint, storedAppearance?.paint),
-        sparkline: resolveSparklineAppearanceSettings(defaults.sparkline, storedAppearance?.sparkline),
+        line: resolveLineAppearanceSettings(defaults.line, storedAppearance?.line),
     };
 }
 
-function resolveAppearanceGraphSettings(
-    defaults: ResolvedAppearanceGraphSettings,
-    storedGraph: StoredAppearanceGraphSettings | undefined,
-): ResolvedAppearanceGraphSettings {
+function resolveAppearanceViewSettings(
+    defaults: ResolvedAppearanceViewSettings,
+    storedView: StoredAppearanceViewSettings | undefined,
+): ResolvedAppearanceViewSettings {
     return {
-        viewLayout: resolveStoredEnum(storedGraph?.viewLayout, singleMetricViewLayoutByProto, defaults.viewLayout),
-        circleStyle: resolveStoredEnum(storedGraph?.circleStyle, circleStyleByProto, defaults.circleStyle),
+        selectedView: resolveStoredEnum(storedView?.selectedView, metricViewByProto, defaults.selectedView),
+        circleVariant: resolveStoredEnum(
+            storedView?.circleVariant,
+            circleViewVariantByProto,
+            defaults.circleVariant,
+        ),
     };
 }
 
@@ -776,18 +780,18 @@ function resolveMetricMultiColorPaintSettings(
     };
 }
 
-function resolveSparklineAppearanceSettings(
-    defaults: ResolvedSparklineAppearanceSettings,
-    storedSparkline: StoredAppearanceSettings["sparkline"] | undefined,
-): ResolvedSparklineAppearanceSettings {
+function resolveLineAppearanceSettings(
+    defaults: ResolvedLineAppearanceSettings,
+    storedLine: StoredAppearanceSettings["line"] | undefined,
+): ResolvedLineAppearanceSettings {
     return {
-        lineSmoothingPercent: storedSparkline?.lineSmoothingPercent ?? defaults.lineSmoothingPercent,
+        lineSmoothingPercent: storedLine?.lineSmoothingPercent ?? defaults.lineSmoothingPercent,
         gridLineVisibility: resolveStoredEnum(
-            storedSparkline?.gridLineVisibility,
+            storedLine?.gridLineVisibility,
             gridLineVisibilityByProto,
             defaults.gridLineVisibility,
         ),
-        gridLineType: resolveStoredEnum(storedSparkline?.gridLineType, gridLineTypeByProto, defaults.gridLineType),
+        gridLineType: resolveStoredEnum(storedLine?.gridLineType, gridLineTypeByProto, defaults.gridLineType),
     };
 }
 
@@ -814,13 +818,13 @@ function resolveGlobalMultiColorPaintSettings(
     };
 }
 
-function applyGlobalGraphOverride(
+function applyGlobalViewOverride(
     appearance: ResolvedAppearanceSettings,
-    graphOverride: ResolvedGlobalGraphOverride,
+    viewOverride: ResolvedGlobalViewOverride,
 ): ResolvedAppearanceSettings {
     return {
         ...appearance,
-        graph: graphOverride.graph,
+        view: viewOverride.view,
     };
 }
 

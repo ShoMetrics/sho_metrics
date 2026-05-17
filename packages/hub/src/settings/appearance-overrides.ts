@@ -2,26 +2,26 @@ import type {
     ColorMode,
     MetricTheme,
     TerminalThemeVariant,
-    ResolvedAppearanceGraphSettings,
     ResolvedAppearanceSettings,
+    ResolvedAppearanceViewSettings,
+    ResolvedLineAppearanceSettings,
     ResolvedMetricMultiColorChannelColors,
     ResolvedMetricMultiColorPaintSettings,
     ResolvedMultiColorSet,
-    ResolvedSparklineAppearanceSettings,
 } from "./resolved-settings";
 
 export type MetricColorChannel = keyof ResolvedMetricMultiColorChannelColors;
 
 export interface ResolvedAppearanceSettingsOverride {
-    readonly graph?: ResolvedAppearanceGraphSettingsOverride | undefined;
+    readonly view?: ResolvedAppearanceViewSettingsOverride | undefined;
     readonly theme?: ResolvedAppearanceThemeSettingsOverride | undefined;
     readonly paint?: ResolvedAppearancePaintSettingsOverride | undefined;
-    readonly sparkline?: ResolvedSparklineAppearanceSettingsOverride | undefined;
+    readonly line?: ResolvedLineAppearanceSettingsOverride | undefined;
 }
 
-export interface ResolvedAppearanceGraphSettingsOverride {
-    readonly viewLayout?: ResolvedAppearanceGraphSettings["viewLayout"] | undefined;
-    readonly circleStyle?: ResolvedAppearanceGraphSettings["circleStyle"] | undefined;
+export interface ResolvedAppearanceViewSettingsOverride {
+    readonly selectedView?: ResolvedAppearanceViewSettings["selectedView"] | undefined;
+    readonly circleVariant?: ResolvedAppearanceViewSettings["circleVariant"] | undefined;
 }
 
 export interface ResolvedAppearanceThemeSettingsOverride {
@@ -94,10 +94,10 @@ export interface ResolvedMultiColorSetOverride {
     readonly highColor?: string | undefined;
 }
 
-export interface ResolvedSparklineAppearanceSettingsOverride {
-    readonly lineSmoothingPercent?: ResolvedSparklineAppearanceSettings["lineSmoothingPercent"] | undefined;
-    readonly gridLineVisibility?: ResolvedSparklineAppearanceSettings["gridLineVisibility"] | undefined;
-    readonly gridLineType?: ResolvedSparklineAppearanceSettings["gridLineType"] | undefined;
+export interface ResolvedLineAppearanceSettingsOverride {
+    readonly lineSmoothingPercent?: ResolvedLineAppearanceSettings["lineSmoothingPercent"] | undefined;
+    readonly gridLineVisibility?: ResolvedLineAppearanceSettings["gridLineVisibility"] | undefined;
+    readonly gridLineType?: ResolvedLineAppearanceSettings["gridLineType"] | undefined;
 }
 
 export function mergeResolvedAppearanceSettings(
@@ -109,9 +109,9 @@ export function mergeResolvedAppearanceSettings(
     }
 
     return {
-        graph: {
-            ...settings.graph,
-            ...override.graph,
+        view: {
+            ...settings.view,
+            ...override.view,
         },
         theme: {
             ...settings.theme,
@@ -122,9 +122,9 @@ export function mergeResolvedAppearanceSettings(
             },
         },
         paint: mergeAppearancePaintSettings(settings.paint, override.paint),
-        sparkline: {
-            ...settings.sparkline,
-            ...override.sparkline,
+        line: {
+            ...settings.line,
+            ...override.line,
         },
     };
 }

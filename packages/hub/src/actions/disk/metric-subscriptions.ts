@@ -2,28 +2,17 @@ import {
     getDefaultDiskUsageMetricKey,
     getDiskThroughputMetricKey,
     getDiskVolumeMetricKey,
+    type DiskUsageMetric,
 } from "../../runtime/disk-metric-keys";
 import type {
     DiskThroughputDirection as DiskThroughputDisplayDirection,
-    SingleMetricViewLayout,
+    MetricView,
 } from "../../settings/resolved-settings";
 
 export interface DiskMetricSubscriptionSettings {
     diskMetricKind: "usage" | "throughput";
-    graphicType: SingleMetricViewLayout;
+    selectedView: MetricView;
     diskThroughputDirection: DiskThroughputDisplayDirection;
-}
-
-export function resolveDiskUsageMetricSubscriptionKeys(volumeId: string | undefined): readonly string[] {
-    if (volumeId && volumeId.length > 0) {
-        return [
-            getDiskVolumeMetricKey("used", volumeId),
-            getDiskVolumeMetricKey("total", volumeId),
-            getDiskVolumeMetricKey("available", volumeId),
-        ];
-    }
-
-    return [getDefaultDiskUsageMetricKey("used"), getDefaultDiskUsageMetricKey("total"), getDefaultDiskUsageMetricKey("available")];
 }
 
 export function resolveDiskMetricSubscriptionKeys(settings: DiskMetricSubscriptionSettings): readonly string[] {
@@ -33,7 +22,7 @@ export function resolveDiskMetricSubscriptionKeys(settings: DiskMetricSubscripti
 
     const throughputDirection = settings.diskThroughputDirection;
 
-    if (isDualDiskThroughputDisplay(settings.graphicType, throughputDirection)) {
+    if (isDualDiskThroughputDisplay(settings.selectedView, throughputDirection)) {
         return [
             getDiskThroughputMetricKey("read"),
             getDiskThroughputMetricKey("write"),
@@ -43,10 +32,24 @@ export function resolveDiskMetricSubscriptionKeys(settings: DiskMetricSubscripti
     return [getDiskThroughputMetricKey(throughputDirection === "both" ? "total" : throughputDirection)];
 }
 
+export function resolveDiskUsageMetricSubscriptionKeys(volumeId: string | undefined): readonly string[] {
+    return [
+        resolveDiskUsageMetricKey("used", volumeId),
+        resolveDiskUsageMetricKey("total", volumeId),
+        resolveDiskUsageMetricKey("available", volumeId),
+    ];
+}
+
 export function isDualDiskThroughputDisplay(
-    graphicType: SingleMetricViewLayout | undefined,
+    selectedView: MetricView | undefined,
     direction: DiskThroughputDisplayDirection,
 ): boolean {
     return direction === "both"
-        && (graphicType === "circular" || graphicType === "text" || graphicType === "sparkline");
+        && (selectedView === "circle" || selectedView === "text" || selectedView === "line");
+}
+
+function resolveDiskUsageMetricKey(metric: DiskUsageMetric, volumeId: string | undefined): string {
+    return volumeId && volumeId.length > 0
+        ? getDiskVolumeMetricKey(metric, volumeId)
+        : getDefaultDiskUsageMetricKey(metric);
 }

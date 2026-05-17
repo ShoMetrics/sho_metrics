@@ -11,14 +11,14 @@ import {
     networkTrafficDisplayModeOptionList,
 } from "./setting-options";
 
-export function SparklineSettings({
+export function LineSettings({
     context,
     onSettingsPatch,
 }: WidgetSettingsPanelProps): React.JSX.Element | null {
     const appearance = context.resolved.widget.slot.appearance;
     const target = context.resolved.widget.slot.metric.target;
 
-    if (appearance.graph.viewLayout !== "sparkline") {
+    if (appearance.view.selectedView !== "line") {
         return null;
     }
 
@@ -30,7 +30,7 @@ export function SparklineSettings({
         <SettingsSection title="Trend">
             {isNetworkBoth && (
                 <SelectSetting
-                    label="Traffic Graph"
+                    label="Traffic Mode"
                     value={target.reading.trafficDisplayMode}
                     optionList={networkTrafficDisplayModeOptionList}
                     onValueChange={(trafficDisplayMode) => onSettingsPatch({
@@ -41,12 +41,12 @@ export function SparklineSettings({
             <SectionHeading text="Visual Guides" />
             <RangeSetting
                 label="Trend Line Smoothing"
-                value={appearance.sparkline.lineSmoothingPercent}
+                value={appearance.line.lineSmoothingPercent}
                 minimum={0}
                 maximum={100}
                 step={5}
                 onValueChange={(lineSmoothingPercent) => onSettingsPatch({
-                    appearance: { sparkline: { lineSmoothingPercent } },
+                    appearance: { line: { lineSmoothingPercent } },
                 })}
             />
             {isMirroredNetworkTraffic ? (
@@ -56,19 +56,19 @@ export function SparklineSettings({
                         value="none"
                         optionList={disabledGridLineVisibilityOptionList}
                         onValueChange={(gridLineVisibility) => onSettingsPatch({
-                            appearance: { sparkline: { gridLineVisibility } },
+                            appearance: { line: { gridLineVisibility } },
                         })}
                         disabled
                     />
                     <InspectorItem className="note-item note-item-caption">
-                        <p className="section-note">Grid line settings are not supported in mirrored Traffic Graph.</p>
+                        <p className="section-note">Grid line settings are not supported in mirrored traffic mode.</p>
                     </InspectorItem>
                     <SelectSetting
                         label="Grid Line Type"
-                        value={appearance.sparkline.gridLineType}
+                        value={appearance.line.gridLineType}
                         optionList={gridLineTypeOptionList}
                         onValueChange={(gridLineType) => onSettingsPatch({
-                            appearance: { sparkline: { gridLineType } },
+                            appearance: { line: { gridLineType } },
                         })}
                         disabled
                     />
@@ -77,10 +77,10 @@ export function SparklineSettings({
                 <>
                     <SelectSetting
                         label="Grid Line Visibility"
-                        value={appearance.sparkline.gridLineVisibility}
+                        value={appearance.line.gridLineVisibility}
                         optionList={gridLineVisibilityOptionList}
                         onValueChange={(gridLineVisibility) => onSettingsPatch({
-                            appearance: { sparkline: { gridLineVisibility } },
+                            appearance: { line: { gridLineVisibility } },
                         })}
                     />
                     <InspectorItem className="note-item note-item-caption">
@@ -88,12 +88,12 @@ export function SparklineSettings({
                     </InspectorItem>
                     <SelectSetting
                         label="Grid Line Type"
-                        value={appearance.sparkline.gridLineType}
+                        value={appearance.line.gridLineType}
                         optionList={gridLineTypeOptionList}
                         onValueChange={(gridLineType) => onSettingsPatch({
-                            appearance: { sparkline: { gridLineType } },
+                            appearance: { line: { gridLineType } },
                         })}
-                        disabled={appearance.sparkline.gridLineVisibility === "none"}
+                        disabled={appearance.line.gridLineVisibility === "none"}
                     />
                 </>
             )}

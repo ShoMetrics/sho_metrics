@@ -23,6 +23,7 @@ import {
     renderNetworkInterfaceIconFragment,
 } from "../../widgets/icons/catalog/network";
 import type { MetricDisplayOptions } from "../../metric-view-runner/runner";
+import { resolveArcGaugeStyle } from "../../settings/render-appearance-builder";
 import { buildColorConfigFromAppearance, resolveSolidMetricColorMode } from "../../settings/render-paint-resolver";
 
 export interface NetworkDisplayUpdate {
@@ -48,26 +49,26 @@ interface BuildNetworkDisplayOptions {
 export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): NetworkDisplayUpdate {
     const appearance = options.settings.widget.slot.appearance;
     const networkReading = options.target.reading;
-    const effectiveGraphicType = appearance.graph.viewLayout;
+    const selectedView = appearance.view.selectedView;
     const displayDirection = networkReading.direction;
 
-    if (effectiveGraphicType === "linear") {
+    if (selectedView === "bar") {
         return {
-            displayOptions: buildLinearNetworkDisplayOptions(options),
+            displayOptions: buildBarNetworkDisplayOptions(options),
         };
     }
 
-    if (effectiveGraphicType === "sparkline" && displayDirection === "both") {
+    if (selectedView === "line" && displayDirection === "both") {
         return {
-            displayOptions: buildDualNetworkSparklineDisplayOptions(options),
+            displayOptions: buildDualNetworkLineDisplayOptions(options),
         };
     }
 
     if (displayDirection === "both") {
         return {
-            displayOptions: buildDualNetworkCircularDisplayOptions({
+            displayOptions: buildDualNetworkCircleOrTextDisplayOptions({
                 ...options,
-                dualGraphicType: effectiveGraphicType === "text" ? "text" : "circular",
+                dualGraphicType: selectedView === "text" ? "text" : "circular",
             }),
         };
     }
@@ -83,8 +84,8 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
         direction: displayDirection,
         target: options.target,
     });
-    const circleStyle = appearance.graph.circleStyle;
-    const shouldRenderGaugeFooter = effectiveGraphicType === "circular" && circleStyle === "gauge";
+    const arcGaugeStyle = resolveArcGaugeStyle(appearance.view.circleVariant);
+    const shouldRenderGaugeFooter = selectedView === "circle" && arcGaugeStyle === "gauge";
     const renderedWidgetData = shouldRenderGaugeFooter
         ? { ...displayWidgetData, label: ARC_GAUGE_LABELS.network }
         : displayWidgetData;
@@ -96,7 +97,7 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
             metricKey: networkMetricKey,
             widgetData: renderedWidgetData,
             centerIconFragment: buildNetworkCenterIconFragment({
-                circleStyle,
+                arcGaugeStyle,
                 direction: displayDirection,
                 selectedNetworkInterface: options.selectedNetworkInterface,
             }),
@@ -109,7 +110,7 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
             statusIcon: getNetworkDirectionStatusIcon({
                 direction: displayDirection,
             }),
-            circleStyleOverride: circleStyle,
+            circleStyleOverride: arcGaugeStyle,
             appearanceOverride: {
                 paint: {
                     metric: {
@@ -159,7 +160,7 @@ export function resolveNetworkMaximumMegabitsPerSecond(
         : DEFAULT_UPLOAD_MAXIMUM_SPEED_MEGABITS_PER_SECOND;
 }
 
-function buildDualNetworkCircularDisplayOptions(
+function buildDualNetworkCircleOrTextDisplayOptions(
     options: BuildNetworkDisplayOptions & { dualGraphicType: "circular" | "text" },
 ): MetricDisplayOptions {
     const uploadMetricKey = getNetworkMetricKey("upload", options.target.interfaceId);
@@ -187,7 +188,7 @@ function buildDualNetworkCircularDisplayOptions(
     const uploadColorConfig = buildNetworkChannelColorConfig("upload", options.settings);
     const downloadColorConfig = buildNetworkChannelColorConfig("download", options.settings);
     const appearance = options.settings.widget.slot.appearance;
-    const circleStyle = appearance.graph.circleStyle;
+    const arcGaugeStyle = resolveArcGaugeStyle(appearance.view.circleVariant);
     const solidMetricColorMode = resolveSolidMetricColorMode(appearance.paint.metric.colorMode);
 
     return {
@@ -207,7 +208,7 @@ function buildDualNetworkCircularDisplayOptions(
         statusIcon: getNetworkDirectionStatusIcon({
             direction: "download",
         }),
-        circleStyleOverride: circleStyle,
+        circleStyleOverride: arcGaugeStyle,
         positiveColor: uploadColor,
         negativeColor: downloadColor,
         positiveColorConfig: uploadColorConfig,
@@ -241,7 +242,7 @@ function buildDualNetworkCircularDisplayOptions(
     };
 }
 
-function buildDualNetworkSparklineDisplayOptions(options: BuildNetworkDisplayOptions): MetricDisplayOptions {
+function buildDualNetworkLineDisplayOptions(options: BuildNetworkDisplayOptions): MetricDisplayOptions {
     const uploadMetricKey = getNetworkMetricKey("upload", options.target.interfaceId);
     const downloadMetricKey = getNetworkMetricKey("download", options.target.interfaceId);
     const uploadWidgetData = buildNetworkWidgetData({
@@ -314,7 +315,7 @@ function buildDualNetworkSparklineDisplayOptions(options: BuildNetworkDisplayOpt
     };
 }
 
-function buildLinearNetworkDisplayOptions(options: BuildNetworkDisplayOptions): MetricDisplayOptions {
+function buildBarNetworkDisplayOptions(options: BuildNetworkDisplayOptions): MetricDisplayOptions {
     const uploadMetricKey = getNetworkMetricKey("upload", options.target.interfaceId);
     const downloadMetricKey = getNetworkMetricKey("download", options.target.interfaceId);
     const uploadWidgetData = buildNetworkWidgetData({
@@ -377,7 +378,7 @@ function buildLinearNetworkDisplayOptions(options: BuildNetworkDisplayOptions): 
                 ?? uploadWidgetData.sampleTimestampMilliseconds,
         },
         centerIconFragment: buildNetworkCenterIconFragment({
-            circleStyle: "compact",
+            arcGaugeStyle: "compact",
             direction: "download",
             selectedNetworkInterface: options.selectedNetworkInterface,
         }),
@@ -435,11 +436,11 @@ function getNetworkDirectionLabel(direction: NetworkDirection): string {
 }
 
 function buildNetworkCenterIconFragment(options: {
-    circleStyle: "value" | "compact" | "gauge";
+    arcGaugeStyle: "value" | "compact" | "gauge";
     direction: NetworkDirection;
     selectedNetworkInterface: NetworkInterfaceOption | null;
 }): string {
-    if (options.circleStyle === "compact") {
+    if (options.arcGaugeStyle === "compact") {
         return renderNetworkInterfaceIconFragment({
             networkInterface: options.selectedNetworkInterface,
             size: NETWORK_CENTER_ICON_SIZE,

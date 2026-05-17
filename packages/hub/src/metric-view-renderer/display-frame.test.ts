@@ -56,9 +56,9 @@ test("single circular icon placeholder keeps source data and marks the render pl
     const displayOptions = buildSingleMetricRenderOptions({
         widgetData: buildWidgetData(),
         resolvedSettings: {
-            graph: {
-                viewLayout: "circular",
-                circleStyle: "compact",
+            view: {
+                selectedView: "circle",
+                circleVariant: "minimal",
             },
         },
     });
@@ -173,9 +173,9 @@ test("center content falls back to value outside circular graphics", () => {
         displayOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData(),
             resolvedSettings: {
-                graph: {
-                    viewLayout: "linear",
-                    circleStyle: "compact",
+                view: {
+                    selectedView: "bar",
+                    circleVariant: "minimal",
                 },
             },
         }),
@@ -200,9 +200,9 @@ test("compact circle style uses icon center content", () => {
         displayOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData(),
             resolvedSettings: {
-                graph: {
-                    viewLayout: "circular",
-                    circleStyle: "compact",
+                view: {
+                    selectedView: "circle",
+                    circleVariant: "minimal",
                 },
             },
         }),
@@ -217,7 +217,7 @@ test("key render plan uses keypad PNG dimensions and no touch strip layout", () 
         displayOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
             resolvedSettings: {
-                graph: { viewLayout: "linear" },
+                view: { selectedView: "bar" },
             },
         }),
         renderTarget: "key",
@@ -233,7 +233,7 @@ test("touch strip layout uses square rendering for circular graphics", () => {
         displayOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
             resolvedSettings: {
-                graph: { viewLayout: "circular" },
+                view: { selectedView: "circle" },
             },
         }),
         renderTarget: "touch-strip",
@@ -246,7 +246,7 @@ test("touch strip layout uses square rendering for circular graphics", () => {
 
 test("touch strip layout uses wide rendering for non-circular graphics", () => {
     const touchStripMetricLayout = resolveTouchStripMetricLayout(buildMetricRenderAppearance(
-        buildDefaultAppearanceSettings({ graph: { viewLayout: "sparkline" } }),
+        buildDefaultAppearanceSettings({ view: { selectedView: "line" } }),
     ));
 
     assert.equal(touchStripMetricLayout.kind, "wide");

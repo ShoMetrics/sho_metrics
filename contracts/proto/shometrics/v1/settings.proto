@@ -170,7 +170,7 @@ message DiskMetricTarget {
   optional string volume_id = 2 [(buf.validate.field).string.max_len = 512];
 
   // Fields below are kind-specific. throughput_direction is only meaningful
-  // for Kind.KIND_THROUGHPUT; usage_display_mode and linear_label are only
+  // for Kind.KIND_THROUGHPUT; usage_display_mode and bar_label are only
   // meaningful for Kind.KIND_USAGE. If either branch grows further, split
   // into oneof sub-messages together with the similar GpuMetricTarget cleanup.
   optional ThroughputDirection throughput_direction = 3 [(buf.validate.field).enum = {
@@ -182,7 +182,7 @@ message DiskMetricTarget {
     not_in: [0]
   }];
 
-  optional string linear_label = 5 [(buf.validate.field).string.max_len = 32];
+  optional string bar_label = 5 [(buf.validate.field).string.max_len = 32];
 }
 
 message GpuMetricTarget {
@@ -289,34 +289,36 @@ message GlobalDefaults {
 
 message GlobalOverrides {
   // Main switch for global override. When enabled, omitted subsection enabled
-  // fields resolve to enabled so one click applies graph, theme, and paint
+  // fields resolve to enabled so one click applies view, theme, and paint
   // overrides.
   optional bool enabled = 1;
-  GlobalGraphOverride graph = 2;
+  GlobalViewOverride view = 2;
   GlobalThemeOverride theme = 3;
   GlobalPaintOverride paint = 4;
 }
 
 // AppearanceSettings describes the visual presentation of one metric. It is
-// grouped by user-facing domains instead of flattening graph, theme, paint, and
-// sparkline settings into one broad message.
+// grouped by user-facing domains instead of flattening view, theme, paint, and
+// line settings into one broad message.
 message AppearanceSettings {
-  AppearanceGraphSettings graph = 1;
+  AppearanceViewSettings view = 1;
   AppearanceThemeSettings theme = 2;
   AppearancePaintSettings paint = 3;
-  SparklineAppearanceSettings sparkline = 4;
+  LineAppearanceSettings line = 4;
 }
 
-message AppearanceGraphSettings {
-  // Single-metric view layout. Composite layouts, such as a touch strip with
-  // two circular meters, should be modeled as a future StoredWidgetSettings
-  // widget oneof arm instead of being added here.
-  optional SingleMetricViewLayout view_layout = 1 [(buf.validate.field).enum = {
+message AppearanceViewSettings {
+  // Main visual form for one metric slot. Composite widgets, such as a touch
+  // strip with two circle views, should be modeled as a future
+  // StoredWidgetSettings widget oneof arm instead of being added here.
+  optional MetricView selected_view = 1 [(buf.validate.field).enum = {
     defined_only: true
     not_in: [0]
   }];
 
-  optional CircleStyle circle_style = 2 [(buf.validate.field).enum = {
+  // Circle owns its variants here so other view families can add their own
+  // variant fields later without introducing invalid cross-view combinations.
+  optional CircleViewVariant circle_variant = 2 [(buf.validate.field).enum = {
     defined_only: true
     not_in: [0]
   }];
@@ -450,7 +452,7 @@ message ColorFilledMultiColorPaintSettings {
   optional bool gradient_enabled = 2;
 }
 
-message SparklineAppearanceSettings {
+message LineAppearanceSettings {
   enum GridLineVisibility {
     GRID_LINE_VISIBILITY_UNSPECIFIED = 0;
     GRID_LINE_VISIBILITY_ADAPTIVE = 1;
@@ -475,11 +477,11 @@ message SparklineAppearanceSettings {
   }];
 }
 
-message GlobalGraphOverride {
+message GlobalViewOverride {
   // When unset and global override is enabled, the resolver treats this
   // subsection as enabled.
   optional bool enabled = 1;
-  AppearanceGraphSettings graph = 2;
+  AppearanceViewSettings view = 2;
 }
 
 message GlobalThemeOverride {
@@ -572,19 +574,19 @@ message DiskThroughputDisplaySettings {
   optional uint32 maximum_write_throughput_mebibytes_per_second = 3 [(buf.validate.field).uint32.gt = 0];
 }
 
-enum SingleMetricViewLayout {
-  SINGLE_METRIC_VIEW_LAYOUT_UNSPECIFIED = 0;
-  SINGLE_METRIC_VIEW_LAYOUT_CIRCULAR = 1;
-  SINGLE_METRIC_VIEW_LAYOUT_TEXT = 2;
-  SINGLE_METRIC_VIEW_LAYOUT_LINEAR = 3;
-  SINGLE_METRIC_VIEW_LAYOUT_SPARKLINE = 4;
+enum MetricView {
+  METRIC_VIEW_UNSPECIFIED = 0;
+  METRIC_VIEW_TEXT = 1;
+  METRIC_VIEW_LINE = 2;
+  METRIC_VIEW_BAR = 3;
+  METRIC_VIEW_CIRCLE = 4;
 }
 
-enum CircleStyle {
-  CIRCLE_STYLE_UNSPECIFIED = 0;
-  CIRCLE_STYLE_VALUE = 1;
-  CIRCLE_STYLE_COMPACT = 2;
-  CIRCLE_STYLE_GAUGE = 3;
+enum CircleViewVariant {
+  CIRCLE_VIEW_VARIANT_UNSPECIFIED = 0;
+  CIRCLE_VIEW_VARIANT_FULL_RING = 1;
+  CIRCLE_VIEW_VARIANT_MINIMAL = 2;
+  CIRCLE_VIEW_VARIANT_GAUGE = 3;
 }
 
 enum MetricTheme {

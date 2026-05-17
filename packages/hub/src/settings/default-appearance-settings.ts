@@ -38,9 +38,9 @@ export const DEFAULT_DISK_WRITE_MULTI_COLOR_SET: ResolvedMultiColorSet = {
 };
 
 export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
-    graph: {
-        viewLayout: "circular",
-        circleStyle: "value",
+    view: {
+        selectedView: "circle",
+        circleVariant: "full-ring",
     },
     theme: {
         selectedTheme: "flat",
@@ -86,7 +86,7 @@ export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
             },
         },
     },
-    sparkline: {
+    line: {
         lineSmoothingPercent: 75,
         gridLineVisibility: "adaptive",
         gridLineType: "horizontal",
