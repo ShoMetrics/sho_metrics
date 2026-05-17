@@ -3,14 +3,14 @@ import {
     resolveDiskUsageMetricKey,
 } from "../../runtime/disk-metric-keys";
 import type {
-    DiskThroughputDirection as DiskThroughputDisplayDirection,
+    DiskThroughputDirection as ResolvedDiskThroughputDirection,
     MetricView,
 } from "../../settings/resolved-settings";
 
 export interface DiskMetricSubscriptionSettings {
     diskMetricKind: "usage" | "throughput";
     selectedView: MetricView;
-    diskThroughputDirection: DiskThroughputDisplayDirection;
+    diskThroughputDirection: ResolvedDiskThroughputDirection;
 }
 
 export function resolveDiskMetricSubscriptionKeys(settings: DiskMetricSubscriptionSettings): readonly string[] {
@@ -20,7 +20,7 @@ export function resolveDiskMetricSubscriptionKeys(settings: DiskMetricSubscripti
 
     const throughputDirection = settings.diskThroughputDirection;
 
-    if (isDualDiskThroughputDisplay(settings.selectedView, throughputDirection)) {
+    if (isDualDiskThroughputView(settings.selectedView, throughputDirection)) {
         return [
             getDiskThroughputMetricKey("read"),
             getDiskThroughputMetricKey("write"),
@@ -38,9 +38,9 @@ export function resolveDiskUsageMetricSubscriptionKeys(volumeId: string | undefi
     ];
 }
 
-export function isDualDiskThroughputDisplay(
+export function isDualDiskThroughputView(
     selectedView: MetricView | undefined,
-    direction: DiskThroughputDisplayDirection,
+    direction: ResolvedDiskThroughputDirection,
 ): boolean {
     return direction === "both"
         && (selectedView === "circle" || selectedView === "text" || selectedView === "line");

@@ -9,7 +9,7 @@ import {
 } from "./performance-stats";
 import type { DisplayUpdatePriority } from "./update-queue";
 
-const log = logger.for("MetricDisplayRunner");
+const log = logger.for("MetricViewRunner");
 const displayPerformanceStats = new DisplayPerformanceStats();
 
 function resolveDisplayPerformanceKind(event: WillAppearEvent): DisplayPerformanceKind {

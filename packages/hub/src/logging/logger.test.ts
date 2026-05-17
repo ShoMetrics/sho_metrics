@@ -83,7 +83,7 @@ test("enabled direct logs capture lazy message failures without throwing", () =>
 
 test("builder withCause appends the original Error object after entry data", () => {
     const sink = new RecordingLoggerSink("trace");
-    const log = createShoLogger(sink).for("MetricDisplayRunner");
+    const log = createShoLogger(sink).for("MetricViewRunner");
     const renderError = new Error("render failed");
     const actionEntry = {
         actionId: "action-1",

@@ -12,7 +12,7 @@ import { buildMetricSnapshot, buildScalarMetricValue } from "../../runtime/sourc
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
 import { resolveInitialActionSettings } from "../settings/action-settings-resolver";
-import { buildNetworkDisplayUpdate } from "./view-builder";
+import { buildNetworkViewUpdate } from "./view-builder";
 
 test("network automatic interface reads aggregate keys after registry selection", () => {
     const rawSettings = writeStoredWidgetSettingsPatch(
@@ -43,16 +43,16 @@ test("network automatic interface reads aggregate keys after registry selection"
         },
     }));
 
-    const displayUpdate = buildNetworkDisplayUpdate({
+    const viewUpdate = buildNetworkViewUpdate({
         event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
         settings,
         target,
         metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
         selectedNetworkInterface: buildNetworkInterfaceOption("Ethernet"),
     });
-    const widgetData = displayUpdate.displayOptions.widgetData;
+    const widgetData = viewUpdate.viewOptions.widgetData;
 
-    assert.equal(displayUpdate.displayOptions.metricKey, getNetworkAggregateMetricKey("download"));
+    assert.equal(viewUpdate.viewOptions.metricKey, getNetworkAggregateMetricKey("download"));
     if ("positive" in widgetData) {
         assert.fail("Expected single metric network display.");
     }
@@ -90,16 +90,16 @@ test("network explicit interface reads interface keys without registry selection
         },
     }));
 
-    const displayUpdate = buildNetworkDisplayUpdate({
+    const viewUpdate = buildNetworkViewUpdate({
         event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
         settings,
         target,
         metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
         selectedNetworkInterface: null,
     });
-    const widgetData = displayUpdate.displayOptions.widgetData;
+    const widgetData = viewUpdate.viewOptions.widgetData;
 
-    assert.equal(displayUpdate.displayOptions.metricKey, getNetworkInterfaceMetricKey("download", "Ethernet"));
+    assert.equal(viewUpdate.viewOptions.metricKey, getNetworkInterfaceMetricKey("download", "Ethernet"));
     if ("positive" in widgetData) {
         assert.fail("Expected single metric network display.");
     }

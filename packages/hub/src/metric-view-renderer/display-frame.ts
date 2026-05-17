@@ -62,21 +62,21 @@ export interface TouchStripMetricLayout {
     pngSize: KeySize;
 }
 
-export interface MetricDisplayRenderPlan {
+export interface MetricViewRenderPlan {
     renderAppearance: MetricRenderAppearance;
     centerContent: "value" | "icon";
     circleVariant: MetricRenderAppearance["circleVariant"];
-    displayHasData: boolean;
+    viewHasData: boolean;
     shouldRenderMutedIconPlaceholder: boolean;
     touchStripMetricLayout: TouchStripMetricLayout | null;
     renderSize: KeySize;
     pngSize: KeySize;
 }
 
-export interface MetricDisplayFrame {
+export interface MetricViewFrame {
     readonly svg: string;
     readonly renderedMetricData: WidgetData | DualChannelWidgetData;
-    readonly renderPlan: MetricDisplayRenderPlan;
+    readonly renderPlan: MetricViewRenderPlan;
 }
 
 interface RenderedMetricBody {
@@ -100,14 +100,14 @@ const TOUCH_STRIP_METRIC_LAYOUTS: Record<TouchStripMetricLayoutKind, TouchStripM
     },
 };
 
-export function composeMetricDisplayFrame(options: {
-    displayOptions: MetricRenderOptions;
+export function composeMetricViewFrame(options: {
+    viewOptions: MetricRenderOptions;
     renderTarget: MetricRenderTarget;
-}): MetricDisplayFrame {
-    const renderPlan = buildMetricDisplayRenderPlan(options);
-    const body = isDualMetricRenderOptions(options.displayOptions)
-        ? composeDualMetricBody(options.displayOptions, renderPlan)
-        : composeSingleMetricBody(options.displayOptions, renderPlan);
+}): MetricViewFrame {
+    const renderPlan = buildMetricViewRenderPlan(options);
+    const body = isDualMetricRenderOptions(options.viewOptions)
+        ? composeDualMetricBody(options.viewOptions, renderPlan)
+        : composeSingleMetricBody(options.viewOptions, renderPlan);
 
     return {
         svg: renderMetricFrame({
@@ -122,24 +122,24 @@ export function composeMetricDisplayFrame(options: {
     };
 }
 
-export function buildMetricDisplayRenderPlan(options: {
-    displayOptions: MetricRenderOptions;
+export function buildMetricViewRenderPlan(options: {
+    viewOptions: MetricRenderOptions;
     renderTarget: MetricRenderTarget;
-}): MetricDisplayRenderPlan {
+}): MetricViewRenderPlan {
     const resolvedAppearance = mergeResolvedAppearanceSettings(
-        options.displayOptions.resolvedSettings,
-        options.displayOptions.appearanceOverride,
+        options.viewOptions.resolvedSettings,
+        options.viewOptions.appearanceOverride,
     );
     const renderAppearance = buildMetricRenderAppearance(resolvedAppearance);
     const circleVariant = resolveEffectiveCircleVariant({
         renderPrimitive: renderAppearance.renderPrimitive,
         circleVariant: renderAppearance.circleVariant,
-        circleVariantOverride: options.displayOptions.circleVariantOverride,
+        circleVariantOverride: options.viewOptions.circleVariantOverride,
     });
     const centerContent = circleVariant === "minimal" ? "icon" : "value";
-    const displayHasData = hasMetricDisplayData(options.displayOptions);
-    const shouldRenderMutedIconPlaceholder = !displayHasData
-        && !isDualMetricRenderOptions(options.displayOptions)
+    const viewHasData = hasMetricViewData(options.viewOptions);
+    const shouldRenderMutedIconPlaceholder = !viewHasData
+        && !isDualMetricRenderOptions(options.viewOptions)
         && renderAppearance.renderPrimitive === "circle"
         && circleVariant === "minimal";
     const touchStripMetricLayout = options.renderTarget === "touch-strip"
@@ -150,7 +150,7 @@ export function buildMetricDisplayRenderPlan(options: {
         renderAppearance,
         centerContent,
         circleVariant,
-        displayHasData,
+        viewHasData,
         shouldRenderMutedIconPlaceholder,
         touchStripMetricLayout,
         renderSize: touchStripMetricLayout?.renderSize ?? WIDGET_LOGICAL_SIZE,
@@ -214,7 +214,7 @@ export function isDualMetricRenderOptions(options: MetricRenderOptions): options
     return "positiveColor" in options;
 }
 
-export function hasMetricDisplayData(options: MetricRenderOptions): boolean {
+export function hasMetricViewData(options: MetricRenderOptions): boolean {
     if (isDualMetricRenderOptions(options)) {
         return options.widgetData.positive.sampleTimestampMilliseconds != null
             || options.widgetData.negative.sampleTimestampMilliseconds != null;
@@ -223,7 +223,7 @@ export function hasMetricDisplayData(options: MetricRenderOptions): boolean {
     return options.widgetData.sampleTimestampMilliseconds != null;
 }
 
-export function resolveDisplayLogValue(widgetData: WidgetData | DualChannelWidgetData): number {
+export function resolveMetricViewLogValue(widgetData: WidgetData | DualChannelWidgetData): number {
     if (isDualChannelWidgetData(widgetData)) {
         return widgetData.positive.current + widgetData.negative.current;
     }
@@ -231,7 +231,7 @@ export function resolveDisplayLogValue(widgetData: WidgetData | DualChannelWidge
     return widgetData.current;
 }
 
-export function resolveDisplaySampleTimestampMilliseconds(widgetData: WidgetData | DualChannelWidgetData): number | undefined {
+export function resolveMetricViewSampleTimestampMilliseconds(widgetData: WidgetData | DualChannelWidgetData): number | undefined {
     if (isDualChannelWidgetData(widgetData)) {
         return widgetData.positive.sampleTimestampMilliseconds
             ?? widgetData.negative.sampleTimestampMilliseconds;
@@ -253,11 +253,11 @@ export function resolveTouchStripMetricLayout(settings: MetricRenderAppearance):
 
 function composeSingleMetricBody(
     options: SingleMetricRenderOptions,
-    renderPlan: MetricDisplayRenderPlan,
+    renderPlan: MetricViewRenderPlan,
 ): RenderedMetricBody {
     const renderedMetricData = buildRenderWidgetData({
         widgetData: options.widgetData,
-        hasData: renderPlan.displayHasData,
+        hasData: renderPlan.viewHasData,
         shouldRenderMutedIconPlaceholder: renderPlan.shouldRenderMutedIconPlaceholder,
     });
 
@@ -279,11 +279,11 @@ function composeSingleMetricBody(
 
 function composeDualMetricBody(
     options: DualMetricRenderOptions,
-    renderPlan: MetricDisplayRenderPlan,
+    renderPlan: MetricViewRenderPlan,
 ): RenderedMetricBody {
     const renderedMetricData = buildRenderDualChannelWidgetData({
         widgetData: options.widgetData,
-        hasData: renderPlan.displayHasData,
+        hasData: renderPlan.viewHasData,
     });
 
     return {

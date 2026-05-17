@@ -1,14 +1,14 @@
 import { action, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import type { MetricStoreReader } from "../runtime/metric-store";
-import { setSingleMetricDisplay } from "../metric-view-runner/runner";
+import { setMetricView } from "../metric-view-runner/runner";
 import type { WidgetData } from "../rendering/widget-data";
 import { formatByteCount } from "../metrics/byte-format";
 import { buildGpuPowerWidgetData } from "../metrics/gpu-power-widget-data";
 import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-format";
 import { buildTemperatureWidgetData } from "../metrics/temperature-widget-data";
 import { logger } from "../logging/logger";
-import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
+import { buildMetricViewIcons } from "../widgets/icons/metric-view-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import {
     GPU_MODEL_METRIC_KEY,
@@ -22,7 +22,7 @@ import {
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import type { ResolvedGpuMetricTarget, ResolvedWidgetSettings } from "../settings/resolved-settings";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
-import type { SingleMetricDisplayOptions } from "../metric-view-runner/runner";
+import type { SingleMetricViewOptions } from "../metric-view-runner/runner";
 
 const log = logger.for("Action:GPU");
 
@@ -44,7 +44,7 @@ export class Gpu extends MetricAction {
 
         this.publishGpuPowerRuntimeMaximum(event, gpuTarget, metrics);
 
-        setSingleMetricDisplay(buildGpuDisplayOptions({
+        setMetricView(buildGpuViewOptions({
             event,
             settings,
             target: gpuTarget,
@@ -89,12 +89,12 @@ export function resolveGpuMetricSubscriptionKeys(target: ResolvedGpuMetricTarget
     }
 }
 
-function buildGpuDisplayOptions(options: {
+function buildGpuViewOptions(options: {
     event: WillAppearEvent;
     settings: ResolvedWidgetSettings;
     target: ResolvedGpuMetricTarget;
     metrics: MetricStoreReader;
-}): SingleMetricDisplayOptions {
+}): SingleMetricViewOptions {
     const baseOptions = {
         event: options.event,
         resolvedSettings: options.settings.widget.slot.appearance,
@@ -116,7 +116,7 @@ function buildGpuDisplayOptions(options: {
                     maximumCelsius: options.target.reading.maximumCelsius,
                     unit: options.target.reading.unit,
                 }),
-                ...buildMetricDisplayIcons({ hardware: "gpu", status: "temperature" }),
+                ...buildMetricViewIcons({ hardware: "gpu", status: "temperature" }),
             };
         case "vram":
             return {
@@ -126,7 +126,7 @@ function buildGpuDisplayOptions(options: {
                     getGpuWidgetData(options.metrics, GPU_VRAM_USED_METRIC_KEY, ARC_GAUGE_LABELS.vram, "MB"),
                     getGpuWidgetData(options.metrics, GPU_VRAM_TOTAL_METRIC_KEY, ARC_GAUGE_LABELS.vram, "MB").current,
                 ),
-                ...buildMetricDisplayIcons({ hardware: "gpu", status: "memory" }),
+                ...buildMetricViewIcons({ hardware: "gpu", status: "memory" }),
             };
         case "power":
             return {
@@ -142,7 +142,7 @@ function buildGpuDisplayOptions(options: {
                     ),
                     maximumPowerWatts: options.target.reading.maximumWatts,
                 }),
-                ...buildMetricDisplayIcons({ hardware: "gpu", status: "power" }),
+                ...buildMetricViewIcons({ hardware: "gpu", status: "power" }),
             };
         case "usage": {
             const data = getGpuWidgetData(options.metrics, GPU_USAGE_METRIC_KEY, ARC_GAUGE_LABELS.gpu, "%");
@@ -159,7 +159,7 @@ function buildGpuDisplayOptions(options: {
                         )
                         : undefined,
                 },
-                ...buildMetricDisplayIcons({ hardware: "gpu", status: "percentage" }),
+                ...buildMetricViewIcons({ hardware: "gpu", status: "percentage" }),
             };
         }
     }

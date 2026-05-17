@@ -1,8 +1,8 @@
 import { action, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
-import { setSingleMetricDisplay } from "../metric-view-runner/runner";
+import { setMetricView } from "../metric-view-runner/runner";
 import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-format";
-import { buildMetricDisplayIcons } from "../widgets/icons/metric-display-icons";
+import { buildMetricViewIcons } from "../widgets/icons/metric-view-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
 import type { WidgetData } from "../rendering/widget-data";
 import { CPU_MODEL_METRIC_KEY, CPU_USAGE_METRIC_KEY } from "../runtime/metric-keys";
@@ -30,7 +30,7 @@ export class Cpu extends MetricAction {
             100,
         );
 
-        setSingleMetricDisplay({
+        setMetricView({
             event,
             resolvedSettings: settings.widget.slot.appearance,
             metricKey: CPU_USAGE_METRIC_KEY,
@@ -41,7 +41,7 @@ export class Cpu extends MetricAction {
                     "cpu",
                 ),
             },
-            ...buildMetricDisplayIcons({ hardware: "cpu", status: "percentage" }),
+            ...buildMetricViewIcons({ hardware: "cpu", status: "percentage" }),
         });
     }
 }
