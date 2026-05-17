@@ -23,6 +23,8 @@ import type {
     MetricDescriptor,
     SourceClient,
     SourceHealth,
+    SourceClientStatus,
+    SourceClientStatusReason,
     SourceWarning,
 } from "./source-client";
 import { WINDOWS_HELPER_SOURCE_ID } from "./source-ids";
@@ -39,8 +41,17 @@ export const MAXIMUM_SOURCE_IPC_FRAME_BYTES = 1024 * 1024;
 /** Minimum cooldown before retrying helper health after protocol incompatibility. */
 export const UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS = 60000;
 
-/** Minimum cooldown before retrying helper health after pipe or health failures. */
+/** Cooldown before retrying when the Windows helper named pipe is missing. */
+export const PIPE_NOT_FOUND_RETRY_COOLDOWN_MILLISECONDS = 300000;
+
+/** First cooldown before retrying helper health after transient helper failures. */
 export const HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS = 5000;
+
+/** Second cooldown before retrying helper health after repeated transient helper failures. */
+export const HELPER_UNAVAILABLE_SECOND_RETRY_COOLDOWN_MILLISECONDS = 15000;
+
+/** Maximum cooldown before retrying helper health after repeated transient helper failures. */
+export const HELPER_UNAVAILABLE_MAXIMUM_RETRY_COOLDOWN_MILLISECONDS = 60000;
 
 const SOURCE_IPC_LENGTH_PREFIX_BYTES = 4;
 const DEFAULT_HEALTH_TIMEOUT_MILLISECONDS = 750;
@@ -122,6 +133,8 @@ export class WindowsHelperSourceClient implements SourceClient {
     private protocolCheckPromise: Promise<void> | undefined;
     private unsupportedProtocolRetryAfterMilliseconds = 0;
     private helperUnavailableRetryAfterMilliseconds = 0;
+    private helperUnavailableFailureCount = 0;
+    private status: SourceClientStatus = { state: "unknown" };
 
     constructor(options: WindowsHelperSourceClientOptions = {}) {
         this.pipePath = options.pipePath ?? DEFAULT_WINDOWS_HELPER_PIPE_PATH;
@@ -141,13 +154,19 @@ export class WindowsHelperSourceClient implements SourceClient {
     async readSnapshot(metricKeys: readonly string[]): Promise<IMetricSnapshot> {
         await this.ensureProtocolSupported();
 
-        const response = await this.sendSourceIpcRequest({
-            case: "readMetricSnapshot",
-            value: create(ReadMetricSnapshotRequestSchema, {
-                metricIds: [...metricKeys],
-                includeDescriptors: false,
-            }),
-        }, this.timeouts.readSnapshotMilliseconds);
+        let response: SourceIpcResponse;
+        try {
+            response = await this.sendSourceIpcRequest({
+                case: "readMetricSnapshot",
+                value: create(ReadMetricSnapshotRequestSchema, {
+                    metricIds: [...metricKeys],
+                    includeDescriptors: false,
+                }),
+            }, this.timeouts.readSnapshotMilliseconds);
+        } catch (error) {
+            this.recordHelperRequestFailure(error);
+            throw error;
+        }
 
         if (response.payload.case !== "readMetricSnapshot") {
             throw new Error(`Unexpected Windows source response: ${response.payload.case ?? "empty"}.`);
@@ -157,6 +176,8 @@ export class WindowsHelperSourceClient implements SourceClient {
         if (!snapshot) {
             throw new Error("Windows source returned a snapshot response without a snapshot.");
         }
+
+        this.recordHelperRequestSuccess();
 
         return buildMetricSnapshot({
             sourceId: this.sourceId,
@@ -168,21 +189,48 @@ export class WindowsHelperSourceClient implements SourceClient {
     async listMetricDescriptors(metricKeys: readonly string[]): Promise<readonly MetricDescriptor[]> {
         await this.ensureProtocolSupported();
 
-        const response = await this.sendSourceIpcRequest({
-            case: "listMetricDescriptors",
-            value: create(ListMetricDescriptorsRequestSchema, {
-                metricIds: [...metricKeys],
-            }),
-        }, this.timeouts.listDescriptorsMilliseconds);
+        let response: SourceIpcResponse;
+        try {
+            response = await this.sendSourceIpcRequest({
+                case: "listMetricDescriptors",
+                value: create(ListMetricDescriptorsRequestSchema, {
+                    metricIds: [...metricKeys],
+                }),
+            }, this.timeouts.listDescriptorsMilliseconds);
+        } catch (error) {
+            this.recordHelperRequestFailure(error);
+            throw error;
+        }
 
         if (response.payload.case !== "listMetricDescriptors") {
             throw new Error(`Unexpected Windows source response: ${response.payload.case ?? "empty"}.`);
         }
 
+        this.recordHelperRequestSuccess();
+
         return response.payload.value.descriptors.map(toRuntimeMetricDescriptor);
     }
 
-    async getHealth(): Promise<SourceHealth> {
+    async checkHealth(): Promise<SourceHealth> {
+        let health: SourceHealth;
+        try {
+            health = await this.readSourceHealth();
+        } catch (error) {
+            this.recordHelperRequestFailure(error);
+            throw error;
+        }
+
+        if (health.protocolVersion === SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION) {
+            this.protocolCompatibility = "supported";
+            this.recordHelperRequestSuccess();
+        } else {
+            this.recordUnsupportedProtocol("unsupported_protocol");
+        }
+
+        return health;
+    }
+
+    private async readSourceHealth(): Promise<SourceHealth> {
         const response = await this.sendSourceIpcRequest({
             case: "getSourceHealth",
             value: create(GetSourceHealthRequestSchema),
@@ -197,6 +245,10 @@ export class WindowsHelperSourceClient implements SourceClient {
 
     dispose(): void {
         this.transport.dispose?.();
+    }
+
+    getCachedStatus(): SourceClientStatus {
+        return { ...this.status };
     }
 
     private async ensureProtocolSupported(): Promise<void> {
@@ -223,29 +275,15 @@ export class WindowsHelperSourceClient implements SourceClient {
     }
 
     private async readAndValidateHealth(): Promise<void> {
-        let health: SourceHealth;
-        try {
-            health = await this.getHealth();
-        } catch (error) {
-            this.helperUnavailableRetryAfterMilliseconds = this.now()
-                + HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
-            throw error;
-        }
+        const health = await this.checkHealth();
 
         if (health.protocolVersion !== SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION) {
-            this.protocolCompatibility = "unknown";
-            this.unsupportedProtocolRetryAfterMilliseconds = this.now()
-                + UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS;
             throw new Error([
                 "Unsupported Windows source protocol.",
                 `expected=${SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION}`,
                 `actual=${health.protocolVersion ?? ""}`,
             ].join(" "));
         }
-
-        this.protocolCompatibility = "supported";
-        this.unsupportedProtocolRetryAfterMilliseconds = 0;
-        this.helperUnavailableRetryAfterMilliseconds = 0;
     }
 
     private async sendSourceIpcRequest(
@@ -270,15 +308,19 @@ export class WindowsHelperSourceClient implements SourceClient {
 
         if (response.payload.case === "error") {
             if (response.payload.value.code === "unsupported_protocol") {
-                this.unsupportedProtocolRetryAfterMilliseconds = this.now()
-                    + UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS;
+                this.recordUnsupportedProtocol(response.payload.value.code);
+                throw new WindowsHelperSourceClientError([
+                    "Windows source returned an error.",
+                    `code=${response.payload.value.code}`,
+                    `message=${response.payload.value.message}`,
+                ].join(" "), response.payload.value.code, "protocolMismatch");
             }
 
-            throw new Error([
+            throw new WindowsHelperSourceClientError([
                 "Windows source returned an error.",
                 `code=${response.payload.value.code}`,
                 `message=${response.payload.value.message}`,
-            ].join(" "));
+            ].join(" "), response.payload.value.code, "sourceError");
         }
 
         if (response.payload.case === undefined) {
@@ -286,6 +328,65 @@ export class WindowsHelperSourceClient implements SourceClient {
         }
 
         return response;
+    }
+
+    private recordUnsupportedProtocol(errorCode: string): void {
+        const nowMilliseconds = this.now();
+        this.protocolCompatibility = "unknown";
+        this.unsupportedProtocolRetryAfterMilliseconds = nowMilliseconds
+            + UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS;
+        this.status = {
+            state: "unsupported",
+            reason: "protocolMismatch",
+            retryAfterTimestampMilliseconds: this.unsupportedProtocolRetryAfterMilliseconds,
+            lastErrorCode: errorCode,
+            lastFailureAtTimestampMilliseconds: nowMilliseconds,
+        };
+    }
+
+    private recordHelperRequestFailure(error: unknown): void {
+        if (isUnsupportedProtocolError(error)) {
+            return;
+        }
+
+        const nowMilliseconds = this.now();
+        const failure = classifyHelperRequestFailure(error);
+        const cooldownMilliseconds = failure.reason === "pipeMissing"
+            ? PIPE_NOT_FOUND_RETRY_COOLDOWN_MILLISECONDS
+            : this.nextUnavailableRetryCooldownMilliseconds();
+
+        this.helperUnavailableRetryAfterMilliseconds = nowMilliseconds + cooldownMilliseconds;
+        this.status = {
+            state: "unavailable",
+            reason: failure.reason,
+            retryAfterTimestampMilliseconds: this.helperUnavailableRetryAfterMilliseconds,
+            ...(failure.errorCode ? { lastErrorCode: failure.errorCode } : {}),
+            lastFailureAtTimestampMilliseconds: nowMilliseconds,
+        };
+    }
+
+    private recordHelperRequestSuccess(): void {
+        this.unsupportedProtocolRetryAfterMilliseconds = 0;
+        this.helperUnavailableRetryAfterMilliseconds = 0;
+        this.helperUnavailableFailureCount = 0;
+        this.status = {
+            state: "available",
+            lastSuccessAtTimestampMilliseconds: this.now(),
+        };
+    }
+
+    private nextUnavailableRetryCooldownMilliseconds(): number {
+        this.helperUnavailableFailureCount += 1;
+
+        if (this.helperUnavailableFailureCount === 1) {
+            return HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
+        }
+
+        if (this.helperUnavailableFailureCount === 2) {
+            return HELPER_UNAVAILABLE_SECOND_RETRY_COOLDOWN_MILLISECONDS;
+        }
+
+        return HELPER_UNAVAILABLE_MAXIMUM_RETRY_COOLDOWN_MILLISECONDS;
     }
 }
 
@@ -449,6 +550,64 @@ function toRuntimeSourceWarning(warning: ProtoSourceWarning): SourceWarning {
         ...(warning.metricId ? { metricId: warning.metricId } : {}),
         ...(warning.sourceSensorId ? { sourceSensorId: warning.sourceSensorId } : {}),
     };
+}
+
+class WindowsHelperSourceClientError extends Error {
+    override readonly name = "WindowsHelperSourceClientError";
+
+    constructor(
+        message: string,
+        readonly code: string,
+        readonly reason: SourceClientStatusReason,
+    ) {
+        super(message);
+    }
+}
+
+function isUnsupportedProtocolError(error: unknown): boolean {
+    return error instanceof WindowsHelperSourceClientError
+        && error.reason === "protocolMismatch";
+}
+
+function classifyHelperRequestFailure(error: unknown): {
+    readonly reason: SourceClientStatusReason;
+    readonly errorCode?: string;
+} {
+    if (error instanceof WindowsHelperSourceClientError) {
+        return {
+            reason: error.reason,
+            errorCode: error.code,
+        };
+    }
+
+    const errorCode = readErrorCode(error);
+    if (errorCode === "ENOENT") {
+        return {
+            reason: "pipeMissing",
+            errorCode,
+        };
+    }
+
+    if (errorCode === "ETIMEDOUT" || toError(error).message.toLowerCase().includes("timed out")) {
+        return {
+            reason: "timeout",
+            ...(errorCode ? { errorCode } : {}),
+        };
+    }
+
+    return {
+        reason: "healthFailed",
+        ...(errorCode ? { errorCode } : {}),
+    };
+}
+
+function readErrorCode(error: unknown): string | undefined {
+    if (!error || typeof error !== "object" || !("code" in error)) {
+        return undefined;
+    }
+
+    const code = (error as { readonly code?: unknown }).code;
+    return typeof code === "string" ? code : undefined;
 }
 
 function toError(error: unknown): Error {

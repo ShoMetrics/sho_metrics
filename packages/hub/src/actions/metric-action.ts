@@ -8,12 +8,8 @@ import streamDeck, {
 import { isDeepStrictEqual } from "node:util";
 import { scheduler } from "../runtime/scheduler";
 import { metricStore, type MetricStoreReader } from "../runtime/metric-store";
-import {
-    buildLocalMetricReadPlan,
-    buildMetricReadPlanKey,
-    normalizeMetricReadPlan,
-    type MetricReadPlan,
-} from "../runtime/sources/metric-read-plan";
+import { buildMetricReadPlanKey, type MetricReadPlan } from "../runtime/sources/metric-read-plan";
+import { buildMetricReadPlanFromSourcePolicy } from "../runtime/sources/metric-read-plan-builder";
 import { clearMetricDisplayState } from "../metric-view-runner/runner";
 import { logger } from "../logging/logger";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
@@ -166,12 +162,15 @@ export abstract class MetricAction extends SingletonAction {
         return metricReader;
     }
 
-    protected refreshMetricKeys(metricKeys: readonly string[]): Promise<void> {
-        return scheduler.refreshMetrics(this.buildMetricReadPlanForMetricKeys(metricKeys))
+    protected refreshMetricKeys(
+        event: WillAppearEvent | PropertyInspectorDidAppearEvent,
+        metricKeys: readonly string[],
+    ): Promise<void> {
+        return scheduler.refreshMetrics(this.buildMetricReadPlanForMetricKeys(event, metricKeys))
             .then(() => undefined);
     }
 
-    protected resolveSettings(event: WillAppearEvent): ResolvedWidgetSettings {
+    protected resolveSettings(event: WillAppearEvent | PropertyInspectorDidAppearEvent): ResolvedWidgetSettings {
         const activeActionState = this.activeActionStates.get(event.action.id);
         if (!activeActionState) {
             throw new Error(`Action ${event.action.id} is not active; cannot resolve settings.`);
@@ -286,15 +285,24 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     private resolveMetricReadPlan(event: WillAppearEvent): MetricReadPlan {
-        return this.buildMetricReadPlanForMetricKeys(this.getMetricKeys(event));
+        return this.buildMetricReadPlanForMetricKeys(event, this.getMetricKeys(event));
     }
 
-    private buildMetricReadPlanForMetricKeys(metricKeys: readonly string[]): MetricReadPlan {
+    private buildMetricReadPlanForMetricKeys(
+        event: WillAppearEvent | PropertyInspectorDidAppearEvent,
+        metricKeys: readonly string[],
+    ): MetricReadPlan {
         if (metricKeys.length === 0) {
             throw new Error(`Action ${this.actionKind} returned no metric keys.`);
         }
 
-        return normalizeMetricReadPlan(buildLocalMetricReadPlan(metricKeys));
+        const settings = this.resolveSettings(event);
+
+        return buildMetricReadPlanFromSourcePolicy({
+            metricKeys,
+            sourcePolicy: settings.widget.slot.metric.source,
+            defaultSourceProfileId: pluginGlobalSettingsStore.getResolved().defaultSourceProfileId,
+        });
     }
 }
 
