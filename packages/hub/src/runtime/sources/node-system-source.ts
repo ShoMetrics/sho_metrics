@@ -3,10 +3,10 @@ import {
     buildMetricSnapshot,
     buildScalarMetricValue,
     buildTextMetricValue,
-    type IMetricSource,
-    type IMetricSnapshot,
-    type IMetricValue,
-} from "./source.interface";
+    type MetricSource,
+    type MetricSnapshot,
+    type MetricValue,
+} from "./metric-source";
 import { logger } from "../../logging/logger";
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../network-interfaces";
 import {
@@ -112,7 +112,7 @@ interface NodeSystemSourceDependencies {
 /**
  * Node.js runtime metric source backed by `systeminformation` and OS command helpers.
  */
-export class NodeSystemSource implements IMetricSource {
+export class NodeSystemSource implements MetricSource {
     readonly sourceId = NODE_SYSTEM_SOURCE_ID;
 
     private readonly systemInformation: NodeSystemInformationClient;
@@ -154,12 +154,12 @@ export class NodeSystemSource implements IMetricSource {
             ?? pollSystemInformationGpuTelemetry;
     }
 
-    async poll(): Promise<IMetricSnapshot> {
+    async poll(): Promise<MetricSnapshot> {
         return this.pollMetrics([]);
     }
 
-    async pollMetrics(metricKeys: readonly string[]): Promise<IMetricSnapshot> {
-        const metrics: Record<string, IMetricValue> = {};
+    async pollMetrics(metricKeys: readonly string[]): Promise<MetricSnapshot> {
+        const metrics: Record<string, MetricValue> = {};
         const metricGroups = resolveMetricGroups(metricKeys);
         const pollStartTimestampMilliseconds = this.now();
 
@@ -199,7 +199,7 @@ export class NodeSystemSource implements IMetricSource {
         });
     }
 
-    private async pollMemory(): Promise<Record<string, IMetricValue>> {
+    private async pollMemory(): Promise<Record<string, MetricValue>> {
         try {
             const memoryData = await this.systemInformation.mem();
 
@@ -213,7 +213,7 @@ export class NodeSystemSource implements IMetricSource {
         }
     }
 
-    private async pollDiskSafely(metricKeys: readonly string[]): Promise<Record<string, IMetricValue>> {
+    private async pollDiskSafely(metricKeys: readonly string[]): Promise<Record<string, MetricValue>> {
         try {
             return await this.pollDisk(metricKeys);
         } catch (error) {
@@ -222,8 +222,8 @@ export class NodeSystemSource implements IMetricSource {
         }
     }
 
-    private async pollDisk(metricKeys: readonly string[]): Promise<Record<string, IMetricValue>> {
-        const metrics: Record<string, IMetricValue> = {};
+    private async pollDisk(metricKeys: readonly string[]): Promise<Record<string, MetricValue>> {
+        const metrics: Record<string, MetricValue> = {};
         const shouldPollUsage = metricKeys.length === 0 || metricKeys.some(isDiskUsageMetricKey);
         const shouldPollThroughput = metricKeys.length === 0 || metricKeys.some(isDiskThroughputMetricKey);
 
@@ -238,8 +238,8 @@ export class NodeSystemSource implements IMetricSource {
         return metrics;
     }
 
-    private async pollDiskUsage(): Promise<Record<string, IMetricValue>> {
-        const metrics: Record<string, IMetricValue> = {};
+    private async pollDiskUsage(): Promise<Record<string, MetricValue>> {
+        const metrics: Record<string, MetricValue> = {};
         const [fileSystems, blockDevices, diskLayout] = await Promise.all([
             this.systemInformation.fsSize(),
             this.systemInformation.blockDevices().catch(error => {
@@ -281,7 +281,7 @@ export class NodeSystemSource implements IMetricSource {
         return metrics;
     }
 
-    private async pollDiskThroughput(): Promise<Record<string, IMetricValue>> {
+    private async pollDiskThroughput(): Promise<Record<string, MetricValue>> {
         const fileSystemStats = await this.systemInformation.fsStats();
 
         return {
@@ -300,10 +300,10 @@ export class NodeSystemSource implements IMetricSource {
         };
     }
 
-    private async pollCpu(): Promise<Record<string, IMetricValue>> {
+    private async pollCpu(): Promise<Record<string, MetricValue>> {
         try {
             const load = await this.systemInformation.currentLoad();
-            const metrics: Record<string, IMetricValue> = {
+            const metrics: Record<string, MetricValue> = {
                 [CPU_USAGE_METRIC_KEY]: buildScalarMetricValue(load.currentLoad, {
                     unit: "%",
                     progress: Math.min(Math.max(load.currentLoad / 100, 0), 1),
@@ -353,7 +353,7 @@ export class NodeSystemSource implements IMetricSource {
             });
     }
 
-    private async pollNetworkSafely(): Promise<Record<string, IMetricValue>> {
+    private async pollNetworkSafely(): Promise<Record<string, MetricValue>> {
         try {
             return await this.pollNetwork();
         } catch (error) {
@@ -362,8 +362,8 @@ export class NodeSystemSource implements IMetricSource {
         }
     }
 
-    private async pollNetwork(): Promise<Record<string, IMetricValue>> {
-        const metrics: Record<string, IMetricValue> = {};
+    private async pollNetwork(): Promise<Record<string, MetricValue>> {
+        const metrics: Record<string, MetricValue> = {};
         const networkInterfaces = await this.systemInformation.networkInterfaces();
         const usableNetworkInterfaces = Array.isArray(networkInterfaces)
             ? networkInterfaces.filter(networkInterface => isUsableNetworkInterface(networkInterface, this.platform))

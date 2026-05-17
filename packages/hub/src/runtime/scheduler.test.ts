@@ -4,8 +4,8 @@ import { Scheduler, type MetricSnapshotStore } from "./scheduler";
 import {
     buildMetricSnapshot,
     buildScalarMetricValue,
-    type IMetricSnapshot,
-} from "./sources/source.interface";
+    type MetricSnapshot,
+} from "./sources/metric-source";
 import {
     buildLocalMetricReadPlan,
     LOCAL_SOURCE_SCOPE_ID,
@@ -17,7 +17,7 @@ test("subscribe polls read plans with sorted unique metric keys", async () => {
     const sourceRunner = new FakeSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
     const scheduler = new Scheduler(sourceRunner, snapshotStore);
-    const receivedSnapshots: IMetricSnapshot[] = [];
+    const receivedSnapshots: MetricSnapshot[] = [];
 
     const unsubscribe = scheduler.subscribe(snapshot => {
         receivedSnapshots.push(snapshot);
@@ -45,8 +45,8 @@ test("scheduler coalesces active subscribers with the same source plan", async (
     const sourceRunner = new FakeSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
     const scheduler = new Scheduler(sourceRunner, snapshotStore);
-    const firstSubscriberSnapshots: IMetricSnapshot[] = [];
-    const secondSubscriberSnapshots: IMetricSnapshot[] = [];
+    const firstSubscriberSnapshots: MetricSnapshot[] = [];
+    const secondSubscriberSnapshots: MetricSnapshot[] = [];
 
     const unsubscribeFirst = scheduler.subscribe(snapshot => {
         firstSubscriberSnapshots.push(snapshot);
@@ -142,8 +142,8 @@ test("later same-group subscribers do not join an in-flight initial poll", async
     const sourceRunner = new DeferredSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
     const scheduler = new Scheduler(sourceRunner, snapshotStore);
-    const firstSubscriberSnapshots: IMetricSnapshot[] = [];
-    const secondSubscriberSnapshots: IMetricSnapshot[] = [];
+    const firstSubscriberSnapshots: MetricSnapshot[] = [];
+    const secondSubscriberSnapshots: MetricSnapshot[] = [];
     let unsubscribeSecond: (() => void) | undefined;
 
     const unsubscribeFirst = scheduler.subscribe(snapshot => {
@@ -175,11 +175,11 @@ test("later same-group subscribers do not join an in-flight initial poll", async
 
 class FakeSourceRunner implements SourceRunner {
     readonly sourceId = "fake-source";
-    readonly snapshot: IMetricSnapshot = buildTestSnapshot(this.sourceId);
+    readonly snapshot: MetricSnapshot = buildTestSnapshot(this.sourceId);
     readonly polledReadPlans: MetricReadPlan[] = [];
     disposeCount = 0;
 
-    async poll(readPlan: MetricReadPlan): Promise<IMetricSnapshot> {
+    async poll(readPlan: MetricReadPlan): Promise<MetricSnapshot> {
         this.polledReadPlans.push(readPlan);
         return this.snapshot;
     }
@@ -191,15 +191,15 @@ class FakeSourceRunner implements SourceRunner {
 
 class DeferredSourceRunner implements SourceRunner {
     readonly sourceId = "deferred-source";
-    readonly snapshot: IMetricSnapshot = buildTestSnapshot(this.sourceId);
+    readonly snapshot: MetricSnapshot = buildTestSnapshot(this.sourceId);
     readonly polledReadPlans: MetricReadPlan[] = [];
-    private readonly pendingPollResolvers: Array<(snapshot: IMetricSnapshot) => void> = [];
+    private readonly pendingPollResolvers: Array<(snapshot: MetricSnapshot) => void> = [];
 
     get pendingPollCount(): number {
         return this.pendingPollResolvers.length;
     }
 
-    poll(readPlan: MetricReadPlan): Promise<IMetricSnapshot> {
+    poll(readPlan: MetricReadPlan): Promise<MetricSnapshot> {
         this.polledReadPlans.push(readPlan);
 
         return new Promise(resolve => {
@@ -219,7 +219,7 @@ class DeferredSourceRunner implements SourceRunner {
     }
 }
 
-function buildTestSnapshot(sourceId: string): IMetricSnapshot {
+function buildTestSnapshot(sourceId: string): MetricSnapshot {
     return buildMetricSnapshot({
         sourceId,
         timestampMilliseconds: 1000,
@@ -232,10 +232,10 @@ function buildTestSnapshot(sourceId: string): IMetricSnapshot {
 class FakeMetricSnapshotStore implements MetricSnapshotStore {
     readonly ingestedSnapshots: Array<{
         sourceScopeId: string;
-        snapshot: IMetricSnapshot;
+        snapshot: MetricSnapshot;
     }> = [];
 
-    ingest(sourceScopeId: string, snapshot: IMetricSnapshot): void {
+    ingest(sourceScopeId: string, snapshot: MetricSnapshot): void {
         this.ingestedSnapshots.push({ sourceScopeId, snapshot });
     }
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Systeminformation } from "systeminformation";
-import type { IMetricSnapshot, IMetricValue } from "./source.interface";
+import type { MetricSnapshot, MetricValue } from "./metric-source";
 import {
     formatCpuModelText,
     isFinitePositiveNumber,
@@ -690,13 +690,13 @@ function assertMetricGroups(
     assert.deepEqual([...actualMetricGroups].sort(), [...expectedMetricGroups].sort());
 }
 
-function assertSnapshotMetrics(snapshot: IMetricSnapshot): Record<string, PlainMetricValue> {
+function assertSnapshotMetrics(snapshot: MetricSnapshot): Record<string, PlainMetricValue> {
     return Object.fromEntries(
         Object.entries(snapshot.metrics).map(([key, value]) => [key, toPlainMetricValue(value)]),
     );
 }
 
-function toPlainMetricValue(value: IMetricValue): PlainMetricValue {
+function toPlainMetricValue(value: MetricValue): PlainMetricValue {
     return {
         ...(value.data.case === "scalar" ? { scalar: value.data.value } : {}),
         ...(value.data.case === "text" ? { text: value.data.value } : {}),

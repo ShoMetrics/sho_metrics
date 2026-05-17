@@ -4,9 +4,9 @@ import { createMetricSourceClient } from "./source-client";
 import {
     buildMetricSnapshot,
     buildScalarMetricValue,
-    type IMetricSnapshot,
-    type IMetricSource,
-} from "./source.interface";
+    type MetricSnapshot,
+    type MetricSource,
+} from "./metric-source";
 
 test("metric source client uses pollMetrics when the source supports requested keys", async () => {
     const source = new FakeMetricSource();
@@ -28,33 +28,33 @@ test("metric source client falls back to poll for poll-only sources", async () =
     assert.equal(source.pollCount, 1);
 });
 
-class FakeMetricSource implements IMetricSource {
+class FakeMetricSource implements MetricSource {
     readonly sourceId = "fake-source";
-    readonly snapshot: IMetricSnapshot = buildTestSnapshot(this.sourceId);
+    readonly snapshot: MetricSnapshot = buildTestSnapshot(this.sourceId);
     readonly polledMetricKeyListList: string[][] = [];
 
-    async poll(): Promise<IMetricSnapshot> {
+    async poll(): Promise<MetricSnapshot> {
         return this.snapshot;
     }
 
-    async pollMetrics(metricKeys: readonly string[]): Promise<IMetricSnapshot> {
+    async pollMetrics(metricKeys: readonly string[]): Promise<MetricSnapshot> {
         this.polledMetricKeyListList.push([...metricKeys]);
         return this.snapshot;
     }
 }
 
-class PollOnlyMetricSource implements IMetricSource {
+class PollOnlyMetricSource implements MetricSource {
     readonly sourceId = "poll-only-source";
-    readonly snapshot: IMetricSnapshot = buildTestSnapshot(this.sourceId);
+    readonly snapshot: MetricSnapshot = buildTestSnapshot(this.sourceId);
     pollCount = 0;
 
-    async poll(): Promise<IMetricSnapshot> {
+    async poll(): Promise<MetricSnapshot> {
         this.pollCount += 1;
         return this.snapshot;
     }
 }
 
-function buildTestSnapshot(sourceId: string): IMetricSnapshot {
+function buildTestSnapshot(sourceId: string): MetricSnapshot {
     return buildMetricSnapshot({
         sourceId,
         timestampMilliseconds: 1000,

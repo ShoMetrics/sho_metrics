@@ -1,4 +1,4 @@
-import type { IMetricSnapshot } from "./sources/source.interface";
+import type { MetricSnapshot } from "./sources/metric-source";
 import { metricStore } from "./metric-store";
 import { logger } from "../logging/logger";
 import {
@@ -10,7 +10,7 @@ import { createDefaultSourceRegistry } from "./sources/source-registry";
 
 const log = logger.for("Scheduler");
 
-export type MetricsSnapshot = IMetricSnapshot;
+export type MetricsSnapshot = MetricSnapshot;
 
 export type MetricSubscriber = (metrics: MetricsSnapshot) => void;
 
@@ -20,7 +20,7 @@ interface SubscriptionOptions {
 }
 
 export interface MetricSnapshotStore {
-    ingest(sourceScopeId: string, snapshot: IMetricSnapshot): void;
+    ingest(sourceScopeId: string, snapshot: MetricSnapshot): void;
 }
 
 interface SubscriberRecord {
