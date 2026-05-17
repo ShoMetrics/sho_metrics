@@ -15,7 +15,7 @@ import {
     clamp,
     renderConstrainedSvgText,
 } from "../../view-rendering/svg-utils";
-import type { Widget, WidgetBaseConfig } from "../widget.interface";
+import type { Widget, WidgetBaseConfig } from "../widget-contract";
 import { renderMetricTextRow } from "./metric-text-row";
 
 export interface ProgressBarConfig extends WidgetBaseConfig {
