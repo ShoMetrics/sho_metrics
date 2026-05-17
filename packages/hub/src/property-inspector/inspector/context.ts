@@ -1,5 +1,5 @@
 import type { WidgetRuntimeCache } from "../../runtime/widget-runtime-cache";
-import { readStoredGlobalSettings, readStoredWidgetSettings } from "../../settings/storage/codec";
+import { readStoredGlobalSettings } from "../../settings/storage/codec";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { resolveStoredWidgetSettings } from "../../settings/storage/resolver";
 import type { ActionKind } from "../../shared/stream-deck-actions";
@@ -21,7 +21,7 @@ export function buildPropertyInspectorContext(options: {
         runtimeCache: options.runtimeCache,
         runtimeCacheStatus: options.runtimeCacheStatus,
         resolved: resolveStoredWidgetSettings({
-            storedWidgetSettings: readStoredWidgetSettings(quickStartSettings.rawSettings).settings,
+            storedWidgetSettings: quickStartSettings.storedSettings,
             storedGlobalSettings: readStoredGlobalSettings(options.rawGlobalSettings).settings,
             runtime: {
                 isWindows: options.isWindows,

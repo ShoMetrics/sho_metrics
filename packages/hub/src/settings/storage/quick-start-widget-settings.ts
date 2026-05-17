@@ -28,6 +28,7 @@ export interface QuickStartStoredWidgetSettings {
     readonly rawSettings: unknown;
     readonly settingsJsonToPersist: StoredSettingsJsonObject | null;
     readonly readWarning: StoredSettingsReadWarning | null;
+    readonly storedSettings: StoredWidgetSettings;
 }
 
 export function resolveQuickStartStoredWidgetSettings(
@@ -35,16 +36,18 @@ export function resolveQuickStartStoredWidgetSettings(
     actionKind: ActionKind,
 ): QuickStartStoredWidgetSettings {
     const quickStartTarget = buildQuickStartMetricTarget(actionKind);
+    const readResult = readStoredWidgetSettings(rawSettings);
+    const storedSettings = readResult.settings;
+
     if (!quickStartTarget) {
         return {
             rawSettings,
             settingsJsonToPersist: null,
-            readWarning: null,
+            readWarning: readResult.warning,
+            storedSettings,
         };
     }
 
-    const readResult = readStoredWidgetSettings(rawSettings);
-    const storedSettings = readResult.settings;
     const readableSettingsJson = writeStoredWidgetSettings(storedSettings);
 
     if (hasStoredMetricTarget(storedSettings)) {
@@ -52,6 +55,7 @@ export function resolveQuickStartStoredWidgetSettings(
             rawSettings: readableSettingsJson,
             settingsJsonToPersist: null,
             readWarning: readResult.warning,
+            storedSettings,
         };
     }
 
@@ -60,6 +64,7 @@ export function resolveQuickStartStoredWidgetSettings(
         rawSettings: settingsJson,
         settingsJsonToPersist: settingsJson,
         readWarning: readResult.warning,
+        storedSettings,
     };
 }
 
