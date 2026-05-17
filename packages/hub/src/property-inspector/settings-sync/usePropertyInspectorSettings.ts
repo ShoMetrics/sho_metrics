@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import {
     readStoredGlobalSettings,
     writeStoredGlobalSettings,
     type StoredSettingsReadWarning,
-    type StoredSettingsJsonObject,
 } from "../../settings/storage/codec";
 import { resolveStoredGlobalSettings } from "../../settings/storage/resolver";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
@@ -12,10 +11,7 @@ import {
     type StoredWidgetSettingsPatch,
 } from "../../settings/storage/widget-settings-patch";
 import {
-    emptyWidgetRuntimeCache,
-    mergeWidgetRuntimeCache,
     WIDGET_RUNTIME_CACHE_MESSAGE_TYPE,
-    type WidgetRuntimeCache,
     type WidgetRuntimeCacheMessage,
     type WidgetRuntimeCachePatch,
 } from "../../runtime/widget-runtime-cache";
@@ -31,71 +27,47 @@ import {
     writeStoredGlobalSettingsPatch,
     type StoredGlobalSettingsPatch,
 } from "../../settings/storage/global-settings-patch";
-import type { LoadStatus, PropertyInspectorRuntimeCacheStatus } from "../inspector/types";
-
-interface SettingsSyncState {
-    actionKind: ActionKind;
-    isWindows: boolean;
-    rawSettings: unknown;
-    widgetSettingsStatus: LoadStatus;
-    runtimeCache: WidgetRuntimeCache;
-    runtimeCacheStatus: PropertyInspectorRuntimeCacheStatus;
-    rawGlobalSettings: unknown;
-    globalSettingsStatus: LoadStatus;
-    widgetSettingsNotice: SettingsNotice | null;
-    pluginSettingsNotice: SettingsNotice | null;
-}
-
-type CommitSettingsSyncState = (
-    buildNextState: (currentState: SettingsSyncState) => SettingsSyncState,
-) => SettingsSyncState;
+import {
+    initialSettingsSyncState,
+    settingsSyncReducer,
+    type InspectorPluginSettingsRead,
+    type InspectorWidgetSettingsRead,
+    type SettingsNotice,
+    type SettingsSyncDispatch,
+} from "./settings-sync-state";
 
 type SettingsScope = "widget" | "plugin";
 
-interface InspectorWidgetSettingsRead {
+interface SettingsInputSnapshot {
+    readonly actionKind: ActionKind;
     readonly rawSettings: unknown;
-    readonly notice: SettingsNotice | null;
-    readonly readWarning: StoredSettingsReadWarning | null;
+    readonly rawGlobalSettings: unknown;
 }
 
-interface InspectorPluginSettingsRead {
-    readonly rawGlobalSettings: StoredSettingsJsonObject;
-    readonly notice: SettingsNotice | null;
-    readonly readWarning: StoredSettingsReadWarning | null;
+interface SettingsInputSnapshotRef {
+    current: SettingsInputSnapshot;
 }
 
-export interface SettingsNotice {
-    kind: "loading" | "warning";
-    text: string;
-}
-
-const initialState: SettingsSyncState = {
-    actionKind: "unknown",
-    isWindows: false,
-    rawSettings: undefined,
-    widgetSettingsStatus: "pending",
-    runtimeCache: { ...emptyWidgetRuntimeCache },
-    runtimeCacheStatus: {
-        diskVolumeOptionsStatus: "pending",
-    },
-    rawGlobalSettings: undefined,
-    globalSettingsStatus: "pending",
-    widgetSettingsNotice: null,
-    pluginSettingsNotice: null,
-};
+export type { SettingsNotice } from "./settings-sync-state";
 
 export function usePropertyInspectorSettings(
     client: StreamDeckPropertyInspectorClient,
 ) {
-    const [state, setState] = useState<SettingsSyncState>(initialState);
-    const stateRef = useRef<SettingsSyncState>(initialState);
-    const commitState = useCallback<CommitSettingsSyncState>((buildNextState) => {
-        const nextState = buildNextState(stateRef.current);
-        stateRef.current = nextState;
-        setState(nextState);
+    const [state, dispatchSettingsAction] = useReducer(settingsSyncReducer, initialSettingsSyncState);
+    const settingsInputSnapshotRef = useRef<SettingsInputSnapshot>({
+        actionKind: initialSettingsSyncState.actionKind,
+        rawSettings: initialSettingsSyncState.rawSettings,
+        rawGlobalSettings: initialSettingsSyncState.rawGlobalSettings,
+    });
 
-        return nextState;
-    }, []);
+    // Stream Deck callbacks can arrive between React renders. Keep only the raw
+    // inputs needed to decode later events; reducer state owns the rendered UI.
+    settingsInputSnapshotRef.current = {
+        actionKind: state.actionKind,
+        rawSettings: state.rawSettings,
+        rawGlobalSettings: state.rawGlobalSettings,
+    };
+
     const resolvedGlobalSettings = useMemo(
         () => resolveStoredGlobalSettings(readStoredGlobalSettings(state.rawGlobalSettings).settings),
         [state.rawGlobalSettings],
@@ -116,122 +88,88 @@ export function usePropertyInspectorSettings(
         state.isWindows,
     ]);
 
-    const updateWidgetSettings = (patch: StoredWidgetSettingsPatch): void => {
-        let settingsJsonToPersist: StoredSettingsJsonObject | undefined;
-        const nextState = commitState((currentState) => {
-            const quickStartSettings = resolveQuickStartStoredWidgetSettings(
-                currentState.rawSettings,
-                currentState.actionKind,
-            );
-            const nextRawSettings = writeStoredWidgetSettingsPatch(quickStartSettings.rawSettings, patch);
-            settingsJsonToPersist = nextRawSettings;
+    const updateWidgetSettings = useCallback((patch: StoredWidgetSettingsPatch): void => {
+        const currentSnapshot = settingsInputSnapshotRef.current;
+        const quickStartSettings = resolveQuickStartStoredWidgetSettings(
+            currentSnapshot.rawSettings,
+            currentSnapshot.actionKind,
+        );
+        const nextRawSettings = writeStoredWidgetSettingsPatch(quickStartSettings.rawSettings, patch);
+        updateSettingsInputSnapshot(settingsInputSnapshotRef, { rawSettings: nextRawSettings });
+        dispatchSettingsAction({ type: "widgetSettingsPatched", rawSettings: nextRawSettings });
 
-            return {
-                ...currentState,
-                rawSettings: nextRawSettings,
-                widgetSettingsStatus: "ready",
-                widgetSettingsNotice: null,
-            };
+        client.setSettings(nextRawSettings).catch((error: Error) => {
+            dispatchSettingsAction({
+                type: "widgetSaveFailed",
+                errorMessage: error.message,
+            });
         });
+    }, [client]);
 
-        void nextState;
-        client.setSettings(settingsJsonToPersist ?? {}).catch((error: Error) => {
-            commitState((errorState) => ({
-                ...errorState,
-                widgetSettingsNotice: {
-                    kind: "warning",
-                    text: `Failed to save widget settings: ${error.message}`,
-                },
-            }));
+    const resetWidgetSettings = useCallback((): void => {
+        const currentSnapshot = settingsInputSnapshotRef.current;
+        const quickStartSettings = resolveQuickStartStoredWidgetSettings(undefined, currentSnapshot.actionKind);
+        const nextRawSettings = quickStartSettings.settingsJsonToPersist ?? {};
+        updateSettingsInputSnapshot(settingsInputSnapshotRef, { rawSettings: nextRawSettings });
+        dispatchSettingsAction({ type: "widgetSettingsPatched", rawSettings: nextRawSettings });
+
+        client.setSettings(nextRawSettings).catch((error: Error) => {
+            dispatchSettingsAction({
+                type: "widgetSaveFailed",
+                errorMessage: error.message,
+            });
         });
-    };
+    }, [client]);
 
-    const resetWidgetSettings = (): void => {
-        let settingsJsonToPersist: StoredSettingsJsonObject | undefined;
-        const nextState = commitState((currentState) => {
-            const quickStartSettings = resolveQuickStartStoredWidgetSettings(undefined, currentState.actionKind);
-            const nextRawSettings = quickStartSettings.settingsJsonToPersist ?? {};
-            settingsJsonToPersist = nextRawSettings;
+    const updateGlobalSettings = useCallback((patch: StoredGlobalSettingsPatch): void => {
+        const currentSnapshot = settingsInputSnapshotRef.current;
+        const globalSettingsRead = readStoredGlobalSettings(currentSnapshot.rawGlobalSettings);
+        const nextRawGlobalSettings = writeStoredGlobalSettingsPatch(
+            writeStoredGlobalSettings(globalSettingsRead.settings),
+            patch,
+        );
+        updateSettingsInputSnapshot(settingsInputSnapshotRef, { rawGlobalSettings: nextRawGlobalSettings });
+        dispatchSettingsAction({ type: "pluginSettingsPatched", rawGlobalSettings: nextRawGlobalSettings });
 
-            return {
-                ...currentState,
-                rawSettings: nextRawSettings,
-                widgetSettingsStatus: "ready",
-                widgetSettingsNotice: null,
-            };
+        client.setGlobalSettings(nextRawGlobalSettings).catch((error: Error) => {
+            dispatchSettingsAction({
+                type: "pluginSaveFailed",
+                errorMessage: error.message,
+            });
         });
-
-        void nextState;
-        client.setSettings(settingsJsonToPersist ?? {}).catch((error: Error) => {
-            commitState((errorState) => ({
-                ...errorState,
-                widgetSettingsNotice: {
-                    kind: "warning",
-                    text: `Failed to save widget settings: ${error.message}`,
-                },
-            }));
-        });
-    };
-
-    const updateGlobalSettings = (patch: StoredGlobalSettingsPatch): void => {
-        let settingsJsonToPersist: StoredSettingsJsonObject | undefined;
-        const nextState = commitState((currentState) => {
-            const globalSettingsRead = readStoredGlobalSettings(currentState.rawGlobalSettings);
-            const nextRawGlobalSettings = writeStoredGlobalSettingsPatch(
-                writeStoredGlobalSettings(globalSettingsRead.settings),
-                patch,
-            );
-            settingsJsonToPersist = nextRawGlobalSettings;
-
-            return {
-                ...currentState,
-                rawGlobalSettings: nextRawGlobalSettings,
-                globalSettingsStatus: "ready",
-                pluginSettingsNotice: null,
-            };
-        });
-
-        void nextState;
-        client.setGlobalSettings(settingsJsonToPersist ?? {}).catch((error: Error) => {
-            commitState((errorState) => ({
-                ...errorState,
-                pluginSettingsNotice: {
-                    kind: "warning",
-                    text: `Failed to save plugin settings: ${error.message}`,
-                },
-            }));
-        });
-    };
+    }, [client]);
 
     useEffect(() => {
         let hasDisposed = false;
         const isDisposed = (): boolean => hasDisposed;
         const unsubscribePropertyInspectorEvents = subscribePropertyInspectorEvents(
             client,
-            commitState,
+            dispatchSettingsAction,
+            settingsInputSnapshotRef,
             isDisposed,
         );
 
-        loadPropertyInspectorSettings(client, commitState, isDisposed).catch((error: Error) => {
+        loadPropertyInspectorSettings(
+            client,
+            dispatchSettingsAction,
+            settingsInputSnapshotRef,
+            isDisposed,
+        ).catch((error: Error) => {
             if (isDisposed()) {
                 return;
             }
 
-            commitState((currentState) => ({
-                ...currentState,
-                widgetSettingsStatus: "failed",
-                widgetSettingsNotice: {
-                    kind: "warning",
-                    text: `Failed to load settings: ${error.message}`,
-                },
-            }));
+            dispatchSettingsAction({
+                type: "widgetLoadFailed",
+                errorMessage: error.message,
+            });
         });
 
         return () => {
             hasDisposed = true;
             unsubscribePropertyInspectorEvents();
         };
-    }, [client, commitState]);
+    }, [client]);
 
     return {
         actionKind: state.actionKind,
@@ -249,7 +187,8 @@ export function usePropertyInspectorSettings(
 
 async function loadPropertyInspectorSettings(
     client: StreamDeckPropertyInspectorClient,
-    commitState: CommitSettingsSyncState,
+    dispatchSettingsAction: SettingsSyncDispatch,
+    settingsInputSnapshotRef: SettingsInputSnapshotRef,
     isDisposed: () => boolean,
 ): Promise<void> {
     const connectionInfo = await client.getConnectionInfo();
@@ -259,30 +198,30 @@ async function loadPropertyInspectorSettings(
         return;
     }
 
-    commitState((currentState) => {
-        const widgetSettingsRead = readInspectorWidgetSettings(
-            connectionInfo.actionInfo?.payload?.settings ?? currentState.rawSettings,
-            actionKind,
-        );
-        writeSettingsReadWarningLog(client, "widget", widgetSettingsRead.readWarning);
-
-        return {
-            ...currentState,
-            actionKind,
-            isWindows,
-            rawSettings: widgetSettingsRead.rawSettings,
-            widgetSettingsStatus: "ready",
-            widgetSettingsNotice: widgetSettingsRead.notice,
-        };
+    const widgetSettingsRead = readInspectorWidgetSettings(
+        connectionInfo.actionInfo?.payload?.settings ?? settingsInputSnapshotRef.current.rawSettings,
+        actionKind,
+    );
+    writeSettingsReadWarningLog(client, "widget", widgetSettingsRead.readWarning);
+    updateSettingsInputSnapshot(settingsInputSnapshotRef, {
+        actionKind,
+        rawSettings: widgetSettingsRead.rawSettings,
+    });
+    dispatchSettingsAction({
+        type: "connectionLoaded",
+        actionKind,
+        isWindows,
+        widgetSettingsRead,
     });
 
-    void refreshWidgetSettings(client, commitState, actionKind, isDisposed);
-    void refreshGlobalSettings(client, commitState, isDisposed);
+    void refreshWidgetSettings(client, dispatchSettingsAction, settingsInputSnapshotRef, actionKind, isDisposed);
+    void refreshGlobalSettings(client, dispatchSettingsAction, settingsInputSnapshotRef, isDisposed);
 }
 
 async function refreshWidgetSettings(
     client: StreamDeckPropertyInspectorClient,
-    commitState: CommitSettingsSyncState,
+    dispatchSettingsAction: SettingsSyncDispatch,
+    settingsInputSnapshotRef: SettingsInputSnapshotRef,
     actionKind: ActionKind,
     isDisposed: () => boolean,
 ): Promise<void> {
@@ -292,33 +231,26 @@ async function refreshWidgetSettings(
             return;
         }
 
-        commitState((currentState) => {
-            const widgetSettingsRead = readInspectorWidgetSettings(payload.settings, actionKind);
-            writeSettingsReadWarningLog(client, "widget", widgetSettingsRead.readWarning);
-
-            return {
-                ...currentState,
-                rawSettings: widgetSettingsRead.rawSettings,
-                widgetSettingsStatus: "ready",
-                widgetSettingsNotice: widgetSettingsRead.notice,
-            };
+        const widgetSettingsRead = readInspectorWidgetSettings(payload.settings, actionKind);
+        writeSettingsReadWarningLog(client, "widget", widgetSettingsRead.readWarning);
+        updateSettingsInputSnapshot(settingsInputSnapshotRef, { rawSettings: widgetSettingsRead.rawSettings });
+        dispatchSettingsAction({
+            type: "widgetSettingsRead",
+            read: widgetSettingsRead,
         });
     } catch {
         if (isDisposed()) {
             return;
         }
 
-        commitState((currentState) => ({
-            ...currentState,
-            widgetSettingsStatus: "failed",
-            widgetSettingsNotice: settingsLoadFailureNotice("widget"),
-        }));
+        dispatchSettingsAction({ type: "widgetLoadFailed" });
     }
 }
 
 async function refreshGlobalSettings(
     client: StreamDeckPropertyInspectorClient,
-    commitState: CommitSettingsSyncState,
+    dispatchSettingsAction: SettingsSyncDispatch,
+    settingsInputSnapshotRef: SettingsInputSnapshotRef,
     isDisposed: () => boolean,
 ): Promise<void> {
     try {
@@ -327,33 +259,28 @@ async function refreshGlobalSettings(
             return;
         }
 
-        commitState((currentState) => {
-            const pluginSettingsRead = readInspectorPluginSettings(payload.settings);
-            writeSettingsReadWarningLog(client, "plugin", pluginSettingsRead.readWarning);
-
-            return {
-                ...currentState,
-                rawGlobalSettings: pluginSettingsRead.rawGlobalSettings,
-                globalSettingsStatus: "ready",
-                pluginSettingsNotice: pluginSettingsRead.notice,
-            };
+        const pluginSettingsRead = readInspectorPluginSettings(payload.settings);
+        writeSettingsReadWarningLog(client, "plugin", pluginSettingsRead.readWarning);
+        updateSettingsInputSnapshot(settingsInputSnapshotRef, {
+            rawGlobalSettings: pluginSettingsRead.rawGlobalSettings,
+        });
+        dispatchSettingsAction({
+            type: "pluginSettingsRead",
+            read: pluginSettingsRead,
         });
     } catch {
         if (isDisposed()) {
             return;
         }
 
-        commitState((currentState) => ({
-            ...currentState,
-            globalSettingsStatus: "failed",
-            pluginSettingsNotice: settingsLoadFailureNotice("plugin"),
-        }));
+        dispatchSettingsAction({ type: "pluginLoadFailed" });
     }
 }
 
 function subscribePropertyInspectorEvents(
     client: StreamDeckPropertyInspectorClient,
-    commitState: CommitSettingsSyncState,
+    dispatchSettingsAction: SettingsSyncDispatch,
+    settingsInputSnapshotRef: SettingsInputSnapshotRef,
     isDisposed: () => boolean,
 ): () => void {
     const unsubscribeSettings = client.didReceiveSettings.subscribe((event) => {
@@ -361,19 +288,15 @@ function subscribePropertyInspectorEvents(
             return;
         }
 
-        commitState((currentState) => {
-            const widgetSettingsRead = readInspectorWidgetSettings(
-                event.payload.settings,
-                currentState.actionKind,
-            );
-            writeSettingsReadWarningLog(client, "widget", widgetSettingsRead.readWarning);
-
-            return {
-                ...currentState,
-                rawSettings: widgetSettingsRead.rawSettings,
-                widgetSettingsStatus: "ready",
-                widgetSettingsNotice: widgetSettingsRead.notice,
-            };
+        const widgetSettingsRead = readInspectorWidgetSettings(
+            event.payload.settings,
+            settingsInputSnapshotRef.current.actionKind,
+        );
+        writeSettingsReadWarningLog(client, "widget", widgetSettingsRead.readWarning);
+        updateSettingsInputSnapshot(settingsInputSnapshotRef, { rawSettings: widgetSettingsRead.rawSettings });
+        dispatchSettingsAction({
+            type: "widgetSettingsRead",
+            read: widgetSettingsRead,
         });
     });
 
@@ -382,16 +305,14 @@ function subscribePropertyInspectorEvents(
             return;
         }
 
-        commitState((currentState) => {
-            const pluginSettingsRead = readInspectorPluginSettings(event.payload.settings);
-            writeSettingsReadWarningLog(client, "plugin", pluginSettingsRead.readWarning);
-
-            return {
-                ...currentState,
-                rawGlobalSettings: pluginSettingsRead.rawGlobalSettings,
-                globalSettingsStatus: "ready",
-                pluginSettingsNotice: pluginSettingsRead.notice,
-            };
+        const pluginSettingsRead = readInspectorPluginSettings(event.payload.settings);
+        writeSettingsReadWarningLog(client, "plugin", pluginSettingsRead.readWarning);
+        updateSettingsInputSnapshot(settingsInputSnapshotRef, {
+            rawGlobalSettings: pluginSettingsRead.rawGlobalSettings,
+        });
+        dispatchSettingsAction({
+            type: "pluginSettingsRead",
+            read: pluginSettingsRead,
         });
     });
 
@@ -405,15 +326,10 @@ function subscribePropertyInspectorEvents(
             return;
         }
 
-        commitState((currentState) => ({
-            ...currentState,
-            runtimeCache: mergeWidgetRuntimeCache(currentState.runtimeCache, runtimeCachePatch),
-            runtimeCacheStatus: {
-                diskVolumeOptionsStatus: "availableDiskVolumes" in runtimeCachePatch
-                    ? "ready"
-                    : currentState.runtimeCacheStatus.diskVolumeOptionsStatus,
-            },
-        }));
+        dispatchSettingsAction({
+            type: "runtimeCachePatch",
+            patch: runtimeCachePatch,
+        });
     });
 
     return () => {
@@ -443,6 +359,19 @@ function readInspectorPluginSettings(rawGlobalSettings: unknown): InspectorPlugi
         rawGlobalSettings: writeStoredGlobalSettings(globalSettingsRead.settings),
         notice: readWarningNotice("plugin", globalSettingsRead.warning),
         readWarning: globalSettingsRead.warning,
+    };
+}
+
+function updateSettingsInputSnapshot(
+    settingsInputSnapshotRef: SettingsInputSnapshotRef,
+    patch: Partial<SettingsInputSnapshot>,
+): void {
+    // Call this immediately before dispatching an action that changes these
+    // inputs. Reducer state commits asynchronously, but SDK callbacks can fire
+    // before the next React render and still need the latest values for patches.
+    settingsInputSnapshotRef.current = {
+        ...settingsInputSnapshotRef.current,
+        ...patch,
     };
 }
 
@@ -486,20 +415,6 @@ function readWarningNotice(
         text:
             `${label} settings could not be read. Defaults are shown; ` +
             `saving ${settingsScope} settings will replace the unreadable settings.`,
-    };
-}
-
-function settingsLoadFailureNotice(settingsScope: SettingsScope): SettingsNotice {
-    if (settingsScope === "widget") {
-        return {
-            kind: "warning",
-            text: "We couldn't load this widget's saved settings, so defaults are shown.",
-        };
-    }
-
-    return {
-        kind: "warning",
-        text: "We couldn't load plugin settings, so defaults are shown.",
     };
 }
 
