@@ -28,7 +28,7 @@ This plan describes how LibreHardwareMonitor data becomes ShoMetrics runtime tel
 
 | Area | Current | Target |
 |---|---|---|
-| Action subscription | `MetricAction.getMetricSubscriptionKeys()` returns bare metric keys. | Actions return a `MetricReadPlan` that includes source scope, source candidates, failure mode, and metric keys. |
+| Action subscription | Action classes expose only metric keys. | `MetricAction` converts resolved source policy plus metric keys into a `MetricReadPlan`. |
 | Scheduler | Owns one global `IMetricSource`. | Groups by read plan signature plus interval, then polls a `SourceRunner`. |
 | MetricStore | Stores history by bare metric key. | Stores history by source-scoped metric identity. |
 | Runtime source | `NodeSystemSource` directly backs all polling. | `SourceRunner` tries source candidates and merges fallback results for missing metrics. |
@@ -51,7 +51,7 @@ Action
   -> WidgetData/rendering
 ```
 
-Actions may choose a metric target from resolved settings, but they must not choose a concrete transport. Source selection and fallback belong to `SourceRunner`.
+Actions may choose a metric target from resolved settings, but they must not choose a concrete transport. `MetricAction` converts resolved source policy into a read plan; source availability and fallback execution belong to `SourceRunner` and `SourceClient`.
 
 ## Proto Contract
 
@@ -197,17 +197,25 @@ export interface MetricReadPlan {
 Action shape:
 
 ```ts
-protected getMetricReadPlan(event: WillAppearEvent): MetricReadPlan {
-    const metricKeys = [CPU_USAGE_METRIC_KEY, CPU_MODEL_METRIC_KEY];
-
-    return buildLocalMetricReadPlan(metricKeys);
+protected getMetricKeys(event: WillAppearEvent): readonly string[] {
+    return [CPU_USAGE_METRIC_KEY, CPU_MODEL_METRIC_KEY];
 }
 ```
 
-Scheduler grouping key becomes:
+`MetricAction` builds the runtime plan:
+
+```ts
+return buildMetricReadPlanFromSourcePolicy({
+    metricKeys,
+    sourcePolicy: settings.widget.slot.metric.source,
+    defaultSourceProfileId: pluginGlobalSettingsStore.getResolved().defaultSourceProfileId,
+});
+```
+
+Scheduler group identity becomes:
 
 ```txt
-pollingIntervalMilliseconds + sourceScopeId + sourceCandidates + metricKeys
+pollingIntervalMilliseconds + sourceScopeId + failureMode + sourceCandidates
 ```
 
 Scheduler grouping rules:
@@ -250,7 +258,8 @@ export interface SourceClient {
     readonly sourceId: string;
     readSnapshot(metricKeys: readonly string[]): Promise<IMetricSnapshot>;
     listMetricDescriptors?(metricKeys: readonly string[]): Promise<readonly MetricDescriptor[]>;
-    getHealth?(): Promise<SourceHealth>;
+    checkHealth?(): Promise<SourceHealth>;
+    getCachedStatus?(): SourceClientStatus;
     dispose?(): void;
 }
 
@@ -269,6 +278,47 @@ Fallback behavior:
 - Log fallback reasons at the source runner boundary with throttling.
 - Do not mutate settings or action state based on fallback results.
 - SourceRunner does not decide sensor semantics. Source adapters must omit semantically invalid values before returning a snapshot.
+
+## Source Policy To Read Plan
+
+Resolved settings source policy is converted into a runtime `MetricReadPlan` by:
+
+```txt
+packages/hub/src/runtime/sources/metric-read-plan-builder.ts
+```
+
+Rules:
+
+- `metric-read-plan-builder.ts` owns only resolved source policy -> runtime read plan conversion.
+- It does not probe helper availability, open pipes, read source health, or mutate settings.
+- It receives only the resolved widget source policy and resolved global `defaultSourceProfileId`; it must not consume `sourceProfiles` directly.
+- Built-in local source profile ids use a reserved `local:*` namespace and are recognized before any user-defined profile handling.
+- Known built-in ids:
+  - `local:auto`
+  - `local:windows-helper`
+  - `local:node-system`
+- `local:auto` expands to `[windows-helper, node-system]` on Windows and `[node-system]` elsewhere until macOS/Linux helpers exist.
+- Unknown `local:*` ids resolve to local scope with no source candidates. They must not be passed to `SourceRunner` as registry source ids.
+- User-defined source profile ids map to runtime source ids with the `source-profile:` prefix. The registry owns whether a matching `SourceClient` exists.
+- `checkHealth()` performs source-owned I/O and may update the client's cached status.
+- `getCachedStatus()` returns the latest client-owned runtime status without I/O. It is for diagnostics and future PI debug views, not for render decisions.
+
+### Runtime Case Table
+
+| Case | Read plan | Runtime behavior |
+|---|---|---|
+| User never installed helper | `local:auto` -> `windows-helper`, `node-system` on Windows | Helper client fails with pipe-missing, caches a 5 minute retry cooldown, and `SourceRunner` falls back to `node-system`. |
+| Helper installed but unhealthy | `local:auto` or explicit helper | Helper client uses transient backoff of 5 s, then 15 s, then 60 s max; fallback runs only when the read plan allows it. |
+| Explicit source is `node-system`, no fallback | `local:node-system` only, `failureMode=empty` | Only `node-system` is queried. Helper health does not matter. |
+| Explicit source is `node-system`, fallback enabled | `node-system` plus configured fallback ids | `node-system` is primary. Fallback candidates are tried only for missing/failed metrics. |
+| Explicit source is `windows-helper`, no fallback | `local:windows-helper` only, `failureMode=empty` | Helper failure yields missing metrics/placeholders. `node-system` is not queried. |
+| Explicit source is `windows-helper`, fallback enabled | `windows-helper` plus configured fallback ids | Helper is primary; missing or failed metrics may be filled from fallback candidates such as `node-system`. |
+| Helper installed, user never touched settings | `local:auto` | Windows tries helper first and fills from `node-system` when needed. Non-Windows uses `node-system` until native helpers exist. |
+| Helper was healthy but stops returning data | Existing plan unchanged | Request failure updates cached status/backoff; success later resets transient backoff; fallback continues when allowed. |
+| User installs plugin and helper without opening PI | Runtime plan is built from resolved settings on action appear | No PI dependency. A Stream Deck/plugin restart gives the process a fresh helper client; no system reboot is required unless the driver stack itself requires it. |
+| Helper broken and user opens PI | No settings mutation | Future PI debug can call `getCachedStatus()` and optional `checkHealth()` through the runtime source registry to show current source, last success, and retry time. |
+| Remote source without fallback | `source-profile:<id>` only, `failureMode=empty` | Remote failure produces missing metrics/placeholders; local fallback is not implicit. |
+| Future macOS/Linux helper | Same builder, new built-in candidate expansion | Add platform helper source id and registry client; `SourceRunner` fallback logic is reused. |
 
 ## Metric Value Validation
 
@@ -480,7 +530,14 @@ Protocol compatibility retry:
 - If health returns `unsupported_protocol`, Node must not retry helper health on every poll.
 - Minimum health retry cooldown after `unsupported_protocol` is 60 seconds.
 - Logs for unsupported protocol must also be throttled so a 1Hz scheduler cannot emit one failure per second.
-- During the cooldown, `SourceRunner` skips the helper candidate and reads from fallback sources.
+- During the cooldown, the helper client fails fast without pipe I/O and `SourceRunner` reads from fallback sources when the read plan allows fallback.
+
+Helper availability retry:
+
+- If the named pipe is missing (`ENOENT`), Node treats the helper as not installed or not started and uses a 5 minute retry cooldown.
+- If helper I/O fails transiently, Node uses 5 s, then 15 s, then 60 s maximum retry cooldown.
+- A successful health, descriptor, or snapshot request resets the transient helper backoff.
+- The helper client must not start an interval timer. Retry is lazy and happens only when a source request reaches the client after the cooldown.
 
 ## Node Integration Files
 
@@ -488,6 +545,7 @@ Add:
 
 ```txt
 packages/hub/src/runtime/sources/source-client.ts
+packages/hub/src/runtime/sources/metric-read-plan-builder.ts
 packages/hub/src/runtime/sources/source-runner.ts
 packages/hub/src/runtime/sources/source-registry.ts
 packages/hub/src/runtime/sources/windows-helper-source-client.ts
@@ -587,21 +645,22 @@ protected getMetricSubscriptionKeys(event: WillAppearEvent): readonly string[] {
 After:
 
 ```ts
-protected getMetricReadPlan(event: WillAppearEvent): MetricReadPlan {
-    return buildLocalMetricReadPlan([CPU_USAGE_METRIC_KEY]);
+protected getMetricKeys(event: WillAppearEvent): readonly string[] {
+    return [CPU_USAGE_METRIC_KEY];
 }
 ```
 
 Rules:
 
 - `MetricAction` owns the transition from action lifecycle events to scheduler subscriptions.
+- `MetricAction` calls `buildMetricReadPlanFromSourcePolicy()` with the action metric keys, resolved widget source policy, and resolved global default source profile id.
 - Concrete action classes may choose metric keys, but must not choose pipe, LHM, systeminformation, or remote transports.
 - Remove the legacy `getMetricSubscriptionKeys()` path after all actions are converted.
 
 Acceptance:
 
 - CPU, GPU, RAM, network, and disk actions compile without `getMetricSubscriptionKeys()`.
-- Action tests assert read plans, not transport-specific behavior.
+- Action tests assert metric keys and read-plan behavior, not transport-specific behavior.
 
 ### Step 4: Add SourceRunner and SourceRegistry
 
@@ -645,11 +704,13 @@ Rules:
 - The pipe client owns frame encode/decode, request ids, timeouts, protocol version checks, and protobuf conversion.
 - The pipe client returns ShoMetrics `IMetricSnapshot` and source warnings. Generated protobuf types must not leak past the source adapter boundary.
 - If the pipe is absent, slow, malformed, unauthorized, or incompatible, the client fails the request and `SourceRunner` falls back.
+- The pipe client owns cached runtime status. `checkHealth()` performs I/O; `getCachedStatus()` does not.
 - Do not spawn or elevate the Windows helper from Node.
 
 Acceptance:
 
 - Tests cover frame encode/decode, mismatched request id, oversized frame, malformed protobuf, timeout, and unsupported protocol.
+- Tests cover pipe-missing cooldown, transient failure backoff, and backoff reset after successful reads.
 - Manual test: helper absent still renders via `NodeSystemSource`.
 
 ### Step 6: Enable Local Candidate Order
@@ -664,6 +725,7 @@ node-system
 Rules:
 
 - Candidate order is runtime configuration owned by source read-plan/bootstrap code.
+- `metric-read-plan-builder.ts` expands built-in local source profile ids into runtime source candidates.
 - Actions and rendering code must not know this order.
 - The Windows registry includes `windows-helper` plus `node-system`; non-Windows registries include only `node-system` until their helpers exist.
 - When the Windows helper is absent, the helper client must fail quickly, apply a retry cooldown, and let `SourceRunner` fallback to `node-system`.

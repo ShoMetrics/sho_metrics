@@ -30,6 +30,38 @@ export interface SourceHealth {
     readonly warnings: readonly SourceWarning[];
 }
 
+/** Runtime source availability state owned by one source client. */
+export type SourceClientStatusState = "unknown" | "available" | "unavailable" | "unsupported";
+
+/** Source-client-owned reason for the latest non-available status. */
+export type SourceClientStatusReason =
+    | "pipeMissing"
+    | "timeout"
+    | "healthFailed"
+    | "sourceError"
+    | "protocolMismatch";
+
+/** Runtime-only source status for diagnostics and future Property Inspector debug views. */
+export interface SourceClientStatus {
+    /** Current availability state known by this client. */
+    readonly state: SourceClientStatusState;
+
+    /** Last non-available reason when one is known. */
+    readonly reason?: SourceClientStatusReason;
+
+    /** Absolute Unix timestamp in milliseconds when this client may retry. */
+    readonly retryAfterTimestampMilliseconds?: number;
+
+    /** Stable source or OS error code for the last failure when one is known. */
+    readonly lastErrorCode?: string;
+
+    /** Absolute Unix timestamp in milliseconds for the latest successful request. */
+    readonly lastSuccessAtTimestampMilliseconds?: number;
+
+    /** Absolute Unix timestamp in milliseconds for the latest failed request. */
+    readonly lastFailureAtTimestampMilliseconds?: number;
+}
+
 /** Runtime descriptor for a metric exposed by a source. */
 export interface MetricDescriptor {
     /** ShoMetrics canonical metric key consumed by actions and MetricStore. */
@@ -68,8 +100,11 @@ export interface SourceClient {
     /** Lists descriptors for requested metric keys or for all known metrics. */
     listMetricDescriptors?(metricKeys: readonly string[]): Promise<readonly MetricDescriptor[]>;
 
-    /** Reads source health without mutating action or settings state. */
-    getHealth?(): Promise<SourceHealth>;
+    /** Checks source health by performing source-owned I/O. */
+    checkHealth?(): Promise<SourceHealth>;
+
+    /** Returns the latest cached client-owned runtime status without doing I/O. */
+    getCachedStatus?(): SourceClientStatus;
 
     /** Releases resources owned by this source client. */
     dispose?(): void;

@@ -19,8 +19,11 @@ import {
 import {
     decodeSourceIpcFrame,
     encodeSourceIpcFrame,
+    HELPER_UNAVAILABLE_MAXIMUM_RETRY_COOLDOWN_MILLISECONDS,
     HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+    HELPER_UNAVAILABLE_SECOND_RETRY_COOLDOWN_MILLISECONDS,
     MAXIMUM_SOURCE_IPC_FRAME_BYTES,
+    PIPE_NOT_FOUND_RETRY_COOLDOWN_MILLISECONDS,
     SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION,
     UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS,
     WindowsHelperSourceClient,
@@ -75,6 +78,7 @@ test("windows helper source client sends requested metric ids and returns a runt
     assert.equal(snapshot.sourceId, WINDOWS_HELPER_SOURCE_ID);
     assert.equal(snapshot.metrics["cpu.usage_percent"]?.data.case, "scalar");
     assert.equal(snapshot.metrics["cpu.usage_percent"]?.data.value, 42);
+    assert.equal(client.getCachedStatus().state, "available");
     assert.deepEqual(
         transport.requests.map(request => request.payload.case),
         ["getSourceHealth", "readMetricSnapshot"],
@@ -86,7 +90,7 @@ test("windows helper source client rejects mismatched response request ids", asy
     const client = createClient(transport);
 
     await assert.rejects(
-        async () => await client.getHealth(),
+        async () => await client.checkHealth(),
         /request id mismatched/u,
     );
 });
@@ -96,7 +100,7 @@ test("windows helper source client rejects malformed protobuf responses", async 
     const client = createClient(transport);
 
     await assert.rejects(
-        async () => await client.getHealth(),
+        async () => await client.checkHealth(),
         /Malformed Windows source IPC response/u,
     );
 });
@@ -107,7 +111,7 @@ test("windows helper source client passes request timeouts to the transport", as
         healthMilliseconds: 123,
     });
 
-    const requestPromise = client.getHealth();
+    const requestPromise = client.checkHealth();
     await Promise.resolve();
 
     assert.equal(transport.timeoutMilliseconds, 123);
@@ -178,6 +182,131 @@ test("windows helper source client cools down unavailable helper retries", async
     assert.equal(transport.requestCount, 2);
 });
 
+test("windows helper source client uses a long cooldown when the pipe is missing", async () => {
+    let nowMilliseconds = 1000;
+    const transport = new RejectingTransport(createNodeError("ENOENT", "pipe not found"));
+    const client = new WindowsHelperSourceClient({
+        transport,
+        now: () => nowMilliseconds,
+        requestIdFactory: createRequestIdFactory(),
+    });
+
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /pipe not found/u,
+    );
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /still inside retry cooldown/u,
+    );
+
+    assert.equal(transport.requestCount, 1);
+    assert.deepEqual(client.getCachedStatus(), {
+        state: "unavailable",
+        reason: "pipeMissing",
+        retryAfterTimestampMilliseconds: 1000 + PIPE_NOT_FOUND_RETRY_COOLDOWN_MILLISECONDS,
+        lastErrorCode: "ENOENT",
+        lastFailureAtTimestampMilliseconds: 1000,
+    });
+
+    nowMilliseconds += PIPE_NOT_FOUND_RETRY_COOLDOWN_MILLISECONDS;
+
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /pipe not found/u,
+    );
+    assert.equal(transport.requestCount, 2);
+});
+
+test("windows helper source client backs off repeated transient failures", async () => {
+    let nowMilliseconds = 1000;
+    const transport = new RejectingTransport(createNodeError("ECONNRESET", "connection reset"));
+    const client = new WindowsHelperSourceClient({
+        transport,
+        now: () => nowMilliseconds,
+        requestIdFactory: createRequestIdFactory(),
+    });
+
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /connection reset/u,
+    );
+    assert.equal(
+        client.getCachedStatus().retryAfterTimestampMilliseconds,
+        1000 + HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+    );
+
+    nowMilliseconds += HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /connection reset/u,
+    );
+    assert.equal(
+        client.getCachedStatus().retryAfterTimestampMilliseconds,
+        nowMilliseconds + HELPER_UNAVAILABLE_SECOND_RETRY_COOLDOWN_MILLISECONDS,
+    );
+
+    nowMilliseconds += HELPER_UNAVAILABLE_SECOND_RETRY_COOLDOWN_MILLISECONDS;
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /connection reset/u,
+    );
+    assert.equal(
+        client.getCachedStatus().retryAfterTimestampMilliseconds,
+        nowMilliseconds + HELPER_UNAVAILABLE_MAXIMUM_RETRY_COOLDOWN_MILLISECONDS,
+    );
+});
+
+test("windows helper source client resets transient backoff after successful reads", async () => {
+    let nowMilliseconds = 1000;
+    let readRequestCount = 0;
+    const transport = new FakeWindowsHelperPipeTransport(request => {
+        switch (request.payload.case) {
+            case "getSourceHealth":
+                return buildHealthResponse(request.requestId);
+            case "readMetricSnapshot":
+                readRequestCount += 1;
+                if (readRequestCount === 1 || readRequestCount === 3) {
+                    throw createNodeError("ECONNRESET", "connection reset");
+                }
+
+                return buildSnapshotResponse(request.requestId);
+            default:
+                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+        }
+    });
+    const client = new WindowsHelperSourceClient({
+        transport,
+        now: () => nowMilliseconds,
+        requestIdFactory: createRequestIdFactory(),
+    });
+
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /connection reset/u,
+    );
+    assert.equal(
+        client.getCachedStatus().retryAfterTimestampMilliseconds,
+        1000 + HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+    );
+
+    nowMilliseconds += HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
+    await client.readSnapshot(["cpu.usage_percent"]);
+    assert.deepEqual(client.getCachedStatus(), {
+        state: "available",
+        lastSuccessAtTimestampMilliseconds: nowMilliseconds,
+    });
+
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /connection reset/u,
+    );
+    assert.equal(
+        client.getCachedStatus().retryAfterTimestampMilliseconds,
+        nowMilliseconds + HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+    );
+});
+
 test("windows helper source client rejects source error responses", async () => {
     const transport = new FakeWindowsHelperPipeTransport(request => create(SourceIpcResponseSchema, {
         requestId: request.requestId,
@@ -192,7 +321,7 @@ test("windows helper source client rejects source error responses", async () => 
     const client = createClient(transport);
 
     await assert.rejects(
-        async () => await client.getHealth(),
+        async () => await client.checkHealth(),
         /source_unavailable/u,
     );
 });
@@ -266,6 +395,12 @@ function createRequestIdFactory(): () => string {
         requestIndex += 1;
         return `request-${requestIndex}`;
     };
+}
+
+function createNodeError(code: string, message: string): Error {
+    const error = new Error(message) as Error & { code: string };
+    error.code = code;
+    return error;
 }
 
 function buildHealthResponse(
