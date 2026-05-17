@@ -19,9 +19,7 @@ import {
 import {
     decodeSourceIpcFrame,
     encodeSourceIpcFrame,
-    HELPER_UNAVAILABLE_MAXIMUM_RETRY_COOLDOWN_MILLISECONDS,
-    HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
-    HELPER_UNAVAILABLE_SECOND_RETRY_COOLDOWN_MILLISECONDS,
+    HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS,
     MAXIMUM_SOURCE_IPC_FRAME_BYTES,
     PIPE_NOT_FOUND_RETRY_COOLDOWN_MILLISECONDS,
     SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION,
@@ -31,6 +29,12 @@ import {
     type WindowsHelperSourceClientOptions,
 } from "./windows-helper-source-client";
 import { WINDOWS_HELPER_SOURCE_ID } from "./source-ids";
+
+const [
+    INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+    ESCALATED_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+    MAXIMUM_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+] = HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS;
 
 test("source IPC frame codec round-trips payload bytes", () => {
     const payload = new Uint8Array([1, 2, 3]);
@@ -173,7 +177,7 @@ test("windows helper source client cools down unavailable helper retries", async
 
     assert.equal(transport.requestCount, 1);
 
-    nowMilliseconds += HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
+    nowMilliseconds += INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
 
     await assert.rejects(
         async () => await client.readSnapshot(["cpu.usage_percent"]),
@@ -233,27 +237,37 @@ test("windows helper source client backs off repeated transient failures", async
     );
     assert.equal(
         client.getCachedStatus().retryAfterTimestampMilliseconds,
-        1000 + HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+        1000 + INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
     );
 
-    nowMilliseconds += HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
+    nowMilliseconds += INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
     await assert.rejects(
         async () => await client.readSnapshot(["cpu.usage_percent"]),
         /connection reset/u,
     );
     assert.equal(
         client.getCachedStatus().retryAfterTimestampMilliseconds,
-        nowMilliseconds + HELPER_UNAVAILABLE_SECOND_RETRY_COOLDOWN_MILLISECONDS,
+        nowMilliseconds + ESCALATED_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
     );
 
-    nowMilliseconds += HELPER_UNAVAILABLE_SECOND_RETRY_COOLDOWN_MILLISECONDS;
+    nowMilliseconds += ESCALATED_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
     await assert.rejects(
         async () => await client.readSnapshot(["cpu.usage_percent"]),
         /connection reset/u,
     );
     assert.equal(
         client.getCachedStatus().retryAfterTimestampMilliseconds,
-        nowMilliseconds + HELPER_UNAVAILABLE_MAXIMUM_RETRY_COOLDOWN_MILLISECONDS,
+        nowMilliseconds + MAXIMUM_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+    );
+
+    nowMilliseconds += MAXIMUM_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /connection reset/u,
+    );
+    assert.equal(
+        client.getCachedStatus().retryAfterTimestampMilliseconds,
+        nowMilliseconds + MAXIMUM_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
     );
 });
 
@@ -287,10 +301,10 @@ test("windows helper source client resets transient backoff after successful rea
     );
     assert.equal(
         client.getCachedStatus().retryAfterTimestampMilliseconds,
-        1000 + HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+        1000 + INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
     );
 
-    nowMilliseconds += HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
+    nowMilliseconds += INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
     await client.readSnapshot(["cpu.usage_percent"]);
     assert.deepEqual(client.getCachedStatus(), {
         state: "available",
@@ -303,7 +317,7 @@ test("windows helper source client resets transient backoff after successful rea
     );
     assert.equal(
         client.getCachedStatus().retryAfterTimestampMilliseconds,
-        nowMilliseconds + HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+        nowMilliseconds + INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
     );
 });
 

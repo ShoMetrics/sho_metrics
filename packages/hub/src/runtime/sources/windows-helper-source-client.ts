@@ -44,14 +44,8 @@ export const UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS = 60000;
 /** Cooldown before retrying when the Windows helper named pipe is missing. */
 export const PIPE_NOT_FOUND_RETRY_COOLDOWN_MILLISECONDS = 300000;
 
-/** First cooldown before retrying helper health after transient helper failures. */
-export const HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS = 5000;
-
-/** Second cooldown before retrying helper health after repeated transient helper failures. */
-export const HELPER_UNAVAILABLE_SECOND_RETRY_COOLDOWN_MILLISECONDS = 15000;
-
-/** Maximum cooldown before retrying helper health after repeated transient helper failures. */
-export const HELPER_UNAVAILABLE_MAXIMUM_RETRY_COOLDOWN_MILLISECONDS = 60000;
+/** Retry cooldowns for transient helper failures, indexed by consecutive failure count. */
+export const HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS = [5000, 15000, 60000] as const;
 
 const SOURCE_IPC_LENGTH_PREFIX_BYTES = 4;
 const DEFAULT_HEALTH_TIMEOUT_MILLISECONDS = 750;
@@ -378,16 +372,18 @@ export class WindowsHelperSourceClient implements SourceClient {
     private nextUnavailableRetryCooldownMilliseconds(): number {
         this.helperUnavailableFailureCount += 1;
 
-        if (this.helperUnavailableFailureCount === 1) {
-            return HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
-        }
-
-        if (this.helperUnavailableFailureCount === 2) {
-            return HELPER_UNAVAILABLE_SECOND_RETRY_COOLDOWN_MILLISECONDS;
-        }
-
-        return HELPER_UNAVAILABLE_MAXIMUM_RETRY_COOLDOWN_MILLISECONDS;
+        return selectHelperUnavailableRetryCooldownMilliseconds(this.helperUnavailableFailureCount);
     }
+}
+
+function selectHelperUnavailableRetryCooldownMilliseconds(failureCount: number): number {
+    const maximumBackoffMilliseconds = HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS[2];
+    const backoffIndex = Math.min(
+        Math.max(0, failureCount - 1),
+        HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS.length - 1,
+    );
+
+    return HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS[backoffIndex] ?? maximumBackoffMilliseconds;
 }
 
 class NodeWindowsHelperPipeTransport implements WindowsHelperPipeTransport {
