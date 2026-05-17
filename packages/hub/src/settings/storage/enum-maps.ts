@@ -1,5 +1,5 @@
 import {
-    CircleStyle as StoredCircleStyle,
+    CircleViewVariant as StoredCircleViewVariant,
     ColorMode as StoredColorMode,
     DiskMetricTarget_Kind as StoredDiskMetricKind,
     DiskMetricTarget_ThroughputDirection as StoredDiskThroughputDirection,
@@ -11,13 +11,13 @@ import {
     NetworkMetricTarget_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
     TerminalThemeVariant as StoredTerminalThemeVariant,
     ScaleMode as StoredScaleMode,
-    SingleMetricViewLayout as StoredSingleMetricViewLayout,
-    SparklineAppearanceSettings_GridLineType as StoredGridLineType,
-    SparklineAppearanceSettings_GridLineVisibility as StoredGridLineVisibility,
+    MetricView as StoredMetricView,
+    LineAppearanceSettings_GridLineType as StoredGridLineType,
+    LineAppearanceSettings_GridLineVisibility as StoredGridLineVisibility,
     TemperatureUnit as StoredTemperatureUnit,
 } from "../../generated/shometrics/v1/settings_pb.js";
 import type {
-    CircleStyle,
+    CircleViewVariant,
     ColorMode,
     DiskThroughputDirection,
     DiskUsageDisplayMode,
@@ -30,22 +30,22 @@ import type {
     NetworkUnitBase,
     TerminalThemeVariant,
     ScaleMode,
-    SingleMetricViewLayout,
+    MetricView,
     TemperatureUnit,
 } from "../resolved-settings";
 
-export const storedSingleMetricViewLayoutByResolved = {
-    circular: StoredSingleMetricViewLayout.CIRCULAR,
-    text: StoredSingleMetricViewLayout.TEXT,
-    linear: StoredSingleMetricViewLayout.LINEAR,
-    sparkline: StoredSingleMetricViewLayout.SPARKLINE,
-} satisfies Record<SingleMetricViewLayout, StoredSingleMetricViewLayout>;
+export const storedMetricViewByResolved = {
+    circle: StoredMetricView.CIRCLE,
+    text: StoredMetricView.TEXT,
+    bar: StoredMetricView.BAR,
+    line: StoredMetricView.LINE,
+} satisfies Record<MetricView, StoredMetricView>;
 
-export const storedCircleStyleByResolved = {
-    value: StoredCircleStyle.VALUE,
-    compact: StoredCircleStyle.COMPACT,
-    gauge: StoredCircleStyle.GAUGE,
-} satisfies Record<CircleStyle, StoredCircleStyle>;
+export const storedCircleViewVariantByResolved = {
+    "full-ring": StoredCircleViewVariant.FULL_RING,
+    minimal: StoredCircleViewVariant.MINIMAL,
+    gauge: StoredCircleViewVariant.GAUGE,
+} satisfies Record<CircleViewVariant, StoredCircleViewVariant>;
 
 export const storedThemeByResolved = {
     flat: StoredMetricTheme.FLAT,

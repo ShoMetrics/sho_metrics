@@ -5,15 +5,15 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { MetricTheme, ResolvedGlobalSettings } from "../../settings/resolved-settings";
 import { PluginSettingsTab } from "./PluginSettingsTab";
 
-test("plugin global override groups graph theme and color controls under the master switch", () => {
+test("plugin global override groups view theme and color controls under the master switch", () => {
     const markup = renderToStaticMarkup(createElement(PluginSettingsTab, {
         resolvedSettings: buildGlobalSettings(),
         onSettingsPatch: () => undefined,
     }));
 
     assert.match(markup, /Global override/);
-    assert.match(markup, /Graph Override/);
-    assert.match(markup, /Override graph/);
+    assert.match(markup, /View Override/);
+    assert.match(markup, /Override view/);
     assert.match(markup, /Theme Override/);
     assert.match(markup, /Override theme/);
     assert.match(markup, /Color Override/);
@@ -59,10 +59,10 @@ function buildGlobalSettings(selectedTheme: MetricTheme = "flat"): ResolvedGloba
             },
         },
         globalOverrideEnabled: true,
-        graphOverride: {
-            graph: {
-                viewLayout: "circular",
-                circleStyle: "value",
+        viewOverride: {
+            view: {
+                selectedView: "circle",
+                circleVariant: "full-ring",
             },
         },
         themeOverride: {

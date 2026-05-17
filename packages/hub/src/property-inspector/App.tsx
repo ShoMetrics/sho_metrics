@@ -25,8 +25,8 @@ export function App({ client }: AppProps): React.JSX.Element {
         updateGlobalSettings,
     } = usePropertyInspectorSettings(client);
     const isGlobalSettingsReady = globalSettingsStatus === "ready";
-    const isGlobalGraphOverrideEnabled =
-        isGlobalSettingsReady && resolvedGlobalSettings.graphOverride !== undefined;
+    const isGlobalViewOverrideEnabled =
+        isGlobalSettingsReady && resolvedGlobalSettings.viewOverride !== undefined;
     const isGlobalThemeOverrideEnabled =
         isGlobalSettingsReady && resolvedGlobalSettings.themeOverride !== undefined;
     const isGlobalPaintOverrideEnabled =
@@ -64,7 +64,7 @@ export function App({ client }: AppProps): React.JSX.Element {
             {activeTab === "widget" ? (
                 <WidgetSettingsTab
                     context={visibilityContext}
-                    isGlobalGraphOverrideEnabled={isGlobalGraphOverrideEnabled}
+                    isGlobalViewOverrideEnabled={isGlobalViewOverrideEnabled}
                     isGlobalThemeOverrideEnabled={isGlobalThemeOverrideEnabled}
                     isGlobalPaintOverrideEnabled={isGlobalPaintOverrideEnabled}
                     onSettingsPatch={updateWidgetSettings}

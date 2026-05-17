@@ -19,7 +19,7 @@ test("network automatic interface reads aggregate keys after registry selection"
         resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
         {
             appearance: {
-                graph: { viewLayout: "sparkline" },
+                view: { selectedView: "line" },
             },
             network: {
                 direction: "download",
@@ -65,7 +65,7 @@ test("network explicit interface reads interface keys without registry selection
         resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
         {
             appearance: {
-                graph: { viewLayout: "sparkline" },
+                view: { selectedView: "line" },
             },
             network: {
                 direction: "download",
@@ -112,3 +112,7 @@ function buildNetworkInterfaceOption(id: string): NetworkInterfaceOption {
         id,
         name: id,
         type: "wired",
+        isDefault: true,
+        speedMegabitsPerSecond: 2500,
+    };
+}

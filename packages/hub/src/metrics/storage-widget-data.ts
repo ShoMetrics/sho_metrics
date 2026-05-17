@@ -45,7 +45,7 @@ export function buildDiskUsageWidgetData(options: {
     availableBytes: number;
     displayMode: DiskUsageDisplayMode;
     label: string;
-    linearLabel?: string;
+    barLabel?: string;
 }): WidgetData {
     const percentageWidgetData = buildMemoryUsageWidgetData({
         usedBytesWidgetData: options.usedBytesWidgetData,
@@ -56,7 +56,7 @@ export function buildDiskUsageWidgetData(options: {
     if (options.displayMode === "percentage") {
         return {
             ...percentageWidgetData,
-            linearLabel: options.linearLabel,
+            linearLabel: options.barLabel,
         };
     }
 
@@ -69,7 +69,7 @@ export function buildDiskUsageWidgetData(options: {
         ...percentageWidgetData,
         displayValue: formattedAvailableSpace.value,
         unit: formattedAvailableSpace.unit,
-        linearLabel: options.linearLabel,
+        linearLabel: options.barLabel,
         linearDisplayValue: percentageWidgetData.current.toFixed(0),
         linearUnit: "%",
     };

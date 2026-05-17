@@ -3,11 +3,11 @@ import type { WidgetData } from "../../rendering/widget-data";
 import { buildDefaultAppearanceSettings } from "../../settings/default-appearance-settings";
 import { mergeResolvedAppearanceSettings, type ResolvedAppearanceSettingsOverride } from "../../settings/appearance-overrides";
 import type {
-    CircleStyle,
+    CircleViewVariant,
+    MetricView,
     MetricTheme,
     ResolvedAppearanceSettings,
     ResolvedMetricTarget,
-    SingleMetricViewLayout,
     TerminalThemeVariant,
 } from "../../settings/resolved-settings";
 import { buildMetricDisplayIcons } from "../../widgets/icons/metric-display-icons";
@@ -34,7 +34,7 @@ interface HardwarePreviewSampleOptions {
     readonly progress?: number | undefined;
     readonly displayValue?: string | undefined;
     readonly secondaryDisplayValue?: string | undefined;
-    readonly linearLabel?: string | undefined;
+    readonly barLabel?: string | undefined;
 }
 
 const DEFAULT_PREVIEW_TARGET = {
@@ -46,23 +46,23 @@ const SAMPLE_HISTORY = [18, 24, 21, 36, 31, 47, 42, 58, 53, 69, 62, 76, 68] as c
 const PREVIEW_SAMPLE_TIMESTAMP_MILLISECONDS = 1;
 const NETWORK_DIRECTION_ICON_SIZE = 30;
 
-export function buildGraphicTypePreviewUri(
-    graphicType: SingleMetricViewLayout,
+export function buildMetricViewPreviewUri(
+    selectedView: MetricView,
     input?: MetricPreviewInput | undefined,
 ): string {
     return buildMetricPreviewUri(input, {
-        graph: { viewLayout: graphicType },
+        view: { selectedView },
     });
 }
 
-export function buildCircleStylePreviewUri(
-    circleStyle: CircleStyle,
+export function buildCircleVariantPreviewUri(
+    circleVariant: CircleViewVariant,
     input?: MetricPreviewInput | undefined,
 ): string {
     return buildMetricPreviewUri(input, {
-        graph: {
-            viewLayout: "circular",
-            circleStyle,
+        view: {
+            selectedView: "circle",
+            circleVariant,
         },
     });
 }
@@ -143,7 +143,7 @@ function buildMetricPreviewSample(target: ResolvedMetricTarget): MetricPreviewSa
                 label: "DISK",
                 current: 58,
                 secondaryDisplayValue: "430 / 1 TB",
-                linearLabel: "SSD",
+                barLabel: "SSD",
             });
         case "catalog":
             return buildHardwarePreviewSample({
@@ -171,7 +171,7 @@ function buildNetworkPreviewSample(): MetricPreviewSample {
             progress: 0.72,
             unit: "MB/s",
             displayValue: current.toString(),
-            linearLabel: "Net Speed",
+            barLabel: "Net Speed",
         }),
         centerIconFragment: directionIconFragment,
         linearIconFragment: directionIconFragment,
@@ -193,7 +193,7 @@ function buildHardwarePreviewSample(options: HardwarePreviewSampleOptions): Metr
             unit: options.unit ?? "%",
             displayValue: options.displayValue ?? options.current.toFixed(0),
             secondaryDisplayValue: options.secondaryDisplayValue,
-            linearLabel: options.linearLabel,
+            barLabel: options.barLabel,
         }),
         centerIconFragment: icons.centerIconFragment,
         linearIconFragment: icons.centerIconFragment,
@@ -208,7 +208,7 @@ function buildWidgetData(options: {
     readonly unit: string;
     readonly displayValue: string;
     readonly secondaryDisplayValue?: string | undefined;
-    readonly linearLabel?: string | undefined;
+    readonly barLabel?: string | undefined;
 }): WidgetData {
     const fixedScaleMaximum = options.unit === "%" ? 100 : undefined;
     const historyMaximum = fixedScaleMaximum ?? Math.max(1, options.current / Math.max(0.01, options.progress));
@@ -221,7 +221,7 @@ function buildWidgetData(options: {
         label: options.label,
         displayValue: options.displayValue,
         secondaryDisplayValue: options.secondaryDisplayValue,
-        linearLabel: options.linearLabel,
+        linearLabel: options.barLabel,
         sparklineScale: fixedScaleMaximum === undefined
             ? undefined
             : {

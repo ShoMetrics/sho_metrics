@@ -1,19 +1,19 @@
 import { create } from "@bufbuild/protobuf";
 import {
-    AppearanceGraphSettingsSchema,
     AppearanceThemeSettingsSchema,
+    AppearanceViewSettingsSchema,
     ColorFilledMultiColorPaintSettingsSchema,
     ColorFilledPaintSettingsSchema,
     ColorFilledSolidPaintSettingsSchema,
     DiskThroughputDisplaySettingsSchema,
     GlobalDefaultsSchema,
-    GlobalGraphOverrideSchema,
     GlobalOverridesSchema,
     GlobalMultiColorPaintSettingsSchema,
     GlobalPaintOverrideSchema,
     GlobalMetricPaintSettingsSchema,
     GlobalSolidPaintSettingsSchema,
     GlobalThemeOverrideSchema,
+    GlobalViewOverrideSchema,
     MultiColorSetSchema,
     NetworkDisplaySettingsSchema,
     TerminalThemeSettingsSchema,
@@ -28,7 +28,7 @@ import type {
     ColorMode,
     MetricTheme,
     NetworkUnitBase,
-    ResolvedAppearanceGraphSettings,
+    ResolvedAppearanceViewSettings,
     ResolvedGlobalMultiColorPaintSettings,
     ResolvedGlobalSolidPaintSettings,
     ScaleMode,
@@ -44,21 +44,21 @@ import {
     type StoredSettingsJsonObject,
 } from "./codec";
 import {
-    storedCircleStyleByResolved,
+    storedCircleViewVariantByResolved,
     storedColorModeByResolved,
     storedNetworkUnitBaseByResolved,
     storedTerminalThemeVariantByResolved,
     storedScaleModeByResolved,
-    storedSingleMetricViewLayoutByResolved,
+    storedMetricViewByResolved,
     storedThemeByResolved,
 } from "./enum-maps";
 
 export interface StoredGlobalSettingsPatch {
     readonly globalOverrideEnabled?: boolean | undefined;
-    readonly graphOverrideEnabled?: boolean | undefined;
+    readonly viewOverrideEnabled?: boolean | undefined;
     readonly themeOverrideEnabled?: boolean | undefined;
     readonly paintOverrideEnabled?: boolean | undefined;
-    readonly graph?: Partial<ResolvedAppearanceGraphSettings> | undefined;
+    readonly view?: Partial<ResolvedAppearanceViewSettings> | undefined;
     readonly theme?: GlobalThemeSettingsPatch | undefined;
     readonly paint?: GlobalPaintSettingsPatch | undefined;
     readonly network?: Partial<{
@@ -115,7 +115,7 @@ export function writeStoredGlobalSettingsPatch(
         settings.overrides.enabled = patch.globalOverrideEnabled;
     }
 
-    applyGraphOverridePatch(settings.overrides, patch);
+    applyViewOverridePatch(settings.overrides, patch);
     applyThemeOverridePatch(settings.overrides, patch);
     applyPaintOverridePatch(settings.overrides, patch);
     applyNetworkDefaultsPatch(settings.defaults, patch.network);
@@ -124,30 +124,30 @@ export function writeStoredGlobalSettingsPatch(
     return writeStoredGlobalSettings(settings);
 }
 
-function applyGraphOverridePatch(
+function applyViewOverridePatch(
     overrides: StoredGlobalOverrides,
     patch: StoredGlobalSettingsPatch,
 ): void {
-    if (patch.graphOverrideEnabled === undefined && patch.graph === undefined) {
+    if (patch.viewOverrideEnabled === undefined && patch.view === undefined) {
         return;
     }
 
-    const graphOverride = overrides.graph ??= create(GlobalGraphOverrideSchema);
+    const viewOverride = overrides.view ??= create(GlobalViewOverrideSchema);
 
-    if (patch.graphOverrideEnabled !== undefined) {
-        graphOverride.enabled = patch.graphOverrideEnabled;
+    if (patch.viewOverrideEnabled !== undefined) {
+        viewOverride.enabled = patch.viewOverrideEnabled;
     }
 
-    if (patch.graph === undefined) {
+    if (patch.view === undefined) {
         return;
     }
 
-    const graph = graphOverride.graph ??= create(AppearanceGraphSettingsSchema);
-    if (patch.graph.viewLayout !== undefined) {
-        graph.viewLayout = storedSingleMetricViewLayoutByResolved[patch.graph.viewLayout];
+    const view = viewOverride.view ??= create(AppearanceViewSettingsSchema);
+    if (patch.view.selectedView !== undefined) {
+        view.selectedView = storedMetricViewByResolved[patch.view.selectedView];
     }
-    if (patch.graph.circleStyle !== undefined) {
-        graph.circleStyle = storedCircleStyleByResolved[patch.graph.circleStyle];
+    if (patch.view.circleVariant !== undefined) {
+        view.circleVariant = storedCircleViewVariantByResolved[patch.view.circleVariant];
     }
 }
 

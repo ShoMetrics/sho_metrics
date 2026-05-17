@@ -1,47 +1,47 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-    buildCircleStylePreviewUri,
-    buildGraphicTypePreviewUri,
+    buildCircleVariantPreviewUri,
+    buildMetricViewPreviewUri,
     buildMetricThemePreviewUri,
     buildTerminalVariantPreviewUri,
     type MetricPreviewInput,
 } from "./metric-option-preview";
-import type { CircleStyle, SingleMetricViewLayout } from "../inspector/settings-types";
+import type { CircleViewVariant, MetricView } from "../inspector/settings-types";
 import type { MetricTheme, TerminalThemeVariant } from "../../settings/resolved-settings";
 import { buildVisibilityContext } from "../testing/test-context";
 
-test("graphic type preview URIs render every Property Inspector graphic option without throwing", () => {
-    const graphicTypes: readonly SingleMetricViewLayout[] = ["circular", "text", "linear", "sparkline"];
+test("metric view preview URIs render every Property Inspector view option without throwing", () => {
+    const metricViews: readonly MetricView[] = ["circle", "text", "bar", "line"];
 
-    for (const graphicType of graphicTypes) {
-        const previewUri = buildGraphicTypePreviewUri(graphicType);
+    for (const metricView of metricViews) {
+        const previewUri = buildMetricViewPreviewUri(metricView);
 
         assert.match(previewUri, /^data:image\/svg\+xml,/);
         assert.ok(decodeURIComponent(previewUri).includes("<svg"));
     }
 });
 
-test("graphic type preview uses the active metric target", () => {
-    const previewUri = buildGraphicTypePreviewUri("circular", buildGpuPreviewInput());
+test("metric view preview uses the active metric target", () => {
+    const previewUri = buildMetricViewPreviewUri("circle", buildGpuPreviewInput());
     const svg = decodeURIComponent(previewUri);
 
     assert.match(svg, />GPU</);
     assert.doesNotMatch(svg, />CPU</);
 });
 
-test("circle style preview URIs render every Property Inspector circle style without throwing", () => {
-    const circleStyles: readonly CircleStyle[] = ["value", "compact", "gauge"];
+test("circle variant preview URIs render every Property Inspector circle variant without throwing", () => {
+    const circleVariants: readonly CircleViewVariant[] = ["full-ring", "minimal", "gauge"];
 
-    for (const circleStyle of circleStyles) {
-        const previewUri = buildCircleStylePreviewUri(circleStyle);
+    for (const circleVariant of circleVariants) {
+        const previewUri = buildCircleVariantPreviewUri(circleVariant);
 
         assert.match(previewUri, /^data:image\/svg\+xml,/);
         assert.ok(decodeURIComponent(previewUri).includes("<svg"));
     }
 });
 
-test("metric theme preview URIs render every Property Inspector graphic style without throwing", () => {
+test("metric theme preview URIs render every Property Inspector theme without throwing", () => {
     const metricThemes: readonly MetricTheme[] = ["flat", "cupertino-glass", "color-filled", "terminal"];
 
     for (const metricTheme of metricThemes) {
@@ -52,7 +52,7 @@ test("metric theme preview URIs render every Property Inspector graphic style wi
     }
 });
 
-test("terminal variant preview URIs render every terminal style without throwing", () => {
+test("terminal variant preview URIs render every terminal variant without throwing", () => {
     const terminalVariants: readonly TerminalThemeVariant[] = ["clean", "vintage"];
 
     for (const terminalVariant of terminalVariants) {

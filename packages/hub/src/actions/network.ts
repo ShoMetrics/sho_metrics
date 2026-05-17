@@ -25,7 +25,7 @@ const NETWORK_INTERFACE_LIST_REFRESH_METRIC_KEYS = [getNetworkAggregateMetricKey
 
 /**
  * Network action.
- * Circle, linear, and sparkline visuals all support either one network
+ * Circle, bar, and line views all support either one network
  * direction or combined download/upload telemetry.
  */
 @action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.network })
@@ -36,7 +36,7 @@ export class Network extends MetricAction {
         const settings = this.resolveSettings(event);
         const networkTarget = readResolvedMetricTarget(settings, "network");
         return resolveNetworkMetricSubscriptionKeys({
-            graphicType: settings.widget.slot.appearance.graph.viewLayout,
+            selectedView: settings.widget.slot.appearance.view.selectedView,
             networkDirection: networkTarget.reading.direction,
             networkInterfaceId: networkTarget.interfaceId ?? "",
         });
@@ -135,7 +135,7 @@ export class Network extends MetricAction {
 }
 
 function resolveNetworkMetricKey(
-    direction: NetworkDirection,
+    direction: Exclude<NetworkDirection, "both">,
     networkInterfaceId: string,
 ): string {
     return networkInterfaceId.length > 0

@@ -1,14 +1,14 @@
-import { CircleStyleSetting } from "../controls/CircleStyleSetting";
-import { GraphicTypeSetting } from "../controls/GraphicTypeSetting";
+import { CircleVariantSetting } from "../controls/CircleVariantSetting";
+import { MetricViewSetting } from "../controls/MetricViewSetting";
 import { TerminalVariantSetting } from "../controls/TerminalVariantSetting";
 import { ThemeSetting } from "../controls/ThemeSetting";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 
-export function LayoutSettings({
+export function AppearanceSettings({
     context,
     onSettingsPatch,
-    graphDisabled = false,
+    viewDisabled = false,
     themeDisabled = false,
 }: WidgetSettingsPanelProps): React.JSX.Element {
     const appearance = context.resolved.widget.slot.appearance;
@@ -18,23 +18,23 @@ export function LayoutSettings({
     };
 
     return (
-        <SettingsSection title="Layout">
-            <GraphicTypeSetting
-                value={appearance.graph.viewLayout}
+        <SettingsSection title="Appearance">
+            <MetricViewSetting
+                value={appearance.view.selectedView}
                 preview={preview}
-                onValueChange={(viewLayout) => onSettingsPatch({
-                    appearance: { graph: { viewLayout } },
+                onValueChange={(selectedView) => onSettingsPatch({
+                    appearance: { view: { selectedView } },
                 })}
-                disabled={graphDisabled}
+                disabled={viewDisabled}
             />
-            {appearance.graph.viewLayout === "circular" && (
-                <CircleStyleSetting
-                    value={appearance.graph.circleStyle}
+            {appearance.view.selectedView === "circle" && (
+                <CircleVariantSetting
+                    value={appearance.view.circleVariant}
                     preview={preview}
-                    onValueChange={(circleStyle) => onSettingsPatch({
-                        appearance: { graph: { circleStyle } },
+                    onValueChange={(circleVariant) => onSettingsPatch({
+                        appearance: { view: { circleVariant } },
                     })}
-                    disabled={graphDisabled}
+                    disabled={viewDisabled}
                 />
             )}
             <ThemeSetting

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-    resolveDiskLinearLabelPlaceholder,
+    resolveDiskBarLabelPlaceholder,
     resolveDiskVolumeOptions,
     resolveNetworkInterfaceOptions,
     resolveSelectedDiskVolumeLabel,
@@ -139,17 +139,17 @@ test("selected disk labels prefer explicit selection then root fallback", () => 
     });
 
     assert.equal(resolveSelectedDiskVolumeLabel(context), "Games");
-    assert.equal(resolveDiskLinearLabelPlaceholder(context), "Auto: HDD (GAME)");
-    assert.equal(resolveDiskLinearLabelPlaceholder(automaticContext), "Auto: SSD (C:)");
+    assert.equal(resolveDiskBarLabelPlaceholder(context), "Auto: HDD (GAME)");
+    assert.equal(resolveDiskBarLabelPlaceholder(automaticContext), "Auto: SSD (C:)");
 });
 
 test("selected disk label returns dash when no valid disk is available", () => {
     const context = buildContext();
     const selectedDiskVolumeLabel = resolveSelectedDiskVolumeLabel(context);
-    const diskLinearLabelPlaceholder = resolveDiskLinearLabelPlaceholder(context);
+    const diskBarLabelPlaceholder = resolveDiskBarLabelPlaceholder(context);
 
     assert.equal(selectedDiskVolumeLabel, "-");
-    assert.equal(diskLinearLabelPlaceholder, "Auto");
+    assert.equal(diskBarLabelPlaceholder, "Auto");
 });
 
 function buildContext(options: {

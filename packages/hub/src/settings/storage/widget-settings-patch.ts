@@ -1,9 +1,9 @@
 import { create } from "@bufbuild/protobuf";
 import {
-    AppearanceGraphSettingsSchema,
     AppearancePaintSettingsSchema,
     AppearanceSettingsSchema,
     AppearanceThemeSettingsSchema,
+    AppearanceViewSettingsSchema,
     ColorFilledMultiColorPaintSettingsSchema,
     ColorFilledPaintSettingsSchema,
     ColorFilledSolidPaintSettingsSchema,
@@ -17,7 +17,7 @@ import {
     NetworkDisplaySettingsSchema,
     TerminalThemeSettingsSchema,
     SlotOverridesSchema,
-    SparklineAppearanceSettingsSchema,
+    LineAppearanceSettingsSchema,
     WidgetPreferencesSchema,
     type AppearanceSettings as StoredAppearanceSettings,
     type ColorFilledPaintSettings as StoredColorFilledPaintSettings,
@@ -55,7 +55,7 @@ import {
     type StoredSettingsJsonObject,
 } from "./codec";
 import {
-    storedCircleStyleByResolved,
+    storedCircleViewVariantByResolved,
     storedColorModeByResolved,
     storedDiskMetricKindByResolved,
     storedDiskThroughputDirectionByResolved,
@@ -68,7 +68,7 @@ import {
     storedNetworkUnitBaseByResolved,
     storedTerminalThemeVariantByResolved,
     storedScaleModeByResolved,
-    storedSingleMetricViewLayoutByResolved,
+    storedMetricViewByResolved,
     storedTemperatureUnitByResolved,
     storedThemeByResolved,
 } from "./enum-maps";
@@ -92,7 +92,7 @@ export interface StoredWidgetSettingsPatch {
         readonly volumeId: string;
         readonly throughputDirection: DiskThroughputDirection;
         readonly usageDisplayMode: DiskUsageDisplayMode;
-        readonly linearLabel: string;
+        readonly barLabel: string;
         readonly scaleMode: ScaleMode;
         readonly maximumReadThroughputMebibytesPerSecond: number | undefined;
         readonly maximumWriteThroughputMebibytesPerSecond: number | undefined;
@@ -150,13 +150,13 @@ function applyPreferencesPatch(
 }
 
 function applyAppearancePatch(appearance: StoredAppearanceSettings, patch: ResolvedAppearanceSettingsOverride): void {
-    if (patch.graph !== undefined) {
-        const graph = appearance.graph ??= create(AppearanceGraphSettingsSchema);
-        if (patch.graph.viewLayout !== undefined) {
-            graph.viewLayout = storedSingleMetricViewLayoutByResolved[patch.graph.viewLayout];
+    if (patch.view !== undefined) {
+        const view = appearance.view ??= create(AppearanceViewSettingsSchema);
+        if (patch.view.selectedView !== undefined) {
+            view.selectedView = storedMetricViewByResolved[patch.view.selectedView];
         }
-        if (patch.graph.circleStyle !== undefined) {
-            graph.circleStyle = storedCircleStyleByResolved[patch.graph.circleStyle];
+        if (patch.view.circleVariant !== undefined) {
+            view.circleVariant = storedCircleViewVariantByResolved[patch.view.circleVariant];
         }
     }
 
@@ -168,16 +168,16 @@ function applyAppearancePatch(appearance: StoredAppearanceSettings, patch: Resol
         applyAppearancePaintPatch(appearance.paint ??= create(AppearancePaintSettingsSchema), patch.paint);
     }
 
-    if (patch.sparkline !== undefined) {
-        const sparkline = appearance.sparkline ??= create(SparklineAppearanceSettingsSchema);
-        if (patch.sparkline.lineSmoothingPercent !== undefined) {
-            sparkline.lineSmoothingPercent = patch.sparkline.lineSmoothingPercent;
+    if (patch.line !== undefined) {
+        const line = appearance.line ??= create(LineAppearanceSettingsSchema);
+        if (patch.line.lineSmoothingPercent !== undefined) {
+            line.lineSmoothingPercent = patch.line.lineSmoothingPercent;
         }
-        if (patch.sparkline.gridLineVisibility !== undefined) {
-            sparkline.gridLineVisibility = storedGridLineVisibilityByResolved[patch.sparkline.gridLineVisibility];
+        if (patch.line.gridLineVisibility !== undefined) {
+            line.gridLineVisibility = storedGridLineVisibilityByResolved[patch.line.gridLineVisibility];
         }
-        if (patch.sparkline.gridLineType !== undefined) {
-            sparkline.gridLineType = storedGridLineTypeByResolved[patch.sparkline.gridLineType];
+        if (patch.line.gridLineType !== undefined) {
+            line.gridLineType = storedGridLineTypeByResolved[patch.line.gridLineType];
         }
     }
 }
@@ -356,7 +356,7 @@ function applyDiskPatch(
     if (patch.usageDisplayMode !== undefined) {
         target.usageDisplayMode = storedDiskUsageDisplayModeByResolved[patch.usageDisplayMode];
     }
-    applyDefinedValue(target, "linearLabel", patch.linearLabel);
+    applyDefinedValue(target, "barLabel", patch.barLabel);
 
     const display = overrides.diskThroughput ??= create(DiskThroughputDisplaySettingsSchema);
 

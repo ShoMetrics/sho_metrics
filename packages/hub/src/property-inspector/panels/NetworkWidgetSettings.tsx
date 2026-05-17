@@ -6,9 +6,9 @@ import {
     NetworkChannelColorSettings,
     StandardColorSettings,
 } from "./ColorSettings";
-import { LayoutSettings } from "./LayoutSettings";
+import { AppearanceSettings } from "./AppearanceSettings";
 import { PollingSettings } from "./PollingSettings";
-import { SparklineSettings } from "./SparklineSettings";
+import { LineSettings } from "./LineSettings";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import type { ResolvedNetworkMetricTarget } from "../../settings/resolved-settings";
@@ -26,9 +26,9 @@ export function NetworkWidgetSettings(props: NetworkWidgetSettingsProps): React.
     return (
         <>
             <NetworkMetricSettings {...props} />
-            <LayoutSettings {...props} />
+            <AppearanceSettings {...props} />
             <NetworkScaleSettings {...props} />
-            <SparklineSettings {...props} />
+            <LineSettings {...props} />
             {props.target.reading.direction === "both" ? (
                 <NetworkChannelColorSettings {...props} />
             ) : (
@@ -54,7 +54,7 @@ function NetworkMetricSettings({
                     network: { direction },
                 })}
             />
-            {context.resolved.widget.slot.appearance.graph.viewLayout === "circular" && (
+            {context.resolved.widget.slot.appearance.view.selectedView === "circle" && (
                 <InspectorItem className="note-item note-item-default">
                     <p className="section-note">Download and upload split the circle into two halves.</p>
                 </InspectorItem>

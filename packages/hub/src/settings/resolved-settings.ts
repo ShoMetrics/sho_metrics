@@ -15,8 +15,8 @@
 // primitives. Proto stays at the storage boundary; rendering gets adapted
 // contracts from resolved settings.
 
-export type SingleMetricViewLayout = "circular" | "text" | "linear" | "sparkline";
-export type CircleStyle = "value" | "compact" | "gauge";
+export type MetricView = "circle" | "text" | "bar" | "line";
+export type CircleViewVariant = "full-ring" | "minimal" | "gauge";
 export type MetricTheme = "flat" | "cupertino-glass" | "color-filled" | "terminal";
 export type TerminalThemeVariant = "clean" | "vintage";
 export type ColorMode = "multi-color" | "solid" | "black-white";
@@ -120,7 +120,7 @@ export type ResolvedDiskReading =
     | {
         readonly kind: "usage";
         readonly displayMode: DiskUsageDisplayMode;
-        readonly linearLabel: string;
+        readonly barLabel: string;
     }
     | {
         readonly kind: "throughput";
@@ -150,15 +150,15 @@ export interface ResolvedCatalogMetricTarget {
 }
 
 export interface ResolvedAppearanceSettings {
-    readonly graph: ResolvedAppearanceGraphSettings;
+    readonly view: ResolvedAppearanceViewSettings;
     readonly theme: ResolvedAppearanceThemeSettings;
     readonly paint: ResolvedAppearancePaintSettings;
-    readonly sparkline: ResolvedSparklineAppearanceSettings;
+    readonly line: ResolvedLineAppearanceSettings;
 }
 
-export interface ResolvedAppearanceGraphSettings {
-    readonly viewLayout: SingleMetricViewLayout;
-    readonly circleStyle: CircleStyle;
+export interface ResolvedAppearanceViewSettings {
+    readonly selectedView: MetricView;
+    readonly circleVariant: CircleViewVariant;
 }
 
 export interface ResolvedAppearanceThemeSettings {
@@ -231,7 +231,7 @@ export interface ResolvedColorFilledMultiColorPaintSettings {
     readonly isGradientEnabled: boolean;
 }
 
-export interface ResolvedSparklineAppearanceSettings {
+export interface ResolvedLineAppearanceSettings {
     readonly lineSmoothingPercent: number;
     readonly gridLineVisibility: GridLineVisibility;
     readonly gridLineType: GridLineType;
@@ -253,7 +253,7 @@ export interface ResolvedDiskThroughputDisplaySettings {
 export interface ResolvedGlobalSettings {
     readonly defaults: ResolvedGlobalDefaults;
     readonly globalOverrideEnabled: boolean;
-    readonly graphOverride: ResolvedGlobalGraphOverride | undefined;
+    readonly viewOverride: ResolvedGlobalViewOverride | undefined;
     readonly themeOverride: ResolvedGlobalThemeOverride | undefined;
     readonly paintOverride: ResolvedGlobalPaintOverride | undefined;
     readonly sourceProfiles: readonly ResolvedMetricSourceProfile[];
@@ -268,8 +268,8 @@ export interface ResolvedGlobalDefaults {
     readonly diskThroughput: ResolvedDiskThroughputDisplaySettings;
 }
 
-export interface ResolvedGlobalGraphOverride {
-    readonly graph: ResolvedAppearanceGraphSettings;
+export interface ResolvedGlobalViewOverride {
+    readonly view: ResolvedAppearanceViewSettings;
 }
 
 export interface ResolvedGlobalThemeOverride {

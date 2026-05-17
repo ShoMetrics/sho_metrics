@@ -1,14 +1,14 @@
 import { StandardColorSettings } from "./ColorSettings";
-import { LayoutSettings } from "./LayoutSettings";
+import { AppearanceSettings } from "./AppearanceSettings";
 import { PollingSettings } from "./PollingSettings";
-import { SparklineSettings } from "./SparklineSettings";
+import { LineSettings } from "./LineSettings";
 import type { WidgetSettingsPanelProps as PanelProps } from "./panel-props";
 
 export function DefaultWidgetSettings(props: PanelProps): React.JSX.Element {
     return (
         <>
-            <LayoutSettings {...props} />
-            <SparklineSettings {...props} />
+            <AppearanceSettings {...props} />
+            <LineSettings {...props} />
             <StandardColorSettings {...props} />
             <PollingSettings {...props} />
         </>

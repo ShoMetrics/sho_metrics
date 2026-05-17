@@ -10,7 +10,7 @@ import { SettingsSection } from "./SettingsSection";
 
 interface WidgetSettingsTabProps {
     context: VisibilityContext;
-    isGlobalGraphOverrideEnabled: boolean;
+    isGlobalViewOverrideEnabled: boolean;
     isGlobalThemeOverrideEnabled: boolean;
     isGlobalPaintOverrideEnabled: boolean;
     onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
@@ -21,7 +21,7 @@ const WIDGET_SETTINGS_PENDING_NOTICE_DELAY_MS = 1000;
 
 export function WidgetSettingsTab({
     context,
-    isGlobalGraphOverrideEnabled,
+    isGlobalViewOverrideEnabled,
     isGlobalThemeOverrideEnabled,
     isGlobalPaintOverrideEnabled,
     onSettingsPatch,
@@ -58,11 +58,11 @@ export function WidgetSettingsTab({
     const panelProps = {
         context,
         onSettingsPatch,
-        graphDisabled: isGlobalGraphOverrideEnabled,
+        viewDisabled: isGlobalViewOverrideEnabled,
         themeDisabled: isGlobalThemeOverrideEnabled,
         colorDisabled: isGlobalPaintOverrideEnabled,
     };
-    const hasGlobalOverride = isGlobalGraphOverrideEnabled
+    const hasGlobalOverride = isGlobalViewOverrideEnabled
         || isGlobalThemeOverrideEnabled
         || isGlobalPaintOverrideEnabled;
 
@@ -93,7 +93,7 @@ function renderMetricPanel(
     panelProps: {
         context: VisibilityContext;
         onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
-        graphDisabled: boolean;
+        viewDisabled: boolean;
         themeDisabled: boolean;
         colorDisabled: boolean;
     },

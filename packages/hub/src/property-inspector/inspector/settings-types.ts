@@ -1,6 +1,6 @@
 export type { ActionKind } from "../../shared/stream-deck-actions";
 export type {
-    CircleStyle,
+    CircleViewVariant,
     ColorMode,
     DiskThroughputDirection,
     DiskUsageDisplayMode,
@@ -10,8 +10,8 @@ export type {
     NetworkDirection,
     NetworkTrafficDisplayMode,
     NetworkUnitBase,
+    MetricView,
     ScaleMode,
-    SingleMetricViewLayout,
     TemperatureUnit,
 } from "../../settings/resolved-settings";
 

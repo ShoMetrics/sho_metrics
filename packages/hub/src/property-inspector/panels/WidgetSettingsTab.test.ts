@@ -11,12 +11,12 @@ import {
 import { buildVisibilityContext, type InspectorTestSettings } from "../testing/test-context";
 import { WidgetSettingsTab } from "./WidgetSettingsTab";
 
-test("disk usage linear settings render label controls without usage-mode controls", () => {
+test("disk usage bar view settings render label controls without usage-mode controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",
         settings: buildWidgetSettings("disk", {
             appearance: {
-                graph: { viewLayout: "linear" },
+                view: { selectedView: "bar" },
             },
             disk: {
                 kind: "usage",
@@ -30,12 +30,12 @@ test("disk usage linear settings render label controls without usage-mode contro
     assert.doesNotMatch(markup, /Usage Display:/);
 });
 
-test("disk usage circular settings render usage display controls", () => {
+test("disk usage circle view settings render usage display controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",
         settings: buildWidgetSettings("disk", {
             appearance: {
-                graph: { viewLayout: "circular" },
+                view: { selectedView: "circle" },
             },
             disk: {
                 kind: "usage",
@@ -67,7 +67,7 @@ test("windows disk settings use usage controls when throughput is unavailable", 
         isWindows: true,
         settings: buildWidgetSettings("disk", {
             appearance: {
-                graph: { viewLayout: "linear" },
+                view: { selectedView: "bar" },
             },
             disk: {
                 kind: "throughput",
@@ -177,7 +177,7 @@ test("network mirrored trend disables grid controls in the panel", () => {
         actionKind: "network",
         settings: buildWidgetSettings("network", {
             appearance: {
-                graph: { viewLayout: "sparkline" },
+                view: { selectedView: "line" },
             },
             network: {
                 direction: "both",
@@ -186,18 +186,18 @@ test("network mirrored trend disables grid controls in the panel", () => {
         }),
     });
 
-    assert.match(markup, /Traffic Graph:/);
+    assert.match(markup, /Traffic Mode:/);
     assert.match(markup, /Grid Line Visibility:/);
     assert.match(markup, /Grid Line Type:/);
     assert.match(markup, /Grid line settings are not supported/);
 });
 
-test("disk throughput linear settings use standard colors", () => {
+test("disk throughput bar view settings use standard colors", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",
         settings: buildWidgetSettings("disk", {
             appearance: {
-                graph: { viewLayout: "linear" },
+                view: { selectedView: "bar" },
                 paint: { metric: { colorMode: "solid" } },
             },
             disk: {
@@ -217,7 +217,7 @@ test("disk throughput dual-channel settings render read/write colors", () => {
         actionKind: "disk",
         settings: buildWidgetSettings("disk", {
             appearance: {
-                graph: { viewLayout: "circular" },
+                view: { selectedView: "circle" },
                 paint: { metric: { colorMode: "solid" } },
             },
             disk: {
@@ -261,7 +261,7 @@ test("widget settings waits for action kind before rendering recovery UI", () =>
 test("widget settings renders widget controls before global settings load", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
-        isGlobalGraphOverrideEnabled: false,
+        isGlobalViewOverrideEnabled: false,
         isGlobalThemeOverrideEnabled: false,
         isGlobalPaintOverrideEnabled: false,
     });
@@ -273,7 +273,7 @@ test("widget settings renders widget controls before global settings load", () =
 test("widget settings renders mismatch recovery before global settings load", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
-        isGlobalGraphOverrideEnabled: false,
+        isGlobalViewOverrideEnabled: false,
         isGlobalThemeOverrideEnabled: false,
         isGlobalPaintOverrideEnabled: false,
         settings: buildWidgetSettings("cpu", {}),
@@ -286,7 +286,7 @@ test("widget settings renders mismatch recovery before global settings load", ()
 test("widget settings renders normally after global settings load without override", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
-        isGlobalGraphOverrideEnabled: false,
+        isGlobalViewOverrideEnabled: false,
         isGlobalThemeOverrideEnabled: false,
         isGlobalPaintOverrideEnabled: false,
     });
@@ -298,37 +298,36 @@ test("widget settings renders normally after global settings load without overri
 test("widget settings keep warnings first and reset in advanced controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
-        isGlobalGraphOverrideEnabled: true,
+        isGlobalViewOverrideEnabled: true,
     });
 
     assertTextOrder(markup, "Some settings are disabled", "GPU Metric:");
-    assertTextOrder(markup, "GPU Metric:", "Layout");
+    assertTextOrder(markup, "GPU Metric:", "Appearance");
     assertTextOrder(markup, "Polling Frequency", "Advanced");
     assertTextOrder(markup, "Advanced", "Reset Widget Settings");
 });
 
-test("widget layout controls keep shape before theme order", () => {
+test("widget view controls keep view before theme order", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
         settings: buildWidgetSettings("gpu", {
             appearance: {
-                graph: { viewLayout: "circular" },
+                view: { selectedView: "circle" },
                 theme: { selectedTheme: "terminal" },
             },
         }),
     });
 
-    assertTextOrder(markup, "Layout:", "Layout Variant:");
-    assertTextOrder(markup, "Layout Variant:", "Theme:");
+    assertTextOrder(markup, "View:", "View Variant:");
+    assertTextOrder(markup, "View Variant:", "Theme:");
     assertTextOrder(markup, "Theme:", "Theme Variant:");
-    assert.doesNotMatch(markup, /Graphic Style:/);
-    assert.doesNotMatch(markup, /Terminal Style:/);
+    assert.match(markup, /Theme Variant:/);
 });
 
 function renderWidgetSettings(options: {
     actionKind: ActionKind;
     isWindows?: boolean;
-    isGlobalGraphOverrideEnabled?: boolean;
+    isGlobalViewOverrideEnabled?: boolean;
     isGlobalThemeOverrideEnabled?: boolean;
     isGlobalPaintOverrideEnabled?: boolean;
     settings?: InspectorTestSettings;
@@ -339,7 +338,7 @@ function renderWidgetSettings(options: {
             isWindows: options.isWindows,
             settings: options.settings,
         }),
-        isGlobalGraphOverrideEnabled: options.isGlobalGraphOverrideEnabled ?? false,
+        isGlobalViewOverrideEnabled: options.isGlobalViewOverrideEnabled ?? false,
         isGlobalThemeOverrideEnabled: options.isGlobalThemeOverrideEnabled ?? false,
         isGlobalPaintOverrideEnabled: options.isGlobalPaintOverrideEnabled ?? false,
         onSettingsPatch: () => undefined,

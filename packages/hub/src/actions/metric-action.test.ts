@@ -25,23 +25,23 @@ test("runtime cache publishes to Property Inspector without writing settings", a
         },
     };
     const action = new TestMetricAction();
-    const circularNetworkSettings = writeStoredWidgetSettingsPatch(
+    const circleViewNetworkSettings = writeStoredWidgetSettingsPatch(
         resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
         {
             appearance: {
-                graph: { viewLayout: "circular" },
+                view: { selectedView: "circle" },
             },
         },
     );
-    const sparklineNetworkSettings = writeStoredWidgetSettingsPatch(circularNetworkSettings, {
+    const lineViewNetworkSettings = writeStoredWidgetSettingsPatch(circleViewNetworkSettings, {
         appearance: {
-            graph: { viewLayout: "sparkline" },
+            view: { selectedView: "line" },
         },
     });
     const willAppearEvent = {
         action: streamDeckAction,
         payload: {
-            settings: circularNetworkSettings,
+            settings: circleViewNetworkSettings,
         },
     } as unknown as WillAppearEvent;
 
@@ -50,7 +50,7 @@ test("runtime cache publishes to Property Inspector without writing settings", a
         action.onDidReceiveSettings({
             action: streamDeckAction,
             payload: {
-                settings: sparklineNetworkSettings,
+                settings: lineViewNetworkSettings,
             },
         } as unknown as DidReceiveSettingsEvent);
 
