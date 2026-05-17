@@ -26,6 +26,7 @@ export interface MetricSnapshotStore {
 interface SubscriberRecord {
     callback: MetricSubscriber;
     readPlan: MetricReadPlan;
+    groupKey: string;
     pollingIntervalMilliseconds: number;
 }
 
@@ -74,6 +75,7 @@ export class Scheduler {
         this.subscribers.set(callback, {
             callback,
             readPlan,
+            groupKey,
             pollingIntervalMilliseconds,
         });
         this.nextPollTimestampByGroup.set(groupKey, 0);
@@ -81,6 +83,7 @@ export class Scheduler {
 
         return () => {
             this.subscribers.delete(callback);
+            this.removeGroupScheduleIfUnused(groupKey);
 
             if (this.subscribers.size === 0) {
                 this.stop();
@@ -153,10 +156,7 @@ export class Scheduler {
         const subscriberGroups = new Map<string, DueSubscriberGroup>();
 
         for (const subscriber of this.subscribers.values()) {
-            const groupKey = Scheduler.buildGroupKey(
-                subscriber.pollingIntervalMilliseconds,
-                subscriber.readPlan,
-            );
+            const groupKey = subscriber.groupKey;
             const nextPollTimestampMilliseconds = this.nextPollTimestampByGroup.get(groupKey) ?? 0;
 
             if (
@@ -197,6 +197,16 @@ export class Scheduler {
         }
 
         return Array.from(subscriberGroups.values());
+    }
+
+    private removeGroupScheduleIfUnused(groupKey: string): void {
+        for (const subscriber of this.subscribers.values()) {
+            if (subscriber.groupKey === groupKey) {
+                return;
+            }
+        }
+
+        this.nextPollTimestampByGroup.delete(groupKey);
     }
 
     private async pollSubscriberGroup(group: DueSubscriberGroup): Promise<void> {
