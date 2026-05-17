@@ -1,8 +1,8 @@
 import type { DualChannelWidgetData, KeySize, SparklineScale } from "../../rendering/widget-data";
 import {
     buildSvgFilterAttributes,
-    DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
-    type RenderGraphicEffectTokens,
+    DEFAULT_RENDER_THEME_EFFECT_TOKENS,
+    type RenderThemeEffectTokens,
 } from "../../rendering/render-svg-effects";
 import { adjustHexColorBrightness, clamp, renderConstrainedSvgText } from "../../rendering/svg-utils";
 import {
@@ -42,7 +42,7 @@ export interface DualChannelSparklineConfig extends WidgetBaseConfig {
     sparklineScale?: SparklineScale;
     paints: DualChannelSparklinePaints;
     textStyles: RenderTextStyles;
-    graphicEffects: RenderGraphicEffectTokens;
+    themeEffects: RenderThemeEffectTokens;
 }
 
 // Dual-channel sparklines draw directly on the theme background, so they intentionally omit surface/divider paints.
@@ -80,7 +80,7 @@ export const DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG: DualChannelSparklineConfig =
         baseline: "rgba(255,255,255,0.24)",
     },
     textStyles: DEFAULT_RENDER_TEXT_STYLES,
-    graphicEffects: DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
+    themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
 };
 
 const CHART_PLOT_TOP_INSET = 2;
@@ -165,7 +165,7 @@ export function renderDualChannelSparkline(
             gridLineType: config.gridLineType,
             timeGuideTickCount: config.timeGuideTickCount,
             paints: config.paints,
-            graphicEffects: config.graphicEffects,
+            themeEffects: config.themeEffects,
         });
 
     return `
@@ -191,7 +191,7 @@ export function renderDualChannelSparkline(
             textColor: config.paints.secondaryText,
             iconColor: config.paints.icon,
             textStyles: config.textStyles,
-            graphicEffects: config.graphicEffects,
+            themeEffects: config.themeEffects,
         })}
         ${renderChannelRow({
             layout: resolveRowLayout(layoutPlan, chartLayout, config.chartMode, "positive"),
@@ -204,7 +204,7 @@ export function renderDualChannelSparkline(
             valueTextColor: config.paints.primaryText,
             unitTextColor: config.paints.supportingText,
             textStyles: config.textStyles,
-            graphicEffects: config.graphicEffects,
+            themeEffects: config.themeEffects,
         })}
         ${renderChannelRow({
             layout: resolveRowLayout(layoutPlan, chartLayout, config.chartMode, "negative"),
@@ -217,10 +217,10 @@ export function renderDualChannelSparkline(
             valueTextColor: config.paints.primaryText,
             unitTextColor: config.paints.supportingText,
             textStyles: config.textStyles,
-            graphicEffects: config.graphicEffects,
+            themeEffects: config.themeEffects,
         })}
         ${gridLineSvg}
-        ${config.chartMode === "mirrored" ? renderMirroredBaseline(plotLayout, config.paints.baseline, config.graphicEffects.subtleFilter) : ""}
+        ${config.chartMode === "mirrored" ? renderMirroredBaseline(plotLayout, config.paints.baseline, config.themeEffects.subtleFilter) : ""}
         ${renderChannelPathGroup({
             model: positiveModel,
             linePaint: config.colorConfig.isGradientEnabled ? `url(#${positiveLineGradientId})` : config.positiveColor,
@@ -228,7 +228,7 @@ export function renderDualChannelSparkline(
             areaOpacity: config.colorConfig.isGradientEnabled ? undefined : config.fillOpacity,
             lineWidth: config.lineWidth,
             glowFilterId,
-            graphicEffects: config.graphicEffects,
+            themeEffects: config.themeEffects,
         })}
         ${renderChannelPathGroup({
             model: negativeModel,
@@ -237,7 +237,7 @@ export function renderDualChannelSparkline(
             areaOpacity: config.colorConfig.isGradientEnabled ? undefined : config.fillOpacity * 0.82,
             lineWidth: config.lineWidth,
             glowFilterId,
-            graphicEffects: config.graphicEffects,
+            themeEffects: config.themeEffects,
         })}
     `;
 }
@@ -445,7 +445,7 @@ function renderTitle(options: {
     textColor: string;
     iconColor: string;
     textStyles: RenderTextStyles;
-    graphicEffects: RenderGraphicEffectTokens;
+    themeEffects: RenderThemeEffectTokens;
 }): string {
     const titleTextStyle = options.textStyles.title;
     const titleXCoordinate = options.iconFragment
@@ -453,7 +453,7 @@ function renderTitle(options: {
         : options.layout.xCoordinate;
     const titleMaxWidth = Math.max(1, options.layout.maxWidth - (titleXCoordinate - options.layout.xCoordinate));
     const iconSvg = options.iconFragment
-        ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 9} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})" ${buildSvgFilterAttributes(options.graphicEffects.iconFilter).join(" ")}>${options.iconFragment}</g>`
+        ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 9} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})" ${buildSvgFilterAttributes(options.themeEffects.iconFilter).join(" ")}>${options.iconFragment}</g>`
         : "";
 
     return `
@@ -516,15 +516,15 @@ function renderChannelRow(options: {
     valueTextColor: string;
     unitTextColor: string;
     textStyles: RenderTextStyles;
-    graphicEffects: RenderGraphicEffectTokens;
+    themeEffects: RenderThemeEffectTokens;
 }): string {
     const valueTextStyle = options.textStyles.value;
     const unitTextStyle = options.textStyles.unit;
     const iconSvg = !options.showIcon
         ? ""
         : options.iconFragment
-        ? `<g color="${options.color}" transform="translate(${formatSvgNumber(options.layout.iconXCoordinate)} ${formatSvgNumber(options.layout.iconYCoordinate)}) scale(${formatSvgNumber(options.layout.iconScale)})" ${buildSvgFilterAttributes(options.graphicEffects.iconFilter).join(" ")}>${options.iconFragment}</g>`
-        : `<circle cx="${formatSvgNumber(options.layout.iconXCoordinate)}" cy="${formatSvgNumber(options.layout.iconYCoordinate)}" r="4" fill="${options.color}" ${buildSvgFilterAttributes(options.graphicEffects.iconFilter).join(" ")} />`;
+        ? `<g color="${options.color}" transform="translate(${formatSvgNumber(options.layout.iconXCoordinate)} ${formatSvgNumber(options.layout.iconYCoordinate)}) scale(${formatSvgNumber(options.layout.iconScale)})" ${buildSvgFilterAttributes(options.themeEffects.iconFilter).join(" ")}>${options.iconFragment}</g>`
+        : `<circle cx="${formatSvgNumber(options.layout.iconXCoordinate)}" cy="${formatSvgNumber(options.layout.iconYCoordinate)}" r="4" fill="${options.color}" ${buildSvgFilterAttributes(options.themeEffects.iconFilter).join(" ")} />`;
 
     return `
         ${iconSvg}
@@ -566,7 +566,7 @@ function renderChannelPathGroup(options: {
     areaOpacity: number | undefined;
     lineWidth: number;
     glowFilterId: string;
-    graphicEffects: RenderGraphicEffectTokens;
+    themeEffects: RenderThemeEffectTokens;
 }): string {
     if (!options.model) {
         return "";
@@ -577,12 +577,12 @@ function renderChannelPathGroup(options: {
         : ` opacity="${formatSvgNumber(options.areaOpacity)}"`;
 
     return `
-        <path d="${options.model.areaPath}" fill="${options.areaPaint}"${areaOpacity} ${buildSvgFilterAttributes(options.graphicEffects.subtleFilter).join(" ")} />
+        <path d="${options.model.areaPath}" fill="${options.areaPaint}"${areaOpacity} ${buildSvgFilterAttributes(options.themeEffects.subtleFilter).join(" ")} />
         <path d="${options.model.linePath}" fill="none" stroke="${options.linePaint}"
             stroke-width="${Math.max(1, options.lineWidth + 1.2)}" stroke-linejoin="round"
             stroke-linecap="round" filter="url(#${options.glowFilterId})" opacity="0.46" />
         <path d="${options.model.linePath}" fill="none" stroke="${options.linePaint}"
-            stroke-width="${options.lineWidth}" stroke-linejoin="round" stroke-linecap="round" ${buildSvgFilterAttributes(options.graphicEffects.metricFilter).join(" ")} />
+            stroke-width="${options.lineWidth}" stroke-linejoin="round" stroke-linecap="round" ${buildSvgFilterAttributes(options.themeEffects.metricFilter).join(" ")} />
     `;
 }
 
@@ -593,7 +593,7 @@ function renderGridLines(options: {
     gridLineType: SparklineGridLineType;
     timeGuideTickCount: number;
     paints: DualChannelSparklinePaints;
-    graphicEffects: RenderGraphicEffectTokens;
+    themeEffects: RenderThemeEffectTokens;
 }): string {
     if (options.gridLineVisibility === "none") {
         return "";
@@ -617,7 +617,7 @@ function renderGridLines(options: {
             timeGuideTickCount: options.timeGuideTickCount,
             gridColor: options.paints.grid,
             baselineColor: options.paints.baseline,
-            graphicEffects: options.graphicEffects,
+            themeEffects: options.themeEffects,
         });
     }
 
@@ -625,7 +625,7 @@ function renderGridLines(options: {
         plotLayout: options.plotLayout,
         opacity: gridLineMetrics.opacity,
         gridColor: options.paints.grid,
-        graphicEffects: options.graphicEffects,
+        themeEffects: options.themeEffects,
     });
 }
 
@@ -633,7 +633,7 @@ function renderHorizontalGuides(options: {
     plotLayout: DualSparklineChartLayout;
     opacity: number;
     gridColor: string;
-    graphicEffects: RenderGraphicEffectTokens;
+    themeEffects: RenderThemeEffectTokens;
 }): string {
     const guideList = [1, 0.5, 0].map(progress => {
         const yCoordinate = options.plotLayout.yCoordinate + options.plotLayout.height * (1 - progress);
@@ -643,7 +643,7 @@ function renderHorizontalGuides(options: {
                 x2="${formatSvgNumber(options.plotLayout.xCoordinate + options.plotLayout.width)}"
                 y2="${formatSvgNumber(yCoordinate)}"
                 stroke="${options.gridColor}" stroke-opacity="${formatSvgNumber(options.opacity)}" stroke-width="1"
-                stroke-dasharray="4 4" stroke-linecap="round" ${buildSvgFilterAttributes(options.graphicEffects.subtleFilter).join(" ")} />
+                stroke-dasharray="4 4" stroke-linecap="round" ${buildSvgFilterAttributes(options.themeEffects.subtleFilter).join(" ")} />
         `;
     });
 
@@ -656,7 +656,7 @@ function renderVerticalGuides(options: {
     timeGuideTickCount: number;
     gridColor: string;
     baselineColor: string;
-    graphicEffects: RenderGraphicEffectTokens;
+    themeEffects: RenderThemeEffectTokens;
 }): string {
     const safeTickCount = Math.max(2, Math.round(options.timeGuideTickCount));
     const baselineYCoordinate = options.plotLayout.yCoordinate + options.plotLayout.height;
@@ -667,7 +667,7 @@ function renderVerticalGuides(options: {
         return `
             <line x1="${formatSvgNumber(xCoordinate)}" y1="${formatSvgNumber(options.plotLayout.yCoordinate)}"
                 x2="${formatSvgNumber(xCoordinate)}" y2="${formatSvgNumber(baselineYCoordinate)}"
-                stroke="${options.gridColor}" stroke-width="1.1" stroke-linecap="round" ${buildSvgFilterAttributes(options.graphicEffects.subtleFilter).join(" ")} />
+                stroke="${options.gridColor}" stroke-width="1.1" stroke-linecap="round" ${buildSvgFilterAttributes(options.themeEffects.subtleFilter).join(" ")} />
         `;
     });
 
@@ -677,7 +677,7 @@ function renderVerticalGuides(options: {
             <line x1="${formatSvgNumber(options.plotLayout.xCoordinate)}" y1="${formatSvgNumber(baselineYCoordinate)}"
                 x2="${formatSvgNumber(options.plotLayout.xCoordinate + options.plotLayout.width)}"
                 y2="${formatSvgNumber(baselineYCoordinate)}"
-                stroke="${options.baselineColor}" stroke-width="1" stroke-dasharray="4 4" stroke-linecap="round" ${buildSvgFilterAttributes(options.graphicEffects.subtleFilter).join(" ")} />
+                stroke="${options.baselineColor}" stroke-width="1" stroke-dasharray="4 4" stroke-linecap="round" ${buildSvgFilterAttributes(options.themeEffects.subtleFilter).join(" ")} />
         </g>
     `;
 }

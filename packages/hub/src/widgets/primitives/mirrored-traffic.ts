@@ -2,8 +2,8 @@ import type { DualChannelWidgetData, KeySize } from "../../rendering/widget-data
 import { buildGradientStops, type ColorConfig } from "../../rendering/color-resolver";
 import {
     buildSvgFilterAttributes,
-    DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
-    type RenderGraphicEffectTokens,
+    DEFAULT_RENDER_THEME_EFFECT_TOKENS,
+    type RenderThemeEffectTokens,
 } from "../../rendering/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
@@ -20,7 +20,7 @@ export interface MirroredTrafficConfig {
     labelTextColor: string;
     dividerColor: string;
     textStyles: RenderTextStyles;
-    graphicEffects: RenderGraphicEffectTokens;
+    themeEffects: RenderThemeEffectTokens;
 }
 
 export const DEFAULT_MIRRORED_TRAFFIC_CONFIG: MirroredTrafficConfig = {
@@ -31,11 +31,11 @@ export const DEFAULT_MIRRORED_TRAFFIC_CONFIG: MirroredTrafficConfig = {
     labelTextColor: "rgba(255,255,255,0.5)",
     dividerColor: "rgba(255,255,255,0.15)",
     textStyles: DEFAULT_RENDER_TEXT_STYLES,
-    graphicEffects: DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
+    themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
 };
 
 /**
- * Mirrored traffic graph for bidirectional data (net down/up, disk read/write).
+ * Mirrored traffic chart for bidirectional data (net down/up, disk read/write).
  * Positive channel renders above center line, negative channel renders below.
  */
 export function renderMirroredTraffic(
@@ -86,10 +86,10 @@ export function renderMirroredTraffic(
                     ${gradientStops}
                 </linearGradient>
             </defs>` : ""}
-            <path d="${areaPath}" fill="${channelPaint}" opacity="${config.fillOpacity}" ${buildSvgFilterAttributes(config.graphicEffects.subtleFilter).join(" ")} />
+            <path d="${areaPath}" fill="${channelPaint}" opacity="${config.fillOpacity}" ${buildSvgFilterAttributes(config.themeEffects.subtleFilter).join(" ")} />
             <polyline points="${polyline}" fill="none"
                 stroke="${channelPaint}" stroke-width="${config.lineWidth}"
-                stroke-linejoin="round" stroke-linecap="round" ${buildSvgFilterAttributes(config.graphicEffects.metricFilter).join(" ")} />
+                stroke-linejoin="round" stroke-linecap="round" ${buildSvgFilterAttributes(config.themeEffects.metricFilter).join(" ")} />
         `;
     };
 
@@ -97,7 +97,7 @@ export function renderMirroredTraffic(
     const negativeLabel = `${data.negative.current.toFixed(1)} ${data.negative.unit}`;
     const labelTextStyle = config.textStyles.smallLabel;
     const labelTextFilterAttributes = buildSvgFilterAttributes(labelTextStyle.filter);
-    const subtleFilterAttributes = buildSvgFilterAttributes(config.graphicEffects.subtleFilter);
+    const subtleFilterAttributes = buildSvgFilterAttributes(config.themeEffects.subtleFilter);
 
     return `
         <!-- Mirrored Traffic: labels -->

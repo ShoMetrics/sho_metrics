@@ -2,33 +2,33 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderSingleMetricBodyView } from "./single-metric-view";
 import type { MetricRenderAppearance } from "./render-appearance";
-import { DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS } from "./render-svg-effects";
+import { DEFAULT_RENDER_THEME_EFFECT_TOKENS } from "./render-svg-effects";
 import { DEFAULT_RENDER_TEXT_STYLES } from "./render-text-style";
 import type { WidgetData } from "./widget-data";
 
-test("single metric view passes foreground paint tokens into linear widgets", () => {
+test("single metric view passes foreground paint tokens into bar widgets", () => {
     const svg = renderSingleMetricBodyView({
         data: {
             ...buildWidgetData(),
-            linearLabel: "CPU Load",
-            linearDisplayValue: "42",
+            barLabel: "CPU Load",
+            barDisplayValue: "42",
             secondaryDisplayValue: "OK",
         },
         visual: {
             ...buildMetricRenderAppearance(),
-            graphicType: "linear",
+            renderPrimitive: "bar",
         },
         renderSize: { width: 144, height: 144 },
         centerIcon: "<path id=\"center-icon\" />",
-        linearIcon: "<path id=\"linear-icon\" />",
-        circleStyle: "value",
+        topIcon: "<path id=\"bar-icon\" />",
+        circleVariant: "full-ring",
     });
 
     assert.match(svg, /color="#icon-token"/);
-    assert.match(svg, /fill="#linear-title-text-token"[\s\S]*CPU Load/);
-    assert.match(svg, /fill="#linear-value-text-token"[\s\S]*42/);
-    assert.match(svg, /fill="#linear-unit-text-token"[\s\S]*%/);
-    assert.match(svg, /fill="#linear-secondary-text-token"[\s\S]*OK/);
+    assert.match(svg, /fill="#bar-title-text-token"[\s\S]*CPU Load/);
+    assert.match(svg, /fill="#bar-value-text-token"[\s\S]*42/);
+    assert.match(svg, /fill="#bar-unit-text-token"[\s\S]*%/);
+    assert.match(svg, /fill="#bar-secondary-text-token"[\s\S]*OK/);
     assert.match(svg, /font-family="Test Label Font"/);
     assert.match(svg, /font-family="Test Value Font"/);
 });
@@ -38,14 +38,14 @@ test("single metric view passes foreground paint tokens into sparkline widgets",
         data: buildWidgetData(),
         visual: {
             ...buildMetricRenderAppearance(),
-            graphicType: "sparkline",
+            renderPrimitive: "sparkline",
             gridLineVisibility: "always",
             gridLineType: "vertical",
         },
         renderSize: { width: 144, height: 144 },
         centerIcon: "<path id=\"center-icon\" />",
-        linearIcon: "<path id=\"sparkline-icon\" />",
-        circleStyle: "value",
+        topIcon: "<path id=\"sparkline-icon\" />",
+        circleVariant: "full-ring",
     });
 
     assert.match(svg, /color="#icon-token"/);
@@ -60,9 +60,9 @@ test("single metric view passes foreground paint tokens into sparkline widgets",
 
 function buildMetricRenderAppearance(): MetricRenderAppearance {
     return {
-        graphicType: "circular",
-        circleStyle: "value",
-        graphicStyle: "flat",
+        renderPrimitive: "circle",
+        circleVariant: "full-ring",
+        themePreset: "flat",
         paintConstraint: "none",
         paints: {
             background: "#background-token",
@@ -72,10 +72,10 @@ function buildMetricRenderAppearance(): MetricRenderAppearance {
             secondaryText: "#secondary-text-token",
             mutedText: "#muted-text-token",
             icon: "#icon-token",
-            linearTitleText: "#linear-title-text-token",
-            linearValueText: "#linear-value-text-token",
-            linearUnitText: "#linear-unit-text-token",
-            linearSecondaryText: "#linear-secondary-text-token",
+            barTitleText: "#bar-title-text-token",
+            barValueText: "#bar-value-text-token",
+            barUnitText: "#bar-unit-text-token",
+            barSecondaryText: "#bar-secondary-text-token",
             primaryMetric: {
                 mode: "solid",
                 solidColor: "#metric-token",
@@ -105,7 +105,7 @@ function buildMetricRenderAppearance(): MetricRenderAppearance {
                 fontFamily: "Test Label Font",
             },
         },
-        graphicEffects: DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
+        themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
         lineSmoothingPercent: 75,
         gridLineVisibility: "adaptive",
         gridLineType: "horizontal",

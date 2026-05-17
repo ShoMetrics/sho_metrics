@@ -20,7 +20,7 @@ import {
     buildRenderDualChannelWidgetData,
     buildRenderWidgetData,
     hasMetricDisplayData,
-    resolveCircleStyle,
+    resolveEffectiveCircleVariant,
     resolveDisplayLogValue,
     resolveDisplaySampleTimestampMilliseconds,
     resolveTouchStripMetricLayout,
@@ -52,7 +52,7 @@ test("single value-capable widget without data renders an N/A placeholder copy",
     });
 });
 
-test("single circular icon placeholder keeps source data and marks the render plan as muted", () => {
+test("single circle icon placeholder keeps source data and marks the render plan as muted", () => {
     const displayOptions = buildSingleMetricRenderOptions({
         widgetData: buildWidgetData(),
         resolvedSettings: {
@@ -168,7 +168,7 @@ test("display data helpers treat either dual-channel timestamp as available data
     assert.equal(sampleTimestampMilliseconds, 2000);
 });
 
-test("center content falls back to value outside circular graphics", () => {
+test("center content falls back to value outside circle renderer branches", () => {
     const renderPlan = buildMetricDisplayRenderPlan({
         displayOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData(),
@@ -185,17 +185,17 @@ test("center content falls back to value outside circular graphics", () => {
     assert.equal(renderPlan.centerContent, "value");
 });
 
-test("circle style override wins for circular graphics", () => {
-    const circleStyle = resolveCircleStyle({
-        graphicType: "circular",
-        circleStyle: "value",
-        circleStyleOverride: "gauge",
+test("circle variant override wins for circle renderer branches", () => {
+    const circleVariant = resolveEffectiveCircleVariant({
+        renderPrimitive: "circle",
+        circleVariant: "full-ring",
+        circleVariantOverride: "gauge",
     });
 
-    assert.equal(circleStyle, "gauge");
+    assert.equal(circleVariant, "gauge");
 });
 
-test("compact circle style uses icon center content", () => {
+test("minimal circle variant uses icon center content", () => {
     const renderPlan = buildMetricDisplayRenderPlan({
         displayOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData(),
@@ -228,7 +228,7 @@ test("key render plan uses keypad PNG dimensions and no touch strip layout", () 
     assert.deepEqual(renderPlan.pngSize, KEYPAD_PNG_SIZE);
 });
 
-test("touch strip layout uses square rendering for circular graphics", () => {
+test("touch strip layout uses square rendering for circle branches", () => {
     const renderPlan = buildMetricDisplayRenderPlan({
         displayOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
@@ -244,10 +244,11 @@ test("touch strip layout uses square rendering for circular graphics", () => {
     assert.deepEqual(renderPlan.pngSize, TOUCH_STRIP_SINGLE_METRIC_SQUARE_PNG_SIZE);
 });
 
-test("touch strip layout uses wide rendering for non-circular graphics", () => {
-    const touchStripMetricLayout = resolveTouchStripMetricLayout(buildMetricRenderAppearance(
+test("touch strip layout uses wide rendering for non-circle branches", () => {
+    const renderAppearance = buildMetricRenderAppearance(
         buildDefaultAppearanceSettings({ view: { selectedView: "line" } }),
-    ));
+    );
+    const touchStripMetricLayout = resolveTouchStripMetricLayout(renderAppearance);
 
     assert.equal(touchStripMetricLayout.kind, "wide");
     assert.deepEqual(touchStripMetricLayout.renderSize, TOUCH_STRIP_LOGICAL_SIZE);

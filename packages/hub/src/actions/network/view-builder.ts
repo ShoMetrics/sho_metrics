@@ -22,7 +22,6 @@ import {
     renderNetworkInterfaceIconFragment,
 } from "../../widgets/icons/catalog/network";
 import type { MetricDisplayOptions } from "../../metric-view-runner/runner";
-import { resolveArcGaugeStyle } from "../../settings/render-appearance-builder";
 import { buildColorConfigFromAppearance, resolveSolidMetricColorMode } from "../../settings/render-paint-resolver";
 
 export interface NetworkDisplayUpdate {
@@ -67,7 +66,7 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
         return {
             displayOptions: buildDualNetworkCircleOrTextDisplayOptions({
                 ...options,
-                dualGraphicType: selectedView === "text" ? "text" : "circular",
+                dualRenderPrimitive: selectedView === "text" ? "text" : "circle",
             }),
         };
     }
@@ -83,8 +82,8 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
         direction: displayDirection,
         target: options.target,
     });
-    const arcGaugeStyle = resolveArcGaugeStyle(appearance.view.circleVariant);
-    const shouldRenderGaugeFooter = selectedView === "circle" && arcGaugeStyle === "gauge";
+    const circleVariant = appearance.view.circleVariant;
+    const shouldRenderGaugeFooter = selectedView === "circle" && circleVariant === "gauge";
     const renderedWidgetData = shouldRenderGaugeFooter
         ? { ...displayWidgetData, label: ARC_GAUGE_LABELS.network }
         : displayWidgetData;
@@ -96,7 +95,7 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
             metricKey: networkMetricKey,
             widgetData: renderedWidgetData,
             centerIconFragment: buildNetworkCenterIconFragment({
-                arcGaugeStyle,
+                circleVariant,
                 direction: displayDirection,
                 selectedNetworkInterface: options.selectedNetworkInterface,
             }),
@@ -109,7 +108,7 @@ export function buildNetworkDisplayUpdate(options: BuildNetworkDisplayOptions): 
             statusIcon: getNetworkDirectionStatusIcon({
                 direction: displayDirection,
             }),
-            circleStyleOverride: arcGaugeStyle,
+            circleVariantOverride: circleVariant,
             appearanceOverride: {
                 paint: {
                     metric: {
@@ -160,7 +159,7 @@ export function resolveNetworkMaximumMegabitsPerSecond(
 }
 
 function buildDualNetworkCircleOrTextDisplayOptions(
-    options: BuildNetworkDisplayOptions & { dualGraphicType: "circular" | "text" },
+    options: BuildNetworkDisplayOptions & { dualRenderPrimitive: "circle" | "text" },
 ): MetricDisplayOptions {
     const uploadMetricKey = resolveNetworkMetricKey("upload", options.target.interfaceId);
     const downloadMetricKey = resolveNetworkMetricKey("download", options.target.interfaceId);
@@ -187,14 +186,14 @@ function buildDualNetworkCircleOrTextDisplayOptions(
     const uploadColorConfig = buildNetworkChannelColorConfig("upload", options.settings);
     const downloadColorConfig = buildNetworkChannelColorConfig("download", options.settings);
     const appearance = options.settings.widget.slot.appearance;
-    const arcGaugeStyle = resolveArcGaugeStyle(appearance.view.circleVariant);
+    const circleVariant = appearance.view.circleVariant;
     const solidMetricColorMode = resolveSolidMetricColorMode(appearance.paint.metric.colorMode);
 
     return {
         event: options.event,
         resolvedSettings: options.settings.widget.slot.appearance,
         metricKey: `${downloadMetricKey},${uploadMetricKey}`,
-        dualGraphicType: options.dualGraphicType,
+        dualRenderPrimitive: options.dualRenderPrimitive,
         widgetData: {
             positive: uploadWidgetData,
             negative: downloadWidgetData,
@@ -207,7 +206,7 @@ function buildDualNetworkCircleOrTextDisplayOptions(
         statusIcon: getNetworkDirectionStatusIcon({
             direction: "download",
         }),
-        circleStyleOverride: arcGaugeStyle,
+        circleVariantOverride: circleVariant,
         positiveColor: uploadColor,
         negativeColor: downloadColor,
         positiveColorConfig: uploadColorConfig,
@@ -348,8 +347,8 @@ function buildBarNetworkDisplayOptions(options: BuildNetworkDisplayOptions): Met
             history: downloadWidgetData.history,
             unit: downloadWidgetData.unit,
             label: "NET",
-            linearLabel: "Net Speed",
-            linearChannels: [
+            barLabel: "Net Speed",
+            barChannels: [
                 {
                     label: "DOWN",
                     displayValue: downloadWidgetData.displayValue ?? downloadWidgetData.current.toFixed(0),
@@ -377,11 +376,11 @@ function buildBarNetworkDisplayOptions(options: BuildNetworkDisplayOptions): Met
                 ?? uploadWidgetData.sampleTimestampMilliseconds,
         },
         centerIconFragment: buildNetworkCenterIconFragment({
-            arcGaugeStyle: "compact",
+            circleVariant: "minimal",
             direction: "download",
             selectedNetworkInterface: options.selectedNetworkInterface,
         }),
-        linearIconFragment: renderNetworkInterfaceIconFragment({
+        topIconFragment: renderNetworkInterfaceIconFragment({
             networkInterface: options.selectedNetworkInterface,
             size: NETWORK_CENTER_ICON_SIZE,
         }),
@@ -426,11 +425,11 @@ function getNetworkDirectionLabel(direction: NetworkDirection): string {
 }
 
 function buildNetworkCenterIconFragment(options: {
-    arcGaugeStyle: "value" | "compact" | "gauge";
+    circleVariant: "full-ring" | "minimal" | "gauge";
     direction: NetworkDirection;
     selectedNetworkInterface: NetworkInterfaceOption | null;
 }): string {
-    if (options.arcGaugeStyle === "compact") {
+    if (options.circleVariant === "minimal") {
         return renderNetworkInterfaceIconFragment({
             networkInterface: options.selectedNetworkInterface,
             size: NETWORK_CENTER_ICON_SIZE,

@@ -1,9 +1,9 @@
 import type { ColorConfig } from "./color-resolver";
 import type { RenderPaintTokens } from "./render-appearance";
 import type { RenderTextStyles } from "./render-text-style";
-import type { RenderGraphicEffectTokens } from "./render-svg-effects";
+import type { RenderThemeEffectTokens } from "./render-svg-effects";
 import type { DualChannelWidgetData, KeySize } from "./widget-data";
-import type { ArcGaugeStatusIcon, ArcGaugeStyle } from "../widgets/primitives/arc-gauge";
+import type { ArcGaugeStatusIcon, CircleVariant } from "../widgets/primitives/arc-gauge";
 import {
     DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG,
     renderDualChannelArcGauge,
@@ -23,7 +23,7 @@ import type {
     SparklineGridLineVisibility,
 } from "../widgets/primitives/sparkline";
 
-type DualMetricGraphicType = "circular" | "text" | "sparkline";
+type DualMetricRenderPrimitive = "circle" | "text" | "sparkline";
 
 interface DualMetricChannelViewProps {
     color: string;
@@ -37,25 +37,25 @@ export interface DualMetricBodyViewProps {
     visual: {
         paints: RenderPaintTokens;
         textStyles: RenderTextStyles;
-        graphicEffects: RenderGraphicEffectTokens;
+        themeEffects: RenderThemeEffectTokens;
         lineSmoothingPercent: number;
         gridLineVisibility: SparklineGridLineVisibility;
         gridLineType: SparklineGridLineType;
     };
-    graphicType: DualMetricGraphicType;
+    renderPrimitive: DualMetricRenderPrimitive;
     renderSize: KeySize;
     titleText: string;
     chartMode: DualChannelSparklineMode;
     centerContent: DualChannelArcGaugeCenterContent;
-    circleStyle: ArcGaugeStyle;
+    circleVariant: CircleVariant;
     topIcon: string;
     positive: DualMetricChannelViewProps;
     negative: DualMetricChannelViewProps;
 }
 
 export function renderDualMetricBodyView(options: DualMetricBodyViewProps): string {
-    switch (options.graphicType) {
-        case "circular":
+    switch (options.renderPrimitive) {
+        case "circle":
             return renderDualCircularMetric(options);
         case "text":
             return renderDualTextMetricView(options);
@@ -73,14 +73,14 @@ function renderDualCircularMetric(options: DualMetricBodyViewProps): string {
         dividerColor: options.visual.paints.divider,
         iconColor: options.visual.paints.icon,
         textStyles: options.visual.textStyles,
-        graphicEffects: options.visual.graphicEffects,
+        themeEffects: options.visual.themeEffects,
         positiveColor: options.positive.color,
         negativeColor: options.negative.color,
         positiveColorConfig: options.positive.colorConfig,
         negativeColorConfig: options.negative.colorConfig,
         titleText: options.titleText,
         centerContent: options.centerContent,
-        circleStyle: options.circleStyle,
+        circleVariant: options.circleVariant,
         centerIconFragment: options.topIcon,
         positiveIconFragment: options.positive.icon,
         negativeIconFragment: options.negative.icon,
@@ -96,7 +96,7 @@ function renderDualTextMetricView(options: DualMetricBodyViewProps): string {
         unitTextColor: options.visual.paints.secondaryText,
         secondaryTextColor: options.visual.paints.mutedText,
         textStyles: options.visual.textStyles,
-        graphicEffects: options.visual.graphicEffects,
+        themeEffects: options.visual.themeEffects,
         positiveColor: options.positive.color,
         negativeColor: options.negative.color,
     }, options.renderSize);
@@ -125,6 +125,6 @@ function renderDualSparklineMetric(options: DualMetricBodyViewProps): string {
             baseline: options.visual.paints.grid,
         },
         textStyles: options.visual.textStyles,
-        graphicEffects: options.visual.graphicEffects,
+        themeEffects: options.visual.themeEffects,
     }, options.renderSize);
 }

@@ -4,7 +4,7 @@ import { resolveColorForThresholdValue } from "./color-resolver";
 import { renderDualMetricBodyView } from "./dual-metric-view";
 import { renderMetricFrame } from "./metric-frame";
 import type { MetricRenderAppearance } from "./render-appearance";
-import { DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS } from "./render-svg-effects";
+import { DEFAULT_RENDER_THEME_EFFECT_TOKENS } from "./render-svg-effects";
 import { DEFAULT_RENDER_TEXT_STYLES } from "./render-text-style";
 import { renderSingleMetricBodyView } from "./single-metric-view";
 import {
@@ -17,10 +17,10 @@ import { getHardwareIconFragment } from "../widgets/icons/hardware-icons";
 import { getMetricStatusIcon } from "../widgets/icons/metric-status-icons";
 import { renderNetworkDirectionIconFragment } from "../widgets/icons/catalog/network";
 
-type TestCircleStyle = MetricRenderAppearance["circleStyle"];
-type TestGraphicStyle = MetricRenderAppearance["graphicStyle"];
+type TestCircleVariant = MetricRenderAppearance["circleVariant"];
+type TestThemePreset = MetricRenderAppearance["themePreset"];
 type TestGridLineType = MetricRenderAppearance["gridLineType"];
-type TestSingleGraphicType = MetricRenderAppearance["graphicType"];
+type TestRenderPrimitive = MetricRenderAppearance["renderPrimitive"];
 
 test("SVG paint scanner rejects chromatic paint values without scanning SVG ids", () => {
     const findings = scanChromaticSvgPaintValues(`
@@ -75,11 +75,11 @@ test("SVG paint scanner rejects malformed rgb paint values", () => {
 test("black-white representative final SVG outputs contain no chromatic paint", () => {
     const testCases = [
         {
-            name: "flat circular compact icon",
+            name: "flat circle minimal icon",
             svg: renderSingleFinalSvg({
-                viewLayout: "circular",
+                renderPrimitive: "circle",
                 theme: "flat",
-                circleStyle: "compact",
+                circleVariant: "minimal",
                 centerIcon: getHardwareIconFragment("cpu"),
                 statusIcon: getMetricStatusIcon("percentage"),
             }),
@@ -87,57 +87,57 @@ test("black-white representative final SVG outputs contain no chromatic paint", 
         {
             name: "cupertino glass text",
             svg: renderSingleFinalSvg({
-                viewLayout: "text",
+                renderPrimitive: "text",
                 theme: "cupertino-glass",
                 data: buildWidgetData({ secondaryDisplayValue: "Peak 91%" }),
             }),
         },
         {
-            name: "flat linear",
+            name: "flat bar",
             svg: renderSingleFinalSvg({
-                viewLayout: "linear",
+                renderPrimitive: "bar",
                 theme: "flat",
-                linearIcon: getHardwareIconFragment("memory"),
+                topIcon: getHardwareIconFragment("memory"),
                 data: buildWidgetData({ secondaryDisplayValue: "12.8 GB used" }),
             }),
         },
         {
             name: "cupertino glass sparkline",
             svg: renderSingleFinalSvg({
-                viewLayout: "sparkline",
+                renderPrimitive: "sparkline",
                 theme: "cupertino-glass",
-                linearIcon: getHardwareIconFragment("gpu"),
+                topIcon: getHardwareIconFragment("gpu"),
                 gridLineType: "vertical",
             }),
         },
         {
             name: "color filled soft triangle",
             svg: renderSingleFinalSvg({
-                viewLayout: "circular",
+                renderPrimitive: "circle",
                 theme: "color-filled",
                 centerIcon: getHardwareIconFragment("cpu"),
             }),
         },
         {
-            name: "terminal circular value",
+            name: "terminal circle value",
             svg: renderSingleFinalSvg({
-                viewLayout: "circular",
+                renderPrimitive: "circle",
                 theme: "terminal-clean",
             }),
         },
         {
-            name: "flat dual circular gauge",
+            name: "flat dual circle gauge",
             svg: renderDualFinalSvg({
                 theme: "flat",
-                graphicType: "circular",
-                circleStyle: "gauge",
+                renderPrimitive: "circle",
+                circleVariant: "gauge",
             }),
         },
         {
             name: "cupertino glass dual sparkline",
             svg: renderDualFinalSvg({
                 theme: "cupertino-glass",
-                graphicType: "sparkline",
+                renderPrimitive: "sparkline",
             }),
         },
     ];
@@ -148,20 +148,20 @@ test("black-white representative final SVG outputs contain no chromatic paint", 
 });
 
 function renderSingleFinalSvg(options: {
-    viewLayout: TestSingleGraphicType;
-    theme: TestGraphicStyle;
-    circleStyle?: TestCircleStyle;
+    renderPrimitive: TestRenderPrimitive;
+    theme: TestThemePreset;
+    circleVariant?: TestCircleVariant;
     gridLineType?: TestGridLineType;
     data?: WidgetData;
     centerIcon?: string;
     footerIcon?: string;
-    linearIcon?: string;
+    topIcon?: string;
     statusIcon?: ArcGaugeStatusIcon;
 }): string {
     const visualSettings = buildBlackWhiteRenderAppearance({
-        graphicType: options.viewLayout,
-        graphicStyle: options.theme,
-        circleStyle: options.circleStyle ?? "value",
+        renderPrimitive: options.renderPrimitive,
+        themePreset: options.theme,
+        circleVariant: options.circleVariant ?? "full-ring",
         gridLineType: options.gridLineType ?? "horizontal",
     });
     const body = renderSingleMetricBodyView({
@@ -170,14 +170,14 @@ function renderSingleFinalSvg(options: {
         renderSize: WIDGET_LOGICAL_SIZE,
         centerIcon: options.centerIcon ?? "",
         footerIcon: options.footerIcon,
-        linearIcon: options.linearIcon,
+        topIcon: options.topIcon,
         statusIcon: options.statusIcon,
-        circleStyle: visualSettings.circleStyle,
+        circleVariant: visualSettings.circleVariant,
     });
 
     return renderMetricFrame({
         body,
-        graphicStyle: visualSettings.graphicStyle,
+        themePreset: visualSettings.themePreset,
         muted: false,
         paints: visualSettings.paints,
         size: WIDGET_LOGICAL_SIZE,
@@ -185,25 +185,25 @@ function renderSingleFinalSvg(options: {
 }
 
 function renderDualFinalSvg(options: {
-    theme: TestGraphicStyle;
-    graphicType: "circular" | "text" | "sparkline";
-    circleStyle?: TestCircleStyle;
+    theme: TestThemePreset;
+    renderPrimitive: "circle" | "text" | "sparkline";
+    circleVariant?: TestCircleVariant;
 }): string {
     const visualSettings = buildBlackWhiteRenderAppearance({
-        graphicType: options.graphicType,
-        graphicStyle: options.theme,
-        circleStyle: options.circleStyle ?? "value",
+        renderPrimitive: options.renderPrimitive,
+        themePreset: options.theme,
+        circleVariant: options.circleVariant ?? "full-ring",
     });
     const channelColor = resolveColorForThresholdValue(50, visualSettings.paints.primaryMetric);
     const body = renderDualMetricBodyView({
         data: buildDualChannelData(),
         visual: visualSettings,
-        graphicType: options.graphicType,
+        renderPrimitive: options.renderPrimitive,
         renderSize: WIDGET_LOGICAL_SIZE,
         titleText: "NETWORK",
         chartMode: "overlay",
         centerContent: "value",
-        circleStyle: visualSettings.circleStyle,
+        circleVariant: visualSettings.circleVariant,
         topIcon: getHardwareIconFragment("disk"),
         positive: {
             color: channelColor,
@@ -227,7 +227,7 @@ function renderDualFinalSvg(options: {
 
     return renderMetricFrame({
         body,
-        graphicStyle: visualSettings.graphicStyle,
+        themePreset: visualSettings.themePreset,
         muted: false,
         paints: visualSettings.paints,
         size: WIDGET_LOGICAL_SIZE,
@@ -235,19 +235,19 @@ function renderDualFinalSvg(options: {
 }
 
 function buildBlackWhiteRenderAppearance(options: {
-    graphicType: TestSingleGraphicType;
-    graphicStyle: TestGraphicStyle;
-    circleStyle: TestCircleStyle;
+    renderPrimitive: TestRenderPrimitive;
+    themePreset: TestThemePreset;
+    circleVariant: TestCircleVariant;
     gridLineType?: TestGridLineType | undefined;
 }): MetricRenderAppearance {
     return {
-        graphicType: options.graphicType,
-        circleStyle: options.circleStyle,
-        graphicStyle: options.graphicStyle,
+        renderPrimitive: options.renderPrimitive,
+        circleVariant: options.circleVariant,
+        themePreset: options.themePreset,
         paintConstraint: "black-white",
         paints: {
             background: "#0f0f0f",
-            backgroundFill: options.graphicStyle === "color-filled"
+            backgroundFill: options.themePreset === "color-filled"
                 ? {
                     fillKind: "soft-triangle",
                     lowColor: "#161616",
@@ -261,10 +261,10 @@ function buildBlackWhiteRenderAppearance(options: {
             secondaryText: "rgba(255,255,255,0.72)",
             mutedText: "rgba(255,255,255,0.48)",
             icon: "rgba(255,255,255,0.88)",
-            linearTitleText: "rgba(255,255,255,0.88)",
-            linearValueText: "white",
-            linearUnitText: "rgba(255,255,255,0.76)",
-            linearSecondaryText: "rgba(255,255,255,0.78)",
+            barTitleText: "rgba(255,255,255,0.88)",
+            barValueText: "white",
+            barUnitText: "rgba(255,255,255,0.76)",
+            barSecondaryText: "rgba(255,255,255,0.78)",
             primaryMetric: {
                 mode: "solid",
                 solidColor: "#e6e6e6",
@@ -276,7 +276,7 @@ function buildBlackWhiteRenderAppearance(options: {
             divider: "rgba(255,255,255,0.18)",
         },
         textStyles: DEFAULT_RENDER_TEXT_STYLES,
-        graphicEffects: DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
+        themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
         lineSmoothingPercent: 75,
         gridLineVisibility: "adaptive",
         gridLineType: options.gridLineType ?? "horizontal",

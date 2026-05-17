@@ -4,7 +4,7 @@ import {
     clamp,
 } from "../../rendering/svg-utils";
 import { interpolateHexColor } from "../../shared/color-utils";
-import type { ArcGaugeStyle } from "./arc-gauge";
+import type { CircleVariant } from "./arc-gauge";
 
 export interface ArcGaugeGeometry {
     centerXCoordinate: number;
@@ -75,7 +75,7 @@ const GAUGE_MARKER_VISUAL_MIN_PROGRESS = 0.08;
 const GAUGE_MARKER_VISUAL_MAX_PROGRESS = 0.90;
 
 export function buildGaugeRangeColorPlan(options: {
-    circleStyle: ArcGaugeStyle;
+    circleVariant: CircleVariant;
     colorConfig: ColorConfig;
     baseColor: string;
     progress: number;
@@ -83,7 +83,7 @@ export function buildGaugeRangeColorPlan(options: {
     gaugeRangeBlendProgress: number;
 }): GaugeRangeColorPlan {
     if (!options.colorConfig.isGradientEnabled) {
-        const paintSegments = options.circleStyle === "gauge" && options.colorConfig.mode === "threshold"
+        const paintSegments = options.circleVariant === "gauge" && options.colorConfig.mode === "threshold"
             ? buildBlendedGaugeRangePaintSegments({
                 bands: buildThresholdGaugeRangeBands(options.colorConfig),
                 blendProgress: 0,
@@ -98,13 +98,13 @@ export function buildGaugeRangeColorPlan(options: {
         return {
             stops: buildGaugeRangeStops(paintSegments),
             paintSegments,
-            markerFill: options.circleStyle === "gauge"
+            markerFill: options.circleVariant === "gauge"
                 ? resolveGaugeRangePaintColor(clamp(options.progress, 0, 1), paintSegments)
                 : options.baseColor,
         };
     }
 
-    if (options.circleStyle === "gauge" && options.colorConfig.mode === "threshold") {
+    if (options.circleVariant === "gauge" && options.colorConfig.mode === "threshold") {
         const blendProgress = clamp(options.gaugeRangeBlendProgress, 0, MAX_GAUGE_RANGE_BLEND_PROGRESS);
         const rangeBands = buildThresholdGaugeRangeBands(options.colorConfig);
         const dynamicSegments = buildBlendedGaugeRangePaintSegments({
@@ -132,7 +132,7 @@ export function buildGaugeRangeColorPlan(options: {
     return {
         stops: baseStops,
         paintSegments: basePaintSegments,
-        markerFill: options.circleStyle === "gauge"
+        markerFill: options.circleVariant === "gauge"
             ? resolveGaugeRangePaintColor(clamp(options.progress, 0, 1), basePaintSegments)
             : baseStops[baseStops.length - 1]?.color ?? options.baseColor,
     };

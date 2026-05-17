@@ -12,7 +12,7 @@ const framePaints: GraphicStylePaints = {
 test("metric frame wraps body with the selected key size and style", () => {
     const svg = renderMetricFrame({
         body: "<g id=\"metric-body\"></g>",
-        graphicStyle: "flat",
+        themePreset: "flat",
         muted: false,
         paints: framePaints,
         size: { width: 144, height: 144 },
@@ -28,7 +28,7 @@ test("metric frame wraps body with the selected key size and style", () => {
 test("metric frame applies the muted filter around the body", () => {
     const svg = renderMetricFrame({
         body: "<g id=\"metric-body\"></g>",
-        graphicStyle: "flat",
+        themePreset: "flat",
         muted: true,
         paints: framePaints,
         size: { width: 100, height: 100 },
