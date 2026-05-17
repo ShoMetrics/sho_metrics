@@ -3,16 +3,20 @@
 This document records the investigation and implementation work behind the
 ShoMetrics rendering performance optimization round in May 2026.
 
+Naming note: this note has been updated to the current metric view vocabulary.
+Older investigation wording has been translated to Product View, metric view
+update queue, and `src/view-rendering`.
+
 ## Summary
 
 The original user-visible symptom was that Property Inspector settings changes,
-especially switching graphic type between circle, line, and sparkline, did not update
-the Stream Deck widget immediately. The delay was usually 1-2 seconds even when the
-polling frequency was set to 10 seconds.
+especially switching Product View between circle, line, and bar, did not update
+the Stream Deck widget immediately. The delay was usually 1-2 seconds even when
+the polling frequency was set to 10 seconds.
 
 The investigation found two separate bottlenecks:
 
-- Display updates were globally serialized, so settings-driven renders could wait
+- Metric view updates were globally serialized, so settings-driven renders could wait
   behind ordinary metric tick renders.
 - `@resvg/resvg-js` was loading system fonts for every SVG render. On Windows this
   cost roughly 120-160 ms per render; on macOS it could cost roughly 3 seconds per
@@ -33,9 +37,9 @@ The final runtime path now:
 
 ### Settings change delay
 
-When the user changed `graphicType` in the Property Inspector, the settings UI showed
-the selected option immediately, but the hardware widget updated after a short delay.
-The delay was not tied to polling frequency.
+When the user changed Product View in the Property Inspector, the settings UI
+showed the selected option immediately, but the hardware widget updated after a
+short delay. The delay was not tied to polling frequency.
 
 ### Many widgets risk
 
@@ -45,10 +49,10 @@ fixes that simply increase global concurrency or push more work into every rende
 
 ### Font/layout regression
 
-After switching the Windows primary font to Inter, one net speed linear layout showed
-the final `d` in `Net Speed` clipped. The underlying issue was not the specific label;
-it was that text helpers clipped fixed-width text but did not shrink text near layout
-boundaries.
+After switching the Windows primary font to Inter, one net speed progress-bar
+widget showed the final `d` in `Net Speed` clipped. The underlying issue was
+not the specific label; it was that text helpers clipped fixed-width text but
+did not shrink text near layout boundaries.
 
 ## Diagnostics
 
@@ -56,8 +60,8 @@ boundaries.
 
 Diagnostic logs were added around:
 
-- Settings changes entering the display path.
-- Display update queue enqueue/dequeue timing.
+- Settings changes entering the metric view update path.
+- Metric view update queue enqueue/dequeue timing.
 - SVG composition, rasterization, base64 encoding, and `setImage`.
 
 The logs showed settings-change renders could sit behind already queued metric tick
@@ -111,13 +115,13 @@ Observed results:
 
 ## Implemented Changes
 
-### Display update queue
+### Metric view update queue
 
 Files:
 
-- `packages/hub/src/actions/display-update-queue.ts`
-- `packages/hub/src/actions/display-update-queue.test.ts`
-- `packages/hub/src/actions/single-metric-display.ts`
+- `packages/hub/src/view-updates/update-queue.ts`
+- `packages/hub/src/view-updates/update-queue.test.ts`
+- `packages/hub/src/view-updates/runner.ts`
 
 The queue now has priority lanes:
 
@@ -128,14 +132,14 @@ The queue now has priority lanes:
 This avoids increasing render concurrency, which protects global drawing performance
 when many keys are visible.
 
-### Display performance stats
+### Metric view performance stats
 
 Files:
 
-- `packages/hub/src/actions/display-performance-stats.ts`
-- `packages/hub/src/actions/display-performance-stats.test.ts`
-- `packages/hub/src/rendering/rasterizer-performance-stats.ts`
-- `packages/hub/src/rendering/rasterizer-performance-stats.test.ts`
+- `packages/hub/src/view-updates/performance-stats.ts`
+- `packages/hub/src/view-updates/performance-stats.test.ts`
+- `packages/hub/src/view-rendering/rasterizer-performance-stats.ts`
+- `packages/hub/src/view-rendering/rasterizer-performance-stats.test.ts`
 
 The performance summaries are log-friendly and aggregated so high-frequency render
 paths do not emit per-frame noise.
@@ -144,9 +148,9 @@ paths do not emit per-frame noise.
 
 Files:
 
-- `packages/hub/src/rendering/resvg-font-options.ts`
-- `packages/hub/src/rendering/resvg-font-options.test.ts`
-- `packages/hub/src/rendering/rasterizer.ts`
+- `packages/hub/src/view-rendering/resvg-font-options.ts`
+- `packages/hub/src/view-rendering/resvg-font-options.test.ts`
+- `packages/hub/src/view-rendering/rasterizer.ts`
 
 The resolver builds resvg font options per SVG:
 
@@ -192,8 +196,8 @@ plugin and users load the bundle at install/update time.
 
 Files:
 
-- `packages/hub/src/rendering/svg-utils.ts`
-- `packages/hub/src/rendering/svg-utils.test.ts`
+- `packages/hub/src/view-rendering/svg-utils.ts`
+- `packages/hub/src/view-rendering/svg-utils.test.ts`
 - `packages/hub/src/widgets/primitives/metric-text-row.ts`
 - `packages/hub/src/widgets/primitives/primitive-smoke.test.ts`
 
