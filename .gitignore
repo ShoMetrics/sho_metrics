@@ -3,6 +3,7 @@
 agent_docs/
 AGENTS.md
 CLAUDE.md
+settings.local.json
 
 ## Adapted from GitHub's gitignore templates for this repo:
 ## - https://github.com/github/gitignore
