@@ -212,7 +212,7 @@ to the default renderer form.
 
 `bar` is a product concept and may appear in settings, resolved settings, and
 renderer contracts when the concept is the Bar family. The current concrete Bar
-widget implementation should use `progress-bar`, not `bar` or `linear-bar`.
+widget implementation uses `progress-bar`, not the family root `bar`.
 `bar` stays the family root; `progress-bar` names the concrete horizontal
 progress form; future concrete forms can use names such as `volume-bar`.
 
@@ -303,7 +303,6 @@ stable.
 
 | Current Name | Target Name | Location | Reason |
 |---|---|---|---|
-| `linear-bar` / `linearBar` primitive owner | `progress-bar` / `progressBar` | `packages/hub/src/widgets/primitives/linear-bar.ts` | `linear` competes with the Line product view. `progress-bar` names the current concrete horizontal progress form while keeping `bar` for the family root. |
 | `arc-gauge` / `ArcGauge*` primitive owner | `progress-circle` / `ProgressCircle*` | `packages/hub/src/widgets/primitives/arc-gauge.ts` | `gauge` is one Circle variant, not the whole Circle family. `progress-circle` names the current concrete circular progress form while keeping `circle` for the family root. |
 
 ## Guardrails

@@ -13,9 +13,9 @@ import {
     textMetric,
 } from "../widgets/primitives/text-metric";
 import {
-    DEFAULT_LINEAR_BAR_CONFIG,
-    linearBar,
-} from "../widgets/primitives/linear-bar";
+    DEFAULT_PROGRESS_BAR_CONFIG,
+    progressBar,
+} from "../widgets/primitives/progress-bar";
 import {
     DEFAULT_SPARKLINE_CONFIG,
     sparkline,
@@ -88,8 +88,8 @@ function renderSingleTextMetric(options: SingleMetricBodyViewProps): string {
 }
 
 function renderSingleBarMetric(options: SingleMetricBodyViewProps): string {
-    return linearBar.render(options.data, {
-        ...DEFAULT_LINEAR_BAR_CONFIG,
+    return progressBar.render(options.data, {
+        ...DEFAULT_PROGRESS_BAR_CONFIG,
         colorConfig: options.visual.paints.primaryMetric,
         paints: {
             primaryText: options.visual.paints.barValueText,

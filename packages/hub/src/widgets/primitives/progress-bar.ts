@@ -18,16 +18,16 @@ import {
 import type { Widget, WidgetBaseConfig } from "../widget.interface";
 import { renderMetricTextRow } from "./metric-text-row";
 
-export interface LinearBarConfig extends WidgetBaseConfig {
+export interface ProgressBarConfig extends WidgetBaseConfig {
     barHeight: number;
     borderRadius: number;
-    paints: LinearBarPaints;
+    paints: ProgressBarPaints;
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
     topIconFragment?: string;
 }
 
-export interface LinearBarPaints {
+export interface ProgressBarPaints {
     readonly primaryText: string;
     readonly secondaryText: string;
     readonly supportingText: string;
@@ -36,7 +36,7 @@ export interface LinearBarPaints {
     readonly track: string;
 }
 
-export const DEFAULT_LINEAR_BAR_CONFIG: LinearBarConfig = {
+export const DEFAULT_PROGRESS_BAR_CONFIG: ProgressBarConfig = {
     colorConfig: { mode: "threshold", solidColor: "#3b82f6", thresholds: [
         { min: 0, max: 50, color: "#22c55e" },
         { min: 50, max: 80, color: "#eab308" },
@@ -57,10 +57,10 @@ export const DEFAULT_LINEAR_BAR_CONFIG: LinearBarConfig = {
     gradientHeadAdjustmentPercent: -15,
 };
 
-type LinearLayoutMode = "square" | "wide";
+type ProgressBarLayoutMode = "square" | "wide";
 
-interface LinearLayoutPlan {
-    mode: LinearLayoutMode;
+interface ProgressBarLayoutPlan {
+    mode: ProgressBarLayoutMode;
     padding: number;
     title: TextLineLayout;
     singleValue: ValueLineLayout;
@@ -99,14 +99,14 @@ interface ChannelLayout {
 }
 
 /**
- * Linear progress bar. Full width = 100%.
+ * Progress bar. Full width = 100%.
  * Renders compact hardware and network layouts for square keys and wide touch strips.
  */
-export const linearBar: Widget<LinearBarConfig> = {
-    widgetId: "linear-bar",
+export const progressBar: Widget<ProgressBarConfig> = {
+    widgetId: "progress-bar",
 
-    render(data: WidgetData, config: LinearBarConfig, keySize: KeySize): string {
-        const layoutPlan = buildLinearLayoutPlan(keySize, config);
+    render(data: WidgetData, config: ProgressBarConfig, keySize: KeySize): string {
+        const layoutPlan = buildProgressBarLayoutPlan(keySize, config);
 
         if (data.barChannels && data.barChannels.length > 0) {
             return renderChannelBars(data, config, keySize, layoutPlan);
@@ -116,9 +116,9 @@ export const linearBar: Widget<LinearBarConfig> = {
     },
 };
 
-function buildLinearLayoutPlan(keySize: KeySize, config: LinearBarConfig): LinearLayoutPlan {
+function buildProgressBarLayoutPlan(keySize: KeySize, config: ProgressBarConfig): ProgressBarLayoutPlan {
     const aspectRatio = keySize.width / keySize.height;
-    const mode: LinearLayoutMode = aspectRatio >= 1.45 ? "wide" : "square";
+    const mode: ProgressBarLayoutMode = aspectRatio >= 1.45 ? "wide" : "square";
     const minimumSize = Math.min(keySize.width, keySize.height);
     const padding = Math.round(minimumSize * (mode === "wide" ? 0.12 : 0.105));
     const contentWidth = keySize.width - padding * 2;
@@ -199,14 +199,14 @@ function buildLinearLayoutPlan(keySize: KeySize, config: LinearBarConfig): Linea
 
 function renderSingleBar(
     data: WidgetData,
-    config: LinearBarConfig,
+    config: ProgressBarConfig,
     keySize: KeySize,
-    layoutPlan: LinearLayoutPlan,
+    layoutPlan: ProgressBarLayoutPlan,
 ): string {
     const fillWidth = Math.max(0, layoutPlan.singleBar.width * clamp(data.progress, 0, 1));
     const barColor = resolveColorForThresholdValue(data.current, config.colorConfig);
     const barHeadColor = adjustHexColorBrightness(barColor, config.gradientHeadAdjustmentPercent ?? -15);
-    const gradientId = `linear-progress-${Math.round(data.current * 10)}-${keySize.width}-${keySize.height}`;
+    const gradientId = `progress-bar-${Math.round(data.current * 10)}-${keySize.width}-${keySize.height}`;
     const fillPaint = config.colorConfig.isGradientEnabled ? `url(#${gradientId})` : barColor;
     const valueText = data.barDisplayValue ?? data.displayValue ?? data.current.toFixed(0);
     const unitText = data.barUnit ?? data.unit;
@@ -225,16 +225,16 @@ function renderSingleBar(
             layout: layoutPlan.title,
             iconScale: layoutPlan.mode === "wide" ? 0.3 : 0.34,
             iconGap: layoutPlan.mode === "wide" ? 25 : 27,
-            clipId: "linear-single-title",
+            clipId: "progress-bar-single-title",
             textColor: config.paints.secondaryText,
             iconColor: config.paints.icon,
             textStyles: config.textStyles,
             themeEffects: config.themeEffects,
         })}
         ${renderValueWithUnit({
-            clipId: "linear-single-value",
+            clipId: "progress-bar-single-value",
             valueText,
-            unitText: formatLinearUnit(unitText),
+            unitText: formatProgressBarUnit(unitText),
             layout: layoutPlan.singleValue,
             valueTextColor: config.paints.primaryText,
             unitTextColor: config.paints.supportingText,
@@ -246,7 +246,7 @@ function renderSingleBar(
         ${renderSecondaryText({
             text: data.secondaryDisplayValue,
             layout: layoutPlan.singleSecondaryText,
-            clipId: "linear-single-secondary",
+            clipId: "progress-bar-single-secondary",
             textColor: config.paints.mutedText,
             textStyles: config.textStyles,
             themeEffects: config.themeEffects,
@@ -256,9 +256,9 @@ function renderSingleBar(
 
 function renderChannelBars(
     data: WidgetData,
-    config: LinearBarConfig,
+    config: ProgressBarConfig,
     keySize: KeySize,
-    layoutPlan: LinearLayoutPlan,
+    layoutPlan: ProgressBarLayoutPlan,
 ): string {
     const titleText = data.barLabel ?? data.label;
     const channels = data.barChannels ?? [];
@@ -270,7 +270,7 @@ function renderChannelBars(
             layout: layoutPlan.title,
             iconScale: layoutPlan.mode === "wide" ? 0.3 : 0.34,
             iconGap: layoutPlan.mode === "wide" ? 25 : 27,
-            clipId: "linear-channel-title",
+            clipId: "progress-bar-channel-title",
             textColor: config.paints.secondaryText,
             iconColor: config.paints.icon,
             textStyles: config.textStyles,
@@ -283,7 +283,7 @@ function renderChannelBars(
                 layoutPlan,
             });
             const fillWidth = Math.max(0, channelLayout.bar.width * clamp(channel.progress, 0, 1));
-            const gradientId = `linear-channel-${channelIndex}-${Math.round(channel.progress * 1000)}-${keySize.width}-${keySize.height}`;
+            const gradientId = `progress-bar-channel-${channelIndex}-${Math.round(channel.progress * 1000)}-${keySize.width}-${keySize.height}`;
             const headColor = adjustHexColorBrightness(channel.color, config.gradientHeadAdjustmentPercent ?? -15);
             const fillPaint = config.colorConfig.isGradientEnabled ? `url(#${gradientId})` : channel.color;
 
@@ -298,7 +298,7 @@ function renderChannelBars(
                     ${channel.iconFragment}
                 </g>
                 ${renderValueWithUnit({
-                    clipId: `linear-channel-${channelIndex}-value`,
+                    clipId: `progress-bar-channel-${channelIndex}-value`,
                     valueText: channel.displayValue,
                     unitText: channel.unit,
                     layout: channelLayout.value,
@@ -317,7 +317,7 @@ function renderChannelBars(
 function buildChannelLayout(options: {
     channelIndex: number;
     keySize: KeySize;
-    layoutPlan: LinearLayoutPlan;
+    layoutPlan: ProgressBarLayoutPlan;
 }): ChannelLayout {
     if (options.layoutPlan.mode === "wide") {
         const columnWidth = (options.keySize.width - options.layoutPlan.padding * 2 - 10) / 2;
@@ -495,7 +495,7 @@ function renderFill(layout: BarLayout, fillWidth: number, fillPaint: string, fil
     `;
 }
 
-function formatLinearUnit(unit: string): string {
+function formatProgressBarUnit(unit: string): string {
     if (unit === "C" || unit === "F") {
         return `°${unit}`;
     }

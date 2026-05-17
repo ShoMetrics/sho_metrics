@@ -6,7 +6,7 @@ import type { DualChannelWidgetData, WidgetData } from "../../view-rendering/wid
 import { arcGauge, DEFAULT_ARC_GAUGE_CONFIG } from "./arc-gauge";
 import { buildGaugeRangeColorPlan, resolveGaugeMarkerGap, resolveGaugeMarkerRenderProgress } from "./arc-gauge-range";
 import { DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG, renderDualChannelArcGauge } from "./dual-channel-arc-gauge";
-import { linearBar, DEFAULT_LINEAR_BAR_CONFIG } from "./linear-bar";
+import { progressBar, DEFAULT_PROGRESS_BAR_CONFIG } from "./progress-bar";
 import { renderMetricTextRow } from "./metric-text-row";
 import { DEFAULT_MIRRORED_TRAFFIC_CONFIG, renderMirroredTraffic } from "./mirrored-traffic";
 import { DEFAULT_TEXT_METRIC_CONFIG, renderDualTextMetric, textMetric } from "./text-metric";
@@ -29,16 +29,16 @@ test("arc gauge clamps progress and escapes center text", () => {
     assert.doesNotMatch(svgFragment, /stroke-dashoffset="-/);
 });
 
-test("linear bar clamps fill width and renders secondary text safely", () => {
-    const svgFragment = linearBar.render({
+test("progress bar clamps fill width and renders secondary text safely", () => {
+    const svgFragment = progressBar.render({
         ...buildWidgetData(),
         label: "Disk",
         current: 75,
         progress: 2,
         secondaryDisplayValue: `C:\\ <System>`,
-    }, DEFAULT_LINEAR_BAR_CONFIG, keySize);
+    }, DEFAULT_PROGRESS_BAR_CONFIG, keySize);
 
-    assert.match(svgFragment, /linear-progress-750-144-144/);
+    assert.match(svgFragment, /progress-bar-750-144-144/);
     assert.match(svgFragment, /width="114"/);
     assert.match(svgFragment, /C:\\ &lt;System&gt;/);
 });
@@ -409,19 +409,19 @@ test("dual-channel gauge variant uses a safe single-row placeholder for unavaila
     assert.doesNotMatch(svgFragment, /dual-arc-gauge-negative-row-unit/);
 });
 
-test("linear bar renders at most two channel bars", () => {
-    const svgFragment = linearBar.render({
+test("progress bar renders at most two channel bars", () => {
+    const svgFragment = progressBar.render({
         ...buildWidgetData(),
         barChannels: [
-            buildLinearChannel("Read", "R"),
-            buildLinearChannel("Write", "W"),
-            buildLinearChannel("Ignored", "I"),
+            buildProgressBarChannel("Read", "R"),
+            buildProgressBarChannel("Write", "W"),
+            buildProgressBarChannel("Ignored", "I"),
         ],
-    }, DEFAULT_LINEAR_BAR_CONFIG, keySize);
+    }, DEFAULT_PROGRESS_BAR_CONFIG, keySize);
 
-    assert.match(svgFragment, /linear-channel-0-value/);
-    assert.match(svgFragment, /linear-channel-1-value/);
-    assert.doesNotMatch(svgFragment, /linear-channel-2-value/);
+    assert.match(svgFragment, /progress-bar-channel-0-value/);
+    assert.match(svgFragment, /progress-bar-channel-1-value/);
+    assert.doesNotMatch(svgFragment, /progress-bar-channel-2-value/);
 });
 
 test("metric text row escapes values and clamps non-finite coordinates", () => {
@@ -566,7 +566,7 @@ function roundMarkerGap(markerGap: ReturnType<typeof resolveGaugeMarkerGap>): Re
     };
 }
 
-function buildLinearChannel(label: string, displayValue: string): NonNullable<WidgetData["barChannels"]>[number] {
+function buildProgressBarChannel(label: string, displayValue: string): NonNullable<WidgetData["barChannels"]>[number] {
     return {
         label,
         displayValue,
