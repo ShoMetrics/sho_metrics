@@ -22,7 +22,7 @@ export interface MetricPreviewInput {
 interface MetricPreviewSample {
     readonly widgetData: WidgetData;
     readonly centerIconFragment: string;
-    readonly linearIconFragment: string;
+    readonly topIconFragment: string;
     readonly statusIcon: SingleMetricRenderOptions["statusIcon"];
 }
 
@@ -104,7 +104,7 @@ function buildMetricPreviewUri(
             resolvedSettings: appearance,
             widgetData: sample.widgetData,
             centerIconFragment: sample.centerIconFragment,
-            linearIconFragment: sample.linearIconFragment,
+            topIconFragment: sample.topIconFragment,
             statusIcon: sample.statusIcon,
         },
     });
@@ -174,7 +174,7 @@ function buildNetworkPreviewSample(): MetricPreviewSample {
             barLabel: "Net Speed",
         }),
         centerIconFragment: directionIconFragment,
-        linearIconFragment: directionIconFragment,
+        topIconFragment: directionIconFragment,
         statusIcon: getNetworkDirectionStatusIcon({ direction: "download" }),
     };
 }
@@ -196,7 +196,7 @@ function buildHardwarePreviewSample(options: HardwarePreviewSampleOptions): Metr
             barLabel: options.barLabel,
         }),
         centerIconFragment: icons.centerIconFragment,
-        linearIconFragment: icons.centerIconFragment,
+        topIconFragment: icons.centerIconFragment,
         statusIcon: icons.statusIcon,
     };
 }
@@ -221,7 +221,7 @@ function buildWidgetData(options: {
         label: options.label,
         displayValue: options.displayValue,
         secondaryDisplayValue: options.secondaryDisplayValue,
-        linearLabel: options.barLabel,
+        barLabel: options.barLabel,
         sparklineScale: fixedScaleMaximum === undefined
             ? undefined
             : {

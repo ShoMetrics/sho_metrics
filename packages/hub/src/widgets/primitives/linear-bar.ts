@@ -2,8 +2,8 @@ import type { WidgetData, KeySize } from "../../rendering/widget-data";
 import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
     buildSvgFilterAttributes,
-    DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
-    type RenderGraphicEffectTokens,
+    DEFAULT_RENDER_THEME_EFFECT_TOKENS,
+    type RenderThemeEffectTokens,
 } from "../../rendering/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
@@ -23,7 +23,7 @@ export interface LinearBarConfig extends WidgetBaseConfig {
     borderRadius: number;
     paints: LinearBarPaints;
     textStyles: RenderTextStyles;
-    graphicEffects: RenderGraphicEffectTokens;
+    themeEffects: RenderThemeEffectTokens;
     topIconFragment?: string;
 }
 
@@ -53,7 +53,7 @@ export const DEFAULT_LINEAR_BAR_CONFIG: LinearBarConfig = {
         track: "rgba(255,255,255,0.08)",
     },
     textStyles: DEFAULT_RENDER_TEXT_STYLES,
-    graphicEffects: DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
+    themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     gradientHeadAdjustmentPercent: -15,
 };
 
@@ -108,7 +108,7 @@ export const linearBar: Widget<LinearBarConfig> = {
     render(data: WidgetData, config: LinearBarConfig, keySize: KeySize): string {
         const layoutPlan = buildLinearLayoutPlan(keySize, config);
 
-        if (data.linearChannels && data.linearChannels.length > 0) {
+        if (data.barChannels && data.barChannels.length > 0) {
             return renderChannelBars(data, config, keySize, layoutPlan);
         }
 
@@ -208,9 +208,9 @@ function renderSingleBar(
     const barHeadColor = adjustHexColorBrightness(barColor, config.gradientHeadAdjustmentPercent ?? -15);
     const gradientId = `linear-progress-${Math.round(data.current * 10)}-${keySize.width}-${keySize.height}`;
     const fillPaint = config.colorConfig.isGradientEnabled ? `url(#${gradientId})` : barColor;
-    const valueText = data.linearDisplayValue ?? data.displayValue ?? data.current.toFixed(0);
-    const unitText = data.linearUnit ?? data.unit;
-    const titleText = data.linearLabel ?? data.label;
+    const valueText = data.barDisplayValue ?? data.displayValue ?? data.current.toFixed(0);
+    const unitText = data.barUnit ?? data.unit;
+    const titleText = data.barLabel ?? data.label;
 
     return `
         ${config.colorConfig.isGradientEnabled ? `<defs>
@@ -229,7 +229,7 @@ function renderSingleBar(
             textColor: config.paints.secondaryText,
             iconColor: config.paints.icon,
             textStyles: config.textStyles,
-            graphicEffects: config.graphicEffects,
+            themeEffects: config.themeEffects,
         })}
         ${renderValueWithUnit({
             clipId: "linear-single-value",
@@ -239,17 +239,17 @@ function renderSingleBar(
             valueTextColor: config.paints.primaryText,
             unitTextColor: config.paints.supportingText,
             textStyles: config.textStyles,
-            graphicEffects: config.graphicEffects,
+            themeEffects: config.themeEffects,
         })}
-        ${renderTrack(layoutPlan.singleBar, config.paints.track, config.graphicEffects.subtleFilter)}
-        ${renderFill(layoutPlan.singleBar, fillWidth, fillPaint, config.graphicEffects.metricFilter)}
+        ${renderTrack(layoutPlan.singleBar, config.paints.track, config.themeEffects.subtleFilter)}
+        ${renderFill(layoutPlan.singleBar, fillWidth, fillPaint, config.themeEffects.metricFilter)}
         ${renderSecondaryText({
             text: data.secondaryDisplayValue,
             layout: layoutPlan.singleSecondaryText,
             clipId: "linear-single-secondary",
             textColor: config.paints.mutedText,
             textStyles: config.textStyles,
-            graphicEffects: config.graphicEffects,
+            themeEffects: config.themeEffects,
         })}
     `;
 }
@@ -260,8 +260,8 @@ function renderChannelBars(
     keySize: KeySize,
     layoutPlan: LinearLayoutPlan,
 ): string {
-    const titleText = data.linearLabel ?? data.label;
-    const channels = data.linearChannels ?? [];
+    const titleText = data.barLabel ?? data.label;
+    const channels = data.barChannels ?? [];
 
     return `
         ${renderTitle({
@@ -274,7 +274,7 @@ function renderChannelBars(
             textColor: config.paints.secondaryText,
             iconColor: config.paints.icon,
             textStyles: config.textStyles,
-            graphicEffects: config.graphicEffects,
+            themeEffects: config.themeEffects,
         })}
         ${channels.slice(0, 2).map((channel, channelIndex) => {
             const channelLayout = buildChannelLayout({
@@ -294,7 +294,7 @@ function renderChannelBars(
                         <stop offset="100%" stop-color="${headColor}" />
                     </linearGradient>
                 </defs>` : ""}
-                <g color="${channel.color}" transform="translate(${channelLayout.iconCenterXCoordinate} ${channelLayout.iconCenterYCoordinate}) scale(${layoutPlan.channelIconScale})" ${buildSvgFilterAttributes(config.graphicEffects.iconFilter).join(" ")}>
+                <g color="${channel.color}" transform="translate(${channelLayout.iconCenterXCoordinate} ${channelLayout.iconCenterYCoordinate}) scale(${layoutPlan.channelIconScale})" ${buildSvgFilterAttributes(config.themeEffects.iconFilter).join(" ")}>
                     ${channel.iconFragment}
                 </g>
                 ${renderValueWithUnit({
@@ -305,10 +305,10 @@ function renderChannelBars(
                     valueTextColor: config.paints.primaryText,
                     unitTextColor: config.paints.supportingText,
                     textStyles: config.textStyles,
-                    graphicEffects: config.graphicEffects,
+                    themeEffects: config.themeEffects,
                 })}
-                ${renderTrack(channelLayout.bar, config.paints.track, config.graphicEffects.subtleFilter)}
-                ${renderFill(channelLayout.bar, fillWidth, fillPaint, config.graphicEffects.metricFilter)}
+                ${renderTrack(channelLayout.bar, config.paints.track, config.themeEffects.subtleFilter)}
+                ${renderFill(channelLayout.bar, fillWidth, fillPaint, config.themeEffects.metricFilter)}
             `;
         }).join("")}
     `;
@@ -383,7 +383,7 @@ function renderTitle(options: {
     textColor: string;
     iconColor: string;
     textStyles: RenderTextStyles;
-    graphicEffects: RenderGraphicEffectTokens;
+    themeEffects: RenderThemeEffectTokens;
 }): string {
     const titleTextStyle = options.textStyles.title;
     const titleXCoordinate = options.iconFragment
@@ -391,7 +391,7 @@ function renderTitle(options: {
         : options.layout.xCoordinate;
     const titleMaxWidth = Math.max(1, options.layout.maxWidth - (titleXCoordinate - options.layout.xCoordinate));
     const iconSvg = options.iconFragment
-        ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 10} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})" ${buildSvgFilterAttributes(options.graphicEffects.iconFilter).join(" ")}>${options.iconFragment}</g>`
+        ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 10} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})" ${buildSvgFilterAttributes(options.themeEffects.iconFilter).join(" ")}>${options.iconFragment}</g>`
         : "";
 
     return `
@@ -419,7 +419,7 @@ function renderValueWithUnit(options: {
     valueTextColor: string;
     unitTextColor: string;
     textStyles: RenderTextStyles;
-    graphicEffects: RenderGraphicEffectTokens;
+    themeEffects: RenderThemeEffectTokens;
 }): string {
     const valueTextStyle = options.textStyles.value;
     const unitTextStyle = options.textStyles.unit;
@@ -460,7 +460,7 @@ function renderSecondaryText(options: {
     clipId: string;
     textColor: string;
     textStyles: RenderTextStyles;
-    graphicEffects: RenderGraphicEffectTokens;
+    themeEffects: RenderThemeEffectTokens;
 }): string {
     if (!options.text) {
         return "";

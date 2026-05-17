@@ -108,7 +108,7 @@ test("disk usage display keeps explicit unavailable volume instead of falling ba
     }
     assert.equal(displayOptions.widgetData.label, "E:");
     assert.equal(displayOptions.widgetData.displayValue, "0");
-    assert.equal(displayOptions.widgetData.linearLabel, "E:");
+    assert.equal(displayOptions.widgetData.barLabel, "E:");
     assert.equal(displayOptions.widgetData.sampleTimestampMilliseconds, undefined);
 
     const renderPlan = buildMetricDisplayRenderPlan({

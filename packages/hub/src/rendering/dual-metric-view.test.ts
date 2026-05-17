@@ -2,15 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderDualMetricBodyView } from "./dual-metric-view";
 import type { MetricRenderAppearance } from "./render-appearance";
-import { DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS } from "./render-svg-effects";
+import { DEFAULT_RENDER_THEME_EFFECT_TOKENS } from "./render-svg-effects";
 import { DEFAULT_RENDER_TEXT_STYLES } from "./render-text-style";
 import type { DualChannelWidgetData, WidgetData } from "./widget-data";
 
 test("dual metric view renders the requested primitive branch", () => {
     const testCases = [
-        { graphicType: "sparkline" as const, expected: /dual-sparkline-positive-row/ },
-        { graphicType: "circular" as const, expected: /dual-arc-positive-row/ },
-        { graphicType: "text" as const, expected: /text-metric-positive-value/ },
+        { renderPrimitive: "sparkline" as const, expected: /dual-sparkline-positive-row/ },
+        { renderPrimitive: "circle" as const, expected: /dual-arc-positive-row/ },
+        { renderPrimitive: "text" as const, expected: /text-metric-positive-value/ },
     ];
     const visualSettings = buildMetricRenderAppearance();
 
@@ -18,12 +18,12 @@ test("dual metric view renders the requested primitive branch", () => {
         const svg = renderDualMetricBodyView({
             data: buildDualChannelData(),
             visual: visualSettings,
-            graphicType: testCase.graphicType,
+            renderPrimitive: testCase.renderPrimitive,
             renderSize: { width: 144, height: 144 },
             titleText: "Network",
             chartMode: "overlay",
             centerContent: "value",
-            circleStyle: "value",
+            circleVariant: "full-ring",
             topIcon: "",
             positive: { color: "#3b82f6" },
             negative: { color: "#ef4444" },
@@ -35,9 +35,9 @@ test("dual metric view renders the requested primitive branch", () => {
 
 function buildMetricRenderAppearance(): MetricRenderAppearance {
     return {
-        graphicType: "circular",
-        circleStyle: "value",
-        graphicStyle: "flat",
+        renderPrimitive: "circle",
+        circleVariant: "full-ring",
+        themePreset: "flat",
         paintConstraint: "none",
         paints: {
             background: "#0f0f0f",
@@ -47,10 +47,10 @@ function buildMetricRenderAppearance(): MetricRenderAppearance {
             secondaryText: "rgba(255,255,255,0.72)",
             mutedText: "rgba(255,255,255,0.48)",
             icon: "rgba(255,255,255,0.88)",
-            linearTitleText: "rgba(255,255,255,0.88)",
-            linearValueText: "white",
-            linearUnitText: "rgba(255,255,255,0.76)",
-            linearSecondaryText: "rgba(255,255,255,0.78)",
+            barTitleText: "rgba(255,255,255,0.88)",
+            barValueText: "white",
+            barUnitText: "rgba(255,255,255,0.76)",
+            barSecondaryText: "rgba(255,255,255,0.78)",
             primaryMetric: {
                 mode: "solid",
                 solidColor: "#3b82f6",
@@ -80,7 +80,7 @@ function buildMetricRenderAppearance(): MetricRenderAppearance {
                 fontFamily: "Test Label Font",
             },
         },
-        graphicEffects: DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
+        themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
         lineSmoothingPercent: 75,
         gridLineVisibility: "adaptive",
         gridLineType: "horizontal",

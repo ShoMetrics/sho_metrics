@@ -56,7 +56,7 @@ export function buildDiskUsageWidgetData(options: {
     if (options.displayMode === "percentage") {
         return {
             ...percentageWidgetData,
-            linearLabel: options.barLabel,
+            barLabel: options.barLabel,
         };
     }
 
@@ -69,9 +69,9 @@ export function buildDiskUsageWidgetData(options: {
         ...percentageWidgetData,
         displayValue: formattedAvailableSpace.value,
         unit: formattedAvailableSpace.unit,
-        linearLabel: options.barLabel,
-        linearDisplayValue: percentageWidgetData.current.toFixed(0),
-        linearUnit: "%",
+        barLabel: options.barLabel,
+        barDisplayValue: percentageWidgetData.current.toFixed(0),
+        barUnit: "%",
     };
 }
 

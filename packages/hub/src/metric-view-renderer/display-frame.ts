@@ -24,9 +24,9 @@ import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
 interface BaseMetricRenderOptions {
     centerIconFragment: string;
     footerIconFragment?: string;
-    linearIconFragment?: string;
+    topIconFragment?: string;
     statusIcon: ArcGaugeStatusIcon;
-    circleStyleOverride?: MetricRenderAppearance["circleStyle"];
+    circleVariantOverride?: MetricRenderAppearance["circleVariant"];
     appearanceOverride?: ResolvedAppearanceSettingsOverride;
     resolvedSettings: ResolvedAppearanceSettings;
 }
@@ -38,7 +38,7 @@ export interface SingleMetricRenderOptions extends BaseMetricRenderOptions {
 export interface DualMetricRenderOptions extends BaseMetricRenderOptions {
     widgetData: DualChannelWidgetData;
     titleText: string;
-    dualGraphicType?: "circular" | "text" | "sparkline";
+    dualRenderPrimitive?: "circle" | "text" | "sparkline";
     chartMode?: "overlay" | "mirrored";
     positiveColor: string;
     negativeColor: string;
@@ -65,7 +65,7 @@ export interface TouchStripMetricLayout {
 export interface MetricDisplayRenderPlan {
     renderAppearance: MetricRenderAppearance;
     centerContent: "value" | "icon";
-    circleStyle: MetricRenderAppearance["circleStyle"];
+    circleVariant: MetricRenderAppearance["circleVariant"];
     displayHasData: boolean;
     shouldRenderMutedIconPlaceholder: boolean;
     touchStripMetricLayout: TouchStripMetricLayout | null;
@@ -112,7 +112,7 @@ export function composeMetricDisplayFrame(options: {
     return {
         svg: renderMetricFrame({
             body: body.svg,
-            graphicStyle: renderPlan.renderAppearance.graphicStyle,
+            themePreset: renderPlan.renderAppearance.themePreset,
             muted: body.muted,
             paints: renderPlan.renderAppearance.paints,
             size: renderPlan.renderSize,
@@ -131,17 +131,17 @@ export function buildMetricDisplayRenderPlan(options: {
         options.displayOptions.appearanceOverride,
     );
     const renderAppearance = buildMetricRenderAppearance(resolvedAppearance);
-    const circleStyle = resolveCircleStyle({
-        graphicType: renderAppearance.graphicType,
-        circleStyle: renderAppearance.circleStyle,
-        circleStyleOverride: options.displayOptions.circleStyleOverride,
+    const circleVariant = resolveEffectiveCircleVariant({
+        renderPrimitive: renderAppearance.renderPrimitive,
+        circleVariant: renderAppearance.circleVariant,
+        circleVariantOverride: options.displayOptions.circleVariantOverride,
     });
-    const centerContent = circleStyle === "compact" ? "icon" : "value";
+    const centerContent = circleVariant === "minimal" ? "icon" : "value";
     const displayHasData = hasMetricDisplayData(options.displayOptions);
     const shouldRenderMutedIconPlaceholder = !displayHasData
         && !isDualMetricRenderOptions(options.displayOptions)
-        && renderAppearance.graphicType === "circular"
-        && circleStyle === "compact";
+        && renderAppearance.renderPrimitive === "circle"
+        && circleVariant === "minimal";
     const touchStripMetricLayout = options.renderTarget === "touch-strip"
         ? resolveTouchStripMetricLayout(renderAppearance)
         : null;
@@ -149,7 +149,7 @@ export function buildMetricDisplayRenderPlan(options: {
     return {
         renderAppearance,
         centerContent,
-        circleStyle,
+        circleVariant,
         displayHasData,
         shouldRenderMutedIconPlaceholder,
         touchStripMetricLayout,
@@ -158,16 +158,16 @@ export function buildMetricDisplayRenderPlan(options: {
     };
 }
 
-export function resolveCircleStyle(options: {
-    graphicType: MetricRenderAppearance["graphicType"];
-    circleStyle: MetricRenderAppearance["circleStyle"];
-    circleStyleOverride: MetricRenderAppearance["circleStyle"] | undefined;
-}): MetricRenderAppearance["circleStyle"] {
-    if (options.graphicType !== "circular") {
-        return "value";
+export function resolveEffectiveCircleVariant(options: {
+    renderPrimitive: MetricRenderAppearance["renderPrimitive"];
+    circleVariant: MetricRenderAppearance["circleVariant"];
+    circleVariantOverride: MetricRenderAppearance["circleVariant"] | undefined;
+}): MetricRenderAppearance["circleVariant"] {
+    if (options.renderPrimitive !== "circle") {
+        return "full-ring";
     }
 
-    return options.circleStyleOverride ?? options.circleStyle;
+    return options.circleVariantOverride ?? options.circleVariant;
 }
 
 export function buildRenderWidgetData(options: {
@@ -241,7 +241,7 @@ export function resolveDisplaySampleTimestampMilliseconds(widgetData: WidgetData
 }
 
 export function resolveTouchStripMetricLayout(settings: MetricRenderAppearance): TouchStripMetricLayout {
-    if (settings.graphicType === "circular") {
+    if (settings.renderPrimitive === "circle") {
         return TOUCH_STRIP_METRIC_LAYOUTS.square;
     }
 
@@ -268,9 +268,9 @@ function composeSingleMetricBody(
             renderSize: renderPlan.renderSize,
             centerIcon: options.centerIconFragment,
             footerIcon: options.footerIconFragment,
-            linearIcon: options.linearIconFragment,
+            topIcon: options.topIconFragment,
             statusIcon: options.statusIcon,
-            circleStyle: renderPlan.circleStyle,
+            circleVariant: renderPlan.circleVariant,
         }),
         renderedMetricData,
         muted: renderPlan.shouldRenderMutedIconPlaceholder,
@@ -290,12 +290,12 @@ function composeDualMetricBody(
         svg: renderDualMetricBodyView({
             data: renderedMetricData,
             visual: renderPlan.renderAppearance,
-            graphicType: options.dualGraphicType ?? "sparkline",
+            renderPrimitive: options.dualRenderPrimitive ?? "sparkline",
             renderSize: renderPlan.renderSize,
             titleText: options.titleText,
             chartMode: options.chartMode ?? "overlay",
             centerContent: renderPlan.centerContent,
-            circleStyle: renderPlan.circleStyle,
+            circleVariant: renderPlan.circleVariant,
             topIcon: options.centerIconFragment,
             positive: {
                 color: options.positiveColor,

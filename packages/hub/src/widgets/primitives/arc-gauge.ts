@@ -2,8 +2,8 @@ import type { WidgetData, KeySize } from "../../rendering/widget-data";
 import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
     buildSvgFilterAttributes,
-    DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
-    type RenderGraphicEffectTokens,
+    DEFAULT_RENDER_THEME_EFFECT_TOKENS,
+    type RenderThemeEffectTokens,
 } from "../../rendering/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
@@ -30,7 +30,7 @@ import {
 } from "./arc-gauge-range";
 import { renderMetricTextRow } from "./metric-text-row";
 
-export type ArcGaugeStyle = "value" | "compact" | "gauge";
+export type CircleVariant = "full-ring" | "minimal" | "gauge";
 
 export interface ArcGaugeStatusIcon {
     fragment: string;
@@ -52,9 +52,9 @@ export interface ArcGaugeConfig extends WidgetBaseConfig {
     unitTextColor: string;
     iconColor: string;
     textStyles: RenderTextStyles;
-    graphicEffects: RenderGraphicEffectTokens;
+    themeEffects: RenderThemeEffectTokens;
     innerTextScale: number;
-    circleStyle: ArcGaugeStyle;
+    circleVariant: CircleVariant;
     gaugeRangeBlendProgress: number;
     centerIconFragment?: string;
     footerIconFragment?: string;
@@ -74,10 +74,10 @@ export const DEFAULT_ARC_GAUGE_CONFIG: ArcGaugeConfig = {
     unitTextColor: "rgba(255,255,255,0.74)",
     iconColor: "rgba(255,255,255,0.88)",
     textStyles: DEFAULT_RENDER_TEXT_STYLES,
-    graphicEffects: DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
+    themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     gradientHeadAdjustmentPercent: -42,
     innerTextScale: 1,
-    circleStyle: "value",
+    circleVariant: "full-ring",
     gaugeRangeBlendProgress: 0.16,
 };
 
@@ -157,7 +157,7 @@ interface StatusNotchGeometry {
  * A circle visual fits one-way single-value data, such as CPU usage, GPU usage,
  * VRAM usage, RAM usage, upload speed, or download speed.
  * Combined bidirectional data, such as upload and download together, needs a
- * different graph that can represent two values at the same time.
+ * different visual form that can represent two values at the same time.
  * Renders a background track circle + a colored progress arc + centered content.
  */
 export const arcGauge: Widget<ArcGaugeConfig> = {
@@ -179,19 +179,19 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
         };
         const arcColor = resolveColorForThresholdValue(data.current, config.colorConfig);
         const gradientId = `circular-progress-${Math.round(data.current * 10)}-${keySize.width}-${keySize.height}`;
-        const circleStyle = config.circleStyle;
+        const circleVariant = config.circleVariant;
         const rangeColorPlan = buildGaugeRangeColorPlan({
-            circleStyle,
+            circleVariant,
             colorConfig: config.colorConfig,
             baseColor: arcColor,
             progress: data.progress,
             gradientHeadAdjustmentPercent: config.gradientHeadAdjustmentPercent ?? -15,
             gaugeRangeBlendProgress: config.gaugeRangeBlendProgress,
         });
-        const statusNotchGeometry = circleStyle === "compact" && config.statusIcon
+        const statusNotchGeometry = circleVariant === "minimal" && config.statusIcon
             ? buildStatusNotchGeometry(geometry, config.strokeWidth, config.statusIcon)
             : null;
-        const gaugeNotchGeometry = circleStyle === "gauge"
+        const gaugeNotchGeometry = circleVariant === "gauge"
             ? buildGaugeNotchGeometry(geometry)
             : null;
         const ringNotchGeometry = statusNotchGeometry ?? gaugeNotchGeometry;
@@ -208,7 +208,7 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
         const labelMaxWidth = Math.max(24, radius * 1.55);
         const centerTextMaxWidth = Math.max(24, radius * 1.5);
         const centerContentFragment = renderCenterContent({
-            circleStyle,
+            circleVariant,
             centerIconFragment: config.centerIconFragment,
             footerIconFragment: config.footerIconFragment,
             statusIcon: config.statusIcon,
@@ -228,7 +228,7 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
             config,
         });
 
-        const shouldRenderFullRangeArc = circleStyle === "gauge" && valueText !== "N/A";
+        const shouldRenderFullRangeArc = circleVariant === "gauge" && valueText !== "N/A";
         const shouldRenderProgressRing = !shouldRenderFullRangeArc && data.progress > 0;
         const shouldRenderProgressGradient = shouldRenderProgressRing && config.colorConfig.isGradientEnabled;
         const progressGradientDefs = shouldRenderProgressGradient
@@ -252,9 +252,9 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
                 strokeWidth: config.strokeWidth,
                 notchGeometry: ringNotchGeometry,
                 shouldRenderFullRangeArc,
-                shouldRenderMarker: circleStyle === "gauge" && valueText !== "N/A",
-                metricFilter: config.graphicEffects.metricFilter,
-                subtleFilter: config.graphicEffects.subtleFilter,
+                shouldRenderMarker: circleVariant === "gauge" && valueText !== "N/A",
+                metricFilter: config.themeEffects.metricFilter,
+                subtleFilter: config.themeEffects.subtleFilter,
             })}
             ${centerContentFragment}
         `;
@@ -262,7 +262,7 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
 };
 
 function renderCenterContent(options: {
-    circleStyle: ArcGaugeStyle;
+    circleVariant: CircleVariant;
     centerIconFragment: string | undefined;
     footerIconFragment: string | undefined;
     statusIcon: ArcGaugeStatusIcon | undefined;
@@ -281,26 +281,26 @@ function renderCenterContent(options: {
     centerTextMaxWidth: number;
     config: ArcGaugeConfig;
 }): string {
-    if (options.circleStyle === "compact") {
+    if (options.circleVariant === "minimal") {
         return `
             ${renderStatusIcon(
                 options.statusIcon,
                 options.centerXCoordinate,
                 options.statusNotchGeometry,
                 options.config.iconColor,
-                options.config.graphicEffects.iconFilter,
+                options.config.themeEffects.iconFilter,
             )}
             ${renderCenterIcon(
                 options.centerIconFragment,
                 options.centerXCoordinate,
                 options.centerYCoordinate,
                 options.config.iconColor,
-                options.config.graphicEffects.iconFilter,
+                options.config.themeEffects.iconFilter,
             )}
         `;
     }
 
-    if (options.circleStyle === "gauge") {
+    if (options.circleVariant === "gauge") {
         return renderGaugeValueContent(options);
     }
 
@@ -731,7 +731,7 @@ function renderGaugeBottomLabel(options: {
             xCoordinate: iconXCoordinate,
             yCoordinate: options.yCoordinate,
             iconColor: options.config.iconColor,
-            iconFilter: options.config.graphicEffects.iconFilter,
+            iconFilter: options.config.themeEffects.iconFilter,
         })}
     `;
 }
@@ -807,7 +807,7 @@ function renderCenterValue(options: {
             options.centerXCoordinate,
             options.centerYCoordinate + ARC_LAYOUT.footerIcon.yOffset,
             options.config.iconColor,
-            options.config.graphicEffects.iconFilter,
+            options.config.themeEffects.iconFilter,
         )}
     `;
 }

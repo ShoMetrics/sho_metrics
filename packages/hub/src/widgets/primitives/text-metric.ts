@@ -2,8 +2,8 @@ import type { DualChannelWidgetData, KeySize, WidgetData } from "../../rendering
 import { resolveColorForThresholdValue } from "../../rendering/color-resolver";
 import {
     buildSvgFilterAttributes,
-    DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
-    type RenderGraphicEffectTokens,
+    DEFAULT_RENDER_THEME_EFFECT_TOKENS,
+    type RenderThemeEffectTokens,
 } from "../../rendering/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
@@ -22,7 +22,7 @@ export interface TextMetricConfig extends WidgetBaseConfig {
     unitTextColor: string;
     secondaryTextColor: string;
     textStyles: RenderTextStyles;
-    graphicEffects: RenderGraphicEffectTokens;
+    themeEffects: RenderThemeEffectTokens;
     positiveColor?: string;
     negativeColor?: string;
 }
@@ -34,7 +34,7 @@ export const DEFAULT_TEXT_METRIC_CONFIG: TextMetricConfig = {
     unitTextColor: "rgba(255,255,255,0.74)",
     secondaryTextColor: "rgba(255,255,255,0.52)",
     textStyles: DEFAULT_RENDER_TEXT_STYLES,
-    graphicEffects: DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
+    themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
 };
 
 const TEXT_LAYOUT = {

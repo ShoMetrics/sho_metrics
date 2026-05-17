@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS } from "../../rendering/render-svg-effects";
+import { DEFAULT_RENDER_THEME_EFFECT_TOKENS } from "../../rendering/render-svg-effects";
 import { DEFAULT_RENDER_TEXT_STYLES } from "../../rendering/render-text-style";
 import type { DualChannelWidgetData, WidgetData } from "../../rendering/widget-data";
 import { arcGauge, DEFAULT_ARC_GAUGE_CONFIG } from "./arc-gauge";
@@ -59,10 +59,10 @@ test("text metric renders a pure text layout without a ring", () => {
     assert.doesNotMatch(svgFragment, /Arc Gauge: track/);
 });
 
-test("gauge circle style opens the bottom arc and renders a marker dot", () => {
+test("gauge circle variant opens the bottom arc and renders a marker dot", () => {
     const svgFragment = arcGauge.render(buildWidgetData(), {
         ...DEFAULT_ARC_GAUGE_CONFIG,
-        circleStyle: "gauge",
+        circleVariant: "gauge",
         centerIconFragment: "<path />",
     }, keySize);
 
@@ -74,13 +74,13 @@ test("gauge circle style opens the bottom arc and renders a marker dot", () => {
     assert.doesNotMatch(svgFragment, /stroke-dasharray="284\.[0-9]+ 89\.[0-9]+"/);
 });
 
-test("gauge circle style puts the label and direction icon at the bottom", () => {
+test("gauge circle variant puts the label and direction icon at the bottom", () => {
     const svgFragment = arcGauge.render({
         ...buildWidgetData(),
         label: "NET",
     }, {
         ...DEFAULT_ARC_GAUGE_CONFIG,
-        circleStyle: "gauge",
+        circleVariant: "gauge",
         footerIconFragment: "<path id=\"direction-icon\" />",
     }, keySize);
 
@@ -90,7 +90,7 @@ test("gauge circle style puts the label and direction icon at the bottom", () =>
     assert.doesNotMatch(svgFragment, /id="arc-label"/);
 });
 
-test("gauge circle style keeps value and unit in fixed regions", () => {
+test("gauge circle variant keeps value and unit in fixed regions", () => {
     const singleDigitFragment = renderGaugeValueSample("3", "KB/s");
     const doubleDigitFragment = renderGaugeValueSample("70", "KB/s");
     const tripleDigitFragment = renderGaugeValueSample("552", "KB/s");
@@ -134,14 +134,14 @@ test("gauge circle style keeps value and unit in fixed regions", () => {
     assert.doesNotMatch(shortUnitTripleDigitFragment, /textLength=/);
 });
 
-test("gauge circle style uses semantic range bands for range colors", () => {
+test("gauge circle variant uses semantic range bands for range colors", () => {
     const svgFragment = arcGauge.render({
         ...buildWidgetData(),
         current: 50,
         progress: 0.5,
     }, {
         ...DEFAULT_ARC_GAUGE_CONFIG,
-        circleStyle: "gauge",
+        circleVariant: "gauge",
         colorConfig: {
             mode: "threshold",
             solidColor: "#000000",
@@ -162,9 +162,9 @@ test("gauge circle style uses semantic range bands for range colors", () => {
     assert.match(svgFragment, /class="arc-gauge-marker"[^>]+fill="#ffff00"/);
 });
 
-test("gauge circle style moves blend ranges with custom range thresholds", () => {
+test("gauge circle variant moves blend ranges with custom range thresholds", () => {
     const colorPlan = buildGaugeRangeColorPlan({
-        circleStyle: "gauge",
+        circleVariant: "gauge",
         baseColor: "#000000",
         progress: 0.6,
         gradientHeadAdjustmentPercent: -42,
@@ -194,14 +194,14 @@ test("gauge circle style moves blend ranges with custom range thresholds", () =>
     ]);
 });
 
-test("gauge circle style keeps the range track uncolored while data is unavailable", () => {
+test("gauge circle variant keeps the range track uncolored while data is unavailable", () => {
     const svgFragment = arcGauge.render({
         ...buildWidgetData(),
         displayValue: "N/A",
         progress: 0,
     }, {
         ...DEFAULT_ARC_GAUGE_CONFIG,
-        circleStyle: "gauge",
+        circleVariant: "gauge",
         centerIconFragment: "<path />",
     }, keySize);
 
@@ -285,7 +285,7 @@ test("gauge marker gap only cuts the marker travel domain for non-endpoint value
     });
 });
 
-test("dual-channel gauge style renders two full-color gauge lanes with marker dots", () => {
+test("dual-channel gauge variant renders two full-color gauge lanes with marker dots", () => {
     const svgFragment = renderDualChannelArcGauge({
         positive: {
             ...buildWidgetData(),
@@ -303,7 +303,7 @@ test("dual-channel gauge style renders two full-color gauge lanes with marker do
         },
     }, {
         ...DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG,
-        circleStyle: "gauge",
+        circleVariant: "gauge",
         titleText: "NETWORK",
         positiveColor: "#ef4444",
         negativeColor: "#3b82f6",
@@ -352,7 +352,7 @@ test("dual-channel gauge style renders two full-color gauge lanes with marker do
     assert.doesNotMatch(svgFragment, /stroke="rgba\(255,255,255,0\.14\)"/);
 });
 
-test("dual-channel gauge style keeps long row values out of icon space", () => {
+test("dual-channel gauge variant keeps long row values out of icon space", () => {
     const svgFragment = renderDualChannelArcGauge({
         positive: {
             ...buildWidgetData(),
@@ -370,7 +370,7 @@ test("dual-channel gauge style keeps long row values out of icon space", () => {
         },
     }, {
         ...DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG,
-        circleStyle: "gauge",
+        circleVariant: "gauge",
         titleText: "NETWORK",
         positiveIconFragment: "<path id=\"upload-icon\" />",
         negativeIconFragment: "<path id=\"download-icon\" />",
@@ -382,7 +382,7 @@ test("dual-channel gauge style keeps long row values out of icon space", () => {
     assert.match(svgFragment, /download-icon/);
 });
 
-test("dual-channel gauge style uses a safe single-row placeholder for unavailable values", () => {
+test("dual-channel gauge variant uses a safe single-row placeholder for unavailable values", () => {
     const svgFragment = renderDualChannelArcGauge({
         positive: {
             ...buildWidgetData(),
@@ -396,7 +396,7 @@ test("dual-channel gauge style uses a safe single-row placeholder for unavailabl
         },
     }, {
         ...DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG,
-        circleStyle: "gauge",
+        circleVariant: "gauge",
         titleText: "NETWORK",
         positiveIconFragment: "<path id=\"upload-icon\" />",
         negativeIconFragment: "<path id=\"download-icon\" />",
@@ -412,7 +412,7 @@ test("dual-channel gauge style uses a safe single-row placeholder for unavailabl
 test("linear bar renders at most two channel bars", () => {
     const svgFragment = linearBar.render({
         ...buildWidgetData(),
-        linearChannels: [
+        barChannels: [
             buildLinearChannel("Read", "R"),
             buildLinearChannel("Write", "W"),
             buildLinearChannel("Ignored", "I"),
@@ -494,8 +494,8 @@ test("mirrored traffic renders labels, center line, and both channel graphs", ()
                 filter: "url(#label-glow)",
             },
         },
-        graphicEffects: {
-            ...DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
+        themeEffects: {
+            ...DEFAULT_RENDER_THEME_EFFECT_TOKENS,
             metricFilter: "url(#metric-glow)",
             subtleFilter: "url(#subtle-glow)",
         },
@@ -551,7 +551,7 @@ function renderGaugeValueSample(displayValue: string, unit: string): string {
         unit,
     }, {
         ...DEFAULT_ARC_GAUGE_CONFIG,
-        circleStyle: "gauge",
+        circleVariant: "gauge",
     }, keySize);
 }
 
@@ -566,7 +566,7 @@ function roundMarkerGap(markerGap: ReturnType<typeof resolveGaugeMarkerGap>): Re
     };
 }
 
-function buildLinearChannel(label: string, displayValue: string): NonNullable<WidgetData["linearChannels"]>[number] {
+function buildLinearChannel(label: string, displayValue: string): NonNullable<WidgetData["barChannels"]>[number] {
     return {
         label,
         displayValue,

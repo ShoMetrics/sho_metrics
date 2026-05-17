@@ -2,8 +2,8 @@ import type { DualChannelWidgetData, KeySize } from "../../rendering/widget-data
 import type { ColorConfig } from "../../rendering/color-resolver";
 import {
     buildSvgFilterAttributes,
-    DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
-    type RenderGraphicEffectTokens,
+    DEFAULT_RENDER_THEME_EFFECT_TOKENS,
+    type RenderThemeEffectTokens,
 } from "../../rendering/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
@@ -15,7 +15,7 @@ import {
     renderConstrainedSvgText,
 } from "../../rendering/svg-utils";
 import type { WidgetBaseConfig } from "../widget.interface";
-import type { ArcGaugeStatusIcon, ArcGaugeStyle } from "./arc-gauge";
+import type { ArcGaugeStatusIcon, CircleVariant } from "./arc-gauge";
 import { renderDualGaugeRing } from "./dual-channel-gauge-ring";
 
 export type DualChannelArcGaugeCenterContent = "value" | "icon" | "icon-value-unit";
@@ -28,9 +28,9 @@ export interface DualChannelArcGaugeConfig extends WidgetBaseConfig {
     dividerColor: string;
     iconColor: string;
     textStyles: RenderTextStyles;
-    graphicEffects: RenderGraphicEffectTokens;
+    themeEffects: RenderThemeEffectTokens;
     centerContent: DualChannelArcGaugeCenterContent;
-    circleStyle: ArcGaugeStyle;
+    circleVariant: CircleVariant;
     titleText?: string;
     centerIconFragment?: string;
     positiveIconFragment?: string;
@@ -52,9 +52,9 @@ export const DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG: DualChannelArcGaugeConfig = 
     dividerColor: "rgba(255,255,255,0.18)",
     iconColor: "rgba(255,255,255,0.88)",
     textStyles: DEFAULT_RENDER_TEXT_STYLES,
-    graphicEffects: DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
+    themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     centerContent: "value",
-    circleStyle: "value",
+    circleVariant: "full-ring",
     titleText: "",
     positiveColor: "#3b82f6",
     negativeColor: "#ef4444",
@@ -162,7 +162,7 @@ export function renderDualChannelArcGauge(
         circumference,
         halfLength: circumference / 2,
     };
-    const isGaugeStyle = config.circleStyle === "gauge";
+    const isGaugeVariant = config.circleVariant === "gauge";
     const channelArcModels: readonly ChannelArcModel[] = [
         {
             channelId: "positive",
@@ -196,14 +196,14 @@ export function renderDualChannelArcGauge(
             channelArcModels,
             trackColor: config.trackColor,
             strokeWidth: config.strokeWidth,
-            mode: isGaugeStyle ? "gauge" : "circle",
-            hasNotches: !isGaugeStyle && config.centerContent === "icon",
-            metricFilter: config.graphicEffects.metricFilter,
-            subtleFilter: config.graphicEffects.subtleFilter,
-            iconFilter: config.graphicEffects.iconFilter,
+            mode: isGaugeVariant ? "gauge" : "circle",
+            hasNotches: !isGaugeVariant && config.centerContent === "icon",
+            metricFilter: config.themeEffects.metricFilter,
+            subtleFilter: config.themeEffects.subtleFilter,
+            iconFilter: config.themeEffects.iconFilter,
         })}
         ${renderCenterContent({ data, config, geometry })}
-        ${isGaugeStyle ? renderGaugeBottomLabel({ config, geometry }) : ""}
+        ${isGaugeVariant ? renderGaugeBottomLabel({ config, geometry }) : ""}
     `;
 }
 
@@ -348,11 +348,11 @@ function renderCenterContent(options: {
             centerIconFragment: options.config.centerIconFragment,
             geometry: options.geometry,
             iconColor: options.config.iconColor,
-            iconFilter: options.config.graphicEffects.iconFilter,
+            iconFilter: options.config.themeEffects.iconFilter,
         });
     }
 
-    if (options.config.circleStyle === "gauge") {
+    if (options.config.circleVariant === "gauge") {
         return renderGaugeValueRows(options);
     }
 
@@ -399,7 +399,7 @@ function renderValueRows(options: {
             y1="${formatSvgNumber(dividerYCoordinate)}"
             x2="${formatSvgNumber(options.geometry.centerXCoordinate + dividerHalfWidth)}"
             y2="${formatSvgNumber(dividerYCoordinate)}"
-            stroke="${options.config.dividerColor}" stroke-width="1.2" stroke-linecap="round" ${buildSvgFilterAttributes(options.config.graphicEffects.subtleFilter).join(" ")} />
+            stroke="${options.config.dividerColor}" stroke-width="1.2" stroke-linecap="round" ${buildSvgFilterAttributes(options.config.themeEffects.subtleFilter).join(" ")} />
         ${renderChannelValueRow({
             rowId: "dual-arc-negative-row",
             widgetData: options.data.negative,
@@ -433,7 +433,7 @@ function renderGaugeValueRows(options: {
             y1="${formatSvgNumber(dividerYCoordinate)}"
             x2="${formatSvgNumber(options.geometry.centerXCoordinate + dividerHalfWidth)}"
             y2="${formatSvgNumber(dividerYCoordinate)}"
-            stroke="${options.config.dividerColor}" stroke-width="1.2" stroke-linecap="round" ${buildSvgFilterAttributes(options.config.graphicEffects.subtleFilter).join(" ")} />
+            stroke="${options.config.dividerColor}" stroke-width="1.2" stroke-linecap="round" ${buildSvgFilterAttributes(options.config.themeEffects.subtleFilter).join(" ")} />
         ${renderGaugeChannelValueRow({
             rowId: "dual-arc-gauge-negative-row",
             widgetData: options.data.negative,
@@ -511,7 +511,7 @@ function renderGaugeChannelValueRow(options: {
                 xCoordinate: iconXCoordinate,
                 yCoordinate: options.yCoordinate,
                 opticalYOffset: 0,
-                iconFilter: options.config.graphicEffects.iconFilter,
+                iconFilter: options.config.themeEffects.iconFilter,
             })}
             ${renderConstrainedSvgText({
                 id: `${options.rowId}-value`,
@@ -540,7 +540,7 @@ function renderGaugeChannelValueRow(options: {
             xCoordinate: iconXCoordinate,
             yCoordinate: options.yCoordinate,
             opticalYOffset: 0,
-            iconFilter: options.config.graphicEffects.iconFilter,
+            iconFilter: options.config.themeEffects.iconFilter,
         })}
         ${renderConstrainedSvgText({
             id: `${options.rowId}-value`,
@@ -660,7 +660,7 @@ function renderChannelValueRow(options: {
             xCoordinate: options.layout.iconXCoordinate,
             yCoordinate: options.layout.groupCenterYCoordinate,
             opticalYOffset: resolveInlineIconOpticalYOffset(options.layout.rowPosition),
-            iconFilter: options.config.graphicEffects.iconFilter,
+            iconFilter: options.config.themeEffects.iconFilter,
         })}
         ${renderChannelValueBlock({
             rowId: options.rowId,

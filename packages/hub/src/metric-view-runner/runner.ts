@@ -128,7 +128,7 @@ function runMetricDisplayUpdate(
             "settingsDisplayRenderStart",
             `actionId=${options.event.action.id}`,
             `metricKey=${options.metricKey}`,
-            `graphicType=${renderPlan.renderAppearance.graphicType}`,
+            `renderPrimitive=${renderPlan.renderAppearance.renderPrimitive}`,
             `queuedMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, renderStartTimestampMilliseconds)}`,
             `activeUpdates=${activeDisplayUpdateCount}`,
             `queueLength=${displayActionQueue.length}`,
@@ -150,7 +150,7 @@ function runMetricDisplayUpdate(
                 "settingsDisplaySkippedUnchanged",
                 `actionId=${options.event.action.id}`,
                 `metricKey=${options.metricKey}`,
-                `graphicType=${renderPlan.renderAppearance.graphicType}`,
+                `renderPrimitive=${renderPlan.renderAppearance.renderPrimitive}`,
                 `queuedMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, renderStartTimestampMilliseconds)}`,
                 `composeMs=${composeEndTimestampMilliseconds - renderStartTimestampMilliseconds}`,
                 `totalMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, composeEndTimestampMilliseconds)}`,
@@ -265,7 +265,7 @@ function runMetricDisplayUpdate(
                         `phase=${dispatchResult.donePhase}`,
                         `actionId=${options.event.action.id}`,
                         `metricKey=${options.metricKey}`,
-                        `graphicType=${renderPlan.renderAppearance.graphicType}`,
+                        `renderPrimitive=${renderPlan.renderAppearance.renderPrimitive}`,
                         `queuedMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, renderStartTimestampMilliseconds)}`,
                         `composeMs=${composeEndTimestampMilliseconds - renderStartTimestampMilliseconds}`,
                         `rasterizeMs=${rasterizeEndTimestampMilliseconds - composeEndTimestampMilliseconds}`,
@@ -345,7 +345,7 @@ function recordDisplayUpdate(displayActionState: DisplayActionState, options: Me
         "settingsDisplayScheduled",
         `actionId=${options.event.action.id}`,
         `metricKey=${options.metricKey}`,
-        `graphicType=${settingsSignature.graphicType}`,
+        `renderPrimitive=${settingsSignature.renderPrimitive}`,
         `displayKind=${isDualMetricDisplayOptions(options) ? "dual" : "single"}`,
         `isRenderInFlight=${displayActionState.isRenderInFlight}`,
         `isQueued=${displayActionState.isQueued}`,
@@ -356,17 +356,17 @@ function recordDisplayUpdate(displayActionState: DisplayActionState, options: Me
 }
 
 function buildMetricDisplaySettingsSignature(settings: ResolvedAppearanceSettings): {
-    readonly graphicType: MetricRenderAppearance["graphicType"];
+    readonly renderPrimitive: MetricRenderAppearance["renderPrimitive"];
     readonly signature: string;
 } {
     const renderAppearance = buildMetricRenderAppearance(settings);
 
     return {
-        graphicType: renderAppearance.graphicType,
+        renderPrimitive: renderAppearance.renderPrimitive,
         signature: [
-            `graphicType=${renderAppearance.graphicType}`,
-            `circleStyle=${renderAppearance.circleStyle}`,
-            `graphicStyle=${renderAppearance.graphicStyle}`,
+            `renderPrimitive=${renderAppearance.renderPrimitive}`,
+            `circleVariant=${renderAppearance.circleVariant}`,
+            `themePreset=${renderAppearance.themePreset}`,
             `paintConstraint=${renderAppearance.paintConstraint}`,
             `background=${renderAppearance.paints.background}`,
             `surface=${renderAppearance.paints.surface}`,

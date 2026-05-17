@@ -83,7 +83,7 @@ function buildGaugeLaneModel(options: {
         GAUGE_RING_LAYOUT.markerRadiusRatio + 0.5 + GAUGE_RING_LAYOUT.markerGapPaddingRatio
     ) * GAUGE_RING_LAYOUT.markerGapScale;
     const colorPlan = buildGaugeRangeColorPlan({
-        circleStyle: "gauge",
+        circleVariant: "gauge",
         colorConfig: options.channel.colorConfig,
         baseColor: options.channel.color,
         progress,

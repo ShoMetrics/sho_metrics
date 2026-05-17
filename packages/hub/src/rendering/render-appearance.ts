@@ -1,9 +1,9 @@
 import type { ColorConfig } from "./color-resolver";
 import type { RenderTextStyles } from "./render-text-style";
-import type { RenderGraphicEffectTokens } from "./render-svg-effects";
-import type { ArcGaugeStyle } from "../widgets/primitives/arc-gauge";
+import type { RenderThemeEffectTokens } from "./render-svg-effects";
+import type { CircleVariant } from "../widgets/primitives/arc-gauge";
 import type { SparklineGridLineType, SparklineGridLineVisibility } from "../widgets/primitives/sparkline";
-import type { GraphicThemePresetName } from "../widgets/widget.interface";
+import type { ThemePresetName } from "../widgets/widget.interface";
 
 export type RenderPaintConstraint = "none" | "black-white";
 
@@ -15,10 +15,10 @@ export interface RenderPaintTokens {
     readonly secondaryText: string;
     readonly mutedText: string;
     readonly icon: string;
-    readonly linearTitleText: string;
-    readonly linearValueText: string;
-    readonly linearUnitText: string;
-    readonly linearSecondaryText: string;
+    readonly barTitleText: string;
+    readonly barValueText: string;
+    readonly barUnitText: string;
+    readonly barSecondaryText: string;
     readonly primaryMetric: ColorConfig;
     readonly track: string;
     readonly grid: string;
@@ -40,13 +40,13 @@ export type RenderBackgroundFill =
     };
 
 export interface MetricRenderAppearance {
-    readonly graphicType: "circular" | "text" | "linear" | "sparkline";
-    readonly circleStyle: ArcGaugeStyle;
-    readonly graphicStyle: GraphicThemePresetName;
+    readonly renderPrimitive: "circle" | "text" | "bar" | "sparkline";
+    readonly circleVariant: CircleVariant;
+    readonly themePreset: ThemePresetName;
     readonly paintConstraint: RenderPaintConstraint;
     readonly paints: RenderPaintTokens;
     readonly textStyles: RenderTextStyles;
-    readonly graphicEffects: RenderGraphicEffectTokens;
+    readonly themeEffects: RenderThemeEffectTokens;
     readonly lineSmoothingPercent: number;
     readonly gridLineVisibility: SparklineGridLineVisibility;
     readonly gridLineType: SparklineGridLineType;

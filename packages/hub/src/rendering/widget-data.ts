@@ -6,10 +6,10 @@ export interface WidgetData {
     label: string;                 // Examples: "CPU Usage", "GPU Temp".
     displayValue?: string;         // Optional preformatted value for compact metric-specific displays.
     secondaryDisplayValue?: string;
-    linearLabel?: string;
-    linearDisplayValue?: string;
-    linearUnit?: string;
-    linearChannels?: readonly LinearChannelWidgetData[];
+    barLabel?: string;
+    barDisplayValue?: string;
+    barUnit?: string;
+    barChannels?: readonly BarChannelWidgetData[];
     sparklineScale?: SparklineScale;
     sampleTimestampMilliseconds?: number;
 }
@@ -34,7 +34,7 @@ interface FixedSparklineScale {
     maximumValue: number;
 }
 
-interface LinearChannelWidgetData {
+interface BarChannelWidgetData {
     label: string;
     displayValue: string;
     unit: string;
@@ -44,7 +44,7 @@ interface LinearChannelWidgetData {
 }
 
 /**
- * Dual-channel data for mirrored traffic graphs (net, disk I/O).
+ * Dual-channel data for mirrored traffic charts (net, disk I/O).
  * Positive and negative identify chart channels, not fixed metric directions.
  */
 export interface DualChannelWidgetData {

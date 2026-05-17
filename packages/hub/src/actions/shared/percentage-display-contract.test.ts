@@ -76,11 +76,11 @@ test("percentage action display values are honored by line view rendering", () =
         visual: visualSettings,
         renderSize: { width: 144, height: 144 },
         centerIcon: "",
-        circleStyle: "value",
+        circleVariant: "full-ring",
     });
     const svg = renderMetricFrame({
         body,
-        graphicStyle: "flat",
+        themePreset: "flat",
         muted: false,
         paints: visualSettings.paints,
         size: { width: 144, height: 144 },

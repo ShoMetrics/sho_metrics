@@ -1,12 +1,12 @@
 import type { RenderPaintTokens } from "./render-appearance";
 import type { RenderTextStyles } from "./render-text-style";
-import type { RenderGraphicEffectTokens } from "./render-svg-effects";
+import type { RenderThemeEffectTokens } from "./render-svg-effects";
 import type { KeySize, WidgetData } from "./widget-data";
 import {
     arcGauge,
     DEFAULT_ARC_GAUGE_CONFIG,
     type ArcGaugeStatusIcon,
-    type ArcGaugeStyle,
+    type CircleVariant,
 } from "../widgets/primitives/arc-gauge";
 import {
     DEFAULT_TEXT_METRIC_CONFIG,
@@ -23,15 +23,15 @@ import {
     type SparklineGridLineVisibility,
 } from "../widgets/primitives/sparkline";
 
-type SingleMetricGraphicType = "circular" | "text" | "linear" | "sparkline";
+type SingleMetricRenderPrimitive = "circle" | "text" | "bar" | "sparkline";
 
 export interface SingleMetricBodyViewProps {
     data: WidgetData;
     visual: {
-        graphicType: SingleMetricGraphicType;
+        renderPrimitive: SingleMetricRenderPrimitive;
         paints: RenderPaintTokens;
         textStyles: RenderTextStyles;
-        graphicEffects: RenderGraphicEffectTokens;
+        themeEffects: RenderThemeEffectTokens;
         lineSmoothingPercent: number;
         gridLineVisibility: SparklineGridLineVisibility;
         gridLineType: SparklineGridLineType;
@@ -39,19 +39,19 @@ export interface SingleMetricBodyViewProps {
     renderSize: KeySize;
     centerIcon: string;
     footerIcon?: string;
-    linearIcon?: string;
+    topIcon?: string;
     statusIcon?: ArcGaugeStatusIcon;
-    circleStyle: ArcGaugeStyle;
+    circleVariant: CircleVariant;
 }
 
 export function renderSingleMetricBodyView(options: SingleMetricBodyViewProps): string {
-    switch (options.visual.graphicType) {
-        case "circular":
+    switch (options.visual.renderPrimitive) {
+        case "circle":
             return renderSingleCircularMetric(options);
         case "text":
             return renderSingleTextMetric(options);
-        case "linear":
-            return renderSingleLinearMetric(options);
+        case "bar":
+            return renderSingleBarMetric(options);
         case "sparkline":
             return renderSingleSparklineMetric(options);
     }
@@ -67,8 +67,8 @@ function renderSingleCircularMetric(options: SingleMetricBodyViewProps): string 
         unitTextColor: options.visual.paints.secondaryText,
         iconColor: options.visual.paints.icon,
         textStyles: options.visual.textStyles,
-        graphicEffects: options.visual.graphicEffects,
-        circleStyle: options.circleStyle,
+        themeEffects: options.visual.themeEffects,
+        circleVariant: options.circleVariant,
         centerIconFragment: options.centerIcon,
         footerIconFragment: options.footerIcon,
         statusIcon: options.statusIcon,
@@ -83,25 +83,25 @@ function renderSingleTextMetric(options: SingleMetricBodyViewProps): string {
         unitTextColor: options.visual.paints.secondaryText,
         secondaryTextColor: options.visual.paints.mutedText,
         textStyles: options.visual.textStyles,
-        graphicEffects: options.visual.graphicEffects,
+        themeEffects: options.visual.themeEffects,
     }, options.renderSize);
 }
 
-function renderSingleLinearMetric(options: SingleMetricBodyViewProps): string {
+function renderSingleBarMetric(options: SingleMetricBodyViewProps): string {
     return linearBar.render(options.data, {
         ...DEFAULT_LINEAR_BAR_CONFIG,
         colorConfig: options.visual.paints.primaryMetric,
         paints: {
-            primaryText: options.visual.paints.linearValueText,
-            secondaryText: options.visual.paints.linearTitleText,
-            supportingText: options.visual.paints.linearUnitText,
-            mutedText: options.visual.paints.linearSecondaryText,
+            primaryText: options.visual.paints.barValueText,
+            secondaryText: options.visual.paints.barTitleText,
+            supportingText: options.visual.paints.barUnitText,
+            mutedText: options.visual.paints.barSecondaryText,
             icon: options.visual.paints.icon,
             track: options.visual.paints.track,
         },
         textStyles: options.visual.textStyles,
-        graphicEffects: options.visual.graphicEffects,
-        topIconFragment: options.linearIcon ?? options.centerIcon,
+        themeEffects: options.visual.themeEffects,
+        topIconFragment: options.topIcon ?? options.centerIcon,
     }, options.renderSize);
 }
 
@@ -124,7 +124,7 @@ function renderSingleSparklineMetric(options: SingleMetricBodyViewProps): string
             baseline: options.visual.paints.grid,
         },
         textStyles: options.visual.textStyles,
-        graphicEffects: options.visual.graphicEffects,
-        topIconFragment: options.linearIcon ?? options.centerIcon,
+        themeEffects: options.visual.themeEffects,
+        topIconFragment: options.topIcon ?? options.centerIcon,
     }, options.renderSize);
 }

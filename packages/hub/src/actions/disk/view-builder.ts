@@ -27,7 +27,6 @@ import {
 } from "./volume-selection";
 import type { MetricDisplayOptions } from "../../metric-view-runner/runner";
 import { buildColorConfigFromAppearance, resolveSolidMetricColorMode } from "../../settings/render-paint-resolver";
-import { resolveArcGaugeStyle } from "../../settings/render-appearance-builder";
 import { resolveRenderTextStyles } from "../../settings/render-text-style-resolver";
 
 interface BuildDiskDisplayOptions {
@@ -94,8 +93,8 @@ function buildDiskUsageDisplayOptions(
     );
     const appearance = options.settings.widget.slot.appearance;
     const selectedView = appearance.view.selectedView;
-    const arcGaugeStyle = resolveArcGaugeStyle(appearance.view.circleVariant);
-    const shouldRenderGauge = selectedView === "circle" && arcGaugeStyle === "gauge";
+    const circleVariant = appearance.view.circleVariant;
+    const shouldRenderGauge = selectedView === "circle" && circleVariant === "gauge";
 
     return {
         event: options.event,
@@ -114,9 +113,9 @@ function buildDiskUsageDisplayOptions(
             resolveRenderTextStyles(appearance).label.fontFamily,
         ),
         footerIconFragment: shouldRenderGauge ? undefined : buildDiskGaugeFooterIconFragment(selectedVolume),
-        linearIconFragment: getDiskIconFragment(selectedVolume?.storageKind ?? "unknown"),
+        topIconFragment: getDiskIconFragment(selectedVolume?.storageKind ?? "unknown"),
         statusIcon: getMetricStatusIcon("percentage"),
-        circleStyleOverride: arcGaugeStyle,
+        circleVariantOverride: circleVariant,
     };
 }
 
@@ -152,8 +151,8 @@ function buildDiskThroughputDisplayOptions(
         throughputLabel,
         "B/s",
     );
-    const arcGaugeStyle = resolveArcGaugeStyle(appearance.view.circleVariant);
-    const shouldRenderGaugeFooter = selectedView === "circle" && arcGaugeStyle === "gauge";
+    const circleVariant = appearance.view.circleVariant;
+    const shouldRenderGaugeFooter = selectedView === "circle" && circleVariant === "gauge";
 
     return {
         event: options.event,
@@ -173,7 +172,7 @@ function buildDiskThroughputDisplayOptions(
             ? buildDiskThroughputFooterIconFragment(singleThroughputDirection)
             : undefined,
         statusIcon: getMetricStatusIcon("percentage"),
-        circleStyleOverride: arcGaugeStyle,
+        circleVariantOverride: circleVariant,
         appearanceOverride: {
             paint: {
                 metric: {
@@ -196,11 +195,11 @@ function buildDualThroughputDisplayOptions(
     const writeMetricKey = getDiskThroughputMetricKey("write");
     const appearance = options.settings.widget.slot.appearance;
     const selectedView = appearance.view.selectedView;
-    let dualGraphicType: "circular" | "text" | undefined;
+    let dualRenderPrimitive: "circle" | "text" | undefined;
     if (selectedView === "circle") {
-        dualGraphicType = "circular";
+        dualRenderPrimitive = "circle";
     } else if (selectedView === "text") {
-        dualGraphicType = "text";
+        dualRenderPrimitive = "text";
     }
     const selectedVolume = resolveAvailableDiskVolume(options.volumeSelection);
     const readWidgetData = buildDiskThroughputWidgetData({
@@ -231,7 +230,7 @@ function buildDualThroughputDisplayOptions(
         event: options.event,
         resolvedSettings: appearance,
         metricKey: `${readMetricKey},${writeMetricKey}`,
-        dualGraphicType,
+        dualRenderPrimitive,
         widgetData: {
             positive: readWidgetData,
             negative: writeWidgetData,
@@ -239,8 +238,8 @@ function buildDualThroughputDisplayOptions(
         titleText: "DISK",
         centerIconFragment: getDiskIconFragment("unknown"),
         statusIcon: getMetricStatusIcon("percentage"),
-        circleStyleOverride: dualGraphicType === "circular"
-            ? resolveArcGaugeStyle(appearance.view.circleVariant)
+        circleVariantOverride: dualRenderPrimitive === "circle"
+            ? appearance.view.circleVariant
             : undefined,
         positiveColor: readColor,
         negativeColor: writeColor,

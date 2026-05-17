@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-    DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS,
-    TERMINAL_CLEAN_RENDER_GRAPHIC_EFFECT_TOKENS,
-    TERMINAL_VINTAGE_RENDER_GRAPHIC_EFFECT_TOKENS,
+    DEFAULT_RENDER_THEME_EFFECT_TOKENS,
+    TERMINAL_CLEAN_RENDER_THEME_EFFECT_TOKENS,
+    TERMINAL_VINTAGE_RENDER_THEME_EFFECT_TOKENS,
 } from "../rendering/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
@@ -18,19 +18,19 @@ test("metric view maps resolved appearance settings to renderer branch values", 
     const barSettings = buildMetricRenderAppearance(buildAppearanceSettings({ view: { selectedView: "bar" } }));
     const lineSettings = buildMetricRenderAppearance(buildAppearanceSettings({ view: { selectedView: "line" } }));
 
-    assert.equal(circleSettings.graphicType, "circular");
-    assert.equal(barSettings.graphicType, "linear");
-    assert.equal(lineSettings.graphicType, "sparkline");
+    assert.equal(circleSettings.renderPrimitive, "circle");
+    assert.equal(barSettings.renderPrimitive, "bar");
+    assert.equal(lineSettings.renderPrimitive, "sparkline");
 });
 
-test("circle variant maps resolved appearance settings to arc gauge style values", () => {
-    const compactSettings = buildMetricRenderAppearance(buildAppearanceSettings({ view: { circleVariant: "minimal" } }));
+test("circle variant maps resolved appearance settings to renderer circle variants", () => {
+    const minimalSettings = buildMetricRenderAppearance(buildAppearanceSettings({ view: { circleVariant: "minimal" } }));
     const gaugeSettings = buildMetricRenderAppearance(buildAppearanceSettings({ view: { circleVariant: "gauge" } }));
-    const valueSettings = buildMetricRenderAppearance(buildAppearanceSettings({ view: { circleVariant: "full-ring" } }));
+    const fullRingSettings = buildMetricRenderAppearance(buildAppearanceSettings({ view: { circleVariant: "full-ring" } }));
 
-    assert.equal(compactSettings.circleStyle, "compact");
-    assert.equal(gaugeSettings.circleStyle, "gauge");
-    assert.equal(valueSettings.circleStyle, "value");
+    assert.equal(minimalSettings.circleVariant, "minimal");
+    assert.equal(gaugeSettings.circleVariant, "gauge");
+    assert.equal(fullRingSettings.circleVariant, "full-ring");
 });
 
 test("theme maps resolved appearance settings to renderer theme presets", () => {
@@ -48,11 +48,11 @@ test("theme maps resolved appearance settings to renderer theme presets", () => 
     }));
     const defaultSettings = buildMetricRenderAppearance(buildAppearanceSettings());
 
-    assert.equal(cupertinoGlassSettings.graphicStyle, "cupertino-glass");
-    assert.equal(colorFilledSettings.graphicStyle, "color-filled");
-    assert.equal(terminalCleanSettings.graphicStyle, "terminal-clean");
-    assert.equal(terminalVintageSettings.graphicStyle, "terminal-vintage");
-    assert.equal(defaultSettings.graphicStyle, "flat");
+    assert.equal(cupertinoGlassSettings.themePreset, "cupertino-glass");
+    assert.equal(colorFilledSettings.themePreset, "color-filled");
+    assert.equal(terminalCleanSettings.themePreset, "terminal-clean");
+    assert.equal(terminalVintageSettings.themePreset, "terminal-vintage");
+    assert.equal(defaultSettings.themePreset, "flat");
 });
 
 test("text styles map resolved appearance settings to renderer text roles", () => {
@@ -69,7 +69,7 @@ test("text styles map resolved appearance settings to renderer text roles", () =
     assert.deepEqual(terminalVintageSettings.textStyles, TERMINAL_VINTAGE_RENDER_TEXT_STYLES);
 });
 
-test("graphic effects map resolved appearance settings to renderer effect tokens", () => {
+test("theme effects map resolved appearance settings to renderer effect tokens", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings());
     const terminalCleanSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         theme: { selectedTheme: "terminal" },
@@ -78,9 +78,9 @@ test("graphic effects map resolved appearance settings to renderer effect tokens
         theme: { selectedTheme: "terminal", terminal: { variant: "vintage" } },
     }));
 
-    assert.deepEqual(visualSettings.graphicEffects, DEFAULT_RENDER_GRAPHIC_EFFECT_TOKENS);
-    assert.deepEqual(terminalCleanSettings.graphicEffects, TERMINAL_CLEAN_RENDER_GRAPHIC_EFFECT_TOKENS);
-    assert.deepEqual(terminalVintageSettings.graphicEffects, TERMINAL_VINTAGE_RENDER_GRAPHIC_EFFECT_TOKENS);
+    assert.deepEqual(visualSettings.themeEffects, DEFAULT_RENDER_THEME_EFFECT_TOKENS);
+    assert.deepEqual(terminalCleanSettings.themeEffects, TERMINAL_CLEAN_RENDER_THEME_EFFECT_TOKENS);
+    assert.deepEqual(terminalVintageSettings.themeEffects, TERMINAL_VINTAGE_RENDER_THEME_EFFECT_TOKENS);
 });
 
 test("solid color mode uses resolved appearance color", () => {
