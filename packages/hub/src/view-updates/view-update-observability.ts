@@ -9,7 +9,7 @@ import {
 } from "./performance-stats";
 import type { MetricViewUpdatePriority } from "./update-queue";
 
-const log = logger.for("MetricViewRunner");
+const log = logger.for("MetricViewUpdateRunner");
 const metricViewPerformanceStats = new MetricViewPerformanceStats();
 
 function resolveMetricViewPerformanceActionKind(event: WillAppearEvent): MetricViewPerformanceActionKind {
