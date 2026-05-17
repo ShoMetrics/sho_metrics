@@ -7,11 +7,11 @@ import {
     formatSvgNumber,
     resolveGaugeMarkerRenderProgress,
     renderGaugeRangeLaneSegments,
-    type ArcGaugeGeometry,
+    type ProgressCircleGeometry,
     type GaugeRangeColorPlan,
     type GaugeMarkerDot,
     type GaugeRangeLaneGeometry,
-} from "./arc-gauge-range";
+} from "./progress-circle-range";
 
 export interface DualGaugeRingGeometry {
     centerXCoordinate: number;
@@ -127,19 +127,19 @@ function renderGaugeLaneArc(options: {
     strokeWidth: number;
 }): string {
     return renderGaugeRangeLaneSegments({
-        geometry: toArcGaugeGeometry(options.geometry),
+        geometry: toProgressCircleGeometry(options.geometry),
         laneGeometry: options.gaugeLane.laneGeometry,
         markerDot: options.gaugeLane.markerDot,
         rangeColorPlan: options.gaugeLane.colorPlan,
         strokeWidth: options.strokeWidth,
-        segmentClassName: `dual-arc-gauge-${options.gaugeLane.channel.channelId}-segment`,
-        capClassName: `dual-arc-gauge-${options.gaugeLane.channel.channelId}-cap`,
+        segmentClassName: `dual-progress-circle-${options.gaugeLane.channel.channelId}-segment`,
+        capClassName: `dual-progress-circle-${options.gaugeLane.channel.channelId}-cap`,
         gradientIdentifierPrefix: `dual-arc-${options.gaugeLane.channel.channelId}-range`,
     });
 }
 
 function renderGaugeMarkerDot(channelId: DualGaugeChannelModel["channelId"], markerDot: GaugeMarkerDot): string {
-    return `<circle class="dual-arc-gauge-${channelId}-marker"
+    return `<circle class="dual-progress-circle-${channelId}-marker"
         cx="${formatSvgNumber(markerDot.xCoordinate)}"
         cy="${formatSvgNumber(markerDot.yCoordinate)}"
         r="${formatSvgNumber(markerDot.radius)}"
@@ -160,7 +160,7 @@ function resolvePointOnCircle(options: {
     };
 }
 
-function toArcGaugeGeometry(geometry: DualGaugeRingGeometry): ArcGaugeGeometry {
+function toProgressCircleGeometry(geometry: DualGaugeRingGeometry): ProgressCircleGeometry {
     return {
         centerXCoordinate: geometry.centerXCoordinate,
         centerYCoordinate: geometry.centerYCoordinate,

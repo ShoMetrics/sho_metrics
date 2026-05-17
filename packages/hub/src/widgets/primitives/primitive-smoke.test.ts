@@ -3,9 +3,9 @@ import test from "node:test";
 import { DEFAULT_RENDER_THEME_EFFECT_TOKENS } from "../../view-rendering/render-svg-effects";
 import { DEFAULT_RENDER_TEXT_STYLES } from "../../view-rendering/render-text-style";
 import type { DualChannelWidgetData, WidgetData } from "../../view-rendering/widget-data";
-import { arcGauge, DEFAULT_ARC_GAUGE_CONFIG } from "./arc-gauge";
-import { buildGaugeRangeColorPlan, resolveGaugeMarkerGap, resolveGaugeMarkerRenderProgress } from "./arc-gauge-range";
-import { DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG, renderDualChannelArcGauge } from "./dual-channel-arc-gauge";
+import { progressCircle, DEFAULT_PROGRESS_CIRCLE_CONFIG } from "./progress-circle";
+import { buildGaugeRangeColorPlan, resolveGaugeMarkerGap, resolveGaugeMarkerRenderProgress } from "./progress-circle-range";
+import { DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG, renderDualChannelProgressCircle } from "./dual-channel-progress-circle";
 import { progressBar, DEFAULT_PROGRESS_BAR_CONFIG } from "./progress-bar";
 import { renderMetricTextRow } from "./metric-text-row";
 import { DEFAULT_MIRRORED_TRAFFIC_CONFIG, renderMirroredTraffic } from "./mirrored-traffic";
@@ -13,14 +13,14 @@ import { DEFAULT_TEXT_METRIC_CONFIG, renderDualTextMetric, textMetric } from "./
 
 const keySize = { width: 144, height: 144 };
 
-test("arc gauge clamps progress and escapes center text", () => {
-    const svgFragment = arcGauge.render({
+test("progress circle clamps progress and escapes center text", () => {
+    const svgFragment = progressCircle.render({
         ...buildWidgetData(),
         label: "CPU",
         displayValue: `<42>`,
         unit: `% & C`,
         progress: 1.5,
-    }, DEFAULT_ARC_GAUGE_CONFIG, keySize);
+    }, DEFAULT_PROGRESS_CIRCLE_CONFIG, keySize);
 
     assert.match(svgFragment, /Arc Gauge: track/);
     assert.match(svgFragment, /Arc Gauge: progress arc/);
@@ -60,31 +60,31 @@ test("text metric renders a pure text layout without a ring", () => {
 });
 
 test("gauge circle variant opens the bottom arc and renders a marker dot", () => {
-    const svgFragment = arcGauge.render(buildWidgetData(), {
-        ...DEFAULT_ARC_GAUGE_CONFIG,
+    const svgFragment = progressCircle.render(buildWidgetData(), {
+        ...DEFAULT_PROGRESS_CIRCLE_CONFIG,
         circleVariant: "gauge",
         centerIconFragment: "<path />",
     }, keySize);
 
-    assert.match(svgFragment, /arc-gauge-marker/);
-    assert.match(svgFragment, /arc-gauge-range-segment/);
-    assert.doesNotMatch(svgFragment, /mask id="arc-gauge-marker-gap-/);
+    assert.match(svgFragment, /progress-circle-marker/);
+    assert.match(svgFragment, /progress-circle-range-segment/);
+    assert.doesNotMatch(svgFragment, /mask id="progress-circle-marker-gap-/);
     assert.doesNotMatch(svgFragment, /fill="black"/);
-    assert.doesNotMatch(svgFragment, /class="arc-gauge-marker"[^>]+stroke=/);
+    assert.doesNotMatch(svgFragment, /class="progress-circle-marker"[^>]+stroke=/);
     assert.doesNotMatch(svgFragment, /stroke-dasharray="284\.[0-9]+ 89\.[0-9]+"/);
 });
 
 test("gauge circle variant puts the label and direction icon at the bottom", () => {
-    const svgFragment = arcGauge.render({
+    const svgFragment = progressCircle.render({
         ...buildWidgetData(),
         label: "NET",
     }, {
-        ...DEFAULT_ARC_GAUGE_CONFIG,
+        ...DEFAULT_PROGRESS_CIRCLE_CONFIG,
         circleVariant: "gauge",
         footerIconFragment: "<path id=\"direction-icon\" />",
     }, keySize);
 
-    assert.match(svgFragment, /arc-gauge-bottom-label/);
+    assert.match(svgFragment, /progress-circle-bottom-label/);
     assert.match(svgFragment, /NET/);
     assert.match(svgFragment, /direction-icon/);
     assert.doesNotMatch(svgFragment, /id="arc-label"/);
@@ -99,8 +99,8 @@ test("gauge circle variant keeps value and unit in fixed regions", () => {
     const shortUnitTripleDigitFragment = renderGaugeValueSample("301", "W");
     const longUnitManyDigitFragment = renderGaugeValueSample("1234", "ms");
 
-    assert.match(singleDigitFragment, /id="arc-gauge-value"/);
-    assert.match(singleDigitFragment, /id="arc-gauge-unit"/);
+    assert.match(singleDigitFragment, /id="progress-circle-value"/);
+    assert.match(singleDigitFragment, /id="progress-circle-unit"/);
     assert.match(singleDigitFragment, /x="74"/);
     assert.match(singleDigitFragment, /x="85"/);
     assert.match(singleDigitFragment, /font-size="43"/);
@@ -125,7 +125,7 @@ test("gauge circle variant keeps value and unit in fixed regions", () => {
     assert.match(longUnitManyDigitFragment, /x="74"/);
     assert.match(longUnitManyDigitFragment, /x="85"/);
     assert.match(longUnitManyDigitFragment, /font-size="21"/);
-    assert.doesNotMatch(singleDigitFragment, /arc-gauge-value-unit/);
+    assert.doesNotMatch(singleDigitFragment, /progress-circle-value-unit/);
     assert.doesNotMatch(singleDigitFragment, /textLength=/);
     assert.doesNotMatch(doubleDigitFragment, /textLength=/);
     assert.doesNotMatch(tripleDigitFragment, /textLength=/);
@@ -135,12 +135,12 @@ test("gauge circle variant keeps value and unit in fixed regions", () => {
 });
 
 test("gauge circle variant uses semantic range bands for range colors", () => {
-    const svgFragment = arcGauge.render({
+    const svgFragment = progressCircle.render({
         ...buildWidgetData(),
         current: 50,
         progress: 0.5,
     }, {
-        ...DEFAULT_ARC_GAUGE_CONFIG,
+        ...DEFAULT_PROGRESS_CIRCLE_CONFIG,
         circleVariant: "gauge",
         colorConfig: {
             mode: "threshold",
@@ -154,12 +154,12 @@ test("gauge circle variant uses semantic range bands for range colors", () => {
         },
     }, keySize);
 
-    assert.equal((svgFragment.match(/class="arc-gauge-range-segment"/g)?.length ?? 0) > 2, true);
+    assert.equal((svgFragment.match(/class="progress-circle-range-segment"/g)?.length ?? 0) > 2, true);
     assert.match(svgFragment, /fill="#00ff00"/);
     assert.match(svgFragment, /fill="#ffff00"/);
     assert.match(svgFragment, /fill="#ff0000"/);
-    assert.match(svgFragment, /fill="url\(#arc-gauge-range-/);
-    assert.match(svgFragment, /class="arc-gauge-marker"[^>]+fill="#ffff00"/);
+    assert.match(svgFragment, /fill="url\(#progress-circle-range-/);
+    assert.match(svgFragment, /class="progress-circle-marker"[^>]+fill="#ffff00"/);
 });
 
 test("gauge circle variant moves blend ranges with custom range thresholds", () => {
@@ -168,7 +168,7 @@ test("gauge circle variant moves blend ranges with custom range thresholds", () 
         baseColor: "#000000",
         progress: 0.6,
         gradientHeadAdjustmentPercent: -42,
-        gaugeRangeBlendProgress: DEFAULT_ARC_GAUGE_CONFIG.gaugeRangeBlendProgress,
+        gaugeRangeBlendProgress: DEFAULT_PROGRESS_CIRCLE_CONFIG.gaugeRangeBlendProgress,
         colorConfig: {
             mode: "threshold",
             solidColor: "#000000",
@@ -195,18 +195,18 @@ test("gauge circle variant moves blend ranges with custom range thresholds", () 
 });
 
 test("gauge circle variant keeps the range track uncolored while data is unavailable", () => {
-    const svgFragment = arcGauge.render({
+    const svgFragment = progressCircle.render({
         ...buildWidgetData(),
         displayValue: "N/A",
         progress: 0,
     }, {
-        ...DEFAULT_ARC_GAUGE_CONFIG,
+        ...DEFAULT_PROGRESS_CIRCLE_CONFIG,
         circleVariant: "gauge",
         centerIconFragment: "<path />",
     }, keySize);
 
-    assert.doesNotMatch(svgFragment, /arc-gauge-marker/);
-    assert.doesNotMatch(svgFragment, /arc-gauge-range-segment/);
+    assert.doesNotMatch(svgFragment, /progress-circle-marker/);
+    assert.doesNotMatch(svgFragment, /progress-circle-range-segment/);
     assert.match(svgFragment, /stroke-dasharray="/);
 });
 
@@ -286,7 +286,7 @@ test("gauge marker gap only cuts the marker travel domain for non-endpoint value
 });
 
 test("dual-channel gauge variant renders two full-color gauge lanes with marker dots", () => {
-    const svgFragment = renderDualChannelArcGauge({
+    const svgFragment = renderDualChannelProgressCircle({
         positive: {
             ...buildWidgetData(),
             current: 0,
@@ -302,7 +302,7 @@ test("dual-channel gauge variant renders two full-color gauge lanes with marker 
             unit: "KB/s",
         },
     }, {
-        ...DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG,
+        ...DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG,
         circleVariant: "gauge",
         titleText: "NETWORK",
         positiveColor: "#ef4444",
@@ -333,27 +333,27 @@ test("dual-channel gauge variant renders two full-color gauge lanes with marker 
 
     assert.match(svgFragment, /dual-arc-positive-range-/);
     assert.match(svgFragment, /dual-arc-negative-range-/);
-    assert.match(svgFragment, /class="dual-arc-gauge-positive-segment"/);
-    assert.match(svgFragment, /class="dual-arc-gauge-negative-segment"/);
-    assert.match(svgFragment, /class="dual-arc-gauge-positive-marker"/);
-    assert.match(svgFragment, /class="dual-arc-gauge-negative-marker"/);
+    assert.match(svgFragment, /class="dual-progress-circle-positive-segment"/);
+    assert.match(svgFragment, /class="dual-progress-circle-negative-segment"/);
+    assert.match(svgFragment, /class="dual-progress-circle-positive-marker"/);
+    assert.match(svgFragment, /class="dual-progress-circle-negative-marker"/);
     assert.match(svgFragment, /#44ff44/);
     assert.match(svgFragment, /#ff8800/);
     assert.match(svgFragment, /#00aaff/);
     assert.match(svgFragment, /upload-icon/);
     assert.match(svgFragment, /download-icon/);
-    assert.match(svgFragment, /dual-arc-gauge-positive-row-value/);
-    assert.match(svgFragment, /dual-arc-gauge-negative-row-value/);
+    assert.match(svgFragment, /dual-progress-circle-positive-row-value/);
+    assert.match(svgFragment, /dual-progress-circle-negative-row-value/);
     assert.match(svgFragment, /x="76\.76"[\s\S]*>0<\/text>/);
     assert.match(svgFragment, /font-size="12"[\s\S]*>KB\/s<\/text>/);
-    assert.match(svgFragment, /dual-arc-gauge-bottom-label/);
+    assert.match(svgFragment, /dual-progress-circle-bottom-label/);
     assert.match(svgFragment, /NET/);
     assert.doesNotMatch(svgFragment, /NETWORK/);
     assert.doesNotMatch(svgFragment, /stroke="rgba\(255,255,255,0\.14\)"/);
 });
 
 test("dual-channel gauge variant keeps long row values out of icon space", () => {
-    const svgFragment = renderDualChannelArcGauge({
+    const svgFragment = renderDualChannelProgressCircle({
         positive: {
             ...buildWidgetData(),
             current: 34,
@@ -369,21 +369,21 @@ test("dual-channel gauge variant keeps long row values out of icon space", () =>
             unit: "KB/s",
         },
     }, {
-        ...DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG,
+        ...DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG,
         circleVariant: "gauge",
         titleText: "NETWORK",
         positiveIconFragment: "<path id=\"upload-icon\" />",
         negativeIconFragment: "<path id=\"download-icon\" />",
     }, keySize);
 
-    assert.match(svgFragment, /id="dual-arc-gauge-negative-row-value"/);
+    assert.match(svgFragment, /id="dual-progress-circle-negative-row-value"/);
     assert.match(svgFragment, /font-size="13\.50"[^>]*>328<\/text>/);
-    assert.match(svgFragment, /id="dual-arc-gauge-negative-row-unit"/);
+    assert.match(svgFragment, /id="dual-progress-circle-negative-row-unit"/);
     assert.match(svgFragment, /download-icon/);
 });
 
 test("dual-channel gauge variant uses a safe single-row placeholder for unavailable values", () => {
-    const svgFragment = renderDualChannelArcGauge({
+    const svgFragment = renderDualChannelProgressCircle({
         positive: {
             ...buildWidgetData(),
             displayValue: "N/A",
@@ -395,18 +395,18 @@ test("dual-channel gauge variant uses a safe single-row placeholder for unavaila
             unit: "KB/s",
         },
     }, {
-        ...DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG,
+        ...DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG,
         circleVariant: "gauge",
         titleText: "NETWORK",
         positiveIconFragment: "<path id=\"upload-icon\" />",
         negativeIconFragment: "<path id=\"download-icon\" />",
     }, keySize);
 
-    assert.match(svgFragment, /id="dual-arc-gauge-positive-row-value"/);
-    assert.match(svgFragment, /id="dual-arc-gauge-negative-row-value"/);
+    assert.match(svgFragment, /id="dual-progress-circle-positive-row-value"/);
+    assert.match(svgFragment, /id="dual-progress-circle-negative-row-value"/);
     assert.match(svgFragment, /text-anchor="start"/);
-    assert.doesNotMatch(svgFragment, /dual-arc-gauge-positive-row-unit/);
-    assert.doesNotMatch(svgFragment, /dual-arc-gauge-negative-row-unit/);
+    assert.doesNotMatch(svgFragment, /dual-progress-circle-positive-row-unit/);
+    assert.doesNotMatch(svgFragment, /dual-progress-circle-negative-row-unit/);
 });
 
 test("progress bar renders at most two channel bars", () => {
@@ -545,12 +545,12 @@ function buildWidgetData(): WidgetData {
 }
 
 function renderGaugeValueSample(displayValue: string, unit: string): string {
-    return arcGauge.render({
+    return progressCircle.render({
         ...buildWidgetData(),
         displayValue,
         unit,
     }, {
-        ...DEFAULT_ARC_GAUGE_CONFIG,
+        ...DEFAULT_PROGRESS_CIRCLE_CONFIG,
         circleVariant: "gauge",
     }, keySize);
 }

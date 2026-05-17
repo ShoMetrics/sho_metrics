@@ -3,7 +3,7 @@ import { MetricAction } from "./metric-action";
 import { setMetricView } from "../view-updates/runner";
 import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-format";
 import { buildMetricViewIcons } from "../widgets/icons/metric-view-icons";
-import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
+import { PROGRESS_CIRCLE_LABELS } from "../widgets/primitives/progress-circle-label";
 import type { WidgetData } from "../view-rendering/widget-data";
 import { CPU_MODEL_METRIC_KEY, CPU_USAGE_METRIC_KEY } from "../runtime/metric-keys";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
@@ -25,7 +25,7 @@ export class Cpu extends MetricAction {
 
         const widgetData = metrics.getWidgetData(
             CPU_USAGE_METRIC_KEY,
-            ARC_GAUGE_LABELS.cpu,
+            PROGRESS_CIRCLE_LABELS.cpu,
             "%",
             100,
         );

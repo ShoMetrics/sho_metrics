@@ -19,13 +19,13 @@ import {
 } from "../settings/appearance-overrides";
 import { buildMetricRenderAppearance } from "../settings/render-appearance-builder";
 import type { ResolvedAppearanceSettings } from "../settings/resolved-settings";
-import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
+import type { ProgressCircleStatusIcon } from "../widgets/primitives/progress-circle";
 
 interface BaseMetricRenderOptions {
     centerIconFragment: string;
     footerIconFragment?: string;
     topIconFragment?: string;
-    statusIcon: ArcGaugeStatusIcon;
+    statusIcon: ProgressCircleStatusIcon;
     circleVariantOverride?: MetricRenderAppearance["circleVariant"];
     appearanceOverride?: ResolvedAppearanceSettingsOverride;
     resolvedSettings: ResolvedAppearanceSettings;
@@ -46,8 +46,8 @@ export interface DualMetricRenderOptions extends BaseMetricRenderOptions {
     negativeColorConfig?: ColorConfig;
     positiveIconFragment?: string;
     negativeIconFragment?: string;
-    positiveStatusIcon?: ArcGaugeStatusIcon;
-    negativeStatusIcon?: ArcGaugeStatusIcon;
+    positiveStatusIcon?: ProgressCircleStatusIcon;
+    negativeStatusIcon?: ProgressCircleStatusIcon;
 }
 
 export type MetricRenderOptions = SingleMetricRenderOptions | DualMetricRenderOptions;

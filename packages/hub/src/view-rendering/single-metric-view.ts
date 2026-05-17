@@ -3,11 +3,11 @@ import type { RenderTextStyles } from "./render-text-style";
 import type { RenderThemeEffectTokens } from "./render-svg-effects";
 import type { KeySize, WidgetData } from "./widget-data";
 import {
-    arcGauge,
-    DEFAULT_ARC_GAUGE_CONFIG,
-    type ArcGaugeStatusIcon,
+    progressCircle,
+    DEFAULT_PROGRESS_CIRCLE_CONFIG,
+    type ProgressCircleStatusIcon,
     type CircleVariant,
-} from "../widgets/primitives/arc-gauge";
+} from "../widgets/primitives/progress-circle";
 import {
     DEFAULT_TEXT_METRIC_CONFIG,
     textMetric,
@@ -40,7 +40,7 @@ export interface SingleMetricBodyViewProps {
     centerIcon: string;
     footerIcon?: string;
     topIcon?: string;
-    statusIcon?: ArcGaugeStatusIcon;
+    statusIcon?: ProgressCircleStatusIcon;
     circleVariant: CircleVariant;
 }
 
@@ -58,8 +58,8 @@ export function renderSingleMetricBodyView(options: SingleMetricBodyViewProps): 
 }
 
 function renderSingleCircularMetric(options: SingleMetricBodyViewProps): string {
-    return arcGauge.render(options.data, {
-        ...DEFAULT_ARC_GAUGE_CONFIG,
+    return progressCircle.render(options.data, {
+        ...DEFAULT_PROGRESS_CIRCLE_CONFIG,
         colorConfig: options.visual.paints.primaryMetric,
         trackColor: options.visual.paints.track,
         labelTextColor: options.visual.paints.secondaryText,

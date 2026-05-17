@@ -4,9 +4,9 @@ import {
     clamp,
 } from "../../view-rendering/svg-utils";
 import { interpolateHexColor } from "../../shared/color-utils";
-import type { CircleVariant } from "./arc-gauge";
+import type { CircleVariant } from "./progress-circle";
 
-export interface ArcGaugeGeometry {
+export interface ProgressCircleGeometry {
     centerXCoordinate: number;
     centerYCoordinate: number;
     radius: number;
@@ -143,7 +143,7 @@ export function renderGradientStop(stop: GaugeRangeGradientStop): string {
 }
 
 export function resolveGaugeMarkerDot(options: {
-    geometry: ArcGaugeGeometry;
+    geometry: ProgressCircleGeometry;
     notchGeometry: RingNotchGeometry;
     progress: number;
     fill: string;
@@ -174,7 +174,7 @@ export function resolveGaugeMarkerDot(options: {
 }
 
 export function renderGaugeRangeArcSegments(options: {
-    geometry: ArcGaugeGeometry;
+    geometry: ProgressCircleGeometry;
     notchGeometry: RingNotchGeometry;
     markerDot: GaugeMarkerDot | null;
     rangeColorPlan: GaugeRangeColorPlan;
@@ -190,14 +190,14 @@ export function renderGaugeRangeArcSegments(options: {
         markerDot: options.markerDot,
         rangeColorPlan: options.rangeColorPlan,
         strokeWidth: options.strokeWidth,
-        segmentClassName: "arc-gauge-range-segment",
-        capClassName: "arc-gauge-range-cap",
-        gradientIdentifierPrefix: "arc-gauge-range",
+        segmentClassName: "progress-circle-range-segment",
+        capClassName: "progress-circle-range-cap",
+        gradientIdentifierPrefix: "progress-circle-range",
     });
 }
 
 export function renderGaugeRangeLaneSegments(options: {
-    geometry: ArcGaugeGeometry;
+    geometry: ProgressCircleGeometry;
     laneGeometry: GaugeRangeLaneGeometry;
     markerDot: GaugeMarkerDot | null;
     rangeColorPlan: GaugeRangeColorPlan;
@@ -240,7 +240,7 @@ export function renderGaugeRangeLaneSegments(options: {
 }
 
 export function renderGaugeMarkerDot(markerDot: GaugeMarkerDot): string {
-    return `<circle class="arc-gauge-marker" cx="${formatSvgNumber(markerDot.xCoordinate)}"
+    return `<circle class="progress-circle-marker" cx="${formatSvgNumber(markerDot.xCoordinate)}"
         cy="${formatSvgNumber(markerDot.yCoordinate)}" r="${formatSvgNumber(markerDot.radius)}"
         fill="${markerDot.fill}" />`;
 }
@@ -589,7 +589,7 @@ function resolveGaugeMarkerHalfGapProgress(options: {
 }
 
 function renderGaugeRangeArcSegment(options: {
-    geometry: ArcGaugeGeometry;
+    geometry: ProgressCircleGeometry;
     laneGeometry: GaugeRangeLaneGeometry;
     segment: GaugeRangePaintSegment;
     gradientIdentifier: string;
@@ -642,7 +642,7 @@ function renderGaugeRangeArcSegment(options: {
 }
 
 function renderAnnularArcPath(options: {
-    geometry: ArcGaugeGeometry;
+    geometry: ProgressCircleGeometry;
     startAngleDegrees: number;
     endAngleDegrees: number;
     largeArcFlag: number;
@@ -687,7 +687,7 @@ function renderAnnularArcPath(options: {
 }
 
 function renderGaugeRangeCap(options: {
-    geometry: ArcGaugeGeometry;
+    geometry: ProgressCircleGeometry;
     laneGeometry: GaugeRangeLaneGeometry;
     progress: number;
     color: string;
@@ -725,7 +725,7 @@ function resolveGaugeRangeSegmentColor(segment: GaugeRangePaintSegment, progress
 }
 
 function resolvePointOnCircle(options: {
-    geometry: ArcGaugeGeometry;
+    geometry: ProgressCircleGeometry;
     angleDegrees: number;
     radialOffset: number;
 }): { xCoordinate: number; yCoordinate: number } {

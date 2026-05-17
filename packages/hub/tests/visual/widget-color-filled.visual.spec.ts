@@ -1,9 +1,9 @@
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { Resvg } from "@resvg/resvg-js";
-import { renderMetricFrame } from "../../src/rendering/metric-frame";
-import { renderSingleMetricBodyView } from "../../src/rendering/single-metric-view";
-import { WIDGET_LOGICAL_SIZE, type KeySize, type WidgetData } from "../../src/rendering/widget-data";
+import { renderMetricFrame } from "../../src/view-rendering/metric-frame";
+import { renderSingleMetricBodyView } from "../../src/view-rendering/single-metric-view";
+import { WIDGET_LOGICAL_SIZE, type KeySize, type WidgetData } from "../../src/view-rendering/widget-data";
 import type { ResolvedAppearanceSettingsOverride } from "../../src/settings/appearance-overrides";
 import { buildDefaultAppearanceSettings } from "../../src/settings/default-appearance-settings";
 import { buildMetricRenderAppearance } from "../../src/settings/render-appearance-builder";
@@ -35,36 +35,36 @@ interface VisualWidgetTestCase {
 
 const VISUAL_WIDGET_TEST_CASES: readonly VisualWidgetTestCase[] = [
     {
-        snapshotName: "color-filled-single-circular-value-color-mix-soft-triangle-gradient",
+        snapshotName: "color-filled-single-circle-full-ring-color-mix-soft-triangle-gradient",
         appearance: buildColorFilledAppearanceOverride({
-            graphType: "circular",
+            selectedView: "circle",
             colorMode: "multi-color",
             isGradientEnabled: true,
         }),
         data: CPU_USAGE_WIDGET_DATA,
     },
     {
-        snapshotName: "color-filled-single-circular-value-color-mix-soft-triangle-flat",
+        snapshotName: "color-filled-single-circle-full-ring-color-mix-soft-triangle-flat",
         appearance: buildColorFilledAppearanceOverride({
-            graphType: "circular",
+            selectedView: "circle",
             colorMode: "multi-color",
             isGradientEnabled: false,
         }),
         data: CPU_USAGE_WIDGET_DATA,
     },
     {
-        snapshotName: "color-filled-single-circular-value-solid-background-gradient",
+        snapshotName: "color-filled-single-circle-full-ring-solid-background-gradient",
         appearance: buildColorFilledAppearanceOverride({
-            graphType: "circular",
+            selectedView: "circle",
             colorMode: "solid",
             isGradientEnabled: true,
         }),
         data: CPU_USAGE_WIDGET_DATA,
     },
     {
-        snapshotName: "color-filled-single-circular-value-solid-background-flat",
+        snapshotName: "color-filled-single-circle-full-ring-solid-background-flat",
         appearance: buildColorFilledAppearanceOverride({
-            graphType: "circular",
+            selectedView: "circle",
             colorMode: "solid",
             isGradientEnabled: false,
         }),
@@ -73,16 +73,16 @@ const VISUAL_WIDGET_TEST_CASES: readonly VisualWidgetTestCase[] = [
     {
         snapshotName: "color-filled-single-text-color-mix-soft-triangle-gradient",
         appearance: buildColorFilledAppearanceOverride({
-            graphType: "text",
+            selectedView: "text",
             colorMode: "multi-color",
             isGradientEnabled: true,
         }),
         data: CPU_USAGE_WIDGET_DATA,
     },
     {
-        snapshotName: "color-filled-single-linear-progress-color-mix-soft-triangle-gradient",
+        snapshotName: "color-filled-single-progress-bar-color-mix-soft-triangle-gradient",
         appearance: buildColorFilledAppearanceOverride({
-            graphType: "linear",
+            selectedView: "bar",
             colorMode: "multi-color",
             isGradientEnabled: true,
         }),
@@ -91,18 +91,18 @@ const VISUAL_WIDGET_TEST_CASES: readonly VisualWidgetTestCase[] = [
     {
         snapshotName: "color-filled-single-sparkline-color-mix-soft-triangle-gradient",
         appearance: buildColorFilledAppearanceOverride({
-            graphType: "sparkline",
+            selectedView: "line",
             colorMode: "multi-color",
             isGradientEnabled: true,
         }),
         data: CPU_USAGE_WIDGET_DATA,
     },
     {
-        snapshotName: "flat-single-circular-value-black-white",
+        snapshotName: "flat-single-circle-full-ring-black-white",
         appearance: {
-            graph: {
-                viewLayout: "circular",
-                circleStyle: "value",
+            view: {
+                selectedView: "circle",
+                circleVariant: "full-ring",
             },
             theme: {
                 selectedTheme: "flat",
@@ -131,7 +131,7 @@ for (const testCase of VISUAL_WIDGET_TEST_CASES) {
 }
 
 function buildColorFilledAppearanceOverride(options: {
-    graphType: "circular" | "text" | "linear" | "sparkline";
+    selectedView: "circle" | "text" | "bar" | "line";
     colorMode: "multi-color" | "solid";
     isGradientEnabled: boolean;
 }): ResolvedAppearanceSettingsOverride {
@@ -156,9 +156,9 @@ function buildColorFilledAppearanceOverride(options: {
         };
 
     return {
-        graph: {
-            viewLayout: options.graphType,
-            circleStyle: "value",
+        view: {
+            selectedView: options.selectedView,
+            circleVariant: "full-ring",
         },
         theme: {
             selectedTheme: "color-filled",
@@ -180,12 +180,12 @@ function renderSingleMetricWidgetSvg(options: {
         visual: visualSettings,
         renderSize: options.keySize,
         centerIcon: "",
-        circleStyle: visualSettings.circleStyle,
+        circleVariant: visualSettings.circleVariant,
     });
 
     return renderMetricFrame({
         body,
-        graphicStyle: visualSettings.graphicStyle,
+        themePreset: visualSettings.themePreset,
         muted: false,
         paints: visualSettings.paints,
         size: options.keySize,

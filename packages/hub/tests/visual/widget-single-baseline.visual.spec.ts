@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { TOUCH_STRIP_LOGICAL_SIZE } from "../../src/rendering/widget-data";
+import { TOUCH_STRIP_LOGICAL_SIZE } from "../../src/view-rendering/widget-data";
 import {
     buildColorFilledAppearanceOverride,
     buildDefaultAppearanceOverride,
     CPU_CENTER_ICON_FRAGMENT,
-    CPU_USAGE_LINEAR_CHANNEL_WIDGET_DATA,
+    CPU_USAGE_BAR_WIDGET_DATA,
     CPU_USAGE_NO_DATA_WIDGET_DATA,
     CPU_USAGE_SWINGING_HISTORY_WIDGET_DATA,
     CPU_USAGE_TOUCH_STRIP_WIDGET_DATA,
@@ -15,29 +15,29 @@ import {
 
 const SINGLE_BASELINE_VISUAL_TEST_CASES: readonly SingleMetricVisualTestCase[] = [
     {
-        snapshotName: "first-visual-baseline-single-circular-value-cpu-usage-default-multi-color",
+        snapshotName: "first-visual-baseline-single-circle-full-ring-cpu-usage-default-multi-color",
         appearance: buildDefaultAppearanceOverride({
-            graphicType: "circular",
-            circleStyle: "value",
+            selectedView: "circle",
+            circleVariant: "full-ring",
             colorMode: "multi-color",
         }),
         data: CPU_USAGE_WIDGET_DATA,
     },
     {
-        snapshotName: "first-visual-baseline-single-circular-minimal-icon-cpu-usage-default-multi-color",
+        snapshotName: "first-visual-baseline-single-circle-minimal-icon-cpu-usage-default-multi-color",
         appearance: buildDefaultAppearanceOverride({
-            graphicType: "circular",
-            circleStyle: "compact",
+            selectedView: "circle",
+            circleVariant: "minimal",
             colorMode: "multi-color",
         }),
         data: CPU_USAGE_WIDGET_DATA,
         centerIcon: CPU_CENTER_ICON_FRAGMENT,
     },
     {
-        snapshotName: "first-visual-baseline-single-circular-gauge-cpu-usage-default-multi-color",
+        snapshotName: "first-visual-baseline-single-circle-gauge-cpu-usage-default-multi-color",
         appearance: buildDefaultAppearanceOverride({
-            graphicType: "circular",
-            circleStyle: "gauge",
+            selectedView: "circle",
+            circleVariant: "gauge",
             colorMode: "multi-color",
         }),
         data: CPU_USAGE_WIDGET_DATA,
@@ -46,134 +46,134 @@ const SINGLE_BASELINE_VISUAL_TEST_CASES: readonly SingleMetricVisualTestCase[] =
     {
         snapshotName: "first-visual-baseline-single-text-cpu-usage-default-multi-color",
         appearance: buildDefaultAppearanceOverride({
-            graphicType: "text",
+            selectedView: "text",
             colorMode: "multi-color",
         }),
         data: CPU_USAGE_WIDGET_DATA,
     },
     {
-        snapshotName: "first-visual-baseline-single-linear-progress-cpu-usage-default-multi-color",
+        snapshotName: "first-visual-baseline-single-progress-bar-cpu-usage-default-multi-color",
         appearance: buildDefaultAppearanceOverride({
-            graphicType: "linear",
+            selectedView: "bar",
             colorMode: "multi-color",
         }),
-        data: CPU_USAGE_LINEAR_CHANNEL_WIDGET_DATA,
-        linearIcon: CPU_CENTER_ICON_FRAGMENT,
+        data: CPU_USAGE_BAR_WIDGET_DATA,
+        topIcon: CPU_CENTER_ICON_FRAGMENT,
     },
     {
         snapshotName: "first-visual-baseline-single-sparkline-cpu-usage-default-multi-color",
         appearance: buildDefaultAppearanceOverride({
-            graphicType: "sparkline",
+            selectedView: "line",
             colorMode: "multi-color",
         }),
         data: CPU_USAGE_WIDGET_DATA,
-        linearIcon: CPU_CENTER_ICON_FRAGMENT,
+        topIcon: CPU_CENTER_ICON_FRAGMENT,
     },
     {
-        snapshotName: "first-visual-baseline-single-circular-value-cpu-usage-default-solid-blue",
+        snapshotName: "first-visual-baseline-single-circle-full-ring-cpu-usage-default-solid-blue",
         appearance: buildDefaultAppearanceOverride({
-            graphicType: "circular",
-            circleStyle: "value",
+            selectedView: "circle",
+            circleVariant: "full-ring",
             colorMode: "solid",
         }),
         data: CPU_USAGE_WIDGET_DATA,
     },
     {
-        snapshotName: "first-visual-baseline-single-linear-progress-cpu-usage-default-black-white",
+        snapshotName: "first-visual-baseline-single-progress-bar-cpu-usage-default-black-white",
         appearance: buildDefaultAppearanceOverride({
-            graphicType: "linear",
+            selectedView: "bar",
             colorMode: "black-white",
         }),
-        data: CPU_USAGE_LINEAR_CHANNEL_WIDGET_DATA,
-        linearIcon: CPU_CENTER_ICON_FRAGMENT,
+        data: CPU_USAGE_BAR_WIDGET_DATA,
+        topIcon: CPU_CENTER_ICON_FRAGMENT,
     },
     {
         snapshotName: "first-visual-baseline-single-sparkline-cpu-usage-default-grid-vertical",
         appearance: buildDefaultAppearanceOverride({
-            graphicType: "sparkline",
+            selectedView: "line",
             colorMode: "multi-color",
             gridLineType: "vertical",
             gridLineVisibility: "always",
         }),
         data: CPU_USAGE_WIDGET_DATA,
-        linearIcon: CPU_CENTER_ICON_FRAGMENT,
+        topIcon: CPU_CENTER_ICON_FRAGMENT,
     },
     {
         snapshotName: "first-visual-baseline-single-sparkline-cpu-usage-swinging-history-default-solid-blue-no-grid-smoothing-0",
         appearance: buildDefaultAppearanceOverride({
-            graphicType: "sparkline",
+            selectedView: "line",
             colorMode: "solid",
             gridLineVisibility: "none",
             lineSmoothingPercent: 0,
         }),
         data: CPU_USAGE_SWINGING_HISTORY_WIDGET_DATA,
-        linearIcon: CPU_CENTER_ICON_FRAGMENT,
+        topIcon: CPU_CENTER_ICON_FRAGMENT,
     },
     {
         snapshotName: "first-visual-baseline-single-sparkline-cpu-usage-swinging-history-default-solid-blue-no-grid-smoothing-35",
         appearance: buildDefaultAppearanceOverride({
-            graphicType: "sparkline",
+            selectedView: "line",
             colorMode: "solid",
             gridLineVisibility: "none",
             lineSmoothingPercent: 35,
         }),
         data: CPU_USAGE_SWINGING_HISTORY_WIDGET_DATA,
-        linearIcon: CPU_CENTER_ICON_FRAGMENT,
+        topIcon: CPU_CENTER_ICON_FRAGMENT,
     },
     {
         snapshotName: "first-visual-baseline-single-sparkline-cpu-usage-swinging-history-default-solid-blue-no-grid-smoothing-75",
         appearance: buildDefaultAppearanceOverride({
-            graphicType: "sparkline",
+            selectedView: "line",
             colorMode: "solid",
             gridLineVisibility: "none",
             lineSmoothingPercent: 75,
         }),
         data: CPU_USAGE_SWINGING_HISTORY_WIDGET_DATA,
-        linearIcon: CPU_CENTER_ICON_FRAGMENT,
+        topIcon: CPU_CENTER_ICON_FRAGMENT,
     },
     {
         snapshotName: "first-visual-baseline-single-sparkline-cpu-usage-swinging-history-default-solid-blue-no-grid-smoothing-100",
         appearance: buildDefaultAppearanceOverride({
-            graphicType: "sparkline",
+            selectedView: "line",
             colorMode: "solid",
             gridLineVisibility: "none",
             lineSmoothingPercent: 100,
         }),
         data: CPU_USAGE_SWINGING_HISTORY_WIDGET_DATA,
-        linearIcon: CPU_CENTER_ICON_FRAGMENT,
+        topIcon: CPU_CENTER_ICON_FRAGMENT,
     },
     {
         snapshotName: "first-visual-baseline-single-text-cpu-usage-no-data-placeholder",
         appearance: buildDefaultAppearanceOverride({
-            graphicType: "text",
+            selectedView: "text",
             colorMode: "multi-color",
         }),
         data: CPU_USAGE_NO_DATA_WIDGET_DATA,
     },
     {
-        snapshotName: "first-visual-baseline-single-linear-progress-touchstrip-cpu-usage-default-multi-color",
+        snapshotName: "first-visual-baseline-single-progress-bar-touchstrip-cpu-usage-default-multi-color",
         appearance: buildDefaultAppearanceOverride({
-            graphicType: "linear",
+            selectedView: "bar",
             colorMode: "multi-color",
         }),
         data: CPU_USAGE_TOUCH_STRIP_WIDGET_DATA,
         keySize: TOUCH_STRIP_LOGICAL_SIZE,
-        linearIcon: CPU_CENTER_ICON_FRAGMENT,
+        topIcon: CPU_CENTER_ICON_FRAGMENT,
     },
     {
         snapshotName: "first-visual-baseline-single-sparkline-touchstrip-cpu-usage-default-multi-color",
         appearance: buildDefaultAppearanceOverride({
-            graphicType: "sparkline",
+            selectedView: "line",
             colorMode: "multi-color",
         }),
         data: CPU_USAGE_TOUCH_STRIP_WIDGET_DATA,
         keySize: TOUCH_STRIP_LOGICAL_SIZE,
-        linearIcon: CPU_CENTER_ICON_FRAGMENT,
+        topIcon: CPU_CENTER_ICON_FRAGMENT,
     },
     {
-        snapshotName: "first-visual-baseline-single-circular-value-color-filled-black-white",
+        snapshotName: "first-visual-baseline-single-circle-full-ring-color-filled-black-white",
         appearance: buildColorFilledAppearanceOverride({
-            graphicType: "circular",
+            selectedView: "circle",
             colorMode: "black-white",
             isGradientEnabled: false,
         }),

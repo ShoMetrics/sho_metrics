@@ -3,7 +3,7 @@ import { MetricAction } from "./metric-action";
 import { setMetricView } from "../view-updates/runner";
 import { buildMemoryUsageWidgetData } from "../metrics/storage-widget-data";
 import { buildMetricViewIcons } from "../widgets/icons/metric-view-icons";
-import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
+import { PROGRESS_CIRCLE_LABELS } from "../widgets/primitives/progress-circle-label";
 import { RAM_TOTAL_METRIC_KEY, RAM_USED_METRIC_KEY } from "../runtime/metric-keys";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
@@ -23,12 +23,12 @@ export class Memory extends MetricAction {
 
         const usedBytesWidgetData = metrics.getWidgetData(
             RAM_USED_METRIC_KEY,
-            ARC_GAUGE_LABELS.ram,
+            PROGRESS_CIRCLE_LABELS.ram,
             "B",
         );
         const totalBytesWidgetData = metrics.getWidgetData(
             RAM_TOTAL_METRIC_KEY,
-            ARC_GAUGE_LABELS.ram,
+            PROGRESS_CIRCLE_LABELS.ram,
             "B",
         );
 
@@ -39,7 +39,7 @@ export class Memory extends MetricAction {
             widgetData: buildMemoryUsageWidgetData({
                 usedBytesWidgetData,
                 totalBytes: totalBytesWidgetData.current,
-                label: ARC_GAUGE_LABELS.ram,
+                label: PROGRESS_CIRCLE_LABELS.ram,
             }),
             ...buildMetricViewIcons({ hardware: "memory", status: "percentage" }),
         });

@@ -1,10 +1,10 @@
-import type { ArcGaugeStatusIcon } from "../primitives/arc-gauge";
+import type { ProgressCircleStatusIcon } from "../primitives/progress-circle";
 import { getHardwareIconFragment, type HardwareIconKind } from "./hardware-icons";
 import { getMetricStatusIcon, type MetricStatusIconKind } from "./metric-status-icons";
 
 export interface MetricViewIcons {
     centerIconFragment: string;
-    statusIcon: ArcGaugeStatusIcon;
+    statusIcon: ProgressCircleStatusIcon;
 }
 
 export function buildMetricViewIcons(options: {

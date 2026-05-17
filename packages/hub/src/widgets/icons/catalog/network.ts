@@ -1,6 +1,6 @@
 import { ChevronsLeftRightEllipsis, Download, GlobeOff, Network, Upload, Wifi } from "lucide";
 import type { IconNode } from "lucide";
-import type { ArcGaugeStatusIcon } from "../../primitives/arc-gauge";
+import type { ProgressCircleStatusIcon } from "../../primitives/progress-circle";
 import type { NetworkInterfaceOption } from "../../../runtime/network-interfaces";
 import type { NetworkMetricDirection } from "../../../runtime/network-metric-keys";
 import { createLucideIconDefinition } from "../sources/lucide";
@@ -28,7 +28,7 @@ export function renderNetworkDirectionIconFragment(options: {
 export function getNetworkDirectionStatusIcon(options: {
     direction: NetworkMetricDirection;
     color?: string;
-}): ArcGaugeStatusIcon {
+}): ProgressCircleStatusIcon {
     return {
         ...createLucideIconDefinition({
             id: `network.direction.${options.direction}`,

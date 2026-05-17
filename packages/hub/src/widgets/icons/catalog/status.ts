@@ -1,10 +1,10 @@
 import { MemoryStick, Percent, Thermometer, Zap } from "lucide";
-import type { ArcGaugeStatusIcon } from "../../primitives/arc-gauge";
+import type { ProgressCircleStatusIcon } from "../../primitives/progress-circle";
 import { createLucideIconDefinition } from "../sources/lucide";
 
 export type MetricStatusIconKind = "percentage" | "temperature" | "memory" | "power";
 
-export function getMetricStatusIconDefinition(kind: MetricStatusIconKind): ArcGaugeStatusIcon {
+export function getMetricStatusIconDefinition(kind: MetricStatusIconKind): ProgressCircleStatusIcon {
     if (kind === "temperature") {
         return {
             ...createLucideIconDefinition({

@@ -3,12 +3,12 @@ import type { RenderPaintTokens } from "./render-appearance";
 import type { RenderTextStyles } from "./render-text-style";
 import type { RenderThemeEffectTokens } from "./render-svg-effects";
 import type { DualChannelWidgetData, KeySize } from "./widget-data";
-import type { ArcGaugeStatusIcon, CircleVariant } from "../widgets/primitives/arc-gauge";
+import type { ProgressCircleStatusIcon, CircleVariant } from "../widgets/primitives/progress-circle";
 import {
-    DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG,
-    renderDualChannelArcGauge,
-    type DualChannelArcGaugeCenterContent,
-} from "../widgets/primitives/dual-channel-arc-gauge";
+    DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG,
+    renderDualChannelProgressCircle,
+    type DualChannelProgressCircleCenterContent,
+} from "../widgets/primitives/dual-channel-progress-circle";
 import {
     DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG,
     renderDualChannelSparkline,
@@ -29,7 +29,7 @@ interface DualMetricChannelViewProps {
     color: string;
     colorConfig?: ColorConfig;
     icon?: string;
-    statusIcon?: ArcGaugeStatusIcon;
+    statusIcon?: ProgressCircleStatusIcon;
 }
 
 export interface DualMetricBodyViewProps {
@@ -46,7 +46,7 @@ export interface DualMetricBodyViewProps {
     renderSize: KeySize;
     titleText: string;
     chartMode: DualChannelSparklineMode;
-    centerContent: DualChannelArcGaugeCenterContent;
+    centerContent: DualChannelProgressCircleCenterContent;
     circleVariant: CircleVariant;
     topIcon: string;
     positive: DualMetricChannelViewProps;
@@ -65,8 +65,8 @@ export function renderDualMetricBodyView(options: DualMetricBodyViewProps): stri
 }
 
 function renderDualCircularMetric(options: DualMetricBodyViewProps): string {
-    return renderDualChannelArcGauge(options.data, {
-        ...DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG,
+    return renderDualChannelProgressCircle(options.data, {
+        ...DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG,
         trackColor: options.visual.paints.track,
         valueTextColor: options.visual.paints.primaryText,
         unitTextColor: options.visual.paints.secondaryText,

@@ -15,12 +15,12 @@ import {
     renderConstrainedSvgText,
 } from "../../view-rendering/svg-utils";
 import type { WidgetBaseConfig } from "../widget.interface";
-import type { ArcGaugeStatusIcon, CircleVariant } from "./arc-gauge";
+import type { ProgressCircleStatusIcon, CircleVariant } from "./progress-circle";
 import { renderDualGaugeRing } from "./dual-channel-gauge-ring";
 
-export type DualChannelArcGaugeCenterContent = "value" | "icon" | "icon-value-unit";
+export type DualChannelProgressCircleCenterContent = "value" | "icon" | "icon-value-unit";
 
-export interface DualChannelArcGaugeConfig extends WidgetBaseConfig {
+export interface DualChannelProgressCircleConfig extends WidgetBaseConfig {
     trackColor: string;
     strokeWidth: number;
     valueTextColor: string;
@@ -29,21 +29,21 @@ export interface DualChannelArcGaugeConfig extends WidgetBaseConfig {
     iconColor: string;
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
-    centerContent: DualChannelArcGaugeCenterContent;
+    centerContent: DualChannelProgressCircleCenterContent;
     circleVariant: CircleVariant;
     titleText?: string;
     centerIconFragment?: string;
     positiveIconFragment?: string;
     negativeIconFragment?: string;
-    positiveStatusIcon?: ArcGaugeStatusIcon;
-    negativeStatusIcon?: ArcGaugeStatusIcon;
+    positiveStatusIcon?: ProgressCircleStatusIcon;
+    negativeStatusIcon?: ProgressCircleStatusIcon;
     positiveColor: string;
     negativeColor: string;
     positiveColorConfig?: ColorConfig;
     negativeColorConfig?: ColorConfig;
 }
 
-export const DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG: DualChannelArcGaugeConfig = {
+export const DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG: DualChannelProgressCircleConfig = {
     colorConfig: { mode: "solid", solidColor: "#3b82f6", thresholds: [], isGradientEnabled: true },
     trackColor: "rgba(255,255,255,0.14)",
     strokeWidth: 11,
@@ -125,7 +125,7 @@ interface ChannelArcModel {
     rotationDegrees: number;
     iconRotationDegrees: number;
     iconFragment: string | undefined;
-    statusIcon: ArcGaugeStatusIcon | undefined;
+    statusIcon: ProgressCircleStatusIcon | undefined;
 }
 
 interface ChannelValueRowLayout {
@@ -139,13 +139,13 @@ interface ChannelValueRowLayout {
 }
 
 /**
- * Renders two independent network speed channels in one circular gauge.
+ * Renders two independent network speed channels in one progress circle.
  * The positive channel owns the first clockwise half and the negative channel
  * owns the second clockwise half, so each value has a fixed visual lane.
  */
-export function renderDualChannelArcGauge(
+export function renderDualChannelProgressCircle(
     data: DualChannelWidgetData,
-    config: DualChannelArcGaugeConfig,
+    config: DualChannelProgressCircleConfig,
     keySize: KeySize,
 ): string {
     const centerXCoordinate = keySize.width / 2;
@@ -340,7 +340,7 @@ function renderNotchIcon(options: {
 
 function renderCenterContent(options: {
     data: DualChannelWidgetData;
-    config: DualChannelArcGaugeConfig;
+    config: DualChannelProgressCircleConfig;
     geometry: RingGeometry;
 }): string {
     if (options.config.centerContent === "icon") {
@@ -378,7 +378,7 @@ function renderCenterIcon(options: {
 
 function renderValueRows(options: {
     data: DualChannelWidgetData;
-    config: DualChannelArcGaugeConfig;
+    config: DualChannelProgressCircleConfig;
     geometry: RingGeometry;
 }): string {
     const dividerYCoordinate = options.geometry.centerYCoordinate + ARC_LAYOUT.dividerYOffset;
@@ -413,7 +413,7 @@ function renderValueRows(options: {
 
 function renderGaugeValueRows(options: {
     data: DualChannelWidgetData;
-    config: DualChannelArcGaugeConfig;
+    config: DualChannelProgressCircleConfig;
     geometry: RingGeometry;
 }): string {
     const dividerYCoordinate = options.geometry.centerYCoordinate + ARC_LAYOUT.dividerYOffset;
@@ -421,7 +421,7 @@ function renderGaugeValueRows(options: {
 
     return `
         ${renderGaugeChannelValueRow({
-            rowId: "dual-arc-gauge-positive-row",
+            rowId: "dual-progress-circle-positive-row",
             widgetData: options.data.positive,
             iconFragment: options.config.positiveIconFragment,
             color: options.config.positiveColor,
@@ -435,7 +435,7 @@ function renderGaugeValueRows(options: {
             y2="${formatSvgNumber(dividerYCoordinate)}"
             stroke="${options.config.dividerColor}" stroke-width="1.2" stroke-linecap="round" ${buildSvgFilterAttributes(options.config.themeEffects.subtleFilter).join(" ")} />
         ${renderGaugeChannelValueRow({
-            rowId: "dual-arc-gauge-negative-row",
+            rowId: "dual-progress-circle-negative-row",
             widgetData: options.data.negative,
             iconFragment: options.config.negativeIconFragment,
             color: options.config.negativeColor,
@@ -447,7 +447,7 @@ function renderGaugeValueRows(options: {
 }
 
 function renderGaugeBottomLabel(options: {
-    config: DualChannelArcGaugeConfig;
+    config: DualChannelProgressCircleConfig;
     geometry: RingGeometry;
 }): string {
     const labelText = resolveGaugeBottomLabelText(options.config);
@@ -458,7 +458,7 @@ function renderGaugeBottomLabel(options: {
     }
 
     return renderConstrainedSvgText({
-        id: "dual-arc-gauge-bottom-label",
+        id: "dual-progress-circle-bottom-label",
         text: labelText,
         xCoordinate: options.geometry.centerXCoordinate,
         yCoordinate: options.geometry.centerYCoordinate + ARC_LAYOUT.gaugeBottomLabelYOffset,
@@ -472,7 +472,7 @@ function renderGaugeBottomLabel(options: {
     });
 }
 
-function resolveGaugeBottomLabelText(config: DualChannelArcGaugeConfig): string {
+function resolveGaugeBottomLabelText(config: DualChannelProgressCircleConfig): string {
     const titleText = config.titleText?.trim() ?? "";
 
     if (titleText.toUpperCase() === "NETWORK") {
@@ -489,7 +489,7 @@ function renderGaugeChannelValueRow(options: {
     color: string;
     yCoordinate: number;
     geometry: RingGeometry;
-    config: DualChannelArcGaugeConfig;
+    config: DualChannelProgressCircleConfig;
 }): string {
     const valueTextStyle = options.config.textStyles.value;
     const unitTextStyle = options.config.textStyles.unit;
@@ -651,7 +651,7 @@ function renderChannelValueRow(options: {
     iconFragment: string | undefined;
     color: string;
     layout: ChannelValueRowLayout;
-    config: DualChannelArcGaugeConfig;
+    config: DualChannelProgressCircleConfig;
 }): string {
     return `
         ${renderInlineIcon({
@@ -677,7 +677,7 @@ function renderChannelValueBlock(options: {
     valueText: string;
     unitText: string;
     layout: ChannelValueRowLayout;
-    config: DualChannelArcGaugeConfig;
+    config: DualChannelProgressCircleConfig;
 }): string {
     const valueTextStyle = options.config.textStyles.value;
     const unitTextStyle = options.config.textStyles.unit;

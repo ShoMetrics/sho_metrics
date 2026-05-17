@@ -218,7 +218,7 @@ progress form; future concrete forms can use names such as `volume-bar`.
 
 `circle` is a product concept and the renderer branch name. The current
 concrete Circle widget implementation should use `progress-circle`, not
-`circle` or `arc-gauge`. `circle` stays the family root; `progress-circle`
+the family root. `circle` stays the family root; `progress-circle`
 names the concrete progress-along-a-circular-path form; future concrete forms
 can use names such as `volume-circle` or `concentric-circle`.
 
@@ -294,16 +294,6 @@ DO use these directory owners:
 
 PREFER adding new files to the nearest existing owner. DON'T create another
 top-level rendering or update directory unless the owner is genuinely new.
-
-## Pending Implementation Owner Renames
-
-These are implementation-owner renames, not product/settings/renderer contract
-renames. Execute them as separate small changes after the contract vocabulary is
-stable.
-
-| Current Name | Target Name | Location | Reason |
-|---|---|---|---|
-| `arc-gauge` / `ArcGauge*` primitive owner | `progress-circle` / `ProgressCircle*` | `packages/hub/src/widgets/primitives/arc-gauge.ts` | `gauge` is one Circle variant, not the whole Circle family. `progress-circle` names the current concrete circular progress form while keeping `circle` for the family root. |
 
 ## Guardrails
 
