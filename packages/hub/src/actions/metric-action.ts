@@ -45,7 +45,6 @@ interface ActiveActionState {
 export abstract class MetricAction extends SingletonAction {
     private activeActionStates = new Map<string, ActiveActionState>();
     private schedulerBindings = new Map<string, SchedulerBinding>();
-    private readonly metricReaderBySourceScopeId = new Map<string, MetricStoreReader>();
 
     protected abstract readonly actionKind: ActionKind;
 
@@ -147,13 +146,7 @@ export abstract class MetricAction extends SingletonAction {
 
     protected getMetricReader(event: WillAppearEvent): MetricStoreReader {
         const readPlan = this.resolveMetricReadPlan(event);
-        let metricReader = this.metricReaderBySourceScopeId.get(readPlan.sourceScopeId);
-        if (!metricReader) {
-            metricReader = metricStore.forScope(readPlan.sourceScopeId);
-            this.metricReaderBySourceScopeId.set(readPlan.sourceScopeId, metricReader);
-        }
-
-        return metricReader;
+        return metricStore.forScope(readPlan.sourceScopeId);
     }
 
     protected refreshMetricKeys(
