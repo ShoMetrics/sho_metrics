@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { DualChannelWidgetData, WidgetData } from "../../rendering/widget-data";
+import type { DualChannelWidgetData, WidgetData } from "../../view-rendering/widget-data";
 import {
     DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG,
     renderDualChannelSparkline,

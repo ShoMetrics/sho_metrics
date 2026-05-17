@@ -1,4 +1,4 @@
-import type { KeySize } from "../../rendering/widget-data";
+import type { KeySize } from "../../view-rendering/widget-data";
 import type { ThemeStyle, ThemeStylePaints } from "./theme-style";
 
 /**

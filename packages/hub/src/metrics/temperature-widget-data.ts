@@ -1,4 +1,4 @@
-import type { WidgetData } from "../rendering/widget-data";
+import type { WidgetData } from "../view-rendering/widget-data";
 
 export type TemperatureUnit = "celsius" | "fahrenheit";
 

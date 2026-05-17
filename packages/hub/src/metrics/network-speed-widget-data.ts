@@ -1,4 +1,4 @@
-import type { WidgetData } from "../rendering/widget-data";
+import type { WidgetData } from "../view-rendering/widget-data";
 import { formatBytesPerSecond, type DataRateUnitBase } from "./byte-format";
 
 type NetworkSpeedUnitBase = DataRateUnitBase;

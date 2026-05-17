@@ -1,4 +1,4 @@
-import type { WidgetData } from "../rendering/widget-data";
+import type { WidgetData } from "../view-rendering/widget-data";
 import { formatByteCount, formatBytesPerSecond } from "./byte-format";
 
 export type DiskUsageDisplayMode = "percentage" | "space";

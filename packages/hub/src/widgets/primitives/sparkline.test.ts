@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { WidgetData } from "../../rendering/widget-data";
+import type { WidgetData } from "../../view-rendering/widget-data";
 import { DEFAULT_SPARKLINE_CONFIG, sparkline } from "./sparkline";
 
 test("sparkline fallback keeps one decimal when no metric display value is provided", () => {

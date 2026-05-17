@@ -13,7 +13,7 @@ import {
     WIDGET_LOGICAL_SIZE,
     type DualChannelWidgetData,
     type WidgetData,
-} from "../rendering/widget-data";
+} from "../view-rendering/widget-data";
 import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
 import {
     buildMetricViewRenderPlan,
@@ -25,7 +25,7 @@ import {
     resolveMetricViewSampleTimestampMilliseconds,
     resolveTouchStripMetricLayout,
     type SingleMetricRenderOptions,
-} from "./display-frame";
+} from "./metric-view-frame";
 
 test("single value-capable widget without data renders an N/A placeholder copy", () => {
     const widgetData = buildWidgetData({
@@ -148,7 +148,7 @@ test("dual-channel widget fills a missing side with zero history when the other 
     assert.equal(renderWidgetData.negative.displayValue, "0");
 });
 
-test("display data helpers treat either dual-channel timestamp as available data", () => {
+test("metric data helpers treat either dual-channel timestamp as available data", () => {
     const dualWidgetData = buildDualChannelWidgetData({
         positive: buildWidgetData({ current: 3 }),
         negative: buildWidgetData({ current: 7, sampleTimestampMilliseconds: 2000 }),

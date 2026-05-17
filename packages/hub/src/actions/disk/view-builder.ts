@@ -11,12 +11,12 @@ import type {
     ResolvedDiskMetricTarget,
     ResolvedWidgetSettings,
 } from "../../settings/resolved-settings";
-import { resolveColorForThresholdValue, type ColorConfig } from "../../rendering/color-resolver";
+import { resolveColorForThresholdValue, type ColorConfig } from "../../view-rendering/color-resolver";
 import { getDiskIcon, getDiskIconFragment, renderCenteredHardwareIconFragment } from "../../widgets/icons/hardware-icons";
 import { renderDiskThroughputDirectionIconFragment } from "../../widgets/icons/catalog/disk";
 import { getMetricStatusIcon } from "../../widgets/icons/metric-status-icons";
-import { escapeSvgText } from "../../rendering/svg-utils";
-import type { WidgetData } from "../../rendering/widget-data";
+import { escapeSvgText } from "../../view-rendering/svg-utils";
+import type { WidgetData } from "../../view-rendering/widget-data";
 import {
     isDualDiskThroughputView,
 } from "./metric-subscriptions";
@@ -25,7 +25,7 @@ import {
     resolveAvailableDiskVolume,
     type DiskVolumeSelection,
 } from "./volume-selection";
-import type { MetricViewOptions } from "../../metric-view-runner/runner";
+import type { MetricViewOptions } from "../../view-updates/runner";
 import { buildColorConfigFromAppearance, resolveSolidMetricColorMode } from "../../settings/render-paint-resolver";
 import { resolveRenderTextStyles } from "../../settings/render-text-style-resolver";
 

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_RENDER_THEME_EFFECT_TOKENS } from "../../rendering/render-svg-effects";
-import { DEFAULT_RENDER_TEXT_STYLES } from "../../rendering/render-text-style";
-import type { DualChannelWidgetData, WidgetData } from "../../rendering/widget-data";
+import { DEFAULT_RENDER_THEME_EFFECT_TOKENS } from "../../view-rendering/render-svg-effects";
+import { DEFAULT_RENDER_TEXT_STYLES } from "../../view-rendering/render-text-style";
+import type { DualChannelWidgetData, WidgetData } from "../../view-rendering/widget-data";
 import { arcGauge, DEFAULT_ARC_GAUGE_CONFIG } from "./arc-gauge";
 import { buildGaugeRangeColorPlan, resolveGaugeMarkerGap, resolveGaugeMarkerRenderProgress } from "./arc-gauge-range";
 import { DEFAULT_DUAL_CHANNEL_ARC_GAUGE_CONFIG, renderDualChannelArcGauge } from "./dual-channel-arc-gauge";

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { renderMetricFrame } from "../../rendering/metric-frame";
-import { renderSingleMetricBodyView } from "../../rendering/single-metric-view";
-import type { WidgetData } from "../../rendering/widget-data";
+import { renderMetricFrame } from "../../view-rendering/metric-frame";
+import { renderSingleMetricBodyView } from "../../view-rendering/single-metric-view";
+import type { WidgetData } from "../../view-rendering/widget-data";
 import { buildDiskUsageWidgetData, buildMemoryUsageWidgetData } from "../../metrics/storage-widget-data";
 import { buildCpuUsageWidgetData } from "../cpu";
 import { buildGpuUsageWidgetData, buildGpuVramWidgetData } from "../gpu";

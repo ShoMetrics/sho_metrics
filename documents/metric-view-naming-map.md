@@ -196,10 +196,10 @@ to the default renderer form.
 
 | Product View | Settings Field | Resolved Field | Renderer Contract | WidgetData Field |
 |---|---|---|---|---|
-| Text | `AppearanceViewSettings.selected_view = METRIC_VIEW_TEXT` | `appearance.view.selectedView = "text"` | Target: `renderPrimitive = "text"`; current: `graphicType = "text"` | No text-only field; uses common `label`, `displayValue`, `unit`, and `secondaryDisplayValue`. |
-| Line | `AppearanceViewSettings.selected_view = METRIC_VIEW_LINE`; line-specific settings live under `AppearanceSettings.line` / `LineAppearanceSettings` | `appearance.view.selectedView = "line"`; `appearance.line.*` | Target: `renderPrimitive = "sparkline"`; current: `graphicType = "sparkline"` | `sparklineScale` is renderer data for the sparkline primitive. |
-| Bar | `AppearanceViewSettings.selected_view = METRIC_VIEW_BAR`; disk usage custom label is `DiskMetricTarget.bar_label` | `appearance.view.selectedView = "bar"`; disk usage label is `reading.barLabel` | Target: `renderPrimitive = "bar"`; current: `graphicType = "linear"` | Target: `barLabel`, `barDisplayValue`, `barUnit`, `barChannels`; current: `linearLabel`, `linearDisplayValue`, `linearUnit`, `linearChannels`. |
-| Circle | `AppearanceViewSettings.selected_view = METRIC_VIEW_CIRCLE`; circle variants live under `circle_variant` | `appearance.view.selectedView = "circle"`; `appearance.view.circleVariant` | Target: `renderPrimitive = "circle"`; current: `graphicType = "circular"` | No circle-only WidgetData field. Circle-specific behavior is renderer config, not metric data. |
+| Text | `AppearanceViewSettings.selected_view = METRIC_VIEW_TEXT` | `appearance.view.selectedView = "text"` | `renderPrimitive = "text"` | No text-only field; uses common `label`, `displayValue`, `unit`, and `secondaryDisplayValue`. |
+| Line | `AppearanceViewSettings.selected_view = METRIC_VIEW_LINE`; line-specific settings live under `AppearanceSettings.line` / `LineAppearanceSettings` | `appearance.view.selectedView = "line"`; `appearance.line.*` | `renderPrimitive = "sparkline"` | `sparklineScale` is renderer data for the sparkline primitive. |
+| Bar | `AppearanceViewSettings.selected_view = METRIC_VIEW_BAR`; disk usage custom label is `DiskMetricTarget.bar_label` | `appearance.view.selectedView = "bar"`; disk usage label is `reading.barLabel` | `renderPrimitive = "bar"` | `barLabel`, `barDisplayValue`, `barUnit`, `barChannels`. |
+| Circle | `AppearanceViewSettings.selected_view = METRIC_VIEW_CIRCLE`; circle variants live under `circle_variant` | `appearance.view.selectedView = "circle"`; `appearance.view.circleVariant` | `renderPrimitive = "circle"` | No circle-only WidgetData field. Circle-specific behavior is renderer config, not metric data. |
 
 `bar` is a product concept and may appear in settings, resolved settings, and
 renderer contracts when the concept is the Bar family. `linear` is renderer
@@ -221,13 +221,9 @@ root `circle`. The family root stays reserved for the renderer contract value.
 
 | Product Variant | Settings Field | Resolved Field | Renderer Contract | WidgetData Field |
 |---|---|---|---|---|
-| Full Ring | `CIRCLE_VIEW_VARIANT_FULL_RING` | `circleVariant = "full-ring"` | Target: `circleVariant = "full-ring"`; current: `circleStyle = "value"` | None |
-| Minimal | `CIRCLE_VIEW_VARIANT_MINIMAL` | `circleVariant = "minimal"` | Target: `circleVariant = "minimal"`; current: `circleStyle = "compact"` | None |
-| Gauge | `CIRCLE_VIEW_VARIANT_GAUGE` | `circleVariant = "gauge"` | Target: `circleVariant = "gauge"`; current: `circleStyle = "gauge"` | None |
-
-The current renderer value `circleStyle = "value"` is especially confusing
-because the product concept is not a value style. It means the full-ring circle
-variant.
+| Full Ring | `CIRCLE_VIEW_VARIANT_FULL_RING` | `circleVariant = "full-ring"` | `circleVariant = "full-ring"` | None |
+| Minimal | `CIRCLE_VIEW_VARIANT_MINIMAL` | `circleVariant = "minimal"` | `circleVariant = "minimal"` | None |
+| Gauge | `CIRCLE_VIEW_VARIANT_GAUGE` | `circleVariant = "gauge"` | `circleVariant = "gauge"` | None |
 
 Circle variant is a product concept. Renderer code may use `circleVariant` only
 after resolved settings have crossed the adapter boundary. Renderer-only names
@@ -250,9 +246,9 @@ data. DON'T put it in proto/settings/resolved appearance settings.
 
 | Product Concept | Settings Field | Resolved Field | Renderer Contract | WidgetData Field |
 |---|---|---|---|---|
-| Theme | `AppearanceThemeSettings.selected_theme` | `appearance.theme.selectedTheme` | Target: `themePreset`; current: `graphicStyle` | None |
-| Theme Variant | `TerminalThemeSettings.variant` | `appearance.theme.terminal.variant` | Target: same `themePreset` field with flattened concrete values; current: `graphicStyle = "terminal-clean"` or `"terminal-vintage"` | None |
-| Renderer effects | Not a product-level control | Derived from theme | Target: `themeEffects`; current: `graphicEffects` | None |
+| Theme | `AppearanceThemeSettings.selected_theme` | `appearance.theme.selectedTheme` | `themePreset` | None |
+| Theme Variant | `TerminalThemeSettings.variant` | `appearance.theme.terminal.variant` | Same `themePreset` field with flattened concrete values such as `terminal-clean` or `terminal-vintage` | None |
+| Renderer effects | Not a product-level control | Derived from theme | `themeEffects` | None |
 
 `themePreset` is a concrete renderer theme preset ID, not the product Theme
 enum. Its target value space is currently:
@@ -272,76 +268,34 @@ Theme x Variant cartesian product. If another Theme adds variants or preset
 names start encoding repeated theme/variant pairs, revisit whether the renderer
 contract needs a structured shape before adding more flattened names.
 
-`graphicStyle` uses a product-rejected word. It survives today only because it
-is renderer-facing. PREFER renaming it to
-`themePreset`.
-
 `themePreset` is renderer-only vocabulary. DON'T put it in
 proto/settings/resolved appearance settings. Settings continue to use
 `selectedTheme` plus theme-owned variant fields.
 
-## Decided Rename Targets
+## Directory Boundary
 
-These names were found during the View rename but were not changed in that
-round. DON'T treat them as endorsed names. These rows are decided
-rename targets, but each row still needs ordinary implementation review. This
-section is a rollout plan. PREFER removing or archiving it after the cleanup.
+DO use these directory owners:
 
-| Current Name | Location | Problem | Proposed Target (subject to PR review) |
-|---|---|---|---|
-| `MetricRenderAppearance.graphicType` | `packages/hub/src/rendering/render-appearance.ts` | Historical graph/layout/view vocabulary. It selects a renderer branch, not a product graphic type. | `renderPrimitive` |
-| `dualGraphicType` | `packages/hub/src/metric-view-renderer/display-frame.ts`, action view builders | Same problem as `graphicType`. Dual means two metric channels rendered inside one Stream Deck widget, such as upload/download or disk read/write. | `dualRenderPrimitive` |
-| `"linear"` renderer value | renderer appearance and tests | Conflicts mentally with the Line view. It really means the Bar renderer primitive. | `"bar"` |
-| `"circular"` renderer value | renderer appearance and tests | Product vocabulary is Circle; adjective form adds another spelling for the same family. | `"circle"` |
-| `circleStyle` | renderer appearance, metric-view renderer, widget primitives | Product/settings now use Circle Variant. `style` overlaps with Theme/style vocabulary. | `circleVariant` |
-| `circleStyle = "value"` | arc gauge renderer config | Does not describe the visual form. It means Full Ring. | `"full-ring"` |
-| `circleStyle = "compact"` | arc gauge renderer config | Does not match product name Minimal. | `"minimal"` |
-| `linearLabel`, `linearDisplayValue`, `linearUnit`, `linearChannels` | `WidgetData`, bar primitive, action view builders | These are Bar view data fields. `linear` competes with Line. | `barLabel`, `barDisplayValue`, `barUnit`, `barChannels` |
-| `linearIconFragment` | metric-view renderer and action view builders | This is the top icon used by compact chart branches, including Bar and Sparkline. `barIconFragment` would overfit one branch. | `topIconFragment` |
-| `linearTitleText`, `linearValueText`, `linearUnitText`, `linearSecondaryText` | render paint tokens | These are Bar text paint tokens. | `barTitleText`, `barValueText`, `barUnitText`, `barSecondaryText` |
-| `viewLayout` in renderer tests | `packages/hub/src/rendering/svg-paint-scanner.test.ts` | Test helper kept an older product term. It now names renderer primitive selection, not a layout. | `renderPrimitive` |
-| `graphicStyle` | renderer appearance and frame composition | Product rejected Graphic Style for UX because it sounds like theme. Renderer uses it for theme preset. | `themePreset` |
-| `GraphicThemePresetName` | widget theme interface | Same `graphic` vocabulary drift around theme. | `ThemePresetName` |
-| `graphicEffects` / `render-graphic-effects-resolver.ts` | renderer theme/effects mapping | Uses `graphic` as a vague visual bucket. | `themeEffects` |
+- `view-rendering/`: renderer contracts, SVG view composition, frame
+  composition, rasterization, and renderer-facing appearance helpers.
+- `view-updates/`: shared metric view update queueing, dispatch, observability,
+  and Stream Deck update workflow.
+- `widgets/primitives/`: concrete SVG widget implementations and their local
+  helper modules.
 
-## Needs Separate Boundary Decision
+PREFER adding new files to the nearest existing owner. DON'T create another
+top-level rendering or update directory unless the owner is genuinely new.
 
-These are real naming concerns, but they are not direct field/type renames. Do
-not execute them as part of the field rename checklist without a separate owner
-or directory boundary plan.
+## Remaining Implementation Owner Decisions
 
-PREFER extending the nearest existing owner until this decision is made. DON'T
-create a new top-level rendering directory only to avoid choosing between
-`rendering/` and `metric-view-renderer/`.
+These are real naming concerns, but they are implementation-owner questions,
+not direct product/settings/renderer contract renames. Do not execute them as
+part of a contract rename without a separate owner plan.
 
 | Current Name | Location | Problem | Decision Needed |
 |---|---|---|---|
 | `linear-bar` / `linearBar` primitive owner | `packages/hub/src/widgets/primitives/linear-bar.ts` | Implementation owner still uses `linear` for the Bar renderer branch. `linear` competes with the Line product view. | Decide whether the primitive owner uses the Bar root or stays as a lower-level geometry owner with an explicit boundary note after the renderer contract uses `renderPrimitive = "bar"`. |
 | `arc-gauge` / `ArcGauge*` primitive owner | `packages/hub/src/widgets/primitives/arc-gauge.ts` | Implementation owner differs from the Product and renderer branch name `circle`. `gauge` is one Circle variant, not the whole Circle family. | DON'T include this in the renderer contract rename. Treat it as implementation-owner vocabulary and revisit separately only if it leaks across contract boundaries or remains misleading after `circleVariant` is fully aligned. |
-| `metric-view-renderer/` | directory name | The directory renders frames from renderer contracts, while `MetricView` now means the product setting. | Decide whether this owner is frame rendering, metric view rendering, or display frame composition. |
-| `rendering/` vs `metric-view-renderer/` | directory names | Both sound like rendering ownership. The boundary is not obvious from names alone. | Decide the directory ownership vocabulary after renderer field names are stable. |
-
-## Recommended Cleanup Order
-
-PREFER doing one step per PR or explicit user request. DON'T bundle multiple
-steps unless the user asks for a broader rename pass.
-
-1. Rename renderer branch selection:
-   `graphicType` -> `renderPrimitive`,
-   `dualGraphicType` -> `dualRenderPrimitive`.
-
-2. Rename Bar renderer data:
-   `linear*` WidgetData and paint token fields -> `bar*`.
-
-3. Rename Circle renderer variant:
-   `circleStyle` -> `circleVariant`,
-   with values aligned to `full-ring`, `minimal`, and `gauge`.
-
-4. Rename theme renderer fields:
-   `graphicStyle` -> `themePreset`,
-   `graphicEffects` -> `themeEffects`.
-
-5. Revisit directory names only after the type/member vocabulary is stable.
 
 ## Guardrails
 

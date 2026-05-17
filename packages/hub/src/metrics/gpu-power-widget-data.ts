@@ -1,5 +1,5 @@
-import { clamp } from "../rendering/svg-utils";
-import type { WidgetData } from "../rendering/widget-data";
+import { clamp } from "../view-rendering/svg-utils";
+import type { WidgetData } from "../view-rendering/widget-data";
 
 interface GpuPowerDisplayOptions {
     powerWidgetData: WidgetData;

@@ -1,19 +1,19 @@
-import type { DualChannelWidgetData, KeySize } from "../../rendering/widget-data";
-import type { ColorConfig } from "../../rendering/color-resolver";
+import type { DualChannelWidgetData, KeySize } from "../../view-rendering/widget-data";
+import type { ColorConfig } from "../../view-rendering/color-resolver";
 import {
     buildSvgFilterAttributes,
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     type RenderThemeEffectTokens,
-} from "../../rendering/render-svg-effects";
+} from "../../view-rendering/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
     resolveRenderTextStyleFontSize,
     type RenderTextStyles,
-} from "../../rendering/render-text-style";
+} from "../../view-rendering/render-text-style";
 import {
     clamp,
     renderConstrainedSvgText,
-} from "../../rendering/svg-utils";
+} from "../../view-rendering/svg-utils";
 import type { WidgetBaseConfig } from "../widget.interface";
 import type { ArcGaugeStatusIcon, CircleVariant } from "./arc-gauge";
 import { renderDualGaugeRing } from "./dual-channel-gauge-ring";

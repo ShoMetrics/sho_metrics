@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { WidgetData } from "../rendering/widget-data";
+import type { WidgetData } from "../view-rendering/widget-data";
 import type { ResolvedGpuMetricTarget, ResolvedGpuReading } from "../settings/resolved-settings";
 import {
     GPU_MODEL_METRIC_KEY,

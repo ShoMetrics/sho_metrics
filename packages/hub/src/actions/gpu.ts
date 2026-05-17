@@ -1,8 +1,8 @@
 import { action, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import type { MetricStoreReader } from "../runtime/metric-store";
-import { setMetricView } from "../metric-view-runner/runner";
-import type { WidgetData } from "../rendering/widget-data";
+import { setMetricView } from "../view-updates/runner";
+import type { WidgetData } from "../view-rendering/widget-data";
 import { formatByteCount } from "../metrics/byte-format";
 import { buildGpuPowerWidgetData } from "../metrics/gpu-power-widget-data";
 import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-format";
@@ -22,7 +22,7 @@ import {
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import type { ResolvedGpuMetricTarget, ResolvedWidgetSettings } from "../settings/resolved-settings";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
-import type { SingleMetricViewOptions } from "../metric-view-runner/runner";
+import type { SingleMetricViewOptions } from "../view-updates/runner";
 
 const log = logger.for("Action:GPU");
 

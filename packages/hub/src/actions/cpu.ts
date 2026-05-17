@@ -1,10 +1,10 @@
 import { action, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
-import { setMetricView } from "../metric-view-runner/runner";
+import { setMetricView } from "../view-updates/runner";
 import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-format";
 import { buildMetricViewIcons } from "../widgets/icons/metric-view-icons";
 import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
-import type { WidgetData } from "../rendering/widget-data";
+import type { WidgetData } from "../view-rendering/widget-data";
 import { CPU_MODEL_METRIC_KEY, CPU_USAGE_METRIC_KEY } from "../runtime/metric-keys";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";

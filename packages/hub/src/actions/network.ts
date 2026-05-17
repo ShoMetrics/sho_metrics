@@ -1,7 +1,7 @@
 import { action, PropertyInspectorDidAppearEvent, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import type { MetricStoreReader } from "../runtime/metric-store";
-import { setMetricView } from "../metric-view-runner/runner";
+import { setMetricView } from "../view-updates/runner";
 import { logger } from "../logging/logger";
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../runtime/network-interfaces";
 import {

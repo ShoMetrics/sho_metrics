@@ -1,8 +1,8 @@
-import type { ColorConfig } from "../../rendering/color-resolver";
+import type { ColorConfig } from "../../view-rendering/color-resolver";
 import {
     adjustHexColorBrightness,
     clamp,
-} from "../../rendering/svg-utils";
+} from "../../view-rendering/svg-utils";
 import { interpolateHexColor } from "../../shared/color-utils";
 import type { CircleVariant } from "./arc-gauge";
 

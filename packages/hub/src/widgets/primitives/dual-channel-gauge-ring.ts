@@ -1,7 +1,7 @@
 import {
     clamp,
-} from "../../rendering/svg-utils";
-import type { ColorConfig } from "../../rendering/color-resolver";
+} from "../../view-rendering/svg-utils";
+import type { ColorConfig } from "../../view-rendering/color-resolver";
 import {
     buildGaugeRangeColorPlan,
     formatSvgNumber,

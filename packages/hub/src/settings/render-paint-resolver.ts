@@ -1,9 +1,9 @@
-import type { ColorConfig, ColorThreshold } from "../rendering/color-resolver";
+import type { ColorConfig, ColorThreshold } from "../view-rendering/color-resolver";
 import type {
     RenderBackgroundFill,
     RenderPaintConstraint,
     RenderPaintTokens,
-} from "../rendering/render-appearance";
+} from "../view-rendering/render-appearance";
 import type { MetricColorChannel } from "./appearance-overrides";
 import type {
     ColorMode,

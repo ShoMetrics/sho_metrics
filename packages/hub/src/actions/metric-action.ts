@@ -10,7 +10,7 @@ import { scheduler } from "../runtime/scheduler";
 import { metricStore, type MetricStoreReader } from "../runtime/metric-store";
 import { buildMetricReadPlanKey, type MetricReadPlan } from "../runtime/sources/metric-read-plan";
 import { buildMetricReadPlanFromSourcePolicy } from "../runtime/sources/metric-read-plan-builder";
-import { clearMetricViewState } from "../metric-view-runner/runner";
+import { clearMetricViewState } from "../view-updates/runner";
 import { logger } from "../logging/logger";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
@@ -44,7 +44,7 @@ interface ActiveActionState {
 }
 
 /**
- * Base class for all metric-display actions.
+ * Base class for all metric view actions.
  * Handles scheduler subscription lifecycle and real-time settings updates.
  * Subclasses implement `onMetricsUpdate` which is called on every tick.
  */

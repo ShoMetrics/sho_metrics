@@ -1,10 +1,10 @@
-import type { KeySize } from "../../rendering/widget-data";
+import type { KeySize } from "../../view-rendering/widget-data";
 import {
     TERMINAL_LABEL_GLOW_FILTER_ID,
     TERMINAL_METRIC_GLOW_FILTER_ID,
     TERMINAL_SUBTLE_GLOW_FILTER_ID,
     TERMINAL_VALUE_GLOW_FILTER_ID,
-} from "../../rendering/render-svg-effects";
+} from "../../view-rendering/render-svg-effects";
 import type { ThemeStyle, ThemeStylePaints } from "./theme-style";
 
 const TERMINAL_RADIUS = 12;

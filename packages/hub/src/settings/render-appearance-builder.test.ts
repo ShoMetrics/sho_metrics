@@ -4,12 +4,12 @@ import {
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     TERMINAL_CLEAN_RENDER_THEME_EFFECT_TOKENS,
     TERMINAL_VINTAGE_RENDER_THEME_EFFECT_TOKENS,
-} from "../rendering/render-svg-effects";
+} from "../view-rendering/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
     TERMINAL_CLEAN_RENDER_TEXT_STYLES,
     TERMINAL_VINTAGE_RENDER_TEXT_STYLES,
-} from "../rendering/render-text-style";
+} from "../view-rendering/render-text-style";
 import { buildMetricRenderAppearance } from "./render-appearance-builder";
 import { buildDefaultAppearanceSettings as buildAppearanceSettings } from "./default-appearance-settings";
 
