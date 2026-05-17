@@ -14,6 +14,7 @@ import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
 import { writeStoredGlobalSettingsPatch } from "../settings/storage/global-settings-patch";
 import { writeStoredWidgetSettingsPatch } from "../settings/storage/widget-settings-patch";
+import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 
 type SchedulerSubscribe = typeof scheduler.subscribe;
 type SchedulerSubscriber = Parameters<SchedulerSubscribe>[0];
@@ -261,6 +262,7 @@ test("runtime cache publishes to Property Inspector without writing settings", a
         await action.publishRuntimeCacheForTest(willAppearEvent);
 
         assert.deepEqual(setSettingsCalls, []);
+        assert.equal(action.resolveNetworkDownloadMaximumForTest(willAppearEvent), 123);
         assert.deepEqual(action.runtimeCachePatchList, [
             {
                 runtimeMaximumDownloadSpeedMbps: 123,
@@ -270,6 +272,31 @@ test("runtime cache publishes to Property Inspector without writing settings", a
         action.onWillDisappear({
             action: streamDeckAction,
         } as unknown as WillDisappearEvent);
+        scheduler.subscribe = originalSubscribe;
+    }
+});
+
+test("unchanged runtime cache patch does not publish to Property Inspector", async () => {
+    const originalSubscribe = scheduler.subscribe;
+    scheduler.subscribe = (() => () => undefined) as typeof scheduler.subscribe;
+    const streamDeckAction = new FakeStreamDeckAction("unchanged-runtime-cache-action");
+    const action = new TestMetricAction();
+    const willAppearEvent = buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings());
+
+    try {
+        action.onWillAppear(willAppearEvent);
+
+        await action.publishRuntimeCacheForTest(willAppearEvent);
+        await action.publishRuntimeCacheForTest(willAppearEvent);
+
+        assert.deepEqual(streamDeckAction.writtenSettingsList, []);
+        assert.deepEqual(action.runtimeCachePatchList, [
+            {
+                runtimeMaximumDownloadSpeedMbps: 123,
+            },
+        ]);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
         scheduler.subscribe = originalSubscribe;
     }
 });
@@ -303,6 +330,12 @@ class TestMetricAction extends MetricAction {
         return this.updateRuntimeCache(event, {
             runtimeMaximumDownloadSpeedMbps: 123,
         });
+    }
+
+    resolveNetworkDownloadMaximumForTest(event: WillAppearEvent): number | undefined {
+        const networkTarget = readResolvedMetricTarget(this.resolveSettings(event), "network");
+
+        return networkTarget.reading.display.maximumDownloadSpeedMegabitsPerSecond;
     }
 
     protected override sendRuntimeCachePatchToPropertyInspector(

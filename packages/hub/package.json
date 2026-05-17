@@ -50,6 +50,7 @@
         "@resvg/resvg-js": "^2.6.2",
         "@types/d3-shape": "^3.1.8",
         "d3-shape": "^3.2.0",
+        "fast-equals": "^6.0.0",
         "lucide": "^1.11.0",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
