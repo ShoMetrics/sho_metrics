@@ -1,3 +1,11 @@
+import {
+    addDurationSample,
+    createDurationAccumulator,
+    summarizeDuration,
+    type DurationAccumulator,
+    type DurationSummary,
+} from "../shared/duration-accumulator";
+
 export interface RasterizerPerformanceSample {
     success: boolean;
     renderWidth: number;
@@ -12,11 +20,7 @@ export interface RasterizerPerformanceSample {
     totalMilliseconds: number;
 }
 
-export interface RasterizerDurationSummary {
-    count: number;
-    averageMilliseconds: number | null;
-    maximumMilliseconds: number | null;
-}
+export type RasterizerDurationSummary = DurationSummary;
 
 export interface RasterizerPerformanceSummary {
     windowMilliseconds: number;
@@ -38,12 +42,6 @@ export interface RasterizerPerformanceSummary {
 const RASTERIZER_WARNING_TOTAL_MILLISECONDS = 100;
 const RASTERIZER_WARNING_AVERAGE_TOTAL_MILLISECONDS = 40;
 
-interface RasterizerDurationAccumulator {
-    count: number;
-    totalMilliseconds: number;
-    maximumMilliseconds: number;
-}
-
 interface RasterizerPerformanceWindow {
     startTimestampMilliseconds: number;
     sampleCount: number;
@@ -54,11 +52,11 @@ interface RasterizerPerformanceWindow {
     maximumFontFileCount: number;
     maximumRenderWidth: number;
     maximumRenderHeight: number;
-    constructDuration: RasterizerDurationAccumulator;
-    renderDuration: RasterizerDurationAccumulator;
-    asPngDuration: RasterizerDurationAccumulator;
-    base64Duration: RasterizerDurationAccumulator;
-    totalDuration: RasterizerDurationAccumulator;
+    constructDuration: DurationAccumulator;
+    renderDuration: DurationAccumulator;
+    asPngDuration: DurationAccumulator;
+    base64Duration: DurationAccumulator;
+    totalDuration: DurationAccumulator;
 }
 
 /**
@@ -157,11 +155,11 @@ function addRasterizerPerformanceSample(
     performanceWindow.maximumRenderWidth = Math.max(performanceWindow.maximumRenderWidth, sample.renderWidth);
     performanceWindow.maximumRenderHeight = Math.max(performanceWindow.maximumRenderHeight, sample.renderHeight);
 
-    addDuration(performanceWindow.constructDuration, sample.constructMilliseconds);
-    addDuration(performanceWindow.renderDuration, sample.renderMilliseconds);
-    addDuration(performanceWindow.asPngDuration, sample.asPngMilliseconds);
-    addDuration(performanceWindow.base64Duration, sample.base64Milliseconds);
-    addDuration(performanceWindow.totalDuration, sample.totalMilliseconds);
+    addDurationSample(performanceWindow.constructDuration, sample.constructMilliseconds);
+    addDurationSample(performanceWindow.renderDuration, sample.renderMilliseconds);
+    addDurationSample(performanceWindow.asPngDuration, sample.asPngMilliseconds);
+    addDurationSample(performanceWindow.base64Duration, sample.base64Milliseconds);
+    addDurationSample(performanceWindow.totalDuration, sample.totalMilliseconds);
 }
 
 function buildRasterizerPerformanceSummary(
@@ -183,42 +181,6 @@ function buildRasterizerPerformanceSummary(
         asPngDuration: summarizeDuration(performanceWindow.asPngDuration),
         base64Duration: summarizeDuration(performanceWindow.base64Duration),
         totalDuration: summarizeDuration(performanceWindow.totalDuration),
-    };
-}
-
-function createDurationAccumulator(): RasterizerDurationAccumulator {
-    return {
-        count: 0,
-        totalMilliseconds: 0,
-        maximumMilliseconds: 0,
-    };
-}
-
-function addDuration(
-    durationAccumulator: RasterizerDurationAccumulator,
-    durationMilliseconds: number,
-): void {
-    durationAccumulator.count += 1;
-    durationAccumulator.totalMilliseconds += durationMilliseconds;
-    durationAccumulator.maximumMilliseconds = Math.max(
-        durationAccumulator.maximumMilliseconds,
-        durationMilliseconds,
-    );
-}
-
-function summarizeDuration(durationAccumulator: RasterizerDurationAccumulator): RasterizerDurationSummary {
-    if (durationAccumulator.count === 0) {
-        return {
-            count: 0,
-            averageMilliseconds: null,
-            maximumMilliseconds: null,
-        };
-    }
-
-    return {
-        count: durationAccumulator.count,
-        averageMilliseconds: durationAccumulator.totalMilliseconds / durationAccumulator.count,
-        maximumMilliseconds: durationAccumulator.maximumMilliseconds,
     };
 }
 
