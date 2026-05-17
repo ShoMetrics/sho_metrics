@@ -102,6 +102,66 @@ test("text samples are retrievable without numeric widget history", () => {
     });
 });
 
+test("scalar metric replaces text metric completely", () => {
+    const metricStore = new MetricStore();
+    const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
+
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        sourceId: "test-source",
+        timestampMilliseconds: 1000,
+        metrics: {
+            "gpu.model": buildTextMetricValue("RTX 4090"),
+        },
+    }));
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        sourceId: "test-source",
+        timestampMilliseconds: 2000,
+        metrics: {
+            "gpu.model": buildScalarMetricValue(40, { unit: "%" }),
+        },
+    }));
+
+    assert.equal(metrics.getTextValue("gpu.model"), undefined);
+    assert.deepEqual(metrics.getWidgetData("gpu.model", "GPU", "%"), {
+        current: 40,
+        progress: 0.4,
+        history: [40],
+        unit: "%",
+        label: "GPU",
+        sampleTimestampMilliseconds: 2000,
+    });
+});
+
+test("text metric replaces scalar metric completely", () => {
+    const metricStore = new MetricStore();
+    const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
+
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        sourceId: "test-source",
+        timestampMilliseconds: 1000,
+        metrics: {
+            "gpu.model": buildScalarMetricValue(40, { unit: "%" }),
+        },
+    }));
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        sourceId: "test-source",
+        timestampMilliseconds: 2000,
+        metrics: {
+            "gpu.model": buildTextMetricValue("RTX 4090"),
+        },
+    }));
+
+    assert.equal(metrics.getTextValue("gpu.model"), "RTX 4090");
+    assert.deepEqual(metrics.getWidgetData("gpu.model", "GPU", ""), {
+        current: 0,
+        progress: 0,
+        history: [],
+        unit: "",
+        label: "GPU",
+        sampleTimestampMilliseconds: 2000,
+    });
+});
+
 test("clear removes scalar history and text values", () => {
     const metricStore = new MetricStore();
     const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
