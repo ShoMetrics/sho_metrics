@@ -6,9 +6,9 @@ import {
     buildMetricSnapshot,
     buildScalarMetricValue,
     buildTextMetricValue,
-    type IMetricSnapshot,
-    type IMetricValue,
-} from "./source.interface";
+    type MetricSnapshot,
+    type MetricValue,
+} from "./metric-source";
 import type { SourceClient } from "./source-client";
 import type { MetricReadPlan } from "./metric-read-plan";
 
@@ -112,10 +112,10 @@ class FakeSourceClient implements SourceClient {
 
     constructor(
         readonly sourceId: string,
-        private readonly metrics: Record<string, IMetricValue>,
+        private readonly metrics: Record<string, MetricValue>,
     ) {}
 
-    async readSnapshot(metricKeys: readonly string[]): Promise<IMetricSnapshot> {
+    async readSnapshot(metricKeys: readonly string[]): Promise<MetricSnapshot> {
         this.requestedMetricKeyListList.push([...metricKeys]);
 
         return buildMetricSnapshot({
@@ -129,17 +129,17 @@ class FakeSourceClient implements SourceClient {
 class FailingSourceClient implements SourceClient {
     constructor(readonly sourceId: string) {}
 
-    async readSnapshot(): Promise<IMetricSnapshot> {
+    async readSnapshot(): Promise<MetricSnapshot> {
         throw new Error(`Source failed: ${this.sourceId}`);
     }
 }
 
-function readScalarMetricValue(snapshot: IMetricSnapshot, metricKey: string): number | undefined {
+function readScalarMetricValue(snapshot: MetricSnapshot, metricKey: string): number | undefined {
     const metricValue = snapshot.metrics[metricKey];
     return metricValue?.data.case === "scalar" ? metricValue.data.value : undefined;
 }
 
-function readTextMetricValue(snapshot: IMetricSnapshot, metricKey: string): string | undefined {
+function readTextMetricValue(snapshot: MetricSnapshot, metricKey: string): string | undefined {
     const metricValue = snapshot.metrics[metricKey];
     return metricValue?.data.case === "text" ? metricValue.data.value : undefined;
 }

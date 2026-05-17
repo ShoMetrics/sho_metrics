@@ -1,9 +1,9 @@
 import { logger } from "../../logging/logger";
 import {
     buildMetricSnapshot,
-    type IMetricSnapshot,
-    type IMetricValue,
-} from "./source.interface";
+    type MetricSnapshot,
+    type MetricValue,
+} from "./metric-source";
 import {
     normalizeMetricReadPlan,
     type MetricReadPlan,
@@ -17,7 +17,7 @@ const FALLBACK_LOG_INTERVAL_MILLISECONDS = 30000;
 /** Polls runtime source candidates for one normalized metric read plan. */
 export interface SourceRunner {
     /** Reads one source-scoped snapshot, applying source candidate fallback. */
-    poll(readPlan: MetricReadPlan): Promise<IMetricSnapshot>;
+    poll(readPlan: MetricReadPlan): Promise<MetricSnapshot>;
 
     /** Releases runner-owned source resources. */
     dispose(): void;
@@ -27,12 +27,12 @@ export interface SourceRunner {
 export class DefaultSourceRunner implements SourceRunner {
     constructor(private readonly sourceRegistry: SourceRegistry) {}
 
-    async poll(readPlan: MetricReadPlan): Promise<IMetricSnapshot> {
+    async poll(readPlan: MetricReadPlan): Promise<MetricSnapshot> {
         const normalizedReadPlan = normalizeMetricReadPlan(readPlan);
         const pollStartTimestampMilliseconds = Date.now();
 
         const pendingMetricKeys = new Set(normalizedReadPlan.metricKeys);
-        const metrics: Record<string, IMetricValue> = {};
+        const metrics: Record<string, MetricValue> = {};
         const sourceCandidates = resolveSourceCandidates(normalizedReadPlan);
 
         for (const sourceCandidate of sourceCandidates) {
@@ -97,9 +97,9 @@ function resolveSourceCandidates(readPlan: MetricReadPlan): readonly SourceCandi
 }
 
 function copyValidMetricValues(
-    snapshot: IMetricSnapshot,
+    snapshot: MetricSnapshot,
     metricKeys: readonly string[],
-    targetMetrics: Record<string, IMetricValue>,
+    targetMetrics: Record<string, MetricValue>,
 ): readonly string[] {
     const resolvedMetricKeys: string[] = [];
 
@@ -116,7 +116,7 @@ function copyValidMetricValues(
     return resolvedMetricKeys;
 }
 
-function isMetricValueValid(metricValue: IMetricValue): boolean {
+function isMetricValueValid(metricValue: MetricValue): boolean {
     switch (metricValue.data.case) {
         case "scalar":
             return Number.isFinite(metricValue.data.value);

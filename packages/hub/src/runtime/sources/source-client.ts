@@ -1,4 +1,4 @@
-import type { IMetricSource, IMetricSnapshot } from "./source.interface";
+import type { MetricSource, MetricSnapshot } from "./metric-source";
 
 /** Source-owned warning emitted while serving health, descriptor, or snapshot requests. */
 export interface SourceWarning {
@@ -95,7 +95,7 @@ export interface SourceClient {
     readonly sourceId: string;
 
     /** Reads one snapshot containing the requested ShoMetrics metric keys. */
-    readSnapshot(metricKeys: readonly string[]): Promise<IMetricSnapshot>;
+    readSnapshot(metricKeys: readonly string[]): Promise<MetricSnapshot>;
 
     /** Lists descriptors for requested metric keys or for all known metrics. */
     listMetricDescriptors?(metricKeys: readonly string[]): Promise<readonly MetricDescriptor[]>;
@@ -111,7 +111,7 @@ export interface SourceClient {
 }
 
 /** Adapts the current metric source contract into the SourceRunner client contract. */
-export function createMetricSourceClient(source: IMetricSource): SourceClient {
+export function createMetricSourceClient(source: MetricSource): SourceClient {
     return {
         sourceId: source.sourceId,
         readSnapshot: metricKeys => source.pollMetrics ? source.pollMetrics(metricKeys) : source.poll(),

@@ -31,7 +31,7 @@ This plan describes how LibreHardwareMonitor data becomes ShoMetrics runtime tel
 | Area | Current | Target |
 |---|---|---|
 | Action subscription | Action classes expose only metric keys. | `MetricAction` converts resolved source policy plus metric keys into a `MetricReadPlan`. |
-| Scheduler | Owns one global `IMetricSource`. | Groups by read plan signature plus interval, then polls a `SourceRunner`. |
+| Scheduler | Owns one global `MetricSource`. | Groups by read plan signature plus interval, then polls a `SourceRunner`. |
 | MetricStore | Stores history by bare metric key. | Stores history by source-scoped metric identity. |
 | Runtime source | `NodeSystemSource` directly backs all polling. | `SourceRunner` tries source candidates and merges fallback results for missing metrics. |
 | Windows LHM | One-shot C# CLI prints JSON. | Installed Windows service exposes read-only source API over named pipe. |
@@ -258,7 +258,7 @@ Target interface:
 ```ts
 export interface SourceClient {
     readonly sourceId: string;
-    readSnapshot(metricKeys: readonly string[]): Promise<IMetricSnapshot>;
+    readSnapshot(metricKeys: readonly string[]): Promise<MetricSnapshot>;
     listMetricDescriptors?(metricKeys: readonly string[]): Promise<readonly MetricDescriptor[]>;
     checkHealth?(): Promise<SourceHealth>;
     getCachedStatus?(): SourceClientStatus;
@@ -266,7 +266,7 @@ export interface SourceClient {
 }
 
 export interface SourceRunner {
-    poll(readPlan: MetricReadPlan): Promise<IMetricSnapshot>;
+    poll(readPlan: MetricReadPlan): Promise<MetricSnapshot>;
     dispose(): void;
 }
 ```
@@ -1117,7 +1117,7 @@ packages/hub/src/runtime/sources/windows-helper-source-client.ts
 Rules:
 
 - The pipe client owns frame encode/decode, request ids, timeouts, protocol version checks, and protobuf conversion.
-- The pipe client returns ShoMetrics `IMetricSnapshot` and source warnings. Generated protobuf types must not leak past the source adapter boundary.
+- The pipe client returns ShoMetrics `MetricSnapshot` and source warnings. Generated protobuf types must not leak past the source adapter boundary.
 - If the pipe is absent, slow, malformed, unauthorized, or incompatible, the client fails the request and `SourceRunner` falls back.
 - The pipe client owns cached runtime status. `checkHealth()` performs I/O; `getCachedStatus()` does not.
 - Do not spawn or elevate the Windows helper from Node.

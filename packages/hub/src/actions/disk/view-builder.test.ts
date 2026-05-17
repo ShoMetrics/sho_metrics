@@ -8,7 +8,7 @@ import {
 } from "../../runtime/disk-metric-keys";
 import type { DiskVolumeOption } from "../../runtime/disk-volumes";
 import { LOCAL_SOURCE_SCOPE_ID } from "../../runtime/sources/metric-read-plan";
-import { buildMetricSnapshot, buildScalarMetricValue } from "../../runtime/sources/source.interface";
+import { buildMetricSnapshot, buildScalarMetricValue } from "../../runtime/sources/metric-source";
 import { buildMetricViewRenderPlan, buildRenderWidgetData } from "../../view-rendering/metric-view-frame";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";

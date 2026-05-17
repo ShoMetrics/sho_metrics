@@ -15,7 +15,7 @@ import {
 import {
     buildMetricSnapshot,
     buildScalarMetricValue,
-} from "./source.interface";
+} from "./metric-source";
 import {
     decodeSourceIpcFrame,
     encodeSourceIpcFrame,

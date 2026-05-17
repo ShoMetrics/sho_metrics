@@ -17,8 +17,8 @@ import {
 } from "../../generated/shometrics/v1/source_ipc_pb.js";
 import {
     buildMetricSnapshot,
-    type IMetricSnapshot,
-} from "./source.interface";
+    type MetricSnapshot,
+} from "./metric-source";
 import type {
     MetricDescriptor,
     SourceClient,
@@ -151,7 +151,7 @@ export class WindowsHelperSourceClient implements SourceClient {
         };
     }
 
-    async readSnapshot(metricKeys: readonly string[]): Promise<IMetricSnapshot> {
+    async readSnapshot(metricKeys: readonly string[]): Promise<MetricSnapshot> {
         await this.ensureProtocolSupported();
 
         let response: SourceIpcResponse;
