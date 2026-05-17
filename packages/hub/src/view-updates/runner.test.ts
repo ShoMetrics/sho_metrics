@@ -7,6 +7,7 @@ import type { WidgetData } from "../view-rendering/widget-data";
 import type { ProgressCircleStatusIcon } from "../widgets/primitives/progress-circle";
 import {
     clearMetricViewState,
+    MetricViewUpdateRunner,
     setMetricView,
     type MetricViewOptions,
 } from "./runner";
@@ -96,6 +97,31 @@ test("a pending settings-change update reason is not overwritten by a metric tic
         assert.deepEqual(updateReasons, ["settings-change"]);
     } finally {
         clearMetricViewState(action.id);
+    }
+});
+
+test("separate runner instances do not share action state", async () => {
+    const firstRunner = new MetricViewUpdateRunner();
+    const secondRunner = new MetricViewUpdateRunner();
+    const firstAction = new FakeKeyAction("shared-instance-action");
+    const secondAction = new FakeKeyAction("shared-instance-action");
+
+    try {
+        firstRunner.setMetricView(buildMetricViewOptions(firstAction, {
+            widgetData: buildWidgetData({ current: 1, displayValue: "1" }),
+        }));
+        secondRunner.setMetricView(buildMetricViewOptions(secondAction, {
+            widgetData: buildWidgetData({ current: 2, displayValue: "2" }),
+        }));
+
+        await waitForImageCall(firstAction);
+        await waitForImageCall(secondAction);
+
+        assert.equal(firstAction.imageDataUrlList.length, 1);
+        assert.equal(secondAction.imageDataUrlList.length, 1);
+    } finally {
+        firstRunner.clearMetricViewState(firstAction.id);
+        secondRunner.clearMetricViewState(secondAction.id);
     }
 });
 
