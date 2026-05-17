@@ -193,7 +193,7 @@ type GraphicVariant =
     | "circular-gauge"
     | "circular-minimal-notch"
     | "text"
-    | "linear-progress"
+    | "progress-bar"
     | "sparkline"
     | "volume-bars";
 ```
@@ -226,7 +226,7 @@ Bad token names:
 - `arcTrack`
 - `gaugeNeedle`
 - `badgeBackground`
-- `linearBarFill`
+- `progressBarFill`
 
 New paint tokens require one of these justifications:
 
