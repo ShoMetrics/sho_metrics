@@ -1,11 +1,11 @@
 import type { KeySize } from "../../rendering/widget-data";
-import type { GraphicStyle, GraphicStylePaints } from "./style.interface";
+import type { ThemeStyle, ThemeStylePaints } from "./theme-style";
 
 /**
  * Cupertino Glass style: frosted translucent background with specular highlight
  * and subtle border glow. Inspired by modern translucent UI design.
  */
-export const cupertinoGlassStyle: GraphicStyle = {
+export const cupertinoGlassStyle: ThemeStyle = {
     styleId: "cupertino-glass",
 
     renderDefs(): string {
@@ -34,7 +34,7 @@ export const cupertinoGlassStyle: GraphicStyle = {
         `;
     },
 
-    renderBackground(keySize: KeySize, paints: GraphicStylePaints): string {
+    renderBackground(keySize: KeySize, paints: ThemeStylePaints): string {
         const inset = 2;
         const radius = 18;
         return `
