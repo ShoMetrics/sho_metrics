@@ -1,9 +1,9 @@
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { Resvg } from "@resvg/resvg-js";
-import { renderMetricFrame } from "../../src/rendering/metric-frame";
-import { renderSingleMetricBodyView } from "../../src/rendering/single-metric-view";
-import { WIDGET_LOGICAL_SIZE, type KeySize, type WidgetData } from "../../src/rendering/widget-data";
+import { renderMetricFrame } from "../../src/view-rendering/metric-frame";
+import { renderSingleMetricBodyView } from "../../src/view-rendering/single-metric-view";
+import { WIDGET_LOGICAL_SIZE, type KeySize, type WidgetData } from "../../src/view-rendering/widget-data";
 import type { ResolvedAppearanceSettingsOverride } from "../../src/settings/appearance-overrides";
 import { buildDefaultAppearanceSettings } from "../../src/settings/default-appearance-settings";
 import { buildMetricRenderAppearance } from "../../src/settings/render-appearance-builder";
@@ -28,50 +28,50 @@ interface DefaultThemeVisualWidgetTestCase {
     readonly data: WidgetData;
     readonly centerIcon?: string;
     readonly footerIcon?: string;
-    readonly linearIcon?: string;
+    readonly topIcon?: string;
 }
 
 const DEFAULT_THEME_VISUAL_TEST_CASES: readonly DefaultThemeVisualWidgetTestCase[] = [
     {
-        snapshotName: "default-theme-single-circular-minimal-icon-cpu-usage-multi-color",
+        snapshotName: "default-theme-single-circle-minimal-icon-cpu-usage-multi-color",
         appearance: buildDefaultThemeAppearanceOverride({
-            graphType: "circular",
-            circleStyle: "compact",
+            selectedView: "circle",
+            circleVariant: "minimal",
         }),
         data: CPU_USAGE_WIDGET_DATA,
         centerIcon: CPU_ICON_FRAGMENT,
     },
     {
-        snapshotName: "default-theme-single-circular-gauge-cpu-usage-multi-color",
+        snapshotName: "default-theme-single-circle-gauge-cpu-usage-multi-color",
         appearance: buildDefaultThemeAppearanceOverride({
-            graphType: "circular",
-            circleStyle: "gauge",
+            selectedView: "circle",
+            circleVariant: "gauge",
         }),
         data: CPU_USAGE_WIDGET_DATA,
     },
     {
-        snapshotName: "default-theme-single-linear-progress-cpu-usage-multi-color",
+        snapshotName: "default-theme-single-progress-bar-cpu-usage-multi-color",
         appearance: buildDefaultThemeAppearanceOverride({
-            graphType: "linear",
-            circleStyle: "value",
+            selectedView: "bar",
+            circleVariant: "full-ring",
         }),
         data: {
             ...CPU_USAGE_WIDGET_DATA,
-            linearLabel: "CPU Load",
+            barLabel: "CPU Load",
             secondaryDisplayValue: "OK",
         },
         centerIcon: CPU_ICON_FRAGMENT,
-        linearIcon: CPU_ICON_FRAGMENT,
+        topIcon: CPU_ICON_FRAGMENT,
     },
     {
         snapshotName: "default-theme-single-sparkline-cpu-usage-multi-color",
         appearance: buildDefaultThemeAppearanceOverride({
-            graphType: "sparkline",
-            circleStyle: "value",
+            selectedView: "line",
+            circleVariant: "full-ring",
         }),
         data: CPU_USAGE_WIDGET_DATA,
         centerIcon: CPU_ICON_FRAGMENT,
-        linearIcon: CPU_ICON_FRAGMENT,
+        topIcon: CPU_ICON_FRAGMENT,
     },
 ];
 
@@ -82,7 +82,7 @@ for (const testCase of DEFAULT_THEME_VISUAL_TEST_CASES) {
             data: testCase.data,
             centerIcon: testCase.centerIcon ?? "",
             footerIcon: testCase.footerIcon,
-            linearIcon: testCase.linearIcon,
+            topIcon: testCase.topIcon,
             keySize: WIDGET_LOGICAL_SIZE,
         });
         const pngBuffer = renderSvgToPngBuffer(svg, WIDGET_LOGICAL_SIZE);
@@ -92,13 +92,13 @@ for (const testCase of DEFAULT_THEME_VISUAL_TEST_CASES) {
 }
 
 function buildDefaultThemeAppearanceOverride(options: {
-    graphType: "circular" | "text" | "linear" | "sparkline";
-    circleStyle: "value" | "compact" | "gauge";
+    selectedView: "circle" | "text" | "bar" | "line";
+    circleVariant: "full-ring" | "minimal" | "gauge";
 }): ResolvedAppearanceSettingsOverride {
     return {
-        graph: {
-            viewLayout: options.graphType,
-            circleStyle: options.circleStyle,
+        view: {
+            selectedView: options.selectedView,
+            circleVariant: options.circleVariant,
         },
     };
 }
@@ -108,7 +108,7 @@ function renderSingleMetricWidgetSvg(options: {
     data: WidgetData;
     centerIcon: string;
     footerIcon?: string;
-    linearIcon?: string;
+    topIcon?: string;
     keySize: KeySize;
 }): string {
     const visualSettings = buildMetricRenderAppearance(buildDefaultAppearanceSettings(options.appearance));
@@ -118,13 +118,13 @@ function renderSingleMetricWidgetSvg(options: {
         renderSize: options.keySize,
         centerIcon: options.centerIcon,
         footerIcon: options.footerIcon,
-        linearIcon: options.linearIcon,
-        circleStyle: visualSettings.circleStyle,
+        topIcon: options.topIcon,
+        circleVariant: visualSettings.circleVariant,
     });
 
     return renderMetricFrame({
         body,
-        graphicStyle: visualSettings.graphicStyle,
+        themePreset: visualSettings.themePreset,
         muted: false,
         paints: visualSettings.paints,
         size: options.keySize,

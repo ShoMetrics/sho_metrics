@@ -16,7 +16,7 @@ import {
     type SvgTextAnchor,
 } from "../../view-rendering/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget.interface";
-import { assertArcGaugeLabel } from "./arc-gauge-label";
+import { assertProgressCircleLabel } from "./progress-circle-label";
 import {
     buildGaugeRangeColorPlan,
     formatSvgNumber,
@@ -24,15 +24,15 @@ import {
     renderGaugeRangeArcSegments,
     renderGradientStop,
     resolveGaugeMarkerDot,
-    type ArcGaugeGeometry,
+    type ProgressCircleGeometry,
     type GaugeRangeColorPlan,
     type RingNotchGeometry,
-} from "./arc-gauge-range";
+} from "./progress-circle-range";
 import { renderMetricTextRow } from "./metric-text-row";
 
 export type CircleVariant = "full-ring" | "minimal" | "gauge";
 
-export interface ArcGaugeStatusIcon {
+export interface ProgressCircleStatusIcon {
     fragment: string;
     viewBox: {
         x: number;
@@ -44,7 +44,7 @@ export interface ArcGaugeStatusIcon {
     opticalYOffsetRatio?: number;
 }
 
-export interface ArcGaugeConfig extends WidgetBaseConfig {
+export interface ProgressCircleConfig extends WidgetBaseConfig {
     trackColor: string;
     strokeWidth: number;
     labelTextColor: string;
@@ -58,10 +58,10 @@ export interface ArcGaugeConfig extends WidgetBaseConfig {
     gaugeRangeBlendProgress: number;
     centerIconFragment?: string;
     footerIconFragment?: string;
-    statusIcon?: ArcGaugeStatusIcon;
+    statusIcon?: ProgressCircleStatusIcon;
 }
 
-export const DEFAULT_ARC_GAUGE_CONFIG: ArcGaugeConfig = {
+export const DEFAULT_PROGRESS_CIRCLE_CONFIG: ProgressCircleConfig = {
     colorConfig: { mode: "threshold", solidColor: "#3b82f6", thresholds: [
         { min: 0, max: 50, color: "#22c55e" },
         { min: 50, max: 80, color: "#eab308" },
@@ -160,10 +160,10 @@ interface StatusNotchGeometry {
  * different visual form that can represent two values at the same time.
  * Renders a background track circle + a colored progress arc + centered content.
  */
-export const arcGauge: Widget<ArcGaugeConfig> = {
-    widgetId: "arc-gauge",
+export const progressCircle: Widget<ProgressCircleConfig> = {
+    widgetId: "progress-circle",
 
-    render(data: WidgetData, config: ArcGaugeConfig, keySize: KeySize): string {
+    render(data: WidgetData, config: ProgressCircleConfig, keySize: KeySize): string {
         const centerXCoordinate = keySize.width / 2;
         const centerYCoordinate = keySize.height / 2;
         const radius = Math.max(
@@ -178,7 +178,7 @@ export const arcGauge: Widget<ArcGaugeConfig> = {
             circumference,
         };
         const arcColor = resolveColorForThresholdValue(data.current, config.colorConfig);
-        const gradientId = `circular-progress-${Math.round(data.current * 10)}-${keySize.width}-${keySize.height}`;
+        const gradientId = `progress-circle-${Math.round(data.current * 10)}-${keySize.width}-${keySize.height}`;
         const circleVariant = config.circleVariant;
         const rangeColorPlan = buildGaugeRangeColorPlan({
             circleVariant,
@@ -265,7 +265,7 @@ function renderCenterContent(options: {
     circleVariant: CircleVariant;
     centerIconFragment: string | undefined;
     footerIconFragment: string | undefined;
-    statusIcon: ArcGaugeStatusIcon | undefined;
+    statusIcon: ProgressCircleStatusIcon | undefined;
     statusNotchGeometry: StatusNotchGeometry | null;
     centerXCoordinate: number;
     centerYCoordinate: number;
@@ -279,7 +279,7 @@ function renderCenterContent(options: {
     unitFontSize: number;
     unitText: string;
     centerTextMaxWidth: number;
-    config: ArcGaugeConfig;
+    config: ProgressCircleConfig;
 }): string {
     if (options.circleVariant === "minimal") {
         return `
@@ -311,7 +311,7 @@ function renderCenterContent(options: {
 }
 
 function renderStatusIcon(
-    statusIcon: ArcGaugeStatusIcon | undefined,
+    statusIcon: ProgressCircleStatusIcon | undefined,
     centerXCoordinate: number,
     statusNotchGeometry: StatusNotchGeometry | null,
     iconColor: string,
@@ -334,9 +334,9 @@ function renderStatusIcon(
 }
 
 function buildStatusNotchGeometry(
-    geometry: ArcGaugeGeometry,
+    geometry: ProgressCircleGeometry,
     strokeWidth: number,
-    statusIcon: ArcGaugeStatusIcon,
+    statusIcon: ProgressCircleStatusIcon,
 ): StatusNotchGeometry {
     const gapWidth = strokeWidth * ARC_LAYOUT.statusIconGapWidthRatio;
     const gapAngleRadians = 2 * Math.asin(clamp(gapWidth / (2 * geometry.radius), 0.1, 0.8));
@@ -357,7 +357,7 @@ function buildStatusNotchGeometry(
     };
 }
 
-function buildGaugeNotchGeometry(geometry: ArcGaugeGeometry): RingNotchGeometry {
+function buildGaugeNotchGeometry(geometry: ProgressCircleGeometry): RingNotchGeometry {
     const gapAngleDegrees = ARC_LAYOUT.gaugeGapAngleDegrees;
     const gapLength = geometry.circumference * (gapAngleDegrees / 360);
 
@@ -370,7 +370,7 @@ function buildGaugeNotchGeometry(geometry: ArcGaugeGeometry): RingNotchGeometry 
 }
 
 function renderRing(options: {
-    geometry: ArcGaugeGeometry;
+    geometry: ProgressCircleGeometry;
     progress: number;
     trackColor: string;
     progressStroke: string;
@@ -452,7 +452,7 @@ function renderRing(options: {
 }
 
 function renderRingCircle(options: {
-    geometry: ArcGaugeGeometry;
+    geometry: ProgressCircleGeometry;
     stroke: string;
     strokeWidth: number;
     dashArray: string;
@@ -512,9 +512,9 @@ function renderGaugeValueContent(options: {
     unitText: string;
     centerTextMaxWidth: number;
     footerIconFragment: string | undefined;
-    config: ArcGaugeConfig;
+    config: ProgressCircleConfig;
 }): string {
-    assertArcGaugeLabel(options.labelText);
+    assertProgressCircleLabel(options.labelText);
     const bottomLabelYCoordinate = options.centerYCoordinate + ARC_LAYOUT.gaugeBottomLabel.yOffset;
 
     return `
@@ -538,7 +538,7 @@ function renderGaugeValueRow(options: {
     unitFontSize: number;
     unitText: string;
     centerTextMaxWidth: number;
-    config: ArcGaugeConfig;
+    config: ProgressCircleConfig;
 }): string {
     const yCoordinate = options.centerYCoordinate + ARC_LAYOUT.gaugeValueYOffset;
     const valueTextStyle = options.config.textStyles.value;
@@ -546,7 +546,7 @@ function renderGaugeValueRow(options: {
 
     if (options.unitText.length === 0) {
         return renderConstrainedSvgText({
-            id: "arc-gauge-value",
+            id: "progress-circle-value",
             text: options.valueText,
             xCoordinate: options.centerXCoordinate,
             yCoordinate,
@@ -579,7 +579,7 @@ function renderGaugeValueRow(options: {
 
     return `
         ${renderConstrainedSvgText({
-            id: "arc-gauge-value",
+            id: "progress-circle-value",
             text: options.valueText,
             xCoordinate: valuePlacement.xCoordinate,
             yCoordinate,
@@ -595,7 +595,7 @@ function renderGaugeValueRow(options: {
             ],
         })}
         ${renderConstrainedSvgText({
-            id: "arc-gauge-unit",
+            id: "progress-circle-unit",
             text: options.unitText,
             xCoordinate: unitXCoordinate,
             yCoordinate,
@@ -698,7 +698,7 @@ function renderGaugeBottomLabel(options: {
     centerXCoordinate: number;
     yCoordinate: number;
     maxWidth: number;
-    config: ArcGaugeConfig;
+    config: ProgressCircleConfig;
 }): string {
     const labelTextStyle = options.config.textStyles.smallLabel;
     const fontSize = ARC_LAYOUT.gaugeBottomLabel.fontSize;
@@ -714,7 +714,7 @@ function renderGaugeBottomLabel(options: {
 
     return `
         ${renderConstrainedSvgText({
-            id: "arc-gauge-bottom-label",
+            id: "progress-circle-bottom-label",
             text: options.labelText,
             xCoordinate: labelXCoordinate,
             yCoordinate: options.yCoordinate,
@@ -750,9 +750,9 @@ function renderCenterValue(options: {
     unitText: string;
     centerTextMaxWidth: number;
     footerIconFragment: string | undefined;
-    config: ArcGaugeConfig;
+    config: ProgressCircleConfig;
 }): string {
-    assertArcGaugeLabel(options.labelText);
+    assertProgressCircleLabel(options.labelText);
     const labelTextStyle = options.config.textStyles.label;
     const valueTextStyle = options.config.textStyles.value;
     const unitTextStyle = options.config.textStyles.unit;

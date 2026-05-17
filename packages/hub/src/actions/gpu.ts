@@ -9,7 +9,7 @@ import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-forma
 import { buildTemperatureWidgetData } from "../metrics/temperature-widget-data";
 import { logger } from "../logging/logger";
 import { buildMetricViewIcons } from "../widgets/icons/metric-view-icons";
-import { ARC_GAUGE_LABELS } from "../widgets/primitives/arc-gauge-label";
+import { PROGRESS_CIRCLE_LABELS } from "../widgets/primitives/progress-circle-label";
 import {
     GPU_MODEL_METRIC_KEY,
     GPU_POWER_LIMIT_METRIC_KEY,
@@ -109,7 +109,7 @@ function buildGpuViewOptions(options: {
                     celsiusWidgetData: getGpuWidgetData(
                         options.metrics,
                         GPU_TEMP_METRIC_KEY,
-                        ARC_GAUGE_LABELS.gpu,
+                        PROGRESS_CIRCLE_LABELS.gpu,
                         "C",
                         options.target.reading.maximumCelsius,
                     ),
@@ -123,8 +123,8 @@ function buildGpuViewOptions(options: {
                 ...baseOptions,
                 metricKey: GPU_VRAM_USED_METRIC_KEY,
                 widgetData: buildGpuVramWidgetData(
-                    getGpuWidgetData(options.metrics, GPU_VRAM_USED_METRIC_KEY, ARC_GAUGE_LABELS.vram, "MB"),
-                    getGpuWidgetData(options.metrics, GPU_VRAM_TOTAL_METRIC_KEY, ARC_GAUGE_LABELS.vram, "MB").current,
+                    getGpuWidgetData(options.metrics, GPU_VRAM_USED_METRIC_KEY, PROGRESS_CIRCLE_LABELS.vram, "MB"),
+                    getGpuWidgetData(options.metrics, GPU_VRAM_TOTAL_METRIC_KEY, PROGRESS_CIRCLE_LABELS.vram, "MB").current,
                 ),
                 ...buildMetricViewIcons({ hardware: "gpu", status: "memory" }),
             };
@@ -136,7 +136,7 @@ function buildGpuViewOptions(options: {
                     powerWidgetData: getGpuWidgetData(
                         options.metrics,
                         GPU_POWER_METRIC_KEY,
-                        ARC_GAUGE_LABELS.gpu,
+                        PROGRESS_CIRCLE_LABELS.gpu,
                         "W",
                         options.target.reading.maximumWatts,
                     ),
@@ -145,7 +145,7 @@ function buildGpuViewOptions(options: {
                 ...buildMetricViewIcons({ hardware: "gpu", status: "power" }),
             };
         case "usage": {
-            const data = getGpuWidgetData(options.metrics, GPU_USAGE_METRIC_KEY, ARC_GAUGE_LABELS.gpu, "%");
+            const data = getGpuWidgetData(options.metrics, GPU_USAGE_METRIC_KEY, PROGRESS_CIRCLE_LABELS.gpu, "%");
 
             return {
                 ...baseOptions,
@@ -168,7 +168,7 @@ function buildGpuViewOptions(options: {
 function resolveRuntimeGpuPowerMaximumWatts(metrics: MetricStoreReader): number | undefined {
     const powerLimitWidgetData = metrics.getWidgetData(
         GPU_POWER_LIMIT_METRIC_KEY,
-        ARC_GAUGE_LABELS.gpu,
+        PROGRESS_CIRCLE_LABELS.gpu,
         "W",
     );
 
@@ -181,7 +181,7 @@ function resolveRuntimeGpuPowerMaximumWatts(metrics: MetricStoreReader): number 
 
     const powerWidgetData = metrics.getWidgetData(
         GPU_POWER_METRIC_KEY,
-        ARC_GAUGE_LABELS.gpu,
+        PROGRESS_CIRCLE_LABELS.gpu,
         "W",
     );
     if (
@@ -260,7 +260,7 @@ export function buildGpuVramWidgetData(used: WidgetData, totalMegabytes: number)
         progress: Math.min(Math.max(used.current / safeTotalMegabytes, 0), 1),
         history: used.history.map((historyValue) => (historyValue / safeTotalMegabytes) * 100),
         unit: "%",
-        label: ARC_GAUGE_LABELS.vram,
+        label: PROGRESS_CIRCLE_LABELS.vram,
         displayValue: ((used.current / safeTotalMegabytes) * 100).toFixed(0),
         secondaryDisplayValue: usedAndTotalText,
         sparklineScale: {

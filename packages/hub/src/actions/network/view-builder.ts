@@ -15,7 +15,7 @@ import {
     buildNetworkSpeedWidgetData,
     convertMegabitsPerSecondToBytesPerSecond,
 } from "../../metrics/network-speed-widget-data";
-import { ARC_GAUGE_LABELS } from "../../widgets/primitives/arc-gauge-label";
+import { PROGRESS_CIRCLE_LABELS } from "../../widgets/primitives/progress-circle-label";
 import {
     getNetworkDirectionStatusIcon,
     renderNetworkDirectionIconFragment,
@@ -85,7 +85,7 @@ export function buildNetworkViewUpdate(options: BuildNetworkViewOptions): Networ
     const circleVariant = appearance.view.circleVariant;
     const shouldRenderGaugeFooter = selectedView === "circle" && circleVariant === "gauge";
     const renderedWidgetData = shouldRenderGaugeFooter
-        ? { ...viewWidgetData, label: ARC_GAUGE_LABELS.network }
+        ? { ...viewWidgetData, label: PROGRESS_CIRCLE_LABELS.network }
         : viewWidgetData;
 
     return {
@@ -421,7 +421,7 @@ function buildNetworkWidgetData(options: {
 }
 
 function getNetworkDirectionLabel(direction: NetworkMetricDirection): string {
-    return direction === "download" ? ARC_GAUGE_LABELS.download : ARC_GAUGE_LABELS.upload;
+    return direction === "download" ? PROGRESS_CIRCLE_LABELS.download : PROGRESS_CIRCLE_LABELS.upload;
 }
 
 function buildNetworkCenterIconFragment(options: {

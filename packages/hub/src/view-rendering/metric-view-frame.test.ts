@@ -14,7 +14,7 @@ import {
     type DualChannelWidgetData,
     type WidgetData,
 } from "../view-rendering/widget-data";
-import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
+import type { ProgressCircleStatusIcon } from "../widgets/primitives/progress-circle";
 import {
     buildMetricViewRenderPlan,
     buildRenderDualChannelWidgetData,
@@ -286,7 +286,7 @@ function buildWidgetData(options: Partial<WidgetData> = {}): WidgetData {
     };
 }
 
-function buildStatusIcon(): ArcGaugeStatusIcon {
+function buildStatusIcon(): ProgressCircleStatusIcon {
     return {
         fragment: "<path />",
         viewBox: {

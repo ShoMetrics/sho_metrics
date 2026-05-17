@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { Resvg } from "@resvg/resvg-js";
-import { renderMetricFrame } from "../../src/rendering/metric-frame";
-import { resolveResvgFontOptions } from "../../src/rendering/resvg-font-options";
-import { renderSingleMetricBodyView } from "../../src/rendering/single-metric-view";
-import { WIDGET_LOGICAL_SIZE, type KeySize, type WidgetData } from "../../src/rendering/widget-data";
+import { renderMetricFrame } from "../../src/view-rendering/metric-frame";
+import { resolveResvgFontOptions } from "../../src/view-rendering/resvg-font-options";
+import { renderSingleMetricBodyView } from "../../src/view-rendering/single-metric-view";
+import { WIDGET_LOGICAL_SIZE, type KeySize, type WidgetData } from "../../src/view-rendering/widget-data";
 import type { ResolvedAppearanceSettingsOverride } from "../../src/settings/appearance-overrides";
 import { buildDefaultAppearanceSettings } from "../../src/settings/default-appearance-settings";
 import { buildMetricRenderAppearance } from "../../src/settings/render-appearance-builder";
@@ -27,117 +27,117 @@ interface TerminalVisualWidgetTestCase {
     readonly data: WidgetData;
     readonly centerIcon?: string;
     readonly footerIcon?: string;
-    readonly linearIcon?: string;
+    readonly topIcon?: string;
 }
 
 const TERMINAL_VISUAL_TEST_CASES: readonly TerminalVisualWidgetTestCase[] = [
     {
-        snapshotName: "terminal-clean-single-circular-value-terminal-screen",
+        snapshotName: "terminal-clean-single-circle-full-ring-terminal-screen",
         appearance: buildTerminalAppearanceOverride({
-            graphType: "circular",
-            circleStyle: "value",
+            selectedView: "circle",
+            circleVariant: "full-ring",
             variant: "clean",
         }),
         data: CPU_USAGE_WIDGET_DATA,
     },
     {
-        snapshotName: "terminal-clean-single-circular-minimal-icon-terminal-screen",
+        snapshotName: "terminal-clean-single-circle-minimal-icon-terminal-screen",
         appearance: buildTerminalAppearanceOverride({
-            graphType: "circular",
-            circleStyle: "compact",
+            selectedView: "circle",
+            circleVariant: "minimal",
             variant: "clean",
         }),
         data: CPU_USAGE_WIDGET_DATA,
         centerIcon: CPU_ICON_FRAGMENT,
     },
     {
-        snapshotName: "terminal-clean-single-circular-gauge-terminal-screen",
+        snapshotName: "terminal-clean-single-circle-gauge-terminal-screen",
         appearance: buildTerminalAppearanceOverride({
-            graphType: "circular",
-            circleStyle: "gauge",
+            selectedView: "circle",
+            circleVariant: "gauge",
             variant: "clean",
         }),
         data: CPU_USAGE_WIDGET_DATA,
     },
     {
-        snapshotName: "terminal-clean-single-linear-progress-terminal-screen",
+        snapshotName: "terminal-clean-single-progress-bar-terminal-screen",
         appearance: buildTerminalAppearanceOverride({
-            graphType: "linear",
-            circleStyle: "value",
+            selectedView: "bar",
+            circleVariant: "full-ring",
             variant: "clean",
         }),
         data: {
             ...CPU_USAGE_WIDGET_DATA,
-            linearLabel: "CPU Load",
+            barLabel: "CPU Load",
             secondaryDisplayValue: "OK",
         },
         centerIcon: CPU_ICON_FRAGMENT,
-        linearIcon: CPU_ICON_FRAGMENT,
+        topIcon: CPU_ICON_FRAGMENT,
     },
     {
         snapshotName: "terminal-clean-single-sparkline-terminal-screen",
         appearance: buildTerminalAppearanceOverride({
-            graphType: "sparkline",
-            circleStyle: "value",
+            selectedView: "line",
+            circleVariant: "full-ring",
             variant: "clean",
         }),
         data: CPU_USAGE_WIDGET_DATA,
         centerIcon: CPU_ICON_FRAGMENT,
-        linearIcon: CPU_ICON_FRAGMENT,
+        topIcon: CPU_ICON_FRAGMENT,
     },
     {
-        snapshotName: "terminal-vintage-single-circular-value-fixed-phosphor-screen",
+        snapshotName: "terminal-vintage-single-circle-full-ring-fixed-phosphor-screen",
         appearance: buildTerminalAppearanceOverride({
-            graphType: "circular",
-            circleStyle: "value",
+            selectedView: "circle",
+            circleVariant: "full-ring",
             variant: "vintage",
         }),
         data: CPU_USAGE_WIDGET_DATA,
     },
     {
-        snapshotName: "terminal-vintage-single-circular-minimal-icon-fixed-phosphor-screen",
+        snapshotName: "terminal-vintage-single-circle-minimal-icon-fixed-phosphor-screen",
         appearance: buildTerminalAppearanceOverride({
-            graphType: "circular",
-            circleStyle: "compact",
+            selectedView: "circle",
+            circleVariant: "minimal",
             variant: "vintage",
         }),
         data: CPU_USAGE_WIDGET_DATA,
         centerIcon: CPU_ICON_FRAGMENT,
     },
     {
-        snapshotName: "terminal-vintage-single-circular-gauge-fixed-phosphor-screen",
+        snapshotName: "terminal-vintage-single-circle-gauge-fixed-phosphor-screen",
         appearance: buildTerminalAppearanceOverride({
-            graphType: "circular",
-            circleStyle: "gauge",
+            selectedView: "circle",
+            circleVariant: "gauge",
             variant: "vintage",
         }),
         data: CPU_USAGE_WIDGET_DATA,
     },
     {
-        snapshotName: "terminal-vintage-single-linear-progress-fixed-phosphor-screen",
+        snapshotName: "terminal-vintage-single-progress-bar-fixed-phosphor-screen",
         appearance: buildTerminalAppearanceOverride({
-            graphType: "linear",
-            circleStyle: "value",
+            selectedView: "bar",
+            circleVariant: "full-ring",
             variant: "vintage",
         }),
         data: {
             ...CPU_USAGE_WIDGET_DATA,
-            linearLabel: "CPU Load",
+            barLabel: "CPU Load",
             secondaryDisplayValue: "OK",
         },
         centerIcon: CPU_ICON_FRAGMENT,
-        linearIcon: CPU_ICON_FRAGMENT,
+        topIcon: CPU_ICON_FRAGMENT,
     },
     {
         snapshotName: "terminal-vintage-single-sparkline-fixed-phosphor-screen",
         appearance: buildTerminalAppearanceOverride({
-            graphType: "sparkline",
-            circleStyle: "value",
+            selectedView: "line",
+            circleVariant: "full-ring",
             variant: "vintage",
         }),
         data: CPU_USAGE_WIDGET_DATA,
         centerIcon: CPU_ICON_FRAGMENT,
-        linearIcon: CPU_ICON_FRAGMENT,
+        topIcon: CPU_ICON_FRAGMENT,
     },
 ];
 
@@ -148,7 +148,7 @@ for (const testCase of TERMINAL_VISUAL_TEST_CASES) {
             data: testCase.data,
             centerIcon: testCase.centerIcon ?? "",
             footerIcon: testCase.footerIcon,
-            linearIcon: testCase.linearIcon,
+            topIcon: testCase.topIcon,
             keySize: WIDGET_LOGICAL_SIZE,
         });
         const pngBuffer = renderSvgToPngBuffer(svg, WIDGET_LOGICAL_SIZE);
@@ -158,14 +158,14 @@ for (const testCase of TERMINAL_VISUAL_TEST_CASES) {
 }
 
 function buildTerminalAppearanceOverride(options: {
-    graphType: "circular" | "text" | "linear" | "sparkline";
-    circleStyle: "value" | "compact" | "gauge";
+    selectedView: "circle" | "text" | "bar" | "line";
+    circleVariant: "full-ring" | "minimal" | "gauge";
     variant: "clean" | "vintage";
 }): ResolvedAppearanceSettingsOverride {
     return {
-        graph: {
-            viewLayout: options.graphType,
-            circleStyle: options.circleStyle,
+        view: {
+            selectedView: options.selectedView,
+            circleVariant: options.circleVariant,
         },
         theme: {
             selectedTheme: "terminal",
@@ -189,7 +189,7 @@ function renderSingleMetricWidgetSvg(options: {
     data: WidgetData;
     centerIcon: string;
     footerIcon?: string;
-    linearIcon?: string;
+    topIcon?: string;
     keySize: KeySize;
 }): string {
     const visualSettings = buildMetricRenderAppearance(buildDefaultAppearanceSettings(options.appearance));
@@ -199,13 +199,13 @@ function renderSingleMetricWidgetSvg(options: {
         renderSize: options.keySize,
         centerIcon: options.centerIcon,
         footerIcon: options.footerIcon,
-        linearIcon: options.linearIcon,
-        circleStyle: visualSettings.circleStyle,
+        topIcon: options.topIcon,
+        circleVariant: visualSettings.circleVariant,
     });
 
     return renderMetricFrame({
         body,
-        graphicStyle: visualSettings.graphicStyle,
+        themePreset: visualSettings.themePreset,
         muted: false,
         paints: visualSettings.paints,
         size: options.keySize,

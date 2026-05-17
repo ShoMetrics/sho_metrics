@@ -12,7 +12,7 @@ import {
 } from "../../tests/support/svg-paint-scanner";
 import type { DualChannelWidgetData, WidgetData } from "./widget-data";
 import { WIDGET_LOGICAL_SIZE } from "./widget-data";
-import type { ArcGaugeStatusIcon } from "../widgets/primitives/arc-gauge";
+import type { ProgressCircleStatusIcon } from "../widgets/primitives/progress-circle";
 import { getHardwareIconFragment } from "../widgets/icons/hardware-icons";
 import { getMetricStatusIcon } from "../widgets/icons/metric-status-icons";
 import { renderNetworkDirectionIconFragment } from "../widgets/icons/catalog/network";
@@ -156,7 +156,7 @@ function renderSingleFinalSvg(options: {
     centerIcon?: string;
     footerIcon?: string;
     topIcon?: string;
-    statusIcon?: ArcGaugeStatusIcon;
+    statusIcon?: ProgressCircleStatusIcon;
 }): string {
     const visualSettings = buildBlackWhiteRenderAppearance({
         renderPrimitive: options.renderPrimitive,
