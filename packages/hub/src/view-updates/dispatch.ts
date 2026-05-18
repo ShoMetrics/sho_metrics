@@ -1,4 +1,4 @@
-import type { WillAppearEvent } from "@elgato/streamdeck";
+import { Target, type WillAppearEvent } from "@elgato/streamdeck";
 import type { TouchStripMetricLayout } from "../view-rendering/metric-view-frame";
 
 export interface TouchStripMetricLayoutState {
@@ -28,7 +28,8 @@ export type MetricViewDispatchResult =
 
 export async function dispatchMetricViewImage(options: {
     readonly event: WillAppearEvent;
-    readonly pngDataUrl: string;
+    readonly softwarePngDataUrl: string;
+    readonly hardwarePngDataUrl: string;
     readonly touchStripMetricLayout: TouchStripMetricLayout | null;
     readonly touchStripMetricLayoutState: TouchStripMetricLayoutState;
     readonly isActionActive: () => boolean;
@@ -52,7 +53,7 @@ export async function dispatchMetricViewImage(options: {
 
 async function dispatchTouchStripMetricImage(options: {
     readonly event: WillAppearEvent;
-    readonly pngDataUrl: string;
+    readonly hardwarePngDataUrl: string;
     readonly touchStripMetricLayout: TouchStripMetricLayout | null;
     readonly touchStripMetricLayoutState: TouchStripMetricLayoutState;
     readonly isActionActive: () => boolean;
@@ -71,7 +72,7 @@ async function dispatchTouchStripMetricImage(options: {
         }
 
         updateStartTimestampMilliseconds = Date.now();
-        await options.event.action.setFeedback({ metricImage: options.pngDataUrl });
+        await options.event.action.setFeedback({ metricImage: options.hardwarePngDataUrl });
 
         return {
             status: "rendered",
@@ -94,12 +95,18 @@ async function dispatchTouchStripMetricImage(options: {
 
 async function dispatchKeyMetricImage(options: {
     readonly event: WillAppearEvent;
-    readonly pngDataUrl: string;
+    readonly softwarePngDataUrl: string;
+    readonly hardwarePngDataUrl: string;
 }): Promise<MetricViewDispatchResult> {
     const updateStartTimestampMilliseconds = Date.now();
 
     try {
-        await options.event.action.setImage(options.pngDataUrl);
+        if (options.softwarePngDataUrl === options.hardwarePngDataUrl) {
+            await options.event.action.setImage(options.hardwarePngDataUrl);
+        } else {
+            await options.event.action.setImage(options.softwarePngDataUrl, { target: Target.Software });
+            await options.event.action.setImage(options.hardwarePngDataUrl, { target: Target.Hardware });
+        }
 
         return {
             status: "rendered",

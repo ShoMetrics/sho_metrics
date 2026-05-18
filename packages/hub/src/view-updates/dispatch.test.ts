@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { WillAppearEvent } from "@elgato/streamdeck";
+import { Target, type WillAppearEvent } from "@elgato/streamdeck";
 import {
     dispatchMetricViewImage,
     type TouchStripMetricLayoutState,
@@ -11,7 +11,8 @@ test("dispatch sends key images through setImage", async () => {
     const action = new FakeKeyAction();
     const result = await dispatchMetricViewImage({
         event: buildEvent(action),
-        pngDataUrl: "data:image/png;base64,key",
+        softwarePngDataUrl: "data:image/png;base64,key",
+        hardwarePngDataUrl: "data:image/png;base64,key",
         touchStripMetricLayout: null,
         touchStripMetricLayoutState: buildTouchStripMetricLayoutState(),
         isActionActive: () => true,
@@ -21,11 +22,30 @@ test("dispatch sends key images through setImage", async () => {
     assert.deepEqual(action.calls, ["setImage:data:image/png;base64,key"]);
 });
 
+test("dispatch can send different key images to software and hardware targets", async () => {
+    const action = new FakeKeyAction();
+    const result = await dispatchMetricViewImage({
+        event: buildEvent(action),
+        softwarePngDataUrl: "data:image/png;base64,software",
+        hardwarePngDataUrl: "data:image/png;base64,hardware",
+        touchStripMetricLayout: null,
+        touchStripMetricLayoutState: buildTouchStripMetricLayoutState(),
+        isActionActive: () => true,
+    });
+
+    assert.equal(result.status, "rendered");
+    assert.deepEqual(action.calls, [
+        "setImage:data:image/png;base64,software:target=2",
+        "setImage:data:image/png;base64,hardware:target=1",
+    ]);
+});
+
 test("dispatch applies touch strip layout before dial feedback", async () => {
     const action = new FakeDialAction();
     const result = await dispatchMetricViewImage({
         event: buildEvent(action),
-        pngDataUrl: "data:image/png;base64,dial",
+        softwarePngDataUrl: "data:image/png;base64,dial-software",
+        hardwarePngDataUrl: "data:image/png;base64,dial",
         touchStripMetricLayout: buildTouchStripMetricLayout(),
         touchStripMetricLayoutState: buildTouchStripMetricLayoutState(),
         isActionActive: () => true,
@@ -45,7 +65,8 @@ test("dispatch does not send dial feedback after the action becomes inactive", a
     });
     const result = await dispatchMetricViewImage({
         event: buildEvent(action),
-        pngDataUrl: "data:image/png;base64,dial",
+        softwarePngDataUrl: "data:image/png;base64,dial-software",
+        hardwarePngDataUrl: "data:image/png;base64,dial",
         touchStripMetricLayout: buildTouchStripMetricLayout(),
         touchStripMetricLayoutState: buildTouchStripMetricLayoutState(),
         isActionActive: () => isActive,
@@ -67,8 +88,9 @@ class FakeKeyAction {
         return false;
     }
 
-    setImage(pngDataUrl: string): Promise<void> {
-        this.calls.push(`setImage:${pngDataUrl}`);
+    setImage(pngDataUrl: string, options?: { readonly target?: Target }): Promise<void> {
+        const targetSuffix = options?.target == null ? "" : `:target=${options.target}`;
+        this.calls.push(`setImage:${pngDataUrl}${targetSuffix}`);
         return Promise.resolve();
     }
 }

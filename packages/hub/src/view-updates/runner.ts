@@ -21,6 +21,12 @@ import {
     recordMetricViewPerformanceSample,
 } from "./view-update-observability";
 import { buildMetricRenderAppearance } from "../settings/render-appearance-builder";
+import {
+    resolveHardwareColorCompensationProfile,
+    shouldSuppressMetricViewForColorCompensation,
+} from "../color-compensation/runtime-store";
+import { wrapSvgWithColorCompensationFilter } from "../view-rendering/color-compensation-filter";
+import { hasColorCompensationProfileEffect } from "../color-compensation/types";
 
 const log = logger.for("MetricViewUpdateRunner");
 
@@ -49,7 +55,7 @@ interface MetricViewActionState {
     pendingUpdateReason: MetricViewUpdatePriority;
     pendingSettingsSignature: string | null;
     touchStripMetricLayoutState: TouchStripMetricLayoutState;
-    lastRenderedSvg: string | null;
+    lastRenderedSvgSignature: string | null;
     lastScheduledSettingsSignature: string | null;
 }
 
@@ -66,6 +72,10 @@ export class MetricViewUpdateRunner {
     }
 
     setMetricView(options: MetricViewOptions): void {
+        if (shouldSuppressMetricViewForColorCompensation(options.event.action.id)) {
+            return;
+        }
+
         const metricViewActionState = this.getOrCreateMetricViewActionState(options.event.action.id);
 
         this.recordMetricViewUpdate(metricViewActionState, options);
@@ -114,7 +124,22 @@ export class MetricViewUpdateRunner {
         });
         const renderPlan = frame.renderPlan;
         const renderedMetricData = frame.renderedMetricData;
-        const svg = frame.svg;
+        const colorCompensationProfile = resolveHardwareColorCompensationProfile({
+            actionId: options.event.action.id,
+            streamDeckDeviceId: options.event.action.device.id,
+            surfaceId: undefined,
+        });
+        const softwareSvg = frame.svg;
+        const hardwareSvg = hasColorCompensationProfileEffect(colorCompensationProfile)
+            ? wrapSvgWithColorCompensationFilter(softwareSvg, colorCompensationProfile)
+            : softwareSvg;
+        const renderedSvgSignature = hardwareSvg === softwareSvg
+            ? softwareSvg
+            : [
+                softwareSvg,
+                "<!-- shometrics-hardware-image -->",
+                hardwareSvg,
+            ].join("\n");
         const titleClearRequested = options.event.action.isKey();
 
         if (updateReason === "settings-change") {
@@ -138,7 +163,7 @@ export class MetricViewUpdateRunner {
 
         const composeEndTimestampMilliseconds = Date.now();
 
-        if (svg === metricViewActionState.lastRenderedSvg) {
+        if (renderedSvgSignature === metricViewActionState.lastRenderedSvgSignature) {
             if (updateReason === "settings-change") {
                 log.info(() => [
                     "settingsViewSkippedUnchanged",
@@ -176,10 +201,33 @@ export class MetricViewUpdateRunner {
             return;
         }
 
-        const pngDataUrl = rasterizeSvgToPngDataUrl(svg, renderPlan.pngSize);
+        const softwarePngDataUrl = rasterizeSvgToPngDataUrl(softwareSvg, renderPlan.pngSize);
+
+        if (!softwarePngDataUrl) {
+            recordMetricViewPerformanceSample({
+                event: options.event,
+                updateReason,
+                outcome: "failed",
+                titleClearRequested,
+                updateTimestampMilliseconds,
+                renderStartTimestampMilliseconds,
+                composeEndTimestampMilliseconds,
+                rasterizeEndTimestampMilliseconds: Date.now(),
+                updateStartTimestampMilliseconds: null,
+                updateEndTimestampMilliseconds: Date.now(),
+                queueLength: this.metricViewActionQueue.length,
+                activeActionCount: this.metricViewActionStates.size,
+            });
+            this.finishMetricViewUpdate(metricViewActionState);
+            return;
+        }
+
+        const hardwarePngDataUrl = hardwareSvg === softwareSvg
+            ? softwarePngDataUrl
+            : rasterizeSvgToPngDataUrl(hardwareSvg, renderPlan.pngSize);
         const rasterizeEndTimestampMilliseconds = Date.now();
 
-        if (!pngDataUrl) {
+        if (!hardwarePngDataUrl) {
             recordMetricViewPerformanceSample({
                 event: options.event,
                 updateReason,
@@ -217,7 +265,8 @@ export class MetricViewUpdateRunner {
 
         dispatchMetricViewImage({
             event: options.event,
-            pngDataUrl,
+            softwarePngDataUrl,
+            hardwarePngDataUrl,
             touchStripMetricLayout: renderPlan.touchStripMetricLayout,
             touchStripMetricLayoutState: metricViewActionState.touchStripMetricLayoutState,
             isActionActive: () => metricViewActionState.active,
@@ -228,7 +277,7 @@ export class MetricViewUpdateRunner {
                 }
 
                 if (dispatchResult.status === "rendered") {
-                    metricViewActionState.lastRenderedSvg = svg;
+                    metricViewActionState.lastRenderedSvgSignature = renderedSvgSignature;
                 }
 
                 recordMetricViewPerformanceSample({
@@ -308,7 +357,7 @@ export class MetricViewUpdateRunner {
                 layoutPromise: null,
                 layoutPath: null,
             },
-            lastRenderedSvg: null,
+            lastRenderedSvgSignature: null,
             lastScheduledSettingsSignature: null,
         };
         this.metricViewActionStates.set(actionId, metricViewActionState);

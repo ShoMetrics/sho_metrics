@@ -128,6 +128,7 @@ test("separate runner instances do not share action state", async () => {
 class FakeKeyAction {
     readonly calls: string[] = [];
     readonly imageDataUrlList: string[] = [];
+    readonly device = { id: "device-1" };
 
     constructor(
         readonly id: string,
