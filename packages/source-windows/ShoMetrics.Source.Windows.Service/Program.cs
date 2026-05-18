@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
+using ShoMetrics.Source.Windows.Core;
 
 namespace ShoMetrics.Source.Windows.Service;
 
@@ -59,6 +60,7 @@ internal static class Program
                     services.AddSingleton<SourceIpcFrameCodec>();
                     services.AddSingleton<SourceProtocolMapper>();
                     services.AddSingleton<SourceRequestHandler>();
+                    services.AddSingleton<LibreHardwareMonitorSession>();
                     services.AddSingleton<WindowsPipeSourceServer>();
                     services.AddHostedService<WindowsSourceWorker>();
                 })

@@ -706,7 +706,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         IReadOnlyCollection<string> metricIds,
         CancellationToken cancellationToken);
 
-    public Task<IReadOnlyList<HardwareMetricDescriptor>> ListMetricDescriptorsAsync(
+    public Task<HardwareMetricDescriptorSnapshot> ListMetricDescriptorsAsync(
         IReadOnlyCollection<string> metricIds,
         CancellationToken cancellationToken);
 }
@@ -720,6 +720,7 @@ Rules:
 - Do not expose LHM types outside Core.
 - `MetricSnapshot` in this step means `ShoMetrics.Source.Windows.Core.MetricSnapshot`, not the protobuf `MetricSnapshot`.
 - `HardwareMetricDescriptor` is a Core DTO with descriptor metadata only. It must not reference generated protobuf types.
+- `HardwareMetricDescriptorSnapshot` carries descriptors plus source warnings. It must not reference generated protobuf types.
 - The existing one-shot `ShoMetrics.Source.Windows.Helper` may keep using the existing CLI path until it is intentionally migrated.
 - If long-lived LHM session initialization fails, service health must report a warning and snapshot reads must return `source_unavailable`.
 
