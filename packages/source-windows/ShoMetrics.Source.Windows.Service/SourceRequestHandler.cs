@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
 using ShoMetrics.Contracts.V1;
 using ShoMetrics.Source.Windows.Core;
+using CoreDescriptorSnapshot = ShoMetrics.Source.Windows.Core.HardwareMetricDescriptorSnapshot;
+using CoreMetricSnapshot = ShoMetrics.Source.Windows.Core.MetricSnapshot;
 
 namespace ShoMetrics.Source.Windows.Service;
 
@@ -48,24 +50,77 @@ internal sealed class SourceRequestHandler(
         }
     }
 
-    private Task<SourceIpcResponse> DispatchAsync(
+    private async Task<SourceIpcResponse> DispatchAsync(
         SourceIpcRequest request,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        SourceIpcResponse response = request.PayloadCase switch
+        return request.PayloadCase switch
         {
             SourceIpcRequest.PayloadOneofCase.GetSourceHealth =>
                 protocolMapper.BuildHealthResponse(request.RequestId, monitorSession.InitializationWarnings),
             SourceIpcRequest.PayloadOneofCase.ReadMetricSnapshot =>
-                protocolMapper.BuildSourceUnavailableResponse(request.RequestId),
+                await HandleReadMetricSnapshotAsync(
+                    request.RequestId,
+                    request.ReadMetricSnapshot,
+                    cancellationToken).ConfigureAwait(false),
             SourceIpcRequest.PayloadOneofCase.ListMetricDescriptors =>
-                protocolMapper.BuildSourceUnavailableResponse(request.RequestId),
+                await HandleListMetricDescriptorsAsync(
+                    request.RequestId,
+                    request.ListMetricDescriptors,
+                    cancellationToken).ConfigureAwait(false),
             _ => protocolMapper.BuildInvalidRequestResponse(request.RequestId),
         };
+    }
 
-        return Task.FromResult(response);
+    private async Task<SourceIpcResponse> HandleReadMetricSnapshotAsync(
+        string requestId,
+        ReadMetricSnapshotRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!monitorSession.IsAvailable)
+        {
+            return protocolMapper.BuildSourceUnavailableResponse(requestId);
+        }
+
+        CoreMetricSnapshot snapshot = await monitorSession
+            .ReadSnapshotAsync(request.MetricIds, cancellationToken)
+            .ConfigureAwait(false);
+
+        CoreDescriptorSnapshot? descriptorSnapshot = null;
+        if (request.IncludeDescriptors)
+        {
+            descriptorSnapshot = await monitorSession
+                .ListMetricDescriptorsAsync(request.MetricIds, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        return protocolMapper.BuildReadMetricSnapshotResponse(
+            requestId,
+            snapshot,
+            request.MetricIds,
+            descriptorSnapshot);
+    }
+
+    private async Task<SourceIpcResponse> HandleListMetricDescriptorsAsync(
+        string requestId,
+        ListMetricDescriptorsRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!monitorSession.IsAvailable)
+        {
+            return protocolMapper.BuildSourceUnavailableResponse(requestId);
+        }
+
+        CoreDescriptorSnapshot descriptorSnapshot = await monitorSession
+            .ListMetricDescriptorsAsync(request.MetricIds, cancellationToken)
+            .ConfigureAwait(false);
+
+        return protocolMapper.BuildListMetricDescriptorsResponse(
+            requestId,
+            descriptorSnapshot,
+            request.MetricIds);
     }
 
     private static TimeSpan ResolveOperationTimeout(SourceIpcRequest.PayloadOneofCase payloadCase)
