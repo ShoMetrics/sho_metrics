@@ -2,13 +2,13 @@ import {
     DEFAULT_COLOR_COMPENSATION_PROFILE,
     normalizeColorCompensationProfile,
     type ColorCompensationProfile,
-    type ColorCompensationStepId,
+    type ColorCompensationAdjustmentId,
 } from "./types";
 
 export const COLOR_COMPENSATION_MESSAGE_TYPE = "shometrics.colorCompensation";
 
 export type ColorCompensationPreviewKind =
-    | ColorCompensationStepId
+    | ColorCompensationAdjustmentId
     | "preflight"
     | "review-before"
     | "review-after"

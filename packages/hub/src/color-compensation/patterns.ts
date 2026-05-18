@@ -1,7 +1,7 @@
-import type { ColorCompensationStepId } from "./types";
+import type { ColorCompensationAdjustmentId } from "./types";
 
 export type ColorCompensationSampleFocus =
-    | ColorCompensationStepId
+    | ColorCompensationAdjustmentId
     | "preflight"
     | "review";
 

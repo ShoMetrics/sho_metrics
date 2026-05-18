@@ -2,16 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
 import {
-    COLOR_COMPENSATION_WIZARD_STEPS,
+    COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS,
     colorCompensationWizardReducer,
     createColorCompensationWizardState,
-    readStepValue,
+    readAdjustmentValue,
 } from "./color-compensation-reducer";
 
 test("wizard orders coarse adjustments before finer tonal adjustments", () => {
-    assert.deepEqual(COLOR_COMPENSATION_WIZARD_STEPS, [
+    assert.deepEqual(COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS, [
         "saturation",
-        "brightness",
         "gamma",
         "shadow",
     ]);
@@ -40,12 +39,12 @@ test("existing stored profile starts on profile page", () => {
 test("step changes write profile adjustments", () => {
     const state = createColorCompensationWizardState(DEFAULT_COLOR_COMPENSATION_PROFILE);
     const changedState = colorCompensationWizardReducer(state, {
-        type: "stepValueChanged",
-        stepId: "saturation",
+        type: "adjustmentValueChanged",
+        adjustmentId: "saturation",
         value: 3,
     });
 
-    assert.equal(readStepValue(changedState.profile, "saturation"), 3);
+    assert.equal(readAdjustmentValue(changedState.profile, "saturation"), 3);
     assert.deepEqual(changedState.profile, {
         brightnessAdjustment: 0,
         saturationAdjustment: 3,
