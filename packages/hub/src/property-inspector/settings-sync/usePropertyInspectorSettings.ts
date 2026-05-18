@@ -28,6 +28,12 @@ import {
     type StoredGlobalSettingsPatch,
 } from "../../settings/storage/global-settings-patch";
 import {
+    clearStoredColorCompensationProfile,
+    readStoredColorCompensationProfile,
+    writeStoredColorCompensationProfile,
+} from "../../settings/storage/color-compensation-settings";
+import type { ColorCompensationProfile } from "../../color-compensation/types";
+import {
     initialSettingsSyncState,
     settingsSyncReducer,
     type InspectorGlobalSettingsRead,
@@ -70,6 +76,10 @@ export function usePropertyInspectorSettings(
 
     const resolvedGlobalSettings = useMemo(
         () => resolveStoredGlobalSettings(readStoredGlobalSettings(state.rawGlobalSettings).settings),
+        [state.rawGlobalSettings],
+    );
+    const colorCompensationProfile = useMemo(
+        () => readStoredColorCompensationProfile(readStoredGlobalSettings(state.rawGlobalSettings).settings),
         [state.rawGlobalSettings],
     );
     const visibilityContext = useMemo(() => buildPropertyInspectorContext({
@@ -138,6 +148,41 @@ export function usePropertyInspectorSettings(
             });
         });
     }, [client]);
+    const saveColorCompensationProfile = useCallback(async (profile: ColorCompensationProfile): Promise<void> => {
+        const currentSnapshot = settingsInputSnapshotRef.current;
+        const nextRawGlobalSettings = writeStoredColorCompensationProfile(
+            currentSnapshot.rawGlobalSettings,
+            profile,
+        );
+        updateSettingsInputSnapshot(settingsInputSnapshotRef, { rawGlobalSettings: nextRawGlobalSettings });
+        dispatchSettingsAction({ type: "globalSettingsPatched", rawGlobalSettings: nextRawGlobalSettings });
+
+        try {
+            await client.setGlobalSettings(nextRawGlobalSettings);
+        } catch (error) {
+            dispatchSettingsAction({
+                type: "globalSaveFailed",
+                errorMessage: readErrorMessage(error),
+            });
+            throw error;
+        }
+    }, [client]);
+    const resetColorCompensationProfile = useCallback(async (): Promise<void> => {
+        const currentSnapshot = settingsInputSnapshotRef.current;
+        const nextRawGlobalSettings = clearStoredColorCompensationProfile(currentSnapshot.rawGlobalSettings);
+        updateSettingsInputSnapshot(settingsInputSnapshotRef, { rawGlobalSettings: nextRawGlobalSettings });
+        dispatchSettingsAction({ type: "globalSettingsPatched", rawGlobalSettings: nextRawGlobalSettings });
+
+        try {
+            await client.setGlobalSettings(nextRawGlobalSettings);
+        } catch (error) {
+            dispatchSettingsAction({
+                type: "globalSaveFailed",
+                errorMessage: readErrorMessage(error),
+            });
+            throw error;
+        }
+    }, [client]);
 
     useEffect(() => {
         let hasDisposed = false;
@@ -179,6 +224,11 @@ export function usePropertyInspectorSettings(
         globalSettingsStatus: state.globalSettingsStatus,
         widgetSettingsNotice: state.widgetSettingsNotice,
         globalSettingsNotice: state.globalSettingsNotice,
+        colorCompensation: {
+            profile: colorCompensationProfile,
+            saveProfile: saveColorCompensationProfile,
+            resetProfile: resetColorCompensationProfile,
+        },
         updateWidgetSettings,
         resetWidgetSettings,
         updateGlobalSettings,
@@ -429,4 +479,8 @@ function readWidgetRuntimeCachePatch(payload: unknown): WidgetRuntimeCachePatch 
     }
 
     return message.patch;
+}
+
+function readErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
 }

@@ -10,6 +10,7 @@ import {
 } from "../../settings/storage/widget-settings-patch";
 import { buildVisibilityContext, type InspectorTestSettings } from "../testing/test-context";
 import { WidgetSettingsTab } from "./WidgetSettingsTab";
+import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
 
 test("disk usage bar view settings render label controls without usage-mode controls", () => {
     const markup = renderWidgetSettings({
@@ -359,8 +360,10 @@ function renderWidgetSettings(options: {
         isGlobalViewOverrideEnabled: options.isGlobalViewOverrideEnabled ?? false,
         isGlobalThemeOverrideEnabled: options.isGlobalThemeOverrideEnabled ?? false,
         isGlobalPaintOverrideEnabled: options.isGlobalPaintOverrideEnabled ?? false,
+        colorCompensationProfile: DEFAULT_COLOR_COMPENSATION_PROFILE,
         onSettingsPatch: () => undefined,
         onResetWidgetSettings: () => undefined,
+        onOpenColorCompensation: () => undefined,
     }));
 }
 

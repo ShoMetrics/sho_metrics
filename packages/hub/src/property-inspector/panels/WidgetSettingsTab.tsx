@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { InspectorItem } from "../components/InspectorItem";
 import type { StoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
 import type { VisibilityContext } from "../inspector/types";
+import {
+    hasColorCompensationProfileEffect,
+    type ColorCompensationProfile,
+} from "../../color-compensation/types";
 import { DefaultWidgetSettings } from "./DefaultWidgetSettings";
 import { DiskWidgetSettings } from "./DiskWidgetSettings";
 import { GpuWidgetSettings } from "./GpuWidgetSettings";
@@ -13,8 +17,10 @@ interface WidgetSettingsTabProps {
     isGlobalViewOverrideEnabled: boolean;
     isGlobalThemeOverrideEnabled: boolean;
     isGlobalPaintOverrideEnabled: boolean;
+    colorCompensationProfile: ColorCompensationProfile;
     onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
     onResetWidgetSettings: () => void;
+    onOpenColorCompensation: () => void;
 }
 
 const WIDGET_SETTINGS_PENDING_NOTICE_DELAY_MS = 1000;
@@ -24,8 +30,10 @@ export function WidgetSettingsTab({
     isGlobalViewOverrideEnabled,
     isGlobalThemeOverrideEnabled,
     isGlobalPaintOverrideEnabled,
+    colorCompensationProfile,
     onSettingsPatch,
     onResetWidgetSettings,
+    onOpenColorCompensation,
 }: WidgetSettingsTabProps): React.JSX.Element {
     const [canShowPendingNotice, setCanShowPendingNotice] = useState(false);
     const isSettingsPending = context.actionKind === "unknown";
@@ -75,6 +83,10 @@ export function WidgetSettingsTab({
             )}
             {renderMetricPanel(panelProps)}
             <SettingsSection title="Advanced">
+                <ColorCompensationControls
+                    profile={colorCompensationProfile}
+                    onOpenColorCompensation={onOpenColorCompensation}
+                />
                 <InspectorItem className="widget-reset-item">
                     <button
                         className="inline-action-button"
@@ -86,6 +98,33 @@ export function WidgetSettingsTab({
                 </InspectorItem>
             </SettingsSection>
         </>
+    );
+}
+
+function ColorCompensationControls({
+    profile,
+    onOpenColorCompensation,
+}: {
+    profile: ColorCompensationProfile;
+    onOpenColorCompensation: () => void;
+}): React.JSX.Element {
+    const hasProfile = hasColorCompensationProfileEffect(profile);
+
+    return (
+        <InspectorItem label="Color">
+            <div className="advanced-action-stack">
+                <button
+                    className="inline-action-button"
+                    type="button"
+                    onClick={onOpenColorCompensation}
+                >
+                    {hasProfile ? "Color Compensation ✓" : "Color Compensation"}
+                </button>
+                <p className="section-note">
+                    If this key uses a custom Stream Deck image, live preview will not update.
+                </p>
+            </div>
+        </InspectorItem>
     );
 }
 

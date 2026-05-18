@@ -1,5 +1,5 @@
 html {
-    overflow-y: scroll;
+    overflow-y: auto;
     scrollbar-gutter: stable;
 }
 
@@ -380,4 +380,202 @@ body {
 
 .widget-reset-item {
     margin-bottom: 8px;
+}
+
+.advanced-action-stack {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    width: 100%;
+}
+
+.advanced-action-stack .section-note {
+    margin-top: 0;
+}
+
+.color-compensation-shell {
+    display: grid;
+    min-height: 100vh;
+    padding: 10px;
+}
+
+.color-compensation-page {
+    align-content: start;
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+}
+
+.color-compensation-page h1 {
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0;
+    line-height: 1.2;
+    margin: 0;
+}
+
+.color-compensation-page p {
+    color: #d8d8d8;
+    font-size: 12px;
+    line-height: 1.35;
+    margin: 0;
+}
+
+.color-compensation-bullet-list {
+    color: #d8d8d8;
+    display: grid;
+    font-size: 12px;
+    gap: 6px;
+    line-height: 1.35;
+    margin: 0;
+    padding-left: 18px;
+}
+
+.color-compensation-progress {
+    color: #ffffff !important;
+    font-size: 13px !important;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.color-compensation-instruction {
+    color: #efefef !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+    margin: 0;
+    text-align: center;
+}
+
+.color-compensation-sample-widget {
+    aspect-ratio: 1;
+    border: 1px solid #555;
+    border-radius: 4px;
+    display: block;
+    justify-self: center;
+    overflow: hidden;
+    width: min(120px, 100%);
+}
+
+.color-compensation-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.color-compensation-actions .inline-action-button {
+    flex: 1 1 auto;
+}
+
+.color-compensation-actions-wide .inline-action-button {
+    flex: 1 1 68px;
+}
+
+.color-compensation-notice {
+    color: #f8d66d !important;
+    font-size: 12px;
+    line-height: 1.35;
+    margin: 0;
+}
+
+.color-compensation-toggle {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: 1fr 1fr;
+}
+
+.color-compensation-toggle .inline-action-button[data-selected="true"] {
+    background: #243447;
+    border-color: #5aa7ff;
+    box-shadow: inset 0 0 0 1px #5aa7ff;
+    color: #ffffff;
+}
+
+.color-compensation-hold-preview {
+    display: grid;
+    gap: 8px;
+}
+
+.color-compensation-hold-preview .inline-action-button[data-selected="true"] {
+    background: #243447;
+    border-color: #5aa7ff;
+    box-shadow: inset 0 0 0 1px #5aa7ff;
+    color: #ffffff;
+}
+
+.color-compensation-details {
+    border-top: 1px solid #4b4b4b;
+    display: grid;
+    gap: 10px;
+    padding-top: 10px;
+}
+
+.color-compensation-details summary {
+    color: #efefef;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.color-compensation-manual-sliders {
+    display: grid;
+    gap: 14px;
+    margin-top: 10px;
+}
+
+.color-compensation-manual-slider {
+    display: grid;
+    gap: 6px;
+}
+
+.color-compensation-manual-slider p {
+    color: #efefef;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.color-compensation-manual-actions {
+    display: flex;
+    justify-content: stretch;
+    margin-top: 10px;
+}
+
+.color-compensation-manual-actions .inline-action-button {
+    width: 100%;
+}
+
+.stepped-slider {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    width: 100%;
+}
+
+.stepped-slider-labels {
+    color: #b8b8b8;
+    display: flex;
+    font-size: 11px;
+    justify-content: space-between;
+    line-height: 1.2;
+}
+
+.stepped-slider input[type="range"] {
+    width: 100%;
+}
+
+.stepped-slider-ticks {
+    display: grid;
+    gap: 0;
+    height: 8px;
+}
+
+.stepped-slider-tick {
+    justify-self: center;
+    width: 1px;
+    background: #777;
+}
+
+.stepped-slider-tick[data-current="true"] {
+    background: #5aa7ff;
+    width: 2px;
 }

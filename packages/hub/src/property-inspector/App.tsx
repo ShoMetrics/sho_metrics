@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { InspectorItem } from "./components/InspectorItem";
+import { ColorCompensationWizard } from "./color-compensation/ColorCompensationWizard";
 import { GlobalSettingsTab } from "./panels/GlobalSettingsTab";
 import { WidgetSettingsTab } from "./panels/WidgetSettingsTab";
 import {
@@ -21,12 +22,14 @@ type SettingsTabId = typeof settingsTabs[number]["id"];
 
 export function App({ client }: AppProps): React.JSX.Element {
     const [activeTab, setActiveTab] = useState<SettingsTabId>("widget");
+    const [isColorCompensationWizardOpen, setIsColorCompensationWizardOpen] = useState(false);
     const {
         visibilityContext,
         resolvedGlobalSettings,
         globalSettingsStatus,
         widgetSettingsNotice,
         globalSettingsNotice,
+        colorCompensation,
         updateWidgetSettings,
         resetWidgetSettings,
         updateGlobalSettings,
@@ -38,6 +41,17 @@ export function App({ client }: AppProps): React.JSX.Element {
         isGlobalSettingsReady && resolvedGlobalSettings.themeOverride !== undefined;
     const isGlobalPaintOverrideEnabled =
         isGlobalSettingsReady && resolvedGlobalSettings.paintOverride !== undefined;
+    if (isColorCompensationWizardOpen) {
+        return (
+            <ColorCompensationWizard
+                client={client}
+                initialProfile={colorCompensation.profile}
+                onProfileSave={colorCompensation.saveProfile}
+                onProfileReset={colorCompensation.resetProfile}
+                onClose={() => setIsColorCompensationWizardOpen(false)}
+            />
+        );
+    }
 
     return (
         <div>
@@ -67,8 +81,10 @@ export function App({ client }: AppProps): React.JSX.Element {
                     isGlobalViewOverrideEnabled={isGlobalViewOverrideEnabled}
                     isGlobalThemeOverrideEnabled={isGlobalThemeOverrideEnabled}
                     isGlobalPaintOverrideEnabled={isGlobalPaintOverrideEnabled}
+                    colorCompensationProfile={colorCompensation.profile}
                     onSettingsPatch={updateWidgetSettings}
                     onResetWidgetSettings={resetWidgetSettings}
+                    onOpenColorCompensation={() => setIsColorCompensationWizardOpen(true)}
                 />
             ) : (
                 <GlobalSettingsTab
