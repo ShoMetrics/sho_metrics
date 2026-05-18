@@ -2,4 +2,5 @@
   <Project Path="ShoMetrics.Source.Windows.ControlPanel/ShoMetrics.Source.Windows.ControlPanel.csproj" />
   <Project Path="ShoMetrics.Source.Windows.Core/ShoMetrics.Source.Windows.Core.csproj" />
   <Project Path="ShoMetrics.Source.Windows.Helper/ShoMetrics.Source.Windows.Helper.csproj" />
+  <Project Path="ShoMetrics.Source.Windows.Service/ShoMetrics.Source.Windows.Service.csproj" />
 </Solution>
