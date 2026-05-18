@@ -1,4 +1,10 @@
-import type { MetricSource, MetricSnapshot } from "./metric-source";
+import type {
+    MetricIdKind,
+    MetricSnapshot,
+    MetricSource,
+    MetricUnit,
+    MetricValueKind,
+} from "./metric-source";
 
 /** Source-owned warning emitted while serving health, descriptor, or snapshot requests. */
 export interface SourceWarning {
@@ -76,17 +82,23 @@ export interface MetricDescriptor {
     /** Human-readable hardware name from the source. */
     readonly hardwareName: string;
 
+    /** Source-owned hardware type for display and diagnostics only. */
+    readonly hardwareType: string;
+
     /** Human-readable sensor name from the source. */
     readonly sensorName: string;
 
-    /** Source sensor type, such as Load, Temperature, or Power. */
-    readonly sensorType: string;
+    /** Source sensor type, such as Load, Temperature, or Power, for display and diagnostics only. */
+    readonly sourceSensorType: string;
 
-    /** Unit used by the metric value. */
-    readonly unit: string;
+    /** Metric value kind exposed by the source descriptor. */
+    readonly valueKind: MetricValueKind;
 
-    /** Whether the metric is discovered dynamically instead of a stable alias. */
-    readonly isDynamic: boolean;
+    /** Canonical unit used by scalar metric values. */
+    readonly unit: MetricUnit;
+
+    /** Origin of the metric id exposed by this descriptor. */
+    readonly metricIdKind: MetricIdKind;
 }
 
 /** Runtime source adapter consumed by SourceRunner. */

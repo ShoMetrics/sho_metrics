@@ -1,6 +1,6 @@
 import { RingBuffer } from "./ring-buffer";
 import type { WidgetData } from "../view-rendering/widget-data";
-import type { MetricSnapshot } from "./sources/metric-source";
+import { readRequiredMetricSnapshotTimestampMilliseconds, type MetricSnapshot } from "./sources/metric-source";
 
 /** Read-only view of metric history bound to one source scope. */
 export interface MetricStoreReader {
@@ -39,17 +39,17 @@ export class MetricStore {
 
     /** Ingests a snapshot into the history owned by one runtime source scope. */
     ingest(sourceScopeId: string, snapshot: MetricSnapshot): void {
-        const sampleTimestampMilliseconds = Number(snapshot.timestampMs);
+        const sampleTimestampMilliseconds = readRequiredMetricSnapshotTimestampMilliseconds(snapshot);
         const sourceStore = this.ensureSourceStore(sourceScopeId);
 
         for (const [metricKey, value] of Object.entries(snapshot.metrics)) {
-            if (value.data.case === "scalar") {
-                this.record(sourceStore, metricKey, value.data.value, sampleTimestampMilliseconds);
+            if (value.value.case === "scalar") {
+                this.record(sourceStore, metricKey, value.value.value, sampleTimestampMilliseconds);
                 continue;
             }
 
-            if (value.data.case === "text") {
-                this.recordText(sourceStore, metricKey, value.data.value, sampleTimestampMilliseconds);
+            if (value.value.case === "text") {
+                this.recordText(sourceStore, metricKey, value.value.value, sampleTimestampMilliseconds);
             }
         }
     }
