@@ -509,7 +509,9 @@ Use the no-production-compatibility window. Break the old contract and fix call 
    - convert timing, energy, conductivity, and small-data values to canonical units
    - generate dynamic LHM metric ids with `lhm.sensor:<source_sensor_id>`
    - keep stable aliases and dynamic ids side by side where both are useful
-   - omit invalid/non-finite values
+   - omit null, non-finite, or source-unavailable values
+   - skip sensors with no canonical unit and report a discovery warning
+   - keep raw dynamic sensor validation conservative; defer source-specific range decisions to the LHM upstream audit
 7. Update `SourceProtocolMapper`:
    - Core unit enum -> protobuf `MetricUnit`
    - `DateTimeOffset` -> `google.protobuf.Timestamp`
@@ -535,3 +537,17 @@ Use the no-production-compatibility window. Break the old contract and fix call 
 - Do not add a compatibility adapter for old `progress`, `unit`, `source_id`, or `timestamp_ms`.
 - Do not make Node parse LHM sensor ids or LHM sensor type strings.
 - Do not persist runtime descriptors or discovered sensor lists into Stream Deck settings.
+
+## Follow-Up Audit
+
+After this refactor closes and the repo is back to a buildable state, perform a targeted LibreHardwareMonitor upstream audit before treating dynamic sensor coverage as complete.
+
+Audit questions:
+
+- Whether `sensor.Identifier` is stable enough across boots, driver updates, and LHM versions for persisted dynamic sensor selections.
+- Whether any `SensorType.Data` or `SensorType.SmallData` family needs decimal rather than binary byte conversion.
+- Whether negative voltage, current, or noise readings are possible from real PC sensor sources and should be preserved.
+- Whether hardware-specific sensor names require more stable alias variants.
+- Which `NaN`, `Infinity`, null, or sentinel values LHM emits for unavailable sensors.
+
+Do not block the current proto migration on this audit. The current dynamic mapping must stay conservative: normalize units, preserve opaque ids, expose descriptors, and avoid source-specific parsing in Node.
