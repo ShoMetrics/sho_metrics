@@ -1,8 +1,10 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using ShoMetrics.Source.Windows.Core;
 
 JsonSerializerOptions jsonOptions = new()
 {
+    NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     WriteIndented = true,
 };
