@@ -55,6 +55,8 @@ internal static class Program
                 .UseSerilog((_, _, loggerConfiguration) => ConfigureSerilog(loggerConfiguration, mode))
                 .ConfigureServices(services =>
                 {
+                    services.AddSingleton<WindowsPipeSecurity>();
+                    services.AddSingleton<WindowsPipeClientVerifier>();
                     services.AddSingleton<WindowsPipeSourceServer>();
                     services.AddHostedService<WindowsSourceWorker>();
                 })
