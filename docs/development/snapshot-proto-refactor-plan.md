@@ -58,7 +58,7 @@ Two sources were inspected:
 
 - `LibreHardwareMonitor.Report.txt`, exported by LHM 0.9.6.
 - `ShoMetrics.Source.Windows.Helper dump`, run from the current C# helper after allowing diagnostic JSON to preserve `Infinity` values.
-- `C:\Users\i2dmp\app\code\ref\LibreHardwareMonitor`, especially `LibreHardwareMonitorLib/Hardware/ISensor.cs` for the complete `SensorType` enum and `LibreHardwareMonitor.Windows.Forms/Utilities/HttpServer.cs` for LHM's own OpenMetrics unit conversions.
+- Local LibreHardwareMonitor checkout source, especially `LibreHardwareMonitorLib/Hardware/ISensor.cs` for the complete `SensorType` enum and `LibreHardwareMonitor.Windows.Forms/Utilities/HttpServer.cs` for LHM's own OpenMetrics unit conversions.
 
 Report parse from `LibreHardwareMonitor.Report.txt` found 348 sensor rows:
 
@@ -540,7 +540,7 @@ Use the no-production-compatibility window. Break the old contract and fix call 
 
 ## Follow-Up Audit
 
-After this refactor closes and the repo is back to a buildable state, perform a targeted LibreHardwareMonitor upstream audit before treating dynamic sensor coverage as complete.
+After this refactor closes and the repo is back to a buildable state, use [LibreHardwareMonitor Upstream Audit](./librehardwaremonitor-upstream-audit.md) before treating dynamic sensor coverage as complete.
 
 Audit questions:
 
