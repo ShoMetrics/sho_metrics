@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { MetricStore } from "./metric-store";
 import { LOCAL_SOURCE_SCOPE_ID } from "./sources/metric-read-plan";
-import { buildMetricSnapshot, buildScalarMetricValue, buildTextMetricValue } from "./sources/metric-source";
+import { buildMetricSnapshot, buildScalarMetricValue, buildTextMetricValue, MetricUnit } from "./sources/metric-source";
 
 test("missing metric returns render-safe numeric defaults without a sample timestamp", () => {
     const metricStore = new MetricStore();
@@ -27,17 +27,15 @@ test("scalar samples keep history, latest value, progress, and timestamp", () =>
     const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
     metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
-        sourceId: "test-source",
         timestampMilliseconds: 1000,
         metrics: {
-            "cpu.usage_percent": buildScalarMetricValue(25, { unit: "%", progress: 0.25 }),
+            "cpu.usage_percent": buildScalarMetricValue(25, { unit: MetricUnit.PERCENT }),
         },
     }));
     metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
-        sourceId: "test-source",
         timestampMilliseconds: 2000,
         metrics: {
-            "cpu.usage_percent": buildScalarMetricValue(50, { unit: "%", progress: 0.5 }),
+            "cpu.usage_percent": buildScalarMetricValue(50, { unit: MetricUnit.PERCENT }),
         },
     }));
 
@@ -61,11 +59,10 @@ test("widget progress is clamped to the render domain", () => {
     const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
     metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
-        sourceId: "test-source",
         timestampMilliseconds: 1000,
         metrics: {
-            "gpu.power": buildScalarMetricValue(160, { unit: "W" }),
-            "gpu.temperature": buildScalarMetricValue(-5, { unit: "°C" }),
+            "gpu.power": buildScalarMetricValue(160, { unit: MetricUnit.WATTS }),
+            "gpu.temperature": buildScalarMetricValue(-5, { unit: MetricUnit.CELSIUS }),
         },
     }));
 
@@ -84,7 +81,6 @@ test("text samples are retrievable without numeric widget history", () => {
     const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
     metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
-        sourceId: "test-source",
         timestampMilliseconds: 1000,
         metrics: {
             "gpu.model": buildTextMetricValue("RTX 4090"),
@@ -107,17 +103,15 @@ test("scalar metric replaces text metric completely", () => {
     const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
     metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
-        sourceId: "test-source",
         timestampMilliseconds: 1000,
         metrics: {
             "gpu.model": buildTextMetricValue("RTX 4090"),
         },
     }));
     metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
-        sourceId: "test-source",
         timestampMilliseconds: 2000,
         metrics: {
-            "gpu.model": buildScalarMetricValue(40, { unit: "%" }),
+            "gpu.model": buildScalarMetricValue(40, { unit: MetricUnit.PERCENT }),
         },
     }));
 
@@ -137,14 +131,12 @@ test("text metric replaces scalar metric completely", () => {
     const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
     metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
-        sourceId: "test-source",
         timestampMilliseconds: 1000,
         metrics: {
-            "gpu.model": buildScalarMetricValue(40, { unit: "%" }),
+            "gpu.model": buildScalarMetricValue(40, { unit: MetricUnit.PERCENT }),
         },
     }));
     metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
-        sourceId: "test-source",
         timestampMilliseconds: 2000,
         metrics: {
             "gpu.model": buildTextMetricValue("RTX 4090"),
@@ -167,10 +159,9 @@ test("clear removes scalar history and text values", () => {
     const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
     metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
-        sourceId: "test-source",
         timestampMilliseconds: 1000,
         metrics: {
-            "cpu.usage_percent": buildScalarMetricValue(25, { unit: "%" }),
+            "cpu.usage_percent": buildScalarMetricValue(25, { unit: MetricUnit.PERCENT }),
             "cpu.model": buildTextMetricValue("Example CPU"),
         },
     }));
@@ -194,17 +185,15 @@ test("same metric keys keep separate history for different source scopes", () =>
     const remoteMetrics = metricStore.forScope("remote:nuc");
 
     metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
-        sourceId: "test-source",
         timestampMilliseconds: 1000,
         metrics: {
-            "cpu.usage_percent": buildScalarMetricValue(25, { unit: "%" }),
+            "cpu.usage_percent": buildScalarMetricValue(25, { unit: MetricUnit.PERCENT }),
         },
     }));
     metricStore.ingest("remote:nuc", buildMetricSnapshot({
-        sourceId: "remote-source",
         timestampMilliseconds: 2000,
         metrics: {
-            "cpu.usage_percent": buildScalarMetricValue(75, { unit: "%" }),
+            "cpu.usage_percent": buildScalarMetricValue(75, { unit: MetricUnit.PERCENT }),
         },
     }));
 
@@ -224,17 +213,15 @@ test("source scope and metric key boundaries do not collide", () => {
     const secondMetrics = metricStore.forScope("remote");
 
     metricStore.ingest("remote\0nuc", buildMetricSnapshot({
-        sourceId: "first-source",
         timestampMilliseconds: 1000,
         metrics: {
-            "cpu.usage_percent": buildScalarMetricValue(25, { unit: "%" }),
+            "cpu.usage_percent": buildScalarMetricValue(25, { unit: MetricUnit.PERCENT }),
         },
     }));
     metricStore.ingest("remote", buildMetricSnapshot({
-        sourceId: "second-source",
         timestampMilliseconds: 2000,
         metrics: {
-            "nuc\0cpu.usage_percent": buildScalarMetricValue(75, { unit: "%" }),
+            "nuc\0cpu.usage_percent": buildScalarMetricValue(75, { unit: MetricUnit.PERCENT }),
         },
     }));
 

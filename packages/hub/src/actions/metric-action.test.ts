@@ -207,14 +207,12 @@ test("onWillDisappear cleans subscription state and ignores later scheduler tick
     try {
         action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
         schedulerRecorder.records[0].callback(buildMetricSnapshot({
-            sourceId: "node-system",
             timestampMilliseconds: 1000,
             metrics: {},
         }));
 
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
         schedulerRecorder.records[0].callback(buildMetricSnapshot({
-            sourceId: "node-system",
             timestampMilliseconds: 2000,
             metrics: {},
         }));

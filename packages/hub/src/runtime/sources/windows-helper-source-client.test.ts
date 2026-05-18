@@ -15,6 +15,8 @@ import {
 import {
     buildMetricSnapshot,
     buildScalarMetricValue,
+    MetricUnit,
+    readRequiredMetricSnapshotTimestampMilliseconds,
 } from "./metric-source";
 import {
     decodeSourceIpcFrame,
@@ -79,9 +81,9 @@ test("windows helper source client sends requested metric ids and returns a runt
 
     const snapshot = await client.readSnapshot(["cpu.usage_percent"]);
 
-    assert.equal(snapshot.sourceId, WINDOWS_HELPER_SOURCE_ID);
-    assert.equal(snapshot.metrics["cpu.usage_percent"]?.data.case, "scalar");
-    assert.equal(snapshot.metrics["cpu.usage_percent"]?.data.value, 42);
+    assert.equal(readRequiredMetricSnapshotTimestampMilliseconds(snapshot), 1000);
+    assert.equal(snapshot.metrics["cpu.usage_percent"]?.value.case, "scalar");
+    assert.equal(snapshot.metrics["cpu.usage_percent"]?.value.value, 42);
     assert.equal(client.getCachedStatus().state, "available");
     assert.deepEqual(
         transport.requests.map(request => request.payload.case),
@@ -441,10 +443,9 @@ function buildSnapshotResponse(requestId: string): SourceIpcResponse {
             case: "readMetricSnapshot",
             value: create(ReadMetricSnapshotResponseSchema, {
                 snapshot: buildMetricSnapshot({
-                    sourceId: "helper-service",
                     timestampMilliseconds: 1000,
                     metrics: {
-                        "cpu.usage_percent": buildScalarMetricValue(42, { unit: "%" }),
+                        "cpu.usage_percent": buildScalarMetricValue(42, { unit: MetricUnit.PERCENT }),
                     },
                 }),
             }),
