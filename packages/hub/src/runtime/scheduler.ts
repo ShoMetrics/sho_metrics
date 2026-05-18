@@ -120,14 +120,14 @@ export class Scheduler {
         }
 
         log.info("Starting");
+        this.pollDueSubscriberGroups().catch(error => {
+            log.error(() => `Initial poll error: ${String(error)}`);
+        });
         this.intervalId = setInterval(() => {
             this.pollDueSubscriberGroups().catch(error => {
                 log.error(() => `Poll error: ${String(error)}`);
             });
         }, Scheduler.TICK_INTERVAL_MS);
-        this.pollDueSubscriberGroups().catch(error => {
-            log.error(() => `Initial poll error: ${String(error)}`);
-        });
     }
 
     private stop(): void {
