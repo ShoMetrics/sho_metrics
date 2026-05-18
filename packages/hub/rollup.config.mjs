@@ -19,6 +19,24 @@ const typescriptOptions = {
     mapRoot: isWatching ? "./" : undefined,
 };
 
+const sharedColorCompensationSourceFiles = [
+    "src/color-compensation/messages.ts",
+    "src/color-compensation/patterns.ts",
+    "src/color-compensation/types.ts",
+    "src/view-rendering/color-compensation-patterns.ts",
+];
+
+function watchSharedColorCompensationSources() {
+    return {
+        name: "watch-shared-color-compensation-sources",
+        buildStart() {
+            for (const sourceFile of sharedColorCompensationSourceFiles) {
+                this.addWatchFile(sourceFile);
+            }
+        },
+    };
+}
+
 function replaceCompileTimeConstants() {
     return {
         name: "replace-compile-time-constants",
@@ -96,6 +114,7 @@ const pluginConfig = {
                 this.addWatchFile(`${sdPlugin}/manifest.json`);
             },
         },
+        watchSharedColorCompensationSources(),
         typescript(typescriptOptions),
         nodeResolve({
             browser: false,
@@ -137,6 +156,7 @@ const propertyInspectorConfig = {
                 this.addWatchFile(`${sdPlugin}/ui/property-inspector.css`);
             },
         },
+        watchSharedColorCompensationSources(),
         typescript(typescriptOptions),
         nodeResolve({
             browser: true,
