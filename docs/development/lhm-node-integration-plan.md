@@ -102,18 +102,9 @@ message ReadMetricSnapshotResponse {
   repeated MetricDescriptor descriptors = 2;
   repeated SourceWarning warnings = 3;
 }
-
-message MetricDescriptor {
-  string metric_id = 1;
-  string source_sensor_id = 2;
-  string hardware_id = 3;
-  string hardware_name = 4;
-  string sensor_name = 5;
-  string sensor_type = 6;
-  string unit = 7;
-  bool is_dynamic = 8;
-}
 ```
+
+`MetricSnapshot`, `MetricValue`, `MetricDescriptor`, `MetricUnit`, `MetricValueKind`, and `MetricIdKind` live in `snapshot.proto`.
 
 `source_ipc.proto` contains the local IPC envelope. Windows named pipes and future macOS/Linux local IPC transports should use this envelope unless the transport already provides method routing and correlation:
 
@@ -153,9 +144,13 @@ Implementation notes:
 - `protocol_version` is the source API compatibility version. Node must reject helpers with an unsupported protocol version and fallback.
 - `helper_version` is the installed helper build/version string for diagnostics and support logs. Node must not parse feature behavior from `helper_version`.
 - `metric_id` is the ShoMetrics metric key consumed by Node.
-- `source_sensor_id` is source-owned and opaque. For LHM it can be the LHM sensor path.
+- `source_sensor_id` and `hardware_id` are source-owned and opaque. For LHM they can be LHM identifier paths.
 - Stable aliases such as `cpu.usage_percent`, `gpu.temp`, `ram.used`, `net.down`, and `disk.throughput.read` are explicit.
-- Dynamic metrics are still exposed through descriptors. Node must not parse LHM-specific path structure.
+- Dynamic metrics use source-owned metric ids such as `lhm.sensor:/intelcpu/0/temperature/26`. Node may store and request those ids but must not parse LHM-specific path structure.
+- `MetricSnapshot.captured_at` is the moment the source completed the read pass.
+- `MetricValue.unit` is a canonical enum, not a display string. Node owns display formatting such as `%`, `°C`, `GB`, and `MB/s`.
+- `MetricValue` does not include rendering progress. Node computes progress from metric semantics plus widget settings.
+- `MetricDescriptor.metric_id_kind` distinguishes stable aliases from source-owned dynamic sensor ids. Do not replace it with a boolean.
 - `MetricSnapshot` may need extension if per-value source diagnostics or descriptor references become necessary.
 
 Proto generation:
@@ -748,13 +743,15 @@ Initial stable aliases required for service MVP:
 
 Rules:
 
-- Units returned in proto must match Node expectations: `%`, `°C`, `W`, `B`, or `B/s`.
-- LHM `Data` values in GB must be converted to bytes before writing `MetricValue.scalar`.
+- Units returned in proto must use canonical `MetricUnit` enum values, not display strings.
+- LHM `Data` values in GiB and `SmallData` values in MiB must be converted to bytes before writing `MetricValue.scalar`.
+- LHM `Clock`, `Timing`, `Energy`, and `Conductivity` values must be converted to the canonical units defined by `snapshot.proto`.
 - Unknown requested metric ids are omitted from the snapshot and reported through `SourceWarning` with `code="metric_unavailable"`.
 - Semantically invalid values are omitted and reported through `SourceWarning`; do not clamp at the service boundary.
 - `0C` for normal CPU/GPU temperature is invalid and must be omitted.
 - Network and disk throughput may validly be `0`.
-- Dynamic LHM sensor descriptors may be listed later, but the first service MVP must not expose dynamic metric ids as widget values until Node has a selector UI for them.
+- Dynamic LHM sensor ids are emitted as `lhm.sensor:<source_sensor_id>` for sensors with canonical units. Built-in widgets still request stable aliases; 1Hz polling must not request all dynamic sensors by default.
+- A sensor with no canonical `MetricUnit` mapping must be skipped and reported through a discovery warning.
 
 ### C# Step 9: Proto Mapping
 
@@ -765,20 +762,22 @@ Rules:
 - Core must not reference generated protobuf types.
 - Service may reference generated protobuf types.
 - Service files that use both Core and protobuf snapshot types must alias at least one of them at the top of the file. Do not rely on ambiguous bare `MetricSnapshot` names.
-- `MetricSnapshot.source_id` must be `windows-helper`.
-- `MetricSnapshot.timestamp_ms` must use Unix time milliseconds from `MetricSnapshot.CapturedAt`.
+- `MetricSnapshot.captured_at` must use `MetricSnapshot.CapturedAt` from Core.
 - `MetricValue.scalar` is used for numeric readings.
 - `MetricValue.text` is used only for model/name descriptors when Node requests text metrics in the future.
-- `MetricValue.progress` must be set for percentage values as `value / 100`. Non-percentage values must leave progress at proto default `0` because Node render adapters compute progress from metric-specific maxima.
+- `MetricValue.unit` must use protobuf `MetricUnit` mapped from the Core unit enum.
+- `MetricValue.progress` does not exist. Node render adapters compute progress from metric-specific values and widget settings.
 - Descriptors use:
   - `metric_id` = ShoMetrics canonical metric id
   - `source_sensor_id` = LHM sensor identifier
   - `hardware_id` = LHM hardware identifier
   - `hardware_name` = LHM hardware name
+  - `hardware_type` = LHM hardware type string for display/support only
   - `sensor_name` = LHM sensor name
-  - `sensor_type` = LHM sensor type
-  - `unit` = proto value unit
-  - `is_dynamic` = `false` for stable aliases
+  - `source_sensor_type` = LHM sensor type string for display/support only
+  - `value_kind` = protobuf `MetricValueKind`
+  - `unit` = protobuf `MetricUnit`
+  - `metric_id_kind` = protobuf `MetricIdKind`
 
 ### C# Step 10: Logging
 
@@ -1163,17 +1162,18 @@ The C# side maps raw LHM readings into ShoMetrics output:
 LHM raw sensor
   -> MetricDescriptor
   -> stable alias if known
-  -> optional dynamic descriptor later
+  -> dynamic source sensor id if the sensor has a canonical unit
   -> MetricSnapshot value
 ```
 
 Rules:
 
 - Stable aliases must cover existing UI metrics first.
-- The first Windows service MVP returns stable aliases as metric values. Dynamic LHM sensors may be listed later as descriptors, but must not be emitted as widget metric values until Node has a selector UI for them.
-- Dynamic metrics must keep `source_sensor_id` opaque when they are introduced.
+- Built-in widgets request stable aliases. Dynamic LHM sensors are available by explicit `metric_id` request and descriptor discovery only; runtime 1Hz polling must not request every dynamic sensor by default.
+- Dynamic metrics must keep `source_sensor_id` opaque.
 - Node must not parse `/intelcpu/0/temperature/26` or other LHM identifiers.
 - New macOS/Linux helpers must emit the same stable aliases for the same UI metrics.
+- New macOS/Linux helpers must normalize source-native units into `MetricUnit` values and descriptor fields before protobuf serialization. Node must not understand `hwmon`, `lm-sensors`, NVML, AMD SMI, powercap, SMC, or powermetrics native sensor enums.
 - Existing C# POC metric ids such as `cpu.load.percent` are diagnostic ids and are not the service contract.
 
 Example mappings:

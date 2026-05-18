@@ -1,12 +1,20 @@
+using System.Diagnostics;
+using Google.Protobuf.WellKnownTypes;
 using ShoMetrics.Contracts.V1;
 using ShoMetrics.Source.Windows.Core;
 using CoreDescriptor = ShoMetrics.Source.Windows.Core.HardwareMetricDescriptor;
 using CoreDescriptorSnapshot = ShoMetrics.Source.Windows.Core.HardwareMetricDescriptorSnapshot;
+using CoreMetricIdKind = ShoMetrics.Source.Windows.Core.MetricIdKind;
 using CoreMetricReading = ShoMetrics.Source.Windows.Core.MetricReading;
 using CoreMetricSnapshot = ShoMetrics.Source.Windows.Core.MetricSnapshot;
+using CoreMetricUnit = ShoMetrics.Source.Windows.Core.MetricUnit;
+using CoreMetricValueKind = ShoMetrics.Source.Windows.Core.MetricValueKind;
 using ProtoMetricDescriptor = ShoMetrics.Contracts.V1.MetricDescriptor;
+using ProtoMetricIdKind = ShoMetrics.Contracts.V1.MetricIdKind;
 using ProtoMetricSnapshot = ShoMetrics.Contracts.V1.MetricSnapshot;
+using ProtoMetricUnit = ShoMetrics.Contracts.V1.MetricUnit;
 using ProtoMetricValue = ShoMetrics.Contracts.V1.MetricValue;
+using ProtoMetricValueKind = ShoMetrics.Contracts.V1.MetricValueKind;
 using SourceWarningList = Google.Protobuf.Collections.RepeatedField<ShoMetrics.Contracts.V1.SourceWarning>;
 
 namespace ShoMetrics.Source.Windows.Service;
@@ -154,8 +162,7 @@ internal sealed class SourceProtocolMapper
     {
         ProtoMetricSnapshot protoSnapshot = new()
         {
-            SourceId = SourceServiceConstants.SourceId,
-            TimestampMs = (ulong)snapshot.CapturedAt.ToUnixTimeMilliseconds(),
+            CapturedAt = Timestamp.FromDateTimeOffset(snapshot.CapturedAt),
         };
 
         foreach (CoreMetricReading reading in snapshot.Readings)
@@ -171,16 +178,8 @@ internal sealed class SourceProtocolMapper
         return new ProtoMetricValue
         {
             Scalar = reading.Value,
-            Unit = reading.Unit,
-            Progress = UsesPercentProgress(reading.MetricId)
-                ? reading.Value / 100
-                : 0,
+            Unit = MapMetricUnit(reading.Unit),
         };
-    }
-
-    private static bool UsesPercentProgress(string metricId)
-    {
-        return metricId is "cpu.usage_percent" or "gpu.usage_percent";
     }
 
     private static ProtoMetricDescriptor BuildMetricDescriptor(CoreDescriptor descriptor)
@@ -191,10 +190,58 @@ internal sealed class SourceProtocolMapper
             SourceSensorId = descriptor.SourceSensorId,
             HardwareId = descriptor.HardwareId,
             HardwareName = descriptor.HardwareName,
+            HardwareType = descriptor.HardwareType,
             SensorName = descriptor.SensorName,
-            SensorType = descriptor.SensorType,
-            Unit = descriptor.Unit,
-            IsDynamic = descriptor.IsDynamic,
+            SourceSensorType = descriptor.SourceSensorType,
+            ValueKind = MapMetricValueKind(descriptor.ValueKind),
+            Unit = MapMetricUnit(descriptor.Unit),
+            MetricIdKind = MapMetricIdKind(descriptor.MetricIdKind),
+        };
+    }
+
+    private static ProtoMetricUnit MapMetricUnit(CoreMetricUnit unit)
+    {
+        return unit switch
+        {
+            CoreMetricUnit.Percent => ProtoMetricUnit.Percent,
+            CoreMetricUnit.Celsius => ProtoMetricUnit.Celsius,
+            CoreMetricUnit.Volts => ProtoMetricUnit.Volts,
+            CoreMetricUnit.Amperes => ProtoMetricUnit.Amperes,
+            CoreMetricUnit.Watts => ProtoMetricUnit.Watts,
+            CoreMetricUnit.Hertz => ProtoMetricUnit.Hertz,
+            CoreMetricUnit.Bytes => ProtoMetricUnit.Bytes,
+            CoreMetricUnit.BytesPerSecond => ProtoMetricUnit.BytesPerSecond,
+            CoreMetricUnit.RevolutionsPerMinute => ProtoMetricUnit.RevolutionsPerMinute,
+            CoreMetricUnit.LitersPerHour => ProtoMetricUnit.LitersPerHour,
+            CoreMetricUnit.Unitless => ProtoMetricUnit.Unitless,
+            CoreMetricUnit.Seconds => ProtoMetricUnit.Seconds,
+            CoreMetricUnit.WattHours => ProtoMetricUnit.WattHours,
+            CoreMetricUnit.DecibelsAWeighted => ProtoMetricUnit.DecibelsAWeighted,
+            CoreMetricUnit.SiemensPerCentimeter => ProtoMetricUnit.SiemensPerCentimeter,
+            CoreMetricUnit.Unspecified => throw new UnreachableException("Metric readings and descriptors must use a specified unit."),
+            _ => throw new UnreachableException($"Missing protobuf unit mapping for '{unit}'."),
+        };
+    }
+
+    private static ProtoMetricValueKind MapMetricValueKind(CoreMetricValueKind valueKind)
+    {
+        return valueKind switch
+        {
+            CoreMetricValueKind.Scalar => ProtoMetricValueKind.Scalar,
+            CoreMetricValueKind.Text => ProtoMetricValueKind.Text,
+            CoreMetricValueKind.Unspecified => throw new UnreachableException("Metric descriptors must use a specified value kind."),
+            _ => throw new UnreachableException($"Missing protobuf value kind mapping for '{valueKind}'."),
+        };
+    }
+
+    private static ProtoMetricIdKind MapMetricIdKind(CoreMetricIdKind metricIdKind)
+    {
+        return metricIdKind switch
+        {
+            CoreMetricIdKind.StableAlias => ProtoMetricIdKind.StableAlias,
+            CoreMetricIdKind.SourceSensor => ProtoMetricIdKind.SourceSensor,
+            CoreMetricIdKind.Unspecified => throw new UnreachableException("Metric descriptors must use a specified metric id kind."),
+            _ => throw new UnreachableException($"Missing protobuf metric id kind mapping for '{metricIdKind}'."),
         };
     }
 
