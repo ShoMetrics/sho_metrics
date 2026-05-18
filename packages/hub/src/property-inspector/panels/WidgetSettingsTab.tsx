@@ -2,10 +2,8 @@ import { useEffect, useState } from "react";
 import { InspectorItem } from "../components/InspectorItem";
 import type { StoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
 import type { VisibilityContext } from "../inspector/types";
-import {
-    hasColorCompensationProfileEffect,
-    type ColorCompensationProfile,
-} from "../../color-compensation/types";
+import type { ColorCompensationProfile } from "../../color-compensation/types";
+import { ColorCompensationControls } from "./ColorCompensationControls";
 import { DefaultWidgetSettings } from "./DefaultWidgetSettings";
 import { DiskWidgetSettings } from "./DiskWidgetSettings";
 import { GpuWidgetSettings } from "./GpuWidgetSettings";
@@ -87,41 +85,19 @@ export function WidgetSettingsTab({
                     profile={colorCompensationProfile}
                     onOpenColorCompensation={onOpenColorCompensation}
                 />
-                <InspectorItem className="widget-reset-item">
-                    <button
-                        className="inline-action-button"
-                        type="button"
-                        onClick={onResetWidgetSettings}
-                    >
-                        Reset Widget Settings
-                    </button>
+                <InspectorItem className="widget-reset-item" label="Reset">
+                    <div className="advanced-action-stack">
+                        <button
+                            className="inline-action-button"
+                            type="button"
+                            onClick={onResetWidgetSettings}
+                        >
+                            Reset Widget Settings
+                        </button>
+                    </div>
                 </InspectorItem>
             </SettingsSection>
         </>
-    );
-}
-
-function ColorCompensationControls({
-    profile,
-    onOpenColorCompensation,
-}: {
-    profile: ColorCompensationProfile;
-    onOpenColorCompensation: () => void;
-}): React.JSX.Element {
-    const hasProfile = hasColorCompensationProfileEffect(profile);
-
-    return (
-        <InspectorItem label="Color">
-            <div className="advanced-action-stack">
-                <button
-                    className="inline-action-button"
-                    type="button"
-                    onClick={onOpenColorCompensation}
-                >
-                    {hasProfile ? "Color Compensation ✓" : "Color Compensation"}
-                </button>
-            </div>
-        </InspectorItem>
     );
 }
 

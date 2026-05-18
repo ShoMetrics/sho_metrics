@@ -323,6 +323,8 @@ test("widget settings keep warnings first and reset in advanced controls", () =>
     assertTextOrder(markup, "Some settings are disabled", "GPU Metric:");
     assertTextOrder(markup, "GPU Metric:", "Appearance");
     assertTextOrder(markup, "Polling Frequency", "Advanced");
+    assertTextOrder(markup, "Advanced", "Color Compensation");
+    assertTextOrder(markup, "Color Compensation", "Reset Widget Settings");
     assertTextOrder(markup, "Advanced", "Reset Widget Settings");
 });
 
