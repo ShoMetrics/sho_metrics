@@ -253,7 +253,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                     SensorId = JoinSourceSensorIds(memoryUsed.SensorId, memoryAvailable.SensorId),
                     SensorName = "Memory Total",
                     Value = memoryTotalBytes,
-                    Unit = "B",
+                    Unit = MetricUnit.Bytes,
                 };
             }
         }
@@ -271,7 +271,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                 SensorId = JoinSourceSensorIds(diskRead?.SensorId, diskWrite?.SensorId),
                 SensorName = "Disk Throughput Total",
                 Value = (diskRead?.Value ?? 0) + (diskWrite?.Value ?? 0),
-                Unit = "B/s",
+                Unit = MetricUnit.BytesPerSecond,
             };
         }
     }
@@ -286,7 +286,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                 MetricId = LibreHardwareMetricCatalog.RamTotalMetricId,
                 SourceSensorId = JoinSourceSensorIds(memoryUsed.SourceSensorId, memoryAvailable.SourceSensorId),
                 SensorName = "Memory Total",
-                Unit = "B",
+                Unit = MetricUnit.Bytes,
             };
         }
 
@@ -302,7 +302,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                 MetricId = LibreHardwareMetricCatalog.DiskTotalThroughputMetricId,
                 SourceSensorId = JoinSourceSensorIds(diskRead?.SourceSensorId, diskWrite?.SourceSensorId),
                 SensorName = "Disk Throughput Total",
-                Unit = "B/s",
+                Unit = MetricUnit.BytesPerSecond,
             };
         }
     }

@@ -10,11 +10,15 @@ public sealed record HardwareMetricDescriptor
 
     public required string HardwareName { get; init; }
 
+    public required string HardwareType { get; init; }
+
     public required string SensorName { get; init; }
 
-    public required string SensorType { get; init; }
+    public required string SourceSensorType { get; init; }
 
-    public required string Unit { get; init; }
+    public required MetricValueKind ValueKind { get; init; }
 
-    public required bool IsDynamic { get; init; }
+    public required MetricUnit Unit { get; init; }
+
+    public required MetricIdKind MetricIdKind { get; init; }
 }

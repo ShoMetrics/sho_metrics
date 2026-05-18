@@ -46,7 +46,7 @@ internal static class LibreHardwareMetricCatalog
             HardwareType = hardware.HardwareType.ToString(),
             SensorId = sensor.Identifier.ToString(),
             SensorName = sensor.Name,
-            SensorType = sensor.SensorType.ToString(),
+            SourceSensorType = sensor.SensorType.ToString(),
             Value = convertedValue,
             Unit = GetCanonicalMetricUnit(sensor.SensorType),
         };
@@ -71,10 +71,12 @@ internal static class LibreHardwareMetricCatalog
             SourceSensorId = sensor.Identifier.ToString(),
             HardwareId = hardware.Identifier.ToString(),
             HardwareName = hardware.Name,
+            HardwareType = hardware.HardwareType.ToString(),
             SensorName = sensor.Name,
-            SensorType = sensor.SensorType.ToString(),
+            SourceSensorType = sensor.SensorType.ToString(),
+            ValueKind = MetricValueKind.Scalar,
             Unit = GetCanonicalMetricUnit(sensor.SensorType),
-            IsDynamic = false,
+            MetricIdKind = MetricIdKind.StableAlias,
         };
         return true;
     }
@@ -201,16 +203,16 @@ internal static class LibreHardwareMetricCatalog
         };
     }
 
-    private static string GetCanonicalMetricUnit(SensorType sensorType)
+    private static MetricUnit GetCanonicalMetricUnit(SensorType sensorType)
     {
         return sensorType switch
         {
-            SensorType.Load => "%",
-            SensorType.Temperature => "°C",
-            SensorType.Data => "B",
-            SensorType.Power => "W",
-            SensorType.Throughput => "B/s",
-            _ => "",
+            SensorType.Load => MetricUnit.Percent,
+            SensorType.Temperature => MetricUnit.Celsius,
+            SensorType.Data => MetricUnit.Bytes,
+            SensorType.Power => MetricUnit.Watts,
+            SensorType.Throughput => MetricUnit.BytesPerSecond,
+            _ => throw new UnreachableException($"Missing unit mapping for sensor type '{sensorType}'."),
         };
     }
 }
