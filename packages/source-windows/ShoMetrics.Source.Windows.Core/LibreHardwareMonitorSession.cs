@@ -173,7 +173,9 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         {
             foreach (ISensor sensor in hardware.Sensors)
             {
-                if (LibreHardwareMetricCatalog.TryCreateReading(hardware, sensor, out MetricReading? reading))
+                AddUnsupportedSensorTypeWarning(sensor, warnings);
+
+                foreach (MetricReading reading in LibreHardwareMetricCatalog.CreateReadings(hardware, sensor))
                 {
                     AddReading(readingsByMetricId, reading);
                 }
@@ -208,7 +210,9 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         {
             foreach (ISensor sensor in hardware.Sensors)
             {
-                if (LibreHardwareMetricCatalog.TryCreateDescriptor(hardware, sensor, out HardwareMetricDescriptor? descriptor))
+                AddUnsupportedSensorTypeWarning(sensor, warnings);
+
+                foreach (HardwareMetricDescriptor descriptor in LibreHardwareMetricCatalog.CreateDescriptors(hardware, sensor))
                 {
                     descriptorsByMetricId.TryAdd(descriptor.MetricId, descriptor);
                 }
@@ -342,6 +346,19 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         if (!readings.Any(reading => reading.MetricId.Equals("cpu.usage_percent", StringComparison.Ordinal)))
         {
             warnings.Add("No CPU metric value was returned by LibreHardwareMonitor.");
+        }
+    }
+
+    private static void AddUnsupportedSensorTypeWarning(ISensor sensor, List<string> warnings)
+    {
+        if (!LibreHardwareMetricCatalog.HasCanonicalMetricUnit(sensor.SensorType))
+        {
+            string warning = $"LibreHardwareMonitor sensor type '{sensor.SensorType}' has no ShoMetrics unit mapping.";
+
+            if (!warnings.Contains(warning, StringComparer.Ordinal))
+            {
+                warnings.Add(warning);
+            }
         }
     }
 
