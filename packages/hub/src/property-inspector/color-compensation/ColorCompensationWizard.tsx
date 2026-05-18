@@ -42,25 +42,25 @@ interface StepCopy {
 const stepCopyById: Record<ColorCompensationStepId, StepCopy> = {
     saturation: {
         title: "Color Strength",
-        instruction: "Adjust until the colored blocks on your Stream Deck match the sample on screen.",
+        instruction: "Adjust until the colored blocks on your Stream Deck key look closest to the monitor sample.",
         lowerLabel: "Muted",
         upperLabel: "Vivid",
     },
     brightness: {
         title: "Overall Brightness",
-        instruction: "Adjust until the gray field on your Stream Deck matches the brightness on screen.",
+        instruction: "Adjust until the gray field on your Stream Deck key looks closest to the gray field on your monitor.",
         lowerLabel: "Dimmer",
         upperLabel: "Brighter",
     },
     gamma: {
         title: "Midtones",
-        instruction: "Adjust until the gray gradient on your Stream Deck matches the sample on screen.",
+        instruction: "Adjust until the gray gradient on your Stream Deck key looks closest to the monitor sample.",
         lowerLabel: "Darker",
         upperLabel: "Lighter",
     },
     shadow: {
         title: "Dark Detail",
-        instruction: "Adjust until the dark blocks on your Stream Deck match the depth on screen.",
+        instruction: "Adjust until the dark blocks on your Stream Deck key look closest to the dark blocks on your monitor.",
         lowerLabel: "Flat",
         upperLabel: "Deep",
     },
@@ -276,18 +276,18 @@ function IntroPage({
         <section className="color-compensation-page">
             <h1>Color Compensation</h1>
             <p>
-                Stream Deck hardware colors look different from your monitor. This wizard adjusts the{" "}
-                <strong>hardware</strong> output so it looks closer to what you see on screen.
+                Stream Deck hardware colors may look different from your monitor. This wizard adjusts the{" "}
+                display result on <strong>Stream Deck</strong> so it looks closer to what you see on your monitor.
             </p>
             <p>
                 Each step shows the same sample on both screens.{" "}
-                <strong>The on-screen sample stays the same. The Stream Deck sample updates as you move the slider.</strong>{" "}
+                <strong>The sample you see on your monitor stays the same. The Stream Deck sample updates as you move the slider.</strong>{" "}
                 Adjust until they look as close as possible.
             </p>
             <ul className="color-compensation-bullet-list">
                 <li>Set Stream Deck global brightness to a comfortable level before starting</li>
-                <li>About 1 minute</li>
-                <li>Saves as a global Stream Deck output profile</li>
+                <li>This wizard takes about 1 minute</li>
+                <li>Affects all Stream Deck keys controlled by Sho Metrics</li>
             </ul>
             <div className="color-compensation-actions">
                 <button className="inline-action-button" type="button" onClick={onStart}>Start</button>
@@ -309,12 +309,19 @@ function PreflightPage({
     return (
         <section className="color-compensation-page">
             <h1>Check Your Key</h1>
-            <SampleWidgetPreview focus="preflight" />
-            <p className="color-compensation-instruction">
-                Look at your Stream Deck. The key you are setting up should show this image.
-            </p>
+            <div className="color-compensation-preflight-summary">
+                <SampleWidgetPreview focus="preflight" />
+                <div className="color-compensation-preflight-copy">
+                    <p className="color-compensation-instruction">
+                        Find the Stream Deck key showing this image.
+                    </p>
+                    <p className="color-compensation-instruction">
+                        In the next steps, compare that key with the reference sample on your monitor.
+                    </p>
+                </div>
+            </div>
             <p className="section-note">
-                If you still see a custom image, live preview is blocked for this key and setup will not work.
+                If you set a custom icon for this key, live preview is blocked for this key and setup will not work.
             </p>
             <div className="color-compensation-actions color-compensation-actions-wide">
                 <button className="inline-action-button" type="button" onClick={onBack}>Back</button>

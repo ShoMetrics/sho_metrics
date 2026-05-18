@@ -110,20 +110,20 @@ function renderColorStrengthPattern(): string {
 
 function renderLightnessPattern(): string {
     return `
-        <rect x="16" y="16" width="112" height="112" rx="14" fill="#808080" />
+        <rect x="11" y="11" width="122" height="122" rx="14" fill="#808080" />
         ${renderLabelText("Aa", 72, 82, 30, 1)}
     `;
 }
 
 function renderGrayLevelsPattern(): string {
     const grayLevels = ["#3a3a3a", "#5d5d5d", "#808080", "#a3a3a3", "#c6c6c6"];
-    const cellWidth = 20;
+    const cellWidth = 21;
     const gap = 4;
     const totalWidth = grayLevels.length * cellWidth + (grayLevels.length - 1) * gap;
     const startX = (WIDGET_LOGICAL_SIZE.width - totalWidth) / 2;
 
     return grayLevels.map((color, index) => (
-        `<rect x="${startX + index * (cellWidth + gap)}" y="50" width="${cellWidth}" height="44" rx="5" fill="${color}" />`
+        `<rect x="${startX + index * (cellWidth + gap)}" y="18" width="${cellWidth}" height="108" rx="8" fill="${color}" />`
     )).join("");
 }
 

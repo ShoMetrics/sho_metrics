@@ -120,9 +120,6 @@ function ColorCompensationControls({
                 >
                     {hasProfile ? "Color Compensation ✓" : "Color Compensation"}
                 </button>
-                <p className="section-note">
-                    If this key uses a custom Stream Deck image, live preview will not update.
-                </p>
             </div>
         </InspectorItem>
     );
