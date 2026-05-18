@@ -255,6 +255,82 @@ message StoredGlobalSettings {
   // MetricSourcePolicy.
   repeated MetricSourceProfile source_profiles = 3;
   optional string default_source_profile_id = 4 [(buf.validate.field).string.max_len = 128];
+
+  // Color compensation is stored globally because it describes Stream Deck
+  // display behavior, not one widget's metric choice. The resolver does not
+  // consume this field until runtime support is intentionally added.
+  optional ColorCompensationSettings color_compensation = 5;
+}
+
+message ColorCompensationSettings {
+  // Profile used when no device-specific target below matches. This is the
+  // current POC behavior: one compensation profile for all Stream Deck output.
+  optional ColorCompensationProfile fallback_profile = 1;
+
+  // Future per-device or per-display-surface overrides. POC writes must leave
+  // this empty, and POC readers must ignore it. Adding target-aware matching
+  // is an intentional resolver change, not a silent behavior shift.
+  //
+  // App-level invariant: targets must be unique by (stream_deck_device_id,
+  // surface_id). The proto cannot enforce this with a map because the key is
+  // composite. Future storage write paths must reject duplicate targets before
+  // saving.
+  repeated TargetColorCompensationProfile target_profiles = 2;
+}
+
+message TargetColorCompensationProfile {
+  ColorCompensationTarget target = 1;
+  ColorCompensationProfile profile = 2;
+}
+
+message ColorCompensationTarget {
+  // Only this id participates in matching. Display hints below are for UI and
+  // diagnostics only.
+  ColorCompensationTargetId id = 1;
+
+  // Human-readable hint captured when the profile is written. This is not
+  // identity and must not be used to match a device.
+  optional string device_display_name = 10 [(buf.validate.field).string.max_len = 128];
+}
+
+message ColorCompensationTargetId {
+  // Opaque Stream Deck SDK device id, available from ActionContext.device.id
+  // or Device.id. Each physical Stream Deck has a unique id regardless of
+  // model, so two Stream Deck XLs can still be distinguished. Do not derive
+  // this from model, display name, size, or action coordinates.
+  optional string stream_deck_device_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+
+  // Optional display-surface id inside one device, for future support where
+  // different screens on the same hardware need different compensation, such
+  // as Stream Deck +'s keypad LCDs versus its touch strip.
+  //
+  // Convention when this is set: use the lowercased SDK Controller value,
+  // such as "keypad" or "encoder", for current Stream Deck hardware. New
+  // surface types should agree on a new lowercase tag here before shipping.
+  // Current storage always leaves this unset; POC matching is device-only.
+  optional string surface_id = 2 [(buf.validate.field).string.max_len = 128];
+}
+
+message ColorCompensationProfile {
+  optional int32 brightness_adjustment = 1 [(buf.validate.field).int32 = {
+    gte: -10
+    lte: 10
+  }];
+  optional int32 shadow_adjustment = 2 [(buf.validate.field).int32 = {
+    gte: -10
+    lte: 10
+  }];
+  optional int32 gamma_adjustment = 3 [(buf.validate.field).int32 = {
+    gte: -10
+    lte: 10
+  }];
+  optional int32 saturation_adjustment = 4 [(buf.validate.field).int32 = {
+    gte: -10
+    lte: 10
+  }];
 }
 
 message MetricSourceProfile {
