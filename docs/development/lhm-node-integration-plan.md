@@ -482,6 +482,7 @@ Rules:
 - `[PINNED_VERSION]` is a placeholder in this spec, not a literal package version.
 - Replace every `[PINNED_VERSION]` with an exact bracketed version after checking NuGet metadata. Do not use floating versions and do not guess package versions.
 - Keep `packages.lock.json` updated. If NuGet metadata cannot be checked, stop and ask instead of committing guessed dependency versions.
+- Keep `signatureValidationMode=require`. If Microsoft-authored dependencies require author trust, add exact Microsoft author certificate fingerprints to `packages/source-windows/NuGet.config`; do not disable package signature validation.
 - Do not make the service executable install or uninstall itself.
 - Do not move ControlPanel or installer code into the service project.
 
@@ -524,7 +525,7 @@ Rules:
 - Generated C# stays build output under `obj`; do not commit generated C# files.
 - If proto generation fails, fix generation. Do not introduce handwritten replacements.
 - After proto changes, run `npm.cmd run proto:format`, `npm.cmd run proto:lint`, and `npm.cmd run proto:build` from `packages/hub`.
-- After C# project changes, run `dotnet build .\packages\source-windows\ShoMetrics.Source.Windows.slnx --locked-mode`.
+- After C# project changes, run `dotnet restore .\packages\source-windows\ShoMetrics.Source.Windows.slnx --locked-mode`, then `dotnet build .\packages\source-windows\ShoMetrics.Source.Windows.slnx --no-restore`.
 
 ### C# Step 3: Service Executable Modes
 
@@ -803,7 +804,8 @@ Rules:
 Before considering the service implementation complete, verify:
 
 ```powershell
-dotnet build .\packages\source-windows\ShoMetrics.Source.Windows.slnx --locked-mode
+dotnet restore .\packages\source-windows\ShoMetrics.Source.Windows.slnx --locked-mode
+dotnet build .\packages\source-windows\ShoMetrics.Source.Windows.slnx --no-restore
 dotnet run --project .\packages\source-windows\ShoMetrics.Source.Windows.Service\ShoMetrics.Source.Windows.Service.csproj -- --help
 dotnet run --project .\packages\source-windows\ShoMetrics.Source.Windows.Service\ShoMetrics.Source.Windows.Service.csproj -- --version
 ```
