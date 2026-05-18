@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
 import {
-    COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS,
+    COLOR_COMPENSATION_GUIDED_ADJUSTMENT_IDS,
     colorCompensationWizardReducer,
     createColorCompensationWizardState,
     readAdjustmentValue,
 } from "./color-compensation-reducer";
 
 test("wizard orders coarse adjustments before finer tonal adjustments", () => {
-    assert.deepEqual(COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS, [
+    assert.deepEqual(COLOR_COMPENSATION_GUIDED_ADJUSTMENT_IDS, [
         "saturation",
         "gamma",
         "shadow",
