@@ -457,6 +457,27 @@ body {
     width: min(120px, 100%);
 }
 
+.color-compensation-preflight-summary {
+    align-items: center;
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(96px, 120px) minmax(0, 1fr);
+}
+
+.color-compensation-preflight-summary .color-compensation-sample-widget {
+    width: 100%;
+}
+
+.color-compensation-preflight-copy {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.color-compensation-preflight-copy .color-compensation-instruction {
+    text-align: left;
+}
+
 .color-compensation-actions {
     display: flex;
     flex-wrap: wrap;
