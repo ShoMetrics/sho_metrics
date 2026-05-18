@@ -14,9 +14,9 @@ public sealed record MetricReading
 
     public required string SensorName { get; init; }
 
-    public required string SensorType { get; init; }
+    public required string SourceSensorType { get; init; }
 
     public required double Value { get; init; }
 
-    public required string Unit { get; init; }
+    public required MetricUnit Unit { get; init; }
 }
