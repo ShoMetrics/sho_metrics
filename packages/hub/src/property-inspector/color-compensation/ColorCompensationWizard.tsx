@@ -19,7 +19,7 @@ import { renderColorCompensationSampleSvg } from "../../view-rendering/color-com
 import { SteppedSlider } from "../components/SteppedSlider";
 import type { StreamDeckPropertyInspectorClient } from "../stream-deck/stream-deck-client";
 import {
-    COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS,
+    COLOR_COMPENSATION_GUIDED_ADJUSTMENT_IDS,
     colorCompensationWizardReducer,
     createColorCompensationWizardState,
     readAdjustmentValue,
@@ -34,19 +34,23 @@ interface ColorCompensationWizardProps {
     readonly onClose: () => void;
 }
 
-interface AdjustmentCopy {
+interface ManualAdjustmentCopy {
     readonly title: string;
     readonly lowerLabel: string;
     readonly upperLabel: string;
 }
 
-const wizardInstructionById: Record<ColorCompensationGuidedAdjustmentId, string> = {
+interface GuidedAdjustmentCopy extends ManualAdjustmentCopy {
+    readonly instruction: string;
+}
+
+const guidedInstructionByAdjustmentId: Record<ColorCompensationGuidedAdjustmentId, string> = {
     saturation: "Adjust until the colored blocks on your Stream Deck key look closest to the monitor sample.",
     gamma: "Adjust until the gray gradient on your Stream Deck key looks closest to the monitor sample.",
     shadow: "Adjust until the dark blocks on your Stream Deck key look closest to the dark blocks on your monitor.",
 };
 
-const adjustmentCopyById: Record<ColorCompensationAdjustmentId, AdjustmentCopy> = {
+const manualAdjustmentCopyById: Record<ColorCompensationAdjustmentId, ManualAdjustmentCopy> = {
     saturation: {
         title: "Color Strength",
         lowerLabel: "Muted",
@@ -69,6 +73,13 @@ const adjustmentCopyById: Record<ColorCompensationAdjustmentId, AdjustmentCopy> 
     },
 };
 
+function buildGuidedAdjustmentCopy(adjustmentId: ColorCompensationGuidedAdjustmentId): GuidedAdjustmentCopy {
+    return {
+        ...manualAdjustmentCopyById[adjustmentId],
+        instruction: guidedInstructionByAdjustmentId[adjustmentId],
+    };
+}
+
 export function ColorCompensationWizard({
     client,
     initialProfile,
@@ -84,8 +95,8 @@ export function ColorCompensationWizard({
     const [noticeText, setNoticeText] = useState<string | null>(null);
     const shouldCancelOnUnmountRef = useRef(true);
     const sessionIdRef = useRef(createColorCompensationSessionId());
-    const activeAdjustmentId = COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS[state.stepIndex]
-        ?? COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS[0];
+    const activeAdjustmentId = COLOR_COMPENSATION_GUIDED_ADJUSTMENT_IDS[state.stepIndex]
+        ?? COLOR_COMPENSATION_GUIDED_ADJUSTMENT_IDS[0];
     const sessionId = sessionIdRef.current;
     const sendMessage = useCallback((message: unknown): void => {
         client.send("sendToPlugin", message).catch((error: Error) => {
@@ -211,7 +222,7 @@ export function ColorCompensationWizard({
                 <StepPage
                     adjustmentId={activeAdjustmentId}
                     stepNumber={state.stepIndex + 1}
-                    stepCount={COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS.length}
+                    stepCount={COLOR_COMPENSATION_GUIDED_ADJUSTMENT_IDS.length}
                     value={readAdjustmentValue(state.profile, activeAdjustmentId)}
                     onValueChange={(value) => dispatch({
                         type: "adjustmentValueChanged",
@@ -365,14 +376,13 @@ function StepPage({
     readonly onNext: () => void;
     readonly onCancel: () => void;
 }): React.JSX.Element {
-    const stepCopy = adjustmentCopyById[adjustmentId];
-    const instruction = wizardInstructionById[adjustmentId];
+    const stepCopy = buildGuidedAdjustmentCopy(adjustmentId);
 
     return (
         <section className="color-compensation-page">
             <p className="color-compensation-progress">Step {stepNumber} of {stepCount}: {stepCopy.title}</p>
             <SampleWidgetPreview focus={adjustmentId} />
-            <p className="color-compensation-instruction">{instruction}</p>
+            <p className="color-compensation-instruction">{stepCopy.instruction}</p>
             <SteppedSlider
                 value={value}
                 minimum={COLOR_COMPENSATION_ADJUSTMENT_MINIMUM}
@@ -509,7 +519,7 @@ function ManualProfileSliders({
     return (
         <div className="color-compensation-manual-sliders">
             {COLOR_COMPENSATION_ADJUSTMENT_IDS.map((adjustmentId) => {
-                const adjustmentCopy = adjustmentCopyById[adjustmentId];
+                const adjustmentCopy = manualAdjustmentCopyById[adjustmentId];
 
                 return (
                     <div key={adjustmentId} className="color-compensation-manual-slider">

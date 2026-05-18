@@ -11,7 +11,7 @@ import {
 export type ColorCompensationWizardPage = "profile" | "intro" | "preflight" | "step" | "review";
 export type ColorCompensationReviewMode = "before" | "after";
 
-export const COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS: readonly ColorCompensationGuidedAdjustmentId[] = [
+export const COLOR_COMPENSATION_GUIDED_ADJUSTMENT_IDS: readonly ColorCompensationGuidedAdjustmentId[] = [
     "saturation",
     "gamma",
     "shadow",
@@ -105,7 +105,7 @@ export function colorCompensationWizardReducer(
                 return {
                     ...state,
                     page: "step",
-                    stepIndex: COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS.length - 1,
+                    stepIndex: COLOR_COMPENSATION_GUIDED_ADJUSTMENT_IDS.length - 1,
                 };
             }
 
@@ -183,7 +183,7 @@ function writeAdjustmentValue(
 function moveToNextStep(state: ColorCompensationWizardState): ColorCompensationWizardState {
     const nextStepIndex = state.stepIndex + 1;
 
-    if (nextStepIndex >= COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS.length) {
+    if (nextStepIndex >= COLOR_COMPENSATION_GUIDED_ADJUSTMENT_IDS.length) {
         return {
             ...state,
             page: "review",
@@ -198,5 +198,5 @@ function moveToNextStep(state: ColorCompensationWizardState): ColorCompensationW
 }
 
 function currentWizardAdjustmentId(state: ColorCompensationWizardState): ColorCompensationGuidedAdjustmentId {
-    return COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS[state.stepIndex] ?? COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS[0];
+    return COLOR_COMPENSATION_GUIDED_ADJUSTMENT_IDS[state.stepIndex] ?? COLOR_COMPENSATION_GUIDED_ADJUSTMENT_IDS[0];
 }
