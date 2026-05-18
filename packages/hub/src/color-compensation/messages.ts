@@ -2,13 +2,13 @@ import {
     DEFAULT_COLOR_COMPENSATION_PROFILE,
     normalizeColorCompensationProfile,
     type ColorCompensationProfile,
-    type ColorCompensationAdjustmentId,
+    type ColorCompensationGuidedAdjustmentId,
 } from "./types";
 
 export const COLOR_COMPENSATION_MESSAGE_TYPE = "shometrics.colorCompensation";
 
 export type ColorCompensationPreviewKind =
-    | ColorCompensationAdjustmentId
+    | ColorCompensationGuidedAdjustmentId
     | "preflight"
     | "review-before"
     | "review-after"
@@ -144,7 +144,6 @@ function readPreviewMessage(sessionId: string, payload: Record<string, unknown>)
 
 function readPreviewKind(value: unknown): ColorCompensationPreviewKind | null {
     switch (value) {
-        case "brightness":
         case "shadow":
         case "gamma":
         case "saturation":

@@ -4,13 +4,14 @@ import {
     hasColorCompensationProfileEffect,
     normalizeColorCompensationProfile,
     type ColorCompensationAdjustmentId,
+    type ColorCompensationGuidedAdjustmentId,
     type ColorCompensationProfile,
 } from "../../color-compensation/types";
 
 export type ColorCompensationWizardPage = "profile" | "intro" | "preflight" | "step" | "review";
 export type ColorCompensationReviewMode = "before" | "after";
 
-export const COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS: readonly ColorCompensationAdjustmentId[] = [
+export const COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS: readonly ColorCompensationGuidedAdjustmentId[] = [
     "saturation",
     "gamma",
     "shadow",
@@ -196,6 +197,6 @@ function moveToNextStep(state: ColorCompensationWizardState): ColorCompensationW
     };
 }
 
-function currentWizardAdjustmentId(state: ColorCompensationWizardState): ColorCompensationAdjustmentId {
+function currentWizardAdjustmentId(state: ColorCompensationWizardState): ColorCompensationGuidedAdjustmentId {
     return COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS[state.stepIndex] ?? COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS[0];
 }

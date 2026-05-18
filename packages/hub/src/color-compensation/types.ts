@@ -1,4 +1,5 @@
 export type ColorCompensationAdjustmentId = "brightness" | "shadow" | "gamma" | "saturation";
+export type ColorCompensationGuidedAdjustmentId = Exclude<ColorCompensationAdjustmentId, "brightness">;
 
 export const COLOR_COMPENSATION_ADJUSTMENT_IDS: readonly ColorCompensationAdjustmentId[] = [
     "saturation",

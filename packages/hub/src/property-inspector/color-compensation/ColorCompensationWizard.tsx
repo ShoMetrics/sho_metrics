@@ -5,6 +5,7 @@ import {
     COLOR_COMPENSATION_ADJUSTMENT_MAXIMUM,
     COLOR_COMPENSATION_ADJUSTMENT_MINIMUM,
     type ColorCompensationAdjustmentId,
+    type ColorCompensationGuidedAdjustmentId,
     type ColorCompensationProfile,
 } from "../../color-compensation/types";
 import {
@@ -35,33 +36,34 @@ interface ColorCompensationWizardProps {
 
 interface AdjustmentCopy {
     readonly title: string;
-    readonly instruction: string;
     readonly lowerLabel: string;
     readonly upperLabel: string;
 }
 
+const wizardInstructionById: Record<ColorCompensationGuidedAdjustmentId, string> = {
+    saturation: "Adjust until the colored blocks on your Stream Deck key look closest to the monitor sample.",
+    gamma: "Adjust until the gray gradient on your Stream Deck key looks closest to the monitor sample.",
+    shadow: "Adjust until the dark blocks on your Stream Deck key look closest to the dark blocks on your monitor.",
+};
+
 const adjustmentCopyById: Record<ColorCompensationAdjustmentId, AdjustmentCopy> = {
     saturation: {
         title: "Color Strength",
-        instruction: "Adjust until the colored blocks on your Stream Deck key look closest to the monitor sample.",
         lowerLabel: "Muted",
         upperLabel: "Vivid",
     },
     brightness: {
         title: "Overall Brightness",
-        instruction: "Adjust until the gray field on your Stream Deck key looks closest to the gray field on your monitor.",
         lowerLabel: "Dimmer",
         upperLabel: "Brighter",
     },
     gamma: {
         title: "Midtones",
-        instruction: "Adjust until the gray gradient on your Stream Deck key looks closest to the monitor sample.",
         lowerLabel: "Darker",
         upperLabel: "Lighter",
     },
     shadow: {
         title: "Dark Detail",
-        instruction: "Adjust until the dark blocks on your Stream Deck key look closest to the dark blocks on your monitor.",
         lowerLabel: "Flat",
         upperLabel: "Deep",
     },
@@ -353,7 +355,7 @@ function StepPage({
     onNext,
     onCancel,
 }: {
-    readonly adjustmentId: ColorCompensationAdjustmentId;
+    readonly adjustmentId: ColorCompensationGuidedAdjustmentId;
     readonly stepNumber: number;
     readonly stepCount: number;
     readonly value: number;
@@ -364,12 +366,13 @@ function StepPage({
     readonly onCancel: () => void;
 }): React.JSX.Element {
     const stepCopy = adjustmentCopyById[adjustmentId];
+    const instruction = wizardInstructionById[adjustmentId];
 
     return (
         <section className="color-compensation-page">
             <p className="color-compensation-progress">Step {stepNumber} of {stepCount}: {stepCopy.title}</p>
             <SampleWidgetPreview focus={adjustmentId} />
-            <p className="color-compensation-instruction">{stepCopy.instruction}</p>
+            <p className="color-compensation-instruction">{instruction}</p>
             <SteppedSlider
                 value={value}
                 minimum={COLOR_COMPENSATION_ADJUSTMENT_MINIMUM}

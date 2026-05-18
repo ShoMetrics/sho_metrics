@@ -72,7 +72,6 @@ function previewColorCompensation(options: {
 }): void {
     switch (options.preview.kind) {
         case "preflight":
-        case "brightness":
         case "shadow":
         case "gamma":
         case "saturation":
