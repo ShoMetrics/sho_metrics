@@ -13,7 +13,7 @@ import {
 test("preview messages round-trip through the untrusted payload reader", () => {
     const message = buildColorCompensationPreviewMessage({
         sessionId: "session-1",
-        kind: "brightness",
+        kind: "saturation",
         profile: {
             brightnessAdjustment: 12,
             shadowAdjustment: -12,
@@ -27,7 +27,7 @@ test("preview messages round-trip through the untrusted payload reader", () => {
         sessionId: "session-1",
         command: "preview",
         preview: {
-            kind: "brightness",
+            kind: "saturation",
             profile: {
                 brightnessAdjustment: 10,
                 shadowAdjustment: -10,
@@ -70,6 +70,14 @@ test("malformed color compensation messages are ignored", () => {
         sessionId: "session-1",
         preview: {
             kind: "unknown",
+        },
+    }), null);
+    assert.equal(readColorCompensationPluginMessage({
+        type: COLOR_COMPENSATION_MESSAGE_TYPE,
+        command: "preview",
+        sessionId: "session-1",
+        preview: {
+            kind: "brightness",
         },
     }), null);
     assert.equal(readColorCompensationPluginMessage({

@@ -26,8 +26,6 @@ function renderSampleWidgetBody(focus: ColorCompensationSampleFocus): string {
             return renderPreflightPattern();
         case "saturation":
             return renderColorStrengthPattern();
-        case "brightness":
-            return renderLightnessPattern();
         case "gamma":
             return renderGrayLevelsPattern();
         case "shadow":
@@ -106,13 +104,6 @@ function renderColorStrengthPattern(): string {
     return swatches.map((swatch, index) => (
         `<rect x="${startX + index * (cellWidth + gap)}" y="18" width="${cellWidth}" height="108" rx="9" fill="${swatch.color}" />`
     )).join("");
-}
-
-function renderLightnessPattern(): string {
-    return `
-        <rect x="11" y="11" width="122" height="122" rx="14" fill="#808080" />
-        ${renderLabelText("Aa", 72, 82, 30, 1)}
-    `;
 }
 
 function renderGrayLevelsPattern(): string {
