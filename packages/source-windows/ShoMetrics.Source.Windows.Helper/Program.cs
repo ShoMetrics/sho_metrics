@@ -42,7 +42,8 @@ if (args is ["diagnose-pawnio"])
     return diagnostic.Warnings.Count == 0 ? 0 : 2;
 }
 
-MetricSnapshot snapshot = metricSource.ReadSnapshot(cancellationTokenSource.Token);
+using LibreHardwareMonitorSession session = new();
+MetricSnapshot snapshot = await session.ReadSnapshotAsync([], cancellationTokenSource.Token);
 
 Console.WriteLine(JsonSerializer.Serialize(snapshot, jsonOptions));
 return snapshot.Readings.Count == 0 ? 2 : 0;

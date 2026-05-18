@@ -10,7 +10,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
 
     public LibreHardwareMonitorSession()
     {
-        Computer computer = CreateComputer();
+        Computer computer = LibreHardwareComputerFactory.Create();
         List<HardwareSourceWarning> warnings = [];
 
         try
@@ -53,15 +53,18 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         {
             ObjectDisposedException.ThrowIf(_isDisposed, this);
 
-            List<MetricReading> readings = [];
+            Dictionary<string, MetricReading> readingsByMetricId = new(StringComparer.Ordinal);
             List<string> warnings = [];
-            HashSet<string> emittedMetricIds = new(StringComparer.Ordinal);
             HashSet<string>? requestedMetricIds = BuildRequestedMetricSet(metricIds);
 
             foreach (IHardware hardware in _computer.Hardware)
             {
-                ReadHardware(hardware, requestedMetricIds, readings, emittedMetricIds, warnings, cancellationToken);
+                ReadHardware(hardware, readingsByMetricId, warnings, cancellationToken);
             }
+
+            AddDerivedReadings(readingsByMetricId);
+
+            List<MetricReading> readings = FilterReadings(readingsByMetricId, requestedMetricIds);
 
             if (metricIds.Count == 0)
             {
@@ -103,19 +106,20 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         {
             ObjectDisposedException.ThrowIf(_isDisposed, this);
 
-            List<HardwareMetricDescriptor> descriptors = [];
+            Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId = new(StringComparer.Ordinal);
             List<string> warnings = [];
-            HashSet<string> emittedMetricIds = new(StringComparer.Ordinal);
             HashSet<string>? requestedMetricIds = BuildRequestedMetricSet(metricIds);
 
             foreach (IHardware hardware in _computer.Hardware)
             {
-                ReadHardwareDescriptors(hardware, requestedMetricIds, descriptors, emittedMetricIds, warnings, cancellationToken);
+                ReadHardwareDescriptors(hardware, descriptorsByMetricId, warnings, cancellationToken);
             }
+
+            AddDerivedDescriptors(descriptorsByMetricId);
 
             return new HardwareMetricDescriptorSnapshot
             {
-                Descriptors = descriptors,
+                Descriptors = FilterDescriptors(descriptorsByMetricId, requestedMetricIds),
                 Warnings = warnings,
             };
         }
@@ -149,9 +153,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
 
     private static void ReadHardware(
         IHardware hardware,
-        HashSet<string>? requestedMetricIds,
-        List<MetricReading> readings,
-        HashSet<string> emittedMetricIds,
+        Dictionary<string, MetricReading> readingsByMetricId,
         List<string> warnings,
         CancellationToken cancellationToken)
     {
@@ -171,26 +173,22 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         {
             foreach (ISensor sensor in hardware.Sensors)
             {
-                if (LibreHardwareMetricCatalog.TryCreateReading(hardware, sensor, out MetricReading? reading)
-                    && IsRequestedMetric(requestedMetricIds, reading.MetricId)
-                    && emittedMetricIds.Add(reading.MetricId))
+                if (LibreHardwareMetricCatalog.TryCreateReading(hardware, sensor, out MetricReading? reading))
                 {
-                    readings.Add(reading);
+                    AddReading(readingsByMetricId, reading);
                 }
             }
         }
 
         foreach (IHardware childHardware in hardware.SubHardware)
         {
-            ReadHardware(childHardware, requestedMetricIds, readings, emittedMetricIds, warnings, cancellationToken);
+            ReadHardware(childHardware, readingsByMetricId, warnings, cancellationToken);
         }
     }
 
     private static void ReadHardwareDescriptors(
         IHardware hardware,
-        HashSet<string>? requestedMetricIds,
-        List<HardwareMetricDescriptor> descriptors,
-        HashSet<string> emittedMetricIds,
+        Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId,
         List<string> warnings,
         CancellationToken cancellationToken)
     {
@@ -210,19 +208,123 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         {
             foreach (ISensor sensor in hardware.Sensors)
             {
-                if (LibreHardwareMetricCatalog.TryCreateDescriptor(hardware, sensor, out HardwareMetricDescriptor? descriptor)
-                    && IsRequestedMetric(requestedMetricIds, descriptor.MetricId)
-                    && emittedMetricIds.Add(descriptor.MetricId))
+                if (LibreHardwareMetricCatalog.TryCreateDescriptor(hardware, sensor, out HardwareMetricDescriptor? descriptor))
                 {
-                    descriptors.Add(descriptor);
+                    descriptorsByMetricId.TryAdd(descriptor.MetricId, descriptor);
                 }
             }
         }
 
         foreach (IHardware childHardware in hardware.SubHardware)
         {
-            ReadHardwareDescriptors(childHardware, requestedMetricIds, descriptors, emittedMetricIds, warnings, cancellationToken);
+            ReadHardwareDescriptors(childHardware, descriptorsByMetricId, warnings, cancellationToken);
         }
+    }
+
+    private static void AddReading(Dictionary<string, MetricReading> readingsByMetricId, MetricReading reading)
+    {
+        if (!readingsByMetricId.TryGetValue(reading.MetricId, out MetricReading? existingReading))
+        {
+            readingsByMetricId.Add(reading.MetricId, reading);
+            return;
+        }
+
+        if (LibreHardwareMetricCatalog.ShouldAggregateMetric(reading.MetricId))
+        {
+            readingsByMetricId[reading.MetricId] = existingReading with
+            {
+                Value = existingReading.Value + reading.Value,
+            };
+        }
+    }
+
+    private static void AddDerivedReadings(Dictionary<string, MetricReading> readingsByMetricId)
+    {
+        if (readingsByMetricId.TryGetValue("ram.used", out MetricReading? memoryUsed)
+            && readingsByMetricId.TryGetValue(LibreHardwareMetricCatalog.RamAvailableMetricId, out MetricReading? memoryAvailable))
+        {
+            double memoryTotalBytes = memoryUsed.Value + memoryAvailable.Value;
+
+            if (memoryTotalBytes > 0)
+            {
+                readingsByMetricId[LibreHardwareMetricCatalog.RamTotalMetricId] = memoryUsed with
+                {
+                    MetricId = LibreHardwareMetricCatalog.RamTotalMetricId,
+                    SensorId = JoinSourceSensorIds(memoryUsed.SensorId, memoryAvailable.SensorId),
+                    SensorName = "Memory Total",
+                    Value = memoryTotalBytes,
+                    Unit = "B",
+                };
+            }
+        }
+
+        MetricReading? diskRead = readingsByMetricId.GetValueOrDefault(LibreHardwareMetricCatalog.DiskReadThroughputMetricId);
+        MetricReading? diskWrite = readingsByMetricId.GetValueOrDefault(LibreHardwareMetricCatalog.DiskWriteThroughputMetricId);
+
+        if (diskRead is not null || diskWrite is not null)
+        {
+            MetricReading baseReading = diskRead ?? diskWrite!;
+
+            readingsByMetricId[LibreHardwareMetricCatalog.DiskTotalThroughputMetricId] = baseReading with
+            {
+                MetricId = LibreHardwareMetricCatalog.DiskTotalThroughputMetricId,
+                SensorId = JoinSourceSensorIds(diskRead?.SensorId, diskWrite?.SensorId),
+                SensorName = "Disk Throughput Total",
+                Value = (diskRead?.Value ?? 0) + (diskWrite?.Value ?? 0),
+                Unit = "B/s",
+            };
+        }
+    }
+
+    private static void AddDerivedDescriptors(Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId)
+    {
+        if (descriptorsByMetricId.TryGetValue("ram.used", out HardwareMetricDescriptor? memoryUsed)
+            && descriptorsByMetricId.TryGetValue(LibreHardwareMetricCatalog.RamAvailableMetricId, out HardwareMetricDescriptor? memoryAvailable))
+        {
+            descriptorsByMetricId[LibreHardwareMetricCatalog.RamTotalMetricId] = memoryUsed with
+            {
+                MetricId = LibreHardwareMetricCatalog.RamTotalMetricId,
+                SourceSensorId = JoinSourceSensorIds(memoryUsed.SourceSensorId, memoryAvailable.SourceSensorId),
+                SensorName = "Memory Total",
+                Unit = "B",
+            };
+        }
+
+        HardwareMetricDescriptor? diskRead = descriptorsByMetricId.GetValueOrDefault(LibreHardwareMetricCatalog.DiskReadThroughputMetricId);
+        HardwareMetricDescriptor? diskWrite = descriptorsByMetricId.GetValueOrDefault(LibreHardwareMetricCatalog.DiskWriteThroughputMetricId);
+
+        if (diskRead is not null || diskWrite is not null)
+        {
+            HardwareMetricDescriptor baseDescriptor = diskRead ?? diskWrite!;
+
+            descriptorsByMetricId[LibreHardwareMetricCatalog.DiskTotalThroughputMetricId] = baseDescriptor with
+            {
+                MetricId = LibreHardwareMetricCatalog.DiskTotalThroughputMetricId,
+                SourceSensorId = JoinSourceSensorIds(diskRead?.SourceSensorId, diskWrite?.SourceSensorId),
+                SensorName = "Disk Throughput Total",
+                Unit = "B/s",
+            };
+        }
+    }
+
+    private static List<MetricReading> FilterReadings(
+        Dictionary<string, MetricReading> readingsByMetricId,
+        HashSet<string>? requestedMetricIds)
+    {
+        return readingsByMetricId.Values
+            .Where(reading => !LibreHardwareMetricCatalog.IsInternalMetricId(reading.MetricId)
+                && IsRequestedMetric(requestedMetricIds, reading.MetricId))
+            .ToList();
+    }
+
+    private static List<HardwareMetricDescriptor> FilterDescriptors(
+        Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId,
+        HashSet<string>? requestedMetricIds)
+    {
+        return descriptorsByMetricId.Values
+            .Where(descriptor => !LibreHardwareMetricCatalog.IsInternalMetricId(descriptor.MetricId)
+                && IsRequestedMetric(requestedMetricIds, descriptor.MetricId))
+            .ToList();
     }
 
     private static HashSet<string>? BuildRequestedMetricSet(IReadOnlyCollection<string> metricIds)
@@ -237,29 +339,16 @@ public sealed class LibreHardwareMonitorSession : IDisposable
 
     private static void AddMissingMetricWarnings(List<MetricReading> readings, List<string> warnings)
     {
-        if (!readings.Any(reading => reading.MetricId.StartsWith("cpu.", StringComparison.Ordinal)
-            && reading.SensorType.Equals("Temperature", StringComparison.Ordinal)))
+        if (!readings.Any(reading => reading.MetricId.Equals("cpu.usage_percent", StringComparison.Ordinal)))
         {
-            warnings.Add("No CPU temperature value was returned by LibreHardwareMonitor. MSR-backed CPU temperature requires running this helper from an elevated administrator process on this machine.");
-        }
-
-        if (!readings.Any(reading => reading.MetricId.StartsWith("gpu.", StringComparison.Ordinal)
-            && reading.SensorType.Equals("Temperature", StringComparison.Ordinal)))
-        {
-            warnings.Add("No GPU temperature value was returned by LibreHardwareMonitor.");
+            warnings.Add("No CPU metric value was returned by LibreHardwareMonitor.");
         }
     }
 
-    private static Computer CreateComputer()
+    private static string JoinSourceSensorIds(string? firstSourceSensorId, string? secondSourceSensorId)
     {
-        return new Computer
-        {
-            IsCpuEnabled = true,
-            IsGpuEnabled = true,
-            IsMemoryEnabled = true,
-            IsMotherboardEnabled = true,
-            IsNetworkEnabled = true,
-            IsStorageEnabled = true,
-        };
+        return string.Join(
+            ';',
+            new[] { firstSourceSensorId, secondSourceSensorId }.Where(id => !string.IsNullOrWhiteSpace(id)));
     }
 }

@@ -1,11 +1,19 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Text;
 using LibreHardwareMonitor.Hardware;
 
 namespace ShoMetrics.Source.Windows.Core;
 
 internal static class LibreHardwareMetricCatalog
 {
+    internal const string RamAvailableMetricId = "ram.available";
+    internal const string RamTotalMetricId = "ram.total";
+    internal const string DiskReadThroughputMetricId = "disk.throughput.read";
+    internal const string DiskWriteThroughputMetricId = "disk.throughput.write";
+    internal const string DiskTotalThroughputMetricId = "disk.throughput.total";
+
+    private const double BytesPerGibibyte = 1024d * 1024d * 1024d;
+
     public static bool IsSupportedHardwareType(HardwareType hardwareType)
     {
         return hardwareType is HardwareType.Cpu
@@ -23,7 +31,9 @@ internal static class LibreHardwareMetricCatalog
 
         if (sensor.Value is not { } value
             || !float.IsFinite(value)
-            || !TryGetMetricId(hardware, sensor, out string? metricId))
+            || !TryGetMetricId(hardware, sensor, out string? metricId)
+            || !TryConvertValue(sensor.SensorType, value, out double convertedValue)
+            || !IsValidMetricValue(metricId, convertedValue))
         {
             return false;
         }
@@ -37,8 +47,8 @@ internal static class LibreHardwareMetricCatalog
             SensorId = sensor.Identifier.ToString(),
             SensorName = sensor.Name,
             SensorType = sensor.SensorType.ToString(),
-            Value = value,
-            Unit = GetUnit(sensor.SensorType),
+            Value = convertedValue,
+            Unit = GetCanonicalMetricUnit(sensor.SensorType),
         };
         return true;
     }
@@ -63,13 +73,13 @@ internal static class LibreHardwareMetricCatalog
             HardwareName = hardware.Name,
             SensorName = sensor.Name,
             SensorType = sensor.SensorType.ToString(),
-            Unit = GetUnit(sensor.SensorType),
+            Unit = GetCanonicalMetricUnit(sensor.SensorType),
             IsDynamic = false,
         };
         return true;
     }
 
-    public static string GetUnit(SensorType sensorType)
+    internal static string GetRawSensorUnit(SensorType sensorType)
     {
         return sensorType switch
         {
@@ -82,15 +92,25 @@ internal static class LibreHardwareMetricCatalog
         };
     }
 
+    internal static bool IsInternalMetricId(string metricId)
+    {
+        return metricId.Equals(RamAvailableMetricId, StringComparison.Ordinal);
+    }
+
+    internal static bool ShouldAggregateMetric(string metricId)
+    {
+        return metricId is "net.down" or "net.up" or DiskReadThroughputMetricId or DiskWriteThroughputMetricId;
+    }
+
     private static bool TryGetMetricId(IHardware hardware, ISensor sensor, [NotNullWhen(true)] out string? metricId)
     {
         metricId = hardware.HardwareType switch
         {
             HardwareType.Cpu => GetCpuMetricId(sensor),
             HardwareType.Memory => GetMemoryMetricId(hardware, sensor),
-            HardwareType.GpuAmd or HardwareType.GpuIntel or HardwareType.GpuNvidia => GetGpuMetricId(hardware, sensor),
-            HardwareType.Network => GetNetworkMetricId(hardware, sensor),
-            HardwareType.Storage => GetStorageMetricId(hardware, sensor),
+            HardwareType.GpuAmd or HardwareType.GpuIntel or HardwareType.GpuNvidia => GetGpuMetricId(sensor),
+            HardwareType.Network => GetNetworkMetricId(sensor),
+            HardwareType.Storage => GetStorageMetricId(sensor),
             _ => null,
         };
 
@@ -101,11 +121,7 @@ internal static class LibreHardwareMetricCatalog
     {
         return sensor.SensorType switch
         {
-            SensorType.Load when sensor.Name.Equals("CPU Total", StringComparison.Ordinal) => "cpu.load.percent",
-            SensorType.Load when sensor.Name.Equals("CPU Core Max", StringComparison.Ordinal) => "cpu.core.max_load.percent",
-            SensorType.Temperature when sensor.Name.Equals("CPU Package", StringComparison.Ordinal) => "cpu.package.temperature.celsius",
-            SensorType.Temperature when sensor.Name.Equals("Core Max", StringComparison.Ordinal) => "cpu.core.max_temperature.celsius",
-            SensorType.Power when sensor.Name.Equals("CPU Package", StringComparison.Ordinal) => "cpu.package.power.watts",
+            SensorType.Load when sensor.Name.Equals("CPU Total", StringComparison.Ordinal) => "cpu.usage_percent",
             _ => null,
         };
     }
@@ -120,98 +136,81 @@ internal static class LibreHardwareMetricCatalog
 
         return sensor.SensorType switch
         {
-            SensorType.Load when sensor.Name.Equals("Memory", StringComparison.Ordinal) => "ram.load.percent",
-            SensorType.Data when sensor.Name.Equals("Memory Used", StringComparison.Ordinal) => "ram.used.gb",
-            SensorType.Data when sensor.Name.Equals("Memory Available", StringComparison.Ordinal) => "ram.available.gb",
+            SensorType.Data when sensor.Name.Equals("Memory Used", StringComparison.Ordinal) => "ram.used",
+            SensorType.Data when sensor.Name.Equals("Memory Available", StringComparison.Ordinal) => RamAvailableMetricId,
             _ => null,
         };
     }
 
-    private static string? GetGpuMetricId(IHardware hardware, ISensor sensor)
+    private static string? GetGpuMetricId(ISensor sensor)
     {
-        string metricPrefix = GetGpuMetricPrefix(hardware);
-
         return sensor.SensorType switch
         {
-            SensorType.Load when sensor.Name.Equals("GPU Core", StringComparison.Ordinal) => $"{metricPrefix}.load.percent",
-            SensorType.Load when sensor.Name.Equals("D3D 3D", StringComparison.Ordinal) => $"{metricPrefix}.d3d_3d_load.percent",
-            SensorType.Load when sensor.Name.Equals("GPU Memory", StringComparison.Ordinal) => $"{metricPrefix}.memory.load.percent",
-            SensorType.Load when sensor.Name.Equals("GPU Memory Controller", StringComparison.Ordinal) => $"{metricPrefix}.memory_controller.load.percent",
-            SensorType.Temperature when sensor.Name.Equals("GPU Core", StringComparison.Ordinal) => $"{metricPrefix}.temperature.celsius",
-            SensorType.Temperature when sensor.Name.Equals("GPU Memory Junction", StringComparison.Ordinal) => $"{metricPrefix}.memory_junction.temperature.celsius",
-            SensorType.Power when sensor.Name.Equals("GPU Package", StringComparison.Ordinal) => $"{metricPrefix}.power.watts",
-            SensorType.Power when sensor.Name.Equals("GPU Power", StringComparison.Ordinal) => $"{metricPrefix}.power.watts",
-            SensorType.Data when sensor.Name.Equals("GPU Memory Used", StringComparison.Ordinal) => $"{metricPrefix}.memory.used.gb",
-            SensorType.Data when sensor.Name.Equals("GPU Memory Free", StringComparison.Ordinal) => $"{metricPrefix}.memory.free.gb",
-            SensorType.Data when sensor.Name.Equals("GPU Memory Total", StringComparison.Ordinal) => $"{metricPrefix}.memory.total.gb",
+            SensorType.Load when sensor.Name.Equals("GPU Core", StringComparison.Ordinal) => "gpu.usage_percent",
+            SensorType.Temperature when sensor.Name.Equals("GPU Core", StringComparison.Ordinal) => "gpu.temp",
+            SensorType.Power when sensor.Name.Equals("GPU Package", StringComparison.Ordinal) => "gpu.power",
+            SensorType.Power when sensor.Name.Equals("GPU Power", StringComparison.Ordinal) => "gpu.power",
+            SensorType.Data when sensor.Name.Equals("GPU Memory Used", StringComparison.Ordinal) => "gpu.vram_used",
+            SensorType.Data when sensor.Name.Equals("GPU Memory Total", StringComparison.Ordinal) => "gpu.vram_total",
             _ => null,
         };
     }
 
-    private static string? GetNetworkMetricId(IHardware hardware, ISensor sensor)
+    private static string? GetNetworkMetricId(ISensor sensor)
     {
-        string metricPrefix = $"network.{GetMetricIdSegment(hardware.Identifier.ToString())}";
-
         return sensor.SensorType switch
         {
-            SensorType.Load when sensor.Name.Equals("Network Utilization", StringComparison.Ordinal) => $"{metricPrefix}.utilization.percent",
-            SensorType.Throughput when sensor.Name.Equals("Download Speed", StringComparison.Ordinal) => $"{metricPrefix}.download.bytes_per_second",
-            SensorType.Throughput when sensor.Name.Equals("Upload Speed", StringComparison.Ordinal) => $"{metricPrefix}.upload.bytes_per_second",
-            SensorType.Data when sensor.Name.Equals("Data Downloaded", StringComparison.Ordinal) => $"{metricPrefix}.download.total.gb",
-            SensorType.Data when sensor.Name.Equals("Data Uploaded", StringComparison.Ordinal) => $"{metricPrefix}.upload.total.gb",
+            SensorType.Throughput when sensor.Name.Equals("Download Speed", StringComparison.Ordinal) => "net.down",
+            SensorType.Throughput when sensor.Name.Equals("Upload Speed", StringComparison.Ordinal) => "net.up",
             _ => null,
         };
     }
 
-    private static string? GetStorageMetricId(IHardware hardware, ISensor sensor)
+    private static string? GetStorageMetricId(ISensor sensor)
     {
-        string metricPrefix = $"storage.{GetMetricIdSegment(hardware.Identifier.ToString())}";
-
         return sensor.SensorType switch
         {
-            SensorType.Throughput when sensor.Name.Equals("Read Rate", StringComparison.Ordinal) => $"{metricPrefix}.read.bytes_per_second",
-            SensorType.Throughput when sensor.Name.Equals("Write Rate", StringComparison.Ordinal) => $"{metricPrefix}.write.bytes_per_second",
-            SensorType.Load when sensor.Name.Equals("Read Activity", StringComparison.Ordinal) => $"{metricPrefix}.read_activity.percent",
-            SensorType.Load when sensor.Name.Equals("Write Activity", StringComparison.Ordinal) => $"{metricPrefix}.write_activity.percent",
-            SensorType.Load when sensor.Name.Equals("Total Activity", StringComparison.Ordinal) => $"{metricPrefix}.activity.percent",
-            SensorType.Load when sensor.Name.Equals("Used Space", StringComparison.Ordinal) => $"{metricPrefix}.used.percent",
-            SensorType.Data when sensor.Name.Equals("Used Space", StringComparison.Ordinal) => $"{metricPrefix}.used.gb",
-            SensorType.Data when sensor.Name.Equals("Free Space", StringComparison.Ordinal) => $"{metricPrefix}.free.gb",
-            SensorType.Data when sensor.Name.Equals("Total Space", StringComparison.Ordinal) => $"{metricPrefix}.total.gb",
+            SensorType.Throughput when sensor.Name.Equals("Read Rate", StringComparison.Ordinal) => DiskReadThroughputMetricId,
+            SensorType.Throughput when sensor.Name.Equals("Write Rate", StringComparison.Ordinal) => DiskWriteThroughputMetricId,
             _ => null,
         };
     }
 
-    private static string GetGpuMetricPrefix(IHardware hardware)
+    private static bool TryConvertValue(SensorType sensorType, double value, out double convertedValue)
     {
-        return hardware.HardwareType switch
+        convertedValue = sensorType switch
         {
-            HardwareType.GpuNvidia => "gpu.nvidia",
-            HardwareType.GpuAmd => "gpu.amd",
-            HardwareType.GpuIntel => "gpu.intel",
-            _ => $"gpu.{GetMetricIdSegment(hardware.Identifier.ToString())}",
+            SensorType.Data => value * BytesPerGibibyte,
+            _ => value,
+        };
+
+        return double.IsFinite(convertedValue);
+    }
+
+    private static bool IsValidMetricValue(string metricId, double value)
+    {
+        return metricId switch
+        {
+            "cpu.usage_percent" or "gpu.usage_percent" => value is >= 0 and <= 100,
+            "gpu.temp" => value is > 0 and <= 130,
+            "gpu.power" => value >= 0,
+            "gpu.vram_used" or "ram.used" or RamAvailableMetricId => value >= 0,
+            "gpu.vram_total" or RamTotalMetricId => value > 0,
+            "net.down" or "net.up" or DiskReadThroughputMetricId or DiskWriteThroughputMetricId or DiskTotalThroughputMetricId => value >= 0,
+            _ => throw new UnreachableException($"Missing validation rule for metric '{metricId}'."),
         };
     }
 
-    private static string GetMetricIdSegment(string identifier)
+    private static string GetCanonicalMetricUnit(SensorType sensorType)
     {
-        string lastSegment = GetLastPathSegment(identifier);
-        StringBuilder segmentBuilder = new(lastSegment.Length);
-
-        foreach (char character in lastSegment)
+        return sensorType switch
         {
-            segmentBuilder.Append(char.IsAsciiLetterOrDigit(character)
-                ? char.ToLowerInvariant(character)
-                : '_');
-        }
-
-        string segment = segmentBuilder.ToString().Trim('_');
-        return segment.Length == 0 ? "0" : segment;
-    }
-
-    private static string GetLastPathSegment(string identifier)
-    {
-        string[] segments = identifier.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return segments.Length == 0 ? identifier : segments[^1];
+            SensorType.Load => "%",
+            SensorType.Temperature => "°C",
+            SensorType.Data => "B",
+            SensorType.Power => "W",
+            SensorType.Throughput => "B/s",
+            _ => "",
+        };
     }
 }
