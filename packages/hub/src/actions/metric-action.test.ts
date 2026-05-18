@@ -3,6 +3,7 @@ import test from "node:test";
 import type {
     DidReceiveSettingsEvent,
     PropertyInspectorDidAppearEvent,
+    SendToPluginEvent,
     WillAppearEvent,
     WillDisappearEvent,
 } from "@elgato/streamdeck";
@@ -15,6 +16,14 @@ import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick
 import { writeStoredGlobalSettingsPatch } from "../settings/storage/global-settings-patch";
 import { writeStoredWidgetSettingsPatch } from "../settings/storage/widget-settings-patch";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
+import {
+    buildColorCompensationPreviewMessage,
+    buildColorCompensationStartMessage,
+} from "../color-compensation/messages";
+import {
+    clearColorCompensationPreview,
+    resolveHardwareColorCompensationProfile,
+} from "../color-compensation/runtime-store";
 
 type SchedulerSubscribe = typeof scheduler.subscribe;
 type SchedulerSubscriber = Parameters<SchedulerSubscribe>[0];
@@ -217,6 +226,60 @@ test("onWillDisappear cleans subscription state and ignores later scheduler tick
     }
 });
 
+test("color compensation messages update delegated preview state and disappear clears it", () => {
+    const schedulerRecorder = installSchedulerSubscribeRecorder();
+    const action = new TestMetricAction();
+    const streamDeckAction = new FakeStreamDeckAction("color-compensation-action");
+    const previewProfile = {
+        brightnessAdjustment: 2,
+        shadowAdjustment: -1,
+        gammaAdjustment: 3,
+        saturationAdjustment: 4,
+    };
+
+    try {
+        clearColorCompensationPreview(streamDeckAction.id);
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
+        const initialProfile = resolveHardwareColorCompensationProfile({
+            actionId: streamDeckAction.id,
+            streamDeckDeviceId: undefined,
+            surfaceId: undefined,
+        });
+
+        action.onSendToPlugin(buildSendToPluginEvent(
+            streamDeckAction,
+            buildColorCompensationStartMessage("session-1"),
+        ));
+        action.onSendToPlugin(buildSendToPluginEvent(
+            streamDeckAction,
+            buildColorCompensationPreviewMessage({
+                sessionId: "session-1",
+                kind: "widget-after",
+                profile: previewProfile,
+            }),
+        ));
+
+        assert.equal(action.metricsUpdateSnapshots.length, 2);
+        assert.deepEqual(resolveHardwareColorCompensationProfile({
+            actionId: streamDeckAction.id,
+            streamDeckDeviceId: undefined,
+            surfaceId: undefined,
+        }), previewProfile);
+
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+
+        assert.deepEqual(resolveHardwareColorCompensationProfile({
+            actionId: streamDeckAction.id,
+            streamDeckDeviceId: undefined,
+            surfaceId: undefined,
+        }), initialProfile);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+        clearColorCompensationPreview(streamDeckAction.id);
+        schedulerRecorder.restore();
+    }
+});
+
 test("runtime cache publishes to Property Inspector without writing settings", async () => {
     const originalSubscribe = scheduler.subscribe;
     scheduler.subscribe = (() => () => undefined) as typeof scheduler.subscribe;
@@ -405,6 +468,16 @@ function buildDidReceiveSettingsEvent(action: FakeStreamDeckAction, settings: un
         action,
         payload: { settings },
     } as unknown as DidReceiveSettingsEvent;
+}
+
+function buildSendToPluginEvent(
+    action: FakeStreamDeckAction,
+    payload: unknown,
+): SendToPluginEvent<never, Record<string, never>> {
+    return {
+        action,
+        payload,
+    } as unknown as SendToPluginEvent<never, Record<string, never>>;
 }
 
 function buildWillDisappearEvent(action: FakeStreamDeckAction): WillDisappearEvent {
