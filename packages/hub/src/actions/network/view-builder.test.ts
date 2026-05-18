@@ -8,7 +8,7 @@ import {
 } from "../../runtime/network-metric-keys";
 import type { NetworkInterfaceOption } from "../../runtime/network-interfaces";
 import { LOCAL_SOURCE_SCOPE_ID } from "../../runtime/sources/metric-read-plan";
-import { buildMetricSnapshot, buildScalarMetricValue } from "../../runtime/sources/metric-source";
+import { buildMetricSnapshot, buildScalarMetricValue, MetricUnit } from "../../runtime/sources/metric-source";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
 import { resolveInitialActionSettings } from "../settings/action-settings-resolver";
@@ -36,10 +36,11 @@ test("network automatic interface reads aggregate keys after registry selection"
 
     const metricStore = new MetricStore();
     metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
-        sourceId: "test",
         timestampMilliseconds: 1000,
         metrics: {
-            [getNetworkAggregateMetricKey("download")]: buildScalarMetricValue(1234, { unit: "B/s" }),
+            [getNetworkAggregateMetricKey("download")]: buildScalarMetricValue(1234, {
+                unit: MetricUnit.BYTES_PER_SECOND,
+            }),
         },
     }));
 
@@ -83,10 +84,11 @@ test("network explicit interface reads interface keys without registry selection
 
     const metricStore = new MetricStore();
     metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
-        sourceId: "test",
         timestampMilliseconds: 1000,
         metrics: {
-            [getNetworkInterfaceMetricKey("download", "Ethernet")]: buildScalarMetricValue(5678, { unit: "B/s" }),
+            [getNetworkInterfaceMetricKey("download", "Ethernet")]: buildScalarMetricValue(5678, {
+                unit: MetricUnit.BYTES_PER_SECOND,
+            }),
         },
     }));
 

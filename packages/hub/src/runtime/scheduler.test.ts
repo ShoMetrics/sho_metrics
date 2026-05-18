@@ -4,6 +4,7 @@ import { Scheduler, type MetricSnapshotStore } from "./scheduler";
 import {
     buildMetricSnapshot,
     buildScalarMetricValue,
+    MetricUnit,
     type MetricSnapshot,
 } from "./sources/metric-source";
 import {
@@ -281,7 +282,7 @@ test("later same-group subscribers do not join an in-flight initial poll", async
 
 class FakeSourceRunner implements SourceRunner {
     readonly sourceId = "fake-source";
-    readonly snapshot: MetricSnapshot = buildTestSnapshot(this.sourceId);
+    readonly snapshot: MetricSnapshot = buildTestSnapshot();
     readonly polledReadPlans: MetricReadPlan[] = [];
     disposeCount = 0;
 
@@ -297,7 +298,7 @@ class FakeSourceRunner implements SourceRunner {
 
 class DeferredSourceRunner implements SourceRunner {
     readonly sourceId = "deferred-source";
-    readonly snapshot: MetricSnapshot = buildTestSnapshot(this.sourceId);
+    readonly snapshot: MetricSnapshot = buildTestSnapshot();
     readonly polledReadPlans: MetricReadPlan[] = [];
     private readonly pendingPollResolvers: Array<(snapshot: MetricSnapshot) => void> = [];
 
@@ -325,12 +326,11 @@ class DeferredSourceRunner implements SourceRunner {
     }
 }
 
-function buildTestSnapshot(sourceId: string): MetricSnapshot {
+function buildTestSnapshot(): MetricSnapshot {
     return buildMetricSnapshot({
-        sourceId,
         timestampMilliseconds: 1000,
         metrics: {
-            "cpu.usage_percent": buildScalarMetricValue(42, { unit: "%" }),
+            "cpu.usage_percent": buildScalarMetricValue(42, { unit: MetricUnit.PERCENT }),
         },
     });
 }

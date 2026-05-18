@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Systeminformation } from "systeminformation";
-import type { MetricSnapshot, MetricValue } from "./metric-source";
+import {
+    MetricUnit,
+    readRequiredMetricSnapshotTimestampMilliseconds,
+    type MetricSnapshot,
+    type MetricValue,
+} from "./metric-source";
 import {
     formatCpuModelText,
     isFinitePositiveNumber,
@@ -86,19 +91,17 @@ test("node system source polls only the requested CPU group and exposes cached C
 
     assert.deepEqual(firstMetrics["cpu.usage_percent"], {
         scalar: 42,
-        unit: "%",
-        progress: 0.42,
+        unit: MetricUnit.PERCENT,
     });
     assert.equal(firstMetrics["cpu.base_frequency"], undefined);
     assert.deepEqual(secondMetrics["cpu.base_frequency"], {
-        scalar: 4.2,
-        unit: "GHz",
+        scalar: 4200000000,
+        unit: MetricUnit.HERTZ,
     });
     assert.deepEqual(secondMetrics["cpu.model"], {
         text: "AMD Ryzen 9",
     });
-    assert.equal(firstSnapshot.sourceId, "node-system");
-    assert.equal(Number(firstSnapshot.timestampMs), 1234);
+    assert.equal(readRequiredMetricSnapshotTimestampMilliseconds(firstSnapshot), 1234);
     assert.equal(callCounts.currentLoad, 2);
     assert.equal(callCounts.cpu, 1);
     assert.equal(callCounts.mem, 0);
@@ -130,11 +133,11 @@ test("node system source polls only memory when RAM metrics are requested", asyn
     assert.deepEqual(metrics, {
         "ram.used": {
             scalar: 8,
-            unit: "B",
+            unit: MetricUnit.BYTES,
         },
         "ram.total": {
             scalar: 16,
-            unit: "B",
+            unit: MetricUnit.BYTES,
         },
     });
     assert.equal(callCounts.mem, 1);
@@ -354,13 +357,12 @@ test("node system source maps injected GPU telemetry without polling systeminfor
 
     assert.deepEqual(metrics["gpu.usage_percent"], {
         scalar: 75,
-        unit: "%",
-        progress: 0.75,
+        unit: MetricUnit.PERCENT,
     });
     assert.deepEqual(metrics["gpu.model"], { text: "NVIDIA RTX" });
     assert.equal(metrics["gpu.temp"]?.scalar, 68);
-    assert.equal(metrics["gpu.vram_used"]?.scalar, 12000);
-    assert.equal(metrics["gpu.vram_total"]?.scalar, 24000);
+    assert.equal(metrics["gpu.vram_used"]?.scalar, 12000 * 1024 * 1024);
+    assert.equal(metrics["gpu.vram_total"]?.scalar, 24000 * 1024 * 1024);
     assert.equal(metrics["gpu.power"]?.scalar, 250);
     assert.equal(metrics["gpu.power_limit"]?.scalar, 450);
     assert.equal(callCounts.windowsGpu, 1);
@@ -698,18 +700,16 @@ function assertSnapshotMetrics(snapshot: MetricSnapshot): Record<string, PlainMe
 
 function toPlainMetricValue(value: MetricValue): PlainMetricValue {
     return {
-        ...(value.data.case === "scalar" ? { scalar: value.data.value } : {}),
-        ...(value.data.case === "text" ? { text: value.data.value } : {}),
-        ...(value.unit === "" ? {} : { unit: value.unit }),
-        ...(value.progress === 0 ? {} : { progress: value.progress }),
+        ...(value.value.case === "scalar" ? { scalar: value.value.value } : {}),
+        ...(value.value.case === "text" ? { text: value.value.value } : {}),
+        ...(value.unit === MetricUnit.UNSPECIFIED ? {} : { unit: value.unit }),
     };
 }
 
 interface PlainMetricValue {
     scalar?: number;
     text?: string;
-    unit?: string;
-    progress?: number;
+    unit?: MetricUnit;
 }
 
 interface NodeSystemSourceCallCounts {

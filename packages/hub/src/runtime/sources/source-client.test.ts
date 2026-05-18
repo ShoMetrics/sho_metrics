@@ -4,6 +4,7 @@ import { createMetricSourceClient } from "./source-client";
 import {
     buildMetricSnapshot,
     buildScalarMetricValue,
+    MetricUnit,
     type MetricSnapshot,
     type MetricSource,
 } from "./metric-source";
@@ -30,7 +31,7 @@ test("metric source client falls back to poll for poll-only sources", async () =
 
 class FakeMetricSource implements MetricSource {
     readonly sourceId = "fake-source";
-    readonly snapshot: MetricSnapshot = buildTestSnapshot(this.sourceId);
+    readonly snapshot: MetricSnapshot = buildTestSnapshot();
     readonly polledMetricKeyListList: string[][] = [];
 
     async poll(): Promise<MetricSnapshot> {
@@ -45,7 +46,7 @@ class FakeMetricSource implements MetricSource {
 
 class PollOnlyMetricSource implements MetricSource {
     readonly sourceId = "poll-only-source";
-    readonly snapshot: MetricSnapshot = buildTestSnapshot(this.sourceId);
+    readonly snapshot: MetricSnapshot = buildTestSnapshot();
     pollCount = 0;
 
     async poll(): Promise<MetricSnapshot> {
@@ -54,12 +55,11 @@ class PollOnlyMetricSource implements MetricSource {
     }
 }
 
-function buildTestSnapshot(sourceId: string): MetricSnapshot {
+function buildTestSnapshot(): MetricSnapshot {
     return buildMetricSnapshot({
-        sourceId,
         timestampMilliseconds: 1000,
         metrics: {
-            "cpu.usage_percent": buildScalarMetricValue(42, { unit: "%" }),
+            "cpu.usage_percent": buildScalarMetricValue(42, { unit: MetricUnit.PERCENT }),
         },
     });
 }

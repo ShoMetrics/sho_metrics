@@ -119,7 +119,6 @@ class FakeSourceClient implements SourceClient {
         this.requestedMetricKeyListList.push([...metricKeys]);
 
         return buildMetricSnapshot({
-            sourceId: this.sourceId,
             timestampMilliseconds: 1000,
             metrics: this.metrics,
         });
@@ -136,10 +135,10 @@ class FailingSourceClient implements SourceClient {
 
 function readScalarMetricValue(snapshot: MetricSnapshot, metricKey: string): number | undefined {
     const metricValue = snapshot.metrics[metricKey];
-    return metricValue?.data.case === "scalar" ? metricValue.data.value : undefined;
+    return metricValue?.value.case === "scalar" ? metricValue.value.value : undefined;
 }
 
 function readTextMetricValue(snapshot: MetricSnapshot, metricKey: string): string | undefined {
     const metricValue = snapshot.metrics[metricKey];
-    return metricValue?.data.case === "text" ? metricValue.data.value : undefined;
+    return metricValue?.value.case === "text" ? metricValue.value.value : undefined;
 }

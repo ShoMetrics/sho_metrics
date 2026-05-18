@@ -8,7 +8,7 @@ import {
 } from "../../runtime/disk-metric-keys";
 import type { DiskVolumeOption } from "../../runtime/disk-volumes";
 import { LOCAL_SOURCE_SCOPE_ID } from "../../runtime/sources/metric-read-plan";
-import { buildMetricSnapshot, buildScalarMetricValue } from "../../runtime/sources/metric-source";
+import { buildMetricSnapshot, buildScalarMetricValue, MetricUnit } from "../../runtime/sources/metric-source";
 import { buildMetricViewRenderPlan, buildRenderWidgetData } from "../../view-rendering/metric-view-frame";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
@@ -37,12 +37,11 @@ test("disk usage automatic volume reads default usage keys after registry select
 
     const metricStore = new MetricStore();
     metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
-        sourceId: "test",
         timestampMilliseconds: 1000,
         metrics: {
-            [getDefaultDiskUsageMetricKey("used")]: buildScalarMetricValue(40, { unit: "B" }),
-            [getDefaultDiskUsageMetricKey("total")]: buildScalarMetricValue(100, { unit: "B" }),
-            [getDefaultDiskUsageMetricKey("available")]: buildScalarMetricValue(60, { unit: "B" }),
+            [getDefaultDiskUsageMetricKey("used")]: buildScalarMetricValue(40, { unit: MetricUnit.BYTES }),
+            [getDefaultDiskUsageMetricKey("total")]: buildScalarMetricValue(100, { unit: MetricUnit.BYTES }),
+            [getDefaultDiskUsageMetricKey("available")]: buildScalarMetricValue(60, { unit: MetricUnit.BYTES }),
         },
     }));
 
@@ -85,12 +84,11 @@ test("disk usage display keeps explicit unavailable volume instead of falling ba
 
     const metricStore = new MetricStore();
     metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
-        sourceId: "test",
         timestampMilliseconds: 1000,
         metrics: {
-            [getDiskVolumeMetricKey("used", "E:\\")]: buildScalarMetricValue(40, { unit: "B" }),
-            [getDiskVolumeMetricKey("total", "E:\\")]: buildScalarMetricValue(100, { unit: "B" }),
-            [getDiskVolumeMetricKey("available", "E:\\")]: buildScalarMetricValue(60, { unit: "B" }),
+            [getDiskVolumeMetricKey("used", "E:\\")]: buildScalarMetricValue(40, { unit: MetricUnit.BYTES }),
+            [getDiskVolumeMetricKey("total", "E:\\")]: buildScalarMetricValue(100, { unit: MetricUnit.BYTES }),
+            [getDiskVolumeMetricKey("available", "E:\\")]: buildScalarMetricValue(60, { unit: MetricUnit.BYTES }),
         },
     }));
 
