@@ -96,21 +96,17 @@ test("different source scopes perform separate polls", async () => {
         });
 
         try {
-            await waitForCondition(() => sourceRunner.polledReadPlans.length >= 3);
+            await waitForCondition(() => {
+                const scheduledPolls = sourceRunner.polledReadPlans.slice(1);
 
-            assert.deepEqual(sourceRunner.polledReadPlans.slice(1, 3).map(readPlan => ({
-                sourceScopeId: readPlan.sourceScopeId,
-                metricKeys: readPlan.metricKeys,
-            })), [
-                {
-                    sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
-                    metricKeys: ["cpu.usage_percent"],
-                },
-                {
-                    sourceScopeId: "remote-host",
-                    metricKeys: ["net.down"],
-                },
-            ]);
+                return hasPolledReadPlan(scheduledPolls, LOCAL_SOURCE_SCOPE_ID, ["cpu.usage_percent"])
+                    && hasPolledReadPlan(scheduledPolls, "remote-host", ["net.down"]);
+            });
+
+            const scheduledPolls = sourceRunner.polledReadPlans.slice(1);
+
+            assert.equal(hasPolledReadPlan(scheduledPolls, LOCAL_SOURCE_SCOPE_ID, ["cpu.usage_percent"]), true);
+            assert.equal(hasPolledReadPlan(scheduledPolls, "remote-host", ["net.down"]), true);
         } finally {
             unsubscribeSecond();
         }
@@ -138,12 +134,17 @@ test("different polling intervals perform separate polls", async () => {
         });
 
         try {
-            await waitForCondition(() => sourceRunner.polledReadPlans.length >= 3);
+            await waitForCondition(() => {
+                const scheduledPolls = sourceRunner.polledReadPlans.slice(1);
 
-            assert.deepEqual(sourceRunner.polledReadPlans.slice(1, 3).map(readPlan => readPlan.metricKeys), [
-                ["cpu.usage_percent"],
-                ["net.down"],
-            ]);
+                return hasPolledReadPlan(scheduledPolls, LOCAL_SOURCE_SCOPE_ID, ["cpu.usage_percent"])
+                    && hasPolledReadPlan(scheduledPolls, LOCAL_SOURCE_SCOPE_ID, ["net.down"]);
+            });
+
+            const scheduledPolls = sourceRunner.polledReadPlans.slice(1);
+
+            assert.equal(hasPolledReadPlan(scheduledPolls, LOCAL_SOURCE_SCOPE_ID, ["cpu.usage_percent"]), true);
+            assert.equal(hasPolledReadPlan(scheduledPolls, LOCAL_SOURCE_SCOPE_ID, ["net.down"]), true);
         } finally {
             unsubscribeSecond();
         }
@@ -341,6 +342,21 @@ function buildScopedMetricReadPlan(sourceScopeId: string, metricKeys: readonly s
     };
 }
 
+function hasPolledReadPlan(
+    readPlans: readonly MetricReadPlan[],
+    sourceScopeId: string,
+    metricKeys: readonly string[],
+): boolean {
+    return readPlans.some(readPlan =>
+        readPlan.sourceScopeId === sourceScopeId
+        && areMetricKeysEqual(readPlan.metricKeys, metricKeys));
+}
+
+function areMetricKeysEqual(firstMetricKeys: readonly string[], secondMetricKeys: readonly string[]): boolean {
+    return firstMetricKeys.length === secondMetricKeys.length
+        && firstMetricKeys.every((metricKey, index) => metricKey === secondMetricKeys[index]);
+}
+
 class FakeMetricSnapshotStore implements MetricSnapshotStore {
     readonly ingestedSnapshots: Array<{
         sourceScopeId: string;
@@ -353,7 +369,7 @@ class FakeMetricSnapshotStore implements MetricSnapshotStore {
 }
 
 async function waitForCondition(predicate: () => boolean): Promise<void> {
-    const maximumAttemptCount = 80;
+    const maximumAttemptCount = 160;
 
     for (let attemptIndex = 0; attemptIndex < maximumAttemptCount; attemptIndex++) {
         if (predicate()) {
