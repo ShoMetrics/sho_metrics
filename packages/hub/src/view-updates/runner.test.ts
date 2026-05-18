@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { WillAppearEvent } from "@elgato/streamdeck";
+import { Target, type WillAppearEvent } from "@elgato/streamdeck";
 import type { ResolvedAppearanceSettingsOverride } from "../settings/appearance-overrides";
 import { buildDefaultAppearanceSettings } from "../settings/default-appearance-settings";
 import type { WidgetData } from "../view-rendering/widget-data";
 import type { ProgressCircleStatusIcon } from "../widgets/primitives/progress-circle";
+import { DEFAULT_COLOR_COMPENSATION_PROFILE, type ColorCompensationProfile } from "../color-compensation/types";
+import { updateCommittedColorCompensationProfileFromStoredSettings } from "../color-compensation/runtime-store";
+import { writeStoredColorCompensationProfile } from "../settings/storage/color-compensation-settings";
+import { readStoredGlobalSettings } from "../settings/storage/codec";
+import * as rasterizer from "../view-rendering/rasterizer";
 import {
     clearMetricViewState,
     MetricViewUpdateRunner,
@@ -14,6 +19,12 @@ import {
 
 type RecordMetricViewPerformanceSample =
     typeof import("./view-update-observability")["recordMetricViewPerformanceSample"];
+type RasterizeSvgToPngDataUrl = typeof rasterizer.rasterizeSvgToPngDataUrl;
+
+interface RasterizerRecorder {
+    readonly svgList: string[];
+    restore(): void;
+}
 
 test("repeated updates for one action render only the latest pending options", async () => {
     const firstAction = new FakeKeyAction("latest-action");
@@ -125,9 +136,58 @@ test("separate runner instances do not share action state", async () => {
     }
 });
 
+test("identity color compensation profile rasterizes one image", async () => {
+    const runner = new MetricViewUpdateRunner();
+    const action = new FakeKeyAction("identity-compensation-action");
+    const rasterizerRecorder = installRasterizerRecorder();
+
+    try {
+        updateCommittedColorCompensationProfile(DEFAULT_COLOR_COMPENSATION_PROFILE);
+        runner.setMetricView(buildMetricViewOptions(action));
+
+        await waitForImageCall(action);
+
+        assert.equal(rasterizerRecorder.svgList.length, 1);
+        assert.equal(rasterizerRecorder.svgList[0].includes("runtime-color-compensation"), false);
+        assert.deepEqual(action.imageTargetList, [undefined]);
+    } finally {
+        runner.clearMetricViewState(action.id);
+        rasterizerRecorder.restore();
+        updateCommittedColorCompensationProfile(DEFAULT_COLOR_COMPENSATION_PROFILE);
+    }
+});
+
+test("effective color compensation profile keeps software image unadjusted", async () => {
+    const runner = new MetricViewUpdateRunner();
+    const action = new FakeKeyAction("effective-compensation-action");
+    const rasterizerRecorder = installRasterizerRecorder();
+
+    try {
+        updateCommittedColorCompensationProfile({
+            brightnessAdjustment: 2,
+            shadowAdjustment: 1,
+            gammaAdjustment: -1,
+            saturationAdjustment: 3,
+        });
+        runner.setMetricView(buildMetricViewOptions(action));
+
+        await waitForImageCallCount(action, 2);
+
+        assert.equal(rasterizerRecorder.svgList.length, 2);
+        assert.equal(rasterizerRecorder.svgList[0].includes("runtime-color-compensation"), false);
+        assert.equal(rasterizerRecorder.svgList[1].includes("runtime-color-compensation"), true);
+        assert.deepEqual(action.imageTargetList, [Target.Software, Target.Hardware]);
+    } finally {
+        runner.clearMetricViewState(action.id);
+        rasterizerRecorder.restore();
+        updateCommittedColorCompensationProfile(DEFAULT_COLOR_COMPENSATION_PROFILE);
+    }
+});
+
 class FakeKeyAction {
     readonly calls: string[] = [];
     readonly imageDataUrlList: string[] = [];
+    readonly imageTargetList: Array<Target | undefined> = [];
     readonly device = { id: "device-1" };
 
     constructor(
@@ -148,9 +208,10 @@ class FakeKeyAction {
         return Promise.resolve();
     }
 
-    setImage(pngDataUrl: string): Promise<void> {
+    setImage(pngDataUrl: string, options?: { readonly target?: Target }): Promise<void> {
         this.calls.push("setImage");
         this.imageDataUrlList.push(pngDataUrl);
+        this.imageTargetList.push(options?.target);
         return this.setImagePromise;
     }
 }
@@ -226,7 +287,11 @@ async function recordMetricViewUpdateReasons(run: () => Promise<void>): Promise<
 }
 
 async function waitForImageCall(action: FakeKeyAction): Promise<void> {
-    await waitFor(() => action.imageDataUrlList.length > 0);
+    await waitForImageCallCount(action, 1);
+}
+
+async function waitForImageCallCount(action: FakeKeyAction, imageCallCount: number): Promise<void> {
+    await waitFor(() => action.imageDataUrlList.length >= imageCallCount);
 }
 
 async function waitForScheduledWork(): Promise<void> {
@@ -265,4 +330,35 @@ function createDeferred<T>(): {
         promise,
         resolve: resolveDeferred,
     };
+}
+
+function installRasterizerRecorder(): RasterizerRecorder {
+    const originalRasterizeSvgToPngDataUrl = rasterizer.rasterizeSvgToPngDataUrl;
+    const svgList: string[] = [];
+    const replacement: RasterizeSvgToPngDataUrl = (svg, renderSize) => {
+        void renderSize;
+        svgList.push(svg);
+        return `data:image/png;base64,test-render-${svgList.length}`;
+    };
+
+    Object.defineProperty(rasterizer, "rasterizeSvgToPngDataUrl", {
+        configurable: true,
+        value: replacement,
+    });
+
+    return {
+        svgList,
+        restore: () => {
+            Object.defineProperty(rasterizer, "rasterizeSvgToPngDataUrl", {
+                configurable: true,
+                value: originalRasterizeSvgToPngDataUrl,
+            });
+        },
+    };
+}
+
+function updateCommittedColorCompensationProfile(profile: ColorCompensationProfile): void {
+    updateCommittedColorCompensationProfileFromStoredSettings(
+        readStoredGlobalSettings(writeStoredColorCompensationProfile(undefined, profile)).settings,
+    );
 }
