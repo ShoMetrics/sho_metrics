@@ -1,4 +1,3 @@
-using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
@@ -57,6 +56,9 @@ internal static class Program
                 {
                     services.AddSingleton<WindowsPipeSecurity>();
                     services.AddSingleton<WindowsPipeClientVerifier>();
+                    services.AddSingleton<SourceIpcFrameCodec>();
+                    services.AddSingleton<SourceProtocolMapper>();
+                    services.AddSingleton<SourceRequestHandler>();
                     services.AddSingleton<WindowsPipeSourceServer>();
                     services.AddHostedService<WindowsSourceWorker>();
                 })
@@ -119,10 +121,7 @@ internal static class Program
 
     private static int WriteVersion()
     {
-        Assembly assembly = typeof(Program).Assembly;
-        AssemblyInformationalVersionAttribute? informationalVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
-
-        Console.Out.WriteLine(informationalVersion?.InformationalVersion ?? assembly.GetName().Version?.ToString() ?? "0.0.0");
+        Console.Out.WriteLine(SourceServiceConstants.HelperVersion);
 
         return 0;
     }
