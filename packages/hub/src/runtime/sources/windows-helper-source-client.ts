@@ -6,7 +6,6 @@ import {
     ListMetricDescriptorsRequestSchema,
     ReadMetricSnapshotRequestSchema,
     type GetSourceHealthResponse,
-    type MetricDescriptor as ProtoMetricDescriptor,
     type SourceWarning as ProtoSourceWarning,
 } from "../../generated/shometrics/v1/source_api_pb.js";
 import {
@@ -15,8 +14,9 @@ import {
     type SourceIpcRequest,
     type SourceIpcResponse,
 } from "../../generated/shometrics/v1/source_ipc_pb.js";
+import type { MetricDescriptor as ProtoMetricDescriptor } from "../../generated/shometrics/v1/snapshot_pb.js";
 import {
-    buildMetricSnapshot,
+    readMetricSnapshotTimestampMilliseconds,
     type MetricSnapshot,
 } from "./metric-source";
 import type {
@@ -171,13 +171,20 @@ export class WindowsHelperSourceClient implements SourceClient {
             throw new Error("Windows source returned a snapshot response without a snapshot.");
         }
 
+        const timestampMilliseconds = readMetricSnapshotTimestampMilliseconds(snapshot);
+        if (timestampMilliseconds === undefined) {
+            const error = new WindowsHelperSourceClientError(
+                "Windows source returned a metric snapshot without captured_at.",
+                "missing_captured_at",
+                "sourceError",
+            );
+            this.recordHelperRequestFailure(error);
+            throw error;
+        }
+
         this.recordHelperRequestSuccess();
 
-        return buildMetricSnapshot({
-            sourceId: this.sourceId,
-            timestampMilliseconds: Number(snapshot.timestampMs),
-            metrics: snapshot.metrics,
-        });
+        return snapshot;
     }
 
     async listMetricDescriptors(metricKeys: readonly string[]): Promise<readonly MetricDescriptor[]> {
@@ -532,10 +539,12 @@ function toRuntimeMetricDescriptor(descriptor: ProtoMetricDescriptor): MetricDes
         sourceSensorId: descriptor.sourceSensorId,
         hardwareId: descriptor.hardwareId,
         hardwareName: descriptor.hardwareName,
+        hardwareType: descriptor.hardwareType,
         sensorName: descriptor.sensorName,
-        sensorType: descriptor.sensorType,
+        sourceSensorType: descriptor.sourceSensorType,
+        valueKind: descriptor.valueKind,
         unit: descriptor.unit,
-        isDynamic: descriptor.isDynamic,
+        metricIdKind: descriptor.metricIdKind,
     };
 }
 

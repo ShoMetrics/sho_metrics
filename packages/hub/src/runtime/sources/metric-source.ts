@@ -1,48 +1,65 @@
 import { create } from "@bufbuild/protobuf";
+import { timestampFromMs, timestampMs } from "@bufbuild/protobuf/wkt";
 import {
+    MetricIdKind,
     MetricSnapshotSchema,
+    MetricUnit,
     MetricValueSchema,
+    MetricValueKind,
     type MetricSnapshot,
     type MetricValue,
 } from "../../generated/shometrics/v1/snapshot_pb.js";
 
+// Runtime source adapters import wire metric enums through this boundary module.
+// Rendering and ordinary PI code should consume render-facing models instead.
+export { MetricIdKind, MetricUnit, MetricValueKind };
 export type { MetricSnapshot, MetricValue };
 
 export function buildMetricSnapshot(options: {
-    sourceId: string;
     timestampMilliseconds: number;
     metrics: Record<string, MetricValue>;
 }): MetricSnapshot {
     return create(MetricSnapshotSchema, {
-        sourceId: options.sourceId,
-        timestampMs: BigInt(Math.trunc(options.timestampMilliseconds)),
+        capturedAt: timestampFromMs(Math.trunc(options.timestampMilliseconds)),
         metrics: options.metrics,
     });
+}
+
+export function readMetricSnapshotTimestampMilliseconds(snapshot: MetricSnapshot): number | undefined {
+    return snapshot.capturedAt ? timestampMs(snapshot.capturedAt) : undefined;
+}
+
+export function readRequiredMetricSnapshotTimestampMilliseconds(snapshot: MetricSnapshot): number {
+    const timestampMilliseconds = readMetricSnapshotTimestampMilliseconds(snapshot);
+    if (timestampMilliseconds === undefined) {
+        throw new Error("Metric snapshot is missing captured_at.");
+    }
+
+    return timestampMilliseconds;
 }
 
 export function buildScalarMetricValue(
     value: number,
     options: {
-        unit?: string;
-        progress?: number;
+        unit?: MetricUnit;
     } = {},
 ): MetricValue {
     return create(MetricValueSchema, {
-        data: {
+        value: {
             case: "scalar",
             value,
         },
         unit: options.unit,
-        progress: options.progress,
     });
 }
 
 export function buildTextMetricValue(value: string): MetricValue {
     return create(MetricValueSchema, {
-        data: {
+        value: {
             case: "text",
             value,
         },
+        unit: MetricUnit.UNSPECIFIED,
     });
 }
 

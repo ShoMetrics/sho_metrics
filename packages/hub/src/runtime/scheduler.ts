@@ -1,4 +1,7 @@
-import type { MetricSnapshot } from "./sources/metric-source";
+import {
+    readRequiredMetricSnapshotTimestampMilliseconds,
+    type MetricSnapshot,
+} from "./sources/metric-source";
 import { metricStore } from "./metric-store";
 import { logger } from "../logging/logger";
 import {
@@ -225,6 +228,7 @@ export class Scheduler {
             const snapshot = await this.sourceRunner.poll(group.readPlan);
             this.snapshotStore.ingest(group.readPlan.sourceScopeId, snapshot);
             const ingestTimestampMilliseconds = Date.now();
+            const snapshotTimestampMilliseconds = readRequiredMetricSnapshotTimestampMilliseconds(snapshot);
 
             log.debug(() => [
                 "pollDone",
@@ -232,7 +236,7 @@ export class Scheduler {
                 `sourceScopeId=${group.readPlan.sourceScopeId}`,
                 `metrics=${formatMetricKeys(group.readPlan.metricKeys)}`,
                 `durationMs=${ingestTimestampMilliseconds - pollStartTimestampMilliseconds}`,
-                `snapshotAgeMs=${ingestTimestampMilliseconds - Number(snapshot.timestampMs ?? ingestTimestampMilliseconds)}`,
+                `snapshotAgeMs=${ingestTimestampMilliseconds - snapshotTimestampMilliseconds}`,
                 `metricCount=${Object.keys(snapshot.metrics ?? {}).length}`,
             ].join(" "));
 

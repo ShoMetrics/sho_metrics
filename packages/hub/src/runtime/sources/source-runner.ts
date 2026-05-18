@@ -61,7 +61,6 @@ export class DefaultSourceRunner implements SourceRunner {
         }
 
         return buildMetricSnapshot({
-            sourceId: normalizedReadPlan.sourceScopeId,
             timestampMilliseconds: pollStartTimestampMilliseconds,
             metrics,
         });
@@ -117,11 +116,11 @@ function copyValidMetricValues(
 }
 
 function isMetricValueValid(metricValue: MetricValue): boolean {
-    switch (metricValue.data.case) {
+    switch (metricValue.value.case) {
         case "scalar":
-            return Number.isFinite(metricValue.data.value);
+            return Number.isFinite(metricValue.value.value);
         case "text":
-            return metricValue.data.value.trim().length > 0;
+            return metricValue.value.value.trim().length > 0;
         default:
             return false;
     }

@@ -3,6 +3,7 @@ import {
     buildMetricSnapshot,
     buildScalarMetricValue,
     buildTextMetricValue,
+    MetricUnit,
     type MetricSource,
     type MetricSnapshot,
     type MetricValue,
@@ -76,6 +77,8 @@ import { NODE_SYSTEM_SOURCE_ID } from "./source-ids";
 const log = logger.for("Source:NodeSystem");
 const networkLog = logger.for("Source:NodeSystem:Network");
 const gpuLog = logger.for("Source:NodeSystem:GPU");
+const BYTES_PER_MEBIBYTE = 1024 * 1024;
+const HERTZ_PER_GIGAHERTZ = 1000 * 1000 * 1000;
 
 const {
     // Do not use. systeminformation v5 documents this as unreliable on Windows
@@ -175,25 +178,29 @@ export class NodeSystemSource implements MetricSource {
 
         if (gpu) {
             metrics[GPU_USAGE_METRIC_KEY] = buildScalarMetricValue(gpu.utilizationGpu ?? 0, {
-                unit: "%",
-                progress: Math.min(Math.max((gpu.utilizationGpu ?? 0) / 100, 0), 1),
+                unit: MetricUnit.PERCENT,
             });
             if (gpu.modelText) {
                 metrics[GPU_MODEL_METRIC_KEY] = buildTextMetricValue(gpu.modelText);
             }
-            metrics[GPU_TEMP_METRIC_KEY] = buildScalarMetricValue(gpu.temperatureGpu ?? 0, { unit: "°C" });
-            metrics[GPU_VRAM_USED_METRIC_KEY] = buildScalarMetricValue(gpu.memoryUsed ?? 0, { unit: "MB" });
-            metrics[GPU_VRAM_TOTAL_METRIC_KEY] = buildScalarMetricValue(gpu.memoryTotal ?? 0, { unit: "MB" });
+            metrics[GPU_TEMP_METRIC_KEY] = buildScalarMetricValue(gpu.temperatureGpu ?? 0, { unit: MetricUnit.CELSIUS });
+            metrics[GPU_VRAM_USED_METRIC_KEY] = buildScalarMetricValue(
+                (gpu.memoryUsed ?? 0) * BYTES_PER_MEBIBYTE,
+                { unit: MetricUnit.BYTES },
+            );
+            metrics[GPU_VRAM_TOTAL_METRIC_KEY] = buildScalarMetricValue(
+                (gpu.memoryTotal ?? 0) * BYTES_PER_MEBIBYTE,
+                { unit: MetricUnit.BYTES },
+            );
             if (typeof gpu.powerDraw === "number" && Number.isFinite(gpu.powerDraw)) {
-                metrics[GPU_POWER_METRIC_KEY] = buildScalarMetricValue(gpu.powerDraw, { unit: "W" });
+                metrics[GPU_POWER_METRIC_KEY] = buildScalarMetricValue(gpu.powerDraw, { unit: MetricUnit.WATTS });
             }
             if (typeof gpu.powerLimit === "number" && Number.isFinite(gpu.powerLimit)) {
-                metrics[GPU_POWER_LIMIT_METRIC_KEY] = buildScalarMetricValue(gpu.powerLimit, { unit: "W" });
+                metrics[GPU_POWER_LIMIT_METRIC_KEY] = buildScalarMetricValue(gpu.powerLimit, { unit: MetricUnit.WATTS });
             }
         }
 
         return buildMetricSnapshot({
-            sourceId: this.sourceId,
             timestampMilliseconds: pollStartTimestampMilliseconds,
             metrics,
         });
@@ -204,8 +211,8 @@ export class NodeSystemSource implements MetricSource {
             const memoryData = await this.systemInformation.mem();
 
             return {
-                [RAM_USED_METRIC_KEY]: buildScalarMetricValue(memoryData.used, { unit: "B" }),
-                [RAM_TOTAL_METRIC_KEY]: buildScalarMetricValue(memoryData.total, { unit: "B" }),
+                [RAM_USED_METRIC_KEY]: buildScalarMetricValue(memoryData.used, { unit: MetricUnit.BYTES }),
+                [RAM_TOTAL_METRIC_KEY]: buildScalarMetricValue(memoryData.total, { unit: MetricUnit.BYTES }),
             };
         } catch (error) {
             log.error(() => `Memory poll error: ${String(error)}`);
@@ -259,22 +266,22 @@ export class NodeSystemSource implements MetricSource {
         this.diskRegistry.update(diskVolumes);
 
         for (const diskVolume of diskVolumes) {
-            metrics[getDiskVolumeMetricKey("used", diskVolume.id)] = buildScalarMetricValue(diskVolume.usedBytes, { unit: "B" });
-            metrics[getDiskVolumeMetricKey("total", diskVolume.id)] = buildScalarMetricValue(diskVolume.sizeBytes, { unit: "B" });
-            metrics[getDiskVolumeMetricKey("available", diskVolume.id)] = buildScalarMetricValue(diskVolume.availableBytes, { unit: "B" });
+            metrics[getDiskVolumeMetricKey("used", diskVolume.id)] = buildScalarMetricValue(diskVolume.usedBytes, { unit: MetricUnit.BYTES });
+            metrics[getDiskVolumeMetricKey("total", diskVolume.id)] = buildScalarMetricValue(diskVolume.sizeBytes, { unit: MetricUnit.BYTES });
+            metrics[getDiskVolumeMetricKey("available", diskVolume.id)] = buildScalarMetricValue(diskVolume.availableBytes, { unit: MetricUnit.BYTES });
             metrics[getDiskVolumeMetricKey("percent", diskVolume.id)] = buildScalarMetricValue(
                 calculatePercent(diskVolume.usedBytes, diskVolume.sizeBytes),
-                { unit: "%" },
+                { unit: MetricUnit.PERCENT },
             );
         }
 
         if (defaultDiskVolume) {
-            metrics[getDefaultDiskUsageMetricKey("used")] = buildScalarMetricValue(defaultDiskVolume.usedBytes, { unit: "B" });
-            metrics[getDefaultDiskUsageMetricKey("total")] = buildScalarMetricValue(defaultDiskVolume.sizeBytes, { unit: "B" });
-            metrics[getDefaultDiskUsageMetricKey("available")] = buildScalarMetricValue(defaultDiskVolume.availableBytes, { unit: "B" });
+            metrics[getDefaultDiskUsageMetricKey("used")] = buildScalarMetricValue(defaultDiskVolume.usedBytes, { unit: MetricUnit.BYTES });
+            metrics[getDefaultDiskUsageMetricKey("total")] = buildScalarMetricValue(defaultDiskVolume.sizeBytes, { unit: MetricUnit.BYTES });
+            metrics[getDefaultDiskUsageMetricKey("available")] = buildScalarMetricValue(defaultDiskVolume.availableBytes, { unit: MetricUnit.BYTES });
             metrics[getDefaultDiskUsageMetricKey("percent")] = buildScalarMetricValue(
                 calculatePercent(defaultDiskVolume.usedBytes, defaultDiskVolume.sizeBytes),
-                { unit: "%" },
+                { unit: MetricUnit.PERCENT },
             );
         }
 
@@ -287,15 +294,15 @@ export class NodeSystemSource implements MetricSource {
         return {
             [getDiskThroughputMetricKey("read")]: buildScalarMetricValue(
                 normalizeNullableRate(fileSystemStats.rx_sec),
-                { unit: "B/s" },
+                { unit: MetricUnit.BYTES_PER_SECOND },
             ),
             [getDiskThroughputMetricKey("write")]: buildScalarMetricValue(
                 normalizeNullableRate(fileSystemStats.wx_sec),
-                { unit: "B/s" },
+                { unit: MetricUnit.BYTES_PER_SECOND },
             ),
             [getDiskThroughputMetricKey("total")]: buildScalarMetricValue(
                 normalizeNullableRate(fileSystemStats.tx_sec),
-                { unit: "B/s" },
+                { unit: MetricUnit.BYTES_PER_SECOND },
             ),
         };
     }
@@ -305,15 +312,14 @@ export class NodeSystemSource implements MetricSource {
             const load = await this.systemInformation.currentLoad();
             const metrics: Record<string, MetricValue> = {
                 [CPU_USAGE_METRIC_KEY]: buildScalarMetricValue(load.currentLoad, {
-                    unit: "%",
-                    progress: Math.min(Math.max(load.currentLoad / 100, 0), 1),
+                    unit: MetricUnit.PERCENT,
                 }),
             };
 
             if (this.cachedCpuBaseFrequencyGigahertz != null) {
                 metrics[CPU_BASE_FREQUENCY_METRIC_KEY] = buildScalarMetricValue(
-                    this.cachedCpuBaseFrequencyGigahertz,
-                    { unit: "GHz" },
+                    this.cachedCpuBaseFrequencyGigahertz * HERTZ_PER_GIGAHERTZ,
+                    { unit: MetricUnit.HERTZ },
                 );
             }
             if (this.cachedCpuModelText) {
@@ -402,11 +408,11 @@ export class NodeSystemSource implements MetricSource {
 
             metrics[getNetworkInterfaceMetricKey("download", networkStat.iface)] = buildScalarMetricValue(
                 downloadBytesPerSecond,
-                { unit: "B/s" },
+                { unit: MetricUnit.BYTES_PER_SECOND },
             );
             metrics[getNetworkInterfaceMetricKey("upload", networkStat.iface)] = buildScalarMetricValue(
                 uploadBytesPerSecond,
-                { unit: "B/s" },
+                { unit: MetricUnit.BYTES_PER_SECOND },
             );
 
             aggregateDownloadBytesPerSecond += downloadBytesPerSecond;
@@ -415,11 +421,11 @@ export class NodeSystemSource implements MetricSource {
 
         metrics[getNetworkAggregateMetricKey("download")] = buildScalarMetricValue(
             aggregateDownloadBytesPerSecond,
-            { unit: "B/s" },
+            { unit: MetricUnit.BYTES_PER_SECOND },
         );
         metrics[getNetworkAggregateMetricKey("upload")] = buildScalarMetricValue(
             aggregateUploadBytesPerSecond,
-            { unit: "B/s" },
+            { unit: MetricUnit.BYTES_PER_SECOND },
         );
 
         this.logNetworkPollDebug({
