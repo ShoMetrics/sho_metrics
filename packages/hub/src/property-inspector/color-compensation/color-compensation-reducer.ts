@@ -3,16 +3,15 @@ import {
     DEFAULT_COLOR_COMPENSATION_PROFILE,
     hasColorCompensationProfileEffect,
     normalizeColorCompensationProfile,
+    type ColorCompensationAdjustmentId,
     type ColorCompensationProfile,
-    type ColorCompensationStepId,
 } from "../../color-compensation/types";
 
 export type ColorCompensationWizardPage = "profile" | "intro" | "preflight" | "step" | "review";
 export type ColorCompensationReviewMode = "before" | "after";
 
-export const COLOR_COMPENSATION_WIZARD_STEPS: readonly ColorCompensationStepId[] = [
+export const COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS: readonly ColorCompensationAdjustmentId[] = [
     "saturation",
-    "brightness",
     "gamma",
     "shadow",
 ];
@@ -21,7 +20,7 @@ export interface ColorCompensationWizardState {
     readonly page: ColorCompensationWizardPage;
     readonly stepIndex: number;
     readonly profile: ColorCompensationProfile;
-    readonly skippedStepIds: readonly ColorCompensationStepId[];
+    readonly skippedAdjustmentIds: readonly ColorCompensationAdjustmentId[];
     readonly reviewMode: ColorCompensationReviewMode;
 }
 
@@ -30,7 +29,7 @@ export type ColorCompensationWizardAction =
     | { readonly type: "setupRequested" }
     | { readonly type: "profileReset" }
     | { readonly type: "preflightConfirmed" }
-    | { readonly type: "stepValueChanged"; readonly stepId: ColorCompensationStepId; readonly value: number }
+    | { readonly type: "adjustmentValueChanged"; readonly adjustmentId: ColorCompensationAdjustmentId; readonly value: number }
     | { readonly type: "stepSkipped" }
     | { readonly type: "nextRequested" }
     | { readonly type: "backRequested" }
@@ -47,7 +46,7 @@ export function createColorCompensationWizardState(
         page: hasColorCompensationProfileEffect(profile) ? "profile" : "intro",
         stepIndex: 0,
         profile,
-        skippedStepIds: [],
+        skippedAdjustmentIds: [],
         reviewMode: "after",
     };
 }
@@ -71,7 +70,7 @@ export function colorCompensationWizardReducer(
                 page: "intro",
                 stepIndex: 0,
                 profile: DEFAULT_COLOR_COMPENSATION_PROFILE,
-                skippedStepIds: [],
+                skippedAdjustmentIds: [],
                 reviewMode: "after",
             };
         case "preflightConfirmed":
@@ -81,18 +80,22 @@ export function colorCompensationWizardReducer(
                 stepIndex: 0,
                 reviewMode: "after",
             };
-        case "stepValueChanged":
+        case "adjustmentValueChanged":
             return {
                 ...state,
-                profile: writeStepValue(state.profile, action.stepId, action.value),
+                profile: writeAdjustmentValue(state.profile, action.adjustmentId, action.value),
             };
         case "stepSkipped":
             return moveToNextStep({
                 ...state,
-                profile: writeStepValue(state.profile, currentStepId(state), COLOR_COMPENSATION_ADJUSTMENT_DEFAULT),
-                skippedStepIds: state.skippedStepIds.includes(currentStepId(state))
-                    ? state.skippedStepIds
-                    : [...state.skippedStepIds, currentStepId(state)],
+                profile: writeAdjustmentValue(
+                    state.profile,
+                    currentWizardAdjustmentId(state),
+                    COLOR_COMPENSATION_ADJUSTMENT_DEFAULT,
+                ),
+                skippedAdjustmentIds: state.skippedAdjustmentIds.includes(currentWizardAdjustmentId(state))
+                    ? state.skippedAdjustmentIds
+                    : [...state.skippedAdjustmentIds, currentWizardAdjustmentId(state)],
             });
         case "nextRequested":
             return moveToNextStep(state);
@@ -101,7 +104,7 @@ export function colorCompensationWizardReducer(
                 return {
                     ...state,
                     page: "step",
-                    stepIndex: COLOR_COMPENSATION_WIZARD_STEPS.length - 1,
+                    stepIndex: COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS.length - 1,
                 };
             }
 
@@ -132,7 +135,7 @@ export function colorCompensationWizardReducer(
             return {
                 ...state,
                 profile: DEFAULT_COLOR_COMPENSATION_PROFILE,
-                skippedStepIds: [],
+                skippedAdjustmentIds: [],
                 reviewMode: "after",
             };
         case "redoRequested":
@@ -143,8 +146,11 @@ export function colorCompensationWizardReducer(
     }
 }
 
-export function readStepValue(profile: ColorCompensationProfile, stepId: ColorCompensationStepId): number {
-    switch (stepId) {
+export function readAdjustmentValue(
+    profile: ColorCompensationProfile,
+    adjustmentId: ColorCompensationAdjustmentId,
+): number {
+    switch (adjustmentId) {
         case "brightness":
             return profile.brightnessAdjustment;
         case "shadow":
@@ -156,12 +162,12 @@ export function readStepValue(profile: ColorCompensationProfile, stepId: ColorCo
     }
 }
 
-function writeStepValue(
+function writeAdjustmentValue(
     profile: ColorCompensationProfile,
-    stepId: ColorCompensationStepId,
+    adjustmentId: ColorCompensationAdjustmentId,
     value: number,
 ): ColorCompensationProfile {
-    switch (stepId) {
+    switch (adjustmentId) {
         case "brightness":
             return normalizeColorCompensationProfile({ ...profile, brightnessAdjustment: value });
         case "shadow":
@@ -176,7 +182,7 @@ function writeStepValue(
 function moveToNextStep(state: ColorCompensationWizardState): ColorCompensationWizardState {
     const nextStepIndex = state.stepIndex + 1;
 
-    if (nextStepIndex >= COLOR_COMPENSATION_WIZARD_STEPS.length) {
+    if (nextStepIndex >= COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS.length) {
         return {
             ...state,
             page: "review",
@@ -190,6 +196,6 @@ function moveToNextStep(state: ColorCompensationWizardState): ColorCompensationW
     };
 }
 
-function currentStepId(state: ColorCompensationWizardState): ColorCompensationStepId {
-    return COLOR_COMPENSATION_WIZARD_STEPS[state.stepIndex] ?? COLOR_COMPENSATION_WIZARD_STEPS[0];
+function currentWizardAdjustmentId(state: ColorCompensationWizardState): ColorCompensationAdjustmentId {
+    return COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS[state.stepIndex] ?? COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS[0];
 }

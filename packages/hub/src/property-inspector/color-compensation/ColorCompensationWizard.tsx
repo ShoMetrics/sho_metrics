@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { ColorCompensationSampleFocus } from "../../color-compensation/patterns";
 import {
+    COLOR_COMPENSATION_ADJUSTMENT_IDS,
     COLOR_COMPENSATION_ADJUSTMENT_MAXIMUM,
     COLOR_COMPENSATION_ADJUSTMENT_MINIMUM,
+    type ColorCompensationAdjustmentId,
     type ColorCompensationProfile,
-    type ColorCompensationStepId,
 } from "../../color-compensation/types";
 import {
     buildColorCompensationCancelMessage,
@@ -17,10 +18,10 @@ import { renderColorCompensationSampleSvg } from "../../view-rendering/color-com
 import { SteppedSlider } from "../components/SteppedSlider";
 import type { StreamDeckPropertyInspectorClient } from "../stream-deck/stream-deck-client";
 import {
-    COLOR_COMPENSATION_WIZARD_STEPS,
+    COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS,
     colorCompensationWizardReducer,
     createColorCompensationWizardState,
-    readStepValue,
+    readAdjustmentValue,
     type ColorCompensationReviewMode,
 } from "./color-compensation-reducer";
 
@@ -32,14 +33,14 @@ interface ColorCompensationWizardProps {
     readonly onClose: () => void;
 }
 
-interface StepCopy {
+interface AdjustmentCopy {
     readonly title: string;
     readonly instruction: string;
     readonly lowerLabel: string;
     readonly upperLabel: string;
 }
 
-const stepCopyById: Record<ColorCompensationStepId, StepCopy> = {
+const adjustmentCopyById: Record<ColorCompensationAdjustmentId, AdjustmentCopy> = {
     saturation: {
         title: "Color Strength",
         instruction: "Adjust until the colored blocks on your Stream Deck key look closest to the monitor sample.",
@@ -81,7 +82,8 @@ export function ColorCompensationWizard({
     const [noticeText, setNoticeText] = useState<string | null>(null);
     const shouldCancelOnUnmountRef = useRef(true);
     const sessionIdRef = useRef(createColorCompensationSessionId());
-    const activeStepId = COLOR_COMPENSATION_WIZARD_STEPS[state.stepIndex] ?? COLOR_COMPENSATION_WIZARD_STEPS[0];
+    const activeAdjustmentId = COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS[state.stepIndex]
+        ?? COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS[0];
     const sessionId = sessionIdRef.current;
     const sendMessage = useCallback((message: unknown): void => {
         client.send("sendToPlugin", message).catch((error: Error) => {
@@ -119,7 +121,7 @@ export function ColorCompensationWizard({
         if (state.page === "step") {
             sendMessage(buildColorCompensationPreviewMessage({
                 sessionId,
-                kind: activeStepId,
+                kind: activeAdjustmentId,
                 profile: state.profile,
             }));
             return;
@@ -130,7 +132,7 @@ export function ColorCompensationWizard({
             kind: state.reviewMode === "before" ? "review-before" : "review-after",
             profile: state.profile,
         }));
-    }, [activeStepId, sendMessage, sessionId, state.page, state.profile, state.reviewMode]);
+    }, [activeAdjustmentId, sendMessage, sessionId, state.page, state.profile, state.reviewMode]);
 
     useEffect(() => () => {
         if (shouldCancelOnUnmountRef.current) {
@@ -172,12 +174,12 @@ export function ColorCompensationWizard({
     }, []);
 
     const skippedStepText = useMemo(() => {
-        if (state.skippedStepIds.length === 0) {
+        if (state.skippedAdjustmentIds.length === 0) {
             return null;
         }
 
-        return `${state.skippedStepIds.length} step${state.skippedStepIds.length === 1 ? "" : "s"} skipped.`;
-    }, [state.skippedStepIds.length]);
+        return `${state.skippedAdjustmentIds.length} step${state.skippedAdjustmentIds.length === 1 ? "" : "s"} skipped.`;
+    }, [state.skippedAdjustmentIds.length]);
 
     return (
         <div className="color-compensation-shell">
@@ -205,11 +207,15 @@ export function ColorCompensationWizard({
             ) : null}
             {state.page === "step" ? (
                 <StepPage
-                    stepId={activeStepId}
+                    adjustmentId={activeAdjustmentId}
                     stepNumber={state.stepIndex + 1}
-                    stepCount={COLOR_COMPENSATION_WIZARD_STEPS.length}
-                    value={readStepValue(state.profile, activeStepId)}
-                    onValueChange={(value) => dispatch({ type: "stepValueChanged", stepId: activeStepId, value })}
+                    stepCount={COLOR_COMPENSATION_WIZARD_ADJUSTMENT_IDS.length}
+                    value={readAdjustmentValue(state.profile, activeAdjustmentId)}
+                    onValueChange={(value) => dispatch({
+                        type: "adjustmentValueChanged",
+                        adjustmentId: activeAdjustmentId,
+                        value,
+                    })}
                     onBack={() => dispatch({ type: "backRequested" })}
                     onSkip={() => dispatch({ type: "stepSkipped" })}
                     onNext={() => dispatch({ type: "nextRequested" })}
@@ -222,7 +228,11 @@ export function ColorCompensationWizard({
                     reviewMode={state.reviewMode}
                     skippedStepText={skippedStepText}
                     onReviewModeChange={(reviewMode) => dispatch({ type: "reviewModeChanged", reviewMode })}
-                    onProfileStepChange={(stepId, value) => dispatch({ type: "stepValueChanged", stepId, value })}
+                    onProfileAdjustmentChange={(adjustmentId, value) => dispatch({
+                        type: "adjustmentValueChanged",
+                        adjustmentId,
+                        value,
+                    })}
                     onResetDraft={resetDraft}
                     onBack={() => dispatch({ type: "backRequested" })}
                     onRedo={() => dispatch({ type: "redoRequested" })}
@@ -333,7 +343,7 @@ function PreflightPage({
 }
 
 function StepPage({
-    stepId,
+    adjustmentId,
     stepNumber,
     stepCount,
     value,
@@ -343,7 +353,7 @@ function StepPage({
     onNext,
     onCancel,
 }: {
-    readonly stepId: ColorCompensationStepId;
+    readonly adjustmentId: ColorCompensationAdjustmentId;
     readonly stepNumber: number;
     readonly stepCount: number;
     readonly value: number;
@@ -353,12 +363,12 @@ function StepPage({
     readonly onNext: () => void;
     readonly onCancel: () => void;
 }): React.JSX.Element {
-    const stepCopy = stepCopyById[stepId];
+    const stepCopy = adjustmentCopyById[adjustmentId];
 
     return (
         <section className="color-compensation-page">
             <p className="color-compensation-progress">Step {stepNumber} of {stepCount}: {stepCopy.title}</p>
-            <SampleWidgetPreview focus={stepId} />
+            <SampleWidgetPreview focus={adjustmentId} />
             <p className="color-compensation-instruction">{stepCopy.instruction}</p>
             <SteppedSlider
                 value={value}
@@ -384,7 +394,7 @@ function ReviewPage({
     reviewMode,
     skippedStepText,
     onReviewModeChange,
-    onProfileStepChange,
+    onProfileAdjustmentChange,
     onResetDraft,
     onBack,
     onRedo,
@@ -395,7 +405,7 @@ function ReviewPage({
     readonly reviewMode: ColorCompensationReviewMode;
     readonly skippedStepText: string | null;
     readonly onReviewModeChange: (reviewMode: ColorCompensationReviewMode) => void;
-    readonly onProfileStepChange: (stepId: ColorCompensationStepId, value: number) => void;
+    readonly onProfileAdjustmentChange: (adjustmentId: ColorCompensationAdjustmentId, value: number) => void;
     readonly onResetDraft: () => void;
     readonly onBack: () => void;
     readonly onRedo: () => void;
@@ -416,7 +426,7 @@ function ReviewPage({
                 <summary>Fine-tune manually</summary>
                 <ManualProfileSliders
                     profile={profile}
-                    onProfileStepChange={onProfileStepChange}
+                    onProfileAdjustmentChange={onProfileAdjustmentChange}
                 />
                 <div className="color-compensation-manual-actions">
                     <button className="inline-action-button" type="button" onClick={onResetDraft}>
@@ -488,27 +498,27 @@ function HoldBeforeButton({
 
 function ManualProfileSliders({
     profile,
-    onProfileStepChange,
+    onProfileAdjustmentChange,
 }: {
     readonly profile: ColorCompensationProfile;
-    readonly onProfileStepChange: (stepId: ColorCompensationStepId, value: number) => void;
+    readonly onProfileAdjustmentChange: (adjustmentId: ColorCompensationAdjustmentId, value: number) => void;
 }): React.JSX.Element {
     return (
         <div className="color-compensation-manual-sliders">
-            {COLOR_COMPENSATION_WIZARD_STEPS.map((stepId) => {
-                const stepCopy = stepCopyById[stepId];
+            {COLOR_COMPENSATION_ADJUSTMENT_IDS.map((adjustmentId) => {
+                const adjustmentCopy = adjustmentCopyById[adjustmentId];
 
                 return (
-                    <div key={stepId} className="color-compensation-manual-slider">
-                        <p>{stepCopy.title}</p>
+                    <div key={adjustmentId} className="color-compensation-manual-slider">
+                        <p>{adjustmentCopy.title}</p>
                         <SteppedSlider
-                            value={readStepValue(profile, stepId)}
+                            value={readAdjustmentValue(profile, adjustmentId)}
                             minimum={COLOR_COMPENSATION_ADJUSTMENT_MINIMUM}
                             maximum={COLOR_COMPENSATION_ADJUSTMENT_MAXIMUM}
-                            lowerLabel={stepCopy.lowerLabel}
-                            upperLabel={stepCopy.upperLabel}
-                            ariaLabel={stepCopy.title}
-                            onValueChange={(value) => onProfileStepChange(stepId, value)}
+                            lowerLabel={adjustmentCopy.lowerLabel}
+                            upperLabel={adjustmentCopy.upperLabel}
+                            ariaLabel={adjustmentCopy.title}
+                            onValueChange={(value) => onProfileAdjustmentChange(adjustmentId, value)}
                         />
                     </div>
                 );

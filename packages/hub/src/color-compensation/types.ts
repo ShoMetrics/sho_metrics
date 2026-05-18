@@ -1,4 +1,11 @@
-export type ColorCompensationStepId = "brightness" | "shadow" | "gamma" | "saturation";
+export type ColorCompensationAdjustmentId = "brightness" | "shadow" | "gamma" | "saturation";
+
+export const COLOR_COMPENSATION_ADJUSTMENT_IDS: readonly ColorCompensationAdjustmentId[] = [
+    "saturation",
+    "brightness",
+    "gamma",
+    "shadow",
+];
 
 export interface ColorCompensationProfile {
     readonly brightnessAdjustment: number;
