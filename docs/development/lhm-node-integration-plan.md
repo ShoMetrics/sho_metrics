@@ -1219,16 +1219,16 @@ Manual developer operations:
 
 Hot reload policy:
 
-- Do not design the service around hot reload.
-- The supported C# inner loop is build plus `--dev-pipe` process restart. Treat this as cheap process restart, not installer reinstall.
-- `dotnet watch run -- --dev-pipe` may be used as a personal convenience from an elevated PowerShell, but it is not a product requirement and tests must not depend on it.
+- Do not design the service around in-process hot reload.
+- The supported C# inner loop is elevated `dotnet watch` plus `--dev-pipe`. Treat this as automatic rebuild plus clean process restart, not true hot reload and not installer reinstall.
+- Tests and product behavior must not depend on `dotnet watch`; they depend only on the service host being able to shut down and restart cleanly.
 - The supported Node inner loop is `npm.cmd run watch` from `packages/hub`, which rebuilds and restarts the Stream Deck plugin process.
 - The service host, named pipe server, LHM session, and PawnIO/native dependencies must be written so process restart is clean and cheap.
 
 Example future commands:
 
 ```powershell
-dotnet run --project .\packages\source-windows\ShoMetrics.Source.Windows.Service\ShoMetrics.Source.Windows.Service.csproj -- --dev-pipe
+dotnet watch --project .\packages\source-windows\ShoMetrics.Source.Windows.Service\ShoMetrics.Source.Windows.Service.csproj run -- --dev-pipe
 cd .\packages\hub
 npm.cmd run watch
 ```
