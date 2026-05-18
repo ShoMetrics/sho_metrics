@@ -11,6 +11,7 @@ import {
     buildColorCompensationCommitMessage,
     buildColorCompensationPreviewMessage,
     buildColorCompensationResetMessage,
+    buildColorCompensationStartMessage,
 } from "../../color-compensation/messages";
 import { renderColorCompensationSampleSvg } from "../../view-rendering/color-compensation-patterns";
 import { SteppedSlider } from "../components/SteppedSlider";
@@ -79,12 +80,18 @@ export function ColorCompensationWizard({
     );
     const [noticeText, setNoticeText] = useState<string | null>(null);
     const shouldCancelOnUnmountRef = useRef(true);
+    const sessionIdRef = useRef(createColorCompensationSessionId());
     const activeStepId = COLOR_COMPENSATION_WIZARD_STEPS[state.stepIndex] ?? COLOR_COMPENSATION_WIZARD_STEPS[0];
+    const sessionId = sessionIdRef.current;
     const sendMessage = useCallback((message: unknown): void => {
         client.send("sendToPlugin", message).catch((error: Error) => {
             setNoticeText(`Preview update failed: ${error.message}`);
         });
     }, [client]);
+
+    useEffect(() => {
+        sendMessage(buildColorCompensationStartMessage(sessionId));
+    }, [sendMessage, sessionId]);
 
     useEffect(() => {
         if (state.page === "intro") {
@@ -93,6 +100,7 @@ export function ColorCompensationWizard({
 
         if (state.page === "profile") {
             sendMessage(buildColorCompensationPreviewMessage({
+                sessionId,
                 kind: state.reviewMode === "before" ? "widget-before" : "widget-after",
                 profile: state.profile,
             }));
@@ -101,6 +109,7 @@ export function ColorCompensationWizard({
 
         if (state.page === "preflight") {
             sendMessage(buildColorCompensationPreviewMessage({
+                sessionId,
                 kind: "preflight",
                 profile: state.profile,
             }));
@@ -109,6 +118,7 @@ export function ColorCompensationWizard({
 
         if (state.page === "step") {
             sendMessage(buildColorCompensationPreviewMessage({
+                sessionId,
                 kind: activeStepId,
                 profile: state.profile,
             }));
@@ -116,45 +126,46 @@ export function ColorCompensationWizard({
         }
 
         sendMessage(buildColorCompensationPreviewMessage({
+            sessionId,
             kind: state.reviewMode === "before" ? "review-before" : "review-after",
             profile: state.profile,
         }));
-    }, [activeStepId, sendMessage, state.page, state.profile, state.reviewMode]);
+    }, [activeStepId, sendMessage, sessionId, state.page, state.profile, state.reviewMode]);
 
     useEffect(() => () => {
         if (shouldCancelOnUnmountRef.current) {
-            client.send("sendToPlugin", buildColorCompensationCancelMessage()).catch(() => undefined);
+            client.send("sendToPlugin", buildColorCompensationCancelMessage(sessionId)).catch(() => undefined);
         }
-    }, [client]);
+    }, [client, sessionId]);
 
     const closeWithoutSaving = useCallback((): void => {
         shouldCancelOnUnmountRef.current = false;
-        sendMessage(buildColorCompensationCancelMessage());
+        sendMessage(buildColorCompensationCancelMessage(sessionId));
         onClose();
-    }, [onClose, sendMessage]);
+    }, [onClose, sendMessage, sessionId]);
 
     const commitProfile = useCallback((): void => {
         onProfileSave(state.profile)
             .then(() => {
                 shouldCancelOnUnmountRef.current = false;
-                sendMessage(buildColorCompensationCommitMessage(state.profile));
+                sendMessage(buildColorCompensationCommitMessage(sessionId, state.profile));
                 onClose();
             })
             .catch((error: unknown) => {
                 setNoticeText(`Failed to save color compensation: ${readErrorMessage(error)}`);
             });
-    }, [onClose, onProfileSave, sendMessage, state.profile]);
+    }, [onClose, onProfileSave, sendMessage, sessionId, state.profile]);
 
     const resetSavedProfile = useCallback((): void => {
         onProfileReset()
             .then(() => {
-                sendMessage(buildColorCompensationResetMessage());
+                sendMessage(buildColorCompensationResetMessage(sessionId));
                 dispatch({ type: "profileReset" });
             })
             .catch((error: unknown) => {
                 setNoticeText(`Failed to reset color compensation: ${readErrorMessage(error)}`);
             });
-    }, [onProfileReset, sendMessage]);
+    }, [onProfileReset, sendMessage, sessionId]);
 
     const resetDraft = useCallback((): void => {
         dispatch({ type: "draftReset" });
@@ -517,4 +528,8 @@ function SampleWidgetPreview({
 
 function readErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+}
+
+function createColorCompensationSessionId(): string {
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }

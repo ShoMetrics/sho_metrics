@@ -1,7 +1,9 @@
+import { Monitor } from "lucide";
 import {
     COLOR_COMPENSATION_SAMPLE_SWATCHES,
     type ColorCompensationSampleFocus,
 } from "../color-compensation/patterns";
+import { createLucideIconDefinition } from "../widgets/icons/sources/lucide";
 import { WIDGET_LOGICAL_SIZE } from "./widget-data";
 
 export function renderColorCompensationSampleSvg(focus: ColorCompensationSampleFocus): string {
@@ -37,36 +39,55 @@ function renderSampleWidgetBody(focus: ColorCompensationSampleFocus): string {
 
 function renderPreflightPattern(): string {
     return `
-        <g stroke="#e8e8e8" fill="none" stroke-linecap="round" stroke-linejoin="round">
-            <g transform="translate(14 28) scale(1.7)">
-                <rect x="2" y="3" width="20" height="14" rx="2" stroke-width="1.4" />
-                <line x1="8" y1="21" x2="16" y2="21" stroke-width="1.4" />
-                <line x1="12" y1="17" x2="12" y2="21" stroke-width="1.4" />
-            </g>
-            <g transform="translate(58 56)" stroke-width="2">
-                <line x1="0" y1="9" x2="28" y2="9" />
-                <polyline points="6,4 0,9 6,14" />
-                <polyline points="22,4 28,9 22,14" />
-            </g>
-            <g transform="translate(89 27) scale(1.7)">
-                <rect x="2" y="2" width="20" height="20" rx="3" stroke-width="1.2" />
-                <g stroke-width="0.8">
-                    <rect x="4.75" y="5.5" width="2.5" height="2.5" rx="0.7" />
-                    <rect x="8.75" y="5.5" width="2.5" height="2.5" rx="0.7" />
-                    <rect x="12.75" y="5.5" width="2.5" height="2.5" rx="0.7" />
-                    <rect x="16.75" y="5.5" width="2.5" height="2.5" rx="0.7" />
-                    <rect x="4.75" y="10.5" width="2.5" height="2.5" rx="0.7" />
-                    <rect x="8.75" y="10.5" width="2.5" height="2.5" rx="0.7" />
-                    <rect x="12.75" y="10.5" width="2.5" height="2.5" rx="0.7" />
-                    <rect x="16.75" y="10.5" width="2.5" height="2.5" rx="0.7" />
-                    <rect x="4.75" y="15.5" width="14.5" height="3" rx="0.7" />
-                </g>
-            </g>
+        <g transform="translate(21 27) scale(1.65)">
+            ${renderMonitorSvg()}
         </g>
-        <text x="72" y="118" fill="#e8e8e8" opacity="0.85"
+        <g transform="translate(85 27) scale(1.65)"
+            stroke="#e8e8e8" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            ${renderStreamDeckPlusSvg()}
+        </g>
+        ${renderLongMatchArrowSvg()}
+        <text x="72" y="122" fill="#e8e8e8" opacity="0.85"
             font-family="Inter, Segoe UI, Arial, sans-serif"
-            font-size="13" font-weight="700" letter-spacing="3"
+            font-size="20" font-weight="700" letter-spacing="3"
             text-anchor="middle">MATCH</text>
+    `;
+}
+
+function renderMonitorSvg(): string {
+    return createLucideIconDefinition({
+        id: "color-compensation.monitor",
+        node: Monitor,
+        color: "#e8e8e8",
+        strokeWidth: 1.4,
+    }).fragment;
+}
+
+function renderLongMatchArrowSvg(): string {
+    return `
+        <g stroke="#e8e8e8" fill="none" stroke-width="2.1"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="25" y1="80" x2="119" y2="80" />
+            <polyline points="34,72 25,80 34,88" />
+            <polyline points="110,72 119,80 110,88" />
+        </g>
+    `;
+}
+
+function renderStreamDeckPlusSvg(): string {
+    return `
+        <rect x="2" y="2" width="20" height="20" rx="3" stroke-width="1.2" />
+        <g stroke-width="0.8">
+            <rect x="4.75" y="5.5" width="2.5" height="2.5" rx="0.7" />
+            <rect x="8.75" y="5.5" width="2.5" height="2.5" rx="0.7" />
+            <rect x="12.75" y="5.5" width="2.5" height="2.5" rx="0.7" />
+            <rect x="16.75" y="5.5" width="2.5" height="2.5" rx="0.7" />
+            <rect x="4.75" y="10.5" width="2.5" height="2.5" rx="0.7" />
+            <rect x="8.75" y="10.5" width="2.5" height="2.5" rx="0.7" />
+            <rect x="12.75" y="10.5" width="2.5" height="2.5" rx="0.7" />
+            <rect x="16.75" y="10.5" width="2.5" height="2.5" rx="0.7" />
+            <rect x="4.75" y="15.5" width="14.5" height="3" rx="0.7" />
+        </g>
     `;
 }
 

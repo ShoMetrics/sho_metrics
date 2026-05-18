@@ -5,12 +5,14 @@ import {
     buildColorCompensationCommitMessage,
     buildColorCompensationPreviewMessage,
     buildColorCompensationResetMessage,
+    buildColorCompensationStartMessage,
     COLOR_COMPENSATION_MESSAGE_TYPE,
     readColorCompensationPluginMessage,
 } from "./messages";
 
 test("preview messages round-trip through the untrusted payload reader", () => {
     const message = buildColorCompensationPreviewMessage({
+        sessionId: "session-1",
         kind: "brightness",
         profile: {
             brightnessAdjustment: 12,
@@ -22,6 +24,7 @@ test("preview messages round-trip through the untrusted payload reader", () => {
 
     assert.deepEqual(readColorCompensationPluginMessage(message), {
         type: COLOR_COMPENSATION_MESSAGE_TYPE,
+        sessionId: "session-1",
         command: "preview",
         preview: {
             kind: "brightness",
@@ -35,9 +38,11 @@ test("preview messages round-trip through the untrusted payload reader", () => {
     });
 });
 
-test("commit cancel and reset messages are accepted", () => {
+test("start commit cancel and reset messages are accepted", () => {
+    assert.equal(readColorCompensationPluginMessage(buildColorCompensationStartMessage("session-1"))?.command, "start");
     assert.equal(
         readColorCompensationPluginMessage(buildColorCompensationPreviewMessage({
+            sessionId: "session-1",
             kind: "widget-before",
             profile: {
                 brightnessAdjustment: 0,
@@ -48,10 +53,10 @@ test("commit cancel and reset messages are accepted", () => {
         }))?.command,
         "preview",
     );
-    assert.equal(readColorCompensationPluginMessage(buildColorCompensationCancelMessage())?.command, "cancel");
-    assert.equal(readColorCompensationPluginMessage(buildColorCompensationResetMessage())?.command, "reset");
+    assert.equal(readColorCompensationPluginMessage(buildColorCompensationCancelMessage("session-1"))?.command, "cancel");
+    assert.equal(readColorCompensationPluginMessage(buildColorCompensationResetMessage("session-1"))?.command, "reset");
     assert.equal(
-        readColorCompensationPluginMessage(buildColorCompensationCommitMessage({
+        readColorCompensationPluginMessage(buildColorCompensationCommitMessage("session-1", {
             brightnessAdjustment: 1,
             shadowAdjustment: 2,
             gammaAdjustment: 3,
@@ -67,8 +72,13 @@ test("malformed color compensation messages are ignored", () => {
     assert.equal(readColorCompensationPluginMessage({
         type: COLOR_COMPENSATION_MESSAGE_TYPE,
         command: "preview",
+        sessionId: "session-1",
         preview: {
             kind: "unknown",
         },
+    }), null);
+    assert.equal(readColorCompensationPluginMessage({
+        type: COLOR_COMPENSATION_MESSAGE_TYPE,
+        command: "cancel",
     }), null);
 });
