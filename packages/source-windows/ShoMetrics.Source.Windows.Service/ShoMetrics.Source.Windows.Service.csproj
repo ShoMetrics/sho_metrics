@@ -22,4 +22,16 @@
     <PackageReference Include="System.IO.Pipes.AccessControl" Version="[5.0.0]" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\snapshot.proto"
+              ProtoRoot="..\..\..\contracts\proto"
+              GrpcServices="None" />
+    <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\source_api.proto"
+              ProtoRoot="..\..\..\contracts\proto"
+              GrpcServices="None" />
+    <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\source_ipc.proto"
+              ProtoRoot="..\..\..\contracts\proto"
+              GrpcServices="None" />
+  </ItemGroup>
+
 </Project>

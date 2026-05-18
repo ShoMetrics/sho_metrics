@@ -1,6 +1,8 @@
 syntax = "proto3";
 package shometrics.v1;
 
+option csharp_namespace = "ShoMetrics.Contracts.V1";
+
 // The universal snapshot format returned by any Metric Source (Node.js, C#, etc.)
 message MetricSnapshot {
   string source_id = 1; // e.g., "builtin-node", "win-native"

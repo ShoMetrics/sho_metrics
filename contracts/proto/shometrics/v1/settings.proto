@@ -4,6 +4,8 @@ package shometrics.v1;
 
 import "buf/validate/validate.proto";
 
+option csharp_namespace = "ShoMetrics.Contracts.V1";
+
 // Persisted Stream Deck action settings.
 //
 // These messages are intended to be stored as plain ProtoJSON in the Stream
