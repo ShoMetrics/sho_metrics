@@ -7,12 +7,14 @@ import {
     readColorCompensationPluginMessage,
     type ColorCompensationPreview,
 } from "./messages";
-import { startColorCompensationPreviewSession } from "./runtime-store";
-import { logger } from "../logging/logger";
 import {
     clearColorCompensationPreview,
     clearColorCompensationPreviewSession,
     setColorCompensationWidgetPreview,
+    startColorCompensationPreviewSession,
+} from "./runtime-store";
+import { logger } from "../logging/logger";
+import {
     showColorCompensationSamplePreview,
 } from "../view-updates/color-compensation-preview";
 

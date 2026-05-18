@@ -161,17 +161,15 @@ function writeStepValue(
     stepId: ColorCompensationStepId,
     value: number,
 ): ColorCompensationProfile {
-    const normalizedProfile = normalizeColorCompensationProfile(profile);
-
     switch (stepId) {
         case "brightness":
-            return normalizeColorCompensationProfile({ ...normalizedProfile, brightnessAdjustment: value });
+            return normalizeColorCompensationProfile({ ...profile, brightnessAdjustment: value });
         case "shadow":
-            return normalizeColorCompensationProfile({ ...normalizedProfile, shadowAdjustment: value });
+            return normalizeColorCompensationProfile({ ...profile, shadowAdjustment: value });
         case "gamma":
-            return normalizeColorCompensationProfile({ ...normalizedProfile, gammaAdjustment: value });
+            return normalizeColorCompensationProfile({ ...profile, gammaAdjustment: value });
         case "saturation":
-            return normalizeColorCompensationProfile({ ...normalizedProfile, saturationAdjustment: value });
+            return normalizeColorCompensationProfile({ ...profile, saturationAdjustment: value });
     }
 }
 

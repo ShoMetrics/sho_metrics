@@ -38,6 +38,10 @@ export class ColorCompensationRuntimeStore {
         readonly actionId: string;
         readonly sessionId: string;
     }): void {
+        if (this.activeSessionIds.get(options.actionId) === options.sessionId) {
+            return;
+        }
+
         this.activeSessionIds.set(options.actionId, options.sessionId);
         this.previewStates.delete(options.actionId);
     }
@@ -46,7 +50,7 @@ export class ColorCompensationRuntimeStore {
         readonly actionId: string;
         readonly sessionId: string;
     }): boolean {
-        if (!this.acceptsSession(options.actionId, options.sessionId)) {
+        if (!this.claimOrMatchPreviewSession(options.actionId, options.sessionId)) {
             return false;
         }
 
@@ -61,7 +65,7 @@ export class ColorCompensationRuntimeStore {
         readonly sessionId: string;
         readonly profile: ColorCompensationProfile;
     }): boolean {
-        if (!this.acceptsSession(options.actionId, options.sessionId)) {
+        if (!this.claimOrMatchPreviewSession(options.actionId, options.sessionId)) {
             return false;
         }
 
@@ -100,7 +104,7 @@ export class ColorCompensationRuntimeStore {
         return previewState?.kind === "widget" ? previewState.profile : this.committedProfile;
     }
 
-    private acceptsSession(actionId: string, sessionId: string): boolean {
+    private claimOrMatchPreviewSession(actionId: string, sessionId: string): boolean {
         const activeSessionId = this.activeSessionIds.get(actionId);
 
         if (!activeSessionId) {

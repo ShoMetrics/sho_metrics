@@ -36,7 +36,6 @@ export type ColorCompensationPluginMessage =
         readonly type: typeof COLOR_COMPENSATION_MESSAGE_TYPE;
         readonly sessionId: string;
         readonly command: "commit";
-        readonly profile: ColorCompensationProfile;
     }
     | {
         readonly type: typeof COLOR_COMPENSATION_MESSAGE_TYPE;
@@ -73,15 +72,11 @@ export function buildColorCompensationPreviewMessage(options: {
     };
 }
 
-export function buildColorCompensationCommitMessage(
-    sessionId: string,
-    profile: ColorCompensationProfile,
-): ColorCompensationPluginMessage {
+export function buildColorCompensationCommitMessage(sessionId: string): ColorCompensationPluginMessage {
     return {
         type: COLOR_COMPENSATION_MESSAGE_TYPE,
         sessionId,
         command: "commit",
-        profile: normalizeColorCompensationProfile(profile),
     };
 }
 
@@ -118,7 +113,7 @@ export function readColorCompensationPluginMessage(payload: unknown): ColorCompe
         case "preview":
             return readPreviewMessage(sessionId, payload);
         case "commit":
-            return readCommitMessage(sessionId, payload);
+            return buildColorCompensationCommitMessage(sessionId);
         case "cancel":
             return buildColorCompensationCancelMessage(sessionId);
         case "reset":
@@ -145,12 +140,6 @@ function readPreviewMessage(sessionId: string, payload: Record<string, unknown>)
         kind: previewKind,
         profile,
     });
-}
-
-function readCommitMessage(sessionId: string, payload: Record<string, unknown>): ColorCompensationPluginMessage | null {
-    const profile = readColorCompensationProfile(payload.profile);
-
-    return profile ? buildColorCompensationCommitMessage(sessionId, profile) : null;
 }
 
 function readPreviewKind(value: unknown): ColorCompensationPreviewKind | null {

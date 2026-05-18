@@ -148,7 +148,7 @@ export function ColorCompensationWizard({
         onProfileSave(state.profile)
             .then(() => {
                 shouldCancelOnUnmountRef.current = false;
-                sendMessage(buildColorCompensationCommitMessage(sessionId, state.profile));
+                sendMessage(buildColorCompensationCommitMessage(sessionId));
                 onClose();
             })
             .catch((error: unknown) => {
