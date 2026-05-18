@@ -8,6 +8,11 @@ namespace ShoMetrics.Source.Windows.Service;
 
 internal static class Program
 {
+    private const long LogFileSizeLimitBytes = 10 * 1024 * 1024;
+    private const int RetainedLogFileCountLimit = 14;
+    private const string LogOutputTemplate =
+        "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}";
+
     public static async Task<int> Main(string[] args)
     {
         ServiceExecutableMode mode = ParseMode(args);
@@ -55,12 +60,12 @@ internal static class Program
                 .UseSerilog((_, _, loggerConfiguration) => ConfigureSerilog(loggerConfiguration, mode))
                 .ConfigureServices(services =>
                 {
+                    services.AddSingleton<LibreHardwareMonitorSession>();
                     services.AddSingleton<WindowsPipeSecurity>();
                     services.AddSingleton<WindowsPipeClientVerifier>();
                     services.AddSingleton<SourceIpcFrameCodec>();
                     services.AddSingleton<SourceProtocolMapper>();
                     services.AddSingleton<SourceRequestHandler>();
-                    services.AddSingleton<LibreHardwareMonitorSession>();
                     services.AddSingleton<WindowsPipeSourceServer>();
                     services.AddHostedService<WindowsSourceWorker>();
                 })
@@ -86,6 +91,14 @@ internal static class Program
     {
         return new LoggerConfiguration()
             .MinimumLevel.Debug()
+            .WriteTo.File(
+                ResolveLogFilePath(),
+                restrictedToMinimumLevel: LogEventLevel.Debug,
+                outputTemplate: LogOutputTemplate,
+                rollingInterval: RollingInterval.Day,
+                rollOnFileSizeLimit: true,
+                fileSizeLimitBytes: LogFileSizeLimitBytes,
+                retainedFileCountLimit: RetainedLogFileCountLimit)
             .WriteTo.Console()
             .CreateLogger();
     }
@@ -95,14 +108,40 @@ internal static class Program
         loggerConfiguration
             .MinimumLevel.Debug()
             .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-            .MinimumLevel.Override("System", LogEventLevel.Warning);
+            .MinimumLevel.Override("System", LogEventLevel.Warning)
+            .Enrich.FromLogContext()
+            .WriteTo.File(
+                ResolveLogFilePath(),
+                restrictedToMinimumLevel: LogEventLevel.Debug,
+                outputTemplate: LogOutputTemplate,
+                rollingInterval: RollingInterval.Day,
+                rollOnFileSizeLimit: true,
+                fileSizeLimitBytes: LogFileSizeLimitBytes,
+                retainedFileCountLimit: RetainedLogFileCountLimit);
+
+        if (mode == ServiceExecutableMode.WindowsService)
+        {
+            loggerConfiguration.WriteTo.EventLog(
+                SourceServiceConstants.ServiceName,
+                logName: "Application",
+                manageEventSource: true,
+                restrictedToMinimumLevel: LogEventLevel.Warning);
+        }
 
         if (mode == ServiceExecutableMode.DevPipe)
         {
-            loggerConfiguration.WriteTo.Console();
+            loggerConfiguration.WriteTo.Console(outputTemplate: LogOutputTemplate);
         }
+    }
 
-        // File and Event Log sinks are added in C# Step 10 with the service logging policy.
+    private static string ResolveLogFilePath()
+    {
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "ShoMetrics",
+            "Source.Windows",
+            "logs",
+            "shometrics-source-windows.log");
     }
 
     private static int WriteHelp()

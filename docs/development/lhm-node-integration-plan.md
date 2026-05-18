@@ -798,7 +798,8 @@ Rules:
 - Do not log full sensor dumps or complete protobuf payloads.
 - Use request id, source id, metric id, source sensor id, and error code for diagnostics.
 - Validation warnings must be throttled per metric id or source sensor id.
-- Dev pipe mode may log to console in addition to file and Event Log.
+- Dev pipe mode logs to console and file only. Do not write dev-pipe warnings to Windows Event Log.
+- Windows Service mode writes Warning and higher events to Windows Event Log. During Phase 1 the runtime may create the Event Source because the service runs as `LocalSystem`; when WiX/MSI owns Event Source registration, switch runtime Event Log source creation off.
 
 ### C# Step 11: Service Acceptance Tests
 
