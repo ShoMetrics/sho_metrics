@@ -33,8 +33,10 @@ import {
     readColorCompensationPluginMessage,
     type ColorCompensationPreview,
 } from "../color-compensation/messages";
+import { startColorCompensationPreviewSession } from "../color-compensation/runtime-store";
 import {
     clearColorCompensationPreview,
+    clearColorCompensationPreviewSession,
     setColorCompensationWidgetPreview,
     showColorCompensationSamplePreview,
 } from "../view-updates/color-compensation-preview";
@@ -146,20 +148,38 @@ export abstract class MetricAction extends SingletonAction {
         }
 
         switch (message.command) {
+            case "start":
+                startColorCompensationPreviewSession({
+                    actionId: event.action.id,
+                    sessionId: message.sessionId,
+                });
+                break;
             case "preview":
-                this.previewColorCompensation(activeActionState, message.preview);
+                this.previewColorCompensation(activeActionState, message.sessionId, message.preview);
                 break;
             case "commit":
-                clearColorCompensationPreview(event.action.id);
-                this.onMetricsUpdate(activeActionState.event);
+                if (clearColorCompensationPreviewSession({
+                    actionId: event.action.id,
+                    sessionId: message.sessionId,
+                })) {
+                    this.onMetricsUpdate(activeActionState.event);
+                }
                 break;
             case "cancel":
-                clearColorCompensationPreview(event.action.id);
-                this.onMetricsUpdate(activeActionState.event);
+                if (clearColorCompensationPreviewSession({
+                    actionId: event.action.id,
+                    sessionId: message.sessionId,
+                })) {
+                    this.onMetricsUpdate(activeActionState.event);
+                }
                 break;
             case "reset":
-                clearColorCompensationPreview(event.action.id);
-                this.onMetricsUpdate(activeActionState.event);
+                if (clearColorCompensationPreviewSession({
+                    actionId: event.action.id,
+                    sessionId: message.sessionId,
+                })) {
+                    this.onMetricsUpdate(activeActionState.event);
+                }
                 break;
         }
     }
@@ -302,6 +322,7 @@ export abstract class MetricAction extends SingletonAction {
 
     private previewColorCompensation(
         activeActionState: ActiveActionState,
+        sessionId: string,
         preview: ColorCompensationPreview,
     ): void {
         switch (preview.kind) {
@@ -312,10 +333,14 @@ export abstract class MetricAction extends SingletonAction {
             case "saturation":
                 showColorCompensationSamplePreview({
                     event: activeActionState.event,
+                    sessionId,
                     focus: preview.kind,
                     profile: preview.profile,
                 }).catch(error => {
-                    clearColorCompensationPreview(activeActionState.event.action.id);
+                    clearColorCompensationPreviewSession({
+                        actionId: activeActionState.event.action.id,
+                        sessionId,
+                    });
                     log.warn(() => `Failed to render color compensation preview: ${String(error)}`);
                     this.onMetricsUpdate(activeActionState.event);
                     activeActionState.event.action.showAlert().catch(alertError => {
@@ -326,10 +351,14 @@ export abstract class MetricAction extends SingletonAction {
             case "review-before":
                 showColorCompensationSamplePreview({
                     event: activeActionState.event,
+                    sessionId,
                     focus: "review",
                     profile: DEFAULT_COLOR_COMPENSATION_PROFILE,
                 }).catch(error => {
-                    clearColorCompensationPreview(activeActionState.event.action.id);
+                    clearColorCompensationPreviewSession({
+                        actionId: activeActionState.event.action.id,
+                        sessionId,
+                    });
                     log.warn(() => `Failed to render color compensation before preview: ${String(error)}`);
                     this.onMetricsUpdate(activeActionState.event);
                 });
@@ -337,26 +366,36 @@ export abstract class MetricAction extends SingletonAction {
             case "review-after":
                 showColorCompensationSamplePreview({
                     event: activeActionState.event,
+                    sessionId,
                     focus: "review",
                     profile: preview.profile,
                 }).catch(error => {
-                    clearColorCompensationPreview(activeActionState.event.action.id);
+                    clearColorCompensationPreviewSession({
+                        actionId: activeActionState.event.action.id,
+                        sessionId,
+                    });
                     log.warn(() => `Failed to render color compensation after preview: ${String(error)}`);
                     this.onMetricsUpdate(activeActionState.event);
                 });
                 break;
             case "widget-before":
-                setColorCompensationWidgetPreview({
+                if (!setColorCompensationWidgetPreview({
                     actionId: activeActionState.event.action.id,
+                    sessionId,
                     profile: DEFAULT_COLOR_COMPENSATION_PROFILE,
-                });
+                })) {
+                    return;
+                }
                 this.onMetricsUpdate(activeActionState.event);
                 break;
             case "widget-after":
-                setColorCompensationWidgetPreview({
+                if (!setColorCompensationWidgetPreview({
                     actionId: activeActionState.event.action.id,
+                    sessionId,
                     profile: preview.profile,
-                });
+                })) {
+                    return;
+                }
                 this.onMetricsUpdate(activeActionState.event);
                 break;
         }
