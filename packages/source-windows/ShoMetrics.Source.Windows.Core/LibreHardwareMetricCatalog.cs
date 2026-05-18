@@ -12,33 +12,97 @@ internal static class LibreHardwareMetricCatalog
     internal const string DiskWriteThroughputMetricId = "disk.throughput.write";
     internal const string DiskTotalThroughputMetricId = "disk.throughput.total";
 
+    private const string DynamicMetricIdPrefix = "lhm.sensor:";
     private const double BytesPerGibibyte = 1024d * 1024d * 1024d;
+    private const double BytesPerMebibyte = 1024d * 1024d;
+    private const double HertzPerMegahertz = 1000d * 1000d;
+    private const double SecondsPerNanosecond = 1e-9d;
+    private const double WattHoursPerMilliwattHour = 0.001d;
+    private const double SiemensPerMicrosiemens = 0.000001d;
 
     public static bool IsSupportedHardwareType(HardwareType hardwareType)
     {
-        return hardwareType is HardwareType.Cpu
+        return hardwareType is HardwareType.Motherboard
+            or HardwareType.SuperIO
+            or HardwareType.Cpu
             or HardwareType.GpuAmd
             or HardwareType.GpuIntel
             or HardwareType.GpuNvidia
             or HardwareType.Memory
             or HardwareType.Network
-            or HardwareType.Storage;
+            or HardwareType.Storage
+            or HardwareType.Cooler
+            or HardwareType.EmbeddedController
+            or HardwareType.Psu
+            or HardwareType.Battery
+            or HardwareType.PowerMonitor;
     }
 
-    public static bool TryCreateReading(IHardware hardware, ISensor sensor, [NotNullWhen(true)] out MetricReading? reading)
+    public static IReadOnlyList<MetricReading> CreateReadings(IHardware hardware, ISensor sensor)
     {
-        reading = null;
-
         if (sensor.Value is not { } value
             || !float.IsFinite(value)
-            || !TryGetMetricId(hardware, sensor, out string? metricId)
-            || !TryConvertValue(sensor.SensorType, value, out double convertedValue)
-            || !IsValidMetricValue(metricId, convertedValue))
+            || !TryConvertValue(sensor.SensorType, value, out double convertedValue, out MetricUnit unit)
+            || !IsValidSensorValue(sensor.SensorType, convertedValue))
         {
-            return false;
+            return [];
         }
 
-        reading = new MetricReading
+        List<MetricReading> readings = [];
+
+        if (TryGetStableMetricId(hardware, sensor, out string? stableMetricId)
+            && IsValidStableMetricValue(stableMetricId, convertedValue))
+        {
+            readings.Add(CreateReading(hardware, sensor, stableMetricId, convertedValue, unit));
+        }
+
+        readings.Add(CreateReading(
+            hardware,
+            sensor,
+            BuildDynamicMetricId(sensor),
+            convertedValue,
+            unit));
+
+        return readings;
+    }
+
+    public static IReadOnlyList<HardwareMetricDescriptor> CreateDescriptors(IHardware hardware, ISensor sensor)
+    {
+        if (!TryGetCanonicalMetricUnit(sensor.SensorType, out MetricUnit unit))
+        {
+            return [];
+        }
+
+        List<HardwareMetricDescriptor> descriptors = [];
+
+        if (TryGetStableMetricId(hardware, sensor, out string? stableMetricId))
+        {
+            descriptors.Add(CreateDescriptor(
+                hardware,
+                sensor,
+                stableMetricId,
+                unit,
+                MetricIdKind.StableAlias));
+        }
+
+        descriptors.Add(CreateDescriptor(
+            hardware,
+            sensor,
+            BuildDynamicMetricId(sensor),
+            unit,
+            MetricIdKind.SourceSensor));
+
+        return descriptors;
+    }
+
+    private static MetricReading CreateReading(
+        IHardware hardware,
+        ISensor sensor,
+        string metricId,
+        double value,
+        MetricUnit unit)
+    {
+        return new MetricReading
         {
             MetricId = metricId,
             HardwareId = hardware.Identifier.ToString(),
@@ -47,25 +111,19 @@ internal static class LibreHardwareMetricCatalog
             SensorId = sensor.Identifier.ToString(),
             SensorName = sensor.Name,
             SourceSensorType = sensor.SensorType.ToString(),
-            Value = convertedValue,
-            Unit = GetCanonicalMetricUnit(sensor.SensorType),
+            Value = value,
+            Unit = unit,
         };
-        return true;
     }
 
-    public static bool TryCreateDescriptor(
+    private static HardwareMetricDescriptor CreateDescriptor(
         IHardware hardware,
         ISensor sensor,
-        [NotNullWhen(true)] out HardwareMetricDescriptor? descriptor)
+        string metricId,
+        MetricUnit unit,
+        MetricIdKind metricIdKind)
     {
-        descriptor = null;
-
-        if (!TryGetMetricId(hardware, sensor, out string? metricId))
-        {
-            return false;
-        }
-
-        descriptor = new HardwareMetricDescriptor
+        return new HardwareMetricDescriptor
         {
             MetricId = metricId,
             SourceSensorId = sensor.Identifier.ToString(),
@@ -75,21 +133,36 @@ internal static class LibreHardwareMetricCatalog
             SensorName = sensor.Name,
             SourceSensorType = sensor.SensorType.ToString(),
             ValueKind = MetricValueKind.Scalar,
-            Unit = GetCanonicalMetricUnit(sensor.SensorType),
-            MetricIdKind = MetricIdKind.StableAlias,
+            Unit = unit,
+            MetricIdKind = metricIdKind,
         };
-        return true;
     }
 
     internal static string GetRawSensorUnit(SensorType sensorType)
     {
         return sensorType switch
         {
-            SensorType.Load => "percent",
-            SensorType.Temperature => "celsius",
-            SensorType.Data => "gb",
+            SensorType.Voltage => "volts",
+            SensorType.Current => "amperes",
             SensorType.Power => "watts",
+            SensorType.Clock => "megahertz",
+            SensorType.Temperature => "celsius",
+            SensorType.Load => "percent",
+            SensorType.Frequency => "hertz",
+            SensorType.Fan => "rpm",
+            SensorType.Flow => "liters_per_hour",
+            SensorType.Control => "percent",
+            SensorType.Level => "percent",
+            SensorType.Factor => "unitless",
+            SensorType.Data => "gibibytes",
+            SensorType.SmallData => "mebibytes",
             SensorType.Throughput => "bytes_per_second",
+            SensorType.TimeSpan => "seconds",
+            SensorType.Timing => "nanoseconds",
+            SensorType.Energy => "milliwatt_hours",
+            SensorType.Noise => "decibels_a_weighted",
+            SensorType.Conductivity => "microsiemens_per_centimeter",
+            SensorType.Humidity => "percent",
             _ => "raw",
         };
     }
@@ -104,7 +177,12 @@ internal static class LibreHardwareMetricCatalog
         return metricId is "net.down" or "net.up" or DiskReadThroughputMetricId or DiskWriteThroughputMetricId;
     }
 
-    private static bool TryGetMetricId(IHardware hardware, ISensor sensor, [NotNullWhen(true)] out string? metricId)
+    internal static bool HasCanonicalMetricUnit(SensorType sensorType)
+    {
+        return TryGetCanonicalMetricUnit(sensorType, out _);
+    }
+
+    private static bool TryGetStableMetricId(IHardware hardware, ISensor sensor, [NotNullWhen(true)] out string? metricId)
     {
         metricId = hardware.HardwareType switch
         {
@@ -117,6 +195,11 @@ internal static class LibreHardwareMetricCatalog
         };
 
         return metricId is not null;
+    }
+
+    private static string BuildDynamicMetricId(ISensor sensor)
+    {
+        return $"{DynamicMetricIdPrefix}{sensor.Identifier}";
     }
 
     private static string? GetCpuMetricId(ISensor sensor)
@@ -150,6 +233,7 @@ internal static class LibreHardwareMetricCatalog
         {
             SensorType.Load when sensor.Name.Equals("GPU Core", StringComparison.Ordinal) => "gpu.usage_percent",
             SensorType.Temperature when sensor.Name.Equals("GPU Core", StringComparison.Ordinal) => "gpu.temp",
+            // LHM uses different names across GPU vendors for the same stable power alias.
             SensorType.Power when sensor.Name.Equals("GPU Package", StringComparison.Ordinal) => "gpu.power",
             SensorType.Power when sensor.Name.Equals("GPU Power", StringComparison.Ordinal) => "gpu.power",
             SensorType.Data when sensor.Name.Equals("GPU Memory Used", StringComparison.Ordinal) => "gpu.vram_used",
@@ -178,41 +262,103 @@ internal static class LibreHardwareMetricCatalog
         };
     }
 
-    private static bool TryConvertValue(SensorType sensorType, double value, out double convertedValue)
+    private static bool TryConvertValue(
+        SensorType sensorType,
+        double value,
+        out double convertedValue,
+        out MetricUnit unit)
     {
+        unit = MetricUnit.Unspecified;
+        convertedValue = 0;
+
+        if (!TryGetCanonicalMetricUnit(sensorType, out unit))
+        {
+            return false;
+        }
+
         convertedValue = sensorType switch
         {
             SensorType.Data => value * BytesPerGibibyte,
+            SensorType.SmallData => value * BytesPerMebibyte,
+            SensorType.Clock => value * HertzPerMegahertz,
+            SensorType.Timing => value * SecondsPerNanosecond,
+            SensorType.Energy => value * WattHoursPerMilliwattHour,
+            SensorType.Conductivity => value * SiemensPerMicrosiemens,
             _ => value,
         };
 
         return double.IsFinite(convertedValue);
     }
 
-    private static bool IsValidMetricValue(string metricId, double value)
+    private static bool IsValidStableMetricValue(string metricId, double value)
     {
         return metricId switch
         {
             "cpu.usage_percent" or "gpu.usage_percent" => value is >= 0 and <= 100,
-            "gpu.temp" => value is > 0 and <= 130,
+            "gpu.temp" => value > 0,
             "gpu.power" => value >= 0,
             "gpu.vram_used" or "ram.used" or RamAvailableMetricId => value >= 0,
-            "gpu.vram_total" or RamTotalMetricId => value > 0,
-            "net.down" or "net.up" or DiskReadThroughputMetricId or DiskWriteThroughputMetricId or DiskTotalThroughputMetricId => value >= 0,
+            "gpu.vram_total" => value > 0,
+            "net.down" or "net.up" or DiskReadThroughputMetricId or DiskWriteThroughputMetricId => value >= 0,
             _ => throw new UnreachableException($"Missing validation rule for metric '{metricId}'."),
         };
     }
 
-    private static MetricUnit GetCanonicalMetricUnit(SensorType sensorType)
+    private static bool IsValidSensorValue(SensorType sensorType, double value)
     {
         return sensorType switch
         {
-            SensorType.Load => MetricUnit.Percent,
-            SensorType.Temperature => MetricUnit.Celsius,
-            SensorType.Data => MetricUnit.Bytes,
-            SensorType.Power => MetricUnit.Watts,
-            SensorType.Throughput => MetricUnit.BytesPerSecond,
-            _ => throw new UnreachableException($"Missing unit mapping for sensor type '{sensorType}'."),
+            SensorType.Load or SensorType.Control or SensorType.Level or SensorType.Humidity =>
+                value is >= 0 and <= 100,
+            SensorType.Temperature => value > 0,
+            SensorType.Clock or SensorType.Frequency => value > 0,
+            SensorType.Factor => double.IsFinite(value),
+            // TODO: Revisit negative voltage/current/noise handling after the LHM upstream audit.
+            SensorType.Voltage
+                or SensorType.Current
+                or SensorType.Power
+                or SensorType.Fan
+                or SensorType.Flow
+                or SensorType.Data
+                or SensorType.SmallData
+                or SensorType.Throughput
+                or SensorType.TimeSpan
+                or SensorType.Timing
+                or SensorType.Energy
+                or SensorType.Noise
+                or SensorType.Conductivity => value >= 0,
+            _ => throw new UnreachableException($"Missing validation rule for sensor type '{sensorType}'."),
         };
+    }
+
+    private static bool TryGetCanonicalMetricUnit(SensorType sensorType, out MetricUnit unit)
+    {
+        unit = sensorType switch
+        {
+            SensorType.Voltage => MetricUnit.Volts,
+            SensorType.Current => MetricUnit.Amperes,
+            SensorType.Power => MetricUnit.Watts,
+            SensorType.Clock => MetricUnit.Hertz,
+            SensorType.Temperature => MetricUnit.Celsius,
+            SensorType.Load => MetricUnit.Percent,
+            SensorType.Frequency => MetricUnit.Hertz,
+            SensorType.Fan => MetricUnit.RevolutionsPerMinute,
+            SensorType.Flow => MetricUnit.LitersPerHour,
+            SensorType.Control => MetricUnit.Percent,
+            SensorType.Level => MetricUnit.Percent,
+            SensorType.Factor => MetricUnit.Unitless,
+            SensorType.Data => MetricUnit.Bytes,
+            SensorType.SmallData => MetricUnit.Bytes,
+            SensorType.Throughput => MetricUnit.BytesPerSecond,
+            SensorType.TimeSpan => MetricUnit.Seconds,
+            SensorType.Timing => MetricUnit.Seconds,
+            SensorType.Energy => MetricUnit.WattHours,
+            SensorType.Noise => MetricUnit.DecibelsAWeighted,
+            SensorType.Conductivity => MetricUnit.SiemensPerCentimeter,
+            SensorType.Humidity => MetricUnit.Percent,
+            _ => MetricUnit.Unspecified,
+        };
+
+        return unit is not MetricUnit.Unspecified;
     }
 }
