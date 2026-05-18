@@ -56,12 +56,7 @@ test("start commit cancel and reset messages are accepted", () => {
     assert.equal(readColorCompensationPluginMessage(buildColorCompensationCancelMessage("session-1"))?.command, "cancel");
     assert.equal(readColorCompensationPluginMessage(buildColorCompensationResetMessage("session-1"))?.command, "reset");
     assert.equal(
-        readColorCompensationPluginMessage(buildColorCompensationCommitMessage("session-1", {
-            brightnessAdjustment: 1,
-            shadowAdjustment: 2,
-            gammaAdjustment: 3,
-            saturationAdjustment: 4,
-        }))?.command,
+        readColorCompensationPluginMessage(buildColorCompensationCommitMessage("session-1"))?.command,
         "commit",
     );
 });

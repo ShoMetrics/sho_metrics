@@ -2,10 +2,8 @@ import { Target, type WillAppearEvent } from "@elgato/streamdeck";
 import type { ColorCompensationProfile } from "../color-compensation/types";
 import type { ColorCompensationSampleFocus } from "../color-compensation/patterns";
 import {
-    clearColorCompensationPreview as clearColorCompensationRuntimePreview,
     clearColorCompensationPreviewSession as clearColorCompensationRuntimePreviewSession,
     setColorCompensationPatternPreview,
-    setColorCompensationWidgetPreview as setColorCompensationRuntimeWidgetPreview,
 } from "../color-compensation/runtime-store";
 import { logger } from "../logging/logger";
 import { wrapSvgWithColorCompensationFilter } from "../view-rendering/color-compensation-filter";
@@ -30,7 +28,9 @@ export async function showColorCompensationSamplePreview(options: {
     const softwareSvg = renderColorCompensationSampleSvg(options.focus);
     const hardwareSvg = wrapSvgWithColorCompensationFilter(softwareSvg, options.profile);
     const softwarePngDataUrl = rasterizeSvgToPngDataUrl(softwareSvg, KEYPAD_PNG_SIZE);
-    const hardwarePngDataUrl = rasterizeSvgToPngDataUrl(hardwareSvg, KEYPAD_PNG_SIZE);
+    const hardwarePngDataUrl = hardwareSvg === softwareSvg
+        ? softwarePngDataUrl
+        : rasterizeSvgToPngDataUrl(hardwareSvg, KEYPAD_PNG_SIZE);
 
     if (!softwarePngDataUrl || !hardwarePngDataUrl) {
         throw new Error("Color compensation preview rasterization failed.");
@@ -55,23 +55,4 @@ export async function showColorCompensationSamplePreview(options: {
         log.warn(() => `Failed to show color compensation pattern preview: ${String(error)}`);
         throw error;
     }
-}
-
-export function setColorCompensationWidgetPreview(options: {
-    readonly actionId: string;
-    readonly sessionId: string;
-    readonly profile: ColorCompensationProfile;
-}): boolean {
-    return setColorCompensationRuntimeWidgetPreview(options);
-}
-
-export function clearColorCompensationPreview(actionId: string): void {
-    clearColorCompensationRuntimePreview(actionId);
-}
-
-export function clearColorCompensationPreviewSession(options: {
-    readonly actionId: string;
-    readonly sessionId: string;
-}): boolean {
-    return clearColorCompensationRuntimePreviewSession(options);
 }

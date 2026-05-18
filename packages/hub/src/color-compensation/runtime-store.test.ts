@@ -169,6 +169,16 @@ test("new session replaces an older preview session", () => {
     });
 });
 
+test("same session start preserves a preview that already claimed the session", () => {
+    const store = new ColorCompensationRuntimeStore();
+
+    assert.equal(store.setPatternPreview({ actionId: "action-1", sessionId: "session-1" }), true);
+
+    store.startPreviewSession({ actionId: "action-1", sessionId: "session-1" });
+
+    assert.equal(store.shouldSuppressMetricView("action-1"), true);
+});
+
 function resolveProfile(store: ColorCompensationRuntimeStore, actionId: string): ColorCompensationProfile {
     return store.resolveHardwareProfile({
         actionId,
