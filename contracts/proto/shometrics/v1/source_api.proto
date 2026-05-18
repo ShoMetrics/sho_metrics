@@ -35,21 +35,6 @@ message ReadMetricSnapshotResponse {
   repeated SourceWarning warnings = 3;
 }
 
-message MetricDescriptor {
-  // ShoMetrics canonical metric key consumed by Node runtime code.
-  string metric_id = 1;
-
-  // Source-owned opaque sensor id. Node must not parse this value.
-  string source_sensor_id = 2;
-
-  string hardware_id = 3;
-  string hardware_name = 4;
-  string sensor_name = 5;
-  string sensor_type = 6;
-  string unit = 7;
-  bool is_dynamic = 8;
-}
-
 message SourceWarning {
   string code = 1;
   string message = 2;

@@ -1,22 +1,87 @@
 syntax = "proto3";
+
 package shometrics.v1;
+
+import "google/protobuf/timestamp.proto";
 
 option csharp_namespace = "ShoMetrics.Contracts.V1";
 
-// The universal snapshot format returned by any Metric Source (Node.js, C#, etc.)
+// Source-agnostic metric values captured at one point in time.
 message MetricSnapshot {
-  string source_id = 1; // e.g., "builtin-node", "win-native"
-  uint64 timestamp_ms = 2;
+  // Moment the source completed the read pass used to build this snapshot.
+  google.protobuf.Timestamp captured_at = 1;
 
-  // A map of metric keys to their values (e.g., "gpu.usage_percent" -> MetricValue)
-  map<string, MetricValue> metrics = 3;
+  // Keyed by ShoMetrics metric id. Metric ids are opaque to generic runtime code.
+  map<string, MetricValue> metrics = 2;
 }
 
 message MetricValue {
-  oneof data {
+  oneof value {
     double scalar = 1;
+
+    // Plain text metric value for source-derived logical metrics such as
+    // hardware model names. Raw hardware sensors are scalar unless a source
+    // exposes a real text-valued reading.
     string text = 2;
   }
-  string unit = 3; // e.g., "%", "°C", "MB/s", "W"
-  double progress = 4; // 0.0 to 1.0 hint for rendering progress bars/arcs
+
+  // Canonical unit for scalar values. Text values use METRIC_UNIT_UNSPECIFIED.
+  MetricUnit unit = 3;
+}
+
+message MetricDescriptor {
+  // ShoMetrics metric id used as the key in MetricSnapshot.metrics.
+  string metric_id = 1;
+
+  // Source-owned opaque sensor id. Node must not parse this value.
+  string source_sensor_id = 2;
+
+  // Source-owned opaque hardware id. Node must not parse this value.
+  string hardware_id = 3;
+
+  string hardware_name = 4;
+  string hardware_type = 5;
+  string sensor_name = 6;
+
+  // Source-owned diagnostic sensor type. Generic Node runtime must not parse it.
+  string source_sensor_type = 7;
+
+  MetricValueKind value_kind = 8;
+  MetricUnit unit = 9;
+  MetricIdKind metric_id_kind = 10;
+}
+
+enum MetricValueKind {
+  METRIC_VALUE_KIND_UNSPECIFIED = 0;
+  METRIC_VALUE_KIND_SCALAR = 1;
+  METRIC_VALUE_KIND_TEXT = 2;
+}
+
+enum MetricIdKind {
+  METRIC_ID_KIND_UNSPECIFIED = 0;
+
+  // ShoMetrics-owned stable alias such as cpu.usage_percent.
+  METRIC_ID_KIND_STABLE_ALIAS = 1;
+
+  // Source-owned raw sensor id such as lhm.sensor:/intelcpu/0/temperature/26.
+  METRIC_ID_KIND_SOURCE_SENSOR = 2;
+}
+
+enum MetricUnit {
+  METRIC_UNIT_UNSPECIFIED = 0;
+  METRIC_UNIT_PERCENT = 1;
+  METRIC_UNIT_CELSIUS = 2;
+  METRIC_UNIT_VOLTS = 3;
+  METRIC_UNIT_AMPERES = 4;
+  METRIC_UNIT_WATTS = 5;
+  METRIC_UNIT_HERTZ = 6;
+  METRIC_UNIT_BYTES = 7;
+  METRIC_UNIT_BYTES_PER_SECOND = 8;
+  METRIC_UNIT_REVOLUTIONS_PER_MINUTE = 9;
+  METRIC_UNIT_LITERS_PER_HOUR = 10;
+  METRIC_UNIT_UNITLESS = 11;
+  METRIC_UNIT_SECONDS = 12;
+  METRIC_UNIT_WATT_HOURS = 13;
+  METRIC_UNIT_DECIBELS_A_WEIGHTED = 14;
+  METRIC_UNIT_SIEMENS_PER_CENTIMETER = 15;
 }
