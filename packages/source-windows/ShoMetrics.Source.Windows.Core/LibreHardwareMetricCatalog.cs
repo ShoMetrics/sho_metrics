@@ -43,6 +43,32 @@ internal static class LibreHardwareMetricCatalog
         return true;
     }
 
+    public static bool TryCreateDescriptor(
+        IHardware hardware,
+        ISensor sensor,
+        [NotNullWhen(true)] out HardwareMetricDescriptor? descriptor)
+    {
+        descriptor = null;
+
+        if (!TryGetMetricId(hardware, sensor, out string? metricId))
+        {
+            return false;
+        }
+
+        descriptor = new HardwareMetricDescriptor
+        {
+            MetricId = metricId,
+            SourceSensorId = sensor.Identifier.ToString(),
+            HardwareId = hardware.Identifier.ToString(),
+            HardwareName = hardware.Name,
+            SensorName = sensor.Name,
+            SensorType = sensor.SensorType.ToString(),
+            Unit = GetUnit(sensor.SensorType),
+            IsDynamic = false,
+        };
+        return true;
+    }
+
     public static string GetUnit(SensorType sensorType)
     {
         return sensorType switch

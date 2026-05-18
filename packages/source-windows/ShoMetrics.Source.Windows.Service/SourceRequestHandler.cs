@@ -1,9 +1,11 @@
 using Microsoft.Extensions.Logging;
 using ShoMetrics.Contracts.V1;
+using ShoMetrics.Source.Windows.Core;
 
 namespace ShoMetrics.Source.Windows.Service;
 
 internal sealed class SourceRequestHandler(
+    LibreHardwareMonitorSession monitorSession,
     SourceProtocolMapper protocolMapper,
     ILogger<SourceRequestHandler> logger)
 {
@@ -55,7 +57,7 @@ internal sealed class SourceRequestHandler(
         SourceIpcResponse response = request.PayloadCase switch
         {
             SourceIpcRequest.PayloadOneofCase.GetSourceHealth =>
-                protocolMapper.BuildHealthResponse(request.RequestId),
+                protocolMapper.BuildHealthResponse(request.RequestId, monitorSession.InitializationWarnings),
             SourceIpcRequest.PayloadOneofCase.ReadMetricSnapshot =>
                 protocolMapper.BuildSourceUnavailableResponse(request.RequestId),
             SourceIpcRequest.PayloadOneofCase.ListMetricDescriptors =>

@@ -1,4 +1,5 @@
 using ShoMetrics.Contracts.V1;
+using ShoMetrics.Source.Windows.Core;
 
 namespace ShoMetrics.Source.Windows.Service;
 
@@ -11,9 +12,9 @@ internal sealed class SourceProtocolMapper
     private const string SourceUnavailableErrorCode = "source_unavailable";
     private const string InternalErrorCode = "internal_error";
 
-    public SourceIpcResponse BuildHealthResponse(string requestId)
+    public SourceIpcResponse BuildHealthResponse(string requestId, IReadOnlyList<HardwareSourceWarning> warnings)
     {
-        return new SourceIpcResponse
+        SourceIpcResponse response = new()
         {
             RequestId = requestId,
             GetSourceHealth = new GetSourceHealthResponse
@@ -23,6 +24,17 @@ internal sealed class SourceProtocolMapper
                 HelperVersion = SourceServiceConstants.HelperVersion,
             },
         };
+
+        foreach (HardwareSourceWarning warning in warnings)
+        {
+            response.GetSourceHealth.Warnings.Add(new SourceWarning
+            {
+                Code = warning.Code,
+                Message = warning.Message,
+            });
+        }
+
+        return response;
     }
 
     public SourceIpcResponse BuildInvalidRequestResponse(string requestId)
