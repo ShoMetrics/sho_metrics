@@ -4,6 +4,8 @@ package shometrics.v1;
 
 import "shometrics/v1/source_api.proto";
 
+option csharp_namespace = "ShoMetrics.Contracts.V1";
+
 // Local IPC envelope for transports that need method routing and correlation.
 message SourceIpcRequest {
   string request_id = 1;
