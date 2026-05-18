@@ -89,7 +89,9 @@ export function App({ client }: AppProps): React.JSX.Element {
             ) : (
                 <GlobalSettingsTab
                     resolvedSettings={resolvedGlobalSettings}
+                    colorCompensationProfile={colorCompensation.profile}
                     onSettingsPatch={updateGlobalSettings}
+                    onOpenColorCompensation={() => setIsColorCompensationWizardOpen(true)}
                 />
             )}
         </div>

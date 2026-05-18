@@ -3,12 +3,15 @@ import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { MetricTheme, ResolvedGlobalSettings } from "../../settings/resolved-settings";
+import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
 import { GlobalSettingsTab } from "./GlobalSettingsTab";
 
 test("global override groups view theme and color controls under the master switch", () => {
     const markup = renderToStaticMarkup(createElement(GlobalSettingsTab, {
         resolvedSettings: buildGlobalSettings(),
+        colorCompensationProfile: DEFAULT_COLOR_COMPENSATION_PROFILE,
         onSettingsPatch: () => undefined,
+        onOpenColorCompensation: () => undefined,
     }));
 
     assert.match(markup, /Global override/);
@@ -27,12 +30,16 @@ test("global override groups view theme and color controls under the master swit
     assert.match(markup, /Medium Color:/);
     assert.match(markup, /High Color:/);
     assert.doesNotMatch(markup, /Tint/);
+    assert.match(markup, /Advanced/);
+    assert.match(markup, /Color Compensation/);
 });
 
 test("global override hides color controls for terminal theme", () => {
     const markup = renderToStaticMarkup(createElement(GlobalSettingsTab, {
         resolvedSettings: buildGlobalSettings("terminal"),
+        colorCompensationProfile: DEFAULT_COLOR_COMPENSATION_PROFILE,
         onSettingsPatch: () => undefined,
+        onOpenColorCompensation: () => undefined,
     }));
 
     assert.match(markup, /Terminal/);

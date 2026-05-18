@@ -24,13 +24,22 @@ import type {
     ResolvedNetworkDisplaySettings,
 } from "../../settings/resolved-settings";
 import type { StoredGlobalSettingsPatch } from "../../settings/storage/global-settings-patch";
+import type { ColorCompensationProfile } from "../../color-compensation/types";
+import { ColorCompensationControls } from "./ColorCompensationControls";
 
 interface GlobalSettingsTabProps {
     resolvedSettings: ResolvedGlobalSettings;
+    colorCompensationProfile: ColorCompensationProfile;
     onSettingsPatch: (patch: StoredGlobalSettingsPatch) => void;
+    onOpenColorCompensation: () => void;
 }
 
-export function GlobalSettingsTab({ resolvedSettings, onSettingsPatch }: GlobalSettingsTabProps): React.JSX.Element {
+export function GlobalSettingsTab({
+    resolvedSettings,
+    colorCompensationProfile,
+    onSettingsPatch,
+    onOpenColorCompensation,
+}: GlobalSettingsTabProps): React.JSX.Element {
     return (
         <div>
             <GlobalOverrideSection
@@ -71,6 +80,12 @@ export function GlobalSettingsTab({ resolvedSettings, onSettingsPatch }: GlobalS
                 diskThroughput={resolvedSettings.defaults.diskThroughput}
                 onDiskThroughputPatch={(diskThroughput) => onSettingsPatch({ diskThroughput })}
             />
+            <SettingsSection title="Advanced">
+                <ColorCompensationControls
+                    profile={colorCompensationProfile}
+                    onOpenColorCompensation={onOpenColorCompensation}
+                />
+            </SettingsSection>
         </div>
     );
 }
