@@ -730,7 +730,7 @@ Initial stable aliases required for service MVP:
 | `cpu.usage_percent` | LHM CPU Total load |
 | `gpu.usage_percent` | LHM GPU Core load |
 | `gpu.temp` | LHM GPU Core temperature |
-| `gpu.power` | LHM GPU Package or GPU Power |
+| `gpu.power` | LHM `SensorType.Power` GPU Package, or Intel integrated GPU Power |
 | `gpu.vram_used` | LHM GPU Memory Used converted to bytes |
 | `gpu.vram_total` | LHM GPU Memory Total converted to bytes |
 | `ram.used` | LHM Memory Used converted to bytes |
@@ -1155,6 +1155,7 @@ Acceptance:
 ## C# Metric Mapping
 
 This is the cross-platform mapping invariant. The implementation-level Windows service rules live in [C# Step 8: Metric Mapping](#c-step-8-metric-mapping).
+LHM source-level findings live in [LibreHardwareMonitor Upstream Audit](./librehardwaremonitor-upstream-audit.md).
 
 The C# side maps raw LHM readings into ShoMetrics output:
 
@@ -1184,7 +1185,7 @@ Example mappings:
 | Memory Used | `ram.used` |
 | Memory Used + Available | `ram.total` |
 | GPU Core temperature | `gpu.temp` |
-| GPU Power or GPU Package | `gpu.power` |
+| `SensorType.Power` GPU Package, or Intel integrated GPU Power | `gpu.power` |
 | GPU Memory Used | `gpu.vram_used` |
 | GPU Memory Total | `gpu.vram_total` |
 | Download Speed aggregate | `net.down` |

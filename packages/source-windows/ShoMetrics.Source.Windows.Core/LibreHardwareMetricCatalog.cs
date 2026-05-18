@@ -19,6 +19,7 @@ internal static class LibreHardwareMetricCatalog
     private const double SecondsPerNanosecond = 1e-9d;
     private const double WattHoursPerMilliwattHour = 0.001d;
     private const double SiemensPerMicrosiemens = 0.000001d;
+    private const string LhmTotalMemoryHardwareId = "/ram";
 
     public static bool IsSupportedHardwareType(HardwareType hardwareType)
     {
@@ -213,8 +214,11 @@ internal static class LibreHardwareMetricCatalog
 
     private static string? GetMemoryMetricId(IHardware hardware, ISensor sensor)
     {
-        if (!hardware.Name.Equals("Memory", StringComparison.Ordinal)
-            && !hardware.Name.Equals("Total Memory", StringComparison.Ordinal))
+        // LHM source: LibreHardwareMonitorLib/Hardware/Memory/TotalMemory.cs
+        // TotalMemory constructor uses new Identifier("ram"). The related
+        // LibreHardwareMonitorLib/Hardware/Memory/VirtualMemory.cs constructor
+        // uses new Identifier("vram") with the same Memory Used/Available names.
+        if (!hardware.Identifier.ToString().Equals(LhmTotalMemoryHardwareId, StringComparison.Ordinal))
         {
             return null;
         }
@@ -233,11 +237,25 @@ internal static class LibreHardwareMetricCatalog
         {
             SensorType.Load when sensor.Name.Equals("GPU Core", StringComparison.Ordinal) => "gpu.usage_percent",
             SensorType.Temperature when sensor.Name.Equals("GPU Core", StringComparison.Ordinal) => "gpu.temp",
-            // LHM uses different names across GPU vendors for the same stable power alias.
+            // LHM sources:
+            // - LibreHardwareMonitorLib/Hardware/Gpu/AmdGpu.cs constructor
+            // - LibreHardwareMonitorLib/Hardware/Gpu/NvidiaGpu.cs constructor
+            // - LibreHardwareMonitorLib/Hardware/Gpu/IntelDiscreteGpu.cs constructor
+            // These use "GPU Package" with SensorType.Power for package power.
             SensorType.Power when sensor.Name.Equals("GPU Package", StringComparison.Ordinal) => "gpu.power",
+            // LHM source: LibreHardwareMonitorLib/Hardware/Gpu/IntelIntegratedGpu.cs
+            // constructor uses "GPU Power" with SensorType.Power.
+            // LibreHardwareMonitorLib/Hardware/Gpu/NvidiaGpu.cs also has "GPU Power",
+            // but it is SensorType.Load and therefore must not become watts.
             SensorType.Power when sensor.Name.Equals("GPU Power", StringComparison.Ordinal) => "gpu.power",
-            SensorType.Data when sensor.Name.Equals("GPU Memory Used", StringComparison.Ordinal) => "gpu.vram_used",
-            SensorType.Data when sensor.Name.Equals("GPU Memory Total", StringComparison.Ordinal) => "gpu.vram_total",
+            // LHM sources:
+            // - LibreHardwareMonitorLib/Hardware/Gpu/AmdGpu.cs constructor
+            // - LibreHardwareMonitorLib/Hardware/Gpu/NvidiaGpu.cs constructor
+            // - LibreHardwareMonitorLib/Hardware/Gpu/IntelDiscreteGpu.cs constructor
+            // These expose GPU Memory Used/Total as SensorType.SmallData (MiB),
+            // not SensorType.Data (GiB).
+            SensorType.SmallData when sensor.Name.Equals("GPU Memory Used", StringComparison.Ordinal) => "gpu.vram_used",
+            SensorType.SmallData when sensor.Name.Equals("GPU Memory Total", StringComparison.Ordinal) => "gpu.vram_total",
             _ => null,
         };
     }
