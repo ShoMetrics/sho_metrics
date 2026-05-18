@@ -4,6 +4,7 @@ import streamDeck, {
     WillDisappearEvent,
     DidReceiveSettingsEvent,
     PropertyInspectorDidAppearEvent,
+    type SendToPluginEvent,
 } from "@elgato/streamdeck";
 import { scheduler } from "../runtime/scheduler";
 import { metricStore, type MetricStoreReader } from "../runtime/metric-store";
@@ -27,6 +28,16 @@ import {
     WidgetRuntimeCacheStore,
 } from "../runtime/widget-runtime-cache";
 import { SchedulerBinding } from "./shared/scheduler-binding";
+import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../color-compensation/types";
+import {
+    readColorCompensationPluginMessage,
+    type ColorCompensationPreview,
+} from "../color-compensation/messages";
+import {
+    clearColorCompensationPreview,
+    setColorCompensationWidgetPreview,
+    showColorCompensationSamplePreview,
+} from "../view-updates/color-compensation-preview";
 
 const log = logger.for("MetricAction");
 
@@ -118,7 +129,39 @@ export abstract class MetricAction extends SingletonAction {
         this.schedulerBindings.get(event.action.id)?.dispose();
         this.schedulerBindings.delete(event.action.id);
         this.activeActionStates.delete(event.action.id);
+        clearColorCompensationPreview(event.action.id);
         clearMetricViewState(event.action.id);
+    }
+
+    override onSendToPlugin(event: SendToPluginEvent<never, Record<string, never>>): void {
+        const message = readColorCompensationPluginMessage(event.payload);
+
+        if (!message) {
+            return;
+        }
+
+        const activeActionState = this.activeActionStates.get(event.action.id);
+        if (!activeActionState) {
+            return;
+        }
+
+        switch (message.command) {
+            case "preview":
+                this.previewColorCompensation(activeActionState, message.preview);
+                break;
+            case "commit":
+                clearColorCompensationPreview(event.action.id);
+                this.onMetricsUpdate(activeActionState.event);
+                break;
+            case "cancel":
+                clearColorCompensationPreview(event.action.id);
+                this.onMetricsUpdate(activeActionState.event);
+                break;
+            case "reset":
+                clearColorCompensationPreview(event.action.id);
+                this.onMetricsUpdate(activeActionState.event);
+                break;
+        }
     }
 
     override onPropertyInspectorDidAppear(event: PropertyInspectorDidAppearEvent): void {
@@ -254,6 +297,68 @@ export abstract class MetricAction extends SingletonAction {
             // source resolution without changing this action's plan signature.
             this.schedulerBindings.get(event.action.id)?.dispose();
             this.refreshSubscription(activeActionState);
+        }
+    }
+
+    private previewColorCompensation(
+        activeActionState: ActiveActionState,
+        preview: ColorCompensationPreview,
+    ): void {
+        switch (preview.kind) {
+            case "preflight":
+            case "brightness":
+            case "shadow":
+            case "gamma":
+            case "saturation":
+                showColorCompensationSamplePreview({
+                    event: activeActionState.event,
+                    focus: preview.kind,
+                    profile: preview.profile,
+                }).catch(error => {
+                    clearColorCompensationPreview(activeActionState.event.action.id);
+                    log.warn(() => `Failed to render color compensation preview: ${String(error)}`);
+                    this.onMetricsUpdate(activeActionState.event);
+                    activeActionState.event.action.showAlert().catch(alertError => {
+                        log.warn(() => `Failed to show color compensation preview alert: ${String(alertError)}`);
+                    });
+                });
+                break;
+            case "review-before":
+                showColorCompensationSamplePreview({
+                    event: activeActionState.event,
+                    focus: "review",
+                    profile: DEFAULT_COLOR_COMPENSATION_PROFILE,
+                }).catch(error => {
+                    clearColorCompensationPreview(activeActionState.event.action.id);
+                    log.warn(() => `Failed to render color compensation before preview: ${String(error)}`);
+                    this.onMetricsUpdate(activeActionState.event);
+                });
+                break;
+            case "review-after":
+                showColorCompensationSamplePreview({
+                    event: activeActionState.event,
+                    focus: "review",
+                    profile: preview.profile,
+                }).catch(error => {
+                    clearColorCompensationPreview(activeActionState.event.action.id);
+                    log.warn(() => `Failed to render color compensation after preview: ${String(error)}`);
+                    this.onMetricsUpdate(activeActionState.event);
+                });
+                break;
+            case "widget-before":
+                setColorCompensationWidgetPreview({
+                    actionId: activeActionState.event.action.id,
+                    profile: DEFAULT_COLOR_COMPENSATION_PROFILE,
+                });
+                this.onMetricsUpdate(activeActionState.event);
+                break;
+            case "widget-after":
+                setColorCompensationWidgetPreview({
+                    actionId: activeActionState.event.action.id,
+                    profile: preview.profile,
+                });
+                this.onMetricsUpdate(activeActionState.event);
+                break;
         }
     }
 
