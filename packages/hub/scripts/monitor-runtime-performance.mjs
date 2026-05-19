@@ -18,6 +18,7 @@ const defaultLogPath = path.join(
 );
 const defaultOutputDirectory = path.join(repositoryRoot, "docs", "development", "perf-logs");
 const defaultWarmupSamples = 5;
+const minimumWarmupMilliseconds = 2000;
 const defaultProcessNames = [
     "node",
     "powershell",
@@ -46,15 +47,17 @@ const processSnapshots = await sampleProcesses({
     intervalMilliseconds: options.intervalMilliseconds,
     processNames: options.processNames,
     processSamplePath,
-    warmupSamples: options.warmupSamples,
+    warmupSamples: options.effectiveWarmupSamples,
 });
 const logText = await readTextSince(options.logPath, logStartOffset);
 const summary = {
-    measurementVersion: 3,
+    measurementVersion: 4,
     capturedAt: startTimestamp.toISOString(),
     durationSeconds: options.durationSeconds,
     intervalMilliseconds: options.intervalMilliseconds,
-    warmupSamples: options.warmupSamples,
+    requestedWarmupSamples: options.requestedWarmupSamples,
+    effectiveWarmupSamples: options.effectiveWarmupSamples,
+    warmupDurationMilliseconds: options.effectiveWarmupSamples * options.intervalMilliseconds,
     logicalProcessorCount,
     schemaNotes: {
         cpuPercent: "Process CPU is normalized by logicalProcessorCount, matching Task Manager system-wide percent.",
@@ -64,9 +67,15 @@ const summary = {
         nvidiaSmiCpu: "Short-lived nvidia-smi processes can be missed by 1Hz process sampling; prefer logSummaries.nvidiaSmi elapsed/start counts.",
     },
     caveats: [
-        "The first warmupSamples process samples are excluded from process summaries to reduce PDH rate-counter warm-up bias.",
+        "The first effectiveWarmupSamples process samples are excluded from process summaries to reduce PDH rate-counter warm-up bias.",
         "The monitor itself uses PowerShell Get-Counter once per interval and can perturb the measured system; compare runs with identical monitor settings.",
         "Plugin log summaries cover the full capture window, while process summaries exclude warm-up samples.",
+    ],
+    recommendedProtocol: [
+        "Idle baseline: stop Stream Deck and run this monitor for 5 minutes with the same interval and process list.",
+        "Before-change baseline: start Stream Deck with the target widget layout and run this monitor for 5 minutes.",
+        "After-change baseline: keep the same widget layout and run this monitor for 5 minutes after the code change.",
+        "Compare before and after using the same summary fields, and treat the idle baseline as monitor/system noise rather than plugin cost.",
     ],
     logPath: path.relative(repositoryRoot, options.logPath),
     processSamplePath: path.relative(repositoryRoot, processSamplePath),
@@ -81,7 +90,11 @@ printSummary(summary, summaryPath);
 function readOptions(args) {
     const durationSeconds = readNumberOption(args, "duration-seconds", 120);
     const intervalMilliseconds = readNumberOption(args, "interval-ms", 1000);
-    const warmupSamples = readNumberOption(args, "warmup-samples", defaultWarmupSamples);
+    const requestedWarmupSamples = readNumberOption(args, "warmup-samples", defaultWarmupSamples);
+    const effectiveWarmupSamples = Math.max(
+        requestedWarmupSamples,
+        Math.ceil(minimumWarmupMilliseconds / intervalMilliseconds),
+    );
     const label = readStringOption(args, "label", "baseline");
     const outputDirectory = path.resolve(readStringOption(args, "out", defaultOutputDirectory));
     const logPath = path.resolve(readStringOption(args, "log", defaultLogPath));
@@ -93,7 +106,8 @@ function readOptions(args) {
     return {
         durationSeconds,
         intervalMilliseconds,
-        warmupSamples,
+        requestedWarmupSamples,
+        effectiveWarmupSamples,
         label,
         outputDirectory,
         logPath,
@@ -254,6 +268,7 @@ function summarizeProcessSnapshots(snapshots, targetProcessNames) {
     const sampleStatusCounts = new Map();
     const systemCpuPercentSamples = [];
     const actualIntervalMillisecondsSamples = [];
+    const counterCollectMillisecondsSamples = [];
     const targetProcessNamesLower = targetProcessNames.map(processName => processName.toLowerCase());
     let warmupSampleCount = 0;
     let includedSampleCount = 0;
@@ -271,6 +286,10 @@ function summarizeProcessSnapshots(snapshots, targetProcessNames) {
 
         if (Number.isFinite(snapshot.actualIntervalMilliseconds)) {
             actualIntervalMillisecondsSamples.push(snapshot.actualIntervalMilliseconds);
+        }
+
+        if (Number.isFinite(snapshot.counterCollectMilliseconds)) {
+            counterCollectMillisecondsSamples.push(snapshot.counterCollectMilliseconds);
         }
 
         if (Number.isFinite(snapshot.systemCpuPercent)) {
@@ -323,6 +342,7 @@ function summarizeProcessSnapshots(snapshots, targetProcessNames) {
         includedSampleCount,
         sampleStatusCounts: Object.fromEntries(Array.from(sampleStatusCounts.entries()).sort()),
         actualIntervalMilliseconds: summarizeSeries(actualIntervalMillisecondsSamples),
+        counterCollectMilliseconds: summarizeSeries(counterCollectMillisecondsSamples),
         systemCpuPercent: summarizeSeries(systemCpuPercentSamples),
         processes: processNames.map(processName => ({
             processName,
@@ -723,6 +743,15 @@ function printSummary(summary, summaryPath) {
             `p50=${summary.processSummaries.actualIntervalMilliseconds.p50}ms`,
             `p95=${summary.processSummaries.actualIntervalMilliseconds.p95}ms`,
             `max=${summary.processSummaries.actualIntervalMilliseconds.max}ms`,
+        ].join(" ") + "\n");
+    }
+
+    if (summary.processSummaries.counterCollectMilliseconds.count > 0) {
+        process.stdout.write([
+            "counterCollect",
+            `p50=${summary.processSummaries.counterCollectMilliseconds.p50}ms`,
+            `p95=${summary.processSummaries.counterCollectMilliseconds.p95}ms`,
+            `max=${summary.processSummaries.counterCollectMilliseconds.max}ms`,
         ].join(" ") + "\n");
     }
 
