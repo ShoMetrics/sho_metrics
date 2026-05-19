@@ -7,6 +7,7 @@
         "test:unit": "node scripts/clean-test-output.mjs && tsc -p tsconfig.test.json && node scripts/write-test-package.mjs && node --test --test-isolation=none .test-dist/src/**/*.test.js",
         "test:visual": "playwright test -c playwright.visual.config.ts",
         "test:visual:update": "playwright test -c playwright.visual.config.ts --update-snapshots",
+        "perf:monitor": "node scripts/monitor-runtime-performance.mjs",
         "benchmark:protobuf": "node scripts/run-buf.mjs generate --template scripts/benchmark/protobuf/buf.gen.yaml && node scripts/benchmark/protobuf/protobuf-performance-benchmark.mjs",
         "benchmark:resvg": "node scripts/benchmark/resvg-minimal.mjs",
         "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart com.ez.sho-metrics\"",
