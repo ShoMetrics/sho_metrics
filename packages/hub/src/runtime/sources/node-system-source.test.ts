@@ -38,6 +38,10 @@ import {
     NodeSystemSource,
     resolveMetricGroups,
 } from "./node-system-source";
+import {
+    buildNetworkInterface,
+    buildNetworkStats,
+} from "./node-system-source-test-helpers";
 import type {
     NodeSystemGpuTelemetryData,
     NodeSystemInformationClient,
@@ -813,53 +817,6 @@ function buildNoSystemGpuPoller(
         callCounts.systemGpu += 1;
         return null;
     };
-}
-
-function buildNetworkInterface(
-    overrides: Partial<Systeminformation.NetworkInterfacesData> = {},
-): Systeminformation.NetworkInterfacesData {
-    return {
-        iface: "en0",
-        ifaceName: "Ethernet",
-        default: false,
-        ip4: "",
-        ip4subnet: "",
-        ip6: "",
-        ip6subnet: "",
-        mac: "",
-        internal: false,
-        virtual: false,
-        operstate: "up",
-        type: "wired",
-        duplex: "",
-        mtu: 1500,
-        speed: null,
-        dhcp: false,
-        dnsSuffix: "",
-        ieee8021xAuth: "",
-        ieee8021xState: "",
-        carrierChanges: 0,
-        ...overrides,
-    } as Systeminformation.NetworkInterfacesData;
-}
-
-function buildNetworkStats(
-    overrides: Partial<Systeminformation.NetworkStatsData> = {},
-): Systeminformation.NetworkStatsData {
-    return {
-        iface: "eth0",
-        operstate: "up",
-        rx_bytes: 0,
-        rx_dropped: 0,
-        rx_errors: 0,
-        rx_sec: 0,
-        tx_bytes: 0,
-        tx_dropped: 0,
-        tx_errors: 0,
-        tx_sec: 0,
-        ms: 0,
-        ...overrides,
-    } as Systeminformation.NetworkStatsData;
 }
 
 function buildCpuData(overrides: Partial<Systeminformation.CpuData>): Systeminformation.CpuData {

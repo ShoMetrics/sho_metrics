@@ -18,6 +18,7 @@ const defaultLogPath = path.join(
 );
 const defaultOutputDirectory = path.join(repositoryRoot, "docs", "development", "perf-logs");
 const defaultWarmupSamples = 5;
+// PDH rate counters need at least two physical intervals before cooked values are stable.
 const minimumWarmupMilliseconds = 2000;
 const defaultProcessNames = [
     "node",

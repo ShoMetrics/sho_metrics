@@ -135,7 +135,10 @@ export class NodeSystemSource implements MetricSource {
     ) => Promise<NodeSystemGpuTelemetryData | null>;
     private lastNetworkStatsByInterface = new Map<string, NodeSystemNetworkCounterSample>();
     private cachedNetworkInterfaces: CachedNetworkInterfaces | null = null;
+    // Coalesces overlapping collector ticks if runtime polling becomes source/collector independent.
     private pendingNetworkInterfacesPromise: Promise<CachedNetworkInterfaces> | null = null;
+    private nextNetworkInterfaceRefreshAllowedTimestampMilliseconds = 0;
+    private lastNetworkInterfaceStaleWarningTimestampMilliseconds = 0;
     private lastNetworkPollDebugLogTimestampMilliseconds = 0;
     private cachedGpuData: NodeSystemGpuTelemetryData | null = null;
     private cachedGpuTimestampMilliseconds = 0;
@@ -150,8 +153,16 @@ export class NodeSystemSource implements MetricSource {
 
     private static readonly GPU_CACHE_MS = 1000;
     private static readonly GPU_POLL_TIMEOUT_MS = 3300;
+    // Interface topology is semi-static. Cache discovery for 10s to keep networkInterfaces()
+    // out of the 1Hz hot path while bounding Wi-Fi/VPN/USB adapter hot-plug staleness.
     private static readonly NETWORK_INTERFACE_CACHE_MS = 10000;
+    // Empty discovery often means startup or reconnect transition; retry quickly so N/A
+    // does not stick for a full topology cache window.
     private static readonly EMPTY_NETWORK_INTERFACE_CACHE_MS = 2000;
+    // When discovery fails, stale last-good interfaces are safer than a 1Hz N/A flicker,
+    // but retry throttling prevents a failing OS query loop from becoming the hot path.
+    private static readonly NETWORK_INTERFACE_REFRESH_RETRY_MS = 2000;
+    private static readonly NETWORK_INTERFACE_STALE_WARNING_INTERVAL_MS = 30000;
     private static readonly NETWORK_DEBUG_LOG_INTERVAL_MS = 5000;
     private static readonly GPU_TIMEOUT_WARNING_INTERVAL_MS = 10000;
     private static readonly GPU_BACKOFF_STEPS_MS = [2000, 5000, 10000, 30000] as const;
@@ -457,11 +468,19 @@ export class NodeSystemSource implements MetricSource {
             return this.cachedNetworkInterfaces;
         }
 
+        if (
+            this.cachedNetworkInterfaces
+            && currentTimestampMilliseconds < this.nextNetworkInterfaceRefreshAllowedTimestampMilliseconds
+        ) {
+            return this.cachedNetworkInterfaces;
+        }
+
         if (this.pendingNetworkInterfacesPromise) {
             return this.pendingNetworkInterfacesPromise;
         }
 
         this.pendingNetworkInterfacesPromise = this.refreshUsableNetworkInterfaces(currentTimestampMilliseconds)
+            .catch(error => this.handleNetworkInterfaceRefreshError(error, currentTimestampMilliseconds))
             .finally(() => {
                 this.pendingNetworkInterfacesPromise = null;
             });
@@ -496,7 +515,41 @@ export class NodeSystemSource implements MetricSource {
         };
 
         this.cachedNetworkInterfaces = cachedNetworkInterfaces;
+        this.nextNetworkInterfaceRefreshAllowedTimestampMilliseconds = 0;
         return cachedNetworkInterfaces;
+    }
+
+    private handleNetworkInterfaceRefreshError(
+        error: unknown,
+        currentTimestampMilliseconds: number,
+    ): CachedNetworkInterfaces {
+        if (!this.cachedNetworkInterfaces) {
+            throw error;
+        }
+
+        this.nextNetworkInterfaceRefreshAllowedTimestampMilliseconds = currentTimestampMilliseconds
+            + NodeSystemSource.NETWORK_INTERFACE_REFRESH_RETRY_MS;
+
+        if (this.shouldLogNetworkInterfaceStaleWarning(currentTimestampMilliseconds)) {
+            const cacheAgeMilliseconds = currentTimestampMilliseconds
+                - this.cachedNetworkInterfaces.timestampMilliseconds;
+            this.lastNetworkInterfaceStaleWarningTimestampMilliseconds = currentTimestampMilliseconds;
+
+            networkLog.warn(() => [
+                "Network interface refresh failed; using stale interfaces",
+                `cacheAgeMs=${cacheAgeMilliseconds}`,
+                `retryMs=${NodeSystemSource.NETWORK_INTERFACE_REFRESH_RETRY_MS}`,
+                `error=${String(error)}`,
+            ].join(" "));
+        }
+
+        return this.cachedNetworkInterfaces;
+    }
+
+    private shouldLogNetworkInterfaceStaleWarning(currentTimestampMilliseconds: number): boolean {
+        return this.lastNetworkInterfaceStaleWarningTimestampMilliseconds === 0
+            || currentTimestampMilliseconds - this.lastNetworkInterfaceStaleWarningTimestampMilliseconds
+                >= NodeSystemSource.NETWORK_INTERFACE_STALE_WARNING_INTERVAL_MS;
     }
 
     private calculateNetworkRate(options: {

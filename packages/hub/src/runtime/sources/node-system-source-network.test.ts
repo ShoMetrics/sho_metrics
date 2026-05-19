@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Systeminformation } from "systeminformation";
+import { MetricUnit } from "./metric-source";
 import { NodeSystemSource } from "./node-system-source";
+import {
+    buildEmptyNodeSystemInformation,
+    buildNetworkInterface,
+    buildNetworkStats,
+} from "./node-system-source-test-helpers";
 import type {
     NodeSystemGpuTelemetryData,
     NodeSystemInformationClient,
@@ -25,7 +31,7 @@ test("node system source refreshes cached network interfaces after the cache int
     let currentTimestampMilliseconds = 1000;
     const source = new NodeSystemSource({
         systemInformation: {
-            ...buildEmptySystemInformation(),
+            ...buildEmptyNodeSystemInformation(),
             networkInterfaces: async () => {
                 networkInterfacePollCount += 1;
                 return networkInterfacesQueue.shift() ?? [];
@@ -56,17 +62,73 @@ test("node system source refreshes cached network interfaces after the cache int
     assert.deepEqual(networkStatsArguments, ["eth0", "wlan0"]);
 });
 
-function buildEmptySystemInformation(): Partial<NodeSystemInformationClient> {
-    return {
-        currentLoad: async () => ({ currentLoad: 0 }) as Systeminformation.CurrentLoadData,
-        mem: async () => ({ used: 0, total: 0 }) as Systeminformation.MemData,
-        fsSize: async () => [],
-        blockDevices: async () => [],
-        diskLayout: async () => [],
-        fsStats: async () => ({ rx_sec: 0, wx_sec: 0, tx_sec: 0 }) as Systeminformation.FsStatsData,
-        graphics: async () => ({ controllers: [], displays: [] }) as Systeminformation.GraphicsData,
-    };
-}
+test("node system source uses stale network interfaces when refresh fails", async () => {
+    const networkStatsArguments: Array<string | undefined> = [];
+    let networkInterfacePollCount = 0;
+    let networkStatsPollCount = 0;
+    let currentTimestampMilliseconds = 1000;
+    const source = new NodeSystemSource({
+        systemInformation: {
+            ...buildEmptyNodeSystemInformation(),
+            networkInterfaces: async () => {
+                networkInterfacePollCount += 1;
+                if (networkInterfacePollCount > 1) {
+                    throw new Error("network interface refresh failed");
+                }
+
+                return [buildNetworkInterface({ iface: "eth0" })];
+            },
+            networkStats: (async (interfaces?: string | ((data: Systeminformation.NetworkStatsData[]) => unknown)) => {
+                const interfaceIds = typeof interfaces === "string" ? interfaces : undefined;
+
+                networkStatsPollCount += 1;
+                networkStatsArguments.push(interfaceIds);
+                return [buildNetworkStats({
+                    iface: interfaceIds ?? "",
+                    rx_bytes: 1000 * networkStatsPollCount,
+                    tx_bytes: 500,
+                })];
+            }) as NodeSystemInformationClient["networkStats"],
+        } as NodeSystemInformationClient,
+        pollWindowsGpuTelemetry: buildNoGpuPoller,
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller,
+        now: () => currentTimestampMilliseconds,
+    });
+
+    await source.pollMetrics(["net.down"]);
+    currentTimestampMilliseconds = 11000;
+    const staleSnapshot = await source.pollMetrics(["net.down"]);
+    currentTimestampMilliseconds = 12000;
+    await source.pollMetrics(["net.down"]);
+
+    assert.equal(networkInterfacePollCount, 2);
+    assert.equal(networkStatsPollCount, 3);
+    assert.deepEqual(networkStatsArguments, ["eth0", "eth0", "eth0"]);
+    assert.equal(readScalarMetric(staleSnapshot, "net.down.eth0"), 100);
+});
+
+test("node system source returns aggregate zero when cached interfaces have no stats", async () => {
+    const networkStatsArguments: Array<string | undefined> = [];
+    const source = new NodeSystemSource({
+        systemInformation: {
+            ...buildEmptyNodeSystemInformation(),
+            networkInterfaces: async () => [buildNetworkInterface({ iface: "eth0" })],
+            networkStats: (async (interfaces?: string | ((data: Systeminformation.NetworkStatsData[]) => unknown)) => {
+                networkStatsArguments.push(typeof interfaces === "string" ? interfaces : undefined);
+                return [];
+            }) as NodeSystemInformationClient["networkStats"],
+        } as NodeSystemInformationClient,
+        pollWindowsGpuTelemetry: buildNoGpuPoller,
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller,
+        now: () => 1000,
+    });
+
+    const snapshot = await source.pollMetrics(["net.down"]);
+
+    assert.deepEqual(networkStatsArguments, ["eth0"]);
+    assert.equal(readScalarMetric(snapshot, "net.down"), 0);
+    assert.equal(snapshot.metrics["net.down.eth0"], undefined);
+});
 
 async function buildNoGpuPoller(): Promise<NodeSystemGpuTelemetryData | null> {
     return null;
@@ -76,49 +138,14 @@ async function buildNoSystemGpuPoller(): Promise<NodeSystemGpuTelemetryData | nu
     return null;
 }
 
-function buildNetworkInterface(
-    overrides: Partial<Systeminformation.NetworkInterfacesData> = {},
-): Systeminformation.NetworkInterfacesData {
-    return {
-        iface: "eth0",
-        ifaceName: "Ethernet",
-        default: false,
-        ip4: "",
-        ip4subnet: "",
-        ip6: "",
-        ip6subnet: "",
-        mac: "",
-        internal: false,
-        virtual: false,
-        operstate: "up",
-        type: "wired",
-        duplex: "",
-        mtu: 1500,
-        speed: null,
-        dhcp: false,
-        dnsSuffix: "",
-        ieee8021xAuth: "",
-        ieee8021xState: "",
-        carrierChanges: 0,
-        ...overrides,
-    } as Systeminformation.NetworkInterfacesData;
-}
+function readScalarMetric(
+    snapshot: Awaited<ReturnType<NodeSystemSource["pollMetrics"]>>,
+    metricKey: string,
+): number | undefined {
+    const metricValue = snapshot.metrics[metricKey];
+    if (!metricValue || metricValue.value.case !== "scalar" || metricValue.unit !== MetricUnit.BYTES_PER_SECOND) {
+        return undefined;
+    }
 
-function buildNetworkStats(
-    overrides: Partial<Systeminformation.NetworkStatsData> = {},
-): Systeminformation.NetworkStatsData {
-    return {
-        iface: "eth0",
-        operstate: "up",
-        rx_bytes: 0,
-        rx_dropped: 0,
-        rx_errors: 0,
-        rx_sec: 0,
-        tx_bytes: 0,
-        tx_dropped: 0,
-        tx_errors: 0,
-        tx_sec: 0,
-        ms: 0,
-        ...overrides,
-    } as Systeminformation.NetworkStatsData;
+    return metricValue.value.value;
 }
