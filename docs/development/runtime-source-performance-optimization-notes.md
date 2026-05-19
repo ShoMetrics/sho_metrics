@@ -62,6 +62,29 @@ Release gates:
   or displayed key count. A text widget with many keys must still reuse the same
   CPU, memory, network, disk, and GPU collector snapshots.
 
+Freshness policy:
+
+| Data | Freshness budget | Expired behavior | Reason |
+| --- | ---: | --- | --- |
+| Network interface topology | Fresh for 10s; stale fallback allowed for three discovery windows, currently 30s total | Drop stale topology and emit no network source metrics until discovery recovers | Topology can survive short OS query failures, but stale Wi-Fi/VPN/USB state must not be presented indefinitely. |
+| Network traffic rate | 5s at the network action view boundary | Render as `N/A` | Throughput is a hot 1 Hz value; after several missed ticks, the old rate is misleading. |
+| GPU telemetry | 1s source cache; 7s action stale TTL | Render as `N/A` | `nvidia-smi` has measured 2.0-2.2s valid tail latency, but temperature, power, and usage cannot remain old forever. |
+| CPU model/base frequency | Cache for the process after success; retry static info fetch every 60s after failure | Omit static fields until a retry succeeds | Static CPU identity is safe to cache, but transient startup failures should not cause permanent `N/A`. |
+| CPU usage | No source cache | Emit no CPU usage metric for that failed poll | CPU usage is a hot value; stale usage is worse than no data. |
+
+These are current implementation budgets, not universal constants. Changes to
+them should be backed by log or perf captures and should preserve the rule that
+expired data becomes `N/A` instead of silently reusing old values.
+
+Network topology and traffic freshness are independent. Stale topology inside
+the topology budget can still produce fresh traffic samples when `networkStats`
+succeeds. When topology expires, or when `networkStats` stops producing samples,
+the metric store stops receiving fresh network values and the action view's 5s
+traffic budget naturally turns the display into `N/A`.
+
+The GPU row describes the existing GPU action freshness behavior in
+`packages/hub/src/actions/gpu.ts`; Phase 2 did not change the GPU TTL.
+
 Measurement protocol:
 
 - Use `npm.cmd run perf:monitor -- --duration-seconds=300 --interval-ms=1000

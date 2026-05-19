@@ -107,6 +107,48 @@ test("node system source uses stale network interfaces when refresh fails", asyn
     assert.equal(readScalarMetric(staleSnapshot, "net.down.eth0"), 100);
 });
 
+test("node system source stops using stale network interfaces after the freshness budget", async () => {
+    let networkInterfacePollCount = 0;
+    let networkStatsPollCount = 0;
+    let currentTimestampMilliseconds = 1000;
+    const source = new NodeSystemSource({
+        systemInformation: {
+            ...buildEmptyNodeSystemInformation(),
+            networkInterfaces: async () => {
+                networkInterfacePollCount += 1;
+                if (networkInterfacePollCount > 1) {
+                    throw new Error("network interface refresh failed");
+                }
+
+                return [buildNetworkInterface({ iface: "eth0" })];
+            },
+            networkStats: (async () => {
+                networkStatsPollCount += 1;
+                return [buildNetworkStats({
+                    iface: "eth0",
+                    rx_bytes: 1000 * networkStatsPollCount,
+                    tx_bytes: 500,
+                })];
+            }) as NodeSystemInformationClient["networkStats"],
+        } as NodeSystemInformationClient,
+        pollWindowsGpuTelemetry: buildNoGpuPoller,
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller,
+        now: () => currentTimestampMilliseconds,
+    });
+
+    await source.pollMetrics(["net.down"]);
+    currentTimestampMilliseconds = 11000;
+    const staleSnapshot = await source.pollMetrics(["net.down"]);
+    currentTimestampMilliseconds = 32000;
+    const expiredSnapshot = await source.pollMetrics(["net.down"]);
+
+    assert.equal(networkInterfacePollCount, 3);
+    assert.equal(networkStatsPollCount, 2);
+    assert.equal(readScalarMetric(staleSnapshot, "net.down.eth0"), 100);
+    assert.equal(readScalarMetric(expiredSnapshot, "net.down.eth0"), undefined);
+    assert.equal(readScalarMetric(expiredSnapshot, "net.down"), undefined);
+});
+
 test("node system source returns aggregate zero when cached interfaces have no stats", async () => {
     const networkStatsArguments: Array<string | undefined> = [];
     const source = new NodeSystemSource({

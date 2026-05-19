@@ -59,6 +59,7 @@ export class Network extends MetricAction {
             target: networkTarget,
             metrics,
             selectedNetworkInterface,
+            currentTimestampMilliseconds: Date.now(),
         });
 
         if (viewUpdate.debugInfo) {

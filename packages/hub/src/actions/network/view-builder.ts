@@ -42,7 +42,12 @@ interface BuildNetworkViewOptions {
     target: ResolvedNetworkMetricTarget;
     metrics: MetricStoreReader;
     selectedNetworkInterface: NetworkInterfaceOption | null;
+    currentTimestampMilliseconds: number;
 }
+
+// Network throughput is a 1 Hz hot reading. Keep a last-good value through a few
+// missed ticks, then let the renderer show N/A instead of a misleading old rate.
+const NETWORK_SAMPLE_STALE_MS = 5000;
 
 export function buildNetworkViewUpdate(options: BuildNetworkViewOptions): NetworkViewUpdate {
     const appearance = options.settings.widget.slot.appearance;
@@ -81,6 +86,7 @@ export function buildNetworkViewUpdate(options: BuildNetworkViewOptions): Networ
         sourceWidgetData,
         direction: networkDirection,
         target: options.target,
+        currentTimestampMilliseconds: options.currentTimestampMilliseconds,
     });
     const circleVariant = appearance.view.circleVariant;
     const shouldRenderGaugeFooter = selectedView === "circle" && circleVariant === "gauge";
@@ -171,6 +177,7 @@ function buildDualNetworkCircleOrTextViewOptions(
         ),
         direction: "upload",
         target: options.target,
+        currentTimestampMilliseconds: options.currentTimestampMilliseconds,
     });
     const downloadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
@@ -180,6 +187,7 @@ function buildDualNetworkCircleOrTextViewOptions(
         ),
         direction: "download",
         target: options.target,
+        currentTimestampMilliseconds: options.currentTimestampMilliseconds,
     });
     const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData);
     const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
@@ -251,6 +259,7 @@ function buildDualNetworkLineViewOptions(options: BuildNetworkViewOptions): Metr
         ),
         direction: "upload",
         target: options.target,
+        currentTimestampMilliseconds: options.currentTimestampMilliseconds,
     });
     const downloadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
@@ -260,6 +269,7 @@ function buildDualNetworkLineViewOptions(options: BuildNetworkViewOptions): Metr
         ),
         direction: "download",
         target: options.target,
+        currentTimestampMilliseconds: options.currentTimestampMilliseconds,
     });
     const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData);
     const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
@@ -324,6 +334,7 @@ function buildBarNetworkViewOptions(options: BuildNetworkViewOptions): MetricVie
         ),
         direction: "upload",
         target: options.target,
+        currentTimestampMilliseconds: options.currentTimestampMilliseconds,
     });
     const downloadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
@@ -333,6 +344,7 @@ function buildBarNetworkViewOptions(options: BuildNetworkViewOptions): MetricVie
         ),
         direction: "download",
         target: options.target,
+        currentTimestampMilliseconds: options.currentTimestampMilliseconds,
     });
     const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
     const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData);
@@ -408,16 +420,41 @@ function buildNetworkWidgetData(options: {
     sourceWidgetData: WidgetData;
     direction: NetworkMetricDirection;
     target: ResolvedNetworkMetricTarget;
+    currentTimestampMilliseconds: number;
 }): WidgetData {
+    const sourceWidgetData = isFreshNetworkWidgetData(
+        options.sourceWidgetData,
+        options.currentTimestampMilliseconds,
+    )
+        ? options.sourceWidgetData
+        : {
+            ...options.sourceWidgetData,
+            current: 0,
+            progress: 0,
+            history: [],
+            sampleTimestampMilliseconds: undefined,
+        };
+
     return buildNetworkSpeedWidgetData({
-        bytesPerSecond: options.sourceWidgetData.current,
-        historyBytesPerSecond: options.sourceWidgetData.history,
+        bytesPerSecond: sourceWidgetData.current,
+        historyBytesPerSecond: sourceWidgetData.history,
         maximumBytesPerSecond: resolveNetworkMaximumBytesPerSecond(options.direction, options.target),
         label: getNetworkDirectionLabel(options.direction),
         unitBase: options.target.reading.display.unitBase,
         maximumDisplayDigits: NETWORK_SPEED_MAXIMUM_DISPLAY_DIGITS,
-        sampleTimestampMilliseconds: options.sourceWidgetData.sampleTimestampMilliseconds,
+        sampleTimestampMilliseconds: sourceWidgetData.sampleTimestampMilliseconds,
     });
+}
+
+function isFreshNetworkWidgetData(
+    widgetData: WidgetData,
+    currentTimestampMilliseconds: number,
+): boolean {
+    if (widgetData.sampleTimestampMilliseconds == null) {
+        return false;
+    }
+
+    return currentTimestampMilliseconds - widgetData.sampleTimestampMilliseconds <= NETWORK_SAMPLE_STALE_MS;
 }
 
 function getNetworkDirectionLabel(direction: NetworkMetricDirection): string {

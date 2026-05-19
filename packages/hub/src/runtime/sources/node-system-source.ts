@@ -136,7 +136,7 @@ export class NodeSystemSource implements MetricSource {
     private lastNetworkStatsByInterface = new Map<string, NodeSystemNetworkCounterSample>();
     private cachedNetworkInterfaces: CachedNetworkInterfaces | null = null;
     // Coalesces overlapping collector ticks if runtime polling becomes source/collector independent.
-    private pendingNetworkInterfacesPromise: Promise<CachedNetworkInterfaces> | null = null;
+    private pendingNetworkInterfacesPromise: Promise<CachedNetworkInterfaces | null> | null = null;
     private nextNetworkInterfaceRefreshAllowedTimestampMilliseconds = 0;
     private lastNetworkInterfaceStaleWarningTimestampMilliseconds = 0;
     private lastNetworkPollDebugLogTimestampMilliseconds = 0;
@@ -146,12 +146,20 @@ export class NodeSystemSource implements MetricSource {
     private cachedCpuBaseFrequencyGigahertz: number | null = null;
     private cachedCpuModelText: string | null = null;
     private pendingCpuInformationPromise: Promise<void> | null = null;
-    private hasAttemptedCpuInformationPoll = false;
+    private hasCachedCpuInformation = false;
+    private nextCpuInformationPollAllowedTimestampMilliseconds = 0;
 
     private static readonly GPU_CACHE_MS = 1000;
+    // Static CPU info is not worth querying every 1 Hz tick, but a transient
+    // startup failure should not hide model/base-frequency for the whole session.
+    private static readonly CPU_INFORMATION_RETRY_MS = 60000;
     // Interface topology is semi-static. Cache discovery for 10s to keep networkInterfaces()
     // out of the 1Hz hot path while bounding Wi-Fi/VPN/USB adapter hot-plug staleness.
     private static readonly NETWORK_INTERFACE_CACHE_MS = 10000;
+    // Expire topology after three missed discovery windows. Short query failures
+    // keep last-good topology; sustained failures become no-data instead of
+    // presenting stale Wi-Fi/VPN/USB adapter state indefinitely.
+    private static readonly NETWORK_INTERFACE_STALE_MAX_MS = NodeSystemSource.NETWORK_INTERFACE_CACHE_MS * 3;
     // When discovery fails, stale last-good interfaces are safer than a 1Hz N/A flicker,
     // but retry throttling prevents a failing OS query loop from becoming the hot path.
     private static readonly NETWORK_INTERFACE_REFRESH_RETRY_MS = 2000;
@@ -348,23 +356,33 @@ export class NodeSystemSource implements MetricSource {
     }
 
     private ensureCpuInformationCached(): void {
+        const currentTimestampMilliseconds = this.now();
+
         if (
-            this.hasAttemptedCpuInformationPoll
+            this.hasCachedCpuInformation
             || this.pendingCpuInformationPromise
+            || currentTimestampMilliseconds < this.nextCpuInformationPollAllowedTimestampMilliseconds
         ) {
             return;
         }
 
-        this.hasAttemptedCpuInformationPoll = true;
         this.pendingCpuInformationPromise = this.systemInformation.cpu()
             .then(cpuData => {
                 if (isFinitePositiveNumber(cpuData.speed)) {
                     this.cachedCpuBaseFrequencyGigahertz = cpuData.speed;
                 }
                 this.cachedCpuModelText = formatCpuModelText(cpuData);
+                this.hasCachedCpuInformation = true;
+                this.nextCpuInformationPollAllowedTimestampMilliseconds = 0;
             })
             .catch(error => {
-                log.warn(() => `CPU information poll error: ${String(error)}`);
+                this.nextCpuInformationPollAllowedTimestampMilliseconds = this.now()
+                    + NodeSystemSource.CPU_INFORMATION_RETRY_MS;
+                log.warn(() => [
+                    "CPU information poll error",
+                    `retryMs=${NodeSystemSource.CPU_INFORMATION_RETRY_MS}`,
+                    `error=${String(error)}`,
+                ].join(" "));
             })
             .finally(() => {
                 this.pendingCpuInformationPromise = null;
@@ -383,6 +401,11 @@ export class NodeSystemSource implements MetricSource {
     private async pollNetwork(): Promise<Record<string, MetricValue>> {
         const metrics: Record<string, MetricValue> = {};
         const cachedNetworkInterfaces = await this.readUsableNetworkInterfaces();
+        if (!cachedNetworkInterfaces) {
+            this.networkRegistry.update([]);
+            return metrics;
+        }
+
         const interfaceOptions = cachedNetworkInterfaces.interfaceOptions;
         const usableInterfaceIds = new Set(interfaceOptions.map((networkInterface) => networkInterface.id));
         const networkStats = usableInterfaceIds.size > 0
@@ -452,7 +475,7 @@ export class NodeSystemSource implements MetricSource {
         return metrics;
     }
 
-    private async readUsableNetworkInterfaces(): Promise<CachedNetworkInterfaces> {
+    private async readUsableNetworkInterfaces(): Promise<CachedNetworkInterfaces | null> {
         const currentTimestampMilliseconds = this.now();
 
         if (this.cachedNetworkInterfaces && !this.isNetworkInterfaceCacheExpired(currentTimestampMilliseconds)) {
@@ -463,7 +486,9 @@ export class NodeSystemSource implements MetricSource {
             this.cachedNetworkInterfaces
             && currentTimestampMilliseconds < this.nextNetworkInterfaceRefreshAllowedTimestampMilliseconds
         ) {
-            return this.cachedNetworkInterfaces;
+            return this.isNetworkInterfaceCacheWithinStaleBudget(currentTimestampMilliseconds)
+                ? this.cachedNetworkInterfaces
+                : null;
         }
 
         if (this.pendingNetworkInterfacesPromise) {
@@ -488,6 +513,15 @@ export class NodeSystemSource implements MetricSource {
         return cacheAgeMilliseconds >= NodeSystemSource.NETWORK_INTERFACE_CACHE_MS;
     }
 
+    private isNetworkInterfaceCacheWithinStaleBudget(currentTimestampMilliseconds: number): boolean {
+        if (!this.cachedNetworkInterfaces) {
+            return false;
+        }
+
+        const cacheAgeMilliseconds = currentTimestampMilliseconds - this.cachedNetworkInterfaces.timestampMilliseconds;
+        return cacheAgeMilliseconds < NodeSystemSource.NETWORK_INTERFACE_STALE_MAX_MS;
+    }
+
     private async refreshUsableNetworkInterfaces(
         currentTimestampMilliseconds: number,
     ): Promise<CachedNetworkInterfaces> {
@@ -509,28 +543,33 @@ export class NodeSystemSource implements MetricSource {
     private handleNetworkInterfaceRefreshError(
         error: unknown,
         currentTimestampMilliseconds: number,
-    ): CachedNetworkInterfaces {
+    ): CachedNetworkInterfaces | null {
         if (!this.cachedNetworkInterfaces) {
             throw error;
         }
 
+        const cacheAgeMilliseconds = currentTimestampMilliseconds
+            - this.cachedNetworkInterfaces.timestampMilliseconds;
         this.nextNetworkInterfaceRefreshAllowedTimestampMilliseconds = currentTimestampMilliseconds
             + NodeSystemSource.NETWORK_INTERFACE_REFRESH_RETRY_MS;
 
         if (this.shouldLogNetworkInterfaceStaleWarning(currentTimestampMilliseconds)) {
-            const cacheAgeMilliseconds = currentTimestampMilliseconds
-                - this.cachedNetworkInterfaces.timestampMilliseconds;
             this.lastNetworkInterfaceStaleWarningTimestampMilliseconds = currentTimestampMilliseconds;
 
             networkLog.warn(() => [
-                "Network interface refresh failed; using stale interfaces",
+                cacheAgeMilliseconds < NodeSystemSource.NETWORK_INTERFACE_STALE_MAX_MS
+                    ? "Network interface refresh failed; using stale interfaces"
+                    : "Network interface refresh failed; stale interfaces expired",
                 `cacheAgeMs=${cacheAgeMilliseconds}`,
+                `maxStaleMs=${NodeSystemSource.NETWORK_INTERFACE_STALE_MAX_MS}`,
                 `retryMs=${NodeSystemSource.NETWORK_INTERFACE_REFRESH_RETRY_MS}`,
                 `error=${String(error)}`,
             ].join(" "));
         }
 
-        return this.cachedNetworkInterfaces;
+        return cacheAgeMilliseconds < NodeSystemSource.NETWORK_INTERFACE_STALE_MAX_MS
+            ? this.cachedNetworkInterfaces
+            : null;
     }
 
     private shouldLogNetworkInterfaceStaleWarning(currentTimestampMilliseconds: number): boolean {
