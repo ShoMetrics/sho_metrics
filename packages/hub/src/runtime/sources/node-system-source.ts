@@ -147,25 +147,16 @@ export class NodeSystemSource implements MetricSource {
     private cachedCpuModelText: string | null = null;
     private pendingCpuInformationPromise: Promise<void> | null = null;
     private hasAttemptedCpuInformationPoll = false;
-    private gpuConsecutiveTimeouts = 0;
-    private nextGpuPollAllowedTimestampMilliseconds = 0;
-    private lastGpuTimeoutWarningTimestampMilliseconds = 0;
 
     private static readonly GPU_CACHE_MS = 1000;
-    private static readonly GPU_POLL_TIMEOUT_MS = 3300;
     // Interface topology is semi-static. Cache discovery for 10s to keep networkInterfaces()
     // out of the 1Hz hot path while bounding Wi-Fi/VPN/USB adapter hot-plug staleness.
     private static readonly NETWORK_INTERFACE_CACHE_MS = 10000;
-    // Empty discovery often means startup or reconnect transition; retry quickly so N/A
-    // does not stick for a full topology cache window.
-    private static readonly EMPTY_NETWORK_INTERFACE_CACHE_MS = 2000;
     // When discovery fails, stale last-good interfaces are safer than a 1Hz N/A flicker,
     // but retry throttling prevents a failing OS query loop from becoming the hot path.
     private static readonly NETWORK_INTERFACE_REFRESH_RETRY_MS = 2000;
     private static readonly NETWORK_INTERFACE_STALE_WARNING_INTERVAL_MS = 30000;
     private static readonly NETWORK_DEBUG_LOG_INTERVAL_MS = 5000;
-    private static readonly GPU_TIMEOUT_WARNING_INTERVAL_MS = 10000;
-    private static readonly GPU_BACKOFF_STEPS_MS = [2000, 5000, 10000, 30000] as const;
 
     constructor(dependencies: NodeSystemSourceDependencies = {}) {
         this.systemInformation = dependencies.systemInformation ?? defaultSystemInformation;
@@ -192,7 +183,7 @@ export class NodeSystemSource implements MetricSource {
             metricGroups.has("memory") ? this.pollMemory() : Promise.resolve({}),
             metricGroups.has("disk") ? this.pollDiskSafely(metricKeys) : Promise.resolve({}),
             metricGroups.has("network") ? this.pollNetworkSafely() : Promise.resolve({}),
-            metricGroups.has("gpu") ? this.pollGpuWithTimeout() : Promise.resolve(null),
+            metricGroups.has("gpu") ? this.pollGpu() : Promise.resolve(null),
         ]);
 
         Object.assign(metrics, cpuMetrics, memoryMetrics, diskMetrics, networkMetrics);
@@ -494,11 +485,7 @@ export class NodeSystemSource implements MetricSource {
         }
 
         const cacheAgeMilliseconds = currentTimestampMilliseconds - this.cachedNetworkInterfaces.timestampMilliseconds;
-        const cacheDurationMilliseconds = this.cachedNetworkInterfaces.interfaceOptions.length > 0
-            ? NodeSystemSource.NETWORK_INTERFACE_CACHE_MS
-            : NodeSystemSource.EMPTY_NETWORK_INTERFACE_CACHE_MS;
-
-        return cacheAgeMilliseconds >= cacheDurationMilliseconds;
+        return cacheAgeMilliseconds >= NodeSystemSource.NETWORK_INTERFACE_CACHE_MS;
     }
 
     private async refreshUsableNetworkInterfaces(
@@ -606,6 +593,34 @@ export class NodeSystemSource implements MetricSource {
     }
 
     private async pollGpu(): Promise<NodeSystemGpuTelemetryData | null> {
+        const pollSequence = reserveNodeSystemGpuPollDebugSequence();
+        const pollStartTimestampMilliseconds = this.now();
+        gpuLog.debug(() => [
+            "sourceStart",
+            `pollId=${pollSequence}`,
+            `activeNvidiaSmiQueries=${getActiveNvidiaSmiQueryCount()}`,
+        ].join(" "));
+
+        const gpuData = await this.readGpuTelemetry();
+
+        if (gpuData) {
+            gpuLog.debug(() => [
+                "sourceSuccess",
+                `pollId=${pollSequence}`,
+                `elapsedMs=${this.now() - pollStartTimestampMilliseconds}`,
+            ].join(" "));
+            return gpuData;
+        }
+
+        gpuLog.debug(() => [
+            "sourceNoData",
+            `pollId=${pollSequence}`,
+            `elapsedMs=${this.now() - pollStartTimestampMilliseconds}`,
+        ].join(" "));
+        return null;
+    }
+
+    private async readGpuTelemetry(): Promise<NodeSystemGpuTelemetryData | null> {
         const currentTimestampMilliseconds = this.now();
 
         if (this.cachedGpuData && (currentTimestampMilliseconds - this.cachedGpuTimestampMilliseconds) < NodeSystemSource.GPU_CACHE_MS) {
@@ -643,100 +658,6 @@ export class NodeSystemSource implements MetricSource {
         })();
 
         return this.pendingGpuPromise;
-    }
-
-    private async pollGpuWithTimeout(): Promise<NodeSystemGpuTelemetryData | null> {
-        const currentTimestampMilliseconds = this.now();
-
-        if (currentTimestampMilliseconds < this.nextGpuPollAllowedTimestampMilliseconds) {
-            gpuLog.debug(() => [
-                "skippedBackoff",
-                `remainingMs=${this.nextGpuPollAllowedTimestampMilliseconds - currentTimestampMilliseconds}`,
-                `timeoutCount=${this.gpuConsecutiveTimeouts}`,
-            ].join(" "));
-            return null;
-        }
-
-        const pollSequence = reserveNodeSystemGpuPollDebugSequence();
-        const pollStartTimestampMilliseconds = this.now();
-        gpuLog.debug(() => [
-            "sourceStart",
-            `pollId=${pollSequence}`,
-            `timeoutMs=${NodeSystemSource.GPU_POLL_TIMEOUT_MS}`,
-            `activeNvidiaSmiQueries=${getActiveNvidiaSmiQueryCount()}`,
-        ].join(" "));
-
-        let timeoutId: NodeJS.Timeout | null = null;
-        const timeoutPromise = new Promise<NodeSystemGpuTelemetryData | null>((resolve) => {
-            timeoutId = setTimeout(() => {
-                const elapsedMilliseconds = this.now() - pollStartTimestampMilliseconds;
-                gpuLog.debug(() => [
-                    "sourceTimeout",
-                    `pollId=${pollSequence}`,
-                    `elapsedMs=${elapsedMilliseconds}`,
-                    `timeoutMs=${NodeSystemSource.GPU_POLL_TIMEOUT_MS}`,
-                    `timerDelayMs=${Math.max(0, elapsedMilliseconds - NodeSystemSource.GPU_POLL_TIMEOUT_MS)}`,
-                    `activeNvidiaSmiQueries=${getActiveNvidiaSmiQueryCount()}`,
-                ].join(" "));
-                this.recordGpuPollTimeout();
-                resolve(null);
-            }, NodeSystemSource.GPU_POLL_TIMEOUT_MS);
-        });
-
-        const gpuData = await Promise.race([this.pollGpu(), timeoutPromise]);
-
-        if (timeoutId) {
-            clearTimeout(timeoutId);
-        }
-
-        if (gpuData && this.now() < this.nextGpuPollAllowedTimestampMilliseconds) {
-            return gpuData;
-        }
-
-        if (gpuData) {
-            this.gpuConsecutiveTimeouts = 0;
-            this.nextGpuPollAllowedTimestampMilliseconds = 0;
-            gpuLog.debug(() => [
-                "sourceSuccess",
-                `pollId=${pollSequence}`,
-                `elapsedMs=${this.now() - pollStartTimestampMilliseconds}`,
-            ].join(" "));
-            return gpuData;
-        }
-
-        gpuLog.debug(() => [
-            "sourceNoData",
-            `pollId=${pollSequence}`,
-            `elapsedMs=${this.now() - pollStartTimestampMilliseconds}`,
-        ].join(" "));
-        return null;
-    }
-
-    private recordGpuPollTimeout(): void {
-        const currentTimestampMilliseconds = this.now();
-        const backoffIndex = Math.min(
-            this.gpuConsecutiveTimeouts,
-            NodeSystemSource.GPU_BACKOFF_STEPS_MS.length - 1,
-        );
-        const backoffMilliseconds = NodeSystemSource.GPU_BACKOFF_STEPS_MS[backoffIndex];
-
-        this.gpuConsecutiveTimeouts += 1;
-        this.nextGpuPollAllowedTimestampMilliseconds = currentTimestampMilliseconds + backoffMilliseconds;
-
-        if (
-            currentTimestampMilliseconds - this.lastGpuTimeoutWarningTimestampMilliseconds
-            < NodeSystemSource.GPU_TIMEOUT_WARNING_INTERVAL_MS
-        ) {
-            return;
-        }
-
-        this.lastGpuTimeoutWarningTimestampMilliseconds = currentTimestampMilliseconds;
-        gpuLog.warn(() => [
-            "GPU poll exceeded timeout; suppressing stale GPU metrics",
-            `timeoutMs=${NodeSystemSource.GPU_POLL_TIMEOUT_MS}`,
-            `timeoutCount=${this.gpuConsecutiveTimeouts}`,
-            `backoffMs=${backoffMilliseconds}`,
-        ].join(" "));
     }
 }
 

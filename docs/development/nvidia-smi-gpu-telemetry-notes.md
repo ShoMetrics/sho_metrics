@@ -21,9 +21,8 @@ The observed N/A chain was:
 2. A later `nvidia-smi` call exceeds the plugin timeout.
 3. Node kills the child process with `SIGTERM`.
 4. The source returns no GPU metrics for that poll.
-5. Backoff suppresses subsequent GPU polls.
-6. The action-level GPU sample freshness TTL expires.
-7. The widget renders no-data state.
+5. The action-level GPU sample freshness TTL expires.
+6. The widget renders no-data state.
 
 This is not proof that every user will hit the issue, but it proves that the previous
 1.5 second `nvidia-smi` timeout was inside the observed normal tail latency range.
@@ -33,12 +32,28 @@ This is not proof that every user will hit the issue, but it proves that the pre
 The plugin now uses more conservative timeouts:
 
 - `nvidia-smi` process timeout: 3000 ms
-- GPU source poll timeout: 3300 ms
 - GPU action stale TTL: 7000 ms
 
 This covers the observed 2.0-2.2 second successful CLI calls while still allowing N/A
-after repeated real failures. The TTL is intentionally below 10 seconds to avoid
+after real failures. The source-level GPU poll no longer adds a second timeout above
+the `nvidia-smi` process timeout; it records source timing and lets the child-process
+boundary own process cancellation. The TTL is intentionally below 10 seconds to avoid
 showing old values for too long on monitoring-focused Stream Deck profiles.
+
+### Removed source-level failure backoff
+
+The previous source-level GPU backoff was tied to a redundant 3300 ms wrapper
+timeout above the 3000 ms `nvidia-smi` process timeout. In normal execution the
+child-process timeout resolved first, so the wrapper timeout and its backoff path
+were effectively unreachable. This phase removes that dead layer instead of
+preserving a misleading throttle.
+
+This means the current GPU source has no source-level failure backoff. The next
+freshness/snapshot-cache pass should add real failure-driven backoff at the
+collector boundary, triggered by `nvidia-smi` failures or timeouts rather than by
+a second wrapper timer. Before adding another warning rate limit for GPU, CPU,
+or helper retries, extract a shared low-frequency warning shape instead of
+copying ad hoc intervals.
 
 ## Known Limitations
 
