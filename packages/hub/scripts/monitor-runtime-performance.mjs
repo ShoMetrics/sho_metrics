@@ -17,6 +17,7 @@ const defaultLogPath = path.join(
     "com.ez.sho-metrics.0.log",
 );
 const defaultOutputDirectory = path.join(repositoryRoot, "docs", "development", "perf-logs");
+const defaultWarmupSamples = 5;
 const defaultProcessNames = [
     "node",
     "powershell",
@@ -45,14 +46,28 @@ const processSnapshots = await sampleProcesses({
     intervalMilliseconds: options.intervalMilliseconds,
     processNames: options.processNames,
     processSamplePath,
+    warmupSamples: options.warmupSamples,
 });
 const logText = await readTextSince(options.logPath, logStartOffset);
 const summary = {
-    measurementVersion: 2,
+    measurementVersion: 3,
     capturedAt: startTimestamp.toISOString(),
     durationSeconds: options.durationSeconds,
     intervalMilliseconds: options.intervalMilliseconds,
+    warmupSamples: options.warmupSamples,
     logicalProcessorCount,
+    schemaNotes: {
+        cpuPercent: "Process CPU is normalized by logicalProcessorCount, matching Task Manager system-wide percent.",
+        processAggregation: "Per processName values are summed across matching PIDs for each sample, then summarized across samples.",
+        processParentAggregation: "processesByParent narrows the same per-sample aggregation by observed parent process name.",
+        wmiAttribution: "WmiPrvSE is a shared WMI provider host and can include activity from clients outside this plugin.",
+        nvidiaSmiCpu: "Short-lived nvidia-smi processes can be missed by 1Hz process sampling; prefer logSummaries.nvidiaSmi elapsed/start counts.",
+    },
+    caveats: [
+        "The first warmupSamples process samples are excluded from process summaries to reduce PDH rate-counter warm-up bias.",
+        "The monitor itself uses PowerShell Get-Counter once per interval and can perturb the measured system; compare runs with identical monitor settings.",
+        "Plugin log summaries cover the full capture window, while process summaries exclude warm-up samples.",
+    ],
     logPath: path.relative(repositoryRoot, options.logPath),
     processSamplePath: path.relative(repositoryRoot, processSamplePath),
     processSummaries: summarizeProcessSnapshots(processSnapshots, options.processNames),
@@ -66,6 +81,7 @@ printSummary(summary, summaryPath);
 function readOptions(args) {
     const durationSeconds = readNumberOption(args, "duration-seconds", 120);
     const intervalMilliseconds = readNumberOption(args, "interval-ms", 1000);
+    const warmupSamples = readNumberOption(args, "warmup-samples", defaultWarmupSamples);
     const label = readStringOption(args, "label", "baseline");
     const outputDirectory = path.resolve(readStringOption(args, "out", defaultOutputDirectory));
     const logPath = path.resolve(readStringOption(args, "log", defaultLogPath));
@@ -77,6 +93,7 @@ function readOptions(args) {
     return {
         durationSeconds,
         intervalMilliseconds,
+        warmupSamples,
         label,
         outputDirectory,
         logPath,
@@ -225,6 +242,7 @@ async function buildProcessSamplerScript(options) {
     return template
         .replaceAll("__DURATION_SECONDS__", String(options.durationSeconds))
         .replaceAll("__INTERVAL_MILLISECONDS__", String(options.intervalMilliseconds))
+        .replaceAll("__WARMUP_SAMPLES__", String(options.warmupSamples))
         .replaceAll("__LOGICAL_PROCESSOR_COUNT__", String(logicalProcessorCount))
         .replaceAll("__MONITOR_NODE_PROCESS_ID__", String(process.pid))
         .replaceAll("__PROCESS_NAMES_JSON__", JSON.stringify(options.processNames));
@@ -235,11 +253,25 @@ function summarizeProcessSnapshots(snapshots, targetProcessNames) {
     const samplesByProcessNameAndParent = createProcessSummaryAccumulator();
     const sampleStatusCounts = new Map();
     const systemCpuPercentSamples = [];
+    const actualIntervalMillisecondsSamples = [];
     const targetProcessNamesLower = targetProcessNames.map(processName => processName.toLowerCase());
+    let warmupSampleCount = 0;
+    let includedSampleCount = 0;
 
     for (const snapshot of snapshots) {
         const sampleStatus = typeof snapshot.status === "string" ? snapshot.status : "unknown";
         sampleStatusCounts.set(sampleStatus, (sampleStatusCounts.get(sampleStatus) ?? 0) + 1);
+
+        if (snapshot.includeInSummary === false) {
+            warmupSampleCount += 1;
+            continue;
+        }
+
+        includedSampleCount += 1;
+
+        if (Number.isFinite(snapshot.actualIntervalMilliseconds)) {
+            actualIntervalMillisecondsSamples.push(snapshot.actualIntervalMilliseconds);
+        }
 
         if (Number.isFinite(snapshot.systemCpuPercent)) {
             systemCpuPercentSamples.push(snapshot.systemCpuPercent);
@@ -286,8 +318,12 @@ function summarizeProcessSnapshots(snapshots, targetProcessNames) {
     ])).sort((firstKey, secondKey) => firstKey.localeCompare(secondKey));
 
     return {
+        rawSampleCount: snapshots.length,
+        warmupSampleCount,
+        includedSampleCount,
         sampleStatusCounts: Object.fromEntries(Array.from(sampleStatusCounts.entries()).sort()),
-        systemCpuPercent: summarizeDurations(systemCpuPercentSamples),
+        actualIntervalMilliseconds: summarizeSeries(actualIntervalMillisecondsSamples),
+        systemCpuPercent: summarizeSeries(systemCpuPercentSamples),
         processes: processNames.map(processName => ({
             processName,
             ...summarizeProcessKey(samplesByProcessName, processName),
@@ -366,13 +402,13 @@ function appendProcessAggregates(accumulator, aggregateMap) {
 function summarizeProcessKey(accumulator, key) {
     return {
         distinctProcessIdCount: accumulator.distinctProcessIds.get(key)?.size ?? 0,
-        cpuPercent: summarizeDurations(accumulator.cpuPercent.get(key) ?? []),
-        privateMegabytes: summarizeDurations(accumulator.privateMegabytes.get(key) ?? []),
-        ioReadOperationsPerSecond: summarizeDurations(accumulator.ioReadOperationsPerSecond.get(key) ?? []),
-        ioWriteOperationsPerSecond: summarizeDurations(accumulator.ioWriteOperationsPerSecond.get(key) ?? []),
-        threadCount: summarizeDurations(accumulator.threadCount.get(key) ?? []),
-        handleCount: summarizeDurations(accumulator.handleCount.get(key) ?? []),
-        processCount: summarizeDurations(accumulator.processCount.get(key) ?? []),
+        cpuPercent: summarizeSeries(accumulator.cpuPercent.get(key) ?? []),
+        privateMegabytes: summarizeSeries(accumulator.privateMegabytes.get(key) ?? []),
+        ioReadOperationsPerSecond: summarizeSeries(accumulator.ioReadOperationsPerSecond.get(key) ?? []),
+        ioWriteOperationsPerSecond: summarizeSeries(accumulator.ioWriteOperationsPerSecond.get(key) ?? []),
+        threadCount: summarizeSeries(accumulator.threadCount.get(key) ?? []),
+        handleCount: summarizeSeries(accumulator.handleCount.get(key) ?? []),
+        processCount: summarizeSeries(accumulator.processCount.get(key) ?? []),
     };
 }
 
@@ -554,7 +590,7 @@ function summarizePluginLog(logText) {
             successCount: nvidiaSmiSuccessCount,
             timeoutCount: nvidiaSmiTimeoutCount,
             maxActiveQueries: maxActiveNvidiaSmiQueries,
-            elapsedMilliseconds: summarizeDurations(nvidiaSmiDurations),
+            elapsedMilliseconds: summarizeSeries(nvidiaSmiDurations),
         },
     };
 }
@@ -621,11 +657,11 @@ function summarizeMap(map) {
     return Object.fromEntries(
         Array.from(map.entries())
             .sort(([firstKey], [secondKey]) => firstKey.localeCompare(secondKey))
-            .map(([key, values]) => [key, summarizeDurations(values)]),
+            .map(([key, values]) => [key, summarizeSeries(values)]),
     );
 }
 
-function summarizeDurations(values) {
+function summarizeSeries(values) {
     const sortedValues = values
         .filter(value => Number.isFinite(value))
         .sort((firstValue, secondValue) => firstValue - secondValue);
@@ -678,6 +714,15 @@ function printSummary(summary, summaryPath) {
             `avg=${summary.processSummaries.systemCpuPercent.average}%`,
             `p95=${summary.processSummaries.systemCpuPercent.p95}%`,
             `max=${summary.processSummaries.systemCpuPercent.max}%`,
+        ].join(" ") + "\n");
+    }
+
+    if (summary.processSummaries.actualIntervalMilliseconds.count > 0) {
+        process.stdout.write([
+            "processSampleInterval",
+            `p50=${summary.processSummaries.actualIntervalMilliseconds.p50}ms`,
+            `p95=${summary.processSummaries.actualIntervalMilliseconds.p95}ms`,
+            `max=${summary.processSummaries.actualIntervalMilliseconds.max}ms`,
         ].join(" ") + "\n");
     }
 

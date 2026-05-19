@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $durationSeconds = __DURATION_SECONDS__
 $intervalMilliseconds = __INTERVAL_MILLISECONDS__
+$warmupSamples = __WARMUP_SAMPLES__
 $logicalProcessorCount = __LOGICAL_PROCESSOR_COUNT__
 $monitorNodeProcessId = __MONITOR_NODE_PROCESS_ID__
 $monitorPowerShellProcessId = $PID
@@ -19,14 +20,23 @@ $counterPaths = @(
     '\Process(*)\Handle Count'
 )
 $deadline = [DateTimeOffset]::UtcNow.AddSeconds($durationSeconds)
+$sampleIndex = 0
+$previousSampleTimestamp = $null
 while ([DateTimeOffset]::UtcNow -lt $deadline) {
     $loopStartedAt = [DateTimeOffset]::UtcNow
     $processesByInstance = @{}
     $systemCpuPercent = $null
     $sampleStatus = 'ok'
+    $counterSampleCount = 0
 
     try {
         $counterSample = Get-Counter -Counter $counterPaths -ErrorAction SilentlyContinue
+        $counterSampleCount = @($counterSample.CounterSamples).Count
+
+        if ($counterSampleCount -eq 0) {
+            $sampleStatus = 'partial:no-counter-samples'
+        }
+
         foreach ($sample in @($counterSample.CounterSamples)) {
             $samplePath = $sample.Path.ToLowerInvariant()
             if ($samplePath -match '\\processor\(_total\)\\% processor time$') {
@@ -101,12 +111,29 @@ while ([DateTimeOffset]::UtcNow -lt $deadline) {
             } |
             ForEach-Object { [pscustomobject]$_ }
     )
+    $sampleTimestamp = [DateTimeOffset]::UtcNow
+    $actualIntervalMilliseconds = $null
+    if ($previousSampleTimestamp -ne $null) {
+        $actualIntervalMilliseconds = ($sampleTimestamp - $previousSampleTimestamp).TotalMilliseconds
+    }
+    $previousSampleTimestamp = $sampleTimestamp
+
+    if ($sampleStatus -eq 'ok' -and ($systemCpuPercent -eq $null -or $sampledProcesses.Count -eq 0)) {
+        $sampleStatus = 'partial:missing-targets'
+    }
+
     [pscustomobject]@{
-        timestamp = [DateTimeOffset]::UtcNow.ToString('o')
+        timestamp = $sampleTimestamp.ToString('o')
+        sampleIndex = $sampleIndex
+        includeInSummary = $sampleIndex -ge $warmupSamples
         status = $sampleStatus
+        counterSampleCount = $counterSampleCount
+        actualIntervalMilliseconds = $actualIntervalMilliseconds
         systemCpuPercent = $systemCpuPercent
         processes = $sampledProcesses
     } | ConvertTo-Json -Compress -Depth 4
+
+    $sampleIndex += 1
 
     $elapsedMilliseconds = ([DateTimeOffset]::UtcNow - $loopStartedAt).TotalMilliseconds
     $sleepMilliseconds = [Math]::Max(0, [int]($intervalMilliseconds - $elapsedMilliseconds))
