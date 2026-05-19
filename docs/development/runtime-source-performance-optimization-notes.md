@@ -248,6 +248,81 @@ Release gate status for the latest run:
 | `2729ca7 Cache network interface discovery` | Moved `networkInterfaces()` out of every 1 Hz network poll. Cached usable interface discovery for 10s and queried `networkStats()` for known interface ids. | Median improvement: `pollDone` p50 1111 -> 339 ms, `pollStartGap` p50 2009 -> 1009 ms, network sample age p50 1221 -> 461 ms. `WmiPrvSE` p95 improved 2.706% -> 2.241%. |
 | `82b559a Preserve stale network interfaces` | On interface refresh failure, keeps last-good interface topology and throttles refresh retry instead of returning empty metrics immediately. Added tests for stale topology fallback and missing stats. | Reliability improvement for transient topology discovery failure, not permission to show old metric values indefinitely. Latest perf run: `pollDone` p50 654 ms, p90 2286 ms, p95 2955 ms; network sample age p50 771 ms, p90 2424 ms. Better than original median, worse than the previous run's tail. Production observability comes from the `Network interface refresh failed; using stale interfaces` warning frequency. |
 
+## Current Phase 5 Slice
+
+Phase 5a changes Scheduler coalescing from "same interval and source plan" to
+"same interval, source plan, and metric polling group." Metric keys are
+currently partitioned into built-in collector-owned groups such as `cpu`,
+`memory`, `disk`, `network`, and `gpu`.
+
+These built-in groups are a static approximation of collector cost boundaries,
+not a permanent hardware taxonomy. The important boundary is "one underlying
+collector call pays this cost," not "this metric mentions CPU/GPU/disk." For
+example, GPU static model discovery and GPU telemetry may eventually be separate
+groups, while a helper-owned cached hardware snapshot may intentionally serve
+many hardware families from one group.
+
+This directly targets the observed freeze mode where one 1 Hz group waited for a
+slow collector and all widgets in that group stopped updating. The scheduler
+still coalesces same-collector work, so many network keys stay one network poll
+instead of becoming one poll per widget or metric.
+
+This is not the final snapshot-cache architecture. Remaining limitations:
+
+- A slow collector still blocks widgets that depend on that same collector.
+- `SourceRunner` still awaits source candidates sequentially inside one polling
+  group, so a slow helper can still delay fallback for the same metric group.
+- Source results are still ingested only when scheduled polls complete; there is
+  no background source snapshot cache yet.
+
+The next perf run should use the new `pollingGroup=...` Scheduler log field and
+compare `pollDone`, `pollStartGap`, and sample age per group. The expected win
+is isolation: CPU/RAM groups should continue on cadence while network/GPU groups
+are slow. Per-group analysis requires debug logging because `pollStart` and
+`pollDone` are debug-level Scheduler entries.
+
+Phase 5a validation criteria for the next 300 second debug capture:
+
+| Check | Pass condition | Why |
+| --- | --- | --- |
+| CPU and memory 1 Hz cadence | `pollStartGap` p95 below 1100 ms for CPU and memory groups | These groups should stay close to the 1 Hz budget when unrelated collectors are slow. |
+| Cross-group isolation | Network/GPU `pollDone` outliers must not coincide with CPU/memory `pollStartGap` spikes | The core invariant is "one slow collector does not freeze unrelated widgets." |
+| Same-collector coalescing | Total source polls should match collector groups, not widget count or metric-key count | Phase 5a must not turn many metric keys into many OS/WMI/process calls. |
+| Network/GPU own latency | `pollDone` p95 for network and GPU should stay within 10% of the previous baseline unless logs identify unrelated noise | Isolation must not make the slow collectors themselves meaningfully worse. |
+| Rendered sample freshness | CPU/memory sample age p90 should stay below 1500 ms; network/GPU should be reported even if still failing | The run must separate "isolation improved" from "all freshness is solved." |
+
+Release gate status change:
+
+- Refresh isolation gate: partial pass. Cross-collector scheduler isolation is
+  now explicit; same-collector stalls still require the later snapshot-cache
+  work.
+- Other gates: unchanged until a new 300 second perf capture proves otherwise.
+
+Maintenance rule: when adding a new built-in metric family or stable metric key
+prefix, update `metric-polling-groups.ts` and its tests. Unknown metric keys are
+routed to the `unknown` group so they still work, but they will not coalesce
+with the intended collector until the mapping is updated. Empty scheduled
+metric lists remain an `all` group for source contract compatibility; ordinary
+actions still subscribe with explicit metric keys.
+
+Pre-LHM gate: do not scale the current predicate cascade into a list of helper
+or source-specific `if` branches. Before adding LibreHardwareMonitor's dynamic
+metric ids, move metric-to-polling-group resolution to a source-declared model:
+either sources expose `ownsMetricKey`/`pollingGroupId`-style ownership metadata,
+or metric descriptors/registers include polling-group metadata. LHM can expose
+hundreds of source-owned sensor ids, and the hub should not learn those ids by
+hard-coded string predicates.
+
+Dynamic regrouping based on recent latency is not the next step. The slow-path
+problem is already addressed by isolation: a slow collector gets its own group
+and no longer freezes unrelated collectors. Runtime adaptation should happen at
+the retry/backoff/frequency layer, where sustained slow or failing collectors can
+be skipped, cooled down, or refreshed less often. Dynamically merging fast groups
+and "exiling" slow metrics would save only scheduler-level microseconds in a 1
+Hz system while adding hysteresis, nondeterminism, and harder debugging. Grouping
+should stay tied to explicit collector cost boundaries unless a source declares
+that it can split work more finely.
+
 ## Architectural Risks
 
 `node-system-source.ts` showed kitchen-sink pressure during the first two
@@ -305,24 +380,31 @@ shape, extract that owner-level glue instead of copying it.
 
 ## Next Plan
 
-1. Repeat the latest 300 second capture before making another performance
-   change. The last run had `counterCollectMilliseconds` p95 1542 ms and
-   `pollStartGap` max 6060 ms, so one run is not enough to blame a specific
-   code change. Do not optimize from a noisy single sample.
+1. Finish Phase 5a validation before claiming a latency win. Repeat a 300
+   second debug capture and evaluate the Phase 5a validation table above. Do not
+   call this successful until the logs show CPU/RAM cadence no longer follows
+   network/GPU stalls and same-collector coalescing is still intact.
 
 2. Audit correctness expiry for cached runtime data. Last-good topology or
    snapshot data must carry enough timestamp/max-age information to decide
    between "safe recent data" and `N/A`. This is a correctness gate, not a
    latency optimization.
 
-3. Continue reducing source cache duplication before the next collector change.
+3. Phase 5b: move metric-to-polling-group ownership out of the hard-coded
+   predicate cascade before adding LHM dynamic metrics or building the source
+   snapshot cache. The target shape is source-declared ownership or descriptor
+   metadata that records the collector/cost group for each metric. Existing
+   built-in stable metrics can keep their current behavior through that new
+   declaration path.
+
+4. Continue reducing source cache duplication before the next collector change.
    `RefreshableCache<T>` and `BackoffPolicy` now cover network topology and CPU
    static info, with `RefreshableCache<T>` backed by `lru-cache` for storage and
    fetch coalescing. Do not add a fourth hand-written cache in
    `node-system-source.ts`; extend or use the existing primitives only after the
    collector's real freshness policy is explicit.
 
-4. Fix the GPU hot path next. Current evidence points there more strongly than
+5. Fix the GPU hot path next. Current evidence points there more strongly than
    network:
 
    - Latest GPU usage sample age p95: 3163 ms.
@@ -335,27 +417,39 @@ shape, extract that owner-level glue instead of copying it.
    paths are a long-lived `nvidia-smi --loop-ms=1000` reader or a direct API,
    but either must be measured before replacing the current path.
 
-5. Move toward collector-owned snapshot caches, not widget-owned polling:
+6. Phase 5c: design collector-owned snapshot caches before implementation. The
+   design must explicitly decide the collector tick owner, how it coexists with
+   the current Scheduler, whether widgets pull from cache or receive pushes, the
+   backpressure behavior when a collector is pending, cache eviction/freshness,
+   settings/source invalidation, and helper-vs-node conflict resolution.
+
+7. Move toward collector-owned snapshot caches, not widget-owned polling:
 
    ```text
    collector tick -> latest snapshot cache <- widget scheduler read
    ```
 
    Each collector should have one in-flight operation, a TTL/backoff policy, and
-   last-good data. CPU, memory, network, disk, and GPU should not block each
-   other's 1 Hz freshness. Do not split by metric or widget.
+   last-good data. Phase 5a isolates scheduler groups, but it does not yet make
+   source reads hot-cache reads. Do not split by metric or widget.
 
-6. Add source capability filtering as a separate behavior change. The helper
+8. Use existing backoff and stale/unavailable policy before considering adaptive
+   polling frequency. Adaptive frequency sounds attractive, but it changes the
+   user-visible refresh rate, needs hysteresis to ramp down/up, and is hard to
+   test deterministically. Add it only after perf logs show that backoff/stale
+   behavior is insufficient.
+
+9. Add source capability filtering as a separate behavior change. The helper
    should not be asked for disk usage/volume stable ids it cannot resolve. The
    historical evidence showed `windows-helper requested=6` returning zero
    resolved metrics after spending up to 2941 ms.
 
-7. Optimize the Windows helper after the default node path is under control. The
+10. Optimize the Windows helper after the default node path is under control. The
    likely helper design is background LibreHardwareMonitor sampling into a
    latest snapshot cache, with IPC reads returning the cached snapshot quickly.
    The goal is to remove synchronous LHM traversal from the pipe request path.
 
-8. Use ETW/WPR/PerfView when process attribution matters. PDH summaries are
+11. Use ETW/WPR/PerfView when process attribution matters. PDH summaries are
    useful for coarse regression gates, but they cannot accurately attribute
    shared `WmiPrvSE` work to this plugin and can miss short-lived `nvidia-smi`
    processes.

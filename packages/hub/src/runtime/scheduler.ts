@@ -10,6 +10,11 @@ import {
 } from "./sources/metric-read-plan";
 import { DefaultSourceRunner, type SourceRunner } from "./sources/source-runner";
 import { createDefaultSourceRegistry } from "./sources/source-registry";
+import {
+    type MetricPollingGroup,
+    partitionMetricKeysByPollingGroup,
+    type MetricPollingGroupId,
+} from "./metric-polling-groups";
 
 const log = logger.for("Scheduler");
 
@@ -29,12 +34,13 @@ export interface MetricSnapshotStore {
 interface SubscriberRecord {
     callback: MetricSubscriber;
     readPlan: MetricReadPlan;
-    groupKey: string;
+    pollingGroups: readonly MetricPollingGroup[];
     pollingIntervalMilliseconds: number;
 }
 
 interface DueSubscriberGroup {
     groupKey: string;
+    pollingGroupId: MetricPollingGroupId;
     readPlan: MetricReadPlan;
     pollingIntervalMilliseconds: number;
     subscribers: readonly SubscriberRecord[];
@@ -64,29 +70,46 @@ export class Scheduler {
     /**
      * Subscribes a metric consumer to one polling group.
      *
-     * Pass every metric key the consumer needs in one subscription. A subscriber
-     * added after a poll starts is scheduled for a later tick; it is not appended
-     * to the in-flight poll.
+     * Pass every metric key the consumer needs in one subscription. The
+     * Scheduler splits that subscription by collector polling group, so the
+     * callback can run once per completed group with a partial snapshot.
+     * Consumers should read accumulated state from MetricStore when they need a
+     * multi-group view.
+     *
+     * A subscriber added after a poll starts is scheduled for a later tick; it
+     * is not appended to the in-flight poll.
      */
     subscribe(callback: MetricSubscriber, options: SubscriptionOptions): () => void {
         const pollingIntervalMilliseconds = Scheduler.normalizePollingIntervalMilliseconds(
             options.pollingIntervalMilliseconds,
         );
         const readPlan = normalizeMetricReadPlan(options.readPlan);
-        const groupKey = Scheduler.buildGroupKey(pollingIntervalMilliseconds, readPlan);
-
-        this.subscribers.set(callback, {
+        const subscriberRecord: SubscriberRecord = {
             callback,
             readPlan,
-            groupKey,
+            pollingGroups: partitionMetricKeysByPollingGroup(readPlan.metricKeys),
             pollingIntervalMilliseconds,
-        });
-        this.nextPollTimestampByGroup.set(groupKey, 0);
+        };
+
+        this.subscribers.set(callback, subscriberRecord);
+
+        for (const groupKey of Scheduler.buildSubscriberGroupKeys(subscriberRecord)) {
+            if (!this.nextPollTimestampByGroup.has(groupKey)) {
+                this.nextPollTimestampByGroup.set(groupKey, 0);
+            }
+        }
+
         this.start();
 
         return () => {
+            const removedSubscriber = this.subscribers.get(callback);
             this.subscribers.delete(callback);
-            this.removeGroupScheduleIfUnused(groupKey);
+
+            if (removedSubscriber) {
+                for (const groupKey of Scheduler.buildSubscriberGroupKeys(removedSubscriber)) {
+                    this.removeGroupScheduleIfUnused(groupKey);
+                }
+            }
 
             if (this.subscribers.size === 0) {
                 this.stop();
@@ -159,37 +182,48 @@ export class Scheduler {
         const subscriberGroups = new Map<string, DueSubscriberGroup>();
 
         for (const subscriber of this.subscribers.values()) {
-            const groupKey = subscriber.groupKey;
-            const nextPollTimestampMilliseconds = this.nextPollTimestampByGroup.get(groupKey) ?? 0;
-
-            if (
-                currentTimestampMilliseconds < nextPollTimestampMilliseconds
-                || this.activePolls.has(groupKey)
-            ) {
-                continue;
-            }
-
-            const existingGroup = subscriberGroups.get(groupKey);
-
-            if (existingGroup) {
-                const readPlan = Scheduler.mergeGroupReadPlans(
-                    existingGroup.readPlan,
+            for (const pollingGroup of subscriber.pollingGroups) {
+                const groupKey = Scheduler.buildGroupKey(
+                    subscriber.pollingIntervalMilliseconds,
                     subscriber.readPlan,
+                    pollingGroup.id,
                 );
-                subscriberGroups.set(groupKey, {
-                    ...existingGroup,
-                    readPlan,
-                    subscribers: [...existingGroup.subscribers, subscriber],
-                });
-                continue;
-            }
+                const nextPollTimestampMilliseconds = this.nextPollTimestampByGroup.get(groupKey) ?? 0;
 
-            subscriberGroups.set(groupKey, {
-                groupKey,
-                readPlan: subscriber.readPlan,
-                pollingIntervalMilliseconds: subscriber.pollingIntervalMilliseconds,
-                subscribers: [subscriber],
-            });
+                if (
+                    currentTimestampMilliseconds < nextPollTimestampMilliseconds
+                    || this.activePolls.has(groupKey)
+                ) {
+                    continue;
+                }
+
+                const pollingGroupReadPlan = {
+                    ...subscriber.readPlan,
+                    metricKeys: pollingGroup.metricKeys,
+                };
+                const existingGroup = subscriberGroups.get(groupKey);
+
+                if (existingGroup) {
+                    const readPlan = Scheduler.mergeGroupReadPlans(
+                        existingGroup.readPlan,
+                        pollingGroupReadPlan,
+                    );
+                    subscriberGroups.set(groupKey, {
+                        ...existingGroup,
+                        readPlan,
+                        subscribers: [...existingGroup.subscribers, subscriber],
+                    });
+                    continue;
+                }
+
+                subscriberGroups.set(groupKey, {
+                    groupKey,
+                    pollingGroupId: pollingGroup.id,
+                    readPlan: pollingGroupReadPlan,
+                    pollingIntervalMilliseconds: subscriber.pollingIntervalMilliseconds,
+                    subscribers: [subscriber],
+                });
+            }
         }
 
         for (const subscriberGroup of subscriberGroups.values()) {
@@ -204,7 +238,7 @@ export class Scheduler {
 
     private removeGroupScheduleIfUnused(groupKey: string): void {
         for (const subscriber of this.subscribers.values()) {
-            if (subscriber.groupKey === groupKey) {
+            if (Scheduler.buildSubscriberGroupKeys(subscriber).includes(groupKey)) {
                 return;
             }
         }
@@ -220,6 +254,7 @@ export class Scheduler {
             log.debug(() => [
                 "pollStart",
                 `intervalMs=${group.pollingIntervalMilliseconds}`,
+                `pollingGroup=${group.pollingGroupId}`,
                 `sourceScopeId=${group.readPlan.sourceScopeId}`,
                 `metrics=${formatMetricKeys(group.readPlan.metricKeys)}`,
                 `subscriberCount=${group.subscribers.length}`,
@@ -233,6 +268,7 @@ export class Scheduler {
             log.debug(() => [
                 "pollDone",
                 `intervalMs=${group.pollingIntervalMilliseconds}`,
+                `pollingGroup=${group.pollingGroupId}`,
                 `sourceScopeId=${group.readPlan.sourceScopeId}`,
                 `metrics=${formatMetricKeys(group.readPlan.metricKeys)}`,
                 `durationMs=${ingestTimestampMilliseconds - pollStartTimestampMilliseconds}`,
@@ -263,28 +299,37 @@ export class Scheduler {
         return value;
     }
 
-    private static normalizeMetricKeys(metricKeys: readonly string[]): readonly string[] {
-        return Array.from(new Set(metricKeys)).sort();
-    }
-
-    private static buildGroupKey(pollingIntervalMilliseconds: number, readPlan: MetricReadPlan): string {
+    private static buildGroupKey(
+        pollingIntervalMilliseconds: number,
+        readPlan: MetricReadPlan,
+        pollingGroupId: MetricPollingGroupId,
+    ): string {
         const normalizedReadPlan = normalizeMetricReadPlan(readPlan);
 
-        // Metric keys are intentionally excluded. Subscribers with the same
-        // cadence and source plan share one poll whose metric keys are merged
-        // for that tick.
+        // Metric keys are grouped by collector ownership, not by exact metric
+        // key. This keeps 100 network keys coalesced while preventing a slow
+        // network or GPU collector from blocking CPU/RAM widgets.
         return JSON.stringify([
             pollingIntervalMilliseconds,
             normalizedReadPlan.sourceScopeId,
             normalizedReadPlan.failureMode,
             normalizedReadPlan.sourceCandidates.map(candidate => candidate.sourceId),
+            pollingGroupId,
         ]);
+    }
+
+    private static buildSubscriberGroupKeys(subscriber: SubscriberRecord): readonly string[] {
+        return subscriber.pollingGroups.map(pollingGroup => Scheduler.buildGroupKey(
+            subscriber.pollingIntervalMilliseconds,
+            subscriber.readPlan,
+            pollingGroup.id,
+        ));
     }
 
     private static mergeGroupReadPlans(firstReadPlan: MetricReadPlan, secondReadPlan: MetricReadPlan): MetricReadPlan {
         return {
             ...firstReadPlan,
-            metricKeys: Scheduler.normalizeMetricKeys([
+            metricKeys: normalizeMetricKeys([
                 ...firstReadPlan.metricKeys,
                 ...secondReadPlan.metricKeys,
             ]),
@@ -294,6 +339,10 @@ export class Scheduler {
 
 function formatMetricKeys(metricKeys: readonly string[]): string {
     return metricKeys.length > 0 ? metricKeys.join(",") : "all";
+}
+
+function normalizeMetricKeys(metricKeys: readonly string[]): readonly string[] {
+    return Array.from(new Set(metricKeys)).sort();
 }
 
 export const scheduler = new Scheduler(new DefaultSourceRunner(createDefaultSourceRegistry()));

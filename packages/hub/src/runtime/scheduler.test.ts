@@ -23,14 +23,14 @@ test("subscribe polls read plans with sorted unique metric keys", async () => {
     const unsubscribe = scheduler.subscribe(snapshot => {
         receivedSnapshots.push(snapshot);
     }, {
-        readPlan: buildLocalMetricReadPlan(["net.down", "cpu.usage_percent", "net.down"]),
+        readPlan: buildLocalMetricReadPlan(["cpu.model", "cpu.usage_percent", "cpu.model"]),
     });
 
     try {
         await waitForCondition(() => receivedSnapshots.length === 1);
 
         assert.deepEqual(sourceRunner.polledReadPlans.map(readPlan => readPlan.metricKeys), [
-            ["cpu.usage_percent", "net.down"],
+            ["cpu.model", "cpu.usage_percent"],
         ]);
         assert.deepEqual(snapshotStore.ingestedSnapshots, [{
             sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
@@ -42,7 +42,7 @@ test("subscribe polls read plans with sorted unique metric keys", async () => {
     }
 });
 
-test("scheduler coalesces active subscribers with the same source plan", async () => {
+test("scheduler coalesces active subscribers with the same polling group", async () => {
     const sourceRunner = new FakeSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
     const scheduler = new Scheduler(sourceRunner, snapshotStore);
@@ -61,15 +61,15 @@ test("scheduler coalesces active subscribers with the same source plan", async (
         const unsubscribeSecond = scheduler.subscribe(snapshot => {
             secondSubscriberSnapshots.push(snapshot);
         }, {
-            readPlan: buildLocalMetricReadPlan(["net.down"]),
+            readPlan: buildLocalMetricReadPlan(["cpu.model"]),
         });
 
         try {
             await waitForCondition(() => sourceRunner.polledReadPlans.length === 2);
 
             assert.deepEqual(sourceRunner.polledReadPlans[1]?.metricKeys, [
+                "cpu.model",
                 "cpu.usage_percent",
-                "net.down",
             ]);
             assert.equal(secondSubscriberSnapshots.length, 1);
         } finally {
@@ -77,6 +77,92 @@ test("scheduler coalesces active subscribers with the same source plan", async (
         }
     } finally {
         unsubscribeFirst();
+    }
+});
+
+test("scheduler polls different metric groups independently", async () => {
+    const sourceRunner = new FakeSourceRunner();
+    const snapshotStore = new FakeMetricSnapshotStore();
+    const scheduler = new Scheduler(sourceRunner, snapshotStore);
+    let cpuCallbackCount = 0;
+    let networkCallbackCount = 0;
+
+    const unsubscribeCpu = scheduler.subscribe(() => {
+        cpuCallbackCount += 1;
+    }, {
+        readPlan: buildLocalMetricReadPlan(["cpu.usage_percent"]),
+    });
+
+    try {
+        await waitForCondition(() => cpuCallbackCount === 1);
+
+        const unsubscribeNetwork = scheduler.subscribe(() => {
+            networkCallbackCount += 1;
+        }, {
+            readPlan: buildLocalMetricReadPlan(["net.down"]),
+        });
+
+        try {
+            await waitForCondition(() => {
+                const scheduledPolls = sourceRunner.polledReadPlans.slice(1);
+
+                return hasPolledReadPlan(scheduledPolls, LOCAL_SOURCE_SCOPE_ID, ["cpu.usage_percent"])
+                    && hasPolledReadPlan(scheduledPolls, LOCAL_SOURCE_SCOPE_ID, ["net.down"]);
+            });
+
+            const scheduledPolls = sourceRunner.polledReadPlans.slice(1);
+
+            assert.equal(hasPolledReadPlan(scheduledPolls, LOCAL_SOURCE_SCOPE_ID, ["cpu.usage_percent"]), true);
+            assert.equal(hasPolledReadPlan(scheduledPolls, LOCAL_SOURCE_SCOPE_ID, ["net.down"]), true);
+            assert.equal(networkCallbackCount > 0, true);
+            assert.equal(
+                scheduledPolls.some(readPlan => areMetricKeysEqual(readPlan.metricKeys, [
+                    "cpu.usage_percent",
+                    "net.down",
+                ])),
+                false,
+            );
+        } finally {
+            unsubscribeNetwork();
+        }
+    } finally {
+        unsubscribeCpu();
+    }
+});
+
+test("single subscriber with multiple polling groups receives one callback per group", async () => {
+    const sourceRunner = new EchoSourceRunner();
+    const snapshotStore = new FakeMetricSnapshotStore();
+    const scheduler = new Scheduler(sourceRunner, snapshotStore);
+    const receivedSnapshots: MetricSnapshot[] = [];
+
+    const unsubscribe = scheduler.subscribe(snapshot => {
+        receivedSnapshots.push(snapshot);
+    }, {
+        readPlan: buildLocalMetricReadPlan(["cpu.usage_percent", "net.down"]),
+    });
+
+    try {
+        await waitForCondition(() => receivedSnapshots.length === 2);
+
+        assert.equal(
+            hasPolledReadPlan(sourceRunner.polledReadPlans, LOCAL_SOURCE_SCOPE_ID, ["cpu.usage_percent"]),
+            true,
+        );
+        assert.equal(
+            hasPolledReadPlan(sourceRunner.polledReadPlans, LOCAL_SOURCE_SCOPE_ID, ["net.down"]),
+            true,
+        );
+        assert.deepEqual(receivedSnapshots.map(snapshot => Object.keys(snapshot.metrics).sort()), [
+            ["cpu.usage_percent"],
+            ["net.down"],
+        ]);
+        assert.deepEqual(snapshotStore.ingestedSnapshots.map(entry => Object.keys(entry.snapshot.metrics).sort()), [
+            ["cpu.usage_percent"],
+            ["net.down"],
+        ]);
+    } finally {
+        unsubscribe();
     }
 });
 
@@ -169,7 +255,7 @@ test("unsubscribing one same-group subscriber keeps the group schedule", async (
         await waitForCondition(() => sourceRunner.polledReadPlans.length === 1);
 
         unsubscribeSecond = scheduler.subscribe(() => undefined, {
-            readPlan: buildLocalMetricReadPlan(["net.down"]),
+            readPlan: buildLocalMetricReadPlan(["cpu.model"]),
             pollingIntervalMilliseconds: 2000,
         });
 
@@ -293,6 +379,28 @@ class FakeSourceRunner implements SourceRunner {
 
     dispose(): void {
         this.disposeCount += 1;
+    }
+}
+
+class EchoSourceRunner implements SourceRunner {
+    readonly polledReadPlans: MetricReadPlan[] = [];
+
+    async poll(readPlan: MetricReadPlan): Promise<MetricSnapshot> {
+        this.polledReadPlans.push(readPlan);
+
+        return buildMetricSnapshot({
+            timestampMilliseconds: 1000,
+            metrics: Object.fromEntries(
+                readPlan.metricKeys.map(metricKey => [
+                    metricKey,
+                    buildScalarMetricValue(42, { unit: MetricUnit.PERCENT }),
+                ]),
+            ),
+        });
+    }
+
+    dispose(): void {
+        return;
     }
 }
 
