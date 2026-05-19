@@ -5,6 +5,7 @@ import type {
     MetricUnit,
     MetricValueKind,
 } from "./metric-source";
+import type { SourceMetricPollingGroupResolver } from "./source-polling-groups";
 
 /** Source-owned warning emitted while serving health, descriptor, or snapshot requests. */
 export interface SourceWarning {
@@ -102,7 +103,7 @@ export interface MetricDescriptor {
 }
 
 /** Runtime source adapter consumed by SourceRunner. */
-export interface SourceClient {
+export interface SourceClient extends Partial<SourceMetricPollingGroupResolver> {
     /** Source id owned by the runtime source registry. */
     readonly sourceId: string;
 
@@ -127,6 +128,7 @@ export function createMetricSourceClient(source: MetricSource): SourceClient {
     return {
         sourceId: source.sourceId,
         readSnapshot: metricKeys => source.pollMetrics ? source.pollMetrics(metricKeys) : source.poll(),
+        resolveMetricPollingGroups: source.resolveMetricPollingGroups?.bind(source),
         dispose: () => source.dispose?.(),
     };
 }
