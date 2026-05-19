@@ -50,6 +50,7 @@ test("network automatic interface reads aggregate keys after registry selection"
         target,
         metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
         selectedNetworkInterface: buildNetworkInterfaceOption("Ethernet"),
+        currentTimestampMilliseconds: 2000,
     });
     const widgetData = viewUpdate.viewOptions.widgetData;
 
@@ -98,6 +99,7 @@ test("network explicit interface reads interface keys without registry selection
         target,
         metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
         selectedNetworkInterface: null,
+        currentTimestampMilliseconds: 2000,
     });
     const widgetData = viewUpdate.viewOptions.widgetData;
 
@@ -107,6 +109,54 @@ test("network explicit interface reads interface keys without registry selection
     }
     assert.equal(widgetData.sampleTimestampMilliseconds, 1000);
     assert.equal(widgetData.current, 5678);
+});
+
+test("network view treats expired throughput samples as no data", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
+        {
+            appearance: {
+                view: { selectedView: "line" },
+            },
+            network: {
+                direction: "download",
+            },
+        },
+    );
+    const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
+    const target = settings.widget.slot.metric.target;
+
+    assert.equal(target.domain, "network");
+    if (target.domain !== "network") {
+        assert.fail("Expected network target.");
+    }
+
+    const metricStore = new MetricStore();
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            [getNetworkAggregateMetricKey("download")]: buildScalarMetricValue(1234, {
+                unit: MetricUnit.BYTES_PER_SECOND,
+            }),
+        },
+    }));
+
+    const viewUpdate = buildNetworkViewUpdate({
+        event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
+        settings,
+        target,
+        metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
+        selectedNetworkInterface: buildNetworkInterfaceOption("Ethernet"),
+        currentTimestampMilliseconds: 7001,
+    });
+    const widgetData = viewUpdate.viewOptions.widgetData;
+
+    if ("positive" in widgetData) {
+        assert.fail("Expected single metric network view.");
+    }
+    assert.equal(widgetData.sampleTimestampMilliseconds, undefined);
+    assert.equal(widgetData.current, 0);
+    assert.deepEqual(widgetData.history, []);
 });
 
 function buildNetworkInterfaceOption(id: string): NetworkInterfaceOption {

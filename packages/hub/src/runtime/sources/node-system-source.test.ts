@@ -88,7 +88,7 @@ test("node system source polls only the requested CPU group and exposes cached C
     });
 
     const firstSnapshot = await source.pollMetrics(["cpu.usage_percent"]);
-    await Promise.resolve();
+    await waitForQueuedCpuInformationPoll();
     const secondSnapshot = await source.pollMetrics(["cpu.usage_percent"]);
     const firstMetrics = assertSnapshotMetrics(firstSnapshot);
     const secondMetrics = assertSnapshotMetrics(secondSnapshot);
@@ -113,6 +113,59 @@ test("node system source polls only the requested CPU group and exposes cached C
     assert.equal(callCounts.networkInterfaces, 0);
     assert.equal(callCounts.windowsGpu, 0);
     assert.equal(callCounts.systemGpu, 0);
+});
+
+test("node system source retries static CPU information after a transient failure", async () => {
+    const callCounts = buildCallCounts();
+    let currentTimestampMilliseconds = 1000;
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            currentLoad: async () => {
+                callCounts.currentLoad += 1;
+                return {
+                    currentLoad: 42,
+                } as Systeminformation.CurrentLoadData;
+            },
+            cpu: async () => {
+                callCounts.cpu += 1;
+                if (callCounts.cpu === 1) {
+                    throw new Error("cpu info failed");
+                }
+
+                return buildCpuData({
+                    manufacturer: "AMD",
+                    brand: "Ryzen 9",
+                    speed: 4.2,
+                });
+            },
+        }),
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+        now: () => currentTimestampMilliseconds,
+    });
+
+    await source.pollMetrics(["cpu.usage_percent"]);
+    await waitForQueuedCpuInformationPoll();
+    currentTimestampMilliseconds = 60000;
+    await source.pollMetrics(["cpu.usage_percent"]);
+    await waitForQueuedCpuInformationPoll();
+    currentTimestampMilliseconds = 61000;
+    const retryStartSnapshot = await source.pollMetrics(["cpu.usage_percent"]);
+    await waitForQueuedCpuInformationPoll();
+    const cachedSnapshot = await source.pollMetrics(["cpu.usage_percent"]);
+    const retryStartMetrics = assertSnapshotMetrics(retryStartSnapshot);
+    const cachedMetrics = assertSnapshotMetrics(cachedSnapshot);
+
+    assert.equal(retryStartMetrics["cpu.base_frequency"], undefined);
+    assert.deepEqual(cachedMetrics["cpu.base_frequency"], {
+        scalar: 4200000000,
+        unit: MetricUnit.HERTZ,
+    });
+    assert.deepEqual(cachedMetrics["cpu.model"], {
+        text: "AMD Ryzen 9",
+    });
+    assert.equal(callCounts.cpu, 2);
+    assert.equal(callCounts.currentLoad, 4);
 });
 
 test("node system source polls only memory when RAM metrics are requested", async () => {
@@ -808,6 +861,12 @@ function buildNoGpuPoller(
         callCounts.windowsGpu += 1;
         return null;
     };
+}
+
+async function waitForQueuedCpuInformationPoll(): Promise<void> {
+    await new Promise<void>(resolve => {
+        setImmediate(resolve);
+    });
 }
 
 function buildNoSystemGpuPoller(
