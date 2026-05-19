@@ -72,6 +72,8 @@ import type {
     NodeSystemNetworkCounterSample,
     NodeSystemNetworkRateCalculation,
 } from "./node-system-source-types";
+import { BackoffPolicy } from "./backoff-policy";
+import { RefreshableCache, type RefreshableCacheReadResult } from "./refreshable-cache";
 import { NODE_SYSTEM_SOURCE_ID } from "./source-ids";
 
 const log = logger.for("Source:NodeSystem");
@@ -115,7 +117,11 @@ interface NodeSystemSourceDependencies {
 interface CachedNetworkInterfaces {
     readonly rawNetworkInterfaces: readonly Systeminformation.NetworkInterfacesData[];
     readonly interfaceOptions: readonly NetworkInterfaceOption[];
-    readonly timestampMilliseconds: number;
+}
+
+interface CachedCpuInformation {
+    readonly baseFrequencyGigahertz: number | null;
+    readonly modelText: string | null;
 }
 
 /**
@@ -133,21 +139,15 @@ export class NodeSystemSource implements MetricSource {
     private readonly pollSystemInformationGpuTelemetry: (
         systemInformation: NodeSystemInformationClient,
     ) => Promise<NodeSystemGpuTelemetryData | null>;
+    private readonly networkInterfaceCache: RefreshableCache<CachedNetworkInterfaces>;
+    private readonly networkInterfaceRefreshBackoff: BackoffPolicy;
+    private readonly cpuInformationCache: RefreshableCache<CachedCpuInformation>;
+    private readonly cpuInformationRefreshBackoff: BackoffPolicy;
     private lastNetworkStatsByInterface = new Map<string, NodeSystemNetworkCounterSample>();
-    private cachedNetworkInterfaces: CachedNetworkInterfaces | null = null;
-    // Coalesces overlapping collector ticks if runtime polling becomes source/collector independent.
-    private pendingNetworkInterfacesPromise: Promise<CachedNetworkInterfaces | null> | null = null;
-    private nextNetworkInterfaceRefreshAllowedTimestampMilliseconds = 0;
-    private lastNetworkInterfaceStaleWarningTimestampMilliseconds = 0;
     private lastNetworkPollDebugLogTimestampMilliseconds = 0;
     private cachedGpuData: NodeSystemGpuTelemetryData | null = null;
     private cachedGpuTimestampMilliseconds = 0;
     private pendingGpuPromise: Promise<NodeSystemGpuTelemetryData | null> | null = null;
-    private cachedCpuBaseFrequencyGigahertz: number | null = null;
-    private cachedCpuModelText: string | null = null;
-    private pendingCpuInformationPromise: Promise<void> | null = null;
-    private hasCachedCpuInformation = false;
-    private nextCpuInformationPollAllowedTimestampMilliseconds = 0;
 
     private static readonly GPU_CACHE_MS = 1000;
     // Static CPU info is not worth querying every 1 Hz tick, but a transient
@@ -175,6 +175,26 @@ export class NodeSystemSource implements MetricSource {
         this.pollWindowsGpuTelemetry = dependencies.pollWindowsGpuTelemetry ?? pollWindowsNvidiaGpuTelemetry;
         this.pollSystemInformationGpuTelemetry = dependencies.pollSystemInformationGpuTelemetry
             ?? pollSystemInformationGpuTelemetry;
+        this.networkInterfaceCache = new RefreshableCache({
+            now: this.now,
+            ttlMilliseconds: NodeSystemSource.NETWORK_INTERFACE_CACHE_MS,
+            maximumStaleMilliseconds: NodeSystemSource.NETWORK_INTERFACE_STALE_MAX_MS,
+            refresh: () => this.refreshUsableNetworkInterfaces(),
+        });
+        this.networkInterfaceRefreshBackoff = BackoffPolicy.flat(
+            this.now,
+            NodeSystemSource.NETWORK_INTERFACE_REFRESH_RETRY_MS,
+        );
+        this.cpuInformationCache = new RefreshableCache({
+            now: this.now,
+            ttlMilliseconds: Number.POSITIVE_INFINITY,
+            maximumStaleMilliseconds: Number.POSITIVE_INFINITY,
+            refresh: () => this.readCpuInformation(),
+        });
+        this.cpuInformationRefreshBackoff = BackoffPolicy.flat(
+            this.now,
+            NodeSystemSource.CPU_INFORMATION_RETRY_MS,
+        );
     }
 
     async poll(): Promise<MetricSnapshot> {
@@ -335,15 +355,19 @@ export class NodeSystemSource implements MetricSource {
                     unit: MetricUnit.PERCENT,
                 }),
             };
+            const cachedCpuInformation = this.cpuInformationCache.current();
 
-            if (this.cachedCpuBaseFrequencyGigahertz != null) {
+            if (
+                cachedCpuInformation.state !== "unavailable"
+                && cachedCpuInformation.value.baseFrequencyGigahertz != null
+            ) {
                 metrics[CPU_BASE_FREQUENCY_METRIC_KEY] = buildScalarMetricValue(
-                    this.cachedCpuBaseFrequencyGigahertz * HERTZ_PER_GIGAHERTZ,
+                    cachedCpuInformation.value.baseFrequencyGigahertz * HERTZ_PER_GIGAHERTZ,
                     { unit: MetricUnit.HERTZ },
                 );
             }
-            if (this.cachedCpuModelText) {
-                metrics[CPU_MODEL_METRIC_KEY] = buildTextMetricValue(this.cachedCpuModelText);
+            if (cachedCpuInformation.state !== "unavailable" && cachedCpuInformation.value.modelText) {
+                metrics[CPU_MODEL_METRIC_KEY] = buildTextMetricValue(cachedCpuInformation.value.modelText);
             }
 
             this.ensureCpuInformationCached();
@@ -356,37 +380,36 @@ export class NodeSystemSource implements MetricSource {
     }
 
     private ensureCpuInformationCached(): void {
-        const currentTimestampMilliseconds = this.now();
-
         if (
-            this.hasCachedCpuInformation
-            || this.pendingCpuInformationPromise
-            || currentTimestampMilliseconds < this.nextCpuInformationPollAllowedTimestampMilliseconds
+            this.cpuInformationCache.current().state === "fresh"
+            || this.cpuInformationCache.hasPendingRefresh()
+            || !this.cpuInformationRefreshBackoff.canAttempt()
         ) {
             return;
         }
 
-        this.pendingCpuInformationPromise = this.systemInformation.cpu()
-            .then(cpuData => {
-                if (isFinitePositiveNumber(cpuData.speed)) {
-                    this.cachedCpuBaseFrequencyGigahertz = cpuData.speed;
+        void this.cpuInformationCache.read()
+            .then(result => {
+                if (result.state !== "unavailable") {
+                    this.cpuInformationRefreshBackoff.recordSuccess();
+                    return;
                 }
-                this.cachedCpuModelText = formatCpuModelText(cpuData);
-                this.hasCachedCpuInformation = true;
-                this.nextCpuInformationPollAllowedTimestampMilliseconds = 0;
-            })
-            .catch(error => {
-                this.nextCpuInformationPollAllowedTimestampMilliseconds = this.now()
-                    + NodeSystemSource.CPU_INFORMATION_RETRY_MS;
+
+                const retryMilliseconds = this.cpuInformationRefreshBackoff.recordFailure();
                 log.warn(() => [
                     "CPU information poll error",
-                    `retryMs=${NodeSystemSource.CPU_INFORMATION_RETRY_MS}`,
-                    `error=${String(error)}`,
+                    `retryMs=${retryMilliseconds}`,
+                    `error=${String(result.error)}`,
                 ].join(" "));
-            })
-            .finally(() => {
-                this.pendingCpuInformationPromise = null;
             });
+    }
+
+    private async readCpuInformation(): Promise<CachedCpuInformation> {
+        const cpuData = await this.systemInformation.cpu();
+        return {
+            baseFrequencyGigahertz: isFinitePositiveNumber(cpuData.speed) ? cpuData.speed : null,
+            modelText: formatCpuModelText(cpuData),
+        };
     }
 
     private async pollNetworkSafely(): Promise<Record<string, MetricValue>> {
@@ -476,106 +499,62 @@ export class NodeSystemSource implements MetricSource {
     }
 
     private async readUsableNetworkInterfaces(): Promise<CachedNetworkInterfaces | null> {
-        const currentTimestampMilliseconds = this.now();
-
-        if (this.cachedNetworkInterfaces && !this.isNetworkInterfaceCacheExpired(currentTimestampMilliseconds)) {
-            return this.cachedNetworkInterfaces;
+        const currentResult = this.networkInterfaceCache.current();
+        if (currentResult.state === "fresh") {
+            return currentResult.value;
         }
 
-        if (
-            this.cachedNetworkInterfaces
-            && currentTimestampMilliseconds < this.nextNetworkInterfaceRefreshAllowedTimestampMilliseconds
-        ) {
-            return this.isNetworkInterfaceCacheWithinStaleBudget(currentTimestampMilliseconds)
-                ? this.cachedNetworkInterfaces
-                : null;
+        if (!this.networkInterfaceRefreshBackoff.canAttempt()) {
+            return currentResult.state === "stale" ? currentResult.value : null;
         }
 
-        if (this.pendingNetworkInterfacesPromise) {
-            return this.pendingNetworkInterfacesPromise;
+        // Only the caller that starts a refresh records the backoff outcome.
+        // Other callers may await the same in-flight refresh, but that should
+        // not make one OS failure count as multiple consecutive failures.
+        const shouldRecordRefreshOutcome = !this.networkInterfaceCache.hasPendingRefresh();
+        const refreshedResult = await this.networkInterfaceCache.read();
+        if (refreshedResult.state === "fresh") {
+            if (shouldRecordRefreshOutcome) {
+                this.networkInterfaceRefreshBackoff.recordSuccess();
+            }
+            return refreshedResult.value;
         }
 
-        this.pendingNetworkInterfacesPromise = this.refreshUsableNetworkInterfaces(currentTimestampMilliseconds)
-            .catch(error => this.handleNetworkInterfaceRefreshError(error, currentTimestampMilliseconds))
-            .finally(() => {
-                this.pendingNetworkInterfacesPromise = null;
-            });
+        if (refreshedResult.error !== undefined && shouldRecordRefreshOutcome) {
+            const retryMilliseconds = this.networkInterfaceRefreshBackoff.recordFailure();
+            this.logNetworkInterfaceRefreshFailure(refreshedResult, retryMilliseconds);
+        }
 
-        return this.pendingNetworkInterfacesPromise;
+        return refreshedResult.state === "stale" ? refreshedResult.value : null;
     }
 
-    private isNetworkInterfaceCacheExpired(currentTimestampMilliseconds: number): boolean {
-        if (!this.cachedNetworkInterfaces) {
-            return true;
-        }
-
-        const cacheAgeMilliseconds = currentTimestampMilliseconds - this.cachedNetworkInterfaces.timestampMilliseconds;
-        return cacheAgeMilliseconds >= NodeSystemSource.NETWORK_INTERFACE_CACHE_MS;
-    }
-
-    private isNetworkInterfaceCacheWithinStaleBudget(currentTimestampMilliseconds: number): boolean {
-        if (!this.cachedNetworkInterfaces) {
-            return false;
-        }
-
-        const cacheAgeMilliseconds = currentTimestampMilliseconds - this.cachedNetworkInterfaces.timestampMilliseconds;
-        return cacheAgeMilliseconds < NodeSystemSource.NETWORK_INTERFACE_STALE_MAX_MS;
-    }
-
-    private async refreshUsableNetworkInterfaces(
-        currentTimestampMilliseconds: number,
-    ): Promise<CachedNetworkInterfaces> {
+    private async refreshUsableNetworkInterfaces(): Promise<CachedNetworkInterfaces> {
         const networkInterfaces = await this.systemInformation.networkInterfaces();
         const usableNetworkInterfaces = Array.isArray(networkInterfaces)
             ? networkInterfaces.filter(networkInterface => isUsableNetworkInterface(networkInterface, this.platform))
             : [];
-        const cachedNetworkInterfaces: CachedNetworkInterfaces = {
+        return {
             rawNetworkInterfaces: usableNetworkInterfaces,
             interfaceOptions: usableNetworkInterfaces.map(toNetworkInterfaceOption),
-            timestampMilliseconds: currentTimestampMilliseconds,
         };
-
-        this.cachedNetworkInterfaces = cachedNetworkInterfaces;
-        this.nextNetworkInterfaceRefreshAllowedTimestampMilliseconds = 0;
-        return cachedNetworkInterfaces;
     }
 
-    private handleNetworkInterfaceRefreshError(
-        error: unknown,
-        currentTimestampMilliseconds: number,
-    ): CachedNetworkInterfaces | null {
-        if (!this.cachedNetworkInterfaces) {
-            throw error;
-        }
-
-        const cacheAgeMilliseconds = currentTimestampMilliseconds
-            - this.cachedNetworkInterfaces.timestampMilliseconds;
-        this.nextNetworkInterfaceRefreshAllowedTimestampMilliseconds = currentTimestampMilliseconds
-            + NodeSystemSource.NETWORK_INTERFACE_REFRESH_RETRY_MS;
-
-        if (this.shouldLogNetworkInterfaceStaleWarning(currentTimestampMilliseconds)) {
-            this.lastNetworkInterfaceStaleWarningTimestampMilliseconds = currentTimestampMilliseconds;
-
-            networkLog.warn(() => [
-                cacheAgeMilliseconds < NodeSystemSource.NETWORK_INTERFACE_STALE_MAX_MS
-                    ? "Network interface refresh failed; using stale interfaces"
-                    : "Network interface refresh failed; stale interfaces expired",
-                `cacheAgeMs=${cacheAgeMilliseconds}`,
+    private logNetworkInterfaceRefreshFailure(
+        result: RefreshableCacheReadResult<CachedNetworkInterfaces>,
+        retryMilliseconds: number,
+    ): void {
+        networkLog.atWarn()
+            .everyMs(
+                "network-interface-refresh-failed",
+                NodeSystemSource.NETWORK_INTERFACE_STALE_WARNING_INTERVAL_MS,
+            )
+            .log(() => [
+                formatNetworkInterfaceRefreshFailureMessage(result),
+                `cacheAgeMs=${result.ageMilliseconds ?? "none"}`,
                 `maxStaleMs=${NodeSystemSource.NETWORK_INTERFACE_STALE_MAX_MS}`,
-                `retryMs=${NodeSystemSource.NETWORK_INTERFACE_REFRESH_RETRY_MS}`,
-                `error=${String(error)}`,
+                `retryMs=${retryMilliseconds}`,
+                `error=${String(result.error)}`,
             ].join(" "));
-        }
-
-        return cacheAgeMilliseconds < NodeSystemSource.NETWORK_INTERFACE_STALE_MAX_MS
-            ? this.cachedNetworkInterfaces
-            : null;
-    }
-
-    private shouldLogNetworkInterfaceStaleWarning(currentTimestampMilliseconds: number): boolean {
-        return this.lastNetworkInterfaceStaleWarningTimestampMilliseconds === 0
-            || currentTimestampMilliseconds - this.lastNetworkInterfaceStaleWarningTimestampMilliseconds
-                >= NodeSystemSource.NETWORK_INTERFACE_STALE_WARNING_INTERVAL_MS;
     }
 
     private calculateNetworkRate(options: {
@@ -734,4 +713,16 @@ export function resolveMetricGroups(metricKeys: readonly string[]): Set<NodeSyst
     }
 
     return metricGroups;
+}
+
+function formatNetworkInterfaceRefreshFailureMessage(
+    result: RefreshableCacheReadResult<CachedNetworkInterfaces>,
+): string {
+    if (result.state === "stale") {
+        return "Network interface refresh failed; using stale interfaces";
+    }
+
+    return result.timestampMilliseconds == null
+        ? "Network interface refresh failed; no cached interfaces"
+        : "Network interface refresh failed; stale interfaces expired";
 }

@@ -250,28 +250,58 @@ Release gate status for the latest run:
 
 ## Architectural Risks
 
-`node-system-source.ts` is showing kitchen-sink pressure. Local Git line counts
-show the file grew from 534 lines at `425828e` to 677 lines at `82b559a`, a
-143-line increase of about 27%.
+`node-system-source.ts` showed kitchen-sink pressure during the first two
+runtime performance phases. Local line counts show the file grew from 534 lines
+at `425828e` to 677 lines at `82b559a`, a 143-line increase of about 27%.
 
-The risky pattern is not the line count alone. The file now contains several
-hand-written async cache/state-machine shapes:
+The risky pattern was not the line count alone. Network interface topology, GPU
+telemetry, and CPU static info each grew their own async cache/state-machine
+shape. They had different field names and small policy differences, but they
+were all variations of the same work: hold a last-good value, coalesce an
+in-flight refresh, decide whether stale data is still usable, and throttle retry
+or logging.
 
-- Network interface topology cache: TTL, in-flight refresh dedupe,
-  stale-on-refresh-error, retry throttle, and warning rate-limit.
-- GPU telemetry cache: short TTL, in-flight refresh dedupe, timeout, consecutive
-  timeout backoff, and warning rate-limit.
-- CPU static info cache: one-shot async discovery guarded by a pending promise.
+Phase 3 starts paying that debt down with two small runtime-source utilities:
 
-These are not identical, but they are similar enough that future changes are
-likely to copy nearby fields and methods with new prefixes. That is the
-architecture risk: the file structure encourages duplicated state machines.
+- `RefreshableCache<T>` owns the ShoMetrics `fresh` / `stale` /
+  `unavailable` facade and delegates storage/fetch mechanics to `lru-cache`.
+- `BackoffPolicy` owns initial/max/factor retry delay.
 
-Before adding another GPU, disk, helper, or source snapshot cache, choose a
-shared cache primitive or a library-backed wrapper and migrate at least the
-network topology cache to it. Collector-specific policy such as timeout,
-exponential backoff, and warning rate-limit should stay explicit and tested,
-but the shared TTL/dedup/stale behavior should not be hand-copied again.
+Network interface topology and CPU static info now use those utilities. GPU
+telemetry remains manual for now because its current behavior includes
+`null`/no-data handling and a lower-level `nvidia-smi` process timeout. Do not
+force GPU through the shared cache until the GPU freshness and failure policy is
+explicit; that would only move the same ambiguity into a cleaner-looking file.
+After this extraction, `node-system-source.ts` is back down to about 642 lines,
+with the shared cache/backoff code living in small tested runtime-source
+utilities.
+
+`lru-cache` is not treated as the freshness policy source of truth. It does not
+preemptively prune expired entries by default, and this wrapper intentionally
+stores only one entry per collector cache. ShoMetrics still uses its own
+timestamps and max-stale budget to decide when stale data becomes `N/A`.
+The current dependency is `lru-cache@^11.3.6`, which adds no transitive runtime
+dependencies in `package-lock.json`. Keep major-version upgrades explicit:
+`lru-cache` has shipped breaking API changes across majors, and the
+`RefreshableCache<T>` facade depends on the v11 `fetchMethod`/status behavior.
+
+Network interface discovery failures now report as throttled warnings at the
+source boundary, including cold-start failures with no cached topology. This is
+intentional: discovery failure is a recoverable OS/runtime condition, repeated
+failures should not spam logs, and the correctness behavior remains no network
+source metrics when no fresh or allowed-stale topology exists.
+
+Collector-specific policy such as timeout, exponential backoff, freshness
+budgets, and warning text should stay explicit and tested. Shared
+TTL/dedup/stale behavior should not be hand-copied again. If a later helper,
+disk, GPU, or source snapshot cache needs this pattern, it should use the same
+small primitives or deliberately justify why the policy is different.
+
+One debt remains in the caller glue: owners still combine
+`RefreshableCache<T>`, `BackoffPolicy`, and logging in a small amount of local
+code. With two callers this is acceptable and keeps cache/backoff separate. If a
+third runtime-source cache repeats the same check-fresh/check-backoff/read/log
+shape, extract that owner-level glue instead of copying it.
 
 ## Next Plan
 
@@ -285,10 +315,12 @@ but the shared TTL/dedup/stale behavior should not be hand-copied again.
    between "safe recent data" and `N/A`. This is a correctness gate, not a
    latency optimization.
 
-3. Stop the cache/state-machine duplication before the next collector change.
-   Compare an internal cache primitive against a library-backed wrapper, then
-   migrate the network topology cache first. Do not add a fourth hand-written
-   cache in `node-system-source.ts`.
+3. Continue reducing source cache duplication before the next collector change.
+   `RefreshableCache<T>` and `BackoffPolicy` now cover network topology and CPU
+   static info, with `RefreshableCache<T>` backed by `lru-cache` for storage and
+   fetch coalescing. Do not add a fourth hand-written cache in
+   `node-system-source.ts`; extend or use the existing primitives only after the
+   collector's real freshness policy is explicit.
 
 4. Fix the GPU hot path next. Current evidence points there more strongly than
    network:
