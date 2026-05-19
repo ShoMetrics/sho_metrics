@@ -511,7 +511,7 @@ Use the no-production-compatibility window. Break the old contract and fix call 
    - keep stable aliases and dynamic ids side by side where both are useful
    - omit null, non-finite, or source-unavailable values
    - skip sensors with no canonical unit and report a discovery warning
-   - keep raw dynamic sensor validation conservative; defer source-specific range decisions to the LHM upstream audit
+   - keep raw dynamic sensor validation conservative; defer source-specific range decisions to the LHM preliminary audit
 7. Update `SourceProtocolMapper`:
    - Core unit enum -> protobuf `MetricUnit`
    - `DateTimeOffset` -> `google.protobuf.Timestamp`
@@ -521,7 +521,7 @@ Use the no-production-compatibility window. Break the old contract and fix call 
    - macOS helpers must map powermetrics/SMC/HID data into the same canonical units and descriptor shape.
    - No future helper may require Node to understand source-native sensor type enums.
 9. Update docs:
-   - `docs/development/lhm-node-integration-plan.md`
+   - `docs/development/archive/librehardwaremonitor-node-integration-plan.md`
    - `.agents/skills/technical-deisn-doc/references/TECHNICAL_DESIGN.md`
 10. Verify:
    - `npm.cmd run proto:format`
@@ -540,7 +540,7 @@ Use the no-production-compatibility window. Break the old contract and fix call 
 
 ## Follow-Up Audit
 
-After this refactor closes and the repo is back to a buildable state, use [LibreHardwareMonitor Upstream Audit](./librehardwaremonitor-upstream-audit.md) before treating dynamic sensor coverage as complete.
+After this refactor closes and the repo is back to a buildable state, use [LibreHardwareMonitor Preliminary Audit](./archive/librehardwaremonitor-preliminary-audit.md) before treating dynamic sensor coverage as complete.
 
 Audit questions:
 
