@@ -12,6 +12,11 @@ internal sealed class WindowsPipeSourceServer(
     SourceRequestHandler requestHandler,
     ILogger<WindowsPipeSourceServer> logger)
 {
+    private const int ErrorBrokenPipe = 109;
+    private const int ErrorNoData = 232;
+    private const int ErrorPipeNotConnected = 233;
+    private const int Win32ErrorCodeMask = 0xFFFF;
+
     private static readonly TimeSpan ShutdownTimeout = TimeSpan.FromSeconds(5);
 
     private readonly Lock _activeClientTaskLock = new();
@@ -113,7 +118,19 @@ internal sealed class WindowsPipeSourceServer(
 
             SourceIpcResponse response = await requestHandler.HandleAsync(request, cancellationToken).ConfigureAwait(false);
 
-            await frameCodec.WriteResponseAsync(pipeServerStream, response, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await frameCodec.WriteResponseAsync(pipeServerStream, response, cancellationToken).ConfigureAwait(false);
+            }
+            catch (IOException exception) when (IsClientDisconnectedPipeError(exception))
+            {
+                logger.LogDebug(
+                    "Named pipe client disconnected before response write for {PipeName}. win32ErrorCode={Win32ErrorCode}",
+                    SourceServiceConstants.PipeName,
+                    ReadWin32ErrorCode(exception));
+
+                return;
+            }
         }
     }
 
@@ -182,5 +199,21 @@ internal sealed class WindowsPipeSourceServer(
         {
             logger.LogWarning("Timed out while waiting for named pipe client task shutdown.");
         }
+    }
+
+    private static bool IsClientDisconnectedPipeError(IOException exception)
+    {
+        int errorCode = ReadWin32ErrorCode(exception);
+
+        // WinError.h: 109 ERROR_BROKEN_PIPE, 232 ERROR_NO_DATA,
+        // 233 ERROR_PIPE_NOT_CONNECTED. Repro: Node timed out and closed the
+        // pipe before this service wrote the response, surfacing as IOException
+        // "Pipe is broken" from PipeStream.WriteAsync.
+        return errorCode is ErrorBrokenPipe or ErrorNoData or ErrorPipeNotConnected;
+    }
+
+    private static int ReadWin32ErrorCode(IOException exception)
+    {
+        return exception.HResult & Win32ErrorCodeMask;
     }
 }

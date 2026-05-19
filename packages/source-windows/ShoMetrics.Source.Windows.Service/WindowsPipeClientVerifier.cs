@@ -7,11 +7,13 @@ namespace ShoMetrics.Source.Windows.Service;
 
 internal sealed partial class WindowsPipeClientVerifier
 {
-    private const int MaximumComputerNameLength = 256;
+    private const int ErrorPipeLocal = 229;
+    private const int MaximumComputerNameCharacterCount = 256;
 
     public unsafe bool IsLocalClient(NamedPipeServerStream pipeServerStream)
     {
-        Span<char> clientComputerNameBuffer = stackalloc char[MaximumComputerNameLength + 1];
+        Span<char> clientComputerNameBuffer = stackalloc char[MaximumComputerNameCharacterCount + 1];
+        uint clientComputerNameBufferByteCount = checked((uint)(clientComputerNameBuffer.Length * sizeof(char)));
 
         bool succeeded;
 
@@ -20,12 +22,23 @@ internal sealed partial class WindowsPipeClientVerifier
             succeeded = GetNamedPipeClientComputerName(
                 pipeServerStream.SafePipeHandle,
                 clientComputerNameBufferPointer,
-                (uint)clientComputerNameBuffer.Length);
+                clientComputerNameBufferByteCount);
         }
 
         if (!succeeded)
         {
-            throw new Win32Exception(Marshal.GetLastPInvokeError());
+            int errorCode = Marshal.GetLastPInvokeError();
+
+            if (errorCode == ErrorPipeLocal)
+            {
+                // GetNamedPipeClientComputerNameW returns false for the local
+                // client path and WinError.h reports 229 as ERROR_PIPE_LOCAL.
+                // Repro: Stream Deck Node -> --dev-pipe produced Win32 229
+                // before the request loop, so 229 is the local-client signal.
+                return true;
+            }
+
+            throw new Win32Exception(errorCode);
         }
 
         int terminatorIndex = clientComputerNameBuffer.IndexOf('\0');
