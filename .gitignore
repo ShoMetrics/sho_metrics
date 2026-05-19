@@ -347,3 +347,5 @@ packages/hub/com.ez.sho-metrics.sdPlugin/bin/
 packages/hub/com.ez.sho-metrics.sdPlugin/ui/property-inspector.js
 packages/hub/com.ez.sho-metrics.sdPlugin/ui/property-inspector.js.map
 packages/hub/.test-dist/
+
+docs/development/perf-logs/*
