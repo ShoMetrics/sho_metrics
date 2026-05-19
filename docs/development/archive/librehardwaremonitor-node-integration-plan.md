@@ -1,6 +1,21 @@
-# LHM to Node Integration Plan
+# LibreHardwareMonitor to Node Integration Plan
 
 This plan describes how LibreHardwareMonitor data becomes ShoMetrics runtime telemetry without requiring the Stream Deck plugin process to run as administrator.
+
+## Archive Status
+
+This document is archived as the historical implementation plan for the first local Windows LibreHardwareMonitor source landing. The main runtime/source boundary and dev-pipe integration are implemented; remaining work belongs in narrower follow-up documents.
+
+| Area | Status | Notes |
+|---|---|---|
+| Source-scoped Node runtime | Done | Actions resolve metric keys into `MetricReadPlan`; `Scheduler` polls a `SourceRunner`; `MetricStore` stores source-scoped samples. |
+| Windows helper service dev pipe | Done | Service project, generated protobuf IPC, named pipe server, request handler, and long-lived LHM session exist. |
+| Node Windows helper client | Done | The client handles framed protobuf IPC, request ids, protocol checks, timeouts, cooldown/backoff, and source fallback. |
+| Helper capability filtering | Done | Node skips helper reads for metrics the helper does not support, such as disk capacity/volume usage. |
+| End-to-end dev validation | Done | Node can connect to the helper; helper success and fallback paths are observable in Stream Deck logs. |
+| Installer and service registration | Pending | WiX/MSI product codes, upgrade behavior, service install, and Event Source ownership are still future work. |
+| Production hot-path performance | Pending | The current performance issue is tracked separately; do not expand it in this archived plan. |
+| Remote source | Pending | Remote monitoring remains a later gRPC/TLS transport phase. |
 
 ## Fixed Decisions
 
@@ -26,9 +41,11 @@ This plan describes how LibreHardwareMonitor data becomes ShoMetrics runtime tel
 - Code signing release timing after unsigned alpha builds.
 - Final Windows helper production publish mode after dev-pipe end-to-end validation.
 
-## Current State vs Target State
+## Original Current State vs Target State
 
-| Area | Current | Target |
+This table records the starting point of the plan. It is kept for context; see Archive Status for the current state.
+
+| Area | Original current state | Target |
 |---|---|---|
 | Action subscription | Action classes expose only metric keys. | `MetricAction` converts resolved source policy plus metric keys into a `MetricReadPlan`. |
 | Scheduler | Owns one global `MetricSource`. | Groups by read plan signature plus interval, then polls a `SourceRunner`. |
@@ -426,9 +443,9 @@ Service logging:
 
 ## C# Service Implementation Spec
 
-The current C# code has a Core snapshot reader and a one-shot Helper CLI. It does not yet have an implementation-level service spec. The rules below are the source of truth for the next C# implementation pass.
+The C# service implementation described in this section is now landed for dev-pipe validation. The rules below are retained as the historical implementation checklist and boundary record.
 
-### C# Step 1: Add Service Project
+### C# Step 1: Add Service Project - Done
 
 Create:
 
@@ -481,7 +498,7 @@ Rules:
 - Do not make the service executable install or uninstall itself.
 - Do not move ControlPanel or installer code into the service project.
 
-### C# Step 2: Generate Protobuf Contracts
+### C# Step 2: Generate Protobuf Contracts - Done
 
 The service must generate C# messages from the same proto files used by Node:
 
@@ -522,7 +539,7 @@ Rules:
 - After proto changes, run `npm.cmd run proto:format`, `npm.cmd run proto:lint`, and `npm.cmd run proto:build` from `packages/hub`.
 - After C# project changes, run `dotnet restore .\packages\source-windows\ShoMetrics.Source.Windows.slnx --locked-mode`, then `dotnet build .\packages\source-windows\ShoMetrics.Source.Windows.slnx --no-restore`.
 
-### C# Step 3: Service Executable Modes
+### C# Step 3: Service Executable Modes - Done
 
 Implement one entry point:
 
@@ -564,7 +581,7 @@ SourceServiceConstants.cs
 
 Do not split further unless a file exceeds 800 lines or starts owning two unrelated responsibilities.
 
-### C# Step 4: Pipe Server
+### C# Step 4: Pipe Server - Done
 
 `WindowsPipeSourceServer` owns the named pipe accept loop and per-connection request loop.
 
@@ -608,7 +625,7 @@ Rules:
 - Track active client tasks and stop accepting new clients during host shutdown.
 - On shutdown, cancel active request loops, dispose active pipe streams, and await client completion with a bounded timeout.
 
-### C# Step 5: Frame Codec
+### C# Step 5: Frame Codec - Done
 
 `SourceIpcFrameCodec` owns length-prefixed protobuf framing.
 
@@ -642,7 +659,7 @@ Rules:
 - Malformed protobuf responses are impossible on the server side; malformed requests must return `malformed_request` when a response can still be written, otherwise close the connection.
 - Oversized frames must close the connection; do not allocate the payload.
 
-### C# Step 6: Request Handler
+### C# Step 6: Request Handler - Done
 
 `SourceRequestHandler` owns command dispatch from `SourceIpcRequest` to source API responses.
 
@@ -681,7 +698,7 @@ Implementation rules:
 - Echo `request_id` from request to response.
 - Do not mutate settings, install drivers, execute commands, read arbitrary files, or load arbitrary DLLs.
 
-### C# Step 7: Core Reader Ownership
+### C# Step 7: Core Reader Ownership - Done
 
 The service must not create and dispose a LibreHardwareMonitor `Computer` for every 1 Hz read in production service mode.
 
@@ -719,7 +736,7 @@ Rules:
 - The existing one-shot `ShoMetrics.Source.Windows.Helper` may keep using the existing CLI path until it is intentionally migrated.
 - If long-lived LHM session initialization fails, service health must report a warning and snapshot reads must return `source_unavailable`.
 
-### C# Step 8: Metric Mapping
+### C# Step 8: Metric Mapping - Done
 
 Service responses must use ShoMetrics canonical metric ids consumed by Node. The current C# POC metric ids such as `cpu.load.percent` and `cpu.package.temperature.celsius` are diagnostic-only and must not be returned by the service API unless Node also consumes them.
 
@@ -753,7 +770,7 @@ Rules:
 - Dynamic LHM sensor ids are emitted as `lhm.sensor:<source_sensor_id>` for sensors with canonical units. Built-in widgets still request stable aliases; 1Hz polling must not request all dynamic sensors by default.
 - A sensor with no canonical `MetricUnit` mapping must be skipped and reported through a discovery warning.
 
-### C# Step 9: Proto Mapping
+### C# Step 9: Proto Mapping - Done
 
 `SourceProtocolMapper` owns conversion from Core models to protobuf messages.
 
@@ -779,7 +796,7 @@ Rules:
   - `unit` = protobuf `MetricUnit`
   - `metric_id_kind` = protobuf `MetricIdKind`
 
-### C# Step 10: Logging
+### C# Step 10: Logging - Done For Dev Pipe
 
 Logging owners:
 
@@ -800,9 +817,9 @@ Rules:
 - Dev pipe mode logs to console and file only. Do not write dev-pipe warnings to Windows Event Log.
 - Windows Service mode writes Warning and higher events to Windows Event Log. During Phase 1 the runtime may create the Event Source because the service runs as `LocalSystem`; when WiX/MSI owns Event Source registration, switch runtime Event Log source creation off.
 
-### C# Step 11: Service Acceptance Tests
+### C# Step 11: Service Acceptance Tests - Done For Dev Pipe
 
-Before considering the service implementation complete, verify:
+The service build and dev-pipe integration have been verified during local development. Installer-backed Windows Service validation remains pending.
 
 ```powershell
 dotnet restore .\packages\source-windows\ShoMetrics.Source.Windows.slnx --locked-mode
@@ -834,6 +851,8 @@ Manual behavior acceptance:
 - Restarting the dev pipe allows later helper reads without restarting the Stream Deck plugin process.
 
 ## Windows Installer
+
+Status: Pending. The dev-pipe service path is implemented, but product installation is not complete.
 
 - Use WiX/MSI for the Windows helper installer from the first user-facing distribution.
 - The installer owns service registration, service account, service SID configuration, start/stop during install and uninstall, upgrade, repair, rollback, installation directory, and `%ProgramData%` log directory permissions.
@@ -988,7 +1007,7 @@ Do not update Property Inspector or settings in the first local LHM landing step
 
 The Node refactor must land before the Windows helper client becomes the default source path. Do not make action classes branch on Windows helper availability.
 
-### Step 1: Add Source-Scoped Runtime Types
+### Step 1: Add Source-Scoped Runtime Types - Done
 
 Add the source runtime contract without changing behavior:
 
@@ -1023,7 +1042,7 @@ Acceptance:
 - No generated proto imports in rendering, actions, or settings code.
 - Unit tests cover read plan normalization and stable grouping keys.
 
-### Step 2: Convert MetricStore to Source-Scoped Keys
+### Step 2: Convert MetricStore to Source-Scoped Keys - Done
 
 Before:
 
@@ -1050,7 +1069,7 @@ Acceptance:
 - Existing widgets still render the same values when all actions use the default local source scope.
 - Tests prove two different source scopes do not share history for the same metric key.
 
-### Step 3: Convert Actions from Bare Keys to Read Plans
+### Step 3: Convert Actions from Bare Keys to Read Plans - Done
 
 Before:
 
@@ -1080,7 +1099,7 @@ Acceptance:
 - CPU, GPU, RAM, network, and disk actions compile without `getMetricSubscriptionKeys()`.
 - Action tests assert metric keys and read-plan behavior, not transport-specific behavior.
 
-### Step 4: Add SourceRunner and SourceRegistry
+### Step 4: Add SourceRunner and SourceRegistry - Done
 
 Before:
 
@@ -1109,7 +1128,7 @@ Acceptance:
 - Unit tests cover primary success, primary partial result, primary failure, and all sources missing.
 - Logs for fallback are throttled at the `SourceRunner` boundary.
 
-### Step 5: Add Windows Helper Client Behind Registry
+### Step 5: Add Windows Helper Client Behind Registry - Done
 
 Add:
 
@@ -1131,7 +1150,7 @@ Acceptance:
 - Tests cover pipe-missing cooldown, transient failure backoff, and backoff reset after successful reads.
 - Manual test: helper absent still renders via `NodeSystemSource`.
 
-### Step 6: Enable Local Candidate Order
+### Step 6: Enable Local Candidate Order - Done
 
 Default Windows local candidate order:
 
@@ -1154,8 +1173,8 @@ Acceptance:
 
 ## C# Metric Mapping
 
-This is the cross-platform mapping invariant. The implementation-level Windows service rules live in [C# Step 8: Metric Mapping](#c-step-8-metric-mapping).
-LHM source-level findings live in [LibreHardwareMonitor Upstream Audit](./librehardwaremonitor-upstream-audit.md).
+This is the cross-platform mapping invariant. The implementation-level Windows service rules live in [C# Step 8: Metric Mapping](#c-step-8-metric-mapping---done).
+LHM source-level findings live in [LibreHardwareMonitor Preliminary Audit](./librehardwaremonitor-preliminary-audit.md).
 
 The C# side maps raw LHM readings into ShoMetrics output:
 
@@ -1239,6 +1258,8 @@ npm.cmd run watch
 ```
 
 ## Remote Source Phase
+
+Status: Pending. Remote monitoring was intentionally not part of the first local Windows helper landing.
 
 Remote source is not part of Phase 1.
 

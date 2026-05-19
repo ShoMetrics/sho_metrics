@@ -1,6 +1,6 @@
-# LibreHardwareMonitor Upstream Audit
+# LibreHardwareMonitor Preliminary Audit
 
-This audit records source-level facts from the local LibreHardwareMonitor checkout before ShoMetrics treats dynamic LHM sensor coverage as complete.
+This preliminary audit records source-level facts from the local LibreHardwareMonitor checkout before ShoMetrics treats dynamic LHM sensor coverage as complete.
 
 All paths below are relative to the LibreHardwareMonitor checkout root.
 
@@ -519,11 +519,11 @@ Future alias option:
 
 ## Audit Findings To Apply
 
-1. Keep ShoMetrics VRAM stable aliases on LHM `SensorType.SmallData` for `GPU Memory Used` and `GPU Memory Total`; do not add `SensorType.Data` branches unless a real fixture requires them.
-2. Keep dynamic sensor values exposed only when the source value is present, finite, and has a canonical unit.
-3. Keep unsupported sensor types observable. When LHM adds a `SensorType` with no ShoMetrics `MetricUnit` mapping, skip the sensor and emit a discovery warning. The current session code has this shape through `LibreHardwareMonitorSession.AddUnsupportedSensorTypeWarning`; keep that invariant covered by tests.
-4. Keep dynamic sensor ids opaque and tolerate missing descriptors after hardware/LHM changes.
-5. Add fixture tests using LHM dumps for RAM GiB, VRAM MiB, network throughput B/s, and disk throughput B/s.
-6. Revisit negative voltage/current/noise handling only with concrete LHM source examples.
-7. Consider CPU single-core fallback only if it matters for supported hardware.
-8. Do not parse LHM `HardwareType`, `SensorType`, `source_sensor_id`, or `hardware_id` outside the Windows source adapter.
+1. Done: Keep ShoMetrics VRAM stable aliases on LHM `SensorType.SmallData` for `GPU Memory Used` and `GPU Memory Total`; do not add `SensorType.Data` branches unless a real fixture requires them.
+2. Done: Keep dynamic sensor values exposed only when the source value is present, finite, and has a canonical unit.
+3. Done: Keep unsupported sensor types observable. When LHM adds a `SensorType` with no ShoMetrics `MetricUnit` mapping, skip the sensor and emit a discovery warning.
+4. Done: Keep dynamic sensor ids opaque and tolerate missing descriptors after hardware/LHM changes.
+5. Pending: Add fixture tests using LHM dumps for RAM GiB, VRAM MiB, network throughput B/s, and disk throughput B/s.
+6. Pending: Revisit negative voltage/current/noise handling only with concrete LHM source examples.
+7. Pending: Consider CPU single-core fallback only if it matters for supported hardware.
+8. Done: Do not parse LHM `HardwareType`, `SensorType`, `source_sensor_id`, or `hardware_id` outside the Windows source adapter.
