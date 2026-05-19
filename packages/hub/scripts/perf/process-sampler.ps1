@@ -28,9 +28,12 @@ while ([DateTimeOffset]::UtcNow -lt $deadline) {
     $systemCpuPercent = $null
     $sampleStatus = 'ok'
     $counterSampleCount = 0
+    $counterCollectMilliseconds = $null
 
     try {
+        $counterCollectionStartedAt = [DateTimeOffset]::UtcNow
         $counterSample = Get-Counter -Counter $counterPaths -ErrorAction SilentlyContinue
+        $counterCollectMilliseconds = ([DateTimeOffset]::UtcNow - $counterCollectionStartedAt).TotalMilliseconds
         $counterSampleCount = @($counterSample.CounterSamples).Count
 
         if ($counterSampleCount -eq 0) {
@@ -118,8 +121,10 @@ while ([DateTimeOffset]::UtcNow -lt $deadline) {
     }
     $previousSampleTimestamp = $sampleTimestamp
 
-    if ($sampleStatus -eq 'ok' -and ($systemCpuPercent -eq $null -or $sampledProcesses.Count -eq 0)) {
-        $sampleStatus = 'partial:missing-targets'
+    if ($sampleStatus -eq 'ok' -and $systemCpuPercent -eq $null) {
+        $sampleStatus = 'partial:no-system-cpu'
+    } elseif ($sampleStatus -eq 'ok' -and $sampledProcesses.Count -eq 0) {
+        $sampleStatus = 'info:no-targets'
     }
 
     [pscustomobject]@{
@@ -128,6 +133,7 @@ while ([DateTimeOffset]::UtcNow -lt $deadline) {
         includeInSummary = $sampleIndex -ge $warmupSamples
         status = $sampleStatus
         counterSampleCount = $counterSampleCount
+        counterCollectMilliseconds = $counterCollectMilliseconds
         actualIntervalMilliseconds = $actualIntervalMilliseconds
         systemCpuPercent = $systemCpuPercent
         processes = $sampledProcesses
