@@ -154,6 +154,7 @@ test("node system source maintains network counter state and updates injected in
         [buildNetworkStats({ rx_bytes: 1000, tx_bytes: 500 })],
         [buildNetworkStats({ rx_bytes: 5000, tx_bytes: 2500 })],
     ];
+    const networkStatsArguments: Array<string | undefined> = [];
     let currentTimestampMilliseconds = 1000;
     const source = new NodeSystemSource({
         systemInformation: buildCountingSystemInformation(callCounts, {
@@ -166,10 +167,11 @@ test("node system source maintains network counter state and updates injected in
                     speed: 1000,
                 })];
             }) as NodeSystemInformationClient["networkInterfaces"],
-            networkStats: async () => {
+            networkStats: (async (interfaces?: string | ((data: Systeminformation.NetworkStatsData[]) => unknown)) => {
                 callCounts.networkStats += 1;
+                networkStatsArguments.push(typeof interfaces === "string" ? interfaces : undefined);
                 return networkStatsQueue.shift() ?? [];
-            },
+            }) as NodeSystemInformationClient["networkStats"],
         }),
         networkRegistry: {
             update: options => networkRegistryUpdates.push([...options]),
@@ -197,7 +199,9 @@ test("node system source maintains network counter state and updates injected in
         isDefault: false,
         speedMegabitsPerSecond: 1000,
     }]);
-    assert.equal(callCounts.networkInterfaces, 2);
+    assert.deepEqual(networkRegistryUpdates[1], networkRegistryUpdates[0]);
+    assert.deepEqual(networkStatsArguments, ["eth0", "eth0"]);
+    assert.equal(callCounts.networkInterfaces, 1);
     assert.equal(callCounts.networkStats, 2);
     assert.equal(callCounts.currentLoad, 0);
 });

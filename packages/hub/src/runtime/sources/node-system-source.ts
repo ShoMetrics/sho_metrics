@@ -112,6 +112,12 @@ interface NodeSystemSourceDependencies {
     ) => Promise<NodeSystemGpuTelemetryData | null>;
 }
 
+interface CachedNetworkInterfaces {
+    readonly rawNetworkInterfaces: readonly Systeminformation.NetworkInterfacesData[];
+    readonly interfaceOptions: readonly NetworkInterfaceOption[];
+    readonly timestampMilliseconds: number;
+}
+
 /**
  * Node.js runtime metric source backed by `systeminformation` and OS command helpers.
  */
@@ -128,6 +134,8 @@ export class NodeSystemSource implements MetricSource {
         systemInformation: NodeSystemInformationClient,
     ) => Promise<NodeSystemGpuTelemetryData | null>;
     private lastNetworkStatsByInterface = new Map<string, NodeSystemNetworkCounterSample>();
+    private cachedNetworkInterfaces: CachedNetworkInterfaces | null = null;
+    private pendingNetworkInterfacesPromise: Promise<CachedNetworkInterfaces> | null = null;
     private lastNetworkPollDebugLogTimestampMilliseconds = 0;
     private cachedGpuData: NodeSystemGpuTelemetryData | null = null;
     private cachedGpuTimestampMilliseconds = 0;
@@ -142,6 +150,8 @@ export class NodeSystemSource implements MetricSource {
 
     private static readonly GPU_CACHE_MS = 1000;
     private static readonly GPU_POLL_TIMEOUT_MS = 3300;
+    private static readonly NETWORK_INTERFACE_CACHE_MS = 10000;
+    private static readonly EMPTY_NETWORK_INTERFACE_CACHE_MS = 2000;
     private static readonly NETWORK_DEBUG_LOG_INTERVAL_MS = 5000;
     private static readonly GPU_TIMEOUT_WARNING_INTERVAL_MS = 10000;
     private static readonly GPU_BACKOFF_STEPS_MS = [2000, 5000, 10000, 30000] as const;
@@ -370,13 +380,12 @@ export class NodeSystemSource implements MetricSource {
 
     private async pollNetwork(): Promise<Record<string, MetricValue>> {
         const metrics: Record<string, MetricValue> = {};
-        const networkInterfaces = await this.systemInformation.networkInterfaces();
-        const usableNetworkInterfaces = Array.isArray(networkInterfaces)
-            ? networkInterfaces.filter(networkInterface => isUsableNetworkInterface(networkInterface, this.platform))
-            : [];
-        const interfaceOptions = usableNetworkInterfaces.map(toNetworkInterfaceOption);
+        const cachedNetworkInterfaces = await this.readUsableNetworkInterfaces();
+        const interfaceOptions = cachedNetworkInterfaces.interfaceOptions;
         const usableInterfaceIds = new Set(interfaceOptions.map((networkInterface) => networkInterface.id));
-        const networkStats = await this.systemInformation.networkStats("*");
+        const networkStats = usableInterfaceIds.size > 0
+            ? await this.systemInformation.networkStats([...usableInterfaceIds].join(","))
+            : [];
         const currentTimestampMilliseconds = this.now();
         let aggregateDownloadBytesPerSecond = 0;
         let aggregateUploadBytesPerSecond = 0;
@@ -429,7 +438,7 @@ export class NodeSystemSource implements MetricSource {
         );
 
         this.logNetworkPollDebug({
-            networkInterfaces: usableNetworkInterfaces,
+            networkInterfaces: cachedNetworkInterfaces.rawNetworkInterfaces,
             interfaceOptions,
             networkStats,
             rateCalculations,
@@ -439,6 +448,55 @@ export class NodeSystemSource implements MetricSource {
         });
 
         return metrics;
+    }
+
+    private async readUsableNetworkInterfaces(): Promise<CachedNetworkInterfaces> {
+        const currentTimestampMilliseconds = this.now();
+
+        if (this.cachedNetworkInterfaces && !this.isNetworkInterfaceCacheExpired(currentTimestampMilliseconds)) {
+            return this.cachedNetworkInterfaces;
+        }
+
+        if (this.pendingNetworkInterfacesPromise) {
+            return this.pendingNetworkInterfacesPromise;
+        }
+
+        this.pendingNetworkInterfacesPromise = this.refreshUsableNetworkInterfaces(currentTimestampMilliseconds)
+            .finally(() => {
+                this.pendingNetworkInterfacesPromise = null;
+            });
+
+        return this.pendingNetworkInterfacesPromise;
+    }
+
+    private isNetworkInterfaceCacheExpired(currentTimestampMilliseconds: number): boolean {
+        if (!this.cachedNetworkInterfaces) {
+            return true;
+        }
+
+        const cacheAgeMilliseconds = currentTimestampMilliseconds - this.cachedNetworkInterfaces.timestampMilliseconds;
+        const cacheDurationMilliseconds = this.cachedNetworkInterfaces.interfaceOptions.length > 0
+            ? NodeSystemSource.NETWORK_INTERFACE_CACHE_MS
+            : NodeSystemSource.EMPTY_NETWORK_INTERFACE_CACHE_MS;
+
+        return cacheAgeMilliseconds >= cacheDurationMilliseconds;
+    }
+
+    private async refreshUsableNetworkInterfaces(
+        currentTimestampMilliseconds: number,
+    ): Promise<CachedNetworkInterfaces> {
+        const networkInterfaces = await this.systemInformation.networkInterfaces();
+        const usableNetworkInterfaces = Array.isArray(networkInterfaces)
+            ? networkInterfaces.filter(networkInterface => isUsableNetworkInterface(networkInterface, this.platform))
+            : [];
+        const cachedNetworkInterfaces: CachedNetworkInterfaces = {
+            rawNetworkInterfaces: usableNetworkInterfaces,
+            interfaceOptions: usableNetworkInterfaces.map(toNetworkInterfaceOption),
+            timestampMilliseconds: currentTimestampMilliseconds,
+        };
+
+        this.cachedNetworkInterfaces = cachedNetworkInterfaces;
+        return cachedNetworkInterfaces;
     }
 
     private calculateNetworkRate(options: {
