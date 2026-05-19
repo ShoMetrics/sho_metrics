@@ -9,6 +9,7 @@ import {
     type MetricSnapshot,
     type MetricValue,
 } from "../../generated/shometrics/v1/snapshot_pb.js";
+import type { SourceMetricPollingGroupResolver } from "./source-polling-groups";
 
 // Runtime source adapters import wire metric enums through this boundary module.
 // Rendering and ordinary PI code should consume render-facing models instead.
@@ -68,7 +69,7 @@ export function buildTextMetricValue(value: string): MetricValue {
  * All sources (built-in, local helpers, push API) implement this contract.
  * The Scheduler consumes this contract, never a concrete implementation.
  */
-export interface MetricSource {
+export interface MetricSource extends Partial<SourceMetricPollingGroupResolver> {
     /** Human-readable identifier, e.g. "node-system", "windows-helper" */
     readonly sourceId: string;
 
