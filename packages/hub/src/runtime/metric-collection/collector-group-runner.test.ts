@@ -31,6 +31,10 @@ test("refreshNow reads the source client and writes scoped samples to MetricStor
         metricStore.forScope("node-system").getWidgetData("cpu.usage_percent", "CPU", "%").current,
         42,
     );
+    assert.equal(
+        metricStore.forScope("local").getWidgetData("cpu.usage_percent", "CPU", "%").sampleTimestampMilliseconds,
+        undefined,
+    );
 });
 
 test("refreshNow skips overlapping refreshes", async () => {
@@ -299,8 +303,8 @@ function buildCollectorGroup(options: {
     readonly intervalMilliseconds?: number;
 }): PlannedCollectorGroup {
     return {
-        collectorGroupKey: JSON.stringify(["node-system", "sourceDeclared", "cpu"]),
-        sourceScopeId: "node-system",
+        collectorGroupKey: JSON.stringify(["local", "node-system", "sourceDeclared", "cpu"]),
+        sourceScopeId: "local",
         sourceId: "node-system",
         groupKind: "sourceDeclared",
         pollingGroupId: "cpu",

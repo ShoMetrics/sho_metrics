@@ -33,6 +33,7 @@ import {
     handleColorCompensationPluginMessage,
 } from "../color-compensation/plugin-controller";
 import { BackgroundCollectionBinding } from "./shared/background-collection-binding";
+import { createFallbackMetricStoreReader } from "../runtime/metric-collection/fallback-composer";
 
 const log = logger.for("MetricAction");
 
@@ -185,7 +186,13 @@ export abstract class MetricAction extends SingletonAction {
 
     protected getMetricReader(event: WillAppearEvent): MetricStoreReader {
         const readPlan = this.resolveMetricReadPlan(event);
-        return metricStore.forScope(readPlan.sourceScopeId);
+
+        // TODO(Phase 5c Slice 6): All built-in actions now use background
+        // collection. Remove the scheduler reader branch when the legacy
+        // SchedulerBinding path is deleted.
+        return this.getMetricCollectionMode() === "background"
+            ? createFallbackMetricStoreReader(metricStore, readPlan)
+            : metricStore.forScope(readPlan.sourceScopeId);
     }
 
     protected refreshMetricKeys(

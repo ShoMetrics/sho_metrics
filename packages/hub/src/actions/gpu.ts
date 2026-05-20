@@ -23,6 +23,7 @@ import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import type { ResolvedGpuMetricTarget, ResolvedWidgetSettings } from "../settings/resolved-settings";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 import type { SingleMetricViewOptions } from "../view-updates/runner";
+import type { MetricCollectionMode } from "./metric-action";
 
 const log = logger.for("Action:GPU");
 
@@ -35,6 +36,10 @@ export class Gpu extends MetricAction {
         const settings = this.resolveSettings(event);
         const gpuTarget = readResolvedMetricTarget(settings, "gpu");
         return resolveGpuMetricSubscriptionKeys(gpuTarget);
+    }
+
+    protected override getMetricCollectionMode(): MetricCollectionMode {
+        return "background";
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {

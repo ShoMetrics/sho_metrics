@@ -98,6 +98,25 @@ test("text samples are retrievable without numeric widget history", () => {
     });
 });
 
+test("invalid scalar and empty text samples are ignored", () => {
+    const metricStore = new MetricStore();
+    const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
+
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            "cpu.usage_percent": buildScalarMetricValue(Number.NaN, { unit: MetricUnit.PERCENT }),
+            "cpu.model": buildTextMetricValue("   "),
+        },
+    }));
+
+    assert.equal(
+        metrics.getWidgetData("cpu.usage_percent", "CPU", "%").sampleTimestampMilliseconds,
+        undefined,
+    );
+    assert.equal(metrics.getTextValue("cpu.model"), undefined);
+});
+
 test("scalar metric replaces text metric completely", () => {
     const metricStore = new MetricStore();
     const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);

@@ -137,7 +137,10 @@ export class CollectorGroupRunner {
                 return { status: this.isStopped ? "stopped" : "skippedSuperseded" };
             }
 
-            this.snapshotStore.ingest(this.collectorGroup.sourceScopeId, snapshot);
+            // Background samples stay scoped to the source/profile that
+            // produced them. Read-time fallback composes those scoped samples
+            // into the action's logical source scope later.
+            this.snapshotStore.ingest(this.collectorGroup.sourceId, snapshot);
             this.backoffPolicy.recordSuccess();
 
             return { status: "refreshed" };

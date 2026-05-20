@@ -8,6 +8,7 @@ import type { WidgetData } from "../view-rendering/widget-data";
 import { CPU_MODEL_METRIC_KEY, CPU_USAGE_METRIC_KEY } from "../runtime/metric-keys";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
+import type { MetricCollectionMode } from "./metric-action";
 
 /** CPU action with full theming support. */
 @action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.cpu })
@@ -16,6 +17,10 @@ export class Cpu extends MetricAction {
 
     protected override getMetricKeys(): readonly string[] {
         return [CPU_USAGE_METRIC_KEY, CPU_MODEL_METRIC_KEY];
+    }
+
+    protected override getMetricCollectionMode(): MetricCollectionMode {
+        return "background";
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {

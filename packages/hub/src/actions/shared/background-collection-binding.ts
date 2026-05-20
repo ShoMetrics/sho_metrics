@@ -67,7 +67,7 @@ export class BackgroundCollectionBinding {
         this.pollingIntervalMilliseconds = options.pollingIntervalMilliseconds;
         this.subscriberId = options.subscriberId;
 
-        log.info(() => [
+        log.debug(() => [
             "backgroundRenderCadenceStarted",
             `subscriberId=${options.subscriberId}`,
             `sourceScopeId=${options.readPlan.sourceScopeId}`,
@@ -84,7 +84,7 @@ export class BackgroundCollectionBinding {
 
         this.cleanupCollection?.();
         if (this.subscriberId) {
-            log.info(() => [
+            log.debug(() => [
                 "backgroundRenderCadenceStopped",
                 `subscriberId=${this.subscriberId}`,
             ].join(" "));
