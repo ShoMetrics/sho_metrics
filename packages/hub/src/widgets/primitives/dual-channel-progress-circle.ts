@@ -256,15 +256,15 @@ function renderRing(options: {
     const trackDashArray = `${visibleHalfLength} ${options.geometry.circumference - visibleHalfLength}`;
     const gapRotationOffset = options.hasNotches ? resolveNotchAngleDegrees(options.geometry, notchGapLength) / 2 : 0;
     const visibleAngleDegrees = visibleHalfLength / options.geometry.circumference * 360;
-    const shouldClipProgressToHalfLane = !options.hasNotches;
-    const progressBottomGapAngleDegrees = shouldClipProgressToHalfLane
+    const isFullRing = !options.hasNotches;
+    const progressBottomGapAngleDegrees = isFullRing
         ? ARC_LAYOUT.fullRingProgressBottomGapAngleDegrees
         : 0;
     const progressVisibleAngleDegrees = visibleAngleDegrees - progressBottomGapAngleDegrees / 2;
     const progressVisibleLength = options.geometry.circumference * (progressVisibleAngleDegrees / 360);
 
     return `
-        ${shouldClipProgressToHalfLane ? renderFullRingProgressClipPaths({
+        ${isFullRing ? renderFullRingProgressClipPaths({
             geometry: options.geometry,
             strokeWidth: options.strokeWidth,
         }) : ""}
@@ -293,6 +293,8 @@ function renderRing(options: {
                 return "";
             }
 
+            // The bottom gap shortens the drawable domain, so rotation needs a
+            // progress ratio in that shortened visual space.
             const renderProgress = progressLength / progressVisibleLength;
 
             return renderArcSegment({
@@ -308,7 +310,7 @@ function renderRing(options: {
                     progressBottomGapAngleDegrees,
                     visibleAngleDegrees: progressVisibleAngleDegrees,
                 }),
-                clipPathId: shouldClipProgressToHalfLane ? resolveFullRingProgressClipPathId(channel.channelId) : undefined,
+                clipPathId: isFullRing ? resolveFullRingProgressClipPathId(channel.channelId) : undefined,
                 filter: options.metricFilter,
             });
         }).join("")}
@@ -419,24 +421,15 @@ function resolveArcProgressRotationDegrees(options: {
 }): number {
     const laneStartRotationDegrees = options.channel.rotationDegrees
         + options.gapRotationOffset
-        + resolveArcProgressStartOffsetDegrees(options.channel, options.progressBottomGapAngleDegrees);
+        + (options.channel.progressDirection === "start-to-end"
+            ? options.progressBottomGapAngleDegrees / 2
+            : 0);
 
     if (options.channel.progressDirection === "end-to-start") {
         return laneStartRotationDegrees + options.visibleAngleDegrees * (1 - options.progress);
     }
 
     return laneStartRotationDegrees;
-}
-
-function resolveArcProgressStartOffsetDegrees(
-    channel: ChannelArcModel,
-    progressBottomGapAngleDegrees: number,
-): number {
-    if (channel.progressDirection === "start-to-end") {
-        return progressBottomGapAngleDegrees / 2;
-    }
-
-    return 0;
 }
 
 function renderNotchIcon(options: {
