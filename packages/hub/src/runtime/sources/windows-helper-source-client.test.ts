@@ -27,6 +27,7 @@ import {
     SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION,
     UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS,
     WindowsHelperSourceClient,
+    WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID,
     type WindowsHelperPipeTransport,
     type WindowsHelperSourceClientOptions,
 } from "./windows-helper-source-client";
@@ -63,6 +64,28 @@ test("source IPC frame codec rejects oversized payloads before decoding", () => 
         () => decodeSourceIpcFrame(frame),
         /exceeds the maximum/u,
     );
+});
+
+test("windows helper declares requested metrics as one helper snapshot group", () => {
+    const client = new WindowsHelperSourceClient({
+        transport: new RejectingTransport(new Error("unused")),
+    });
+
+    const resolutions = client.resolveMetricPollingGroups([
+        "cpu.usage_percent",
+        "gpu.temp",
+    ]);
+
+    assert.deepEqual([...resolutions.entries()], [
+        ["cpu.usage_percent", {
+            state: "owned",
+            pollingGroupId: WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID,
+        }],
+        ["gpu.temp", {
+            state: "owned",
+            pollingGroupId: WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID,
+        }],
+    ]);
 });
 
 test("windows helper source client sends requested metric ids and returns a runtime snapshot", async () => {

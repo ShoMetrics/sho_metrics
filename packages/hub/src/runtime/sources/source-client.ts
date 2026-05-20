@@ -102,8 +102,8 @@ export interface MetricDescriptor {
     readonly metricIdKind: MetricIdKind;
 }
 
-/** Runtime source adapter consumed by SourceRunner. */
-export interface SourceClient extends Partial<SourceMetricPollingGroupResolver> {
+/** Runtime source adapter consumed by background metric collection. */
+export interface SourceClient extends SourceMetricPollingGroupResolver {
     /** Source id owned by the runtime source registry. */
     readonly sourceId: string;
 
@@ -123,12 +123,12 @@ export interface SourceClient extends Partial<SourceMetricPollingGroupResolver> 
     dispose?(): void;
 }
 
-/** Adapts the current metric source contract into the SourceRunner client contract. */
+/** Adapts the current metric source contract into the source client contract. */
 export function createMetricSourceClient(source: MetricSource): SourceClient {
     return {
         sourceId: source.sourceId,
         readSnapshot: metricKeys => source.pollMetrics ? source.pollMetrics(metricKeys) : source.poll(),
-        resolveMetricPollingGroups: source.resolveMetricPollingGroups?.bind(source),
+        resolveMetricPollingGroups: source.resolveMetricPollingGroups.bind(source),
         dispose: () => source.dispose?.(),
     };
 }

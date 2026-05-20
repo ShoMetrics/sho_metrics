@@ -2,7 +2,7 @@ import type { MetricStore, MetricStoreReader } from "../metric-store";
 import {
     normalizeMetricReadPlan,
     type MetricReadPlan,
-    type SourceCandidate,
+    selectMetricReadPlanSourceCandidates,
 } from "../sources/metric-read-plan";
 
 /**
@@ -17,7 +17,7 @@ export function createFallbackMetricStoreReader(
     readPlan: MetricReadPlan,
 ): MetricStoreReader {
     const normalizedReadPlan = normalizeMetricReadPlan(readPlan);
-    const sourceCandidates = selectSourceCandidatesForFailureMode(normalizedReadPlan);
+    const sourceCandidates = selectMetricReadPlanSourceCandidates(normalizedReadPlan);
     const sourceReaders = sourceCandidates.map(candidate => metricStore.forScope(candidate.sourceId));
     const defaultReader = sourceReaders[0] ?? metricStore.forScope(normalizedReadPlan.sourceScopeId);
 
@@ -54,10 +54,4 @@ export function createFallbackMetricStoreReader(
             return defaultReader.getTextValue(metricKey);
         },
     };
-}
-
-function selectSourceCandidatesForFailureMode(readPlan: MetricReadPlan): readonly SourceCandidate[] {
-    return readPlan.failureMode === "fallback"
-        ? readPlan.sourceCandidates
-        : readPlan.sourceCandidates.slice(0, 1);
 }

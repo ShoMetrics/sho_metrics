@@ -28,6 +28,7 @@ import type {
     SourceWarning,
 } from "./source-client";
 import { WINDOWS_HELPER_SOURCE_ID } from "./source-ids";
+import type { SourceMetricPollingGroupResolution } from "./source-polling-groups";
 
 /** Named pipe path used by the Windows helper service. */
 export const DEFAULT_WINDOWS_HELPER_PIPE_PATH = "\\\\.\\pipe\\ShoMetrics.Source.Windows.v1";
@@ -46,6 +47,9 @@ export const PIPE_NOT_FOUND_RETRY_COOLDOWN_MILLISECONDS = 300000;
 
 /** Retry cooldowns for transient helper failures, indexed by consecutive failure count. */
 export const HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS = [5000, 15000, 60000] as const;
+
+/** Source-scoped polling group for helper snapshot reads. */
+export const WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID = "helper-snapshot";
 
 const SOURCE_IPC_LENGTH_PREFIX_BYTES = 4;
 const DEFAULT_HEALTH_TIMEOUT_MILLISECONDS = 750;
@@ -185,6 +189,18 @@ export class WindowsHelperSourceClient implements SourceClient {
         this.recordHelperRequestSuccess();
 
         return snapshot;
+    }
+
+    resolveMetricPollingGroups(
+        metricKeys: readonly string[],
+    ): ReadonlyMap<string, SourceMetricPollingGroupResolution> {
+        return new Map(metricKeys.map(metricKey => [
+            metricKey,
+            {
+                state: "owned",
+                pollingGroupId: WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID,
+            },
+        ]));
     }
 
     async listMetricDescriptors(metricKeys: readonly string[]): Promise<readonly MetricDescriptor[]> {

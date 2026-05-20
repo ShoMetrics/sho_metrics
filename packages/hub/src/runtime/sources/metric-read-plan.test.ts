@@ -4,6 +4,7 @@ import {
     buildLocalMetricReadPlan,
     buildMetricReadPlanKey,
     normalizeMetricReadPlan,
+    selectMetricReadPlanSourceCandidates,
     type MetricReadPlan,
 } from "./metric-read-plan";
 import {
@@ -115,4 +116,24 @@ test("buildMetricReadPlanKey preserves source candidate priority", () => {
     };
 
     assert.notEqual(buildMetricReadPlanKey(primaryWindowsPlan), buildMetricReadPlanKey(primaryNodePlan));
+});
+
+test("selectMetricReadPlanSourceCandidates follows the read plan failure mode", () => {
+    const sourceCandidates = [
+        { sourceId: WINDOWS_HELPER_SOURCE_ID },
+        { sourceId: NODE_SYSTEM_SOURCE_ID },
+    ];
+
+    assert.deepEqual(selectMetricReadPlanSourceCandidates({
+        sourceScopeId: "local",
+        metricKeys: ["cpu.usage_percent"],
+        sourceCandidates,
+        failureMode: "fallback",
+    }), sourceCandidates);
+    assert.deepEqual(selectMetricReadPlanSourceCandidates({
+        sourceScopeId: "local",
+        metricKeys: ["cpu.usage_percent"],
+        sourceCandidates,
+        failureMode: "empty",
+    }), [{ sourceId: WINDOWS_HELPER_SOURCE_ID }]);
 });

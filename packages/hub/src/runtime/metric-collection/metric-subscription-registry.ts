@@ -30,7 +30,7 @@ export interface MetricSubscription {
 /**
  * Registers one legacy read-plan subscription during the Phase 5c migration.
  *
- * @deprecated This bridge exists only while SchedulerBinding still owns
+ * @deprecated This bridge exists while action collection still carries
  * `MetricReadPlan`. A later cut should make actions register metric-key and
  * source-policy subscriptions directly.
  */
@@ -41,10 +41,10 @@ export interface RegisterMetricReadPlanSubscriptionBridgeOptions {
 }
 
 /**
- * Minimal bridge writer used by SchedulerBinding during Slice 1.
+ * Minimal bridge writer used by the action collection binding during migration.
  *
- * @deprecated SchedulerBinding should stop writing read-plan subscriptions when
- * actions register metric-key/source-policy subscriptions directly.
+ * @deprecated Action collection should stop writing read-plan subscriptions
+ * when actions register metric-key/source-policy subscriptions directly.
  */
 export interface MetricReadPlanSubscriptionBridgeWriter {
     registerReadPlanBridge(options: RegisterMetricReadPlanSubscriptionBridgeOptions): void;

@@ -20,7 +20,7 @@ export interface SourceMetricPollingGroupUnknownResolution {
     readonly state: "unknown";
 }
 
-/** Synchronous source-owned resolver used by scheduler planning. */
+/** Synchronous source-owned resolver used by background collection planning. */
 export interface SourceMetricPollingGroupResolver {
     resolveMetricPollingGroups(
         metricKeys: readonly string[],

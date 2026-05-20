@@ -1,4 +1,3 @@
-import { resolveMetricPollingGroupId } from "../metric-polling-groups";
 import type { SourceMetricPollingGroupResolution } from "../sources/source-polling-groups";
 import type { SourceRegistry } from "../sources/source-registry";
 import type {
@@ -70,11 +69,8 @@ type CollectorGroupAccumulator =
 /**
  * Plans registration-time background collector groups from active subscriptions.
  *
- * This is not the old Scheduler polling-group planner. Scheduler groups had to
- * include the whole fallback signature because SourceRunner did fallback I/O
- * inside a poll. Background collection runs each source/profile group
- * independently; read-time fallback composition chooses between the scoped
- * samples later.
+ * Background collection runs each source/profile group independently; read-time
+ * fallback composition chooses between the scoped samples later.
  */
 export class CollectorGroupPlanner {
     constructor(private readonly sourceRegistry: SourceRegistry) {}
@@ -157,13 +153,9 @@ export class CollectorGroupPlanner {
             const normalizedMetricKeys = Array.from(metricKeys).sort();
             const sourceClient = this.sourceRegistry.resolveSourceClient(sourceId);
 
-            // Temporary migration bridge for legacy sources that have not yet
-            // declared ownership. It must disappear with the Phase 5b bridge.
-            resolutionsBySourceId.set(
-                sourceId,
-                sourceClient?.resolveMetricPollingGroups?.(normalizedMetricKeys)
-                    ?? resolveMetricKeysWithStaticBridge(normalizedMetricKeys),
-            );
+            resolutionsBySourceId.set(sourceId, sourceClient
+                ? sourceClient.resolveMetricPollingGroups(normalizedMetricKeys)
+                : resolveMetricKeysAsUnknown(normalizedMetricKeys));
         }
 
         return resolutionsBySourceId;
@@ -178,16 +170,13 @@ function selectSourceCandidatesForFailureMode(
         : subscription.sourceCandidates.slice(0, 1);
 }
 
-function resolveMetricKeysWithStaticBridge(
+function resolveMetricKeysAsUnknown(
     metricKeys: readonly string[],
 ): ReadonlyMap<string, SourceMetricPollingGroupResolution> {
     const resolutions = new Map<string, SourceMetricPollingGroupResolution>();
 
     for (const metricKey of metricKeys) {
-        const pollingGroupId = resolveMetricPollingGroupId(metricKey);
-        resolutions.set(metricKey, pollingGroupId === "unknown"
-            ? { state: "unknown" }
-            : { state: "owned", pollingGroupId });
+        resolutions.set(metricKey, { state: "unknown" });
     }
 
     return resolutions;
