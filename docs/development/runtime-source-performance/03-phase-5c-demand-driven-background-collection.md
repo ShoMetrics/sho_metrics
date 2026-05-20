@@ -500,7 +500,10 @@ own migration step.
    `MetricSubscriptionRegistry` with tests for register/unregister,
    ref-counting, interval minimums, rotation prefetch, and invalidation version
    handling. Wire actions to populate it while the existing Scheduler/source I/O
-   still runs, then assert registry state matches current subscriptions.
+   still runs, then assert registry state matches current subscriptions. If this
+   slice still receives `MetricReadPlan` from `SchedulerBinding`, every such API
+   must be named `ReadPlanSubscriptionBridge` and marked `@deprecated`; it is a
+   migration bridge, not the final subscription shape.
 
 2. **Move grouping to subscription time.** Introduce `CollectorGroupPlanner`
    under `runtime/metric-collection/` and migrate Phase 5b planner tests to it.

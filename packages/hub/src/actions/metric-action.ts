@@ -238,6 +238,7 @@ export abstract class MetricAction extends SingletonAction {
         const schedulerBinding = this.getOrCreateSchedulerBinding(event.action.id);
 
         schedulerBinding.refresh({
+            subscriberId: event.action.id,
             readPlan,
             pollingIntervalMilliseconds,
             onTick: () => {
