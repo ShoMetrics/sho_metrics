@@ -85,6 +85,21 @@ const restrictedConcreteActionColorFallbackSyntax = [
   },
 ];
 
+const restrictedRenderTimingVocabularySyntax = [
+  {
+    selector: 'Identifier[name=/cad[ae]nce/i]',
+    message: 'Use render timer or render interval instead of cadence/cadance in TypeScript code.',
+  },
+  {
+    selector: 'Literal[value=/cad[ae]nce/i]',
+    message: 'Use render timer or render interval instead of cadence/cadance in TypeScript code.',
+  },
+  {
+    selector: 'TemplateElement[value.raw=/cad[ae]nce/i]',
+    message: 'Use render timer or render interval instead of cadence/cadance in TypeScript code.',
+  },
+];
+
 const restrictedSchemaHardeningImports = {
   paths: [
     {
@@ -266,6 +281,7 @@ export default tseslint.config(
         'error',
         ...restrictedLegacySettingSyntax,
         ...restrictedSettingsCompatibilitySyntax,
+        ...restrictedRenderTimingVocabularySyntax,
       ],
     },
   },
@@ -273,6 +289,10 @@ export default tseslint.config(
     files: ['src/**/*.test.ts'],
     rules: {
       ...sourceSafetyRules,
+      'no-restricted-syntax': [
+        'error',
+        ...restrictedRenderTimingVocabularySyntax,
+      ],
     },
   },
   {
@@ -289,6 +309,7 @@ export default tseslint.config(
         'error',
         ...restrictedLegacySettingSyntax,
         ...restrictedSettingsCompatibilitySyntax,
+        ...restrictedRenderTimingVocabularySyntax,
         ...restrictedActionPayloadSettingsMutationSyntax,
         {
           selector: 'MemberExpression[object.type="MemberExpression"][object.object.name="event"][object.property.name="payload"][property.name="settings"]',
@@ -304,6 +325,7 @@ export default tseslint.config(
         'error',
         ...restrictedLegacySettingSyntax,
         ...restrictedSettingsCompatibilitySyntax,
+        ...restrictedRenderTimingVocabularySyntax,
         ...restrictedActionPayloadSettingsMutationSyntax,
       ],
     },
@@ -316,6 +338,7 @@ export default tseslint.config(
         'error',
         ...restrictedLegacySettingSyntax,
         ...restrictedSettingsCompatibilitySyntax,
+        ...restrictedRenderTimingVocabularySyntax,
         ...restrictedConcreteActionRawSettingsSyntax,
         ...restrictedActionPayloadSettingsMutationSyntax,
         ...restrictedConcreteActionVisualFallbackSyntax,
@@ -333,6 +356,7 @@ export default tseslint.config(
         'error',
         ...restrictedLegacySettingSyntax,
         ...restrictedSettingsCompatibilitySyntax,
+        ...restrictedRenderTimingVocabularySyntax,
       ],
     },
   },
@@ -343,6 +367,7 @@ export default tseslint.config(
         'error',
         ...restrictedLegacySettingSyntax,
         ...restrictedSettingsCompatibilitySyntax,
+        ...restrictedRenderTimingVocabularySyntax,
         ...restrictedMetricVisualAliasSyntax,
       ],
     },
