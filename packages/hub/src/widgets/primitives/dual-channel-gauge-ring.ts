@@ -40,7 +40,7 @@ export interface DualGaugeChannelModel {
      * semantic progress onto the mirrored geometry without changing the metric
      * value itself.
      */
-    gaugeProgressDirection: "start-to-end" | "end-to-start";
+    progressDirection: "start-to-end" | "end-to-start";
     gaugeStartAngleDegrees: number;
     gaugeEndAngleDegrees: number;
 }
@@ -112,7 +112,7 @@ function buildGaugeLaneModel(options: {
         visibleLength,
     });
     const markerLaneProgress = resolveGaugeLaneProgress(
-        options.channel.gaugeProgressDirection,
+        options.channel.progressDirection,
         markerRenderProgress,
     );
     const markerAngleDegrees = options.channel.gaugeStartAngleDegrees + arcAngleDegrees * markerLaneProgress;
@@ -129,7 +129,7 @@ function buildGaugeLaneModel(options: {
             endAngleDegrees: options.channel.gaugeEndAngleDegrees,
             visibleLength,
         },
-        colorPlan: options.channel.gaugeProgressDirection === "end-to-start"
+        colorPlan: options.channel.progressDirection === "end-to-start"
             ? reverseGaugeRangeColorPlan(colorPlan)
             : colorPlan,
         markerDot: {
@@ -144,7 +144,7 @@ function buildGaugeLaneModel(options: {
 }
 
 function resolveGaugeLaneProgress(
-    progressDirection: DualGaugeChannelModel["gaugeProgressDirection"],
+    progressDirection: DualGaugeChannelModel["progressDirection"],
     progress: number,
 ): number {
     if (progressDirection === "end-to-start") {
