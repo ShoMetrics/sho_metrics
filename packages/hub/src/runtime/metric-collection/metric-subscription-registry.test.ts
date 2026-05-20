@@ -1,110 +1,104 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MetricSubscriptionRegistry } from "./metric-subscription-registry";
-import type { MetricReadPlan } from "../sources/metric-read-plan";
+import { MetricSubscriptionRegistry, type MetricSubscription } from "./metric-subscription-registry";
 
-test("registerReadPlanBridge stores a normalized bridge subscription", () => {
+test("register stores direct metric subscriptions", () => {
     const registry = new MetricSubscriptionRegistry();
 
-    registry.registerReadPlanBridge({
+    registry.register({
         subscriberId: "action-1",
-        readPlan: buildReadPlan(["gpu.temp", "cpu.usage_percent", "gpu.temp"]),
-        intervalMilliseconds: 1000,
+        subscriptions: [
+            buildSubscription("action-1", "gpu.temp", 1000),
+            buildSubscription("action-1", "cpu.usage_percent", 1000),
+        ],
     });
 
-    assert.deepEqual(registry.listSubscriptions(), [{
-        subscriberId: "action-1",
-        metricKey: "cpu.usage_percent",
-        sourceScopeId: "local",
-        sourceCandidates: [{ sourceId: "node-system" }],
-        failureMode: "fallback",
-        intervalMilliseconds: 1000,
-    }, {
-        subscriberId: "action-1",
-        metricKey: "gpu.temp",
-        sourceScopeId: "local",
-        sourceCandidates: [{ sourceId: "node-system" }],
-        failureMode: "fallback",
-        intervalMilliseconds: 1000,
-    }]);
+    assert.deepEqual(registry.listSubscriptions(), [
+        buildSubscription("action-1", "cpu.usage_percent", 1000),
+        buildSubscription("action-1", "gpu.temp", 1000),
+    ]);
 });
 
-test("registerReadPlanBridge replaces an existing subscriber", () => {
+test("register deduplicates duplicate metric subscriptions for one subscriber", () => {
     const registry = new MetricSubscriptionRegistry();
 
-    registry.registerReadPlanBridge({
+    registry.register({
         subscriberId: "action-1",
-        readPlan: buildReadPlan(["cpu.usage_percent"]),
-        intervalMilliseconds: 1000,
-    });
-    registry.registerReadPlanBridge({
-        subscriberId: "action-1",
-        readPlan: buildReadPlan(["net.down"]),
-        intervalMilliseconds: 5000,
+        subscriptions: [
+            buildSubscription("action-1", "gpu.temp", 1000),
+            buildSubscription("action-1", "cpu.usage_percent", 1000),
+            buildSubscription("action-1", "gpu.temp", 1000),
+        ],
     });
 
-    assert.deepEqual(registry.listSubscriptions(), [{
+    assert.deepEqual(registry.listSubscriptions(), [
+        buildSubscription("action-1", "cpu.usage_percent", 1000),
+        buildSubscription("action-1", "gpu.temp", 1000),
+    ]);
+});
+
+test("register replaces an existing subscriber", () => {
+    const registry = new MetricSubscriptionRegistry();
+
+    registry.register({
         subscriberId: "action-1",
-        metricKey: "net.down",
-        sourceScopeId: "local",
-        sourceCandidates: [{ sourceId: "node-system" }],
-        failureMode: "fallback",
-        intervalMilliseconds: 5000,
-    }]);
+        subscriptions: [buildSubscription("action-1", "cpu.usage_percent", 1000)],
+    });
+    registry.register({
+        subscriberId: "action-1",
+        subscriptions: [buildSubscription("action-1", "net.down", 5000)],
+    });
+
+    assert.deepEqual(registry.listSubscriptions(), [
+        buildSubscription("action-1", "net.down", 5000),
+    ]);
 });
 
 test("unregister removes one subscriber without touching others", () => {
     const registry = new MetricSubscriptionRegistry();
 
-    registry.registerReadPlanBridge({
+    registry.register({
         subscriberId: "action-1",
-        readPlan: buildReadPlan(["cpu.usage_percent"]),
-        intervalMilliseconds: 1000,
+        subscriptions: [buildSubscription("action-1", "cpu.usage_percent", 1000)],
     });
-    registry.registerReadPlanBridge({
+    registry.register({
         subscriberId: "action-2",
-        readPlan: buildReadPlan(["gpu.temp"]),
-        intervalMilliseconds: 1000,
+        subscriptions: [buildSubscription("action-2", "gpu.temp", 1000)],
     });
 
     registry.unregister("action-1");
 
-    assert.deepEqual(registry.listSubscriptions(), [{
-        subscriberId: "action-2",
-        metricKey: "gpu.temp",
-        sourceScopeId: "local",
-        sourceCandidates: [{ sourceId: "node-system" }],
-        failureMode: "fallback",
-        intervalMilliseconds: 1000,
-    }]);
+    assert.deepEqual(registry.listSubscriptions(), [
+        buildSubscription("action-2", "gpu.temp", 1000),
+    ]);
 });
 
 test("invalidatePlans increments the planning version without dropping subscriptions", () => {
     const registry = new MetricSubscriptionRegistry();
 
-    registry.registerReadPlanBridge({
+    registry.register({
         subscriberId: "action-1",
-        readPlan: buildReadPlan(["cpu.usage_percent"]),
-        intervalMilliseconds: 1000,
+        subscriptions: [buildSubscription("action-1", "cpu.usage_percent", 1000)],
     });
 
     assert.equal(registry.invalidatePlans(), 1);
 
-    assert.deepEqual(registry.listSubscriptions(), [{
-        subscriberId: "action-1",
-        metricKey: "cpu.usage_percent",
-        sourceScopeId: "local",
-        sourceCandidates: [{ sourceId: "node-system" }],
-        failureMode: "fallback",
-        intervalMilliseconds: 1000,
-    }]);
+    assert.deepEqual(registry.listSubscriptions(), [
+        buildSubscription("action-1", "cpu.usage_percent", 1000),
+    ]);
 });
 
-function buildReadPlan(metricKeys: readonly string[]): MetricReadPlan {
+function buildSubscription(
+    subscriberId: string,
+    metricKey: string,
+    intervalMilliseconds: number,
+): MetricSubscription {
     return {
+        subscriberId,
+        metricKey,
         sourceScopeId: "local",
-        metricKeys,
         sourceCandidates: [{ sourceId: "node-system" }],
         failureMode: "fallback",
+        intervalMilliseconds,
     };
 }

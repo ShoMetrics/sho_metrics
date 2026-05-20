@@ -7,7 +7,7 @@ import streamDeck, {
     type SendToPluginEvent,
 } from "@elgato/streamdeck";
 import { metricStore, type MetricStoreReader } from "../runtime/metric-store";
-import type { MetricReadPlan } from "../runtime/sources/metric-read-plan";
+import { normalizeMetricReadPlan, type MetricReadPlan } from "../runtime/sources/metric-read-plan";
 import { buildMetricReadPlanFromSourcePolicy } from "../runtime/sources/metric-read-plan-builder";
 import { clearMetricViewState } from "../view-updates/runner";
 import { logger } from "../logging/logger";
@@ -36,6 +36,7 @@ import {
 } from "./shared/background-collection-binding";
 import { createFallbackMetricStoreReader } from "../runtime/metric-collection/fallback-composer";
 import { backgroundMetricCollection } from "../runtime/metric-collection/background-metric-collection";
+import type { MetricSubscription } from "../runtime/metric-collection/metric-subscription-registry";
 
 const log = logger.for("MetricAction");
 
@@ -264,6 +265,11 @@ export abstract class MetricAction extends SingletonAction {
         metricCollectionBinding.refresh({
             subscriberId: event.action.id,
             readPlan,
+            metricSubscriptions: buildMetricSubscriptions({
+                subscriberId: event.action.id,
+                readPlan,
+                intervalMilliseconds: pollingIntervalMilliseconds,
+            }),
             pollingIntervalMilliseconds,
             maximumSampleAgeMilliseconds,
             onTick: () => {
@@ -354,6 +360,23 @@ function resolvePollingIntervalMilliseconds(pollingFrequencySeconds: number): nu
 function resolveFallbackSampleFreshnessBudgetMilliseconds(pollingFrequencySeconds: number): number {
     return resolvePollingIntervalMilliseconds(pollingFrequencySeconds)
         + FALLBACK_SAMPLE_FRESHNESS_GRACE_MILLISECONDS;
+}
+
+function buildMetricSubscriptions(options: {
+    readonly subscriberId: string;
+    readonly readPlan: MetricReadPlan;
+    readonly intervalMilliseconds: number;
+}): readonly MetricSubscription[] {
+    const readPlan = normalizeMetricReadPlan(options.readPlan);
+
+    return readPlan.metricKeys.map(metricKey => ({
+        subscriberId: options.subscriberId,
+        metricKey,
+        sourceScopeId: readPlan.sourceScopeId,
+        sourceCandidates: readPlan.sourceCandidates,
+        failureMode: readPlan.failureMode,
+        intervalMilliseconds: options.intervalMilliseconds,
+    }));
 }
 
 function formatSettingValue(value: unknown): string {

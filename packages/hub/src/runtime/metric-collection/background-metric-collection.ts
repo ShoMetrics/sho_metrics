@@ -15,7 +15,7 @@ import { CollectorGroupPlanner } from "./collector-group-planner";
 import { CollectorGroupSupervisor } from "./collector-group-supervisor";
 import {
     MetricSubscriptionRegistry,
-    type RegisterMetricReadPlanSubscriptionBridgeOptions,
+    type RegisterMetricSubscriptionsOptions,
 } from "./metric-subscription-registry";
 
 const log = logger.for("BackgroundMetricCollection");
@@ -49,15 +49,13 @@ export class BackgroundMetricCollection {
     }
 
     /**
-     * Registers one migration-era read-plan subscription.
+     * Registers one action's collection subscriptions.
      *
-     * This is a collection-only subscription. Rendering is owned by the action
-     * render interval; this method only keeps source samples fresh in MetricStore.
+     * This is collection-only state. Rendering is owned by the action render
+     * interval; this method only keeps source samples fresh in MetricStore.
      */
-    registerReadPlanBridgeSubscription(
-        options: RegisterMetricReadPlanSubscriptionBridgeOptions,
-    ): () => void {
-        this.subscriptionRegistry.registerReadPlanBridge(options);
+    registerSubscriptions(options: RegisterMetricSubscriptionsOptions): () => void {
+        this.subscriptionRegistry.register(options);
         this.reconcileCollectorGroups();
 
         return () => {

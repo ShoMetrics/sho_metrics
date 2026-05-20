@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { MetricSubscription } from "../../runtime/metric-collection/metric-subscription-registry";
 import type { MetricReadPlan } from "../../runtime/sources/metric-read-plan";
 import { BackgroundCollectionBinding, type BackgroundCollectionBindingTimer } from "./background-collection-binding";
 
 interface CollectionRegistrationRecord {
     readonly subscriberId: string;
-    readonly readPlan: MetricReadPlan;
-    readonly intervalMilliseconds: number;
+    readonly metricSubscriptions: readonly MetricSubscription[];
     cleanupCallCount: number;
 }
 
@@ -33,6 +33,7 @@ test("first refresh registers collection and starts render timer", () => {
         binding.refresh({
             subscriberId: "action-1",
             readPlan: buildReadPlan(["memory.used"]),
+            metricSubscriptions: [buildSubscription("action-1", "memory.used", 1000)],
             pollingIntervalMilliseconds: 1000,
             maximumSampleAgeMilliseconds: 6000,
             onTick: () => {
@@ -42,8 +43,9 @@ test("first refresh registers collection and starts render timer", () => {
         timer.runAll();
 
         assert.equal(registrations.length, 1);
-        assert.deepEqual(registrations[0].readPlan.metricKeys, ["memory.used"]);
-        assert.equal(registrations[0].intervalMilliseconds, 1000);
+        assert.deepEqual(registrations[0].metricSubscriptions, [
+            buildSubscription("action-1", "memory.used", 1000),
+        ]);
         assert.deepEqual(timer.recordedIntervalsMilliseconds, [1000, 500]);
         assert.equal(tickCount, 1);
     } finally {
@@ -72,6 +74,7 @@ test("refresh with the same read plan and interval keeps existing collection", (
         binding.refresh({
             subscriberId: "action-1",
             readPlan: buildReadPlan(["memory.used"]),
+            metricSubscriptions: [buildSubscription("action-1", "memory.used", 1000)],
             pollingIntervalMilliseconds: 1000,
             maximumSampleAgeMilliseconds: 6000,
             onTick: () => undefined,
@@ -79,6 +82,7 @@ test("refresh with the same read plan and interval keeps existing collection", (
         binding.refresh({
             subscriberId: "action-1",
             readPlan: buildReadPlan(["memory.used"]),
+            metricSubscriptions: [buildSubscription("action-1", "memory.used", 1000)],
             pollingIntervalMilliseconds: 1000,
             maximumSampleAgeMilliseconds: 6000,
             onTick: () => undefined,
@@ -113,6 +117,7 @@ test("refresh with a different plan replaces collection and render timer", () =>
         binding.refresh({
             subscriberId: "action-1",
             readPlan: buildReadPlan(["memory.used"]),
+            metricSubscriptions: [buildSubscription("action-1", "memory.used", 1000)],
             pollingIntervalMilliseconds: 1000,
             maximumSampleAgeMilliseconds: 6000,
             onTick: () => undefined,
@@ -120,6 +125,7 @@ test("refresh with a different plan replaces collection and render timer", () =>
         binding.refresh({
             subscriberId: "action-1",
             readPlan: buildReadPlan(["memory.total"]),
+            metricSubscriptions: [buildSubscription("action-1", "memory.total", 5000)],
             pollingIntervalMilliseconds: 5000,
             maximumSampleAgeMilliseconds: 10000,
             onTick: () => undefined,
@@ -127,7 +133,9 @@ test("refresh with a different plan replaces collection and render timer", () =>
 
         assert.equal(registrations.length, 2);
         assert.equal(registrations[0].cleanupCallCount, 1);
-        assert.deepEqual(registrations[1].readPlan.metricKeys, ["memory.total"]);
+        assert.deepEqual(registrations[1].metricSubscriptions, [
+            buildSubscription("action-1", "memory.total", 5000),
+        ]);
         assert.deepEqual(timer.recordedIntervalsMilliseconds, [1000, 500, 5000, 500]);
         assert.equal(timer.clearedHandleCount, 2);
     } finally {
@@ -156,6 +164,7 @@ test("dispose unregisters collection and clears render timer", () => {
     binding.refresh({
         subscriberId: "action-1",
         readPlan: buildReadPlan(["memory.used"]),
+        metricSubscriptions: [buildSubscription("action-1", "memory.used", 1000)],
         pollingIntervalMilliseconds: 1000,
         maximumSampleAgeMilliseconds: 6000,
         onTick: () => undefined,
@@ -185,6 +194,10 @@ test("first-reading warmup renders once when any subscribed metric receives a re
         binding.refresh({
             subscriberId: "action-1",
             readPlan: buildReadPlan(["disk.usage.percent", "disk.usage.available"]),
+            metricSubscriptions: [
+                buildSubscription("action-1", "disk.usage.percent", 60000),
+                buildSubscription("action-1", "disk.usage.available", 60000),
+            ],
             pollingIntervalMilliseconds: 60000,
             maximumSampleAgeMilliseconds: 65000,
             onTick: () => {
@@ -256,5 +269,20 @@ function buildReadPlan(metricKeys: readonly string[]): MetricReadPlan {
         metricKeys,
         sourceCandidates: [{ sourceId: "node-system" }],
         failureMode: "empty",
+    };
+}
+
+function buildSubscription(
+    subscriberId: string,
+    metricKey: string,
+    intervalMilliseconds: number,
+): MetricSubscription {
+    return {
+        subscriberId,
+        metricKey,
+        sourceScopeId: "local",
+        sourceCandidates: [{ sourceId: "node-system" }],
+        failureMode: "empty",
+        intervalMilliseconds,
     };
 }

@@ -3,6 +3,11 @@
 Phase 5a and Phase 5b reduce cross-collector blocking without yet changing the
 fundamental pull-based runtime shape.
 
+Status after Phase 5c: this document is historical design evidence. The old
+Scheduler and SourceRunner hot path no longer exists in production code, but the
+source-declared polling group model survived and now feeds
+`CollectorGroupPlanner`/`CollectorGroupRunner`.
+
 ## Phase 5a: Scheduler Group Isolation
 
 Phase 5a changes Scheduler coalescing from "same interval and source plan" to
@@ -406,30 +411,21 @@ into scheduler complexity:
 
 ## Current Implementation State
 
-Current production path:
+Current production path after Phase 5c:
 
-- Scheduler accepts a `planMetricPollingGroups` dependency.
-- Production Scheduler uses `planMetricPollingGroups(readPlan, sourceRegistry)`.
+- Scheduler-as-I/O-owner and SourceRunner hot-path orchestration have been
+  deleted.
 - `node-system` declares source-owned polling groups.
-- A static bridge remains for legacy sources that do not yet declare groups.
-- `SourceClient` and `MetricSource` still use
-  `Partial<SourceMetricPollingGroupResolver>` during migration.
-
-Maintenance rule while the static bridge exists: when adding a new built-in
-metric family or stable metric key prefix, update `metric-polling-groups.ts` and
-its tests. Unknown metric keys still work, but they will not coalesce with the
-intended collector and may be more expensive until mapped.
-
-The static bridge is temporary. The migration is complete only when:
-
-- `windows-helper` declares static or descriptor-backed groups.
-- `MetricSource` and `SourceClient` require the resolver contract.
-- `metric-polling-groups.ts` has no production or test importers.
-- Scheduler tests keep coverage for true planner signatures, not only legacy
-  short group ids.
+- `windows-helper` declares a helper snapshot polling group.
+- `SourceClient` requires the polling group resolver contract.
+- The static `metric-polling-groups.ts` bridge and its tests have been deleted.
+- Runtime grouping now happens through `CollectorGroupPlanner` from active
+  `MetricSubscription` records, not through Scheduler ticks.
 
 ## Why Phase 5c Still Exists
 
-Phase 5a/5b reduced how far collector stalls can spread. They did not remove
-collector I/O from the visible refresh chain. Phase 5c changes the shape from
-synchronous pull to demand-driven background collection.
+Phase 5a/5b reduced how far collector stalls could spread. They did not remove
+collector I/O from the visible refresh chain. Phase 5c changed the shape from
+synchronous pull to demand-driven background collection; see
+`03-phase-5c-demand-driven-background-collection.md` for the current runtime
+architecture.
