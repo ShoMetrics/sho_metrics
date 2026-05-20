@@ -15,9 +15,10 @@ export interface PlannedMetricPollingGroup {
 /**
  * Partitions metric keys by fallback-aware source-declared collector ownership.
  *
- * This is the Phase 5b planner entry point. The current Scheduler still uses
- * the static bridge directly; this planner lets source-declared ownership land
- * behind tests before Scheduler behavior changes.
+ * The Scheduler uses this planner to decide which metric keys are safe to poll
+ * together. The group id is a source-candidate signature, not a hardware label:
+ * two metrics only coalesce when every source candidate in the read plan would
+ * collect them through the same source-scoped cost boundary.
  */
 export function planMetricPollingGroups(
     readPlan: MetricReadPlan,
@@ -54,6 +55,8 @@ export function planMetricPollingGroups(
 }
 
 function selectSourceCandidatesForFailureMode(readPlan: MetricReadPlan): readonly SourceCandidate[] {
+    // In non-fallback modes only the primary candidate can affect this poll, so
+    // fallback ownership must not split or merge the scheduled group.
     return readPlan.failureMode === "fallback"
         ? readPlan.sourceCandidates
         : readPlan.sourceCandidates.slice(0, 1);
@@ -85,6 +88,9 @@ function resolveMetricKeysWithStaticBridge(
 ): ReadonlyMap<string, SourceMetricPollingGroupResolution> {
     const resolutions = new Map<string, SourceMetricPollingGroupResolution>();
 
+    // Temporary Phase 5b migration bridge for legacy sources. The input has
+    // already been normalized, so iterating directly avoids running the static
+    // predicate cascade twice.
     for (const metricKey of metricKeys) {
         const pollingGroupId = resolveMetricPollingGroupId(metricKey);
         resolutions.set(metricKey, pollingGroupId === "unknown"
