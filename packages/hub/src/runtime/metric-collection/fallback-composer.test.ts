@@ -5,6 +5,9 @@ import { buildMetricSnapshot, buildScalarMetricValue, buildTextMetricValue } fro
 import { normalizeMetricReadPlan, type MetricReadPlan } from "../sources/metric-read-plan";
 import { createFallbackMetricStoreReader } from "./fallback-composer";
 
+const TEST_NOW_MILLISECONDS = 3000;
+const TEST_MAXIMUM_SAMPLE_AGE_MILLISECONDS = 5000;
+
 test("fallback reader uses the first source candidate with a scalar sample", () => {
     const metricStore = new MetricStore();
     const readPlan = buildReadPlan();
@@ -22,7 +25,7 @@ test("fallback reader uses the first source candidate with a scalar sample", () 
         },
     }));
 
-    const reader = createFallbackMetricStoreReader(metricStore, readPlan);
+    const reader = createTestFallbackReader(metricStore, readPlan);
 
     assert.equal(reader.getWidgetData("ram.used", "RAM", "B").current, 25);
 });
@@ -38,7 +41,7 @@ test("fallback reader uses the next source candidate when the primary has no sca
         },
     }));
 
-    const reader = createFallbackMetricStoreReader(metricStore, readPlan);
+    const reader = createTestFallbackReader(metricStore, readPlan);
 
     assert.deepEqual(reader.getWidgetData("ram.used", "RAM", "B"), {
         current: 50,
@@ -47,6 +50,63 @@ test("fallback reader uses the next source candidate when the primary has no sca
         unit: "B",
         label: "RAM",
         sampleTimestampMilliseconds: 2000,
+    });
+});
+
+test("fallback reader uses fallback when the primary scalar sample is stale", () => {
+    const metricStore = new MetricStore();
+    const readPlan = buildReadPlan();
+
+    metricStore.ingest("windows-helper", buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            "ram.used": buildScalarMetricValue(25),
+        },
+    }));
+    metricStore.ingest("node-system", buildMetricSnapshot({
+        timestampMilliseconds: 10000,
+        metrics: {
+            "ram.used": buildScalarMetricValue(50),
+        },
+    }));
+
+    const reader = createTestFallbackReader(metricStore, readPlan, {
+        now: 11000,
+        maximumSampleAgeMilliseconds: 5000,
+    });
+
+    assert.equal(reader.getWidgetData("ram.used", "RAM", "B").current, 50);
+});
+
+test("fallback reader returns no data when every scalar sample is stale", () => {
+    const metricStore = new MetricStore();
+    const readPlan = buildReadPlan();
+
+    metricStore.ingest("windows-helper", buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            "ram.used": buildScalarMetricValue(25),
+        },
+    }));
+    metricStore.ingest("node-system", buildMetricSnapshot({
+        timestampMilliseconds: 2000,
+        metrics: {
+            "ram.used": buildScalarMetricValue(50),
+        },
+    }));
+
+    const reader = createTestFallbackReader(metricStore, readPlan, {
+        now: 11000,
+        maximumSampleAgeMilliseconds: 5000,
+    });
+
+    assert.deepEqual(reader.getWidgetData("ram.used", "RAM", "B"), {
+        current: 0,
+        progress: 0,
+        history: [],
+        unit: "B",
+        label: "RAM",
+        sampleTimestampMilliseconds: undefined,
     });
 });
 
@@ -67,7 +127,7 @@ test("fallback reader uses fallback when the primary source writes invalid sampl
         },
     }));
 
-    const reader = createFallbackMetricStoreReader(metricStore, readPlan);
+    const reader = createTestFallbackReader(metricStore, readPlan);
 
     assert.equal(reader.getWidgetData("ram.used", "RAM", "B").current, 50);
 });
@@ -83,7 +143,7 @@ test("fallback reader uses only the primary candidate in empty failure mode", ()
         },
     }));
 
-    const reader = createFallbackMetricStoreReader(metricStore, readPlan);
+    const reader = createTestFallbackReader(metricStore, readPlan);
 
     assert.equal(
         reader.getWidgetData("ram.used", "RAM", "B").sampleTimestampMilliseconds,
@@ -102,7 +162,7 @@ test("fallback reader uses the next source candidate when the primary has no tex
         },
     }));
 
-    const reader = createFallbackMetricStoreReader(metricStore, readPlan);
+    const reader = createTestFallbackReader(metricStore, readPlan);
 
     assert.equal(reader.getTextValue("cpu.model"), "Example CPU");
 });
@@ -110,7 +170,7 @@ test("fallback reader uses the next source candidate when the primary has no tex
 test("fallback reader returns render-safe defaults when no candidate has a sample", () => {
     const metricStore = new MetricStore();
     const readPlan = buildReadPlan();
-    const reader = createFallbackMetricStoreReader(metricStore, readPlan);
+    const reader = createTestFallbackReader(metricStore, readPlan);
 
     assert.deepEqual(reader.getWidgetData("ram.used", "RAM", "B"), {
         current: 0,
@@ -122,6 +182,21 @@ test("fallback reader returns render-safe defaults when no candidate has a sampl
     });
     assert.equal(reader.getTextValue("cpu.model"), undefined);
 });
+
+function createTestFallbackReader(
+    metricStore: MetricStore,
+    readPlan: MetricReadPlan,
+    options: {
+        readonly now?: number;
+        readonly maximumSampleAgeMilliseconds?: number;
+    } = {},
+) {
+    return createFallbackMetricStoreReader(metricStore, readPlan, {
+        now: () => options.now ?? TEST_NOW_MILLISECONDS,
+        maximumSampleAgeMilliseconds: options.maximumSampleAgeMilliseconds
+            ?? TEST_MAXIMUM_SAMPLE_AGE_MILLISECONDS,
+    });
+}
 
 function buildReadPlan(
     options: Partial<Pick<MetricReadPlan, "failureMode">> = {},

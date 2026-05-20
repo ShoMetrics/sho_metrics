@@ -34,6 +34,7 @@ test("first refresh registers collection and starts render timer", () => {
             subscriberId: "action-1",
             readPlan: buildReadPlan(["memory.used"]),
             pollingIntervalMilliseconds: 1000,
+            maximumSampleAgeMilliseconds: 6000,
             onTick: () => {
                 tickCount += 1;
             },
@@ -72,12 +73,14 @@ test("refresh with the same read plan and interval keeps existing collection", (
             subscriberId: "action-1",
             readPlan: buildReadPlan(["memory.used"]),
             pollingIntervalMilliseconds: 1000,
+            maximumSampleAgeMilliseconds: 6000,
             onTick: () => undefined,
         });
         binding.refresh({
             subscriberId: "action-1",
             readPlan: buildReadPlan(["memory.used"]),
             pollingIntervalMilliseconds: 1000,
+            maximumSampleAgeMilliseconds: 6000,
             onTick: () => undefined,
         });
 
@@ -111,12 +114,14 @@ test("refresh with a different plan replaces collection and render timer", () =>
             subscriberId: "action-1",
             readPlan: buildReadPlan(["memory.used"]),
             pollingIntervalMilliseconds: 1000,
+            maximumSampleAgeMilliseconds: 6000,
             onTick: () => undefined,
         });
         binding.refresh({
             subscriberId: "action-1",
             readPlan: buildReadPlan(["memory.total"]),
             pollingIntervalMilliseconds: 5000,
+            maximumSampleAgeMilliseconds: 10000,
             onTick: () => undefined,
         });
 
@@ -152,6 +157,7 @@ test("dispose unregisters collection and clears render timer", () => {
         subscriberId: "action-1",
         readPlan: buildReadPlan(["memory.used"]),
         pollingIntervalMilliseconds: 1000,
+        maximumSampleAgeMilliseconds: 6000,
         onTick: () => undefined,
     });
     binding.dispose();
@@ -163,11 +169,15 @@ test("dispose unregisters collection and clears render timer", () => {
 
 test("first-reading warmup renders once when any subscribed metric receives a reading", () => {
     const metricKeysWithReadings = new Set<string>();
+    const checkedMaximumSampleAgeMilliseconds: number[] = [];
     const timer = new FakeTimer();
     const binding = new BackgroundCollectionBinding(
         () => () => undefined,
         timer,
-        readPlan => readPlan.metricKeys.some(metricKey => metricKeysWithReadings.has(metricKey)),
+        (readPlan, maximumSampleAgeMilliseconds) => {
+            checkedMaximumSampleAgeMilliseconds.push(maximumSampleAgeMilliseconds);
+            return readPlan.metricKeys.some(metricKey => metricKeysWithReadings.has(metricKey));
+        },
     );
     let tickCount = 0;
 
@@ -176,6 +186,7 @@ test("first-reading warmup renders once when any subscribed metric receives a re
             subscriberId: "action-1",
             readPlan: buildReadPlan(["disk.usage.percent", "disk.usage.available"]),
             pollingIntervalMilliseconds: 60000,
+            maximumSampleAgeMilliseconds: 65000,
             onTick: () => {
                 tickCount += 1;
             },
@@ -188,6 +199,7 @@ test("first-reading warmup renders once when any subscribed metric receives a re
         timer.runByInterval(500);
 
         assert.equal(tickCount, 1);
+        assert.deepEqual(checkedMaximumSampleAgeMilliseconds, [65000, 65000]);
         assert.equal(timer.clearedHandleCount, 1);
     } finally {
         binding.dispose();

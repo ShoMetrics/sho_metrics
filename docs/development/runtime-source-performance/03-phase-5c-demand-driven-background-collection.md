@@ -362,6 +362,38 @@ subscription's source policy. It returns the first fresh, valid displayable valu
 or a no-data result. Render-facing code may still ask for a logical metric key;
 the source-scoped lookup and fallback policy remain runtime internals.
 
+Fallback freshness bug fixed after Slice 6:
+
+- Repro case: a primary source profile writes a scalar sample once, then stops
+  refreshing because the helper disconnects, enters backoff, or times out. A
+  fallback source profile continues writing fresh samples for the same metric.
+- User impact before the fix: read-time fallback accepted the primary merely
+  because it had ever written a sample. The stale primary could therefore hide a
+  fresh fallback indefinitely, leaving the widget stuck on old data instead of
+  degrading to the fallback source or `N/A`.
+- Fix: `FallbackComposer` now accepts scalar samples only inside the action's
+  freshness budget. `MetricAction` sets that budget to the configured render
+  interval plus a 5s grace window, so 1Hz widgets degrade quickly while
+  60s widgets are not incorrectly marked stale after a fixed short TTL.
+- Performance cost: render-time fallback now performs one timestamp comparison
+  per source candidate before accepting a scalar sample. It does not perform
+  source I/O and does not add timers, subscriptions, or store scans beyond the
+  already-requested metric key.
+
+Known edge case not solved by this fix:
+
+- If a primary helper repeatedly connects, writes a fresh sample, disconnects,
+  and reconnects on a short cycle such as every 10s or 100s, the display may
+  switch between helper and fallback when the helper sample crosses the
+  freshness budget.
+- This is source flapping, not render blocking. The current fix guarantees that
+  stale primary samples cannot hide fresh fallback samples forever; it does not
+  implement source-health hysteresis or "only promote primary after N stable
+  successes" policy.
+- This is not a current priority because it requires stateful source health
+  policy across candidates. Add it only if helper flapping becomes visible in
+  real logs or user testing.
+
 History retention:
 
 - The current product default is a short one-minute scalar history for existing
@@ -561,11 +593,10 @@ code and focused tests. It is not a commit target.
 
 Recommended execution order:
 
-1. Fix `FallbackComposer` freshness.
-2. Remove the deprecated `MetricReadPlan` bridge.
-3. Update stale historical docs.
-4. Design and implement descriptor/profile invalidation.
-5. Repeat the performance capture after the next TODO batch.
+1. Remove the deprecated `MetricReadPlan` bridge.
+2. Update stale historical docs.
+3. Design and implement descriptor/profile invalidation.
+4. Repeat the performance capture after the next TODO batch.
 
 Invalidation is intentionally later in the list even though it is high impact:
 it has the highest risk because it spans settings changes, source profile edits,
@@ -573,7 +604,6 @@ and helper descriptor refresh.
 
 | TODO | Priority | Estimated LOC | Why it still matters |
 | --- | ---: | ---: | --- |
-| Add `FallbackComposer` freshness checks. | High | 60-120 | Read-time fallback currently accepts the first candidate that has ever written a sample. A stale helper primary can therefore block a fresh `node-system` fallback until freshness budgets are enforced. |
 | Remove the `MetricReadPlan` subscription bridge. | Medium | 80-160 | `MetricSubscriptionRegistry.registerReadPlanBridge` is still a deprecated migration bridge. It is runnable technical debt, not a current correctness bug; clean it after measurement and fallback freshness are correct. |
 | Update historical docs after each major migration commit. | Medium | 40-100 | Some Phase 5a/5b text intentionally describes history, but implementation-state sections must not keep saying Scheduler/static bridge work is pending after those paths are deleted. |
 | Wire source profile and descriptor invalidation into re-planning. | High | 100-220 | LHM descriptors, source profile edits, and custom-source metadata changes must re-plan affected subscriptions without requiring actions to disappear and reappear. Do this after listing invalidation sources and trigger timing. |

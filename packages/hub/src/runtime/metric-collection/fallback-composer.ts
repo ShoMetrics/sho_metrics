@@ -1,9 +1,24 @@
 import type { MetricStore, MetricStoreReader } from "../metric-store";
+import type { WidgetData } from "../../view-rendering/widget-data";
 import {
     normalizeMetricReadPlan,
     type MetricReadPlan,
     selectMetricReadPlanSourceCandidates,
 } from "../sources/metric-read-plan";
+
+export interface FallbackMetricStoreReaderOptions {
+    /** Returns the current timestamp used to decide whether a candidate sample is still fresh. */
+    readonly now?: () => number;
+
+    /**
+     * Maximum scalar sample age accepted from a source candidate.
+     *
+     * Callers must set this from the visible action's collection interval plus
+     * a small grace window. A fixed global value would make low-frequency
+     * widgets render false N/A states.
+     */
+    readonly maximumSampleAgeMilliseconds: number;
+}
 
 /**
  * Creates a synchronous reader that applies a read plan's source fallback order.
@@ -15,32 +30,35 @@ import {
 export function createFallbackMetricStoreReader(
     metricStore: MetricStore,
     readPlan: MetricReadPlan,
+    options: FallbackMetricStoreReaderOptions,
 ): MetricStoreReader {
     const normalizedReadPlan = normalizeMetricReadPlan(readPlan);
     const sourceCandidates = selectMetricReadPlanSourceCandidates(normalizedReadPlan);
     const sourceReaders = sourceCandidates.map(candidate => metricStore.forScope(candidate.sourceId));
-    const defaultReader = sourceReaders[0] ?? metricStore.forScope(normalizedReadPlan.sourceScopeId);
+    const now = options.now ?? Date.now;
 
     return {
         getWidgetData: (metricKey, label, unit, maxValue) => {
+            const currentTimestampMilliseconds = now();
+
             for (const sourceReader of sourceReaders) {
                 const widgetData = sourceReader.getWidgetData(metricKey, label, unit, maxValue);
 
-                // TODO(Phase 5c fallback freshness): Check the candidate
-                // sample against the metric/source freshness budget before
-                // accepting it. Presence only means this source has written at
-                // least once; it does not prove the sample is still usable.
-                if (widgetData.sampleTimestampMilliseconds !== undefined) {
+                if (isFreshWidgetData(
+                    widgetData,
+                    currentTimestampMilliseconds,
+                    options.maximumSampleAgeMilliseconds,
+                )) {
                     return widgetData;
                 }
             }
 
-            // Return render-safe no-data defaults from the primary candidate
-            // reader. The loop above has already proven no candidate currently
-            // has an accepted sample.
-            return defaultReader.getWidgetData(metricKey, label, unit, maxValue);
+            return buildNoDataWidgetData({ label, unit });
         },
         getTextValue: metricKey => {
+            // Text values currently represent static descriptors such as CPU/GPU
+            // model names. Add timestamped text reads only when real-time text
+            // metrics need freshness semantics.
             for (const sourceReader of sourceReaders) {
                 const textValue = sourceReader.getTextValue(metricKey);
 
@@ -49,9 +67,36 @@ export function createFallbackMetricStoreReader(
                 }
             }
 
-            // Mirrors getWidgetData(): no accepted candidate text exists, so
-            // fall back to the primary reader's empty/default response.
-            return defaultReader.getTextValue(metricKey);
+            return undefined;
         },
+    };
+}
+
+function isFreshWidgetData(
+    widgetData: WidgetData,
+    currentTimestampMilliseconds: number,
+    maximumSampleAgeMilliseconds: number,
+): boolean {
+    const sampleTimestampMilliseconds = widgetData.sampleTimestampMilliseconds;
+
+    if (sampleTimestampMilliseconds === undefined) {
+        return false;
+    }
+
+    return currentTimestampMilliseconds - sampleTimestampMilliseconds
+        <= maximumSampleAgeMilliseconds;
+}
+
+function buildNoDataWidgetData(options: {
+    readonly label: string;
+    readonly unit: string;
+}): WidgetData {
+    return {
+        current: 0,
+        progress: 0,
+        history: [],
+        unit: options.unit,
+        label: options.label,
+        sampleTimestampMilliseconds: undefined,
     };
 }

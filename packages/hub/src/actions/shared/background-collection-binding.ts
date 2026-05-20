@@ -25,6 +25,8 @@ export interface BackgroundCollectionBindingRefreshOptions {
     readonly subscriberId: string;
     readonly readPlan: MetricReadPlan;
     readonly pollingIntervalMilliseconds: number;
+    /** Matches the render-time fallback freshness budget for the same action. */
+    readonly maximumSampleAgeMilliseconds: number;
     readonly onTick: () => void;
 }
 
@@ -67,7 +69,10 @@ export class BackgroundCollectionBinding {
         private readonly registerCollection: BackgroundCollectionRegistration
             = options => backgroundMetricCollection.registerReadPlanBridgeSubscription(options),
         private readonly timer: BackgroundCollectionBindingTimer = defaultTimer,
-        private readonly hasAnyMetricReading: (readPlan: MetricReadPlan) => boolean
+        private readonly hasAnyMetricReading: (
+            readPlan: MetricReadPlan,
+            maximumSampleAgeMilliseconds: number,
+        ) => boolean
             = hasAnyMetricStoreReading,
     ) {}
 
@@ -130,7 +135,10 @@ export class BackgroundCollectionBinding {
 
         this.firstReadingTimerHandle = this.timer.set(() => {
             attemptCount += 1;
-            const hasAnyReading = this.hasAnyMetricReading(options.readPlan);
+            const hasAnyReading = this.hasAnyMetricReading(
+                options.readPlan,
+                options.maximumSampleAgeMilliseconds,
+            );
 
             if (hasAnyReading) {
                 options.onTick();
@@ -150,8 +158,13 @@ export class BackgroundCollectionBinding {
     }
 }
 
-function hasAnyMetricStoreReading(readPlan: MetricReadPlan): boolean {
-    const reader = createFallbackMetricStoreReader(metricStore, readPlan);
+function hasAnyMetricStoreReading(
+    readPlan: MetricReadPlan,
+    maximumSampleAgeMilliseconds: number,
+): boolean {
+    const reader = createFallbackMetricStoreReader(metricStore, readPlan, {
+        maximumSampleAgeMilliseconds,
+    });
 
     return readPlan.metricKeys.some(metricKey => (
         reader.getWidgetData(metricKey, "", "").sampleTimestampMilliseconds !== undefined

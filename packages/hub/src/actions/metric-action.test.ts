@@ -26,6 +26,8 @@ import {
     resolveHardwareColorCompensationProfile,
 } from "../color-compensation/runtime-store";
 
+const TEST_CURRENT_TIMESTAMP_MILLISECONDS = 10_000;
+
 test("onWillAppear persists quick-start settings only when missing", () => {
     const action = new TestMetricAction();
     const streamDeckAction = new FakeStreamDeckAction("quick-start-action");
@@ -112,6 +114,7 @@ test("changed polling plan resubscribes and forces an immediate update", () => {
         assert.equal(action.bindings[0].refreshOptionsList.length, 2);
         assert.equal(action.bindings[0].refreshDisposeCallCount, 1);
         assert.equal(action.bindings[0].refreshOptionsList[1].pollingIntervalMilliseconds, 5000);
+        assert.equal(action.bindings[0].refreshOptionsList[1].maximumSampleAgeMilliseconds, 10000);
         assert.deepEqual(action.bindings[0].refreshOptionsList[0].readPlan.metricKeys, ["net.down"]);
         assert.deepEqual(action.bindings[0].refreshOptionsList[1].readPlan.metricKeys, ["net.up"]);
         assert.equal(action.metricsUpdateSnapshots.length, 2);
@@ -199,6 +202,7 @@ test("metric collection uses action-owned render timer", () => {
 
     assert.equal(action.bindings[0].refreshOptionsList.length, 1);
     assert.deepEqual(action.bindings[0].refreshOptionsList[0].readPlan.metricKeys, ["net.down"]);
+    assert.equal(action.bindings[0].refreshOptionsList[0].maximumSampleAgeMilliseconds, 6000);
     assert.equal(action.metricsUpdateSnapshots.length, 1);
 
     action.bindings[0].refreshOptionsList[0].onTick();
@@ -216,7 +220,7 @@ test("metric collection reads source-candidate samples through synchronous fallb
     const streamDeckAction = new FakeStreamDeckAction("background-fallback-action");
 
     metricStore.ingest("node-system", buildMetricSnapshot({
-        timestampMilliseconds: 1000,
+        timestampMilliseconds: TEST_CURRENT_TIMESTAMP_MILLISECONDS,
         metrics: {
             "net.down": buildScalarMetricValue(123),
         },
@@ -443,6 +447,10 @@ class TestMetricAction extends MetricAction {
         const binding = this.bindingFactory();
         this.bindings.push(binding);
         return binding;
+    }
+
+    protected override currentTimestampMilliseconds(): number {
+        return TEST_CURRENT_TIMESTAMP_MILLISECONDS;
     }
 }
 
