@@ -19,6 +19,7 @@ import type { ProgressCircleStatusIcon, CircleVariant } from "./progress-circle"
 import { renderDualGaugeRing } from "./dual-channel-gauge-ring";
 
 export type DualChannelProgressCircleCenterContent = "value" | "icon" | "icon-value-unit";
+type ArcProgressDirection = "start-to-end" | "end-to-start";
 
 export interface DualChannelProgressCircleConfig extends WidgetBaseConfig {
     trackColor: string;
@@ -119,8 +120,22 @@ interface ChannelArcModel {
     channelId: "positive" | "negative";
     color: string;
     colorConfig: ColorConfig;
+    /**
+     * The metric progress before any visual lane mirroring.
+     *
+     * Keep this as the semantic value from the metric: 0 is low traffic and 1
+     * is high traffic, regardless of which side of the circle owns the lane.
+     */
     progress: number;
-    gaugeProgressDirection: "start-to-end" | "end-to-start";
+    /**
+     * Whether geometric lane progress follows the lane start or is mirrored.
+     *
+     * `start-to-end` draws from the lane's geometric start. `end-to-start`
+     * anchors the colored segment at the lane's geometric end, which lets the
+     * right-side network lane behave as a visual mirror of the left-side lane
+     * without changing the metric progress value.
+     */
+    progressDirection: ArcProgressDirection;
     gaugeStartAngleDegrees: number;
     gaugeEndAngleDegrees: number;
     rotationDegrees: number;
@@ -170,10 +185,10 @@ export function renderDualChannelProgressCircle(
             color: config.positiveColor,
             colorConfig: config.positiveColorConfig ?? buildSolidChannelColorConfig(config.positiveColor),
             progress: data.positive.progress,
-            gaugeProgressDirection: "start-to-end",
+            progressDirection: "start-to-end",
             gaugeStartAngleDegrees: 90 + ARC_LAYOUT.gaugeBottomGapAngleDegrees / 2,
             gaugeEndAngleDegrees: 270 - ARC_LAYOUT.gaugeTopGapAngleDegrees / 2,
-            rotationDegrees: -90,
+            rotationDegrees: 90,
             iconRotationDegrees: -90,
             iconFragment: config.positiveIconFragment,
             statusIcon: config.positiveStatusIcon,
@@ -184,12 +199,12 @@ export function renderDualChannelProgressCircle(
             colorConfig: config.negativeColorConfig ?? buildSolidChannelColorConfig(config.negativeColor),
             progress: data.negative.progress,
             // The right lane is the visual mirror of the left lane: users see it
-            // fill from bottom to top, even though the shared gauge arc geometry
+            // fill from bottom to top, even though the circle/gauge geometry
             // draws that side clockwise from top to bottom.
-            gaugeProgressDirection: "end-to-start",
+            progressDirection: "end-to-start",
             gaugeStartAngleDegrees: 270 + ARC_LAYOUT.gaugeTopGapAngleDegrees / 2,
             gaugeEndAngleDegrees: 450 - ARC_LAYOUT.gaugeBottomGapAngleDegrees / 2,
-            rotationDegrees: 90,
+            rotationDegrees: -90,
             iconRotationDegrees: 90,
             iconFragment: config.negativeIconFragment,
             statusIcon: config.negativeStatusIcon,
@@ -238,6 +253,7 @@ function renderRing(options: {
     const visibleHalfLength = Math.max(1, options.geometry.halfLength - notchGapLength);
     const trackDashArray = `${visibleHalfLength} ${options.geometry.circumference - visibleHalfLength}`;
     const gapRotationOffset = options.hasNotches ? resolveNotchAngleDegrees(options.geometry, notchGapLength) / 2 : 0;
+    const visibleAngleDegrees = visibleHalfLength / options.geometry.circumference * 360;
 
     return `
         ${options.channelArcModels.map(channel => renderArcSegment({
@@ -250,7 +266,8 @@ function renderRing(options: {
             filter: options.subtleFilter,
         })).join("")}
         ${options.channelArcModels.map(channel => {
-            const progressLength = visibleHalfLength * clamp(channel.progress, 0, 1);
+            const progress = clamp(channel.progress, 0, 1);
+            const progressLength = visibleHalfLength * progress;
 
             if (progressLength <= 0) {
                 return "";
@@ -262,7 +279,12 @@ function renderRing(options: {
                 strokeWidth: options.strokeWidth,
                 dashArray: `${progressLength} ${options.geometry.circumference - progressLength}`,
                 dashOffset: 0,
-                rotationDegrees: channel.rotationDegrees + gapRotationOffset,
+                rotationDegrees: resolveArcProgressRotationDegrees({
+                    channel,
+                    gapRotationOffset,
+                    progress,
+                    visibleAngleDegrees,
+                }),
                 filter: options.metricFilter,
             });
         }).join("")}
@@ -303,6 +325,21 @@ function renderArcSegment(options: {
             transform="rotate(${formatSvgNumber(options.rotationDegrees)} ${formatSvgNumber(options.geometry.centerXCoordinate)} ${formatSvgNumber(options.geometry.centerYCoordinate)})"
             ${buildSvgFilterAttributes(options.filter).join(" ")} />
     `;
+}
+
+function resolveArcProgressRotationDegrees(options: {
+    channel: ChannelArcModel;
+    gapRotationOffset: number;
+    progress: number;
+    visibleAngleDegrees: number;
+}): number {
+    const laneStartRotationDegrees = options.channel.rotationDegrees + options.gapRotationOffset;
+
+    if (options.channel.progressDirection === "end-to-start") {
+        return laneStartRotationDegrees + options.visibleAngleDegrees * (1 - options.progress);
+    }
+
+    return laneStartRotationDegrees;
 }
 
 function renderNotchIcon(options: {
