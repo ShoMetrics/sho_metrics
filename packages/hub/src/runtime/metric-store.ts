@@ -16,7 +16,10 @@ export interface MetricStoreReader {
  */
 export class MetricStore {
     // Store layout is private to MetricStore:
-    // - outer key: runtime source scope id, for example "local" or a future "remote:nuc".
+    // - outer key: runtime source scope id. Composed samples may use logical
+    //   scopes such as "local"; background collection writes source or profile
+    //   scopes such as "node-system" so read-time fallback can compare
+    //   candidates without overwriting them.
     // - inner key: ShoMetrics metric id inside that source scope, for example "cpu.usage_percent" or "disk.throughput.read".
     // No separator or escaped string format is reserved here; adapters own validation before values reach this store.
     private store = new Map<string, SourceMetricStore>();
@@ -44,11 +47,22 @@ export class MetricStore {
 
         for (const [metricKey, value] of Object.entries(snapshot.metrics)) {
             if (value.value.case === "scalar") {
+                // Renderer-facing history accepts only finite scalar samples.
+                // NaN and +/-Infinity keep the previous valid value available
+                // instead of poisoning progress/history calculations.
+                if (!Number.isFinite(value.value.value)) {
+                    continue;
+                }
+
                 this.record(sourceStore, metricKey, value.value.value, sampleTimestampMilliseconds);
                 continue;
             }
 
             if (value.value.case === "text") {
+                if (value.value.value.trim().length === 0) {
+                    continue;
+                }
+
                 this.recordText(sourceStore, metricKey, value.value.value, sampleTimestampMilliseconds);
             }
         }

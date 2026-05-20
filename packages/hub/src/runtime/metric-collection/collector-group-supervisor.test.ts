@@ -36,7 +36,7 @@ test("reconcile starts a runner for a new collector group", async () => {
 
     assert.deepEqual(sourceClient.requestedMetricKeys, [["cpu.usage_percent"]]);
     assert.equal(
-        metricStore.forScope("local").getWidgetData("cpu.usage_percent", "CPU", "%").current,
+        metricStore.forScope("node-system").getWidgetData("cpu.usage_percent", "CPU", "%").current,
         42,
     );
 });
@@ -183,6 +183,10 @@ test("stopAll prevents in-flight runner results from writing", async () => {
         metricStore.forScope("local").getWidgetData("cpu.usage_percent", "CPU", "%").sampleTimestampMilliseconds,
         undefined,
     );
+    assert.equal(
+        metricStore.forScope("node-system").getWidgetData("cpu.usage_percent", "CPU", "%").sampleTimestampMilliseconds,
+        undefined,
+    );
 });
 
 test("slow collector groups do not block unrelated groups", async () => {
@@ -219,11 +223,11 @@ test("slow collector groups do not block unrelated groups", async () => {
     assert.deepEqual(gpuSourceClient.requestedMetricKeys, [["gpu.usage_percent"]]);
     assert.deepEqual(cpuSourceClient.requestedMetricKeys, [["cpu.usage_percent"]]);
     assert.equal(
-        metricStore.forScope("local").getWidgetData("cpu.usage_percent", "CPU", "%").current,
+        metricStore.forScope("cpu-source").getWidgetData("cpu.usage_percent", "CPU", "%").current,
         42,
     );
     assert.equal(
-        metricStore.forScope("local").getWidgetData("gpu.usage_percent", "GPU", "%").sampleTimestampMilliseconds,
+        metricStore.forScope("gpu-source").getWidgetData("gpu.usage_percent", "GPU", "%").sampleTimestampMilliseconds,
         undefined,
     );
 });

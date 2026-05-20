@@ -10,7 +10,8 @@ import type {
 import { scheduler } from "../runtime/scheduler";
 import { MetricAction, type MetricCollectionBinding, type MetricCollectionMode } from "./metric-action";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
-import { buildMetricSnapshot } from "../runtime/sources/metric-source";
+import { metricStore } from "../runtime/metric-store";
+import { buildMetricSnapshot, buildScalarMetricValue } from "../runtime/sources/metric-source";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
 import { writeStoredGlobalSettingsPatch } from "../settings/storage/global-settings-patch";
@@ -250,6 +251,32 @@ test("background collection mode uses action-owned render cadence instead of Sch
     }
 });
 
+test("background collection mode reads source-candidate samples through synchronous fallback", () => {
+    metricStore.clear();
+    const schedulerRecorder = installSchedulerSubscribeRecorder();
+    const backgroundBinding = new FakeMetricCollectionBinding();
+    const action = new TestBackgroundMetricReaderAction(() => backgroundBinding);
+    const streamDeckAction = new FakeStreamDeckAction("background-fallback-action");
+
+    metricStore.ingest("node-system", buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            "net.down": buildScalarMetricValue(123),
+        },
+    }));
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
+
+        assert.equal(schedulerRecorder.records.length, 0);
+        assert.deepEqual(action.widgetCurrents, [123]);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+        schedulerRecorder.restore();
+        metricStore.clear();
+    }
+});
+
 test("global settings changes recreate background collection bindings", () => {
     pluginGlobalSettingsStore.update(undefined);
     const schedulerRecorder = installSchedulerSubscribeRecorder();
@@ -476,6 +503,18 @@ class TestBackgroundMetricAction extends TestMetricAction {
 
     protected override createMetricCollectionBinding(): MetricCollectionBinding {
         return this.createBinding();
+    }
+}
+
+class TestBackgroundMetricReaderAction extends TestBackgroundMetricAction {
+    readonly widgetCurrents: number[] = [];
+
+    protected override onMetricsUpdate(event: WillAppearEvent): void {
+        this.widgetCurrents.push(
+            this.getMetricReader(event)
+                .getWidgetData("net.down", "Download", "B")
+                .current,
+        );
     }
 }
 
