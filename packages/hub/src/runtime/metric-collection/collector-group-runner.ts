@@ -44,6 +44,9 @@ const defaultTimer: CollectorGroupRunnerTimer = {
  *
  * It owns timer state, in-flight suppression, retry backoff, and the generation
  * guard that prevents stopped or superseded refreshes from writing samples.
+ *
+ * TODO(Phase 5c observability): Emit collector duration plus skipped/backoff
+ * counters after this runner is wired into production collection.
  */
 export class CollectorGroupRunner {
     private collectorGroup: PlannedCollectorGroup;
