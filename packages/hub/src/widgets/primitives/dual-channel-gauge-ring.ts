@@ -24,7 +24,23 @@ export interface DualGaugeChannelModel {
     channelId: "positive" | "negative";
     color: string;
     colorConfig: ColorConfig;
+    /**
+     * The metric progress before any visual lane mirroring.
+     *
+     * Keep this as the semantic value from the metric: 0 is low traffic and 1
+     * is high traffic, regardless of which side of the gauge owns the lane.
+     */
     progress: number;
+    /**
+     * Whether geometric lane progress follows the lane angles or is mirrored.
+     *
+     * The right-side network lane is user-facing bottom-to-top, mirroring the
+     * left-side lane. The shared gauge arc renderer still draws that right lane
+     * clockwise from its top angle to its bottom angle, so `end-to-start` maps
+     * semantic progress onto the mirrored geometry without changing the metric
+     * value itself.
+     */
+    gaugeProgressDirection: "start-to-end" | "end-to-start";
     gaugeStartAngleDegrees: number;
     gaugeEndAngleDegrees: number;
 }
@@ -76,7 +92,7 @@ function buildGaugeLaneModel(options: {
     strokeWidth: number;
 }): GaugeLaneModel {
     const arcAngleDegrees = options.channel.gaugeEndAngleDegrees - options.channel.gaugeStartAngleDegrees;
-    const visibleLength = options.geometry.circumference * (arcAngleDegrees / 360);
+    const visibleLength = options.geometry.circumference * (Math.abs(arcAngleDegrees) / 360);
     const progress = clamp(options.channel.progress, 0, 1);
     const markerRadius = options.strokeWidth * GAUGE_RING_LAYOUT.markerRadiusRatio;
     const markerGapLength = options.strokeWidth * (
@@ -95,7 +111,11 @@ function buildGaugeLaneModel(options: {
         gapLength: markerGapLength,
         visibleLength,
     });
-    const markerAngleDegrees = options.channel.gaugeStartAngleDegrees + arcAngleDegrees * markerRenderProgress;
+    const markerLaneProgress = resolveGaugeLaneProgress(
+        options.channel.gaugeProgressDirection,
+        markerRenderProgress,
+    );
+    const markerAngleDegrees = options.channel.gaugeStartAngleDegrees + arcAngleDegrees * markerLaneProgress;
     const markerPoint = resolvePointOnCircle({
         geometry: options.geometry,
         angleDegrees: markerAngleDegrees,
@@ -109,15 +129,47 @@ function buildGaugeLaneModel(options: {
             endAngleDegrees: options.channel.gaugeEndAngleDegrees,
             visibleLength,
         },
-        colorPlan,
+        colorPlan: options.channel.gaugeProgressDirection === "end-to-start"
+            ? reverseGaugeRangeColorPlan(colorPlan)
+            : colorPlan,
         markerDot: {
             xCoordinate: markerPoint.xCoordinate,
             yCoordinate: markerPoint.yCoordinate,
             radius: markerRadius,
             fill: colorPlan.markerFill,
-            progress: markerRenderProgress,
+            progress: markerLaneProgress,
             gapLength: markerGapLength,
         },
+    };
+}
+
+function resolveGaugeLaneProgress(
+    progressDirection: DualGaugeChannelModel["gaugeProgressDirection"],
+    progress: number,
+): number {
+    if (progressDirection === "end-to-start") {
+        return 1 - progress;
+    }
+
+    return progress;
+}
+
+function reverseGaugeRangeColorPlan(colorPlan: GaugeRangeColorPlan): GaugeRangeColorPlan {
+    // When a lane mirrors semantic progress onto geometric progress, the
+    // always-filled range track must mirror with it. Otherwise the marker would
+    // move bottom-to-top while the low/mid/high colors stayed top-to-bottom.
+    return {
+        ...colorPlan,
+        stops: colorPlan.stops.map(stop => ({
+            offset: 1 - stop.offset,
+            color: stop.color,
+        })).reverse(),
+        paintSegments: colorPlan.paintSegments.map(segment => ({
+            startProgress: 1 - segment.endProgress,
+            endProgress: 1 - segment.startProgress,
+            startColor: segment.endColor,
+            endColor: segment.startColor,
+        })).reverse(),
     };
 }
 

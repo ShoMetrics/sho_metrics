@@ -200,7 +200,7 @@ function buildDualNetworkCircleOrTextViewOptions(
     return {
         event: options.event,
         resolvedSettings: options.settings.widget.slot.appearance,
-        metricKey: `${downloadMetricKey},${uploadMetricKey}`,
+        metricKey: `${uploadMetricKey},${downloadMetricKey}`,
         dualRenderPrimitive: options.dualRenderPrimitive,
         widgetData: {
             positive: uploadWidgetData,
@@ -212,7 +212,7 @@ function buildDualNetworkCircleOrTextViewOptions(
             size: NETWORK_CENTER_ICON_SIZE,
         }),
         statusIcon: getNetworkDirectionStatusIcon({
-            direction: "download",
+            direction: "upload",
         }),
         circleVariantOverride: circleVariant,
         positiveColor: uploadColor,
@@ -274,22 +274,16 @@ function buildDualNetworkLineViewOptions(options: BuildNetworkViewOptions): Metr
     const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData);
     const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
     const trafficDisplayMode = options.target.reading.trafficDisplayMode;
-    const positiveDirection = trafficDisplayMode === "mirrored" ? "upload" : "download";
-    const negativeDirection = trafficDisplayMode === "mirrored" ? "download" : "upload";
-    const positiveWidgetData = trafficDisplayMode === "mirrored" ? uploadWidgetData : downloadWidgetData;
-    const negativeWidgetData = trafficDisplayMode === "mirrored" ? downloadWidgetData : uploadWidgetData;
-    const positiveColor = positiveDirection === "download" ? downloadColor : uploadColor;
-    const negativeColor = negativeDirection === "download" ? downloadColor : uploadColor;
     const appearance = options.settings.widget.slot.appearance;
     const solidMetricColorMode = resolveSolidMetricColorMode(appearance.paint.metric.colorMode);
 
     return {
         event: options.event,
         resolvedSettings: options.settings.widget.slot.appearance,
-        metricKey: `${downloadMetricKey},${uploadMetricKey}`,
+        metricKey: `${uploadMetricKey},${downloadMetricKey}`,
         widgetData: {
-            positive: positiveWidgetData,
-            negative: negativeWidgetData,
+            positive: uploadWidgetData,
+            negative: downloadWidgetData,
         },
         titleText: "NETWORK",
         chartMode: trafficDisplayMode,
@@ -298,25 +292,25 @@ function buildDualNetworkLineViewOptions(options: BuildNetworkViewOptions): Metr
             size: NETWORK_CENTER_ICON_SIZE,
         }),
         statusIcon: getNetworkDirectionStatusIcon({
-            direction: "download",
+            direction: "upload",
         }),
-        positiveColor,
-        negativeColor,
+        positiveColor: uploadColor,
+        negativeColor: downloadColor,
         positiveIconFragment: renderNetworkDirectionIconFragment({
-            direction: positiveDirection,
-            color: positiveColor,
+            direction: "upload",
+            color: uploadColor,
             size: NETWORK_TOP_ICON_SIZE,
         }),
         negativeIconFragment: renderNetworkDirectionIconFragment({
-            direction: negativeDirection,
-            color: negativeColor,
+            direction: "download",
+            color: downloadColor,
             size: NETWORK_TOP_ICON_SIZE,
         }),
         appearanceOverride: {
             paint: {
                 metric: {
                     colorMode: solidMetricColorMode,
-                    solid: { colors: { usageColor: downloadColor } },
+                    solid: { colors: { usageColor: uploadColor } },
                 },
             },
         },
@@ -352,26 +346,15 @@ function buildBarNetworkViewOptions(options: BuildNetworkViewOptions): MetricVie
     return {
         event: options.event,
         resolvedSettings: options.settings.widget.slot.appearance,
-        metricKey: downloadMetricKey,
+        metricKey: `${uploadMetricKey},${downloadMetricKey}`,
         widgetData: {
-            current: downloadWidgetData.current,
-            progress: downloadWidgetData.progress,
-            history: downloadWidgetData.history,
-            unit: downloadWidgetData.unit,
+            current: uploadWidgetData.current,
+            progress: uploadWidgetData.progress,
+            history: uploadWidgetData.history,
+            unit: uploadWidgetData.unit,
             label: "NET",
             barLabel: "Net Speed",
             barChannels: [
-                {
-                    label: "DOWN",
-                    displayValue: downloadWidgetData.displayValue ?? downloadWidgetData.current.toFixed(0),
-                    unit: downloadWidgetData.unit,
-                    progress: downloadWidgetData.progress,
-                    color: downloadColor,
-                    iconFragment: renderNetworkDirectionIconFragment({
-                        direction: "download",
-                        size: NETWORK_TOP_ICON_SIZE,
-                    }),
-                },
                 {
                     label: "UP",
                     displayValue: uploadWidgetData.displayValue ?? uploadWidgetData.current.toFixed(0),
@@ -383,13 +366,24 @@ function buildBarNetworkViewOptions(options: BuildNetworkViewOptions): MetricVie
                         size: NETWORK_TOP_ICON_SIZE,
                     }),
                 },
+                {
+                    label: "DOWN",
+                    displayValue: downloadWidgetData.displayValue ?? downloadWidgetData.current.toFixed(0),
+                    unit: downloadWidgetData.unit,
+                    progress: downloadWidgetData.progress,
+                    color: downloadColor,
+                    iconFragment: renderNetworkDirectionIconFragment({
+                        direction: "download",
+                        size: NETWORK_TOP_ICON_SIZE,
+                    }),
+                },
             ],
-            sampleTimestampMilliseconds: downloadWidgetData.sampleTimestampMilliseconds
-                ?? uploadWidgetData.sampleTimestampMilliseconds,
+            sampleTimestampMilliseconds: uploadWidgetData.sampleTimestampMilliseconds
+                ?? downloadWidgetData.sampleTimestampMilliseconds,
         },
         centerIconFragment: buildNetworkCenterIconFragment({
             circleVariant: "minimal",
-            direction: "download",
+            direction: "upload",
             selectedNetworkInterface: options.selectedNetworkInterface,
         }),
         topIconFragment: renderNetworkInterfaceIconFragment({
@@ -397,7 +391,7 @@ function buildBarNetworkViewOptions(options: BuildNetworkViewOptions): MetricVie
             size: NETWORK_CENTER_ICON_SIZE,
         }),
         statusIcon: getNetworkDirectionStatusIcon({
-            direction: "download",
+            direction: "upload",
         }),
         appearanceOverride: {
             paint: {
@@ -407,7 +401,7 @@ function buildBarNetworkViewOptions(options: BuildNetworkViewOptions): MetricVie
                     ),
                     solid: {
                         colors: {
-                            usageColor: downloadColor,
+                            usageColor: uploadColor,
                         },
                     },
                 },

@@ -352,6 +352,84 @@ test("dual-channel gauge variant renders two full-color gauge lanes with marker 
     assert.doesNotMatch(svgFragment, /stroke="rgba\(255,255,255,0\.14\)"/);
 });
 
+test("dual-channel gauge variant moves the right-side marker from bottom toward top", () => {
+    const lowProgressFragment = renderDualChannelProgressCircle({
+        positive: buildWidgetData(),
+        negative: {
+            ...buildWidgetData(),
+            progress: 0,
+        },
+    }, {
+        ...DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG,
+        circleVariant: "gauge",
+    }, keySize);
+    const highProgressFragment = renderDualChannelProgressCircle({
+        positive: buildWidgetData(),
+        negative: {
+            ...buildWidgetData(),
+            progress: 1,
+        },
+    }, {
+        ...DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG,
+        circleVariant: "gauge",
+    }, keySize);
+
+    const lowProgressXCoordinate = readCircleCoordinate(
+        lowProgressFragment,
+        "dual-progress-circle-negative-marker",
+        "cx",
+    );
+    const lowProgressYCoordinate = readCircleCoordinate(
+        lowProgressFragment,
+        "dual-progress-circle-negative-marker",
+        "cy",
+    );
+    const highProgressXCoordinate = readCircleCoordinate(
+        highProgressFragment,
+        "dual-progress-circle-negative-marker",
+        "cx",
+    );
+    const highProgressYCoordinate = readCircleCoordinate(
+        highProgressFragment,
+        "dual-progress-circle-negative-marker",
+        "cy",
+    );
+
+    assert.ok(lowProgressXCoordinate > keySize.width / 2);
+    assert.ok(highProgressXCoordinate > keySize.width / 2);
+    assert.ok(lowProgressYCoordinate > keySize.height / 2);
+    assert.ok(highProgressYCoordinate < keySize.height / 2);
+});
+
+test("dual-channel gauge variant mirrors right-side range colors", () => {
+    const svgFragment = renderDualChannelProgressCircle({
+        positive: buildWidgetData(),
+        negative: {
+            ...buildWidgetData(),
+            progress: 0.6,
+        },
+    }, {
+        ...DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG,
+        circleVariant: "gauge",
+        negativeColorConfig: {
+            mode: "threshold",
+            solidColor: "#3b82f6",
+            thresholds: [
+                { min: 0, max: 30, color: "#44ff44" },
+                { min: 30, max: 70, color: "#ff8800" },
+                { min: 70, max: 101, color: "#00aaff" },
+            ],
+            isGradientEnabled: true,
+        },
+    }, keySize);
+    const negativeCaps = readCircleElements(svgFragment, "dual-progress-circle-negative-cap");
+    const topCap = negativeCaps.reduce((top, cap) => cap.yCoordinate < top.yCoordinate ? cap : top);
+    const bottomCap = negativeCaps.reduce((bottom, cap) => cap.yCoordinate > bottom.yCoordinate ? cap : bottom);
+
+    assert.equal(topCap.fill, "#00aaff");
+    assert.equal(bottomCap.fill, "#44ff44");
+});
+
 test("dual-channel gauge variant keeps long row values out of icon space", () => {
     const svgFragment = renderDualChannelProgressCircle({
         positive: {
@@ -575,6 +653,41 @@ function buildProgressBarChannel(label: string, displayValue: string): NonNullab
         color: "#123456",
         iconFragment: "<path d=\"M0 0\" />",
     };
+}
+
+interface CircleElement {
+    readonly xCoordinate: number;
+    readonly yCoordinate: number;
+    readonly fill: string;
+}
+
+function readCircleElements(svgFragment: string, className: string): readonly CircleElement[] {
+    const pattern = new RegExp(
+        `<circle class="${className}"\\s+cx="([^"]+)"\\s+cy="([^"]+)"\\s+r="[^"]+"\\s+fill="([^"]+)"`,
+        "gu",
+    );
+    const elements = [...svgFragment.matchAll(pattern)].map(match => ({
+        xCoordinate: Number(match[1]),
+        yCoordinate: Number(match[2]),
+        fill: match[3] ?? "",
+    }));
+
+    if (elements.length === 0) {
+        assert.fail(`Expected circle elements for ${className}.`);
+    }
+
+    return elements;
+}
+
+function readCircleCoordinate(svgFragment: string, className: string, coordinateName: "cx" | "cy"): number {
+    const match = new RegExp(`class="${className}"[^>]+${coordinateName}="([^"]+)"`, "u").exec(svgFragment);
+    const coordinateText = match?.[1];
+
+    if (coordinateText === undefined) {
+        assert.fail(`Expected ${coordinateName} on ${className}.`);
+    }
+
+    return Number(coordinateText);
 }
 
 function buildDualChannelData(): DualChannelWidgetData {

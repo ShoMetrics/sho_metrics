@@ -95,8 +95,9 @@ test("network dual-channel settings render channel colors instead of usage color
         }),
     });
 
-    assert.match(markup, /Color - Download/);
     assert.match(markup, /Color - Upload/);
+    assert.match(markup, /Color - Download/);
+    assertTextOrder(markup, "Color - Upload", "Color - Download");
 });
 
 test("network black-white dual-channel settings hide channel colors", () => {
@@ -124,6 +125,9 @@ test("network settings render from empty quick-start settings", () => {
 
     assert.match(markup, /Network Metric/);
     assert.match(markup, /Network Interface/);
+    assert.match(markup, /Color - Upload/);
+    assert.match(markup, /Color - Download/);
+    assertTextOrder(markup, "Color - Upload", "Color - Download");
 });
 
 test("network single-channel settings render standard usage colors", () => {

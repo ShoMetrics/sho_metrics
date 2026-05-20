@@ -43,8 +43,8 @@ const solidColorKeyByChannel = {
 } satisfies Record<MetricChannelKey, SolidColorKey>;
 
 const networkColorChannels = [
-    { channel: "download", heading: "Color - Download" },
     { channel: "upload", heading: "Color - Upload" },
+    { channel: "download", heading: "Color - Download" },
 ] as const satisfies readonly ChannelColorSectionSettings[];
 
 const diskThroughputColorChannels = [

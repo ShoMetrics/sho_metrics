@@ -32,8 +32,8 @@ export const VISUAL_TEST_COLORS = {
     colorFilledRight: "#55aaff",
     colorFilledBottom: "#ff557f",
     colorFilledSolidBackground: "#55aaff",
-    networkDownload: "#3b82f6",
-    networkUpload: "#ef4444",
+    networkUpload: "#F97316",
+    networkDownload: "#2563EB",
 } as const;
 
 export const CPU_USAGE_WIDGET_DATA: WidgetData = {
@@ -99,7 +99,7 @@ export const NETWORK_UPLOAD_WIDGET_DATA: WidgetData = {
 
 export const NETWORK_NO_DATA_WIDGET_DATA: DualChannelWidgetData = {
     positive: {
-        ...NETWORK_DOWNLOAD_WIDGET_DATA,
+        ...NETWORK_UPLOAD_WIDGET_DATA,
         current: 0,
         progress: 0,
         history: [],
@@ -108,7 +108,7 @@ export const NETWORK_NO_DATA_WIDGET_DATA: DualChannelWidgetData = {
         sampleTimestampMilliseconds: undefined,
     },
     negative: {
-        ...NETWORK_UPLOAD_WIDGET_DATA,
+        ...NETWORK_DOWNLOAD_WIDGET_DATA,
         current: 0,
         progress: 0,
         history: [],
@@ -119,8 +119,8 @@ export const NETWORK_NO_DATA_WIDGET_DATA: DualChannelWidgetData = {
 };
 
 export const NETWORK_DUAL_CHANNEL_WIDGET_DATA: DualChannelWidgetData = {
-    positive: NETWORK_DOWNLOAD_WIDGET_DATA,
-    negative: NETWORK_UPLOAD_WIDGET_DATA,
+    positive: NETWORK_UPLOAD_WIDGET_DATA,
+    negative: NETWORK_DOWNLOAD_WIDGET_DATA,
 };
 
 export const CPU_CENTER_ICON_FRAGMENT = getHardwareIconFragment("cpu");
@@ -279,8 +279,8 @@ export function renderSingleMetricWidgetPngBuffer(testCase: SingleMetricVisualTe
 
 export function renderDualMetricWidgetPngBuffer(testCase: DualMetricVisualTestCase): Buffer {
     const visualSettings = buildMetricRenderAppearance(buildDefaultAppearanceSettings(testCase.appearance));
-    const positiveColorConfig = buildSolidColorConfig(VISUAL_TEST_COLORS.networkDownload);
-    const negativeColorConfig = buildSolidColorConfig(VISUAL_TEST_COLORS.networkUpload);
+    const positiveColorConfig = buildSolidColorConfig(VISUAL_TEST_COLORS.networkUpload);
+    const negativeColorConfig = buildSolidColorConfig(VISUAL_TEST_COLORS.networkDownload);
     const body = renderDualMetricBodyView({
         data: testCase.data,
         visual: visualSettings,
@@ -292,16 +292,16 @@ export function renderDualMetricWidgetPngBuffer(testCase: DualMetricVisualTestCa
         circleVariant: testCase.circleVariant ?? visualSettings.circleVariant,
         topIcon: NETWORK_CENTER_ICON_FRAGMENT,
         positive: {
-            color: VISUAL_TEST_COLORS.networkDownload,
-            colorConfig: positiveColorConfig,
-            icon: NETWORK_DOWNLOAD_ICON_FRAGMENT,
-            statusIcon: NETWORK_DOWNLOAD_STATUS_ICON,
-        },
-        negative: {
             color: VISUAL_TEST_COLORS.networkUpload,
-            colorConfig: negativeColorConfig,
+            colorConfig: positiveColorConfig,
             icon: NETWORK_UPLOAD_ICON_FRAGMENT,
             statusIcon: NETWORK_UPLOAD_STATUS_ICON,
+        },
+        negative: {
+            color: VISUAL_TEST_COLORS.networkDownload,
+            colorConfig: negativeColorConfig,
+            icon: NETWORK_DOWNLOAD_ICON_FRAGMENT,
+            statusIcon: NETWORK_DOWNLOAD_STATUS_ICON,
         },
     });
 

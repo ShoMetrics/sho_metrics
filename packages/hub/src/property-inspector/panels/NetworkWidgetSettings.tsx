@@ -56,7 +56,7 @@ function NetworkMetricSettings({
             />
             {context.resolved.widget.slot.appearance.view.selectedView === "circle" && (
                 <InspectorItem className="note-item note-item-default">
-                    <p className="section-note">Download and upload split the circle into two halves.</p>
+                    <p className="section-note">Upload and download split the circle into two halves.</p>
                 </InspectorItem>
             )}
             <SelectSetting
@@ -89,12 +89,12 @@ function NetworkScaleSettings({
                 })}
             />
             <NumberSetting
-                label="Download Max (Mbps)"
-                value={display.maximumDownloadSpeedMegabitsPerSecond}
-                onValueChange={(maximumDownloadSpeedMegabitsPerSecond) => onSettingsPatch({
+                label="Upload Max (Mbps)"
+                value={display.maximumUploadSpeedMegabitsPerSecond}
+                onValueChange={(maximumUploadSpeedMegabitsPerSecond) => onSettingsPatch({
                     network: {
                         scaleMode: "custom",
-                        maximumDownloadSpeedMegabitsPerSecond,
+                        maximumUploadSpeedMegabitsPerSecond,
                     },
                 })}
                 minimum={1}
@@ -103,12 +103,12 @@ function NetworkScaleSettings({
                 disabled={isAutoScale}
             />
             <NumberSetting
-                label="Upload Max (Mbps)"
-                value={display.maximumUploadSpeedMegabitsPerSecond}
-                onValueChange={(maximumUploadSpeedMegabitsPerSecond) => onSettingsPatch({
+                label="Download Max (Mbps)"
+                value={display.maximumDownloadSpeedMegabitsPerSecond}
+                onValueChange={(maximumDownloadSpeedMegabitsPerSecond) => onSettingsPatch({
                     network: {
                         scaleMode: "custom",
-                        maximumUploadSpeedMegabitsPerSecond,
+                        maximumDownloadSpeedMegabitsPerSecond,
                     },
                 })}
                 minimum={1}

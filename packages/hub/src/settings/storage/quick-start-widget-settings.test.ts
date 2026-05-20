@@ -80,6 +80,10 @@ describe("quick-start stored widget settings", () => {
                         assert.fail(`Expected network target, received ${String(target?.case)}`);
                     }
                     assert.equal(target.value.direction, StoredNetworkDirection.BOTH);
+                    if (settings.widget.case !== "singleMetric") {
+                        assert.fail(`Expected singleMetric widget, received ${String(settings.widget.case)}`);
+                    }
+                    assert.equal(settings.widget.value.slot?.overrides?.appearance, undefined);
                 },
             },
         ];
