@@ -8,6 +8,7 @@ import { Disk } from "./actions/disk";
 import { logger } from "./logging/logger";
 import { pluginGlobalSettingsStore } from "./settings/global-settings-store";
 import { scheduler } from "./runtime/scheduler";
+import { backgroundMetricCollection } from "./runtime/metric-collection/background-metric-collection";
 import { updateCommittedColorCompensationProfileFromStoredSettings } from "./color-compensation/runtime-store";
 
 logger.setLevel(__LOG_LEVEL__);
@@ -27,6 +28,7 @@ streamDeck.actions.registerAction(new Gpu());
 
 process.once("exit", () => {
     scheduler.dispose();
+    backgroundMetricCollection.dispose();
 });
 
 streamDeck.connect()

@@ -32,6 +32,7 @@ import {
     clearColorCompensationActionPreview,
     handleColorCompensationPluginMessage,
 } from "../color-compensation/plugin-controller";
+import { BackgroundCollectionBinding } from "./shared/background-collection-binding";
 
 const log = logger.for("MetricAction");
 
@@ -42,6 +43,13 @@ interface ActiveActionState {
     runtimeCacheStore: WidgetRuntimeCacheStore;
 }
 
+export type MetricCollectionMode = "scheduler" | "background";
+
+export interface MetricCollectionBinding {
+    refresh(options: Parameters<SchedulerBinding["refresh"]>[0]): void;
+    dispose(): void;
+}
+
 /**
  * Base class for all metric view actions.
  * Handles scheduler subscription lifecycle and real-time settings updates.
@@ -49,7 +57,7 @@ interface ActiveActionState {
  */
 export abstract class MetricAction extends SingletonAction {
     private activeActionStates = new Map<string, ActiveActionState>();
-    private schedulerBindings = new Map<string, SchedulerBinding>();
+    private metricCollectionBindings = new Map<string, MetricCollectionBinding>();
 
     protected abstract readonly actionKind: ActionKind;
 
@@ -120,8 +128,8 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     override onWillDisappear(event: WillDisappearEvent): void {
-        this.schedulerBindings.get(event.action.id)?.dispose();
-        this.schedulerBindings.delete(event.action.id);
+        this.metricCollectionBindings.get(event.action.id)?.dispose();
+        this.metricCollectionBindings.delete(event.action.id);
         this.activeActionStates.delete(event.action.id);
         clearColorCompensationActionPreview(event.action.id);
         clearMetricViewState(event.action.id);
@@ -163,6 +171,17 @@ export abstract class MetricAction extends SingletonAction {
     protected abstract onMetricsUpdate(event: WillAppearEvent): void;
 
     protected abstract getMetricKeys(event: WillAppearEvent): readonly string[];
+
+    protected getMetricCollectionMode(): MetricCollectionMode {
+        return "scheduler";
+    }
+
+    protected buildMetricCollectionReadPlan(
+        event: WillAppearEvent,
+        metricKeys: readonly string[],
+    ): MetricReadPlan {
+        return this.buildMetricReadPlanForMetricKeys(event, metricKeys);
+    }
 
     protected getMetricReader(event: WillAppearEvent): MetricStoreReader {
         const readPlan = this.resolveMetricReadPlan(event);
@@ -234,10 +253,12 @@ export abstract class MetricAction extends SingletonAction {
         const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
             this.resolveSettings(event).preferences.pollingFrequencySeconds,
         );
-        const readPlan = this.resolveMetricReadPlan(event);
-        const schedulerBinding = this.getOrCreateSchedulerBinding(event.action.id);
+        const metricKeys = this.getMetricKeys(event);
+        const readPlan = this.buildMetricCollectionReadPlan(event, metricKeys);
+        const collectionMode = this.getMetricCollectionMode();
+        const metricCollectionBinding = this.getOrCreateMetricCollectionBinding(event.action.id, collectionMode);
 
-        schedulerBinding.refresh({
+        metricCollectionBinding.refresh({
             subscriberId: event.action.id,
             readPlan,
             pollingIntervalMilliseconds,
@@ -251,16 +272,25 @@ export abstract class MetricAction extends SingletonAction {
         });
     }
 
-    private getOrCreateSchedulerBinding(actionId: string): SchedulerBinding {
-        const existingSchedulerBinding = this.schedulerBindings.get(actionId);
+    private getOrCreateMetricCollectionBinding(
+        actionId: string,
+        mode: MetricCollectionMode,
+    ): MetricCollectionBinding {
+        const existingBinding = this.metricCollectionBindings.get(actionId);
 
-        if (existingSchedulerBinding) {
-            return existingSchedulerBinding;
+        if (existingBinding) {
+            return existingBinding;
         }
 
-        const schedulerBinding = new SchedulerBinding();
-        this.schedulerBindings.set(actionId, schedulerBinding);
-        return schedulerBinding;
+        const binding = this.createMetricCollectionBinding(mode);
+        this.metricCollectionBindings.set(actionId, binding);
+        return binding;
+    }
+
+    protected createMetricCollectionBinding(mode: MetricCollectionMode): MetricCollectionBinding {
+        return mode === "background"
+            ? new BackgroundCollectionBinding()
+            : new SchedulerBinding();
     }
 
     private resubscribeAllActions(): void {
@@ -273,7 +303,8 @@ export abstract class MetricAction extends SingletonAction {
             // Force a fresh subscribe even when the read plan and polling
             // interval are unchanged. Global settings can affect downstream
             // source resolution without changing this action's plan signature.
-            this.schedulerBindings.get(event.action.id)?.dispose();
+            this.metricCollectionBindings.get(event.action.id)?.dispose();
+            this.metricCollectionBindings.delete(event.action.id);
             this.refreshSubscription(activeActionState);
         }
     }
@@ -283,7 +314,7 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     private resolveMetricReadPlan(event: WillAppearEvent): MetricReadPlan {
-        return this.buildMetricReadPlanForMetricKeys(event, this.getMetricKeys(event));
+        return this.buildMetricCollectionReadPlan(event, this.getMetricKeys(event));
     }
 
     private buildMetricReadPlanForMetricKeys(
