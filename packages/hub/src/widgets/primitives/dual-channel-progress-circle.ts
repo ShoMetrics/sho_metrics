@@ -106,6 +106,8 @@ const ARC_LAYOUT = {
     notchIconSizeRatio: 2.15,
     notchGapWidthRatio: 4.4,
     notchIconRadialInsetRatio: 0.72,
+    fullRingProgressBottomGapAngleDegrees: 10,
+    minimumNonZeroCircleProgressAngleDegrees: 16,
 } as const;
 
 interface RingGeometry {
@@ -254,8 +256,18 @@ function renderRing(options: {
     const trackDashArray = `${visibleHalfLength} ${options.geometry.circumference - visibleHalfLength}`;
     const gapRotationOffset = options.hasNotches ? resolveNotchAngleDegrees(options.geometry, notchGapLength) / 2 : 0;
     const visibleAngleDegrees = visibleHalfLength / options.geometry.circumference * 360;
+    const shouldClipProgressToHalfLane = !options.hasNotches;
+    const progressBottomGapAngleDegrees = shouldClipProgressToHalfLane
+        ? ARC_LAYOUT.fullRingProgressBottomGapAngleDegrees
+        : 0;
+    const progressVisibleAngleDegrees = visibleAngleDegrees - progressBottomGapAngleDegrees / 2;
+    const progressVisibleLength = options.geometry.circumference * (progressVisibleAngleDegrees / 360);
 
     return `
+        ${shouldClipProgressToHalfLane ? renderFullRingProgressClipPaths({
+            geometry: options.geometry,
+            strokeWidth: options.strokeWidth,
+        }) : ""}
         ${options.channelArcModels.map(channel => renderArcSegment({
             geometry: options.geometry,
             stroke: options.trackColor,
@@ -263,15 +275,25 @@ function renderRing(options: {
             dashArray: trackDashArray,
             dashOffset: 0,
             rotationDegrees: channel.rotationDegrees + gapRotationOffset,
+            // Full-ring track halves meet at the top and bottom. Round caps
+            // make those joins look like stray dots, but notched tracks still
+            // need rounded ends around the icon gaps.
+            strokeLineCap: options.hasNotches ? "round" : "butt",
             filter: options.subtleFilter,
         })).join("")}
         ${options.channelArcModels.map(channel => {
             const progress = clamp(channel.progress, 0, 1);
-            const progressLength = visibleHalfLength * progress;
+            const progressLength = resolveCircleProgressLength({
+                progress,
+                visibleLength: progressVisibleLength,
+                circumference: options.geometry.circumference,
+            });
 
             if (progressLength <= 0) {
                 return "";
             }
+
+            const renderProgress = progressLength / progressVisibleLength;
 
             return renderArcSegment({
                 geometry: options.geometry,
@@ -282,9 +304,11 @@ function renderRing(options: {
                 rotationDegrees: resolveArcProgressRotationDegrees({
                     channel,
                     gapRotationOffset,
-                    progress,
-                    visibleAngleDegrees,
+                    progress: renderProgress,
+                    progressBottomGapAngleDegrees,
+                    visibleAngleDegrees: progressVisibleAngleDegrees,
                 }),
+                clipPathId: shouldClipProgressToHalfLane ? resolveFullRingProgressClipPathId(channel.channelId) : undefined,
                 filter: options.metricFilter,
             });
         }).join("")}
@@ -313,33 +337,106 @@ function renderArcSegment(options: {
     dashArray: string;
     dashOffset: number;
     rotationDegrees: number;
+    strokeLineCap?: "butt" | "round";
+    clipPathId?: string;
     filter: string | undefined;
 }): string {
-    return `
+    const circleFragment = `
         <circle cx="${formatSvgNumber(options.geometry.centerXCoordinate)}"
             cy="${formatSvgNumber(options.geometry.centerYCoordinate)}"
             r="${formatSvgNumber(options.geometry.radius)}"
             fill="none" stroke="${options.stroke}" stroke-width="${formatSvgNumber(options.strokeWidth)}"
             stroke-dasharray="${options.dashArray}" stroke-dashoffset="${formatSvgNumber(options.dashOffset)}"
-            stroke-linecap="round"
+            stroke-linecap="${options.strokeLineCap ?? "round"}"
             transform="rotate(${formatSvgNumber(options.rotationDegrees)} ${formatSvgNumber(options.geometry.centerXCoordinate)} ${formatSvgNumber(options.geometry.centerYCoordinate)})"
             ${buildSvgFilterAttributes(options.filter).join(" ")} />
     `;
+
+    if (options.clipPathId === undefined) {
+        return circleFragment;
+    }
+
+    return `<g clip-path="url(#${options.clipPathId})">${circleFragment}</g>`;
+}
+
+function renderFullRingProgressClipPaths(options: {
+    geometry: RingGeometry;
+    strokeWidth: number;
+}): string {
+    const leftXCoordinate = options.geometry.centerXCoordinate - options.geometry.radius - options.strokeWidth;
+    const topYCoordinate = options.geometry.centerYCoordinate - options.geometry.radius - options.strokeWidth;
+    const halfWidth = options.geometry.radius + options.strokeWidth;
+    const height = options.geometry.radius * 2 + options.strokeWidth * 2;
+
+    return `
+        <defs>
+            <clipPath id="${resolveFullRingProgressClipPathId("positive")}" clipPathUnits="userSpaceOnUse">
+                <rect x="${formatSvgNumber(leftXCoordinate)}" y="${formatSvgNumber(topYCoordinate)}"
+                    width="${formatSvgNumber(halfWidth)}" height="${formatSvgNumber(height)}" />
+            </clipPath>
+            <clipPath id="${resolveFullRingProgressClipPathId("negative")}" clipPathUnits="userSpaceOnUse">
+                <rect x="${formatSvgNumber(options.geometry.centerXCoordinate)}" y="${formatSvgNumber(topYCoordinate)}"
+                    width="${formatSvgNumber(halfWidth)}" height="${formatSvgNumber(height)}" />
+            </clipPath>
+        </defs>
+    `;
+}
+
+function resolveFullRingProgressClipPathId(channelId: ChannelArcModel["channelId"]): string {
+    return `dual-progress-circle-${channelId}-clip`;
+}
+
+/**
+ * Resolves the visual arc length without changing semantic progress.
+ *
+ * Very low network traffic can be nonzero but shorter than a round stroke cap,
+ * which makes upload and download collapse into the same bottom dot. The small
+ * floor is visual-only: zero remains zero, and all metric values keep their
+ * original normalized progress.
+ */
+function resolveCircleProgressLength(options: {
+    progress: number;
+    visibleLength: number;
+    circumference: number;
+}): number {
+    if (options.progress <= 0) {
+        return 0;
+    }
+
+    const semanticProgressLength = options.visibleLength * options.progress;
+    const minimumVisibleLength = options.circumference
+        * (ARC_LAYOUT.minimumNonZeroCircleProgressAngleDegrees / 360);
+
+    return Math.min(options.visibleLength, Math.max(semanticProgressLength, minimumVisibleLength));
 }
 
 function resolveArcProgressRotationDegrees(options: {
     channel: ChannelArcModel;
     gapRotationOffset: number;
     progress: number;
+    progressBottomGapAngleDegrees: number;
     visibleAngleDegrees: number;
 }): number {
-    const laneStartRotationDegrees = options.channel.rotationDegrees + options.gapRotationOffset;
+    const laneStartRotationDegrees = options.channel.rotationDegrees
+        + options.gapRotationOffset
+        + resolveArcProgressStartOffsetDegrees(options.channel, options.progressBottomGapAngleDegrees);
 
     if (options.channel.progressDirection === "end-to-start") {
         return laneStartRotationDegrees + options.visibleAngleDegrees * (1 - options.progress);
     }
 
     return laneStartRotationDegrees;
+}
+
+function resolveArcProgressStartOffsetDegrees(
+    channel: ChannelArcModel,
+    progressBottomGapAngleDegrees: number,
+): number {
+    if (channel.progressDirection === "start-to-end") {
+        return progressBottomGapAngleDegrees / 2;
+    }
+
+    return 0;
 }
 
 function renderNotchIcon(options: {
