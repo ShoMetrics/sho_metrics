@@ -10,6 +10,7 @@ import {
 } from "../sources/metric-source";
 import { BackoffPolicy } from "../sources/backoff-policy";
 import type { SourceClient } from "../sources/source-client";
+import type { SourceMetricPollingGroupResolution } from "../sources/source-polling-groups";
 
 // The runner callback chains through timer -> refreshNow -> readSnapshot ->
 // ingest -> finally. Ten turns leaves margin for small async instrumentation.
@@ -269,6 +270,15 @@ class FakeSourceClient implements SourceClient {
         }
 
         return response;
+    }
+
+    resolveMetricPollingGroups(
+        metricKeys: readonly string[],
+    ): ReadonlyMap<string, SourceMetricPollingGroupResolution> {
+        return new Map(metricKeys.map(metricKey => [
+            metricKey,
+            { state: "owned", pollingGroupId: `${this.sourceId}:test` },
+        ]));
     }
 }
 

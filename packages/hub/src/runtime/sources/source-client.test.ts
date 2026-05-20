@@ -34,9 +34,9 @@ test("metric source client forwards source-declared polling groups", () => {
     const source = new ResolvingMetricSource();
     const sourceClient = createMetricSourceClient(source);
 
-    const resolutions = sourceClient.resolveMetricPollingGroups?.(["cpu.usage_percent"]);
+    const resolutions = sourceClient.resolveMetricPollingGroups(["cpu.usage_percent"]);
 
-    assert.deepEqual(resolutions?.get("cpu.usage_percent"), {
+    assert.deepEqual(resolutions.get("cpu.usage_percent"), {
         state: "owned",
         pollingGroupId: "fake-source:cpu",
     });
@@ -55,10 +55,19 @@ class FakeMetricSource implements MetricSource {
         this.polledMetricKeyListList.push([...metricKeys]);
         return this.snapshot;
     }
+
+    resolveMetricPollingGroups(
+        metricKeys: readonly string[],
+    ): ReadonlyMap<string, SourceMetricPollingGroupResolution> {
+        return new Map(metricKeys.map(metricKey => [
+            metricKey,
+            { state: "owned", pollingGroupId: `${this.sourceId}:default` },
+        ]));
+    }
 }
 
 class ResolvingMetricSource extends FakeMetricSource {
-    resolveMetricPollingGroups(
+    override resolveMetricPollingGroups(
         metricKeys: readonly string[],
     ): ReadonlyMap<string, SourceMetricPollingGroupResolution> {
         return new Map(metricKeys.map(metricKey => [
@@ -76,6 +85,15 @@ class PollOnlyMetricSource implements MetricSource {
     async poll(): Promise<MetricSnapshot> {
         this.pollCount += 1;
         return this.snapshot;
+    }
+
+    resolveMetricPollingGroups(
+        metricKeys: readonly string[],
+    ): ReadonlyMap<string, SourceMetricPollingGroupResolution> {
+        return new Map(metricKeys.map(metricKey => [
+            metricKey,
+            { state: "owned", pollingGroupId: `${this.sourceId}:default` },
+        ]));
     }
 }
 

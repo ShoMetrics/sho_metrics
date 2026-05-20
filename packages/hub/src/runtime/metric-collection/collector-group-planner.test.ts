@@ -211,31 +211,31 @@ test("uses only the primary source candidate in empty failure mode", () => {
     assert.deepEqual(groups.map(group => group.sourceId), ["windows-helper"]);
 });
 
-test("uses the static bridge for sources without declared groups", () => {
-    const planner = new CollectorGroupPlanner(new FakeSourceRegistry([
-        new FakeLegacySourceClient("legacy-source"),
-    ]));
+test("isolates metrics for missing source candidates", () => {
+    const planner = new CollectorGroupPlanner(new FakeSourceRegistry([]));
 
     const groups = planner.plan([
-        buildSubscription({ metricKey: "cpu.model", sourceIds: ["legacy-source"] }),
-        buildSubscription({ metricKey: "cpu.usage_percent", sourceIds: ["legacy-source"] }),
-        buildSubscription({ metricKey: "net.down", sourceIds: ["legacy-source"] }),
+        buildSubscription({ metricKey: "cpu.model", sourceIds: ["missing-source"] }),
+        buildSubscription({ metricKey: "cpu.usage_percent", sourceIds: ["missing-source"] }),
     ]);
 
     assert.deepEqual(groups.map(group => ({
+        sourceId: group.sourceId,
         groupKind: group.groupKind,
-        pollingGroupId: group.groupKind === "sourceDeclared" ? group.pollingGroupId : null,
+        isolatedMetricKey: group.groupKind === "unknownMetric" ? group.isolatedMetricKey : null,
         metricKeys: group.metricKeys,
     })), [
         {
-            groupKind: "sourceDeclared",
-            pollingGroupId: "cpu",
-            metricKeys: ["cpu.model", "cpu.usage_percent"],
+            sourceId: "missing-source",
+            groupKind: "unknownMetric",
+            isolatedMetricKey: "cpu.model",
+            metricKeys: ["cpu.model"],
         },
         {
-            groupKind: "sourceDeclared",
-            pollingGroupId: "network",
-            metricKeys: ["net.down"],
+            sourceId: "missing-source",
+            groupKind: "unknownMetric",
+            isolatedMetricKey: "cpu.usage_percent",
+            metricKeys: ["cpu.usage_percent"],
         },
     ]);
 });
@@ -254,14 +254,6 @@ class FakeSourceClient implements SourceClient {
         metricKeys: readonly string[],
     ): ReadonlyMap<string, SourceMetricPollingGroupResolution> {
         return new Map(metricKeys.map(metricKey => [metricKey, this.resolveMetricKey(metricKey)]));
-    }
-}
-
-class FakeLegacySourceClient implements SourceClient {
-    constructor(readonly sourceId: string) {}
-
-    async readSnapshot(): Promise<MetricSnapshot> {
-        throw new Error("FakeLegacySourceClient does not serve snapshots.");
     }
 }
 

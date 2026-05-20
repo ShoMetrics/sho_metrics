@@ -6,7 +6,6 @@ import streamDeck, {
     PropertyInspectorDidAppearEvent,
     type SendToPluginEvent,
 } from "@elgato/streamdeck";
-import { scheduler } from "../runtime/scheduler";
 import { metricStore, type MetricStoreReader } from "../runtime/metric-store";
 import type { MetricReadPlan } from "../runtime/sources/metric-read-plan";
 import { buildMetricReadPlanFromSourcePolicy } from "../runtime/sources/metric-read-plan-builder";
@@ -27,13 +26,16 @@ import {
     type WidgetRuntimeCachePatch,
     WidgetRuntimeCacheStore,
 } from "../runtime/widget-runtime-cache";
-import { SchedulerBinding } from "./shared/scheduler-binding";
 import {
     clearColorCompensationActionPreview,
     handleColorCompensationPluginMessage,
 } from "../color-compensation/plugin-controller";
-import { BackgroundCollectionBinding } from "./shared/background-collection-binding";
+import {
+    BackgroundCollectionBinding,
+    type BackgroundCollectionBindingRefreshOptions,
+} from "./shared/background-collection-binding";
 import { createFallbackMetricStoreReader } from "../runtime/metric-collection/fallback-composer";
+import { backgroundMetricCollection } from "../runtime/metric-collection/background-metric-collection";
 
 const log = logger.for("MetricAction");
 
@@ -44,16 +46,14 @@ interface ActiveActionState {
     runtimeCacheStore: WidgetRuntimeCacheStore;
 }
 
-export type MetricCollectionMode = "scheduler" | "background";
-
 export interface MetricCollectionBinding {
-    refresh(options: Parameters<SchedulerBinding["refresh"]>[0]): void;
+    refresh(options: BackgroundCollectionBindingRefreshOptions): void;
     dispose(): void;
 }
 
 /**
  * Base class for all metric view actions.
- * Handles scheduler subscription lifecycle and real-time settings updates.
+ * Handles metric collection subscription lifecycle and real-time settings updates.
  * Subclasses implement `onMetricsUpdate` which is called on every tick.
  */
 export abstract class MetricAction extends SingletonAction {
@@ -173,10 +173,6 @@ export abstract class MetricAction extends SingletonAction {
 
     protected abstract getMetricKeys(event: WillAppearEvent): readonly string[];
 
-    protected getMetricCollectionMode(): MetricCollectionMode {
-        return "scheduler";
-    }
-
     protected buildMetricCollectionReadPlan(
         event: WillAppearEvent,
         metricKeys: readonly string[],
@@ -187,19 +183,14 @@ export abstract class MetricAction extends SingletonAction {
     protected getMetricReader(event: WillAppearEvent): MetricStoreReader {
         const readPlan = this.resolveMetricReadPlan(event);
 
-        // TODO(Phase 5c Slice 6): All built-in actions now use background
-        // collection. Remove the scheduler reader branch when the legacy
-        // SchedulerBinding path is deleted.
-        return this.getMetricCollectionMode() === "background"
-            ? createFallbackMetricStoreReader(metricStore, readPlan)
-            : metricStore.forScope(readPlan.sourceScopeId);
+        return createFallbackMetricStoreReader(metricStore, readPlan);
     }
 
     protected refreshMetricKeys(
         event: WillAppearEvent | PropertyInspectorDidAppearEvent,
         metricKeys: readonly string[],
     ): Promise<void> {
-        return scheduler.refreshMetrics(this.buildMetricReadPlanForMetricKeys(event, metricKeys))
+        return backgroundMetricCollection.refreshReadPlanOnce(this.buildMetricReadPlanForMetricKeys(event, metricKeys))
             .then(() => undefined);
     }
 
@@ -262,8 +253,7 @@ export abstract class MetricAction extends SingletonAction {
         );
         const metricKeys = this.getMetricKeys(event);
         const readPlan = this.buildMetricCollectionReadPlan(event, metricKeys);
-        const collectionMode = this.getMetricCollectionMode();
-        const metricCollectionBinding = this.getOrCreateMetricCollectionBinding(event.action.id, collectionMode);
+        const metricCollectionBinding = this.getOrCreateMetricCollectionBinding(event.action.id);
 
         metricCollectionBinding.refresh({
             subscriberId: event.action.id,
@@ -279,25 +269,20 @@ export abstract class MetricAction extends SingletonAction {
         });
     }
 
-    private getOrCreateMetricCollectionBinding(
-        actionId: string,
-        mode: MetricCollectionMode,
-    ): MetricCollectionBinding {
+    private getOrCreateMetricCollectionBinding(actionId: string): MetricCollectionBinding {
         const existingBinding = this.metricCollectionBindings.get(actionId);
 
         if (existingBinding) {
             return existingBinding;
         }
 
-        const binding = this.createMetricCollectionBinding(mode);
+        const binding = this.createMetricCollectionBinding();
         this.metricCollectionBindings.set(actionId, binding);
         return binding;
     }
 
-    protected createMetricCollectionBinding(mode: MetricCollectionMode): MetricCollectionBinding {
-        return mode === "background"
-            ? new BackgroundCollectionBinding()
-            : new SchedulerBinding();
+    protected createMetricCollectionBinding(): MetricCollectionBinding {
+        return new BackgroundCollectionBinding();
     }
 
     private resubscribeAllActions(): void {

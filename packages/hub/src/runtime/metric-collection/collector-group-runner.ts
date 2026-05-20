@@ -182,7 +182,7 @@ export class CollectorGroupRunner {
         }
 
         if (result.status === "refreshed") {
-            log.atInfo()
+            log.atDebug()
                 .everyMs(this.buildLogThrottleKey(result.status), REFRESH_SUCCESS_LOG_INTERVAL_MILLISECONDS)
                 .log(logMessage);
             return result;

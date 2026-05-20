@@ -67,9 +67,9 @@ export function buildTextMetricValue(value: string): MetricValue {
 /**
  * Metric source contract.
  * All sources (built-in, local helpers, push API) implement this contract.
- * The Scheduler consumes this contract, never a concrete implementation.
+ * Background collection consumes this contract, never a concrete implementation.
  */
-export interface MetricSource extends Partial<SourceMetricPollingGroupResolver> {
+export interface MetricSource extends SourceMetricPollingGroupResolver {
     /** Human-readable identifier, e.g. "node-system", "windows-helper" */
     readonly sourceId: string;
 

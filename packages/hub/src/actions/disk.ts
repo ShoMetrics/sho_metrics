@@ -24,7 +24,6 @@ import {
 } from "./disk/volume-selection";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
-import type { MetricCollectionMode } from "./metric-action";
 
 const log = logger.for("Action:Disk");
 const DISK_USAGE_REFRESH_METRIC_KEYS = [
@@ -51,10 +50,6 @@ export class Disk extends MetricAction {
         }
 
         return resolveDiskUsageMetricSubscriptionKeys(diskTarget.volumeId);
-    }
-
-    protected override getMetricCollectionMode(): MetricCollectionMode {
-        return "background";
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {

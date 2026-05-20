@@ -7,11 +7,11 @@ import type {
     WillAppearEvent,
     WillDisappearEvent,
 } from "@elgato/streamdeck";
-import { scheduler } from "../runtime/scheduler";
-import { MetricAction, type MetricCollectionBinding, type MetricCollectionMode } from "./metric-action";
+import { MetricAction, type MetricCollectionBinding } from "./metric-action";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
 import { metricStore } from "../runtime/metric-store";
 import { buildMetricSnapshot, buildScalarMetricValue } from "../runtime/sources/metric-source";
+import { buildMetricReadPlanKey } from "../runtime/sources/metric-read-plan";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
 import { writeStoredGlobalSettingsPatch } from "../settings/storage/global-settings-patch";
@@ -26,23 +26,7 @@ import {
     resolveHardwareColorCompensationProfile,
 } from "../color-compensation/runtime-store";
 
-type SchedulerSubscribe = typeof scheduler.subscribe;
-type SchedulerSubscriber = Parameters<SchedulerSubscribe>[0];
-type SchedulerSubscribeOptions = Parameters<SchedulerSubscribe>[1];
-
-interface SchedulerSubscriptionRecord {
-    readonly callback: SchedulerSubscriber;
-    readonly options: SchedulerSubscribeOptions;
-    cleanupCallCount: number;
-}
-
-interface SchedulerSubscribeRecorder {
-    readonly records: SchedulerSubscriptionRecord[];
-    restore(): void;
-}
-
 test("onWillAppear persists quick-start settings only when missing", () => {
-    const schedulerRecorder = installSchedulerSubscribeRecorder();
     const action = new TestMetricAction();
     const streamDeckAction = new FakeStreamDeckAction("quick-start-action");
     const willAppearEvent = buildWillAppearEvent(streamDeckAction, undefined);
@@ -51,16 +35,15 @@ test("onWillAppear persists quick-start settings only when missing", () => {
         action.onWillAppear(willAppearEvent);
 
         assert.equal(streamDeckAction.writtenSettingsList.length, 1);
-        assert.equal(schedulerRecorder.records.length, 1);
+        assert.equal(action.bindings.length, 1);
+        assert.equal(action.bindings[0].refreshOptionsList.length, 1);
         assert.equal(action.metricsUpdateSnapshots.length, 1);
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
-        schedulerRecorder.restore();
     }
 });
 
 test("onWillAppear keeps existing quick-start settings without rewriting them", () => {
-    const schedulerRecorder = installSchedulerSubscribeRecorder();
     const action = new TestMetricAction();
     const streamDeckAction = new FakeStreamDeckAction("existing-settings-action");
     const willAppearEvent = buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings());
@@ -69,16 +52,15 @@ test("onWillAppear keeps existing quick-start settings without rewriting them", 
         action.onWillAppear(willAppearEvent);
 
         assert.deepEqual(streamDeckAction.writtenSettingsList, []);
-        assert.equal(schedulerRecorder.records.length, 1);
+        assert.equal(action.bindings.length, 1);
+        assert.equal(action.bindings[0].refreshOptionsList.length, 1);
         assert.equal(action.metricsUpdateSnapshots.length, 1);
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
-        schedulerRecorder.restore();
     }
 });
 
 test("unchanged polling plan keeps the existing subscription and forces an immediate update", () => {
-    const schedulerRecorder = installSchedulerSubscribeRecorder();
     const action = new TestMetricAction();
     const streamDeckAction = new FakeStreamDeckAction("same-plan-action");
     const initialSettings = buildNetworkWidgetSettings({
@@ -96,17 +78,16 @@ test("unchanged polling plan keeps the existing subscription and forces an immed
         action.onWillAppear(buildWillAppearEvent(streamDeckAction, initialSettings));
         action.onDidReceiveSettings(buildDidReceiveSettingsEvent(streamDeckAction, nextSettings));
 
-        assert.equal(schedulerRecorder.records.length, 1);
-        assert.equal(schedulerRecorder.records[0].cleanupCallCount, 0);
+        assert.equal(action.bindings.length, 1);
+        assert.equal(action.bindings[0].refreshOptionsList.length, 1);
+        assert.equal(action.bindings[0].refreshDisposeCallCount, 0);
         assert.equal(action.metricsUpdateSnapshots.length, 2);
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
-        schedulerRecorder.restore();
     }
 });
 
 test("changed polling plan resubscribes and forces an immediate update", () => {
-    const schedulerRecorder = installSchedulerSubscribeRecorder();
     const action = new TestMetricAction();
     const streamDeckAction = new FakeStreamDeckAction("changed-plan-action");
     const initialSettings = buildNetworkWidgetSettings({
@@ -127,21 +108,20 @@ test("changed polling plan resubscribes and forces an immediate update", () => {
         action.onWillAppear(buildWillAppearEvent(streamDeckAction, initialSettings));
         action.onDidReceiveSettings(buildDidReceiveSettingsEvent(streamDeckAction, nextSettings));
 
-        assert.equal(schedulerRecorder.records.length, 2);
-        assert.equal(schedulerRecorder.records[0].cleanupCallCount, 1);
-        assert.equal(schedulerRecorder.records[1].options.pollingIntervalMilliseconds, 5000);
-        assert.deepEqual(schedulerRecorder.records[0].options.readPlan.metricKeys, ["net.down"]);
-        assert.deepEqual(schedulerRecorder.records[1].options.readPlan.metricKeys, ["net.up"]);
+        assert.equal(action.bindings.length, 1);
+        assert.equal(action.bindings[0].refreshOptionsList.length, 2);
+        assert.equal(action.bindings[0].refreshDisposeCallCount, 1);
+        assert.equal(action.bindings[0].refreshOptionsList[1].pollingIntervalMilliseconds, 5000);
+        assert.deepEqual(action.bindings[0].refreshOptionsList[0].readPlan.metricKeys, ["net.down"]);
+        assert.deepEqual(action.bindings[0].refreshOptionsList[1].readPlan.metricKeys, ["net.up"]);
         assert.equal(action.metricsUpdateSnapshots.length, 2);
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
-        schedulerRecorder.restore();
     }
 });
 
 test("global settings changes re-resolve settings resubscribe and force an immediate update", () => {
     pluginGlobalSettingsStore.update(undefined);
-    const schedulerRecorder = installSchedulerSubscribeRecorder();
     const action = new TestMetricAction();
     const streamDeckAction = new FakeStreamDeckAction("global-settings-action");
     const initialSettings = buildNetworkWidgetSettings({
@@ -158,21 +138,19 @@ test("global settings changes re-resolve settings resubscribe and force an immed
             view: { selectedView: "line" },
         }));
 
-        assert.equal(schedulerRecorder.records.length, 2);
-        assert.equal(schedulerRecorder.records[0].cleanupCallCount, 1);
-        assert.deepEqual(schedulerRecorder.records[0].options.readPlan.metricKeys, ["net.down"]);
-        assert.deepEqual(schedulerRecorder.records[1].options.readPlan.metricKeys, ["net.up"]);
+        assert.equal(action.bindings.length, 2);
+        assert.equal(action.bindings[0].disposeCallCount, 1);
+        assert.deepEqual(action.bindings[0].refreshOptionsList[0].readPlan.metricKeys, ["net.down"]);
+        assert.deepEqual(action.bindings[1].refreshOptionsList[0].readPlan.metricKeys, ["net.up"]);
         assert.deepEqual(action.metricsUpdateSnapshots.map(snapshot => snapshot.selectedView), ["circle", "line"]);
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
-        schedulerRecorder.restore();
         pluginGlobalSettingsStore.update(undefined);
     }
 });
 
 test("global settings changes resubscribe even when the polling plan is unchanged", () => {
     pluginGlobalSettingsStore.update(undefined);
-    const schedulerRecorder = installSchedulerSubscribeRecorder();
     const action = new TestMetricAction();
     const streamDeckAction = new FakeStreamDeckAction("global-same-plan-action");
 
@@ -188,74 +166,53 @@ test("global settings changes resubscribe even when the polling plan is unchange
             },
         }));
 
-        assert.equal(schedulerRecorder.records.length, 2);
-        assert.equal(schedulerRecorder.records[0].cleanupCallCount, 1);
-        assert.deepEqual(schedulerRecorder.records[0].options.readPlan.metricKeys, ["net.down"]);
-        assert.deepEqual(schedulerRecorder.records[1].options.readPlan.metricKeys, ["net.down"]);
+        assert.equal(action.bindings.length, 2);
+        assert.equal(action.bindings[0].disposeCallCount, 1);
+        assert.deepEqual(action.bindings[0].refreshOptionsList[0].readPlan.metricKeys, ["net.down"]);
+        assert.deepEqual(action.bindings[1].refreshOptionsList[0].readPlan.metricKeys, ["net.down"]);
         assert.deepEqual(action.metricsUpdateSnapshots.map(snapshot => snapshot.selectedView), ["circle", "circle"]);
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
-        schedulerRecorder.restore();
         pluginGlobalSettingsStore.update(undefined);
     }
 });
 
-test("onWillDisappear cleans subscription state and ignores later scheduler ticks", () => {
-    const schedulerRecorder = installSchedulerSubscribeRecorder();
+test("onWillDisappear cleans subscription state and ignores later render ticks", () => {
     const action = new TestMetricAction();
     const streamDeckAction = new FakeStreamDeckAction("disappear-action");
 
-    try {
-        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
-        schedulerRecorder.records[0].callback(buildMetricSnapshot({
-            timestampMilliseconds: 1000,
-            metrics: {},
-        }));
+    action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
+    action.bindings[0].refreshOptionsList[0].onTick();
 
-        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
-        schedulerRecorder.records[0].callback(buildMetricSnapshot({
-            timestampMilliseconds: 2000,
-            metrics: {},
-        }));
+    action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    action.bindings[0].refreshOptionsList[0].onTick();
 
-        assert.equal(schedulerRecorder.records[0].cleanupCallCount, 1);
-        assert.equal(action.metricsUpdateSnapshots.length, 2);
-    } finally {
-        schedulerRecorder.restore();
-    }
+    assert.equal(action.bindings[0].disposeCallCount, 1);
+    assert.equal(action.metricsUpdateSnapshots.length, 2);
 });
 
-test("background collection mode uses action-owned render cadence instead of Scheduler subscribe", () => {
-    const schedulerRecorder = installSchedulerSubscribeRecorder();
-    const backgroundBinding = new FakeMetricCollectionBinding();
-    const action = new TestBackgroundMetricAction(() => backgroundBinding);
+test("metric collection uses action-owned render cadence", () => {
+    const action = new TestMetricAction();
     const streamDeckAction = new FakeStreamDeckAction("background-action");
 
-    try {
-        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
+    action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
 
-        assert.equal(schedulerRecorder.records.length, 0);
-        assert.equal(backgroundBinding.refreshOptionsList.length, 1);
-        assert.deepEqual(backgroundBinding.refreshOptionsList[0].readPlan.metricKeys, ["net.down"]);
-        assert.equal(action.metricsUpdateSnapshots.length, 1);
+    assert.equal(action.bindings[0].refreshOptionsList.length, 1);
+    assert.deepEqual(action.bindings[0].refreshOptionsList[0].readPlan.metricKeys, ["net.down"]);
+    assert.equal(action.metricsUpdateSnapshots.length, 1);
 
-        backgroundBinding.refreshOptionsList[0].onTick();
+    action.bindings[0].refreshOptionsList[0].onTick();
 
-        assert.equal(action.metricsUpdateSnapshots.length, 2);
+    assert.equal(action.metricsUpdateSnapshots.length, 2);
 
-        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
 
-        assert.equal(backgroundBinding.disposeCallCount, 1);
-    } finally {
-        schedulerRecorder.restore();
-    }
+    assert.equal(action.bindings[0].disposeCallCount, 1);
 });
 
-test("background collection mode reads source-candidate samples through synchronous fallback", () => {
+test("metric collection reads source-candidate samples through synchronous fallback", () => {
     metricStore.clear();
-    const schedulerRecorder = installSchedulerSubscribeRecorder();
-    const backgroundBinding = new FakeMetricCollectionBinding();
-    const action = new TestBackgroundMetricReaderAction(() => backgroundBinding);
+    const action = new TestMetricReaderAction();
     const streamDeckAction = new FakeStreamDeckAction("background-fallback-action");
 
     metricStore.ingest("node-system", buildMetricSnapshot({
@@ -268,21 +225,18 @@ test("background collection mode reads source-candidate samples through synchron
     try {
         action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
 
-        assert.equal(schedulerRecorder.records.length, 0);
         assert.deepEqual(action.widgetCurrents, [123]);
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
-        schedulerRecorder.restore();
         metricStore.clear();
     }
 });
 
 test("global settings changes recreate background collection bindings", () => {
     pluginGlobalSettingsStore.update(undefined);
-    const schedulerRecorder = installSchedulerSubscribeRecorder();
     const firstBinding = new FakeMetricCollectionBinding();
     const secondBinding = new FakeMetricCollectionBinding();
-    const action = new TestBackgroundMetricAction(createQueuedBindingFactory([
+    const action = new TestMetricAction(createQueuedBindingFactory([
         firstBinding,
         secondBinding,
     ]));
@@ -296,19 +250,16 @@ test("global settings changes recreate background collection bindings", () => {
             },
         }));
 
-        assert.equal(schedulerRecorder.records.length, 0);
         assert.equal(firstBinding.refreshOptionsList.length, 1);
         assert.equal(firstBinding.disposeCallCount, 1);
         assert.equal(secondBinding.refreshOptionsList.length, 1);
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
-        schedulerRecorder.restore();
         pluginGlobalSettingsStore.update(undefined);
     }
 });
 
 test("color compensation messages update delegated preview state and disappear clears it", () => {
-    const schedulerRecorder = installSchedulerSubscribeRecorder();
     const action = new TestMetricAction();
     const streamDeckAction = new FakeStreamDeckAction("color-compensation-action");
     const previewProfile = {
@@ -357,14 +308,10 @@ test("color compensation messages update delegated preview state and disappear c
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
         clearColorCompensationPreview(streamDeckAction.id);
-        schedulerRecorder.restore();
     }
 });
 
 test("runtime cache publishes to Property Inspector without writing settings", async () => {
-    const originalSubscribe = scheduler.subscribe;
-    scheduler.subscribe = (() => () => undefined) as typeof scheduler.subscribe;
-
     const setSettingsCalls: unknown[] = [];
     const streamDeckAction = {
         id: "action-1",
@@ -416,13 +363,10 @@ test("runtime cache publishes to Property Inspector without writing settings", a
         action.onWillDisappear({
             action: streamDeckAction,
         } as unknown as WillDisappearEvent);
-        scheduler.subscribe = originalSubscribe;
     }
 });
 
 test("unchanged runtime cache patch does not publish to Property Inspector", async () => {
-    const originalSubscribe = scheduler.subscribe;
-    scheduler.subscribe = (() => () => undefined) as typeof scheduler.subscribe;
     const streamDeckAction = new FakeStreamDeckAction("unchanged-runtime-cache-action");
     const action = new TestMetricAction();
     const willAppearEvent = buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings());
@@ -441,17 +385,21 @@ test("unchanged runtime cache patch does not publish to Property Inspector", asy
         ]);
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
-        scheduler.subscribe = originalSubscribe;
     }
 });
 
 class TestMetricAction extends MetricAction {
     protected readonly actionKind = "network";
+    readonly bindings: FakeMetricCollectionBinding[] = [];
     readonly runtimeCachePatchList: WidgetRuntimeCachePatch[] = [];
     readonly metricsUpdateSnapshots: Array<{
         readonly selectedView: string;
         readonly pollingFrequencySeconds: number;
     }> = [];
+
+    constructor(private readonly bindingFactory: () => FakeMetricCollectionBinding = () => new FakeMetricCollectionBinding()) {
+        super();
+    }
 
     protected getMetricKeys(event: WillAppearEvent): readonly string[] {
         const settings = this.resolveSettings(event);
@@ -490,23 +438,15 @@ class TestMetricAction extends MetricAction {
         this.runtimeCachePatchList.push(patch);
         return Promise.resolve();
     }
-}
-
-class TestBackgroundMetricAction extends TestMetricAction {
-    constructor(private readonly createBinding: () => FakeMetricCollectionBinding) {
-        super();
-    }
-
-    protected override getMetricCollectionMode(): MetricCollectionMode {
-        return "background";
-    }
 
     protected override createMetricCollectionBinding(): MetricCollectionBinding {
-        return this.createBinding();
+        const binding = this.bindingFactory();
+        this.bindings.push(binding);
+        return binding;
     }
 }
 
-class TestBackgroundMetricReaderAction extends TestBackgroundMetricAction {
+class TestMetricReaderAction extends TestMetricAction {
     readonly widgetCurrents: number[] = [];
 
     protected override onMetricsUpdate(event: WillAppearEvent): void {
@@ -521,13 +461,37 @@ class TestBackgroundMetricReaderAction extends TestBackgroundMetricAction {
 class FakeMetricCollectionBinding implements MetricCollectionBinding {
     readonly refreshOptionsList: Parameters<MetricCollectionBinding["refresh"]>[0][] = [];
     disposeCallCount = 0;
+    refreshDisposeCallCount = 0;
+    private readPlanSignature: string | null = null;
+    private pollingIntervalMilliseconds: number | null = null;
+    private subscriberId: string | null = null;
 
     refresh(options: Parameters<MetricCollectionBinding["refresh"]>[0]): void {
+        const nextReadPlanSignature = buildMetricReadPlanKey(options.readPlan);
+
+        if (
+            this.readPlanSignature === nextReadPlanSignature
+            && this.pollingIntervalMilliseconds === options.pollingIntervalMilliseconds
+            && this.subscriberId === options.subscriberId
+        ) {
+            return;
+        }
+
+        if (this.readPlanSignature !== null) {
+            this.refreshDisposeCallCount += 1;
+        }
+
         this.refreshOptionsList.push(options);
+        this.readPlanSignature = nextReadPlanSignature;
+        this.pollingIntervalMilliseconds = options.pollingIntervalMilliseconds;
+        this.subscriberId = options.subscriberId;
     }
 
     dispose(): void {
         this.disposeCallCount += 1;
+        this.readPlanSignature = null;
+        this.pollingIntervalMilliseconds = null;
+        this.subscriberId = null;
     }
 }
 
@@ -540,31 +504,6 @@ class FakeStreamDeckAction {
         this.writtenSettingsList.push(settings);
         return Promise.resolve();
     }
-}
-
-function installSchedulerSubscribeRecorder(): SchedulerSubscribeRecorder {
-    const originalSubscribe = scheduler.subscribe;
-    const records: SchedulerSubscriptionRecord[] = [];
-
-    scheduler.subscribe = ((callback: SchedulerSubscriber, options: SchedulerSubscribeOptions) => {
-        const record: SchedulerSubscriptionRecord = {
-            callback,
-            options,
-            cleanupCallCount: 0,
-        };
-        records.push(record);
-
-        return () => {
-            record.cleanupCallCount += 1;
-        };
-    }) as SchedulerSubscribe;
-
-    return {
-        records,
-        restore: () => {
-            scheduler.subscribe = originalSubscribe;
-        },
-    };
 }
 
 function buildNetworkWidgetSettings(

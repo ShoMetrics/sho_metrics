@@ -2,6 +2,12 @@ import { logger } from "../../logging/logger";
 import { metricStore } from "../metric-store";
 import { BackoffPolicy } from "../sources/backoff-policy";
 import {
+    normalizeMetricReadPlan,
+    type MetricReadPlan,
+    type SourceCandidate,
+    selectMetricReadPlanSourceCandidates,
+} from "../sources/metric-read-plan";
+import {
     createDefaultSourceRegistry,
     type SourceRegistry,
 } from "../sources/source-registry";
@@ -19,7 +25,7 @@ interface BackgroundMetricCollectionOptions {
     readonly subscriptionRegistry: MetricSubscriptionRegistry;
     readonly collectorGroupPlanner: CollectorGroupPlanner;
     readonly collectorGroupSupervisor: CollectorGroupSupervisor;
-    readonly sourceRegistry?: Pick<SourceRegistry, "dispose">;
+    readonly sourceRegistry: SourceRegistry;
 }
 
 /**
@@ -33,7 +39,7 @@ export class BackgroundMetricCollection {
     private readonly subscriptionRegistry: MetricSubscriptionRegistry;
     private readonly collectorGroupPlanner: CollectorGroupPlanner;
     private readonly collectorGroupSupervisor: CollectorGroupSupervisor;
-    private readonly sourceRegistry?: Pick<SourceRegistry, "dispose">;
+    private readonly sourceRegistry: SourceRegistry;
 
     constructor(options: BackgroundMetricCollectionOptions) {
         this.subscriptionRegistry = options.subscriptionRegistry;
@@ -60,10 +66,31 @@ export class BackgroundMetricCollection {
         };
     }
 
+    /**
+     * Performs one low-frequency lifecycle refresh for runtime option caches.
+     *
+     * Property Inspector option refreshes need to nudge source-owned discovery
+     * such as network interfaces and disk volumes. This method writes
+     * source/profile-scoped samples and intentionally does not trigger render
+     * callbacks or replace the background collection cadence.
+     *
+     * This is a lifecycle-only escape hatch. It bypasses CollectorGroupRunner
+     * backoff, in-flight dedupe, and generation guards, so callers must not use
+     * it from render ticks, polling loops, or any other hot path.
+     */
+    async refreshReadPlanOnce(readPlan: MetricReadPlan): Promise<void> {
+        const normalizedReadPlan = normalizeMetricReadPlan(readPlan);
+        const sourceCandidates = selectMetricReadPlanSourceCandidates(normalizedReadPlan);
+
+        await Promise.all(sourceCandidates.map(sourceCandidate => (
+            this.refreshSourceCandidateOnce(sourceCandidate, normalizedReadPlan.metricKeys)
+        )));
+    }
+
     /** Stops background loops and releases source resources owned by this root. */
     dispose(): void {
         this.collectorGroupSupervisor.stopAll();
-        this.sourceRegistry?.dispose();
+        this.sourceRegistry.dispose();
     }
 
     private reconcileCollectorGroups(): void {
@@ -78,12 +105,35 @@ export class BackgroundMetricCollection {
 
         this.collectorGroupSupervisor.reconcile(collectorGroups);
     }
+
+    private async refreshSourceCandidateOnce(
+        sourceCandidate: SourceCandidate,
+        metricKeys: readonly string[],
+    ): Promise<void> {
+        const sourceClient = this.sourceRegistry.resolveSourceClient(sourceCandidate.sourceId);
+
+        if (!sourceClient) {
+            log.warn(() => [
+                "runtimeOptionRefreshSourceMissing",
+                `sourceId=${sourceCandidate.sourceId}`,
+                `metricCount=${metricKeys.length}`,
+            ].join(" "));
+            return;
+        }
+
+        try {
+            metricStore.ingest(sourceCandidate.sourceId, await sourceClient.readSnapshot(metricKeys));
+        } catch (error) {
+            log.warn(() => [
+                "runtimeOptionRefreshFailed",
+                `sourceId=${sourceCandidate.sourceId}`,
+                `metricCount=${metricKeys.length}`,
+                `error=${String(error)}`,
+            ].join(" "));
+        }
+    }
 }
 
-// TODO(Phase 5c Slice 6): Merge this source registry with the remaining
-// Scheduler/SourceRunner registry when the old collection path is deleted.
-// During migration, RAM uses this background-owned registry while unmigrated
-// actions still use Scheduler's registry.
 const backgroundSourceRegistry: SourceRegistry = createDefaultSourceRegistry();
 
 export const backgroundMetricCollection = new BackgroundMetricCollection({

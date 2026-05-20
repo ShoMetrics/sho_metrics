@@ -71,6 +71,20 @@ export function buildMetricReadPlanKey(readPlan: MetricReadPlan): string {
     ]);
 }
 
+/**
+ * Selects the source candidates that may be consulted for one read plan.
+ *
+ * Fallback mode tries every candidate in priority order. Empty mode uses only
+ * the primary candidate and renders no-data when it cannot provide a sample.
+ */
+export function selectMetricReadPlanSourceCandidates(
+    readPlan: MetricReadPlan,
+): readonly SourceCandidate[] {
+    return readPlan.failureMode === "fallback"
+        ? readPlan.sourceCandidates
+        : readPlan.sourceCandidates.slice(0, 1);
+}
+
 function normalizeMetricKeys(metricKeys: readonly string[]): readonly string[] {
     return Array.from(new Set(metricKeys)).sort();
 }

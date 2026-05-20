@@ -2,19 +2,24 @@ import { logger } from "../../logging/logger";
 import { backgroundMetricCollection } from "../../runtime/metric-collection/background-metric-collection";
 import {
     buildMetricReadPlanKey,
+    type MetricReadPlan,
 } from "../../runtime/sources/metric-read-plan";
-// TODO(Phase 5c Slice 6): Replace this shared migration shape when
-// SchedulerBinding is removed or renamed to the final action collection handle.
-import type { SchedulerBindingRefreshOptions } from "./scheduler-binding";
 
 const log = logger.for("BackgroundCollectionBinding");
 
 type BackgroundCollectionRegistration = (
     options: Pick<
-        SchedulerBindingRefreshOptions,
+        BackgroundCollectionBindingRefreshOptions,
         "subscriberId" | "readPlan"
     > & { readonly intervalMilliseconds: number },
 ) => () => void;
+
+export interface BackgroundCollectionBindingRefreshOptions {
+    readonly subscriberId: string;
+    readonly readPlan: MetricReadPlan;
+    readonly pollingIntervalMilliseconds: number;
+    readonly onTick: () => void;
+}
 
 export interface BackgroundCollectionBindingTimer {
     set(callback: () => void, intervalMilliseconds: number): unknown;
@@ -45,7 +50,7 @@ export class BackgroundCollectionBinding {
         private readonly timer: BackgroundCollectionBindingTimer = defaultTimer,
     ) {}
 
-    refresh(options: SchedulerBindingRefreshOptions): void {
+    refresh(options: BackgroundCollectionBindingRefreshOptions): void {
         const nextReadPlanSignature = buildMetricReadPlanKey(options.readPlan);
 
         if (

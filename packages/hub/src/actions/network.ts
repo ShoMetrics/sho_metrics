@@ -19,7 +19,6 @@ import {
 } from "./network/view-builder";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
-import type { MetricCollectionMode } from "./metric-action";
 
 const log = logger.for("Action:Network");
 const NETWORK_INTERFACE_LIST_REFRESH_METRIC_KEYS = [getNetworkAggregateMetricKey("download")] as const;
@@ -41,10 +40,6 @@ export class Network extends MetricAction {
             networkDirection: networkTarget.reading.direction,
             networkInterfaceId: networkTarget.interfaceId,
         });
-    }
-
-    protected override getMetricCollectionMode(): MetricCollectionMode {
-        return "background";
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
