@@ -712,11 +712,12 @@ shape, extract that owner-level glue instead of copying it.
    between "safe recent data" and `N/A`. This is a correctness gate, not a
    latency optimization.
 
-3. Implement Phase 5b as designed above. The first code slice should add the
-   source-declared ownership types and planner tests before changing Scheduler
-   behavior. The migration is complete only when Scheduler no longer imports
-   built-in metric-family predicates and fallback-aware grouping is covered by
-   tests.
+3. Finish the Phase 5b migration cleanup. The source-declared planner is now in
+   the Scheduler path and covered by fallback-aware tests, but the temporary
+   static bridge still exists for legacy sources. The migration is complete only
+   when `windows-helper` declares its polling groups, `MetricSource` and
+   `SourceClient` require the resolver contract instead of `Partial<>`, and
+   `metric-polling-groups.ts` has no remaining production or test importers.
 
 4. Continue reducing source cache duplication before the next collector change.
    `RefreshableCache<T>` and `BackoffPolicy` now cover network topology and CPU
