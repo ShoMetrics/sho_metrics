@@ -191,7 +191,7 @@ test("onWillDisappear cleans subscription state and ignores later render ticks",
     assert.equal(action.metricsUpdateSnapshots.length, 2);
 });
 
-test("metric collection uses action-owned render cadence", () => {
+test("metric collection uses action-owned render timer", () => {
     const action = new TestMetricAction();
     const streamDeckAction = new FakeStreamDeckAction("background-action");
 

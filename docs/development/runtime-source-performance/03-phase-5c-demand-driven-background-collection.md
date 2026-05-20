@@ -43,7 +43,7 @@ Background collection time:
     -> source/profile-scoped samples written to MetricStore
 
 Render time:
-  Action-owned render cadence
+  Action-owned render timer
     -> synchronous MetricStore read
     -> synchronous fallback composition
     -> view model / PNG cache / Stream Deck update
@@ -60,7 +60,7 @@ If a collector is slow:
 - that collector group's latest sample ages out;
 - related metrics render stale-within-budget or `N/A`;
 - unrelated groups continue to render from their own latest samples;
-- UI cadence keeps running.
+- UI render interval keeps running.
 
 ## Life Of A Metric
 
@@ -77,7 +77,7 @@ Action subscribes
   -> subscriber callback renders
 ```
 
-Problem: render cadence is downstream of collector I/O. Phase 5a/5b group
+Problem: render timing is downstream of collector I/O. Phase 5a/5b group
 isolation reduces blast radius, but the group still waits.
 
 ### Target Background Life
@@ -131,7 +131,7 @@ the first implementation slice does not scatter new runtime polling files across
 Tracks visible metric collection subscriptions.
 
 A `MetricSubscription` means "keep this metric fresh for this action"; it does
-not deliver samples or own render callbacks. Actions render on their own cadence
+not deliver samples or own render callbacks. Actions render on their own interval
 and synchronously read `MetricStore`.
 
 Responsibilities:
@@ -382,12 +382,13 @@ History retention:
 
 ## Render Trigger Decision
 
-Render is action-owned fixed cadence.
+Render uses an action-owned fixed interval.
 
 ```text
 Action appears
   -> register MetricSubscription records
   -> start action render timer, usually 1Hz
+  -> run a bounded first-reading render warmup for the current subscription
   -> each render tick synchronously reads MetricStore
   -> build view model / reuse PNG cache / update Stream Deck
 Action disappears
@@ -399,17 +400,32 @@ Why this is the chosen trigger:
 
 - It most directly enforces "render never awaits collector I/O."
 - It matches the Stream Deck widget mental model: the widget refreshes at its
-  configured cadence and displays the current known state.
+  configured interval and displays the current known state.
 - It works with existing PNG caching: a render tick does not imply a full
   rasterization when the display model is unchanged.
 - It keeps data ownership clean. `MetricStore` stores samples; collectors
   collect; actions render.
 
+First-reading warmup:
+
+- Background collectors start immediately when a subscription appears. The
+  action render timer still follows the user's configured interval.
+- Without warmup, a widget set to a long interval, such as 60 seconds, can show
+  the initial placeholder until the first scheduled render tick even when the
+  collector already wrote a real reading.
+- The fix is scoped to the current visible action subscription: check only that
+  subscription's metric keys for a short bounded warmup window, render once
+  when any metric gets its first real reading, then stop the warmup. If no
+  metric becomes available, stop at the attempt limit.
+- This is intentionally not a general `MetricStore` event system. The overhead
+  is limited to short-lived store reads at subscription startup plus at most one
+  extra render per subscription warmup.
+
 Rejected render triggers:
 
 | Option | Benefit | Why rejected |
 | --- | --- | --- |
-| `MetricStore` emits `valueChanged(metricId)` | Renders only when data changes | Turns `MetricStore` into an event bus, couples data write cadence to UI cadence, and can cause multi-metric widgets to render multiple times per collector cycle. |
+| `MetricStore` emits `valueChanged(metricId)` | Renders only when data changes | Turns `MetricStore` into an event bus, couples data writes to UI render timing, and can cause multi-metric widgets to render multiple times per collector cycle. |
 | `CollectorGroupRunner` notifies actions after writes | Lowest data-to-render delay | Re-couples collectors to UI and recreates the path Phase 5c is trying to break. |
 | `CollectorGroupSupervisor` scans active widgets and renders them | Centralized timing control | Risks becoming the next `Scheduler`/god class and blurs action lifecycle ownership. |
 
@@ -471,7 +487,7 @@ runtime shape. The first GPU-specific cut remains:
 | `MetricRuntime` as the main new class | Convenient composition point | Name is too vague and invites god-class growth. Use smaller owners first. |
 | Let each worker implement fallback internally | Looks simple in pseudocode | Duplicates source fallback, invalid-value filtering, logging, and capability handling across workers. |
 | Move fallback I/O into rendering | Makes collectors simpler | Violates rendering boundary and would make render wait on sources again. |
-| Event-driven render from store/source writes | Avoids render ticks when values do not change | Re-couples data write cadence to UI behavior and adds event fan-out complexity. |
+| Event-driven render from store/source writes | Avoids render ticks when values do not change | Re-couples data writes to UI behavior and adds event fan-out complexity. |
 
 ## Migration Principles
 
@@ -519,8 +535,8 @@ own migration step.
 4. **Make MetricStore source-scoped and cut over one low-risk domain.** Extend
    MetricStore writes/reads to support `sourceScopeId + metricKey` sample
    identity, then migrate CPU or memory first. Actions render
-   from `MetricStore` on their own cadence; source I/O happens through the
-   runner. Verify a slow fake unrelated collector does not delay render cadence.
+   from `MetricStore` on their own render interval; source I/O happens through the
+   runner. Verify a slow fake unrelated collector does not delay rendering.
 
 5. **Migrate remaining built-in domains and fallback composition.** Move network,
    disk, GPU, and helper-backed paths after the runner seam is proven. Add
@@ -531,8 +547,8 @@ own migration step.
 6. **Delete old orchestration.** Remove the old Scheduler-as-I/O-owner,
    SourceRunner hot-path orchestration, and temporary static grouping bridges
    only after all active metric paths use subscription-driven background
-   collection. Keep or rename any remaining render cadence helper so it clearly
-   owns rendering cadence only, not collection.
+   collection. Keep or rename any remaining render timer helper so it clearly
+   owns rendering only, not collection.
 
 ## Remaining TODOs After Slice 6
 
@@ -546,12 +562,10 @@ code and focused tests. It is not a commit target.
 Recommended execution order:
 
 1. Fix `FallbackComposer` freshness.
-2. Render once after the first successful background sample for low-frequency
-   actions.
-3. Remove the deprecated `MetricReadPlan` bridge.
-4. Update stale historical docs.
-5. Design and implement descriptor/profile invalidation.
-6. Repeat the performance capture after the next TODO batch.
+2. Remove the deprecated `MetricReadPlan` bridge.
+3. Update stale historical docs.
+4. Design and implement descriptor/profile invalidation.
+5. Repeat the performance capture after the next TODO batch.
 
 Invalidation is intentionally later in the list even though it is high impact:
 it has the highest risk because it spans settings changes, source profile edits,
@@ -560,7 +574,6 @@ and helper descriptor refresh.
 | TODO | Priority | Estimated LOC | Why it still matters |
 | --- | ---: | ---: | --- |
 | Add `FallbackComposer` freshness checks. | High | 60-120 | Read-time fallback currently accepts the first candidate that has ever written a sample. A stale helper primary can therefore block a fresh `node-system` fallback until freshness budgets are enforced. |
-| Render once after the first successful background sample for low-frequency actions. | High | 40-100 | `CollectorGroupRunner` starts collection immediately, but action render cadence follows the user interval. A disk widget set to 60s can therefore show the first `N/A` until the first 60s render tick even if the collector already wrote data. Add a one-shot post-first-sample render path without turning store writes into general render events. |
 | Remove the `MetricReadPlan` subscription bridge. | Medium | 80-160 | `MetricSubscriptionRegistry.registerReadPlanBridge` is still a deprecated migration bridge. It is runnable technical debt, not a current correctness bug; clean it after measurement and fallback freshness are correct. |
 | Update historical docs after each major migration commit. | Medium | 40-100 | Some Phase 5a/5b text intentionally describes history, but implementation-state sections must not keep saying Scheduler/static bridge work is pending after those paths are deleted. |
 | Wire source profile and descriptor invalidation into re-planning. | High | 100-220 | LHM descriptors, source profile edits, and custom-source metadata changes must re-plan affected subscriptions without requiring actions to disappear and reappear. Do this after listing invalidation sources and trigger timing. |
@@ -654,11 +667,11 @@ The remaining measured risks are:
 
 - Move Phase 5b planner tests to `CollectorGroupPlanner` instead of keeping a
   duplicate planner test suite.
-- Replace Scheduler I/O timing tests with render-cadence tests and
+- Replace Scheduler I/O timing tests with render-timer tests and
   `CollectorGroupRunner` tests.
 - Keep source resolver tests because source-declared grouping remains a product
   contract.
-- Add tests that action render cadence does not await a pending runner.
+- Add tests that action rendering does not await a pending runner.
 - Add tests that multi-metric render can show fresh CPU while GPU is expired.
 - Add tests that source/profile/descriptor invalidation re-plans affected
   subscriptions without requiring action disappear/reappear.
@@ -682,7 +695,7 @@ Observability ownership:
 
 - `CollectorGroupRunner` logs collector duration, pending/skipped refreshes,
   timeout/backoff, and writes/no-writes.
-- Action/render cadence logs render/update duration and PNG cache hits.
+- Action/render timer logs render/update duration and PNG cache hits.
 - Perf monitor correlates these logs; it should not infer source ownership from
   process names alone.
 

@@ -52,7 +52,7 @@ export class BackgroundMetricCollection {
      * Registers one migration-era read-plan subscription.
      *
      * This is a collection-only subscription. Rendering is owned by the action
-     * render cadence; this method only keeps source samples fresh in MetricStore.
+     * render interval; this method only keeps source samples fresh in MetricStore.
      */
     registerReadPlanBridgeSubscription(
         options: RegisterMetricReadPlanSubscriptionBridgeOptions,
@@ -72,7 +72,7 @@ export class BackgroundMetricCollection {
      * Property Inspector option refreshes need to nudge source-owned discovery
      * such as network interfaces and disk volumes. This method writes
      * source/profile-scoped samples and intentionally does not trigger render
-     * callbacks or replace the background collection cadence.
+     * callbacks or replace the background collection interval.
      *
      * This is a lifecycle-only escape hatch. It bypasses CollectorGroupRunner
      * backoff, in-flight dedupe, and generation guards, so callers must not use
