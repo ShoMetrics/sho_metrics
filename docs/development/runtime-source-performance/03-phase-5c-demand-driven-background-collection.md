@@ -534,6 +534,122 @@ own migration step.
    collection. Keep or rename any remaining render cadence helper so it clearly
    owns rendering cadence only, not collection.
 
+## Remaining TODOs After Slice 6
+
+The old Scheduler, SourceRunner, static polling-group bridge, and dual
+Scheduler/background action mode have been removed. Do not carry old Phase 5a/5b
+TODOs forward unless they still apply to the background collection shape.
+
+Estimated LOC is an order-of-magnitude planning number including production
+code and focused tests. It is not a commit target.
+
+Recommended execution order:
+
+1. Fix `FallbackComposer` freshness.
+2. Render once after the first successful background sample for low-frequency
+   actions.
+3. Remove the deprecated `MetricReadPlan` bridge.
+4. Update stale historical docs.
+5. Design and implement descriptor/profile invalidation.
+6. Repeat the performance capture after the next TODO batch.
+
+Invalidation is intentionally later in the list even though it is high impact:
+it has the highest risk because it spans settings changes, source profile edits,
+and helper descriptor refresh.
+
+| TODO | Priority | Estimated LOC | Why it still matters |
+| --- | ---: | ---: | --- |
+| Add `FallbackComposer` freshness checks. | High | 60-120 | Read-time fallback currently accepts the first candidate that has ever written a sample. A stale helper primary can therefore block a fresh `node-system` fallback until freshness budgets are enforced. |
+| Render once after the first successful background sample for low-frequency actions. | High | 40-100 | `CollectorGroupRunner` starts collection immediately, but action render cadence follows the user interval. A disk widget set to 60s can therefore show the first `N/A` until the first 60s render tick even if the collector already wrote data. Add a one-shot post-first-sample render path without turning store writes into general render events. |
+| Remove the `MetricReadPlan` subscription bridge. | Medium | 80-160 | `MetricSubscriptionRegistry.registerReadPlanBridge` is still a deprecated migration bridge. It is runnable technical debt, not a current correctness bug; clean it after measurement and fallback freshness are correct. |
+| Update historical docs after each major migration commit. | Medium | 40-100 | Some Phase 5a/5b text intentionally describes history, but implementation-state sections must not keep saying Scheduler/static bridge work is pending after those paths are deleted. |
+| Wire source profile and descriptor invalidation into re-planning. | High | 100-220 | LHM descriptors, source profile edits, and custom-source metadata changes must re-plan affected subscriptions without requiring actions to disappear and reappear. Do this after listing invalidation sources and trigger timing. |
+| Repeat the performance capture after the next TODO batch. | High | 20-60 | The post-Slice-6 baseline is recorded below. Repeat the same 300 second debug capture after freshness/bridge/invalidation changes so regressions are visible. |
+| Keep GPU process-churn optimization separate. | Medium | 120-300 | Background collection prevents `nvidia-smi` latency from blocking unrelated widgets, but it does not reduce cold process starts. Optimize only after measuring `nvidia-smi` start count and elapsed time. |
+| Implement LHM/helper descriptor preload or helper-side unknown coalescing. | Medium | 150-350 | Unknown isolation is a cold-start safety fallback. It cannot be the steady-state model for hundreds of LHM sensors. This depends on helper-side descriptor metadata or helper-side request coalescing. |
+| Add source capability filtering for helper/custom sources. | Medium | 80-180 | The `unsupported` planning state exists, but helper/custom sources still need real capability metadata so the runtime avoids asking a source for metrics it cannot resolve. |
+| Make metric history retention policy-driven when the product needs longer windows. | Low | 120-240 | `MetricStore` still uses a 60-sample default internally. The API intentionally does not promise `RingBuffer<60>`, so future CPU/network/disk history windows can become per-metric without changing render callers. |
+
+## Post-Slice-6 Performance Capture
+
+Capture:
+
+- Date: 2026-05-20.
+- Build: debug log build, `SHO_METRICS_LOG_LEVEL=debug`.
+- Duration: 300 seconds, 1000 ms sampler interval.
+- Layout: same visible Stream Deck layout used by the previous runtime-source
+  captures.
+- Helper state: `windows-helper` was unavailable, so helper refresh attempts
+  entered backoff and `node-system` provided the built-in samples.
+- Raw summary and process samples were local perf-log artifacts from this run.
+  They are not committed and should not be referenced by stable filename.
+
+The monitor was updated to measurement version 5 for this capture. Version 5
+adds `CollectorGroupRunner` refresh status and duration summaries. Earlier
+post-Slice-6 smoke/debug captures were used as local smoke checks, but the v5
+debug capture summarized below is the comparison baseline.
+
+### Comparison Against The Previous 300s Runtime Capture
+
+Previous baseline: the 2026-05-19 300 second runtime-source capture after the
+stale network cache change.
+
+| Metric | Previous `82b559a` run | Post-Slice-6 v5 run | Interpretation |
+| --- | ---: | ---: | --- |
+| Scheduler `pollDone` 1 Hz count | 206 | 0 | Expected. Scheduler-as-I/O-owner is deleted. |
+| Scheduler `pollDone` p95 | 2955 ms | n/a | Old gate no longer applies; use collector and render metrics below. |
+| Scheduler `pollStartGap` p95 | 3072 ms | n/a | Old shared 1 Hz polling group is gone. |
+| CPU rendered sample age p90 | 2325 ms | 857 ms | Pass. CPU render freshness no longer follows slow unrelated collector tails. |
+| RAM rendered sample age p90 | 2467 ms | 1264 ms | Pass. Still under the 1500 ms 1 Hz target in this run. |
+| Network rendered sample age p90 | 2424 ms | 1316 ms | Pass. Network is under the 1500 ms 1 Hz target in this run. |
+| GPU usage rendered sample age p90 | 2489 ms | 1767 ms | Improved but still above the 1500 ms target. GPU process churn remains separate. |
+| GPU temp rendered sample age p90 | 3184 ms | 1627 ms | Improved but still slightly above the 1500 ms target. |
+| `node` parent=`streamdeck` CPU p95 | 1.665% | 1.017% | Improved in this run. |
+| `WmiPrvSE` CPU p95 | 2.434% | 1.921% | Improved in this run; PDH attribution remains coarse. |
+| process sampler `counterCollect` p95 | 1542 ms | 1481 ms | Similar monitor overhead range; use as noise context. |
+| Metric view `avgTotalMs` p95 | 131.5 ms | 107.9 ms | Improved render/update aggregate. |
+| Metric view `maxTotalMs` p95 | 250 ms | 226 ms | Improved render/update tail. |
+| `nvidia-smi` start count | 132 | 231 | Worse. Background collection prevents UI coupling, but it did not reduce GPU process churn. |
+| `nvidia-smi` elapsed p95 | 1554 ms | 1138 ms | Better in this run, but start count is higher; do not treat this as GPU optimization. |
+
+Disk sample age is intentionally not used as a 1 Hz freshness gate here: the
+captured disk usage action produced only five rendered samples during the 300s
+window, so its sample-age distribution reflects a lower-frequency display path
+rather than 1 Hz collector isolation.
+
+### Collector Group Evidence
+
+| Collector group | Count | p50 | p90 | p95 | Max | Notes |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| `node-system cpu` | 10 | 1 ms | 1 ms | 1 ms | 1 ms | CPU collector is cheap. |
+| `node-system memory` | 10 | 217 ms | 252 ms | 315 ms | 315 ms | Memory collector is isolated from GPU/network. |
+| `node-system network` | 10 | 225 ms | 888 ms | 918 ms | 918 ms | Network collector remains a non-trivial OS boundary but no longer freezes CPU/RAM rendering. |
+| `node-system gpu` | 10 | 56 ms | 1167 ms | 1306 ms | 1306 ms | GPU still has process/driver tail latency. |
+| `node-system disk` | 5 | 1053 ms | 1278 ms | 1278 ms | 1278 ms | Low-frequency display path in this capture. |
+| `windows-helper helper-snapshot` | 60 | 0 ms | 0 ms | 0 ms | 1 ms | Helper was unavailable; attempts quickly failed/backed off. |
+
+Refresh status counts:
+
+| Status | Count | Meaning |
+| --- | ---: | --- |
+| `refreshed` | 45 | Successful source/profile-scoped writes to `MetricStore`. |
+| `failed` | 10 | `windows-helper` unavailable. |
+| `skippedBackoff` | 50 | Helper retries suppressed during backoff. |
+
+### Capture Conclusion
+
+Phase 5c's core claim is supported by this run: render freshness for CPU, RAM,
+network, and GPU no longer follows the old shared Scheduler 1 Hz polling-group
+tail. The old `pollDone`/`pollStartGap` metrics are now intentionally absent.
+
+The remaining measured risks are:
+
+- GPU process churn: `nvidia-smi` starts increased to 231 in 300 seconds.
+- GPU freshness: GPU usage/temp p90 improved but still exceeded the 1500 ms
+  target.
+- Helper unavailability: helper fallback/backoff behavior is visible and cheap,
+  but helper-backed LHM descriptor work is still not implemented.
+
 ## Test Migration
 
 - Move Phase 5b planner tests to `CollectorGroupPlanner` instead of keeping a
