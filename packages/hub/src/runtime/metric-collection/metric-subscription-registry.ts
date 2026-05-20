@@ -16,7 +16,7 @@ export interface MetricSubscriptionSourceCandidate {
  *
  * This is a collection subscription, not a value-event callback subscription.
  * It describes demand for background collection; rendering reads MetricStore on
- * its own cadence.
+ * its own render interval.
  */
 export interface MetricSubscription {
     readonly subscriberId: string;

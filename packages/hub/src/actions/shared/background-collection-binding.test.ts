@@ -10,7 +10,7 @@ interface CollectionRegistrationRecord {
     cleanupCallCount: number;
 }
 
-test("first refresh registers collection and starts render cadence", () => {
+test("first refresh registers collection and starts render timer", () => {
     const registrations: CollectionRegistrationRecord[] = [];
     const timer = new FakeTimer();
     const binding = new BackgroundCollectionBinding(
@@ -25,6 +25,7 @@ test("first refresh registers collection and starts render cadence", () => {
             };
         },
         timer,
+        () => false,
     );
     let tickCount = 0;
 
@@ -42,7 +43,7 @@ test("first refresh registers collection and starts render cadence", () => {
         assert.equal(registrations.length, 1);
         assert.deepEqual(registrations[0].readPlan.metricKeys, ["memory.used"]);
         assert.equal(registrations[0].intervalMilliseconds, 1000);
-        assert.deepEqual(timer.recordedIntervalsMilliseconds, [1000]);
+        assert.deepEqual(timer.recordedIntervalsMilliseconds, [1000, 500]);
         assert.equal(tickCount, 1);
     } finally {
         binding.dispose();
@@ -51,16 +52,20 @@ test("first refresh registers collection and starts render cadence", () => {
 
 test("refresh with the same read plan and interval keeps existing collection", () => {
     const registrations: CollectionRegistrationRecord[] = [];
-    const binding = new BackgroundCollectionBinding(options => {
-        const record = {
-            ...options,
-            cleanupCallCount: 0,
-        };
-        registrations.push(record);
-        return () => {
-            record.cleanupCallCount += 1;
-        };
-    }, new FakeTimer());
+    const binding = new BackgroundCollectionBinding(
+        options => {
+            const record = {
+                ...options,
+                cleanupCallCount: 0,
+            };
+            registrations.push(record);
+            return () => {
+                record.cleanupCallCount += 1;
+            };
+        },
+        new FakeTimer(),
+        () => false,
+    );
 
     try {
         binding.refresh({
@@ -83,19 +88,23 @@ test("refresh with the same read plan and interval keeps existing collection", (
     }
 });
 
-test("refresh with a different plan replaces collection and cadence", () => {
+test("refresh with a different plan replaces collection and render timer", () => {
     const registrations: CollectionRegistrationRecord[] = [];
     const timer = new FakeTimer();
-    const binding = new BackgroundCollectionBinding(options => {
-        const record = {
-            ...options,
-            cleanupCallCount: 0,
-        };
-        registrations.push(record);
-        return () => {
-            record.cleanupCallCount += 1;
-        };
-    }, timer);
+    const binding = new BackgroundCollectionBinding(
+        options => {
+            const record = {
+                ...options,
+                cleanupCallCount: 0,
+            };
+            registrations.push(record);
+            return () => {
+                record.cleanupCallCount += 1;
+            };
+        },
+        timer,
+        () => false,
+    );
 
     try {
         binding.refresh({
@@ -114,26 +123,30 @@ test("refresh with a different plan replaces collection and cadence", () => {
         assert.equal(registrations.length, 2);
         assert.equal(registrations[0].cleanupCallCount, 1);
         assert.deepEqual(registrations[1].readPlan.metricKeys, ["memory.total"]);
-        assert.deepEqual(timer.recordedIntervalsMilliseconds, [1000, 5000]);
-        assert.equal(timer.clearedHandleCount, 1);
+        assert.deepEqual(timer.recordedIntervalsMilliseconds, [1000, 500, 5000, 500]);
+        assert.equal(timer.clearedHandleCount, 2);
     } finally {
         binding.dispose();
     }
 });
 
-test("dispose unregisters collection and clears cadence", () => {
+test("dispose unregisters collection and clears render timer", () => {
     const registrations: CollectionRegistrationRecord[] = [];
     const timer = new FakeTimer();
-    const binding = new BackgroundCollectionBinding(options => {
-        const record = {
-            ...options,
-            cleanupCallCount: 0,
-        };
-        registrations.push(record);
-        return () => {
-            record.cleanupCallCount += 1;
-        };
-    }, timer);
+    const binding = new BackgroundCollectionBinding(
+        options => {
+            const record = {
+                ...options,
+                cleanupCallCount: 0,
+            };
+            registrations.push(record);
+            return () => {
+                record.cleanupCallCount += 1;
+            };
+        },
+        timer,
+        () => false,
+    );
 
     binding.refresh({
         subscriberId: "action-1",
@@ -145,24 +158,54 @@ test("dispose unregisters collection and clears cadence", () => {
     binding.dispose();
 
     assert.equal(registrations[0].cleanupCallCount, 1);
-    assert.equal(timer.clearedHandleCount, 1);
+    assert.equal(timer.clearedHandleCount, 2);
+});
+
+test("first-reading warmup renders once when any subscribed metric receives a reading", () => {
+    const metricKeysWithReadings = new Set<string>();
+    const timer = new FakeTimer();
+    const binding = new BackgroundCollectionBinding(
+        () => () => undefined,
+        timer,
+        readPlan => readPlan.metricKeys.some(metricKey => metricKeysWithReadings.has(metricKey)),
+    );
+    let tickCount = 0;
+
+    try {
+        binding.refresh({
+            subscriberId: "action-1",
+            readPlan: buildReadPlan(["disk.usage.percent", "disk.usage.available"]),
+            pollingIntervalMilliseconds: 60000,
+            onTick: () => {
+                tickCount += 1;
+            },
+        });
+
+        timer.runByInterval(500);
+        metricKeysWithReadings.add("disk.usage.percent");
+        timer.runByInterval(500);
+        metricKeysWithReadings.add("disk.usage.available");
+        timer.runByInterval(500);
+
+        assert.equal(tickCount, 1);
+        assert.equal(timer.clearedHandleCount, 1);
+    } finally {
+        binding.dispose();
+    }
 });
 
 class FakeTimer implements BackgroundCollectionBindingTimer {
     readonly recordedIntervalsMilliseconds: number[] = [];
-    private readonly callbacks: Array<() => void> = [];
+    private readonly handles: FakeTimerHandle[] = [];
     clearedHandleCount = 0;
 
     set(callback: () => void, intervalMilliseconds: number): unknown {
         const handle = {
             active: true,
             callback,
+            intervalMilliseconds,
         };
-        this.callbacks.push(() => {
-            if (handle.active) {
-                callback();
-            }
-        });
+        this.handles.push(handle);
         this.recordedIntervalsMilliseconds.push(intervalMilliseconds);
         return handle;
     }
@@ -173,10 +216,26 @@ class FakeTimer implements BackgroundCollectionBindingTimer {
     }
 
     runAll(): void {
-        for (const callback of this.callbacks) {
-            callback();
+        for (const handle of this.handles) {
+            if (handle.active) {
+                handle.callback();
+            }
         }
     }
+
+    runByInterval(intervalMilliseconds: number): void {
+        for (const handle of this.handles) {
+            if (handle.active && handle.intervalMilliseconds === intervalMilliseconds) {
+                handle.callback();
+            }
+        }
+    }
+}
+
+interface FakeTimerHandle {
+    active: boolean;
+    readonly callback: () => void;
+    readonly intervalMilliseconds: number;
 }
 
 function buildReadPlan(metricKeys: readonly string[]): MetricReadPlan {
