@@ -52,7 +52,7 @@ const processSnapshots = await sampleProcesses({
 });
 const logText = await readTextSince(options.logPath, logStartOffset);
 const summary = {
-    measurementVersion: 4,
+    measurementVersion: 5,
     capturedAt: startTimestamp.toISOString(),
     durationSeconds: options.durationSeconds,
     intervalMilliseconds: options.intervalMilliseconds,
@@ -66,6 +66,7 @@ const summary = {
         processParentAggregation: "processesByParent narrows the same per-sample aggregation by observed parent process name.",
         wmiAttribution: "WmiPrvSE is a shared WMI provider host and can include activity from clients outside this plugin.",
         nvidiaSmiCpu: "Short-lived nvidia-smi processes can be missed by 1Hz process sampling; prefer logSummaries.nvidiaSmi elapsed/start counts.",
+        collectorGroupRefresh: "Measurement version 5 adds CollectorGroupRunner refresh status and duration summaries for the Phase 5c background collection path.",
     },
     caveats: [
         "The first effectiveWarmupSamples process samples are excluded from process summaries to reduce PDH rate-counter warm-up bias.",
@@ -455,6 +456,10 @@ function appendSetValue(map, key, value) {
     map.set(key, new Set([value]));
 }
 
+function incrementMapCount(map, key) {
+    map.set(key, (map.get(key) ?? 0) + 1);
+}
+
 function summarizePluginLog(logText) {
     const pollDurationsByInterval = new Map();
     const pollStartTimestampsByInterval = new Map();
@@ -464,6 +469,10 @@ function summarizePluginLog(logText) {
     const sourceFallbackDurationsBySource = new Map();
     const sourceFallbackDurationsBySourceAndMetricSet = new Map();
     const sourceSkippedUnsupportedCountsBySourceAndMetricSet = new Map();
+    const collectorGroupRefreshDurationsBySource = new Map();
+    const collectorGroupRefreshDurationsBySourceAndGroup = new Map();
+    const collectorGroupRefreshDurationsByStatus = new Map();
+    const collectorGroupRefreshStatusCounts = new Map();
     const renderedSampleAgeDurationsByMetric = new Map();
     const dispatchSampleAgeDurationsByMetric = new Map();
     const metricViewSummaryValuesByField = new Map();
@@ -548,6 +557,30 @@ function summarizePluginLog(logText) {
             }
         }
 
+        if (line.includes("CollectorGroupRunner: collectorGroupRefresh")) {
+            const fields = readLogFields(line);
+            const status = fields.get("status");
+            const sourceId = fields.get("sourceId");
+            const groupId = fields.get("groupId");
+            const durationMs = readNumberField(fields, "durationMs");
+
+            if (status) {
+                incrementMapCount(collectorGroupRefreshStatusCounts, status);
+            }
+
+            if (status && durationMs != null) {
+                appendMapValue(collectorGroupRefreshDurationsByStatus, status, durationMs);
+            }
+
+            if (sourceId && durationMs != null) {
+                appendMapValue(collectorGroupRefreshDurationsBySource, sourceId, durationMs);
+            }
+
+            if (sourceId && groupId && durationMs != null) {
+                appendMapValue(collectorGroupRefreshDurationsBySourceAndGroup, `${sourceId} ${groupId}`, durationMs);
+            }
+        }
+
         if (line.includes("nvidiaSmiStart")) {
             nvidiaSmiStartCount += 1;
         }
@@ -601,6 +634,12 @@ function summarizePluginLog(logText) {
         sourceFallbackDurationsBySourceAndMetricSet: summarizeMap(sourceFallbackDurationsBySourceAndMetricSet),
         sourceSkippedUnsupportedCountsBySourceAndMetricSet: Object.fromEntries(
             Array.from(sourceSkippedUnsupportedCountsBySourceAndMetricSet.entries()).sort(),
+        ),
+        collectorGroupRefreshDurationsBySource: summarizeMap(collectorGroupRefreshDurationsBySource),
+        collectorGroupRefreshDurationsBySourceAndGroup: summarizeMap(collectorGroupRefreshDurationsBySourceAndGroup),
+        collectorGroupRefreshDurationsByStatus: summarizeMap(collectorGroupRefreshDurationsByStatus),
+        collectorGroupRefreshStatusCounts: Object.fromEntries(
+            Array.from(collectorGroupRefreshStatusCounts.entries()).sort(),
         ),
         renderedSampleAgeDurationsByMetric: summarizeMap(renderedSampleAgeDurationsByMetric),
         dispatchSampleAgeDurationsByMetric: summarizeMap(dispatchSampleAgeDurationsByMetric),
@@ -754,6 +793,17 @@ function printSummary(summary, summaryPath) {
             `p95=${summary.processSummaries.counterCollectMilliseconds.p95}ms`,
             `max=${summary.processSummaries.counterCollectMilliseconds.max}ms`,
         ].join(" ") + "\n");
+    }
+
+    const collectorRefreshStatusCounts = summary.logSummaries.collectorGroupRefreshStatusCounts;
+    if (Object.keys(collectorRefreshStatusCounts).length > 0) {
+        process.stdout.write(
+            "collectorGroupRefreshStatus "
+            + Object.entries(collectorRefreshStatusCounts)
+                .map(([status, count]) => `${status}=${count}`)
+                .join(" ")
+            + "\n",
+        );
     }
 
     const processSummaries = summary.processSummaries.processes
