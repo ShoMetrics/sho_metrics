@@ -577,6 +577,19 @@ into scheduler complexity:
   OS query, IPC request, external process, or JSON endpoint call per displayed
   key.
 
+### Known Phase 5b Limitations
+
+- Unknown dynamic metrics are intentionally isolated so the hub does not guess
+  source-native ownership. This is correct but expensive during descriptor
+  cold-start. For example, if 100 configured LHM sensors are all `unknown`
+  because helper descriptors have not loaded yet, the planner can produce 100
+  isolated groups. Production LHM integration must preload descriptors before
+  exposing the source to the planner, or the helper/source client must coalesce
+  unknown requests on its side until descriptors are ready.
+- `pollingGroup=...` log values become fallback-aware JSON signatures instead
+  of short labels such as `cpu`. Perf tooling must parse the whole non-whitespace
+  token and should not assume the old enum-style group id.
+
 ### Implementation Sketch
 
 1. Add runtime types for source-declared polling groups near the source client
@@ -598,6 +611,10 @@ into scheduler complexity:
    - PR 3: implement `windows-helper` static or descriptor-backed groups without
      parsing LHM ids in the hub.
    - PR 4: delete the static bridge after all built-in declarations are active.
+     The cleanup must also change `MetricSource` and `SourceClient` from
+     `Partial<SourceMetricPollingGroupResolver>` to required resolver contracts,
+     delete `metric-polling-groups.ts` and its tests if no importers remain, and
+     keep Scheduler tests using the real planner rather than a legacy bridge.
 6. After Phase 5b, implement Phase 5b.1 capability filtering using the
    `unsupported` state.
 

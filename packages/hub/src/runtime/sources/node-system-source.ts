@@ -74,6 +74,7 @@ import type {
 } from "./node-system-source-types";
 import { BackoffPolicy } from "./backoff-policy";
 import { RefreshableCache, type RefreshableCacheReadResult } from "./refreshable-cache";
+import type { SourceMetricPollingGroupResolution } from "./source-polling-groups";
 import { NODE_SYSTEM_SOURCE_ID } from "./source-ids";
 
 const log = logger.for("Source:NodeSystem");
@@ -201,9 +202,21 @@ export class NodeSystemSource implements MetricSource {
         return this.pollMetrics([]);
     }
 
+    resolveMetricPollingGroups(
+        metricKeys: readonly string[],
+    ): ReadonlyMap<string, SourceMetricPollingGroupResolution> {
+        return new Map(metricKeys.map(metricKey => {
+            const metricGroup = resolveNodeSystemMetricGroup(metricKey);
+
+            return [metricKey, metricGroup
+                ? { state: "owned", pollingGroupId: metricGroup }
+                : { state: "unknown" }];
+        }));
+    }
+
     async pollMetrics(metricKeys: readonly string[]): Promise<MetricSnapshot> {
         const metrics: Record<string, MetricValue> = {};
-        const metricGroups = resolveMetricGroups(metricKeys);
+        const metricGroups = resolveCollectorGroups(metricKeys);
         const pollStartTimestampMilliseconds = this.now();
 
         const [cpuMetrics, memoryMetrics, diskMetrics, networkMetrics, gpu] = await Promise.all([
@@ -679,7 +692,7 @@ export class NodeSystemSource implements MetricSource {
     }
 }
 
-export function resolveMetricGroups(metricKeys: readonly string[]): Set<NodeSystemMetricGroup> {
+export function resolveCollectorGroups(metricKeys: readonly string[]): Set<NodeSystemMetricGroup> {
     if (metricKeys.length === 0) {
         return new Set(["cpu", "memory", "disk", "network", "gpu"]);
     }
@@ -687,32 +700,37 @@ export function resolveMetricGroups(metricKeys: readonly string[]): Set<NodeSyst
     const metricGroups = new Set<NodeSystemMetricGroup>();
 
     for (const metricKey of metricKeys) {
-        if (isCpuMetricKey(metricKey)) {
-            metricGroups.add("cpu");
-            continue;
-        }
-
-        if (isNetworkMetricKey(metricKey)) {
-            metricGroups.add("network");
-            continue;
-        }
-
-        if (isRamMetricKey(metricKey)) {
-            metricGroups.add("memory");
-            continue;
-        }
-
-        if (isDiskMetricKey(metricKey)) {
-            metricGroups.add("disk");
-            continue;
-        }
-
-        if (isGpuMetricKey(metricKey)) {
-            metricGroups.add("gpu");
+        const metricGroup = resolveNodeSystemMetricGroup(metricKey);
+        if (metricGroup) {
+            metricGroups.add(metricGroup);
         }
     }
 
     return metricGroups;
+}
+
+export function resolveNodeSystemMetricGroup(metricKey: string): NodeSystemMetricGroup | undefined {
+    if (isCpuMetricKey(metricKey)) {
+        return "cpu";
+    }
+
+    if (isNetworkMetricKey(metricKey)) {
+        return "network";
+    }
+
+    if (isRamMetricKey(metricKey)) {
+        return "memory";
+    }
+
+    if (isDiskMetricKey(metricKey)) {
+        return "disk";
+    }
+
+    if (isGpuMetricKey(metricKey)) {
+        return "gpu";
+    }
+
+    return undefined;
 }
 
 function formatNetworkInterfaceRefreshFailureMessage(

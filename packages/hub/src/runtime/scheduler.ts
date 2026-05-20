@@ -11,10 +11,9 @@ import {
 import { DefaultSourceRunner, type SourceRunner } from "./sources/source-runner";
 import { createDefaultSourceRegistry } from "./sources/source-registry";
 import {
-    type MetricPollingGroup,
-    partitionMetricKeysByPollingGroup,
-    type MetricPollingGroupId,
-} from "./metric-polling-groups";
+    planMetricPollingGroups,
+    type PlannedMetricPollingGroup,
+} from "./metric-polling-group-planner";
 
 const log = logger.for("Scheduler");
 
@@ -22,9 +21,17 @@ export type MetricsSnapshot = MetricSnapshot;
 
 export type MetricSubscriber = (metrics: MetricsSnapshot) => void;
 
+/** Plans collector-safe polling groups for one source read plan. */
+export type MetricPollingGroupPlanner = (readPlan: MetricReadPlan) => readonly PlannedMetricPollingGroup[];
+
 interface SubscriptionOptions {
     pollingIntervalMilliseconds?: number;
     readPlan: MetricReadPlan;
+}
+
+interface SchedulerOptions {
+    snapshotStore?: MetricSnapshotStore;
+    planMetricPollingGroups: MetricPollingGroupPlanner;
 }
 
 export interface MetricSnapshotStore {
@@ -34,13 +41,13 @@ export interface MetricSnapshotStore {
 interface SubscriberRecord {
     callback: MetricSubscriber;
     readPlan: MetricReadPlan;
-    pollingGroups: readonly MetricPollingGroup[];
+    pollingGroups: readonly PlannedMetricPollingGroup[];
     pollingIntervalMilliseconds: number;
 }
 
 interface DueSubscriberGroup {
     groupKey: string;
-    pollingGroupId: MetricPollingGroupId;
+    pollingGroupId: string;
     readPlan: MetricReadPlan;
     pollingIntervalMilliseconds: number;
     subscribers: readonly SubscriberRecord[];
@@ -56,15 +63,17 @@ export class Scheduler {
     private readonly activePolls = new Set<string>();
     private readonly sourceRunner: SourceRunner;
     private readonly snapshotStore: MetricSnapshotStore;
+    private readonly planMetricPollingGroups: MetricPollingGroupPlanner;
     private readonly nextPollTimestampByGroup = new Map<string, number>();
 
     private static readonly TICK_INTERVAL_MS = 1000;
     private static readonly DEFAULT_POLLING_INTERVAL_MS = 1000;
     private static readonly ALLOWED_POLLING_INTERVALS_MS = new Set([1000, 2000, 3000, 5000, 10000, 15000, 30000, 60000]);
 
-    constructor(sourceRunner: SourceRunner, snapshotStore: MetricSnapshotStore = metricStore) {
+    constructor(sourceRunner: SourceRunner, options: SchedulerOptions) {
         this.sourceRunner = sourceRunner;
-        this.snapshotStore = snapshotStore;
+        this.snapshotStore = options.snapshotStore ?? metricStore;
+        this.planMetricPollingGroups = options.planMetricPollingGroups;
     }
 
     /**
@@ -87,7 +96,7 @@ export class Scheduler {
         const subscriberRecord: SubscriberRecord = {
             callback,
             readPlan,
-            pollingGroups: partitionMetricKeysByPollingGroup(readPlan.metricKeys),
+            pollingGroups: this.planMetricPollingGroups(readPlan),
             pollingIntervalMilliseconds,
         };
 
@@ -302,7 +311,7 @@ export class Scheduler {
     private static buildGroupKey(
         pollingIntervalMilliseconds: number,
         readPlan: MetricReadPlan,
-        pollingGroupId: MetricPollingGroupId,
+        pollingGroupId: string,
     ): string {
         const normalizedReadPlan = normalizeMetricReadPlan(readPlan);
 
@@ -345,4 +354,9 @@ function normalizeMetricKeys(metricKeys: readonly string[]): readonly string[] {
     return Array.from(new Set(metricKeys)).sort();
 }
 
-export const scheduler = new Scheduler(new DefaultSourceRunner(createDefaultSourceRegistry()));
+const defaultSourceRegistry = createDefaultSourceRegistry();
+
+export const scheduler = new Scheduler(new DefaultSourceRunner(defaultSourceRegistry), {
+    snapshotStore: metricStore,
+    planMetricPollingGroups: readPlan => planMetricPollingGroups(readPlan, defaultSourceRegistry),
+});

@@ -36,7 +36,7 @@ import {
 } from "./node-system-network";
 import {
     NodeSystemSource,
-    resolveMetricGroups,
+    resolveCollectorGroups,
 } from "./node-system-source";
 import {
     buildNetworkInterface,
@@ -50,17 +50,39 @@ import type {
 import type { DiskVolumeOption } from "../disk-volumes";
 import type { NetworkInterfaceOption } from "../network-interfaces";
 
-test("metric groups resolve all groups when no metric keys are requested", () => {
-    assertMetricGroups(resolveMetricGroups([]), ["cpu", "disk", "gpu", "memory", "network"]);
+test("collector groups resolve all groups when no metric keys are requested", () => {
+    assertMetricGroups(resolveCollectorGroups([]), ["cpu", "disk", "gpu", "memory", "network"]);
 });
 
-test("metric groups resolve only requested key prefixes", () => {
-    assertMetricGroups(resolveMetricGroups([
+test("collector groups resolve only requested key prefixes", () => {
+    assertMetricGroups(resolveCollectorGroups([
         "net.down",
         "cpu.usage_percent",
         "gpu.temp",
         "unknown.metric",
     ]), ["cpu", "gpu", "network"]);
+});
+
+test("node system source declares polling groups for owned metric keys", () => {
+    const source = new NodeSystemSource();
+
+    const resolutions = source.resolveMetricPollingGroups([
+        "cpu.usage_percent",
+        "net.down",
+        "unknown.metric",
+    ]);
+
+    assert.deepEqual(resolutions.get("cpu.usage_percent"), {
+        state: "owned",
+        pollingGroupId: "cpu",
+    });
+    assert.deepEqual(resolutions.get("net.down"), {
+        state: "owned",
+        pollingGroupId: "network",
+    });
+    assert.deepEqual(resolutions.get("unknown.metric"), {
+        state: "unknown",
+    });
 });
 
 test("node system source polls only the requested CPU group and exposes cached CPU info on the next poll", async () => {
