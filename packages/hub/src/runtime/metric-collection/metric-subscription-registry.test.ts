@@ -12,9 +12,19 @@ test("registerReadPlanBridge stores a normalized bridge subscription", () => {
         intervalMilliseconds: 1000,
     });
 
-    assert.deepEqual(registry.listReadPlanBridgeSubscriptions(), [{
+    assert.deepEqual(registry.listSubscriptions(), [{
         subscriberId: "action-1",
-        readPlan: buildReadPlan(["cpu.usage_percent", "gpu.temp"]),
+        metricKey: "cpu.usage_percent",
+        sourceScopeId: "local",
+        sourceCandidates: [{ sourceId: "node-system" }],
+        failureMode: "fallback",
+        intervalMilliseconds: 1000,
+    }, {
+        subscriberId: "action-1",
+        metricKey: "gpu.temp",
+        sourceScopeId: "local",
+        sourceCandidates: [{ sourceId: "node-system" }],
+        failureMode: "fallback",
         intervalMilliseconds: 1000,
     }]);
 });
@@ -33,9 +43,12 @@ test("registerReadPlanBridge replaces an existing subscriber", () => {
         intervalMilliseconds: 5000,
     });
 
-    assert.deepEqual(registry.listReadPlanBridgeSubscriptions(), [{
+    assert.deepEqual(registry.listSubscriptions(), [{
         subscriberId: "action-1",
-        readPlan: buildReadPlan(["net.down"]),
+        metricKey: "net.down",
+        sourceScopeId: "local",
+        sourceCandidates: [{ sourceId: "node-system" }],
+        failureMode: "fallback",
         intervalMilliseconds: 5000,
     }]);
 });
@@ -56,9 +69,12 @@ test("unregister removes one subscriber without touching others", () => {
 
     registry.unregister("action-1");
 
-    assert.deepEqual(registry.listReadPlanBridgeSubscriptions(), [{
+    assert.deepEqual(registry.listSubscriptions(), [{
         subscriberId: "action-2",
-        readPlan: buildReadPlan(["gpu.temp"]),
+        metricKey: "gpu.temp",
+        sourceScopeId: "local",
+        sourceCandidates: [{ sourceId: "node-system" }],
+        failureMode: "fallback",
         intervalMilliseconds: 1000,
     }]);
 });
@@ -74,9 +90,12 @@ test("invalidatePlans increments the planning version without dropping subscript
 
     assert.equal(registry.invalidatePlans(), 1);
 
-    assert.deepEqual(registry.listReadPlanBridgeSubscriptions(), [{
+    assert.deepEqual(registry.listSubscriptions(), [{
         subscriberId: "action-1",
-        readPlan: buildReadPlan(["cpu.usage_percent"]),
+        metricKey: "cpu.usage_percent",
+        sourceScopeId: "local",
+        sourceCandidates: [{ sourceId: "node-system" }],
+        failureMode: "fallback",
         intervalMilliseconds: 1000,
     }]);
 });
