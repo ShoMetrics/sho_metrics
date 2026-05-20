@@ -20,8 +20,58 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.slot.metric.target.domain, "cpu");
         assert.equal(settings.preferences.pollingFrequencySeconds, 1);
         assert.equal(settings.widget.slot.appearance.view.selectedView, "circle");
+        assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "multi-color");
         assert.equal(settings.widget.slot.appearance.paint.metric.solid.colors.usageColor, "#3b82f6");
         assert.equal(settings.widget.slot.appearance.theme.terminal.variant, "clean");
+    });
+
+    it("defaults network metric paint to solid without changing other metric defaults", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    metric: {
+                        network: {},
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+        });
+
+        assert.equal(settings.widget.slot.metric.target.domain, "network");
+        assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "solid");
+        assert.equal(settings.widget.slot.appearance.paint.metric.solid.colors.downloadColor, "#2563EB");
+        assert.equal(settings.widget.slot.appearance.paint.metric.solid.colors.uploadColor, "#F97316");
+    });
+
+    it("preserves an explicit network multi-color paint selection", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    metric: {
+                        network: {},
+                    },
+                    overrides: {
+                        appearance: {
+                            paint: {
+                                metric: {
+                                    colorMode: "COLOR_MODE_MULTI_COLOR",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+        });
+
+        assert.equal(settings.widget.slot.metric.target.domain, "network");
+        assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "multi-color");
     });
 
     it("cascades global defaults widget overrides and runtime maxima", () => {

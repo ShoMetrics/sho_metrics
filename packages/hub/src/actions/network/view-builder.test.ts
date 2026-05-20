@@ -159,6 +159,90 @@ test("network view treats expired throughput samples as no data", () => {
     assert.deepEqual(widgetData.history, []);
 });
 
+test("network overlay line keeps upload as the first channel", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
+        {
+            appearance: {
+                view: { selectedView: "line" },
+                paint: { metric: { colorMode: "solid" } },
+            },
+            network: {
+                direction: "both",
+                trafficDisplayMode: "overlay",
+            },
+        },
+    );
+    const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
+    const target = settings.widget.slot.metric.target;
+
+    assert.equal(target.domain, "network");
+    if (target.domain !== "network") {
+        assert.fail("Expected network target.");
+    }
+
+    const viewUpdate = buildNetworkViewUpdate({
+        event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
+        settings,
+        target,
+        metrics: buildNetworkMetricStore().forScope(LOCAL_SOURCE_SCOPE_ID),
+        selectedNetworkInterface: buildNetworkInterfaceOption("Ethernet"),
+        currentTimestampMilliseconds: 2000,
+    });
+    const widgetData = viewUpdate.viewOptions.widgetData;
+
+    if (!("positive" in widgetData)) {
+        assert.fail("Expected dual metric network view.");
+    }
+
+    assert.equal(widgetData.positive.label, "UP");
+    assert.equal(widgetData.negative.label, "DOWN");
+    if (!("positiveColor" in viewUpdate.viewOptions)) {
+        assert.fail("Expected dual metric network colors.");
+    }
+    assert.equal(viewUpdate.viewOptions.positiveColor, "#F97316");
+    assert.equal(viewUpdate.viewOptions.negativeColor, "#2563EB");
+});
+
+test("network bar keeps upload as the first channel", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
+        {
+            appearance: {
+                view: { selectedView: "bar" },
+                paint: { metric: { colorMode: "solid" } },
+            },
+            network: {
+                direction: "both",
+            },
+        },
+    );
+    const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
+    const target = settings.widget.slot.metric.target;
+
+    assert.equal(target.domain, "network");
+    if (target.domain !== "network") {
+        assert.fail("Expected network target.");
+    }
+
+    const viewUpdate = buildNetworkViewUpdate({
+        event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
+        settings,
+        target,
+        metrics: buildNetworkMetricStore().forScope(LOCAL_SOURCE_SCOPE_ID),
+        selectedNetworkInterface: buildNetworkInterfaceOption("Ethernet"),
+        currentTimestampMilliseconds: 2000,
+    });
+    const widgetData = viewUpdate.viewOptions.widgetData;
+
+    if ("positive" in widgetData) {
+        assert.fail("Expected bar network view.");
+    }
+
+    assert.deepEqual(widgetData.barChannels?.map(channel => channel.label), ["UP", "DOWN"]);
+    assert.deepEqual(widgetData.barChannels?.map(channel => channel.color), ["#F97316", "#2563EB"]);
+});
+
 function buildNetworkInterfaceOption(id: string): NetworkInterfaceOption {
     return {
         id,
@@ -167,4 +251,20 @@ function buildNetworkInterfaceOption(id: string): NetworkInterfaceOption {
         isDefault: true,
         speedMegabitsPerSecond: 2500,
     };
+}
+
+function buildNetworkMetricStore(): MetricStore {
+    const metricStore = new MetricStore();
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            [getNetworkAggregateMetricKey("upload")]: buildScalarMetricValue(1000, {
+                unit: MetricUnit.BYTES_PER_SECOND,
+            }),
+            [getNetworkAggregateMetricKey("download")]: buildScalarMetricValue(2000, {
+                unit: MetricUnit.BYTES_PER_SECOND,
+            }),
+        },
+    }));
+    return metricStore;
 }

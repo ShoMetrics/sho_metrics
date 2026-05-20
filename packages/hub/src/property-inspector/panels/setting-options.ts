@@ -52,9 +52,9 @@ export const gridLineTypeOptionList = [
 ] as const satisfies readonly SelectOption[];
 
 export const networkDirectionOptionList = [
-    { value: "both", label: "Download & Upload" },
-    { value: "download", label: "Download" },
+    { value: "both", label: "Upload & Download" },
     { value: "upload", label: "Upload" },
+    { value: "download", label: "Download" },
 ] as const satisfies readonly SelectOption[];
 
 export const networkTrafficDisplayModeOptionList = [

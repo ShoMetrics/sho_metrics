@@ -103,7 +103,10 @@ import type {
     SourceFailureMode,
     TemperatureUnit,
 } from "../resolved-settings";
-import { DEFAULT_APPEARANCE_SETTINGS } from "../default-appearance-settings";
+import {
+    buildDefaultAppearanceSettings,
+    DEFAULT_APPEARANCE_SETTINGS,
+} from "../default-appearance-settings";
 
 export interface ResolveStoredWidgetSettingsOptions {
     readonly storedWidgetSettings: StoredWidgetSettings;
@@ -132,6 +135,14 @@ const DEFAULT_DISK_THROUGHPUT_DISPLAY_SETTINGS: ResolvedDiskThroughputDisplaySet
     maximumReadThroughputMebibytesPerSecond: undefined,
     maximumWriteThroughputMebibytesPerSecond: undefined,
 };
+
+const DEFAULT_NETWORK_APPEARANCE_SETTINGS = buildDefaultAppearanceSettings({
+    paint: {
+        metric: {
+            colorMode: "solid",
+        },
+    },
+});
 
 const DEFAULT_WIDGET_PREFERENCES: ResolvedWidgetPreferences = {
     pollingFrequencySeconds: 1,
@@ -330,8 +341,14 @@ function resolveMetricSlot(
         storedSlot?.overrides?.diskThroughput,
         runtime,
     );
+    const metric = resolveMetricSelection(
+        storedSlot?.metric,
+        networkDisplay,
+        diskThroughputDisplay,
+        runtime,
+    );
     const slotAppearance = mergeAppearanceSettings(
-        DEFAULT_APPEARANCE_SETTINGS,
+        resolveDefaultAppearanceSettings(metric.target),
         storedSlot?.overrides?.appearance,
     );
     const appearanceWithViewOverride = globalSettings.viewOverride
@@ -345,14 +362,17 @@ function resolveMetricSlot(
         : appearanceWithThemeOverride;
 
     return {
-        metric: resolveMetricSelection(
-            storedSlot?.metric,
-            networkDisplay,
-            diskThroughputDisplay,
-            runtime,
-        ),
+        metric,
         appearance,
     };
+}
+
+function resolveDefaultAppearanceSettings(target: ResolvedMetricTarget): ResolvedAppearanceSettings {
+    if (target.domain === "network") {
+        return DEFAULT_NETWORK_APPEARANCE_SETTINGS;
+    }
+
+    return DEFAULT_APPEARANCE_SETTINGS;
 }
 
 function resolveMetricSelection(

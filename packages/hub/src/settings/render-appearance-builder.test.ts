@@ -144,6 +144,23 @@ test("threshold colors use resolved appearance colors", () => {
     ]);
 });
 
+test("network channel defaults use blue download and orange upload ramps", () => {
+    const appearance = buildAppearanceSettings();
+
+    assert.equal(appearance.paint.metric.solid.colors.downloadColor, "#2563EB");
+    assert.equal(appearance.paint.metric.solid.colors.uploadColor, "#F97316");
+    assert.deepEqual(appearance.paint.metric.multiColor.colors.download, {
+        lowColor: "#60A5FA",
+        mediumColor: "#2563EB",
+        highColor: "#1E3A8A",
+    });
+    assert.deepEqual(appearance.paint.metric.multiColor.colors.upload, {
+        lowColor: "#FDBA74",
+        mediumColor: "#F97316",
+        highColor: "#C2410C",
+    });
+});
+
 test("black-white color mode lowers renderer paint to neutral colors", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         paint: {

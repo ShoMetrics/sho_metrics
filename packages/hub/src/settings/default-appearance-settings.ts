@@ -14,15 +14,15 @@ export const DEFAULT_USAGE_MULTI_COLOR_SET: ResolvedMultiColorSet = {
 };
 
 export const DEFAULT_DOWNLOAD_MULTI_COLOR_SET: ResolvedMultiColorSet = {
-    lowColor: "#22c55e",
-    mediumColor: "#3b82f6",
-    highColor: "#60a5fa",
+    lowColor: "#60A5FA",
+    mediumColor: "#2563EB",
+    highColor: "#1E3A8A",
 };
 
 export const DEFAULT_UPLOAD_MULTI_COLOR_SET: ResolvedMultiColorSet = {
-    lowColor: "#f97316",
-    mediumColor: "#ef4444",
-    highColor: "#f472b6",
+    lowColor: "#FDBA74",
+    mediumColor: "#F97316",
+    highColor: "#C2410C",
 };
 
 export const DEFAULT_DISK_READ_MULTI_COLOR_SET: ResolvedMultiColorSet = {
@@ -55,8 +55,8 @@ export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
                 isGradientEnabled: true,
                 colors: {
                     usageColor: "#3b82f6",
-                    downloadColor: "#3b82f6",
-                    uploadColor: "#ef4444",
+                    downloadColor: "#2563EB",
+                    uploadColor: "#F97316",
                     diskReadColor: "#38bdf8",
                     diskWriteColor: "#f472b6",
                 },

@@ -79,7 +79,7 @@ const ARC_LAYOUT = {
     dividerDiameterRatio: 0.78,
     dividerYOffset: 0,
     gaugeBottomGapAngleDegrees: 92,
-    gaugeTopGapAngleDegrees: 25,
+    gaugeTopGapAngleDegrees: 92,
     gaugeRowIconXRatio: 0.50,
     gaugeRowValueEndXRatio: 0.18,
     gaugeRowOneDigitValueEndXRatio: 0.08,
@@ -120,6 +120,7 @@ interface ChannelArcModel {
     color: string;
     colorConfig: ColorConfig;
     progress: number;
+    gaugeProgressDirection: "start-to-end" | "end-to-start";
     gaugeStartAngleDegrees: number;
     gaugeEndAngleDegrees: number;
     rotationDegrees: number;
@@ -140,8 +141,8 @@ interface ChannelValueRowLayout {
 
 /**
  * Renders two independent network speed channels in one progress circle.
- * The positive channel owns the first clockwise half and the negative channel
- * owns the second clockwise half, so each value has a fixed visual lane.
+ * The positive channel owns the upper/left lane and the negative channel owns
+ * the lower/right lane, so each value has a fixed visual lane.
  */
 export function renderDualChannelProgressCircle(
     data: DualChannelWidgetData,
@@ -169,8 +170,9 @@ export function renderDualChannelProgressCircle(
             color: config.positiveColor,
             colorConfig: config.positiveColorConfig ?? buildSolidChannelColorConfig(config.positiveColor),
             progress: data.positive.progress,
-            gaugeStartAngleDegrees: 270 + ARC_LAYOUT.gaugeTopGapAngleDegrees / 2,
-            gaugeEndAngleDegrees: 450 - ARC_LAYOUT.gaugeBottomGapAngleDegrees / 2,
+            gaugeProgressDirection: "start-to-end",
+            gaugeStartAngleDegrees: 90 + ARC_LAYOUT.gaugeBottomGapAngleDegrees / 2,
+            gaugeEndAngleDegrees: 270 - ARC_LAYOUT.gaugeTopGapAngleDegrees / 2,
             rotationDegrees: -90,
             iconRotationDegrees: -90,
             iconFragment: config.positiveIconFragment,
@@ -181,8 +183,12 @@ export function renderDualChannelProgressCircle(
             color: config.negativeColor,
             colorConfig: config.negativeColorConfig ?? buildSolidChannelColorConfig(config.negativeColor),
             progress: data.negative.progress,
-            gaugeStartAngleDegrees: 90 + ARC_LAYOUT.gaugeBottomGapAngleDegrees / 2,
-            gaugeEndAngleDegrees: 270 - ARC_LAYOUT.gaugeTopGapAngleDegrees / 2,
+            // The right lane is the visual mirror of the left lane: users see it
+            // fill from bottom to top, even though the shared gauge arc geometry
+            // draws that side clockwise from top to bottom.
+            gaugeProgressDirection: "end-to-start",
+            gaugeStartAngleDegrees: 270 + ARC_LAYOUT.gaugeTopGapAngleDegrees / 2,
+            gaugeEndAngleDegrees: 450 - ARC_LAYOUT.gaugeBottomGapAngleDegrees / 2,
             rotationDegrees: 90,
             iconRotationDegrees: 90,
             iconFragment: config.negativeIconFragment,
