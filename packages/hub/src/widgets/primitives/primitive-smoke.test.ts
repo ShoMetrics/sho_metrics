@@ -285,7 +285,7 @@ test("gauge marker gap only cuts the marker travel domain for non-endpoint value
     });
 });
 
-test("dual-channel full-ring variant anchors both channel progress at the bottom", () => {
+test("dual-channel full-ring variant mirrors channel progress from the bottom lanes", () => {
     const svgFragment = renderDualChannelProgressCircle({
         positive: {
             ...buildWidgetData(),
@@ -304,8 +304,63 @@ test("dual-channel full-ring variant anchors both channel progress at the bottom
     const uploadArc = readStrokeCircleElement(svgFragment, "#ff5500");
     const downloadArc = readStrokeCircleElement(svgFragment, "#0055ff");
 
-    assert.equal(uploadArc.rotationDegrees, 90);
-    assert.equal(downloadArc.rotationDegrees, 0);
+    assert.equal(uploadArc.rotationDegrees, 95);
+    assert.equal(downloadArc.rotationDegrees, -2.5);
+});
+
+test("dual-channel full-ring variant uses flush track joins", () => {
+    const svgFragment = renderDualChannelProgressCircle({
+        positive: {
+            ...buildWidgetData(),
+            progress: 0,
+        },
+        negative: {
+            ...buildWidgetData(),
+            progress: 0,
+        },
+    }, {
+        ...DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG,
+        circleVariant: "full-ring",
+        trackColor: "#444444",
+    }, keySize);
+    const trackArcs = readStrokeCircleElements(svgFragment, "#444444");
+
+    assert.equal(trackArcs.length, 2);
+    assert.deepEqual(trackArcs.map(arc => arc.lineCap), ["butt", "butt"]);
+});
+
+test("dual-channel full-ring variant keeps tiny nonzero progress visible", () => {
+    const svgFragment = renderDualChannelProgressCircle({
+        positive: {
+            ...buildWidgetData(),
+            progress: 0.001,
+        },
+        negative: {
+            ...buildWidgetData(),
+            progress: 0.001,
+        },
+    }, {
+        ...DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG,
+        circleVariant: "full-ring",
+        positiveColor: "#ff5500",
+        negativeColor: "#0055ff",
+    }, keySize);
+    const uploadArc = readStrokeCircleElement(svgFragment, "#ff5500");
+    const downloadArc = readStrokeCircleElement(svgFragment, "#0055ff");
+    const uploadLength = readDashArrayFirstLength(uploadArc.dashArray);
+    const downloadLength = readDashArrayFirstLength(downloadArc.dashArray);
+
+    assert.equal(uploadArc.lineCap, "round");
+    assert.equal(downloadArc.lineCap, "round");
+    assert.match(svgFragment, /clipPath id="dual-progress-circle-positive-clip"/);
+    assert.match(svgFragment, /clipPath id="dual-progress-circle-negative-clip"/);
+    assert.match(svgFragment, /clip-path="url\(#dual-progress-circle-positive-clip\)"[\s\S]*stroke="#ff5500"/);
+    assert.match(svgFragment, /clip-path="url\(#dual-progress-circle-negative-clip\)"[\s\S]*stroke="#0055ff"/);
+    assert.equal(uploadArc.rotationDegrees, 95);
+    assert.ok(uploadLength >= 15 && uploadLength <= 18);
+    assert.ok(downloadLength >= 15 && downloadLength <= 18);
+    assert.ok(downloadArc.rotationDegrees > 65);
+    assert.ok(downloadArc.rotationDegrees < 75);
 });
 
 test("dual-channel gauge variant renders two full-color gauge lanes with marker dots", () => {
@@ -685,23 +740,40 @@ interface CircleElement {
 }
 
 interface StrokeCircleElement {
+    readonly dashArray: string;
+    readonly lineCap: string;
     readonly rotationDegrees: number;
 }
 
 function readStrokeCircleElement(svgFragment: string, strokeColor: string): StrokeCircleElement {
-    const match = new RegExp(
-        `<circle[\\s\\S]*?stroke="${strokeColor}"[\\s\\S]*?transform="rotate\\((-?[0-9.]+)`,
-        "u",
-    ).exec(svgFragment);
-    const rotationText = match?.[1];
+    const [element] = readStrokeCircleElements(svgFragment, strokeColor);
 
-    if (rotationText === undefined) {
+    if (element === undefined) {
         assert.fail(`Expected circle stroke ${strokeColor}.`);
     }
 
-    return {
-        rotationDegrees: Number(rotationText),
-    };
+    return element;
+}
+
+function readStrokeCircleElements(svgFragment: string, strokeColor: string): readonly StrokeCircleElement[] {
+    const match = new RegExp(
+        `<circle\\b[^>]*?stroke="${escapeRegexLiteral(strokeColor)}"[^>]*?stroke-dasharray="([^"]+)"[^>]*?stroke-linecap="([^"]+)"[^>]*?transform="rotate\\((-?[0-9.]+)`,
+        "gu",
+    );
+
+    return [...svgFragment.matchAll(match)].map(result => ({
+        dashArray: result[1] ?? "",
+        lineCap: result[2] ?? "",
+        rotationDegrees: Number(result[3]),
+    }));
+}
+
+function readDashArrayFirstLength(dashArray: string): number {
+    return Number(dashArray.split(" ")[0]);
+}
+
+function escapeRegexLiteral(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
 function readCircleElements(svgFragment: string, className: string): readonly CircleElement[] {
