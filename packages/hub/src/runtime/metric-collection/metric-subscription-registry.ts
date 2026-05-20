@@ -3,27 +3,38 @@ import {
     type MetricReadPlan,
 } from "../sources/metric-read-plan";
 
+/** Source selection mode for one metric collection subscription. */
+export type MetricSubscriptionFailureMode = "fallback" | "empty";
+
+/** Source candidate for one metric collection subscription. */
+export interface MetricSubscriptionSourceCandidate {
+    readonly sourceId: string;
+}
+
 /**
- * Registers one legacy read-plan subscription during the Phase 5c migration.
+ * One visible action's request to keep one metric fresh.
  *
- * @deprecated This bridge exists only while SchedulerBinding still owns
- * `MetricReadPlan`. Slice 2 should replace it with metric-key/source-policy
- * subscriptions consumed by CollectorGroupPlanner.
+ * This is a collection subscription, not a value-event callback subscription.
+ * It describes demand for background collection; rendering reads MetricStore on
+ * its own cadence.
  */
-export interface RegisterMetricReadPlanSubscriptionBridgeOptions {
+export interface MetricSubscription {
     readonly subscriberId: string;
-    readonly readPlan: MetricReadPlan;
+    readonly metricKey: string;
+    readonly sourceScopeId: string;
+    readonly sourceCandidates: readonly MetricSubscriptionSourceCandidate[];
+    readonly failureMode: MetricSubscriptionFailureMode;
     readonly intervalMilliseconds: number;
 }
 
 /**
- * One visible action's legacy request to keep a read plan fresh.
+ * Registers one legacy read-plan subscription during the Phase 5c migration.
  *
- * @deprecated This is a bridge shape, not the final MetricSubscription model.
- * It is intentionally named after `MetricReadPlan` so new code does not treat
- * it as the long-term subscription contract.
+ * @deprecated This bridge exists only while SchedulerBinding still owns
+ * `MetricReadPlan`. A later cut should make actions register metric-key and
+ * source-policy subscriptions directly.
  */
-export interface MetricReadPlanSubscriptionBridge {
+export interface RegisterMetricReadPlanSubscriptionBridgeOptions {
     readonly subscriberId: string;
     readonly readPlan: MetricReadPlan;
     readonly intervalMilliseconds: number;
@@ -47,7 +58,7 @@ export interface MetricReadPlanSubscriptionBridgeWriter {
  * the registration-time fact table that later collector group planning reads.
  */
 export class MetricSubscriptionRegistry implements MetricReadPlanSubscriptionBridgeWriter {
-    private readonly readPlanBridgeSubscriptionsBySubscriberId = new Map<string, MetricReadPlanSubscriptionBridge>();
+    private readonly subscriptionsBySubscriberId = new Map<string, readonly MetricSubscription[]>();
     private currentPlanningVersion = 0;
 
     get planningVersion(): number {
@@ -57,19 +68,25 @@ export class MetricSubscriptionRegistry implements MetricReadPlanSubscriptionBri
     /**
      * Registers a legacy read-plan subscription.
      *
-     * @deprecated Slice 2 should replace this bridge with final subscription
-     * records that carry metric key, source policy, and interval.
+     * @deprecated This bridge adapts the old multi-key read plan into final
+     * per-metric subscription records until actions register them directly.
      */
     registerReadPlanBridge(options: RegisterMetricReadPlanSubscriptionBridgeOptions): void {
-        this.readPlanBridgeSubscriptionsBySubscriberId.set(options.subscriberId, {
+        const readPlan = normalizeMetricReadPlan(options.readPlan);
+        const subscriptions = readPlan.metricKeys.map(metricKey => ({
             subscriberId: options.subscriberId,
-            readPlan: normalizeMetricReadPlan(options.readPlan),
+            metricKey,
+            sourceScopeId: readPlan.sourceScopeId,
+            sourceCandidates: readPlan.sourceCandidates,
+            failureMode: readPlan.failureMode,
             intervalMilliseconds: options.intervalMilliseconds,
-        });
+        }));
+
+        this.subscriptionsBySubscriberId.set(options.subscriberId, subscriptions);
     }
 
     unregister(subscriberId: string): void {
-        this.readPlanBridgeSubscriptionsBySubscriberId.delete(subscriberId);
+        this.subscriptionsBySubscriberId.delete(subscriberId);
     }
 
     invalidatePlans(): number {
@@ -78,13 +95,10 @@ export class MetricSubscriptionRegistry implements MetricReadPlanSubscriptionBri
     }
 
     /**
-     * Lists legacy read-plan subscriptions for migration assertions.
-     *
-     * @deprecated Slice 2 should move grouping and minimum-interval decisions to
-     * CollectorGroupPlanner and stop reading this bridge output.
+     * Lists active collection subscriptions.
      */
-    listReadPlanBridgeSubscriptions(): readonly MetricReadPlanSubscriptionBridge[] {
-        return Array.from(this.readPlanBridgeSubscriptionsBySubscriberId.values());
+    listSubscriptions(): readonly MetricSubscription[] {
+        return Array.from(this.subscriptionsBySubscriberId.values()).flat();
     }
 }
 
