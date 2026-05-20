@@ -8,6 +8,7 @@ import {
     type MetricSnapshot,
     type MetricSource,
 } from "./metric-source";
+import type { SourceMetricPollingGroupResolution } from "./source-polling-groups";
 
 test("metric source client uses pollMetrics when the source supports requested keys", async () => {
     const source = new FakeMetricSource();
@@ -29,6 +30,18 @@ test("metric source client falls back to poll for poll-only sources", async () =
     assert.equal(source.pollCount, 1);
 });
 
+test("metric source client forwards source-declared polling groups", () => {
+    const source = new ResolvingMetricSource();
+    const sourceClient = createMetricSourceClient(source);
+
+    const resolutions = sourceClient.resolveMetricPollingGroups?.(["cpu.usage_percent"]);
+
+    assert.deepEqual(resolutions?.get("cpu.usage_percent"), {
+        state: "owned",
+        pollingGroupId: "fake-source:cpu",
+    });
+});
+
 class FakeMetricSource implements MetricSource {
     readonly sourceId = "fake-source";
     readonly snapshot: MetricSnapshot = buildTestSnapshot();
@@ -41,6 +54,17 @@ class FakeMetricSource implements MetricSource {
     async pollMetrics(metricKeys: readonly string[]): Promise<MetricSnapshot> {
         this.polledMetricKeyListList.push([...metricKeys]);
         return this.snapshot;
+    }
+}
+
+class ResolvingMetricSource extends FakeMetricSource {
+    resolveMetricPollingGroups(
+        metricKeys: readonly string[],
+    ): ReadonlyMap<string, SourceMetricPollingGroupResolution> {
+        return new Map(metricKeys.map(metricKey => [
+            metricKey,
+            { state: "owned", pollingGroupId: `${this.sourceId}:cpu` },
+        ]));
     }
 }
 

@@ -13,11 +13,16 @@ import {
     type MetricReadPlan,
 } from "./sources/metric-read-plan";
 import type { SourceRunner } from "./sources/source-runner";
+import { partitionMetricKeysByPollingGroup } from "./metric-polling-groups";
+import { planMetricPollingGroups } from "./metric-polling-group-planner";
+import type { SourceClient } from "./sources/source-client";
+import type { SourceMetricPollingGroupResolution } from "./sources/source-polling-groups";
+import type { SourceRegistry } from "./sources/source-registry";
 
 test("subscribe polls read plans with sorted unique metric keys", async () => {
     const sourceRunner = new FakeSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
-    const scheduler = new Scheduler(sourceRunner, snapshotStore);
+    const scheduler = createTestScheduler(sourceRunner, snapshotStore);
     const receivedSnapshots: MetricSnapshot[] = [];
 
     const unsubscribe = scheduler.subscribe(snapshot => {
@@ -45,7 +50,7 @@ test("subscribe polls read plans with sorted unique metric keys", async () => {
 test("scheduler coalesces active subscribers with the same polling group", async () => {
     const sourceRunner = new FakeSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
-    const scheduler = new Scheduler(sourceRunner, snapshotStore);
+    const scheduler = createTestScheduler(sourceRunner, snapshotStore);
     const firstSubscriberSnapshots: MetricSnapshot[] = [];
     const secondSubscriberSnapshots: MetricSnapshot[] = [];
 
@@ -83,7 +88,7 @@ test("scheduler coalesces active subscribers with the same polling group", async
 test("scheduler polls different metric groups independently", async () => {
     const sourceRunner = new FakeSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
-    const scheduler = new Scheduler(sourceRunner, snapshotStore);
+    const scheduler = createTestScheduler(sourceRunner, snapshotStore);
     let cpuCallbackCount = 0;
     let networkCallbackCount = 0;
 
@@ -133,7 +138,7 @@ test("scheduler polls different metric groups independently", async () => {
 test("single subscriber with multiple polling groups receives one callback per group", async () => {
     const sourceRunner = new EchoSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
-    const scheduler = new Scheduler(sourceRunner, snapshotStore);
+    const scheduler = createTestScheduler(sourceRunner, snapshotStore);
     const receivedSnapshots: MetricSnapshot[] = [];
 
     const unsubscribe = scheduler.subscribe(snapshot => {
@@ -169,7 +174,7 @@ test("single subscriber with multiple polling groups receives one callback per g
 test("different source scopes perform separate polls", async () => {
     const sourceRunner = new FakeSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
-    const scheduler = new Scheduler(sourceRunner, snapshotStore);
+    const scheduler = createTestScheduler(sourceRunner, snapshotStore);
 
     const unsubscribeFirst = scheduler.subscribe(() => undefined, {
         readPlan: buildScopedMetricReadPlan(LOCAL_SOURCE_SCOPE_ID, ["cpu.usage_percent"]),
@@ -205,7 +210,7 @@ test("different source scopes perform separate polls", async () => {
 test("different polling intervals perform separate polls", async () => {
     const sourceRunner = new FakeSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
-    const scheduler = new Scheduler(sourceRunner, snapshotStore);
+    const scheduler = createTestScheduler(sourceRunner, snapshotStore);
 
     const unsubscribeFirst = scheduler.subscribe(() => undefined, {
         readPlan: buildLocalMetricReadPlan(["cpu.usage_percent"]),
@@ -243,7 +248,7 @@ test("different polling intervals perform separate polls", async () => {
 test("unsubscribing one same-group subscriber keeps the group schedule", async () => {
     const sourceRunner = new FakeSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
-    const scheduler = new Scheduler(sourceRunner, snapshotStore);
+    const scheduler = createTestScheduler(sourceRunner, snapshotStore);
     let unsubscribeSecond: (() => void) | undefined;
 
     const unsubscribeFirst = scheduler.subscribe(() => undefined, {
@@ -275,7 +280,7 @@ test("unsubscribing one same-group subscriber keeps the group schedule", async (
 test("unsupported polling intervals still poll the requested metric keys", async () => {
     const sourceRunner = new FakeSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
-    const scheduler = new Scheduler(sourceRunner, snapshotStore);
+    const scheduler = createTestScheduler(sourceRunner, snapshotStore);
     let callbackCount = 0;
 
     const unsubscribe = scheduler.subscribe(() => {
@@ -297,7 +302,7 @@ test("unsupported polling intervals still poll the requested metric keys", async
 test("refreshMetrics polls and ingests requested metric keys without subscribers", async () => {
     const sourceRunner = new FakeSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
-    const scheduler = new Scheduler(sourceRunner, snapshotStore);
+    const scheduler = createTestScheduler(sourceRunner, snapshotStore);
 
     const snapshot = await scheduler.refreshMetrics(
         buildLocalMetricReadPlan(["net.down", "cpu.usage_percent", "net.down"]),
@@ -316,7 +321,7 @@ test("refreshMetrics polls and ingests requested metric keys without subscribers
 test("dispose stops polling and disposes the source runner", async () => {
     const sourceRunner = new FakeSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
-    const scheduler = new Scheduler(sourceRunner, snapshotStore);
+    const scheduler = createTestScheduler(sourceRunner, snapshotStore);
     let callbackCount = 0;
 
     scheduler.subscribe(() => {
@@ -334,7 +339,7 @@ test("dispose stops polling and disposes the source runner", async () => {
 test("later same-group subscribers do not join an in-flight initial poll", async () => {
     const sourceRunner = new DeferredSourceRunner();
     const snapshotStore = new FakeMetricSnapshotStore();
-    const scheduler = new Scheduler(sourceRunner, snapshotStore);
+    const scheduler = createTestScheduler(sourceRunner, snapshotStore);
     const firstSubscriberSnapshots: MetricSnapshot[] = [];
     const secondSubscriberSnapshots: MetricSnapshot[] = [];
     let unsubscribeSecond: (() => void) | undefined;
@@ -365,6 +370,103 @@ test("later same-group subscribers do not join an in-flight initial poll", async
         unsubscribeFirst();
     }
 });
+
+test("scheduler uses source-declared planner signatures for fallback-aware groups", async () => {
+    const sourceRunner = new EchoSourceRunner();
+    const snapshotStore = new FakeMetricSnapshotStore();
+    const sourceRegistry = new FakeSourceRegistry([
+        new FakePlannerSourceClient("windows-helper", metricKey => {
+            if (metricKey === "cpu.usage_percent" || metricKey === "gpu.temp") {
+                return { state: "owned", pollingGroupId: "lhm-snapshot" };
+            }
+
+            return { state: "unknown" };
+        }),
+        new FakePlannerSourceClient("node-system", metricKey => {
+            if (metricKey === "cpu.usage_percent") {
+                return { state: "owned", pollingGroupId: "cpu" };
+            }
+
+            if (metricKey === "gpu.temp") {
+                return { state: "owned", pollingGroupId: "gpu-telemetry" };
+            }
+
+            return { state: "unknown" };
+        }),
+    ]);
+    const scheduler = createPlannerScheduler(sourceRunner, snapshotStore, sourceRegistry);
+    const receivedSnapshots: MetricSnapshot[] = [];
+
+    const unsubscribe = scheduler.subscribe(snapshot => {
+        receivedSnapshots.push(snapshot);
+    }, {
+        readPlan: buildReadPlan({
+            metricKeys: ["cpu.usage_percent", "gpu.temp"],
+            sourceIds: ["windows-helper", "node-system"],
+            failureMode: "fallback",
+        }),
+    });
+
+    try {
+        await waitForCondition(() => receivedSnapshots.length === 2);
+
+        assert.equal(
+            hasPolledReadPlan(sourceRunner.polledReadPlans, LOCAL_SOURCE_SCOPE_ID, ["cpu.usage_percent"]),
+            true,
+        );
+        assert.equal(
+            hasPolledReadPlan(sourceRunner.polledReadPlans, LOCAL_SOURCE_SCOPE_ID, ["gpu.temp"]),
+            true,
+        );
+    } finally {
+        unsubscribe();
+    }
+});
+
+test("scheduler caches planned polling groups per subscriber", async () => {
+    const sourceRunner = new FakeSourceRunner();
+    const snapshotStore = new FakeMetricSnapshotStore();
+    let planCallCount = 0;
+    const scheduler = new Scheduler(sourceRunner, {
+        snapshotStore,
+        planMetricPollingGroups: readPlan => {
+            planCallCount += 1;
+            return partitionMetricKeysByPollingGroup(readPlan.metricKeys);
+        },
+    });
+
+    const unsubscribe = scheduler.subscribe(() => undefined, {
+        readPlan: buildLocalMetricReadPlan(["cpu.usage_percent"]),
+    });
+
+    try {
+        await waitForCondition(() => sourceRunner.polledReadPlans.length >= 2);
+
+        assert.equal(planCallCount, 1);
+    } finally {
+        unsubscribe();
+    }
+});
+
+function createTestScheduler(sourceRunner: SourceRunner, snapshotStore: MetricSnapshotStore): Scheduler {
+    return new Scheduler(sourceRunner, {
+        snapshotStore,
+        // Most Scheduler tests isolate timing/coalescing behavior. The real
+        // planner integration is covered by a dedicated test above.
+        planMetricPollingGroups: readPlan => partitionMetricKeysByPollingGroup(readPlan.metricKeys),
+    });
+}
+
+function createPlannerScheduler(
+    sourceRunner: SourceRunner,
+    snapshotStore: MetricSnapshotStore,
+    sourceRegistry: SourceRegistry,
+): Scheduler {
+    return new Scheduler(sourceRunner, {
+        snapshotStore,
+        planMetricPollingGroups: readPlan => planMetricPollingGroups(readPlan, sourceRegistry),
+    });
+}
 
 class FakeSourceRunner implements SourceRunner {
     readonly sourceId = "fake-source";
@@ -434,6 +536,41 @@ class DeferredSourceRunner implements SourceRunner {
     }
 }
 
+class FakePlannerSourceClient implements SourceClient {
+    constructor(
+        readonly sourceId: string,
+        private readonly resolveMetricKey: (metricKey: string) => SourceMetricPollingGroupResolution,
+    ) {}
+
+    async readSnapshot(): Promise<MetricSnapshot> {
+        throw new Error("FakePlannerSourceClient does not serve snapshots.");
+    }
+
+    resolveMetricPollingGroups(
+        metricKeys: readonly string[],
+    ): ReadonlyMap<string, SourceMetricPollingGroupResolution> {
+        return new Map(metricKeys.map(metricKey => [metricKey, this.resolveMetricKey(metricKey)]));
+    }
+}
+
+class FakeSourceRegistry implements SourceRegistry {
+    private readonly sourceClientsById = new Map<string, SourceClient>();
+
+    constructor(sourceClients: readonly SourceClient[]) {
+        for (const sourceClient of sourceClients) {
+            this.sourceClientsById.set(sourceClient.sourceId, sourceClient);
+        }
+    }
+
+    resolveSourceClient(sourceId: string): SourceClient | undefined {
+        return this.sourceClientsById.get(sourceId);
+    }
+
+    dispose(): void {
+        return;
+    }
+}
+
 function buildTestSnapshot(): MetricSnapshot {
     return buildMetricSnapshot({
         timestampMilliseconds: 1000,
@@ -441,6 +578,19 @@ function buildTestSnapshot(): MetricSnapshot {
             "cpu.usage_percent": buildScalarMetricValue(42, { unit: MetricUnit.PERCENT }),
         },
     });
+}
+
+function buildReadPlan(options: {
+    metricKeys: readonly string[];
+    sourceIds: readonly string[];
+    failureMode: MetricReadPlan["failureMode"];
+}): MetricReadPlan {
+    return {
+        sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
+        metricKeys: options.metricKeys,
+        sourceCandidates: options.sourceIds.map(sourceId => ({ sourceId })),
+        failureMode: options.failureMode,
+    };
 }
 
 function buildScopedMetricReadPlan(sourceScopeId: string, metricKeys: readonly string[]): MetricReadPlan {
