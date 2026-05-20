@@ -166,8 +166,8 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     /**
-     * Called on every scheduler tick. Actions query MetricStore themselves
-     * for the specific WidgetData they need.
+     * Called on every action render interval or forced refresh. Actions query
+     * MetricStore themselves for the specific WidgetData they need.
      */
     protected abstract onMetricsUpdate(event: WillAppearEvent): void;
 
@@ -182,8 +182,14 @@ export abstract class MetricAction extends SingletonAction {
 
     protected getMetricReader(event: WillAppearEvent): MetricStoreReader {
         const readPlan = this.resolveMetricReadPlan(event);
+        const fallbackSampleFreshnessBudgetMilliseconds = resolveFallbackSampleFreshnessBudgetMilliseconds(
+            this.resolveSettings(event).preferences.pollingFrequencySeconds,
+        );
 
-        return createFallbackMetricStoreReader(metricStore, readPlan);
+        return createFallbackMetricStoreReader(metricStore, readPlan, {
+            now: () => this.currentTimestampMilliseconds(),
+            maximumSampleAgeMilliseconds: fallbackSampleFreshnessBudgetMilliseconds,
+        });
     }
 
     protected refreshMetricKeys(
@@ -248,9 +254,9 @@ export abstract class MetricAction extends SingletonAction {
 
     private refreshSubscription(activeActionState: ActiveActionState): void {
         const { event } = activeActionState;
-        const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
-            this.resolveSettings(event).preferences.pollingFrequencySeconds,
-        );
+        const pollingFrequencySeconds = this.resolveSettings(event).preferences.pollingFrequencySeconds;
+        const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(pollingFrequencySeconds);
+        const maximumSampleAgeMilliseconds = resolveFallbackSampleFreshnessBudgetMilliseconds(pollingFrequencySeconds);
         const metricKeys = this.getMetricKeys(event);
         const readPlan = this.buildMetricCollectionReadPlan(event, metricKeys);
         const metricCollectionBinding = this.getOrCreateMetricCollectionBinding(event.action.id);
@@ -259,6 +265,7 @@ export abstract class MetricAction extends SingletonAction {
             subscriberId: event.action.id,
             readPlan,
             pollingIntervalMilliseconds,
+            maximumSampleAgeMilliseconds,
             onTick: () => {
                 const currentActionState = this.activeActionStates.get(event.action.id);
 
@@ -283,6 +290,10 @@ export abstract class MetricAction extends SingletonAction {
 
     protected createMetricCollectionBinding(): MetricCollectionBinding {
         return new BackgroundCollectionBinding();
+    }
+
+    protected currentTimestampMilliseconds(): number {
+        return Date.now();
     }
 
     private resubscribeAllActions(): void {
@@ -329,6 +340,8 @@ export abstract class MetricAction extends SingletonAction {
 
 const DEFAULT_POLLING_INTERVAL_MILLISECONDS = 1000;
 const ALLOWED_POLLING_FREQUENCY_SECONDS = new Set([1, 2, 3, 5, 10, 15, 30, 60]);
+// Gives the background collector one missed interval before fallback render treats its sample as expired.
+const FALLBACK_SAMPLE_FRESHNESS_GRACE_MILLISECONDS = 5000;
 
 function resolvePollingIntervalMilliseconds(pollingFrequencySeconds: number): number {
     if (ALLOWED_POLLING_FREQUENCY_SECONDS.has(pollingFrequencySeconds)) {
@@ -336,6 +349,11 @@ function resolvePollingIntervalMilliseconds(pollingFrequencySeconds: number): nu
     }
 
     return DEFAULT_POLLING_INTERVAL_MILLISECONDS;
+}
+
+function resolveFallbackSampleFreshnessBudgetMilliseconds(pollingFrequencySeconds: number): number {
+    return resolvePollingIntervalMilliseconds(pollingFrequencySeconds)
+        + FALLBACK_SAMPLE_FRESHNESS_GRACE_MILLISECONDS;
 }
 
 function formatSettingValue(value: unknown): string {
