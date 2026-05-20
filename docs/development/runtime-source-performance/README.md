@@ -17,10 +17,9 @@ slows it down, and one slow collector must not freeze unrelated widgets.
 ```
 
 The current implementation has completed the measurement and cleanup phases,
-plus Phase 5a/5b scheduler grouping work. The next target is Phase 5c:
-collapse the runtime polling orchestration so UI rendering reads already-known
-state from `MetricStore` instead of waiting on WMI, helper IPC, HTTP, or
-`nvidia-smi`.
+Phase 5a/5b grouping work, and the Phase 5c cutover to demand-driven background
+collection. UI rendering now reads already-known state from `MetricStore`
+instead of waiting on WMI, helper IPC, HTTP, or `nvidia-smi`.
 
 This folder replaces the old single-file
 `docs/development/runtime-source-performance-optimization-notes.md`. The split
@@ -32,8 +31,8 @@ that only made sense during the original investigation.
 | File | Purpose | Read when |
 | --- | --- | --- |
 | `01-phases-1-4-baseline-and-measurement.md` | Product priorities, perf gates, measurement protocol, historical latency data, and completed cleanup work. | You need to know why this effort exists and what data justified it. |
-| `02-phase-5ab-scheduler-and-source-grouping.md` | Phase 5a/5b design and implementation state: scheduler grouping, source-declared polling groups, profile isolation, LHM/custom source scale rules. | You are touching Scheduler grouping, source ownership, source profiles, or LHM/custom metric descriptors. |
-| `03-phase-5c-demand-driven-background-collection.md` | Current target architecture: metric subscriptions, collector group planning, background runners, render cadence, fallback composition, rejected ideas, and Phase 5c invariants. | You are about to change runtime polling, SourceRunner, Scheduler, MetricStore writes, or action subscriptions. |
+| `02-phase-5ab-scheduler-and-source-grouping.md` | Historical Phase 5a/5b design: scheduler grouping, source-declared polling groups, profile isolation, LHM/custom source scale rules. | You need the rationale for source-owned polling groups or the pre-5c scheduler migration. |
+| `03-phase-5c-demand-driven-background-collection.md` | Current runtime collection architecture: metric subscriptions, collector group planning, background runners, render cadence, fallback composition, rejected ideas, and Phase 5c invariants. | You are about to change runtime polling, MetricStore writes, source subscriptions, fallback composition, or render timing. |
 
 ## Non-Negotiable Priorities
 

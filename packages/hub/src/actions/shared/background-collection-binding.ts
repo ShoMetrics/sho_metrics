@@ -2,6 +2,7 @@ import { logger } from "../../logging/logger";
 import { backgroundMetricCollection } from "../../runtime/metric-collection/background-metric-collection";
 import { createFallbackMetricStoreReader } from "../../runtime/metric-collection/fallback-composer";
 import { metricStore } from "../../runtime/metric-store";
+import type { MetricSubscription } from "../../runtime/metric-collection/metric-subscription-registry";
 import {
     buildMetricReadPlanKey,
     type MetricReadPlan,
@@ -15,15 +16,20 @@ const FIRST_READING_CHECK_INTERVAL_MILLISECONDS = 500;
 const FIRST_READING_CHECK_ATTEMPT_LIMIT = 20;
 
 type BackgroundCollectionRegistration = (
-    options: Pick<
-        BackgroundCollectionBindingRefreshOptions,
-        "subscriberId" | "readPlan"
-    > & { readonly intervalMilliseconds: number },
+    options: Pick<BackgroundCollectionBindingRefreshOptions, "subscriberId" | "metricSubscriptions">,
 ) => () => void;
 
 export interface BackgroundCollectionBindingRefreshOptions {
     readonly subscriberId: string;
+    /**
+     * Render-side fallback plan used for MetricStore reads and first-reading checks.
+     *
+     * Collector registration uses `metricSubscriptions`. Keep both derived from
+     * the same action state until the fallback reader accepts subscriptions
+     * directly.
+     */
     readonly readPlan: MetricReadPlan;
+    readonly metricSubscriptions: readonly MetricSubscription[];
     readonly pollingIntervalMilliseconds: number;
     /** Matches the render-time fallback freshness budget for the same action. */
     readonly maximumSampleAgeMilliseconds: number;
@@ -67,7 +73,10 @@ export class BackgroundCollectionBinding {
 
     constructor(
         private readonly registerCollection: BackgroundCollectionRegistration
-            = options => backgroundMetricCollection.registerReadPlanBridgeSubscription(options),
+            = options => backgroundMetricCollection.registerSubscriptions({
+                subscriberId: options.subscriberId,
+                subscriptions: options.metricSubscriptions,
+            }),
         private readonly timer: BackgroundCollectionBindingTimer = defaultTimer,
         private readonly hasAnyMetricReading: (
             readPlan: MetricReadPlan,
@@ -90,8 +99,7 @@ export class BackgroundCollectionBinding {
         this.dispose();
         this.cleanupCollection = this.registerCollection({
             subscriberId: options.subscriberId,
-            readPlan: options.readPlan,
-            intervalMilliseconds: options.pollingIntervalMilliseconds,
+            metricSubscriptions: options.metricSubscriptions,
         });
         this.renderTimerHandle = this.timer.set(options.onTick, options.pollingIntervalMilliseconds);
         this.startFirstReadingRenderWarmup(options);

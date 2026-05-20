@@ -1,8 +1,3 @@
-import {
-    normalizeMetricReadPlan,
-    type MetricReadPlan,
-} from "../sources/metric-read-plan";
-
 /** Source selection mode for one metric collection subscription. */
 export type MetricSubscriptionFailureMode = "fallback" | "empty";
 
@@ -27,28 +22,10 @@ export interface MetricSubscription {
     readonly intervalMilliseconds: number;
 }
 
-/**
- * Registers one legacy read-plan subscription during the Phase 5c migration.
- *
- * @deprecated This bridge exists while action collection still carries
- * `MetricReadPlan`. A later cut should make actions register metric-key and
- * source-policy subscriptions directly.
- */
-export interface RegisterMetricReadPlanSubscriptionBridgeOptions {
+/** Registers one subscriber's current metric collection subscriptions. */
+export interface RegisterMetricSubscriptionsOptions {
     readonly subscriberId: string;
-    readonly readPlan: MetricReadPlan;
-    readonly intervalMilliseconds: number;
-}
-
-/**
- * Minimal bridge writer used by the action collection binding during migration.
- *
- * @deprecated Action collection should stop writing read-plan subscriptions
- * when actions register metric-key/source-policy subscriptions directly.
- */
-export interface MetricReadPlanSubscriptionBridgeWriter {
-    registerReadPlanBridge(options: RegisterMetricReadPlanSubscriptionBridgeOptions): void;
-    unregister(subscriberId: string): void;
+    readonly subscriptions: readonly MetricSubscription[];
 }
 
 /**
@@ -57,7 +34,7 @@ export interface MetricReadPlanSubscriptionBridgeWriter {
  * It does not poll sources, render widgets, or deliver metric callbacks. It is
  * the registration-time fact table that later collector group planning reads.
  */
-export class MetricSubscriptionRegistry implements MetricReadPlanSubscriptionBridgeWriter {
+export class MetricSubscriptionRegistry {
     private readonly subscriptionsBySubscriberId = new Map<string, readonly MetricSubscription[]>();
     private currentPlanningVersion = 0;
 
@@ -66,23 +43,20 @@ export class MetricSubscriptionRegistry implements MetricReadPlanSubscriptionBri
     }
 
     /**
-     * Registers a legacy read-plan subscription.
+     * Replaces one subscriber's active collection subscriptions.
      *
-     * @deprecated This bridge adapts the old multi-key read plan into final
-     * per-metric subscription records until actions register them directly.
+     * The registry keeps this API stable for any caller, so it removes exact
+     * duplicate subscriptions even though the current action path already
+     * normalizes metric keys. This is input-boundary protection only; read-plan
+     * normalization and collector-group planning stay outside the registry.
      */
-    registerReadPlanBridge(options: RegisterMetricReadPlanSubscriptionBridgeOptions): void {
-        const readPlan = normalizeMetricReadPlan(options.readPlan);
-        const subscriptions = readPlan.metricKeys.map(metricKey => ({
-            subscriberId: options.subscriberId,
-            metricKey,
-            sourceScopeId: readPlan.sourceScopeId,
-            sourceCandidates: readPlan.sourceCandidates,
-            failureMode: readPlan.failureMode,
-            intervalMilliseconds: options.intervalMilliseconds,
-        }));
+    register(options: RegisterMetricSubscriptionsOptions): void {
+        const sortedSubscriptions = options.subscriptions.slice().sort(compareMetricSubscriptions);
 
-        this.subscriptionsBySubscriberId.set(options.subscriberId, subscriptions);
+        this.subscriptionsBySubscriberId.set(
+            options.subscriberId,
+            deduplicateMetricSubscriptions(sortedSubscriptions),
+        );
     }
 
     unregister(subscriberId: string): void {
@@ -103,3 +77,36 @@ export class MetricSubscriptionRegistry implements MetricReadPlanSubscriptionBri
 }
 
 export const metricSubscriptionRegistry = new MetricSubscriptionRegistry();
+
+function compareMetricSubscriptions(first: MetricSubscription, second: MetricSubscription): number {
+    return buildMetricSubscriptionKey(first).localeCompare(buildMetricSubscriptionKey(second));
+}
+
+function deduplicateMetricSubscriptions(
+    sortedSubscriptions: readonly MetricSubscription[],
+): readonly MetricSubscription[] {
+    const uniqueSubscriptions: MetricSubscription[] = [];
+    let previousSubscriptionKey: string | null = null;
+
+    for (const subscription of sortedSubscriptions) {
+        const subscriptionKey = buildMetricSubscriptionKey(subscription);
+
+        if (subscriptionKey !== previousSubscriptionKey) {
+            uniqueSubscriptions.push(subscription);
+            previousSubscriptionKey = subscriptionKey;
+        }
+    }
+
+    return uniqueSubscriptions;
+}
+
+function buildMetricSubscriptionKey(subscription: MetricSubscription): string {
+    return JSON.stringify([
+        subscription.subscriberId,
+        subscription.metricKey,
+        subscription.sourceScopeId,
+        subscription.failureMode,
+        subscription.intervalMilliseconds,
+        subscription.sourceCandidates.map(sourceCandidate => sourceCandidate.sourceId),
+    ]);
+}

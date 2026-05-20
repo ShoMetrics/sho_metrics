@@ -137,7 +137,8 @@ and synchronously read `MetricStore`.
 Responsibilities:
 
 - Register/unregister collection subscriptions on action appear/disappear.
-- Track subscriber/action id, metric key, source policy, and requested interval.
+- Track subscriber/action id, metric key, normalized source candidates/failure
+  mode, source scope, and requested interval.
 - Reference-count equivalent subscriptions so multiple widgets do not multiply
   collector work.
 - Expose subscription changes to the planner/supervisor.
@@ -157,8 +158,14 @@ Shape:
 interface MetricSubscription {
     readonly subscriberId: string;
     readonly metricKey: string;
-    readonly sourcePolicy: MetricSourcePolicy;
+    readonly sourceScopeId: string;
+    readonly sourceCandidates: readonly MetricSubscriptionSourceCandidate[];
+    readonly failureMode: "fallback" | "empty";
     readonly intervalMilliseconds: number;
+}
+
+interface MetricSubscriptionSourceCandidate {
+    readonly sourceId: string;
 }
 ```
 
@@ -548,10 +555,10 @@ own migration step.
    `MetricSubscriptionRegistry` with tests for register/unregister,
    ref-counting, interval minimums, rotation prefetch, and invalidation version
    handling. Wire actions to populate it while the existing Scheduler/source I/O
-   still runs, then assert registry state matches current subscriptions. If this
-   slice still receives `MetricReadPlan` from `SchedulerBinding`, every such API
-   must be named `ReadPlanSubscriptionBridge` and marked `@deprecated`; it is a
-   migration bridge, not the final subscription shape.
+   still runs, then assert registry state matches current subscriptions. The
+   early migration used a deliberately named read-plan bridge; that bridge has
+   since been removed, and the registry now accepts direct per-metric
+   `MetricSubscription` records.
 
 2. **Move grouping to subscription time.** Introduce `CollectorGroupPlanner`
    under `runtime/metric-collection/` and migrate Phase 5b planner tests to it.
@@ -593,19 +600,15 @@ code and focused tests. It is not a commit target.
 
 Recommended execution order:
 
-1. Remove the deprecated `MetricReadPlan` bridge.
-2. Update stale historical docs.
-3. Design and implement descriptor/profile invalidation.
-4. Repeat the performance capture after the next TODO batch.
+1. Design and implement descriptor/profile invalidation.
+2. Repeat the performance capture after the next TODO batch.
 
-Invalidation is intentionally later in the list even though it is high impact:
-it has the highest risk because it spans settings changes, source profile edits,
-and helper descriptor refresh.
+Invalidation is the next design-sized item because it spans settings changes,
+source profile edits, and helper descriptor refresh. List the invalidation
+sources and trigger timing before changing code.
 
 | TODO | Priority | Estimated LOC | Why it still matters |
 | --- | ---: | ---: | --- |
-| Remove the `MetricReadPlan` subscription bridge. | Medium | 80-160 | `MetricSubscriptionRegistry.registerReadPlanBridge` is still a deprecated migration bridge. It is runnable technical debt, not a current correctness bug; clean it after measurement and fallback freshness are correct. |
-| Update historical docs after each major migration commit. | Medium | 40-100 | Some Phase 5a/5b text intentionally describes history, but implementation-state sections must not keep saying Scheduler/static bridge work is pending after those paths are deleted. |
 | Wire source profile and descriptor invalidation into re-planning. | High | 100-220 | LHM descriptors, source profile edits, and custom-source metadata changes must re-plan affected subscriptions without requiring actions to disappear and reappear. Do this after listing invalidation sources and trigger timing. |
 | Repeat the performance capture after the next TODO batch. | High | 20-60 | The post-Slice-6 baseline is recorded below. Repeat the same 300 second debug capture after freshness/bridge/invalidation changes so regressions are visible. |
 | Keep GPU process-churn optimization separate. | Medium | 120-300 | Background collection prevents `nvidia-smi` latency from blocking unrelated widgets, but it does not reduce cold process starts. Optimize only after measuring `nvidia-smi` start count and elapsed time. |
