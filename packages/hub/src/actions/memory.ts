@@ -7,6 +7,13 @@ import { PROGRESS_CIRCLE_LABELS } from "../widgets/primitives/progress-circle-la
 import { RAM_TOTAL_METRIC_KEY, RAM_USED_METRIC_KEY } from "../runtime/metric-keys";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
+import {
+    LOCAL_SOURCE_SCOPE_ID,
+    normalizeMetricReadPlan,
+    type MetricReadPlan,
+} from "../runtime/sources/metric-read-plan";
+import { NODE_SYSTEM_SOURCE_ID } from "../runtime/sources/source-ids";
+import type { MetricCollectionMode } from "./metric-action";
 
 @action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.memory })
 export class Memory extends MetricAction {
@@ -14,6 +21,25 @@ export class Memory extends MetricAction {
 
     protected override getMetricKeys(): readonly string[] {
         return [RAM_USED_METRIC_KEY, RAM_TOTAL_METRIC_KEY];
+    }
+
+    protected override getMetricCollectionMode(): MetricCollectionMode {
+        return "background";
+    }
+
+    protected override buildMetricCollectionReadPlan(
+        _event: WillAppearEvent,
+        metricKeys: readonly string[],
+    ): MetricReadPlan {
+        // Slice 4 intentionally cuts RAM over through node-system only. The
+        // final background path will restore source-policy fallback after
+        // read-time fallback composition exists.
+        return normalizeMetricReadPlan({
+            sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
+            metricKeys,
+            sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
+            failureMode: "empty",
+        });
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {

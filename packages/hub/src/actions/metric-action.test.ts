@@ -8,7 +8,7 @@ import type {
     WillDisappearEvent,
 } from "@elgato/streamdeck";
 import { scheduler } from "../runtime/scheduler";
-import { MetricAction } from "./metric-action";
+import { MetricAction, type MetricCollectionBinding, type MetricCollectionMode } from "./metric-action";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
 import { buildMetricSnapshot } from "../runtime/sources/metric-source";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
@@ -224,6 +224,62 @@ test("onWillDisappear cleans subscription state and ignores later scheduler tick
     }
 });
 
+test("background collection mode uses action-owned render cadence instead of Scheduler subscribe", () => {
+    const schedulerRecorder = installSchedulerSubscribeRecorder();
+    const backgroundBinding = new FakeMetricCollectionBinding();
+    const action = new TestBackgroundMetricAction(() => backgroundBinding);
+    const streamDeckAction = new FakeStreamDeckAction("background-action");
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
+
+        assert.equal(schedulerRecorder.records.length, 0);
+        assert.equal(backgroundBinding.refreshOptionsList.length, 1);
+        assert.deepEqual(backgroundBinding.refreshOptionsList[0].readPlan.metricKeys, ["net.down"]);
+        assert.equal(action.metricsUpdateSnapshots.length, 1);
+
+        backgroundBinding.refreshOptionsList[0].onTick();
+
+        assert.equal(action.metricsUpdateSnapshots.length, 2);
+
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+
+        assert.equal(backgroundBinding.disposeCallCount, 1);
+    } finally {
+        schedulerRecorder.restore();
+    }
+});
+
+test("global settings changes recreate background collection bindings", () => {
+    pluginGlobalSettingsStore.update(undefined);
+    const schedulerRecorder = installSchedulerSubscribeRecorder();
+    const firstBinding = new FakeMetricCollectionBinding();
+    const secondBinding = new FakeMetricCollectionBinding();
+    const action = new TestBackgroundMetricAction(createQueuedBindingFactory([
+        firstBinding,
+        secondBinding,
+    ]));
+    const streamDeckAction = new FakeStreamDeckAction("background-global-settings-action");
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
+        pluginGlobalSettingsStore.update(writeStoredGlobalSettingsPatch(undefined, {
+            network: {
+                maximumDownloadSpeedMegabitsPerSecond: 1000,
+            },
+        }));
+
+        assert.equal(schedulerRecorder.records.length, 0);
+        assert.equal(firstBinding.refreshOptionsList.length, 1);
+        assert.equal(firstBinding.disposeCallCount, 1);
+        assert.equal(secondBinding.refreshOptionsList.length, 1);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+        schedulerRecorder.restore();
+        pluginGlobalSettingsStore.update(undefined);
+    }
+});
+
 test("color compensation messages update delegated preview state and disappear clears it", () => {
     const schedulerRecorder = installSchedulerSubscribeRecorder();
     const action = new TestMetricAction();
@@ -409,6 +465,33 @@ class TestMetricAction extends MetricAction {
     }
 }
 
+class TestBackgroundMetricAction extends TestMetricAction {
+    constructor(private readonly createBinding: () => FakeMetricCollectionBinding) {
+        super();
+    }
+
+    protected override getMetricCollectionMode(): MetricCollectionMode {
+        return "background";
+    }
+
+    protected override createMetricCollectionBinding(): MetricCollectionBinding {
+        return this.createBinding();
+    }
+}
+
+class FakeMetricCollectionBinding implements MetricCollectionBinding {
+    readonly refreshOptionsList: Parameters<MetricCollectionBinding["refresh"]>[0][] = [];
+    disposeCallCount = 0;
+
+    refresh(options: Parameters<MetricCollectionBinding["refresh"]>[0]): void {
+        this.refreshOptionsList.push(options);
+    }
+
+    dispose(): void {
+        this.disposeCallCount += 1;
+    }
+}
+
 class FakeStreamDeckAction {
     readonly writtenSettingsList: unknown[] = [];
 
@@ -480,4 +563,18 @@ function buildSendToPluginEvent(
 
 function buildWillDisappearEvent(action: FakeStreamDeckAction): WillDisappearEvent {
     return { action } as unknown as WillDisappearEvent;
+}
+
+function createQueuedBindingFactory(
+    bindings: FakeMetricCollectionBinding[],
+): () => FakeMetricCollectionBinding {
+    return () => {
+        const binding = bindings.shift();
+
+        if (!binding) {
+            throw new Error("No fake background binding queued.");
+        }
+
+        return binding;
+    };
 }
