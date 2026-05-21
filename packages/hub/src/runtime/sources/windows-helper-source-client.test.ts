@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
     GetSourceHealthResponseSchema,
+    ListMetricDescriptorsResponseSchema,
     ReadMetricSnapshotResponseSchema,
     SourceErrorSchema,
 } from "../../generated/shometrics/v1/source_api_pb.js";
@@ -15,7 +16,9 @@ import {
 import {
     buildMetricSnapshot,
     buildScalarMetricValue,
+    MetricIdKind,
     MetricUnit,
+    MetricValueKind,
     readRequiredMetricSnapshotTimestampMilliseconds,
 } from "./metric-source";
 import {
@@ -112,6 +115,37 @@ test("windows helper source client sends requested metric ids and returns a runt
         transport.requests.map(request => request.payload.case),
         ["getSourceHealth", "readMetricSnapshot"],
     );
+});
+
+test("windows helper source client returns descriptors with the catalog fingerprint", async () => {
+    const transport = new FakeWindowsHelperPipeTransport(request => {
+        switch (request.payload.case) {
+            case "getSourceHealth":
+                return buildHealthResponse(request.requestId);
+            case "listMetricDescriptors":
+                assert.deepEqual(request.payload.value.metricIds, ["cpu.usage_percent"]);
+                return buildDescriptorResponse(request.requestId);
+            default:
+                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport);
+
+    const descriptorSnapshot = await client.listMetricDescriptors(["cpu.usage_percent"]);
+
+    assert.equal(descriptorSnapshot.descriptorFingerprint, "catalog-sha256-test");
+    assert.deepEqual(descriptorSnapshot.descriptors, [{
+        metricId: "cpu.usage_percent",
+        sourceSensorId: "lhm:/cpu/0/load/0",
+        hardwareId: "hardware-1",
+        hardwareName: "CPU",
+        hardwareType: "Cpu",
+        sensorName: "CPU Total",
+        sourceSensorType: "Load",
+        valueKind: MetricValueKind.SCALAR,
+        unit: MetricUnit.PERCENT,
+        metricIdKind: MetricIdKind.STABLE_ALIAS,
+    }]);
 });
 
 test("windows helper source client rejects mismatched response request ids", async () => {
@@ -471,6 +505,32 @@ function buildSnapshotResponse(requestId: string): SourceIpcResponse {
                         "cpu.usage_percent": buildScalarMetricValue(42, { unit: MetricUnit.PERCENT }),
                     },
                 }),
+            }),
+        },
+    });
+}
+
+function buildDescriptorResponse(requestId: string): SourceIpcResponse {
+    return create(SourceIpcResponseSchema, {
+        requestId,
+        payload: {
+            case: "listMetricDescriptors",
+            value: create(ListMetricDescriptorsResponseSchema, {
+                descriptorSnapshot: {
+                    descriptorFingerprint: "catalog-sha256-test",
+                    descriptors: [{
+                        metricId: "cpu.usage_percent",
+                        sourceSensorId: "lhm:/cpu/0/load/0",
+                        hardwareId: "hardware-1",
+                        hardwareName: "CPU",
+                        hardwareType: "Cpu",
+                        sensorName: "CPU Total",
+                        sourceSensorType: "Load",
+                        valueKind: MetricValueKind.SCALAR,
+                        unit: MetricUnit.PERCENT,
+                        metricIdKind: MetricIdKind.STABLE_ALIAS,
+                    }],
+                },
             }),
         },
     });

@@ -434,6 +434,10 @@ that keeps the descriptor store and latest snapshot cache fresh.
      `pendingMetadata`; they do not parse ids and do not create runners.
    - Only sources that explicitly declare bounded probing may return `unknown`
      for missing metadata.
+   - Choose one explicit preload path: either `listMetricDescriptors(...)` or a
+     low-frequency `readSnapshot(... includeDescriptors=true)` call. Do not
+     leave `ReadMetricSnapshotResponse.descriptor_snapshot` permanently
+     unmapped if snapshot-read preload becomes the chosen path.
    - Render fallback/N/A until descriptors load.
    - Estimate: 120-220 TypeScript LOC.
 
@@ -442,6 +446,40 @@ that keeps the descriptor store and latest snapshot cache fresh.
      background collection invalidation.
    - Same fingerprint is ignored.
    - Estimate: included in section 1 if done together.
+
+### Current Implementation Status
+
+Completed in the Windows helper/service boundary:
+
+- Helper builds a cached descriptor snapshot at session startup.
+- Helper computes a descriptor fingerprint for the complete descriptor catalog.
+- Helper keeps a latest metric snapshot cache refreshed by
+  `WindowsMetricSnapshotWorker`.
+- IPC `ListMetricDescriptorsResponse` returns filtered descriptors plus the
+  complete catalog descriptor fingerprint.
+- IPC `ReadMetricSnapshotResponse` returns a cached metric snapshot and, when
+  descriptors are requested, returns filtered descriptors plus the complete
+  catalog descriptor fingerprint.
+- Hub `WindowsHelperSourceClient.listMetricDescriptors(...)` returns a
+  descriptor snapshot object containing both descriptors and the descriptor
+  fingerprint.
+
+Use case fixed:
+
+```text
+Hub asks helper for descriptor metadata
+  -> helper returns only requested descriptors when filtered
+  -> response still carries the full catalog fingerprint
+  -> Hub can later compare planning metadata identity without parsing LHM ids
+```
+
+Still pending:
+
+- Node helper source client descriptor cache.
+- `pendingMetadata` planning behavior for descriptor-backed dynamic metrics.
+- Helper descriptor fingerprint conversion into Hub `planningFingerprint`.
+- Helper descriptor load/change invalidation hook.
+- Capability filtering from helper descriptors.
 
 ### Required Tests
 

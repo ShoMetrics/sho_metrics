@@ -74,10 +74,7 @@ internal sealed class SourceProtocolMapper
 
         if (descriptorSnapshot is not null)
         {
-            foreach (CoreDescriptor descriptor in descriptorSnapshot.Descriptors)
-            {
-                readResponse.Descriptors.Add(BuildMetricDescriptor(descriptor));
-            }
+            readResponse.DescriptorSnapshot = BuildMetricDescriptorSnapshot(descriptorSnapshot);
 
             AddHardwareWarnings(readResponse.Warnings, descriptorSnapshot.Warnings);
         }
@@ -94,12 +91,10 @@ internal sealed class SourceProtocolMapper
         CoreDescriptorSnapshot descriptorSnapshot,
         IReadOnlyCollection<string> requestedMetricIds)
     {
-        ListMetricDescriptorsResponse listResponse = new();
-
-        foreach (CoreDescriptor descriptor in descriptorSnapshot.Descriptors)
+        ListMetricDescriptorsResponse listResponse = new()
         {
-            listResponse.Descriptors.Add(BuildMetricDescriptor(descriptor));
-        }
+            DescriptorSnapshot = BuildMetricDescriptorSnapshot(descriptorSnapshot),
+        };
 
         AddHardwareWarnings(listResponse.Warnings, descriptorSnapshot.Warnings);
         AddUnavailableMetricWarnings(
@@ -168,6 +163,21 @@ internal sealed class SourceProtocolMapper
         foreach (CoreMetricReading reading in snapshot.Readings)
         {
             protoSnapshot.Metrics[reading.MetricId] = BuildMetricValue(reading);
+        }
+
+        return protoSnapshot;
+    }
+
+    private static MetricDescriptorSnapshot BuildMetricDescriptorSnapshot(CoreDescriptorSnapshot descriptorSnapshot)
+    {
+        MetricDescriptorSnapshot protoSnapshot = new()
+        {
+            DescriptorFingerprint = descriptorSnapshot.DescriptorFingerprint,
+        };
+
+        foreach (CoreDescriptor descriptor in descriptorSnapshot.Descriptors)
+        {
+            protoSnapshot.Descriptors.Add(BuildMetricDescriptor(descriptor));
         }
 
         return protoSnapshot;
