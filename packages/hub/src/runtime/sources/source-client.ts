@@ -78,6 +78,9 @@ export interface MetricDescriptor {
     /** Opaque sensor id owned by the source adapter. */
     readonly sourceSensorId: string;
 
+    /** Source-owned collector cost group. Runtime planning treats it as opaque. */
+    readonly pollingGroupId: string;
+
     /** Opaque hardware id owned by the source adapter. */
     readonly hardwareId: string;
 

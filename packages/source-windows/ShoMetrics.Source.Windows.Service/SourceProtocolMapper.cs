@@ -198,6 +198,7 @@ internal sealed class SourceProtocolMapper
         {
             MetricId = descriptor.MetricId,
             SourceSensorId = descriptor.SourceSensorId,
+            PollingGroupId = descriptor.PollingGroupId,
             HardwareId = descriptor.HardwareId,
             HardwareName = descriptor.HardwareName,
             HardwareType = descriptor.HardwareType,

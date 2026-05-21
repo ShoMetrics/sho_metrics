@@ -31,7 +31,6 @@ import {
     SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION,
     UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS,
     WindowsHelperSourceClient,
-    WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID,
     type WindowsHelperDescriptorPreloadTimer,
     type WindowsHelperDescriptorPreloadTimerHandle,
     type WindowsHelperPipeTransport,
@@ -44,6 +43,9 @@ const [
     ESCALATED_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
     MAXIMUM_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
 ] = HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS;
+
+const CPU_HELPER_POLLING_GROUP_ID = "lhm:hardware:cpu";
+const GPU_HELPER_POLLING_GROUP_ID = "lhm:hardware:gpu";
 
 test("source IPC frame codec round-trips payload bytes", () => {
     const payload = new Uint8Array([1, 2, 3]);
@@ -92,7 +94,7 @@ test("windows helper waits for descriptor metadata before declaring helper group
     ]);
 });
 
-test("windows helper declares cached descriptor metrics as one helper snapshot group", async () => {
+test("windows helper declares cached descriptor metrics with descriptor polling groups", async () => {
     const transport = new FakeWindowsHelperPipeTransport(request => {
         switch (request.payload.case) {
             case "getSourceHealth":
@@ -114,7 +116,7 @@ test("windows helper declares cached descriptor metrics as one helper snapshot g
     assert.deepEqual([...resolutions.entries()], [
         ["cpu.usage_percent", {
             state: "owned",
-            pollingGroupId: WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID,
+            pollingGroupId: CPU_HELPER_POLLING_GROUP_ID,
         }],
         ["lhm.sensor:/missing", {
             state: "pendingMetadata",
@@ -147,11 +149,11 @@ test("windows helper keeps filtered descriptors when the catalog fingerprint is 
     assert.deepEqual([...resolutions.entries()], [
         ["cpu.usage_percent", {
             state: "owned",
-            pollingGroupId: WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID,
+            pollingGroupId: CPU_HELPER_POLLING_GROUP_ID,
         }],
         ["gpu.temp", {
             state: "owned",
-            pollingGroupId: WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID,
+            pollingGroupId: GPU_HELPER_POLLING_GROUP_ID,
         }],
     ]);
 });
@@ -192,7 +194,7 @@ test("windows helper clears cached descriptors when the catalog fingerprint chan
         }],
         ["gpu.temp", {
             state: "owned",
-            pollingGroupId: WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID,
+            pollingGroupId: GPU_HELPER_POLLING_GROUP_ID,
         }],
     ]);
 });
@@ -474,6 +476,7 @@ test("windows helper source client returns descriptors with the catalog fingerpr
     assert.deepEqual(descriptorSnapshot.descriptors, [{
         metricId: "cpu.usage_percent",
         sourceSensorId: "lhm:/cpu.usage_percent",
+        pollingGroupId: CPU_HELPER_POLLING_GROUP_ID,
         hardwareId: "hardware-1",
         hardwareName: "CPU",
         hardwareType: "Cpu",
@@ -483,6 +486,30 @@ test("windows helper source client returns descriptors with the catalog fingerpr
         unit: MetricUnit.PERCENT,
         metricIdKind: MetricIdKind.STABLE_ALIAS,
     }]);
+});
+
+test("windows helper source client rejects descriptors without polling group ids", async () => {
+    const transport = new FakeWindowsHelperPipeTransport(request => {
+        switch (request.payload.case) {
+            case "getSourceHealth":
+                return buildHealthResponse(request.requestId);
+            case "listMetricDescriptors":
+                return buildDescriptorResponse(request.requestId, {
+                    descriptors: [buildDescriptor({
+                        metricId: "cpu.usage_percent",
+                        pollingGroupId: "",
+                    })],
+                });
+            default:
+                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport);
+
+    await assert.rejects(
+        async () => await client.listMetricDescriptors(["cpu.usage_percent"]),
+        /missing polling_group_id/u,
+    );
 });
 
 test("windows helper source client rejects mismatched response request ids", async () => {
@@ -881,9 +908,11 @@ function buildDescriptorResponse(
 
 function buildDescriptor(options: {
     readonly metricId: string;
+    readonly pollingGroupId?: string;
 }): {
     readonly metricId: string;
     readonly sourceSensorId: string;
+    readonly pollingGroupId: string;
     readonly hardwareId: string;
     readonly hardwareName: string;
     readonly hardwareType: string;
@@ -896,6 +925,7 @@ function buildDescriptor(options: {
     return {
         metricId: options.metricId,
         sourceSensorId: `lhm:/${options.metricId}`,
+        pollingGroupId: options.pollingGroupId ?? defaultHelperPollingGroupId(options.metricId),
         hardwareId: "hardware-1",
         hardwareName: "CPU",
         hardwareType: "Cpu",
@@ -905,6 +935,12 @@ function buildDescriptor(options: {
         unit: MetricUnit.PERCENT,
         metricIdKind: MetricIdKind.STABLE_ALIAS,
     };
+}
+
+function defaultHelperPollingGroupId(metricId: string): string {
+    return metricId.startsWith("gpu.")
+        ? GPU_HELPER_POLLING_GROUP_ID
+        : CPU_HELPER_POLLING_GROUP_ID;
 }
 
 class FakeDescriptorPreloadTimer implements WindowsHelperDescriptorPreloadTimer {

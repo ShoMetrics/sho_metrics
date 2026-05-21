@@ -60,10 +60,8 @@ export const PIPE_NOT_FOUND_RETRY_COOLDOWN_MILLISECONDS = 300000;
 /** Retry cooldowns for transient helper failures, indexed by consecutive failure count. */
 export const HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS = [5000, 15000, 60000] as const;
 
-/** Source-scoped polling group for helper snapshot reads. */
-export const WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID = "helper-snapshot";
-
 const SOURCE_IPC_LENGTH_PREFIX_BYTES = 4;
+const CPU_USAGE_METRIC_KEY = "cpu.usage_percent";
 const DEFAULT_HEALTH_TIMEOUT_MILLISECONDS = 750;
 const DEFAULT_READ_SNAPSHOT_TIMEOUT_MILLISECONDS = 2000;
 const DEFAULT_LIST_DESCRIPTORS_TIMEOUT_MILLISECONDS = 5000;
@@ -218,6 +216,7 @@ export class WindowsHelperSourceClient implements SourceClient {
     async readSnapshot(metricKeys: readonly string[]): Promise<MetricSnapshot> {
         await this.ensureProtocolSupported();
 
+        const requestStartedAtTimestampMilliseconds = this.now();
         let response: SourceIpcResponse;
         try {
             response = await this.sendSourceIpcRequest({
@@ -253,6 +252,7 @@ export class WindowsHelperSourceClient implements SourceClient {
         }
 
         this.recordHelperRequestSuccess();
+        this.logSnapshotRead(metricKeys, snapshot, requestStartedAtTimestampMilliseconds, timestampMilliseconds);
 
         return snapshot;
     }
@@ -441,10 +441,12 @@ export class WindowsHelperSourceClient implements SourceClient {
      * should not fan out into isolated helper IPC calls before descriptors load.
      */
     private resolveMetricPollingGroup(metricKey: string): SourceMetricPollingGroupResolution {
-        if (this.descriptorsByMetricId.has(metricKey)) {
+        const descriptor = this.descriptorsByMetricId.get(metricKey);
+
+        if (descriptor) {
             return {
                 state: "owned",
-                pollingGroupId: WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID,
+                pollingGroupId: descriptor.pollingGroupId,
             };
         }
 
@@ -538,6 +540,7 @@ export class WindowsHelperSourceClient implements SourceClient {
         timeoutMilliseconds: number,
     ): Promise<SourceIpcResponse> {
         const requestId = this.requestIdFactory();
+        const requestStartedAtTimestampMilliseconds = this.now();
         const request = create(SourceIpcRequestSchema, {
             requestId,
             payload,
@@ -573,6 +576,18 @@ export class WindowsHelperSourceClient implements SourceClient {
         if (response.payload.case === undefined) {
             throw new Error("Windows source returned an empty response payload.");
         }
+
+        const requestCompletedAtTimestampMilliseconds = this.now();
+        // TODO: Remove this temporary IPC timing log after the per-group
+        // helper cache is implemented and measured.
+        log.debug(() => [
+            "sourceIpcRequestCompleted",
+            `requestId=${requestId}`,
+            `payloadCase=${payload.case ?? "empty"}`,
+            `durationMs=${requestCompletedAtTimestampMilliseconds - requestStartedAtTimestampMilliseconds}`,
+            `requestBytes=${requestBytes.byteLength}`,
+            `responseBytes=${responseBytes.byteLength}`,
+        ].join(" "));
 
         return response;
     }
@@ -650,10 +665,37 @@ export class WindowsHelperSourceClient implements SourceClient {
             reason,
         };
     }
+
+    private logSnapshotRead(
+        metricKeys: readonly string[],
+        snapshot: MetricSnapshot,
+        requestStartedAtTimestampMilliseconds: number,
+        sampleTimestampMilliseconds: number,
+    ): void {
+        const completedAtTimestampMilliseconds = this.now();
+
+        // TODO: Remove this temporary helper snapshot latency log after the
+        // per-group helper cache is implemented and measured.
+        log.debug(() => [
+            "helperSnapshotRead",
+            `metricCount=${metricKeys.length}`,
+            `metricKeys=${metricKeys.join(",")}`,
+            `durationMs=${completedAtTimestampMilliseconds - requestStartedAtTimestampMilliseconds}`,
+            `sampleAgeMs=${completedAtTimestampMilliseconds - sampleTimestampMilliseconds}`,
+            `snapshotMetricCount=${Object.keys(snapshot.metrics).length}`,
+            `cpuUsagePercent=${readScalarMetricValue(snapshot, CPU_USAGE_METRIC_KEY) ?? ""}`,
+        ].join(" "));
+    }
 }
 
 function buildWindowsHelperPlanningFingerprint(descriptorFingerprint: string): string {
     return `windows-helper-descriptor:${descriptorFingerprint}`;
+}
+
+function readScalarMetricValue(snapshot: MetricSnapshot, metricKey: string): number | undefined {
+    const metricValue = snapshot.metrics[metricKey];
+
+    return metricValue?.value.case === "scalar" ? metricValue.value.value : undefined;
 }
 
 const nodeDescriptorPreloadTimer: WindowsHelperDescriptorPreloadTimer = {
@@ -681,11 +723,15 @@ class NodeWindowsHelperPipeTransport implements WindowsHelperPipeTransport {
         options: WindowsHelperPipeTransportRequestOptions,
     ): Promise<Uint8Array> {
         const requestFrame = encodeSourceIpcFrame(payload);
+        const requestStartedAtTimestampMilliseconds = Date.now();
 
         return await new Promise<Uint8Array>((resolve, reject) => {
             const socket = createConnection(options.pipePath);
             const frameAccumulator = new SourceIpcFrameAccumulator();
             let isSettled = false;
+            let connectedAtTimestampMilliseconds: number | undefined;
+            let writeCompletedAtTimestampMilliseconds: number | undefined;
+            let firstDataAtTimestampMilliseconds: number | undefined;
             const timeout = setTimeout(() => {
                 fail(new Error("Windows source pipe request timed out."));
             }, options.timeoutMilliseconds);
@@ -705,18 +751,44 @@ class NodeWindowsHelperPipeTransport implements WindowsHelperPipeTransport {
                 }
 
                 isSettled = true;
+                // TODO: Remove this temporary pipe timing log after the
+                // per-group helper cache is implemented and measured.
+                log.debug(() => [
+                    "sourcePipeRequestFailed",
+                    `durationMs=${Date.now() - requestStartedAtTimestampMilliseconds}`,
+                    `connectMs=${formatOptionalDuration(
+                        connectedAtTimestampMilliseconds,
+                        requestStartedAtTimestampMilliseconds,
+                    )}`,
+                    `writeCompleteMs=${formatOptionalDuration(
+                        writeCompletedAtTimestampMilliseconds,
+                        requestStartedAtTimestampMilliseconds,
+                    )}`,
+                    `firstDataMs=${formatOptionalDuration(
+                        firstDataAtTimestampMilliseconds,
+                        requestStartedAtTimestampMilliseconds,
+                    )}`,
+                    `requestBytes=${requestFrame.byteLength}`,
+                    `timeoutMs=${options.timeoutMilliseconds}`,
+                    `error=${error.message}`,
+                ].join(" "));
                 cleanup();
                 reject(error);
             };
 
             socket.once("connect", () => {
+                connectedAtTimestampMilliseconds = Date.now();
                 socket.write(requestFrame, error => {
                     if (error) {
                         fail(error);
+                        return;
                     }
+
+                    writeCompletedAtTimestampMilliseconds = Date.now();
                 });
             });
             socket.on("data", chunk => {
+                firstDataAtTimestampMilliseconds ??= Date.now();
                 try {
                     const responsePayload = frameAccumulator.push(chunk);
                     if (!responsePayload) {
@@ -728,6 +800,27 @@ class NodeWindowsHelperPipeTransport implements WindowsHelperPipeTransport {
                     }
 
                     isSettled = true;
+                    // TODO: Remove this temporary pipe timing log after the
+                    // per-group helper cache is implemented and measured.
+                    log.debug(() => [
+                        "sourcePipeRequestCompleted",
+                        `durationMs=${Date.now() - requestStartedAtTimestampMilliseconds}`,
+                        `connectMs=${formatOptionalDuration(
+                            connectedAtTimestampMilliseconds,
+                            requestStartedAtTimestampMilliseconds,
+                        )}`,
+                        `writeCompleteMs=${formatOptionalDuration(
+                            writeCompletedAtTimestampMilliseconds,
+                            requestStartedAtTimestampMilliseconds,
+                        )}`,
+                        `firstDataMs=${formatOptionalDuration(
+                            firstDataAtTimestampMilliseconds,
+                            requestStartedAtTimestampMilliseconds,
+                        )}`,
+                        `requestBytes=${requestFrame.byteLength}`,
+                        `responseBytes=${responsePayload.byteLength}`,
+                        `timeoutMs=${options.timeoutMilliseconds}`,
+                    ].join(" "));
                     cleanup();
                     resolve(responsePayload);
                 } catch (error) {
@@ -748,6 +841,15 @@ class NodeWindowsHelperPipeTransport implements WindowsHelperPipeTransport {
 
         this.activeSockets.clear();
     }
+}
+
+function formatOptionalDuration(
+    timestampMilliseconds: number | undefined,
+    startTimestampMilliseconds: number,
+): string {
+    return timestampMilliseconds === undefined
+        ? ""
+        : String(timestampMilliseconds - startTimestampMilliseconds);
 }
 
 class SourceIpcFrameAccumulator {
@@ -817,6 +919,11 @@ function toRuntimeMetricDescriptor(descriptor: ProtoMetricDescriptor): MetricDes
     return {
         metricId: descriptor.metricId,
         sourceSensorId: descriptor.sourceSensorId,
+        pollingGroupId: readRequiredDescriptorString({
+            fieldName: "polling_group_id",
+            fieldValue: descriptor.pollingGroupId,
+            metricId: descriptor.metricId,
+        }),
         hardwareId: descriptor.hardwareId,
         hardwareName: descriptor.hardwareName,
         hardwareType: descriptor.hardwareType,
@@ -826,6 +933,24 @@ function toRuntimeMetricDescriptor(descriptor: ProtoMetricDescriptor): MetricDes
         unit: descriptor.unit,
         metricIdKind: descriptor.metricIdKind,
     };
+}
+
+function readRequiredDescriptorString(options: {
+    readonly fieldName: string;
+    readonly fieldValue: string;
+    readonly metricId: string;
+}): string {
+    const value = options.fieldValue.trim();
+
+    if (value.length === 0) {
+        throw new WindowsHelperSourceClientError(
+            `Windows source descriptor '${options.metricId}' is missing ${options.fieldName}.`,
+            `missing_${options.fieldName}`,
+            "protocolMismatch",
+        );
+    }
+
+    return value;
 }
 
 function toRuntimeSourceWarning(warning: ProtoSourceWarning): SourceWarning {

@@ -13,6 +13,8 @@ internal static class LibreHardwareMetricCatalog
     internal const string DiskTotalThroughputMetricId = "disk.throughput.total";
 
     private const string DynamicMetricIdPrefix = "lhm.sensor:";
+    private const string NetworkAggregatePollingGroupId = "lhm:aggregate:network";
+    private const string StorageAggregatePollingGroupId = "lhm:aggregate:storage";
     private const double BytesPerGibibyte = 1024d * 1024d * 1024d;
     private const double BytesPerMebibyte = 1024d * 1024d;
     private const double HertzPerMegahertz = 1000d * 1000d;
@@ -128,6 +130,7 @@ internal static class LibreHardwareMetricCatalog
         {
             MetricId = metricId,
             SourceSensorId = sensor.Identifier.ToString(),
+            PollingGroupId = BuildPollingGroupId(hardware, metricId),
             HardwareId = hardware.Identifier.ToString(),
             HardwareName = hardware.Name,
             HardwareType = hardware.HardwareType.ToString(),
@@ -201,6 +204,17 @@ internal static class LibreHardwareMetricCatalog
     private static string BuildDynamicMetricId(ISensor sensor)
     {
         return $"{DynamicMetricIdPrefix}{sensor.Identifier}";
+    }
+
+    private static string BuildPollingGroupId(IHardware hardware, string metricId)
+    {
+        return metricId switch
+        {
+            "net.down" or "net.up" => NetworkAggregatePollingGroupId,
+            DiskReadThroughputMetricId or DiskWriteThroughputMetricId or DiskTotalThroughputMetricId =>
+                StorageAggregatePollingGroupId,
+            _ => $"lhm:hardware:{hardware.Identifier}",
+        };
     }
 
     private static string? GetCpuMetricId(ISensor sensor)
