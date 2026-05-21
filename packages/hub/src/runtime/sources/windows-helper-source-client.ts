@@ -134,6 +134,8 @@ export class WindowsHelperSourceClient implements SourceClient {
     private helperUnavailableRetryAfterMilliseconds = 0;
     private helperUnavailableFailureCount = 0;
     private status: SourceClientStatus = { state: "unknown" };
+    private descriptorFingerprint: string | undefined;
+    private readonly descriptorsByMetricId = new Map<string, MetricDescriptor>();
 
     constructor(options: WindowsHelperSourceClientOptions = {}) {
         this.pipePath = options.pipePath ?? DEFAULT_WINDOWS_HELPER_PIPE_PATH;
@@ -195,13 +197,7 @@ export class WindowsHelperSourceClient implements SourceClient {
     resolveMetricPollingGroups(
         metricKeys: readonly string[],
     ): ReadonlyMap<string, SourceMetricPollingGroupResolution> {
-        return new Map(metricKeys.map(metricKey => [
-            metricKey,
-            {
-                state: "owned",
-                pollingGroupId: WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID,
-            },
-        ]));
+        return new Map(metricKeys.map(metricKey => [metricKey, this.resolveMetricPollingGroup(metricKey)]));
     }
 
     async listMetricDescriptors(metricKeys: readonly string[]): Promise<MetricDescriptorSnapshot> {
@@ -231,10 +227,13 @@ export class WindowsHelperSourceClient implements SourceClient {
 
         this.recordHelperRequestSuccess();
 
-        return {
+        const runtimeDescriptorSnapshot = {
             descriptors: descriptorSnapshot.descriptors.map(toRuntimeMetricDescriptor),
             descriptorFingerprint: descriptorSnapshot.descriptorFingerprint,
         };
+        this.recordDescriptorSnapshot(runtimeDescriptorSnapshot);
+
+        return runtimeDescriptorSnapshot;
     }
 
     async checkHealth(): Promise<SourceHealth> {
@@ -267,6 +266,45 @@ export class WindowsHelperSourceClient implements SourceClient {
         }
 
         return toRuntimeSourceHealth(response.payload.value);
+    }
+
+    /**
+     * Resolves helper metrics only from the cached descriptor catalog.
+     *
+     * A cache miss means the helper catalog is not ready for this metric. It is
+     * not an unknown probe, because LHM/catalog sensor ids are source-owned and
+     * should not fan out into isolated helper IPC calls before descriptors load.
+     */
+    private resolveMetricPollingGroup(metricKey: string): SourceMetricPollingGroupResolution {
+        if (this.descriptorsByMetricId.has(metricKey)) {
+            return {
+                state: "owned",
+                pollingGroupId: WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID,
+            };
+        }
+
+        // Descriptor-backed helper metrics must wait for metadata instead of
+        // creating one isolated runner per unknown sensor id during cold start.
+        return { state: "pendingMetadata" };
+    }
+
+    /**
+     * Records descriptors returned by the helper while preserving catalog identity.
+     *
+     * Helper responses may be filtered to requested ids, but their fingerprint
+     * names the complete catalog. Same-fingerprint responses accumulate;
+     * changed-fingerprint responses clear old descriptors before adding the
+     * filtered response.
+     */
+    private recordDescriptorSnapshot(descriptorSnapshot: MetricDescriptorSnapshot): void {
+        if (this.descriptorFingerprint !== descriptorSnapshot.descriptorFingerprint) {
+            this.descriptorFingerprint = descriptorSnapshot.descriptorFingerprint;
+            this.descriptorsByMetricId.clear();
+        }
+
+        for (const descriptor of descriptorSnapshot.descriptors) {
+            this.descriptorsByMetricId.set(descriptor.metricId, descriptor);
+        }
     }
 
     dispose(): void {

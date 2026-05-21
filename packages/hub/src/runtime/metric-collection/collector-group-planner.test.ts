@@ -172,6 +172,29 @@ test("keeps unknown dynamic metrics isolated per source", () => {
     assert.notEqual(groups[0]?.collectorGroupKey, groups[1]?.collectorGroupKey);
 });
 
+test("skips source candidates waiting for descriptor metadata", () => {
+    const planner = new CollectorGroupPlanner(new FakeSourceRegistry([
+        new FakeSourceClient("windows-helper", () => ({ state: "pendingMetadata" })),
+        new FakeSourceClient("node-system", () => ({ state: "owned", pollingGroupId: "cpu" })),
+    ]));
+
+    const groups = planner.plan([
+        buildSubscription({ metricKey: "cpu.usage_percent" }),
+    ]);
+
+    assert.deepEqual(groups.map(group => ({
+        sourceId: group.sourceId,
+        groupKind: group.groupKind,
+        pollingGroupId: group.groupKind === "sourceDeclared" ? group.pollingGroupId : null,
+        metricKeys: group.metricKeys,
+    })), [{
+        sourceId: "node-system",
+        groupKind: "sourceDeclared",
+        pollingGroupId: "cpu",
+        metricKeys: ["cpu.usage_percent"],
+    }]);
+});
+
 test("skips unsupported source candidates", () => {
     const planner = new CollectorGroupPlanner(new FakeSourceRegistry([
         new FakeSourceClient("windows-helper", () => ({ state: "unsupported" })),

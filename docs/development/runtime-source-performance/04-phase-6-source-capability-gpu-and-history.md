@@ -463,6 +463,13 @@ Completed in the Windows helper/service boundary:
 - Hub `WindowsHelperSourceClient.listMetricDescriptors(...)` returns a
   descriptor snapshot object containing both descriptors and the descriptor
   fingerprint.
+- Hub `WindowsHelperSourceClient` records descriptor snapshots in a source-owned
+  descriptor cache.
+- Helper descriptor cache hits resolve to the single helper snapshot polling
+  group.
+- Helper descriptor cache misses resolve to `pendingMetadata`, not `unknown`,
+  so descriptor-backed helper metrics do not create isolated runners while the
+  catalog is missing.
 
 Use case fixed:
 
@@ -473,10 +480,16 @@ Hub asks helper for descriptor metadata
   -> Hub can later compare planning metadata identity without parsing LHM ids
 ```
 
+```text
+Hub starts before helper descriptor metadata is available
+  -> helper-backed catalog metrics resolve as pendingMetadata
+  -> planner creates no helper runner for those metric ids
+  -> widgets render fallback/N/A until descriptors load and re-plan
+  -> cold start does not create one helper runner or IPC call per catalog metric
+```
+
 Still pending:
 
-- Node helper source client descriptor cache.
-- `pendingMetadata` planning behavior for descriptor-backed dynamic metrics.
 - Helper descriptor fingerprint conversion into Hub `planningFingerprint`.
 - Helper descriptor load/change invalidation hook.
 - Capability filtering from helper descriptors.

@@ -69,7 +69,7 @@ test("source IPC frame codec rejects oversized payloads before decoding", () => 
     );
 });
 
-test("windows helper declares requested metrics as one helper snapshot group", () => {
+test("windows helper waits for descriptor metadata before declaring helper groups", () => {
     const client = new WindowsHelperSourceClient({
         transport: new RejectingTransport(new Error("unused")),
     });
@@ -81,8 +81,111 @@ test("windows helper declares requested metrics as one helper snapshot group", (
 
     assert.deepEqual([...resolutions.entries()], [
         ["cpu.usage_percent", {
+            state: "pendingMetadata",
+        }],
+        ["gpu.temp", {
+            state: "pendingMetadata",
+        }],
+    ]);
+});
+
+test("windows helper declares cached descriptor metrics as one helper snapshot group", async () => {
+    const transport = new FakeWindowsHelperPipeTransport(request => {
+        switch (request.payload.case) {
+            case "getSourceHealth":
+                return buildHealthResponse(request.requestId);
+            case "listMetricDescriptors":
+                return buildDescriptorResponse(request.requestId);
+            default:
+                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport);
+
+    await client.listMetricDescriptors(["cpu.usage_percent"]);
+    const resolutions = client.resolveMetricPollingGroups([
+        "cpu.usage_percent",
+        "lhm.sensor:/missing",
+    ]);
+
+    assert.deepEqual([...resolutions.entries()], [
+        ["cpu.usage_percent", {
             state: "owned",
             pollingGroupId: WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID,
+        }],
+        ["lhm.sensor:/missing", {
+            state: "pendingMetadata",
+        }],
+    ]);
+});
+
+test("windows helper keeps filtered descriptors when the catalog fingerprint is unchanged", async () => {
+    const transport = new FakeWindowsHelperPipeTransport(request => {
+        switch (request.payload.case) {
+            case "getSourceHealth":
+                return buildHealthResponse(request.requestId);
+            case "listMetricDescriptors":
+                return buildDescriptorResponse(request.requestId, {
+                    descriptors: request.payload.value.metricIds.map(metricId => buildDescriptor({ metricId })),
+                });
+            default:
+                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport);
+
+    await client.listMetricDescriptors(["cpu.usage_percent"]);
+    await client.listMetricDescriptors(["gpu.temp"]);
+    const resolutions = client.resolveMetricPollingGroups([
+        "cpu.usage_percent",
+        "gpu.temp",
+    ]);
+
+    assert.deepEqual([...resolutions.entries()], [
+        ["cpu.usage_percent", {
+            state: "owned",
+            pollingGroupId: WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID,
+        }],
+        ["gpu.temp", {
+            state: "owned",
+            pollingGroupId: WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID,
+        }],
+    ]);
+});
+
+test("windows helper clears cached descriptors when the catalog fingerprint changes", async () => {
+    let descriptorRequestCount = 0;
+    const transport = new FakeWindowsHelperPipeTransport(request => {
+        switch (request.payload.case) {
+            case "getSourceHealth":
+                return buildHealthResponse(request.requestId);
+            case "listMetricDescriptors":
+                descriptorRequestCount += 1;
+                return descriptorRequestCount === 1
+                    ? buildDescriptorResponse(request.requestId, {
+                        descriptorFingerprint: "catalog-sha256-before",
+                        descriptors: [buildDescriptor({ metricId: "cpu.usage_percent" })],
+                    })
+                    : buildDescriptorResponse(request.requestId, {
+                        descriptorFingerprint: "catalog-sha256-after",
+                        descriptors: [buildDescriptor({ metricId: "gpu.temp" })],
+                    });
+            default:
+                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport);
+
+    await client.listMetricDescriptors(["cpu.usage_percent"]);
+    await client.listMetricDescriptors(["gpu.temp"]);
+    const resolutions = client.resolveMetricPollingGroups([
+        "cpu.usage_percent",
+        "gpu.temp",
+    ]);
+
+    assert.deepEqual([...resolutions.entries()], [
+        ["cpu.usage_percent", {
+            state: "pendingMetadata",
         }],
         ["gpu.temp", {
             state: "owned",
@@ -136,7 +239,7 @@ test("windows helper source client returns descriptors with the catalog fingerpr
     assert.equal(descriptorSnapshot.descriptorFingerprint, "catalog-sha256-test");
     assert.deepEqual(descriptorSnapshot.descriptors, [{
         metricId: "cpu.usage_percent",
-        sourceSensorId: "lhm:/cpu/0/load/0",
+        sourceSensorId: "lhm:/cpu.usage_percent",
         hardwareId: "hardware-1",
         hardwareName: "CPU",
         hardwareType: "Cpu",
@@ -510,28 +613,51 @@ function buildSnapshotResponse(requestId: string): SourceIpcResponse {
     });
 }
 
-function buildDescriptorResponse(requestId: string): SourceIpcResponse {
+function buildDescriptorResponse(
+    requestId: string,
+    options: {
+        readonly descriptorFingerprint?: string;
+        readonly descriptors?: readonly ReturnType<typeof buildDescriptor>[];
+    } = {},
+): SourceIpcResponse {
     return create(SourceIpcResponseSchema, {
         requestId,
         payload: {
             case: "listMetricDescriptors",
             value: create(ListMetricDescriptorsResponseSchema, {
                 descriptorSnapshot: {
-                    descriptorFingerprint: "catalog-sha256-test",
-                    descriptors: [{
-                        metricId: "cpu.usage_percent",
-                        sourceSensorId: "lhm:/cpu/0/load/0",
-                        hardwareId: "hardware-1",
-                        hardwareName: "CPU",
-                        hardwareType: "Cpu",
-                        sensorName: "CPU Total",
-                        sourceSensorType: "Load",
-                        valueKind: MetricValueKind.SCALAR,
-                        unit: MetricUnit.PERCENT,
-                        metricIdKind: MetricIdKind.STABLE_ALIAS,
-                    }],
+                    descriptorFingerprint: options.descriptorFingerprint ?? "catalog-sha256-test",
+                    descriptors: [...(options.descriptors ?? [buildDescriptor({ metricId: "cpu.usage_percent" })])],
                 },
             }),
         },
     });
+}
+
+function buildDescriptor(options: {
+    readonly metricId: string;
+}): {
+    readonly metricId: string;
+    readonly sourceSensorId: string;
+    readonly hardwareId: string;
+    readonly hardwareName: string;
+    readonly hardwareType: string;
+    readonly sensorName: string;
+    readonly sourceSensorType: string;
+    readonly valueKind: MetricValueKind;
+    readonly unit: MetricUnit;
+    readonly metricIdKind: MetricIdKind;
+} {
+    return {
+        metricId: options.metricId,
+        sourceSensorId: `lhm:/${options.metricId}`,
+        hardwareId: "hardware-1",
+        hardwareName: "CPU",
+        hardwareType: "Cpu",
+        sensorName: "CPU Total",
+        sourceSensorType: "Load",
+        valueKind: MetricValueKind.SCALAR,
+        unit: MetricUnit.PERCENT,
+        metricIdKind: MetricIdKind.STABLE_ALIAS,
+    };
 }
