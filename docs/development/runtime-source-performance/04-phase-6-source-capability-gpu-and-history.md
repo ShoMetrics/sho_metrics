@@ -566,6 +566,54 @@ cache publishing is wired end to end.
    - Mixed-group reads fall back to the full latest snapshot for diagnostic and
      compatibility paths; normal Hub runners should request one helper group.
 
+6. Batched helper IPC reads are preserved.
+   - Descriptor reads return descriptor snapshots plus fingerprints.
+   - Snapshot reads accept repeated metric ids and return one filtered cached
+     `MetricSnapshot`.
+   - `CollectorGroupPlanner` coalesces metrics by `(sourceProfileId,
+     pollingGroupId)`.
+   - `CollectorGroupRunner` calls `readSnapshot(metricKeys)` once per planned
+     helper group, so 1 metric and 100 metrics in the same helper group remain
+     one IPC request.
+
+7. Descriptor preload uses the descriptor API.
+   - Keep `listMetricDescriptors([])` as the long-term descriptor preload path.
+   - Do not switch preload to `readSnapshot(... includeDescriptors=true)`.
+   - Snapshot responses may still include descriptor snapshots for explicit
+     callers, but background metadata preload should stay on the metadata API.
+   - This keeps metadata loading separate from metric value reads and avoids
+     making ordinary snapshot reads responsible for source planning freshness.
+
+8. Do not add periodic descriptor polling after startup.
+   - The helper preloads descriptors when metadata listeners subscribe and
+     publishes invalidation when a later descriptor read observes a changed
+     fingerprint.
+   - The runtime does not poll descriptors forever just to discover hardware
+     hotplug.
+   - This keeps planning metadata out of recurring background work unless a
+     concrete product path needs it.
+   - Future hotplug refresh, if needed, should be user- or lifecycle-triggered
+     first, such as opening the catalog selector or an explicit refresh action.
+     Add low-frequency background metadata refresh only after logs or product
+     need justify it.
+
+9. Latency verification after group-cache publishing.
+   - A 30 second CPU stress probe compared direct Node CPU reads with helper
+     pipe CPU reads at 250 ms intervals.
+   - In that run, Node crossed 80% CPU at 259 ms and helper crossed 80% CPU at
+     3260 ms, so helper still lagged Node by about 3001 ms for that stress
+     transition on this machine.
+   - Helper pipe/request handling was not the bottleneck. Direct helper reads
+     usually returned from cached values in low single-digit milliseconds, and
+     service-side request handling for CPU reads was about 0.01-0.03 ms in the
+     C# log.
+   - Group-cache publishing did remove the full-snapshot publication barrier:
+     CPU reads could observe a newly published CPU group value while the same
+     serialized helper refresh cycle was still refreshing later hardware.
+   - Remaining helper-vs-Node response differences come from LHM CPU hardware
+     update timing/traversal order and the helper refresh cycle, not from CPU
+     waiting for unrelated GPU/storage/network publication.
+
 Use cases fixed by the completed steps:
 
 ```text
@@ -600,42 +648,40 @@ Helper refresh starts
   -> later GPU/storage/network work no longer gates CPU publication
 ```
 
-### Remaining Implementation Plan
+```text
+CPU stress starts
+  -> Node may observe the CPU spike before helper on this machine
+  -> helper still publishes CPU as soon as its CPU hardware group refreshes
+  -> IPC reads return cached CPU values quickly
+  -> remaining lag is a source behavior/priority question, not a helper cache
+     barrier
+```
 
-1. Preserve batched IPC reads.
-   - Descriptor read returns descriptor snapshot plus fingerprint.
-   - Snapshot read accepts metric ids and returns a metric snapshot from the
-     helper latest value cache.
-   - The normal runtime path should send ids from one helper polling group.
-   - Subscribing to 1 LHM sensor and 100 LHM sensors should not become 100 IPC
-     messages when they share a helper polling group.
-   - Estimate: 40-120 C# LOC and 40-100 TypeScript LOC if the current IPC shape
-     remains sufficient.
+```text
+Widget subscribes to many helper metrics from the same helper group
+  -> planner produces one collector group
+  -> runner calls readSnapshot([...metric ids]) once per tick
+  -> helper filters its cached group snapshot
+  -> subscription width does not become one IPC request per metric
+```
 
-2. Choose one long-term descriptor preload path.
-   - Current implementation uses `listMetricDescriptors(...)`.
-   - Keep that path, or deliberately switch to a low-frequency
-     `readSnapshot(... includeDescriptors=true)` call.
-   - Do not leave `ReadMetricSnapshotResponse.descriptor_snapshot` permanently
-     unmapped if snapshot-read preload becomes the chosen path.
-   - Estimate: 0-80 TypeScript LOC depending on whether the path changes.
+```text
+Background metadata preload starts
+  -> helper client calls listMetricDescriptors([])
+  -> descriptor cache records descriptors and fingerprint
+  -> source metadata invalidation re-plans active subscriptions
+  -> metric snapshot reads stay value-only in the normal runtime path
+```
 
-3. Decide whether descriptor refresh after startup needs polling.
-   - Current implementation preloads descriptors and observes changed
-     fingerprints when descriptor reads happen later.
-   - It does not periodically poll descriptors for hardware hotplug.
-   - Add a low-frequency metadata refresh only after product need or logs show
-     hotplug descriptors do not recover through existing reads.
-   - Estimate: 60-160 TypeScript/C# LOC if added.
+```text
+User hotplugs hardware after startup
+  -> existing planned metrics keep using data-plane freshness/fallback/N/A
+  -> new dynamic sensor ids are not discovered automatically
+  -> removed dynamic sensor ids age out to N/A or fallback
+  -> catalog UI remains unchanged until a future explicit/lifecycle descriptor refresh
+```
 
-4. Add latency verification.
-   - Compare Node CPU and helper CPU under the same stress window.
-   - Record helper group refresh duration, group publish age, IPC duration, and
-     `MetricStore` sample age separately.
-   - The expected post-change result is not "helper always beats Node"; it is
-     "CPU helper values are no longer delayed by unrelated helper hardware
-     groups."
-   - Estimate: 40-100 TypeScript/C# LOC if current diagnostic logs remain.
+### Remaining Cleanup
 
 Known limitation after the first group-cache implementation:
 
@@ -655,7 +701,7 @@ Still pending:
   when a later descriptor read observes a changed fingerprint, but it does not
   poll descriptors periodically.
 - Capability filtering from helper descriptors.
-- Post-change latency capture and removal of temporary latency diagnostics.
+- Removal of temporary latency diagnostics after the latency result is accepted.
 
 ### Required Tests
 
@@ -688,9 +734,8 @@ Still pending:
 | Hub parses LHM ids | Quick prototype. | Reject. Opaque ids must stay source-owned; path formats are not a Hub contract. |
 | Special Hub-side merging for unknown dynamic ids | Hides cold-start cost. | Reject. It creates a planner special case and weakens the descriptor contract. Wait for descriptors, render fallback/N/A, then re-plan. |
 
-Estimated remaining work: 120-280 TypeScript LOC plus 300-620 C# LOC depending
-on how much of the current snapshot cache can be reused as a group-level latest
-value cache.
+Estimated remaining work for this section: diagnostic cleanup only, unless
+hotplug refresh is promoted to a product requirement.
 
 ## 3. Source Capability Filtering
 

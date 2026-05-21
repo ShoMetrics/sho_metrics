@@ -327,6 +327,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         diagnosticAccumulator.HardwareCount += 1;
         diagnosticAccumulator.SensorCount += hardware.Sensors.Length;
         long updateStartedTimestamp = Stopwatch.GetTimestamp();
+        int warningCountBefore = warnings.Count;
         string? updateError = null;
 
         try
@@ -342,7 +343,6 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         double updateDurationMilliseconds = Stopwatch.GetElapsedTime(updateStartedTimestamp).TotalMilliseconds;
         long ownReadStartedTimestamp = Stopwatch.GetTimestamp();
         int readingCountBefore = readingsByMetricId.Count;
-        int warningCountBefore = warnings.Count;
         Dictionary<string, MetricReading> hardwareReadingsByMetricId = new(StringComparer.Ordinal);
         List<string> hardwareWarnings = [];
         MetricReading? cpuUsageReading = null;
