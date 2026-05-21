@@ -21,6 +21,7 @@ import {
     MetricValueKind,
     readRequiredMetricSnapshotTimestampMilliseconds,
 } from "./metric-source";
+import type { SourceMetadataInvalidation } from "./source-planning-metadata";
 import {
     decodeSourceIpcFrame,
     encodeSourceIpcFrame,
@@ -31,6 +32,8 @@ import {
     UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS,
     WindowsHelperSourceClient,
     WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID,
+    type WindowsHelperDescriptorPreloadTimer,
+    type WindowsHelperDescriptorPreloadTimerHandle,
     type WindowsHelperPipeTransport,
     type WindowsHelperSourceClientOptions,
 } from "./windows-helper-source-client";
@@ -192,6 +195,206 @@ test("windows helper clears cached descriptors when the catalog fingerprint chan
             pollingGroupId: WINDOWS_HELPER_SNAPSHOT_POLLING_GROUP_ID,
         }],
     ]);
+});
+
+test("windows helper preloads descriptors and emits source metadata invalidation on subscribe", async () => {
+    const transport = new FakeWindowsHelperPipeTransport(request => {
+        switch (request.payload.case) {
+            case "getSourceHealth":
+                return buildHealthResponse(request.requestId);
+            case "listMetricDescriptors":
+                assert.deepEqual(request.payload.value.metricIds, []);
+                return buildDescriptorResponse(request.requestId);
+            default:
+                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport);
+    const invalidations: SourceMetadataInvalidation[] = [];
+
+    const unsubscribe = client.subscribeSourceMetadataInvalidations(invalidation => {
+        invalidations.push(invalidation);
+    });
+    await drainAsyncOperations();
+
+    assert.deepEqual(
+        transport.requests.map(request => request.payload.case),
+        ["getSourceHealth", "listMetricDescriptors"],
+    );
+    assert.deepEqual(invalidations, [{
+        sourceScopeId: "local",
+        sourceProfileId: WINDOWS_HELPER_SOURCE_ID,
+        planningFingerprint: "windows-helper-descriptor:catalog-sha256-test",
+        reason: "descriptorLoaded",
+    }]);
+
+    unsubscribe();
+});
+
+test("windows helper retries descriptor preload after failure and emits descriptorLoaded", async () => {
+    let healthRequestCount = 0;
+    const retryTimer = new FakeDescriptorPreloadTimer();
+    const transport = new FakeWindowsHelperPipeTransport(request => {
+        switch (request.payload.case) {
+            case "getSourceHealth":
+                healthRequestCount += 1;
+                if (healthRequestCount === 1) {
+                    throw new Error("helper is still starting");
+                }
+
+                return buildHealthResponse(request.requestId);
+            case "listMetricDescriptors":
+                return buildDescriptorResponse(request.requestId);
+            default:
+                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport, {}, {
+        descriptorPreloadRetryMilliseconds: 25,
+        descriptorPreloadTimer: retryTimer,
+    });
+    const invalidations: SourceMetadataInvalidation[] = [];
+
+    const unsubscribe = client.subscribeSourceMetadataInvalidations(invalidation => {
+        invalidations.push(invalidation);
+    });
+    await drainAsyncOperations();
+
+    assert.equal(retryTimer.activeHandleCount(), 1);
+    assert.deepEqual(invalidations, []);
+
+    retryTimer.runNext();
+    await drainAsyncOperations();
+
+    assert.deepEqual(
+        transport.requests.map(request => request.payload.case),
+        ["getSourceHealth", "getSourceHealth", "listMetricDescriptors"],
+    );
+    assert.deepEqual(invalidations, [{
+        sourceScopeId: "local",
+        sourceProfileId: WINDOWS_HELPER_SOURCE_ID,
+        planningFingerprint: "windows-helper-descriptor:catalog-sha256-test",
+        reason: "descriptorLoaded",
+    }]);
+
+    unsubscribe();
+});
+
+test("windows helper dispose stops descriptor preload retry timer", async () => {
+    const retryTimer = new FakeDescriptorPreloadTimer();
+    const transport = new FakeWindowsHelperPipeTransport(request => {
+        switch (request.payload.case) {
+            case "getSourceHealth":
+                throw new Error("helper unavailable");
+            default:
+                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport, {}, {
+        descriptorPreloadRetryMilliseconds: 25,
+        descriptorPreloadTimer: retryTimer,
+    });
+
+    client.subscribeSourceMetadataInvalidations(() => undefined);
+    await drainAsyncOperations();
+
+    assert.equal(retryTimer.activeHandleCount(), 1);
+    client.dispose();
+    retryTimer.runNext();
+    await drainAsyncOperations();
+
+    assert.equal(retryTimer.activeHandleCount(), 0);
+    assert.deepEqual(
+        transport.requests.map(request => request.payload.case),
+        ["getSourceHealth"],
+    );
+});
+
+test("windows helper forwards descriptor metadata invalidation to every listener", async () => {
+    const transport = new FakeWindowsHelperPipeTransport(request => {
+        switch (request.payload.case) {
+            case "getSourceHealth":
+                return buildHealthResponse(request.requestId);
+            case "listMetricDescriptors":
+                return buildDescriptorResponse(request.requestId);
+            default:
+                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport);
+    const firstListenerInvalidations: SourceMetadataInvalidation[] = [];
+    const secondListenerInvalidations: SourceMetadataInvalidation[] = [];
+
+    const unsubscribeFirst = client.subscribeSourceMetadataInvalidations(invalidation => {
+        firstListenerInvalidations.push(invalidation);
+    });
+    const unsubscribeSecond = client.subscribeSourceMetadataInvalidations(invalidation => {
+        secondListenerInvalidations.push(invalidation);
+    });
+    await drainAsyncOperations();
+
+    const expectedInvalidations = [{
+        sourceScopeId: "local",
+        sourceProfileId: WINDOWS_HELPER_SOURCE_ID,
+        planningFingerprint: "windows-helper-descriptor:catalog-sha256-test",
+        reason: "descriptorLoaded" as const,
+    }];
+    assert.deepEqual(firstListenerInvalidations, expectedInvalidations);
+    assert.deepEqual(secondListenerInvalidations, expectedInvalidations);
+    assert.deepEqual(
+        transport.requests.map(request => request.payload.case),
+        ["getSourceHealth", "listMetricDescriptors"],
+    );
+
+    unsubscribeFirst();
+    unsubscribeSecond();
+});
+
+test("windows helper emits descriptor metadata changes only when fingerprint changes", async () => {
+    let descriptorRequestCount = 0;
+    const transport = new FakeWindowsHelperPipeTransport(request => {
+        switch (request.payload.case) {
+            case "getSourceHealth":
+                return buildHealthResponse(request.requestId);
+            case "listMetricDescriptors":
+                descriptorRequestCount += 1;
+                return descriptorRequestCount <= 2
+                    ? buildDescriptorResponse(request.requestId, {
+                        descriptorFingerprint: "catalog-sha256-before",
+                    })
+                    : buildDescriptorResponse(request.requestId, {
+                        descriptorFingerprint: "catalog-sha256-after",
+                    });
+            default:
+                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport);
+    const invalidations: SourceMetadataInvalidation[] = [];
+
+    const unsubscribe = client.subscribeSourceMetadataInvalidations(invalidation => {
+        invalidations.push(invalidation);
+    });
+    await drainAsyncOperations();
+    await client.listMetricDescriptors(["cpu.usage_percent"]);
+    await client.listMetricDescriptors(["gpu.temp"]);
+
+    assert.deepEqual(invalidations, [
+        {
+            sourceScopeId: "local",
+            sourceProfileId: WINDOWS_HELPER_SOURCE_ID,
+            planningFingerprint: "windows-helper-descriptor:catalog-sha256-before",
+            reason: "descriptorLoaded",
+        },
+        {
+            sourceScopeId: "local",
+            sourceProfileId: WINDOWS_HELPER_SOURCE_ID,
+            planningFingerprint: "windows-helper-descriptor:catalog-sha256-after",
+            reason: "descriptorChanged",
+        },
+    ]);
+
+    unsubscribe();
 });
 
 test("windows helper source client sends requested metric ids and returns a runtime snapshot", async () => {
@@ -557,11 +760,16 @@ class RejectingTransport implements WindowsHelperPipeTransport {
 function createClient(
     transport: WindowsHelperPipeTransport,
     timeouts: WindowsHelperSourceClientOptions["timeouts"] = {},
+    options: Pick<
+        WindowsHelperSourceClientOptions,
+        "descriptorPreloadRetryMilliseconds" | "descriptorPreloadTimer"
+    > = {},
 ): WindowsHelperSourceClient {
     return new WindowsHelperSourceClient({
         transport,
         requestIdFactory: createRequestIdFactory(),
         timeouts,
+        ...options,
     });
 }
 
@@ -577,6 +785,12 @@ function createNodeError(code: string, message: string): Error {
     const error = new Error(message) as Error & { code: string };
     error.code = code;
     return error;
+}
+
+async function drainAsyncOperations(): Promise<void> {
+    for (let step = 0; step < 10; step += 1) {
+        await Promise.resolve();
+    }
 }
 
 function buildHealthResponse(
@@ -660,4 +874,59 @@ function buildDescriptor(options: {
         unit: MetricUnit.PERCENT,
         metricIdKind: MetricIdKind.STABLE_ALIAS,
     };
+}
+
+class FakeDescriptorPreloadTimer implements WindowsHelperDescriptorPreloadTimer {
+    private readonly handles: FakeDescriptorPreloadTimerHandle[] = [];
+
+    set(callback: () => void, delayMilliseconds: number): WindowsHelperDescriptorPreloadTimerHandle {
+        const handle = new FakeDescriptorPreloadTimerHandle(callback, delayMilliseconds);
+        this.handles.push(handle);
+        return handle;
+    }
+
+    clear(handle: WindowsHelperDescriptorPreloadTimerHandle): void {
+        (handle as FakeDescriptorPreloadTimerHandle).clear();
+    }
+
+    runNext(): void {
+        this.handles.find(handle => handle.isActive)?.run();
+    }
+
+    activeHandleCount(): number {
+        return this.handles.filter(handle => handle.isActive).length;
+    }
+}
+
+class FakeDescriptorPreloadTimerHandle implements WindowsHelperDescriptorPreloadTimerHandle {
+    private active = true;
+    private readonly callback: () => void;
+    readonly delayMilliseconds: number;
+    unrefCallCount = 0;
+
+    constructor(callback: () => void, delayMilliseconds: number) {
+        this.callback = callback;
+        this.delayMilliseconds = delayMilliseconds;
+    }
+
+    get isActive(): boolean {
+        return this.active;
+    }
+
+    unref(): void {
+        this.unrefCallCount += 1;
+    }
+
+    clear(): void {
+        this.active = false;
+    }
+
+    run(): void {
+        if (!this.active) {
+            return;
+        }
+
+        this.active = false;
+        this.callback();
+    }
 }

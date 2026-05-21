@@ -1,10 +1,10 @@
 import {
+    LOCAL_SOURCE_SCOPE_ID,
     NODE_SYSTEM_SOURCE_ID,
     WINDOWS_HELPER_SOURCE_ID,
 } from "./source-ids";
 
-/** Source scope used for telemetry collected from the current machine. */
-export const LOCAL_SOURCE_SCOPE_ID = "local";
+export { LOCAL_SOURCE_SCOPE_ID } from "./source-ids";
 
 /** How a read plan handles missing values after source candidates are tried. */
 export type MetricReadPlanFailureMode = "fallback" | "empty";
