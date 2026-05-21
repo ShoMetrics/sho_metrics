@@ -1,5 +1,6 @@
 import { NodeSystemSource } from "./node-system-source";
 import { createMetricSourceClient, type SourceClient } from "./source-client";
+import type { SourceMetadataInvalidationListener } from "./source-planning-metadata";
 import { WindowsHelperSourceClient } from "./windows-helper-source-client";
 
 /** Options for default source registry creation. */
@@ -12,6 +13,9 @@ export interface DefaultSourceRegistryOptions {
 export interface SourceRegistry {
     /** Resolves a source client by registry-owned source id. */
     resolveSourceClient(sourceId: string): SourceClient | undefined;
+
+    /** Subscribes to source planning metadata invalidations emitted by registered sources. */
+    subscribeSourceMetadataInvalidations(listener: SourceMetadataInvalidationListener): () => void;
 
     /** Disposes all registered source clients. */
     dispose(): void;
@@ -33,6 +37,24 @@ export class DefaultSourceRegistry implements SourceRegistry {
 
     resolveSourceClient(sourceId: string): SourceClient | undefined {
         return this.sourceClientById.get(sourceId);
+    }
+
+    subscribeSourceMetadataInvalidations(listener: SourceMetadataInvalidationListener): () => void {
+        const unsubscribeCallbacks: Array<() => void> = [];
+
+        for (const sourceClient of this.sourceClientById.values()) {
+            const unsubscribe = sourceClient.subscribeSourceMetadataInvalidations?.(listener);
+
+            if (unsubscribe) {
+                unsubscribeCallbacks.push(unsubscribe);
+            }
+        }
+
+        return () => {
+            for (const unsubscribe of unsubscribeCallbacks) {
+                unsubscribe();
+            }
+        };
     }
 
     dispose(): void {

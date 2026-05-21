@@ -6,6 +6,7 @@ import type {
     MetricValueKind,
 } from "./metric-source";
 import type { SourceMetricPollingGroupResolver } from "./source-polling-groups";
+import type { SourceMetadataInvalidationListener } from "./source-planning-metadata";
 
 /** Source-owned warning emitted while serving health, descriptor, or snapshot requests. */
 export interface SourceWarning {
@@ -118,6 +119,16 @@ export interface SourceClient extends SourceMetricPollingGroupResolver {
 
     /** Returns the latest cached client-owned runtime status without doing I/O. */
     getCachedStatus?(): SourceClientStatus;
+
+    /**
+     * Subscribes to complete source planning metadata changes.
+     *
+     * Source clients must call the listener only after descriptor, capability,
+     * and planning-relevant profile metadata has reached a complete snapshot.
+     * This hook must not report source health, connection recovery, partial
+     * descriptor traversal, or sample freshness.
+     */
+    subscribeSourceMetadataInvalidations?(listener: SourceMetadataInvalidationListener): () => void;
 
     /** Releases resources owned by this source client. */
     dispose?(): void;

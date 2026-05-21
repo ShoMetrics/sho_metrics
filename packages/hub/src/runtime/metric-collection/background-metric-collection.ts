@@ -20,8 +20,8 @@ import {
 import {
     SourcePlanningMetadataRegistry,
     sourcePlanningMetadataRegistry,
-    type SourceMetadataInvalidation,
 } from "./source-planning-metadata-registry";
+import type { SourceMetadataInvalidation } from "../sources/source-planning-metadata";
 
 const log = logger.for("BackgroundMetricCollection");
 const BACKOFF_RETRY_MILLISECONDS = 2000;
@@ -47,6 +47,7 @@ export class BackgroundMetricCollection {
     private readonly collectorGroupSupervisor: CollectorGroupSupervisor;
     private readonly sourceMetadataRegistry: SourcePlanningMetadataRegistry;
     private readonly sourceRegistry: SourceRegistry;
+    private readonly unsubscribeSourceMetadataInvalidations: () => void;
 
     constructor(options: BackgroundMetricCollectionOptions) {
         this.subscriptionRegistry = options.subscriptionRegistry;
@@ -54,6 +55,11 @@ export class BackgroundMetricCollection {
         this.collectorGroupSupervisor = options.collectorGroupSupervisor;
         this.sourceMetadataRegistry = options.sourceMetadataRegistry;
         this.sourceRegistry = options.sourceRegistry;
+        this.unsubscribeSourceMetadataInvalidations = this.sourceRegistry.subscribeSourceMetadataInvalidations(
+            invalidation => {
+                this.notifySourceMetadataChanged(invalidation);
+            },
+        );
     }
 
     /**
@@ -128,6 +134,7 @@ export class BackgroundMetricCollection {
 
     /** Stops background loops and releases source resources owned by this root. */
     dispose(): void {
+        this.unsubscribeSourceMetadataInvalidations();
         this.collectorGroupSupervisor.stopAll();
         this.sourceRegistry.dispose();
     }
