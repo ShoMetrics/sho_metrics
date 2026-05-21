@@ -3,12 +3,17 @@ import test from "node:test";
 import type { SourceClient } from "../sources/source-client";
 import type { SourceRegistry } from "../sources/source-registry";
 import type { SourceMetricPollingGroupResolution } from "../sources/source-polling-groups";
+import type { SourceMetadataInvalidation, SourceMetadataInvalidationListener } from "../sources/source-planning-metadata";
 import { BackoffPolicy } from "../sources/backoff-policy";
 import { BackgroundMetricCollection } from "./background-metric-collection";
 import { CollectorGroupPlanner } from "./collector-group-planner";
 import { CollectorGroupSupervisor } from "./collector-group-supervisor";
 import { MetricSubscriptionRegistry } from "./metric-subscription-registry";
 import { SourcePlanningMetadataRegistry } from "./source-planning-metadata-registry";
+
+type BuildBackgroundMetricCollectionOptions =
+    | { readonly sourceClients: readonly SourceClient[]; readonly sourceRegistry?: never }
+    | { readonly sourceRegistry: FakeSourceRegistry; readonly sourceClients?: never };
 
 test("source metadata invalidation increments planning version only when fingerprint changes", () => {
     const subscriptionRegistry = new MetricSubscriptionRegistry();
@@ -95,13 +100,56 @@ test("changed source metadata re-plans current subscriptions", () => {
     unregister();
 });
 
+test("source registry metadata hook re-plans current subscriptions", () => {
+    const subscriptionRegistry = new MetricSubscriptionRegistry();
+    const sourceClient = new FakeSourceClient("node-system", () => ({
+        state: "owned",
+        pollingGroupId: "system",
+    }));
+    const sourceRegistry = new FakeSourceRegistry([sourceClient]);
+    const collection = buildBackgroundMetricCollection(subscriptionRegistry, {
+        sourceRegistry,
+    });
+
+    collection.registerSubscriptions({
+        subscriberId: "action-1",
+        subscriptions: [{
+            subscriberId: "action-1",
+            metricKey: "cpu.usage_percent",
+            sourceScopeId: "local",
+            sourceCandidates: [{ sourceId: "node-system" }],
+            failureMode: "fallback",
+            intervalMilliseconds: 1000,
+        }],
+    });
+
+    assert.equal(sourceClient.resolveMetricPollingGroupsCallCount, 1);
+
+    sourceRegistry.emitSourceMetadataInvalidation({
+        sourceScopeId: "local",
+        sourceProfileId: "node-system",
+        planningFingerprint: "fingerprint-1",
+        reason: "descriptorLoaded",
+    });
+
+    assert.equal(sourceClient.resolveMetricPollingGroupsCallCount, 2);
+
+    collection.dispose();
+    sourceRegistry.emitSourceMetadataInvalidation({
+        sourceScopeId: "local",
+        sourceProfileId: "node-system",
+        planningFingerprint: "fingerprint-2",
+        reason: "descriptorChanged",
+    });
+
+    assert.equal(sourceClient.resolveMetricPollingGroupsCallCount, 2);
+});
+
 function buildBackgroundMetricCollection(
     subscriptionRegistry: MetricSubscriptionRegistry,
-    options: {
-        readonly sourceClients?: readonly SourceClient[];
-    } = {},
+    options?: BuildBackgroundMetricCollectionOptions,
 ): BackgroundMetricCollection {
-    const sourceRegistry = new FakeSourceRegistry(options.sourceClients ?? []);
+    const sourceRegistry = options?.sourceRegistry ?? new FakeSourceRegistry(options?.sourceClients ?? []);
     const timer = new FakeTimer();
 
     return new BackgroundMetricCollection({
@@ -120,6 +168,7 @@ function buildBackgroundMetricCollection(
 
 class FakeSourceRegistry implements SourceRegistry {
     private readonly sourceClientsById = new Map<string, SourceClient>();
+    private readonly sourceMetadataInvalidationListeners = new Set<SourceMetadataInvalidationListener>();
 
     constructor(sourceClients: readonly SourceClient[]) {
         for (const sourceClient of sourceClients) {
@@ -129,6 +178,20 @@ class FakeSourceRegistry implements SourceRegistry {
 
     resolveSourceClient(sourceId: string): SourceClient | undefined {
         return this.sourceClientsById.get(sourceId);
+    }
+
+    subscribeSourceMetadataInvalidations(listener: SourceMetadataInvalidationListener): () => void {
+        this.sourceMetadataInvalidationListeners.add(listener);
+
+        return () => {
+            this.sourceMetadataInvalidationListeners.delete(listener);
+        };
+    }
+
+    emitSourceMetadataInvalidation(invalidation: SourceMetadataInvalidation): void {
+        for (const listener of this.sourceMetadataInvalidationListeners) {
+            listener(invalidation);
+        }
     }
 
     dispose(): void {

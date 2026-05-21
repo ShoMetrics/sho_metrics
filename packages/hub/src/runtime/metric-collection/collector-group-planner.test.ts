@@ -270,6 +270,10 @@ class FakeSourceRegistry implements SourceRegistry {
         return this.sourceClientsById.get(sourceId);
     }
 
+    subscribeSourceMetadataInvalidations(): () => void {
+        return () => undefined;
+    }
+
     dispose(): void {
         return;
     }
