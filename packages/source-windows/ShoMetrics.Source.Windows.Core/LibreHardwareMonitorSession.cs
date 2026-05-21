@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -15,6 +16,9 @@ public sealed class LibreHardwareMonitorSession : IDisposable
     private readonly Computer? _computer;
     private readonly HardwareMetricDescriptorSnapshot _cachedDescriptorSnapshot;
     private readonly ILibreHardwareMonitorDiagnosticSink? _diagnosticSink;
+    private readonly IReadOnlyDictionary<string, string> _pollingGroupIdsByMetricId;
+    private readonly ConcurrentDictionary<string, MetricSnapshot> _latestSnapshotsByPollingGroupId =
+        new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _readGate = new(1, 1);
     private MetricSnapshot _latestSnapshot;
     private long _refreshIndex;
@@ -68,6 +72,10 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             warnings.Select(warning => warning.Message).ToList());
         InitializationWarnings = warnings;
         _cachedDescriptorSnapshot = cachedDescriptorSnapshot;
+        _pollingGroupIdsByMetricId = cachedDescriptorSnapshot.Descriptors.ToDictionary(
+            descriptor => descriptor.MetricId,
+            descriptor => descriptor.PollingGroupId,
+            StringComparer.Ordinal);
         _latestSnapshot = BuildUnavailableSnapshot();
     }
 
@@ -81,9 +89,11 @@ public sealed class LibreHardwareMonitorSession : IDisposable
     /// <remarks>
     /// This method does not traverse LibreHardwareMonitor hardware. Call
     /// <see cref="RefreshSnapshotAsync" /> from the helper background refresh
-    /// loop to update the cache. The method keeps the Async suffix because it is
-    /// the async-shaped source contract even though cache reads usually complete
-    /// synchronously.
+    /// loop to update the cache. When the requested ids all belong to one
+    /// helper polling group, this reads that group's latest published values
+    /// without waiting for unrelated groups. The method keeps the Async suffix
+    /// because it is the async-shaped source contract even though cache reads
+    /// usually complete synchronously.
     ///
     /// A service client can read before the background refresh loop completes
     /// its first pass. In that startup race, this returns the initial
@@ -96,7 +106,10 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         ObjectDisposedException.ThrowIf(_isDisposed, this);
         cancellationToken.ThrowIfCancellationRequested();
 
-        return Task.FromResult(FilterSnapshot(Volatile.Read(ref _latestSnapshot), BuildRequestedMetricSet(metricIds)));
+        HashSet<string>? requestedMetricIds = BuildRequestedMetricSet(metricIds);
+        MetricSnapshot snapshot = ReadCachedSnapshot(metricIds);
+
+        return Task.FromResult(FilterSnapshot(snapshot, requestedMetricIds));
     }
 
     /// <summary>
@@ -157,6 +170,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             }
 
             AddDerivedReadings(readingsByMetricId);
+            PublishAggregatePollingGroupSnapshots(readingsByMetricId);
 
             List<MetricReading> readings = FilterReadings(readingsByMetricId, requestedMetricIds: null);
             AddMissingMetricWarnings(readings, warnings);
@@ -225,6 +239,46 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         };
     }
 
+    private MetricSnapshot ReadCachedSnapshot(IReadOnlyCollection<string> metricIds)
+    {
+        if (TryResolveSinglePollingGroupId(metricIds, out string? pollingGroupId)
+            && pollingGroupId is not null
+            && _latestSnapshotsByPollingGroupId.TryGetValue(pollingGroupId, out MetricSnapshot? groupSnapshot))
+        {
+            return groupSnapshot;
+        }
+
+        return Volatile.Read(ref _latestSnapshot);
+    }
+
+    private bool TryResolveSinglePollingGroupId(
+        IReadOnlyCollection<string> metricIds,
+        out string? pollingGroupId)
+    {
+        pollingGroupId = null;
+
+        foreach (string metricId in metricIds)
+        {
+            if (!_pollingGroupIdsByMetricId.TryGetValue(metricId, out string? currentPollingGroupId))
+            {
+                return false;
+            }
+
+            if (pollingGroupId is null)
+            {
+                pollingGroupId = currentPollingGroupId;
+                continue;
+            }
+
+            if (!pollingGroupId.Equals(currentPollingGroupId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return pollingGroupId is not null;
+    }
+
     private static HardwareMetricDescriptorSnapshot BuildMetricDescriptorSnapshot(
         Computer computer,
         CancellationToken cancellationToken)
@@ -259,7 +313,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         };
     }
 
-    private static void ReadHardware(
+    private void ReadHardware(
         IHardware hardware,
         Dictionary<string, MetricReading> readingsByMetricId,
         List<string> warnings,
@@ -289,16 +343,25 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         long ownReadStartedTimestamp = Stopwatch.GetTimestamp();
         int readingCountBefore = readingsByMetricId.Count;
         int warningCountBefore = warnings.Count;
+        Dictionary<string, MetricReading> hardwareReadingsByMetricId = new(StringComparer.Ordinal);
+        List<string> hardwareWarnings = [];
         MetricReading? cpuUsageReading = null;
+
+        if (updateError is not null)
+        {
+            hardwareWarnings.Add($"Hardware update failed for {hardware.Name}: {updateError}");
+        }
 
         if (updateError is null && LibreHardwareMetricCatalog.IsSupportedHardwareType(hardware.HardwareType))
         {
             foreach (ISensor sensor in hardware.Sensors)
             {
                 AddUnsupportedSensorTypeWarning(sensor, warnings);
+                AddUnsupportedSensorTypeWarning(sensor, hardwareWarnings);
 
                 foreach (MetricReading reading in LibreHardwareMetricCatalog.CreateReadings(hardware, sensor))
                 {
+                    AddReading(hardwareReadingsByMetricId, reading);
                     AddReading(readingsByMetricId, reading);
 
                     if (reading.MetricId.Equals("cpu.usage_percent", StringComparison.Ordinal))
@@ -308,6 +371,12 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                 }
             }
         }
+
+        AddMemoryDerivedReadings(hardwareReadingsByMetricId);
+        PublishPollingGroupSnapshot(
+            LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(hardware),
+            hardwareReadingsByMetricId,
+            hardwareWarnings);
 
         diagnosticAccumulator.RecordHardwareRefresh(new LibreHardwareMonitorHardwareRefreshDiagnostic
         {
@@ -400,7 +469,57 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         }
     }
 
+    private void PublishAggregatePollingGroupSnapshots(Dictionary<string, MetricReading> readingsByMetricId)
+    {
+        // Aggregate groups are computed from the full traversal, but their
+        // snapshots must not inherit unrelated hardware warnings. A GPU update
+        // failure should not appear on a network throughput read.
+        PublishPollingGroupSnapshot(
+            LibreHardwareMetricCatalog.NetworkAggregatePollingGroupId,
+            readingsByMetricId,
+            []);
+        PublishPollingGroupSnapshot(
+            LibreHardwareMetricCatalog.StorageAggregatePollingGroupId,
+            readingsByMetricId,
+            []);
+    }
+
+    private void PublishPollingGroupSnapshot(
+        string pollingGroupId,
+        Dictionary<string, MetricReading> readingsByMetricId,
+        IReadOnlyList<string> warnings)
+    {
+        List<MetricReading> readings = readingsByMetricId.Values
+            .Where(reading => !LibreHardwareMetricCatalog.IsInternalMetricId(reading.MetricId)
+                && IsMetricInPollingGroup(reading.MetricId, pollingGroupId))
+            .ToList();
+
+        if (readings.Count == 0 && warnings.Count == 0)
+        {
+            return;
+        }
+
+        _latestSnapshotsByPollingGroupId[pollingGroupId] = new MetricSnapshot
+        {
+            CapturedAt = DateTimeOffset.UtcNow,
+            Readings = readings,
+            Warnings = warnings.ToList(),
+        };
+    }
+
+    private bool IsMetricInPollingGroup(string metricId, string pollingGroupId)
+    {
+        return _pollingGroupIdsByMetricId.TryGetValue(metricId, out string? metricPollingGroupId)
+            && metricPollingGroupId.Equals(pollingGroupId, StringComparison.Ordinal);
+    }
+
     private static void AddDerivedReadings(Dictionary<string, MetricReading> readingsByMetricId)
+    {
+        AddMemoryDerivedReadings(readingsByMetricId);
+        AddDiskDerivedReadings(readingsByMetricId);
+    }
+
+    private static void AddMemoryDerivedReadings(Dictionary<string, MetricReading> readingsByMetricId)
     {
         if (readingsByMetricId.TryGetValue("ram.used", out MetricReading? memoryUsed)
             && readingsByMetricId.TryGetValue(LibreHardwareMetricCatalog.RamAvailableMetricId, out MetricReading? memoryAvailable))
@@ -419,7 +538,10 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                 };
             }
         }
+    }
 
+    private static void AddDiskDerivedReadings(Dictionary<string, MetricReading> readingsByMetricId)
+    {
         MetricReading? diskRead = readingsByMetricId.GetValueOrDefault(LibreHardwareMetricCatalog.DiskReadThroughputMetricId);
         MetricReading? diskWrite = readingsByMetricId.GetValueOrDefault(LibreHardwareMetricCatalog.DiskWriteThroughputMetricId);
 

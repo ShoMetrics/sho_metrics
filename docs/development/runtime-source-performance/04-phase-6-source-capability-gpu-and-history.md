@@ -444,8 +444,10 @@ Examples are illustrative; the exact ids are helper-owned and opaque to Hub:
 | --- | --- | --- |
 | CPU load/temperature sensors | `lhm:hardware:<cpu-hardware-id>` | CPU refresh should not wait for GPU/storage/network refresh. |
 | GPU sensors | `lhm:hardware:<gpu-hardware-id>` | GPU native calls can stall independently. |
-| Storage sensors | `lhm:hardware:<storage-hardware-id>` | Disk SMART/NVMe refresh can be slow and should not delay CPU. |
-| Network sensors | `lhm:hardware:<network-hardware-id>` | Network adapter refresh is an independent cost boundary. |
+| Dynamic storage sensors | `lhm:hardware:<storage-hardware-id>` | Disk SMART/NVMe refresh can be slow and should not delay CPU. |
+| Dynamic network sensors | `lhm:hardware:<network-hardware-id>` | Network adapter refresh is an independent cost boundary. |
+| Built-in network aggregate aliases | `lhm:aggregate:network` | `net.down` and `net.up` may combine values from multiple adapters, so they are published after network aggregate values are known. |
+| Built-in storage aggregate aliases | `lhm:aggregate:storage` | Disk throughput aliases may combine multiple storage devices, so they are not tied to one storage hardware id. |
 | Sensors under one LHM hardware node | Same hardware group unless measurement proves a child subtree has separate cost. | Keeps grouping simple without one-IPC-per-sensor behavior. |
 
 Built-in ShoMetrics semantic metrics and dynamic catalog metrics may both use
@@ -552,6 +554,18 @@ cache publishing is wired end to end.
    - `WindowsHelperSourceClient.resolveMetricPollingGroups(...)` returns the
      descriptor-provided group id instead of a hardcoded helper group.
 
+5. The helper publishes latest values by helper polling group during refresh.
+   - `LibreHardwareMonitorSession.ReadSnapshotAsync(...)` reads cached values
+     only; it does not traverse LHM hardware.
+   - When requested metric ids belong to one helper polling group,
+     `ReadSnapshotAsync(...)` returns that group's latest published snapshot.
+   - The helper still uses one serialized LHM refresh traversal, but publishes
+     each hardware group as soon as that group is read.
+   - Network and storage aggregate semantic metrics publish after the traversal
+     has enough data to compute their aggregate group values.
+   - Mixed-group reads fall back to the full latest snapshot for diagnostic and
+     compatibility paths; normal Hub runners should request one helper group.
+
 Use cases fixed by the completed steps:
 
 ```text
@@ -578,24 +592,17 @@ Background collection subscribes to source metadata invalidations
   -> helper-backed metrics move from pendingMetadata to descriptor-provided helper groups
 ```
 
+```text
+Helper refresh starts
+  -> CPU hardware group refreshes
+  -> helper publishes CPU group snapshot immediately
+  -> Node CPU helper read can observe the new CPU value
+  -> later GPU/storage/network work no longer gates CPU publication
+```
+
 ### Remaining Implementation Plan
 
-1. Replace the full-snapshot publish barrier with latest value cache publishing.
-   - It refreshes LHM values inside the helper process on its own schedule.
-   - `ReadCachedSnapshot(...)` reads that cache; it must not trigger
-     per-request LHM traversal.
-   - A successful group refresh publishes that group's values immediately.
-   - Slow GPU/storage/network refresh must not delay CPU group publication.
-   - Do not implement this as parallel per-group LHM update loops. LHM's
-     hardware object graph is source-owned and should be treated as serialized
-     unless a specific API is proven thread-safe. The first implementation
-     should use one refresh coordinator, one in-flight guard for LHM traversal,
-     and group-level cache publishes during the traversal.
-   - Remove any read-path gate that exists only because reads used to trigger or
-     wait for full traversal. Reads should filter immutable cached group values.
-   - Estimate: 260-520 C# LOC.
-
-2. Preserve batched IPC reads.
+1. Preserve batched IPC reads.
    - Descriptor read returns descriptor snapshot plus fingerprint.
    - Snapshot read accepts metric ids and returns a metric snapshot from the
      helper latest value cache.
@@ -605,7 +612,7 @@ Background collection subscribes to source metadata invalidations
    - Estimate: 40-120 C# LOC and 40-100 TypeScript LOC if the current IPC shape
      remains sufficient.
 
-3. Choose one long-term descriptor preload path.
+2. Choose one long-term descriptor preload path.
    - Current implementation uses `listMetricDescriptors(...)`.
    - Keep that path, or deliberately switch to a low-frequency
      `readSnapshot(... includeDescriptors=true)` call.
@@ -613,7 +620,7 @@ Background collection subscribes to source metadata invalidations
      unmapped if snapshot-read preload becomes the chosen path.
    - Estimate: 0-80 TypeScript LOC depending on whether the path changes.
 
-4. Decide whether descriptor refresh after startup needs polling.
+3. Decide whether descriptor refresh after startup needs polling.
    - Current implementation preloads descriptors and observes changed
      fingerprints when descriptor reads happen later.
    - It does not periodically poll descriptors for hardware hotplug.
@@ -621,7 +628,7 @@ Background collection subscribes to source metadata invalidations
      hotplug descriptors do not recover through existing reads.
    - Estimate: 60-160 TypeScript/C# LOC if added.
 
-5. Add latency verification.
+4. Add latency verification.
    - Compare Node CPU and helper CPU under the same stress window.
    - Record helper group refresh duration, group publish age, IPC duration, and
      `MetricStore` sample age separately.
@@ -630,15 +637,16 @@ Background collection subscribes to source metadata invalidations
      groups."
    - Estimate: 40-100 TypeScript/C# LOC if current diagnostic logs remain.
 
-Known limitation discovered during latency testing:
+Known limitation after the first group-cache implementation:
 
-- The current helper cache is still published as one full LHM snapshot after
-  the complete refresh finishes.
-- This can make a fast CPU update wait behind slower unrelated hardware before
-  Node can read it.
-- This does not match the final latest-value cache design. The next
-  implementation step is group-level latest value publishing, not source
-  priority special casing.
+- The helper still uses one serialized LHM traversal. This avoids unsafe
+  speculative parallel `hardware.Update()` calls.
+- A group no longer waits for later unrelated groups before its cache is
+  published.
+- A group can still wait for earlier groups in the serialized traversal order.
+  If measurements show this is material, the next design step is source-owned
+  traversal ordering or proven-safe per-source refresh splitting, not Hub-side
+  source-priority special casing.
 
 Still pending:
 
@@ -647,7 +655,7 @@ Still pending:
   when a later descriptor read observes a changed fingerprint, but it does not
   poll descriptors periodically.
 - Capability filtering from helper descriptors.
-- Helper group-level latest value cache publication.
+- Post-change latency capture and removal of temporary latency diagnostics.
 
 ### Required Tests
 
