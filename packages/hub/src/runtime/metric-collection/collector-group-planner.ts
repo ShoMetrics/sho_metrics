@@ -225,6 +225,8 @@ function resolveCollectorGroupIdentity(options: {
             };
         case "unsupported":
             return null;
+        case "pendingMetadata":
+            return null;
     }
 }
 
