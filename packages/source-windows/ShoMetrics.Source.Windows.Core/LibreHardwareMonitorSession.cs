@@ -1,10 +1,18 @@
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using LibreHardwareMonitor.Hardware;
 
 namespace ShoMetrics.Source.Windows.Core;
 
 public sealed class LibreHardwareMonitorSession : IDisposable
 {
+    // Empty means the helper has no complete descriptor catalog yet. The Hub
+    // treats the later non-empty descriptor fingerprint as a real change.
+    private const string UnavailableDescriptorFingerprint = "";
+
     private readonly Computer? _computer;
+    private readonly HardwareMetricDescriptorSnapshot _cachedDescriptorSnapshot;
     private readonly SemaphoreSlim _readGate = new(1, 1);
     private bool _isDisposed;
 
@@ -12,6 +20,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
     {
         Computer computer = LibreHardwareComputerFactory.Create();
         List<HardwareSourceWarning> warnings = [];
+        HardwareMetricDescriptorSnapshot? cachedDescriptorSnapshot = null;
 
         try
         {
@@ -28,7 +37,26 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             computer.Close();
         }
 
+        if (_computer is not null)
+        {
+            try
+            {
+                cachedDescriptorSnapshot = BuildMetricDescriptorSnapshot(computer, CancellationToken.None);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                warnings.Add(new HardwareSourceWarning
+                {
+                    Code = "lhm_descriptor_preload_failed",
+                    Message = $"LibreHardwareMonitor descriptor preload failed: {exception.Message}",
+                });
+            }
+        }
+
+        cachedDescriptorSnapshot ??= BuildUnavailableDescriptorSnapshot(
+            warnings.Select(warning => warning.Message).ToList());
         InitializationWarnings = warnings;
+        _cachedDescriptorSnapshot = cachedDescriptorSnapshot;
     }
 
     public bool IsAvailable => _computer is not null;
@@ -84,49 +112,14 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         }
     }
 
-    public async Task<HardwareMetricDescriptorSnapshot> ListMetricDescriptorsAsync(
+    public Task<HardwareMetricDescriptorSnapshot> ListMetricDescriptorsAsync(
         IReadOnlyCollection<string> metricIds,
         CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_isDisposed, this);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (_computer is null)
-        {
-            return new HardwareMetricDescriptorSnapshot
-            {
-                Descriptors = [],
-                Warnings = InitializationWarnings.Select(warning => warning.Message).ToList(),
-            };
-        }
-
-        await _readGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            ObjectDisposedException.ThrowIf(_isDisposed, this);
-
-            Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId = new(StringComparer.Ordinal);
-            List<string> warnings = [];
-            HashSet<string>? requestedMetricIds = BuildRequestedMetricSet(metricIds);
-
-            foreach (IHardware hardware in _computer.Hardware)
-            {
-                ReadHardwareDescriptors(hardware, descriptorsByMetricId, warnings, cancellationToken);
-            }
-
-            AddDerivedDescriptors(descriptorsByMetricId);
-
-            return new HardwareMetricDescriptorSnapshot
-            {
-                Descriptors = FilterDescriptors(descriptorsByMetricId, requestedMetricIds),
-                Warnings = warnings,
-            };
-        }
-        finally
-        {
-            _readGate.Release();
-        }
+        return Task.FromResult(FilterDescriptorSnapshot(_cachedDescriptorSnapshot, BuildRequestedMetricSet(metricIds)));
     }
 
     public void Dispose()
@@ -148,6 +141,40 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             CapturedAt = DateTimeOffset.UtcNow,
             Readings = [],
             Warnings = InitializationWarnings.Select(warning => warning.Message).ToList(),
+        };
+    }
+
+    private static HardwareMetricDescriptorSnapshot BuildMetricDescriptorSnapshot(
+        Computer computer,
+        CancellationToken cancellationToken)
+    {
+        Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId = new(StringComparer.Ordinal);
+        List<string> warnings = [];
+
+        foreach (IHardware hardware in computer.Hardware)
+        {
+            ReadHardwareDescriptors(hardware, descriptorsByMetricId, warnings, cancellationToken);
+        }
+
+        AddDerivedDescriptors(descriptorsByMetricId);
+
+        List<HardwareMetricDescriptor> descriptors = FilterDescriptors(descriptorsByMetricId, requestedMetricIds: null);
+
+        return new HardwareMetricDescriptorSnapshot
+        {
+            DescriptorFingerprint = BuildDescriptorFingerprint(descriptors),
+            Descriptors = descriptors,
+            Warnings = warnings,
+        };
+    }
+
+    private static HardwareMetricDescriptorSnapshot BuildUnavailableDescriptorSnapshot(IReadOnlyList<string> warnings)
+    {
+        return new HardwareMetricDescriptorSnapshot
+        {
+            DescriptorFingerprint = UnavailableDescriptorFingerprint,
+            Descriptors = [],
+            Warnings = warnings,
         };
     }
 
@@ -329,6 +356,59 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             .Where(descriptor => !LibreHardwareMetricCatalog.IsInternalMetricId(descriptor.MetricId)
                 && IsRequestedMetric(requestedMetricIds, descriptor.MetricId))
             .ToList();
+    }
+
+    private static HardwareMetricDescriptorSnapshot FilterDescriptorSnapshot(
+        HardwareMetricDescriptorSnapshot descriptorSnapshot,
+        HashSet<string>? requestedMetricIds)
+    {
+        if (requestedMetricIds is null)
+        {
+            return descriptorSnapshot;
+        }
+
+        return descriptorSnapshot with
+        {
+            Descriptors = descriptorSnapshot.Descriptors
+                .Where(descriptor => requestedMetricIds.Contains(descriptor.MetricId))
+                .ToList(),
+        };
+    }
+
+    private static string BuildDescriptorFingerprint(IReadOnlyList<HardwareMetricDescriptor> descriptors)
+    {
+        StringBuilder builder = new();
+
+        // The fingerprint is an equality token for Hub re-planning. Sort by
+        // stable ids and length-prefix each field so adjacent field values
+        // cannot collide, then hash the canonical text form.
+        foreach (HardwareMetricDescriptor descriptor in descriptors
+            .OrderBy(descriptor => descriptor.MetricId, StringComparer.Ordinal)
+            .ThenBy(descriptor => descriptor.SourceSensorId, StringComparer.Ordinal))
+        {
+            AppendFingerprintField(builder, descriptor.MetricId);
+            AppendFingerprintField(builder, descriptor.SourceSensorId);
+            AppendFingerprintField(builder, descriptor.HardwareId);
+            AppendFingerprintField(builder, descriptor.HardwareName);
+            AppendFingerprintField(builder, descriptor.HardwareType);
+            AppendFingerprintField(builder, descriptor.SensorName);
+            AppendFingerprintField(builder, descriptor.SourceSensorType);
+            AppendFingerprintField(builder, descriptor.ValueKind.ToString());
+            AppendFingerprintField(builder, descriptor.Unit.ToString());
+            AppendFingerprintField(builder, descriptor.MetricIdKind.ToString());
+        }
+
+        byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString()));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    private static void AppendFingerprintField(StringBuilder builder, string value)
+    {
+        builder
+            .Append(value.Length.ToString(CultureInfo.InvariantCulture))
+            .Append(':')
+            .Append(value)
+            .Append(';');
     }
 
     private static HashSet<string>? BuildRequestedMetricSet(IReadOnlyCollection<string> metricIds)
