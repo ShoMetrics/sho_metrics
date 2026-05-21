@@ -314,7 +314,7 @@ Required tests when helper IPC exists:
 | Treat descriptor presence as data availability | Easy mental model. | Incorrect. Metadata can be true while actual samples are stale, failed, or unavailable. |
 | Microtask debounce as correctness guard | Looks cheap. | Too short for real IPC reconnect storms and easy to over-trust. Fingerprint equality is the correctness guard; use measured time-window debounce only if needed. |
 
-## 2. LHM Helper Descriptor Preload And Snapshot Cache
+## 2. LHM Helper Descriptor Preload And Latest Value Cache
 
 ### Dependency
 
@@ -329,7 +329,7 @@ The local prior-art note is:
 .agents/skills/technical-deisn-doc/references/runtime-collection-prior-art-lhm.md
 ```
 
-The useful lesson is the shape, not source-code copying:
+The relevant product pattern is:
 
 ```text
 long-lived hardware/sensor catalog
@@ -337,21 +337,36 @@ long-lived hardware/sensor catalog
   -> UI reads latest values
 ```
 
-ShoMetrics should use this shape for the Windows helper:
+ShoMetrics should use this product pattern for the Windows helper. The
+important lesson is not "build one full snapshot"; it is "keep a long-lived
+catalog, update latest values in the background, and let readers observe the
+latest value for the group they asked for."
 
 ```text
 Windows Helper
   -> owns LHM computer/hardware/sensor catalog
   -> owns descriptor snapshot
-  -> owns latest metric snapshot cache
+  -> owns latest metric value cache
+  -> publishes refreshed values by helper-declared polling group
   -> exposes descriptor fingerprint and batched snapshot reads over IPC
 
 Node Hub
   -> never parses LHM source-native ids
   -> receives descriptor/capability metadata from helper
-  -> batch-requests active metric ids
+  -> batch-requests active metric ids for one helper-declared polling group
   -> stores source/profile-scoped samples in MetricStore
 ```
+
+The helper must not wait for every LHM hardware device to finish refreshing
+before publishing values from a hardware group that has already refreshed.
+Hardware monitoring UIs need fresh per-sensor values more than they need one
+atomic whole-machine snapshot.
+
+This does not change source priority policy. Phase 6 first fixes helper-side
+latency caused by full-snapshot publication. Per-metric source priority
+exceptions, such as preferring Node for one built-in metric on one class of
+machine, require separate theory plus measurement and are not part of this
+helper cache design.
 
 ### Required Helper Concepts
 
@@ -366,12 +381,12 @@ interface IMetricDescriptorStore
 }
 ```
 
-Helper-side latest snapshot store:
+Helper-side latest value store:
 
 ```csharp
-interface IMetricSnapshotStore
+interface IMetricLatestValueStore
 {
-    ValueTask<MetricSnapshot> ReadCachedSnapshotAsync(
+    MetricSnapshot ReadCachedSnapshot(
         IReadOnlyCollection<string> metricIds,
         CancellationToken cancellationToken);
 }
@@ -400,90 +415,144 @@ profile content into the `planningFingerprint` used by
 planning fingerprint unless descriptor metadata already includes capability
 state.
 
-`ReadCachedSnapshotAsync` must not perform LHM hardware traversal or per-sensor
-native reads. It only filters the helper's latest background-refreshed snapshot
+`ReadCachedSnapshot` must not perform LHM hardware traversal or per-sensor
+native reads. It only filters the helper's latest background-refreshed values
 for the requested metric ids. The helper owns a separate background update loop
-that keeps the descriptor store and latest snapshot cache fresh.
+that keeps the descriptor store and latest value cache fresh.
 
-### Implementation Plan
+### Required Design Decisions
+
+| Decision | Final position |
+| --- | --- |
+| Cache unit | Cache latest values by helper-declared polling group, not as one full helper snapshot. |
+| Publish timing | After one polling group refreshes, publish that group's values immediately. Do not wait for unrelated hardware groups. |
+| Group ownership | The helper declares polling group ids in descriptors. Hub treats them as opaque strings and never parses LHM hardware paths. |
+| IPC read unit | Hub should request metrics that belong to one helper-declared polling group. If callers request mixed groups, the helper may return values, but the planner must not rely on mixed-group requests for normal collection. |
+| Timestamp semantics | A returned `MetricSnapshot.captured_at` represents the latest cache publish time for the requested helper polling group. Avoid mixing metrics from different helper groups in one normal runner request so one timestamp remains meaningful. |
+| Refresh concurrency | Keep LHM object graph updates on one serialized helper-owned path unless a specific hardware API is proven safe to refresh independently. Publish each group after it refreshes; do not run speculative parallel `hardware.Update()` calls across the LHM catalog. |
+| Overlap behavior | If the helper refresh cycle is still running when the next tick arrives, skip the overlapping cycle. Do not queue duplicate refreshes. If a future source-owned group is proven independently refreshable, it may add its own single-flight guard locally. |
+| Failure behavior | If one group refresh fails, preserve that group's previous values until freshness expires. Do not block successful groups from publishing. |
+| Source priority | Keep source priority simple while this helper latency fix is evaluated. Do not add vendor/model-specific priority rules as part of this work. |
+
+### Helper Polling Group Model
+
+Descriptor entries must carry a helper-owned `pollingGroupId`.
+
+Examples are illustrative; the exact ids are helper-owned and opaque to Hub:
+
+| Metric family | Example helper group | Why |
+| --- | --- | --- |
+| CPU load/temperature sensors | `lhm:hardware:<cpu-hardware-id>` | CPU refresh should not wait for GPU/storage/network refresh. |
+| GPU sensors | `lhm:hardware:<gpu-hardware-id>` | GPU native calls can stall independently. |
+| Storage sensors | `lhm:hardware:<storage-hardware-id>` | Disk SMART/NVMe refresh can be slow and should not delay CPU. |
+| Network sensors | `lhm:hardware:<network-hardware-id>` | Network adapter refresh is an independent cost boundary. |
+| Sensors under one LHM hardware node | Same hardware group unless measurement proves a child subtree has separate cost. | Keeps grouping simple without one-IPC-per-sensor behavior. |
+
+Built-in ShoMetrics semantic metrics and dynamic catalog metrics may both use
+helper-declared groups when the helper owns their values. The Hub must not infer
+groups from prefixes like `cpu.` or by parsing LHM native ids.
+
+### Data Flow
+
+```text
+Helper startup:
+  build LHM catalog
+  build descriptors with helper pollingGroupId
+  compute descriptor fingerprint
+  report descriptor readiness
+
+Helper background loop:
+  if refresh cycle is already running:
+    skip this tick
+  else:
+    for each helper polling group in the source-owned traversal order:
+      refresh the LHM hardware/group on the serialized LHM update path
+      map refreshed sensors to ShoMetrics metric values
+      publish latest values for that group with capturedAt
+
+Hub planning:
+  source descriptor cache resolves metric ids to helper pollingGroupId
+  CollectorGroupPlanner builds one runner per helper polling group
+
+Hub collection:
+  CollectorGroupRunner requests metric ids for one helper polling group
+  WindowsHelperSourceClient reads cached values over IPC
+  MetricStore stores the returned source/profile-scoped samples
+```
+
+### Final Target
+
+After this section is fully implemented, the helper path should look like this:
+
+```text
+Helper descriptors:
+  every helper-backed metric has a helper-owned pollingGroupId
+  descriptor fingerprint covers the complete planning catalog
+
+Hub planning:
+  WindowsHelperSourceClient caches descriptors
+  CollectorGroupPlanner creates one runner per helper pollingGroupId
+  there is no Hub-side fallback to a single helper snapshot group
+
+Helper data path:
+  LHM catalog stays long-lived inside the helper
+  one serialized helper refresh coordinator updates LHM values
+  each refreshed helper polling group publishes latest values immediately
+  IPC reads filter cached values only; reads do not traverse LHM hardware
+
+Runtime behavior:
+  CPU helper values do not wait for unrelated GPU/storage/network refresh
+  one metric and 100 metrics in the same helper group use one IPC request
+  failed/stalled groups age out through MetricStore freshness/fallback
+```
+
+This final target is not "current code plus one wrapper." The full-snapshot
+publish barrier is migration scaffolding and should be removed when group-level
+cache publishing is wired end to end.
+
+### Completed Steps
 
 1. Helper builds the LHM catalog before reporting descriptor readiness.
-   - Startup may still return "descriptor unavailable" while LHM is loading.
-   - Once ready, helper exposes a descriptor snapshot and fingerprint.
-   - Estimate: 120-260 C# LOC.
+   - Helper builds a cached descriptor snapshot at session startup.
+   - Helper computes a descriptor fingerprint for the complete descriptor
+     catalog.
+   - IPC `ListMetricDescriptorsResponse` returns filtered descriptors plus the
+     complete catalog descriptor fingerprint.
+   - IPC `ReadMetricSnapshotResponse` can include filtered descriptors plus the
+     complete catalog descriptor fingerprint when descriptors are requested.
+   - Hub `WindowsHelperSourceClient.listMetricDescriptors(...)` returns a
+     descriptor snapshot object containing both descriptors and the descriptor
+     fingerprint.
 
-2. Helper owns a latest snapshot cache and background refresh loop.
-   - It refreshes LHM values inside the helper process on its own schedule.
-   - `ReadCachedSnapshotAsync(...)` reads that cache; it must not trigger
-     per-request LHM traversal.
-   - Node reads latest values through one batched IPC call.
-   - Subscribing to 1 LHM sensor and 100 LHM sensors should not become 100 IPC
-     messages when they share the helper snapshot group.
-   - Estimate: 180-360 C# LOC.
+2. Hub source client stores descriptors in a source descriptor cache.
+   - `WindowsHelperSourceClient` records descriptor snapshots in a source-owned
+     descriptor cache.
+   - Helper descriptor cache misses resolve to `pendingMetadata`, not
+     `unknown`, so descriptor-backed helper metrics do not create isolated
+     runners while the catalog is missing.
+   - Hub `WindowsHelperSourceClient` preloads the full helper descriptor catalog
+     when source metadata invalidation listeners subscribe.
 
-3. IPC exposes descriptor read and snapshot read.
-   - Descriptor read returns descriptor snapshot plus fingerprint.
-   - Snapshot read accepts metric ids and returns a metric snapshot from the
-     helper cache.
-   - Estimate: 100-220 C# LOC and 80-160 TypeScript LOC.
+3. Descriptor changes emit invalidation.
+   - First descriptor load emits source metadata invalidation with a Hub
+     `planningFingerprint`.
+   - Same-fingerprint reads do not emit.
+   - Changed fingerprints emit `descriptorChanged`.
+   - Descriptor preload retries while metadata listeners are active and no
+     descriptor snapshot has loaded.
+   - Descriptor preload uses a short startup retry window before falling back to
+     the slower steady retry.
 
-4. Node helper source client stores descriptors in a source descriptor cache.
-   - `resolveMetricPollingGroups(metricKeys)` uses the cache.
-   - Known LHM ids return `owned` with helper-declared polling group.
-   - Descriptor-backed dynamic ids with missing metadata return
-     `pendingMetadata`; they do not parse ids and do not create runners.
-   - Only sources that explicitly declare bounded probing may return `unknown`
-     for missing metadata.
-   - Choose one explicit preload path: either `listMetricDescriptors(...)` or a
-     low-frequency `readSnapshot(... includeDescriptors=true)` call. Do not
-     leave `ReadMetricSnapshotResponse.descriptor_snapshot` permanently
-     unmapped if snapshot-read preload becomes the chosen path.
-   - Render fallback/N/A until descriptors load.
-   - Estimate: 120-220 TypeScript LOC.
+4. Helper-declared polling group ids are carried by descriptors.
+   - `MetricDescriptor.polling_group_id` is part of the proto contract.
+   - C# helper descriptors populate helper-owned group ids.
+   - Descriptor fingerprints include polling group ids because group identity
+     affects planning.
+   - Node runtime descriptors store `pollingGroupId`.
+   - `WindowsHelperSourceClient.resolveMetricPollingGroups(...)` returns the
+     descriptor-provided group id instead of a hardcoded helper group.
 
-5. Descriptor changes emit invalidation.
-   - On first descriptor load or fingerprint change, helper source client calls
-     background collection invalidation.
-   - Same fingerprint is ignored.
-   - Estimate: included in section 1 if done together.
-
-### Current Implementation Status
-
-Completed in the Windows helper/service boundary:
-
-- Helper builds a cached descriptor snapshot at session startup.
-- Helper computes a descriptor fingerprint for the complete descriptor catalog.
-- Helper keeps a latest metric snapshot cache refreshed by
-  `WindowsMetricSnapshotWorker`.
-- IPC `ListMetricDescriptorsResponse` returns filtered descriptors plus the
-  complete catalog descriptor fingerprint.
-- IPC `ReadMetricSnapshotResponse` returns a cached metric snapshot and, when
-  descriptors are requested, returns filtered descriptors plus the complete
-  catalog descriptor fingerprint.
-- Hub `WindowsHelperSourceClient.listMetricDescriptors(...)` returns a
-  descriptor snapshot object containing both descriptors and the descriptor
-  fingerprint.
-- Hub `WindowsHelperSourceClient` records descriptor snapshots in a source-owned
-  descriptor cache.
-- Helper descriptor cache hits resolve to the single helper snapshot polling
-  group.
-- Helper descriptor cache misses resolve to `pendingMetadata`, not `unknown`,
-  so descriptor-backed helper metrics do not create isolated runners while the
-  catalog is missing.
-- Hub `WindowsHelperSourceClient` preloads the full helper descriptor catalog
-  when source metadata invalidation listeners subscribe.
-- First descriptor load emits source metadata invalidation with a Hub
-  `planningFingerprint`; same-fingerprint reads do not emit; changed
-  fingerprints emit `descriptorChanged`.
-- Descriptor preload retries while metadata listeners are active and no
-  descriptor snapshot has loaded. Retry timers are unref'd so they do not keep
-  the plugin process alive.
-- Descriptor preload uses a short startup retry window before falling back to
-  the slower steady retry. This keeps the common "Node starts, helper appears a
-  few seconds later" path responsive without polling a missing helper
-  aggressively for the whole session.
-
-Use case fixed:
+Use cases fixed by the completed steps:
 
 ```text
 Hub asks helper for descriptor metadata
@@ -506,8 +575,70 @@ Background collection subscribes to source metadata invalidations
   -> descriptor cache records the full catalog fingerprint
   -> source emits descriptorLoaded invalidation
   -> BackgroundMetricCollection full re-plans active subscriptions
-  -> helper-backed metrics move from pendingMetadata to helper-snapshot groups
+  -> helper-backed metrics move from pendingMetadata to descriptor-provided helper groups
 ```
+
+### Remaining Implementation Plan
+
+1. Replace the full-snapshot publish barrier with latest value cache publishing.
+   - It refreshes LHM values inside the helper process on its own schedule.
+   - `ReadCachedSnapshot(...)` reads that cache; it must not trigger
+     per-request LHM traversal.
+   - A successful group refresh publishes that group's values immediately.
+   - Slow GPU/storage/network refresh must not delay CPU group publication.
+   - Do not implement this as parallel per-group LHM update loops. LHM's
+     hardware object graph is source-owned and should be treated as serialized
+     unless a specific API is proven thread-safe. The first implementation
+     should use one refresh coordinator, one in-flight guard for LHM traversal,
+     and group-level cache publishes during the traversal.
+   - Remove any read-path gate that exists only because reads used to trigger or
+     wait for full traversal. Reads should filter immutable cached group values.
+   - Estimate: 260-520 C# LOC.
+
+2. Preserve batched IPC reads.
+   - Descriptor read returns descriptor snapshot plus fingerprint.
+   - Snapshot read accepts metric ids and returns a metric snapshot from the
+     helper latest value cache.
+   - The normal runtime path should send ids from one helper polling group.
+   - Subscribing to 1 LHM sensor and 100 LHM sensors should not become 100 IPC
+     messages when they share a helper polling group.
+   - Estimate: 40-120 C# LOC and 40-100 TypeScript LOC if the current IPC shape
+     remains sufficient.
+
+3. Choose one long-term descriptor preload path.
+   - Current implementation uses `listMetricDescriptors(...)`.
+   - Keep that path, or deliberately switch to a low-frequency
+     `readSnapshot(... includeDescriptors=true)` call.
+   - Do not leave `ReadMetricSnapshotResponse.descriptor_snapshot` permanently
+     unmapped if snapshot-read preload becomes the chosen path.
+   - Estimate: 0-80 TypeScript LOC depending on whether the path changes.
+
+4. Decide whether descriptor refresh after startup needs polling.
+   - Current implementation preloads descriptors and observes changed
+     fingerprints when descriptor reads happen later.
+   - It does not periodically poll descriptors for hardware hotplug.
+   - Add a low-frequency metadata refresh only after product need or logs show
+     hotplug descriptors do not recover through existing reads.
+   - Estimate: 60-160 TypeScript/C# LOC if added.
+
+5. Add latency verification.
+   - Compare Node CPU and helper CPU under the same stress window.
+   - Record helper group refresh duration, group publish age, IPC duration, and
+     `MetricStore` sample age separately.
+   - The expected post-change result is not "helper always beats Node"; it is
+     "CPU helper values are no longer delayed by unrelated helper hardware
+     groups."
+   - Estimate: 40-100 TypeScript/C# LOC if current diagnostic logs remain.
+
+Known limitation discovered during latency testing:
+
+- The current helper cache is still published as one full LHM snapshot after
+  the complete refresh finishes.
+- This can make a fast CPU update wait behind slower unrelated hardware before
+  Node can read it.
+- This does not match the final latest-value cache design. The next
+  implementation step is group-level latest value publishing, not source
+  priority special casing.
 
 Still pending:
 
@@ -516,6 +647,7 @@ Still pending:
   when a later descriptor read observes a changed fingerprint, but it does not
   poll descriptors periodically.
 - Capability filtering from helper descriptors.
+- Helper group-level latest value cache publication.
 
 ### Required Tests
 
@@ -523,7 +655,12 @@ Still pending:
   become helper-owned groups.
 - Node starts before helper: dynamic metrics start as unavailable/descriptor
   missing and later re-plan to helper-owned groups.
-- One LHM metric and 100 LHM metrics share one helper snapshot IPC.
+- One LHM metric and 100 LHM metrics in the same helper-declared polling group
+  share one helper IPC request.
+- CPU helper group publication is not delayed by a slow GPU/storage/network
+  helper group.
+- If a helper group refresh fails, other groups continue publishing fresh
+  values and the failed group's stale values age out through normal freshness.
 - Helper descriptor fingerprint unchanged: no runner churn.
 - Helper descriptor fingerprint changed: affected groups re-plan.
 - Hub never parses LHM path/id strings.
@@ -534,13 +671,18 @@ Still pending:
 
 | Alternative | Pros | Cons |
 | --- | --- | --- |
-| Helper descriptor preload + snapshot cache | Matches mature hardware monitor architecture; cheap batch reads; clean source ownership. | Requires helper contract and cache lifecycle. |
+| Helper descriptor preload + group-level latest value cache | Matches mature hardware monitor architecture; cheap batch reads; clean source ownership; slow groups do not block fast groups. | Requires helper contract, cache lifecycle, and helper-declared polling groups. |
+| One full helper snapshot cache | Simple to implement; one timestamp and one cache pointer. | Reject as steady-state design. It recreates a full-refresh publish barrier, so CPU can wait behind unrelated slow hardware. |
+| Parallel per-hardware LHM update loops | Looks like stronger isolation and could improve slow hardware tails. | Reject for the first implementation. LHM's object graph is source-owned and not documented here as safely refreshable in parallel. Use serialized LHM updates with group-level publish first. |
+| Per-metric IPC reads | Simple source request mapping. | Reject. Scales poorly and defeats helper-side cache. |
+| Per-metric timestamps in IPC values | Can represent mixed-group snapshots precisely. | Defer. It expands the wire contract and MetricStore ingest semantics. Prefer normal requests scoped to one helper polling group first. |
+| Vendor/model-specific source priority rules | Can optimize one measured machine. | Reject for this phase. It creates maintenance debt and should only follow broad theory plus repeated measurements. |
 | Hub parses LHM ids | Quick prototype. | Reject. Opaque ids must stay source-owned; path formats are not a Hub contract. |
-| Node sends one IPC per metric | Simple request mapping. | Reject. Scales poorly and defeats helper-side cache. |
 | Special Hub-side merging for unknown dynamic ids | Hides cold-start cost. | Reject. It creates a planner special case and weakens the descriptor contract. Wait for descriptors, render fallback/N/A, then re-plan. |
 
-Estimated total: 200-440 TypeScript LOC plus 400-840 C# LOC depending on how much
-descriptor/snapshot infrastructure already exists in the helper.
+Estimated remaining work: 120-280 TypeScript LOC plus 300-620 C# LOC depending
+on how much of the current snapshot cache can be reused as a group-level latest
+value cache.
 
 ## 3. Source Capability Filtering
 
@@ -824,7 +966,7 @@ Sequential work required for LHM/custom source scale:
 
 ```text
 1. Source descriptor/capability invalidation
-2. Helper descriptor preload + helper snapshot cache
+2. Helper descriptor preload + helper latest value cache
 3. Descriptor-driven source capability filtering
 ```
 

@@ -60,7 +60,11 @@ internal static class Program
                 .UseSerilog((_, _, loggerConfiguration) => ConfigureSerilog(loggerConfiguration, mode))
                 .ConfigureServices(services =>
                 {
-                    services.AddSingleton<LibreHardwareMonitorSession>();
+                    // TODO: Remove this temporary LHM latency diagnostic sink
+                    // once the helper publishes per-group cached values.
+                    services.AddSingleton<ILibreHardwareMonitorDiagnosticSink, LibreHardwareMonitorDiagnosticLogger>();
+                    services.AddSingleton(sp => new LibreHardwareMonitorSession(
+                        sp.GetRequiredService<ILibreHardwareMonitorDiagnosticSink>()));
                     services.AddSingleton<WindowsPipeSecurity>();
                     services.AddSingleton<WindowsPipeClientVerifier>();
                     services.AddSingleton<SourceIpcFrameCodec>();

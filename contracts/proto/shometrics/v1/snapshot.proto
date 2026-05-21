@@ -49,6 +49,9 @@ message MetricDescriptor {
   MetricValueKind value_kind = 8;
   MetricUnit unit = 9;
   MetricIdKind metric_id_kind = 10;
+
+  // Source-owned collector cost group. Consumers treat this as opaque.
+  string polling_group_id = 11;
 }
 
 enum MetricValueKind {
