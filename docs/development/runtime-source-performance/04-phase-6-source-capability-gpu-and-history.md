@@ -470,6 +470,14 @@ Completed in the Windows helper/service boundary:
 - Helper descriptor cache misses resolve to `pendingMetadata`, not `unknown`,
   so descriptor-backed helper metrics do not create isolated runners while the
   catalog is missing.
+- Hub `WindowsHelperSourceClient` preloads the full helper descriptor catalog
+  when source metadata invalidation listeners subscribe.
+- First descriptor load emits source metadata invalidation with a Hub
+  `planningFingerprint`; same-fingerprint reads do not emit; changed
+  fingerprints emit `descriptorChanged`.
+- Descriptor preload retries while metadata listeners are active and no
+  descriptor snapshot has loaded. Retry timers are unref'd so they do not keep
+  the plugin process alive.
 
 Use case fixed:
 
@@ -488,10 +496,21 @@ Hub starts before helper descriptor metadata is available
   -> cold start does not create one helper runner or IPC call per catalog metric
 ```
 
+```text
+Background collection subscribes to source metadata invalidations
+  -> Windows helper source preloads descriptors with listMetricDescriptors([])
+  -> descriptor cache records the full catalog fingerprint
+  -> source emits descriptorLoaded invalidation
+  -> BackgroundMetricCollection full re-plans active subscriptions
+  -> helper-backed metrics move from pendingMetadata to helper-snapshot groups
+```
+
 Still pending:
 
-- Helper descriptor fingerprint conversion into Hub `planningFingerprint`.
-- Helper descriptor load/change invalidation hook.
+- Helper-side or Hub-side catalog refresh trigger for hardware hotplug after
+  the initial descriptor preload. The current Hub emits `descriptorChanged`
+  when a later descriptor read observes a changed fingerprint, but it does not
+  poll descriptors periodically.
 - Capability filtering from helper descriptors.
 
 ### Required Tests

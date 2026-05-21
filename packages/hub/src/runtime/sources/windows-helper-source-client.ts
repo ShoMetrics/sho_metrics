@@ -1,6 +1,7 @@
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import { randomUUID } from "node:crypto";
 import { createConnection, type Socket } from "node:net";
+import { logger } from "../../logging/logger";
 import {
     GetSourceHealthRequestSchema,
     ListMetricDescriptorsRequestSchema,
@@ -28,8 +29,18 @@ import type {
     SourceWarning,
     MetricDescriptorSnapshot,
 } from "./source-client";
-import { WINDOWS_HELPER_SOURCE_ID } from "./source-ids";
+import type {
+    SourceMetadataInvalidation,
+    SourceMetadataInvalidationListener,
+    SourceMetadataInvalidationReason,
+} from "./source-planning-metadata";
+import {
+    LOCAL_SOURCE_SCOPE_ID,
+    WINDOWS_HELPER_SOURCE_ID,
+} from "./source-ids";
 import type { SourceMetricPollingGroupResolution } from "./source-polling-groups";
+
+const log = logger.for("Source:WindowsHelper");
 
 /** Named pipe path used by the Windows helper service. */
 export const DEFAULT_WINDOWS_HELPER_PIPE_PATH = "\\\\.\\pipe\\ShoMetrics.Source.Windows.v1";
@@ -57,11 +68,40 @@ const DEFAULT_HEALTH_TIMEOUT_MILLISECONDS = 750;
 const DEFAULT_READ_SNAPSHOT_TIMEOUT_MILLISECONDS = 2000;
 const DEFAULT_LIST_DESCRIPTORS_TIMEOUT_MILLISECONDS = 5000;
 
+/**
+ * Retries descriptor preload often enough to recover from Node-before-helper
+ * startup without waiting for the longer missing-pipe data-read cooldown.
+ * This timer is metadata-only and is active only while descriptor listeners
+ * exist and no descriptor snapshot has loaded yet.
+ */
+const DEFAULT_DESCRIPTOR_PRELOAD_RETRY_MILLISECONDS = 10000;
+
+/**
+ * Throttles repeated descriptor preload warnings to one supportable log per
+ * minute while the helper is starting, missing, or temporarily unavailable.
+ */
+const DESCRIPTOR_PRELOAD_WARNING_INTERVAL_MILLISECONDS = 60000;
+
 /** Timeout configuration for the Windows helper source client. */
 export interface WindowsHelperSourceTimeouts {
     readonly healthMilliseconds: number;
     readonly readSnapshotMilliseconds: number;
     readonly listDescriptorsMilliseconds: number;
+}
+
+/** Timer handle used by descriptor preload retry scheduling. */
+export interface WindowsHelperDescriptorPreloadTimerHandle {
+    /** Allows retry timers to avoid keeping the plugin process alive. */
+    unref?(): void;
+}
+
+/** Timer dependency for descriptor preload retry scheduling. */
+export interface WindowsHelperDescriptorPreloadTimer {
+    /** Schedules a retry after the configured delay. */
+    set(callback: () => void, delayMilliseconds: number): WindowsHelperDescriptorPreloadTimerHandle;
+
+    /** Clears a previously scheduled retry. */
+    clear(handle: WindowsHelperDescriptorPreloadTimerHandle): void;
 }
 
 /** Options passed to a source IPC transport request. */
@@ -89,6 +129,8 @@ export interface WindowsHelperSourceClientOptions {
     readonly requestIdFactory?: () => string;
     readonly now?: () => number;
     readonly timeouts?: Partial<WindowsHelperSourceTimeouts>;
+    readonly descriptorPreloadRetryMilliseconds?: number;
+    readonly descriptorPreloadTimer?: WindowsHelperDescriptorPreloadTimer;
 }
 
 /** Encodes one source IPC protobuf payload using uint32 little-endian framing. */
@@ -128,6 +170,8 @@ export class WindowsHelperSourceClient implements SourceClient {
     private readonly requestIdFactory: () => string;
     private readonly now: () => number;
     private readonly timeouts: WindowsHelperSourceTimeouts;
+    private readonly descriptorPreloadRetryMilliseconds: number;
+    private readonly descriptorPreloadTimer: WindowsHelperDescriptorPreloadTimer;
     private protocolCompatibility: "unknown" | "supported" = "unknown";
     private protocolCheckPromise: Promise<void> | undefined;
     private unsupportedProtocolRetryAfterMilliseconds = 0;
@@ -135,7 +179,11 @@ export class WindowsHelperSourceClient implements SourceClient {
     private helperUnavailableFailureCount = 0;
     private status: SourceClientStatus = { state: "unknown" };
     private descriptorFingerprint: string | undefined;
+    private hasDescriptorSnapshot = false;
+    private descriptorPreloadPromise: Promise<void> | undefined;
+    private descriptorPreloadRetryTimer: WindowsHelperDescriptorPreloadTimerHandle | undefined;
     private readonly descriptorsByMetricId = new Map<string, MetricDescriptor>();
+    private readonly sourceMetadataInvalidationListeners = new Set<SourceMetadataInvalidationListener>();
 
     constructor(options: WindowsHelperSourceClientOptions = {}) {
         this.pipePath = options.pipePath ?? DEFAULT_WINDOWS_HELPER_PIPE_PATH;
@@ -150,6 +198,9 @@ export class WindowsHelperSourceClient implements SourceClient {
             listDescriptorsMilliseconds: options.timeouts?.listDescriptorsMilliseconds
                 ?? DEFAULT_LIST_DESCRIPTORS_TIMEOUT_MILLISECONDS,
         };
+        this.descriptorPreloadRetryMilliseconds = options.descriptorPreloadRetryMilliseconds
+            ?? DEFAULT_DESCRIPTOR_PRELOAD_RETRY_MILLISECONDS;
+        this.descriptorPreloadTimer = options.descriptorPreloadTimer ?? nodeDescriptorPreloadTimer;
     }
 
     async readSnapshot(metricKeys: readonly string[]): Promise<MetricSnapshot> {
@@ -203,6 +254,28 @@ export class WindowsHelperSourceClient implements SourceClient {
     async listMetricDescriptors(metricKeys: readonly string[]): Promise<MetricDescriptorSnapshot> {
         await this.ensureProtocolSupported();
 
+        return await this.readMetricDescriptors(metricKeys);
+    }
+
+    subscribeSourceMetadataInvalidations(listener: SourceMetadataInvalidationListener): () => void {
+        this.sourceMetadataInvalidationListeners.add(listener);
+
+        if (this.hasDescriptorSnapshot && this.descriptorFingerprint !== undefined) {
+            listener(this.buildSourceMetadataInvalidation("descriptorLoaded"));
+        } else {
+            this.startDescriptorPreload();
+        }
+
+        return () => {
+            this.sourceMetadataInvalidationListeners.delete(listener);
+
+            if (this.sourceMetadataInvalidationListeners.size === 0) {
+                this.clearDescriptorPreloadRetry();
+            }
+        };
+    }
+
+    private async readMetricDescriptors(metricKeys: readonly string[]): Promise<MetricDescriptorSnapshot> {
         let response: SourceIpcResponse;
         try {
             response = await this.sendSourceIpcRequest({
@@ -231,7 +304,10 @@ export class WindowsHelperSourceClient implements SourceClient {
             descriptors: descriptorSnapshot.descriptors.map(toRuntimeMetricDescriptor),
             descriptorFingerprint: descriptorSnapshot.descriptorFingerprint,
         };
-        this.recordDescriptorSnapshot(runtimeDescriptorSnapshot);
+        const invalidationReason = this.recordDescriptorSnapshot(runtimeDescriptorSnapshot);
+        if (invalidationReason) {
+            this.publishSourceMetadataInvalidation(invalidationReason);
+        }
 
         return runtimeDescriptorSnapshot;
     }
@@ -268,6 +344,62 @@ export class WindowsHelperSourceClient implements SourceClient {
         return toRuntimeSourceHealth(response.payload.value);
     }
 
+    private startDescriptorPreload(): void {
+        if (this.descriptorPreloadPromise) {
+            return;
+        }
+
+        this.clearDescriptorPreloadRetry();
+
+        this.descriptorPreloadPromise = this.preloadDescriptorMetadata()
+            .finally(() => {
+                this.descriptorPreloadPromise = undefined;
+
+                if (!this.hasDescriptorSnapshot && this.sourceMetadataInvalidationListeners.size > 0) {
+                    this.scheduleDescriptorPreloadRetry();
+                }
+            });
+    }
+
+    private async preloadDescriptorMetadata(): Promise<void> {
+        try {
+            await this.readAndValidateHealth();
+            await this.readMetricDescriptors([]);
+        } catch (error) {
+            log.atWarn()
+                .everyMs(
+                    "descriptor-preload-failed",
+                    DESCRIPTOR_PRELOAD_WARNING_INTERVAL_MILLISECONDS,
+                )
+                .log(() => [
+                    "Descriptor preload failed",
+                    `retryMs=${this.descriptorPreloadRetryMilliseconds}`,
+                    `error=${String(error)}`,
+                ].join(" "));
+        }
+    }
+
+    private scheduleDescriptorPreloadRetry(): void {
+        if (this.descriptorPreloadRetryTimer) {
+            return;
+        }
+
+        this.descriptorPreloadRetryTimer = this.descriptorPreloadTimer.set(() => {
+            this.descriptorPreloadRetryTimer = undefined;
+            this.startDescriptorPreload();
+        }, this.descriptorPreloadRetryMilliseconds);
+        this.descriptorPreloadRetryTimer.unref?.();
+    }
+
+    private clearDescriptorPreloadRetry(): void {
+        if (!this.descriptorPreloadRetryTimer) {
+            return;
+        }
+
+        this.descriptorPreloadTimer.clear(this.descriptorPreloadRetryTimer);
+        this.descriptorPreloadRetryTimer = undefined;
+    }
+
     /**
      * Resolves helper metrics only from the cached descriptor catalog.
      *
@@ -296,7 +428,13 @@ export class WindowsHelperSourceClient implements SourceClient {
      * changed-fingerprint responses clear old descriptors before adding the
      * filtered response.
      */
-    private recordDescriptorSnapshot(descriptorSnapshot: MetricDescriptorSnapshot): void {
+    private recordDescriptorSnapshot(
+        descriptorSnapshot: MetricDescriptorSnapshot,
+    ): SourceMetadataInvalidationReason | undefined {
+        const previousDescriptorFingerprint = this.descriptorFingerprint;
+
+        this.hasDescriptorSnapshot = true;
+
         if (this.descriptorFingerprint !== descriptorSnapshot.descriptorFingerprint) {
             this.descriptorFingerprint = descriptorSnapshot.descriptorFingerprint;
             this.descriptorsByMetricId.clear();
@@ -305,9 +443,19 @@ export class WindowsHelperSourceClient implements SourceClient {
         for (const descriptor of descriptorSnapshot.descriptors) {
             this.descriptorsByMetricId.set(descriptor.metricId, descriptor);
         }
+
+        if (previousDescriptorFingerprint === descriptorSnapshot.descriptorFingerprint) {
+            return undefined;
+        }
+
+        return previousDescriptorFingerprint === undefined
+            ? "descriptorLoaded"
+            : "descriptorChanged";
     }
 
     dispose(): void {
+        this.clearDescriptorPreloadRetry();
+        this.sourceMetadataInvalidationListeners.clear();
         this.transport.dispose?.();
     }
 
@@ -444,7 +592,41 @@ export class WindowsHelperSourceClient implements SourceClient {
 
         return selectHelperUnavailableRetryCooldownMilliseconds(this.helperUnavailableFailureCount);
     }
+
+    private publishSourceMetadataInvalidation(reason: SourceMetadataInvalidationReason): void {
+        if (this.sourceMetadataInvalidationListeners.size === 0) {
+            return;
+        }
+
+        const invalidation = this.buildSourceMetadataInvalidation(reason);
+
+        for (const listener of this.sourceMetadataInvalidationListeners) {
+            listener(invalidation);
+        }
+    }
+
+    private buildSourceMetadataInvalidation(
+        reason: SourceMetadataInvalidationReason,
+    ): SourceMetadataInvalidation {
+        return {
+            sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
+            sourceProfileId: this.sourceId,
+            planningFingerprint: buildWindowsHelperPlanningFingerprint(this.descriptorFingerprint ?? ""),
+            reason,
+        };
+    }
 }
+
+function buildWindowsHelperPlanningFingerprint(descriptorFingerprint: string): string {
+    return `windows-helper-descriptor:${descriptorFingerprint}`;
+}
+
+const nodeDescriptorPreloadTimer: WindowsHelperDescriptorPreloadTimer = {
+    set: (callback, delayMilliseconds) => setTimeout(callback, delayMilliseconds),
+    clear: handle => {
+        clearTimeout(handle as ReturnType<typeof setTimeout>);
+    },
+};
 
 function selectHelperUnavailableRetryCooldownMilliseconds(failureCount: number): number {
     const maximumBackoffMilliseconds = HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS[2];

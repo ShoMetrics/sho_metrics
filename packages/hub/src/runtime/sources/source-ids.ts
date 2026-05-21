@@ -4,6 +4,9 @@ export const NODE_SYSTEM_SOURCE_ID = "node-system";
 /** Source id for the installed Windows helper source. */
 export const WINDOWS_HELPER_SOURCE_ID = "windows-helper";
 
+/** Source scope used for telemetry collected from the current machine. */
+export const LOCAL_SOURCE_SCOPE_ID = "local";
+
 /** Reserved source profile id for the best available local source chain. */
 export const BUILT_IN_LOCAL_AUTO_SOURCE_PROFILE_ID = "local:auto";
 
