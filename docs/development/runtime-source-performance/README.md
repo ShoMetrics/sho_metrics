@@ -5,6 +5,7 @@ Read these documents in order:
 1. [Phases 1-4 Baseline And Measurement](01-phases-1-4-baseline-and-measurement.md)
 2. [Phase 5a/5b Scheduler And Source Grouping](02-phase-5ab-scheduler-and-source-grouping.md)
 3. [Phase 5c Demand-Driven Background Collection](03-phase-5c-demand-driven-background-collection.md)
+4. [Phase 6 Source Capability, GPU, And History](04-phase-6-source-capability-gpu-and-history.md)
 
 ## Current State
 
@@ -33,6 +34,7 @@ that only made sense during the original investigation.
 | `01-phases-1-4-baseline-and-measurement.md` | Product priorities, perf gates, measurement protocol, historical latency data, and completed cleanup work. | You need to know why this effort exists and what data justified it. |
 | `02-phase-5ab-scheduler-and-source-grouping.md` | Historical Phase 5a/5b design: scheduler grouping, source-declared polling groups, profile isolation, LHM/custom source scale rules. | You need the rationale for source-owned polling groups or the pre-5c scheduler migration. |
 | `03-phase-5c-demand-driven-background-collection.md` | Current runtime collection architecture: metric subscriptions, collector group planning, background runners, render cadence, fallback composition, rejected ideas, and Phase 5c invariants. | You are about to change runtime polling, MetricStore writes, source subscriptions, fallback composition, or render timing. |
+| `04-phase-6-source-capability-gpu-and-history.md` | Phase 6 design notes for descriptor/capability invalidation, LHM helper snapshot caching, GPU process churn, source capability filtering, and history retention. | You are about to add LHM/custom descriptors, source capability filtering, GPU telemetry changes, or retention policy. |
 
 ## Non-Negotiable Priorities
 
