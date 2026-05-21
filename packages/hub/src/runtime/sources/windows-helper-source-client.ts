@@ -69,10 +69,21 @@ const DEFAULT_READ_SNAPSHOT_TIMEOUT_MILLISECONDS = 2000;
 const DEFAULT_LIST_DESCRIPTORS_TIMEOUT_MILLISECONDS = 5000;
 
 /**
- * Retries descriptor preload often enough to recover from Node-before-helper
- * startup without waiting for the longer missing-pipe data-read cooldown.
- * This timer is metadata-only and is active only while descriptor listeners
- * exist and no descriptor snapshot has loaded yet.
+ * Startup retry interval for descriptor preload. This closes the common
+ * Node-before-helper race without waiting for the steady retry interval.
+ */
+const DESCRIPTOR_PRELOAD_STARTUP_RETRY_MILLISECONDS = 2000;
+
+/**
+ * Startup window for fast descriptor preload retries. After this window, a
+ * missing helper is no longer treated as a startup race and retries slow down.
+ */
+const DESCRIPTOR_PRELOAD_STARTUP_RETRY_WINDOW_MILLISECONDS = 60000;
+
+/**
+ * Steady descriptor preload retry interval after the startup window has passed.
+ * This timer is metadata-only and runs only while descriptor listeners exist
+ * and no descriptor snapshot has loaded yet.
  */
 const DEFAULT_DESCRIPTOR_PRELOAD_RETRY_MILLISECONDS = 10000;
 
@@ -180,6 +191,7 @@ export class WindowsHelperSourceClient implements SourceClient {
     private status: SourceClientStatus = { state: "unknown" };
     private descriptorFingerprint: string | undefined;
     private hasDescriptorSnapshot = false;
+    private descriptorPreloadStartedAtTimestampMilliseconds: number | undefined;
     private descriptorPreloadPromise: Promise<void> | undefined;
     private descriptorPreloadRetryTimer: WindowsHelperDescriptorPreloadTimerHandle | undefined;
     private readonly descriptorsByMetricId = new Map<string, MetricDescriptor>();
@@ -271,6 +283,7 @@ export class WindowsHelperSourceClient implements SourceClient {
 
             if (this.sourceMetadataInvalidationListeners.size === 0) {
                 this.clearDescriptorPreloadRetry();
+                this.descriptorPreloadStartedAtTimestampMilliseconds = undefined;
             }
         };
     }
@@ -349,6 +362,7 @@ export class WindowsHelperSourceClient implements SourceClient {
             return;
         }
 
+        this.descriptorPreloadStartedAtTimestampMilliseconds ??= this.now();
         this.clearDescriptorPreloadRetry();
 
         this.descriptorPreloadPromise = this.preloadDescriptorMetadata()
@@ -366,6 +380,8 @@ export class WindowsHelperSourceClient implements SourceClient {
             await this.readAndValidateHealth();
             await this.readMetricDescriptors([]);
         } catch (error) {
+            const retryMilliseconds = this.selectDescriptorPreloadRetryMilliseconds();
+
             log.atWarn()
                 .everyMs(
                     "descriptor-preload-failed",
@@ -373,7 +389,7 @@ export class WindowsHelperSourceClient implements SourceClient {
                 )
                 .log(() => [
                     "Descriptor preload failed",
-                    `retryMs=${this.descriptorPreloadRetryMilliseconds}`,
+                    `retryMs=${retryMilliseconds}`,
                     `error=${String(error)}`,
                 ].join(" "));
         }
@@ -384,11 +400,28 @@ export class WindowsHelperSourceClient implements SourceClient {
             return;
         }
 
+        const retryMilliseconds = this.selectDescriptorPreloadRetryMilliseconds();
+
         this.descriptorPreloadRetryTimer = this.descriptorPreloadTimer.set(() => {
             this.descriptorPreloadRetryTimer = undefined;
             this.startDescriptorPreload();
-        }, this.descriptorPreloadRetryMilliseconds);
+        }, retryMilliseconds);
         this.descriptorPreloadRetryTimer.unref?.();
+    }
+
+    private selectDescriptorPreloadRetryMilliseconds(): number {
+        const descriptorPreloadStartedAtTimestampMilliseconds = this.descriptorPreloadStartedAtTimestampMilliseconds;
+
+        if (
+            descriptorPreloadStartedAtTimestampMilliseconds !== undefined
+            && (
+                this.now() - descriptorPreloadStartedAtTimestampMilliseconds
+            ) < DESCRIPTOR_PRELOAD_STARTUP_RETRY_WINDOW_MILLISECONDS
+        ) {
+            return DESCRIPTOR_PRELOAD_STARTUP_RETRY_MILLISECONDS;
+        }
+
+        return this.descriptorPreloadRetryMilliseconds;
     }
 
     private clearDescriptorPreloadRetry(): void {
@@ -434,6 +467,7 @@ export class WindowsHelperSourceClient implements SourceClient {
         const previousDescriptorFingerprint = this.descriptorFingerprint;
 
         this.hasDescriptorSnapshot = true;
+        this.descriptorPreloadStartedAtTimestampMilliseconds = undefined;
 
         if (this.descriptorFingerprint !== descriptorSnapshot.descriptorFingerprint) {
             this.descriptorFingerprint = descriptorSnapshot.descriptorFingerprint;
@@ -455,6 +489,7 @@ export class WindowsHelperSourceClient implements SourceClient {
 
     dispose(): void {
         this.clearDescriptorPreloadRetry();
+        this.descriptorPreloadStartedAtTimestampMilliseconds = undefined;
         this.sourceMetadataInvalidationListeners.clear();
         this.transport.dispose?.();
     }
