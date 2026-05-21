@@ -478,6 +478,10 @@ Completed in the Windows helper/service boundary:
 - Descriptor preload retries while metadata listeners are active and no
   descriptor snapshot has loaded. Retry timers are unref'd so they do not keep
   the plugin process alive.
+- Descriptor preload uses a short startup retry window before falling back to
+  the slower steady retry. This keeps the common "Node starts, helper appears a
+  few seconds later" path responsive without polling a missing helper
+  aggressively for the whole session.
 
 Use case fixed:
 

@@ -280,6 +280,37 @@ test("windows helper retries descriptor preload after failure and emits descript
     unsubscribe();
 });
 
+test("windows helper uses fast descriptor preload retry only during startup window", async () => {
+    let currentTimestampMilliseconds = 1000;
+    const retryTimer = new FakeDescriptorPreloadTimer();
+    const transport = new FakeWindowsHelperPipeTransport(request => {
+        switch (request.payload.case) {
+            case "getSourceHealth":
+                throw new Error("helper unavailable");
+            default:
+                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport, {}, {
+        descriptorPreloadRetryMilliseconds: 25_000,
+        descriptorPreloadTimer: retryTimer,
+        now: () => currentTimestampMilliseconds,
+    });
+
+    const unsubscribe = client.subscribeSourceMetadataInvalidations(() => undefined);
+    await drainAsyncOperations();
+
+    assert.equal(retryTimer.activeDelayMilliseconds(), 2000);
+
+    currentTimestampMilliseconds += 60_001;
+    retryTimer.runNext();
+    await drainAsyncOperations();
+
+    assert.equal(retryTimer.activeDelayMilliseconds(), 25_000);
+
+    unsubscribe();
+});
+
 test("windows helper dispose stops descriptor preload retry timer", async () => {
     const retryTimer = new FakeDescriptorPreloadTimer();
     const transport = new FakeWindowsHelperPipeTransport(request => {
@@ -762,7 +793,7 @@ function createClient(
     timeouts: WindowsHelperSourceClientOptions["timeouts"] = {},
     options: Pick<
         WindowsHelperSourceClientOptions,
-        "descriptorPreloadRetryMilliseconds" | "descriptorPreloadTimer"
+        "descriptorPreloadRetryMilliseconds" | "descriptorPreloadTimer" | "now"
     > = {},
 ): WindowsHelperSourceClient {
     return new WindowsHelperSourceClient({
@@ -895,6 +926,10 @@ class FakeDescriptorPreloadTimer implements WindowsHelperDescriptorPreloadTimer 
 
     activeHandleCount(): number {
         return this.handles.filter(handle => handle.isActive).length;
+    }
+
+    activeDelayMilliseconds(): number | undefined {
+        return this.handles.find(handle => handle.isActive)?.delayMilliseconds;
     }
 }
 
