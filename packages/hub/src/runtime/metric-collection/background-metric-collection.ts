@@ -17,6 +17,11 @@ import {
     MetricSubscriptionRegistry,
     type RegisterMetricSubscriptionsOptions,
 } from "./metric-subscription-registry";
+import {
+    SourcePlanningMetadataRegistry,
+    sourcePlanningMetadataRegistry,
+    type SourceMetadataInvalidation,
+} from "./source-planning-metadata-registry";
 
 const log = logger.for("BackgroundMetricCollection");
 const BACKOFF_RETRY_MILLISECONDS = 2000;
@@ -25,6 +30,7 @@ interface BackgroundMetricCollectionOptions {
     readonly subscriptionRegistry: MetricSubscriptionRegistry;
     readonly collectorGroupPlanner: CollectorGroupPlanner;
     readonly collectorGroupSupervisor: CollectorGroupSupervisor;
+    readonly sourceMetadataRegistry: SourcePlanningMetadataRegistry;
     readonly sourceRegistry: SourceRegistry;
 }
 
@@ -39,12 +45,14 @@ export class BackgroundMetricCollection {
     private readonly subscriptionRegistry: MetricSubscriptionRegistry;
     private readonly collectorGroupPlanner: CollectorGroupPlanner;
     private readonly collectorGroupSupervisor: CollectorGroupSupervisor;
+    private readonly sourceMetadataRegistry: SourcePlanningMetadataRegistry;
     private readonly sourceRegistry: SourceRegistry;
 
     constructor(options: BackgroundMetricCollectionOptions) {
         this.subscriptionRegistry = options.subscriptionRegistry;
         this.collectorGroupPlanner = options.collectorGroupPlanner;
         this.collectorGroupSupervisor = options.collectorGroupSupervisor;
+        this.sourceMetadataRegistry = options.sourceMetadataRegistry;
         this.sourceRegistry = options.sourceRegistry;
     }
 
@@ -62,6 +70,39 @@ export class BackgroundMetricCollection {
             this.subscriptionRegistry.unregister(options.subscriberId);
             this.reconcileCollectorGroups();
         };
+    }
+
+    /**
+     * Reconciles collector groups after source planning metadata changes.
+     *
+     * This is a thin composition-root entry point. It records the fingerprint,
+     * invalidates cached plans, and reconciles active subscriptions. Source
+     * health, connection recovery, descriptor parsing, and fallback remain
+     * owned by their existing data-plane boundaries.
+     */
+    notifySourceMetadataChanged(invalidation: SourceMetadataInvalidation): boolean {
+        if (!this.sourceMetadataRegistry.recordInvalidation(invalidation)) {
+            log.debug(() => [
+                "sourceMetadataUnchanged",
+                `sourceScopeId=${invalidation.sourceScopeId}`,
+                `sourceProfileId=${invalidation.sourceProfileId}`,
+                `reason=${invalidation.reason}`,
+            ].join(" "));
+            return false;
+        }
+
+        const planningVersion = this.subscriptionRegistry.invalidatePlans();
+
+        log.debug(() => [
+            "sourceMetadataChanged",
+            `sourceScopeId=${invalidation.sourceScopeId}`,
+            `sourceProfileId=${invalidation.sourceProfileId}`,
+            `reason=${invalidation.reason}`,
+            `planningVersion=${planningVersion}`,
+        ].join(" "));
+
+        this.reconcileCollectorGroups();
+        return true;
     }
 
     /**
@@ -142,5 +183,6 @@ export const backgroundMetricCollection = new BackgroundMetricCollection({
         snapshotStore: metricStore,
         createBackoffPolicy: () => BackoffPolicy.flat(Date.now, BACKOFF_RETRY_MILLISECONDS),
     }),
+    sourceMetadataRegistry: sourcePlanningMetadataRegistry,
     sourceRegistry: backgroundSourceRegistry,
 });
