@@ -231,6 +231,52 @@ interface SourceMetadataInvalidation {
 Total estimate: 340-660 TypeScript LOC, plus helper descriptor event support if
 the source is the Windows helper.
 
+### Current Implementation Status
+
+Completed in Hub:
+
+- Source planning metadata fingerprints are stored by
+  `(sourceScopeId, sourceProfileId)`.
+- `BackgroundMetricCollection.notifySourceMetadataChanged(...)` records the
+  fingerprint, invalidates active plans only when the fingerprint changes, and
+  runs the existing full collector-group reconcile.
+- `SourceRegistry` forwards source-owned metadata invalidations from registered
+  source clients to background collection.
+- Same-fingerprint reconnects are idempotent and do not restart collector
+  groups.
+- Changed planning fingerprints can re-plan already-active subscriptions and
+  start a new collector group when the source-declared group identity changes.
+
+Use case fixed:
+
+```text
+Action appears before source metadata is ready
+  -> action registers subscriptions
+  -> initial plan uses the best available source metadata
+  -> source descriptor/capability metadata loads or changes later
+  -> active subscriptions re-plan without requiring action reopen/settings churn
+```
+
+This also covers source profile metadata changes that keep the same profile id
+but produce different planning assumptions, such as a changed custom endpoint,
+descriptor endpoint, auth scope, or helper descriptor fingerprint.
+
+Still blocked on helper/custom descriptor implementation:
+
+- Descriptor load after action subscription turning descriptor-backed no-data
+  state into helper-owned groups.
+- 100 descriptor-backed metrics before descriptor load creating zero helper
+  runners, then re-planning into helper-owned groups after descriptor load.
+- Helper disconnect alone not emitting metadata invalidation.
+- Offline/loading helper never reporting `unsupported`.
+- Concurrent descriptor refresh serialization inside a real source client.
+- Broken helper pipe recovering through data-plane retry/backoff without using
+  metadata invalidation as a socket reset signal.
+
+Do not fake these with Hub-only tests. They require the helper/custom source to
+own descriptor readiness, descriptor fingerprints, and source-client publish
+serialization first.
+
 ### Data-Plane Connection Recovery Invariant
 
 Same-fingerprint reconnects are intentionally control-plane no-ops. Therefore

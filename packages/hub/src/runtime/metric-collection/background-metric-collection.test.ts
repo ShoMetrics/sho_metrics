@@ -12,8 +12,12 @@ import { MetricSubscriptionRegistry } from "./metric-subscription-registry";
 import { SourcePlanningMetadataRegistry } from "./source-planning-metadata-registry";
 
 type BuildBackgroundMetricCollectionOptions =
-    | { readonly sourceClients: readonly SourceClient[]; readonly sourceRegistry?: never }
-    | { readonly sourceRegistry: FakeSourceRegistry; readonly sourceClients?: never };
+    (
+        | { readonly sourceClients: readonly SourceClient[]; readonly sourceRegistry?: never }
+        | { readonly sourceRegistry: FakeSourceRegistry; readonly sourceClients?: never }
+    ) & {
+        readonly timer?: FakeTimer;
+    };
 
 test("source metadata invalidation increments planning version only when fingerprint changes", () => {
     const subscriptionRegistry = new MetricSubscriptionRegistry();
@@ -145,12 +149,90 @@ test("source registry metadata hook re-plans current subscriptions", () => {
     assert.equal(sourceClient.resolveMetricPollingGroupsCallCount, 2);
 });
 
+test("same source metadata fingerprint does not restart collector groups", () => {
+    const subscriptionRegistry = new MetricSubscriptionRegistry();
+    const timer = new FakeTimer();
+    const sourceClient = new FakeSourceClient("node-system", () => ({
+        state: "owned",
+        pollingGroupId: "system",
+    }));
+    const collection = buildBackgroundMetricCollection(subscriptionRegistry, {
+        sourceClients: [sourceClient],
+        timer,
+    });
+
+    collection.registerSubscriptions({
+        subscriberId: "action-1",
+        subscriptions: [{
+            subscriberId: "action-1",
+            metricKey: "cpu.usage_percent",
+            sourceScopeId: "local",
+            sourceCandidates: [{ sourceId: "node-system" }],
+            failureMode: "fallback",
+            intervalMilliseconds: 1000,
+        }],
+    });
+    assert.deepEqual(timer.recordedDelaysMilliseconds, [0]);
+
+    assert.equal(collection.notifySourceMetadataChanged({
+        sourceScopeId: "local",
+        sourceProfileId: "node-system",
+        planningFingerprint: "fingerprint-1",
+        reason: "descriptorLoaded",
+    }), true);
+    assert.deepEqual(timer.recordedDelaysMilliseconds, [0]);
+
+    assert.equal(collection.notifySourceMetadataChanged({
+        sourceScopeId: "local",
+        sourceProfileId: "node-system",
+        planningFingerprint: "fingerprint-1",
+        reason: "descriptorChanged",
+    }), false);
+    assert.deepEqual(timer.recordedDelaysMilliseconds, [0]);
+});
+
+test("changed source profile planning fingerprint restarts changed collector groups", () => {
+    const subscriptionRegistry = new MetricSubscriptionRegistry();
+    const timer = new FakeTimer();
+    let pollingGroupId = "system-v1";
+    const sourceClient = new FakeSourceClient("node-system", () => ({
+        state: "owned",
+        pollingGroupId,
+    }));
+    const collection = buildBackgroundMetricCollection(subscriptionRegistry, {
+        sourceClients: [sourceClient],
+        timer,
+    });
+
+    collection.registerSubscriptions({
+        subscriberId: "action-1",
+        subscriptions: [{
+            subscriberId: "action-1",
+            metricKey: "cpu.usage_percent",
+            sourceScopeId: "local",
+            sourceCandidates: [{ sourceId: "node-system" }],
+            failureMode: "fallback",
+            intervalMilliseconds: 1000,
+        }],
+    });
+
+    pollingGroupId = "system-v2";
+    assert.equal(collection.notifySourceMetadataChanged({
+        sourceScopeId: "local",
+        sourceProfileId: "node-system",
+        planningFingerprint: "profile-fingerprint-v2",
+        reason: "sourceProfileChanged",
+    }), true);
+
+    assert.deepEqual(timer.recordedDelaysMilliseconds, [0, 0]);
+});
+
 function buildBackgroundMetricCollection(
     subscriptionRegistry: MetricSubscriptionRegistry,
     options?: BuildBackgroundMetricCollectionOptions,
 ): BackgroundMetricCollection {
     const sourceRegistry = options?.sourceRegistry ?? new FakeSourceRegistry(options?.sourceClients ?? []);
-    const timer = new FakeTimer();
+    const timer = options?.timer ?? new FakeTimer();
 
     return new BackgroundMetricCollection({
         subscriptionRegistry,
@@ -223,11 +305,23 @@ class FakeSourceClient implements SourceClient {
 }
 
 class FakeTimer {
-    set(): unknown {
-        return {};
+    readonly recordedDelaysMilliseconds: number[] = [];
+
+    set(callback: () => void, delayMilliseconds: number): unknown {
+        const handle = {
+            active: true,
+            callback,
+        };
+        this.recordedDelaysMilliseconds.push(delayMilliseconds);
+        return handle;
     }
 
-    clear(): void {
-        // Nothing to clear in tests.
+    clear(handle: unknown): void {
+        (handle as FakeTimerHandle).active = false;
     }
+}
+
+interface FakeTimerHandle {
+    active: boolean;
+    callback(): void;
 }
