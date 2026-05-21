@@ -14,6 +14,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
     private readonly Computer? _computer;
     private readonly HardwareMetricDescriptorSnapshot _cachedDescriptorSnapshot;
     private readonly SemaphoreSlim _readGate = new(1, 1);
+    private MetricSnapshot _latestSnapshot;
     private bool _isDisposed;
 
     public LibreHardwareMonitorSession()
@@ -57,22 +58,53 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             warnings.Select(warning => warning.Message).ToList());
         InitializationWarnings = warnings;
         _cachedDescriptorSnapshot = cachedDescriptorSnapshot;
+        _latestSnapshot = BuildUnavailableSnapshot();
     }
 
     public bool IsAvailable => _computer is not null;
 
     public IReadOnlyList<HardwareSourceWarning> InitializationWarnings { get; }
 
-    public async Task<MetricSnapshot> ReadSnapshotAsync(
+    /// <summary>
+    /// Reads the latest cached metric snapshot, filtered to requested metric ids.
+    /// </summary>
+    /// <remarks>
+    /// This method does not traverse LibreHardwareMonitor hardware. Call
+    /// <see cref="RefreshSnapshotAsync" /> from the helper background refresh
+    /// loop to update the cache. The method keeps the Async suffix because it is
+    /// the async-shaped source contract even though cache reads usually complete
+    /// synchronously.
+    ///
+    /// A service client can read before the background refresh loop completes
+    /// its first pass. In that startup race, this returns the initial
+    /// unavailable snapshot and the next background refresh replaces it.
+    /// </remarks>
+    public Task<MetricSnapshot> ReadSnapshotAsync(
         IReadOnlyCollection<string> metricIds,
         CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_isDisposed, this);
         cancellationToken.ThrowIfCancellationRequested();
 
+        return Task.FromResult(FilterSnapshot(Volatile.Read(ref _latestSnapshot), BuildRequestedMetricSet(metricIds)));
+    }
+
+    /// <summary>
+    /// Refreshes the cached snapshot by traversing LibreHardwareMonitor once.
+    /// </summary>
+    public async Task RefreshSnapshotAsync(CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (_computer is null)
         {
-            return BuildUnavailableSnapshot();
+            // LHM-unavailable refreshes intentionally stamp a fresh timestamp.
+            // This allocates once per refresh while unavailable, which is tiny
+            // compared with the normal LHM traversal path and keeps source
+            // health observable through the latest cached snapshot.
+            Volatile.Write(ref _latestSnapshot, BuildUnavailableSnapshot());
+            return;
         }
 
         await _readGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -83,7 +115,6 @@ public sealed class LibreHardwareMonitorSession : IDisposable
 
             Dictionary<string, MetricReading> readingsByMetricId = new(StringComparer.Ordinal);
             List<string> warnings = [];
-            HashSet<string>? requestedMetricIds = BuildRequestedMetricSet(metricIds);
 
             foreach (IHardware hardware in _computer.Hardware)
             {
@@ -92,19 +123,16 @@ public sealed class LibreHardwareMonitorSession : IDisposable
 
             AddDerivedReadings(readingsByMetricId);
 
-            List<MetricReading> readings = FilterReadings(readingsByMetricId, requestedMetricIds);
+            List<MetricReading> readings = FilterReadings(readingsByMetricId, requestedMetricIds: null);
+            AddMissingMetricWarnings(readings, warnings);
 
-            if (metricIds.Count == 0)
-            {
-                AddMissingMetricWarnings(readings, warnings);
-            }
-
-            return new MetricSnapshot
+            MetricSnapshot snapshot = new()
             {
                 CapturedAt = DateTimeOffset.UtcNow,
                 Readings = readings,
                 Warnings = warnings,
             };
+            Volatile.Write(ref _latestSnapshot, snapshot);
         }
         finally
         {
@@ -346,6 +374,23 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             .Where(reading => !LibreHardwareMetricCatalog.IsInternalMetricId(reading.MetricId)
                 && IsRequestedMetric(requestedMetricIds, reading.MetricId))
             .ToList();
+    }
+
+    private static MetricSnapshot FilterSnapshot(
+        MetricSnapshot snapshot,
+        HashSet<string>? requestedMetricIds)
+    {
+        if (requestedMetricIds is null)
+        {
+            return snapshot;
+        }
+
+        return snapshot with
+        {
+            Readings = snapshot.Readings
+                .Where(reading => requestedMetricIds.Contains(reading.MetricId))
+                .ToList(),
+        };
     }
 
     private static List<HardwareMetricDescriptor> FilterDescriptors(

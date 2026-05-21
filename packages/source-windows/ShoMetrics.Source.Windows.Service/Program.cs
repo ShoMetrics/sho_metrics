@@ -67,6 +67,7 @@ internal static class Program
                     services.AddSingleton<SourceProtocolMapper>();
                     services.AddSingleton<SourceRequestHandler>();
                     services.AddSingleton<WindowsPipeSourceServer>();
+                    services.AddHostedService<WindowsMetricSnapshotWorker>();
                     services.AddHostedService<WindowsSourceWorker>();
                 })
                 .Build();
