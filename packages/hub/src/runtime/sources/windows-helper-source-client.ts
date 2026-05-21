@@ -26,6 +26,7 @@ import type {
     SourceClientStatus,
     SourceClientStatusReason,
     SourceWarning,
+    MetricDescriptorSnapshot,
 } from "./source-client";
 import { WINDOWS_HELPER_SOURCE_ID } from "./source-ids";
 import type { SourceMetricPollingGroupResolution } from "./source-polling-groups";
@@ -203,7 +204,7 @@ export class WindowsHelperSourceClient implements SourceClient {
         ]));
     }
 
-    async listMetricDescriptors(metricKeys: readonly string[]): Promise<readonly MetricDescriptor[]> {
+    async listMetricDescriptors(metricKeys: readonly string[]): Promise<MetricDescriptorSnapshot> {
         await this.ensureProtocolSupported();
 
         let response: SourceIpcResponse;
@@ -223,9 +224,17 @@ export class WindowsHelperSourceClient implements SourceClient {
             throw new Error(`Unexpected Windows source response: ${response.payload.case ?? "empty"}.`);
         }
 
+        const descriptorSnapshot = response.payload.value.descriptorSnapshot;
+        if (!descriptorSnapshot) {
+            throw new Error("Windows source returned a descriptor response without a descriptor snapshot.");
+        }
+
         this.recordHelperRequestSuccess();
 
-        return response.payload.value.descriptors.map(toRuntimeMetricDescriptor);
+        return {
+            descriptors: descriptorSnapshot.descriptors.map(toRuntimeMetricDescriptor),
+            descriptorFingerprint: descriptorSnapshot.descriptorFingerprint,
+        };
     }
 
     async checkHealth(): Promise<SourceHealth> {

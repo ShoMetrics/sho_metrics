@@ -20,7 +20,7 @@ message ListMetricDescriptorsRequest {
 }
 
 message ListMetricDescriptorsResponse {
-  repeated MetricDescriptor descriptors = 1;
+  MetricDescriptorSnapshot descriptor_snapshot = 1;
   repeated SourceWarning warnings = 2;
 }
 
@@ -31,8 +31,20 @@ message ReadMetricSnapshotRequest {
 
 message ReadMetricSnapshotResponse {
   MetricSnapshot snapshot = 1;
-  repeated MetricDescriptor descriptors = 2;
+  MetricDescriptorSnapshot descriptor_snapshot = 2;
   repeated SourceWarning warnings = 3;
+}
+
+message MetricDescriptorSnapshot {
+  // Descriptors matching the request filter. Empty filters return all known
+  // descriptors.
+  repeated MetricDescriptor descriptors = 1;
+
+  // Opaque source-owned identity for the complete planning descriptor catalog.
+  //
+  // It covers the full catalog even when `descriptors` is filtered. Consumers
+  // compare it for equality only; do not parse it or infer source health from it.
+  string descriptor_fingerprint = 2;
 }
 
 message SourceWarning {

@@ -103,6 +103,20 @@ export interface MetricDescriptor {
     readonly metricIdKind: MetricIdKind;
 }
 
+/** Source-owned descriptor snapshot read through the source client boundary. */
+export interface MetricDescriptorSnapshot {
+    /** Descriptors matching the requested metric keys, or all descriptors when the request is empty. */
+    readonly descriptors: readonly MetricDescriptor[];
+
+    /**
+     * Source-owned identity for the complete descriptor catalog.
+     *
+     * This fingerprint must cover the complete planning descriptor set even
+     * when `descriptors` is filtered to requested metric keys.
+     */
+    readonly descriptorFingerprint: string;
+}
+
 /** Runtime source adapter consumed by background metric collection. */
 export interface SourceClient extends SourceMetricPollingGroupResolver {
     /** Source id owned by the runtime source registry. */
@@ -112,7 +126,7 @@ export interface SourceClient extends SourceMetricPollingGroupResolver {
     readSnapshot(metricKeys: readonly string[]): Promise<MetricSnapshot>;
 
     /** Lists descriptors for requested metric keys or for all known metrics. */
-    listMetricDescriptors?(metricKeys: readonly string[]): Promise<readonly MetricDescriptor[]>;
+    listMetricDescriptors?(metricKeys: readonly string[]): Promise<MetricDescriptorSnapshot>;
 
     /** Checks source health by performing source-owned I/O. */
     checkHealth?(): Promise<SourceHealth>;
