@@ -6,13 +6,30 @@ using LibreHardwareMonitor.Hardware;
 
 namespace ShoMetrics.Source.Windows.Core;
 
+/// <summary>
+/// Runs the Windows-side diagnostic probe used by the Hub's source comparison script.
+/// </summary>
+/// <remarks>
+/// This is not a production metric source. It emits newline-delimited JSON so
+/// `packages/hub/scripts/diagnostics/metric-source-comparison.mjs` can compare
+/// OS-native aggregate counters against LibreHardwareMonitor DLL traversal in
+/// the same measurement window. Keep it in source control because Phase 6
+/// network/disk routing changes must be validated with the same workload shape.
+/// </remarks>
 public static partial class MetricSourceComparisonProbe
 {
     private static readonly TimeSpan DefaultProbeDuration = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan DefaultProbeInterval = TimeSpan.FromSeconds(1);
+
+    private const string DurationOptionName = "--duration-ms";
+    private const string IntervalOptionName = "--interval-ms";
+    private const string ProbeSourcesOptionName = "--probe-sources";
     private const string NativeProbeSourceName = "native";
     private const string LhmDllProbeSourceName = "lhm-dll";
 
+    /// <summary>
+    /// Runs the probe with CLI-style arguments and writes NDJSON events to stdout.
+    /// </summary>
     public static async Task<int> RunAsync(IReadOnlyList<string> args)
     {
         ProbeOptions options = ReadOptions(args);
@@ -38,6 +55,9 @@ public static partial class MetricSourceComparisonProbe
             while (stopwatch.Elapsed < options.Duration)
             {
                 TimeSpan elapsed = stopwatch.Elapsed;
+
+                // Native and LHM samples share one loop tick here. That is useful
+                // for comparing value shape, but it is not independent validation.
                 NativeSample? nativeSample = options.ShouldReadNative ? nativeSampler!.Read() : null;
                 LhmDllSample? lhmDllSample = options.ShouldReadLhmDll ? ReadLhmDllSample(computer!) : null;
 
@@ -86,23 +106,23 @@ public static partial class MetricSourceComparisonProbe
         {
             string argument = args[argumentIndex];
 
-            if (TryReadTimeSpanOption(args, ref argumentIndex, "--duration-ms", out TimeSpan durationOption))
+            if (TryReadTimeSpanOption(args, ref argumentIndex, DurationOptionName, out TimeSpan durationOption))
             {
                 duration = durationOption;
                 continue;
             }
 
-            if (TryReadTimeSpanOption(args, ref argumentIndex, "--interval-ms", out TimeSpan intervalOption))
+            if (TryReadTimeSpanOption(args, ref argumentIndex, IntervalOptionName, out TimeSpan intervalOption))
             {
                 interval = intervalOption;
                 continue;
             }
 
-            if (TryReadStringOption(args, ref argumentIndex, "--probe-sources", out string? probeSourcesOption))
+            if (TryReadStringOption(args, ref argumentIndex, ProbeSourcesOptionName, out string? probeSourcesOption))
             {
                 if (string.IsNullOrWhiteSpace(probeSourcesOption))
                 {
-                    throw new ArgumentException("--probe-sources must not be empty.", nameof(args));
+                    throw new ArgumentException($"{ProbeSourcesOptionName} must not be empty.", nameof(args));
                 }
 
                 (shouldReadNative, shouldReadLhmDll) = ReadProbeSources(probeSourcesOption);
@@ -126,7 +146,7 @@ public static partial class MetricSourceComparisonProbe
         if (!shouldReadNative && !shouldReadLhmDll)
         {
             throw new ArgumentException(
-                $"--probe-sources must include {NativeProbeSourceName}, {LhmDllProbeSourceName}, or both.",
+                $"{ProbeSourcesOptionName} must include {NativeProbeSourceName}, {LhmDllProbeSourceName}, or both.",
                 nameof(probeSources));
         }
 
@@ -218,6 +238,8 @@ public static partial class MetricSourceComparisonProbe
         List<HardwareUpdateSample> hardwareUpdates = [];
         double? cpuTemperatureCelsius = null;
 
+        // The probe uses the same catalog mapping as the helper, but drives LHM
+        // directly so we can measure traversal cost without IPC in the way.
         foreach (IHardware hardware in computer.Hardware)
         {
             ReadHardware(hardware, readingsByMetricId, hardwareUpdates, ref cpuTemperatureCelsius);
@@ -325,6 +347,9 @@ public static partial class MetricSourceComparisonProbe
 
         if (LibreHardwareMetricCatalog.ShouldAggregateMetric(reading.MetricId))
         {
+            // This intentionally preserves the naive LHM aggregate shape for
+            // diagnostics. Production network aggregation still needs adapter
+            // filtering before it can become a routing default or fallback.
             readingsByMetricId[reading.MetricId] = existingReading with
             {
                 Value = existingReading.Value + reading.Value,
@@ -447,6 +472,9 @@ public static partial class MetricSourceComparisonProbe
             ulong receivedBytes = 0;
             ulong sentBytes = 0;
 
+            // This simple aggregate is intentionally broad. The latency report
+            // proved it can overcount on machines with virtual/filter adapters;
+            // production code must add adapter filtering and revalidate values.
             foreach (NetworkInterface networkInterface in NetworkInterface.GetAllNetworkInterfaces())
             {
                 if (networkInterface.OperationalStatus != OperationalStatus.Up
@@ -488,6 +516,9 @@ public static partial class MetricSourceComparisonProbe
 
     private sealed class NativeDiskSampler : IDisposable
     {
+        private const string TotalPhysicalDiskReadCounterPath = @"\PhysicalDisk(_Total)\Disk Read Bytes/sec";
+        private const string TotalPhysicalDiskWriteCounterPath = @"\PhysicalDisk(_Total)\Disk Write Bytes/sec";
+
         private nint _queryHandle;
         private nint _readCounterHandle;
         private nint _writeCounterHandle;
@@ -495,6 +526,8 @@ public static partial class MetricSourceComparisonProbe
 
         public NativeDiskSampler()
         {
+            // Use the _Total instance directly. The network POC showed why
+            // summing all instances can double-count aggregate counters.
             if (PdhOpenQuery(null, nuint.Zero, out _queryHandle) != 0)
             {
                 return;
@@ -502,12 +535,12 @@ public static partial class MetricSourceComparisonProbe
 
             if (PdhAddEnglishCounter(
                     _queryHandle,
-                    @"\PhysicalDisk(_Total)\Disk Read Bytes/sec",
+                    TotalPhysicalDiskReadCounterPath,
                     nuint.Zero,
                     out _readCounterHandle) != 0
                 || PdhAddEnglishCounter(
                     _queryHandle,
-                    @"\PhysicalDisk(_Total)\Disk Write Bytes/sec",
+                    TotalPhysicalDiskWriteCounterPath,
                     nuint.Zero,
                     out _writeCounterHandle) != 0)
             {
