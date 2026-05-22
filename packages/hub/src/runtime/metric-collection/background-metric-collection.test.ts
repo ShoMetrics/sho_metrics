@@ -4,6 +4,7 @@ import type { SourceClient } from "../sources/source-client";
 import type { SourceRegistry } from "../sources/source-registry";
 import type { SourceMetricPollingGroupResolution } from "../sources/source-polling-groups";
 import type { SourceMetadataInvalidation, SourceMetadataInvalidationListener } from "../sources/source-planning-metadata";
+import { buildMetricSnapshot } from "../sources/metric-source";
 import { BackoffPolicy } from "../sources/backoff-policy";
 import { BackgroundMetricCollection } from "./background-metric-collection";
 import { CollectorGroupPlanner } from "./collector-group-planner";
@@ -227,6 +228,55 @@ test("changed source profile planning fingerprint restarts changed collector gro
     assert.deepEqual(timer.recordedDelaysMilliseconds, [0, 0]);
 });
 
+test("refreshReadPlanOnce requests only each source candidate's routed metric keys", async () => {
+    const subscriptionRegistry = new MetricSubscriptionRegistry();
+    const windowsHelperSourceClient = new FakeSourceClient("windows-helper", () => ({
+        state: "owned",
+        pollingGroupId: "helper",
+    }), { servesSnapshots: true });
+    const nodeSystemSourceClient = new FakeSourceClient("node-system", () => ({
+        state: "owned",
+        pollingGroupId: "system",
+    }), { servesSnapshots: true });
+    const collection = buildBackgroundMetricCollection(subscriptionRegistry, {
+        sourceClients: [windowsHelperSourceClient, nodeSystemSourceClient],
+    });
+
+    await collection.refreshReadPlanOnce({
+        metrics: [
+            {
+                sourceScopeId: "local",
+                metricKey: "cpu.usage_percent",
+                sourceCandidates: [{ sourceId: "node-system" }],
+                failureMode: "empty",
+            },
+            {
+                sourceScopeId: "local",
+                metricKey: "gpu.temp",
+                sourceCandidates: [
+                    { sourceId: "windows-helper" },
+                    { sourceId: "node-system" },
+                ],
+                failureMode: "fallback",
+            },
+            {
+                sourceScopeId: "local",
+                metricKey: "ram.used",
+                sourceCandidates: [
+                    { sourceId: "windows-helper" },
+                    { sourceId: "node-system" },
+                ],
+                failureMode: "empty",
+            },
+        ],
+    });
+
+    assert.deepEqual(windowsHelperSourceClient.latestReadMetricKeys, ["gpu.temp", "ram.used"]);
+    assert.equal(windowsHelperSourceClient.readSnapshotCallCount, 1);
+    assert.deepEqual(nodeSystemSourceClient.latestReadMetricKeys, ["cpu.usage_percent", "gpu.temp"]);
+    assert.equal(nodeSystemSourceClient.readSnapshotCallCount, 1);
+});
+
 function buildBackgroundMetricCollection(
     subscriptionRegistry: MetricSubscriptionRegistry,
     options?: BuildBackgroundMetricCollectionOptions,
@@ -284,14 +334,29 @@ class FakeSourceRegistry implements SourceRegistry {
 class FakeSourceClient implements SourceClient {
     resolveMetricPollingGroupsCallCount = 0;
     latestResolvedMetricKeys: readonly string[] = [];
+    readSnapshotCallCount = 0;
+    latestReadMetricKeys: readonly string[] = [];
 
     constructor(
         readonly sourceId: string,
         private readonly resolveMetricKey: (metricKey: string) => SourceMetricPollingGroupResolution,
+        private readonly options: {
+            readonly servesSnapshots?: boolean;
+        } = {},
     ) {}
 
-    async readSnapshot(): Promise<never> {
-        throw new Error("FakeSourceClient does not serve snapshots.");
+    async readSnapshot(metricKeys: readonly string[]) {
+        if (this.options.servesSnapshots !== true) {
+            throw new Error("FakeSourceClient does not serve snapshots.");
+        }
+
+        this.readSnapshotCallCount += 1;
+        this.latestReadMetricKeys = metricKeys;
+
+        return buildMetricSnapshot({
+            timestampMilliseconds: 1000,
+            metrics: {},
+        });
     }
 
     resolveMetricPollingGroups(
