@@ -121,6 +121,31 @@ test("fallback reader uses fallback when the primary scalar sample is stale", ()
     assert.equal(reader.getWidgetData("ram.used", "RAM", "B").current, 50);
 });
 
+test("fallback reader uses node when a helper-preferred metric's helper sample is stale", () => {
+    const metricStore = new MetricStore();
+    const readPlan = buildReadPlan({ metricKey: "gpu.temp" });
+
+    metricStore.ingest("windows-helper", buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            "gpu.temp": buildScalarMetricValue(70),
+        },
+    }));
+    metricStore.ingest("node-system", buildMetricSnapshot({
+        timestampMilliseconds: 10000,
+        metrics: {
+            "gpu.temp": buildScalarMetricValue(60),
+        },
+    }));
+
+    const reader = createTestFallbackReader(metricStore, readPlan, {
+        now: 11000,
+        maximumSampleAgeMilliseconds: 5000,
+    });
+
+    assert.equal(reader.getWidgetData("gpu.temp", "GPU", "C").current, 60);
+});
+
 test("fallback reader returns no data when every scalar sample is stale", () => {
     const metricStore = new MetricStore();
     const readPlan = buildReadPlan();

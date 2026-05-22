@@ -11,7 +11,11 @@ import { MetricAction, type MetricCollectionBinding } from "./metric-action";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
 import { metricStore } from "../runtime/metric-store";
 import { buildMetricSnapshot, buildScalarMetricValue } from "../runtime/sources/metric-source";
-import { buildMetricReadPlanKey, listMetricReadPlanKeys } from "../runtime/sources/metric-read-plan";
+import { buildMetricReadPlanKey, listMetricReadPlanKeys, type MetricReadPlan } from "../runtime/sources/metric-read-plan";
+import {
+    NODE_SYSTEM_SOURCE_ID,
+    WINDOWS_HELPER_SOURCE_ID,
+} from "../runtime/sources/source-ids";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
 import { writeStoredGlobalSettingsPatch } from "../settings/storage/global-settings-patch";
@@ -212,6 +216,57 @@ test("metric collection uses action-owned render timer", () => {
     action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
 
     assert.equal(action.bindings[0].disposeCallCount, 1);
+});
+
+test("metric collection subscriptions preserve each metric route's source candidates", () => {
+    const action = new TestCustomReadPlanAction({
+        metrics: [
+            {
+                sourceScopeId: "local",
+                metricKey: "cpu.usage_percent",
+                sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
+                failureMode: "empty",
+            },
+            {
+                sourceScopeId: "local",
+                metricKey: "gpu.temp",
+                sourceCandidates: [
+                    { sourceId: WINDOWS_HELPER_SOURCE_ID },
+                    { sourceId: NODE_SYSTEM_SOURCE_ID },
+                ],
+                failureMode: "fallback",
+            },
+        ],
+    });
+    const streamDeckAction = new FakeStreamDeckAction("per-route-subscription-action");
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
+
+        assert.deepEqual(action.bindings[0].refreshOptionsList[0].metricSubscriptions, [
+            {
+                subscriberId: "per-route-subscription-action",
+                metricKey: "cpu.usage_percent",
+                sourceScopeId: "local",
+                sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
+                failureMode: "empty",
+                intervalMilliseconds: 1000,
+            },
+            {
+                subscriberId: "per-route-subscription-action",
+                metricKey: "gpu.temp",
+                sourceScopeId: "local",
+                sourceCandidates: [
+                    { sourceId: WINDOWS_HELPER_SOURCE_ID },
+                    { sourceId: NODE_SYSTEM_SOURCE_ID },
+                ],
+                failureMode: "fallback",
+                intervalMilliseconds: 1000,
+            },
+        ]);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    }
 });
 
 test("metric collection reads source-candidate samples through synchronous fallback", () => {
@@ -463,6 +518,26 @@ class TestMetricReaderAction extends TestMetricAction {
                 .getWidgetData("net.down", "Download", "B")
                 .current,
         );
+    }
+}
+
+class TestCustomReadPlanAction extends TestMetricAction {
+    constructor(private readonly readPlan: MetricReadPlan) {
+        super();
+    }
+
+    protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
+        void event;
+        return listMetricReadPlanKeys(this.readPlan);
+    }
+
+    protected override buildMetricCollectionReadPlan(
+        event: WillAppearEvent,
+        metricKeys: readonly string[],
+    ): MetricReadPlan {
+        void event;
+        void metricKeys;
+        return this.readPlan;
     }
 }
 
