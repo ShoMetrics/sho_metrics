@@ -1,4 +1,5 @@
 import type { ResolvedMetricSourcePolicy } from "../../settings/resolved-settings";
+import { resolveLocalAutoMetricSourceCandidates } from "./metric-source-preferences";
 import {
     LOCAL_SOURCE_SCOPE_ID,
     normalizeMetricReadPlan,
@@ -30,9 +31,20 @@ export interface BuildMetricReadPlanFromSourcePolicyOptions {
     readonly platform?: NodeJS.Platform;
 }
 
-interface SourceProfileResolution {
+type SourceProfileResolution = StaticSourceProfileResolution | MetricRoutedSourceProfileResolution;
+
+interface StaticSourceProfileResolution {
+    readonly kind: "static";
     readonly sourceScopeId: string;
     readonly sourceCandidates: readonly SourceCandidate[];
+}
+
+interface MetricRoutedSourceProfileResolution {
+    readonly kind: "metricRouted";
+    readonly sourceScopeId: string;
+    readonly resolveMetricSourceCandidates: (
+        metricKey: string,
+    ) => readonly SourceCandidate[];
 }
 
 /** Builds a runtime read plan from resolved settings without probing source availability. */
@@ -56,21 +68,24 @@ export function buildMetricReadPlanFromSourcePolicy(
                 platform,
             ))
         : [];
-    const fallbackSourceCandidates = fallbackResolutions.flatMap(resolution => resolution.sourceCandidates);
-    const sourceCandidates = [
-        ...primaryResolution.sourceCandidates,
-        ...fallbackSourceCandidates,
-    ];
-    const shouldFallback = primaryResolution.sourceCandidates.length > 1 || fallbackSourceCandidates.length > 0;
-    const failureMode = shouldFallback ? "fallback" : "empty";
-
     return normalizeMetricReadPlan({
-        metrics: options.metricKeys.map(metricKey => ({
-            sourceScopeId: primaryResolution.sourceScopeId,
-            metricKey,
-            sourceCandidates,
-            failureMode,
-        })),
+        metrics: options.metricKeys.map(metricKey => {
+            const primarySourceCandidates = selectResolutionCandidatesForMetric(primaryResolution, metricKey);
+            const fallbackSourceCandidates = fallbackResolutions
+                .flatMap(resolution => selectResolutionCandidatesForMetric(resolution, metricKey));
+            const sourceCandidates = [
+                ...primarySourceCandidates,
+                ...fallbackSourceCandidates,
+            ];
+            const shouldFallback = primarySourceCandidates.length > 1 || fallbackSourceCandidates.length > 0;
+
+            return {
+                sourceScopeId: primaryResolution.sourceScopeId,
+                metricKey,
+                sourceCandidates,
+                failureMode: shouldFallback ? "fallback" : "empty",
+            };
+        }),
     });
 }
 
@@ -87,6 +102,7 @@ function resolveSourceProfileReference(
 
     if (sourceProfileId.startsWith(BUILT_IN_LOCAL_SOURCE_PROFILE_ID_PREFIX)) {
         return {
+            kind: "static",
             sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
             sourceCandidates: [],
         };
@@ -99,6 +115,7 @@ function resolveSourceProfileReference(
 
 function resolveUserDefinedSourceProfile(sourceProfileId: string): SourceProfileResolution {
     return {
+        kind: "static",
         sourceScopeId: buildUserSourceProfileSourceId(sourceProfileId),
         sourceCandidates: [{
             sourceId: buildUserSourceProfileSourceId(sourceProfileId),
@@ -113,16 +130,22 @@ function resolveBuiltInLocalSourceProfile(
     switch (sourceProfileId) {
         case BUILT_IN_LOCAL_AUTO_SOURCE_PROFILE_ID:
             return {
+                kind: "metricRouted",
                 sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
-                sourceCandidates: resolveLocalAutoSourceCandidates(platform),
+                resolveMetricSourceCandidates: metricKey => resolveLocalAutoMetricSourceCandidates(
+                    metricKey,
+                    platform,
+                ),
             };
         case BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID:
             return {
+                kind: "static",
                 sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
                 sourceCandidates: [{ sourceId: WINDOWS_HELPER_SOURCE_ID }],
             };
         case BUILT_IN_NODE_SYSTEM_SOURCE_PROFILE_ID:
             return {
+                kind: "static",
                 sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
                 sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
             };
@@ -131,19 +154,17 @@ function resolveBuiltInLocalSourceProfile(
     }
 }
 
-function resolveLocalAutoSourceCandidates(platform: NodeJS.Platform): readonly SourceCandidate[] {
-    if (platform !== "win32") {
-        return [{ sourceId: NODE_SYSTEM_SOURCE_ID }];
-    }
-
-    return [
-        { sourceId: WINDOWS_HELPER_SOURCE_ID },
-        { sourceId: NODE_SYSTEM_SOURCE_ID },
-    ];
-}
-
 function normalizeSourceProfileId(sourceProfileId: string | undefined): string | undefined {
     return sourceProfileId && sourceProfileId.length > 0
         ? sourceProfileId
         : undefined;
+}
+
+function selectResolutionCandidatesForMetric(
+    resolution: SourceProfileResolution,
+    metricKey: string,
+): readonly SourceCandidate[] {
+    return resolution.kind === "metricRouted"
+        ? resolution.resolveMetricSourceCandidates(metricKey)
+        : resolution.sourceCandidates;
 }

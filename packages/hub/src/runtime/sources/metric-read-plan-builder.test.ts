@@ -12,9 +12,9 @@ import {
     buildUserSourceProfileSourceId,
 } from "./source-ids";
 
-test("metric read plan builder uses Windows helper then node fallback for unset local Windows settings", () => {
+test("metric read plan builder uses per-metric local auto source preferences on Windows", () => {
     const readPlan = buildMetricReadPlanFromSourcePolicy({
-        metricKeys: ["cpu.usage_percent"],
+        metricKeys: ["cpu.usage_percent", "gpu.temp"],
         sourcePolicy: createSourcePolicy(),
         defaultSourceProfileId: undefined,
         platform: "win32",
@@ -25,6 +25,44 @@ test("metric read plan builder uses Windows helper then node fallback for unset 
             {
                 sourceScopeId: "local",
                 metricKey: "cpu.usage_percent",
+                sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
+                failureMode: "empty",
+            },
+            {
+                sourceScopeId: "local",
+                metricKey: "gpu.temp",
+                sourceCandidates: [
+                    { sourceId: WINDOWS_HELPER_SOURCE_ID },
+                    { sourceId: NODE_SYSTEM_SOURCE_ID },
+                ],
+                failureMode: "fallback",
+            },
+        ],
+    });
+});
+
+test("metric read plan builder appends fallback profile ids to each local auto metric", () => {
+    const readPlan = buildMetricReadPlanFromSourcePolicy({
+        metricKeys: ["cpu.usage_percent", "gpu.temp"],
+        sourcePolicy: createSourcePolicy({
+            fallbackSourceProfileIds: [BUILT_IN_NODE_SYSTEM_SOURCE_PROFILE_ID],
+            failureMode: "useFallback",
+        }),
+        defaultSourceProfileId: undefined,
+        platform: "win32",
+    });
+
+    assert.deepEqual(readPlan, {
+        metrics: [
+            {
+                sourceScopeId: "local",
+                metricKey: "cpu.usage_percent",
+                sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
+                failureMode: "fallback",
+            },
+            {
+                sourceScopeId: "local",
+                metricKey: "gpu.temp",
                 sourceCandidates: [
                     { sourceId: WINDOWS_HELPER_SOURCE_ID },
                     { sourceId: NODE_SYSTEM_SOURCE_ID },
