@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { MetricStore } from "../metric-store";
 import { buildMetricSnapshot, buildScalarMetricValue, buildTextMetricValue } from "../sources/metric-source";
-import { normalizeMetricReadPlan, type MetricReadPlan } from "../sources/metric-read-plan";
+import { normalizeMetricReadPlan, type MetricReadPlan } from "../source-routing/metric-read-plan";
 import { createFallbackMetricStoreReader } from "./fallback-composer";
 
 const TEST_NOW_MILLISECONDS = 3000;

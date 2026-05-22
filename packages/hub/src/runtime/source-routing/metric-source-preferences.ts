@@ -19,7 +19,7 @@ import type { SourceCandidate } from "./metric-read-plan";
 import {
     NODE_SYSTEM_SOURCE_ID,
     WINDOWS_HELPER_SOURCE_ID,
-} from "./source-ids";
+} from "../sources/source-ids";
 
 const NODE_SYSTEM_ONLY_METRIC_KEYS = [
     CPU_USAGE_METRIC_KEY,

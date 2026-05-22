@@ -4,7 +4,7 @@ import {
     normalizeMetricReadPlan,
     type MetricReadPlan,
     selectMetricReadRouteSourceCandidates,
-} from "../sources/metric-read-plan";
+} from "../source-routing/metric-read-plan";
 
 export interface FallbackMetricStoreReaderOptions {
     /** Returns the current timestamp used to decide whether a candidate sample is still fresh. */

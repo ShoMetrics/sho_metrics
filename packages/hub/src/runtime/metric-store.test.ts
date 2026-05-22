@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { MetricStore } from "./metric-store";
-import { LOCAL_SOURCE_SCOPE_ID } from "./sources/metric-read-plan";
+import { LOCAL_SOURCE_SCOPE_ID } from "./source-routing/metric-read-plan";
 import { buildMetricSnapshot, buildScalarMetricValue, buildTextMetricValue, MetricUnit } from "./sources/metric-source";
 
 test("missing metric returns render-safe numeric defaults without a sample timestamp", () => {

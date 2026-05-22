@@ -2,9 +2,9 @@ import {
     LOCAL_SOURCE_SCOPE_ID,
     NODE_SYSTEM_SOURCE_ID,
     WINDOWS_HELPER_SOURCE_ID,
-} from "./source-ids";
+} from "../sources/source-ids";
 
-export { LOCAL_SOURCE_SCOPE_ID } from "./source-ids";
+export { LOCAL_SOURCE_SCOPE_ID } from "../sources/source-ids";
 
 /** How a read plan handles missing values after source candidates are tried. */
 export type MetricReadPlanFailureMode = "fallback" | "empty";

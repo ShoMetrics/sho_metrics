@@ -25,7 +25,7 @@ import {
 import {
     NODE_SYSTEM_SOURCE_ID,
     WINDOWS_HELPER_SOURCE_ID,
-} from "./source-ids";
+} from "../sources/source-ids";
 
 const NODE_SYSTEM_CANDIDATES = [{ sourceId: NODE_SYSTEM_SOURCE_ID }];
 const WINDOWS_HELPER_THEN_NODE_CANDIDATES = [
