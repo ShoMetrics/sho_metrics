@@ -701,7 +701,6 @@ Still pending:
   when a later descriptor read observes a changed fingerprint, but it does not
   poll descriptors periodically.
 - Capability filtering from helper descriptors.
-- Removal of temporary latency diagnostics after the latency result is accepted.
 
 ### Required Tests
 

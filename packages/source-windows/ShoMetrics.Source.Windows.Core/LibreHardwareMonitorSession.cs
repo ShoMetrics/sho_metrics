@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -15,24 +14,15 @@ public sealed class LibreHardwareMonitorSession : IDisposable
 
     private readonly Computer? _computer;
     private readonly HardwareMetricDescriptorSnapshot _cachedDescriptorSnapshot;
-    private readonly ILibreHardwareMonitorDiagnosticSink? _diagnosticSink;
     private readonly IReadOnlyDictionary<string, string> _pollingGroupIdsByMetricId;
     private readonly ConcurrentDictionary<string, MetricSnapshot> _latestSnapshotsByPollingGroupId =
         new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _readGate = new(1, 1);
     private MetricSnapshot _latestSnapshot;
-    private long _refreshIndex;
     private bool _isDisposed;
 
     public LibreHardwareMonitorSession()
-        : this(diagnosticSink: null)
     {
-    }
-
-    public LibreHardwareMonitorSession(ILibreHardwareMonitorDiagnosticSink? diagnosticSink)
-    {
-        _diagnosticSink = diagnosticSink;
-
         Computer computer = LibreHardwareComputerFactory.Create();
         List<HardwareSourceWarning> warnings = [];
         HardwareMetricDescriptorSnapshot? cachedDescriptorSnapshot = null;
@@ -120,9 +110,6 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         ObjectDisposedException.ThrowIf(_isDisposed, this);
         cancellationToken.ThrowIfCancellationRequested();
 
-        long refreshIndex = _refreshIndex++;
-        long refreshStartedTimestamp = Stopwatch.GetTimestamp();
-
         if (_computer is null)
         {
             // LHM-unavailable refreshes intentionally stamp a fresh timestamp.
@@ -131,23 +118,10 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             // health observable through the latest cached snapshot.
             MetricSnapshot unavailableSnapshot = BuildUnavailableSnapshot();
             Volatile.Write(ref _latestSnapshot, unavailableSnapshot);
-            _diagnosticSink?.RecordRefreshSummary(new LibreHardwareMonitorRefreshSummary
-            {
-                RefreshIndex = refreshIndex,
-                DurationMilliseconds = Stopwatch.GetElapsedTime(refreshStartedTimestamp).TotalMilliseconds,
-                GateWaitMilliseconds = 0,
-                HardwareCount = 0,
-                SensorCount = 0,
-                ReadingCount = unavailableSnapshot.Readings.Count,
-                WarningCount = unavailableSnapshot.Warnings.Count,
-                CapturedAt = unavailableSnapshot.CapturedAt,
-            });
             return unavailableSnapshot;
         }
 
-        long gateWaitStartedTimestamp = Stopwatch.GetTimestamp();
         await _readGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        double gateWaitMilliseconds = Stopwatch.GetElapsedTime(gateWaitStartedTimestamp).TotalMilliseconds;
 
         try
         {
@@ -155,7 +129,6 @@ public sealed class LibreHardwareMonitorSession : IDisposable
 
             Dictionary<string, MetricReading> readingsByMetricId = new(StringComparer.Ordinal);
             List<string> warnings = [];
-            RefreshDiagnosticAccumulator diagnosticAccumulator = new(_diagnosticSink);
 
             foreach (IHardware hardware in _computer.Hardware)
             {
@@ -163,9 +136,6 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                     hardware,
                     readingsByMetricId,
                     warnings,
-                    refreshIndex,
-                    depth: 0,
-                    diagnosticAccumulator,
                     cancellationToken);
             }
 
@@ -174,8 +144,6 @@ public sealed class LibreHardwareMonitorSession : IDisposable
 
             List<MetricReading> readings = FilterReadings(readingsByMetricId, requestedMetricIds: null);
             AddMissingMetricWarnings(readings, warnings);
-            MetricReading? cpuUsageReading = readings
-                .FirstOrDefault(reading => reading.MetricId.Equals("cpu.usage_percent", StringComparison.Ordinal));
 
             MetricSnapshot snapshot = new()
             {
@@ -184,21 +152,6 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                 Warnings = warnings,
             };
             Volatile.Write(ref _latestSnapshot, snapshot);
-            _diagnosticSink?.RecordRefreshSummary(new LibreHardwareMonitorRefreshSummary
-            {
-                RefreshIndex = refreshIndex,
-                DurationMilliseconds = Stopwatch.GetElapsedTime(refreshStartedTimestamp).TotalMilliseconds,
-                GateWaitMilliseconds = gateWaitMilliseconds,
-                HardwareCount = diagnosticAccumulator.HardwareCount,
-                SensorCount = diagnosticAccumulator.SensorCount,
-                ReadingCount = readings.Count,
-                WarningCount = warnings.Count,
-                CapturedAt = snapshot.CapturedAt,
-                CpuUsagePercent = cpuUsageReading?.Value,
-                CpuSensorId = cpuUsageReading?.SensorId,
-                CpuSensorName = cpuUsageReading?.SensorName,
-                CpuHardwareName = cpuUsageReading?.HardwareName,
-            });
             return snapshot;
         }
         finally
@@ -317,17 +270,10 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         IHardware hardware,
         Dictionary<string, MetricReading> readingsByMetricId,
         List<string> warnings,
-        long refreshIndex,
-        int depth,
-        RefreshDiagnosticAccumulator diagnosticAccumulator,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        diagnosticAccumulator.HardwareCount += 1;
-        diagnosticAccumulator.SensorCount += hardware.Sensors.Length;
-        long updateStartedTimestamp = Stopwatch.GetTimestamp();
-        int warningCountBefore = warnings.Count;
         string? updateError = null;
 
         try
@@ -340,12 +286,8 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             warnings.Add($"Hardware update failed for {hardware.Name}: {updateError}");
         }
 
-        double updateDurationMilliseconds = Stopwatch.GetElapsedTime(updateStartedTimestamp).TotalMilliseconds;
-        long ownReadStartedTimestamp = Stopwatch.GetTimestamp();
-        int readingCountBefore = readingsByMetricId.Count;
         Dictionary<string, MetricReading> hardwareReadingsByMetricId = new(StringComparer.Ordinal);
         List<string> hardwareWarnings = [];
-        MetricReading? cpuUsageReading = null;
 
         if (updateError is not null)
         {
@@ -363,11 +305,6 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                 {
                     AddReading(hardwareReadingsByMetricId, reading);
                     AddReading(readingsByMetricId, reading);
-
-                    if (reading.MetricId.Equals("cpu.usage_percent", StringComparison.Ordinal))
-                    {
-                        cpuUsageReading = reading;
-                    }
                 }
             }
         }
@@ -377,25 +314,6 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(hardware),
             hardwareReadingsByMetricId,
             hardwareWarnings);
-
-        diagnosticAccumulator.RecordHardwareRefresh(new LibreHardwareMonitorHardwareRefreshDiagnostic
-        {
-            RefreshIndex = refreshIndex,
-            Depth = depth,
-            HardwareId = hardware.Identifier.ToString(),
-            HardwareName = hardware.Name,
-            HardwareType = hardware.HardwareType.ToString(),
-            UpdateDurationMilliseconds = updateDurationMilliseconds,
-            OwnReadDurationMilliseconds = Stopwatch.GetElapsedTime(ownReadStartedTimestamp).TotalMilliseconds,
-            SensorCount = hardware.Sensors.Length,
-            SubHardwareCount = hardware.SubHardware.Length,
-            AddedReadingCount = readingsByMetricId.Count - readingCountBefore,
-            AddedWarningCount = warnings.Count - warningCountBefore,
-            CpuUsagePercent = cpuUsageReading?.Value,
-            CpuSensorId = cpuUsageReading?.SensorId,
-            CpuSensorName = cpuUsageReading?.SensorName,
-            UpdateError = updateError,
-        });
 
         if (updateError is not null)
         {
@@ -408,9 +326,6 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                 childHardware,
                 readingsByMetricId,
                 warnings,
-                refreshIndex,
-                depth + 1,
-                diagnosticAccumulator,
                 cancellationToken);
         }
     }
@@ -718,17 +633,5 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         return string.Join(
             ';',
             new[] { firstSourceSensorId, secondSourceSensorId }.Where(id => !string.IsNullOrWhiteSpace(id)));
-    }
-
-    private sealed class RefreshDiagnosticAccumulator(ILibreHardwareMonitorDiagnosticSink? diagnosticSink)
-    {
-        public int HardwareCount { get; set; }
-
-        public int SensorCount { get; set; }
-
-        public void RecordHardwareRefresh(LibreHardwareMonitorHardwareRefreshDiagnostic diagnostic)
-        {
-            diagnosticSink?.RecordHardwareRefresh(diagnostic);
-        }
     }
 }

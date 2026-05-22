@@ -2,7 +2,6 @@
 // This file is a quick script used to expose system metrics from a Node.js environment for reference.
 
 const { execFile } = require("node:child_process");
-const os = require("node:os");
 const si = require("systeminformation");
 
 const NVIDIA_SMI_QUERY_FIELDS = [
@@ -110,8 +109,6 @@ async function main() {
             platform: process.platform,
             arch: process.arch,
             node: process.version,
-            cwd: process.cwd(),
-            hostname: os.hostname(),
             systeminformationVersion: require("systeminformation/package.json").version,
         },
         sections: {

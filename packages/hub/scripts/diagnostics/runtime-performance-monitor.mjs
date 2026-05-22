@@ -7,8 +7,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
-const processSamplerScriptPath = path.join(scriptDirectory, "perf", "process-sampler.ps1");
-const hubRoot = path.resolve(scriptDirectory, "..");
+const processSamplerScriptPath = path.join(scriptDirectory, "process-sampler.ps1");
+const hubRoot = path.resolve(scriptDirectory, "..", "..");
 const repositoryRoot = path.resolve(hubRoot, "..", "..");
 const defaultLogPath = path.join(
     hubRoot,
