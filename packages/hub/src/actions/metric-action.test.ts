@@ -11,7 +11,7 @@ import { MetricAction, type MetricCollectionBinding } from "./metric-action";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
 import { metricStore } from "../runtime/metric-store";
 import { buildMetricSnapshot, buildScalarMetricValue } from "../runtime/sources/metric-source";
-import { buildMetricReadPlanKey } from "../runtime/sources/metric-read-plan";
+import { buildMetricReadPlanKey, listMetricReadPlanKeys } from "../runtime/sources/metric-read-plan";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
 import { writeStoredGlobalSettingsPatch } from "../settings/storage/global-settings-patch";
@@ -115,8 +115,8 @@ test("changed polling plan resubscribes and forces an immediate update", () => {
         assert.equal(action.bindings[0].refreshDisposeCallCount, 1);
         assert.equal(action.bindings[0].refreshOptionsList[1].pollingIntervalMilliseconds, 5000);
         assert.equal(action.bindings[0].refreshOptionsList[1].maximumSampleAgeMilliseconds, 10000);
-        assert.deepEqual(action.bindings[0].refreshOptionsList[0].readPlan.metricKeys, ["net.down"]);
-        assert.deepEqual(action.bindings[0].refreshOptionsList[1].readPlan.metricKeys, ["net.up"]);
+        assert.deepEqual(listMetricReadPlanKeys(action.bindings[0].refreshOptionsList[0].readPlan), ["net.down"]);
+        assert.deepEqual(listMetricReadPlanKeys(action.bindings[0].refreshOptionsList[1].readPlan), ["net.up"]);
         assert.equal(action.metricsUpdateSnapshots.length, 2);
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
@@ -143,8 +143,8 @@ test("global settings changes re-resolve settings resubscribe and force an immed
 
         assert.equal(action.bindings.length, 2);
         assert.equal(action.bindings[0].disposeCallCount, 1);
-        assert.deepEqual(action.bindings[0].refreshOptionsList[0].readPlan.metricKeys, ["net.down"]);
-        assert.deepEqual(action.bindings[1].refreshOptionsList[0].readPlan.metricKeys, ["net.up"]);
+        assert.deepEqual(listMetricReadPlanKeys(action.bindings[0].refreshOptionsList[0].readPlan), ["net.down"]);
+        assert.deepEqual(listMetricReadPlanKeys(action.bindings[1].refreshOptionsList[0].readPlan), ["net.up"]);
         assert.deepEqual(action.metricsUpdateSnapshots.map(snapshot => snapshot.selectedView), ["circle", "line"]);
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
@@ -171,8 +171,8 @@ test("global settings changes resubscribe even when the polling plan is unchange
 
         assert.equal(action.bindings.length, 2);
         assert.equal(action.bindings[0].disposeCallCount, 1);
-        assert.deepEqual(action.bindings[0].refreshOptionsList[0].readPlan.metricKeys, ["net.down"]);
-        assert.deepEqual(action.bindings[1].refreshOptionsList[0].readPlan.metricKeys, ["net.down"]);
+        assert.deepEqual(listMetricReadPlanKeys(action.bindings[0].refreshOptionsList[0].readPlan), ["net.down"]);
+        assert.deepEqual(listMetricReadPlanKeys(action.bindings[1].refreshOptionsList[0].readPlan), ["net.down"]);
         assert.deepEqual(action.metricsUpdateSnapshots.map(snapshot => snapshot.selectedView), ["circle", "circle"]);
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
@@ -201,7 +201,7 @@ test("metric collection uses action-owned render timer", () => {
     action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
 
     assert.equal(action.bindings[0].refreshOptionsList.length, 1);
-    assert.deepEqual(action.bindings[0].refreshOptionsList[0].readPlan.metricKeys, ["net.down"]);
+    assert.deepEqual(listMetricReadPlanKeys(action.bindings[0].refreshOptionsList[0].readPlan), ["net.down"]);
     assert.equal(action.bindings[0].refreshOptionsList[0].maximumSampleAgeMilliseconds, 6000);
     assert.equal(action.metricsUpdateSnapshots.length, 1);
 

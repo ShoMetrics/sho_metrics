@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { MetricSubscription } from "../../runtime/metric-collection/metric-subscription-registry";
-import type { MetricReadPlan } from "../../runtime/sources/metric-read-plan";
+import { listMetricReadPlanKeys, type MetricReadPlan } from "../../runtime/sources/metric-read-plan";
 import { BackgroundCollectionBinding, type BackgroundCollectionBindingTimer } from "./background-collection-binding";
 
 interface CollectionRegistrationRecord {
@@ -185,7 +185,7 @@ test("first-reading warmup renders once when any subscribed metric receives a re
         timer,
         (readPlan, maximumSampleAgeMilliseconds) => {
             checkedMaximumSampleAgeMilliseconds.push(maximumSampleAgeMilliseconds);
-            return readPlan.metricKeys.some(metricKey => metricKeysWithReadings.has(metricKey));
+            return listMetricReadPlanKeys(readPlan).some(metricKey => metricKeysWithReadings.has(metricKey));
         },
     );
     let tickCount = 0;
@@ -265,10 +265,12 @@ interface FakeTimerHandle {
 
 function buildReadPlan(metricKeys: readonly string[]): MetricReadPlan {
     return {
-        sourceScopeId: "local",
-        metricKeys,
-        sourceCandidates: [{ sourceId: "node-system" }],
-        failureMode: "empty",
+        metrics: metricKeys.map(metricKey => ({
+            sourceScopeId: "local",
+            metricKey,
+            sourceCandidates: [{ sourceId: "node-system" }],
+            failureMode: "empty",
+        })),
     };
 }
 
