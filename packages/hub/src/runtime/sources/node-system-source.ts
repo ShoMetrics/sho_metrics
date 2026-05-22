@@ -262,9 +262,10 @@ export class NodeSystemSource implements MetricSource {
     private async pollMemory(): Promise<Record<string, MetricValue>> {
         try {
             const memoryData = await this.systemInformation.mem();
+            const usedBytes = resolveRamUsedBytes(memoryData, this.platform);
 
             return {
-                [RAM_USED_METRIC_KEY]: buildScalarMetricValue(memoryData.used, { unit: MetricUnit.BYTES }),
+                [RAM_USED_METRIC_KEY]: buildScalarMetricValue(usedBytes, { unit: MetricUnit.BYTES }),
                 [RAM_TOTAL_METRIC_KEY]: buildScalarMetricValue(memoryData.total, { unit: MetricUnit.BYTES }),
             };
         } catch (error) {
@@ -731,6 +732,26 @@ export function resolveNodeSystemMetricGroup(metricKey: string): NodeSystemMetri
     }
 
     return undefined;
+}
+
+function resolveRamUsedBytes(memoryData: Systeminformation.MemData, platform: NodeJS.Platform): number {
+    // On macOS, systeminformation v5 derives available from active pages and can
+    // treat Cached Files as unavailable. Subtract reclaimable memory instead,
+    // matching Activity Monitor's Memory Used more closely. Linux/Windows
+    // available is the platform-level reclaimable-aware value.
+    if (platform === "darwin") {
+        return Number.isFinite(memoryData.reclaimable) && memoryData.reclaimable >= 0
+            ? Math.max(memoryData.used - memoryData.reclaimable, 0)
+            : memoryData.used;
+    }
+
+    if (Number.isFinite(memoryData.available)
+        && memoryData.available >= 0
+        && memoryData.available <= memoryData.total) {
+        return memoryData.total - memoryData.available;
+    }
+
+    return memoryData.used;
 }
 
 function formatNetworkInterfaceRefreshFailureMessage(
