@@ -53,6 +53,49 @@ test("fallback reader uses the next source candidate when the primary has no sca
     });
 });
 
+test("fallback reader uses each metric route's own source order", () => {
+    const metricStore = new MetricStore();
+    const readPlan = normalizeMetricReadPlan({
+        metrics: [
+            {
+                sourceScopeId: "local",
+                metricKey: "cpu.usage_percent",
+                sourceCandidates: [{ sourceId: "node-system" }],
+                failureMode: "empty",
+            },
+            {
+                sourceScopeId: "local",
+                metricKey: "gpu.temp",
+                sourceCandidates: [
+                    { sourceId: "windows-helper" },
+                    { sourceId: "node-system" },
+                ],
+                failureMode: "fallback",
+            },
+        ],
+    });
+
+    metricStore.ingest("windows-helper", buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            "cpu.usage_percent": buildScalarMetricValue(5),
+            "gpu.temp": buildScalarMetricValue(70),
+        },
+    }));
+    metricStore.ingest("node-system", buildMetricSnapshot({
+        timestampMilliseconds: 2000,
+        metrics: {
+            "cpu.usage_percent": buildScalarMetricValue(50),
+            "gpu.temp": buildScalarMetricValue(60),
+        },
+    }));
+
+    const reader = createTestFallbackReader(metricStore, readPlan);
+
+    assert.equal(reader.getWidgetData("cpu.usage_percent", "CPU", "%").current, 50);
+    assert.equal(reader.getWidgetData("gpu.temp", "GPU", "C").current, 70);
+});
+
 test("fallback reader uses fallback when the primary scalar sample is stale", () => {
     const metricStore = new MetricStore();
     const readPlan = buildReadPlan();
