@@ -21,8 +21,8 @@ export interface RenderTextStyles {
 
 const MINIMUM_TEXT_STYLE_FONT_SIZE_SCALE = 0.9;
 const MAXIMUM_TEXT_STYLE_FONT_SIZE_SCALE = 1.12;
-const DEFAULT_RENDER_FONT_FAMILY = "'Inter','SF Pro Display','Segoe UI',sans-serif";
-const TERMINAL_FONT_FAMILY = "'Share Tech Mono','Inter','SF Pro Display','Segoe UI',monospace";
+const DEFAULT_RENDER_FONT_FAMILY = "'SF Pro Display','Helvetica Neue','Inter','Segoe UI',sans-serif";
+const TERMINAL_FONT_FAMILY = "'Share Tech Mono','SF Pro Display','Helvetica Neue','Inter','Segoe UI',monospace";
 
 export const DEFAULT_RENDER_TEXT_STYLES = {
     value: createRenderTextStyle({

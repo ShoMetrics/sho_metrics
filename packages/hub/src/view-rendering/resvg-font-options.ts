@@ -32,9 +32,10 @@ const SYMBOL_FALLBACK_PATTERN = /[\u00b0\u03bc\u03a9\u2190-\u21ff\u2200-\u22ff]/
  * Builds resvg font options without system-wide font loading.
  *
  * Windows and Linux use vendored Inter as the primary Latin UI font for stable
- * small-screen rendering and CI snapshots. macOS uses SF system fonts as the
- * primary UI font to match platform expectations. CJK fallback fonts are added
- * only when visible SVG text needs them.
+ * small-screen rendering and CI snapshots. macOS keeps SF Pro as the primary
+ * family and loads resolvable preinstalled fonts with bundled Inter as the
+ * final Latin fallback. CJK fallback fonts are added only when visible SVG text
+ * needs them.
  */
 export function resolveResvgFontOptions(
     svgString: string,
@@ -179,12 +180,9 @@ function resolvePrimaryFontFileCandidates(environment: ResvgFontResolverEnvironm
             ].filter((fontFile): fontFile is string => Boolean(fontFile));
         case "darwin":
             return [
-                "/System/Library/Fonts/SFNS.ttf",
-                "/System/Library/Fonts/SFNSDisplay.ttf",
-                "/System/Library/Fonts/SFNSRounded.ttf",
-                "/System/Library/Fonts/Apple Symbols.ttf",
-                "/System/Library/Fonts/Supplemental/Arial.ttf",
-            ];
+                "/System/Library/Fonts/HelveticaNeue.ttc",
+                environment.bundledInterFontFile,
+            ].filter((fontFile): fontFile is string => Boolean(fontFile));
         default:
             return [environment.bundledInterFontFile]
                 .filter((fontFile): fontFile is string => Boolean(fontFile));
