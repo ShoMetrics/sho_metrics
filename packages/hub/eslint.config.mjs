@@ -222,6 +222,55 @@ const restrictedConcreteActionImportRules = {
   patterns: [...restrictedNonStorageSchemaHardeningImports.patterns],
 };
 
+const restrictedRuntimeSourceClientImports = {
+  patterns: [
+    {
+      group: [
+        '../source-routing/*',
+        '../../source-routing/*',
+        '../../../source-routing/*',
+      ],
+      message: 'Runtime source clients must not import source-routing policy. Routing decides desired source order before sources read data.',
+    },
+  ],
+};
+
+const restrictedRuntimeSourceRoutingImports = {
+  patterns: [
+    {
+      group: [
+        '../metric-collection/*',
+        '../../metric-collection/*',
+        '../../../metric-collection/*',
+      ],
+      message: 'Source routing must not import metric collection. Routing builds read plans; collection owns polling and freshness.',
+    },
+    {
+      group: [
+        '../sources/node-system/*',
+        '../sources/windows-helper/*',
+        '../../sources/node-system/*',
+        '../../sources/windows-helper/*',
+      ],
+      message: 'Source routing may import source IDs/contracts, not concrete source implementations.',
+    },
+  ],
+};
+
+const restrictedRuntimeMetricCollectionImports = {
+  patterns: [
+    {
+      group: [
+        '../sources/node-system/*',
+        '../sources/windows-helper/*',
+        '../../sources/node-system/*',
+        '../../sources/windows-helper/*',
+      ],
+      message: 'Metric collection must depend on source contracts, not concrete source implementations.',
+    },
+  ],
+};
+
 const sourceSafetyRules = {
   'no-console': 'error',
   'no-eval': 'error',
@@ -299,6 +348,42 @@ export default tseslint.config(
     files: ['src/{rendering,widgets}/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': ['error', restrictedRendererImportRules],
+    },
+  },
+  {
+    files: ['src/runtime/sources/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [...restrictedNonStorageSchemaHardeningImports.paths],
+        patterns: [
+          ...restrictedNonStorageSchemaHardeningImports.patterns,
+          ...restrictedRuntimeSourceClientImports.patterns,
+        ],
+      }],
+    },
+  },
+  {
+    files: ['src/runtime/source-routing/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [...restrictedNonStorageSchemaHardeningImports.paths],
+        patterns: [
+          ...restrictedNonStorageSchemaHardeningImports.patterns,
+          ...restrictedRuntimeSourceRoutingImports.patterns,
+        ],
+      }],
+    },
+  },
+  {
+    files: ['src/runtime/metric-collection/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [...restrictedNonStorageSchemaHardeningImports.paths],
+        patterns: [
+          ...restrictedNonStorageSchemaHardeningImports.patterns,
+          ...restrictedRuntimeMetricCollectionImports.patterns,
+        ],
+      }],
     },
   },
   {
