@@ -7,16 +7,16 @@ import {
     type MetricSource,
     type MetricSnapshot,
     type MetricValue,
-} from "./metric-source";
-import { logger } from "../../logging/logger";
-import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../network-interfaces";
+} from "../metric-source";
+import { logger } from "../../../logging/logger";
+import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../../network-interfaces";
 import {
     getNetworkAggregateMetricKey,
     getNetworkInterfaceMetricKey,
     isNetworkMetricKey,
     type NetworkMetricDirection,
-} from "../network-metric-keys";
-import { diskVolumeRegistry, type DiskVolumeOption } from "../disk-volumes";
+} from "../../network-metric-keys";
+import { diskVolumeRegistry, type DiskVolumeOption } from "../../disk-volumes";
 import {
     getDefaultDiskUsageMetricKey,
     getDiskThroughputMetricKey,
@@ -24,7 +24,7 @@ import {
     isDiskMetricKey,
     isDiskThroughputMetricKey,
     isDiskUsageMetricKey,
-} from "../disk-metric-keys";
+} from "../../disk-metric-keys";
 import {
     CPU_BASE_FREQUENCY_METRIC_KEY,
     CPU_MODEL_METRIC_KEY,
@@ -41,7 +41,7 @@ import {
     isCpuMetricKey,
     isGpuMetricKey,
     isRamMetricKey,
-} from "../metric-keys";
+} from "../../metric-keys";
 import { formatCpuModelText, isFinitePositiveNumber } from "./node-system-cpu";
 import {
     calculatePercent,
@@ -72,10 +72,10 @@ import type {
     NodeSystemNetworkCounterSample,
     NodeSystemNetworkRateCalculation,
 } from "./node-system-source-types";
-import { BackoffPolicy } from "./backoff-policy";
-import { RefreshableCache, type RefreshableCacheReadResult } from "./refreshable-cache";
-import type { SourceMetricPollingGroupResolution } from "./source-polling-groups";
-import { NODE_SYSTEM_SOURCE_ID } from "./source-ids";
+import { BackoffPolicy } from "../backoff-policy";
+import { RefreshableCache, type RefreshableCacheReadResult } from "../refreshable-cache";
+import type { SourceMetricPollingGroupResolution } from "../source-polling-groups";
+import { NODE_SYSTEM_SOURCE_ID } from "../source-ids";
 
 const log = logger.for("Source:NodeSystem");
 const networkLog = logger.for("Source:NodeSystem:Network");

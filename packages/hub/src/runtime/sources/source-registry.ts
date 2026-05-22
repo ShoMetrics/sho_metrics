@@ -1,7 +1,7 @@
-import { NodeSystemSource } from "./node-system-source";
+import { NodeSystemSource } from "./node-system/node-system-source";
 import { createMetricSourceClient, type SourceClient } from "./source-client";
 import type { SourceMetadataInvalidationListener } from "./source-planning-metadata";
-import { WindowsHelperSourceClient } from "./windows-helper-source-client";
+import { WindowsHelperSourceClient } from "./windows-helper/windows-helper-source-client";
 
 /** Options for default source registry creation. */
 export interface DefaultSourceRegistryOptions {

@@ -6,13 +6,13 @@ import {
     ListMetricDescriptorsResponseSchema,
     ReadMetricSnapshotResponseSchema,
     SourceErrorSchema,
-} from "../../generated/shometrics/v1/source_api_pb.js";
+} from "../../../generated/shometrics/v1/source_api_pb.js";
 import {
     SourceIpcRequestSchema,
     SourceIpcResponseSchema,
     type SourceIpcRequest,
     type SourceIpcResponse,
-} from "../../generated/shometrics/v1/source_ipc_pb.js";
+} from "../../../generated/shometrics/v1/source_ipc_pb.js";
 import {
     buildMetricSnapshot,
     buildScalarMetricValue,
@@ -20,8 +20,8 @@ import {
     MetricUnit,
     MetricValueKind,
     readRequiredMetricSnapshotTimestampMilliseconds,
-} from "./metric-source";
-import type { SourceMetadataInvalidation } from "./source-planning-metadata";
+} from "../metric-source";
+import type { SourceMetadataInvalidation } from "../source-planning-metadata";
 import {
     decodeSourceIpcFrame,
     encodeSourceIpcFrame,
@@ -36,7 +36,7 @@ import {
     type WindowsHelperPipeTransport,
     type WindowsHelperSourceClientOptions,
 } from "./windows-helper-source-client";
-import { WINDOWS_HELPER_SOURCE_ID } from "./source-ids";
+import { WINDOWS_HELPER_SOURCE_ID } from "../source-ids";
 
 const [
     INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,

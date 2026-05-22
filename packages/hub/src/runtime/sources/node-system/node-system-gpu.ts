@@ -1,5 +1,5 @@
 import { execFile, type ExecFileException } from "node:child_process";
-import { logger } from "../../logging/logger";
+import { logger } from "../../../logging/logger";
 import { normalizeNonEmptyText } from "./node-system-cpu";
 import type { NodeSystemGpuTelemetryData, NodeSystemInformationClient } from "./node-system-source-types";
 

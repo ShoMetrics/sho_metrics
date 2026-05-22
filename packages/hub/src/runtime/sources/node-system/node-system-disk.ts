@@ -1,5 +1,5 @@
 import type { Systeminformation } from "systeminformation";
-import { type DiskStorageKind, type DiskVolumeOption } from "../disk-volumes";
+import { type DiskStorageKind, type DiskVolumeOption } from "../../disk-volumes";
 
 export function isUsableFileSystem(fileSystem: Systeminformation.FsSizeData): boolean {
     return fileSystem.size > 0

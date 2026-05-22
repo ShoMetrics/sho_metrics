@@ -1,6 +1,6 @@
 import type { Systeminformation } from "systeminformation";
-import { type NetworkInterfaceOption } from "../network-interfaces";
-import type { NetworkMetricDirection } from "../network-metric-keys";
+import { type NetworkInterfaceOption } from "../../network-interfaces";
+import type { NetworkMetricDirection } from "../../network-metric-keys";
 import type {
     NodeSystemNetworkCounterSample,
     NodeSystemNetworkRateCalculation,

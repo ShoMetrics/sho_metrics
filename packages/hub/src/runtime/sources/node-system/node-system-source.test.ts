@@ -6,7 +6,7 @@ import {
     readRequiredMetricSnapshotTimestampMilliseconds,
     type MetricSnapshot,
     type MetricValue,
-} from "./metric-source";
+} from "../metric-source";
 import {
     formatCpuModelText,
     isFinitePositiveNumber,
@@ -47,8 +47,8 @@ import type {
     NodeSystemInformationClient,
     NodeSystemMetricGroup,
 } from "./node-system-source-types";
-import type { DiskVolumeOption } from "../disk-volumes";
-import type { NetworkInterfaceOption } from "../network-interfaces";
+import type { DiskVolumeOption } from "../../disk-volumes";
+import type { NetworkInterfaceOption } from "../../network-interfaces";
 
 test("collector groups resolve all groups when no metric keys are requested", () => {
     assertMetricGroups(resolveCollectorGroups([]), ["cpu", "disk", "gpu", "memory", "network"]);
