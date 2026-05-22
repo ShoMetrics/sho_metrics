@@ -8,6 +8,7 @@ Read these documents in order:
 4. [Phase 6 Source Capability, GPU, And History](04-phase-6-source-capability-gpu-and-history.md)
 5. [Windows Source Latency Findings](05-windows-source-latency-findings.md)
 6. [Metric-Level Source Routing](06-metric-level-source-routing.md)
+7. [Runtime Source Future Work](07-runtime-source-future-work.md)
 
 ## Current State
 
@@ -39,6 +40,7 @@ that only made sense during the original investigation.
 | `04-phase-6-source-capability-gpu-and-history.md` | Phase 6 design notes for descriptor/capability invalidation, LHM helper snapshot caching, GPU process churn, source capability filtering, and history retention. | You are about to add LHM/custom descriptors, source capability filtering, GPU telemetry changes, or retention policy. |
 | `05-windows-source-latency-findings.md` | Evidence-backed Windows source choice notes after comparing Node/systeminformation, C# native counters, helper LHM DLL reads, and LHM JSON cache reads. | You are about to choose the default provider for CPU/RAM/network/disk/GPU metrics or revise Phase 6 helper priorities. |
 | `06-metric-level-source-routing.md` | Design for moving source candidate preference from plan-level to metric-level while preserving Phase 5c boundaries. | You are about to change `MetricReadPlan`, local auto source preference, action subscriptions, or render-time fallback order. |
+| `07-runtime-source-future-work.md` | Extracted future-work checklist: what can be built next, what is not wired yet, and what is deferred. | You need to decide whether PI/settings, LHM catalog selection, custom HTTP, rotation, multi-metric widgets, or remaining runtime follow-ups are blocked. |
 
 ## Non-Negotiable Priorities
 
