@@ -10,7 +10,7 @@ export function renderDiskThroughputDirectionIconFragment(options: {
 }): string {
     const iconDefinition = createLucideIconDefinition({
         id: `disk.throughput.${options.direction}`,
-        node: options.direction === "read" ? HardDriveDownload : HardDriveUpload,
+        node: options.direction === "read" ? HardDriveUpload : HardDriveDownload,
         color: options.color,
         strokeWidth: 2.35,
         opticalScale: 1.05,
