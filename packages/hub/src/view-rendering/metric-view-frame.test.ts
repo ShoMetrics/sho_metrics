@@ -19,11 +19,13 @@ import {
     buildMetricViewRenderPlan,
     buildRenderDualChannelWidgetData,
     buildRenderWidgetData,
+    composeMetricViewFrame,
     hasMetricViewData,
     resolveEffectiveCircleVariant,
     resolveMetricViewLogValue,
     resolveMetricViewSampleTimestampMilliseconds,
     resolveTouchStripMetricLayout,
+    type DualMetricRenderOptions,
     type SingleMetricRenderOptions,
 } from "./metric-view-frame";
 
@@ -122,6 +124,23 @@ test("dual-channel widget without any data renders both channels as N/A", () => 
     assert.equal(renderWidgetData.negative.displayValue, "N/A");
     assert.equal(renderWidgetData.negative.unit, "");
     assert.deepEqual(renderWidgetData.negative.history, []);
+});
+
+test("dual text view does not render caller unit text for unavailable channels", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildDualMetricRenderOptions({
+            widgetData: buildDualChannelWidgetData({
+                positive: buildWidgetData({ label: "UP", unit: "MB/s" }),
+                negative: buildWidgetData({ label: "DOWN", unit: "MB/s" }),
+            }),
+            positiveUnitText: "M",
+            negativeUnitText: "M",
+        }),
+        renderTarget: "key",
+    });
+
+    assert.match(frame.svg, />N\/A<\/text>/);
+    assert.doesNotMatch(frame.svg, />M<\/text>/);
 });
 
 test("dual-channel widget fills a missing side with zero history when the other side has data", () => {
@@ -264,6 +283,29 @@ function buildSingleMetricRenderOptions(options: {
         statusIcon: buildStatusIcon(),
         widgetData: options.widgetData,
         resolvedSettings: buildDefaultAppearanceSettings(options.resolvedSettings),
+    };
+}
+
+function buildDualMetricRenderOptions(options: {
+    widgetData: DualChannelWidgetData;
+    positiveUnitText?: string;
+    negativeUnitText?: string;
+}): DualMetricRenderOptions {
+    return {
+        centerIconFragment: "",
+        statusIcon: buildStatusIcon(),
+        widgetData: options.widgetData,
+        titleText: "NET",
+        dualRenderPrimitive: "text",
+        positiveColor: "#ffffff",
+        negativeColor: "#ffffff",
+        positiveLabelText: "UP",
+        negativeLabelText: "DN",
+        positiveUnitText: options.positiveUnitText,
+        negativeUnitText: options.negativeUnitText,
+        resolvedSettings: buildDefaultAppearanceSettings({
+            view: { selectedView: "text" },
+        }),
     };
 }
 

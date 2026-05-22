@@ -206,6 +206,8 @@ function renderDualFinalSvg(options: {
         circleVariant: visualSettings.circleVariant,
         topIcon: getHardwareIconFragment("disk"),
         positive: {
+            labelText: "UP",
+            unitText: "M",
             color: channelColor,
             colorConfig: visualSettings.paints.primaryMetric,
             icon: renderNetworkDirectionIconFragment({
@@ -215,6 +217,8 @@ function renderDualFinalSvg(options: {
             }),
         },
         negative: {
+            labelText: "DN",
+            unitText: "M",
             color: channelColor,
             colorConfig: visualSettings.paints.primaryMetric,
             icon: renderNetworkDirectionIconFragment({

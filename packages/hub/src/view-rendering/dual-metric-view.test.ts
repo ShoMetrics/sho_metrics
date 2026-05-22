@@ -25,8 +25,8 @@ test("dual metric view renders the requested primitive branch", () => {
             centerContent: "value",
             circleVariant: "full-ring",
             topIcon: "",
-            positive: { color: "#3b82f6" },
-            negative: { color: "#ef4444" },
+            positive: { labelText: "UP", unitText: "M", color: "#3b82f6" },
+            negative: { labelText: "DN", unitText: "M", color: "#ef4444" },
         });
 
         assert.match(svg, testCase.expected);

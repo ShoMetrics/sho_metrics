@@ -74,6 +74,84 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "multi-color");
     });
 
+    it("defaults text view metric paint to black-white", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    overrides: {
+                        appearance: {
+                            view: {
+                                selectedView: "METRIC_VIEW_TEXT",
+                            },
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+        });
+
+        assert.equal(settings.widget.slot.appearance.view.selectedView, "text");
+        assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "black-white");
+    });
+
+    it("keeps terminal text view paint on the theme-owned default", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    overrides: {
+                        appearance: {
+                            view: {
+                                selectedView: "METRIC_VIEW_TEXT",
+                            },
+                            theme: {
+                                selectedTheme: "METRIC_THEME_TERMINAL",
+                            },
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+        });
+
+        assert.equal(settings.widget.slot.appearance.view.selectedView, "text");
+        assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "terminal");
+        assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "multi-color");
+    });
+
+    it("preserves an explicit text view metric paint selection", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    overrides: {
+                        appearance: {
+                            view: {
+                                selectedView: "METRIC_VIEW_TEXT",
+                            },
+                            paint: {
+                                metric: {
+                                    colorMode: "COLOR_MODE_SOLID",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+        });
+
+        assert.equal(settings.widget.slot.appearance.view.selectedView, "text");
+        assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "solid");
+    });
+
     it("cascades global defaults widget overrides and runtime maxima", () => {
         const storedGlobalSettings = readStoredGlobalSettings({
             defaults: {

@@ -26,6 +26,8 @@ import type {
 type DualMetricRenderPrimitive = "circle" | "text" | "sparkline";
 
 interface DualMetricChannelViewProps {
+    labelText: string;
+    unitText: string;
     color: string;
     colorConfig?: ColorConfig;
     icon?: string;
@@ -99,7 +101,17 @@ function renderDualTextMetricView(options: DualMetricBodyViewProps): string {
         themeEffects: options.visual.themeEffects,
         positiveColor: options.positive.color,
         negativeColor: options.negative.color,
-    }, options.renderSize);
+    }, options.renderSize, {
+        titleText: options.titleText,
+        positive: {
+            labelText: options.positive.labelText,
+            unitText: options.positive.unitText,
+        },
+        negative: {
+            labelText: options.negative.labelText,
+            unitText: options.negative.unitText,
+        },
+    });
 }
 
 function renderDualSparklineMetric(options: DualMetricBodyViewProps): string {

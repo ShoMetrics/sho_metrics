@@ -15,6 +15,7 @@ import {
     buildNetworkSpeedWidgetData,
     convertMegabitsPerSecondToBytesPerSecond,
 } from "../../metrics/network-speed-widget-data";
+import { formatDataRateUnitSymbol } from "../../metrics/byte-format";
 import { PROGRESS_CIRCLE_LABELS } from "../../widgets/primitives/progress-circle-label";
 import {
     getNetworkDirectionStatusIcon,
@@ -206,7 +207,7 @@ function buildDualNetworkCircleOrTextViewOptions(
             positive: uploadWidgetData,
             negative: downloadWidgetData,
         },
-        titleText: "NETWORK",
+        titleText: options.dualRenderPrimitive === "text" ? "NET" : "NETWORK",
         centerIconFragment: renderNetworkInterfaceIconFragment({
             networkInterface: options.selectedNetworkInterface,
             size: NETWORK_CENTER_ICON_SIZE,
@@ -219,6 +220,10 @@ function buildDualNetworkCircleOrTextViewOptions(
         negativeColor: downloadColor,
         positiveColorConfig: uploadColorConfig,
         negativeColorConfig: downloadColorConfig,
+        positiveLabelText: "UP",
+        negativeLabelText: "DN",
+        positiveUnitText: formatDataRateUnitSymbol(uploadWidgetData.unit),
+        negativeUnitText: formatDataRateUnitSymbol(downloadWidgetData.unit),
         positiveIconFragment: renderNetworkDirectionIconFragment({
             direction: "upload",
             color: uploadColor,
