@@ -7,6 +7,7 @@ import {
     type DiskThroughputMetricDirection,
 } from "../../runtime/disk-metric-keys";
 import { buildDiskThroughputWidgetData, buildDiskUsageWidgetData } from "../../metrics/storage-widget-data";
+import { formatDataRateUnitSymbol } from "../../metrics/byte-format";
 import type {
     ResolvedDiskMetricTarget,
     ResolvedWidgetSettings,
@@ -245,6 +246,10 @@ function buildDualThroughputViewOptions(
         negativeColor: writeColor,
         positiveColorConfig: readColorConfig,
         negativeColorConfig: writeColorConfig,
+        positiveLabelText: "RD",
+        negativeLabelText: "WR",
+        positiveUnitText: formatDataRateUnitSymbol(readWidgetData.unit),
+        negativeUnitText: formatDataRateUnitSymbol(writeWidgetData.unit),
         positiveIconFragment: renderDiskThroughputDirectionIconFragment({
             direction: "read",
             color: readColor,

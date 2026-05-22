@@ -44,6 +44,10 @@ export interface DualMetricRenderOptions extends BaseMetricRenderOptions {
     negativeColor: string;
     positiveColorConfig?: ColorConfig;
     negativeColorConfig?: ColorConfig;
+    positiveLabelText?: string;
+    negativeLabelText?: string;
+    positiveUnitText?: string;
+    negativeUnitText?: string;
     positiveIconFragment?: string;
     negativeIconFragment?: string;
     positiveStatusIcon?: ProgressCircleStatusIcon;
@@ -298,12 +302,16 @@ function composeDualMetricBody(
             circleVariant: renderPlan.circleVariant,
             topIcon: options.centerIconFragment,
             positive: {
+                labelText: options.positiveLabelText ?? renderedMetricData.positive.label,
+                unitText: resolveDualMetricChannelUnitText(renderedMetricData.positive, options.positiveUnitText),
                 color: options.positiveColor,
                 colorConfig: options.positiveColorConfig,
                 icon: options.positiveIconFragment,
                 statusIcon: options.positiveStatusIcon,
             },
             negative: {
+                labelText: options.negativeLabelText ?? renderedMetricData.negative.label,
+                unitText: resolveDualMetricChannelUnitText(renderedMetricData.negative, options.negativeUnitText),
                 color: options.negativeColor,
                 colorConfig: options.negativeColorConfig,
                 icon: options.negativeIconFragment,
@@ -313,6 +321,14 @@ function composeDualMetricBody(
         renderedMetricData,
         muted: false,
     };
+}
+
+function resolveDualMetricChannelUnitText(widgetData: WidgetData, unitText: string | undefined): string {
+    if (widgetData.unit.length === 0) {
+        return "";
+    }
+
+    return unitText ?? widgetData.unit;
 }
 
 function buildPlaceholderChannelWidgetData(widgetData: WidgetData, displayValue: string): WidgetData {

@@ -144,6 +144,8 @@ const DEFAULT_NETWORK_APPEARANCE_SETTINGS = buildDefaultAppearanceSettings({
     },
 });
 
+const TEXT_VIEW_DEFAULT_METRIC_COLOR_MODE = "black-white" satisfies ColorMode;
+
 const DEFAULT_WIDGET_PREFERENCES: ResolvedWidgetPreferences = {
     pollingFrequencySeconds: 1,
 };
@@ -669,11 +671,36 @@ function mergeAppearanceSettings(
     defaults: ResolvedAppearanceSettings,
     storedAppearance: StoredAppearanceSettings | undefined,
 ): ResolvedAppearanceSettings {
+    const view = resolveAppearanceViewSettings(defaults.view, storedAppearance?.view);
+    const theme = resolveAppearanceThemeSettings(defaults.theme, storedAppearance?.theme);
+    const appearanceDefaults = resolveAppearanceDefaultsForViewAndTheme(defaults, view, theme);
+
     return {
-        view: resolveAppearanceViewSettings(defaults.view, storedAppearance?.view),
-        theme: resolveAppearanceThemeSettings(defaults.theme, storedAppearance?.theme),
-        paint: resolveAppearancePaintSettings(defaults.paint, storedAppearance?.paint),
-        line: resolveLineAppearanceSettings(defaults.line, storedAppearance?.line),
+        view,
+        theme,
+        paint: resolveAppearancePaintSettings(appearanceDefaults.paint, storedAppearance?.paint),
+        line: resolveLineAppearanceSettings(appearanceDefaults.line, storedAppearance?.line),
+    };
+}
+
+function resolveAppearanceDefaultsForViewAndTheme(
+    targetDefaults: ResolvedAppearanceSettings,
+    resolvedView: ResolvedAppearanceViewSettings,
+    resolvedTheme: ResolvedAppearanceThemeSettings,
+): ResolvedAppearanceSettings {
+    if (resolvedTheme.selectedTheme === "terminal" || resolvedView.selectedView !== "text") {
+        return targetDefaults;
+    }
+
+    return {
+        ...targetDefaults,
+        paint: {
+            ...targetDefaults.paint,
+            metric: {
+                ...targetDefaults.paint.metric,
+                colorMode: TEXT_VIEW_DEFAULT_METRIC_COLOR_MODE,
+            },
+        },
     };
 }
 

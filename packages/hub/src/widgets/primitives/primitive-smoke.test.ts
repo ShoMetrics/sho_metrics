@@ -54,9 +54,27 @@ test("text metric renders a pure text layout without a ring", () => {
     assert.match(svgFragment, /text-metric-label/);
     assert.match(svgFragment, /&lt;CPU&gt;/);
     assert.match(svgFragment, /&lt;42&gt;/);
-    assert.match(svgFragment, /fill="#3b82f6"/);
-    assert.match(svgFragment, /Ryzen &amp; Threadripper/);
+    assert.match(svgFragment, /text-metric-unit/);
+    assert.match(svgFragment, /id="text-metric-label"[\s\S]*y="23\.04"/);
+    assert.match(svgFragment, /id="text-metric-value"[\s\S]*y="77\.76"/);
+    assert.match(svgFragment, /id="text-metric-unit"[\s\S]*y="125\.28"/);
+    assert.match(svgFragment, /fill="#e6e6e6"/);
+    assert.doesNotMatch(svgFragment, /Ryzen &amp; Threadripper/);
+    assert.doesNotMatch(svgFragment, /text-metric-secondary/);
     assert.doesNotMatch(svgFragment, /Arc Gauge: track/);
+});
+
+test("text metric uses a horizontal touch strip layout for wide keys", () => {
+    const svgFragment = textMetric.render({
+        ...buildWidgetData(),
+        label: "CPU",
+        displayValue: "67",
+        unit: "%",
+    }, DEFAULT_TEXT_METRIC_CONFIG, { width: 200, height: 100 });
+
+    assert.match(svgFragment, /id="text-metric-label"[\s\S]*x="14" y="52"/);
+    assert.match(svgFragment, /id="text-metric-value"[\s\S]*x="112(?:\.00)?" y="56(?:\.00)?"/);
+    assert.match(svgFragment, /id="text-metric-unit"[\s\S]*x="186" y="68"[\s\S]*text-anchor="end"/);
 });
 
 test("gauge circle variant opens the bottom arc and renders a marker dot", () => {
@@ -673,20 +691,136 @@ test("dual text metric renders two escaped value rows", () => {
     const svgFragment = renderDualTextMetric({
         positive: {
             ...buildWidgetData(),
-            label: `<UP>`,
+            label: `Positive Source`,
             displayValue: "12",
         },
         negative: {
             ...buildWidgetData(),
-            label: `<DOWN>`,
+            label: `Negative Source`,
             displayValue: "4",
         },
-    }, DEFAULT_TEXT_METRIC_CONFIG, keySize);
+    }, DEFAULT_TEXT_METRIC_CONFIG, keySize, {
+        titleText: "GPU",
+        positive: {
+            labelText: "P0",
+            unitText: "U0",
+        },
+        negative: {
+            labelText: "P1",
+            unitText: "U1",
+        },
+    });
 
     assert.match(svgFragment, /text-metric-positive-value/);
     assert.match(svgFragment, /text-metric-negative-value/);
-    assert.match(svgFragment, /&lt;UP&gt;/);
-    assert.match(svgFragment, /&lt;DOWN&gt;/);
+    assert.match(svgFragment, /text-metric-dual-title/);
+    assert.match(svgFragment, />GPU<\/text>/);
+    assert.match(svgFragment, />P0<\/text>/);
+    assert.match(svgFragment, />P1<\/text>/);
+    assert.match(svgFragment, />U0<\/text>/);
+    assert.match(svgFragment, />U1<\/text>/);
+    assert.doesNotMatch(svgFragment, />NET<\/text>/);
+});
+
+test("dual text metric uses aligned compact rate rows for wide keys", () => {
+    const svgFragment = renderDualTextMetric({
+        positive: {
+            ...buildWidgetData(),
+            label: "UP",
+            displayValue: "12",
+            unit: "MB/s",
+        },
+        negative: {
+            ...buildWidgetData(),
+            label: "DOWN",
+            displayValue: "4",
+            unit: "MB/s",
+        },
+    }, DEFAULT_TEXT_METRIC_CONFIG, { width: 200, height: 100 }, {
+        titleText: "NET",
+        positive: {
+            labelText: "UP",
+            unitText: "M",
+        },
+        negative: {
+            labelText: "DN",
+            unitText: "M",
+        },
+    });
+
+    assert.match(svgFragment, /id="text-metric-dual-title"[\s\S]*x="14" y="52"[\s\S]*>NET<\/text>/);
+    assert.match(svgFragment, /id="text-metric-positive-label"[\s\S]*x="54" y="36"[\s\S]*>UP<\/text>/);
+    assert.match(svgFragment, /id="text-metric-negative-label"[\s\S]*x="54" y="68"[\s\S]*>DN<\/text>/);
+    assert.match(svgFragment, /id="text-metric-positive-value"[\s\S]*x="156" y="36"[\s\S]*text-anchor="end"/);
+    assert.match(svgFragment, /id="text-metric-negative-value"[\s\S]*x="156" y="68"[\s\S]*text-anchor="end"/);
+    assert.match(svgFragment, /id="text-metric-positive-unit"[\s\S]*x="186" y="42"[\s\S]*text-anchor="end"[\s\S]*>M<\/text>/);
+    assert.match(svgFragment, /id="text-metric-negative-unit"[\s\S]*x="186" y="74"[\s\S]*text-anchor="end"[\s\S]*>M<\/text>/);
+});
+
+test("dual text metric keeps square rate rows inside symmetric padding", () => {
+    const svgFragment = renderDualTextMetric({
+        positive: {
+            ...buildWidgetData(),
+            label: "UP",
+            displayValue: "999",
+            unit: "MB/s",
+        },
+        negative: {
+            ...buildWidgetData(),
+            label: "DOWN",
+            displayValue: "1000",
+            unit: "GB/s",
+        },
+    }, DEFAULT_TEXT_METRIC_CONFIG, keySize, {
+        titleText: "NET",
+        positive: {
+            labelText: "UP",
+            unitText: "M",
+        },
+        negative: {
+            labelText: "DN",
+            unitText: "G",
+        },
+    });
+
+    assert.match(svgFragment, /id="text-metric-positive-label"[\s\S]*x="14"[\s\S]*>UP<\/text>/);
+    assert.match(svgFragment, /id="text-metric-positive-value"[\s\S]*x="108"[\s\S]*text-anchor="end"[\s\S]*>999<\/text>/);
+    assert.match(svgFragment, /id="text-metric-negative-value"[\s\S]*x="108"[\s\S]*text-anchor="end"[\s\S]*>1000<\/text>/);
+    assert.match(svgFragment, /id="text-metric-positive-unit"[\s\S]*x="130"[\s\S]*y="73\.24"[\s\S]*text-anchor="end"[\s\S]*>M<\/text>/);
+    assert.match(svgFragment, /id="text-metric-negative-unit"[\s\S]*x="130"[\s\S]*y="112\.12"[\s\S]*text-anchor="end"[\s\S]*>G<\/text>/);
+});
+
+test("dual text metric uses disk read and write abbreviations", () => {
+    const svgFragment = renderDualTextMetric({
+        positive: {
+            ...buildWidgetData(),
+            label: "READ",
+            displayValue: "1",
+            unit: "GB/s",
+        },
+        negative: {
+            ...buildWidgetData(),
+            label: "WRIT",
+            displayValue: "512",
+            unit: "KB/s",
+        },
+    }, DEFAULT_TEXT_METRIC_CONFIG, keySize, {
+        titleText: "DISK",
+        positive: {
+            labelText: "RD",
+            unitText: "G",
+        },
+        negative: {
+            labelText: "WR",
+            unitText: "K",
+        },
+    });
+
+    assert.match(svgFragment, />DISK<\/text>/);
+    assert.match(svgFragment, />RD<\/text>/);
+    assert.match(svgFragment, />WR<\/text>/);
+    assert.match(svgFragment, /id="text-metric-positive-unit"[\s\S]*>G<\/text>/);
+    assert.match(svgFragment, /id="text-metric-negative-unit"[\s\S]*>K<\/text>/);
 });
 
 function buildWidgetData(): WidgetData {

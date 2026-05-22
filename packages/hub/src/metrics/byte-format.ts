@@ -63,6 +63,10 @@ export function formatBytesPerSecond(options: {
     };
 }
 
+export function formatDataRateUnitSymbol(unit: string): string {
+    return unit.trim().charAt(0).toUpperCase();
+}
+
 export function formatByteCount(options: {
     bytes: number;
     base: number;
