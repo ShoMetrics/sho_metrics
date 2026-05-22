@@ -3,7 +3,7 @@ import type { WidgetData } from "../../view-rendering/widget-data";
 import {
     normalizeMetricReadPlan,
     type MetricReadPlan,
-    selectMetricReadPlanSourceCandidates,
+    selectMetricReadRouteSourceCandidates,
 } from "../sources/metric-read-plan";
 
 export interface FallbackMetricStoreReaderOptions {
@@ -33,13 +33,17 @@ export function createFallbackMetricStoreReader(
     options: FallbackMetricStoreReaderOptions,
 ): MetricStoreReader {
     const normalizedReadPlan = normalizeMetricReadPlan(readPlan);
-    const sourceCandidates = selectMetricReadPlanSourceCandidates(normalizedReadPlan);
-    const sourceReaders = sourceCandidates.map(candidate => metricStore.forScope(candidate.sourceId));
+    const sourceReadersByMetricKey = new Map(normalizedReadPlan.metrics.map(metric => [
+        metric.metricKey,
+        selectMetricReadRouteSourceCandidates(metric)
+            .map(candidate => metricStore.forScope(candidate.sourceId)),
+    ]));
     const now = options.now ?? Date.now;
 
     return {
         getWidgetData: (metricKey, label, unit, maxValue) => {
             const currentTimestampMilliseconds = now();
+            const sourceReaders = sourceReadersByMetricKey.get(metricKey) ?? [];
 
             for (const sourceReader of sourceReaders) {
                 const widgetData = sourceReader.getWidgetData(metricKey, label, unit, maxValue);
@@ -59,6 +63,8 @@ export function createFallbackMetricStoreReader(
             // Text values currently represent static descriptors such as CPU/GPU
             // model names. Add timestamped text reads only when real-time text
             // metrics need freshness semantics.
+            const sourceReaders = sourceReadersByMetricKey.get(metricKey) ?? [];
+
             for (const sourceReader of sourceReaders) {
                 const textValue = sourceReader.getTextValue(metricKey);
 

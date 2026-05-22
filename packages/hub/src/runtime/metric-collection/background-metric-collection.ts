@@ -5,7 +5,7 @@ import {
     normalizeMetricReadPlan,
     type MetricReadPlan,
     type SourceCandidate,
-    selectMetricReadPlanSourceCandidates,
+    selectMetricReadRouteSourceCandidates,
 } from "../sources/metric-read-plan";
 import {
     createDefaultSourceRegistry,
@@ -125,10 +125,23 @@ export class BackgroundMetricCollection {
      */
     async refreshReadPlanOnce(readPlan: MetricReadPlan): Promise<void> {
         const normalizedReadPlan = normalizeMetricReadPlan(readPlan);
-        const sourceCandidates = selectMetricReadPlanSourceCandidates(normalizedReadPlan);
+        const metricKeysBySourceId = new Map<string, Set<string>>();
 
-        await Promise.all(sourceCandidates.map(sourceCandidate => (
-            this.refreshSourceCandidateOnce(sourceCandidate, normalizedReadPlan.metricKeys)
+        for (const metric of normalizedReadPlan.metrics) {
+            for (const sourceCandidate of selectMetricReadRouteSourceCandidates(metric)) {
+                const metricKeys = metricKeysBySourceId.get(sourceCandidate.sourceId);
+
+                if (metricKeys) {
+                    metricKeys.add(metric.metricKey);
+                    continue;
+                }
+
+                metricKeysBySourceId.set(sourceCandidate.sourceId, new Set([metric.metricKey]));
+            }
+        }
+
+        await Promise.all(Array.from(metricKeysBySourceId.entries()).map(([sourceId, metricKeys]) => (
+            this.refreshSourceCandidateOnce({ sourceId }, Array.from(metricKeys).sort())
         )));
     }
 

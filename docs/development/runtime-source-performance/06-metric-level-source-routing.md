@@ -58,7 +58,7 @@ Current metric lifecycle:
 ```text
 MetricAction
   -> getMetricKeys(event)
-  -> buildMetricReadPlanForMetricKeys(...)
+  -> buildReadPlanForMetricKeys(...)
   -> buildMetricReadPlanFromSourcePolicy(...)
   -> buildMetricSubscriptions(readPlan)
   -> BackgroundCollectionBinding.refresh(...)
@@ -124,10 +124,10 @@ Replace plan-level candidates with metric-level candidates:
 
 ```typescript
 export interface MetricReadPlan {
-    readonly metrics: readonly MetricReadPlanMetric[];
+    readonly metrics: readonly MetricReadRoute[];
 }
 
-export interface MetricReadPlanMetric {
+export interface MetricReadRoute {
     readonly metricKey: string;
     readonly sourceScopeId: string;
     readonly sourceCandidates: readonly SourceCandidate[];
@@ -145,6 +145,9 @@ scope stays plan-level.
 that shape. The source policy is still widget/slot-level for now, so all metrics
 from one current single-metric widget normally share the same failure mode. Do
 not infer a new user-facing per-metric failure-mode requirement from this type.
+`MetricReadRoute` is therefore slightly broader than a pure route: it also
+carries missing-value behavior so collection warmup and render fallback select
+candidates the same way.
 
 `normalizeMetricReadPlan(...)` should:
 
@@ -428,13 +431,13 @@ packages/hub/src/runtime/sources/metric-read-plan.ts
 Work:
 
 - Replace `sourceScopeId`, `metricKeys`, and plan-level
-  `sourceCandidates`/`failureMode` with `metrics: MetricReadPlanMetric[]`.
+  `sourceCandidates`/`failureMode` with `metrics: MetricReadRoute[]`.
 - Update normalization and read-plan key generation.
 - Replace helpers that select candidates for the whole plan with helpers that
   select candidates for one plan metric.
 - Add a helper such as `listMetricReadPlanKeys(readPlan)` for lifecycle/debug
   paths that only need the metric key list.
-- Add a helper such as `selectMetricReadPlanMetricSourceCandidates(metric)` for
+- Add a helper such as `selectMetricReadRouteSourceCandidates(metric)` for
   callers that need to respect one metric's failure mode.
 - Throw if the same `metricKey` appears with conflicting routing identity inside
   one plan.
@@ -514,7 +517,7 @@ Work:
 - Build `sourceReadersByMetricKey` from normalized plan metrics.
 - In `getWidgetData(metricKey, ...)`, use that metric's own source order.
 - In `getTextValue(metricKey)`, use that metric's own source order.
-- Use `selectMetricReadPlanMetricSourceCandidates(metric)` when building each
+- Use `selectMetricReadRouteSourceCandidates(metric)` when building each
   metric's reader list. Render fallback must still respect `failureMode`:
   `empty` mode reads only the primary candidate, while fallback mode reads the
   full candidate list.
@@ -540,7 +543,7 @@ Build source requests from each metric's own candidates:
 sourceMetricKeys = Map<sourceId, Set<metricKey>>
 
 for each metric in normalizeMetricReadPlan(readPlan).metrics:
-  for each candidate in selectMetricReadPlanMetricSourceCandidates(metric):
+  for each candidate in selectMetricReadRouteSourceCandidates(metric):
     sourceMetricKeys[candidate.sourceId].add(metric.metricKey)
 
 for each (sourceId, metricKeys) in sourceMetricKeys:

@@ -62,12 +62,15 @@ export function buildMetricReadPlanFromSourcePolicy(
         ...fallbackSourceCandidates,
     ];
     const shouldFallback = primaryResolution.sourceCandidates.length > 1 || fallbackSourceCandidates.length > 0;
+    const failureMode = shouldFallback ? "fallback" : "empty";
 
     return normalizeMetricReadPlan({
-        sourceScopeId: primaryResolution.sourceScopeId,
-        metricKeys: options.metricKeys,
-        sourceCandidates,
-        failureMode: shouldFallback ? "fallback" : "empty",
+        metrics: options.metricKeys.map(metricKey => ({
+            sourceScopeId: primaryResolution.sourceScopeId,
+            metricKey,
+            sourceCandidates,
+            failureMode,
+        })),
     });
 }
 

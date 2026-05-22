@@ -178,7 +178,7 @@ export abstract class MetricAction extends SingletonAction {
         event: WillAppearEvent,
         metricKeys: readonly string[],
     ): MetricReadPlan {
-        return this.buildMetricReadPlanForMetricKeys(event, metricKeys);
+        return this.buildReadPlanForMetricKeys(event, metricKeys);
     }
 
     protected getMetricReader(event: WillAppearEvent): MetricStoreReader {
@@ -197,7 +197,7 @@ export abstract class MetricAction extends SingletonAction {
         event: WillAppearEvent | PropertyInspectorDidAppearEvent,
         metricKeys: readonly string[],
     ): Promise<void> {
-        return backgroundMetricCollection.refreshReadPlanOnce(this.buildMetricReadPlanForMetricKeys(event, metricKeys))
+        return backgroundMetricCollection.refreshReadPlanOnce(this.buildReadPlanForMetricKeys(event, metricKeys))
             .then(() => undefined);
     }
 
@@ -326,7 +326,7 @@ export abstract class MetricAction extends SingletonAction {
         return this.buildMetricCollectionReadPlan(event, this.getMetricKeys(event));
     }
 
-    private buildMetricReadPlanForMetricKeys(
+    private buildReadPlanForMetricKeys(
         event: WillAppearEvent | PropertyInspectorDidAppearEvent,
         metricKeys: readonly string[],
     ): MetricReadPlan {
@@ -369,12 +369,12 @@ function buildMetricSubscriptions(options: {
 }): readonly MetricSubscription[] {
     const readPlan = normalizeMetricReadPlan(options.readPlan);
 
-    return readPlan.metricKeys.map(metricKey => ({
+    return readPlan.metrics.map(metric => ({
         subscriberId: options.subscriberId,
-        metricKey,
-        sourceScopeId: readPlan.sourceScopeId,
-        sourceCandidates: readPlan.sourceCandidates,
-        failureMode: readPlan.failureMode,
+        metricKey: metric.metricKey,
+        sourceScopeId: metric.sourceScopeId,
+        sourceCandidates: metric.sourceCandidates,
+        failureMode: metric.failureMode,
         intervalMilliseconds: options.intervalMilliseconds,
     }));
 }

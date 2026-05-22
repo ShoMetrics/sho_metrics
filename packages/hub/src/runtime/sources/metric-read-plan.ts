@@ -21,13 +21,19 @@ export interface SourceCandidate {
     readonly sourceId: string;
 }
 
-/** Runtime-only description of which metrics to read and which sources may serve them. */
-export interface MetricReadPlan {
+/**
+ * Runtime-only route for reading one metric.
+ *
+ * This is slightly broader than a pure source route: it also carries the
+ * missing-value failure mode so collection warmup and render-time fallback use
+ * the same candidate selection rules for this metric.
+ */
+export interface MetricReadRoute {
     /** Logical storage scope for samples read by this plan. */
     readonly sourceScopeId: string;
 
-    /** ShoMetrics canonical metric keys requested by subscribers. */
-    readonly metricKeys: readonly string[];
+    /** ShoMetrics canonical metric key requested by subscribers. */
+    readonly metricKey: string;
 
     /** Candidate source ids in priority order. */
     readonly sourceCandidates: readonly SourceCandidate[];
@@ -36,26 +42,35 @@ export interface MetricReadPlan {
     readonly failureMode: MetricReadPlanFailureMode;
 }
 
+/** Runtime-only description of which metrics to read and which sources may serve them. */
+export interface MetricReadPlan {
+    /** Per-metric routing entries. */
+    readonly metrics: readonly MetricReadRoute[];
+}
+
 /** Builds the default local read plan for the current machine. */
 export function buildLocalMetricReadPlan(
     metricKeys: readonly string[],
     options: LocalMetricReadPlanOptions = {},
 ): MetricReadPlan {
+    const sourceScopeId = LOCAL_SOURCE_SCOPE_ID;
+    const sourceCandidates = resolveLocalSourceCandidates(options.platform ?? process.platform);
+    const failureMode: MetricReadPlanFailureMode = "fallback";
+
     return normalizeMetricReadPlan({
-        sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
-        metricKeys,
-        sourceCandidates: resolveLocalSourceCandidates(options.platform ?? process.platform),
-        failureMode: "fallback",
+        metrics: metricKeys.map(metricKey => ({
+            sourceScopeId,
+            metricKey,
+            sourceCandidates,
+            failureMode,
+        })),
     });
 }
 
 /** Normalizes a read plan into the stable form used by schedulers and tests. */
 export function normalizeMetricReadPlan(readPlan: MetricReadPlan): MetricReadPlan {
     return {
-        sourceScopeId: readPlan.sourceScopeId,
-        metricKeys: normalizeMetricKeys(readPlan.metricKeys),
-        sourceCandidates: normalizeSourceCandidates(readPlan.sourceCandidates),
-        failureMode: readPlan.failureMode,
+        metrics: normalizeMetricReadRoutes(readPlan.metrics),
     };
 }
 
@@ -63,30 +78,65 @@ export function normalizeMetricReadPlan(readPlan: MetricReadPlan): MetricReadPla
 export function buildMetricReadPlanKey(readPlan: MetricReadPlan): string {
     const normalizedReadPlan = normalizeMetricReadPlan(readPlan);
 
-    return JSON.stringify([
-        normalizedReadPlan.sourceScopeId,
-        normalizedReadPlan.failureMode,
-        normalizedReadPlan.sourceCandidates.map(candidate => candidate.sourceId),
-        normalizedReadPlan.metricKeys,
-    ]);
+    return JSON.stringify(normalizedReadPlan.metrics.map(buildMetricIdentityTuple));
 }
 
 /**
- * Selects the source candidates that may be consulted for one read plan.
+ * Lists the metric keys referenced by a read plan.
+ */
+export function listMetricReadPlanKeys(readPlan: MetricReadPlan): readonly string[] {
+    return normalizeMetricReadPlan(readPlan).metrics.map(metric => metric.metricKey);
+}
+
+/**
+ * Selects the source candidates that may be consulted for one read-plan metric.
  *
  * Fallback mode tries every candidate in priority order. Empty mode uses only
  * the primary candidate and renders no-data when it cannot provide a sample.
  */
-export function selectMetricReadPlanSourceCandidates(
-    readPlan: MetricReadPlan,
+export function selectMetricReadRouteSourceCandidates(
+    metric: MetricReadRoute,
 ): readonly SourceCandidate[] {
-    return readPlan.failureMode === "fallback"
-        ? readPlan.sourceCandidates
-        : readPlan.sourceCandidates.slice(0, 1);
+    return metric.failureMode === "fallback"
+        ? metric.sourceCandidates
+        : metric.sourceCandidates.slice(0, 1);
 }
 
-function normalizeMetricKeys(metricKeys: readonly string[]): readonly string[] {
-    return Array.from(new Set(metricKeys)).sort();
+function normalizeMetricReadRoutes(
+    metrics: readonly MetricReadRoute[],
+): readonly MetricReadRoute[] {
+    const metricsByKey = new Map<string, MetricReadRoute>();
+    const metricIdentityKeys = new Set<string>();
+
+    for (const metric of metrics) {
+        const normalizedMetric = {
+            sourceScopeId: metric.sourceScopeId,
+            metricKey: metric.metricKey,
+            sourceCandidates: normalizeSourceCandidates(metric.sourceCandidates),
+            failureMode: metric.failureMode,
+        };
+        const metricIdentityKey = buildMetricIdentityKey(normalizedMetric);
+
+        if (metricIdentityKeys.has(metricIdentityKey)) {
+            continue;
+        }
+
+        const existingMetric = metricsByKey.get(normalizedMetric.metricKey);
+        if (existingMetric) {
+            throw new Error([
+                "Metric read plan contains conflicting routes for one metric key.",
+                `metricKey=${normalizedMetric.metricKey}`,
+                `first=${buildMetricIdentityKey(existingMetric)}`,
+                `second=${metricIdentityKey}`,
+            ].join(" "));
+        }
+
+        metricsByKey.set(normalizedMetric.metricKey, normalizedMetric);
+        metricIdentityKeys.add(metricIdentityKey);
+    }
+
+    return Array.from(metricsByKey.values())
+        .sort((first, second) => first.metricKey.localeCompare(second.metricKey));
 }
 
 function normalizeSourceCandidates(sourceCandidates: readonly SourceCandidate[]): readonly SourceCandidate[] {
@@ -103,6 +153,24 @@ function normalizeSourceCandidates(sourceCandidates: readonly SourceCandidate[])
     }
 
     return normalizedSourceCandidates;
+}
+
+function buildMetricIdentityKey(metric: MetricReadRoute): string {
+    return JSON.stringify(buildMetricIdentityTuple(metric));
+}
+
+function buildMetricIdentityTuple(metric: MetricReadRoute): readonly [
+    string,
+    string,
+    MetricReadPlanFailureMode,
+    readonly string[],
+] {
+    return [
+        metric.metricKey,
+        metric.sourceScopeId,
+        metric.failureMode,
+        metric.sourceCandidates.map(sourceCandidate => sourceCandidate.sourceId),
+    ];
 }
 
 function resolveLocalSourceCandidates(platform: NodeJS.Platform): readonly SourceCandidate[] {

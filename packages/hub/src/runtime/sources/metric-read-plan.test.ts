@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
     buildLocalMetricReadPlan,
+    listMetricReadPlanKeys,
     buildMetricReadPlanKey,
     normalizeMetricReadPlan,
-    selectMetricReadPlanSourceCandidates,
+    selectMetricReadRouteSourceCandidates,
     type MetricReadPlan,
+    type MetricReadRoute,
 } from "./metric-read-plan";
 import {
     NODE_SYSTEM_SOURCE_ID,
@@ -20,13 +22,26 @@ test("buildLocalMetricReadPlan prefers the Windows helper before the node system
     ], { platform: "win32" });
 
     assert.deepEqual(readPlan, {
-        sourceScopeId: "local",
-        metricKeys: ["cpu.usage_percent", "net.down"],
-        sourceCandidates: [
-            { sourceId: WINDOWS_HELPER_SOURCE_ID },
-            { sourceId: NODE_SYSTEM_SOURCE_ID },
+        metrics: [
+            {
+                sourceScopeId: "local",
+                metricKey: "cpu.usage_percent",
+                sourceCandidates: [
+                    { sourceId: WINDOWS_HELPER_SOURCE_ID },
+                    { sourceId: NODE_SYSTEM_SOURCE_ID },
+                ],
+                failureMode: "fallback",
+            },
+            {
+                sourceScopeId: "local",
+                metricKey: "net.down",
+                sourceCandidates: [
+                    { sourceId: WINDOWS_HELPER_SOURCE_ID },
+                    { sourceId: NODE_SYSTEM_SOURCE_ID },
+                ],
+                failureMode: "fallback",
+            },
         ],
-        failureMode: "fallback",
     });
 });
 
@@ -38,58 +53,96 @@ test("buildLocalMetricReadPlan uses only the node system source outside Windows"
     ], { platform: "darwin" });
 
     assert.deepEqual(readPlan, {
-        sourceScopeId: "local",
-        metricKeys: ["cpu.usage_percent", "net.down"],
-        sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
-        failureMode: "fallback",
+        metrics: [
+            {
+                sourceScopeId: "local",
+                metricKey: "cpu.usage_percent",
+                sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
+                failureMode: "fallback",
+            },
+            {
+                sourceScopeId: "local",
+                metricKey: "net.down",
+                sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
+                failureMode: "fallback",
+            },
+        ],
     });
 });
 
-test("normalizeMetricReadPlan sorts unique metric keys and preserves source candidate priority", () => {
+test("normalizeMetricReadPlan sorts unique metric entries and preserves source candidate priority", () => {
     const readPlan = normalizeMetricReadPlan({
-        sourceScopeId: "local",
-        metricKeys: [
-            "gpu.temperature",
-            "cpu.usage_percent",
-            "gpu.temperature",
+        metrics: [
+            {
+                sourceScopeId: "local",
+                metricKey: "gpu.temperature",
+                sourceCandidates: [
+                    { sourceId: WINDOWS_HELPER_SOURCE_ID },
+                    { sourceId: NODE_SYSTEM_SOURCE_ID },
+                    { sourceId: WINDOWS_HELPER_SOURCE_ID },
+                ],
+                failureMode: "fallback",
+            },
+            {
+                sourceScopeId: "local",
+                metricKey: "cpu.usage_percent",
+                sourceCandidates: [
+                    { sourceId: WINDOWS_HELPER_SOURCE_ID },
+                    { sourceId: NODE_SYSTEM_SOURCE_ID },
+                    { sourceId: WINDOWS_HELPER_SOURCE_ID },
+                ],
+                failureMode: "fallback",
+            },
+            {
+                sourceScopeId: "local",
+                metricKey: "gpu.temperature",
+                sourceCandidates: [
+                    { sourceId: WINDOWS_HELPER_SOURCE_ID },
+                    { sourceId: NODE_SYSTEM_SOURCE_ID },
+                    { sourceId: WINDOWS_HELPER_SOURCE_ID },
+                ],
+                failureMode: "fallback",
+            },
         ],
-        sourceCandidates: [
-            { sourceId: WINDOWS_HELPER_SOURCE_ID },
-            { sourceId: NODE_SYSTEM_SOURCE_ID },
-            { sourceId: WINDOWS_HELPER_SOURCE_ID },
-        ],
-        failureMode: "fallback",
     });
 
     assert.deepEqual(readPlan, {
-        sourceScopeId: "local",
-        metricKeys: ["cpu.usage_percent", "gpu.temperature"],
-        sourceCandidates: [
-            { sourceId: WINDOWS_HELPER_SOURCE_ID },
-            { sourceId: NODE_SYSTEM_SOURCE_ID },
+        metrics: [
+            {
+                sourceScopeId: "local",
+                metricKey: "cpu.usage_percent",
+                sourceCandidates: [
+                    { sourceId: WINDOWS_HELPER_SOURCE_ID },
+                    { sourceId: NODE_SYSTEM_SOURCE_ID },
+                ],
+                failureMode: "fallback",
+            },
+            {
+                sourceScopeId: "local",
+                metricKey: "gpu.temperature",
+                sourceCandidates: [
+                    { sourceId: WINDOWS_HELPER_SOURCE_ID },
+                    { sourceId: NODE_SYSTEM_SOURCE_ID },
+                ],
+                failureMode: "fallback",
+            },
         ],
-        failureMode: "fallback",
     });
 });
 
 test("buildMetricReadPlanKey is stable for equivalent normalized plans", () => {
     const firstReadPlan: MetricReadPlan = {
-        sourceScopeId: "local",
-        metricKeys: ["net.up", "cpu.usage_percent", "net.up"],
-        sourceCandidates: [
-            { sourceId: WINDOWS_HELPER_SOURCE_ID },
-            { sourceId: NODE_SYSTEM_SOURCE_ID },
+        metrics: [
+            buildPlanMetric("net.up"),
+            buildPlanMetric("cpu.usage_percent"),
+            buildPlanMetric("net.up"),
         ],
-        failureMode: "fallback",
     };
     const secondReadPlan: MetricReadPlan = {
-        sourceScopeId: "local",
-        metricKeys: ["cpu.usage_percent", "net.up"],
-        sourceCandidates: [
-            { sourceId: WINDOWS_HELPER_SOURCE_ID },
-            { sourceId: NODE_SYSTEM_SOURCE_ID },
+        metrics: [
+            buildPlanMetric("cpu.usage_percent"),
+            buildPlanMetric("net.up"),
         ],
-        failureMode: "fallback",
     };
 
     assert.equal(buildMetricReadPlanKey(firstReadPlan), buildMetricReadPlanKey(secondReadPlan));
@@ -97,43 +150,83 @@ test("buildMetricReadPlanKey is stable for equivalent normalized plans", () => {
 
 test("buildMetricReadPlanKey preserves source candidate priority", () => {
     const primaryWindowsPlan: MetricReadPlan = {
-        sourceScopeId: "local",
-        metricKeys: ["cpu.usage_percent"],
-        sourceCandidates: [
-            { sourceId: WINDOWS_HELPER_SOURCE_ID },
-            { sourceId: NODE_SYSTEM_SOURCE_ID },
-        ],
-        failureMode: "fallback",
+        metrics: [buildPlanMetric("cpu.usage_percent", {
+            sourceCandidates: [
+                { sourceId: WINDOWS_HELPER_SOURCE_ID },
+                { sourceId: NODE_SYSTEM_SOURCE_ID },
+            ],
+        })],
     };
     const primaryNodePlan: MetricReadPlan = {
-        sourceScopeId: "local",
-        metricKeys: ["cpu.usage_percent"],
-        sourceCandidates: [
-            { sourceId: NODE_SYSTEM_SOURCE_ID },
-            { sourceId: WINDOWS_HELPER_SOURCE_ID },
-        ],
-        failureMode: "fallback",
+        metrics: [buildPlanMetric("cpu.usage_percent", {
+            sourceCandidates: [
+                { sourceId: NODE_SYSTEM_SOURCE_ID },
+                { sourceId: WINDOWS_HELPER_SOURCE_ID },
+            ],
+        })],
     };
 
     assert.notEqual(buildMetricReadPlanKey(primaryWindowsPlan), buildMetricReadPlanKey(primaryNodePlan));
 });
 
-test("selectMetricReadPlanSourceCandidates follows the read plan failure mode", () => {
+test("normalizeMetricReadPlan rejects conflicting routes for one metric key", () => {
+    assert.throws(
+        () => normalizeMetricReadPlan({
+            metrics: [
+                buildPlanMetric("cpu.usage_percent", {
+                    sourceCandidates: [{ sourceId: WINDOWS_HELPER_SOURCE_ID }],
+                }),
+                buildPlanMetric("cpu.usage_percent", {
+                    sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
+                }),
+            ],
+        }),
+        /conflicting routes/,
+    );
+});
+
+test("listMetricReadPlanKeys returns sorted normalized metric keys", () => {
+    assert.deepEqual(listMetricReadPlanKeys({
+        metrics: [
+            buildPlanMetric("net.up"),
+            buildPlanMetric("cpu.usage_percent"),
+            buildPlanMetric("net.up"),
+        ],
+    }), ["cpu.usage_percent", "net.up"]);
+});
+
+test("selectMetricReadRouteSourceCandidates follows the route failure mode", () => {
     const sourceCandidates = [
         { sourceId: WINDOWS_HELPER_SOURCE_ID },
         { sourceId: NODE_SYSTEM_SOURCE_ID },
     ];
 
-    assert.deepEqual(selectMetricReadPlanSourceCandidates({
+    assert.deepEqual(selectMetricReadRouteSourceCandidates({
         sourceScopeId: "local",
-        metricKeys: ["cpu.usage_percent"],
+        metricKey: "cpu.usage_percent",
         sourceCandidates,
         failureMode: "fallback",
     }), sourceCandidates);
-    assert.deepEqual(selectMetricReadPlanSourceCandidates({
+    assert.deepEqual(selectMetricReadRouteSourceCandidates({
         sourceScopeId: "local",
-        metricKeys: ["cpu.usage_percent"],
+        metricKey: "cpu.usage_percent",
         sourceCandidates,
         failureMode: "empty",
     }), [{ sourceId: WINDOWS_HELPER_SOURCE_ID }]);
 });
+
+function buildPlanMetric(
+    metricKey: string,
+    overrides: Partial<MetricReadRoute> = {},
+): MetricReadRoute {
+    return {
+        sourceScopeId: "local",
+        metricKey,
+        sourceCandidates: [
+            { sourceId: WINDOWS_HELPER_SOURCE_ID },
+            { sourceId: NODE_SYSTEM_SOURCE_ID },
+        ],
+        failureMode: "fallback",
+        ...overrides,
+    };
+}

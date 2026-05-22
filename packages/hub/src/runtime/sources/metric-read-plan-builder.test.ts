@@ -21,13 +21,17 @@ test("metric read plan builder uses Windows helper then node fallback for unset 
     });
 
     assert.deepEqual(readPlan, {
-        sourceScopeId: "local",
-        metricKeys: ["cpu.usage_percent"],
-        sourceCandidates: [
-            { sourceId: WINDOWS_HELPER_SOURCE_ID },
-            { sourceId: NODE_SYSTEM_SOURCE_ID },
+        metrics: [
+            {
+                sourceScopeId: "local",
+                metricKey: "cpu.usage_percent",
+                sourceCandidates: [
+                    { sourceId: WINDOWS_HELPER_SOURCE_ID },
+                    { sourceId: NODE_SYSTEM_SOURCE_ID },
+                ],
+                failureMode: "fallback",
+            },
         ],
-        failureMode: "fallback",
     });
 });
 
@@ -40,10 +44,14 @@ test("metric read plan builder uses only node for unset local non-Windows settin
     });
 
     assert.deepEqual(readPlan, {
-        sourceScopeId: "local",
-        metricKeys: ["cpu.usage_percent"],
-        sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
-        failureMode: "empty",
+        metrics: [
+            {
+                sourceScopeId: "local",
+                metricKey: "cpu.usage_percent",
+                sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
+                failureMode: "empty",
+            },
+        ],
     });
 });
 
@@ -57,8 +65,8 @@ test("metric read plan builder honors explicit node source without fallback", ()
         platform: "win32",
     });
 
-    assert.deepEqual(readPlan.sourceCandidates, [{ sourceId: NODE_SYSTEM_SOURCE_ID }]);
-    assert.equal(readPlan.failureMode, "empty");
+    assert.deepEqual(readPlan.metrics[0]?.sourceCandidates, [{ sourceId: NODE_SYSTEM_SOURCE_ID }]);
+    assert.equal(readPlan.metrics[0]?.failureMode, "empty");
 });
 
 test("metric read plan builder honors explicit Windows helper source without fallback", () => {
@@ -71,8 +79,8 @@ test("metric read plan builder honors explicit Windows helper source without fal
         platform: "win32",
     });
 
-    assert.deepEqual(readPlan.sourceCandidates, [{ sourceId: WINDOWS_HELPER_SOURCE_ID }]);
-    assert.equal(readPlan.failureMode, "empty");
+    assert.deepEqual(readPlan.metrics[0]?.sourceCandidates, [{ sourceId: WINDOWS_HELPER_SOURCE_ID }]);
+    assert.equal(readPlan.metrics[0]?.failureMode, "empty");
 });
 
 test("metric read plan builder appends explicit fallback profile ids", () => {
@@ -87,11 +95,11 @@ test("metric read plan builder appends explicit fallback profile ids", () => {
         platform: "win32",
     });
 
-    assert.deepEqual(readPlan.sourceCandidates, [
+    assert.deepEqual(readPlan.metrics[0]?.sourceCandidates, [
         { sourceId: WINDOWS_HELPER_SOURCE_ID },
         { sourceId: NODE_SYSTEM_SOURCE_ID },
     ]);
-    assert.equal(readPlan.failureMode, "fallback");
+    assert.equal(readPlan.metrics[0]?.failureMode, "fallback");
 });
 
 test("metric read plan builder uses global default source profile before local auto", () => {
@@ -104,10 +112,14 @@ test("metric read plan builder uses global default source profile before local a
     });
 
     assert.deepEqual(readPlan, {
-        sourceScopeId: remoteSourceId,
-        metricKeys: ["cpu.usage_percent"],
-        sourceCandidates: [{ sourceId: remoteSourceId }],
-        failureMode: "empty",
+        metrics: [
+            {
+                sourceScopeId: remoteSourceId,
+                metricKey: "cpu.usage_percent",
+                sourceCandidates: [{ sourceId: remoteSourceId }],
+                failureMode: "empty",
+            },
+        ],
     });
 });
 
@@ -121,8 +133,8 @@ test("metric read plan builder treats built-in local ids as reserved runtime pro
         platform: "win32",
     });
 
-    assert.deepEqual(readPlan.sourceCandidates, [{ sourceId: NODE_SYSTEM_SOURCE_ID }]);
-    assert.equal(readPlan.sourceScopeId, "local");
+    assert.deepEqual(readPlan.metrics[0]?.sourceCandidates, [{ sourceId: NODE_SYSTEM_SOURCE_ID }]);
+    assert.equal(readPlan.metrics[0]?.sourceScopeId, "local");
 });
 
 test("metric read plan builder keeps unknown local reserved ids out of registry source ids", () => {
@@ -135,8 +147,8 @@ test("metric read plan builder keeps unknown local reserved ids out of registry 
         platform: "win32",
     });
 
-    assert.deepEqual(readPlan.sourceCandidates, []);
-    assert.equal(readPlan.sourceScopeId, "local");
+    assert.deepEqual(readPlan.metrics[0]?.sourceCandidates, []);
+    assert.equal(readPlan.metrics[0]?.sourceScopeId, "local");
 });
 
 test("metric read plan builder can fallback after an unknown local reserved id", () => {
@@ -151,9 +163,9 @@ test("metric read plan builder can fallback after an unknown local reserved id",
         platform: "win32",
     });
 
-    assert.deepEqual(readPlan.sourceCandidates, [{ sourceId: NODE_SYSTEM_SOURCE_ID }]);
-    assert.equal(readPlan.sourceScopeId, "local");
-    assert.equal(readPlan.failureMode, "fallback");
+    assert.deepEqual(readPlan.metrics[0]?.sourceCandidates, [{ sourceId: NODE_SYSTEM_SOURCE_ID }]);
+    assert.equal(readPlan.metrics[0]?.sourceScopeId, "local");
+    assert.equal(readPlan.metrics[0]?.failureMode, "fallback");
 });
 
 function createSourcePolicy(

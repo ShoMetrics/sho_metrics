@@ -5,6 +5,7 @@ import { metricStore } from "../../runtime/metric-store";
 import type { MetricSubscription } from "../../runtime/metric-collection/metric-subscription-registry";
 import {
     buildMetricReadPlanKey,
+    listMetricReadPlanKeys,
     type MetricReadPlan,
 } from "../../runtime/sources/metric-read-plan";
 
@@ -110,9 +111,8 @@ export class BackgroundCollectionBinding {
         log.debug(() => [
             "backgroundRenderTimerStarted",
             `subscriberId=${options.subscriberId}`,
-            `sourceScopeId=${options.readPlan.sourceScopeId}`,
             `intervalMs=${options.pollingIntervalMilliseconds}`,
-            `metricCount=${options.readPlan.metricKeys.length}`,
+            `metricCount=${listMetricReadPlanKeys(options.readPlan).length}`,
         ].join(" "));
     }
 
@@ -174,7 +174,7 @@ function hasAnyMetricStoreReading(
         maximumSampleAgeMilliseconds,
     });
 
-    return readPlan.metricKeys.some(metricKey => (
+    return listMetricReadPlanKeys(readPlan).some(metricKey => (
         reader.getWidgetData(metricKey, "", "").sampleTimestampMilliseconds !== undefined
         || reader.getTextValue(metricKey) !== undefined
     ));

@@ -153,7 +153,7 @@ test("fallback reader uses only the primary candidate in empty failure mode", ()
 
 test("fallback reader uses the next source candidate when the primary has no text sample", () => {
     const metricStore = new MetricStore();
-    const readPlan = buildReadPlan();
+    const readPlan = buildReadPlan({ metricKey: "cpu.model" });
 
     metricStore.ingest("node-system", buildMetricSnapshot({
         timestampMilliseconds: 2000,
@@ -183,6 +183,29 @@ test("fallback reader returns render-safe defaults when no candidate has a sampl
     assert.equal(reader.getTextValue("cpu.model"), undefined);
 });
 
+test("fallback reader returns render-safe defaults for metrics outside the read plan", () => {
+    const metricStore = new MetricStore();
+    const readPlan = buildReadPlan({ metricKey: "ram.used" });
+    const reader = createTestFallbackReader(metricStore, readPlan);
+
+    metricStore.ingest("node-system", buildMetricSnapshot({
+        timestampMilliseconds: 2000,
+        metrics: {
+            "cpu.model": buildTextMetricValue("Example CPU"),
+        },
+    }));
+
+    assert.deepEqual(reader.getWidgetData("cpu.usage_percent", "CPU", "%"), {
+        current: 0,
+        progress: 0,
+        history: [],
+        unit: "%",
+        label: "CPU",
+        sampleTimestampMilliseconds: undefined,
+    });
+    assert.equal(reader.getTextValue("cpu.model"), undefined);
+});
+
 function createTestFallbackReader(
     metricStore: MetricStore,
     readPlan: MetricReadPlan,
@@ -199,15 +222,20 @@ function createTestFallbackReader(
 }
 
 function buildReadPlan(
-    options: Partial<Pick<MetricReadPlan, "failureMode">> = {},
+    options: {
+        readonly metricKey?: string;
+        readonly failureMode?: "fallback" | "empty";
+    } = {},
 ): MetricReadPlan {
     return normalizeMetricReadPlan({
-        sourceScopeId: "local",
-        metricKeys: ["ram.used"],
-        sourceCandidates: [
-            { sourceId: "windows-helper" },
-            { sourceId: "node-system" },
-        ],
-        failureMode: options.failureMode ?? "fallback",
+        metrics: [{
+            sourceScopeId: "local",
+            metricKey: options.metricKey ?? "ram.used",
+            sourceCandidates: [
+                { sourceId: "windows-helper" },
+                { sourceId: "node-system" },
+            ],
+            failureMode: options.failureMode ?? "fallback",
+        }],
     });
 }
