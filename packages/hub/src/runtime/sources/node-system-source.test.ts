@@ -193,12 +193,14 @@ test("node system source retries static CPU information after a transient failur
 test("node system source polls only memory when RAM metrics are requested", async () => {
     const callCounts = buildCallCounts();
     const source = new NodeSystemSource({
+        platform: "linux",
         systemInformation: buildCountingSystemInformation(callCounts, {
             mem: async () => {
                 callCounts.mem += 1;
                 return {
                     used: 8,
                     total: 16,
+                    available: 8,
                 } as Systeminformation.MemData;
             },
         }),
@@ -224,6 +226,124 @@ test("node system source polls only memory when RAM metrics are requested", asyn
     assert.equal(callCounts.fsSize, 0);
     assert.equal(callCounts.networkInterfaces, 0);
     assert.equal(callCounts.windowsGpu, 0);
+});
+
+test("node system source excludes macOS reclaimable memory from RAM used", async () => {
+    const callCounts = buildCallCounts();
+    const source = new NodeSystemSource({
+        platform: "darwin",
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            mem: async () => {
+                callCounts.mem += 1;
+                return {
+                    used: 15_940,
+                    total: 16_000,
+                    reclaimable: 2_240,
+                } as Systeminformation.MemData;
+            },
+        }),
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+    });
+
+    const snapshot = await source.pollMetrics(["ram.used"]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.deepEqual(metrics["ram.used"], {
+        scalar: 13_700,
+        unit: MetricUnit.BYTES,
+    });
+    assert.deepEqual(metrics["ram.total"], {
+        scalar: 16_000,
+        unit: MetricUnit.BYTES,
+    });
+});
+
+test("node system source falls back to used memory when macOS reclaimable memory is unavailable", async () => {
+    const callCounts = buildCallCounts();
+    const source = new NodeSystemSource({
+        platform: "darwin",
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            mem: async () => {
+                callCounts.mem += 1;
+                return {
+                    used: 9_000,
+                    total: 16_000,
+                } as Systeminformation.MemData;
+            },
+        }),
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+    });
+
+    const snapshot = await source.pollMetrics(["ram.used"]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.deepEqual(metrics["ram.used"], {
+        scalar: 9_000,
+        unit: MetricUnit.BYTES,
+    });
+});
+
+test("node system source uses available memory for non-macOS RAM used", async () => {
+    for (const platform of ["linux", "win32"] as const) {
+        const callCounts = buildCallCounts();
+        const source = new NodeSystemSource({
+            platform,
+            systemInformation: buildCountingSystemInformation(callCounts, {
+                mem: async () => {
+                    callCounts.mem += 1;
+                    return {
+                        used: 15_000,
+                        total: 16_000,
+                        available: 4_000,
+                        reclaimable: 2_000,
+                    } as Systeminformation.MemData;
+                },
+            }),
+            pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+            pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+        });
+
+        const snapshot = await source.pollMetrics(["ram.used"]);
+        const metrics = assertSnapshotMetrics(snapshot);
+
+        assert.deepEqual(metrics["ram.used"], {
+            scalar: 12_000,
+            unit: MetricUnit.BYTES,
+        }, platform);
+        assert.deepEqual(metrics["ram.total"], {
+            scalar: 16_000,
+            unit: MetricUnit.BYTES,
+        }, platform);
+    }
+});
+
+test("node system source falls back to used memory when non-macOS available memory is unusable", async () => {
+    const callCounts = buildCallCounts();
+    const source = new NodeSystemSource({
+        platform: "linux",
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            mem: async () => {
+                callCounts.mem += 1;
+                return {
+                    used: 9_000,
+                    total: 16_000,
+                    available: 17_000,
+                } as Systeminformation.MemData;
+            },
+        }),
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+    });
+
+    const snapshot = await source.pollMetrics(["ram.used"]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.deepEqual(metrics["ram.used"], {
+        scalar: 9_000,
+        unit: MetricUnit.BYTES,
+    });
 });
 
 test("node system source maintains network counter state and updates injected interface registry", async () => {
