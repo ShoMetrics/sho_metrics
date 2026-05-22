@@ -11,6 +11,7 @@ import {
 
 const BUNDLED_INTER_FONT_FILE = "C:\\Plugin\\assets\\fonts\\inter\\InterVariable.ttf";
 const BUNDLED_SHARE_TECH_MONO_FONT_FILE = "C:\\Plugin\\assets\\fonts\\share-tech-mono\\ShareTechMono-Regular.ttf";
+const MACOS_HELVETICA_NEUE_FONT_FILE = "/System/Library/Fonts/HelveticaNeue.ttc";
 
 // Keep these tests hermetic. They simulate Windows/macOS font availability
 // instead of reading real OS font files, whose presence and load cost vary by machine.
@@ -203,34 +204,61 @@ test("font options add only detected macOS Hangul fallback font files", () => {
         buildTextSvg("&#48176;&#53552;&#47532; &#49324;&#50857;"),
         buildEnvironment({
             platform: "darwin",
+            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
             existingFontFiles: [
-                "/System/Library/Fonts/SFNS.ttf",
+                MACOS_HELVETICA_NEUE_FONT_FILE,
+                BUNDLED_INTER_FONT_FILE,
                 "/System/Library/Fonts/PingFang.ttc",
                 "/System/Library/Fonts/AppleSDGothicNeo.ttc",
             ],
         }),
     );
 
+    assert.equal(fontOptions.loadSystemFonts, false);
     assert.equal(fontOptions.defaultFontFamily, "SF Pro Display");
     assert.deepEqual(fontOptions.fontFiles, [
-        "/System/Library/Fonts/SFNS.ttf",
+        MACOS_HELVETICA_NEUE_FONT_FILE,
+        BUNDLED_INTER_FONT_FILE,
         "/System/Library/Fonts/AppleSDGothicNeo.ttc",
     ]);
 });
 
-test("font options degrade safely when macOS CJK fallback font files are missing", () => {
+test("font options degrade safely to bundled Inter when macOS primary and CJK fallback files are missing", () => {
     const fontOptions = resolveResvgFontOptions(
         buildTextSvg("&#48176;&#53552;&#47532; &#49324;&#50857;"),
         buildEnvironment({
             platform: "darwin",
+            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
             existingFontFiles: [
-                "/System/Library/Fonts/SFNS.ttf",
+                BUNDLED_INTER_FONT_FILE,
+            ],
+        }),
+    );
+
+    assert.equal(fontOptions.defaultFontFamily, "SF Pro Display");
+    assert.deepEqual(fontOptions.fontFiles, [
+        BUNDLED_INTER_FONT_FILE,
+    ]);
+});
+
+test("font options add macOS symbol fallback fonts only when visible text needs symbols", () => {
+    const fontOptions = resolveResvgFontOptions(
+        buildTextSvg("&#8592; &#8594;"),
+        buildEnvironment({
+            platform: "darwin",
+            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            existingFontFiles: [
+                MACOS_HELVETICA_NEUE_FONT_FILE,
+                BUNDLED_INTER_FONT_FILE,
+                "/System/Library/Fonts/Apple Symbols.ttf",
             ],
         }),
     );
 
     assert.deepEqual(fontOptions.fontFiles, [
-        "/System/Library/Fonts/SFNS.ttf",
+        MACOS_HELVETICA_NEUE_FONT_FILE,
+        BUNDLED_INTER_FONT_FILE,
+        "/System/Library/Fonts/Apple Symbols.ttf",
     ]);
 });
 
