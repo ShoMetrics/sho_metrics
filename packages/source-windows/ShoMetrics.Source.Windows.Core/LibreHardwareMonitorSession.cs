@@ -30,6 +30,10 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         try
         {
             computer.Open();
+            // LHM enables per-sensor history by default. ShoMetrics stores the
+            // user-visible history in MetricStore, so the helper disables the
+            // duplicate LHM buffer as soon as the catalog is opened.
+            DisableSensorHistoryForComputer(computer);
             _computer = computer;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -296,6 +300,11 @@ public sealed class LibreHardwareMonitorSession : IDisposable
 
         if (updateError is null && LibreHardwareMetricCatalog.IsSupportedHardwareType(hardware.HardwareType))
         {
+            // Some LHM sensors can appear after a hardware update. Disable
+            // their local history before copying current values into the
+            // helper cache.
+            DisableSensorHistoryForHardware(hardware);
+
             foreach (ISensor sensor in hardware.Sensors)
             {
                 AddUnsupportedSensorTypeWarning(sensor, warnings);
@@ -350,6 +359,11 @@ public sealed class LibreHardwareMonitorSession : IDisposable
 
         if (LibreHardwareMetricCatalog.IsSupportedHardwareType(hardware.HardwareType))
         {
+            // Descriptor preload also updates hardware, which can expose new
+            // sensors. Keep the descriptor pass under the same no-history
+            // policy as normal snapshot refreshes.
+            DisableSensorHistoryForHardware(hardware);
+
             foreach (ISensor sensor in hardware.Sensors)
             {
                 AddUnsupportedSensorTypeWarning(sensor, warnings);
@@ -625,6 +639,34 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             {
                 warnings.Add(warning);
             }
+        }
+    }
+
+    private static void DisableSensorHistoryForComputer(Computer computer)
+    {
+        foreach (IHardware hardware in computer.Hardware)
+        {
+            DisableSensorHistoryForHardwareTree(hardware);
+        }
+    }
+
+    private static void DisableSensorHistoryForHardwareTree(IHardware hardware)
+    {
+        DisableSensorHistoryForHardware(hardware);
+
+        foreach (IHardware childHardware in hardware.SubHardware)
+        {
+            DisableSensorHistoryForHardwareTree(childHardware);
+        }
+    }
+
+    private static void DisableSensorHistoryForHardware(IHardware hardware)
+    {
+        // ShoMetrics owns history in MetricStore. Keeping LHM's per-sensor
+        // history duplicates storage and allocation work inside the helper.
+        foreach (ISensor sensor in hardware.Sensors)
+        {
+            sensor.ValuesTimeWindow = TimeSpan.Zero;
         }
     }
 
