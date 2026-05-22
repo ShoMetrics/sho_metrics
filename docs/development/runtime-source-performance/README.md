@@ -7,6 +7,7 @@ Read these documents in order:
 3. [Phase 5c Demand-Driven Background Collection](03-phase-5c-demand-driven-background-collection.md)
 4. [Phase 6 Source Capability, GPU, And History](04-phase-6-source-capability-gpu-and-history.md)
 5. [Windows Source Latency Findings](05-windows-source-latency-findings.md)
+6. [Metric-Level Source Routing](06-metric-level-source-routing.md)
 
 ## Current State
 
@@ -37,6 +38,7 @@ that only made sense during the original investigation.
 | `03-phase-5c-demand-driven-background-collection.md` | Current runtime collection architecture: metric subscriptions, collector group planning, background runners, render cadence, fallback composition, rejected ideas, and Phase 5c invariants. | You are about to change runtime polling, MetricStore writes, source subscriptions, fallback composition, or render timing. |
 | `04-phase-6-source-capability-gpu-and-history.md` | Phase 6 design notes for descriptor/capability invalidation, LHM helper snapshot caching, GPU process churn, source capability filtering, and history retention. | You are about to add LHM/custom descriptors, source capability filtering, GPU telemetry changes, or retention policy. |
 | `05-windows-source-latency-findings.md` | Evidence-backed Windows source choice notes after comparing Node/systeminformation, C# native counters, helper LHM DLL reads, and LHM JSON cache reads. | You are about to choose the default provider for CPU/RAM/network/disk/GPU metrics or revise Phase 6 helper priorities. |
+| `06-metric-level-source-routing.md` | Design for moving source candidate preference from plan-level to metric-level while preserving Phase 5c boundaries. | You are about to change `MetricReadPlan`, local auto source preference, action subscriptions, or render-time fallback order. |
 
 ## Non-Negotiable Priorities
 
