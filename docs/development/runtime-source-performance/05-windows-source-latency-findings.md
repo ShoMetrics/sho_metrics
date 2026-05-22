@@ -92,6 +92,56 @@ Current ShoMetrics Node source behavior is in
 
 The relevant `systeminformation` version in this workspace is `5.31.5`.
 
+## Prior Art: LiteMonitor
+
+[LiteMonitor](https://github.com/Diorser/LiteMonitor) was reviewed as a prior art.
+
+Its README declares the project under the MIT License. This document records
+observed design choices only. No LiteMonitor code is copied into ShoMetrics.
+
+LiteMonitor is a single-process Windows desktop monitor, so its shape is not the
+same as ShoMetrics' source/runtime boundary. It uses a central value provider
+that switches on metric keys and performs source choice, fallback, value
+correction, last-valid reuse, and no-data substitution in one place. That is
+acceptable for a small local app, but ShoMetrics should keep those concerns
+separate:
+
+```text
+metric-level source order
+  -> source planning and collection
+  -> MetricStore freshness
+  -> render-time fallback/N/A
+```
+
+Observed LiteMonitor routing:
+
+| Metric area | LiteMonitor shape | ShoMetrics interpretation |
+| --- | --- | --- |
+| CPU usage and CPU clock | Prefer Windows performance counters; fall back to LHM CPU sensors. | Supports keeping aggregate CPU usage out of LHM. |
+| RAM usage | Prefer Windows counters/`GlobalMemoryStatusEx`; fall back to LHM memory sensors. | Supports replacing heavy Node RAM reads with direct OS values instead of using LHM as the primary RAM path. |
+| Disk throughput/activity | Prefer Windows `PhysicalDisk(_Total)` counters unless a specific disk is selected; then use LHM storage sensors. | Supports the future `windows-native` disk-throughput direction and the requirement to validate `_Total`/no-duplicate-instance behavior. |
+| Disk usage/capacity | Use `DriveInfo`-style OS volume data. | Supports treating volume capacity as OS metadata, not a hardware sensor. |
+| GPU load/temp/power/VRAM/fan | Use LHM GPU sensors. | Supports helper/LHM-first GPU sensor routing with `nvidia-smi` only as fallback. |
+| CPU temperature, fans, pump, motherboard, battery, voltages | Use LHM sensors. | Supports keeping hardware sensor tree metrics in the helper/LHM source. |
+| Network speed | Use LHM network throughput sensors for displayed speed, with native `NetworkInterface` matching and counters for traffic accounting. | Interesting but not enough to change ShoMetrics defaults. ShoMetrics' measurements found naive native/LHM network aggregation can overcount badly; production network routing still needs adapter filtering and workload validation. |
+
+LiteMonitor also contains several LHM workarounds. ShoMetrics does not copy the
+implementation. The table is sorted by importance, with `P0`/`S0` highest and
+`P4`/`S4` lowest. Experiment ease is a higher-is-easier score.
+
+| Workaround | Status | Importance | Severity | Confidence | Experiment ease | Decision |
+| --- | --- | --- | --- | ---: | ---: | --- |
+| Keep OS aggregate metrics separate from LHM traversal. | Verified and adopted. | P0 | S1 | 95% | 90% | Adopt. This is the same boundary as metric-level source routing: CPU/RAM/network/disk aggregate metrics should not move to LHM just because the helper is online. |
+| Disable LHM sensor value history. | Verified and adopted. | P0 | S2 | 95% | 100% | Adopt. Local diagnostics showed LHM sensors keep value history by default. ShoMetrics owns history in `MetricStore`, so the helper sets `ISensor.ValuesTimeWindow = TimeSpan.Zero` and avoids reflection. |
+| Return `0` when a sensor cannot be read. | Rejected by data semantics. | P0 | S1 | 100% | 90% | Reject. `0` is valid telemetry. ShoMetrics preserves no-data/freshness semantics and renders `N/A` when no fresh candidate exists. |
+| Catch individual hardware update failures. | Already aligned with helper design. | P1 | S2 | 85% | 70% | Keep. Handle failures at the helper ownership boundary with warnings. Do not swallow all exceptions silently. |
+| Reflection-based sensor history mutation. | Rejected by API and NativeAOT/trimming boundary. | P1 | S2 | 100% | 100% | Reject. `ISensor.ValuesTimeWindow` is a public setter, so reflection is unnecessary and worse for published helper builds. |
+| Network speed through LHM/native matching. | Pending validation. | P2 | S2 | 60% | 60% | Do not adopt yet. Current naive aggregate paths overcounted; production routing still needs adapter filtering and workload validation. |
+| Hardware warmup before first display. | Pending production-shape validation. | P2 | S3 | 70% | 70% | Keep the idea, but implement only through helper background cache readiness and descriptor invalidation. Do not block render paths. |
+| Manually clear `Computer.Hardware` after `Computer.Close()`. | Verified and rejected. | P2 | S3 | 95% | 100% | Reject. In LHM 0.9.6, `Computer.Hardware` returns a list built from current groups; clearing the returned list is not a cleanup mechanism. |
+| Use slow update cadence for SuperIO/controller/storage-like hardware. | Pending hardware-specific evidence. | P3 | S3 | 50% | 50% | Defer. Add it only after per-hardware update timing from the production helper shows a repeatable slow group. |
+| Only update the active GPU. | Pending product semantics. | P4 | S4 | 45% | 40% | Do not adopt now. ShoMetrics needs descriptor-backed catalog behavior and possible multi-GPU selection before narrowing updates this way. |
+
 ## Isolated Cost Results
 
 Each source below was measured in its own 10 minute window.
