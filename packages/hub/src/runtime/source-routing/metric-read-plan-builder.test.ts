@@ -14,7 +14,7 @@ import {
     NODE_SYSTEM_SOURCE_ID,
     WINDOWS_HELPER_SOURCE_ID,
     buildUserSourceProfileSourceId,
-} from "./source-ids";
+} from "../sources/source-ids";
 
 test("metric read plan builder uses per-metric local auto source preferences on Windows", () => {
     const readPlan = buildMetricReadPlanFromSourcePolicy({

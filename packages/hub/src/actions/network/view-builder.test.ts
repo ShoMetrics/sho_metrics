@@ -7,7 +7,7 @@ import {
     getNetworkInterfaceMetricKey,
 } from "../../runtime/network-metric-keys";
 import type { NetworkInterfaceOption } from "../../runtime/network-interfaces";
-import { LOCAL_SOURCE_SCOPE_ID } from "../../runtime/sources/metric-read-plan";
+import { LOCAL_SOURCE_SCOPE_ID } from "../../runtime/source-routing/metric-read-plan";
 import { buildMetricSnapshot, buildScalarMetricValue, MetricUnit } from "../../runtime/sources/metric-source";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";

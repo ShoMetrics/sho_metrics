@@ -11,7 +11,7 @@ import { MetricAction, type MetricCollectionBinding } from "./metric-action";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
 import { metricStore } from "../runtime/metric-store";
 import { buildMetricSnapshot, buildScalarMetricValue } from "../runtime/sources/metric-source";
-import { buildMetricReadPlanKey, listMetricReadPlanKeys, type MetricReadPlan } from "../runtime/sources/metric-read-plan";
+import { buildMetricReadPlanKey, listMetricReadPlanKeys, type MetricReadPlan } from "../runtime/source-routing/metric-read-plan";
 import {
     NODE_SYSTEM_SOURCE_ID,
     WINDOWS_HELPER_SOURCE_ID,

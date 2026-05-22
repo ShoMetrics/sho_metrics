@@ -6,7 +6,7 @@ import {
     type MetricReadPlan,
     type SourceCandidate,
     selectMetricReadRouteSourceCandidates,
-} from "../sources/metric-read-plan";
+} from "../source-routing/metric-read-plan";
 import {
     createDefaultSourceRegistry,
     type SourceRegistry,

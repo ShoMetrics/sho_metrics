@@ -14,7 +14,7 @@ import {
     NODE_SYSTEM_SOURCE_ID,
     WINDOWS_HELPER_SOURCE_ID,
     buildUserSourceProfileSourceId,
-} from "./source-ids";
+} from "../sources/source-ids";
 
 /** Options for building a runtime read plan from resolved source settings. */
 export interface BuildMetricReadPlanFromSourcePolicyOptions {

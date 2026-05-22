@@ -7,7 +7,7 @@ import {
     buildMetricReadPlanKey,
     listMetricReadPlanKeys,
     type MetricReadPlan,
-} from "../../runtime/sources/metric-read-plan";
+} from "../../runtime/source-routing/metric-read-plan";
 
 const log = logger.for("BackgroundCollectionBinding");
 // Startup-only first-reading check: 500ms x 20 = 10s. It runs faster than a

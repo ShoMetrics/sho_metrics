@@ -12,7 +12,7 @@ import {
 import {
     NODE_SYSTEM_SOURCE_ID,
     WINDOWS_HELPER_SOURCE_ID,
-} from "./source-ids";
+} from "../sources/source-ids";
 
 test("buildLocalMetricReadPlan prefers the Windows helper before the node system source on Windows", () => {
     const readPlan = buildLocalMetricReadPlan([

@@ -7,8 +7,8 @@ import streamDeck, {
     type SendToPluginEvent,
 } from "@elgato/streamdeck";
 import { metricStore, type MetricStoreReader } from "../runtime/metric-store";
-import { normalizeMetricReadPlan, type MetricReadPlan } from "../runtime/sources/metric-read-plan";
-import { buildMetricReadPlanFromSourcePolicy } from "../runtime/sources/metric-read-plan-builder";
+import { normalizeMetricReadPlan, type MetricReadPlan } from "../runtime/source-routing/metric-read-plan";
+import { buildMetricReadPlanFromSourcePolicy } from "../runtime/source-routing/metric-read-plan-builder";
 import { clearMetricViewState } from "../view-updates/runner";
 import { logger } from "../logging/logger";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
