@@ -21,6 +21,7 @@ internal static class Program
         {
             ServiceExecutableMode.Help => WriteHelp(),
             ServiceExecutableMode.Version => WriteVersion(),
+            ServiceExecutableMode.MetricSourceProbe => await MetricSourceComparisonProbe.RunAsync(args[1..]).ConfigureAwait(false),
             ServiceExecutableMode.DevPipe => await RunHostAsync(args, mode).ConfigureAwait(false),
             ServiceExecutableMode.WindowsService => await RunHostAsync(args, mode).ConfigureAwait(false),
             ServiceExecutableMode.Invalid => WriteInvalidArguments(args),
@@ -35,16 +36,12 @@ internal static class Program
             return ServiceExecutableMode.WindowsService;
         }
 
-        if (args.Length != 1)
-        {
-            return ServiceExecutableMode.Invalid;
-        }
-
         return args[0] switch
         {
-            "--dev-pipe" => ServiceExecutableMode.DevPipe,
-            "--help" or "-h" => ServiceExecutableMode.Help,
-            "--version" => ServiceExecutableMode.Version,
+            "--dev-pipe" when args.Length == 1 => ServiceExecutableMode.DevPipe,
+            "--metric-source-probe" => ServiceExecutableMode.MetricSourceProbe,
+            "--help" or "-h" when args.Length == 1 => ServiceExecutableMode.Help,
+            "--version" when args.Length == 1 => ServiceExecutableMode.Version,
             _ => ServiceExecutableMode.Invalid,
         };
     }
@@ -60,11 +57,7 @@ internal static class Program
                 .UseSerilog((_, _, loggerConfiguration) => ConfigureSerilog(loggerConfiguration, mode))
                 .ConfigureServices(services =>
                 {
-                    // TODO: Remove this temporary LHM latency diagnostic sink
-                    // once the helper publishes per-group cached values.
-                    services.AddSingleton<ILibreHardwareMonitorDiagnosticSink, LibreHardwareMonitorDiagnosticLogger>();
-                    services.AddSingleton(sp => new LibreHardwareMonitorSession(
-                        sp.GetRequiredService<ILibreHardwareMonitorDiagnosticSink>()));
+                    services.AddSingleton<LibreHardwareMonitorSession>();
                     services.AddSingleton<WindowsPipeSecurity>();
                     services.AddSingleton<WindowsPipeClientVerifier>();
                     services.AddSingleton<SourceIpcFrameCodec>();
@@ -158,6 +151,8 @@ internal static class Program
             Usage:
               ShoMetrics.Source.Windows.Service.exe            Run as a Windows Service.
               ShoMetrics.Source.Windows.Service.exe --dev-pipe Run the service host in console dev mode.
+              ShoMetrics.Source.Windows.Service.exe --metric-source-probe [--duration-ms N] [--interval-ms N] [--probe-sources native,lhm-dll]
+                                                               Run a metric source comparison probe.
               ShoMetrics.Source.Windows.Service.exe --help     Print this help.
               ShoMetrics.Source.Windows.Service.exe --version  Print the helper version.
             """);
