@@ -1,25 +1,25 @@
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import { randomUUID } from "node:crypto";
 import { createConnection, type Socket } from "node:net";
-import { logger } from "../../logging/logger";
+import { logger } from "../../../logging/logger";
 import {
     GetSourceHealthRequestSchema,
     ListMetricDescriptorsRequestSchema,
     ReadMetricSnapshotRequestSchema,
     type GetSourceHealthResponse,
     type SourceWarning as ProtoSourceWarning,
-} from "../../generated/shometrics/v1/source_api_pb.js";
+} from "../../../generated/shometrics/v1/source_api_pb.js";
 import {
     SourceIpcRequestSchema,
     SourceIpcResponseSchema,
     type SourceIpcRequest,
     type SourceIpcResponse,
-} from "../../generated/shometrics/v1/source_ipc_pb.js";
-import type { MetricDescriptor as ProtoMetricDescriptor } from "../../generated/shometrics/v1/snapshot_pb.js";
+} from "../../../generated/shometrics/v1/source_ipc_pb.js";
+import type { MetricDescriptor as ProtoMetricDescriptor } from "../../../generated/shometrics/v1/snapshot_pb.js";
 import {
     readMetricSnapshotTimestampMilliseconds,
     type MetricSnapshot,
-} from "./metric-source";
+} from "../metric-source";
 import type {
     MetricDescriptor,
     SourceClient,
@@ -28,17 +28,17 @@ import type {
     SourceClientStatusReason,
     SourceWarning,
     MetricDescriptorSnapshot,
-} from "./source-client";
+} from "../source-client";
 import type {
     SourceMetadataInvalidation,
     SourceMetadataInvalidationListener,
     SourceMetadataInvalidationReason,
-} from "./source-planning-metadata";
+} from "../source-planning-metadata";
 import {
     LOCAL_SOURCE_SCOPE_ID,
     WINDOWS_HELPER_SOURCE_ID,
-} from "./source-ids";
-import type { SourceMetricPollingGroupResolution } from "./source-polling-groups";
+} from "../source-ids";
+import type { SourceMetricPollingGroupResolution } from "../source-polling-groups";
 
 const log = logger.for("Source:WindowsHelper");
 

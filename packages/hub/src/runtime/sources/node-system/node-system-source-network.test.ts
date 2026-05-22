@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Systeminformation } from "systeminformation";
-import { MetricUnit } from "./metric-source";
+import { MetricUnit } from "../metric-source";
 import { NodeSystemSource } from "./node-system-source";
 import {
     buildEmptyNodeSystemInformation,

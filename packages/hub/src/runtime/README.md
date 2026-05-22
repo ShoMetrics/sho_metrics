@@ -25,7 +25,9 @@ stored sample does not decide which source should be polled next.
   sources, write `MetricStore`, or parse source-native ids.
 - `sources/` owns source clients, source capability metadata, polling groups,
   source registry, and source-local retry behavior. It must not import routing
-  policy or decide widget fallback.
+  policy or decide widget fallback. Source contracts and small source support
+  helpers stay at the root; concrete implementations live under
+  `sources/node-system/` and `sources/windows-helper/`.
 - `metric-collection/` owns subscriptions, planning, runner lifecycle, and
   background writes to `MetricStore`. It must not render widgets or persist
   settings.

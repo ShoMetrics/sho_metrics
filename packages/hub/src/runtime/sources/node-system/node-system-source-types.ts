@@ -1,5 +1,5 @@
 import si from "systeminformation";
-import type { NetworkMetricDirection } from "../network-metric-keys";
+import type { NetworkMetricDirection } from "../../network-metric-keys";
 
 export type NodeSystemInformationClient = Omit<typeof si, "cpuCurrentSpeed">;
 
