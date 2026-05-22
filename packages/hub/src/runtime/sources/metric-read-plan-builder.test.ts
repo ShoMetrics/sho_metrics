@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { ResolvedMetricSourcePolicy } from "../../settings/resolved-settings";
 import {
+    RAM_TOTAL_METRIC_KEY,
+    RAM_USED_METRIC_KEY,
+} from "../metric-keys";
+import {
     buildMetricReadPlanFromSourcePolicy,
 } from "./metric-read-plan-builder";
 import {
@@ -36,6 +40,32 @@ test("metric read plan builder uses per-metric local auto source preferences on 
                     { sourceId: NODE_SYSTEM_SOURCE_ID },
                 ],
                 failureMode: "fallback",
+            },
+        ],
+    });
+});
+
+test("metric read plan builder keeps RAM local auto source preferences on node-system", () => {
+    const readPlan = buildMetricReadPlanFromSourcePolicy({
+        metricKeys: [RAM_USED_METRIC_KEY, RAM_TOTAL_METRIC_KEY],
+        sourcePolicy: createSourcePolicy(),
+        defaultSourceProfileId: undefined,
+        platform: "win32",
+    });
+
+    assert.deepEqual(readPlan, {
+        metrics: [
+            {
+                sourceScopeId: "local",
+                metricKey: RAM_TOTAL_METRIC_KEY,
+                sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
+                failureMode: "empty",
+            },
+            {
+                sourceScopeId: "local",
+                metricKey: RAM_USED_METRIC_KEY,
+                sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
+                failureMode: "empty",
             },
         ],
     });
@@ -95,7 +125,7 @@ test("metric read plan builder uses only node for unset local non-Windows settin
 
 test("metric read plan builder honors explicit node source without fallback", () => {
     const readPlan = buildMetricReadPlanFromSourcePolicy({
-        metricKeys: ["cpu.usage_percent"],
+        metricKeys: ["cpu.usage_percent", "gpu.temp"],
         sourcePolicy: createSourcePolicy({
             primarySourceProfileId: BUILT_IN_NODE_SYSTEM_SOURCE_PROFILE_ID,
         }),
@@ -103,13 +133,27 @@ test("metric read plan builder honors explicit node source without fallback", ()
         platform: "win32",
     });
 
-    assert.deepEqual(readPlan.metrics[0]?.sourceCandidates, [{ sourceId: NODE_SYSTEM_SOURCE_ID }]);
-    assert.equal(readPlan.metrics[0]?.failureMode, "empty");
+    assert.deepEqual(readPlan, {
+        metrics: [
+            {
+                sourceScopeId: "local",
+                metricKey: "cpu.usage_percent",
+                sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
+                failureMode: "empty",
+            },
+            {
+                sourceScopeId: "local",
+                metricKey: "gpu.temp",
+                sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
+                failureMode: "empty",
+            },
+        ],
+    });
 });
 
 test("metric read plan builder honors explicit Windows helper source without fallback", () => {
     const readPlan = buildMetricReadPlanFromSourcePolicy({
-        metricKeys: ["cpu.usage_percent"],
+        metricKeys: ["cpu.usage_percent", "gpu.temp"],
         sourcePolicy: createSourcePolicy({
             primarySourceProfileId: BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID,
         }),
@@ -117,8 +161,22 @@ test("metric read plan builder honors explicit Windows helper source without fal
         platform: "win32",
     });
 
-    assert.deepEqual(readPlan.metrics[0]?.sourceCandidates, [{ sourceId: WINDOWS_HELPER_SOURCE_ID }]);
-    assert.equal(readPlan.metrics[0]?.failureMode, "empty");
+    assert.deepEqual(readPlan, {
+        metrics: [
+            {
+                sourceScopeId: "local",
+                metricKey: "cpu.usage_percent",
+                sourceCandidates: [{ sourceId: WINDOWS_HELPER_SOURCE_ID }],
+                failureMode: "empty",
+            },
+            {
+                sourceScopeId: "local",
+                metricKey: "gpu.temp",
+                sourceCandidates: [{ sourceId: WINDOWS_HELPER_SOURCE_ID }],
+                failureMode: "empty",
+            },
+        ],
+    });
 });
 
 test("metric read plan builder appends explicit fallback profile ids", () => {
@@ -143,7 +201,7 @@ test("metric read plan builder appends explicit fallback profile ids", () => {
 test("metric read plan builder uses global default source profile before local auto", () => {
     const remoteSourceId = buildUserSourceProfileSourceId("remote-nuc");
     const readPlan = buildMetricReadPlanFromSourcePolicy({
-        metricKeys: ["cpu.usage_percent"],
+        metricKeys: ["cpu.usage_percent", "gpu.temp"],
         sourcePolicy: createSourcePolicy(),
         defaultSourceProfileId: "remote-nuc",
         platform: "win32",
@@ -154,6 +212,12 @@ test("metric read plan builder uses global default source profile before local a
             {
                 sourceScopeId: remoteSourceId,
                 metricKey: "cpu.usage_percent",
+                sourceCandidates: [{ sourceId: remoteSourceId }],
+                failureMode: "empty",
+            },
+            {
+                sourceScopeId: remoteSourceId,
+                metricKey: "gpu.temp",
                 sourceCandidates: [{ sourceId: remoteSourceId }],
                 failureMode: "empty",
             },
