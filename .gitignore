@@ -351,3 +351,6 @@ packages/hub/.test-dist/
 docs/development/perf-logs/*
 
 *.tmp.*
+
+.DS_Store
+Thumbs.db
