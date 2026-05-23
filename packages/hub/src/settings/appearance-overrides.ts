@@ -10,6 +10,7 @@ import type {
     ResolvedMetricMultiColorChannelColors,
     ResolvedMetricMultiColorPaintSettings,
     ResolvedMultiColorSet,
+    ResolvedTerminalPaintSettings,
 } from "./resolved-settings";
 
 export type MetricColorChannel = keyof ResolvedMetricMultiColorChannelColors;
@@ -47,6 +48,11 @@ export interface ResolvedColorFilledThemeSettingsOverride {
 
 export interface ResolvedTerminalThemeSettingsOverride {
     readonly variant?: TerminalThemeVariant | undefined;
+    readonly paint?: ResolvedTerminalPaintSettingsOverride | undefined;
+}
+
+export interface ResolvedTerminalPaintSettingsOverride {
+    readonly preset?: ResolvedTerminalPaintSettings["preset"] | undefined;
 }
 
 export interface ResolvedMetricPaintSettingsOverride {
@@ -157,6 +163,10 @@ export function mergeResolvedAppearanceSettings(
             terminal: {
                 ...settings.theme.terminal,
                 ...override.theme?.terminal,
+                paint: {
+                    ...settings.theme.terminal.paint,
+                    ...override.theme?.terminal?.paint,
+                },
             },
         },
         line: {
@@ -200,6 +210,22 @@ export function buildColorFilledPaintAppearanceOverride(
     return {
         theme: {
             colorFilled: { paint },
+        },
+    };
+}
+
+/**
+ * Builds a theme-owned override for Terminal phosphor paint.
+ *
+ * Used by Terminal color controls so palette changes stay scoped to the
+ * Terminal theme instead of leaking into ordinary metric accent paint.
+ */
+export function buildTerminalPaintAppearanceOverride(
+    paint: ResolvedTerminalPaintSettingsOverride,
+): ResolvedAppearanceSettingsOverride {
+    return {
+        theme: {
+            terminal: { paint },
         },
     };
 }

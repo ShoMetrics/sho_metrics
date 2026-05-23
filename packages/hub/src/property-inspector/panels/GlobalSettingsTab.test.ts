@@ -35,7 +35,7 @@ test("global override groups view theme and color controls under the master swit
     assert.match(markup, /Color Compensation/);
 });
 
-test("global override hides color controls for terminal theme", () => {
+test("global override renders terminal palette controls for terminal theme", () => {
     const markup = renderToStaticMarkup(createElement(GlobalSettingsTab, {
         resolvedSettings: buildGlobalSettings("terminal"),
         colorCompensationProfile: DEFAULT_COLOR_COMPENSATION_PROFILE,
@@ -47,7 +47,9 @@ test("global override hides color controls for terminal theme", () => {
     assert.match(markup, /Theme Variant:/);
     assert.match(markup, /Clean/);
     assert.match(markup, /Vintage/);
-    assert.doesNotMatch(markup, /Color Override/);
+    assert.match(markup, /Color Override/);
+    assert.match(markup, /Phosphor:/);
+    assert.match(markup, /Green/);
     assert.doesNotMatch(markup, /Color Mode:/);
 });
 
@@ -111,6 +113,9 @@ function buildGlobalSettings(selectedTheme: MetricTheme = "flat"): ResolvedGloba
                     },
                     isGradientEnabled: true,
                 },
+            },
+            terminal: {
+                preset: "green",
             },
         },
         sourceProfiles: [],

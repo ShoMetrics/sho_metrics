@@ -8,7 +8,10 @@ import {
     type MetricPreviewInput,
 } from "./metric-option-preview";
 import type { CircleViewVariant, MetricView } from "../inspector/settings-types";
-import type { MetricTheme, TerminalThemeVariant } from "../../settings/resolved-settings";
+import type {
+    MetricTheme,
+    TerminalThemeVariant,
+} from "../../settings/resolved-settings";
 import { buildVisibilityContext } from "../testing/test-context";
 
 test("metric view preview URIs render every Property Inspector view option without throwing", () => {

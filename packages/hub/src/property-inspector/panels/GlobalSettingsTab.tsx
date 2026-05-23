@@ -8,6 +8,7 @@ import { InspectorItem } from "../components/InspectorItem";
 import {
     ColorFilledPaintControls,
     MetricColorControls,
+    TerminalPaintControls,
 } from "./ColorSettings";
 import { SettingsSection } from "./SettingsSection";
 import {
@@ -196,10 +197,6 @@ function PaintOverrideSection({
     onOverrideChange: (isEnabled: boolean) => void;
     onPaintPatch: (patch: NonNullable<StoredGlobalSettingsPatch["paint"]>) => void;
 }): React.JSX.Element {
-    if (selectedTheme === "terminal") {
-        return <></>;
-    }
-
     return (
         <SettingsSection title="Color Override">
             <OverrideSubsectionToggle
@@ -227,10 +224,6 @@ function ActivePaintOverrideControls({
     paintOverride: ResolvedGlobalPaintOverride;
     onPaintPatch: (patch: NonNullable<StoredGlobalSettingsPatch["paint"]>) => void;
 }): React.JSX.Element {
-    if (selectedTheme === "terminal") {
-        return <></>;
-    }
-
     if (selectedTheme === "color-filled") {
         return (
             <ColorFilledPaintControls
@@ -238,6 +231,15 @@ function ActivePaintOverrideControls({
                 onColorModeChange={(colorMode) => onPaintPatch({ colorFilled: { colorMode } })}
                 onSolidPatch={(solid) => onPaintPatch({ colorFilled: { solid } })}
                 onMultiColorPatch={(multiColor) => onPaintPatch({ colorFilled: { multiColor } })}
+            />
+        );
+    }
+
+    if (selectedTheme === "terminal") {
+        return (
+            <TerminalPaintControls
+                terminalPaint={paintOverride.terminal}
+                onPaintPatch={(terminal) => onPaintPatch({ terminal })}
             />
         );
     }

@@ -23,6 +23,7 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.slot.appearance.theme.flat.paint.colorMode, "multi-color");
         assert.equal(settings.widget.slot.appearance.theme.flat.paint.solid.colors.usageColor, "#3b82f6");
         assert.equal(settings.widget.slot.appearance.theme.terminal.variant, "clean");
+        assert.equal(settings.widget.slot.appearance.theme.terminal.paint.preset, "green");
     });
 
     it("defaults network metric paint to solid without changing other metric defaults", () => {
@@ -328,6 +329,7 @@ describe("stored settings proto resolver", () => {
 
         assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "terminal");
         assert.equal(settings.widget.slot.appearance.theme.terminal.variant, "clean");
+        assert.equal(settings.widget.slot.appearance.theme.terminal.paint.preset, "green");
     });
 
     it("resolves terminal vintage as a theme-owned variant", () => {
@@ -354,6 +356,34 @@ describe("stored settings proto resolver", () => {
 
         assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "terminal");
         assert.equal(settings.widget.slot.appearance.theme.terminal.variant, "vintage");
+    });
+
+    it("resolves terminal palette as theme-owned paint", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    overrides: {
+                        appearance: {
+                            theme: {
+                                selectedTheme: "METRIC_THEME_TERMINAL",
+                                terminal: {
+                                    paint: {
+                                        preset: "TERMINAL_PALETTE_PRESET_AMBER",
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+        });
+
+        assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "terminal");
+        assert.equal(settings.widget.slot.appearance.theme.terminal.paint.preset, "amber");
     });
 
     it("applies global paint override without replacing widget view and theme", () => {
@@ -409,6 +439,51 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "cupertino-glass");
         assert.equal(settings.widget.slot.appearance.theme.cupertinoGlass.paint.colorMode, "black-white");
         assert.equal(settings.widget.slot.appearance.theme.cupertinoGlass.paint.solid.colors.usageColor, "#3b82f6");
+    });
+
+    it("applies terminal global paint override to terminal widgets", () => {
+        const storedGlobalSettings = readStoredGlobalSettings({
+            overrides: {
+                enabled: true,
+                view: {
+                    enabled: false,
+                },
+                theme: {
+                    enabled: false,
+                },
+                paint: {
+                    terminal: {
+                        preset: "TERMINAL_PALETTE_PRESET_CYAN",
+                    },
+                },
+            },
+        }).settings;
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    overrides: {
+                        appearance: {
+                            theme: {
+                                selectedTheme: "METRIC_THEME_TERMINAL",
+                                terminal: {
+                                    paint: {
+                                        preset: "TERMINAL_PALETTE_PRESET_AMBER",
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+            storedGlobalSettings,
+        });
+
+        assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "terminal");
+        assert.equal(settings.widget.slot.appearance.theme.terminal.paint.preset, "cyan");
     });
 
     it("uses kind switches for disk metric branches", () => {

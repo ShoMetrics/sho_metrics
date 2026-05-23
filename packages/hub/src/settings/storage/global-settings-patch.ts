@@ -16,6 +16,7 @@ import {
     GlobalViewOverrideSchema,
     MultiColorSetSchema,
     NetworkDisplaySettingsSchema,
+    TerminalPaintSettingsSchema,
     TerminalThemeSettingsSchema,
     type AppearanceThemeSettings as StoredAppearanceThemeSettings,
     type ColorFilledPaintSettings as StoredColorFilledPaintSettings,
@@ -35,6 +36,7 @@ import type {
 } from "../resolved-settings";
 import type {
     ResolvedColorFilledPaintSettingsOverride,
+    ResolvedTerminalPaintSettingsOverride,
     ResolvedTerminalThemeSettingsOverride,
     ResolvedMultiColorSetOverride,
 } from "../appearance-overrides";
@@ -47,6 +49,7 @@ import {
     storedCircleViewVariantByResolved,
     storedColorModeByResolved,
     storedNetworkUnitBaseByResolved,
+    storedTerminalPalettePresetByResolved,
     storedTerminalThemeVariantByResolved,
     storedScaleModeByResolved,
     storedMetricViewByResolved,
@@ -82,6 +85,7 @@ interface GlobalThemeSettingsPatch {
 interface GlobalPaintSettingsPatch {
     readonly metric?: GlobalMetricPaintSettingsPatch | undefined;
     readonly colorFilled?: ResolvedColorFilledPaintSettingsOverride | undefined;
+    readonly terminal?: ResolvedTerminalPaintSettingsOverride | undefined;
 }
 
 interface GlobalMetricPaintSettingsPatch {
@@ -237,6 +241,12 @@ function applyPaintOverridePatch(
             paint.colorFilled ??= create(ColorFilledPaintSettingsSchema),
             patch.paint.colorFilled,
         );
+    }
+    if (patch.paint.terminal !== undefined) {
+        const terminal = paint.terminal ??= create(TerminalPaintSettingsSchema);
+        if (patch.paint.terminal.preset !== undefined) {
+            terminal.preset = storedTerminalPalettePresetByResolved[patch.paint.terminal.preset];
+        }
     }
 }
 

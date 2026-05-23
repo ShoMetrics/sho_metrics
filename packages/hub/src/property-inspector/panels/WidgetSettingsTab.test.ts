@@ -175,7 +175,7 @@ test("color filled theme renders color mix without range controls", () => {
     assert.doesNotMatch(markup, /High Starts At:/);
 });
 
-test("terminal theme uses fixed paint without color controls", () => {
+test("terminal theme renders palette controls without metric color controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "network",
         settings: buildWidgetSettings("network", {
@@ -192,6 +192,8 @@ test("terminal theme uses fixed paint without color controls", () => {
     assert.match(markup, /Theme Variant:/);
     assert.match(markup, /Clean/);
     assert.match(markup, /Vintage/);
+    assert.match(markup, /Phosphor:/);
+    assert.match(markup, /Green/);
     assert.doesNotMatch(markup, /Color Mode:/);
     assert.doesNotMatch(markup, /Color - Download/);
     assert.doesNotMatch(markup, /Color - Upload/);

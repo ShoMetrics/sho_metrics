@@ -4,6 +4,7 @@ import {
     ColorMode as StoredColorMode,
     MetricView as StoredMetricView,
     MetricTheme as StoredMetricTheme,
+    TerminalPalettePreset as StoredTerminalPalettePreset,
     TerminalThemeVariant as StoredTerminalThemeVariant,
 } from "../../generated/shometrics/v1/settings_pb";
 import { readStoredGlobalSettings } from "./codec";
@@ -39,6 +40,9 @@ test("global settings patch writes nested view theme and paint overrides", () =>
             metric: {
                 colorMode: "black-white",
             },
+            terminal: {
+                preset: "cyan",
+            },
         },
     });
 
@@ -52,4 +56,5 @@ test("global settings patch writes nested view theme and paint overrides", () =>
     assert.equal(overrides?.theme?.theme?.terminal?.variant, StoredTerminalThemeVariant.VINTAGE);
     assert.equal(overrides?.paint?.enabled, true);
     assert.equal(overrides?.paint?.metric?.colorMode, StoredColorMode.BLACK_WHITE);
+    assert.equal(overrides?.paint?.terminal?.preset, StoredTerminalPalettePreset.CYAN);
 });
