@@ -197,12 +197,12 @@ export function buildDefaultAppearanceOverride(options: {
         },
         theme: {
             selectedTheme: "flat",
-        },
-        paint: {
-            metric: {
-                colorMode: options.colorMode ?? "multi-color",
-                solid: {
-                    isGradientEnabled: options.isGradientEnabled ?? true,
+            flat: {
+                paint: {
+                    colorMode: options.colorMode ?? "multi-color",
+                    solid: {
+                        isGradientEnabled: options.isGradientEnabled ?? true,
+                    },
                 },
             },
         },
@@ -247,9 +247,9 @@ export function buildColorFilledAppearanceOverride(options: {
         },
         theme: {
             selectedTheme: "color-filled",
-        },
-        paint: {
-            colorFilled: colorFilledPaint,
+            colorFilled: {
+                paint: colorFilledPaint,
+            },
         },
     };
 }

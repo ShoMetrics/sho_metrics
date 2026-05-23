@@ -55,16 +55,18 @@ test("widget patch writes black-white color mode", () => {
 
     const nextSettings = writeStoredWidgetSettingsPatch(cpuSettings, {
         appearance: {
-            paint: {
-                metric: {
-                    colorMode: "black-white",
+            theme: {
+                flat: {
+                    paint: {
+                        colorMode: "black-white",
+                    },
                 },
             },
         },
     });
 
     const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
-    assert.equal(appearance?.paint?.metric?.colorMode, StoredColorMode.BLACK_WHITE);
+    assert.equal(appearance?.theme?.flat?.paint?.colorMode, StoredColorMode.BLACK_WHITE);
 });
 
 test("widget patch writes terminal theme", () => {

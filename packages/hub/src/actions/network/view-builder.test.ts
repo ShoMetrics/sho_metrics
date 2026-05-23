@@ -165,7 +165,7 @@ test("network overlay line keeps upload as the first channel", () => {
         {
             appearance: {
                 view: { selectedView: "line" },
-                paint: { metric: { colorMode: "solid" } },
+                theme: { flat: { paint: { colorMode: "solid" } } },
             },
             network: {
                 direction: "both",
@@ -210,7 +210,7 @@ test("network bar keeps upload as the first channel", () => {
         {
             appearance: {
                 view: { selectedView: "bar" },
-                paint: { metric: { colorMode: "solid" } },
+                theme: { flat: { paint: { colorMode: "solid" } } },
             },
             network: {
                 direction: "both",

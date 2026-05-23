@@ -62,8 +62,10 @@ test("percentage metric builders expose integer display values for compact widge
 test("percentage action display values are honored by line view rendering", () => {
     const visualSettings = buildMetricRenderAppearance(buildDefaultAppearanceSettings({
         view: { selectedView: "line" },
-        paint: {
-            metric: { colorMode: "solid" },
+        theme: {
+            flat: {
+                paint: { colorMode: "solid" },
+            },
         },
     }));
     const body = renderSingleMetricBodyView({

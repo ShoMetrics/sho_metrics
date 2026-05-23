@@ -23,7 +23,12 @@ import {
     renderNetworkInterfaceIconFragment,
 } from "../../widgets/icons/catalog/network";
 import type { MetricViewOptions } from "../../view-updates/runner";
-import { buildColorConfigFromAppearance, resolveSolidMetricColorMode } from "../../settings/render-paint-resolver";
+import {
+    buildColorConfigFromAppearance,
+    resolveActiveMetricAccentColorMode,
+    resolveSolidMetricColorMode,
+} from "../../settings/render-paint-resolver";
+import { buildMetricAccentPaintAppearanceOverride } from "../../settings/appearance-overrides";
 
 export interface NetworkViewUpdate {
     viewOptions: MetricViewOptions;
@@ -116,18 +121,17 @@ export function buildNetworkViewUpdate(options: BuildNetworkViewOptions): Networ
                 direction: networkDirection,
             }),
             circleVariantOverride: circleVariant,
-            appearanceOverride: {
-                paint: {
-                    metric: {
-                        colorMode: appearance.paint.metric.colorMode,
-                        solid: {
-                            colors: {
-                                usageColor: appearance.paint.metric.solid.colors.usageColor,
-                            },
+            appearanceOverride: buildMetricAccentPaintAppearanceOverride(
+                appearance.theme.selectedTheme,
+                {
+                    colorMode: resolveActiveMetricAccentColorMode(appearance),
+                    solid: {
+                        colors: {
+                            usageColor: buildColorConfigFromAppearance(appearance, "usage").solidColor,
                         },
                     },
                 },
-            },
+            ),
         },
         debugInfo: {
             direction: networkDirection,
@@ -196,7 +200,7 @@ function buildDualNetworkCircleOrTextViewOptions(
     const downloadColorConfig = buildNetworkChannelColorConfig("download", options.settings);
     const appearance = options.settings.widget.slot.appearance;
     const circleVariant = appearance.view.circleVariant;
-    const solidMetricColorMode = resolveSolidMetricColorMode(appearance.paint.metric.colorMode);
+    const solidMetricColorMode = resolveSolidMetricColorMode(resolveActiveMetricAccentColorMode(appearance));
 
     return {
         event: options.event,
@@ -242,14 +246,13 @@ function buildDualNetworkCircleOrTextViewOptions(
             direction: "download",
             color: downloadColor,
         }),
-        appearanceOverride: {
-            paint: {
-                metric: {
-                    colorMode: solidMetricColorMode,
-                    solid: { colors: { usageColor: uploadColor } },
-                },
+        appearanceOverride: buildMetricAccentPaintAppearanceOverride(
+            appearance.theme.selectedTheme,
+            {
+                colorMode: solidMetricColorMode,
+                solid: { colors: { usageColor: uploadColor } },
             },
-        },
+        ),
     };
 }
 
@@ -280,7 +283,7 @@ function buildDualNetworkLineViewOptions(options: BuildNetworkViewOptions): Metr
     const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
     const trafficDisplayMode = options.target.reading.trafficDisplayMode;
     const appearance = options.settings.widget.slot.appearance;
-    const solidMetricColorMode = resolveSolidMetricColorMode(appearance.paint.metric.colorMode);
+    const solidMetricColorMode = resolveSolidMetricColorMode(resolveActiveMetricAccentColorMode(appearance));
 
     return {
         event: options.event,
@@ -311,14 +314,13 @@ function buildDualNetworkLineViewOptions(options: BuildNetworkViewOptions): Metr
             color: downloadColor,
             size: NETWORK_TOP_ICON_SIZE,
         }),
-        appearanceOverride: {
-            paint: {
-                metric: {
-                    colorMode: solidMetricColorMode,
-                    solid: { colors: { usageColor: uploadColor } },
-                },
+        appearanceOverride: buildMetricAccentPaintAppearanceOverride(
+            appearance.theme.selectedTheme,
+            {
+                colorMode: solidMetricColorMode,
+                solid: { colors: { usageColor: uploadColor } },
             },
-        },
+        ),
     };
 }
 
@@ -398,20 +400,19 @@ function buildBarNetworkViewOptions(options: BuildNetworkViewOptions): MetricVie
         statusIcon: getNetworkDirectionStatusIcon({
             direction: "upload",
         }),
-        appearanceOverride: {
-            paint: {
-                metric: {
-                    colorMode: resolveSolidMetricColorMode(
-                        options.settings.widget.slot.appearance.paint.metric.colorMode,
-                    ),
-                    solid: {
-                        colors: {
-                            usageColor: uploadColor,
-                        },
+        appearanceOverride: buildMetricAccentPaintAppearanceOverride(
+            options.settings.widget.slot.appearance.theme.selectedTheme,
+            {
+                colorMode: resolveSolidMetricColorMode(resolveActiveMetricAccentColorMode(
+                    options.settings.widget.slot.appearance,
+                )),
+                solid: {
+                    colors: {
+                        usageColor: uploadColor,
                     },
                 },
             },
-        },
+        ),
     };
 }
 

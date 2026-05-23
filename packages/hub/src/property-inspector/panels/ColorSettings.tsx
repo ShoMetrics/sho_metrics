@@ -1,5 +1,6 @@
 import type {
     ColorMode,
+    MetricTheme,
     ResolvedColorFilledPaintSettings,
     ResolvedMetricSolidChannelColors,
     ResolvedMultiColorSet,
@@ -11,6 +12,14 @@ import type {
     ResolvedMetricPaintSettingsOverride,
     ResolvedMultiColorSetOverride,
 } from "../../settings/appearance-overrides";
+import {
+    buildColorFilledPaintAppearanceOverride,
+    buildMetricAccentPaintAppearanceOverride,
+} from "../../settings/appearance-overrides";
+import {
+    resolveActiveColorFilledPaint,
+    resolveActiveMetricAccentPaint,
+} from "../../settings/render-paint-resolver";
 import { InspectorItem } from "../components/InspectorItem";
 import { SectionHeading } from "../components/SectionHeading";
 import { ColorBandSetting } from "../controls/ColorBandSetting";
@@ -59,27 +68,37 @@ interface ChannelColorSectionSettings {
 
 function patchMetricPaintSettings(
     onSettingsPatch: WidgetSettingsPanelProps["onSettingsPatch"],
+    selectedTheme: MetricTheme,
     metric: ResolvedMetricPaintSettingsOverride,
 ): void {
-    onSettingsPatch({ appearance: { paint: { metric } } });
+    const appearance = buildMetricAccentPaintAppearanceOverride(selectedTheme, metric);
+    if (appearance !== undefined) {
+        onSettingsPatch({ appearance });
+    }
 }
 
 function patchColorFilledPaintSettings(
     onSettingsPatch: WidgetSettingsPanelProps["onSettingsPatch"],
     colorFilled: ResolvedColorFilledPaintSettingsOverride,
 ): void {
-    onSettingsPatch({ appearance: { paint: { colorFilled } } });
+    onSettingsPatch({ appearance: buildColorFilledPaintAppearanceOverride(colorFilled) });
 }
 
 export function StandardColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
     const { context } = props;
     const appearance = context.resolved.widget.slot.appearance;
+    const selectedTheme = appearance.theme.selectedTheme;
 
-    if (appearance.theme.selectedTheme === "color-filled") {
+    if (selectedTheme === "color-filled") {
         return <ColorFilledSettingsSection {...props} />;
     }
 
-    if (appearance.theme.selectedTheme === "terminal") {
+    if (selectedTheme === "terminal") {
+        return <></>;
+    }
+
+    const metricPaint = resolveActiveMetricAccentPaint(appearance);
+    if (metricPaint === undefined) {
         return <></>;
     }
 
@@ -87,27 +106,31 @@ export function StandardColorSettings(props: WidgetSettingsPanelProps): React.JS
         <SettingsSection title="Colors">
             <SectionHeading text="Color Settings" />
             <MetricColorControls
-                colorMode={appearance.paint.metric.colorMode}
-                solidColor={appearance.paint.metric.solid.colors.usageColor}
-                multiColor={appearance.paint.metric.multiColor.colors.usage}
-                lowThresholdPercent={appearance.paint.metric.multiColor.lowThresholdPercent}
-                highThresholdPercent={appearance.paint.metric.multiColor.highThresholdPercent}
-                isSolidGradientEnabled={appearance.paint.metric.solid.isGradientEnabled}
-                isMultiColorGradientEnabled={appearance.paint.metric.multiColor.isGradientEnabled}
-                onColorModeChange={(colorMode) => patchMetricPaintSettings(props.onSettingsPatch, { colorMode })}
-                onSolidColorChange={(usageColor) => patchMetricPaintSettings(props.onSettingsPatch, {
+                colorMode={metricPaint.colorMode}
+                solidColor={metricPaint.solid.colors.usageColor}
+                multiColor={metricPaint.multiColor.colors.usage}
+                lowThresholdPercent={metricPaint.multiColor.lowThresholdPercent}
+                highThresholdPercent={metricPaint.multiColor.highThresholdPercent}
+                isSolidGradientEnabled={metricPaint.solid.isGradientEnabled}
+                isMultiColorGradientEnabled={metricPaint.multiColor.isGradientEnabled}
+                onColorModeChange={(colorMode) => patchMetricPaintSettings(
+                    props.onSettingsPatch,
+                    selectedTheme,
+                    { colorMode },
+                )}
+                onSolidColorChange={(usageColor) => patchMetricPaintSettings(props.onSettingsPatch, selectedTheme, {
                     solid: { colors: { usageColor } },
                 })}
-                onMultiColorPatch={(usage) => patchMetricPaintSettings(props.onSettingsPatch, {
+                onMultiColorPatch={(usage) => patchMetricPaintSettings(props.onSettingsPatch, selectedTheme, {
                     multiColor: { colors: { usage } },
                 })}
-                onThresholdPatch={(thresholdPatch) => patchMetricPaintSettings(props.onSettingsPatch, {
+                onThresholdPatch={(thresholdPatch) => patchMetricPaintSettings(props.onSettingsPatch, selectedTheme, {
                     multiColor: thresholdPatch,
                 })}
-                onSolidGradientChange={(isGradientEnabled) => patchMetricPaintSettings(props.onSettingsPatch, {
+                onSolidGradientChange={(isGradientEnabled) => patchMetricPaintSettings(props.onSettingsPatch, selectedTheme, {
                     solid: { isGradientEnabled },
                 })}
-                onMultiColorGradientChange={(isGradientEnabled) => patchMetricPaintSettings(props.onSettingsPatch, {
+                onMultiColorGradientChange={(isGradientEnabled) => patchMetricPaintSettings(props.onSettingsPatch, selectedTheme, {
                     multiColor: { isGradientEnabled },
                 })}
                 disabled={props.colorDisabled ?? false}
@@ -212,8 +235,12 @@ export function NetworkChannelColorSettings(props: WidgetSettingsPanelProps): Re
         return <></>;
     }
 
-    const shouldShowChannelColors =
-        props.context.resolved.widget.slot.appearance.paint.metric.colorMode !== "black-white";
+    const metricPaint = resolveActiveMetricAccentPaint(props.context.resolved.widget.slot.appearance);
+    if (metricPaint === undefined) {
+        return <></>;
+    }
+
+    const shouldShowChannelColors = metricPaint.colorMode !== "black-white";
 
     return (
         <SettingsSection title="Colors">
@@ -246,8 +273,12 @@ export function DiskThroughputChannelColorSettings(props: WidgetSettingsPanelPro
         return <></>;
     }
 
-    const shouldShowChannelColors =
-        props.context.resolved.widget.slot.appearance.paint.metric.colorMode !== "black-white";
+    const metricPaint = resolveActiveMetricAccentPaint(props.context.resolved.widget.slot.appearance);
+    if (metricPaint === undefined) {
+        return <></>;
+    }
+
+    const shouldShowChannelColors = metricPaint.colorMode !== "black-white";
 
     return (
         <SettingsSection title="Colors">
@@ -276,12 +307,22 @@ function ColorModeSetting({
     onSettingsPatch,
     colorDisabled = false,
 }: WidgetSettingsPanelProps): React.JSX.Element {
+    const appearance = context.resolved.widget.slot.appearance;
+    const metricPaint = resolveActiveMetricAccentPaint(appearance);
+    if (metricPaint === undefined) {
+        return <></>;
+    }
+
     return (
         <SelectSetting
             label="Color Mode"
-            value={context.resolved.widget.slot.appearance.paint.metric.colorMode}
+            value={metricPaint.colorMode}
             optionList={metricPaintColorModeOptionList}
-            onValueChange={(colorMode) => patchMetricPaintSettings(onSettingsPatch, { colorMode })}
+            onValueChange={(colorMode) => patchMetricPaintSettings(
+                onSettingsPatch,
+                appearance.theme.selectedTheme,
+                { colorMode },
+            )}
             disabled={colorDisabled}
         />
     );
@@ -341,12 +382,16 @@ function MultiColorSettings({
 
 function ColorFilledSettingsSection(props: WidgetSettingsPanelProps): React.JSX.Element {
     const appearance = props.context.resolved.widget.slot.appearance;
+    const colorFilledPaint = resolveActiveColorFilledPaint(appearance);
+    if (colorFilledPaint === undefined) {
+        return <></>;
+    }
 
     return (
         <SettingsSection title="Colors">
             <SectionHeading text="Color Filled" />
             <ColorFilledPaintControls
-                colorFilled={appearance.paint.colorFilled}
+                colorFilled={colorFilledPaint}
                 onColorModeChange={(colorMode) => patchColorFilledPaintSettings(props.onSettingsPatch, { colorMode })}
                 onSolidPatch={(solid) => patchColorFilledPaintSettings(props.onSettingsPatch, { solid })}
                 onMultiColorPatch={(multiColor) => patchColorFilledPaintSettings(props.onSettingsPatch, { multiColor })}
@@ -499,9 +544,10 @@ function GradientSetting({
 }
 
 function ChannelThresholdControls(props: WidgetSettingsPanelProps): React.JSX.Element | null {
-    const metricPaint = props.context.resolved.widget.slot.appearance.paint.metric;
+    const appearance = props.context.resolved.widget.slot.appearance;
+    const metricPaint = resolveActiveMetricAccentPaint(appearance);
 
-    if (metricPaint.colorMode !== "multi-color") {
+    if (metricPaint === undefined || metricPaint.colorMode !== "multi-color") {
         return null;
     }
 
@@ -511,9 +557,11 @@ function ChannelThresholdControls(props: WidgetSettingsPanelProps): React.JSX.El
             <ThresholdRangeSettings
                 lowThresholdPercent={metricPaint.multiColor.lowThresholdPercent}
                 highThresholdPercent={metricPaint.multiColor.highThresholdPercent}
-                onThresholdPatch={(thresholdPatch) => patchMetricPaintSettings(props.onSettingsPatch, {
-                    multiColor: thresholdPatch,
-                })}
+                onThresholdPatch={(thresholdPatch) => patchMetricPaintSettings(
+                    props.onSettingsPatch,
+                    appearance.theme.selectedTheme,
+                    { multiColor: thresholdPatch },
+                )}
                 disabled={props.colorDisabled ?? false}
             />
         </>
@@ -521,9 +569,10 @@ function ChannelThresholdControls(props: WidgetSettingsPanelProps): React.JSX.El
 }
 
 function MetricGradientSetting(props: WidgetSettingsPanelProps): React.JSX.Element | null {
-    const metricPaint = props.context.resolved.widget.slot.appearance.paint.metric;
+    const appearance = props.context.resolved.widget.slot.appearance;
+    const metricPaint = resolveActiveMetricAccentPaint(appearance);
 
-    if (metricPaint.colorMode === "black-white") {
+    if (metricPaint === undefined || metricPaint.colorMode === "black-white") {
         return null;
     }
 
@@ -531,9 +580,11 @@ function MetricGradientSetting(props: WidgetSettingsPanelProps): React.JSX.Eleme
         return (
             <GradientSetting
                 isEnabled={metricPaint.solid.isGradientEnabled}
-                onValueChange={(isGradientEnabled) => patchMetricPaintSettings(props.onSettingsPatch, {
-                    solid: { isGradientEnabled },
-                })}
+                onValueChange={(isGradientEnabled) => patchMetricPaintSettings(
+                    props.onSettingsPatch,
+                    appearance.theme.selectedTheme,
+                    { solid: { isGradientEnabled } },
+                )}
                 disabled={props.colorDisabled ?? false}
             />
         );
@@ -542,9 +593,11 @@ function MetricGradientSetting(props: WidgetSettingsPanelProps): React.JSX.Eleme
     return (
         <GradientSetting
             isEnabled={metricPaint.multiColor.isGradientEnabled}
-            onValueChange={(isGradientEnabled) => patchMetricPaintSettings(props.onSettingsPatch, {
-                multiColor: { isGradientEnabled },
-            })}
+            onValueChange={(isGradientEnabled) => patchMetricPaintSettings(
+                props.onSettingsPatch,
+                appearance.theme.selectedTheme,
+                { multiColor: { isGradientEnabled } },
+            )}
             disabled={props.colorDisabled ?? false}
         />
     );
@@ -624,11 +677,17 @@ function ChannelColorFields({
 }: WidgetSettingsPanelProps & {
     channel: MetricColorChannelKey;
 }): React.JSX.Element {
-    const metricPaint = context.resolved.widget.slot.appearance.paint.metric;
+    const appearance = context.resolved.widget.slot.appearance;
+    const selectedTheme = appearance.theme.selectedTheme;
+    const metricPaint = resolveActiveMetricAccentPaint(appearance);
     const solidColorKey = solidColorKeyByChannel[channel];
 
+    if (metricPaint === undefined) {
+        return <></>;
+    }
+
     function patchSolidChannelColor(color: string): void {
-        patchMetricPaintSettings(onSettingsPatch, {
+        patchMetricPaintSettings(onSettingsPatch, selectedTheme, {
             solid: {
                 colors: {
                     [solidColorKey]: color,
@@ -638,7 +697,7 @@ function ChannelColorFields({
     }
 
     function patchMultiColorChannel(colorKey: MultiColorKey, value: string): void {
-        patchMetricPaintSettings(onSettingsPatch, {
+        patchMetricPaintSettings(onSettingsPatch, selectedTheme, {
             multiColor: {
                 colors: {
                     [channel]: {

@@ -19,15 +19,17 @@ import {
     LineAppearanceSettings_GridLineVisibility as StoredGridLineVisibility,
     TemperatureUnit as StoredTemperatureUnit,
     type AppearanceSettings as StoredAppearanceSettings,
-    type AppearancePaintSettings as StoredAppearancePaintSettings,
     type AppearanceThemeSettings as StoredAppearanceThemeSettings,
     type AppearanceViewSettings as StoredAppearanceViewSettings,
     type CatalogMetricTarget as StoredCatalogMetricTarget,
+    type ColorFilledThemeSettings as StoredColorFilledThemeSettings,
     type ColorFilledMultiColorPaintSettings as StoredColorFilledMultiColorPaintSettings,
     type ColorFilledPaintSettings as StoredColorFilledPaintSettings,
     type ColorFilledSolidPaintSettings as StoredColorFilledSolidPaintSettings,
+    type CupertinoGlassThemeSettings as StoredCupertinoGlassThemeSettings,
     type DiskMetricTarget as StoredDiskMetricTarget,
     type DiskThroughputDisplaySettings as StoredDiskThroughputDisplaySettings,
+    type FlatThemeSettings as StoredFlatThemeSettings,
     type GlobalMetricPaintSettings as StoredGlobalMetricPaintSettings,
     type GlobalMultiColorPaintSettings as StoredGlobalMultiColorPaintSettings,
     type GlobalPaintOverride as StoredGlobalPaintOverride,
@@ -63,9 +65,9 @@ import type {
     TerminalThemeVariant,
     ResolvedAppearanceSettings,
     ResolvedCatalogMetricTarget,
-    ResolvedAppearancePaintSettings,
     ResolvedAppearanceThemeSettings,
     ResolvedAppearanceViewSettings,
+    ResolvedColorFilledThemeSettings,
     ResolvedColorFilledMultiColorPaintSettings,
     ResolvedColorFilledPaintSettings,
     ResolvedColorFilledSolidPaintSettings,
@@ -82,6 +84,7 @@ import type {
     ResolvedGpuReading,
     ResolvedHttpMetricSourceConnection,
     ResolvedMemoryReading,
+    ResolvedFlatThemeSettings,
     ResolvedMetricPaintSettings,
     ResolvedMetricMultiColorPaintSettings,
     ResolvedMetricSolidPaintSettings,
@@ -94,6 +97,7 @@ import type {
     ResolvedMultiColorSet,
     ResolvedNetworkDisplaySettings,
     ResolvedNetworkReading,
+    ResolvedCupertinoGlassThemeSettings,
     ResolvedTerminalThemeSettings,
     ResolvedLineAppearanceSettings,
     ResolvedWidgetPreferences,
@@ -137,9 +141,16 @@ const DEFAULT_DISK_THROUGHPUT_DISPLAY_SETTINGS: ResolvedDiskThroughputDisplaySet
 };
 
 const DEFAULT_NETWORK_APPEARANCE_SETTINGS = buildDefaultAppearanceSettings({
-    paint: {
-        metric: {
-            colorMode: "solid",
+    theme: {
+        flat: {
+            paint: {
+                colorMode: "solid",
+            },
+        },
+        cupertinoGlass: {
+            paint: {
+                colorMode: "solid",
+            },
         },
     },
 });
@@ -626,7 +637,7 @@ function resolveGlobalPaintOverride(
     return {
         metric: resolveGlobalMetricPaintSettings(storedOverride?.metric),
         colorFilled: resolveColorFilledPaintSettings(
-            DEFAULT_APPEARANCE_SETTINGS.paint.colorFilled,
+            DEFAULT_APPEARANCE_SETTINGS.theme.colorFilled.paint,
             storedOverride?.colorFilled,
         ),
     };
@@ -672,13 +683,16 @@ function mergeAppearanceSettings(
     storedAppearance: StoredAppearanceSettings | undefined,
 ): ResolvedAppearanceSettings {
     const view = resolveAppearanceViewSettings(defaults.view, storedAppearance?.view);
-    const theme = resolveAppearanceThemeSettings(defaults.theme, storedAppearance?.theme);
-    const appearanceDefaults = resolveAppearanceDefaultsForViewAndTheme(defaults, view, theme);
+    const selectedTheme = resolveStoredEnum(
+        storedAppearance?.theme?.selectedTheme,
+        metricThemeByProto,
+        defaults.theme.selectedTheme,
+    );
+    const appearanceDefaults = resolveAppearanceDefaultsForViewAndTheme(defaults, view, selectedTheme);
 
     return {
         view,
-        theme,
-        paint: resolveAppearancePaintSettings(appearanceDefaults.paint, storedAppearance?.paint),
+        theme: resolveAppearanceThemeSettings(appearanceDefaults.theme, storedAppearance?.theme, selectedTheme),
         line: resolveLineAppearanceSettings(appearanceDefaults.line, storedAppearance?.line),
     };
 }
@@ -686,19 +700,122 @@ function mergeAppearanceSettings(
 function resolveAppearanceDefaultsForViewAndTheme(
     targetDefaults: ResolvedAppearanceSettings,
     resolvedView: ResolvedAppearanceViewSettings,
-    resolvedTheme: ResolvedAppearanceThemeSettings,
+    selectedTheme: MetricTheme,
 ): ResolvedAppearanceSettings {
-    if (resolvedTheme.selectedTheme === "terminal" || resolvedView.selectedView !== "text") {
+    if (resolvedView.selectedView !== "text") {
         return targetDefaults;
     }
 
+    switch (selectedTheme) {
+        case "flat":
+            return {
+                ...targetDefaults,
+                theme: {
+                    ...targetDefaults.theme,
+                    flat: {
+                        ...targetDefaults.theme.flat,
+                        paint: {
+                            ...targetDefaults.theme.flat.paint,
+                            colorMode: TEXT_VIEW_DEFAULT_METRIC_COLOR_MODE,
+                        },
+                    },
+                },
+            };
+        case "cupertino-glass":
+            return {
+                ...targetDefaults,
+                theme: {
+                    ...targetDefaults.theme,
+                    cupertinoGlass: {
+                        ...targetDefaults.theme.cupertinoGlass,
+                        paint: {
+                            ...targetDefaults.theme.cupertinoGlass.paint,
+                            colorMode: TEXT_VIEW_DEFAULT_METRIC_COLOR_MODE,
+                        },
+                    },
+                },
+            };
+        case "color-filled":
+        case "terminal":
+            return targetDefaults;
+    }
+}
+
+function resolveAppearanceThemeSettings(
+    defaults: ResolvedAppearanceThemeSettings,
+    storedTheme: StoredAppearanceThemeSettings | undefined,
+    selectedTheme = resolveStoredEnum(storedTheme?.selectedTheme, metricThemeByProto, defaults.selectedTheme),
+): ResolvedAppearanceThemeSettings {
     return {
-        ...targetDefaults,
-        paint: {
-            ...targetDefaults.paint,
-            metric: {
-                ...targetDefaults.paint.metric,
-                colorMode: TEXT_VIEW_DEFAULT_METRIC_COLOR_MODE,
+        selectedTheme,
+        flat: resolveFlatThemeSettings(defaults.flat, storedTheme?.flat),
+        cupertinoGlass: resolveCupertinoGlassThemeSettings(defaults.cupertinoGlass, storedTheme?.cupertinoGlass),
+        colorFilled: resolveColorFilledThemeSettings(defaults.colorFilled, storedTheme?.colorFilled),
+        terminal: resolveTerminalThemeSettings(defaults.terminal, storedTheme?.terminal),
+    };
+}
+
+function resolveFlatThemeSettings(
+    defaults: ResolvedFlatThemeSettings,
+    storedTheme: StoredFlatThemeSettings | undefined,
+): ResolvedFlatThemeSettings {
+    return {
+        paint: resolveMetricPaintSettings(defaults.paint, storedTheme?.paint),
+    };
+}
+
+function resolveCupertinoGlassThemeSettings(
+    defaults: ResolvedCupertinoGlassThemeSettings,
+    storedTheme: StoredCupertinoGlassThemeSettings | undefined,
+): ResolvedCupertinoGlassThemeSettings {
+    return {
+        paint: resolveMetricPaintSettings(defaults.paint, storedTheme?.paint),
+    };
+}
+
+function resolveColorFilledThemeSettings(
+    defaults: ResolvedColorFilledThemeSettings,
+    storedTheme: StoredColorFilledThemeSettings | undefined,
+): ResolvedColorFilledThemeSettings {
+    return {
+        paint: resolveColorFilledPaintSettings(defaults.paint, storedTheme?.paint),
+    };
+}
+
+function resolveTerminalThemeSettings(
+    defaults: ResolvedTerminalThemeSettings,
+    storedTerminal: StoredTerminalThemeSettings | undefined,
+): ResolvedTerminalThemeSettings {
+    return {
+        variant: resolveStoredEnum(storedTerminal?.variant, terminalThemeVariantByProto, defaults.variant),
+    };
+}
+
+function resolveGlobalMetricPaintAsMetricPaint(
+    paintOverride: ResolvedGlobalMetricPaintSettings,
+): ResolvedMetricPaintSettings {
+    return {
+        colorMode: paintOverride.colorMode,
+        solid: {
+            isGradientEnabled: paintOverride.solid.isGradientEnabled,
+            colors: {
+                usageColor: paintOverride.solid.color,
+                downloadColor: paintOverride.solid.color,
+                uploadColor: paintOverride.solid.color,
+                diskReadColor: paintOverride.solid.color,
+                diskWriteColor: paintOverride.solid.color,
+            },
+        },
+        multiColor: {
+            lowThresholdPercent: paintOverride.multiColor.lowThresholdPercent,
+            highThresholdPercent: paintOverride.multiColor.highThresholdPercent,
+            isGradientEnabled: paintOverride.multiColor.isGradientEnabled,
+            colors: {
+                usage: paintOverride.multiColor.colors,
+                download: paintOverride.multiColor.colors,
+                upload: paintOverride.multiColor.colors,
+                diskRead: paintOverride.multiColor.colors,
+                diskWrite: paintOverride.multiColor.colors,
             },
         },
     };
@@ -715,35 +832,6 @@ function resolveAppearanceViewSettings(
             circleViewVariantByProto,
             defaults.circleVariant,
         ),
-    };
-}
-
-function resolveAppearanceThemeSettings(
-    defaults: ResolvedAppearanceThemeSettings,
-    storedTheme: StoredAppearanceThemeSettings | undefined,
-): ResolvedAppearanceThemeSettings {
-    return {
-        selectedTheme: resolveStoredEnum(storedTheme?.selectedTheme, metricThemeByProto, defaults.selectedTheme),
-        terminal: resolveTerminalThemeSettings(defaults.terminal, storedTheme?.terminal),
-    };
-}
-
-function resolveTerminalThemeSettings(
-    defaults: ResolvedTerminalThemeSettings,
-    storedTerminal: StoredTerminalThemeSettings | undefined,
-): ResolvedTerminalThemeSettings {
-    return {
-        variant: resolveStoredEnum(storedTerminal?.variant, terminalThemeVariantByProto, defaults.variant),
-    };
-}
-
-function resolveAppearancePaintSettings(
-    defaults: ResolvedAppearancePaintSettings,
-    storedPaint: StoredAppearancePaintSettings | undefined,
-): ResolvedAppearancePaintSettings {
-    return {
-        metric: resolveMetricPaintSettings(defaults.metric, storedPaint?.metric),
-        colorFilled: resolveColorFilledPaintSettings(defaults.colorFilled, storedPaint?.colorFilled),
     };
 }
 
@@ -846,16 +934,16 @@ function resolveGlobalSolidPaintSettings(
     storedSolid: StoredGlobalSolidPaintSettings | undefined,
 ): ResolvedGlobalSolidPaintSettings {
     return {
-        color: storedSolid?.color ?? DEFAULT_APPEARANCE_SETTINGS.paint.metric.solid.colors.usageColor,
+        color: storedSolid?.color ?? DEFAULT_APPEARANCE_SETTINGS.theme.flat.paint.solid.colors.usageColor,
         isGradientEnabled: storedSolid?.gradientEnabled
-            ?? DEFAULT_APPEARANCE_SETTINGS.paint.metric.solid.isGradientEnabled,
+            ?? DEFAULT_APPEARANCE_SETTINGS.theme.flat.paint.solid.isGradientEnabled,
     };
 }
 
 function resolveGlobalMultiColorPaintSettings(
     storedMultiColor: StoredGlobalMultiColorPaintSettings | undefined,
 ): ResolvedGlobalMultiColorPaintSettings {
-    const defaults = DEFAULT_APPEARANCE_SETTINGS.paint.metric.multiColor;
+    const defaults = DEFAULT_APPEARANCE_SETTINGS.theme.flat.paint.multiColor;
 
     return {
         colors: resolveMultiColorSet(defaults.colors.usage, storedMultiColor?.colors),
@@ -889,37 +977,45 @@ function applyGlobalPaintOverride(
     appearance: ResolvedAppearanceSettings,
     paintOverride: ResolvedGlobalPaintOverride,
 ): ResolvedAppearanceSettings {
-    return {
-        ...appearance,
-        paint: {
-            metric: {
-                colorMode: paintOverride.metric.colorMode,
-                solid: {
-                    isGradientEnabled: paintOverride.metric.solid.isGradientEnabled,
-                    colors: {
-                        usageColor: paintOverride.metric.solid.color,
-                        downloadColor: paintOverride.metric.solid.color,
-                        uploadColor: paintOverride.metric.solid.color,
-                        diskReadColor: paintOverride.metric.solid.color,
-                        diskWriteColor: paintOverride.metric.solid.color,
+    const metricPaintOverride = resolveGlobalMetricPaintAsMetricPaint(paintOverride.metric);
+
+    switch (appearance.theme.selectedTheme) {
+        case "flat":
+            return {
+                ...appearance,
+                theme: {
+                    ...appearance.theme,
+                    flat: {
+                        ...appearance.theme.flat,
+                        paint: metricPaintOverride,
                     },
                 },
-                multiColor: {
-                    lowThresholdPercent: paintOverride.metric.multiColor.lowThresholdPercent,
-                    highThresholdPercent: paintOverride.metric.multiColor.highThresholdPercent,
-                    isGradientEnabled: paintOverride.metric.multiColor.isGradientEnabled,
-                    colors: {
-                        usage: paintOverride.metric.multiColor.colors,
-                        download: paintOverride.metric.multiColor.colors,
-                        upload: paintOverride.metric.multiColor.colors,
-                        diskRead: paintOverride.metric.multiColor.colors,
-                        diskWrite: paintOverride.metric.multiColor.colors,
+            };
+        case "cupertino-glass":
+            return {
+                ...appearance,
+                theme: {
+                    ...appearance.theme,
+                    cupertinoGlass: {
+                        ...appearance.theme.cupertinoGlass,
+                        paint: metricPaintOverride,
                     },
                 },
-            },
-            colorFilled: paintOverride.colorFilled,
-        },
-    };
+            };
+        case "color-filled":
+            return {
+                ...appearance,
+                theme: {
+                    ...appearance.theme,
+                    colorFilled: {
+                        ...appearance.theme.colorFilled,
+                        paint: paintOverride.colorFilled,
+                    },
+                },
+            };
+        case "terminal":
+            return appearance;
+    }
 }
 
 function resolveMultiColorSet(
