@@ -4,7 +4,9 @@ import type {
     TerminalThemeVariant,
     ResolvedAppearanceSettings,
     ResolvedAppearanceViewSettings,
+    ResolvedColorFilledPaintSettings,
     ResolvedLineAppearanceSettings,
+    ResolvedMetricPaintSettings,
     ResolvedMetricMultiColorChannelColors,
     ResolvedMetricMultiColorPaintSettings,
     ResolvedMultiColorSet,
@@ -15,7 +17,6 @@ export type MetricColorChannel = keyof ResolvedMetricMultiColorChannelColors;
 export interface ResolvedAppearanceSettingsOverride {
     readonly view?: ResolvedAppearanceViewSettingsOverride | undefined;
     readonly theme?: ResolvedAppearanceThemeSettingsOverride | undefined;
-    readonly paint?: ResolvedAppearancePaintSettingsOverride | undefined;
     readonly line?: ResolvedLineAppearanceSettingsOverride | undefined;
 }
 
@@ -26,16 +27,26 @@ export interface ResolvedAppearanceViewSettingsOverride {
 
 export interface ResolvedAppearanceThemeSettingsOverride {
     readonly selectedTheme?: MetricTheme | undefined;
+    readonly flat?: ResolvedFlatThemeSettingsOverride | undefined;
+    readonly cupertinoGlass?: ResolvedCupertinoGlassThemeSettingsOverride | undefined;
+    readonly colorFilled?: ResolvedColorFilledThemeSettingsOverride | undefined;
     readonly terminal?: ResolvedTerminalThemeSettingsOverride | undefined;
+}
+
+export interface ResolvedFlatThemeSettingsOverride {
+    readonly paint?: ResolvedMetricPaintSettingsOverride | undefined;
+}
+
+export interface ResolvedCupertinoGlassThemeSettingsOverride {
+    readonly paint?: ResolvedMetricPaintSettingsOverride | undefined;
+}
+
+export interface ResolvedColorFilledThemeSettingsOverride {
+    readonly paint?: ResolvedColorFilledPaintSettingsOverride | undefined;
 }
 
 export interface ResolvedTerminalThemeSettingsOverride {
     readonly variant?: TerminalThemeVariant | undefined;
-}
-
-export interface ResolvedAppearancePaintSettingsOverride {
-    readonly metric?: ResolvedMetricPaintSettingsOverride | undefined;
-    readonly colorFilled?: ResolvedColorFilledPaintSettingsOverride | undefined;
 }
 
 export interface ResolvedMetricPaintSettingsOverride {
@@ -100,6 +111,12 @@ export interface ResolvedLineAppearanceSettingsOverride {
     readonly gridLineType?: ResolvedLineAppearanceSettings["gridLineType"] | undefined;
 }
 
+/**
+ * Merges a sparse appearance override into complete resolved appearance settings.
+ *
+ * Used by previews and metric view rendering when a caller needs a temporary
+ * view, theme, or paint override without writing that intent back to storage.
+ */
 export function mergeResolvedAppearanceSettings(
     settings: ResolvedAppearanceSettings,
     override: ResolvedAppearanceSettingsOverride | undefined,
@@ -116,12 +133,32 @@ export function mergeResolvedAppearanceSettings(
         theme: {
             ...settings.theme,
             selectedTheme: override.theme?.selectedTheme ?? settings.theme.selectedTheme,
+            flat: {
+                ...settings.theme.flat,
+                ...override.theme?.flat,
+                paint: mergeMetricPaintSettings(settings.theme.flat.paint, override.theme?.flat?.paint),
+            },
+            cupertinoGlass: {
+                ...settings.theme.cupertinoGlass,
+                ...override.theme?.cupertinoGlass,
+                paint: mergeMetricPaintSettings(
+                    settings.theme.cupertinoGlass.paint,
+                    override.theme?.cupertinoGlass?.paint,
+                ),
+            },
+            colorFilled: {
+                ...settings.theme.colorFilled,
+                ...override.theme?.colorFilled,
+                paint: mergeColorFilledPaintSettings(
+                    settings.theme.colorFilled.paint,
+                    override.theme?.colorFilled?.paint,
+                ),
+            },
             terminal: {
                 ...settings.theme.terminal,
                 ...override.theme?.terminal,
             },
         },
-        paint: mergeAppearancePaintSettings(settings.paint, override.paint),
         line: {
             ...settings.line,
             ...override.line,
@@ -129,45 +166,87 @@ export function mergeResolvedAppearanceSettings(
     };
 }
 
-function mergeAppearancePaintSettings(
-    paint: ResolvedAppearanceSettings["paint"],
-    override: ResolvedAppearancePaintSettingsOverride | undefined,
-): ResolvedAppearanceSettings["paint"] {
+/**
+ * Builds a theme-owned override for metric accent paint.
+ *
+ * Used by color controls and domain view builders when the active theme exposes
+ * foreground accent paint for rings, bars, lines, or large text. Returns
+ * `undefined` for themes whose paint is not metric-accent based.
+ */
+export function buildMetricAccentPaintAppearanceOverride(
+    selectedTheme: MetricTheme,
+    paint: ResolvedMetricPaintSettingsOverride,
+): ResolvedAppearanceSettingsOverride | undefined {
+    switch (selectedTheme) {
+        case "flat":
+            return { theme: { flat: { paint } } };
+        case "cupertino-glass":
+            return { theme: { cupertinoGlass: { paint } } };
+        case "color-filled":
+        case "terminal":
+            return undefined;
+    }
+}
+
+/**
+ * Builds a theme-owned override for Color Filled background paint.
+ *
+ * Used by Color Filled controls when the user's color mode edits the widget
+ * background instead of the metric accent paint.
+ */
+export function buildColorFilledPaintAppearanceOverride(
+    paint: ResolvedColorFilledPaintSettingsOverride,
+): ResolvedAppearanceSettingsOverride {
     return {
-        metric: {
-            ...paint.metric,
-            ...override?.metric,
-            solid: {
-                ...paint.metric.solid,
-                ...override?.metric?.solid,
-                colors: {
-                    ...paint.metric.solid.colors,
-                    ...override?.metric?.solid?.colors,
-                },
-            },
-            multiColor: {
-                ...paint.metric.multiColor,
-                ...override?.metric?.multiColor,
-                colors: mergeMetricMultiColorChannelColors(
-                    paint.metric.multiColor.colors,
-                    override?.metric?.multiColor?.colors,
-                ),
+        theme: {
+            colorFilled: { paint },
+        },
+    };
+}
+
+function mergeMetricPaintSettings(
+    paint: ResolvedMetricPaintSettings,
+    override: ResolvedMetricPaintSettingsOverride | undefined,
+): ResolvedMetricPaintSettings {
+    return {
+        ...paint,
+        ...override,
+        solid: {
+            ...paint.solid,
+            ...override?.solid,
+            colors: {
+                ...paint.solid.colors,
+                ...override?.solid?.colors,
             },
         },
-        colorFilled: {
-            ...paint.colorFilled,
-            ...override?.colorFilled,
-            solid: {
-                ...paint.colorFilled.solid,
-                ...override?.colorFilled?.solid,
-            },
-            multiColor: {
-                ...paint.colorFilled.multiColor,
-                ...override?.colorFilled?.multiColor,
-                colors: {
-                    ...paint.colorFilled.multiColor.colors,
-                    ...override?.colorFilled?.multiColor?.colors,
-                },
+        multiColor: {
+            ...paint.multiColor,
+            ...override?.multiColor,
+            colors: mergeMetricMultiColorChannelColors(
+                paint.multiColor.colors,
+                override?.multiColor?.colors,
+            ),
+        },
+    };
+}
+
+function mergeColorFilledPaintSettings(
+    paint: ResolvedColorFilledPaintSettings,
+    override: ResolvedColorFilledPaintSettingsOverride | undefined,
+): ResolvedColorFilledPaintSettings {
+    return {
+        ...paint,
+        ...override,
+        solid: {
+            ...paint.solid,
+            ...override?.solid,
+        },
+        multiColor: {
+            ...paint.multiColor,
+            ...override?.multiColor,
+            colors: {
+                ...paint.multiColor.colors,
+                ...override?.multiColor?.colors,
             },
         },
     };

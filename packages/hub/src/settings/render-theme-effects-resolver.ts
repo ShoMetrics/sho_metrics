@@ -6,6 +6,12 @@ import {
 } from "../view-rendering/render-svg-effects";
 import type { ResolvedAppearanceSettings } from "./resolved-settings";
 
+/**
+ * Resolves renderer SVG effect tokens for the selected theme.
+ *
+ * Used by Terminal themes to add scanline, glow, and distortion treatment
+ * without changing the user's selected metric view.
+ */
 export function resolveRenderThemeEffects(settings: ResolvedAppearanceSettings): RenderThemeEffectTokens {
     switch (settings.theme.selectedTheme) {
         case "terminal":

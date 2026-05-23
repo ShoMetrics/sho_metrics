@@ -8,6 +8,7 @@ import type { MetricColorChannel } from "./appearance-overrides";
 import type {
     ColorMode,
     ResolvedAppearanceSettings,
+    ResolvedColorFilledPaintSettings,
     ResolvedMetricPaintSettings,
     ResolvedMetricSolidChannelColors,
 } from "./resolved-settings";
@@ -99,6 +100,12 @@ const solidColorKeyByChannel = {
     diskWrite: "diskWriteColor",
 } satisfies Record<MetricColorChannel, keyof ResolvedMetricSolidChannelColors>;
 
+/**
+ * Resolves renderer paint tokens and the active paint constraint from appearance settings.
+ *
+ * Used before SVG composition so renderers consume theme semantics without
+ * reading theme-scoped settings paths directly.
+ */
 export function resolveRenderPaint(settings: ResolvedAppearanceSettings): {
     readonly paintConstraint: RenderPaintConstraint;
     readonly paintTokens: RenderPaintTokens;
@@ -111,33 +118,92 @@ export function resolveRenderPaint(settings: ResolvedAppearanceSettings): {
     };
 }
 
+/**
+ * Builds a renderer color config for one metric channel from the active theme paint.
+ *
+ * Used by widgets and domain view builders to color rings, bars, lines, and
+ * channel accents without knowing where each theme stores its paint settings.
+ */
 export function buildColorConfigFromAppearance(
     appearance: ResolvedAppearanceSettings,
     channel: MetricColorChannel,
 ): ColorConfig {
-    const colorConfig = buildColorConfigFromMetricPaint(appearance.paint.metric, channel);
-
-    if (appearance.theme.selectedTheme !== "color-filled") {
-        if (appearance.theme.selectedTheme === "terminal") {
-            return lowerColorConfigForColorMode(
-                appearance.paint.metric.colorMode,
-                terminalColorConfigForVariant(appearance.theme.terminal.variant),
-            );
-        }
-
-        return colorConfig;
+    switch (appearance.theme.selectedTheme) {
+        case "flat":
+            return buildColorConfigFromMetricPaint(appearance.theme.flat.paint, channel);
+        case "cupertino-glass":
+            return buildColorConfigFromMetricPaint(appearance.theme.cupertinoGlass.paint, channel);
+        case "color-filled":
+            return {
+                mode: "solid",
+                solidColor: BLACK_WHITE_PAINT,
+                thresholds: [],
+                isGradientEnabled: false,
+            };
+        case "terminal":
+            return terminalColorConfigForVariant(appearance.theme.terminal.variant);
     }
-
-    return {
-        mode: "solid",
-        solidColor: BLACK_WHITE_PAINT,
-        thresholds: [],
-        isGradientEnabled: false,
-    };
 }
 
-export function resolveSolidMetricColorMode(colorMode: ColorMode): ColorMode {
+/**
+ * Resolves the equivalent solid-only metric accent mode.
+ *
+ * Used by dual-channel metric views that choose per-channel colors in action
+ * code while preserving the user's Black & White choice.
+ */
+export function resolveSolidMetricColorMode(colorMode: ColorMode | undefined): ColorMode | undefined {
+    if (colorMode === undefined) {
+        return undefined;
+    }
+
     return colorMode === "black-white" ? "black-white" : "solid";
+}
+
+/**
+ * Resolves the active theme's metric accent paint when the theme has one.
+ *
+ * Used by Property Inspector color controls that should disappear for themes
+ * such as Color Filled or Terminal where the same controls would edit the
+ * wrong visual object.
+ */
+export function resolveActiveMetricAccentPaint(
+    appearance: ResolvedAppearanceSettings,
+): ResolvedMetricPaintSettings | undefined {
+    switch (appearance.theme.selectedTheme) {
+        case "flat":
+            return appearance.theme.flat.paint;
+        case "cupertino-glass":
+            return appearance.theme.cupertinoGlass.paint;
+        case "color-filled":
+        case "terminal":
+            return undefined;
+    }
+}
+
+/**
+ * Resolves Color Filled paint when Color Filled is the active theme.
+ *
+ * Used by Property Inspector controls where color mode edits the widget
+ * background rather than the foreground metric accent.
+ */
+export function resolveActiveColorFilledPaint(
+    appearance: ResolvedAppearanceSettings,
+): ResolvedColorFilledPaintSettings | undefined {
+    if (appearance.theme.selectedTheme !== "color-filled") {
+        return undefined;
+    }
+
+    return appearance.theme.colorFilled.paint;
+}
+
+/**
+ * Resolves the active theme's metric accent color mode when the theme has one.
+ *
+ * Used by domain view builders that need to preserve Black & White while
+ * constructing temporary per-channel accent overrides.
+ */
+export function resolveActiveMetricAccentColorMode(appearance: ResolvedAppearanceSettings): ColorMode | undefined {
+    return resolveActiveMetricAccentPaint(appearance)?.colorMode;
 }
 
 function buildColorConfigFromMetricPaint(
@@ -226,7 +292,7 @@ function buildRenderBackgroundFill(settings: ResolvedAppearanceSettings): Render
         return undefined;
     }
 
-    const colorFilledPaint = settings.paint.colorFilled;
+    const colorFilledPaint = settings.theme.colorFilled.paint;
 
     if (colorFilledPaint.colorMode === "solid") {
         return {
@@ -246,11 +312,16 @@ function buildRenderBackgroundFill(settings: ResolvedAppearanceSettings): Render
 }
 
 function activePaintColorMode(settings: ResolvedAppearanceSettings): ColorMode {
-    if (settings.theme.selectedTheme === "color-filled") {
-        return settings.paint.colorFilled.colorMode;
+    switch (settings.theme.selectedTheme) {
+        case "flat":
+            return settings.theme.flat.paint.colorMode;
+        case "cupertino-glass":
+            return settings.theme.cupertinoGlass.paint.colorMode;
+        case "color-filled":
+            return settings.theme.colorFilled.paint.colorMode;
+        case "terminal":
+            return "solid";
     }
-
-    return settings.paint.metric.colorMode;
 }
 
 function lowerBackgroundFillToBlackWhite(backgroundFill: RenderBackgroundFill | undefined): RenderBackgroundFill | undefined {

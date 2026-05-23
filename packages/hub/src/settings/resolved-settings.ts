@@ -152,7 +152,6 @@ export interface ResolvedCatalogMetricTarget {
 export interface ResolvedAppearanceSettings {
     readonly view: ResolvedAppearanceViewSettings;
     readonly theme: ResolvedAppearanceThemeSettings;
-    readonly paint: ResolvedAppearancePaintSettings;
     readonly line: ResolvedLineAppearanceSettings;
 }
 
@@ -163,16 +162,26 @@ export interface ResolvedAppearanceViewSettings {
 
 export interface ResolvedAppearanceThemeSettings {
     readonly selectedTheme: MetricTheme;
+    readonly flat: ResolvedFlatThemeSettings;
+    readonly cupertinoGlass: ResolvedCupertinoGlassThemeSettings;
+    readonly colorFilled: ResolvedColorFilledThemeSettings;
     readonly terminal: ResolvedTerminalThemeSettings;
+}
+
+export interface ResolvedFlatThemeSettings {
+    readonly paint: ResolvedMetricPaintSettings;
+}
+
+export interface ResolvedCupertinoGlassThemeSettings {
+    readonly paint: ResolvedMetricPaintSettings;
+}
+
+export interface ResolvedColorFilledThemeSettings {
+    readonly paint: ResolvedColorFilledPaintSettings;
 }
 
 export interface ResolvedTerminalThemeSettings {
     readonly variant: TerminalThemeVariant;
-}
-
-export interface ResolvedAppearancePaintSettings {
-    readonly metric: ResolvedMetricPaintSettings;
-    readonly colorFilled: ResolvedColorFilledPaintSettings;
 }
 
 export interface ResolvedMetricPaintSettings {

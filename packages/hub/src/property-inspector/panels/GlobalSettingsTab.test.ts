@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { MetricTheme, ResolvedGlobalSettings } from "../../settings/resolved-settings";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
+import { DEFAULT_APPEARANCE_SETTINGS } from "../../settings/default-appearance-settings";
 import { GlobalSettingsTab } from "./GlobalSettingsTab";
 
 test("global override groups view theme and color controls under the master switch", () => {
@@ -74,10 +75,8 @@ function buildGlobalSettings(selectedTheme: MetricTheme = "flat"): ResolvedGloba
         },
         themeOverride: {
             theme: {
+                ...DEFAULT_APPEARANCE_SETTINGS.theme,
                 selectedTheme,
-                terminal: {
-                    variant: "clean",
-                },
             },
         },
         paintOverride: {

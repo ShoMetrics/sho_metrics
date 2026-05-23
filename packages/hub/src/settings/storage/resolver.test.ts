@@ -20,8 +20,8 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.slot.metric.target.domain, "cpu");
         assert.equal(settings.preferences.pollingFrequencySeconds, 1);
         assert.equal(settings.widget.slot.appearance.view.selectedView, "circle");
-        assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "multi-color");
-        assert.equal(settings.widget.slot.appearance.paint.metric.solid.colors.usageColor, "#3b82f6");
+        assert.equal(settings.widget.slot.appearance.theme.flat.paint.colorMode, "multi-color");
+        assert.equal(settings.widget.slot.appearance.theme.flat.paint.solid.colors.usageColor, "#3b82f6");
         assert.equal(settings.widget.slot.appearance.theme.terminal.variant, "clean");
     });
 
@@ -41,9 +41,9 @@ describe("stored settings proto resolver", () => {
         });
 
         assert.equal(settings.widget.slot.metric.target.domain, "network");
-        assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "solid");
-        assert.equal(settings.widget.slot.appearance.paint.metric.solid.colors.downloadColor, "#2563EB");
-        assert.equal(settings.widget.slot.appearance.paint.metric.solid.colors.uploadColor, "#F97316");
+        assert.equal(settings.widget.slot.appearance.theme.flat.paint.colorMode, "solid");
+        assert.equal(settings.widget.slot.appearance.theme.flat.paint.solid.colors.downloadColor, "#2563EB");
+        assert.equal(settings.widget.slot.appearance.theme.flat.paint.solid.colors.uploadColor, "#F97316");
     });
 
     it("preserves an explicit network multi-color paint selection", () => {
@@ -55,9 +55,11 @@ describe("stored settings proto resolver", () => {
                     },
                     overrides: {
                         appearance: {
-                            paint: {
-                                metric: {
-                                    colorMode: "COLOR_MODE_MULTI_COLOR",
+                            theme: {
+                                flat: {
+                                    paint: {
+                                        colorMode: "COLOR_MODE_MULTI_COLOR",
+                                    },
                                 },
                             },
                         },
@@ -71,7 +73,7 @@ describe("stored settings proto resolver", () => {
         });
 
         assert.equal(settings.widget.slot.metric.target.domain, "network");
-        assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "multi-color");
+        assert.equal(settings.widget.slot.appearance.theme.flat.paint.colorMode, "multi-color");
     });
 
     it("defaults text view metric paint to black-white", () => {
@@ -94,7 +96,7 @@ describe("stored settings proto resolver", () => {
         });
 
         assert.equal(settings.widget.slot.appearance.view.selectedView, "text");
-        assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "black-white");
+        assert.equal(settings.widget.slot.appearance.theme.flat.paint.colorMode, "black-white");
     });
 
     it("keeps terminal text view paint on the theme-owned default", () => {
@@ -121,7 +123,7 @@ describe("stored settings proto resolver", () => {
 
         assert.equal(settings.widget.slot.appearance.view.selectedView, "text");
         assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "terminal");
-        assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "multi-color");
+        assert.equal(settings.widget.slot.appearance.theme.flat.paint.colorMode, "multi-color");
     });
 
     it("preserves an explicit text view metric paint selection", () => {
@@ -133,9 +135,11 @@ describe("stored settings proto resolver", () => {
                             view: {
                                 selectedView: "METRIC_VIEW_TEXT",
                             },
-                            paint: {
-                                metric: {
-                                    colorMode: "COLOR_MODE_SOLID",
+                            theme: {
+                                flat: {
+                                    paint: {
+                                        colorMode: "COLOR_MODE_SOLID",
+                                    },
                                 },
                             },
                         },
@@ -149,7 +153,7 @@ describe("stored settings proto resolver", () => {
         });
 
         assert.equal(settings.widget.slot.appearance.view.selectedView, "text");
-        assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "solid");
+        assert.equal(settings.widget.slot.appearance.theme.flat.paint.colorMode, "solid");
     });
 
     it("cascades global defaults widget overrides and runtime maxima", () => {
@@ -172,11 +176,13 @@ describe("stored settings proto resolver", () => {
                     },
                     overrides: {
                         appearance: {
-                            paint: {
-                                metric: {
-                                    solid: {
-                                        colors: {
-                                            usageColor: "#222222",
+                            theme: {
+                                flat: {
+                                    paint: {
+                                        solid: {
+                                            colors: {
+                                                usageColor: "#222222",
+                                            },
                                         },
                                     },
                                 },
@@ -199,7 +205,7 @@ describe("stored settings proto resolver", () => {
         });
         const target = settings.widget.slot.metric.target;
 
-        assert.equal(settings.widget.slot.appearance.paint.metric.solid.colors.usageColor, "#222222");
+        assert.equal(settings.widget.slot.appearance.theme.flat.paint.solid.colors.usageColor, "#222222");
         assert.equal(target.domain, "network");
         assert.equal(target.reading.kind, "traffic");
         assert.equal(target.reading.direction, "download");
@@ -245,11 +251,13 @@ describe("stored settings proto resolver", () => {
                             view: {
                                 selectedView: "METRIC_VIEW_LINE",
                             },
-                            paint: {
-                                metric: {
-                                    solid: {
-                                        colors: {
-                                            usageColor: "#222222",
+                            theme: {
+                                flat: {
+                                    paint: {
+                                        solid: {
+                                            colors: {
+                                                usageColor: "#222222",
+                                            },
                                         },
                                     },
                                 },
@@ -269,8 +277,8 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.slot.appearance.view.selectedView, "bar");
         assert.equal(settings.widget.slot.appearance.view.circleVariant, "gauge");
         assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "cupertino-glass");
-        assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "solid");
-        assert.equal(settings.widget.slot.appearance.paint.metric.solid.colors.usageColor, "#111111");
+        assert.equal(settings.widget.slot.appearance.theme.cupertinoGlass.paint.colorMode, "solid");
+        assert.equal(settings.widget.slot.appearance.theme.cupertinoGlass.paint.solid.colors.usageColor, "#111111");
     });
 
     it("resolves black-white as a user-facing color mode", () => {
@@ -279,9 +287,11 @@ describe("stored settings proto resolver", () => {
                 slot: {
                     overrides: {
                         appearance: {
-                            paint: {
-                                metric: {
-                                    colorMode: "COLOR_MODE_BLACK_WHITE",
+                            theme: {
+                                flat: {
+                                    paint: {
+                                        colorMode: "COLOR_MODE_BLACK_WHITE",
+                                    },
                                 },
                             },
                         },
@@ -294,7 +304,7 @@ describe("stored settings proto resolver", () => {
             storedWidgetSettings,
         });
 
-        assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "black-white");
+        assert.equal(settings.widget.slot.appearance.theme.flat.paint.colorMode, "black-white");
     });
 
     it("resolves terminal as a user-facing theme", () => {
@@ -373,13 +383,13 @@ describe("stored settings proto resolver", () => {
                             },
                             theme: {
                                 selectedTheme: "METRIC_THEME_CUPERTINO_GLASS",
-                            },
-                            paint: {
-                                metric: {
-                                    colorMode: "COLOR_MODE_SOLID",
-                                    solid: {
-                                        colors: {
-                                            usageColor: "#222222",
+                                cupertinoGlass: {
+                                    paint: {
+                                        colorMode: "COLOR_MODE_SOLID",
+                                        solid: {
+                                            colors: {
+                                                usageColor: "#222222",
+                                            },
                                         },
                                     },
                                 },
@@ -397,8 +407,8 @@ describe("stored settings proto resolver", () => {
 
         assert.equal(settings.widget.slot.appearance.view.selectedView, "line");
         assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "cupertino-glass");
-        assert.equal(settings.widget.slot.appearance.paint.metric.colorMode, "black-white");
-        assert.equal(settings.widget.slot.appearance.paint.metric.solid.colors.usageColor, "#3b82f6");
+        assert.equal(settings.widget.slot.appearance.theme.cupertinoGlass.paint.colorMode, "black-white");
+        assert.equal(settings.widget.slot.appearance.theme.cupertinoGlass.paint.solid.colors.usageColor, "#3b82f6");
     });
 
     it("uses kind switches for disk metric branches", () => {

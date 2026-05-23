@@ -4,6 +4,8 @@ import {
 } from "./appearance-overrides";
 import type {
     ResolvedAppearanceSettings,
+    ResolvedColorFilledPaintSettings,
+    ResolvedMetricPaintSettings,
     ResolvedMultiColorSet,
 } from "./resolved-settings";
 
@@ -37,6 +39,44 @@ export const DEFAULT_DISK_WRITE_MULTI_COLOR_SET: ResolvedMultiColorSet = {
     highColor: "#fb7185",
 };
 
+const DEFAULT_METRIC_ACCENT_PAINT_SETTINGS: ResolvedMetricPaintSettings = {
+    colorMode: "multi-color",
+    solid: {
+        isGradientEnabled: true,
+        colors: {
+            usageColor: "#3b82f6",
+            downloadColor: "#2563EB",
+            uploadColor: "#F97316",
+            diskReadColor: "#38bdf8",
+            diskWriteColor: "#f472b6",
+        },
+    },
+    multiColor: {
+        lowThresholdPercent: 30,
+        highThresholdPercent: 70,
+        isGradientEnabled: true,
+        colors: {
+            usage: DEFAULT_USAGE_MULTI_COLOR_SET,
+            download: DEFAULT_DOWNLOAD_MULTI_COLOR_SET,
+            upload: DEFAULT_UPLOAD_MULTI_COLOR_SET,
+            diskRead: DEFAULT_DISK_READ_MULTI_COLOR_SET,
+            diskWrite: DEFAULT_DISK_WRITE_MULTI_COLOR_SET,
+        },
+    },
+};
+
+const DEFAULT_COLOR_FILLED_PAINT_SETTINGS: ResolvedColorFilledPaintSettings = {
+    colorMode: "multi-color",
+    solid: {
+        color: "#3b82f6",
+        isGradientEnabled: true,
+    },
+    multiColor: {
+        colors: DEFAULT_USAGE_MULTI_COLOR_SET,
+        isGradientEnabled: true,
+    },
+};
+
 export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
     view: {
         selectedView: "circle",
@@ -44,46 +84,17 @@ export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
     },
     theme: {
         selectedTheme: "flat",
-        terminal: {
-            variant: "clean",
+        flat: {
+            paint: DEFAULT_METRIC_ACCENT_PAINT_SETTINGS,
         },
-    },
-    paint: {
-        metric: {
-            colorMode: "multi-color",
-            solid: {
-                isGradientEnabled: true,
-                colors: {
-                    usageColor: "#3b82f6",
-                    downloadColor: "#2563EB",
-                    uploadColor: "#F97316",
-                    diskReadColor: "#38bdf8",
-                    diskWriteColor: "#f472b6",
-                },
-            },
-            multiColor: {
-                lowThresholdPercent: 30,
-                highThresholdPercent: 70,
-                isGradientEnabled: true,
-                colors: {
-                    usage: DEFAULT_USAGE_MULTI_COLOR_SET,
-                    download: DEFAULT_DOWNLOAD_MULTI_COLOR_SET,
-                    upload: DEFAULT_UPLOAD_MULTI_COLOR_SET,
-                    diskRead: DEFAULT_DISK_READ_MULTI_COLOR_SET,
-                    diskWrite: DEFAULT_DISK_WRITE_MULTI_COLOR_SET,
-                },
-            },
+        cupertinoGlass: {
+            paint: DEFAULT_METRIC_ACCENT_PAINT_SETTINGS,
         },
         colorFilled: {
-            colorMode: "multi-color",
-            solid: {
-                color: "#3b82f6",
-                isGradientEnabled: true,
-            },
-            multiColor: {
-                colors: DEFAULT_USAGE_MULTI_COLOR_SET,
-                isGradientEnabled: true,
-            },
+            paint: DEFAULT_COLOR_FILLED_PAINT_SETTINGS,
+        },
+        terminal: {
+            variant: "clean",
         },
     },
     line: {
@@ -93,6 +104,12 @@ export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
     },
 };
 
+/**
+ * Builds complete default appearance settings with an optional sparse override.
+ *
+ * Used by tests, previews, and target-specific defaults that need normal
+ * resolved appearance settings without going through persisted storage.
+ */
 export function buildDefaultAppearanceSettings(
     overrides: ResolvedAppearanceSettingsOverride = {},
 ): ResolvedAppearanceSettings {

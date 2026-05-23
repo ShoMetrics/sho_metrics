@@ -172,12 +172,12 @@ function buildTerminalAppearanceOverride(options: {
             terminal: {
                 variant: options.variant,
             },
-        },
-        paint: {
-            metric: {
-                colorMode: "solid",
-                solid: {
-                    colors: { usageColor: "#ef4444" },
+            flat: {
+                paint: {
+                    colorMode: "solid",
+                    solid: {
+                        colors: { usageColor: "#ef4444" },
+                    },
                 },
             },
         },

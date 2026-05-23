@@ -85,11 +85,13 @@ test("theme effects map resolved appearance settings to renderer effect tokens",
 
 test("solid color mode uses resolved appearance color", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
-        paint: {
-            metric: {
-                colorMode: "solid",
-                solid: {
-                    colors: { usageColor: "#123456" },
+        theme: {
+            flat: {
+                paint: {
+                    colorMode: "solid",
+                    solid: {
+                        colors: { usageColor: "#123456" },
+                    },
                 },
             },
         },
@@ -100,11 +102,13 @@ test("solid color mode uses resolved appearance color", () => {
 
 test("threshold values build renderer color bands", () => {
     const primaryMetric = buildMetricRenderAppearance(buildAppearanceSettings({
-        paint: {
-            metric: {
-                multiColor: {
-                    lowThresholdPercent: 20,
-                    highThresholdPercent: 90,
+        theme: {
+            flat: {
+                paint: {
+                    multiColor: {
+                        lowThresholdPercent: 20,
+                        highThresholdPercent: 90,
+                    },
                 },
             },
         },
@@ -122,14 +126,16 @@ test("threshold values build renderer color bands", () => {
 
 test("threshold colors use resolved appearance colors", () => {
     const primaryMetric = buildMetricRenderAppearance(buildAppearanceSettings({
-        paint: {
-            metric: {
-                multiColor: {
-                    colors: {
-                        usage: {
-                            lowColor: "#111111",
-                            mediumColor: "#222222",
-                            highColor: "#333333",
+        theme: {
+            flat: {
+                paint: {
+                    multiColor: {
+                        colors: {
+                            usage: {
+                                lowColor: "#111111",
+                                mediumColor: "#222222",
+                                highColor: "#333333",
+                            },
                         },
                     },
                 },
@@ -147,14 +153,14 @@ test("threshold colors use resolved appearance colors", () => {
 test("network channel defaults use blue download and orange upload ramps", () => {
     const appearance = buildAppearanceSettings();
 
-    assert.equal(appearance.paint.metric.solid.colors.downloadColor, "#2563EB");
-    assert.equal(appearance.paint.metric.solid.colors.uploadColor, "#F97316");
-    assert.deepEqual(appearance.paint.metric.multiColor.colors.download, {
+    assert.equal(appearance.theme.flat.paint.solid.colors.downloadColor, "#2563EB");
+    assert.equal(appearance.theme.flat.paint.solid.colors.uploadColor, "#F97316");
+    assert.deepEqual(appearance.theme.flat.paint.multiColor.colors.download, {
         lowColor: "#60A5FA",
         mediumColor: "#2563EB",
         highColor: "#1E3A8A",
     });
-    assert.deepEqual(appearance.paint.metric.multiColor.colors.upload, {
+    assert.deepEqual(appearance.theme.flat.paint.multiColor.colors.upload, {
         lowColor: "#FDBA74",
         mediumColor: "#F97316",
         highColor: "#C2410C",
@@ -163,8 +169,10 @@ test("network channel defaults use blue download and orange upload ramps", () =>
 
 test("black-white color mode lowers renderer paint to neutral colors", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
-        paint: {
-            metric: { colorMode: "black-white" },
+        theme: {
+            flat: {
+                paint: { colorMode: "black-white" },
+            },
         },
     }));
 
@@ -177,29 +185,33 @@ test("black-white color mode lowers renderer paint to neutral colors", () => {
     });
 });
 
-test("terminal clean theme uses fixed readable terminal paint unless black-white mode is active", () => {
+test("terminal clean theme uses fixed readable terminal paint", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
-        theme: { selectedTheme: "terminal" },
-        paint: {
-            metric: {
-                colorMode: "solid",
-                solid: { colors: { usageColor: "#ef4444" } },
+        theme: {
+            selectedTheme: "terminal",
+            flat: {
+                paint: {
+                    colorMode: "solid",
+                    solid: { colors: { usageColor: "#ef4444" } },
+                },
             },
         },
     }));
     const blackWhiteSettings = buildMetricRenderAppearance(buildAppearanceSettings({
-        theme: { selectedTheme: "terminal" },
-        paint: {
-            metric: { colorMode: "black-white" },
+        theme: {
+            selectedTheme: "terminal",
+            flat: {
+                paint: { colorMode: "black-white" },
+            },
         },
     }));
 
     assert.equal(visualSettings.paints.primaryMetric.solidColor, "#25e84a");
     assert.equal(visualSettings.paints.primaryText, "#67ff70");
     assert.equal(visualSettings.paints.background, "#010705");
-    assert.equal(blackWhiteSettings.paintConstraint, "black-white");
-    assert.equal(blackWhiteSettings.paints.primaryMetric.solidColor, "#e6e6e6");
-    assert.equal(blackWhiteSettings.paints.primaryText, "rgba(255,255,255,0.94)");
+    assert.equal(blackWhiteSettings.paintConstraint, "none");
+    assert.equal(blackWhiteSettings.paints.primaryMetric.solidColor, "#25e84a");
+    assert.equal(blackWhiteSettings.paints.primaryText, "#67ff70");
 });
 
 test("terminal vintage theme keeps the physical phosphor palette", () => {
@@ -216,15 +228,17 @@ test("color filled solid mode uses theme background color and neutral foreground
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         theme: {
             selectedTheme: "color-filled",
-        },
-        paint: {
-            metric: {
-                colorMode: "solid",
-                solid: { colors: { usageColor: "#ef4444" } },
+            flat: {
+                paint: {
+                    colorMode: "solid",
+                    solid: { colors: { usageColor: "#ef4444" } },
+                },
             },
             colorFilled: {
-                colorMode: "solid",
-                solid: { color: "#123456" },
+                paint: {
+                    colorMode: "solid",
+                    solid: { color: "#123456" },
+                },
             },
         },
     }));
@@ -246,23 +260,25 @@ test("color filled multi-color mode uses soft triangle colors without threshold 
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         theme: {
             selectedTheme: "color-filled",
-        },
-        paint: {
-            metric: {
-                multiColor: {
-                    lowThresholdPercent: 10,
-                    highThresholdPercent: 90,
+            flat: {
+                paint: {
+                    multiColor: {
+                        lowThresholdPercent: 10,
+                        highThresholdPercent: 90,
+                    },
                 },
             },
             colorFilled: {
-                colorMode: "multi-color",
-                multiColor: {
-                    colors: {
-                        lowColor: "#111111",
-                        mediumColor: "#222222",
-                        highColor: "#333333",
+                paint: {
+                    colorMode: "multi-color",
+                    multiColor: {
+                        colors: {
+                            lowColor: "#111111",
+                            mediumColor: "#222222",
+                            highColor: "#333333",
+                        },
+                        isGradientEnabled: false,
                     },
-                    isGradientEnabled: false,
                 },
             },
         },

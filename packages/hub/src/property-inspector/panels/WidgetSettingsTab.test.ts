@@ -87,7 +87,7 @@ test("network dual-channel settings render channel colors instead of usage color
         actionKind: "network",
         settings: buildWidgetSettings("network", {
             appearance: {
-                paint: { metric: { colorMode: "solid" } },
+                theme: { flat: { paint: { colorMode: "solid" } } },
             },
             network: {
                 direction: "both",
@@ -105,7 +105,7 @@ test("network black-white dual-channel settings hide channel colors", () => {
         actionKind: "network",
         settings: buildWidgetSettings("network", {
             appearance: {
-                paint: { metric: { colorMode: "black-white" } },
+                theme: { flat: { paint: { colorMode: "black-white" } } },
             },
             network: {
                 direction: "both",
@@ -135,7 +135,7 @@ test("network single-channel settings render standard usage colors", () => {
         actionKind: "network",
         settings: buildWidgetSettings("network", {
             appearance: {
-                paint: { metric: { colorMode: "solid" } },
+                theme: { flat: { paint: { colorMode: "solid" } } },
             },
             network: {
                 direction: "download",
@@ -153,9 +153,11 @@ test("color filled theme renders color mix without range controls", () => {
         actionKind: "network",
         settings: buildWidgetSettings("network", {
             appearance: {
-                theme: { selectedTheme: "color-filled" },
-                paint: {
-                    colorFilled: { colorMode: "multi-color" },
+                theme: {
+                    selectedTheme: "color-filled",
+                    colorFilled: {
+                        paint: { colorMode: "multi-color" },
+                    },
                 },
             },
             network: {
@@ -221,7 +223,7 @@ test("disk throughput bar view settings use standard colors", () => {
         settings: buildWidgetSettings("disk", {
             appearance: {
                 view: { selectedView: "bar" },
-                paint: { metric: { colorMode: "solid" } },
+                theme: { flat: { paint: { colorMode: "solid" } } },
             },
             disk: {
                 kind: "throughput",
@@ -241,7 +243,7 @@ test("disk throughput dual-channel settings render read/write colors", () => {
         settings: buildWidgetSettings("disk", {
             appearance: {
                 view: { selectedView: "circle" },
-                paint: { metric: { colorMode: "solid" } },
+                theme: { flat: { paint: { colorMode: "solid" } } },
             },
             disk: {
                 kind: "throughput",

@@ -381,8 +381,7 @@ message GlobalOverrides {
 message AppearanceSettings {
   AppearanceViewSettings view = 1;
   AppearanceThemeSettings theme = 2;
-  AppearancePaintSettings paint = 3;
-  LineAppearanceSettings line = 4;
+  LineAppearanceSettings line = 3;
 }
 
 message AppearanceViewSettings {
@@ -411,10 +410,31 @@ message AppearanceThemeSettings {
     not_in: [0]
   }];
 
+  FlatThemeSettings flat = 2;
+  CupertinoGlassThemeSettings cupertino_glass = 3;
+  ColorFilledThemeSettings color_filled = 4;
+
   // Terminal owns its variants inside one theme so users can choose between a
-  // clean terminal look and the more opinionated vintage screen
-  // treatment without splitting them into separate themes.
-  TerminalThemeSettings terminal = 2;
+  // clean terminal look and the more opinionated vintage screen treatment
+  // without splitting them into separate themes.
+  TerminalThemeSettings terminal = 5;
+}
+
+message FlatThemeSettings {
+  // Metric accent paint controls ring, large text, bar fill, and line stroke.
+  MetricPaintSettings paint = 1;
+}
+
+message CupertinoGlassThemeSettings {
+  // Metric accent paint controls foreground metric emphasis for now. Future
+  // glass tint or glass material settings belong in this message, not in Flat.
+  MetricPaintSettings paint = 1;
+}
+
+message ColorFilledThemeSettings {
+  // Color Filled paint controls the widget background fill. Foreground paint is
+  // derived by the renderer for legibility.
+  ColorFilledPaintSettings paint = 1;
 }
 
 message TerminalThemeSettings {
@@ -422,18 +442,9 @@ message TerminalThemeSettings {
     defined_only: true
     not_in: [0]
   }];
-}
 
-message AppearancePaintSettings {
-  // Metric paint is used by ordinary themes. It stays independent from
-  // Color Filled paint so switching themes does not rewrite the user's metric
-  // paint preferences.
-  MetricPaintSettings metric = 1;
-
-  // Color Filled paint is active only when the selected theme is Color Filled.
-  // It owns its own color mode because its solid and multi-color branches
-  // describe background fill, not metric value paint.
-  ColorFilledPaintSettings color_filled = 2;
+  // Add TerminalPaintSettings here when terminal color customization is added.
+  // Do not reuse MetricPaintSettings for Terminal.
 }
 
 message MetricPaintSettings {
@@ -572,15 +583,20 @@ message GlobalThemeOverride {
 message GlobalPaintOverride {
   // When unset and global override is enabled, the resolver treats this
   // subsection as enabled.
+  //
+  // This is intentionally one global paint override switch. It is not stored
+  // per theme: when enabled, the resolver applies the active branch below based
+  // on each widget's effective theme.
   optional bool enabled = 1;
 
-  // Global metric colors apply the same ordinary metric paint behavior to
-  // every widget channel.
+  // Used when the effective theme is Flat or Cupertino Glass.
   GlobalMetricPaintSettings metric = 2;
 
-  // Global Color Filled paint applies when a widget is rendered with the Color
-  // Filled theme.
+  // Used when the effective theme is Color Filled.
   ColorFilledPaintSettings color_filled = 3;
+
+  // Add terminal paint override here only when Terminal exposes configurable
+  // paint. Until then Terminal ignores global paint override.
 }
 
 message GlobalMetricPaintSettings {

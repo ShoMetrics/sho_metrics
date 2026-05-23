@@ -27,8 +27,13 @@ import {
     type DiskVolumeSelection,
 } from "./volume-selection";
 import type { MetricViewOptions } from "../../view-updates/runner";
-import { buildColorConfigFromAppearance, resolveSolidMetricColorMode } from "../../settings/render-paint-resolver";
+import {
+    buildColorConfigFromAppearance,
+    resolveActiveMetricAccentColorMode,
+    resolveSolidMetricColorMode,
+} from "../../settings/render-paint-resolver";
 import { resolveRenderTextStyles } from "../../settings/render-text-style-resolver";
+import { buildMetricAccentPaintAppearanceOverride } from "../../settings/appearance-overrides";
 
 interface BuildDiskViewOptions {
     event: WillAppearEvent;
@@ -174,18 +179,17 @@ function buildDiskThroughputViewOptions(
             : undefined,
         statusIcon: getMetricStatusIcon("percentage"),
         circleVariantOverride: circleVariant,
-        appearanceOverride: {
-            paint: {
-                metric: {
-                    colorMode: appearance.paint.metric.colorMode,
-                    solid: {
-                        colors: {
-                            usageColor: appearance.paint.metric.solid.colors.usageColor,
-                        },
+        appearanceOverride: buildMetricAccentPaintAppearanceOverride(
+            appearance.theme.selectedTheme,
+            {
+                colorMode: resolveActiveMetricAccentColorMode(appearance),
+                solid: {
+                    colors: {
+                        usageColor: buildColorConfigFromAppearance(appearance, "usage").solidColor,
                     },
                 },
             },
-        },
+        ),
     };
 }
 
@@ -225,7 +229,7 @@ function buildDualThroughputViewOptions(
     const writeColor = resolveDiskWidgetChannelColor("write", options.settings, writeWidgetData);
     const readColorConfig = buildDiskChannelColorConfig("read", options.settings);
     const writeColorConfig = buildDiskChannelColorConfig("write", options.settings);
-    const solidMetricColorMode = resolveSolidMetricColorMode(appearance.paint.metric.colorMode);
+    const solidMetricColorMode = resolveSolidMetricColorMode(resolveActiveMetricAccentColorMode(appearance));
 
     return {
         event: options.event,
@@ -260,14 +264,13 @@ function buildDualThroughputViewOptions(
             color: writeColor,
             size: DISK_THROUGHPUT_DIRECTION_ICON_SIZE,
         }),
-        appearanceOverride: {
-            paint: {
-                metric: {
-                    colorMode: solidMetricColorMode,
-                    solid: { colors: { usageColor: readColor } },
-                },
+        appearanceOverride: buildMetricAccentPaintAppearanceOverride(
+            appearance.theme.selectedTheme,
+            {
+                colorMode: solidMetricColorMode,
+                solid: { colors: { usageColor: readColor } },
             },
-        },
+        ),
     };
 }
 

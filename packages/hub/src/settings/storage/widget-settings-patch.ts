@@ -1,13 +1,15 @@
 import { create } from "@bufbuild/protobuf";
 import {
-    AppearancePaintSettingsSchema,
     AppearanceSettingsSchema,
     AppearanceThemeSettingsSchema,
     AppearanceViewSettingsSchema,
     ColorFilledMultiColorPaintSettingsSchema,
     ColorFilledPaintSettingsSchema,
+    ColorFilledThemeSettingsSchema,
     ColorFilledSolidPaintSettingsSchema,
+    CupertinoGlassThemeSettingsSchema,
     DiskThroughputDisplaySettingsSchema,
+    FlatThemeSettingsSchema,
     MetricMultiColorChannelColorsSchema,
     MetricMultiColorPaintSettingsSchema,
     MetricPaintSettingsSchema,
@@ -164,10 +166,6 @@ function applyAppearancePatch(appearance: StoredAppearanceSettings, patch: Resol
         applyAppearanceThemePatch(appearance.theme ??= create(AppearanceThemeSettingsSchema), patch.theme);
     }
 
-    if (patch.paint !== undefined) {
-        applyAppearancePaintPatch(appearance.paint ??= create(AppearancePaintSettingsSchema), patch.paint);
-    }
-
     if (patch.line !== undefined) {
         const line = appearance.line ??= create(LineAppearanceSettingsSchema);
         if (patch.line.lineSmoothingPercent !== undefined) {
@@ -193,19 +191,19 @@ function applyAppearanceThemePatch(
         theme.terminal ??= create(TerminalThemeSettingsSchema);
         theme.terminal.variant = storedTerminalThemeVariantByResolved[patch.terminal.variant];
     }
-}
-
-function applyAppearancePaintPatch(
-    paint: NonNullable<StoredAppearanceSettings["paint"]>,
-    patch: NonNullable<ResolvedAppearanceSettingsOverride["paint"]>,
-): void {
-    if (patch.metric !== undefined) {
-        applyMetricPaintPatch(paint.metric ??= create(MetricPaintSettingsSchema), patch.metric);
+    if (patch.flat?.paint !== undefined) {
+        const flat = theme.flat ??= create(FlatThemeSettingsSchema);
+        applyMetricPaintPatch(flat.paint ??= create(MetricPaintSettingsSchema), patch.flat.paint);
     }
-    if (patch.colorFilled !== undefined) {
+    if (patch.cupertinoGlass?.paint !== undefined) {
+        const cupertinoGlass = theme.cupertinoGlass ??= create(CupertinoGlassThemeSettingsSchema);
+        applyMetricPaintPatch(cupertinoGlass.paint ??= create(MetricPaintSettingsSchema), patch.cupertinoGlass.paint);
+    }
+    if (patch.colorFilled?.paint !== undefined) {
+        const colorFilled = theme.colorFilled ??= create(ColorFilledThemeSettingsSchema);
         applyColorFilledPaintPatch(
-            paint.colorFilled ??= create(ColorFilledPaintSettingsSchema),
-            patch.colorFilled,
+            colorFilled.paint ??= create(ColorFilledPaintSettingsSchema),
+            patch.colorFilled.paint,
         );
     }
 }

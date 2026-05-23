@@ -9,6 +9,12 @@ import { resolveRenderThemeEffects } from "./render-theme-effects-resolver";
 import { resolveRenderPaint } from "./render-paint-resolver";
 import { resolveRenderTextStyles } from "./render-text-style-resolver";
 
+/**
+ * Builds renderer-facing appearance tokens from resolved appearance settings.
+ *
+ * Used before Stream Deck SVG composition so renderer code receives a stable
+ * render contract instead of reading product settings directly.
+ */
 export function buildMetricRenderAppearance(
     settings: ResolvedAppearanceSettings,
 ): MetricRenderAppearance {

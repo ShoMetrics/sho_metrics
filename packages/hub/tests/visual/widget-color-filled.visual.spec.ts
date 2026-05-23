@@ -106,10 +106,10 @@ const VISUAL_WIDGET_TEST_CASES: readonly VisualWidgetTestCase[] = [
             },
             theme: {
                 selectedTheme: "flat",
-            },
-            paint: {
-                metric: {
-                    colorMode: "black-white",
+                flat: {
+                    paint: {
+                        colorMode: "black-white",
+                    },
                 },
             },
         },
@@ -162,9 +162,9 @@ function buildColorFilledAppearanceOverride(options: {
         },
         theme: {
             selectedTheme: "color-filled",
-        },
-        paint: {
-            colorFilled: colorFilledPaint,
+            colorFilled: {
+                paint: colorFilledPaint,
+            },
         },
     };
 }
