@@ -19,15 +19,6 @@ export function resolveSelectedOptionValue<TValue extends SelectOptionValue>(opt
     return options.optionList.find(isSelectableOption)?.value ?? "";
 }
 
-export function readSelectedOptionValue<TValue extends SelectOptionValue>(options: {
-    optionList: readonly SelectOption<TValue>[];
-    rawValue: string;
-}): TValue | undefined {
-    return options.optionList.find(option =>
-        String(option.value) === options.rawValue && isSelectableOption(option)
-    )?.value;
-}
-
 function isSelectableOption<TValue extends SelectOptionValue>(option: SelectOption<TValue>): boolean {
     return !isOptionDisabled(option);
 }

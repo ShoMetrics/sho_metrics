@@ -23,8 +23,8 @@ test("global override groups view theme and color controls under the master swit
     assert.match(markup, /Color Override/);
     assert.match(markup, /Override color/);
     assert.doesNotMatch(markup, /Global Color Mode:/);
-    assert.match(markup, /Black &amp; White/);
     assert.match(markup, /Color Mode:/);
+    assert.match(markup, /Range Colors/);
     assert.match(markup, /Low Ends At:/);
     assert.match(markup, /High Starts At:/);
     assert.match(markup, /Low Color:/);
