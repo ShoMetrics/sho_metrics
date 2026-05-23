@@ -7,6 +7,7 @@ import type {
     ResolvedColorFilledPaintSettings,
     ResolvedMetricPaintSettings,
     ResolvedMultiColorSet,
+    ResolvedTerminalPaintSettings,
 } from "./resolved-settings";
 
 export const DEFAULT_USAGE_MULTI_COLOR_SET: ResolvedMultiColorSet = {
@@ -77,6 +78,10 @@ const DEFAULT_COLOR_FILLED_PAINT_SETTINGS: ResolvedColorFilledPaintSettings = {
     },
 };
 
+const DEFAULT_TERMINAL_PAINT_SETTINGS: ResolvedTerminalPaintSettings = {
+    preset: "green",
+};
+
 export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
     view: {
         selectedView: "circle",
@@ -95,6 +100,7 @@ export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
         },
         terminal: {
             variant: "clean",
+            paint: DEFAULT_TERMINAL_PAINT_SETTINGS,
         },
     },
     line: {

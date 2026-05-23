@@ -12,6 +12,7 @@ import {
     NetworkDisplaySettings_UnitBase as StoredNetworkUnitBase,
     NetworkMetricTarget_Direction as StoredNetworkDirection,
     NetworkMetricTarget_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
+    TerminalPalettePreset as StoredTerminalPalettePreset,
     TerminalThemeVariant as StoredTerminalThemeVariant,
     ScaleMode as StoredScaleMode,
     MetricView as StoredMetricView,
@@ -47,6 +48,7 @@ import {
     type MetricSourceProfile as StoredMetricSourceProfile,
     type NetworkDisplaySettings as StoredNetworkDisplaySettings,
     type NetworkMetricTarget as StoredNetworkMetricTarget,
+    type TerminalPaintSettings as StoredTerminalPaintSettings,
     type TerminalThemeSettings as StoredTerminalThemeSettings,
     type StoredGlobalSettings,
     type StoredWidgetSettings,
@@ -62,6 +64,7 @@ import type {
     NetworkDirection,
     NetworkTrafficDisplayMode,
     NetworkUnitBase,
+    TerminalPalettePreset,
     TerminalThemeVariant,
     ResolvedAppearanceSettings,
     ResolvedCatalogMetricTarget,
@@ -99,6 +102,7 @@ import type {
     ResolvedNetworkReading,
     ResolvedCupertinoGlassThemeSettings,
     ResolvedTerminalThemeSettings,
+    ResolvedTerminalPaintSettings,
     ResolvedLineAppearanceSettings,
     ResolvedWidgetPreferences,
     ResolvedWidgetSettings,
@@ -199,6 +203,14 @@ const terminalThemeVariantByProto = {
     [StoredTerminalThemeVariant.CLEAN]: "clean",
     [StoredTerminalThemeVariant.VINTAGE]: "vintage",
 } satisfies Record<StoredTerminalThemeVariant, TerminalThemeVariant | undefined>;
+
+const terminalPalettePresetByProto = {
+    [StoredTerminalPalettePreset.UNSPECIFIED]: undefined,
+    [StoredTerminalPalettePreset.GREEN]: "green",
+    [StoredTerminalPalettePreset.AMBER]: "amber",
+    [StoredTerminalPalettePreset.CYAN]: "cyan",
+    [StoredTerminalPalettePreset.WHITE]: "white",
+} satisfies Record<StoredTerminalPalettePreset, TerminalPalettePreset | undefined>;
 
 const colorModeByProto = {
     [StoredColorMode.UNSPECIFIED]: undefined,
@@ -640,6 +652,10 @@ function resolveGlobalPaintOverride(
             DEFAULT_APPEARANCE_SETTINGS.theme.colorFilled.paint,
             storedOverride?.colorFilled,
         ),
+        terminal: resolveTerminalPaintSettings(
+            DEFAULT_APPEARANCE_SETTINGS.theme.terminal.paint,
+            storedOverride?.terminal,
+        ),
     };
 }
 
@@ -788,6 +804,16 @@ function resolveTerminalThemeSettings(
 ): ResolvedTerminalThemeSettings {
     return {
         variant: resolveStoredEnum(storedTerminal?.variant, terminalThemeVariantByProto, defaults.variant),
+        paint: resolveTerminalPaintSettings(defaults.paint, storedTerminal?.paint),
+    };
+}
+
+function resolveTerminalPaintSettings(
+    defaults: ResolvedTerminalPaintSettings,
+    storedPaint: StoredTerminalPaintSettings | undefined,
+): ResolvedTerminalPaintSettings {
+    return {
+        preset: resolveStoredEnum(storedPaint?.preset, terminalPalettePresetByProto, defaults.preset),
     };
 }
 
@@ -1014,7 +1040,16 @@ function applyGlobalPaintOverride(
                 },
             };
         case "terminal":
-            return appearance;
+            return {
+                ...appearance,
+                theme: {
+                    ...appearance.theme,
+                    terminal: {
+                        ...appearance.theme.terminal,
+                        paint: paintOverride.terminal,
+                    },
+                },
+            };
     }
 }
 

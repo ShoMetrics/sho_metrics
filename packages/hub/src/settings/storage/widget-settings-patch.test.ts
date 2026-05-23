@@ -4,6 +4,7 @@ import {
     ColorMode as StoredColorMode,
     GpuMetricTarget_Kind as StoredGpuMetricKind,
     MetricTheme as StoredMetricTheme,
+    TerminalPalettePreset as StoredTerminalPalettePreset,
     TerminalThemeVariant as StoredTerminalThemeVariant,
 } from "../../generated/shometrics/v1/settings_pb";
 import { readStoredWidgetSettings } from "./codec";
@@ -100,4 +101,24 @@ test("widget patch writes terminal variant", () => {
 
     const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
     assert.equal(appearance?.theme?.terminal?.variant, StoredTerminalThemeVariant.VINTAGE);
+});
+
+test("widget patch writes terminal palette", () => {
+    const cpuSettings = resolveQuickStartStoredWidgetSettings(undefined, "cpu").rawSettings;
+
+    const nextSettings = writeStoredWidgetSettingsPatch(cpuSettings, {
+        appearance: {
+            theme: {
+                selectedTheme: "terminal",
+                terminal: {
+                    paint: {
+                        preset: "amber",
+                    },
+                },
+            },
+        },
+    });
+
+    const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
+    assert.equal(appearance?.theme?.terminal?.paint?.preset, StoredTerminalPalettePreset.AMBER);
 });

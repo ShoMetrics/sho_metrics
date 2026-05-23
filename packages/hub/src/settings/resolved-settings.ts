@@ -19,6 +19,7 @@ export type MetricView = "circle" | "text" | "bar" | "line";
 export type CircleViewVariant = "full-ring" | "minimal" | "gauge";
 export type MetricTheme = "flat" | "cupertino-glass" | "color-filled" | "terminal";
 export type TerminalThemeVariant = "clean" | "vintage";
+export type TerminalPalettePreset = "green" | "amber" | "cyan" | "white";
 export type ColorMode = "multi-color" | "solid" | "black-white";
 export type GridLineVisibility = "adaptive" | "always" | "none";
 export type GridLineType = "horizontal" | "vertical";
@@ -182,6 +183,11 @@ export interface ResolvedColorFilledThemeSettings {
 
 export interface ResolvedTerminalThemeSettings {
     readonly variant: TerminalThemeVariant;
+    readonly paint: ResolvedTerminalPaintSettings;
+}
+
+export interface ResolvedTerminalPaintSettings {
+    readonly preset: TerminalPalettePreset;
 }
 
 export interface ResolvedMetricPaintSettings {
@@ -288,6 +294,7 @@ export interface ResolvedGlobalThemeOverride {
 export interface ResolvedGlobalPaintOverride {
     readonly metric: ResolvedGlobalMetricPaintSettings;
     readonly colorFilled: ResolvedColorFilledPaintSettings;
+    readonly terminal: ResolvedTerminalPaintSettings;
 }
 
 export interface ResolvedGlobalMetricPaintSettings {

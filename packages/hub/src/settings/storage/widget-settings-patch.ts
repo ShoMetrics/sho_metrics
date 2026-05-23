@@ -17,6 +17,7 @@ import {
     MetricSolidPaintSettingsSchema,
     MultiColorSetSchema,
     NetworkDisplaySettingsSchema,
+    TerminalPaintSettingsSchema,
     TerminalThemeSettingsSchema,
     SlotOverridesSchema,
     LineAppearanceSettingsSchema,
@@ -68,6 +69,7 @@ import {
     storedNetworkDirectionByResolved,
     storedNetworkTrafficDisplayModeByResolved,
     storedNetworkUnitBaseByResolved,
+    storedTerminalPalettePresetByResolved,
     storedTerminalThemeVariantByResolved,
     storedScaleModeByResolved,
     storedMetricViewByResolved,
@@ -190,6 +192,13 @@ function applyAppearanceThemePatch(
     if (patch.terminal?.variant !== undefined) {
         theme.terminal ??= create(TerminalThemeSettingsSchema);
         theme.terminal.variant = storedTerminalThemeVariantByResolved[patch.terminal.variant];
+    }
+    if (patch.terminal?.paint !== undefined) {
+        theme.terminal ??= create(TerminalThemeSettingsSchema);
+        const paint = theme.terminal.paint ??= create(TerminalPaintSettingsSchema);
+        if (patch.terminal.paint.preset !== undefined) {
+            paint.preset = storedTerminalPalettePresetByResolved[patch.terminal.paint.preset];
+        }
     }
     if (patch.flat?.paint !== undefined) {
         const flat = theme.flat ??= create(FlatThemeSettingsSchema);

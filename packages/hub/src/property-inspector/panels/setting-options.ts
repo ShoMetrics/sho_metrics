@@ -1,5 +1,8 @@
 import type { SelectOption } from "../inspector/types";
-import type { TerminalThemeVariant } from "../../settings/resolved-settings";
+import type {
+    TerminalPalettePreset,
+    TerminalThemeVariant,
+} from "../../settings/resolved-settings";
 
 export const pollingFrequencyOptionList = [
     { value: 1, label: "1s" },
@@ -23,6 +26,13 @@ export const terminalVariantOptionList = [
     { value: "clean", label: "Clean" },
     { value: "vintage", label: "Vintage" },
 ] as const satisfies readonly SelectOption<TerminalThemeVariant>[];
+
+export const terminalPaletteOptionList = [
+    { value: "green", label: "Green" },
+    { value: "amber", label: "Amber" },
+    { value: "cyan", label: "Cyan" },
+    { value: "white", label: "White" },
+] as const satisfies readonly SelectOption<TerminalPalettePreset>[];
 
 export const metricPaintColorModeOptionList = [
     { value: "multi-color", label: "Range Colors" },

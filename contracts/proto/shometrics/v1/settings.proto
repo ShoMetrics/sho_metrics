@@ -443,8 +443,18 @@ message TerminalThemeSettings {
     not_in: [0]
   }];
 
-  // Add TerminalPaintSettings here when terminal color customization is added.
-  // Do not reuse MetricPaintSettings for Terminal.
+  // Terminal paint is theme-owned because terminal palettes control the whole
+  // foreground treatment, including text, dim text, and glow.
+  TerminalPaintSettings paint = 2;
+}
+
+message TerminalPaintSettings {
+  // Selected phosphor palette for Terminal. The resolver owns concrete RGB
+  // values so stored settings keep product-level intent.
+  optional TerminalPalettePreset preset = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
 }
 
 message MetricPaintSettings {
@@ -595,8 +605,8 @@ message GlobalPaintOverride {
   // Used when the effective theme is Color Filled.
   ColorFilledPaintSettings color_filled = 3;
 
-  // Add terminal paint override here only when Terminal exposes configurable
-  // paint. Until then Terminal ignores global paint override.
+  // Used when the effective theme is Terminal.
+  TerminalPaintSettings terminal = 4;
 }
 
 message GlobalMetricPaintSettings {
@@ -695,6 +705,14 @@ enum TerminalThemeVariant {
   TERMINAL_THEME_VARIANT_UNSPECIFIED = 0;
   TERMINAL_THEME_VARIANT_CLEAN = 1;
   TERMINAL_THEME_VARIANT_VINTAGE = 2;
+}
+
+enum TerminalPalettePreset {
+  TERMINAL_PALETTE_PRESET_UNSPECIFIED = 0;
+  TERMINAL_PALETTE_PRESET_GREEN = 1;
+  TERMINAL_PALETTE_PRESET_AMBER = 2;
+  TERMINAL_PALETTE_PRESET_CYAN = 3;
+  TERMINAL_PALETTE_PRESET_WHITE = 4;
 }
 
 enum ColorMode {

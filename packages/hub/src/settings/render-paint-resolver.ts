@@ -11,6 +11,9 @@ import type {
     ResolvedColorFilledPaintSettings,
     ResolvedMetricPaintSettings,
     ResolvedMetricSolidChannelColors,
+    ResolvedTerminalPaintSettings,
+    ResolvedTerminalThemeSettings,
+    TerminalPalettePreset,
 } from "./resolved-settings";
 
 const MINIMUM_THRESHOLD = 0;
@@ -22,13 +25,79 @@ const BLACK_WHITE_SOFT_TRIANGLE_LOW_PAINT = "#161616";
 const BLACK_WHITE_SOFT_TRIANGLE_MEDIUM_PAINT = "#2c2c2c";
 const BLACK_WHITE_SOFT_TRIANGLE_HIGH_PAINT = "#444444";
 const TERMINAL_CLEAN_BLACK_GLASS_PAINT = "#010705";
-const TERMINAL_CLEAN_BRIGHT_CORE_PAINT = "#67ff70";
-const TERMINAL_CLEAN_NORMAL_PHOSPHOR_PAINT = "#25e84a";
-const TERMINAL_CLEAN_DIM_PHOSPHOR_PAINT = "rgba(37,232,74,0.54)";
 const TERMINAL_VINTAGE_BLACK_GLASS_PAINT = "#010301";
-const TERMINAL_VINTAGE_BRIGHT_CORE_PAINT = "#46ff36";
-const TERMINAL_VINTAGE_NORMAL_PHOSPHOR_PAINT = "#10d82a";
-const TERMINAL_VINTAGE_DIM_PHOSPHOR_PAINT = "rgba(1,174,31,0.44)";
+
+interface TerminalPaletteVariantPaints {
+    readonly bright: string;
+    readonly normal: string;
+    readonly rgbChannels: string;
+    readonly dimRgbChannels?: string | undefined;
+    readonly trackRgbChannels?: string | undefined;
+    readonly gridRgbChannels?: string | undefined;
+}
+
+const TERMINAL_PALETTE_PAINTS = {
+    green: {
+        clean: {
+            bright: "#67ff70",
+            normal: "#25e84a",
+            rgbChannels: "37,232,74",
+        },
+        vintage: {
+            bright: "#46ff36",
+            normal: "#10d82a",
+            rgbChannels: "16,216,42",
+            dimRgbChannels: "1,174,31",
+            trackRgbChannels: "1,160,30",
+            gridRgbChannels: "1,198,39",
+        },
+    },
+    amber: {
+        clean: {
+            bright: "#ffd166",
+            normal: "#ffb000",
+            rgbChannels: "255,176,0",
+        },
+        vintage: {
+            bright: "#ffc247",
+            normal: "#e69f00",
+            rgbChannels: "230,159,0",
+            dimRgbChannels: "194,128,0",
+            trackRgbChannels: "190,124,0",
+            gridRgbChannels: "220,145,0",
+        },
+    },
+    cyan: {
+        clean: {
+            bright: "#67e8f9",
+            normal: "#22d3ee",
+            rgbChannels: "34,211,238",
+        },
+        vintage: {
+            bright: "#5eead4",
+            normal: "#00b8d8",
+            rgbChannels: "0,184,216",
+            dimRgbChannels: "0,145,178",
+            trackRgbChannels: "0,132,166",
+            gridRgbChannels: "0,170,205",
+        },
+    },
+    white: {
+        clean: {
+            bright: "#ffffff",
+            normal: "#e6e6e6",
+            rgbChannels: "230,230,230",
+        },
+        vintage: {
+            bright: "#f5f5f5",
+            normal: "#cfcfcf",
+            rgbChannels: "207,207,207",
+            dimRgbChannels: "174,174,174",
+            trackRgbChannels: "156,156,156",
+            gridRgbChannels: "190,190,190",
+        },
+    },
+} satisfies Record<TerminalPalettePreset, Record<ResolvedTerminalThemeSettings["variant"], TerminalPaletteVariantPaints>>;
 
 const DEFAULT_RENDER_PAINT_TOKENS = {
     background: DEFAULT_BACKGROUND_PAINT,
@@ -45,52 +114,6 @@ const DEFAULT_RENDER_PAINT_TOKENS = {
     grid: "rgba(255,255,255,0.18)",
     divider: "rgba(255,255,255,0.18)",
 } satisfies Omit<RenderPaintTokens, "backgroundFill" | "primaryMetric">;
-
-const TERMINAL_CLEAN_RENDER_PAINT_TOKENS = {
-    background: TERMINAL_CLEAN_BLACK_GLASS_PAINT,
-    surface: TERMINAL_CLEAN_NORMAL_PHOSPHOR_PAINT,
-    primaryText: TERMINAL_CLEAN_BRIGHT_CORE_PAINT,
-    secondaryText: "rgba(37,232,74,0.82)",
-    mutedText: TERMINAL_CLEAN_DIM_PHOSPHOR_PAINT,
-    icon: "rgba(37,232,74,0.88)",
-    barTitleText: "rgba(37,232,74,0.80)",
-    barValueText: TERMINAL_CLEAN_BRIGHT_CORE_PAINT,
-    barUnitText: "rgba(37,232,74,0.78)",
-    barSecondaryText: TERMINAL_CLEAN_DIM_PHOSPHOR_PAINT,
-    track: "rgba(37,232,74,0.17)",
-    grid: "rgba(37,232,74,0.18)",
-    divider: "rgba(37,232,74,0.18)",
-} satisfies Omit<RenderPaintTokens, "backgroundFill" | "primaryMetric">;
-
-const TERMINAL_VINTAGE_RENDER_PAINT_TOKENS = {
-    background: TERMINAL_VINTAGE_BLACK_GLASS_PAINT,
-    surface: TERMINAL_VINTAGE_NORMAL_PHOSPHOR_PAINT,
-    primaryText: TERMINAL_VINTAGE_BRIGHT_CORE_PAINT,
-    secondaryText: "rgba(16,216,42,0.78)",
-    mutedText: TERMINAL_VINTAGE_DIM_PHOSPHOR_PAINT,
-    icon: "rgba(16,216,42,0.84)",
-    barTitleText: "rgba(16,216,42,0.76)",
-    barValueText: TERMINAL_VINTAGE_BRIGHT_CORE_PAINT,
-    barUnitText: "rgba(16,216,42,0.72)",
-    barSecondaryText: TERMINAL_VINTAGE_DIM_PHOSPHOR_PAINT,
-    track: "rgba(1,160,30,0.18)",
-    grid: "rgba(1,198,39,0.28)",
-    divider: "rgba(1,198,39,0.24)",
-} satisfies Omit<RenderPaintTokens, "backgroundFill" | "primaryMetric">;
-
-const TERMINAL_CLEAN_COLOR_CONFIG = {
-    mode: "solid",
-    solidColor: TERMINAL_CLEAN_NORMAL_PHOSPHOR_PAINT,
-    thresholds: [],
-    isGradientEnabled: false,
-} satisfies ColorConfig;
-
-const TERMINAL_VINTAGE_COLOR_CONFIG = {
-    mode: "solid",
-    solidColor: TERMINAL_VINTAGE_NORMAL_PHOSPHOR_PAINT,
-    thresholds: [],
-    isGradientEnabled: false,
-} satisfies ColorConfig;
 
 const solidColorKeyByChannel = {
     usage: "usageColor",
@@ -141,7 +164,7 @@ export function buildColorConfigFromAppearance(
                 isGradientEnabled: false,
             };
         case "terminal":
-            return terminalColorConfigForVariant(appearance.theme.terminal.variant);
+            return terminalColorConfig(appearance.theme.terminal);
     }
 }
 
@@ -194,6 +217,22 @@ export function resolveActiveColorFilledPaint(
     }
 
     return appearance.theme.colorFilled.paint;
+}
+
+/**
+ * Resolves Terminal paint when Terminal is the active theme.
+ *
+ * Used by Property Inspector controls where palette changes should affect the
+ * terminal phosphor treatment instead of ordinary metric accent colors.
+ */
+export function resolveActiveTerminalPaint(
+    appearance: ResolvedAppearanceSettings,
+): ResolvedTerminalPaintSettings | undefined {
+    if (appearance.theme.selectedTheme !== "terminal") {
+        return undefined;
+    }
+
+    return appearance.theme.terminal.paint;
 }
 
 /**
@@ -262,7 +301,7 @@ function buildRenderPaintTokens(
 
     if (settings.theme.selectedTheme === "terminal") {
         return {
-            ...terminalRenderPaintTokensForVariant(settings.theme.terminal.variant),
+            ...terminalRenderPaintTokens(settings.theme.terminal),
             backgroundFill: undefined,
             primaryMetric,
         };
@@ -275,16 +314,68 @@ function buildRenderPaintTokens(
     };
 }
 
-function terminalColorConfigForVariant(
-    variant: ResolvedAppearanceSettings["theme"]["terminal"]["variant"],
-): ColorConfig {
-    return variant === "vintage" ? TERMINAL_VINTAGE_COLOR_CONFIG : TERMINAL_CLEAN_COLOR_CONFIG;
+function terminalColorConfig(terminal: ResolvedTerminalThemeSettings): ColorConfig {
+    return {
+        mode: "solid",
+        solidColor: terminalPalettePaints(terminal).normal,
+        thresholds: [],
+        isGradientEnabled: false,
+    };
 }
 
-function terminalRenderPaintTokensForVariant(
-    variant: ResolvedAppearanceSettings["theme"]["terminal"]["variant"],
+function terminalRenderPaintTokens(
+    terminal: ResolvedTerminalThemeSettings,
 ): Omit<RenderPaintTokens, "backgroundFill" | "primaryMetric"> {
-    return variant === "vintage" ? TERMINAL_VINTAGE_RENDER_PAINT_TOKENS : TERMINAL_CLEAN_RENDER_PAINT_TOKENS;
+    const paints = terminalPalettePaints(terminal);
+    const dimRgbChannels = paints.dimRgbChannels ?? paints.rgbChannels;
+    const trackRgbChannels = paints.trackRgbChannels ?? paints.rgbChannels;
+    const gridRgbChannels = paints.gridRgbChannels ?? paints.rgbChannels;
+
+    if (terminal.variant === "vintage") {
+        const dimPhosphorPaint = rgba(dimRgbChannels, 0.44);
+
+        return {
+            background: TERMINAL_VINTAGE_BLACK_GLASS_PAINT,
+            surface: paints.normal,
+            primaryText: paints.bright,
+            secondaryText: rgba(paints.rgbChannels, 0.78),
+            mutedText: dimPhosphorPaint,
+            icon: rgba(paints.rgbChannels, 0.84),
+            barTitleText: rgba(paints.rgbChannels, 0.76),
+            barValueText: paints.bright,
+            barUnitText: rgba(paints.rgbChannels, 0.72),
+            barSecondaryText: dimPhosphorPaint,
+            track: rgba(trackRgbChannels, 0.18),
+            grid: rgba(gridRgbChannels, 0.28),
+            divider: rgba(gridRgbChannels, 0.24),
+        };
+    }
+
+    const dimPhosphorPaint = rgba(dimRgbChannels, 0.54);
+
+    return {
+        background: TERMINAL_CLEAN_BLACK_GLASS_PAINT,
+        surface: paints.normal,
+        primaryText: paints.bright,
+        secondaryText: rgba(paints.rgbChannels, 0.82),
+        mutedText: dimPhosphorPaint,
+        icon: rgba(paints.rgbChannels, 0.88),
+        barTitleText: rgba(paints.rgbChannels, 0.80),
+        barValueText: paints.bright,
+        barUnitText: rgba(paints.rgbChannels, 0.78),
+        barSecondaryText: dimPhosphorPaint,
+        track: rgba(trackRgbChannels, 0.17),
+        grid: rgba(gridRgbChannels, 0.18),
+        divider: rgba(gridRgbChannels, 0.18),
+    };
+}
+
+function terminalPalettePaints(terminal: ResolvedTerminalThemeSettings): TerminalPaletteVariantPaints {
+    return TERMINAL_PALETTE_PAINTS[terminal.paint.preset][terminal.variant];
+}
+
+function rgba(rgbChannels: string, opacity: number): string {
+    return `rgba(${rgbChannels},${opacity})`;
 }
 
 function buildRenderBackgroundFill(settings: ResolvedAppearanceSettings): RenderBackgroundFill | undefined {

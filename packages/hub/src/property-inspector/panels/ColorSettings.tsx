@@ -4,6 +4,7 @@ import type {
     ResolvedColorFilledPaintSettings,
     ResolvedMetricSolidChannelColors,
     ResolvedMultiColorSet,
+    ResolvedTerminalPaintSettings,
 } from "../../settings/resolved-settings";
 import type {
     ResolvedColorFilledPaintSettingsOverride,
@@ -11,14 +12,17 @@ import type {
     ResolvedColorFilledSolidPaintSettingsOverride,
     ResolvedMetricPaintSettingsOverride,
     ResolvedMultiColorSetOverride,
+    ResolvedTerminalPaintSettingsOverride,
 } from "../../settings/appearance-overrides";
 import {
     buildColorFilledPaintAppearanceOverride,
     buildMetricAccentPaintAppearanceOverride,
+    buildTerminalPaintAppearanceOverride,
 } from "../../settings/appearance-overrides";
 import {
     resolveActiveColorFilledPaint,
     resolveActiveMetricAccentPaint,
+    resolveActiveTerminalPaint,
 } from "../../settings/render-paint-resolver";
 import { InspectorItem } from "../components/InspectorItem";
 import { SectionHeading } from "../components/SectionHeading";
@@ -31,6 +35,7 @@ import type { WidgetSettingsPanelProps } from "./panel-props";
 import {
     colorFilledColorModeOptionList,
     metricPaintColorModeOptionList,
+    terminalPaletteOptionList,
 } from "./setting-options";
 
 type MetricChannelKey = "usage" | "download" | "upload" | "diskRead" | "diskWrite";
@@ -84,6 +89,13 @@ function patchColorFilledPaintSettings(
     onSettingsPatch({ appearance: buildColorFilledPaintAppearanceOverride(colorFilled) });
 }
 
+function patchTerminalPaintSettings(
+    onSettingsPatch: WidgetSettingsPanelProps["onSettingsPatch"],
+    terminal: ResolvedTerminalPaintSettingsOverride,
+): void {
+    onSettingsPatch({ appearance: buildTerminalPaintAppearanceOverride(terminal) });
+}
+
 export function StandardColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
     const { context } = props;
     const appearance = context.resolved.widget.slot.appearance;
@@ -94,7 +106,7 @@ export function StandardColorSettings(props: WidgetSettingsPanelProps): React.JS
     }
 
     if (selectedTheme === "terminal") {
-        return <></>;
+        return <TerminalPaintSettingsSection {...props} />;
     }
 
     const metricPaint = resolveActiveMetricAccentPaint(appearance);
@@ -232,7 +244,7 @@ export function NetworkChannelColorSettings(props: WidgetSettingsPanelProps): Re
     }
 
     if (props.context.resolved.widget.slot.appearance.theme.selectedTheme === "terminal") {
-        return <></>;
+        return <TerminalPaintSettingsSection {...props} />;
     }
 
     const metricPaint = resolveActiveMetricAccentPaint(props.context.resolved.widget.slot.appearance);
@@ -270,7 +282,7 @@ export function DiskThroughputChannelColorSettings(props: WidgetSettingsPanelPro
     }
 
     if (props.context.resolved.widget.slot.appearance.theme.selectedTheme === "terminal") {
-        return <></>;
+        return <TerminalPaintSettingsSection {...props} />;
     }
 
     const metricPaint = resolveActiveMetricAccentPaint(props.context.resolved.widget.slot.appearance);
@@ -398,6 +410,45 @@ function ColorFilledSettingsSection(props: WidgetSettingsPanelProps): React.JSX.
                 disabled={(props.colorDisabled ?? false) || (props.themeDisabled ?? false)}
             />
         </SettingsSection>
+    );
+}
+
+function TerminalPaintSettingsSection(props: WidgetSettingsPanelProps): React.JSX.Element {
+    const appearance = props.context.resolved.widget.slot.appearance;
+    const terminalPaint = resolveActiveTerminalPaint(appearance);
+    if (terminalPaint === undefined) {
+        return <></>;
+    }
+
+    return (
+        <SettingsSection title="Colors">
+            <SectionHeading text="Terminal" />
+            <TerminalPaintControls
+                terminalPaint={terminalPaint}
+                onPaintPatch={(paint) => patchTerminalPaintSettings(props.onSettingsPatch, paint)}
+                disabled={props.colorDisabled ?? false}
+            />
+        </SettingsSection>
+    );
+}
+
+export function TerminalPaintControls({
+    terminalPaint,
+    onPaintPatch,
+    disabled = false,
+}: {
+    readonly terminalPaint: ResolvedTerminalPaintSettings;
+    readonly onPaintPatch: (patch: ResolvedTerminalPaintSettingsOverride) => void;
+    readonly disabled?: boolean | undefined;
+}): React.JSX.Element {
+    return (
+        <SelectSetting
+            label="Phosphor"
+            value={terminalPaint.preset}
+            optionList={terminalPaletteOptionList}
+            onValueChange={(preset) => onPaintPatch({ preset })}
+            disabled={disabled}
+        />
     );
 }
 

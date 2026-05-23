@@ -185,7 +185,7 @@ test("black-white color mode lowers renderer paint to neutral colors", () => {
     });
 });
 
-test("terminal clean theme uses fixed readable terminal paint", () => {
+test("terminal clean theme uses terminal paint without reading ordinary metric paint", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         theme: {
             selectedTheme: "terminal",
@@ -222,6 +222,31 @@ test("terminal vintage theme keeps the physical phosphor palette", () => {
     assert.equal(visualSettings.paints.primaryMetric.solidColor, "#10d82a");
     assert.equal(visualSettings.paints.primaryText, "#46ff36");
     assert.equal(visualSettings.paints.background, "#010301");
+});
+
+test("terminal palette changes the phosphor paint", () => {
+    const amberSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: {
+            selectedTheme: "terminal",
+            terminal: {
+                paint: { preset: "amber" },
+            },
+        },
+    }));
+    const cyanVintageSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: {
+            selectedTheme: "terminal",
+            terminal: {
+                variant: "vintage",
+                paint: { preset: "cyan" },
+            },
+        },
+    }));
+
+    assert.equal(amberSettings.paints.primaryMetric.solidColor, "#ffb000");
+    assert.equal(amberSettings.paints.primaryText, "#ffd166");
+    assert.equal(cyanVintageSettings.paints.primaryMetric.solidColor, "#00b8d8");
+    assert.equal(cyanVintageSettings.paints.primaryText, "#5eead4");
 });
 
 test("color filled solid mode uses theme background color and neutral foreground paint", () => {

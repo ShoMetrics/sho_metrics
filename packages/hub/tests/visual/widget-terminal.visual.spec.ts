@@ -86,7 +86,7 @@ const TERMINAL_VISUAL_TEST_CASES: readonly TerminalVisualWidgetTestCase[] = [
         topIcon: CPU_ICON_FRAGMENT,
     },
     {
-        snapshotName: "terminal-vintage-single-circle-full-ring-fixed-phosphor-screen",
+        snapshotName: "terminal-vintage-single-circle-full-ring-green-phosphor-screen",
         appearance: buildTerminalAppearanceOverride({
             selectedView: "circle",
             circleVariant: "full-ring",
@@ -95,7 +95,7 @@ const TERMINAL_VISUAL_TEST_CASES: readonly TerminalVisualWidgetTestCase[] = [
         data: CPU_USAGE_WIDGET_DATA,
     },
     {
-        snapshotName: "terminal-vintage-single-circle-minimal-icon-fixed-phosphor-screen",
+        snapshotName: "terminal-vintage-single-circle-minimal-icon-green-phosphor-screen",
         appearance: buildTerminalAppearanceOverride({
             selectedView: "circle",
             circleVariant: "minimal",
@@ -105,7 +105,7 @@ const TERMINAL_VISUAL_TEST_CASES: readonly TerminalVisualWidgetTestCase[] = [
         centerIcon: CPU_ICON_FRAGMENT,
     },
     {
-        snapshotName: "terminal-vintage-single-circle-gauge-fixed-phosphor-screen",
+        snapshotName: "terminal-vintage-single-circle-gauge-green-phosphor-screen",
         appearance: buildTerminalAppearanceOverride({
             selectedView: "circle",
             circleVariant: "gauge",
@@ -114,7 +114,7 @@ const TERMINAL_VISUAL_TEST_CASES: readonly TerminalVisualWidgetTestCase[] = [
         data: CPU_USAGE_WIDGET_DATA,
     },
     {
-        snapshotName: "terminal-vintage-single-progress-bar-fixed-phosphor-screen",
+        snapshotName: "terminal-vintage-single-progress-bar-green-phosphor-screen",
         appearance: buildTerminalAppearanceOverride({
             selectedView: "bar",
             circleVariant: "full-ring",
@@ -129,7 +129,7 @@ const TERMINAL_VISUAL_TEST_CASES: readonly TerminalVisualWidgetTestCase[] = [
         topIcon: CPU_ICON_FRAGMENT,
     },
     {
-        snapshotName: "terminal-vintage-single-sparkline-fixed-phosphor-screen",
+        snapshotName: "terminal-vintage-single-sparkline-green-phosphor-screen",
         appearance: buildTerminalAppearanceOverride({
             selectedView: "line",
             circleVariant: "full-ring",

@@ -9,6 +9,7 @@ import {
     NetworkDisplaySettings_UnitBase as StoredNetworkUnitBase,
     NetworkMetricTarget_Direction as StoredNetworkDirection,
     NetworkMetricTarget_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
+    TerminalPalettePreset as StoredTerminalPalettePreset,
     TerminalThemeVariant as StoredTerminalThemeVariant,
     ScaleMode as StoredScaleMode,
     MetricView as StoredMetricView,
@@ -28,6 +29,7 @@ import type {
     NetworkDirection,
     NetworkTrafficDisplayMode,
     NetworkUnitBase,
+    TerminalPalettePreset,
     TerminalThemeVariant,
     ScaleMode,
     MetricView,
@@ -58,6 +60,13 @@ export const storedTerminalThemeVariantByResolved = {
     clean: StoredTerminalThemeVariant.CLEAN,
     vintage: StoredTerminalThemeVariant.VINTAGE,
 } satisfies Record<TerminalThemeVariant, StoredTerminalThemeVariant>;
+
+export const storedTerminalPalettePresetByResolved = {
+    green: StoredTerminalPalettePreset.GREEN,
+    amber: StoredTerminalPalettePreset.AMBER,
+    cyan: StoredTerminalPalettePreset.CYAN,
+    white: StoredTerminalPalettePreset.WHITE,
+} satisfies Record<TerminalPalettePreset, StoredTerminalPalettePreset>;
 
 export const storedColorModeByResolved = {
     "multi-color": StoredColorMode.MULTI_COLOR,
