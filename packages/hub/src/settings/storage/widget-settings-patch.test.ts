@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
     ColorMode as StoredColorMode,
+    CpuMetricTarget_Kind as StoredCpuMetricKind,
     GpuMetricTarget_Kind as StoredGpuMetricKind,
     MetricSourcePolicy_FailureMode as StoredSourceFailureMode,
     MetricTheme as StoredMetricTheme,
     TerminalPalettePreset as StoredTerminalPalettePreset,
     TerminalThemeVariant as StoredTerminalThemeVariant,
+    TemperatureUnit as StoredTemperatureUnit,
     TextViewVariant as StoredTextViewVariant,
 } from "../../generated/shometrics/v1/settings_pb";
 import { readStoredWidgetSettings } from "./codec";
@@ -74,6 +76,44 @@ test("widget patch writes black-white color mode", () => {
 
     const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
     assert.equal(appearance?.theme?.flat?.paint?.colorMode, StoredColorMode.BLACK_WHITE);
+});
+
+test("widget patch updates CPU reading within the CPU action domain", () => {
+    const cpuSettings = resolveQuickStartStoredWidgetSettings(undefined, "cpu").rawSettings;
+
+    const nextSettings = writeStoredWidgetSettingsPatch(cpuSettings, {
+        cpu: {
+            kind: "temperature",
+            temperatureUnit: "fahrenheit",
+            maximumTemperatureCelsius: 95,
+        },
+    });
+
+    const target = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.metric?.target;
+    assert.equal(target?.case, "cpu");
+    if (target?.case === "cpu") {
+        assert.equal(target.value.kind, StoredCpuMetricKind.TEMPERATURE);
+        assert.equal(target.value.temperatureUnit, StoredTemperatureUnit.FAHRENHEIT);
+        assert.equal(target.value.maximumTemperatureCelsius, 95);
+    }
+});
+
+test("widget patch writes optional CPU power maximum", () => {
+    const cpuSettings = resolveQuickStartStoredWidgetSettings(undefined, "cpu").rawSettings;
+
+    const nextSettings = writeStoredWidgetSettingsPatch(cpuSettings, {
+        cpu: {
+            kind: "power",
+            maximumPowerWatts: 180,
+        },
+    });
+
+    const target = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.metric?.target;
+    assert.equal(target?.case, "cpu");
+    if (target?.case === "cpu") {
+        assert.equal(target.value.kind, StoredCpuMetricKind.POWER);
+        assert.equal(target.value.maximumPowerWatts, 180);
+    }
 });
 
 test("widget patch replaces metric source policy with helper preference and fallback", () => {

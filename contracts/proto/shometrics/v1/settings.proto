@@ -97,6 +97,8 @@ message CpuMetricTarget {
   enum Kind {
     KIND_UNSPECIFIED = 0;
     KIND_USAGE = 1;
+    KIND_TEMPERATURE = 2;
+    KIND_POWER = 3;
   }
 
   optional Kind kind = 1 [(buf.validate.field).enum = {
@@ -104,7 +106,21 @@ message CpuMetricTarget {
     not_in: [0]
   }];
 
-  // Future per-core CPU usage or CPU temperature settings belong here.
+  // These display settings are meaningful only for the corresponding CPU
+  // metric kinds. If CPU target settings grow further, split kind-specific
+  // fields into oneof sub-messages together with the similar GPU/Disk cleanup.
+  optional uint32 maximum_temperature_celsius = 2 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 200
+  }];
+  optional uint32 maximum_power_watts = 3 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 2000
+  }];
+  optional TemperatureUnit temperature_unit = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
 }
 
 message MemoryMetricTarget {
