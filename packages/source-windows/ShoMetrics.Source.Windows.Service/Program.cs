@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
 using ShoMetrics.Source.Windows.Core;
+using ShoMetrics.Source.Windows.Ipc;
 
 namespace ShoMetrics.Source.Windows.Service;
 
@@ -53,7 +54,7 @@ internal static class Program
         try
         {
             using IHost host = Host.CreateDefaultBuilder(args)
-                .UseWindowsService(options => options.ServiceName = SourceServiceConstants.ServiceName)
+                .UseWindowsService(options => options.ServiceName = SourceIpcConstants.ServiceName)
                 .UseSerilog((_, _, loggerConfiguration) => ConfigureSerilog(loggerConfiguration, mode))
                 .ConfigureServices(services =>
                 {
@@ -90,7 +91,7 @@ internal static class Program
         return new LoggerConfiguration()
             .MinimumLevel.Debug()
             .WriteTo.File(
-                ResolveLogFilePath(),
+                WindowsSourceServicePaths.ResolveLogFilePath(),
                 restrictedToMinimumLevel: LogEventLevel.Debug,
                 outputTemplate: LogOutputTemplate,
                 rollingInterval: RollingInterval.Day,
@@ -109,7 +110,7 @@ internal static class Program
             .MinimumLevel.Override("System", LogEventLevel.Warning)
             .Enrich.FromLogContext()
             .WriteTo.File(
-                ResolveLogFilePath(),
+                WindowsSourceServicePaths.ResolveLogFilePath(),
                 restrictedToMinimumLevel: LogEventLevel.Debug,
                 outputTemplate: LogOutputTemplate,
                 rollingInterval: RollingInterval.Day,
@@ -120,7 +121,7 @@ internal static class Program
         if (mode == ServiceExecutableMode.WindowsService)
         {
             loggerConfiguration.WriteTo.EventLog(
-                SourceServiceConstants.ServiceName,
+                SourceIpcConstants.ServiceName,
                 logName: "Application",
                 manageEventSource: true,
                 restrictedToMinimumLevel: LogEventLevel.Warning);
@@ -130,16 +131,6 @@ internal static class Program
         {
             loggerConfiguration.WriteTo.Console(outputTemplate: LogOutputTemplate);
         }
-    }
-
-    private static string ResolveLogFilePath()
-    {
-        return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-            "ShoMetrics",
-            "Source.Windows",
-            "logs",
-            "shometrics-source-windows.log");
     }
 
     private static int WriteHelp()
@@ -162,7 +153,7 @@ internal static class Program
 
     private static int WriteVersion()
     {
-        Console.Out.WriteLine(SourceServiceConstants.HelperVersion);
+        Console.Out.WriteLine(WindowsSourceServiceIdentity.HelperVersion);
 
         return 0;
     }

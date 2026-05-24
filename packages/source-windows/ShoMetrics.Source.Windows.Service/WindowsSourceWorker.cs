@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ShoMetrics.Source.Windows.Ipc;
 
 namespace ShoMetrics.Source.Windows.Service;
 
@@ -11,8 +12,8 @@ internal sealed class WindowsSourceWorker(
     {
         logger.LogInformation(
             "Starting ShoMetrics Windows source worker for source {SourceId} and protocol {ProtocolVersion}.",
-            SourceServiceConstants.SourceId,
-            SourceServiceConstants.ProtocolVersion);
+            WindowsSourceServiceIdentity.SourceId,
+            WindowsSourceServiceIdentity.ProtocolVersion);
 
         try
         {

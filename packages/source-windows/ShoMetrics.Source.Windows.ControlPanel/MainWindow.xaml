@@ -1,0 +1,183 @@
+<Window x:Class="ShoMetrics.Source.Windows.ControlPanel.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
+        Title="ShoMetrics Helper">
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <muxc:NavigationView x:Name="Navigation"
+                             PaneDisplayMode="Left"
+                             IsSettingsVisible="False"
+                             IsBackButtonVisible="Collapsed"
+                             SelectionChanged="OnNavigationSelectionChanged">
+            <muxc:NavigationView.MenuItems>
+                <muxc:NavigationViewItem Content="Status"
+                                         IsSelected="True"
+                                         Tag="status" />
+                <muxc:NavigationViewItem Content="About"
+                                         Tag="about" />
+            </muxc:NavigationView.MenuItems>
+
+            <Grid>
+                <ScrollViewer x:Name="StatusPage"
+                              Padding="40,32,40,32"
+                              VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="24">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Helper status"
+                                       Style="{ThemeResource TitleTextBlockStyle}" />
+                            <TextBlock Text="Check whether the Windows helper is installed, running, connected, and reading hardware."
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <Grid ColumnSpacing="16" RowSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0" Grid.Column="0"
+                                    Style="{StaticResource StatusCardStyle}">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Service"
+                                               Style="{StaticResource CardLabelTextStyle}" />
+                                    <TextBlock x:Name="ServiceInstallText"
+                                               Style="{StaticResource CardValueTextStyle}" />
+                                    <TextBlock x:Name="ServiceRuntimeText"
+                                               Style="{StaticResource CardDetailTextStyle}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Row="0" Grid.Column="1"
+                                    Style="{StaticResource StatusCardStyle}">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Connection"
+                                               Style="{StaticResource CardLabelTextStyle}" />
+                                    <TextBlock x:Name="ConnectionStatusText"
+                                               Style="{StaticResource CardValueTextStyle}" />
+                                    <TextBlock Text="Installed does not mean the service is running."
+                                               Style="{StaticResource CardDetailTextStyle}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Row="1" Grid.Column="0"
+                                    Style="{StaticResource StatusCardStyle}">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="PawnIO driver"
+                                               Style="{StaticResource CardLabelTextStyle}" />
+                                    <TextBlock x:Name="PawnIoDriverText"
+                                               Style="{StaticResource CardValueTextStyle}" />
+                                    <TextBlock Text="Required for some CPU temperature and power sensors."
+                                               Style="{StaticResource CardDetailTextStyle}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Row="1" Grid.Column="1"
+                                    Style="{StaticResource StatusCardStyle}">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Telemetry"
+                                               Style="{StaticResource CardLabelTextStyle}" />
+                                    <TextBlock x:Name="LastSampleText"
+                                               Style="{StaticResource CardValueTextStyle}" />
+                                    <TextBlock x:Name="DescriptorCountText"
+                                               Style="{StaticResource CardDetailTextStyle}" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <Border Style="{StaticResource StatusCardStyle}">
+                            <StackPanel Spacing="12">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Warnings"
+                                               Style="{ThemeResource SubtitleTextBlockStyle}" />
+                                    <TextBlock x:Name="WarningCountText"
+                                               Grid.Column="1"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </Grid>
+                                <TextBlock x:Name="WarningDetailsText"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock x:Name="ErrorText"
+                                   Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </ScrollViewer>
+
+                <ScrollViewer x:Name="AboutPage"
+                              Visibility="Collapsed"
+                              Padding="40,32,40,32"
+                              VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="24">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="About"
+                                       Style="{ThemeResource TitleTextBlockStyle}" />
+                            <TextBlock Text="ShoMetrics Windows Helper"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+
+                        <Border Style="{StaticResource StatusCardStyle}">
+                            <Grid ColumnSpacing="24" RowSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource DetailLabelTextStyle}" Text="Helper version" />
+                                <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DetailValueTextStyle}" x:Name="VersionText" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource DetailLabelTextStyle}" Text="Protocol" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DetailValueTextStyle}" x:Name="ProtocolText" />
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource DetailLabelTextStyle}" Text="Service status" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DetailValueTextStyle}" x:Name="ServiceStatusText" />
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource DetailLabelTextStyle}" Text="Log folder" />
+                                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DetailValueTextStyle}" x:Name="LogFolderText" TextWrapping="Wrap" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+            <muxc:NavigationView.FooterMenuItems>
+                <muxc:NavigationViewItem x:Name="CheckedAtItem"
+                                         Content="Not checked" />
+            </muxc:NavigationView.FooterMenuItems>
+        </muxc:NavigationView>
+
+        <StackPanel HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    Margin="0,18,40,0">
+            <Button x:Name="RefreshButton"
+                    Content="Refresh"
+                    MinWidth="86"
+                    Click="OnRefreshClicked" />
+            <Button Content="Copy diagnostics"
+                    MinWidth="132"
+                    Click="OnCopyDiagnosticsClicked" />
+            <Button Content="Open logs"
+                    MinWidth="92"
+                    Click="OnOpenLogsClicked" />
+        </StackPanel>
+    </Grid>
+</Window>

@@ -2,19 +2,16 @@ using System.Reflection;
 
 namespace ShoMetrics.Source.Windows.Service;
 
-internal static class SourceServiceConstants
+internal static class WindowsSourceServiceIdentity
 {
     public const string SourceId = "windows-helper";
     public const string ProtocolVersion = "1";
-    public const string PipeName = "ShoMetrics.Source.Windows.v1";
-    public const string ServiceName = "ShoMetrics Source Windows";
-    public const int MaximumFrameBytes = 1024 * 1024;
 
     public static readonly string HelperVersion = ResolveHelperVersion();
 
     private static string ResolveHelperVersion()
     {
-        Assembly assembly = typeof(SourceServiceConstants).Assembly;
+        Assembly assembly = typeof(WindowsSourceServiceIdentity).Assembly;
         AssemblyInformationalVersionAttribute? informationalVersion =
             assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
 

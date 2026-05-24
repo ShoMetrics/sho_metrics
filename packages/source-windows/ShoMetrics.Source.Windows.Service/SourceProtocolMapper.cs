@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Google.Protobuf.WellKnownTypes;
 using ShoMetrics.Contracts.V1;
 using ShoMetrics.Source.Windows.Core;
+using ShoMetrics.Source.Windows.Ipc;
 using CoreDescriptor = ShoMetrics.Source.Windows.Core.HardwareMetricDescriptor;
 using CoreDescriptorSnapshot = ShoMetrics.Source.Windows.Core.HardwareMetricDescriptorSnapshot;
 using CoreMetricIdKind = ShoMetrics.Source.Windows.Core.MetricIdKind;
@@ -37,9 +38,9 @@ internal sealed class SourceProtocolMapper
             RequestId = requestId,
             GetSourceHealth = new GetSourceHealthResponse
             {
-                SourceId = SourceServiceConstants.SourceId,
-                ProtocolVersion = SourceServiceConstants.ProtocolVersion,
-                HelperVersion = SourceServiceConstants.HelperVersion,
+                SourceId = WindowsSourceServiceIdentity.SourceId,
+                ProtocolVersion = WindowsSourceServiceIdentity.ProtocolVersion,
+                HelperVersion = WindowsSourceServiceIdentity.HelperVersion,
             },
         };
 
@@ -145,7 +146,8 @@ internal sealed class SourceProtocolMapper
     {
         string errorCode = exception.Error switch
         {
-            SourceIpcFrameError.MalformedRequest => MalformedRequestErrorCode,
+            SourceIpcFrameError.MalformedPayload => MalformedRequestErrorCode,
+            SourceIpcFrameError.IncompleteFrame => MalformedRequestErrorCode,
             SourceIpcFrameError.FrameTooLarge => FrameTooLargeErrorCode,
             _ => MalformedRequestErrorCode,
         };
