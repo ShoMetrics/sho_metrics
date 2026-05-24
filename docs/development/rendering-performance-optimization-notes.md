@@ -89,8 +89,8 @@ encoding were comparatively small.
 A standalone benchmark was added:
 
 ```powershell
-node packages\hub\scripts\bench-resvg-minimal.mjs 30
-node packages\hub\scripts\bench-resvg-minimal.mjs 1 --write-samples --list-fonts
+node packages\hub\scripts\benchmark\resvg-minimal.mjs 30
+node packages\hub\scripts\benchmark\resvg-minimal.mjs 1 --write-samples --list-fonts
 ```
 
 The benchmark compares:
@@ -112,6 +112,30 @@ Observed results:
   widgets, with `maxFontFiles=2`.
 - CJK fallback remains more expensive because system CJK fonts are large and still
   must be loaded when needed.
+
+### Title-card font fallback benchmark
+
+Title-card widgets intentionally use Japanese Mincho/serif typography. A focused
+benchmark compares the previous title-card system font candidate list with the current
+preferred-serif-first resolver:
+
+```powershell
+node packages\hub\scripts\benchmark\resvg-title-card-fonts.mjs 120
+```
+
+Windows x64 / Node 24.15.0 results on the development machine:
+
+| Case | Previous font files | Current font files | Previous total avg | Current total avg |
+| --- | ---: | ---: | ---: | ---: |
+| square single | 8 | 7 | 48-50 ms | 43-47 ms |
+| square network | 8 | 7 | 73-75 ms | 69-75 ms |
+| wide network | 8 | 7 | 80-83 ms | 79-80 ms |
+
+An intermediate broad-fallback version loaded 10 font files on Windows and was about
+5-8% slower in `new Resvg(...)` construction. The current resolver avoids that by
+loading preferred Japanese serif fonts first and skipping generic Han/Kana fallback
+when a Japanese serif font is available. Broad CJK fallback is still used when the
+preferred Japanese serif fonts are missing.
 
 ## Implemented Changes
 
@@ -161,12 +185,15 @@ The resolver builds resvg font options per SVG:
 - Kana fallback only when visible SVG text contains Hiragana or Katakana
 - Hangul fallback only when visible SVG text contains Hangul
 - Symbol fallback only when visible SVG text contains known symbol ranges
+- Japanese serif fallback only when the Japanese serif font family appears in the SVG
 
 Detection uses visible SVG text only. It ignores comments, path data, ids, and other
 non-visible SVG content.
 
 Important design point: CJK fallback is based on input text, not system language. An
 English UI can still contain Chinese, Japanese, or Korean text inside the SVG.
+When a Japanese serif font is found, generic Han/Kana fallback is skipped to avoid
+loading extra large CJK font files on every title-card render.
 
 ### Bundled Inter
 
@@ -302,7 +329,8 @@ npm.cmd run lint
 npm.cmd run test:unit
 npm.cmd run build
 npx.cmd streamdeck restart com.ez.sho-metrics
-node scripts\bench-resvg-minimal.mjs 3 --write-samples --list-fonts
+node scripts\benchmark\resvg-minimal.mjs 3 --write-samples --list-fonts
+node scripts\benchmark\resvg-title-card-fonts.mjs 120
 ```
 
 Results:
@@ -322,6 +350,10 @@ Runtime rasterizer logs after restart showed normal widget windows around:
 - `avgConstructMs`: 3-5 ms
 - `avgTotalMs`: 4-6 ms
 - `maxFontFiles`: 2 for normal non-CJK widgets
+
+The title-card font benchmark showed no meaningful slowdown after adding broader
+system fallback paths because the resolver only uses broad fallback when preferred
+Japanese serif fonts are missing.
 
 ## Known Limitations
 

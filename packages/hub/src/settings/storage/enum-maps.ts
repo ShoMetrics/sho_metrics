@@ -11,6 +11,7 @@ import {
     NetworkMetricTarget_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
     TerminalPalettePreset as StoredTerminalPalettePreset,
     TerminalThemeVariant as StoredTerminalThemeVariant,
+    TextViewVariant as StoredTextViewVariant,
     ScaleMode as StoredScaleMode,
     MetricView as StoredMetricView,
     LineAppearanceSettings_GridLineType as StoredGridLineType,
@@ -31,6 +32,7 @@ import type {
     NetworkUnitBase,
     TerminalPalettePreset,
     TerminalThemeVariant,
+    TextViewVariant,
     ScaleMode,
     MetricView,
     TemperatureUnit,
@@ -48,6 +50,11 @@ export const storedCircleViewVariantByResolved = {
     minimal: StoredCircleViewVariant.MINIMAL,
     gauge: StoredCircleViewVariant.GAUGE,
 } satisfies Record<CircleViewVariant, StoredCircleViewVariant>;
+
+export const storedTextViewVariantByResolved = {
+    centered: StoredTextViewVariant.CENTERED,
+    "title-card": StoredTextViewVariant.TITLE_CARD,
+} satisfies Record<TextViewVariant, StoredTextViewVariant>;
 
 export const storedThemeByResolved = {
     flat: StoredMetricTheme.FLAT,

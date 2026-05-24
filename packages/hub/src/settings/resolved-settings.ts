@@ -17,6 +17,7 @@
 
 export type MetricView = "circle" | "text" | "bar" | "line";
 export type CircleViewVariant = "full-ring" | "minimal" | "gauge";
+export type TextViewVariant = "centered" | "title-card";
 export type MetricTheme = "flat" | "cupertino-glass" | "color-filled" | "terminal";
 export type TerminalThemeVariant = "clean" | "vintage";
 export type TerminalPalettePreset = "green" | "amber" | "cyan" | "white";
@@ -159,6 +160,7 @@ export interface ResolvedAppearanceSettings {
 export interface ResolvedAppearanceViewSettings {
     readonly selectedView: MetricView;
     readonly circleVariant: CircleViewVariant;
+    readonly textVariant: TextViewVariant;
 }
 
 export interface ResolvedAppearanceThemeSettings {

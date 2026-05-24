@@ -353,6 +353,23 @@ test("widget view controls keep view before theme order", () => {
     assert.match(markup, /Theme Variant:/);
 });
 
+test("widget text view renders text variant controls", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "gpu",
+        settings: buildWidgetSettings("gpu", {
+            appearance: {
+                view: { selectedView: "text" },
+            },
+        }),
+    });
+
+    assertTextOrder(markup, "View:", "View Variant:");
+    assertTextOrder(markup, "View Variant:", "Theme:");
+    assert.match(markup, /Centered/);
+    assert.match(markup, /Title Card/);
+    assert.doesNotMatch(markup, /Full Ring/);
+});
+
 function renderWidgetSettings(options: {
     actionKind: ActionKind;
     isWindows?: boolean;

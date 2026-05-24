@@ -17,8 +17,7 @@ npm.cmd run test:visual
 npm.cmd run test:visual:update
 ```
 
-Current widget visual coverage has 46 snapshots. The baseline suite is grouped
-by rendering surface:
+The baseline suite is grouped by rendering surface:
 
 - `widget-color-filled.visual.spec.ts`: original Color Filled smoke coverage.
 - `widget-single-baseline.visual.spec.ts`: broader single-metric widget coverage
@@ -28,7 +27,9 @@ by rendering surface:
 - `widget-default-theme.visual.spec.ts`: representative default-theme coverage
   added after the baseline suite.
 - `widget-terminal.visual.spec.ts`: Terminal theme coverage.
+- `widget-title-card.visual.spec.ts`: Title-card text edge cases across square
+  and wide keys.
 
-On the Windows development machine used to expand the suite, `npm.cmd run
-test:visual` reported 41 snapshots in 1.4 seconds, or roughly 0.034 seconds per
-snapshot. Treat this as a rough local cost estimate; CI hardware can differ.
+On the Windows development machine used to expand the suite, the widget visual
+suite stayed small enough for local review. Treat this as a rough local cost
+estimate; CI hardware can differ.

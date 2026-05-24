@@ -23,6 +23,7 @@ export function buildMetricRenderAppearance(
     return {
         renderPrimitive: resolveRenderPrimitive(settings.view.selectedView),
         circleVariant: settings.view.circleVariant,
+        textVariant: settings.view.textVariant,
         themePreset: resolveThemePresetName(settings.theme),
         paintConstraint: renderPaint.paintConstraint,
         paints: renderPaint.paintTokens,

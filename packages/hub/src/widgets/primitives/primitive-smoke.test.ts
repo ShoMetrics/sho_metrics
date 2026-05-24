@@ -9,7 +9,7 @@ import { DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG, renderDualChannelProgressC
 import { progressBar, DEFAULT_PROGRESS_BAR_CONFIG } from "./progress-bar";
 import { renderMetricTextRow } from "./metric-text-row";
 import { DEFAULT_MIRRORED_TRAFFIC_CONFIG, renderMirroredTraffic } from "./mirrored-traffic";
-import { DEFAULT_TEXT_METRIC_CONFIG, renderDualTextMetric, textMetric } from "./text-metric";
+import { DEFAULT_TEXT_METRIC_CONFIG, renderDualTextMetric, renderTextMetric, textMetric } from "./text-metric";
 
 const keySize = { width: 144, height: 144 };
 
@@ -75,6 +75,102 @@ test("text metric uses a horizontal touch strip layout for wide keys", () => {
     assert.match(svgFragment, /id="text-metric-label"[\s\S]*x="14" y="52"/);
     assert.match(svgFragment, /id="text-metric-value"[\s\S]*x="112(?:\.00)?" y="56(?:\.00)?"/);
     assert.match(svgFragment, /id="text-metric-unit"[\s\S]*x="186" y="68"[\s\S]*text-anchor="end"/);
+});
+
+test("title-card text metric renders supplied asymmetrical caption content", () => {
+    const svgFragment = renderTextMetric({
+        ...buildWidgetData(),
+        label: "CPU",
+        displayValue: "23",
+        unit: "%",
+    }, {
+        ...DEFAULT_TEXT_METRIC_CONFIG,
+        textVariant: "title-card",
+    }, keySize, {
+        titleCard: {
+            codeText: "CPU",
+            compactCodeText: "CPU",
+            threeCharacterCaptionText: "使用率",
+            unitText: "%",
+        },
+    });
+
+    assert.match(svgFragment, /title-card-code/);
+    assert.match(svgFragment, />CPU<\/text>/);
+    assert.match(svgFragment, />使<\/text>/);
+    assert.match(svgFragment, />用<\/text>/);
+    assert.match(svgFragment, />率<\/text>/);
+    assert.match(svgFragment, /id="title-card-value"[\s\S]*>23<\/text>/);
+    assert.match(svgFragment, /id="title-card-unit"[\s\S]*>%<\/text>/);
+    assert.doesNotMatch(svgFragment, /title-card-secondary/);
+    assert.doesNotMatch(svgFragment, /text-metric-label/);
+});
+
+test("title-card text metric gives square edge values a left clip guard", () => {
+    for (const displayValue of ["9", "91", "999", "N/A"]) {
+        const svgFragment = renderTextMetric({
+            ...buildWidgetData(),
+            displayValue,
+        }, {
+            ...DEFAULT_TEXT_METRIC_CONFIG,
+            textVariant: "title-card",
+        }, { width: 120, height: 120 }, {
+            titleCard: {
+                codeText: "CPU",
+                compactCodeText: "CPU",
+                threeCharacterCaptionText: "使用率",
+                unitText: "%",
+            },
+        });
+
+        assert.match(svgFragment, new RegExp(`>${displayValue.replace("/", "\\/")}<\\/text>`, "u"));
+        assert.equal(readConstrainedTextClipWidth(svgFragment, "title-card-value"), 65);
+    }
+});
+
+test("title-card text metric uses a wide title layout", () => {
+    const svgFragment = renderTextMetric({
+        ...buildWidgetData(),
+        label: "GPU",
+        displayValue: "54",
+        unit: "C",
+    }, {
+        ...DEFAULT_TEXT_METRIC_CONFIG,
+        textVariant: "title-card",
+    }, { width: 200, height: 100 }, {
+        titleCard: {
+            codeText: "GPU",
+            compactCodeText: "GPU",
+            threeCharacterCaptionText: "温度計",
+            unitText: "°C",
+        },
+    });
+
+    assert.doesNotMatch(svgFragment, /title-card-caption-text/);
+    assert.match(svgFragment, />温<\/text>/);
+    assert.match(svgFragment, />度<\/text>/);
+    assert.match(svgFragment, />計<\/text>/);
+    assert.match(svgFragment, />G<\/text>/);
+    assert.match(svgFragment, />P<\/text>/);
+    assert.match(svgFragment, />U<\/text>/);
+    assert.match(svgFragment, /id="title-card-unit"[\s\S]*>°C<\/text>/);
+});
+
+test("title-card text metric renders only the three contracted caption rows", () => {
+    const svgFragment = renderTextMetric(buildWidgetData(), {
+        ...DEFAULT_TEXT_METRIC_CONFIG,
+        textVariant: "title-card",
+    }, keySize, {
+        titleCard: {
+            codeText: "CPU",
+            compactCodeText: "CPU",
+            threeCharacterCaptionText: "ABCD",
+            unitText: "%",
+        },
+    });
+
+    assert.equal(readTitleCardCaptionText(svgFragment, "title-card-caption"), "ABC");
+    assert.doesNotMatch(svgFragment, />D<\/text>/);
 });
 
 test("gauge circle variant opens the bottom arc and renders a marker dot", () => {
@@ -823,6 +919,39 @@ test("dual text metric uses disk read and write abbreviations", () => {
     assert.match(svgFragment, /id="text-metric-negative-unit"[\s\S]*>K<\/text>/);
 });
 
+test("title-card dual text metric renders compact channel rows", () => {
+    const svgFragment = renderDualTextMetric(buildDualChannelData(), {
+        ...DEFAULT_TEXT_METRIC_CONFIG,
+        textVariant: "title-card",
+    }, { width: 200, height: 100 }, {
+        titleText: "NET",
+        positive: {
+            labelText: "UP",
+            unitText: "M",
+        },
+        negative: {
+            labelText: "DN",
+            unitText: "M",
+        },
+        titleCard: {
+            codeText: "NET",
+            compactCodeText: "NET",
+            threeCharacterCaptionText: "転送速",
+            positiveLabelText: "↑",
+            positiveUnitText: "M",
+            negativeLabelText: "↓",
+            negativeUnitText: "M",
+        },
+    });
+
+    assert.match(svgFragment, /title-card-dual-caption/);
+    assert.equal(readTitleCardCaptionText(svgFragment, "title-card-dual-caption"), "転送速");
+    assert.match(svgFragment, /id="title-card-positive-label"[\s\S]*>↑<\/text>/);
+    assert.match(svgFragment, /id="title-card-negative-label"[\s\S]*>↓<\/text>/);
+    assert.match(svgFragment, /id="title-card-positive-value"/);
+    assert.match(svgFragment, /id="title-card-negative-value"/);
+});
+
 function buildWidgetData(): WidgetData {
     return {
         current: 42,
@@ -832,6 +961,29 @@ function buildWidgetData(): WidgetData {
         label: "CPU",
         displayValue: "42",
     };
+}
+
+function readTitleCardCaptionText(svgFragment: string, captionIdPrefix: string): string {
+    const captionMatches = [...svgFragment.matchAll(new RegExp(
+        `id="${captionIdPrefix}-(\\d+)"[\\s\\S]*?<text\\b[\\s\\S]*?>([^<]+)<\\/text>`,
+        "gu",
+    ))];
+
+    return captionMatches
+        .sort((left, right) => Number(left[1]) - Number(right[1]))
+        .map(match => match[2] ?? "")
+        .join("");
+}
+
+function readConstrainedTextClipWidth(svgFragment: string, textId: string): number {
+    const match = new RegExp(
+        `<clipPath id="${textId}">[\\s\\S]*?<rect\\b[\\s\\S]*?width="([^"]+)"`,
+        "u",
+    ).exec(svgFragment);
+
+    assert.ok(match?.[1], `missing clip width for ${textId}`);
+
+    return Number(match[1]);
 }
 
 function renderGaugeValueSample(displayValue: string, unit: string): string {

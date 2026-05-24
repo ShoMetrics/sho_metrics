@@ -10,8 +10,10 @@ import {
 } from "../widgets/primitives/progress-circle";
 import {
     DEFAULT_TEXT_METRIC_CONFIG,
-    textMetric,
+    renderTextMetric,
+    type TextMetricVariant,
 } from "../widgets/primitives/text-metric";
+import { buildTitleCardSingleMetricContent } from "./title-card-text-content";
 import {
     DEFAULT_PROGRESS_BAR_CONFIG,
     progressBar,
@@ -32,6 +34,7 @@ export interface SingleMetricBodyViewProps {
         paints: RenderPaintTokens;
         textStyles: RenderTextStyles;
         themeEffects: RenderThemeEffectTokens;
+        textVariant: TextMetricVariant;
         lineSmoothingPercent: number;
         gridLineVisibility: SparklineGridLineVisibility;
         gridLineType: SparklineGridLineType;
@@ -76,7 +79,7 @@ function renderSingleCircularMetric(options: SingleMetricBodyViewProps): string 
 }
 
 function renderSingleTextMetric(options: SingleMetricBodyViewProps): string {
-    return textMetric.render(options.data, {
+    return renderTextMetric(options.data, {
         ...DEFAULT_TEXT_METRIC_CONFIG,
         colorConfig: options.visual.paints.primaryMetric,
         labelTextColor: options.visual.paints.secondaryText,
@@ -84,7 +87,10 @@ function renderSingleTextMetric(options: SingleMetricBodyViewProps): string {
         secondaryTextColor: options.visual.paints.mutedText,
         textStyles: options.visual.textStyles,
         themeEffects: options.visual.themeEffects,
-    }, options.renderSize);
+        textVariant: options.visual.textVariant,
+    }, options.renderSize, {
+        titleCard: buildTitleCardSingleMetricContent(options.data),
+    });
 }
 
 function renderSingleBarMetric(options: SingleMetricBodyViewProps): string {

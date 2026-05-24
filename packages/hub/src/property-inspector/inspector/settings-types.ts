@@ -13,6 +13,7 @@ export type {
     MetricView,
     ScaleMode,
     TemperatureUnit,
+    TextViewVariant,
 } from "../../settings/resolved-settings";
 
 export type DiskMetricKind = "usage" | "throughput";

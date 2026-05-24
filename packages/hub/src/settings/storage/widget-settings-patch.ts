@@ -71,6 +71,7 @@ import {
     storedNetworkUnitBaseByResolved,
     storedTerminalPalettePresetByResolved,
     storedTerminalThemeVariantByResolved,
+    storedTextViewVariantByResolved,
     storedScaleModeByResolved,
     storedMetricViewByResolved,
     storedTemperatureUnitByResolved,
@@ -161,6 +162,9 @@ function applyAppearancePatch(appearance: StoredAppearanceSettings, patch: Resol
         }
         if (patch.view.circleVariant !== undefined) {
             view.circleVariant = storedCircleViewVariantByResolved[patch.view.circleVariant];
+        }
+        if (patch.view.textVariant !== undefined) {
+            view.textVariant = storedTextViewVariantByResolved[patch.view.textVariant];
         }
     }
 

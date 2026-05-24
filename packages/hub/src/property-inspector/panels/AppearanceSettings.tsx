@@ -1,6 +1,7 @@
 import { CircleVariantSetting } from "../controls/CircleVariantSetting";
 import { MetricViewSetting } from "../controls/MetricViewSetting";
 import { TerminalVariantSetting } from "../controls/TerminalVariantSetting";
+import { TextVariantSetting } from "../controls/TextVariantSetting";
 import { ThemeSetting } from "../controls/ThemeSetting";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
@@ -33,6 +34,16 @@ export function AppearanceSettings({
                     preview={preview}
                     onValueChange={(circleVariant) => onSettingsPatch({
                         appearance: { view: { circleVariant } },
+                    })}
+                    disabled={viewDisabled}
+                />
+            )}
+            {appearance.view.selectedView === "text" && (
+                <TextVariantSetting
+                    value={appearance.view.textVariant}
+                    preview={preview}
+                    onValueChange={(textVariant) => onSettingsPatch({
+                        appearance: { view: { textVariant } },
                     })}
                     disabled={viewDisabled}
                 />

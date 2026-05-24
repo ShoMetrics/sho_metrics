@@ -17,7 +17,10 @@ import {
 import {
     DEFAULT_TEXT_METRIC_CONFIG,
     renderDualTextMetric,
+    type DualTextMetricContent,
+    type TextMetricVariant,
 } from "../widgets/primitives/text-metric";
+import { buildTitleCardDualMetricContent } from "./title-card-text-content";
 import type {
     SparklineGridLineType,
     SparklineGridLineVisibility,
@@ -40,6 +43,7 @@ export interface DualMetricBodyViewProps {
         paints: RenderPaintTokens;
         textStyles: RenderTextStyles;
         themeEffects: RenderThemeEffectTokens;
+        textVariant: TextMetricVariant;
         lineSmoothingPercent: number;
         gridLineVisibility: SparklineGridLineVisibility;
         gridLineType: SparklineGridLineType;
@@ -92,16 +96,7 @@ function renderDualCircularMetric(options: DualMetricBodyViewProps): string {
 }
 
 function renderDualTextMetricView(options: DualMetricBodyViewProps): string {
-    return renderDualTextMetric(options.data, {
-        ...DEFAULT_TEXT_METRIC_CONFIG,
-        labelTextColor: options.visual.paints.secondaryText,
-        unitTextColor: options.visual.paints.secondaryText,
-        secondaryTextColor: options.visual.paints.mutedText,
-        textStyles: options.visual.textStyles,
-        themeEffects: options.visual.themeEffects,
-        positiveColor: options.positive.color,
-        negativeColor: options.negative.color,
-    }, options.renderSize, {
+    const textContent: DualTextMetricContent = {
         titleText: options.titleText,
         positive: {
             labelText: options.positive.labelText,
@@ -111,6 +106,21 @@ function renderDualTextMetricView(options: DualMetricBodyViewProps): string {
             labelText: options.negative.labelText,
             unitText: options.negative.unitText,
         },
+    };
+
+    return renderDualTextMetric(options.data, {
+        ...DEFAULT_TEXT_METRIC_CONFIG,
+        labelTextColor: options.visual.paints.secondaryText,
+        unitTextColor: options.visual.paints.secondaryText,
+        secondaryTextColor: options.visual.paints.mutedText,
+        textStyles: options.visual.textStyles,
+        themeEffects: options.visual.themeEffects,
+        textVariant: options.visual.textVariant,
+        positiveColor: options.positive.color,
+        negativeColor: options.negative.color,
+    }, options.renderSize, {
+        ...textContent,
+        titleCard: buildTitleCardDualMetricContent(textContent),
     });
 }
 

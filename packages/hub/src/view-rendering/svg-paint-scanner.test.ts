@@ -247,6 +247,7 @@ function buildBlackWhiteRenderAppearance(options: {
     return {
         renderPrimitive: options.renderPrimitive,
         circleVariant: options.circleVariant,
+        textVariant: "centered",
         themePreset: options.themePreset,
         paintConstraint: "black-white",
         paints: {

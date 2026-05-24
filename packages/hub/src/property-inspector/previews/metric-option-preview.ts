@@ -9,6 +9,7 @@ import type {
     ResolvedAppearanceSettings,
     ResolvedMetricTarget,
     TerminalThemeVariant,
+    TextViewVariant,
 } from "../../settings/resolved-settings";
 import { buildMetricViewIcons } from "../../widgets/icons/metric-view-icons";
 import type { HardwareIconKind } from "../../widgets/icons/hardware-icons";
@@ -63,6 +64,18 @@ export function buildCircleVariantPreviewUri(
         view: {
             selectedView: "circle",
             circleVariant,
+        },
+    });
+}
+
+export function buildTextVariantPreviewUri(
+    textVariant: TextViewVariant,
+    input?: MetricPreviewInput | undefined,
+): string {
+    return buildMetricPreviewUri(input, {
+        view: {
+            selectedView: "text",
+            textVariant,
         },
     });
 }

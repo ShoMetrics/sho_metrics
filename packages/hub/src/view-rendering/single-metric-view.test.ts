@@ -62,6 +62,7 @@ function buildMetricRenderAppearance(): MetricRenderAppearance {
     return {
         renderPrimitive: "circle",
         circleVariant: "full-ring",
+        textVariant: "centered",
         themePreset: "flat",
         paintConstraint: "none",
         paints: {

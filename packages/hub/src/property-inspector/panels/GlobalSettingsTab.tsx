@@ -2,6 +2,7 @@ import { CircleVariantSetting } from "../controls/CircleVariantSetting";
 import { MetricViewSetting } from "../controls/MetricViewSetting";
 import { NumberSetting } from "../controls/NumberSetting";
 import { TerminalVariantSetting } from "../controls/TerminalVariantSetting";
+import { TextVariantSetting } from "../controls/TextVariantSetting";
 import { ThemeSetting } from "../controls/ThemeSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { InspectorItem } from "../components/InspectorItem";
@@ -145,6 +146,11 @@ function ViewOverrideSection({
                         value={viewOverride.view.circleVariant}
                         onValueChange={(circleVariant) => onViewPatch({ circleVariant })}
                         disabled={viewOverride.view.selectedView !== "circle"}
+                    />
+                    <TextVariantSetting
+                        value={viewOverride.view.textVariant}
+                        onValueChange={(textVariant) => onViewPatch({ textVariant })}
+                        disabled={viewOverride.view.selectedView !== "text"}
                     />
                 </>
             )}

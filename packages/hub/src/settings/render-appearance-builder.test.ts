@@ -33,6 +33,19 @@ test("circle variant maps resolved appearance settings to renderer circle varian
     assert.equal(fullRingSettings.circleVariant, "full-ring");
 });
 
+test("text variant maps resolved appearance settings to renderer text variants", () => {
+    const centeredSettings = buildMetricRenderAppearance(buildAppearanceSettings({ view: { textVariant: "centered" } }));
+    const titleCardSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        view: {
+            selectedView: "text",
+            textVariant: "title-card",
+        },
+    }));
+
+    assert.equal(centeredSettings.textVariant, "centered");
+    assert.equal(titleCardSettings.textVariant, "title-card");
+});
+
 test("theme maps resolved appearance settings to renderer theme presets", () => {
     const cupertinoGlassSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         theme: { selectedTheme: "cupertino-glass" },

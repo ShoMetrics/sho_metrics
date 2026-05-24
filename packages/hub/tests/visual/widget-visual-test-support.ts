@@ -14,6 +14,7 @@ import type { ResolvedAppearanceSettingsOverride } from "../../src/settings/appe
 import { buildDefaultAppearanceSettings } from "../../src/settings/default-appearance-settings";
 import { buildMetricRenderAppearance } from "../../src/settings/render-appearance-builder";
 import { getDiskIconFragment, getHardwareIconFragment } from "../../src/widgets/icons/hardware-icons";
+import type { TextMetricVariant } from "../../src/widgets/primitives/text-metric";
 import {
     getNetworkDirectionStatusIcon,
     renderNetworkDirectionIconFragment,
@@ -161,6 +162,7 @@ export interface DualMetricVisualTestCase {
     readonly appearance: ResolvedAppearanceSettingsOverride;
     readonly data: DualChannelWidgetData;
     readonly selectedView: DualVisualMetricView;
+    readonly keySize?: KeySize;
     readonly chartMode?: DualChannelSparklineMode;
     readonly centerContent?: DualChannelProgressCircleCenterContent;
     readonly circleVariant?: CircleVariant;
@@ -172,6 +174,7 @@ export function buildDefaultAppearanceOverride(options: {
     circleVariant?: CircleVariant;
     colorMode?: "multi-color" | "solid" | "black-white";
     isGradientEnabled?: boolean;
+    textVariant?: TextMetricVariant;
     gridLineType?: "horizontal" | "vertical";
     gridLineVisibility?: "adaptive" | "always" | "none";
     lineSmoothingPercent?: number;
@@ -194,6 +197,7 @@ export function buildDefaultAppearanceOverride(options: {
         view: {
             selectedView: options.selectedView,
             circleVariant: options.circleVariant ?? "full-ring",
+            textVariant: options.textVariant,
         },
         theme: {
             selectedTheme: "flat",
@@ -278,6 +282,7 @@ export function renderSingleMetricWidgetPngBuffer(testCase: SingleMetricVisualTe
 }
 
 export function renderDualMetricWidgetPngBuffer(testCase: DualMetricVisualTestCase): Buffer {
+    const keySize = testCase.keySize ?? WIDGET_LOGICAL_SIZE;
     const visualSettings = buildMetricRenderAppearance(buildDefaultAppearanceSettings(testCase.appearance));
     const positiveColorConfig = buildSolidColorConfig(VISUAL_TEST_COLORS.networkUpload);
     const negativeColorConfig = buildSolidColorConfig(VISUAL_TEST_COLORS.networkDownload);
@@ -285,7 +290,7 @@ export function renderDualMetricWidgetPngBuffer(testCase: DualMetricVisualTestCa
         data: testCase.data,
         visual: visualSettings,
         renderPrimitive: toDualRenderPrimitive(testCase.selectedView),
-        renderSize: WIDGET_LOGICAL_SIZE,
+        renderSize: keySize,
         titleText: testCase.selectedView === "text" ? "NET" : "NETWORK",
         chartMode: testCase.chartMode ?? "overlay",
         centerContent: testCase.centerContent ?? "value",
@@ -314,8 +319,8 @@ export function renderDualMetricWidgetPngBuffer(testCase: DualMetricVisualTestCa
         themePreset: visualSettings.themePreset,
         muted: testCase.muted ?? false,
         paints: visualSettings.paints,
-        size: WIDGET_LOGICAL_SIZE,
-    }), WIDGET_LOGICAL_SIZE);
+        size: keySize,
+    }), keySize);
 }
 
 export function renderSvgToPngBuffer(svg: string, keySize: KeySize): Buffer {

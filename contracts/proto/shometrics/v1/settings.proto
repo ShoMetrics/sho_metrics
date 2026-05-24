@@ -399,6 +399,13 @@ message AppearanceViewSettings {
     defined_only: true
     not_in: [0]
   }];
+
+  // Text owns its variants here so centered metric text and title-card
+  // typography remain view-level choices instead of theme or renderer details.
+  optional TextViewVariant text_variant = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
 }
 
 message AppearanceThemeSettings {
@@ -691,6 +698,12 @@ enum CircleViewVariant {
   CIRCLE_VIEW_VARIANT_FULL_RING = 1;
   CIRCLE_VIEW_VARIANT_MINIMAL = 2;
   CIRCLE_VIEW_VARIANT_GAUGE = 3;
+}
+
+enum TextViewVariant {
+  TEXT_VIEW_VARIANT_UNSPECIFIED = 0;
+  TEXT_VIEW_VARIANT_CENTERED = 1;
+  TEXT_VIEW_VARIANT_TITLE_CARD = 2;
 }
 
 enum MetricTheme {

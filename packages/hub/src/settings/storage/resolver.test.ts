@@ -20,10 +20,35 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.slot.metric.target.domain, "cpu");
         assert.equal(settings.preferences.pollingFrequencySeconds, 1);
         assert.equal(settings.widget.slot.appearance.view.selectedView, "circle");
+        assert.equal(settings.widget.slot.appearance.view.textVariant, "centered");
         assert.equal(settings.widget.slot.appearance.theme.flat.paint.colorMode, "multi-color");
         assert.equal(settings.widget.slot.appearance.theme.flat.paint.solid.colors.usageColor, "#3b82f6");
         assert.equal(settings.widget.slot.appearance.theme.terminal.variant, "clean");
         assert.equal(settings.widget.slot.appearance.theme.terminal.paint.preset, "green");
+    });
+
+    it("resolves title-card as a text view-owned variant", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    overrides: {
+                        appearance: {
+                            view: {
+                                selectedView: "METRIC_VIEW_TEXT",
+                                textVariant: "TEXT_VIEW_VARIANT_TITLE_CARD",
+                            },
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+        });
+
+        assert.equal(settings.widget.slot.appearance.view.selectedView, "text");
+        assert.equal(settings.widget.slot.appearance.view.textVariant, "title-card");
     });
 
     it("defaults network metric paint to solid without changing other metric defaults", () => {
