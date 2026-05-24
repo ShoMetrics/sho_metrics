@@ -1,10 +1,10 @@
-import type { DualTextMetricContent } from "../widgets/primitives/text-metric";
+import type { DualTextMetricContent } from "../../widgets/primitives/text-metric";
 import type {
     TitleCardDualMetricContent,
     TitleCardSingleMetricContent,
-} from "../widgets/primitives/title-card-text-metric";
-import { formatCompactDataRateUnitText } from "./compact-unit-text";
-import type { WidgetData } from "./widget-data";
+} from "../../widgets/primitives/title-card-text-metric";
+import type { WidgetData } from "../widget-data";
+import { formatCompactDataRateUnitText, formatRenderUnitText } from "./render-unit-text";
 
 export function buildTitleCardSingleMetricContent(data: WidgetData): TitleCardSingleMetricContent {
     const codeText = resolveTitleCardCodeText(data.label);
@@ -115,12 +115,12 @@ function resolveTitleCardCompactCodeText(codeText: string): string {
 function formatTitleCardUnitText(unitText: string): string {
     const normalizedUnitText = unitText.toUpperCase();
 
-    if (normalizedUnitText === "C" || normalizedUnitText === "F") {
-        return `°${normalizedUnitText}`;
-    }
-
     if (normalizedUnitText.endsWith("B/S")) {
         return formatCompactDataRateUnitText(normalizedUnitText);
+    }
+
+    if (normalizedUnitText === "C" || normalizedUnitText === "F") {
+        return formatRenderUnitText(normalizedUnitText);
     }
 
     return unitText;

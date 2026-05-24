@@ -15,7 +15,6 @@ import {
     buildNetworkSpeedWidgetData,
     convertMegabitsPerSecondToBytesPerSecond,
 } from "../../metrics/network-speed-widget-data";
-import { formatCompactDataRateUnitText } from "../../view-rendering/compact-unit-text";
 import { PROGRESS_CIRCLE_LABELS } from "../../widgets/primitives/progress-circle-label";
 import {
     getNetworkDirectionStatusIcon,
@@ -226,8 +225,6 @@ function buildDualNetworkCircleOrTextViewOptions(
         negativeColorConfig: downloadColorConfig,
         positiveLabelText: "UP",
         negativeLabelText: "DN",
-        positiveUnitText: formatCompactDataRateUnitText(uploadWidgetData.unit),
-        negativeUnitText: formatCompactDataRateUnitText(downloadWidgetData.unit),
         positiveIconFragment: renderNetworkDirectionIconFragment({
             direction: "upload",
             color: uploadColor,

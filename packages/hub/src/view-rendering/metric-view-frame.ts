@@ -2,6 +2,7 @@ import type { ColorConfig } from "./color-resolver";
 import { renderDualMetricBodyView } from "./dual-metric-view";
 import { renderMetricFrame } from "./metric-frame";
 import type { MetricRenderAppearance } from "./render-appearance";
+import { formatRenderUnitText } from "./text-content/render-unit-text";
 import { renderSingleMetricBodyView } from "./single-metric-view";
 import {
     KEYPAD_PNG_SIZE,
@@ -46,8 +47,6 @@ export interface DualMetricRenderOptions extends BaseMetricRenderOptions {
     negativeColorConfig?: ColorConfig;
     positiveLabelText?: string;
     negativeLabelText?: string;
-    positiveUnitText?: string;
-    negativeUnitText?: string;
     positiveIconFragment?: string;
     negativeIconFragment?: string;
     positiveStatusIcon?: ProgressCircleStatusIcon;
@@ -180,17 +179,17 @@ export function buildRenderWidgetData(options: {
     shouldRenderMutedIconPlaceholder: boolean;
 }): WidgetData {
     if (options.hasData || options.shouldRenderMutedIconPlaceholder) {
-        return options.widgetData;
+        return formatRenderWidgetDataUnit(options.widgetData);
     }
 
-    return {
+    return formatRenderWidgetDataUnit({
         ...options.widgetData,
         current: 0,
         progress: 0,
         history: [],
         unit: "",
         displayValue: "N/A",
-    };
+    });
 }
 
 export function buildRenderDualChannelWidgetData(options: {
@@ -199,18 +198,21 @@ export function buildRenderDualChannelWidgetData(options: {
 }): DualChannelWidgetData {
     if (!options.hasData) {
         return {
-            positive: buildPlaceholderChannelWidgetData(options.widgetData.positive, "N/A"),
-            negative: buildPlaceholderChannelWidgetData(options.widgetData.negative, "N/A"),
+            positive: formatRenderWidgetDataUnit(buildPlaceholderChannelWidgetData(options.widgetData.positive, "N/A")),
+            negative: formatRenderWidgetDataUnit(buildPlaceholderChannelWidgetData(options.widgetData.negative, "N/A")),
         };
     }
 
+    const positiveWidgetData = options.widgetData.positive.sampleTimestampMilliseconds == null
+        ? buildZeroChannelWidgetData(options.widgetData.positive, options.widgetData.negative.history.length)
+        : options.widgetData.positive;
+    const negativeWidgetData = options.widgetData.negative.sampleTimestampMilliseconds == null
+        ? buildZeroChannelWidgetData(options.widgetData.negative, options.widgetData.positive.history.length)
+        : options.widgetData.negative;
+
     return {
-        positive: options.widgetData.positive.sampleTimestampMilliseconds == null
-            ? buildZeroChannelWidgetData(options.widgetData.positive, options.widgetData.negative.history.length)
-            : options.widgetData.positive,
-        negative: options.widgetData.negative.sampleTimestampMilliseconds == null
-            ? buildZeroChannelWidgetData(options.widgetData.negative, options.widgetData.positive.history.length)
-            : options.widgetData.negative,
+        positive: formatRenderWidgetDataUnit(positiveWidgetData),
+        negative: formatRenderWidgetDataUnit(negativeWidgetData),
     };
 }
 
@@ -303,7 +305,7 @@ function composeDualMetricBody(
             topIcon: options.centerIconFragment,
             positive: {
                 labelText: options.positiveLabelText ?? renderedMetricData.positive.label,
-                unitText: resolveDualMetricChannelUnitText(renderedMetricData.positive, options.positiveUnitText),
+                unitText: renderedMetricData.positive.unit,
                 color: options.positiveColor,
                 colorConfig: options.positiveColorConfig,
                 icon: options.positiveIconFragment,
@@ -311,7 +313,7 @@ function composeDualMetricBody(
             },
             negative: {
                 labelText: options.negativeLabelText ?? renderedMetricData.negative.label,
-                unitText: resolveDualMetricChannelUnitText(renderedMetricData.negative, options.negativeUnitText),
+                unitText: renderedMetricData.negative.unit,
                 color: options.negativeColor,
                 colorConfig: options.negativeColorConfig,
                 icon: options.negativeIconFragment,
@@ -323,12 +325,33 @@ function composeDualMetricBody(
     };
 }
 
-function resolveDualMetricChannelUnitText(widgetData: WidgetData, unitText: string | undefined): string {
-    if (widgetData.unit.length === 0) {
-        return "";
+// Render-format units once at the frame so downstream renderers do not
+// re-implement display-only rules such as C/F -> °C/°F.
+function formatRenderWidgetDataUnit(widgetData: WidgetData): WidgetData {
+    const formattedUnit = formatRenderUnitText(widgetData.unit);
+
+    if (widgetData.barUnit === undefined) {
+        if (formattedUnit === widgetData.unit) {
+            return widgetData;
+        }
+
+        return {
+            ...widgetData,
+            unit: formattedUnit,
+        };
     }
 
-    return unitText ?? widgetData.unit;
+    const formattedBarUnit = formatRenderUnitText(widgetData.barUnit);
+
+    if (formattedUnit === widgetData.unit && formattedBarUnit === widgetData.barUnit) {
+        return widgetData;
+    }
+
+    return {
+        ...widgetData,
+        unit: formattedUnit,
+        barUnit: formattedBarUnit,
+    };
 }
 
 function buildPlaceholderChannelWidgetData(widgetData: WidgetData, displayValue: string): WidgetData {

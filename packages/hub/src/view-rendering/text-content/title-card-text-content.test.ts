@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { DualTextMetricContent } from "../widgets/primitives/text-metric";
-import type { WidgetData } from "./widget-data";
+import type { DualTextMetricContent } from "../../widgets/primitives/text-metric";
+import type { WidgetData } from "../widget-data";
 import { buildTitleCardDualMetricContent, buildTitleCardSingleMetricContent } from "./title-card-text-content";
 
 test("title-card single metric content maps known metric display labels outside the primitive", () => {

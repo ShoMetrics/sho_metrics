@@ -234,7 +234,7 @@ function renderSingleBar(
         ${renderValueWithUnit({
             clipId: "progress-bar-single-value",
             valueText,
-            unitText: formatProgressBarUnit(unitText),
+            unitText,
             layout: layoutPlan.singleValue,
             valueTextColor: config.paints.primaryText,
             unitTextColor: config.paints.supportingText,
@@ -493,12 +493,4 @@ function renderFill(layout: BarLayout, fillWidth: number, fillPaint: string, fil
         <rect x="${layout.xCoordinate}" y="${layout.yCoordinate}" width="${fillWidth}" height="${layout.height}"
             rx="${layout.radius}" fill="${fillPaint}" ${buildSvgFilterAttributes(filter).join(" ")} />
     `;
-}
-
-function formatProgressBarUnit(unit: string): string {
-    if (unit === "C" || unit === "F") {
-        return `°${unit}`;
-    }
-
-    return unit;
 }
