@@ -5,6 +5,7 @@ import { StandardColorSettings } from "./ColorSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { PollingSettings } from "./PollingSettings";
 import { LineSettings } from "./LineSettings";
+import { MetricSourceSettings } from "./MetricSourceSettings";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import {
@@ -36,6 +37,7 @@ export function GpuWidgetSettings(props: GpuWidgetSettingsProps): React.JSX.Elem
 }
 
 function GpuMetricSettings({
+    context,
     target,
     onSettingsPatch,
 }: GpuWidgetSettingsProps): React.JSX.Element {
@@ -49,6 +51,12 @@ function GpuMetricSettings({
                     gpu: { kind },
                 })}
             />
+            {context.isWindows && (
+                <MetricSourceSettings
+                    sourcePolicy={context.resolved.widget.slot.metric.source}
+                    onSettingsPatch={onSettingsPatch}
+                />
+            )}
         </SettingsSection>
     );
 }

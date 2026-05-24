@@ -291,6 +291,61 @@ test("metric collection reads source-candidate samples through synchronous fallb
     }
 });
 
+test("metric action publishes displayed metric source attribution from the fallback reader", () => {
+    metricStore.clear();
+    const action = new TestDisplayedAttributionAction();
+    const streamDeckAction = new FakeStreamDeckAction("displayed-attribution-action");
+
+    metricStore.ingest(NODE_SYSTEM_SOURCE_ID, buildMetricSnapshot({
+        timestampMilliseconds: TEST_CURRENT_TIMESTAMP_MILLISECONDS,
+        metrics: {
+            "net.down": buildScalarMetricValue(123),
+        },
+    }));
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
+
+        assert.deepEqual(action.runtimeCachePatchList, [
+            {
+                displayedMetricReadAttribution: {
+                    metricKey: "net.down",
+                    preferredSourceId: NODE_SYSTEM_SOURCE_ID,
+                    selectedSourceId: NODE_SYSTEM_SOURCE_ID,
+                    sampleTimestampMilliseconds: TEST_CURRENT_TIMESTAMP_MILLISECONDS,
+                },
+            },
+        ]);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+        metricStore.clear();
+    }
+});
+
+test("metric action reports no selected source when displayed metric has no fresh sample", () => {
+    metricStore.clear();
+    const action = new TestDisplayedAttributionAction();
+    const streamDeckAction = new FakeStreamDeckAction("displayed-no-source-action");
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
+
+        assert.deepEqual(action.runtimeCachePatchList, [
+            {
+                displayedMetricReadAttribution: {
+                    metricKey: "net.down",
+                    preferredSourceId: NODE_SYSTEM_SOURCE_ID,
+                    selectedSourceId: undefined,
+                    sampleTimestampMilliseconds: undefined,
+                },
+            },
+        ]);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+        metricStore.clear();
+    }
+});
+
 test("global settings changes recreate background collection bindings", () => {
     pluginGlobalSettingsStore.update(undefined);
     const firstBinding = new FakeMetricCollectionBinding();
@@ -477,6 +532,11 @@ class TestMetricAction extends MetricAction {
         });
     }
 
+    protected override getDisplayedMetricKey(event: WillAppearEvent): string | undefined {
+        void event;
+        return undefined;
+    }
+
     publishRuntimeCacheForTest(event: WillAppearEvent): Promise<void> {
         return this.updateRuntimeCache(event, {
             runtimeMaximumDownloadSpeedMbps: 123,
@@ -518,6 +578,13 @@ class TestMetricReaderAction extends TestMetricAction {
                 .getWidgetData("net.down", "Download", "B")
                 .current,
         );
+    }
+}
+
+class TestDisplayedAttributionAction extends TestMetricAction {
+    protected override getDisplayedMetricKey(event: WillAppearEvent): string {
+        void event;
+        return "net.down";
     }
 }
 

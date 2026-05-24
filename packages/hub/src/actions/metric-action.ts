@@ -7,7 +7,11 @@ import streamDeck, {
     type SendToPluginEvent,
 } from "@elgato/streamdeck";
 import { metricStore, type MetricStoreReader } from "../runtime/metric-store";
-import { normalizeMetricReadPlan, type MetricReadPlan } from "../runtime/source-routing/metric-read-plan";
+import {
+    normalizeMetricReadPlan,
+    selectMetricReadRouteSourceCandidates,
+    type MetricReadPlan,
+} from "../runtime/source-routing/metric-read-plan";
 import { buildMetricReadPlanFromSourcePolicy } from "../runtime/source-routing/metric-read-plan-builder";
 import { clearMetricViewState } from "../view-updates/runner";
 import { logger } from "../logging/logger";
@@ -68,7 +72,7 @@ export abstract class MetricAction extends SingletonAction {
         pluginGlobalSettingsStore.subscribe(() => {
             this.resubscribeAllActions();
             for (const activeActionState of this.activeActionStates.values()) {
-                this.onMetricsUpdate(activeActionState.event);
+                this.refreshMetricView(activeActionState.event);
             }
         });
     }
@@ -93,7 +97,7 @@ export abstract class MetricAction extends SingletonAction {
             });
         }
         this.refreshSubscription(activeActionState);
-        this.onMetricsUpdate(event);
+        this.refreshMetricView(event);
     }
 
     override onDidReceiveSettings(event: DidReceiveSettingsEvent): void {
@@ -125,7 +129,7 @@ export abstract class MetricAction extends SingletonAction {
             }
             this.refreshSubscription(activeActionState);
             // Force an immediate update for snappy UI feedback.
-            this.onMetricsUpdate(activeActionState.event);
+            this.refreshMetricView(activeActionState.event);
         }
     }
 
@@ -145,7 +149,7 @@ export abstract class MetricAction extends SingletonAction {
             activeActionEvent: activeActionState?.event,
             refreshActiveAction: () => {
                 if (activeActionState) {
-                    this.onMetricsUpdate(activeActionState.event);
+                    this.refreshMetricView(activeActionState.event);
                 }
             },
         });
@@ -173,6 +177,17 @@ export abstract class MetricAction extends SingletonAction {
     protected abstract onMetricsUpdate(event: WillAppearEvent): void;
 
     protected abstract getMetricKeys(event: WillAppearEvent): readonly string[];
+
+    /**
+     * Returns the primary metric used for PI source diagnostics.
+     *
+     * The default treats the first subscribed metric as the widget's displayed
+     * value. Multi-metric actions should keep their displayed value first or
+     * override this method.
+     */
+    protected getDisplayedMetricKey(event: WillAppearEvent): string | undefined {
+        return this.getMetricKeys(event)[0];
+    }
 
     protected buildMetricCollectionReadPlan(
         event: WillAppearEvent,
@@ -276,7 +291,7 @@ export abstract class MetricAction extends SingletonAction {
                 const currentActionState = this.activeActionStates.get(event.action.id);
 
                 if (currentActionState) {
-                    this.onMetricsUpdate(currentActionState.event);
+                    this.refreshMetricView(currentActionState.event);
                 }
             },
         });
@@ -300,6 +315,43 @@ export abstract class MetricAction extends SingletonAction {
 
     protected currentTimestampMilliseconds(): number {
         return Date.now();
+    }
+
+    private refreshMetricView(event: WillAppearEvent): void {
+        this.onMetricsUpdate(event);
+        this.publishDisplayedMetricReadAttribution(event);
+    }
+
+    private publishDisplayedMetricReadAttribution(event: WillAppearEvent): void {
+        const displayedMetricKey = this.getDisplayedMetricKey(event);
+        if (displayedMetricKey === undefined) {
+            return;
+        }
+
+        const readPlan = this.resolveMetricReadPlan(event);
+        const displayedMetric = normalizeMetricReadPlan(readPlan).metrics
+            .find(metric => metric.metricKey === displayedMetricKey);
+        if (displayedMetric === undefined) {
+            return;
+        }
+
+        const preferredSourceId = selectMetricReadRouteSourceCandidates(displayedMetric)[0]?.sourceId;
+        const readResult = this.getMetricReader(event).getWidgetDataWithAttribution(
+            displayedMetricKey,
+            "",
+            "",
+        );
+
+        this.updateRuntimeCache(event, {
+            displayedMetricReadAttribution: {
+                metricKey: displayedMetricKey,
+                preferredSourceId,
+                selectedSourceId: readResult.selectedSourceId,
+                sampleTimestampMilliseconds: readResult.widgetData.sampleTimestampMilliseconds,
+            },
+        }).catch(error => {
+            log.error(() => `Failed to publish displayed metric source attribution: ${String(error)}`);
+        });
     }
 
     private resubscribeAllActions(): void {
