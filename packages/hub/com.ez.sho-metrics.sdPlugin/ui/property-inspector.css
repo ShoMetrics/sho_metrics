@@ -199,6 +199,22 @@ body {
     white-space: nowrap;
 }
 
+.metric-source-debug-panel {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.metric-source-debug-details {
+    display: grid;
+    gap: 2px;
+    padding-left: 24px;
+}
+
+.metric-source-debug-details .section-note {
+    margin-top: 0;
+}
+
 .override-toggle-control .section-note {
     margin-top: 2px;
 }

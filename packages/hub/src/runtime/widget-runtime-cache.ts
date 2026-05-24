@@ -17,6 +17,15 @@ export interface WidgetRuntimeCache {
     runtimeMaximumDiskReadThroughputMebibytesPerSecond: number | undefined;
     runtimeMaximumDiskWriteThroughputMebibytesPerSecond: number | undefined;
     runtimeMaximumGpuPowerWatts: number | undefined;
+    displayedMetricReadAttribution: DisplayedMetricReadAttribution | undefined;
+}
+
+/** Latest render-path source attribution for the primary metric displayed by an action. */
+export interface DisplayedMetricReadAttribution {
+    readonly metricKey: string;
+    readonly preferredSourceId: string | undefined;
+    readonly selectedSourceId: string | undefined;
+    readonly sampleTimestampMilliseconds: number | undefined;
 }
 
 export type WidgetRuntimeCachePatch = Partial<WidgetRuntimeCache>;
@@ -29,6 +38,7 @@ export const emptyWidgetRuntimeCache: WidgetRuntimeCache = {
     runtimeMaximumDiskReadThroughputMebibytesPerSecond: undefined,
     runtimeMaximumDiskWriteThroughputMebibytesPerSecond: undefined,
     runtimeMaximumGpuPowerWatts: undefined,
+    displayedMetricReadAttribution: undefined,
 };
 
 export const WIDGET_RUNTIME_CACHE_MESSAGE_TYPE = "widget-runtime-cache";

@@ -1,4 +1,4 @@
-import type { MetricStore, MetricStoreReader } from "../metric-store";
+import type { MetricStore, MetricStoreReader, MetricWidgetDataReadResult } from "../metric-store";
 import type { WidgetData } from "../../view-rendering/widget-data";
 import {
     normalizeMetricReadPlan,
@@ -41,24 +41,9 @@ export function createFallbackMetricStoreReader(
     const now = options.now ?? Date.now;
 
     return {
-        getWidgetData: (metricKey, label, unit, maxValue) => {
-            const currentTimestampMilliseconds = now();
-            const sourceReaders = sourceReadersByMetricKey.get(metricKey) ?? [];
-
-            for (const sourceReader of sourceReaders) {
-                const widgetData = sourceReader.getWidgetData(metricKey, label, unit, maxValue);
-
-                if (isFreshWidgetData(
-                    widgetData,
-                    currentTimestampMilliseconds,
-                    options.maximumSampleAgeMilliseconds,
-                )) {
-                    return widgetData;
-                }
-            }
-
-            return buildNoDataWidgetData({ label, unit });
-        },
+        getWidgetData: (metricKey, label, unit, maxValue) =>
+            readWidgetDataWithAttribution(metricKey, label, unit, maxValue).widgetData,
+        getWidgetDataWithAttribution: readWidgetDataWithAttribution,
         getTextValue: metricKey => {
             // Text values currently represent static descriptors such as CPU/GPU
             // model names. Add timestamped text reads only when real-time text
@@ -76,6 +61,33 @@ export function createFallbackMetricStoreReader(
             return undefined;
         },
     };
+
+    function readWidgetDataWithAttribution(
+        metricKey: string,
+        label: string,
+        unit: string,
+        maxValue?: number,
+    ): MetricWidgetDataReadResult {
+        const currentTimestampMilliseconds = now();
+        const sourceReaders = sourceReadersByMetricKey.get(metricKey) ?? [];
+
+        for (const sourceReader of sourceReaders) {
+            const readResult = sourceReader.getWidgetDataWithAttribution(metricKey, label, unit, maxValue);
+
+            if (isFreshWidgetData(
+                readResult.widgetData,
+                currentTimestampMilliseconds,
+                options.maximumSampleAgeMilliseconds,
+            )) {
+                return readResult;
+            }
+        }
+
+        return {
+            widgetData: buildNoDataWidgetData({ label, unit }),
+            selectedSourceId: undefined,
+        };
+    }
 }
 
 function isFreshWidgetData(

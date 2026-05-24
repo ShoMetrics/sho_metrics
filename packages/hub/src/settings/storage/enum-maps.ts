@@ -16,6 +16,7 @@ import {
     MetricView as StoredMetricView,
     LineAppearanceSettings_GridLineType as StoredGridLineType,
     LineAppearanceSettings_GridLineVisibility as StoredGridLineVisibility,
+    MetricSourcePolicy_FailureMode as StoredSourceFailureMode,
     TemperatureUnit as StoredTemperatureUnit,
 } from "../../generated/shometrics/v1/settings_pb.js";
 import type {
@@ -34,6 +35,7 @@ import type {
     TerminalThemeVariant,
     TextViewVariant,
     ScaleMode,
+    SourceFailureMode,
     MetricView,
     TemperatureUnit,
 } from "../resolved-settings";
@@ -141,3 +143,8 @@ export const storedTemperatureUnitByResolved = {
     celsius: StoredTemperatureUnit.CELSIUS,
     fahrenheit: StoredTemperatureUnit.FAHRENHEIT,
 } satisfies Record<TemperatureUnit, StoredTemperatureUnit>;
+
+export const storedSourceFailureModeByResolved = {
+    showUnavailable: StoredSourceFailureMode.SHOW_UNAVAILABLE,
+    useFallback: StoredSourceFailureMode.USE_FALLBACK,
+} satisfies Record<SourceFailureMode, StoredSourceFailureMode>;

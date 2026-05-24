@@ -30,6 +30,30 @@ test("fallback reader uses the first source candidate with a scalar sample", () 
     assert.equal(reader.getWidgetData("ram.used", "RAM", "B").current, 25);
 });
 
+test("fallback reader attributes the first fresh scalar sample to its source", () => {
+    const metricStore = new MetricStore();
+    const readPlan = buildReadPlan();
+
+    metricStore.ingest("windows-helper", buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            "ram.used": buildScalarMetricValue(25),
+        },
+    }));
+    metricStore.ingest("node-system", buildMetricSnapshot({
+        timestampMilliseconds: 2000,
+        metrics: {
+            "ram.used": buildScalarMetricValue(50),
+        },
+    }));
+
+    const reader = createTestFallbackReader(metricStore, readPlan);
+    const readResult = reader.getWidgetDataWithAttribution("ram.used", "RAM", "B");
+
+    assert.equal(readResult.selectedSourceId, "windows-helper");
+    assert.equal(readResult.widgetData.current, 25);
+});
+
 test("fallback reader uses the next source candidate when the primary has no scalar sample", () => {
     const metricStore = new MetricStore();
     const readPlan = buildReadPlan();
@@ -121,6 +145,33 @@ test("fallback reader uses fallback when the primary scalar sample is stale", ()
     assert.equal(reader.getWidgetData("ram.used", "RAM", "B").current, 50);
 });
 
+test("fallback reader attributes fallback samples to the selected fallback source", () => {
+    const metricStore = new MetricStore();
+    const readPlan = buildReadPlan();
+
+    metricStore.ingest("windows-helper", buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            "ram.used": buildScalarMetricValue(25),
+        },
+    }));
+    metricStore.ingest("node-system", buildMetricSnapshot({
+        timestampMilliseconds: 10000,
+        metrics: {
+            "ram.used": buildScalarMetricValue(50),
+        },
+    }));
+
+    const reader = createTestFallbackReader(metricStore, readPlan, {
+        now: 11000,
+        maximumSampleAgeMilliseconds: 5000,
+    });
+    const readResult = reader.getWidgetDataWithAttribution("ram.used", "RAM", "B");
+
+    assert.equal(readResult.selectedSourceId, "node-system");
+    assert.equal(readResult.widgetData.current, 50);
+});
+
 test("fallback reader uses node when a helper-preferred metric's helper sample is stale", () => {
     const metricStore = new MetricStore();
     const readPlan = buildReadPlan({ metricKey: "gpu.temp" });
@@ -175,6 +226,17 @@ test("fallback reader returns no data when every scalar sample is stale", () => 
         unit: "B",
         label: "RAM",
         sampleTimestampMilliseconds: undefined,
+    });
+    assert.deepEqual(reader.getWidgetDataWithAttribution("ram.used", "RAM", "B"), {
+        widgetData: {
+            current: 0,
+            progress: 0,
+            history: [],
+            unit: "B",
+            label: "RAM",
+            sampleTimestampMilliseconds: undefined,
+        },
+        selectedSourceId: undefined,
     });
 });
 

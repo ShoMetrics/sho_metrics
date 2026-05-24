@@ -13,6 +13,7 @@ import {
     MetricMultiColorChannelColorsSchema,
     MetricMultiColorPaintSettingsSchema,
     MetricPaintSettingsSchema,
+    MetricSourcePolicySchema,
     MetricSolidChannelColorsSchema,
     MetricSolidPaintSettingsSchema,
     MultiColorSetSchema,
@@ -44,6 +45,7 @@ import type {
     NetworkUnitBase,
     ResolvedGpuReading,
     ScaleMode,
+    SourceFailureMode,
     TemperatureUnit,
 } from "../resolved-settings";
 import type {
@@ -74,11 +76,18 @@ import {
     storedTextViewVariantByResolved,
     storedScaleModeByResolved,
     storedMetricViewByResolved,
+    storedSourceFailureModeByResolved,
     storedTemperatureUnitByResolved,
     storedThemeByResolved,
 } from "./enum-maps";
 
 export interface StoredWidgetSettingsPatch {
+    /** Replaces the metric source policy as a complete metric-level routing preference. */
+    readonly source?: {
+        readonly primarySourceProfileId: string | undefined;
+        readonly fallbackSourceProfileIds: readonly string[];
+        readonly failureMode: SourceFailureMode;
+    } | undefined;
     readonly preferences?: {
         readonly pollingFrequencySeconds?: number | undefined;
     } | undefined;
@@ -131,6 +140,10 @@ function applyPatch(settings: StoredWidgetSettings, patch: StoredWidgetSettingsP
         applyAppearancePatch(overrides.appearance ??= create(AppearanceSettingsSchema), patch.appearance);
     }
 
+    if (patch.source) {
+        applySourcePatch(requireMetricSelection(requireSingleMetricSlot(settings)), patch.source);
+    }
+
     if (patch.network) {
         const slot = requireSingleMetricSlot(settings);
         applyNetworkPatch(requireNetworkTarget(requireMetricSelection(slot)), ensureSlotOverrides(slot), patch.network);
@@ -152,6 +165,18 @@ function applyPreferencesPatch(
 ): void {
     settings.preferences ??= create(WidgetPreferencesSchema);
     settings.preferences.pollingFrequencySeconds = patch.pollingFrequencySeconds;
+}
+
+function applySourcePatch(
+    metric: StoredMetricSelection,
+    patch: NonNullable<StoredWidgetSettingsPatch["source"]>,
+): void {
+    const sourcePolicy = create(MetricSourcePolicySchema);
+
+    sourcePolicy.primarySourceProfileId = patch.primarySourceProfileId;
+    sourcePolicy.fallbackSourceProfileIds = [...patch.fallbackSourceProfileIds];
+    sourcePolicy.failureMode = storedSourceFailureModeByResolved[patch.failureMode];
+    metric.sourcePolicy = sourcePolicy;
 }
 
 function applyAppearancePatch(appearance: StoredAppearanceSettings, patch: ResolvedAppearanceSettingsOverride): void {

@@ -7,8 +7,27 @@ export interface MetricStoreReader {
     /** Builds renderer-facing widget data for one metric in the bound source scope. */
     getWidgetData(metricKey: string, label: string, unit: string, maxValue?: number): WidgetData;
 
+    /**
+     * Builds renderer-facing widget data and reports which source scope supplied it.
+     *
+     * Fallback readers use this to expose runtime diagnostics without
+     * reimplementing source selection outside the fallback decision point.
+     */
+    getWidgetDataWithAttribution(
+        metricKey: string,
+        label: string,
+        unit: string,
+        maxValue?: number,
+    ): MetricWidgetDataReadResult;
+
     /** Reads the latest text value for one metric in the bound source scope. */
     getTextValue(metricKey: string): string | undefined;
+}
+
+/** Renderer-facing metric data plus source attribution for diagnostics. */
+export interface MetricWidgetDataReadResult {
+    readonly widgetData: WidgetData;
+    readonly selectedSourceId: string | undefined;
 }
 
 /**
@@ -28,14 +47,36 @@ export class MetricStore {
 
     /** Creates a read-only metric view bound to one runtime source scope. */
     forScope(sourceScopeId: string): MetricStoreReader {
-        return {
-            getWidgetData: (metricKey, label, unit, maxValue) => this.readWidgetData(
+        const readWidgetDataWithAttribution = (
+            metricKey: string,
+            label: string,
+            unit: string,
+            maxValue?: number,
+        ): MetricWidgetDataReadResult => {
+            const widgetData = this.readWidgetData(
                 sourceScopeId,
                 metricKey,
                 label,
                 unit,
                 maxValue,
-            ),
+            );
+
+            return {
+                widgetData,
+                selectedSourceId: widgetData.sampleTimestampMilliseconds === undefined
+                    ? undefined
+                    : sourceScopeId,
+            };
+        };
+
+        return {
+            getWidgetData: (metricKey, label, unit, maxValue) => readWidgetDataWithAttribution(
+                metricKey,
+                label,
+                unit,
+                maxValue,
+            ).widgetData,
+            getWidgetDataWithAttribution: readWidgetDataWithAttribution,
             getTextValue: metricKey => this.readTextValue(sourceScopeId, metricKey),
         };
     }

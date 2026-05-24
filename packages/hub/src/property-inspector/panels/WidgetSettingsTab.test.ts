@@ -8,9 +8,16 @@ import {
     writeStoredWidgetSettingsPatch,
     type StoredWidgetSettingsPatch,
 } from "../../settings/storage/widget-settings-patch";
+import type { WidgetRuntimeCachePatch } from "../../runtime/widget-runtime-cache";
 import { buildVisibilityContext, type InspectorTestSettings } from "../testing/test-context";
 import { WidgetSettingsTab } from "./WidgetSettingsTab";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
+import {
+    BUILT_IN_NODE_SYSTEM_SOURCE_PROFILE_ID,
+    BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID,
+    NODE_SYSTEM_SOURCE_ID,
+    WINDOWS_HELPER_SOURCE_ID,
+} from "../../runtime/sources/source-ids";
 
 test("disk usage bar view settings render label controls without usage-mode controls", () => {
     const markup = renderWidgetSettings({
@@ -267,6 +274,95 @@ test("GPU settings panel renders from the GPU domain action", () => {
     assert.match(markup, /Polling Frequency/);
 });
 
+test("windows GPU settings panel renders source preference controls", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "gpu",
+        isWindows: true,
+    });
+
+    assert.match(markup, /Source:/);
+    assert.match(markup, /Auto \(Recommended\)/);
+});
+
+test("windows GPU settings panel reflects helper source preference", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "gpu",
+        isWindows: true,
+        settings: buildWidgetSettings("gpu", {
+            source: {
+                primarySourceProfileId: BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID,
+                fallbackSourceProfileIds: [BUILT_IN_NODE_SYSTEM_SOURCE_PROFILE_ID],
+                failureMode: "useFallback",
+            },
+        }),
+    });
+
+    assert.match(markup, /Source:/);
+    assert.match(markup, /Prefer Helper/);
+});
+
+test("non-windows GPU settings panel hides source preference controls", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "gpu",
+        isWindows: false,
+    });
+
+    assert.doesNotMatch(markup, /Source:/);
+    assert.doesNotMatch(markup, /nvidia-smi/);
+});
+
+test("GPU source preference control preserves custom source selections", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "gpu",
+        isWindows: true,
+        settings: buildWidgetSettings("gpu", {
+            source: {
+                primarySourceProfileId: "source-profile:gpu-lab",
+                fallbackSourceProfileIds: [],
+                failureMode: "showUnavailable",
+            },
+        }),
+    });
+
+    assert.match(markup, /Custom Source/);
+});
+
+test("widget advanced controls render current metric source attribution", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "cpu",
+        runtimeCache: {
+            displayedMetricReadAttribution: {
+                metricKey: "cpu.usage_percent",
+                preferredSourceId: NODE_SYSTEM_SOURCE_ID,
+                selectedSourceId: NODE_SYSTEM_SOURCE_ID,
+                sampleTimestampMilliseconds: Date.now(),
+            },
+        },
+    });
+
+    assert.match(markup, /Current source: Built-in/);
+    assert.match(markup, /Preferred source: Built-in/);
+    assert.match(markup, /Last sample age:/);
+});
+
+test("widget advanced controls report fallback source attribution", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "gpu",
+        runtimeCache: {
+            displayedMetricReadAttribution: {
+                metricKey: "gpu.temp",
+                preferredSourceId: WINDOWS_HELPER_SOURCE_ID,
+                selectedSourceId: NODE_SYSTEM_SOURCE_ID,
+                sampleTimestampMilliseconds: Date.now(),
+            },
+        },
+    });
+
+    assert.match(markup, /Current source: Built-in \(nvidia-smi\)/);
+    assert.match(markup, /Preferred source: Helper/);
+    assert.match(markup, /Using fallback; preferred source has no fresh data/);
+});
+
 test("domain action does not render a mismatched stored target panel", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
@@ -334,6 +430,8 @@ test("widget settings keep warnings first and reset in advanced controls", () =>
     assertTextOrder(markup, "Advanced", "Color Compensation");
     assertTextOrder(markup, "Color Compensation", "Reset Widget Settings");
     assertTextOrder(markup, "Advanced", "Reset Widget Settings");
+    assertTextOrder(markup, "Reset Widget Settings", "DEBUG");
+    assertTextOrder(markup, "DEBUG", "Show debug");
 });
 
 test("widget view controls keep view before theme order", () => {
@@ -377,12 +475,14 @@ function renderWidgetSettings(options: {
     isGlobalThemeOverrideEnabled?: boolean;
     isGlobalPaintOverrideEnabled?: boolean;
     settings?: InspectorTestSettings;
+    runtimeCache?: WidgetRuntimeCachePatch;
 }): string {
     return renderToStaticMarkup(createElement(WidgetSettingsTab, {
         context: buildVisibilityContext({
             actionKind: options.actionKind,
             isWindows: options.isWindows,
             settings: options.settings,
+            runtimeCache: options.runtimeCache,
         }),
         isGlobalViewOverrideEnabled: options.isGlobalViewOverrideEnabled ?? false,
         isGlobalThemeOverrideEnabled: options.isGlobalThemeOverrideEnabled ?? false,

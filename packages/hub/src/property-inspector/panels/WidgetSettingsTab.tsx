@@ -7,6 +7,7 @@ import { ColorCompensationControls } from "./ColorCompensationControls";
 import { DefaultWidgetSettings } from "./DefaultWidgetSettings";
 import { DiskWidgetSettings } from "./DiskWidgetSettings";
 import { GpuWidgetSettings } from "./GpuWidgetSettings";
+import { MetricSourceDiagnostic } from "./MetricSourceDiagnostic";
 import { NetworkWidgetSettings } from "./NetworkWidgetSettings";
 import { SettingsSection } from "./SettingsSection";
 
@@ -97,6 +98,9 @@ export function WidgetSettingsTab({
                     </div>
                 </InspectorItem>
             </SettingsSection>
+            <MetricSourceDiagnostic
+                attribution={context.runtimeCache.displayedMetricReadAttribution}
+            />
         </>
     );
 }
