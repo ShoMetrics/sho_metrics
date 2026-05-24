@@ -1,4 +1,4 @@
-import type { RenderPaintTokens } from "./render-appearance";
+import type { RenderPaintTokens, TextMetricVariant } from "./render-appearance";
 import type { RenderTextStyles } from "./render-text-style";
 import type { RenderThemeEffectTokens } from "./render-svg-effects";
 import type { KeySize, WidgetData } from "./widget-data";
@@ -10,9 +10,9 @@ import {
 } from "../widgets/primitives/progress-circle";
 import {
     DEFAULT_TEXT_METRIC_CONFIG,
-    renderTextMetric,
-    type TextMetricVariant,
+    renderCenteredTextMetric,
 } from "../widgets/primitives/text-metric";
+import { renderTitleCardTextMetric } from "../widgets/primitives/title-card-text-metric";
 import { buildTitleCardSingleMetricContent } from "./title-card-text-content";
 import {
     DEFAULT_PROGRESS_BAR_CONFIG,
@@ -79,7 +79,7 @@ function renderSingleCircularMetric(options: SingleMetricBodyViewProps): string 
 }
 
 function renderSingleTextMetric(options: SingleMetricBodyViewProps): string {
-    return renderTextMetric(options.data, {
+    const config = {
         ...DEFAULT_TEXT_METRIC_CONFIG,
         colorConfig: options.visual.paints.primaryMetric,
         labelTextColor: options.visual.paints.secondaryText,
@@ -87,10 +87,18 @@ function renderSingleTextMetric(options: SingleMetricBodyViewProps): string {
         secondaryTextColor: options.visual.paints.mutedText,
         textStyles: options.visual.textStyles,
         themeEffects: options.visual.themeEffects,
-        textVariant: options.visual.textVariant,
-    }, options.renderSize, {
-        titleCard: buildTitleCardSingleMetricContent(options.data),
-    });
+    };
+
+    if (options.visual.textVariant === "title-card") {
+        return renderTitleCardTextMetric(
+            options.data,
+            config,
+            options.renderSize,
+            buildTitleCardSingleMetricContent(options.data),
+        );
+    }
+
+    return renderCenteredTextMetric(options.data, config, options.renderSize);
 }
 
 function renderSingleBarMetric(options: SingleMetricBodyViewProps): string {

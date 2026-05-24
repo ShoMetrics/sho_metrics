@@ -9,7 +9,12 @@ import { DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG, renderDualChannelProgressC
 import { progressBar, DEFAULT_PROGRESS_BAR_CONFIG } from "./progress-bar";
 import { renderMetricTextRow } from "./metric-text-row";
 import { DEFAULT_MIRRORED_TRAFFIC_CONFIG, renderMirroredTraffic } from "./mirrored-traffic";
-import { DEFAULT_TEXT_METRIC_CONFIG, renderDualTextMetric, renderTextMetric, textMetric } from "./text-metric";
+import {
+    DEFAULT_TEXT_METRIC_CONFIG,
+    renderCenteredDualTextMetric,
+    renderCenteredTextMetric,
+} from "./text-metric";
+import { renderTitleCardDualTextMetric, renderTitleCardTextMetric } from "./title-card-text-metric";
 
 const keySize = { width: 144, height: 144 };
 
@@ -44,7 +49,7 @@ test("progress bar clamps fill width and renders secondary text safely", () => {
 });
 
 test("text metric renders a pure text layout without a ring", () => {
-    const svgFragment = textMetric.render({
+    const svgFragment = renderCenteredTextMetric({
         ...buildWidgetData(),
         label: `<CPU>`,
         displayValue: `<42>`,
@@ -65,7 +70,7 @@ test("text metric renders a pure text layout without a ring", () => {
 });
 
 test("text metric uses a horizontal touch strip layout for wide keys", () => {
-    const svgFragment = textMetric.render({
+    const svgFragment = renderCenteredTextMetric({
         ...buildWidgetData(),
         label: "CPU",
         displayValue: "67",
@@ -78,21 +83,18 @@ test("text metric uses a horizontal touch strip layout for wide keys", () => {
 });
 
 test("title-card text metric renders supplied asymmetrical caption content", () => {
-    const svgFragment = renderTextMetric({
+    const svgFragment = renderTitleCardTextMetric({
         ...buildWidgetData(),
         label: "CPU",
         displayValue: "23",
         unit: "%",
     }, {
         ...DEFAULT_TEXT_METRIC_CONFIG,
-        textVariant: "title-card",
     }, keySize, {
-        titleCard: {
-            codeText: "CPU",
-            compactCodeText: "CPU",
-            threeCharacterCaptionText: "使用率",
-            unitText: "%",
-        },
+        codeText: "CPU",
+        compactCodeText: "CPU",
+        threeCharacterCaptionText: "使用率",
+        unitText: "%",
     });
 
     assert.match(svgFragment, /title-card-code/);
@@ -108,19 +110,16 @@ test("title-card text metric renders supplied asymmetrical caption content", () 
 
 test("title-card text metric gives square edge values a left clip guard", () => {
     for (const displayValue of ["9", "91", "999", "N/A"]) {
-        const svgFragment = renderTextMetric({
+        const svgFragment = renderTitleCardTextMetric({
             ...buildWidgetData(),
             displayValue,
         }, {
             ...DEFAULT_TEXT_METRIC_CONFIG,
-            textVariant: "title-card",
         }, { width: 120, height: 120 }, {
-            titleCard: {
-                codeText: "CPU",
-                compactCodeText: "CPU",
-                threeCharacterCaptionText: "使用率",
-                unitText: "%",
-            },
+            codeText: "CPU",
+            compactCodeText: "CPU",
+            threeCharacterCaptionText: "使用率",
+            unitText: "%",
         });
 
         assert.match(svgFragment, new RegExp(`>${displayValue.replace("/", "\\/")}<\\/text>`, "u"));
@@ -129,21 +128,18 @@ test("title-card text metric gives square edge values a left clip guard", () => 
 });
 
 test("title-card text metric uses a wide title layout", () => {
-    const svgFragment = renderTextMetric({
+    const svgFragment = renderTitleCardTextMetric({
         ...buildWidgetData(),
         label: "GPU",
         displayValue: "54",
         unit: "C",
     }, {
         ...DEFAULT_TEXT_METRIC_CONFIG,
-        textVariant: "title-card",
     }, { width: 200, height: 100 }, {
-        titleCard: {
-            codeText: "GPU",
-            compactCodeText: "GPU",
-            threeCharacterCaptionText: "温度計",
-            unitText: "°C",
-        },
+        codeText: "GPU",
+        compactCodeText: "GPU",
+        threeCharacterCaptionText: "温度計",
+        unitText: "°C",
     });
 
     assert.doesNotMatch(svgFragment, /title-card-caption-text/);
@@ -157,16 +153,13 @@ test("title-card text metric uses a wide title layout", () => {
 });
 
 test("title-card text metric renders only the three contracted caption rows", () => {
-    const svgFragment = renderTextMetric(buildWidgetData(), {
+    const svgFragment = renderTitleCardTextMetric(buildWidgetData(), {
         ...DEFAULT_TEXT_METRIC_CONFIG,
-        textVariant: "title-card",
     }, keySize, {
-        titleCard: {
-            codeText: "CPU",
-            compactCodeText: "CPU",
-            threeCharacterCaptionText: "ABCD",
-            unitText: "%",
-        },
+        codeText: "CPU",
+        compactCodeText: "CPU",
+        threeCharacterCaptionText: "ABCD",
+        unitText: "%",
     });
 
     assert.equal(readTitleCardCaptionText(svgFragment, "title-card-caption"), "ABC");
@@ -784,7 +777,7 @@ test("mirrored traffic renders labels, center line, and both channel graphs", ()
 });
 
 test("dual text metric renders two escaped value rows", () => {
-    const svgFragment = renderDualTextMetric({
+    const svgFragment = renderCenteredDualTextMetric({
         positive: {
             ...buildWidgetData(),
             label: `Positive Source`,
@@ -819,7 +812,7 @@ test("dual text metric renders two escaped value rows", () => {
 });
 
 test("dual text metric uses aligned compact rate rows for wide keys", () => {
-    const svgFragment = renderDualTextMetric({
+    const svgFragment = renderCenteredDualTextMetric({
         positive: {
             ...buildWidgetData(),
             label: "UP",
@@ -854,7 +847,7 @@ test("dual text metric uses aligned compact rate rows for wide keys", () => {
 });
 
 test("dual text metric keeps square rate rows inside symmetric padding", () => {
-    const svgFragment = renderDualTextMetric({
+    const svgFragment = renderCenteredDualTextMetric({
         positive: {
             ...buildWidgetData(),
             label: "UP",
@@ -887,7 +880,7 @@ test("dual text metric keeps square rate rows inside symmetric padding", () => {
 });
 
 test("dual text metric uses disk read and write abbreviations", () => {
-    const svgFragment = renderDualTextMetric({
+    const svgFragment = renderCenteredDualTextMetric({
         positive: {
             ...buildWidgetData(),
             label: "READ",
@@ -920,28 +913,16 @@ test("dual text metric uses disk read and write abbreviations", () => {
 });
 
 test("title-card dual text metric renders compact channel rows", () => {
-    const svgFragment = renderDualTextMetric(buildDualChannelData(), {
+    const svgFragment = renderTitleCardDualTextMetric(buildDualChannelData(), {
         ...DEFAULT_TEXT_METRIC_CONFIG,
-        textVariant: "title-card",
     }, { width: 200, height: 100 }, {
-        titleText: "NET",
-        positive: {
-            labelText: "UP",
-            unitText: "M",
-        },
-        negative: {
-            labelText: "DN",
-            unitText: "M",
-        },
-        titleCard: {
-            codeText: "NET",
-            compactCodeText: "NET",
-            threeCharacterCaptionText: "転送速",
-            positiveLabelText: "↑",
-            positiveUnitText: "M",
-            negativeLabelText: "↓",
-            negativeUnitText: "M",
-        },
+        codeText: "NET",
+        compactCodeText: "NET",
+        threeCharacterCaptionText: "転送速",
+        positiveLabelText: "↑",
+        positiveUnitText: "M",
+        negativeLabelText: "↓",
+        negativeUnitText: "M",
     });
 
     assert.match(svgFragment, /title-card-dual-caption/);

@@ -3,10 +3,10 @@ import type { RenderTextStyles } from "./render-text-style";
 import type { RenderThemeEffectTokens } from "./render-svg-effects";
 import type { CircleVariant } from "../widgets/primitives/progress-circle";
 import type { SparklineGridLineType, SparklineGridLineVisibility } from "../widgets/primitives/sparkline";
-import type { TextMetricVariant } from "../widgets/primitives/text-metric";
 import type { ThemePresetName } from "../widgets/widget-contract";
 
 export type RenderPaintConstraint = "none" | "black-white";
+export type TextMetricVariant = "centered" | "title-card";
 
 export interface RenderPaintTokens {
     readonly background: string;

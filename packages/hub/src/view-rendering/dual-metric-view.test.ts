@@ -33,6 +33,46 @@ test("dual metric view renders the requested primitive branch", () => {
     }
 });
 
+test("dual metric view dispatches text variants to centered and title-card renderers", () => {
+    const centeredSvg = renderDualMetricBodyView({
+        data: buildDualChannelData(),
+        visual: {
+            ...buildMetricRenderAppearance(),
+            textVariant: "centered",
+        },
+        renderPrimitive: "text",
+        renderSize: { width: 200, height: 100 },
+        titleText: "NET",
+        chartMode: "overlay",
+        centerContent: "value",
+        circleVariant: "full-ring",
+        topIcon: "",
+        positive: { labelText: "UP", unitText: "M", color: "#3b82f6" },
+        negative: { labelText: "DN", unitText: "M", color: "#ef4444" },
+    });
+    const titleCardSvg = renderDualMetricBodyView({
+        data: buildDualChannelData(),
+        visual: {
+            ...buildMetricRenderAppearance(),
+            textVariant: "title-card",
+        },
+        renderPrimitive: "text",
+        renderSize: { width: 200, height: 100 },
+        titleText: "NET",
+        chartMode: "overlay",
+        centerContent: "value",
+        circleVariant: "full-ring",
+        topIcon: "",
+        positive: { labelText: "UP", unitText: "M", color: "#3b82f6" },
+        negative: { labelText: "DN", unitText: "M", color: "#ef4444" },
+    });
+
+    assert.match(centeredSvg, /text-metric-positive-value/);
+    assert.doesNotMatch(centeredSvg, /title-card-dual-caption/);
+    assert.match(titleCardSvg, /title-card-dual-caption/);
+    assert.doesNotMatch(titleCardSvg, /text-metric-positive-value/);
+});
+
 function buildMetricRenderAppearance(): MetricRenderAppearance {
     return {
         renderPrimitive: "circle",
