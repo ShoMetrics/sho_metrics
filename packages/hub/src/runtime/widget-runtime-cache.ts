@@ -1,6 +1,7 @@
 import { deepEqual } from "fast-equals";
 import type { DiskVolumeOption } from "./disk-volumes";
 import type { NetworkInterfaceOption } from "./network-interfaces";
+import type { SourceClientStatus } from "./sources/source-client";
 
 /**
  * Ephemeral per-action runtime facts.
@@ -24,6 +25,7 @@ export interface WidgetRuntimeCache {
 export interface DisplayedMetricReadAttribution {
     readonly metricKey: string;
     readonly preferredSourceId: string | undefined;
+    readonly preferredSourceStatus?: SourceClientStatus;
     readonly selectedSourceId: string | undefined;
     readonly sampleTimestampMilliseconds: number | undefined;
 }

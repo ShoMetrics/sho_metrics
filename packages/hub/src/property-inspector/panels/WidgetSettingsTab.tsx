@@ -4,6 +4,7 @@ import type { StoredWidgetSettingsPatch } from "../../settings/storage/widget-se
 import type { VisibilityContext } from "../inspector/types";
 import type { ColorCompensationProfile } from "../../color-compensation/types";
 import { ColorCompensationControls } from "./ColorCompensationControls";
+import { CpuWidgetSettings } from "./CpuWidgetSettings";
 import { DefaultWidgetSettings } from "./DefaultWidgetSettings";
 import { DiskWidgetSettings } from "./DiskWidgetSettings";
 import { GpuWidgetSettings } from "./GpuWidgetSettings";
@@ -129,6 +130,7 @@ function renderMetricPanel(
         case "gpu":
             return <GpuWidgetSettings {...panelProps} target={target} />;
         case "cpu":
+            return <CpuWidgetSettings {...panelProps} target={target} />;
         case "memory":
             return <DefaultWidgetSettings {...panelProps} />;
     }

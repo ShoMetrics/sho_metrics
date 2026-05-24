@@ -41,6 +41,7 @@ import {
 import { createFallbackMetricStoreReader } from "../runtime/metric-collection/fallback-composer";
 import { backgroundMetricCollection } from "../runtime/metric-collection/background-metric-collection";
 import type { MetricSubscription } from "../runtime/metric-collection/metric-subscription-registry";
+import type { SourceClientStatus } from "../runtime/sources/source-client";
 
 const log = logger.for("MetricAction");
 
@@ -317,6 +318,10 @@ export abstract class MetricAction extends SingletonAction {
         return Date.now();
     }
 
+    protected readCachedSourceStatus(sourceId: string): SourceClientStatus | undefined {
+        return backgroundMetricCollection.readCachedSourceStatus(sourceId);
+    }
+
     private refreshMetricView(event: WillAppearEvent): void {
         this.onMetricsUpdate(event);
         this.publishDisplayedMetricReadAttribution(event);
@@ -336,6 +341,9 @@ export abstract class MetricAction extends SingletonAction {
         }
 
         const preferredSourceId = selectMetricReadRouteSourceCandidates(displayedMetric)[0]?.sourceId;
+        const preferredSourceStatus = preferredSourceId === undefined
+            ? undefined
+            : this.readCachedSourceStatus(preferredSourceId);
         const readResult = this.getMetricReader(event).getWidgetDataWithAttribution(
             displayedMetricKey,
             "",
@@ -346,6 +354,7 @@ export abstract class MetricAction extends SingletonAction {
             displayedMetricReadAttribution: {
                 metricKey: displayedMetricKey,
                 preferredSourceId,
+                ...(preferredSourceStatus ? { preferredSourceStatus } : {}),
                 selectedSourceId: readResult.selectedSourceId,
                 sampleTimestampMilliseconds: readResult.widgetData.sampleTimestampMilliseconds,
             },

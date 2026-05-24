@@ -70,9 +70,6 @@ test("local auto source preference uses only Windows helper for helper-owned sta
     const helperOnlyMetricKeys = [
         CPU_TEMP_METRIC_KEY,
         CPU_POWER_METRIC_KEY,
-        getDiskThroughputMetricKey("read"),
-        getDiskThroughputMetricKey("write"),
-        getDiskThroughputMetricKey("total"),
     ];
 
     for (const metricKey of helperOnlyMetricKeys) {
@@ -80,6 +77,16 @@ test("local auto source preference uses only Windows helper for helper-owned sta
             resolveLocalAutoMetricSourceCandidates(metricKey, "win32"),
             WINDOWS_HELPER_CANDIDATES,
             metricKey,
+        );
+    }
+});
+
+test("local auto source preference does not route Windows disk throughput through LHM", () => {
+    for (const direction of ["read", "write", "total"] as const) {
+        assert.deepEqual(
+            resolveLocalAutoMetricSourceCandidates(getDiskThroughputMetricKey(direction), "win32"),
+            NODE_SYSTEM_CANDIDATES,
+            direction,
         );
     }
 });

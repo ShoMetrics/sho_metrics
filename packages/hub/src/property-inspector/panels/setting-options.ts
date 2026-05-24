@@ -99,6 +99,16 @@ export const diskThroughputDirectionOptionList = [
     { value: "write", label: "Write" },
 ] as const satisfies readonly SelectOption[];
 
+export const cpuMetricKindOptionList = [
+    { value: "usage", label: "Usage" },
+    { value: "temperature", label: "Temperature" },
+    { value: "power", label: "Power" },
+] as const satisfies readonly SelectOption[];
+
+export const nonWindowsCpuMetricKindOptionList = [
+    { value: "usage", label: "Usage" },
+] as const satisfies readonly SelectOption[];
+
 export const gpuMetricKindOptionList = [
     { value: "usage", label: "Usage" },
     { value: "temperature", label: "Temperature" },

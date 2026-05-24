@@ -11,6 +11,7 @@ import {
     createDefaultSourceRegistry,
     type SourceRegistry,
 } from "../sources/source-registry";
+import type { SourceClientStatus } from "../sources/source-client";
 import { CollectorGroupPlanner } from "./collector-group-planner";
 import { CollectorGroupSupervisor } from "./collector-group-supervisor";
 import {
@@ -143,6 +144,11 @@ export class BackgroundMetricCollection {
         await Promise.all(Array.from(metricKeysBySourceId.entries()).map(([sourceId, metricKeys]) => (
             this.refreshSourceCandidateOnce({ sourceId }, Array.from(metricKeys).sort())
         )));
+    }
+
+    /** Reads source-owned runtime status without performing source I/O. */
+    readCachedSourceStatus(sourceId: string): SourceClientStatus | undefined {
+        return this.sourceRegistry.readCachedSourceStatus(sourceId);
     }
 
     /** Stops background loops and releases source resources owned by this root. */

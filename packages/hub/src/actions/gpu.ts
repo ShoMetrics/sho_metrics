@@ -21,6 +21,9 @@ import {
 } from "../runtime/metric-keys";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import type { ResolvedGpuMetricTarget, ResolvedWidgetSettings } from "../settings/resolved-settings";
+import type { SourceClientStatus } from "../runtime/sources/source-client";
+import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
+import { readHelperBackedWidgetData } from "./shared/helper-backed-widget-data";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 import type { SingleMetricViewOptions } from "../view-updates/runner";
 
@@ -49,6 +52,7 @@ export class Gpu extends MetricAction {
             settings,
             target: gpuTarget,
             metrics,
+            helperStatus: this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID),
         }));
     }
 
@@ -74,8 +78,6 @@ export class Gpu extends MetricAction {
     }
 }
 
-const GPU_SAMPLE_STALE_MS = 7000;
-
 export function resolveGpuMetricSubscriptionKeys(target: ResolvedGpuMetricTarget): readonly string[] {
     switch (target.reading.kind) {
         case "usage":
@@ -94,6 +96,7 @@ function buildGpuViewOptions(options: {
     settings: ResolvedWidgetSettings;
     target: ResolvedGpuMetricTarget;
     metrics: MetricStoreReader;
+    helperStatus: SourceClientStatus | undefined;
 }): SingleMetricViewOptions {
     const baseOptions = {
         event: options.event,
@@ -106,13 +109,14 @@ function buildGpuViewOptions(options: {
                 ...baseOptions,
                 metricKey: GPU_TEMP_METRIC_KEY,
                 widgetData: buildTemperatureWidgetData({
-                    celsiusWidgetData: getGpuWidgetData(
-                        options.metrics,
-                        GPU_TEMP_METRIC_KEY,
-                        PROGRESS_CIRCLE_LABELS.gpu,
-                        "C",
-                        options.target.reading.maximumCelsius,
-                    ),
+                    celsiusWidgetData: readHelperBackedWidgetData({
+                        metrics: options.metrics,
+                        metricKey: GPU_TEMP_METRIC_KEY,
+                        label: PROGRESS_CIRCLE_LABELS.gpu,
+                        unit: "C",
+                        maxValue: options.target.reading.maximumCelsius,
+                        helperStatus: options.helperStatus,
+                    }),
                     maximumCelsius: options.target.reading.maximumCelsius,
                     unit: options.target.reading.unit,
                 }),
@@ -123,8 +127,20 @@ function buildGpuViewOptions(options: {
                 ...baseOptions,
                 metricKey: GPU_VRAM_USED_METRIC_KEY,
                 widgetData: buildGpuVramWidgetData(
-                    getGpuWidgetData(options.metrics, GPU_VRAM_USED_METRIC_KEY, PROGRESS_CIRCLE_LABELS.vram, "MB"),
-                    getGpuWidgetData(options.metrics, GPU_VRAM_TOTAL_METRIC_KEY, PROGRESS_CIRCLE_LABELS.vram, "MB").current,
+                    readHelperBackedWidgetData({
+                        metrics: options.metrics,
+                        metricKey: GPU_VRAM_USED_METRIC_KEY,
+                        label: PROGRESS_CIRCLE_LABELS.vram,
+                        unit: "MB",
+                        helperStatus: options.helperStatus,
+                    }),
+                    readHelperBackedWidgetData({
+                        metrics: options.metrics,
+                        metricKey: GPU_VRAM_TOTAL_METRIC_KEY,
+                        label: PROGRESS_CIRCLE_LABELS.vram,
+                        unit: "MB",
+                        helperStatus: options.helperStatus,
+                    }).current,
                 ),
                 ...buildMetricViewIcons({ hardware: "gpu", status: "memory" }),
             };
@@ -133,19 +149,26 @@ function buildGpuViewOptions(options: {
                 ...baseOptions,
                 metricKey: GPU_POWER_METRIC_KEY,
                 widgetData: buildGpuPowerWidgetData({
-                    powerWidgetData: getGpuWidgetData(
-                        options.metrics,
-                        GPU_POWER_METRIC_KEY,
-                        PROGRESS_CIRCLE_LABELS.gpu,
-                        "W",
-                        options.target.reading.maximumWatts,
-                    ),
+                    powerWidgetData: readHelperBackedWidgetData({
+                        metrics: options.metrics,
+                        metricKey: GPU_POWER_METRIC_KEY,
+                        label: PROGRESS_CIRCLE_LABELS.gpu,
+                        unit: "W",
+                        maxValue: options.target.reading.maximumWatts,
+                        helperStatus: options.helperStatus,
+                    }),
                     maximumPowerWatts: options.target.reading.maximumWatts,
                 }),
                 ...buildMetricViewIcons({ hardware: "gpu", status: "power" }),
             };
         case "usage": {
-            const data = getGpuWidgetData(options.metrics, GPU_USAGE_METRIC_KEY, PROGRESS_CIRCLE_LABELS.gpu, "%");
+            const data = readHelperBackedWidgetData({
+                metrics: options.metrics,
+                metricKey: GPU_USAGE_METRIC_KEY,
+                label: PROGRESS_CIRCLE_LABELS.gpu,
+                unit: "%",
+                helperStatus: options.helperStatus,
+            });
 
             return {
                 ...baseOptions,
@@ -194,51 +217,6 @@ function resolveRuntimeGpuPowerMaximumWatts(metrics: MetricStoreReader): number 
     return undefined;
 }
 
-function getGpuWidgetData(
-    metrics: MetricStoreReader,
-    metricKey: string,
-    label: string,
-    unit: string,
-    maxValue = 100,
-): WidgetData {
-    const widgetData = metrics.getWidgetData(
-        metricKey,
-        label,
-        unit,
-        maxValue,
-    );
-
-    if (isFreshGpuWidgetData(widgetData)) {
-        return widgetData;
-    }
-
-    const {
-        displayValue: ignoredDisplayValue,
-        secondaryDisplayValue: ignoredSecondaryDisplayValue,
-        sampleTimestampMilliseconds: ignoredSampleTimestampMilliseconds,
-        ...baseWidgetData
-    } = widgetData;
-
-    void ignoredDisplayValue;
-    void ignoredSecondaryDisplayValue;
-    void ignoredSampleTimestampMilliseconds;
-
-    return {
-        ...baseWidgetData,
-        current: 0,
-        progress: 0,
-        history: [],
-    };
-}
-
-function isFreshGpuWidgetData(widgetData: WidgetData): boolean {
-    if (widgetData.sampleTimestampMilliseconds == null) {
-        return false;
-    }
-
-    return Date.now() - widgetData.sampleTimestampMilliseconds <= GPU_SAMPLE_STALE_MS;
-}
-
 export function buildGpuUsageWidgetData(widgetData: WidgetData): WidgetData {
     return {
         ...widgetData,
@@ -269,6 +247,7 @@ export function buildGpuVramWidgetData(used: WidgetData, totalMegabytes: number)
             maximumValue: 100,
         },
         sampleTimestampMilliseconds: used.sampleTimestampMilliseconds,
+        unavailableDisplayValue: used.unavailableDisplayValue,
     };
 }
 

@@ -1,5 +1,5 @@
 import { NodeSystemSource } from "./node-system/node-system-source";
-import { createMetricSourceClient, type SourceClient } from "./source-client";
+import { createMetricSourceClient, type SourceClient, type SourceClientStatus } from "./source-client";
 import type { SourceMetadataInvalidationListener } from "./source-planning-metadata";
 import { WindowsHelperSourceClient } from "./windows-helper/windows-helper-source-client";
 
@@ -13,6 +13,9 @@ export interface DefaultSourceRegistryOptions {
 export interface SourceRegistry {
     /** Resolves a source client by registry-owned source id. */
     resolveSourceClient(sourceId: string): SourceClient | undefined;
+
+    /** Reads a source client's cached status without doing source I/O. */
+    readCachedSourceStatus(sourceId: string): SourceClientStatus | undefined;
 
     /** Subscribes to source planning metadata invalidations emitted by registered sources. */
     subscribeSourceMetadataInvalidations(listener: SourceMetadataInvalidationListener): () => void;
@@ -37,6 +40,10 @@ export class DefaultSourceRegistry implements SourceRegistry {
 
     resolveSourceClient(sourceId: string): SourceClient | undefined {
         return this.sourceClientById.get(sourceId);
+    }
+
+    readCachedSourceStatus(sourceId: string): SourceClientStatus | undefined {
+        return this.sourceClientById.get(sourceId)?.getCachedStatus?.();
     }
 
     subscribeSourceMetadataInvalidations(listener: SourceMetadataInvalidationListener): () => void {
