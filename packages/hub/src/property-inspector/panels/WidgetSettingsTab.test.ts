@@ -274,6 +274,67 @@ test("GPU settings panel renders from the GPU domain action", () => {
     assert.match(markup, /Polling Frequency/);
 });
 
+test("windows CPU settings panel renders helper-owned metric options", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "cpu",
+        isWindows: true,
+    });
+
+    assert.match(markup, /CPU Metric:/);
+    assert.match(markup, /Usage/);
+    assert.doesNotMatch(markup, /Source: Helper only/);
+});
+
+test("windows CPU temperature settings render helper-only source text and temperature scale", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "cpu",
+        isWindows: true,
+        settings: buildWidgetSettings("cpu", {
+            cpu: {
+                kind: "temperature",
+                temperatureUnit: "fahrenheit",
+                maximumTemperatureCelsius: 95,
+            },
+        }),
+    });
+
+    assert.match(markup, /Source: Helper only/);
+    assert.match(markup, /Unit:/);
+    assert.match(markup, /Max Temp \(C\):/);
+    assert.doesNotMatch(markup, /Max Power/);
+    assert.doesNotMatch(markup, /Source:<\/label>/);
+});
+
+test("windows CPU power settings render helper-only source text and power scale", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "cpu",
+        isWindows: true,
+        settings: buildWidgetSettings("cpu", {
+            cpu: {
+                kind: "power",
+                maximumPowerWatts: 180,
+            },
+        }),
+    });
+
+    assert.match(markup, /Source: Helper only/);
+    assert.match(markup, /Max Power \(W\):/);
+    assert.doesNotMatch(markup, /Max Temp/);
+});
+
+test("non-windows CPU settings hide helper-owned metric options", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "cpu",
+        isWindows: false,
+    });
+
+    assert.match(markup, /CPU Metric:/);
+    assert.match(markup, /Usage/);
+    assert.doesNotMatch(markup, /Temperature/);
+    assert.doesNotMatch(markup, /Power/);
+    assert.doesNotMatch(markup, /Source: Helper only/);
+});
+
 test("windows GPU settings panel renders source preference controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
@@ -361,6 +422,28 @@ test("widget advanced controls report fallback source attribution", () => {
     assert.match(markup, /Current source: Built-in \(nvidia-smi\)/);
     assert.match(markup, /Preferred source: Helper/);
     assert.match(markup, /Using fallback; preferred source has no fresh data/);
+});
+
+test("widget advanced controls report helper source status", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "cpu",
+        runtimeCache: {
+            displayedMetricReadAttribution: {
+                metricKey: "cpu.temp",
+                preferredSourceId: WINDOWS_HELPER_SOURCE_ID,
+                preferredSourceStatus: {
+                    state: "unavailable",
+                    reason: "pipeMissing",
+                },
+                selectedSourceId: undefined,
+                sampleTimestampMilliseconds: undefined,
+            },
+        },
+    });
+
+    assert.match(markup, /Current source: No fresh source/);
+    assert.match(markup, /Preferred source: Helper/);
+    assert.match(markup, /Helper status: Required/);
 });
 
 test("domain action does not render a mismatched stored target panel", () => {

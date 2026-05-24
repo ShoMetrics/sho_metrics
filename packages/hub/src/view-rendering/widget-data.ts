@@ -5,6 +5,7 @@ export interface WidgetData {
     unit: string;                  // Examples: "%", "deg C", "MB/s".
     label: string;                 // Examples: "CPU Usage", "GPU Temp".
     displayValue?: string;         // Optional preformatted value for compact metric-specific displays.
+    unavailableDisplayValue?: string; // Optional placeholder text when no fresh sample exists.
     secondaryDisplayValue?: string;
     barLabel?: string;
     barDisplayValue?: string;

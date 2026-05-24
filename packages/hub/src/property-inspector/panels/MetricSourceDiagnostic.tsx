@@ -47,6 +47,9 @@ export function MetricSourceDiagnostic({
         && attribution.preferredSourceId !== attribution.selectedSourceId
         ? "Using fallback; preferred source has no fresh data."
         : undefined;
+    const helperStatusText = attribution?.preferredSourceId === WINDOWS_HELPER_SOURCE_ID
+        ? formatHelperStatusText(attribution)
+        : undefined;
 
     return (
         <SettingsSection title="DEBUG">
@@ -77,6 +80,12 @@ export function MetricSourceDiagnostic({
                                     attribution?.sampleTimestampMilliseconds,
                                     currentTimestampMilliseconds,
                                 )}
+                                {helperStatusText !== undefined && (
+                                    <>
+                                        <br />
+                                        Helper status: {helperStatusText}
+                                    </>
+                                )}
                                 {fallbackText !== undefined && (
                                     <>
                                         <br />
@@ -94,6 +103,30 @@ export function MetricSourceDiagnostic({
 
 function isDevelopmentBuild(): boolean {
     return typeof __BUILD_MODE__ === "undefined" || __BUILD_MODE__ === "development";
+}
+
+function formatHelperStatusText(attribution: DisplayedMetricReadAttribution): string {
+    if (attribution.selectedSourceId === WINDOWS_HELPER_SOURCE_ID) {
+        return "Ready";
+    }
+
+    const status = attribution.preferredSourceStatus;
+    if (!status || status.state === "unknown") {
+        return "Required";
+    }
+
+    if (status.state === "available") {
+        return "Ready";
+    }
+
+    if (status.state === "unavailable") {
+        return status.reason === "pipeMissing"
+            && status.lastSuccessAtTimestampMilliseconds === undefined
+            ? "Required"
+            : "Error";
+    }
+
+    return "Error";
 }
 
 function formatCurrentSourceLabel(attribution: DisplayedMetricReadAttribution | undefined): string {

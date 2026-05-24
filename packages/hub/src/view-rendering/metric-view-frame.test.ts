@@ -54,6 +54,20 @@ test("single value-capable widget without data renders an N/A placeholder copy",
     });
 });
 
+test("single value-capable widget without data can render action-owned placeholder copy", () => {
+    const widgetData = buildWidgetData({
+        unavailableDisplayValue: "Helper required",
+    });
+
+    const renderWidgetData = buildRenderWidgetData({
+        widgetData,
+        hasData: false,
+        shouldRenderMutedIconPlaceholder: false,
+    });
+
+    assert.equal(renderWidgetData.displayValue, "Helper required");
+});
+
 test("single circle icon placeholder keeps source data and marks the render plan as muted", () => {
     const viewOptions = buildSingleMetricRenderOptions({
         widgetData: buildWidgetData(),
@@ -352,6 +366,7 @@ function buildWidgetData(options: Partial<WidgetData> = {}): WidgetData {
         barUnit: options.barUnit,
         label: options.label ?? "CPU",
         displayValue: options.displayValue,
+        unavailableDisplayValue: options.unavailableDisplayValue,
         sampleTimestampMilliseconds: options.sampleTimestampMilliseconds,
     };
 }

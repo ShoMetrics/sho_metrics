@@ -1,6 +1,5 @@
 import {
     getDefaultDiskUsageMetricKey,
-    getDiskThroughputMetricKey,
     isDiskUsageMetricKey,
 } from "../disk-metric-keys";
 import {
@@ -40,12 +39,6 @@ const NODE_SYSTEM_ONLY_METRIC_KEYS = [
 const WINDOWS_HELPER_ONLY_METRIC_KEYS = [
     CPU_TEMP_METRIC_KEY,
     CPU_POWER_METRIC_KEY,
-    // Windows disk throughput routing is ready before the helper-native PDH
-    // provider and PI unlock. Until that phase lands, resolver/UI still keep
-    // users off this route.
-    getDiskThroughputMetricKey("read"),
-    getDiskThroughputMetricKey("write"),
-    getDiskThroughputMetricKey("total"),
 ] as const;
 
 const WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEYS = [...GPU_METRIC_KEYS] as const;

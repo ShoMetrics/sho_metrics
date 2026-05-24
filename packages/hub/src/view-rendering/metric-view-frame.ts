@@ -188,7 +188,7 @@ export function buildRenderWidgetData(options: {
         progress: 0,
         history: [],
         unit: "",
-        displayValue: "N/A",
+        displayValue: options.widgetData.unavailableDisplayValue ?? "N/A",
     });
 }
 
