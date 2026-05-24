@@ -13,7 +13,7 @@ import {
     renderCenteredTextMetric,
 } from "../widgets/primitives/text-metric";
 import { renderTitleCardTextMetric } from "../widgets/primitives/title-card-text-metric";
-import { buildTitleCardSingleMetricContent } from "./title-card-text-content";
+import { buildTitleCardSingleMetricContent } from "./text-content/title-card-text-content";
 import {
     DEFAULT_PROGRESS_BAR_CONFIG,
     progressBar,

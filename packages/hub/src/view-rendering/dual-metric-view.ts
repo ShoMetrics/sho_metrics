@@ -20,7 +20,8 @@ import {
     type DualTextMetricContent,
 } from "../widgets/primitives/text-metric";
 import { renderTitleCardDualTextMetric } from "../widgets/primitives/title-card-text-metric";
-import { buildTitleCardDualMetricContent } from "./title-card-text-content";
+import { buildTitleCardDualMetricContent } from "./text-content/title-card-text-content";
+import { formatCompactDataRateUnitText } from "./text-content/render-unit-text";
 import type {
     SparklineGridLineType,
     SparklineGridLineVisibility,
@@ -110,11 +111,11 @@ function renderDualTextMetricView(options: DualMetricBodyViewProps): string {
         titleText: options.titleText,
         positive: {
             labelText: options.positive.labelText,
-            unitText: options.positive.unitText,
+            unitText: formatCompactDataRateUnitText(options.positive.unitText),
         },
         negative: {
             labelText: options.negative.labelText,
-            unitText: options.negative.unitText,
+            unitText: formatCompactDataRateUnitText(options.negative.unitText),
         },
     };
 

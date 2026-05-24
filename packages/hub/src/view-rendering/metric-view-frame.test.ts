@@ -94,6 +94,25 @@ test("single widget with data keeps the original render data", () => {
     assert.equal(renderWidgetData, widgetData);
 });
 
+test("single widget render data formats temperature units for renderers", () => {
+    const widgetData = buildWidgetData({
+        unit: "C",
+        barUnit: "F",
+        sampleTimestampMilliseconds: 1000,
+    });
+    const renderWidgetData = buildRenderWidgetData({
+        widgetData,
+        hasData: true,
+        shouldRenderMutedIconPlaceholder: false,
+    });
+
+    assert.notEqual(renderWidgetData, widgetData);
+    assert.equal(widgetData.unit, "C");
+    assert.equal(widgetData.barUnit, "F");
+    assert.equal(renderWidgetData.unit, "°C");
+    assert.equal(renderWidgetData.barUnit, "°F");
+});
+
 test("placeholder rendering does not overwrite metric display values when data is present", () => {
     const widgetData = buildWidgetData({
         current: 1,
@@ -126,15 +145,27 @@ test("dual-channel widget without any data renders both channels as N/A", () => 
     assert.deepEqual(renderWidgetData.negative.history, []);
 });
 
-test("dual text view does not render caller unit text for unavailable channels", () => {
+test("dual-channel render data formats temperature units for renderers", () => {
+    const dualWidgetData = buildDualChannelWidgetData({
+        positive: buildWidgetData({ unit: "C", sampleTimestampMilliseconds: 1000 }),
+        negative: buildWidgetData({ unit: "F", sampleTimestampMilliseconds: 1000 }),
+    });
+    const renderWidgetData = buildRenderDualChannelWidgetData({
+        widgetData: dualWidgetData,
+        hasData: true,
+    });
+
+    assert.equal(renderWidgetData.positive.unit, "°C");
+    assert.equal(renderWidgetData.negative.unit, "°F");
+});
+
+test("dual text view does not render unit text for unavailable channels", () => {
     const frame = composeMetricViewFrame({
         viewOptions: buildDualMetricRenderOptions({
             widgetData: buildDualChannelWidgetData({
                 positive: buildWidgetData({ label: "UP", unit: "MB/s" }),
                 negative: buildWidgetData({ label: "DOWN", unit: "MB/s" }),
             }),
-            positiveUnitText: "M",
-            negativeUnitText: "M",
         }),
         renderTarget: "key",
     });
@@ -288,8 +319,6 @@ function buildSingleMetricRenderOptions(options: {
 
 function buildDualMetricRenderOptions(options: {
     widgetData: DualChannelWidgetData;
-    positiveUnitText?: string;
-    negativeUnitText?: string;
 }): DualMetricRenderOptions {
     return {
         centerIconFragment: "",
@@ -301,8 +330,6 @@ function buildDualMetricRenderOptions(options: {
         negativeColor: "#ffffff",
         positiveLabelText: "UP",
         negativeLabelText: "DN",
-        positiveUnitText: options.positiveUnitText,
-        negativeUnitText: options.negativeUnitText,
         resolvedSettings: buildDefaultAppearanceSettings({
             view: { selectedView: "text" },
         }),
@@ -322,6 +349,7 @@ function buildWidgetData(options: Partial<WidgetData> = {}): WidgetData {
         progress: options.progress ?? 0,
         history: options.history ?? [],
         unit: options.unit ?? "%",
+        barUnit: options.barUnit,
         label: options.label ?? "CPU",
         displayValue: options.displayValue,
         sampleTimestampMilliseconds: options.sampleTimestampMilliseconds,

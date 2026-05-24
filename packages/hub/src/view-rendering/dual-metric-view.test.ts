@@ -73,6 +73,30 @@ test("dual metric view dispatches text variants to centered and title-card rende
     assert.doesNotMatch(titleCardSvg, /text-metric-positive-value/);
 });
 
+test("dual text metric compacts data-rate units in the view layer", () => {
+    const svg = renderDualMetricBodyView({
+        data: buildDualChannelData(),
+        visual: {
+            ...buildMetricRenderAppearance(),
+            textVariant: "centered",
+        },
+        renderPrimitive: "text",
+        renderSize: { width: 200, height: 100 },
+        titleText: "NET",
+        chartMode: "overlay",
+        centerContent: "value",
+        circleVariant: "full-ring",
+        topIcon: "",
+        positive: { labelText: "UP", unitText: "MB/s", color: "#3b82f6" },
+        negative: { labelText: "DN", unitText: "KB/s", color: "#ef4444" },
+    });
+
+    assert.match(svg, />M<\/text>/);
+    assert.match(svg, />K<\/text>/);
+    assert.doesNotMatch(svg, />MB\/s<\/text>/);
+    assert.doesNotMatch(svg, />KB\/s<\/text>/);
+});
+
 function buildMetricRenderAppearance(): MetricRenderAppearance {
     return {
         renderPrimitive: "circle",
