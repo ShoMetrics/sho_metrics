@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import type { ResvgRenderOptions } from "@resvg/resvg-js";
+import { JAPANESE_SERIF_RENDER_FONT_FAMILY } from "./render-text-style";
 
 export type FontScript = "han" | "kana" | "hangul" | "symbol";
 export type BundledFontFamily = "share-tech-mono";
@@ -27,6 +28,19 @@ const HIRAGANA_SCRIPT_PATTERN = /\p{Script_Extensions=Hiragana}/u;
 const KATAKANA_SCRIPT_PATTERN = /\p{Script_Extensions=Katakana}/u;
 const HANGUL_SCRIPT_PATTERN = /\p{Script_Extensions=Hangul}/u;
 const SYMBOL_FALLBACK_PATTERN = /[\u00b0\u03bc\u03a9\u2190-\u21ff\u2200-\u22ff]/u;
+const JAPANESE_SERIF_FONT_FAMILY_PATTERN = new RegExp([
+    "Yu\\s*Mincho",
+    "Hiragino Mincho",
+    "Noto Serif(?: CJK)? JP",
+    "Source Han Serif(?: JP)?",
+    "IPAexMincho",
+    "IPAMincho",
+    "BIZ UDP?Mincho",
+    "MS P?Mincho",
+    "Songti SC",
+    "SimSun",
+    "MingLiU",
+].join("|"), "iu");
 
 /**
  * Builds resvg font options without system-wide font loading.
@@ -43,10 +57,12 @@ export function resolveResvgFontOptions(
 ): NonNullable<ResvgRenderOptions["font"]> {
     const scriptList = detectFontScriptsFromSvg(svgString);
     const bundledFontFamilyList = detectBundledFontFamiliesFromSvg(svgString);
+    const usesJapaneseSerifFontFamily = usesJapaneseSerifRenderFontFamily(svgString);
     const cacheKey = [
         environment.platform,
         environment.bundledInterFontFile ?? "",
         environment.bundledShareTechMonoFontFile ?? "",
+        usesJapaneseSerifFontFamily ? "japanese-serif" : "",
         ...bundledFontFamilyList,
         ...scriptList,
     ].join("|");
@@ -56,7 +72,7 @@ export function resolveResvgFontOptions(
         return cachedFontOptions;
     }
 
-    const fontFiles = resolveFontFiles(scriptList, bundledFontFamilyList, environment);
+    const fontFiles = resolveFontFiles(scriptList, bundledFontFamilyList, usesJapaneseSerifFontFamily, environment);
     const fontOptions: NonNullable<ResvgRenderOptions["font"]> = {
         loadSystemFonts: false,
         fontFiles: [...fontFiles],
@@ -101,6 +117,11 @@ export function detectBundledFontFamiliesFromSvg(svgString: string): readonly Bu
     return bundledFontFamilyList;
 }
 
+export function usesJapaneseSerifRenderFontFamily(svgString: string): boolean {
+    return svgString.includes(JAPANESE_SERIF_RENDER_FONT_FAMILY)
+        || JAPANESE_SERIF_FONT_FAMILY_PATTERN.test(svgString);
+}
+
 export function clearResvgFontOptionsCacheForTests(): void {
     fontFileCacheByKey.clear();
     fontOptionsCacheByKey.clear();
@@ -122,12 +143,14 @@ export function extractVisibleSvgText(svgString: string): string {
 function resolveFontFiles(
     scriptList: readonly FontScript[],
     bundledFontFamilyList: readonly BundledFontFamily[],
+    usesJapaneseSerifFontFamily: boolean,
     environment: ResvgFontResolverEnvironment,
 ): readonly string[] {
     const cacheKey = [
         environment.platform,
         environment.bundledInterFontFile ?? "",
         environment.bundledShareTechMonoFontFile ?? "",
+        usesJapaneseSerifFontFamily ? "japanese-serif" : "",
         ...bundledFontFamilyList,
         ...scriptList,
     ].join("|");
@@ -137,10 +160,17 @@ function resolveFontFiles(
         return cachedFontFiles;
     }
 
+    const japaneseSerifFontFiles = usesJapaneseSerifFontFamily
+        ? resolveJapaneseSerifFontFiles(environment)
+        : [];
+    const scriptFontList = japaneseSerifFontFiles.length > 0
+        ? scriptList.filter(fontScript => fontScript !== "han" && fontScript !== "kana")
+        : scriptList;
     const fontFiles = Array.from(new Set([
         ...bundledFontFamilyList.flatMap(fontFamily => resolveBundledFontFileCandidates(fontFamily, environment)),
         ...resolvePrimaryFontFileCandidates(environment),
-        ...scriptList.flatMap(fontScript => resolveFontFileCandidatesForScript(fontScript, environment.platform)),
+        ...japaneseSerifFontFiles,
+        ...scriptFontList.flatMap(fontScript => resolveFontFileCandidatesForScript(fontScript, environment.platform)),
     ])).filter(fontFile => environment.fileExists(fontFile));
 
     fontFileCacheByKey.set(cacheKey, fontFiles);
@@ -195,11 +225,25 @@ function resolveHanFontFileCandidates(platform: NodeJS.Platform): readonly strin
             return [
                 "C:\\Windows\\Fonts\\msyh.ttc",
                 "C:\\Windows\\Fonts\\msyhbd.ttc",
+                "C:\\Windows\\Fonts\\simsun.ttc",
+                "C:\\Windows\\Fonts\\mingliu.ttc",
             ];
         case "darwin":
             return [
                 "/System/Library/Fonts/PingFang.ttc",
+                "/System/Library/Fonts/Supplemental/Songti.ttc",
                 "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+            ];
+        case "linux":
+            return [
+                "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+                "/usr/share/fonts/opentype/noto/NotoSansCJKjp-Regular.otf",
+                "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+                "/usr/share/fonts/opentype/source-han-sans/SourceHanSans-Regular.ttc",
+                "/usr/share/fonts/opentype/source-han-sans/SourceHanSansJP-Regular.otf",
+                "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+                "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+                "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
             ];
         default:
             return [];
@@ -212,12 +256,88 @@ function resolveKanaFontFileCandidates(platform: NodeJS.Platform): readonly stri
             return [
                 "C:\\Windows\\Fonts\\meiryo.ttc",
                 "C:\\Windows\\Fonts\\meiryob.ttc",
+                "C:\\Windows\\Fonts\\msgothic.ttc",
             ];
         case "darwin":
             return [
                 "/System/Library/Fonts/\u30d2\u30e9\u30ae\u30ce\u89d2\u30b4\u30b7\u30c3\u30af W3.ttc",
                 "/System/Library/Fonts/\u30d2\u30e9\u30ae\u30ce\u89d2\u30b4\u30b7\u30c3\u30af W6.ttc",
                 "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+            ];
+        case "linux":
+            return [
+                "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+                "/usr/share/fonts/opentype/noto/NotoSansCJKjp-Regular.otf",
+                "/usr/share/fonts/opentype/ipaexfont-gothic/ipaexg.ttf",
+                "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf",
+            ];
+        default:
+            return [];
+    }
+}
+
+function resolveJapaneseSerifFontFiles(environment: ResvgFontResolverEnvironment): readonly string[] {
+    const preferredFontFiles = resolveJapaneseSerifPreferredFontFileCandidates(environment.platform)
+        .filter(fontFile => environment.fileExists(fontFile));
+
+    if (preferredFontFiles.length > 0) {
+        return preferredFontFiles;
+    }
+
+    return resolveJapaneseSerifFallbackFontFileCandidates(environment.platform)
+        .filter(fontFile => environment.fileExists(fontFile));
+}
+
+function resolveJapaneseSerifPreferredFontFileCandidates(platform: NodeJS.Platform): readonly string[] {
+    switch (platform) {
+        case "win32":
+            return [
+                "C:\\Windows\\Fonts\\yuminl.ttf",
+                "C:\\Windows\\Fonts\\yumin.ttf",
+                "C:\\Windows\\Fonts\\yumindb.ttf",
+                "C:\\Windows\\Fonts\\BIZ-UDMinchoM.ttc",
+                "C:\\Windows\\Fonts\\msmincho.ttc",
+            ];
+        case "darwin":
+            return [
+                "/System/Library/Fonts/\u30d2\u30e9\u30ae\u30ce\u660e\u671d ProN.ttc",
+                "/System/Library/Fonts/Supplemental/\u30d2\u30e9\u30ae\u30ce\u660e\u671d ProN.ttc",
+                "/System/Library/Fonts/Supplemental/\u30d2\u30e9\u30ae\u30ce\u660e\u671d Pro.ttc",
+            ];
+        case "linux":
+            return [
+                "/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc",
+                "/usr/share/fonts/opentype/noto/NotoSerifCJK-Bold.ttc",
+                "/usr/share/fonts/opentype/noto/NotoSerifCJKjp-Regular.otf",
+                "/usr/share/fonts/opentype/noto/NotoSerifCJKjp-Bold.otf",
+                "/usr/share/fonts/truetype/noto/NotoSerifCJK-Regular.ttc",
+                "/usr/share/fonts/opentype/source-han-serif/SourceHanSerif-Regular.ttc",
+                "/usr/share/fonts/opentype/source-han-serif/SourceHanSerifJP-Regular.otf",
+                "/usr/share/fonts/opentype/ipaexfont-mincho/ipaexm.ttf",
+                "/usr/share/fonts/opentype/ipafont-mincho/ipam.ttf",
+                "/usr/share/fonts/truetype/fonts-japanese-mincho.ttf",
+            ];
+        default:
+            return [];
+    }
+}
+
+function resolveJapaneseSerifFallbackFontFileCandidates(platform: NodeJS.Platform): readonly string[] {
+    switch (platform) {
+        case "win32":
+            return [
+                "C:\\Windows\\Fonts\\simsun.ttc",
+                "C:\\Windows\\Fonts\\mingliu.ttc",
+            ];
+        case "darwin":
+            return [
+                "/System/Library/Fonts/Supplemental/Songti.ttc",
+                "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+            ];
+        case "linux":
+            return [
+                "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+                "/usr/share/fonts/opentype/noto/NotoSansCJKjp-Regular.otf",
             ];
         default:
             return [];
@@ -237,6 +357,13 @@ function resolveHangulFontFileCandidates(platform: NodeJS.Platform): readonly st
                 "/System/Library/Fonts/Supplemental/AppleGothic.ttf",
                 "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
             ];
+        case "linux":
+            return [
+                "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+                "/usr/share/fonts/opentype/noto/NotoSansCJKkr-Regular.otf",
+                "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+                "/usr/share/fonts/truetype/unfonts-core/UnDotum.ttf",
+            ];
         default:
             return [];
     }
@@ -252,6 +379,12 @@ function resolveSymbolFontFileCandidates(platform: NodeJS.Platform): readonly st
             return [
                 "/System/Library/Fonts/Apple Symbols.ttf",
                 "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+            ];
+        case "linux":
+            return [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                "/usr/share/fonts/truetype/noto/NotoSansSymbols-Regular.ttf",
+                "/usr/share/fonts/truetype/noto/NotoSansSymbols2-Regular.ttf",
             ];
         default:
             return [];

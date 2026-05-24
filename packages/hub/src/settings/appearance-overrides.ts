@@ -24,6 +24,7 @@ export interface ResolvedAppearanceSettingsOverride {
 export interface ResolvedAppearanceViewSettingsOverride {
     readonly selectedView?: ResolvedAppearanceViewSettings["selectedView"] | undefined;
     readonly circleVariant?: ResolvedAppearanceViewSettings["circleVariant"] | undefined;
+    readonly textVariant?: ResolvedAppearanceViewSettings["textVariant"] | undefined;
 }
 
 export interface ResolvedAppearanceThemeSettingsOverride {

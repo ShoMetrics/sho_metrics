@@ -6,14 +6,20 @@ import {
     detectFontScriptsFromSvg,
     extractVisibleSvgText,
     resolveResvgFontOptions,
+    usesJapaneseSerifRenderFontFamily,
     type ResvgFontResolverEnvironment,
 } from "./resvg-font-options";
+import { JAPANESE_SERIF_RENDER_FONT_FAMILY } from "./render-text-style";
 
 const BUNDLED_INTER_FONT_FILE = "C:\\Plugin\\assets\\fonts\\inter\\InterVariable.ttf";
 const BUNDLED_SHARE_TECH_MONO_FONT_FILE = "C:\\Plugin\\assets\\fonts\\share-tech-mono\\ShareTechMono-Regular.ttf";
 const MACOS_HELVETICA_NEUE_FONT_FILE = "/System/Library/Fonts/HelveticaNeue.ttc";
+const MACOS_HIRAGINO_MINCHO_FONT_FILE = "/System/Library/Fonts/\u30d2\u30e9\u30ae\u30ce\u660e\u671d ProN.ttc";
+const WINDOWS_YU_MINCHO_FONT_FILE = "C:\\Windows\\Fonts\\yumin.ttf";
+const LINUX_NOTO_SERIF_CJK_FONT_FILE = "/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc";
+const LINUX_NOTO_SANS_CJK_FONT_FILE = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc";
 
-// Keep these tests hermetic. They simulate Windows/macOS font availability
+// Keep these tests hermetic. They simulate platform font availability
 // instead of reading real OS font files, whose presence and load cost vary by machine.
 beforeEach(() => {
     clearResvgFontOptionsCacheForTests();
@@ -31,6 +37,14 @@ test("bundled font family detection finds terminal font-family usage", () => {
     ].join("");
 
     assert.deepEqual(detectBundledFontFamiliesFromSvg(svgString), ["share-tech-mono"]);
+});
+
+test("Japanese serif font family detection finds serif family usage", () => {
+    assert.equal(
+        usesJapaneseSerifRenderFontFamily(buildTextSvgWithFontFamily("温度計", JAPANESE_SERIF_RENDER_FONT_FAMILY)),
+        true,
+    );
+    assert.equal(usesJapaneseSerifRenderFontFamily(buildTextSvgWithFontFamily("CPU", "Inter")), false);
 });
 
 test("font script detection detects Han Kana Hangul and symbols from visible text", () => {
@@ -130,6 +144,90 @@ test("font options add only detected Windows CJK fallback font files", () => {
     ]);
 });
 
+test("font options load Japanese serif candidates only when requested", () => {
+    const titleCardFontOptions = resolveResvgFontOptions(
+        buildTextSvgWithFontFamily("温度計", JAPANESE_SERIF_RENDER_FONT_FAMILY),
+        buildEnvironment({
+            platform: "win32",
+            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            existingFontFiles: [
+                BUNDLED_INTER_FONT_FILE,
+                "C:\\Windows\\Fonts\\seguisym.ttf",
+                WINDOWS_YU_MINCHO_FONT_FILE,
+                "C:\\Windows\\Fonts\\msyh.ttc",
+            ],
+        }),
+    );
+    clearResvgFontOptionsCacheForTests();
+    const plainCjkFontOptions = resolveResvgFontOptions(
+        buildTextSvg("温度計"),
+        buildEnvironment({
+            platform: "win32",
+            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            existingFontFiles: [
+                BUNDLED_INTER_FONT_FILE,
+                "C:\\Windows\\Fonts\\seguisym.ttf",
+                WINDOWS_YU_MINCHO_FONT_FILE,
+                "C:\\Windows\\Fonts\\msyh.ttc",
+            ],
+        }),
+    );
+
+    assert.deepEqual(titleCardFontOptions.fontFiles, [
+        BUNDLED_INTER_FONT_FILE,
+        "C:\\Windows\\Fonts\\seguisym.ttf",
+        WINDOWS_YU_MINCHO_FONT_FILE,
+    ]);
+    assert.deepEqual(plainCjkFontOptions.fontFiles, [
+        BUNDLED_INTER_FONT_FILE,
+        "C:\\Windows\\Fonts\\seguisym.ttf",
+        "C:\\Windows\\Fonts\\msyh.ttc",
+    ]);
+});
+
+test("font options load Japanese serif candidates on macOS", () => {
+    const fontOptions = resolveResvgFontOptions(
+        buildTextSvgWithFontFamily("温度計", JAPANESE_SERIF_RENDER_FONT_FAMILY),
+        buildEnvironment({
+            platform: "darwin",
+            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            existingFontFiles: [
+                MACOS_HELVETICA_NEUE_FONT_FILE,
+                BUNDLED_INTER_FONT_FILE,
+                MACOS_HIRAGINO_MINCHO_FONT_FILE,
+                "/System/Library/Fonts/PingFang.ttc",
+            ],
+        }),
+    );
+
+    assert.deepEqual(fontOptions.fontFiles, [
+        MACOS_HELVETICA_NEUE_FONT_FILE,
+        BUNDLED_INTER_FONT_FILE,
+        MACOS_HIRAGINO_MINCHO_FONT_FILE,
+    ]);
+});
+
+test("font options use broad Japanese serif fallback when preferred fonts are missing", () => {
+    const fontOptions = resolveResvgFontOptions(
+        buildTextSvgWithFontFamily("温度計", JAPANESE_SERIF_RENDER_FONT_FAMILY),
+        buildEnvironment({
+            platform: "win32",
+            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            existingFontFiles: [
+                BUNDLED_INTER_FONT_FILE,
+                "C:\\Windows\\Fonts\\seguisym.ttf",
+                "C:\\Windows\\Fonts\\simsun.ttc",
+            ],
+        }),
+    );
+
+    assert.deepEqual(fontOptions.fontFiles, [
+        BUNDLED_INTER_FONT_FILE,
+        "C:\\Windows\\Fonts\\seguisym.ttf",
+        "C:\\Windows\\Fonts\\simsun.ttc",
+    ]);
+});
+
 test("font options degrade safely when Windows CJK fallback font files are missing", () => {
     const fontOptions = resolveResvgFontOptions(
         buildTextSvg("&#32593;&#32476;&#19979;&#36733;"),
@@ -146,6 +244,45 @@ test("font options degrade safely when Windows CJK fallback font files are missi
     assert.deepEqual(fontOptions.fontFiles, [
         BUNDLED_INTER_FONT_FILE,
         "C:\\Windows\\Fonts\\seguisym.ttf",
+    ]);
+});
+
+test("font options load Linux CJK fallback fonts when visible text needs them", () => {
+    const fontOptions = resolveResvgFontOptions(
+        buildTextSvg("温度計"),
+        buildEnvironment({
+            platform: "linux",
+            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            existingFontFiles: [
+                BUNDLED_INTER_FONT_FILE,
+                LINUX_NOTO_SANS_CJK_FONT_FILE,
+            ],
+        }),
+    );
+
+    assert.deepEqual(fontOptions.fontFiles, [
+        BUNDLED_INTER_FONT_FILE,
+        LINUX_NOTO_SANS_CJK_FONT_FILE,
+    ]);
+});
+
+test("font options load Linux Japanese serif before plain CJK fallback fonts", () => {
+    const fontOptions = resolveResvgFontOptions(
+        buildTextSvgWithFontFamily("温度計", JAPANESE_SERIF_RENDER_FONT_FAMILY),
+        buildEnvironment({
+            platform: "linux",
+            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            existingFontFiles: [
+                BUNDLED_INTER_FONT_FILE,
+                LINUX_NOTO_SERIF_CJK_FONT_FILE,
+                LINUX_NOTO_SANS_CJK_FONT_FILE,
+            ],
+        }),
+    );
+
+    assert.deepEqual(fontOptions.fontFiles, [
+        BUNDLED_INTER_FONT_FILE,
+        LINUX_NOTO_SERIF_CJK_FONT_FILE,
     ]);
 });
 

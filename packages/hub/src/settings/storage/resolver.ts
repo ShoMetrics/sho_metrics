@@ -14,6 +14,7 @@ import {
     NetworkMetricTarget_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
     TerminalPalettePreset as StoredTerminalPalettePreset,
     TerminalThemeVariant as StoredTerminalThemeVariant,
+    TextViewVariant as StoredTextViewVariant,
     ScaleMode as StoredScaleMode,
     MetricView as StoredMetricView,
     LineAppearanceSettings_GridLineType as StoredGridLineType,
@@ -66,6 +67,7 @@ import type {
     NetworkUnitBase,
     TerminalPalettePreset,
     TerminalThemeVariant,
+    TextViewVariant,
     ResolvedAppearanceSettings,
     ResolvedCatalogMetricTarget,
     ResolvedAppearanceThemeSettings,
@@ -189,6 +191,12 @@ const circleViewVariantByProto = {
     [StoredCircleViewVariant.MINIMAL]: "minimal",
     [StoredCircleViewVariant.GAUGE]: "gauge",
 } satisfies Record<StoredCircleViewVariant, CircleViewVariant | undefined>;
+
+const textViewVariantByProto = {
+    [StoredTextViewVariant.UNSPECIFIED]: undefined,
+    [StoredTextViewVariant.CENTERED]: "centered",
+    [StoredTextViewVariant.TITLE_CARD]: "title-card",
+} satisfies Record<StoredTextViewVariant, TextViewVariant | undefined>;
 
 const metricThemeByProto = {
     [StoredMetricTheme.UNSPECIFIED]: undefined,
@@ -857,6 +865,11 @@ function resolveAppearanceViewSettings(
             storedView?.circleVariant,
             circleViewVariantByProto,
             defaults.circleVariant,
+        ),
+        textVariant: resolveStoredEnum(
+            storedView?.textVariant,
+            textViewVariantByProto,
+            defaults.textVariant,
         ),
     };
 }

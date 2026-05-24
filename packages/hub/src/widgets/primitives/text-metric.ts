@@ -14,8 +14,10 @@ import {
     renderConstrainedSvgText,
 } from "../../view-rendering/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget-contract";
+import { renderTitleCardDualTextMetric, renderTitleCardTextMetric } from "./title-card-text-metric";
 
 export interface TextMetricConfig extends WidgetBaseConfig {
+    textVariant: TextMetricVariant;
     labelTextColor: string;
     valueTextColor: string;
     unitTextColor: string;
@@ -24,6 +26,33 @@ export interface TextMetricConfig extends WidgetBaseConfig {
     themeEffects: RenderThemeEffectTokens;
     positiveColor?: string;
     negativeColor?: string;
+}
+
+export type TextMetricVariant = "centered" | "title-card";
+
+export interface TextMetricContent {
+    readonly titleCard: TitleCardSingleMetricContent;
+}
+
+export interface TitleCardSingleMetricContent {
+    readonly codeText: string;
+    /** At most three display characters; used by the wide title-card code row. */
+    readonly compactCodeText: string;
+    /** Exactly three display characters; the title-card layout renders one caption row per character. */
+    readonly threeCharacterCaptionText: string;
+    readonly unitText: string;
+}
+
+export interface TitleCardDualMetricContent {
+    readonly codeText: string;
+    /** At most three display characters; used by the wide title-card code row. */
+    readonly compactCodeText: string;
+    /** Exactly three display characters; the title-card layout renders one caption row per character. */
+    readonly threeCharacterCaptionText: string;
+    readonly positiveLabelText: string;
+    readonly positiveUnitText: string;
+    readonly negativeLabelText: string;
+    readonly negativeUnitText: string;
 }
 
 export interface DualTextMetricChannelContent {
@@ -35,10 +64,13 @@ export interface DualTextMetricContent {
     readonly titleText: string;
     readonly positive: DualTextMetricChannelContent;
     readonly negative: DualTextMetricChannelContent;
+    /** Required when the text variant is title-card. */
+    readonly titleCard?: TitleCardDualMetricContent | undefined;
 }
 
 export const DEFAULT_TEXT_METRIC_CONFIG: TextMetricConfig = {
     colorConfig: { mode: "solid", solidColor: "#e6e6e6", thresholds: [], isGradientEnabled: false },
+    textVariant: "centered",
     labelTextColor: "rgba(255,255,255,0.70)",
     valueTextColor: "white",
     unitTextColor: "rgba(255,255,255,0.74)",
@@ -112,13 +144,28 @@ export const textMetric: Widget<TextMetricConfig> = {
     widgetId: "text-metric",
 
     render(data: WidgetData, config: TextMetricConfig, keySize: KeySize): string {
-        if (isWideKeySize(keySize)) {
-            return renderWideTextMetric(data, config, keySize);
-        }
-
-        return renderSquareTextMetric(data, config, keySize);
+        return renderTextMetric(data, config, keySize);
     },
 };
+
+export function renderTextMetric(
+    data: WidgetData,
+    config: TextMetricConfig,
+    keySize: KeySize,
+    content?: TextMetricContent,
+): string {
+    if (config.textVariant === "title-card") {
+        const titleCardContent = content?.titleCard ?? buildFallbackTextMetricContent(data).titleCard;
+
+        return renderTitleCardTextMetric(data, config, keySize, titleCardContent);
+    }
+
+    if (isWideKeySize(keySize)) {
+        return renderWideTextMetric(data, config, keySize);
+    }
+
+    return renderSquareTextMetric(data, config, keySize);
+}
 
 export function renderDualTextMetric(
     data: DualChannelWidgetData,
@@ -126,11 +173,49 @@ export function renderDualTextMetric(
     keySize: KeySize,
     content: DualTextMetricContent,
 ): string {
+    if (config.textVariant === "title-card") {
+        if (content.titleCard === undefined) {
+            throw new Error("Title-card dual text metric content is required for the title-card text variant.");
+        }
+
+        return renderTitleCardDualTextMetric(
+            data,
+            config,
+            keySize,
+            content.titleCard,
+        );
+    }
+
     if (isWideKeySize(keySize)) {
         return renderWideDualTextMetric(data, config, keySize, content);
     }
 
     return renderSquareDualTextMetric(data, config, keySize, content);
+}
+
+function buildFallbackTextMetricContent(data: WidgetData): TextMetricContent {
+    return {
+        titleCard: {
+            codeText: normalizeTitleCardFallbackText(data.label),
+            compactCodeText: buildFallbackCompactCodeText(data.label),
+            threeCharacterCaptionText: buildFallbackThreeCharacterCaptionText(data.label),
+            unitText: data.unit,
+        },
+    };
+}
+
+function buildFallbackCompactCodeText(text: string): string {
+    return Array.from(normalizeTitleCardFallbackText(text)).slice(0, 3).join("");
+}
+
+function buildFallbackThreeCharacterCaptionText(text: string): string {
+    return Array.from(normalizeTitleCardFallbackText(text).padEnd(3, " ")).slice(0, 3).join("");
+}
+
+function normalizeTitleCardFallbackText(text: string): string {
+    const normalizedText = text.trim().toUpperCase().replace(/\s+/gu, "");
+
+    return normalizedText.length === 0 ? "SYS" : normalizedText;
 }
 
 function renderSquareTextMetric(data: WidgetData, config: TextMetricConfig, keySize: KeySize): string {

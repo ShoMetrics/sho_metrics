@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { MetricTheme, ResolvedGlobalSettings } from "../../settings/resolved-settings";
+import type { MetricTheme, MetricView, ResolvedGlobalSettings } from "../../settings/resolved-settings";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
 import { DEFAULT_APPEARANCE_SETTINGS } from "../../settings/default-appearance-settings";
 import { GlobalSettingsTab } from "./GlobalSettingsTab";
@@ -53,7 +53,20 @@ test("global override renders terminal palette controls for terminal theme", () 
     assert.doesNotMatch(markup, /Color Mode:/);
 });
 
-function buildGlobalSettings(selectedTheme: MetricTheme = "flat"): ResolvedGlobalSettings {
+test("global override renders text view variant controls for text view", () => {
+    const markup = renderToStaticMarkup(createElement(GlobalSettingsTab, {
+        resolvedSettings: buildGlobalSettings("flat", "text"),
+        colorCompensationProfile: DEFAULT_COLOR_COMPENSATION_PROFILE,
+        onSettingsPatch: () => undefined,
+        onOpenColorCompensation: () => undefined,
+    }));
+
+    assert.match(markup, /View Variant:/);
+    assert.match(markup, /Centered/);
+    assert.match(markup, /Title Card/);
+});
+
+function buildGlobalSettings(selectedTheme: MetricTheme = "flat", selectedView: MetricView = "circle"): ResolvedGlobalSettings {
     return {
         defaults: {
             network: {
@@ -71,8 +84,9 @@ function buildGlobalSettings(selectedTheme: MetricTheme = "flat"): ResolvedGloba
         globalOverrideEnabled: true,
         viewOverride: {
             view: {
-                selectedView: "circle",
+                selectedView,
                 circleVariant: "full-ring",
+                textVariant: "centered",
             },
         },
         themeOverride: {

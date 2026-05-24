@@ -6,6 +6,7 @@ import {
     MetricTheme as StoredMetricTheme,
     TerminalPalettePreset as StoredTerminalPalettePreset,
     TerminalThemeVariant as StoredTerminalThemeVariant,
+    TextViewVariant as StoredTextViewVariant,
 } from "../../generated/shometrics/v1/settings_pb";
 import { readStoredWidgetSettings } from "./codec";
 import { resolveQuickStartStoredWidgetSettings } from "./quick-start-widget-settings";
@@ -83,6 +84,22 @@ test("widget patch writes terminal theme", () => {
 
     const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
     assert.equal(appearance?.theme?.selectedTheme, StoredMetricTheme.TERMINAL);
+});
+
+test("widget patch writes text view variant", () => {
+    const cpuSettings = resolveQuickStartStoredWidgetSettings(undefined, "cpu").rawSettings;
+
+    const nextSettings = writeStoredWidgetSettingsPatch(cpuSettings, {
+        appearance: {
+            view: {
+                selectedView: "text",
+                textVariant: "title-card",
+            },
+        },
+    });
+
+    const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
+    assert.equal(appearance?.view?.textVariant, StoredTextViewVariant.TITLE_CARD);
 });
 
 test("widget patch writes terminal variant", () => {

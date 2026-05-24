@@ -5,9 +5,10 @@ import {
     buildMetricViewPreviewUri,
     buildMetricThemePreviewUri,
     buildTerminalVariantPreviewUri,
+    buildTextVariantPreviewUri,
     type MetricPreviewInput,
 } from "./metric-option-preview";
-import type { CircleViewVariant, MetricView } from "../inspector/settings-types";
+import type { CircleViewVariant, MetricView, TextViewVariant } from "../inspector/settings-types";
 import type {
     MetricTheme,
     TerminalThemeVariant,
@@ -38,6 +39,17 @@ test("circle variant preview URIs render every Property Inspector circle variant
 
     for (const circleVariant of circleVariants) {
         const previewUri = buildCircleVariantPreviewUri(circleVariant);
+
+        assert.match(previewUri, /^data:image\/svg\+xml,/);
+        assert.ok(decodeURIComponent(previewUri).includes("<svg"));
+    }
+});
+
+test("text variant preview URIs render every Property Inspector text variant without throwing", () => {
+    const textVariants: readonly TextViewVariant[] = ["centered", "title-card"];
+
+    for (const textVariant of textVariants) {
+        const previewUri = buildTextVariantPreviewUri(textVariant);
 
         assert.match(previewUri, /^data:image\/svg\+xml,/);
         assert.ok(decodeURIComponent(previewUri).includes("<svg"));

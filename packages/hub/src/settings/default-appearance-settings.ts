@@ -86,6 +86,7 @@ export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
     view: {
         selectedView: "circle",
         circleVariant: "full-ring",
+        textVariant: "centered",
     },
     theme: {
         selectedTheme: "flat",

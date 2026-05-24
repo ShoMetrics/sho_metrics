@@ -23,6 +23,26 @@ const MINIMUM_TEXT_STYLE_FONT_SIZE_SCALE = 0.9;
 const MAXIMUM_TEXT_STYLE_FONT_SIZE_SCALE = 1.12;
 const DEFAULT_RENDER_FONT_FAMILY = "'SF Pro Display','Helvetica Neue','Inter','Segoe UI',sans-serif";
 const TERMINAL_FONT_FAMILY = "'Share Tech Mono','SF Pro Display','Helvetica Neue','Inter','Segoe UI',monospace";
+export const JAPANESE_SERIF_RENDER_FONT_FAMILY = [
+    "'Yu Mincho'",
+    "'YuMincho'",
+    "'Hiragino Mincho ProN'",
+    "'Hiragino Mincho Pro'",
+    "'Noto Serif CJK JP'",
+    "'Noto Serif JP'",
+    "'Source Han Serif JP'",
+    "'Source Han Serif'",
+    "'IPAexMincho'",
+    "'IPAMincho'",
+    "'BIZ UDMincho'",
+    "'BIZ UDPMincho'",
+    "'MS Mincho'",
+    "'MS PMincho'",
+    "'Songti SC'",
+    "'SimSun'",
+    "'MingLiU'",
+    "serif",
+].join(",");
 
 export const DEFAULT_RENDER_TEXT_STYLES = {
     value: createRenderTextStyle({

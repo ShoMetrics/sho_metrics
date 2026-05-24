@@ -6,6 +6,7 @@ import {
     MetricTheme as StoredMetricTheme,
     TerminalPalettePreset as StoredTerminalPalettePreset,
     TerminalThemeVariant as StoredTerminalThemeVariant,
+    TextViewVariant as StoredTextViewVariant,
 } from "../../generated/shometrics/v1/settings_pb";
 import { readStoredGlobalSettings } from "./codec";
 import { writeStoredGlobalSettingsPatch } from "./global-settings-patch";
@@ -29,6 +30,7 @@ test("global settings patch writes nested view theme and paint overrides", () =>
         paintOverrideEnabled: true,
         view: {
             selectedView: "bar",
+            textVariant: "title-card",
         },
         theme: {
             selectedTheme: "color-filled",
@@ -51,6 +53,7 @@ test("global settings patch writes nested view theme and paint overrides", () =>
 
     assert.equal(overrides?.view?.enabled, false);
     assert.equal(overrides?.view?.view?.selectedView, StoredMetricView.BAR);
+    assert.equal(overrides?.view?.view?.textVariant, StoredTextViewVariant.TITLE_CARD);
     assert.equal(overrides?.theme?.enabled, true);
     assert.equal(overrides?.theme?.theme?.selectedTheme, StoredMetricTheme.COLOR_FILLED);
     assert.equal(overrides?.theme?.theme?.terminal?.variant, StoredTerminalThemeVariant.VINTAGE);
