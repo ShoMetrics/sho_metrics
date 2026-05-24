@@ -1,0 +1,135 @@
+{{ define "main" }}
+<section class="home-hero">
+  <h1>See your system<br><span>on every key.</span></h1>
+  <p class="hero-lede">{{ .Description }}</p>
+  <div class="hero-actions" id="start" aria-label="Primary actions">
+    <a class="action-button action-button-primary" href="{{ "install/" | relURL }}">
+      <span class="button-icon">S</span>
+      <span class="button-text">
+        <small>Step 1 - plugin</small>
+        <strong>Install ShoMetrics</strong>
+      </span>
+    </a>
+    <a class="action-button action-button-secondary" href="{{ "download/" | relURL }}">
+      <span class="button-icon">W</span>
+      <span class="button-text">
+        <small>Step 2 - optional, Windows</small>
+        <strong>Download the helper (.msi)</strong>
+      </span>
+    </a>
+  </div>
+  <p class="hero-note">The helper unlocks deeper Windows hardware sensors when you need them.</p>
+</section>
+
+<section class="deck-stage" aria-label="Example Stream Deck metric keys">
+  <div class="stream-deck">
+    <div class="deck-grid">
+      <div class="metric-key key-warm key-ring"><span>CPU</span><strong>42%</strong><i style="--progress: .42"></i></div>
+      <div class="metric-key key-cool key-ring"><span>GPU</span><strong>71%</strong><i style="--progress: .71"></i></div>
+      <div class="metric-key key-dark"><span>Memory</span><strong>12.4G</strong></div>
+      <div class="metric-key key-cool key-spark"><span>Network</span><strong>8.2M</strong>
+        <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,21 11,15 23,18 35,9 47,13 59,5 71,10 83,4 95,12 100,8"/></svg>
+      </div>
+      <div class="metric-key key-warm key-ring"><span>Disk</span><strong>58%</strong><i style="--progress: .58"></i></div>
+      <div class="metric-key key-dark"><span>GPU Temp</span><strong>63 C</strong></div>
+      <div class="metric-key key-warm key-spark"><span>CPU 60s</span><strong>avg 38</strong>
+        <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,23 10,18 20,20 30,12 40,16 50,8 60,14 70,7 80,12 90,5 100,10"/></svg>
+      </div>
+      <div class="metric-key key-dark"><span>VRAM</span><strong>33%</strong></div>
+      <div class="metric-key key-cool key-ring"><span>Power</span><strong>187W</strong><i style="--progress: .64"></i></div>
+      <div class="metric-key key-dark"><span>Disk I/O</span><strong>R + W</strong></div>
+    </div>
+  </div>
+</section>
+
+<section class="sellpoint-section" aria-label="ShoMetrics highlights">
+  <header>
+    <h2>What makes it good.</h2>
+    <p>A short, honest list.</p>
+  </header>
+  <div class="feature-row">
+    <article>
+      <span>VARIANTS</span>
+      <h3>Display styles</h3>
+      <p>Many visual variants, from clean rings and bars to lines and text-first tiles. Pick the look that fits each key.</p>
+    </article>
+    <article>
+      <span>PLATFORMS</span>
+      <h3>Windows &amp; macOS</h3>
+      <p>Use the plugin on both supported Stream Deck desktop platforms.</p>
+    </article>
+    <article>
+      <span>SETUP</span>
+      <h3>Out of the box</h3>
+      <p>Install from Marketplace in one click. The plugin does not need administrator permission by default; the deeper-sensor helper does.</p>
+    </article>
+    <article>
+      <span>PROJECT</span>
+      <h3>Free &amp; open</h3>
+      <p>Free to use, open source, and built in public.</p>
+    </article>
+  </div>
+  <div class="variant-preview" aria-label="Metric display variant previews">
+    <div class="mini-key mini-warm mini-ring"><span>CPU</span><strong>42%</strong></div>
+    <div class="mini-key mini-warm mini-bar"><span>CPU</span><strong>42%</strong><b></b></div>
+    <div class="mini-key mini-warm mini-line"><span>CPU 60s</span><svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,21 11,15 23,18 35,9 47,13 59,5 71,10 83,4 95,12 100,8"/></svg></div>
+    <div class="mini-key mini-warm"><span>CPU</span><strong>42%</strong></div>
+
+    <div class="mini-key mini-cool mini-ring"><span>CPU</span><strong>42%</strong></div>
+    <div class="mini-key mini-cool mini-bar"><span>CPU</span><strong>42%</strong><b></b></div>
+    <div class="mini-key mini-cool mini-line"><span>CPU 60s</span><svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,21 11,15 23,18 35,9 47,13 59,5 71,10 83,4 95,12 100,8"/></svg></div>
+    <div class="mini-key mini-cool"><span>CPU</span><strong>42%</strong></div>
+
+    <div class="mini-key mini-terminal mini-ring"><span>CPU</span><strong>42%</strong></div>
+    <div class="mini-key mini-terminal mini-bar"><span>CPU</span><strong>42%</strong><b></b></div>
+    <div class="mini-key mini-terminal mini-line"><span>CPU 60s</span><svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,21 11,15 23,18 35,9 47,13 59,5 71,10 83,4 95,12 100,8"/></svg></div>
+    <div class="mini-key mini-terminal"><span>CPU</span><strong>42%</strong></div>
+
+    <div class="mini-key mini-paper mini-ring"><span>CPU</span><strong>42%</strong></div>
+    <div class="mini-key mini-paper mini-bar"><span>CPU</span><strong>42%</strong><b></b></div>
+    <div class="mini-key mini-paper mini-line"><span>CPU 60s</span><svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,21 11,15 23,18 35,9 47,13 59,5 71,10 83,4 95,12 100,8"/></svg></div>
+    <div class="mini-key mini-paper"><span>CPU</span><strong>42%</strong></div>
+  </div>
+</section>
+
+<section class="step-grid" aria-label="Setup steps">
+  <article class="step-card">
+    <span class="step-number">01</span>
+    <h2>Install the plugin</h2>
+    <p>Add ShoMetrics to Stream Deck, then find CPU, GPU, Memory, Disk, and Network actions in the Stream Deck app.</p>
+  </article>
+  <article class="step-card">
+    <span class="step-number">02</span>
+    <h2>Drop a metric onto a key</h2>
+    <p>Pick the metric you want visible and let the key update while your system changes.</p>
+  </article>
+  <article class="step-card">
+    <span class="step-number">03</span>
+    <h2>Tune the display</h2>
+    <p>Use the Property Inspector to choose the view, theme, colors, labels, and chart details that fit the key.</p>
+  </article>
+</section>
+
+<section class="home-panel">
+  <div>
+    <p class="section-kicker">Built for Stream Deck</p>
+    <h2>One glance, less dashboard switching.</h2>
+  </div>
+  <div class="home-copy">{{ .Content }}</div>
+</section>
+
+<section class="faq-panel" aria-label="Common questions">
+  <details open>
+    <summary>Which metrics are available?</summary>
+    <p>The plugin currently exposes CPU, GPU, Memory, Disk, and Network actions.</p>
+  </details>
+  <details>
+    <summary>Which systems does the plugin target?</summary>
+    <p>The Stream Deck manifest targets Windows 10 or later and macOS 12 or later.</p>
+  </details>
+  <details>
+    <summary>What is the helper for?</summary>
+    <p>The Windows helper is used when richer hardware data is needed. Download and setup details live on the download page.</p>
+  </details>
+</section>
+{{ end }}

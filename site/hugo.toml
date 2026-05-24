@@ -1,0 +1,20 @@
+baseURL = "/"
+title = "Sho Metrics"
+locale = "en-US"
+defaultContentLanguage = "en"
+relativeURLs = true
+canonifyURLs = false
+disableKinds = ["taxonomy", "term", "RSS"]
+enableRobotsTXT = false
+
+[params]
+description = "A Stream Deck plugin for clear, glanceable system metrics."
+
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = false
+  [markup.tableOfContents]
+    startLevel = 2
+    endLevel = 3
+    ordered = false
