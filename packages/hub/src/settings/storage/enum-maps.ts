@@ -1,6 +1,7 @@
 import {
     CircleViewVariant as StoredCircleViewVariant,
     ColorMode as StoredColorMode,
+    CpuMetricTarget_Kind as StoredCpuMetricKind,
     DiskMetricTarget_Kind as StoredDiskMetricKind,
     DiskMetricTarget_ThroughputDirection as StoredDiskThroughputDirection,
     DiskMetricTarget_UsageDisplayMode as StoredDiskUsageDisplayMode,
@@ -24,6 +25,7 @@ import type {
     ColorMode,
     DiskThroughputDirection,
     DiskUsageDisplayMode,
+    ResolvedCpuReading,
     ResolvedGpuReading,
     GridLineType,
     GridLineVisibility,
@@ -131,6 +133,12 @@ export const storedDiskUsageDisplayModeByResolved = {
     percentage: StoredDiskUsageDisplayMode.PERCENTAGE,
     space: StoredDiskUsageDisplayMode.SPACE,
 } satisfies Record<DiskUsageDisplayMode, StoredDiskUsageDisplayMode>;
+
+export const storedCpuMetricKindByResolved = {
+    usage: StoredCpuMetricKind.USAGE,
+    temperature: StoredCpuMetricKind.TEMPERATURE,
+    power: StoredCpuMetricKind.POWER,
+} satisfies Record<ResolvedCpuReading["kind"], StoredCpuMetricKind>;
 
 export const storedGpuMetricKindByResolved = {
     usage: StoredGpuMetricKind.USAGE,

@@ -83,10 +83,10 @@ export interface ResolvedCpuMetricTarget {
     readonly reading: ResolvedCpuReading;
 }
 
-// Future per-core CPU usage, CPU temperature, frequency, and power readings
-// belong here after CpuMetricTarget in proto gains the matching fields.
 export type ResolvedCpuReading =
-    | { readonly kind: "usage" };
+    | { readonly kind: "usage" }
+    | { readonly kind: "temperature"; readonly maximumCelsius: number; readonly unit: TemperatureUnit }
+    | { readonly kind: "power"; readonly maximumWatts: number };
 
 export interface ResolvedMemoryMetricTarget {
     readonly domain: "memory";

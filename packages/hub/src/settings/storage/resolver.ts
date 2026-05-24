@@ -29,6 +29,7 @@ import {
     type ColorFilledPaintSettings as StoredColorFilledPaintSettings,
     type ColorFilledSolidPaintSettings as StoredColorFilledSolidPaintSettings,
     type CupertinoGlassThemeSettings as StoredCupertinoGlassThemeSettings,
+    type CpuMetricTarget as StoredCpuMetricTarget,
     type DiskMetricTarget as StoredDiskMetricTarget,
     type DiskThroughputDisplaySettings as StoredDiskThroughputDisplaySettings,
     type FlatThemeSettings as StoredFlatThemeSettings,
@@ -167,6 +168,8 @@ const DEFAULT_WIDGET_PREFERENCES: ResolvedWidgetPreferences = {
     pollingFrequencySeconds: 1,
 };
 
+const DEFAULT_CPU_TEMPERATURE_CELSIUS = 100;
+const DEFAULT_CPU_POWER_WATTS = 150;
 const DEFAULT_GPU_TEMPERATURE_CELSIUS = 100;
 const DEFAULT_GPU_POWER_WATTS = 300;
 const DEFAULT_DISK_USAGE_POLLING_FREQUENCY_SECONDS = 60;
@@ -433,7 +436,7 @@ function resolveMetricTarget(
 ): ResolvedMetricTarget {
     switch (storedMetricSelection?.target.case) {
         case "cpu":
-            return resolveCpuMetricTarget(storedMetricSelection.target.value.kind);
+            return resolveCpuMetricTarget(storedMetricSelection.target.value, runtime);
         case "memory":
             return resolveMemoryMetricTarget(storedMetricSelection.target.value.kind);
         case "network":
@@ -445,12 +448,39 @@ function resolveMetricTarget(
         case "catalog":
             return resolveCatalogMetricTarget(storedMetricSelection.target.value);
         case undefined:
-            return resolveCpuMetricTarget(undefined);
+            return resolveCpuMetricTarget(undefined, runtime);
     }
 }
 
-function resolveCpuMetricTarget(kind: StoredCpuMetricKind | undefined): ResolvedMetricTarget {
+function resolveCpuMetricTarget(
+    storedTarget: StoredCpuMetricTarget | undefined,
+    runtime: ResolveStoredSettingsRuntimeContext | undefined,
+): ResolvedMetricTarget {
+    const kind = runtime?.isWindows === false && (
+        storedTarget?.kind === StoredCpuMetricKind.TEMPERATURE
+        || storedTarget?.kind === StoredCpuMetricKind.POWER
+    )
+        ? StoredCpuMetricKind.USAGE
+        : storedTarget?.kind;
+
     switch (kind) {
+        case StoredCpuMetricKind.TEMPERATURE:
+            return {
+                domain: "cpu",
+                reading: {
+                    kind: "temperature",
+                    maximumCelsius: storedTarget?.maximumTemperatureCelsius ?? DEFAULT_CPU_TEMPERATURE_CELSIUS,
+                    unit: resolveStoredEnum(storedTarget?.temperatureUnit, temperatureUnitByProto, "celsius"),
+                },
+            };
+        case StoredCpuMetricKind.POWER:
+            return {
+                domain: "cpu",
+                reading: {
+                    kind: "power",
+                    maximumWatts: storedTarget?.maximumPowerWatts ?? DEFAULT_CPU_POWER_WATTS,
+                },
+            };
         case StoredCpuMetricKind.USAGE:
         case undefined:
             return {

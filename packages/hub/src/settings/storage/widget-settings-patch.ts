@@ -25,6 +25,7 @@ import {
     WidgetPreferencesSchema,
     type AppearanceSettings as StoredAppearanceSettings,
     type ColorFilledPaintSettings as StoredColorFilledPaintSettings,
+    type CpuMetricTarget as StoredCpuMetricTarget,
     type DiskMetricTarget as StoredDiskMetricTarget,
     type GpuMetricTarget as StoredGpuMetricTarget,
     type MetricPaintSettings as StoredMetricPaintSettings,
@@ -43,6 +44,7 @@ import type {
     NetworkDirection,
     NetworkTrafficDisplayMode,
     NetworkUnitBase,
+    ResolvedCpuReading,
     ResolvedGpuReading,
     ScaleMode,
     SourceFailureMode,
@@ -62,6 +64,7 @@ import {
 import {
     storedCircleViewVariantByResolved,
     storedColorModeByResolved,
+    storedCpuMetricKindByResolved,
     storedDiskMetricKindByResolved,
     storedDiskThroughputDirectionByResolved,
     storedDiskUsageDisplayModeByResolved,
@@ -111,6 +114,12 @@ export interface StoredWidgetSettingsPatch {
         readonly maximumReadThroughputMebibytesPerSecond: number | undefined;
         readonly maximumWriteThroughputMebibytesPerSecond: number | undefined;
     }>;
+    readonly cpu?: Partial<{
+        readonly kind: ResolvedCpuReading["kind"];
+        readonly temperatureUnit: TemperatureUnit;
+        readonly maximumTemperatureCelsius: number;
+        readonly maximumPowerWatts: number | undefined;
+    }>;
     readonly gpu?: Partial<{
         readonly kind: ResolvedGpuReading["kind"];
         readonly temperatureUnit: TemperatureUnit;
@@ -152,6 +161,10 @@ function applyPatch(settings: StoredWidgetSettings, patch: StoredWidgetSettingsP
     if (patch.disk) {
         const slot = requireSingleMetricSlot(settings);
         applyDiskPatch(requireDiskTarget(requireMetricSelection(slot)), ensureSlotOverrides(slot), patch.disk);
+    }
+
+    if (patch.cpu) {
+        applyCpuPatch(requireCpuTarget(requireMetricSelection(requireSingleMetricSlot(settings))), patch.cpu);
     }
 
     if (patch.gpu) {
@@ -407,6 +420,22 @@ function applyDiskPatch(
     }
 }
 
+function applyCpuPatch(
+    target: StoredCpuMetricTarget,
+    patch: NonNullable<StoredWidgetSettingsPatch["cpu"]>,
+): void {
+    if (patch.kind !== undefined) {
+        target.kind = storedCpuMetricKindByResolved[patch.kind];
+    }
+    if (patch.temperatureUnit !== undefined) {
+        target.temperatureUnit = storedTemperatureUnitByResolved[patch.temperatureUnit];
+    }
+    applyDefinedValue(target, "maximumTemperatureCelsius", patch.maximumTemperatureCelsius);
+    if ("maximumPowerWatts" in patch) {
+        target.maximumPowerWatts = patch.maximumPowerWatts;
+    }
+}
+
 function applyGpuPatch(
     target: StoredGpuMetricTarget,
     patch: NonNullable<StoredWidgetSettingsPatch["gpu"]>,
@@ -459,6 +488,14 @@ function requireNetworkTarget(metric: StoredMetricSelection): StoredNetworkMetri
 function requireDiskTarget(metric: StoredMetricSelection): StoredDiskMetricTarget {
     if (metric.target.case !== "disk") {
         return throwPatchTargetMismatch("Cannot apply a disk settings patch to a non-disk metric.");
+    }
+
+    return metric.target.value;
+}
+
+function requireCpuTarget(metric: StoredMetricSelection): StoredCpuMetricTarget {
+    if (metric.target.case !== "cpu") {
+        return throwPatchTargetMismatch("Cannot apply a CPU settings patch to a non-CPU metric.");
     }
 
     return metric.target.value;

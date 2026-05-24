@@ -51,6 +51,165 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.slot.appearance.view.textVariant, "title-card");
     });
 
+    it("resolves Windows CPU temperature settings", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    metric: {
+                        cpu: {
+                            kind: "KIND_TEMPERATURE",
+                            maximumTemperatureCelsius: 95,
+                            temperatureUnit: "TEMPERATURE_UNIT_FAHRENHEIT",
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+            runtime: {
+                isWindows: true,
+            },
+        });
+        const target = settings.widget.slot.metric.target;
+
+        assert.equal(target.domain, "cpu");
+        if (target.domain === "cpu") {
+            assert.deepEqual(target.reading, {
+                kind: "temperature",
+                maximumCelsius: 95,
+                unit: "fahrenheit",
+            });
+        }
+    });
+
+    it("resolves Windows CPU power settings", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    metric: {
+                        cpu: {
+                            kind: "KIND_POWER",
+                            maximumPowerWatts: 180,
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+            runtime: {
+                isWindows: true,
+            },
+        });
+        const target = settings.widget.slot.metric.target;
+
+        assert.equal(target.domain, "cpu");
+        if (target.domain === "cpu") {
+            assert.deepEqual(target.reading, {
+                kind: "power",
+                maximumWatts: 180,
+            });
+        }
+    });
+
+    it("uses CPU temperature and power defaults", () => {
+        const temperatureSettings = resolveStoredWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                singleMetric: {
+                    slot: {
+                        metric: {
+                            cpu: {
+                                kind: "KIND_TEMPERATURE",
+                            },
+                        },
+                    },
+                },
+            }).settings,
+            runtime: {
+                isWindows: true,
+            },
+        });
+        const powerSettings = resolveStoredWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                singleMetric: {
+                    slot: {
+                        metric: {
+                            cpu: {
+                                kind: "KIND_POWER",
+                            },
+                        },
+                    },
+                },
+            }).settings,
+            runtime: {
+                isWindows: true,
+            },
+        });
+        const temperatureTarget = temperatureSettings.widget.slot.metric.target;
+        const powerTarget = powerSettings.widget.slot.metric.target;
+
+        assert.equal(temperatureTarget.domain, "cpu");
+        assert.equal(powerTarget.domain, "cpu");
+        if (temperatureTarget.domain === "cpu" && powerTarget.domain === "cpu") {
+            assert.deepEqual(temperatureTarget.reading, {
+                kind: "temperature",
+                maximumCelsius: 100,
+                unit: "celsius",
+            });
+            assert.deepEqual(powerTarget.reading, {
+                kind: "power",
+                maximumWatts: 150,
+            });
+        }
+    });
+
+    it("resolves unsupported non-Windows CPU helper readings to usage", () => {
+        const temperatureSettings = resolveStoredWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                singleMetric: {
+                    slot: {
+                        metric: {
+                            cpu: {
+                                kind: "KIND_TEMPERATURE",
+                            },
+                        },
+                    },
+                },
+            }).settings,
+            runtime: {
+                isWindows: false,
+            },
+        });
+        const powerSettings = resolveStoredWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                singleMetric: {
+                    slot: {
+                        metric: {
+                            cpu: {
+                                kind: "KIND_POWER",
+                            },
+                        },
+                    },
+                },
+            }).settings,
+            runtime: {
+                isWindows: false,
+            },
+        });
+        const temperatureTarget = temperatureSettings.widget.slot.metric.target;
+        const powerTarget = powerSettings.widget.slot.metric.target;
+
+        assert.equal(temperatureTarget.domain, "cpu");
+        assert.equal(powerTarget.domain, "cpu");
+        if (temperatureTarget.domain === "cpu" && powerTarget.domain === "cpu") {
+            assert.deepEqual(temperatureTarget.reading, { kind: "usage" });
+            assert.deepEqual(powerTarget.reading, { kind: "usage" });
+        }
+    });
+
     it("defaults network metric paint to solid without changing other metric defaults", () => {
         const storedWidgetSettings = readStoredWidgetSettings({
             singleMetric: {
