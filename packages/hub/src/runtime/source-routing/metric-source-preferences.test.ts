@@ -8,6 +8,8 @@ import {
 import {
     CPU_BASE_FREQUENCY_METRIC_KEY,
     CPU_MODEL_METRIC_KEY,
+    CPU_POWER_METRIC_KEY,
+    CPU_TEMP_METRIC_KEY,
     CPU_USAGE_METRIC_KEY,
     GPU_METRIC_KEYS,
     RAM_TOTAL_METRIC_KEY,
@@ -28,6 +30,7 @@ import {
 } from "../sources/source-ids";
 
 const NODE_SYSTEM_CANDIDATES = [{ sourceId: NODE_SYSTEM_SOURCE_ID }];
+const WINDOWS_HELPER_CANDIDATES = [{ sourceId: WINDOWS_HELPER_SOURCE_ID }];
 const WINDOWS_HELPER_THEN_NODE_CANDIDATES = [
     { sourceId: WINDOWS_HELPER_SOURCE_ID },
     { sourceId: NODE_SYSTEM_SOURCE_ID },
@@ -52,15 +55,30 @@ test("local auto source preference keeps OS aggregate metrics on node-system", (
         getDiskVolumeMetricKey("total", "C:\\"),
         getDiskVolumeMetricKey("available", "C:\\"),
         getDiskVolumeMetricKey("percent", "C:\\"),
-        getDiskThroughputMetricKey("read"),
-        getDiskThroughputMetricKey("write"),
-        getDiskThroughputMetricKey("total"),
     ];
 
     for (const metricKey of nodeSystemMetricKeys) {
         assert.deepEqual(
             resolveLocalAutoMetricSourceCandidates(metricKey, "win32"),
             NODE_SYSTEM_CANDIDATES,
+            metricKey,
+        );
+    }
+});
+
+test("local auto source preference uses only Windows helper for helper-owned stable metrics", () => {
+    const helperOnlyMetricKeys = [
+        CPU_TEMP_METRIC_KEY,
+        CPU_POWER_METRIC_KEY,
+        getDiskThroughputMetricKey("read"),
+        getDiskThroughputMetricKey("write"),
+        getDiskThroughputMetricKey("total"),
+    ];
+
+    for (const metricKey of helperOnlyMetricKeys) {
+        assert.deepEqual(
+            resolveLocalAutoMetricSourceCandidates(metricKey, "win32"),
+            WINDOWS_HELPER_CANDIDATES,
             metricKey,
         );
     }
@@ -79,6 +97,10 @@ test("local auto source preference uses Windows helper before node-system for st
 test("local auto source preference uses node-system outside Windows", () => {
     assert.deepEqual(
         resolveLocalAutoMetricSourceCandidates(GPU_METRIC_KEYS[0], "darwin"),
+        NODE_SYSTEM_CANDIDATES,
+    );
+    assert.deepEqual(
+        resolveLocalAutoMetricSourceCandidates(getDiskThroughputMetricKey("read"), "darwin"),
         NODE_SYSTEM_CANDIDATES,
     );
 });

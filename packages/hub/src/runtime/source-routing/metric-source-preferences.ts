@@ -6,6 +6,8 @@ import {
 import {
     CPU_BASE_FREQUENCY_METRIC_KEY,
     CPU_MODEL_METRIC_KEY,
+    CPU_POWER_METRIC_KEY,
+    CPU_TEMP_METRIC_KEY,
     CPU_USAGE_METRIC_KEY,
     GPU_METRIC_KEYS,
     RAM_TOTAL_METRIC_KEY,
@@ -33,6 +35,14 @@ const NODE_SYSTEM_ONLY_METRIC_KEYS = [
     getDefaultDiskUsageMetricKey("total"),
     getDefaultDiskUsageMetricKey("available"),
     getDefaultDiskUsageMetricKey("percent"),
+] as const;
+
+const WINDOWS_HELPER_ONLY_METRIC_KEYS = [
+    CPU_TEMP_METRIC_KEY,
+    CPU_POWER_METRIC_KEY,
+    // Windows disk throughput routing is ready before the helper-native PDH
+    // provider and PI unlock. Until that phase lands, resolver/UI still keep
+    // users off this route.
     getDiskThroughputMetricKey("read"),
     getDiskThroughputMetricKey("write"),
     getDiskThroughputMetricKey("total"),
@@ -53,15 +63,18 @@ const WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEYS = [...GPU_METRIC_KEYS] as co
  */
 export const BUILT_IN_STABLE_METRIC_KEYS = [
     ...NODE_SYSTEM_ONLY_METRIC_KEYS,
+    ...WINDOWS_HELPER_ONLY_METRIC_KEYS,
     ...WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEYS,
 ] as const;
 
 const NODE_SYSTEM_ONLY_METRIC_KEY_SET = new Set<string>(NODE_SYSTEM_ONLY_METRIC_KEYS);
+const WINDOWS_HELPER_ONLY_METRIC_KEY_SET = new Set<string>(WINDOWS_HELPER_ONLY_METRIC_KEYS);
 const WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEY_SET = new Set<string>(
     WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEYS,
 );
 
 const NODE_SYSTEM_CANDIDATES = [{ sourceId: NODE_SYSTEM_SOURCE_ID }] as const;
+const WINDOWS_HELPER_CANDIDATES = [{ sourceId: WINDOWS_HELPER_SOURCE_ID }] as const;
 const WINDOWS_HELPER_THEN_NODE_CANDIDATES = [
     { sourceId: WINDOWS_HELPER_SOURCE_ID },
     { sourceId: NODE_SYSTEM_SOURCE_ID },
@@ -80,6 +93,10 @@ export function resolveLocalAutoMetricSourceCandidates(
 ): readonly SourceCandidate[] {
     if (platform !== "win32") {
         return NODE_SYSTEM_CANDIDATES;
+    }
+
+    if (WINDOWS_HELPER_ONLY_METRIC_KEY_SET.has(metricKey)) {
+        return WINDOWS_HELPER_CANDIDATES;
     }
 
     if (WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEY_SET.has(metricKey)) {
@@ -101,6 +118,7 @@ export function resolveLocalAutoMetricSourceCandidates(
  */
 export function hasExplicitLocalAutoMetricSourcePreference(metricKey: string): boolean {
     return NODE_SYSTEM_ONLY_METRIC_KEY_SET.has(metricKey)
+        || WINDOWS_HELPER_ONLY_METRIC_KEY_SET.has(metricKey)
         || WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEY_SET.has(metricKey)
         || isNetworkMetricKey(metricKey)
         || isDiskUsageMetricKey(metricKey);

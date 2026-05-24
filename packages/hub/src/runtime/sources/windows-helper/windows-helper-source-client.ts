@@ -188,7 +188,7 @@ export class WindowsHelperSourceClient implements SourceClient {
     private helperUnavailableFailureCount = 0;
     private status: SourceClientStatus = { state: "unknown" };
     private descriptorFingerprint: string | undefined;
-    private hasDescriptorSnapshot = false;
+    private hasCompleteDescriptorSnapshot = false;
     private descriptorPreloadStartedAtTimestampMilliseconds: number | undefined;
     private descriptorPreloadPromise: Promise<void> | undefined;
     private descriptorPreloadRetryTimer: WindowsHelperDescriptorPreloadTimerHandle | undefined;
@@ -272,7 +272,7 @@ export class WindowsHelperSourceClient implements SourceClient {
     subscribeSourceMetadataInvalidations(listener: SourceMetadataInvalidationListener): () => void {
         this.sourceMetadataInvalidationListeners.add(listener);
 
-        if (this.hasDescriptorSnapshot && this.descriptorFingerprint !== undefined) {
+        if (this.hasCompleteDescriptorSnapshot && this.descriptorFingerprint !== undefined) {
             listener(this.buildSourceMetadataInvalidation("descriptorLoaded"));
         } else {
             this.startDescriptorPreload();
@@ -289,6 +289,7 @@ export class WindowsHelperSourceClient implements SourceClient {
     }
 
     private async readMetricDescriptors(metricKeys: readonly string[]): Promise<MetricDescriptorSnapshot> {
+        const isCompleteCatalogResponse = metricKeys.length === 0;
         let response: SourceIpcResponse;
         try {
             response = await this.sendSourceIpcRequest({
@@ -317,7 +318,10 @@ export class WindowsHelperSourceClient implements SourceClient {
             descriptors: descriptorSnapshot.descriptors.map(toRuntimeMetricDescriptor),
             descriptorFingerprint: descriptorSnapshot.descriptorFingerprint,
         };
-        const invalidationReason = this.recordDescriptorSnapshot(runtimeDescriptorSnapshot);
+        const invalidationReason = this.recordDescriptorSnapshot(
+            runtimeDescriptorSnapshot,
+            { isCompleteCatalogResponse },
+        );
         if (invalidationReason) {
             this.publishSourceMetadataInvalidation(invalidationReason);
         }
@@ -369,7 +373,7 @@ export class WindowsHelperSourceClient implements SourceClient {
             .finally(() => {
                 this.descriptorPreloadPromise = undefined;
 
-                if (!this.hasDescriptorSnapshot && this.sourceMetadataInvalidationListeners.size > 0) {
+                if (!this.hasCompleteDescriptorSnapshot && this.sourceMetadataInvalidationListeners.size > 0) {
                     this.scheduleDescriptorPreloadRetry();
                 }
             });
@@ -450,6 +454,10 @@ export class WindowsHelperSourceClient implements SourceClient {
             };
         }
 
+        if (this.hasCompleteDescriptorSnapshot) {
+            return { state: "unsupported" };
+        }
+
         // Descriptor-backed helper metrics must wait for metadata instead of
         // creating one isolated runner per unknown sensor id during cold start.
         return { state: "pendingMetadata" };
@@ -465,19 +473,37 @@ export class WindowsHelperSourceClient implements SourceClient {
      */
     private recordDescriptorSnapshot(
         descriptorSnapshot: MetricDescriptorSnapshot,
+        options: {
+            readonly isCompleteCatalogResponse: boolean;
+        },
     ): SourceMetadataInvalidationReason | undefined {
         const previousDescriptorFingerprint = this.descriptorFingerprint;
+        const hadCompleteDescriptorSnapshot = this.hasCompleteDescriptorSnapshot;
+        const descriptorFingerprintChanged = this.descriptorFingerprint !== descriptorSnapshot.descriptorFingerprint;
 
-        this.hasDescriptorSnapshot = true;
         this.descriptorPreloadStartedAtTimestampMilliseconds = undefined;
 
-        if (this.descriptorFingerprint !== descriptorSnapshot.descriptorFingerprint) {
+        if (descriptorFingerprintChanged) {
             this.descriptorFingerprint = descriptorSnapshot.descriptorFingerprint;
             this.descriptorsByMetricId.clear();
+            this.hasCompleteDescriptorSnapshot = false;
         }
 
         for (const descriptor of descriptorSnapshot.descriptors) {
             this.descriptorsByMetricId.set(descriptor.metricId, descriptor);
+        }
+
+        if (!options.isCompleteCatalogResponse) {
+            // Production only reads complete catalogs today. If a future
+            // filtered descriptor caller can receive a new fingerprint, it must
+            // also publish descriptorChanged so active plans are reconciled.
+            return undefined;
+        }
+
+        this.hasCompleteDescriptorSnapshot = true;
+
+        if (!hadCompleteDescriptorSnapshot) {
+            return "descriptorLoaded";
         }
 
         if (previousDescriptorFingerprint === descriptorSnapshot.descriptorFingerprint) {

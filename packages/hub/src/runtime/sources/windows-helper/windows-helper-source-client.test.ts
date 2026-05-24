@@ -124,6 +124,37 @@ test("windows helper declares cached descriptor metrics with descriptor polling 
     ]);
 });
 
+test("windows helper marks missing metrics unsupported after complete descriptor preload", async () => {
+    const transport = new FakeWindowsHelperPipeTransport(request => {
+        switch (request.payload.case) {
+            case "getSourceHealth":
+                return buildHealthResponse(request.requestId);
+            case "listMetricDescriptors":
+                assert.deepEqual(request.payload.value.metricIds, []);
+                return buildDescriptorResponse(request.requestId);
+            default:
+                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport);
+
+    await client.listMetricDescriptors([]);
+    const resolutions = client.resolveMetricPollingGroups([
+        "cpu.usage_percent",
+        "cpu.temp",
+    ]);
+
+    assert.deepEqual([...resolutions.entries()], [
+        ["cpu.usage_percent", {
+            state: "owned",
+            pollingGroupId: CPU_HELPER_POLLING_GROUP_ID,
+        }],
+        ["cpu.temp", {
+            state: "unsupported",
+        }],
+    ]);
+});
+
 test("windows helper keeps filtered descriptors when the catalog fingerprint is unchanged", async () => {
     const transport = new FakeWindowsHelperPipeTransport(request => {
         switch (request.payload.case) {
@@ -409,8 +440,8 @@ test("windows helper emits descriptor metadata changes only when fingerprint cha
         invalidations.push(invalidation);
     });
     await drainAsyncOperations();
-    await client.listMetricDescriptors(["cpu.usage_percent"]);
-    await client.listMetricDescriptors(["gpu.temp"]);
+    await client.listMetricDescriptors([]);
+    await client.listMetricDescriptors([]);
 
     assert.deepEqual(invalidations, [
         {

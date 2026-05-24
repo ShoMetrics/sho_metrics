@@ -1,6 +1,16 @@
 export const CPU_USAGE_METRIC_KEY = "cpu.usage_percent";
 export const CPU_BASE_FREQUENCY_METRIC_KEY = "cpu.base_frequency";
 export const CPU_MODEL_METRIC_KEY = "cpu.model";
+export const CPU_TEMP_METRIC_KEY = "cpu.temp";
+export const CPU_POWER_METRIC_KEY = "cpu.power";
+
+export const CPU_METRIC_KEYS = [
+    CPU_USAGE_METRIC_KEY,
+    CPU_BASE_FREQUENCY_METRIC_KEY,
+    CPU_MODEL_METRIC_KEY,
+    CPU_TEMP_METRIC_KEY,
+    CPU_POWER_METRIC_KEY,
+] as const;
 
 export const GPU_USAGE_METRIC_KEY = "gpu.usage_percent";
 export const GPU_MODEL_METRIC_KEY = "gpu.model";
