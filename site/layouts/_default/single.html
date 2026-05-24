@@ -1,0 +1,13 @@
+{{ define "main" }}
+<article class="page-shell">
+  <header class="page-header">
+    <p class="eyebrow">Sho Metrics</p>
+    <h1>{{ .Title }}</h1>
+    {{ with .Description }}<p>{{ . }}</p>{{ end }}
+  </header>
+  <div class="page-content">
+    {{ .Content }}
+  </div>
+</article>
+{{ end }}
+

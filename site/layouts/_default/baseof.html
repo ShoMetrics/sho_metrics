@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="{{ site.Language.Locale | default "en" }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ site.Params.description }}{{ end }}">
+  <title>{{ if .IsHome }}{{ site.Title }}{{ else }}{{ .Title }} | {{ site.Title }}{{ end }}</title>
+  <link rel="stylesheet" href="{{ "css/site.css" | relURL }}">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <nav class="site-nav" aria-label="Main navigation">
+      <a class="brand" href="{{ "/" | relURL }}" aria-label="ShoMetrics home">ShoMetrics</a>
+      <div class="nav-links">
+        <a href="{{ "/#start" | relURL }}">Get started</a>
+        <a href="{{ "install/" | relURL }}">Install guide</a>
+        <a href="{{ "faq/" | relURL }}">FAQ</a>
+      </div>
+    </nav>
+  </header>
+  <main id="main">
+    {{ block "main" . }}{{ end }}
+  </main>
+  <footer class="site-footer">
+    <p>ShoMetrics is a Stream Deck plugin for clear system metrics.</p>
+  </footer>
+</body>
+</html>

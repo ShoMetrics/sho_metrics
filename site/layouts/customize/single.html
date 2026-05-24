@@ -1,0 +1,95 @@
+{{ define "main" }}
+<section class="studio-hero">
+  <p class="hero-tag">Configurable metric keys</p>
+  <h1>Make each key look right.</h1>
+  <p class="studio-lede">{{ .Description }}</p>
+  <div class="hero-actions" aria-label="Customize page actions">
+    <a class="action-button action-button-primary" href="{{ "install/" | relURL }}">
+      <span class="button-icon">S</span>
+      <span class="button-text">
+        <small>Start</small>
+        <strong>Install guide</strong>
+      </span>
+    </a>
+    <a class="action-button action-button-secondary" href="{{ "/" | relURL }}">
+      <span class="button-icon">H</span>
+      <span class="button-text">
+        <small>Overview</small>
+        <strong>Back home</strong>
+      </span>
+    </a>
+  </div>
+</section>
+
+<section class="studio-deck" aria-label="Configurable Stream Deck preview">
+  <div class="studio-device">
+    <div class="deck-grid">
+      <div class="metric-key key-warm key-ring"><span>CPU</span><strong>42%</strong><i style="--progress: .42"></i></div>
+      <div class="metric-key key-glass key-ring"><span>GPU</span><strong>71%</strong><i style="--progress: .71"></i></div>
+      <div class="metric-key key-terminal"><span>RAM</span><strong>12.4G</strong></div>
+      <div class="metric-key key-filled key-spark"><span>Net Down</span><strong>8.2M</strong>
+        <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,21 11,15 23,18 35,9 47,13 59,5 71,10 83,4 95,12 100,8"/></svg>
+      </div>
+      <div class="metric-key key-paper key-ring"><span>Disk</span><strong>58%</strong><i style="--progress: .58"></i></div>
+      <div class="metric-key key-terminal"><span>GPU Temp</span><strong>63 C</strong></div>
+      <div class="metric-key key-warm key-spark"><span>Disk Read</span><strong>240M</strong>
+        <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,24 12,20 24,21 36,11 48,14 60,7 72,15 84,9 96,13 100,11"/></svg>
+      </div>
+      <div class="metric-key key-glass"><span>VRAM</span><strong>33%</strong></div>
+      <div class="metric-key key-filled key-ring"><span>Power</span><strong>187W</strong><i style="--progress: .64"></i></div>
+      <div class="metric-key key-paper"><span>Net Up</span><strong>1.1M</strong></div>
+    </div>
+  </div>
+</section>
+
+<section class="feature-row" aria-label="Customization controls">
+  <article>
+    <span>View</span>
+    <h2>Circle, text, bar, line.</h2>
+    <p>Choose a visual form that fits the metric and the key size.</p>
+  </article>
+  <article>
+    <span>Theme</span>
+    <h2>Default, glass, filled, terminal.</h2>
+    <p>Switch the overall look without changing the selected metric.</p>
+  </article>
+  <article>
+    <span>Color</span>
+    <h2>Solid or range based.</h2>
+    <p>Use one color, threshold colors, or black and white rendering.</p>
+  </article>
+  <article>
+    <span>Detail</span>
+    <h2>Labels, grid lines, smoothing.</h2>
+    <p>Adjust the small things that make each display readable.</p>
+  </article>
+</section>
+
+<section class="variant-gallery" aria-label="Example configurable key previews">
+  <header>
+    <p class="section-kicker">Visual range</p>
+    <h2>Same system data, many readable looks.</h2>
+  </header>
+  <div class="variant-grid">
+    <div class="mini-key mini-warm mini-ring"><span>CPU</span><strong>42%</strong></div>
+    <div class="mini-key mini-warm mini-bar"><span>CPU</span><strong>42%</strong><b></b></div>
+    <div class="mini-key mini-warm mini-line"><span>CPU 60s</span><svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,21 11,15 23,18 35,9 47,13 59,5 71,10 83,4 95,12 100,8"/></svg></div>
+    <div class="mini-key mini-warm"><span>CPU</span><strong>42%</strong></div>
+
+    <div class="mini-key mini-cool mini-ring"><span>GPU</span><strong>71%</strong></div>
+    <div class="mini-key mini-cool mini-bar"><span>GPU</span><strong>71%</strong><b></b></div>
+    <div class="mini-key mini-cool mini-line"><span>GPU 60s</span><svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,22 10,17 20,19 30,12 40,16 50,8 60,14 70,7 80,12 90,5 100,10"/></svg></div>
+    <div class="mini-key mini-cool"><span>GPU</span><strong>71%</strong></div>
+
+    <div class="mini-key mini-terminal mini-ring"><span>RAM</span><strong>64%</strong></div>
+    <div class="mini-key mini-terminal mini-bar"><span>RAM</span><strong>64%</strong><b></b></div>
+    <div class="mini-key mini-terminal mini-line"><span>RAM 60s</span><svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,18 12,16 24,17 36,15 48,13 60,14 72,12 84,11 96,12 100,10"/></svg></div>
+    <div class="mini-key mini-terminal"><span>RAM</span><strong>64%</strong></div>
+
+    <div class="mini-key mini-paper mini-ring"><span>Disk</span><strong>58%</strong></div>
+    <div class="mini-key mini-paper mini-bar"><span>Disk</span><strong>58%</strong><b></b></div>
+    <div class="mini-key mini-paper mini-line"><span>Disk I/O</span><svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,23 12,20 24,22 36,11 48,15 60,7 72,14 84,8 96,16 100,12"/></svg></div>
+    <div class="mini-key mini-paper"><span>Disk</span><strong>58%</strong></div>
+  </div>
+</section>
+{{ end }}

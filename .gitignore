@@ -350,6 +350,9 @@ packages/hub/.test-dist/
 
 docs/development/perf-logs/*
 
+site/public/
+site/.hugo_build.lock
+
 *.tmp.*
 
 .DS_Store

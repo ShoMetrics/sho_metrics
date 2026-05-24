@@ -1,0 +1,47 @@
+name: Site Preview
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "site/**"
+      - ".github/workflows/site-preview.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Hugo site
+    runs-on: ubuntu-latest
+    env:
+      HUGO_VERSION: "0.161.1"
+      HUGO_TARBALL: "hugo_0.161.1_linux-amd64.tar.gz"
+      HUGO_SHA256: "fae28bf7909c1a42d1365b89d2e9e3d4194fbe5968ae0dd5504f562381018a1d"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Download Hugo
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --remote-name "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/${HUGO_TARBALL}"
+          echo "${HUGO_SHA256}  ${HUGO_TARBALL}" | sha256sum --check -
+          tar -xzf "${HUGO_TARBALL}" hugo
+          ./hugo version
+
+      - name: Build site
+        shell: bash
+        working-directory: site
+        run: ../hugo --destination public --minify
+
+      - name: Upload preview artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sho-metrics-site-preview
+          path: site/public
+          if-no-files-found: error
+          retention-days: 7
