@@ -58,6 +58,36 @@ test("single metric view passes foreground paint tokens into sparkline widgets",
     assert.match(svg, /fill="#muted-text-token"[\s\S]*s<\/text>/);
 });
 
+test("single metric view dispatches text variants to centered and title-card renderers", () => {
+    const centeredSvg = renderSingleMetricBodyView({
+        data: buildWidgetData(),
+        visual: {
+            ...buildMetricRenderAppearance(),
+            renderPrimitive: "text",
+            textVariant: "centered",
+        },
+        renderSize: { width: 144, height: 144 },
+        centerIcon: "<path id=\"center-icon\" />",
+        circleVariant: "full-ring",
+    });
+    const titleCardSvg = renderSingleMetricBodyView({
+        data: buildWidgetData(),
+        visual: {
+            ...buildMetricRenderAppearance(),
+            renderPrimitive: "text",
+            textVariant: "title-card",
+        },
+        renderSize: { width: 144, height: 144 },
+        centerIcon: "<path id=\"center-icon\" />",
+        circleVariant: "full-ring",
+    });
+
+    assert.match(centeredSvg, /text-metric-label/);
+    assert.doesNotMatch(centeredSvg, /title-card-code/);
+    assert.match(titleCardSvg, /title-card-code/);
+    assert.doesNotMatch(titleCardSvg, /text-metric-label/);
+});
+
 function buildMetricRenderAppearance(): MetricRenderAppearance {
     return {
         renderPrimitive: "circle",

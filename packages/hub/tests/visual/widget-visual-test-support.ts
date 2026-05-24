@@ -3,6 +3,7 @@ import { renderDualMetricBodyView } from "../../src/view-rendering/dual-metric-v
 import { renderMetricFrame } from "../../src/view-rendering/metric-frame";
 import { resolveResvgFontOptions } from "../../src/view-rendering/resvg-font-options";
 import { renderSingleMetricBodyView } from "../../src/view-rendering/single-metric-view";
+import type { TextMetricVariant } from "../../src/view-rendering/render-appearance";
 import type { ColorConfig } from "../../src/view-rendering/color-resolver";
 import type {
     DualChannelWidgetData,
@@ -14,7 +15,6 @@ import type { ResolvedAppearanceSettingsOverride } from "../../src/settings/appe
 import { buildDefaultAppearanceSettings } from "../../src/settings/default-appearance-settings";
 import { buildMetricRenderAppearance } from "../../src/settings/render-appearance-builder";
 import { getDiskIconFragment, getHardwareIconFragment } from "../../src/widgets/icons/hardware-icons";
-import type { TextMetricVariant } from "../../src/widgets/primitives/text-metric";
 import {
     getNetworkDirectionStatusIcon,
     renderNetworkDirectionIconFragment,

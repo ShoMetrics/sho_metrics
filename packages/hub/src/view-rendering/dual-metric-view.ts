@@ -1,5 +1,5 @@
 import type { ColorConfig } from "./color-resolver";
-import type { RenderPaintTokens } from "./render-appearance";
+import type { RenderPaintTokens, TextMetricVariant } from "./render-appearance";
 import type { RenderTextStyles } from "./render-text-style";
 import type { RenderThemeEffectTokens } from "./render-svg-effects";
 import type { DualChannelWidgetData, KeySize } from "./widget-data";
@@ -16,10 +16,10 @@ import {
 } from "../widgets/primitives/dual-channel-sparkline";
 import {
     DEFAULT_TEXT_METRIC_CONFIG,
-    renderDualTextMetric,
+    renderCenteredDualTextMetric,
     type DualTextMetricContent,
-    type TextMetricVariant,
 } from "../widgets/primitives/text-metric";
+import { renderTitleCardDualTextMetric } from "../widgets/primitives/title-card-text-metric";
 import { buildTitleCardDualMetricContent } from "./title-card-text-content";
 import type {
     SparklineGridLineType,
@@ -96,6 +96,16 @@ function renderDualCircularMetric(options: DualMetricBodyViewProps): string {
 }
 
 function renderDualTextMetricView(options: DualMetricBodyViewProps): string {
+    const config = {
+        ...DEFAULT_TEXT_METRIC_CONFIG,
+        labelTextColor: options.visual.paints.secondaryText,
+        unitTextColor: options.visual.paints.secondaryText,
+        secondaryTextColor: options.visual.paints.mutedText,
+        textStyles: options.visual.textStyles,
+        themeEffects: options.visual.themeEffects,
+        positiveColor: options.positive.color,
+        negativeColor: options.negative.color,
+    };
     const textContent: DualTextMetricContent = {
         titleText: options.titleText,
         positive: {
@@ -108,20 +118,16 @@ function renderDualTextMetricView(options: DualMetricBodyViewProps): string {
         },
     };
 
-    return renderDualTextMetric(options.data, {
-        ...DEFAULT_TEXT_METRIC_CONFIG,
-        labelTextColor: options.visual.paints.secondaryText,
-        unitTextColor: options.visual.paints.secondaryText,
-        secondaryTextColor: options.visual.paints.mutedText,
-        textStyles: options.visual.textStyles,
-        themeEffects: options.visual.themeEffects,
-        textVariant: options.visual.textVariant,
-        positiveColor: options.positive.color,
-        negativeColor: options.negative.color,
-    }, options.renderSize, {
-        ...textContent,
-        titleCard: buildTitleCardDualMetricContent(textContent),
-    });
+    if (options.visual.textVariant === "title-card") {
+        return renderTitleCardDualTextMetric(
+            options.data,
+            config,
+            options.renderSize,
+            buildTitleCardDualMetricContent(textContent),
+        );
+    }
+
+    return renderCenteredDualTextMetric(options.data, config, options.renderSize, textContent);
 }
 
 function renderDualSparklineMetric(options: DualMetricBodyViewProps): string {

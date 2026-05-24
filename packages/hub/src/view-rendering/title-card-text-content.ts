@@ -1,8 +1,8 @@
+import type { DualTextMetricContent } from "../widgets/primitives/text-metric";
 import type {
-    DualTextMetricContent,
     TitleCardDualMetricContent,
     TitleCardSingleMetricContent,
-} from "../widgets/primitives/text-metric";
+} from "../widgets/primitives/title-card-text-metric";
 import { formatCompactDataRateUnitText } from "./compact-unit-text";
 import type { WidgetData } from "./widget-data";
 

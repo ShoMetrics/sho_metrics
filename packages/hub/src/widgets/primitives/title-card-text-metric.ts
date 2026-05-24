@@ -3,7 +3,28 @@ import { resolveColorForThresholdValue } from "../../view-rendering/color-resolv
 import { buildSvgFilterAttributes } from "../../view-rendering/render-svg-effects";
 import { JAPANESE_SERIF_RENDER_FONT_FAMILY } from "../../view-rendering/render-text-style";
 import { escapeSvgText, renderConstrainedSvgText, resolveSvgTextFit } from "../../view-rendering/svg-utils";
-import type { TextMetricConfig, TitleCardDualMetricContent, TitleCardSingleMetricContent } from "./text-metric";
+import type { TextMetricConfig } from "./text-metric";
+
+export interface TitleCardSingleMetricContent {
+    readonly codeText: string;
+    /** At most three display characters; used by the wide title-card code row. */
+    readonly compactCodeText: string;
+    /** Exactly three display characters; the title-card layout renders one caption row per character. */
+    readonly threeCharacterCaptionText: string;
+    readonly unitText: string;
+}
+
+export interface TitleCardDualMetricContent {
+    readonly codeText: string;
+    /** At most three display characters; used by the wide title-card code row. */
+    readonly compactCodeText: string;
+    /** Exactly three display characters; the title-card layout renders one caption row per character. */
+    readonly threeCharacterCaptionText: string;
+    readonly positiveLabelText: string;
+    readonly positiveUnitText: string;
+    readonly negativeLabelText: string;
+    readonly negativeUnitText: string;
+}
 
 const TITLE_CARD_SQUARE_REFERENCE_SIZE = 144;
 
