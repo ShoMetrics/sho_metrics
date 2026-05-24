@@ -1,6 +1,7 @@
 using System.IO.Pipes;
 using Microsoft.Extensions.Logging;
 using ShoMetrics.Contracts.V1;
+using ShoMetrics.Source.Windows.Ipc;
 
 namespace ShoMetrics.Source.Windows.Service;
 
@@ -24,7 +25,7 @@ internal sealed class WindowsPipeSourceServer(
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {
-        logger.LogInformation("Binding named pipe server {PipeName}.", SourceServiceConstants.PipeName);
+        logger.LogInformation("Binding named pipe server {PipeName}.", SourceIpcConstants.PipeName);
 
         try
         {
@@ -47,7 +48,7 @@ internal sealed class WindowsPipeSourceServer(
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            logger.LogInformation("Named pipe server {PipeName} is stopping.", SourceServiceConstants.PipeName);
+            logger.LogInformation("Named pipe server {PipeName} is stopping.", SourceIpcConstants.PipeName);
         }
         finally
         {
@@ -58,7 +59,7 @@ internal sealed class WindowsPipeSourceServer(
     private NamedPipeServerStream CreatePipeServerStream()
     {
         return NamedPipeServerStreamAcl.Create(
-            SourceServiceConstants.PipeName,
+            SourceIpcConstants.PipeName,
             PipeDirection.InOut,
             NamedPipeServerStream.MaxAllowedServerInstances,
             PipeTransmissionMode.Byte,
@@ -76,18 +77,18 @@ internal sealed class WindowsPipeSourceServer(
             {
                 if (!pipeClientVerifier.IsLocalClient(pipeServerStream))
                 {
-                    logger.LogWarning("Rejected remote named pipe client for {PipeName}.", SourceServiceConstants.PipeName);
+                    logger.LogWarning("Rejected remote named pipe client for {PipeName}.", SourceIpcConstants.PipeName);
 
                     return;
                 }
 
-                logger.LogDebug("Accepted local named pipe client for {PipeName}.", SourceServiceConstants.PipeName);
+                logger.LogDebug("Accepted local named pipe client for {PipeName}.", SourceIpcConstants.PipeName);
 
                 await HandleRequestLoopAsync(pipeServerStream, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
-                logger.LogWarning(exception, "Named pipe client handling failed for {PipeName}.", SourceServiceConstants.PipeName);
+                logger.LogWarning(exception, "Named pipe client handling failed for {PipeName}.", SourceIpcConstants.PipeName);
             }
         }
     }
@@ -111,7 +112,7 @@ internal sealed class WindowsPipeSourceServer(
 
             if (request is null)
             {
-                logger.LogDebug("Named pipe client disconnected from {PipeName}.", SourceServiceConstants.PipeName);
+                logger.LogDebug("Named pipe client disconnected from {PipeName}.", SourceIpcConstants.PipeName);
 
                 return;
             }
@@ -126,7 +127,7 @@ internal sealed class WindowsPipeSourceServer(
             {
                 logger.LogDebug(
                     "Named pipe client disconnected before response write for {PipeName}. win32ErrorCode={Win32ErrorCode}",
-                    SourceServiceConstants.PipeName,
+                    SourceIpcConstants.PipeName,
                     ReadWin32ErrorCode(exception));
 
                 return;
@@ -143,9 +144,9 @@ internal sealed class WindowsPipeSourceServer(
             exception,
             "Rejected invalid Source IPC frame {FrameError} on {PipeName}.",
             exception.Error,
-            SourceServiceConstants.PipeName);
+            SourceIpcConstants.PipeName);
 
-        if (!exception.CanWriteErrorResponse)
+        if (!CanWriteFrameErrorResponse(exception.Error))
         {
             return;
         }
@@ -153,6 +154,11 @@ internal sealed class WindowsPipeSourceServer(
         SourceIpcResponse response = protocolMapper.BuildFrameErrorResponse(exception);
 
         await frameCodec.WriteResponseAsync(pipeServerStream, response, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static bool CanWriteFrameErrorResponse(SourceIpcFrameError error)
+    {
+        return error is SourceIpcFrameError.MalformedPayload;
     }
 
     private void TrackClientTask(Task clientTask)

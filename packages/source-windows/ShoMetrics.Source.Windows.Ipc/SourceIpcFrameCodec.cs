@@ -2,20 +2,62 @@ using System.Buffers.Binary;
 using Google.Protobuf;
 using ShoMetrics.Contracts.V1;
 
-namespace ShoMetrics.Source.Windows.Service;
+namespace ShoMetrics.Source.Windows.Ipc;
 
-internal sealed class SourceIpcFrameCodec
+public sealed class SourceIpcFrameCodec
 {
     private const int LengthPrefixByteCount = sizeof(uint);
 
     public async Task<SourceIpcRequest?> ReadRequestAsync(Stream stream, CancellationToken cancellationToken)
+    {
+        return await ReadMessageAsync(
+            stream,
+            SourceIpcRequest.Parser,
+            "request",
+            allowEndBeforeAnyByte: true,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<SourceIpcResponse?> ReadResponseAsync(Stream stream, CancellationToken cancellationToken)
+    {
+        return await ReadMessageAsync(
+            stream,
+            SourceIpcResponse.Parser,
+            "response",
+            allowEndBeforeAnyByte: true,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task WriteRequestAsync(
+        Stream stream,
+        SourceIpcRequest request,
+        CancellationToken cancellationToken)
+    {
+        await WriteMessageAsync(stream, request, "request", cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task WriteResponseAsync(
+        Stream stream,
+        SourceIpcResponse response,
+        CancellationToken cancellationToken)
+    {
+        await WriteMessageAsync(stream, response, "response", cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<TMessage?> ReadMessageAsync<TMessage>(
+        Stream stream,
+        MessageParser<TMessage> parser,
+        string frameKind,
+        bool allowEndBeforeAnyByte,
+        CancellationToken cancellationToken)
+        where TMessage : class, IMessage<TMessage>
     {
         byte[] lengthPrefixBytes = new byte[LengthPrefixByteCount];
         bool hasLengthPrefix = await ReadExactlyOrEndAsync(
             stream,
             lengthPrefixBytes,
             "length prefix",
-            allowEndBeforeAnyByte: true,
+            allowEndBeforeAnyByte,
             cancellationToken).ConfigureAwait(false);
 
         if (!hasLengthPrefix)
@@ -23,7 +65,7 @@ internal sealed class SourceIpcFrameCodec
             return null;
         }
 
-        int payloadLength = ReadPayloadLength(lengthPrefixBytes);
+        int payloadLength = ReadPayloadLength(lengthPrefixBytes, frameKind);
         byte[] payloadBytes = new byte[payloadLength];
 
         await ReadExactlyOrEndAsync(
@@ -35,33 +77,33 @@ internal sealed class SourceIpcFrameCodec
 
         try
         {
-            return SourceIpcRequest.Parser.ParseFrom(payloadBytes);
+            return parser.ParseFrom(payloadBytes);
         }
         catch (InvalidProtocolBufferException exception)
         {
             throw new SourceIpcFrameException(
-                SourceIpcFrameError.MalformedRequest,
-                canWriteErrorResponse: true,
-                "Source IPC request payload is not valid protobuf.",
+                SourceIpcFrameError.MalformedPayload,
+                $"Source IPC {frameKind} payload is not valid protobuf.",
                 exception);
         }
     }
 
-    public async Task WriteResponseAsync(
+    private static async Task WriteMessageAsync(
         Stream stream,
-        SourceIpcResponse response,
+        IMessage message,
+        string frameKind,
         CancellationToken cancellationToken)
     {
-        byte[] payloadBytes = response.ToByteArray();
+        byte[] payloadBytes = message.ToByteArray();
 
         if (payloadBytes.Length == 0)
         {
-            throw new InvalidOperationException("Source IPC responses must not serialize to an empty payload.");
+            throw new InvalidOperationException($"Source IPC {frameKind}s must not serialize to an empty payload.");
         }
 
-        if (payloadBytes.Length > SourceServiceConstants.MaximumFrameBytes)
+        if (payloadBytes.Length > SourceIpcConstants.MaximumFrameBytes)
         {
-            throw new InvalidOperationException("Source IPC response exceeds the maximum frame size.");
+            throw new InvalidOperationException($"Source IPC {frameKind} exceeds the maximum frame size.");
         }
 
         byte[] lengthPrefixBytes = new byte[LengthPrefixByteCount];
@@ -72,24 +114,22 @@ internal sealed class SourceIpcFrameCodec
         await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private static int ReadPayloadLength(ReadOnlySpan<byte> lengthPrefixBytes)
+    private static int ReadPayloadLength(ReadOnlySpan<byte> lengthPrefixBytes, string frameKind)
     {
         uint payloadLength = BinaryPrimitives.ReadUInt32LittleEndian(lengthPrefixBytes);
 
         if (payloadLength == 0)
         {
             throw new SourceIpcFrameException(
-                SourceIpcFrameError.MalformedRequest,
-                canWriteErrorResponse: true,
-                "Source IPC request payload length must not be zero.");
+                SourceIpcFrameError.MalformedPayload,
+                $"Source IPC {frameKind} payload length must not be zero.");
         }
 
-        if (payloadLength > SourceServiceConstants.MaximumFrameBytes)
+        if (payloadLength > SourceIpcConstants.MaximumFrameBytes)
         {
             throw new SourceIpcFrameException(
                 SourceIpcFrameError.FrameTooLarge,
-                canWriteErrorResponse: false,
-                "Source IPC request exceeds the maximum frame size.");
+                $"Source IPC {frameKind} exceeds the maximum frame size.");
         }
 
         return checked((int)payloadLength);
@@ -116,8 +156,7 @@ internal sealed class SourceIpcFrameCodec
                 }
 
                 throw new SourceIpcFrameException(
-                    SourceIpcFrameError.MalformedRequest,
-                    canWriteErrorResponse: false,
+                    SourceIpcFrameError.IncompleteFrame,
                     $"Unexpected end of stream while reading Source IPC frame {framePart}.");
             }
 

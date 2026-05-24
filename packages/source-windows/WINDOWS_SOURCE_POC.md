@@ -6,7 +6,7 @@ This directory contains a clean one-shot LibreHardwareMonitor POC. It does not c
 
 - `ShoMetrics.Source.Windows.Core`: owns LibreHardwareMonitor access, sensor-to-metric mapping, snapshot DTOs, and PawnIO diagnostics.
 - `ShoMetrics.Source.Windows.Helper`: tiny console boundary that prints one JSON result and exits.
-- `ShoMetrics.Source.Windows.ControlPanel`: minimal future control-panel boundary; no UI framework dependency yet.
+- `ShoMetrics.Source.Windows.ControlPanel`: WinUI 3 read-only status UI for helper diagnostics; it queries the service over IPC and does not read hardware directly.
 
 ## Commands
 
