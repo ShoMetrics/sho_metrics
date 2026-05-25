@@ -1,4 +1,4 @@
-# Font-Safe Rendering Implementation Plan
+# Pixel Window Theme Rendering Implementation Plan
 
 ## Purpose
 
@@ -52,6 +52,116 @@ view case x theme x render surface x data state
 - Do not use title-card as the first font-safe typography driver. Title-card may
   keep its current Japanese serif font unless a later product slice explicitly
   pixelizes that view.
+
+## Pixel Window Theme Addendum
+
+The font-safe renderer work is the prerequisite for a formal `pixel-window`
+theme slice. That slice should not copy the reference game's name, character
+assets, icons, or exact Rainmeter layout. It should express the usable visual
+idea in ShoMetrics-owned terms:
+
+- a small desktop-window frame around existing widget content;
+- a title bar and hard-edged pixel borders;
+- flat color fills with no gradients;
+- DotGothic16 through `PIXEL_RENDER_TEXT_STYLES`;
+- existing widget bodies rendered directly inside a frame-owned client area.
+
+Theme name candidates:
+
+| Candidate | Renderer id | Notes |
+| --- | --- | --- |
+| Pixel Window | `pixel-window` | Recommended implementation name. Most direct and safest. Describes the frame without tying the theme to a color or external IP. |
+| Retro Window | `retro-window` | Stronger desktop-era signal, still generic. |
+| Pixel Desktop | `pixel-desktop` | Emphasizes the desktop UI reference; less specific about the window frame. |
+| Tiny Window | `tiny-window` | Friendly and compact, but less clearly pixel-themed. |
+| Window Pixel | `window-pixel` | Distinct, but less natural as a product name. |
+
+Use **Pixel Window** / `pixel-window` as the implementation name for this plan.
+If product naming changes before release, rename the renderer id, visual matrix
+case, and snapshots in one final naming pass.
+
+Avoid names that include a color word such as `pastel`, `purple`, or `pink`.
+Future theme color customization is expected, so the name should survive palette
+changes.
+
+### Future Color Customization Policy
+
+The first product slice does not need to add custom color UI, custom-color
+settings/proto fields, import/export behavior, or Property Inspector color
+controls. However, the theme implementation must not make future color
+customization require a rewrite.
+
+Implementation rules:
+
+- Define the initial colors as theme paint tokens or a narrow default palette,
+  not as scattered literals across frame drawing code.
+- Keep frame geometry separate from color selection.
+- Route colors through the same renderer appearance or paint-resolution layer
+  used by existing themes where possible.
+- Do not encode the default palette in the theme name, renderer id, snapshot
+  axis name, or text style preset name.
+- Keep the default palette in one renderer-owned token module and document it as
+  the default palette.
+
+Future custom color support should be a settings/PI slice that changes how the
+palette is resolved, not a rewrite of the frame renderer.
+
+### Body Viewport Requirement
+
+The pixel-window title bar and border consume pixels that current primitives
+expect to own. Do not fix that by editing each primitive. Add a frame-level body
+viewport owned by `ThemeStyle`, and let the view frame render the existing widget
+body directly at the viewport size.
+
+Do not use arbitrary SVG scale for Pixel Window body content. DotGothic16 is a
+pixel font, and non-integer SVG scaling blurs the glyph grid. The client body
+should be rendered at its final logical size, then placed into the frame with an
+integer translate and a clip path.
+
+Chosen body layout approach:
+
+- Treat the client viewport as the body render surface.
+- Render primitives directly at `viewport.width` x `viewport.height`.
+- Place the rendered body into the frame with integer `translate(...)`.
+- Clip the body to the viewport.
+- Do not apply SVG `scale(...)` to the body.
+- Do not apply different X/Y scale factors.
+
+This is not stretching or flattening the widget body. Existing primitives receive
+a smaller logical canvas and run their normal responsive layout against that
+canvas. Circular views should continue to derive circular geometry from
+`min(width, height)`; text should be laid out for the viewport instead of being
+scaled after raster-style composition.
+
+Rejected alternatives:
+
+- Fractional uniform scale, such as rendering at `144x144` and scaling to
+  `128x110`, because it blurs pixel-font glyph grids.
+- Integer snap scale, such as `0.5`, because it preserves pixel edges but makes
+  small widget text too small.
+- Non-uniform `scaleX/scaleY`, because it distorts circles and text.
+
+Expected ownership:
+
+- `contracts/proto/shometrics/v1/settings.proto`: selectable theme enum.
+- `packages/hub/src/settings/*`: stored/resolved theme mapping, render
+  appearance, paint, text styles, and theme effects.
+- `packages/hub/src/property-inspector/*`: theme option and preview coverage.
+- `widgets/styles/theme-style.ts`: optional body viewport contract.
+- `view-rendering/metric-view-frame.ts`: resolves body render size from the
+  theme viewport before rendering primitives.
+- `view-rendering/metric-frame.ts`: translates and clips the already-sized body
+  into the frame.
+- `widgets/styles/*`: the pixel-window frame drawing.
+- `view-rendering/pixel-window-theme-tokens.ts`: shared renderer-owned default
+  palette tokens used by both paint resolution and frame drawing.
+- `tests/visual/*`: full matrix coverage for the new selectable theme.
+
+Expected code size is roughly `500-900 LOC`, excluding generated proto output
+and visual snapshots.
+
+Pixel Window is a real selectable theme in this plan. Do not implement it as a
+hidden renderer-only preset.
 
 ## Font Driver Decision
 
@@ -876,6 +986,500 @@ user font support can reuse this layer but still needs separate product work:
 
 Do not implement those items in this plan.
 
+### Step 9: Add Selectable Pixel Window Theme
+
+This is the next implementation step. Pixel Window is a real product theme, not
+a hidden renderer preset.
+
+Use:
+
+```txt
+product name: Pixel Window
+settings theme id: pixel-window
+renderer preset id: pixel-window
+```
+
+Do not add custom color UI in this step. The first Pixel Window slice ships with
+a centralized default palette. Future custom color support should add
+theme-owned settings and PI controls without rewriting the frame renderer.
+
+Do not change action view builders. The theme must flow through settings,
+resolved appearance, renderer appearance, and frame style contracts.
+
+#### Step 9.1: Add The Stored Theme Enum
+
+Edit:
+
+```txt
+contracts/proto/shometrics/v1/settings.proto
+```
+
+Add one enum value:
+
+```proto
+enum MetricTheme {
+  METRIC_THEME_UNSPECIFIED = 0;
+  METRIC_THEME_FLAT = 1;
+  METRIC_THEME_CUPERTINO_GLASS = 2;
+  METRIC_THEME_COLOR_FILLED = 3;
+  METRIC_THEME_TERMINAL = 4;
+  METRIC_THEME_PIXEL_WINDOW = 5;
+}
+```
+
+Do not add an empty `PixelWindowThemeSettings` message in this slice. Empty
+stored messages create schema surface without persisted user intent. A later
+custom color slice can add a `pixel_window` field to `AppearanceThemeSettings`
+with a new field number and migrate no existing data.
+
+Run after the proto edit:
+
+```powershell
+cd packages\hub
+npm.cmd run proto:format
+npm.cmd run proto:lint
+npm.cmd run proto:build
+npm.cmd run generate:proto
+```
+
+Expected code size: `1-5 LOC` in proto, plus generated output.
+
+#### Step 9.2: Update Stored And Resolved Settings
+
+Edit:
+
+```txt
+packages/hub/src/settings/resolved-settings.ts
+packages/hub/src/settings/storage/enum-maps.ts
+packages/hub/src/settings/storage/resolver.ts
+packages/hub/src/settings/storage/resolver.test.ts
+packages/hub/src/settings/storage/widget-settings-patch.ts
+packages/hub/src/settings/storage/widget-settings-patch.test.ts
+packages/hub/src/settings/storage/global-settings-patch.ts
+packages/hub/src/settings/storage/global-settings-patch.test.ts
+packages/hub/src/settings/appearance-overrides.ts
+```
+
+Required changes:
+
+- Add `"pixel-window"` to the `MetricTheme` union.
+- Add both stored/resolved enum mappings:
+  - `StoredMetricTheme.PIXEL_WINDOW -> "pixel-window"`
+  - `"pixel-window" -> StoredMetricTheme.PIXEL_WINDOW`
+- Add `"pixel-window"` to all exhaustive `selectedTheme` switches.
+- Keep `DEFAULT_APPEARANCE_SETTINGS.theme.selectedTheme` as `"flat"`.
+- Do not add resolved `pixelWindow` settings until real pixel-window settings
+  exist.
+
+Paint behavior for this slice:
+
+- Pixel Window uses a theme-owned default palette.
+- Global metric paint overrides should not mutate Pixel Window until a future
+  Pixel Window color settings slice exists.
+- In `appearance-overrides.ts`, functions that build metric paint overrides
+  should return no pixel-window paint patch unless a future pixel-window paint
+  contract exists.
+
+Required tests:
+
+- Resolver reads `METRIC_THEME_PIXEL_WINDOW` as `"pixel-window"`.
+- Widget patch writes `"pixel-window"` as `StoredMetricTheme.PIXEL_WINDOW`.
+- Global theme override writes `"pixel-window"` as
+  `StoredMetricTheme.PIXEL_WINDOW`.
+- Existing theme resolver tests still pass.
+
+Expected code size: `80-180 LOC`.
+
+#### Step 9.3: Update Render Appearance Resolution
+
+Edit:
+
+```txt
+packages/hub/src/widgets/widget-contract.ts
+packages/hub/src/settings/render-appearance-builder.ts
+packages/hub/src/settings/render-appearance-builder.test.ts
+packages/hub/src/settings/render-text-style-resolver.ts
+packages/hub/src/settings/render-theme-effects-resolver.ts
+packages/hub/src/settings/render-paint-resolver.ts
+```
+
+Required changes:
+
+- Add `"pixel-window"` to `ThemePresetName`.
+- Map `selectedTheme: "pixel-window"` to `themePreset: "pixel-window"`.
+- Resolve `PIXEL_RENDER_TEXT_STYLES` for `selectedTheme: "pixel-window"`.
+- Resolve default/no-op theme effects for Pixel Window unless the frame style
+  introduces a real renderer-owned effect.
+- Add `pixel-window` branches to every exhaustive paint switch.
+
+Paint behavior:
+
+- `buildColorConfigFromAppearance()` should return a Pixel Window body accent
+  config from a centralized renderer-owned default palette.
+- Put that palette in a renderer-owned token module, not in settings and not in
+  the style implementation:
+
+```txt
+packages/hub/src/view-rendering/pixel-window-theme-tokens.ts
+```
+
+- Export a narrow constant such as `DEFAULT_PIXEL_WINDOW_PALETTE` from that
+  module. Both `render-paint-resolver.ts` and `widgets/styles/pixel-window.ts`
+  may import it. This keeps one palette source without making settings depend on
+  widget style implementation.
+- `resolveActiveMetricAccentPaint()` should return `undefined` for Pixel Window
+  so existing ordinary metric color controls are not shown for this theme.
+- `resolveActiveColorFilledPaint()` and `resolveActiveTerminalPaint()` remain
+  specific to their current themes.
+- `activePaintColorMode()` should return `"solid"` for Pixel Window until a
+  future custom color slice exists.
+
+Required tests:
+
+- `buildMetricRenderAppearance()` maps Pixel Window to `themePreset:
+  "pixel-window"`.
+- Pixel Window uses `PIXEL_RENDER_TEXT_STYLES`.
+- Pixel Window uses the intended no-gradient paint behavior.
+- Existing terminal/flat/color-filled/cupertino render appearance tests still
+  pass.
+
+Expected code size: `100-220 LOC`.
+
+#### Step 9.4: Add Theme Frame Viewport Support
+
+Implement Step 9.4 and Step 9.5 in the same code slice. Step 9.4 adds the
+generic frame contract; Step 9.5 adds the first real style that exercises it.
+Positive viewport tests belong with Step 9.5 after `pixelWindowStyle` exists.
+
+Edit:
+
+```txt
+packages/hub/src/widgets/styles/theme-style.ts
+packages/hub/src/view-rendering/metric-view-frame.ts
+packages/hub/src/view-rendering/metric-frame.ts
+packages/hub/src/view-rendering/metric-frame.test.ts
+```
+
+Add a renderer-owned body viewport type:
+
+```ts
+export interface ThemeBodyViewport {
+    readonly xCoordinate: number;
+    readonly yCoordinate: number;
+    readonly width: number;
+    readonly height: number;
+    readonly clipRadius?: number;
+}
+```
+
+Add an optional method to `ThemeStyle`:
+
+```ts
+resolveBodyViewport?(keySize: KeySize, paints: ThemeStylePaints): ThemeBodyViewport;
+```
+
+Contract:
+
+- Existing themes may omit the method.
+- Coordinates are in the same SVG logical coordinate system as `keySize`.
+- The viewport describes the client area available to widget body content after
+  the frame/title bar is drawn.
+- The viewport owns geometry only. It must not carry colors, fonts, theme names,
+  or primitive-specific layout instructions.
+- `paints` is included only for signature consistency with other `ThemeStyle`
+  methods. Pixel Window should not use `paints` to change viewport geometry in
+  this slice.
+
+Update `metric-view-frame.ts` and `metric-frame.ts` so themes with a body
+viewport render the body at the viewport size, then translate and clip it into
+the frame. Do not render at `144x144` and apply a fractional SVG scale. The
+viewport size is a new logical render surface for primitives, not a post-render
+image scale.
+
+Required data flow:
+
+1. Resolve `themePreset`, `paints`, and frame `renderSize` in
+   `buildMetricViewRenderPlan()`.
+2. Resolve the active theme's `bodyViewport` before rendering the primitive
+   body.
+3. Use the viewport dimensions as the body render size when a viewport exists:
+
+   ```ts
+   const bodyRenderSize = bodyViewport == null
+       ? renderSize
+       : {
+           width: bodyViewport.width,
+           height: bodyViewport.height,
+       };
+   ```
+
+   Pass `bodyRenderSize` to `renderSingleMetricBodyView()` or
+   `renderDualMetricBodyView()`.
+4. Keep `renderSize` as the outer SVG/frame size passed to `renderMetricFrame()`.
+5. Pass `bodyViewport` to `renderMetricFrame()`.
+
+The body placement wrapper should be a pure integer translate plus clip:
+
+```txt
+translateX = viewport.xCoordinate
+translateY = viewport.yCoordinate
+```
+
+```svg
+<g clip-path="url(#...)">
+  <g transform="translate(...)">...</g>
+</g>
+```
+
+All viewport geometry should resolve to integer values. If any calculation
+produces a fractional result, round before it becomes `ThemeBodyViewport`.
+
+The viewport clip path belongs in `<defs>`. Keep the id deterministic and
+derived from the theme preset and viewport size, for example:
+
+```txt
+pixel-window-body-viewport-${viewport.width}-${viewport.height}
+```
+
+Muted/no-data behavior must remain body-local. If a body is both muted and
+viewport-placed, the muted filter should still wrap the body content inside the
+viewport translation path.
+
+Required tests:
+
+- Existing flat frame output has no body viewport transform.
+- Existing muted flat frame output still wraps the body in the muted filter.
+- Existing non-Pixel Window view-frame tests keep using the full outer render
+  size for primitive body rendering.
+
+Expected code size: `130-240 LOC`.
+
+#### Step 9.5: Add The Pixel Window Theme Style
+
+Add:
+
+```txt
+packages/hub/src/view-rendering/pixel-window-theme-tokens.ts
+packages/hub/src/widgets/styles/pixel-window.ts
+```
+
+Edit:
+
+```txt
+packages/hub/src/view-rendering/metric-frame.ts
+```
+
+Add `pixelWindowStyle` to `resolveThemePreset()`.
+
+The style must:
+
+- export `pixelWindowStyle`;
+- set `styleId: "pixel-window"`;
+- draw the outer frame and title bar in `renderBackground()`;
+- return the body client area from `resolveBodyViewport()`;
+- keep `renderDefs()` and `renderOverlay()` minimal unless the visual needs a
+  real effect;
+- use `DEFAULT_PIXEL_WINDOW_PALETTE` from
+  `view-rendering/pixel-window-theme-tokens.ts`;
+- use flat colors and hard edges; no gradients.
+
+Default palette rules:
+
+- The first implementation may use a pastel-like default palette.
+- Do not put color words in names.
+- Keep colors in `view-rendering/pixel-window-theme-tokens.ts`, for example:
+
+```ts
+export const DEFAULT_PIXEL_WINDOW_PALETTE = {
+    outerBorder: "...",
+    innerBorder: "...",
+    titleBar: "...",
+    titleText: "...",
+    clientBackground: "...",
+    controlButton: "...",
+    bodyAccent: "...",
+} as const;
+```
+
+- Do not scatter color literals throughout drawing functions.
+- Do not duplicate palette values in `render-paint-resolver.ts`.
+- Do not add settings support for custom colors in this step.
+
+Suggested geometry for `144x144` keypad renders:
+
+```txt
+outer margin: 4
+border thickness: 2
+title bar height: 18
+client padding: 4
+client viewport x: 8
+client viewport y: 26
+client viewport width: 128
+client viewport height: 110
+clip radius: 0 or 2
+```
+
+For non-square touch-strip sizes, derive values from dimensions but keep them
+bounded:
+
+```txt
+outer margin: clamp(round(min(width, height) * 0.03), 3, 6)
+border thickness: 2
+title bar height: clamp(round(height * 0.13), 14, 20)
+client padding: 4
+```
+
+Expected body viewport examples:
+
+```txt
+144x144 key: body render size 128x110, placed at x=8, y=26, no scale
+200x100 touch strip: body render size about 184x78, placed at integer x/y, no scale
+```
+
+If a viewport makes a specific visual case too cramped, tune the Pixel Window
+viewport geometry or the primitive's existing responsive layout. Do not solve it
+by adding a Pixel Window-only body scale.
+
+Use a local clamp helper if needed. Do not create a shared utility for this
+single theme.
+
+The title bar may render a generic text label. Use a ShoMetrics-owned label such
+as `ShoMetrics` or `Monitor`; do not use copied reference labels. Keep the text
+small enough to fit `144x144`.
+
+Required tests:
+
+- Pixel Window frame output contains the body viewport clip path.
+- Pixel Window frame output contains a deterministic translate transform with no
+  `scale(...)`.
+- Muted Pixel Window output still contains both viewport clipping and muted
+  filtering.
+- A view-frame test proves Pixel Window passes the viewport size as the body
+  render size while keeping the outer frame render size unchanged.
+
+Expected code size: `120-260 LOC`.
+
+#### Step 9.6: Update Property Inspector
+
+Edit:
+
+```txt
+packages/hub/src/property-inspector/panels/setting-options.ts
+packages/hub/src/property-inspector/previews/metric-option-preview.ts
+packages/hub/src/property-inspector/previews/metric-view-preview.test.ts
+packages/hub/src/property-inspector/panels/AppearanceSettings.tsx
+packages/hub/src/property-inspector/panels/GlobalSettingsTab.tsx
+packages/hub/src/property-inspector/panels/ColorSettings.tsx
+packages/hub/src/property-inspector/panels/WidgetSettingsTab.test.tsx
+packages/hub/src/property-inspector/panels/GlobalSettingsTab.test.tsx
+```
+
+Required changes:
+
+- Add `{ value: "pixel-window", label: "Pixel Window" }` to
+  `themeOptionList`.
+- Ensure theme previews can render Pixel Window.
+- Do not show terminal variant controls for Pixel Window.
+- Do not show ordinary metric color controls for Pixel Window in this slice.
+- Do not add Pixel Window custom color controls yet.
+- Update tests that enumerate all themes.
+
+Expected code size: `80-180 LOC`.
+
+#### Step 9.7: Add Visual Matrix Coverage
+
+Edit:
+
+```txt
+packages/hub/tests/visual/widget-visual-matrix.ts
+packages/hub/tests/visual/widget-visual-matrix.visual.spec.ts
+```
+
+Add `pixel-window` to:
+
+- `VisualMatrixThemeCaseId`;
+- `VISUAL_MATRIX_THEME_CASES`;
+- `THEME_CASE_DEFINITIONS`.
+
+The theme case should use real resolved product settings:
+
+```ts
+{
+    themeCase: "pixel-window",
+    appearanceTheme: {
+        selectedTheme: "pixel-window",
+    },
+}
+```
+
+Snapshot names must include `pixel-window`.
+
+Expected matrix growth:
+
+```txt
+15 view cases x 1 new theme x 2 production-valid surfaces x 2 data states
+= 60 new snapshots
+```
+
+Acceptance criteria:
+
+- Pixel Window participates in the same matrix as all existing themes.
+- Keypad square, touch-strip wide, touch-strip square, data, and no-data states
+  are covered.
+- No ad hoc Pixel Window-only visual harness replaces matrix coverage.
+
+Expected code size: `10-40 LOC`, excluding snapshots.
+
+#### Step 9.8: Verify
+
+Run:
+
+```powershell
+cd packages\hub
+npm.cmd run proto:lint
+npm.cmd run proto:build
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run test:pi
+npm.cmd run test:visual
+```
+
+If new snapshots are expected:
+
+```powershell
+npm.cmd run test:visual:update
+```
+
+Review all generated `pixel-window-*` snapshots before accepting them. Do not
+update unrelated existing snapshots unless the diff is intentionally caused by
+this theme work and documented.
+
+Because Pixel Window gives primitives a smaller body render surface, Step 9.8
+must specifically review whether any primitive has a hidden square or minimum
+height assumption that fails at viewport sizes such as `128x110`. If that
+happens, fix the primitive's existing responsive layout or tune Pixel Window
+viewport geometry. Do not reintroduce body scaling as the workaround.
+
+#### Step 9 Completion Criteria
+
+Step 9 is complete when:
+
+- `METRIC_THEME_PIXEL_WINDOW` exists in stored settings.
+- `"pixel-window"` exists in resolved settings.
+- Pixel Window is selectable in the Property Inspector.
+- Pixel Window maps to renderer preset `pixel-window`.
+- Pixel Window uses `PIXEL_RENDER_TEXT_STYLES`.
+- Pixel Window draws an outer frame and title bar.
+- Existing widget bodies render at the client-area size and are clipped into the
+  frame without SVG scaling.
+- Default colors are centralized in `pixel-window-theme-tokens.ts`.
+- Pixel Window does not expose custom color controls yet.
+- Existing selectable themes still render without a body viewport.
+- No action view builders are changed.
+- No primitive contains `pixel-window` conditionals.
+- Visual matrix coverage includes Pixel Window.
+- Unit, PI, build, proto, and visual checks pass.
+
 ## Slice 1 Implementation Note
 
 Slice 1 created a manifest-driven visual matrix under `packages/hub/tests/visual`:
@@ -1046,6 +1650,30 @@ Regular weight.
 The row clip remains value-centered for now; if future visual tuning finds unit
 clipping, revisit the row clip-centering strategy instead of adding
 primitive-local pixel-font branches.
+
+## Slice 6 Future User Font Path Note
+
+The renderer is now shaped so future theme fonts can be added through bundled
+font assets, resvg font resolver entries, and `RenderTextStyles` presets. That
+does not mean arbitrary user font import is implemented.
+
+Future user-provided font support must be a separate product slice with its own
+storage and UX decisions:
+
+- Property Inspector controls for selecting, replacing, and clearing fonts.
+- Settings/proto fields for referencing imported font assets.
+- A storage location and migration policy for user font files.
+- File validation for corrupt, unsupported, or excessive font files.
+- Import/export behavior for profiles that reference custom fonts.
+- Recovery UI and render fallback behavior when a referenced font is missing.
+- License and user-responsibility copy for imported third-party fonts.
+
+The renderer contract should remain the same for that future work: user fonts
+become resolved render text styles plus explicit font files. Do not let
+Property Inspector, storage schema, or action view builders own baseline,
+width, or clip layout. Extreme decorative fonts remain out of scope unless a
+future product decision accepts per-font visual failures or a heavier
+measurement pipeline.
 
 ## Required Verification
 
