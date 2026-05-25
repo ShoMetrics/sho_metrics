@@ -5,7 +5,7 @@ This plan is written for a new coding session with no conversation context.
 Read this after:
 
 1. [Helper Source Reliability Implementation Plan](02-helper-source-reliability-implementation-plan.md)
-2. [LHM Storage Reading Implementation Plan](03-lhm-storage-reading-implementation-plan.md)
+2. [Windows Disk Throughput Implementation Plan](03-lhm-storage-reading-implementation-plan.md)
 3. [Runtime Collection Demand-Driven Background Collection](../../runtime-collection/03-demand-driven-background-collection.md)
 
 ## Objective

@@ -35,7 +35,7 @@ cache boundaries.
 | CPU temperature is a helper-owned stable alias. | Ordinary users expect "CPU temperature", not a choice between package, Tctl, Tdie, CCD, and individual core sensors. | The helper ranks and selects the source sensor. Hub must not parse raw LHM ids. |
 | CPU power means CPU package/socket total power. | Hardware users generally expect whole-CPU package/socket power, not graphics, DRAM, platform, or SoC rails. | Rank package/socket total first; only use an existing aggregate CPU-cores power fallback when no total-like sensor exists. Do not synthesize a sum from individual core sensors in this plan. |
 | CPU usage remains an OS aggregate metric. | LHM CPU load has source-cost and metric-definition traps; Task Manager semantics require explicit OS counter choices. | Do not route `cpu.usage_percent` through LHM. Future Windows native CPU usage should document `% Processor Utility` semantics. |
-| Disk throughput is deferred. | "All disks total" is confusing, and LHM storage probing can wake or disturb disks. | Do not enable Windows disk throughput through LHM. Keep the UI hidden until a native per-disk descriptor path exists. |
+| Disk throughput is handled in its own plan. | First-class Windows disk throughput should be system-total native I/O; per-disk LHM storage belongs to custom catalog with risk copy. | Do not enable Windows disk throughput through LHM. Re-enable stable `disk.throughput.*` only through the native system-total provider. |
 | Multi-GPU hardware selection is not in this batch. | Source choice and hardware choice are separate concepts; mixing them would confuse the PI model. | Keep current source selector work. Add hardware selector later when descriptor-backed hardware choices are ready. |
 
 ## Evidence Mapping
@@ -50,7 +50,7 @@ cache boundaries.
 | `09` What To Adopt 1, Source-Owned Stable Alias Ranking | LiteMonitor maps raw sensors to app-level keys using source-owned rules. | Implement CPU stable alias ranking in C# helper/Core. |
 | `09` What To Adopt 3, Driver/Helper Readiness Needs Its Own Status Layer | Driver/helper readiness differs from no sample. | Add cached helper install/service/driver/status diagnostics separate from MetricStore samples. |
 | `09` What To Adopt 4, CPU Usage Needs An Explicit Definition | Task Manager uses `% Processor Utility`; LHM total load is not a ShoMetrics default. | Keep CPU usage on `node-system` or future Windows native, not LHM. |
-| `09` What To Adopt 5, Disk Probing Must Stay Conservative | Disk monitoring can disturb external storage. | Remove Windows disk throughput from helper-only first-class routing until native descriptors exist. |
+| `09` What To Adopt 5, Disk Probing Must Stay Conservative | Disk monitoring can disturb external storage. | Keep first-class disk throughput off LHM storage. Use native system-total counters for the ordinary widget and custom catalog for explicit LHM per-disk sensors. |
 | `09` What To Experiment With 1, Bounded Last-Good Caching | Last-good helps flicker but can hide dead sensors if unbounded. | Use a short TTL with DEBUG attribution. |
 | `09` What To Reject | Reject unbounded last-valid, raw LHM id parsing in Hub, broad disk probing, pipe failure as install status. | Keep all new behavior bounded and owned by the source/helper boundary. |
 
@@ -598,16 +598,17 @@ that rendering actually used, plus helper-specific details when available.
 `09` What To Adopt 5, `09` Issue Signal #455.
 
 **Why this batch exists:** Earlier routing work prepared Windows disk throughput
-as helper-only. The later product decision is stricter: first-class disk
-throughput should not ship until it is per-disk and native-safe. A hidden route
-that nobody can select is still misleading maintenance debt.
+as helper-only through the Windows helper. The later product decision is
+stricter: first-class disk throughput must not come from LHM storage traversal.
+A hidden route that nobody can select is still misleading maintenance debt.
 
 **Implement:**
 
 1. Remove `disk.throughput.read`, `disk.throughput.write`, and
    `disk.throughput.total` from `WINDOWS_HELPER_ONLY_METRIC_KEYS`.
 
-2. Keep Windows disk throughput hidden/downgraded in resolver and PI.
+2. Keep Windows disk throughput hidden/downgraded in resolver and PI until the
+   native system-total provider is enabled.
 
 3. Keep Node/macOS disk throughput behavior unchanged.
 
@@ -618,7 +619,7 @@ that nobody can select is still misleading maintenance debt.
 5. Add a comment near disk routing explaining the product decision:
 
    ```text
-   Windows disk throughput waits for a native per-disk descriptor path. Do not
+   Windows disk throughput waits for a native system-total provider. Do not
    route first-class disk throughput through LHM storage traversal.
    ```
 
@@ -626,185 +627,21 @@ that nobody can select is still misleading maintenance debt.
 
 - Windows `local:auto` no longer resolves stable disk throughput keys to
   `windows-helper`.
-- Windows disk throughput remains unavailable in resolved settings/PI.
+- Windows disk throughput remains unavailable in resolved settings/PI until the
+  native system-total provider is enabled.
 - Darwin disk throughput still uses `node-system` where the existing Node path
   supports it.
 
 **Estimate:** 40-100 TS LOC, 50-120 test LOC.
 
-### Batch 4: Native Disk Throughput Implementation Plan
+### Batch 4: Windows Disk Throughput Plan
 
-**Maps to:** `08` Section 8 open questions, `09` disk probing findings.
+The full disk read/write speed plan now lives in
+[Windows Disk Throughput Implementation Plan](03-lhm-storage-reading-implementation-plan.md).
 
-**Why this batch exists:** Users expect "which disk?" for disk throughput. A
-total-system number is confusing, and joining a Node volume list to a C# disk
-counter by display string would create another fragile mapping layer.
-
-This is the implementation plan for first-class Windows disk throughput. Do not
-implement production code from this section until the implementation batch is
-explicitly started.
-
-Product decision:
-
-- V1 disk throughput is for one selected physical disk.
-- Do not ship an "all disks" or total-system throughput option in V1.
-- The `total` metric means read plus write throughput for the selected disk,
-  not throughput across every disk in the machine.
-- Darwin keeps the existing `node-system` throughput path. This plan is only
-  for Windows.
-
-Provider boundary:
-
-- Use a Windows native throughput provider, not LHM storage traversal.
-- The native provider owns disk identity, counter binding, descriptors,
-  throughput cadence, and sleeping-drive behavior.
-- Hub and PI must not parse native disk ids, join Node volume names to C# disk
-  counters, or infer disk identity from display strings.
-- The provider may use PDH `PhysicalDisk`, `IOCTL_DISK_PERFORMANCE`, or another
-  native API internally. That choice must stay behind the provider boundary.
-
-Descriptor shape:
-
-```text
-windows-native.disk:<stable-device-id>.throughput.read
-windows-native.disk:<stable-device-id>.throughput.write
-windows-native.disk:<stable-device-id>.throughput.total
-```
-
-`<stable-device-id>` is source-owned and opaque to Hub. The descriptor should
-carry the user-facing disk label separately from the metric id so PI can display
-choices without parsing ids.
-
-Implementation steps:
-
-1. Windows Core provider and validation probe.
-
-   Add a source-owned native disk throughput provider under
-   `packages/source-windows/ShoMetrics.Source.Windows.Core`.
-
-   - Use testable seams:
-     - `WindowsNativeDiskIdentityReader` owns stable disk identity discovery.
-     - `WindowsNativeDiskCounterReader` owns read/write counter sampling.
-     - `WindowsNativeDiskThroughputProvider` joins identity to counters and
-       produces descriptors/readings.
-   - Start from PDH `PhysicalDisk` counters because the existing comparison
-     probe already proves PDH can read `_Total`. Do not expose the feature until
-     per-disk identity mapping is validated.
-   - Do not use `System.Diagnostics.PerformanceCounter` or shell commands in
-     the provider. Prefer P/Invoke/native API wrappers that are compatible with
-     the helper deployment model.
-   - Disk number or PDH instance name may be used only as a runtime binding key.
-     The persisted/provider disk id must be a stable source-owned identity. If
-     the provider cannot produce one, omit that disk.
-   - Add a probe mode or extend `--metric-source-probe` so manual validation can
-     print disk ids, labels, counter instance names, and live read/write values.
-
-2. Service-facing session integration.
-
-   Keep LHM traversal and native disk throughput as separate Core owners.
-
-   - Prefer introducing a service-facing `WindowsMetricSourceSession` that
-     composes `LibreHardwareMonitorSession` and
-     `WindowsNativeDiskThroughputProvider`.
-   - Avoid putting native disk counter logic into `LibreHardwareMetricCatalog`.
-   - Merge descriptor snapshots and metric snapshots at the Windows source
-     session boundary.
-   - Descriptor fingerprint must change when the native disk descriptor set
-     changes.
-   - Throughput polling group ids should be per physical disk so read/write/total
-     for one selected disk can be collected without refreshing unrelated disks.
-   - Throughput freshness must not wait on slow disk metadata refresh.
-
-3. Hub descriptor registry and source routing.
-
-   Add a Hub runtime registry for Windows native disk throughput devices.
-
-   - Build the registry from Windows helper metric descriptors.
-   - Group descriptors by source-owned disk identity, not by Node volume.
-   - Store for each device:
-     - opaque disk id;
-     - display label;
-     - read metric id;
-     - write metric id;
-     - total metric id.
-   - Add a disk-throughput metric-id helper that recognizes only the
-     ShoMetrics-owned `windows-native.disk:<id>.throughput.<direction>` shape.
-     It must treat `<id>` as opaque and must not parse Windows-native ids.
-   - Route Windows native disk throughput ids to `windows-helper` under
-     `local:auto`.
-   - Keep Darwin `disk.throughput.*` on `node-system`.
-   - Log low-frequency warnings for malformed descriptor groups, such as a disk
-     with read but no write descriptor.
-
-4. Settings and PI enablement.
-
-   Extend the disk target so usage and throughput do not share invalid fields.
-
-   - Add a stored throughput disk selector field, for example
-     `DiskMetricTarget.throughput_disk_id`.
-   - Refactor `ResolvedDiskMetricTarget` so:
-     - usage owns `volumeId`;
-     - throughput owns `throughputDiskId`;
-     - `volumeId` is not a top-level field on every disk target.
-   - `DiskWidgetSettings` should:
-     - show the Node volume picker only for usage;
-     - show the native disk selector only for throughput;
-     - preserve an unavailable selected disk id and mark it unavailable;
-     - show throughput on Windows only after the provider/registry path exists.
-   - The selector options come from the native descriptor registry, not from
-     `diskVolumeRegistry`.
-
-5. Disk action and rendering hookup.
-
-   Update the Disk action to subscribe to selected native disk metric ids.
-
-   - For `read`, subscribe to the selected disk read metric id.
-   - For `write`, subscribe to the selected disk write metric id.
-   - For `total`, subscribe to the selected disk total metric id.
-   - For `both`, keep existing dual-channel behavior using read and write.
-   - If the selected disk is unavailable, render ordinary no-data rather than
-     falling back to a different disk.
-   - Runtime maximums must be learned per selected physical disk, not shared
-     across every disk.
-
-6. Validation gate before user-facing completion.
-
-   Do not consider the feature complete until manual validation covers:
-
-   - read-only workload on the selected disk;
-   - write-only workload on the selected disk;
-   - mixed read/write workload;
-   - helper restart;
-   - system sleep/wake;
-   - removable or external disk removal and reattach;
-   - a disk whose stable identity cannot be resolved.
-
-   If a disk cannot be safely identified, omit it or mark it unavailable. Do not
-   guess by model name, volume label, drive letter, or PDH display string.
-
-Size guard:
-
-- Expected production-code size is roughly:
-  - 500-900 C# LOC total for provider, session integration, and probe support;
-  - 350-700 TS/proto LOC total for registry, settings, PI, routing, and action
-    hookup.
-- Tests may be comparable in size to production code, but should stay focused
-  on identity mapping, descriptor grouping, settings resolution, and action
-  subscription behavior.
-- If the implementation wants to exceed about 1,200 C# production LOC or 900
-  TS/proto production LOC, stop and review the design. That likely means the
-  provider boundary is too broad, the PI is joining Node volumes to native disk
-  identities, or the feature is trying to ship more than one selected physical
-  disk.
-
-Non-goals:
-
-- No LHM disk throughput implementation.
-- No broad LHM storage traversal, SMART reads, or eager drive probing.
-- No Node volume to native disk identity join.
-- No all-disk aggregate metric.
-- No invisible wake/probe side effect from creating a widget.
-- No advanced catalog picker work.
+Keep this document focused on helper-owned CPU/power reliability. Disk
+throughput has its own plan because it spans LHM storage safety, native Windows
+system-total counters, custom catalog risk copy, and Disk action subscriptions.
 
 ## Verification Matrix
 
@@ -848,9 +685,9 @@ These are intentionally not part of this implementation plan:
 
 - Descriptor-backed advanced catalog picker UI.
 - Multi-GPU hardware selector.
-- First-class disk throughput.
+- First-class per-disk throughput selector.
 - Windows native CPU usage using `% Processor Utility`.
-- Windows native RAM/network/disk aggregate source.
+- Windows native RAM/network aggregate source.
 - Helper installer UX and Control Panel flows beyond the minimal status facts
   needed for widget/DEBUG diagnostics.
 - User-facing history retention settings.
