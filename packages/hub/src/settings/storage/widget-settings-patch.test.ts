@@ -3,6 +3,7 @@ import test from "node:test";
 import {
     ColorMode as StoredColorMode,
     CpuMetricTarget_Kind as StoredCpuMetricKind,
+    DiskMetricTarget_Kind as StoredDiskMetricKind,
     GpuMetricTarget_Kind as StoredGpuMetricKind,
     MetricSourcePolicy_FailureMode as StoredSourceFailureMode,
     MetricTheme as StoredMetricTheme,
@@ -95,6 +96,30 @@ test("widget patch updates CPU reading within the CPU action domain", () => {
         assert.equal(target.value.kind, StoredCpuMetricKind.TEMPERATURE);
         assert.equal(target.value.temperatureUnit, StoredTemperatureUnit.FAHRENHEIT);
         assert.equal(target.value.maximumTemperatureCelsius, 95);
+    }
+});
+
+test("widget patch preserves disk volume id when switching to throughput", () => {
+    const diskSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings,
+        {
+            disk: {
+                volumeId: "E:\\",
+            },
+        },
+    );
+
+    const nextSettings = writeStoredWidgetSettingsPatch(diskSettings, {
+        disk: {
+            kind: "throughput",
+        },
+    });
+
+    const target = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.metric?.target;
+    assert.equal(target?.case, "disk");
+    if (target?.case === "disk") {
+        assert.equal(target.value.kind, StoredDiskMetricKind.THROUGHPUT);
+        assert.equal(target.value.volumeId, "E:\\");
     }
 });
 

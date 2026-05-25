@@ -33,6 +33,12 @@ type DiskWidgetSettingsProps = WidgetSettingsPanelProps & {
     target: ResolvedDiskMetricTarget;
 };
 
+const systemTotalDiskVolumeOptionList = [
+    { value: "", label: "System total" },
+] as const;
+const DISK_THROUGHPUT_SYSTEM_TOTAL_NOTE =
+    "Showing total system disk read/write. Per-disk monitoring is not available in this version.";
+
 export function DiskWidgetSettings(props: DiskWidgetSettingsProps): React.JSX.Element {
     const reading = props.target.reading;
     const usesThroughputChannelColors = reading.kind === "throughput"
@@ -114,6 +120,18 @@ function DiskThroughputSettings(props: DiskWidgetSettingsProps & {
                         disk: { throughputDirection },
                     })}
                 />
+                <SelectSetting
+                    label="Volume"
+                    value=""
+                    optionList={systemTotalDiskVolumeOptionList}
+                    onValueChange={() => undefined}
+                    disabled
+                />
+                <InspectorItem>
+                    <div className="readonly-inline">
+                        <span className="readonly-text">{DISK_THROUGHPUT_SYSTEM_TOTAL_NOTE}</span>
+                    </div>
+                </InspectorItem>
             </SettingsSection>
             <SettingsSection title="Scale & Units">
                 <SelectSetting
@@ -159,21 +177,16 @@ function DiskThroughputSettings(props: DiskWidgetSettingsProps & {
 }
 
 function DiskMetricKindSetting({
-    context,
     currentKind,
     onSettingsPatch,
 }: WidgetSettingsPanelProps & {
     currentKind: ResolvedDiskMetricTarget["reading"]["kind"];
 }): React.JSX.Element {
-    const optionList = context.isWindows
-        ? diskMetricKindOptionList.filter(option => option.value !== "throughput")
-        : diskMetricKindOptionList;
-
     return (
         <SelectSetting
             label="Disk Metric"
             value={currentKind}
-            optionList={optionList}
+            optionList={diskMetricKindOptionList}
             onValueChange={(kind) => onSettingsPatch({
                 disk: { kind },
             })}

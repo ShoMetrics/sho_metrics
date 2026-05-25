@@ -69,7 +69,7 @@ test("disk usage settings preserve selected unavailable volume", () => {
     assert.match(markup, /E: \(Unavailable\)/);
 });
 
-test("windows disk settings use usage controls when throughput is unavailable", () => {
+test("windows disk throughput settings show system-total controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",
         isWindows: true,
@@ -84,9 +84,13 @@ test("windows disk settings use usage controls when throughput is unavailable", 
     });
 
     assert.match(markup, /Disk Metric:/);
-    assert.doesNotMatch(markup, /Direction:/);
-    assert.doesNotMatch(markup, /Read Max/);
-    assert.doesNotMatch(markup, /Write Max/);
+    assert.match(markup, /Direction:/);
+    assert.match(markup, /Volume:/);
+    assert.match(markup, /Volume:<\/label>[\s\S]*data-disabled="true"[\s\S]*System total/);
+    assert.match(markup, /System total/);
+    assert.match(markup, /Showing total system disk read\/write/);
+    assert.match(markup, /Read Max/);
+    assert.match(markup, /Write Max/);
 });
 
 test("network dual-channel settings render channel colors instead of usage colors", () => {
