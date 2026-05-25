@@ -460,6 +460,23 @@ test("widget advanced controls report helper source status", () => {
     assert.match(markup, /Helper status: Required/);
 });
 
+test("widget advanced controls tolerate old attribution payloads without routing", () => {
+    const runtimeCache = {
+        displayedMetricReadAttribution: {
+            metricKey: "cpu.temp",
+            outcome: undefined,
+        },
+    } as WidgetRuntimeCachePatch;
+
+    const markup = renderWidgetSettings({
+        actionKind: "cpu",
+        runtimeCache,
+    });
+
+    assert.match(markup, /Current source: No fresh source/);
+    assert.match(markup, /Last value age: none/);
+});
+
 test("widget advanced controls report sensor identity and metric state", () => {
     const markup = renderWidgetSettings({
         actionKind: "cpu",
