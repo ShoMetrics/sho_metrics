@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DEFAULT_RENDER_THEME_EFFECT_TOKENS } from "../../view-rendering/render-svg-effects";
-import { DEFAULT_RENDER_TEXT_STYLES } from "../../view-rendering/render-text-style";
+import { DEFAULT_RENDER_TEXT_STYLES, PIXEL_RENDER_TEXT_STYLES } from "../../view-rendering/render-text-style";
 import type { DualChannelWidgetData, WidgetData } from "../../view-rendering/widget-data";
 import { progressCircle, DEFAULT_PROGRESS_CIRCLE_CONFIG } from "./progress-circle";
 import { buildGaugeRangeColorPlan, resolveGaugeMarkerGap, resolveGaugeMarkerRenderProgress } from "./progress-circle-range";
@@ -756,6 +756,34 @@ test("metric text row shrinks long values and units into the row width", () => {
 
     assert.match(svgFragment, /textLength="48" lengthAdjust="spacingAndGlyphs"/);
     assert.match(svgFragment, /font-size="18\.[0-9]+"/);
+});
+
+test("metric text row keeps pixel unit text inside the shifted clip box", () => {
+    const svgFragment = renderMetricTextRow({
+        id: "metric-pixel-row",
+        layout: {
+            xCoordinate: 16,
+            yCoordinate: 61,
+            width: 120,
+        },
+        value: {
+            text: "999",
+            baseFontSize: 24,
+            textStyle: PIXEL_RENDER_TEXT_STYLES.value,
+            fill: "white",
+        },
+        unit: {
+            text: "MB/s",
+            baseFontSize: 14,
+            textStyle: PIXEL_RENDER_TEXT_STYLES.unit,
+            fill: "#aaa",
+        },
+    });
+
+    assert.match(svgFragment, /DotGothic16/);
+    assert.match(svgFragment, /y="61\.48"/);
+    assert.match(svgFragment, /dy="0\.51"/);
+    assert.match(svgFragment, /height="34\.80"/);
 });
 
 test("mirrored traffic renders labels, center line, and both channel graphs", () => {
