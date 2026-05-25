@@ -29,47 +29,6 @@ message MetricValue {
   MetricUnit unit = 3;
 }
 
-message MetricDescriptor {
-  // ShoMetrics metric id used as the key in MetricSnapshot.metrics.
-  string metric_id = 1;
-
-  // Source-owned opaque sensor id. Node must not parse this value.
-  string source_sensor_id = 2;
-
-  // Source-owned opaque hardware id. Node must not parse this value.
-  string hardware_id = 3;
-
-  string hardware_name = 4;
-  string hardware_type = 5;
-  string sensor_name = 6;
-
-  // Source-owned diagnostic sensor type. Generic Node runtime must not parse it.
-  string source_sensor_type = 7;
-
-  MetricValueKind value_kind = 8;
-  MetricUnit unit = 9;
-  MetricIdKind metric_id_kind = 10;
-
-  // Source-owned collector cost group. Consumers treat this as opaque.
-  string polling_group_id = 11;
-}
-
-enum MetricValueKind {
-  METRIC_VALUE_KIND_UNSPECIFIED = 0;
-  METRIC_VALUE_KIND_SCALAR = 1;
-  METRIC_VALUE_KIND_TEXT = 2;
-}
-
-enum MetricIdKind {
-  METRIC_ID_KIND_UNSPECIFIED = 0;
-
-  // ShoMetrics-owned stable alias such as cpu.usage_percent.
-  METRIC_ID_KIND_STABLE_ALIAS = 1;
-
-  // Source-owned raw sensor id such as lhm.sensor:/intelcpu/0/temperature/26.
-  METRIC_ID_KIND_SOURCE_SENSOR = 2;
-}
-
 enum MetricUnit {
   METRIC_UNIT_UNSPECIFIED = 0;
   METRIC_UNIT_PERCENT = 1;

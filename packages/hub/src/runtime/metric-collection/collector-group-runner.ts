@@ -1,5 +1,9 @@
 import type { MetricSnapshot } from "../sources/metric-source";
-import type { SourceClient } from "../sources/source-client";
+import type {
+    MetricUnavailableReport,
+    MetricValueAttribution,
+    SourceClient,
+} from "../sources/source-client";
 import { BackoffPolicy } from "../sources/backoff-policy";
 import type { PlannedCollectorGroup } from "./collector-group-planner";
 import { logger } from "../../logging/logger";
@@ -19,7 +23,14 @@ export interface CollectorGroupRefreshResult {
 }
 
 export interface CollectorGroupSnapshotStore {
-    ingest(sourceScopeId: string, snapshot: MetricSnapshot): void;
+    ingest(
+        sourceScopeId: string,
+        snapshot: MetricSnapshot,
+        sourceMetadata?: {
+            readonly valueAttributions?: readonly MetricValueAttribution[];
+            readonly unavailableMetrics?: readonly MetricUnavailableReport[];
+        },
+    ): void;
 }
 
 export interface CollectorGroupRunnerTimer {
@@ -131,7 +142,7 @@ export class CollectorGroupRunner {
 
     private async refresh(refreshGeneration: number): Promise<CollectorGroupRefreshResult> {
         try {
-            const snapshot = await this.sourceClient.readSnapshot(this.collectorGroup.metricKeys);
+            const readResult = await this.sourceClient.readSnapshot(this.collectorGroup.metricKeys);
 
             if (this.isStopped || refreshGeneration !== this.generation) {
                 return { status: this.isStopped ? "stopped" : "skippedSuperseded" };
@@ -140,7 +151,10 @@ export class CollectorGroupRunner {
             // Background samples stay scoped to the source/profile that
             // produced them. Read-time fallback composes those scoped samples
             // into the action's logical source scope later.
-            this.snapshotStore.ingest(this.collectorGroup.sourceId, snapshot);
+            this.snapshotStore.ingest(this.collectorGroup.sourceId, readResult.snapshot, {
+                valueAttributions: readResult.valueAttributions,
+                unavailableMetrics: readResult.unavailableMetrics,
+            });
             this.backoffPolicy.recordSuccess();
 
             return { status: "refreshed" };

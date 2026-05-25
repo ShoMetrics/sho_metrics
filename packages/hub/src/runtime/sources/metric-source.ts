@@ -1,11 +1,9 @@
 import { create } from "@bufbuild/protobuf";
 import { timestampFromMs, timestampMs } from "@bufbuild/protobuf/wkt";
 import {
-    MetricIdKind,
     MetricSnapshotSchema,
     MetricUnit,
     MetricValueSchema,
-    MetricValueKind,
     type MetricSnapshot,
     type MetricValue,
 } from "../../generated/shometrics/v1/snapshot_pb.js";
@@ -13,7 +11,7 @@ import type { SourceMetricPollingGroupResolver } from "./source-polling-groups";
 
 // Runtime source adapters import wire metric enums through this boundary module.
 // Rendering and ordinary PI code should consume render-facing models instead.
-export { MetricIdKind, MetricUnit, MetricValueKind };
+export { MetricUnit };
 export type { MetricSnapshot, MetricValue };
 
 export function buildMetricSnapshot(options: {

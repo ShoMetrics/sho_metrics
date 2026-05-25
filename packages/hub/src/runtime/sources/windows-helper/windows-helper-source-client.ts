@@ -1,12 +1,18 @@
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import { randomUUID } from "node:crypto";
+import { execFile } from "node:child_process";
 import { createConnection, type Socket } from "node:net";
+import { promisify } from "node:util";
 import { logger } from "../../../logging/logger";
 import {
     GetSourceHealthRequestSchema,
     ListMetricDescriptorsRequestSchema,
     ReadMetricSnapshotRequestSchema,
     type GetSourceHealthResponse,
+    type MetricDescriptor as ProtoMetricDescriptor,
+    type MetricUnavailableReport as ProtoMetricUnavailableReport,
+    type MetricValueAttribution as ProtoMetricValueAttribution,
+    type RawSensorIdentity as ProtoRawSensorIdentity,
     type SourceWarning as ProtoSourceWarning,
 } from "../../../generated/shometrics/v1/source_api_pb.js";
 import {
@@ -15,19 +21,24 @@ import {
     type SourceIpcRequest,
     type SourceIpcResponse,
 } from "../../../generated/shometrics/v1/source_ipc_pb.js";
-import type { MetricDescriptor as ProtoMetricDescriptor } from "../../../generated/shometrics/v1/snapshot_pb.js";
 import {
     readMetricSnapshotTimestampMilliseconds,
     type MetricSnapshot,
 } from "../metric-source";
-import type {
-    MetricDescriptor,
-    SourceClient,
-    SourceHealth,
-    SourceClientStatus,
-    SourceClientStatusReason,
-    SourceWarning,
-    MetricDescriptorSnapshot,
+import {
+    MetricUnavailableReason,
+    MetricValueFreshness,
+    type MetricDescriptor,
+    type MetricDescriptorSnapshot,
+    type MetricUnavailableReport,
+    type MetricValueAttribution,
+    type RawSensorIdentity,
+    type SourceClient,
+    type SourceClientStatus,
+    type SourceClientStatusReason,
+    type SourceHealth,
+    type SourceSnapshotReadResult,
+    type SourceWarning,
 } from "../source-client";
 import type {
     SourceMetadataInvalidation,
@@ -57,6 +68,15 @@ export const UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS = 60000;
 /** Cooldown before retrying when the Windows helper named pipe is missing. */
 export const PIPE_NOT_FOUND_RETRY_COOLDOWN_MILLISECONDS = 300000;
 
+/** Fast pipe retry interval while helper-backed demand first appears or recovers. */
+export const ACTIVE_HELPER_PIPE_RETRY_MILLISECONDS = 2000;
+
+/** Fast pipe retry window for active helper-backed demand. */
+export const ACTIVE_HELPER_PIPE_RETRY_WINDOW_MILLISECONDS = 60000;
+
+/** Cache duration for Windows service status probes. */
+export const HELPER_SERVICE_STATUS_CACHE_MILLISECONDS = 30000;
+
 /** Retry cooldowns for transient helper failures, indexed by consecutive failure count. */
 export const HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS = [5000, 15000, 60000] as const;
 
@@ -65,6 +85,10 @@ const CPU_USAGE_METRIC_KEY = "cpu.usage_percent";
 const DEFAULT_HEALTH_TIMEOUT_MILLISECONDS = 750;
 const DEFAULT_READ_SNAPSHOT_TIMEOUT_MILLISECONDS = 2000;
 const DEFAULT_LIST_DESCRIPTORS_TIMEOUT_MILLISECONDS = 5000;
+// Mirrors `ServiceName` in
+// packages/source-windows/ShoMetrics.Source.Windows.Ipc/SourceIpcConstants.cs.
+const WINDOWS_HELPER_SERVICE_NAME = "ShoMetrics Source Windows";
+const execFileAsync = promisify(execFile);
 
 /**
  * Startup retry interval for descriptor preload. This closes the common
@@ -90,6 +114,7 @@ const DEFAULT_DESCRIPTOR_PRELOAD_RETRY_MILLISECONDS = 10000;
  * minute while the helper is starting, missing, or temporarily unavailable.
  */
 const DESCRIPTOR_PRELOAD_WARNING_INTERVAL_MILLISECONDS = 60000;
+const WIRE_INVARIANT_WARNING_INTERVAL_MILLISECONDS = 30000;
 
 /** Timeout configuration for the Windows helper source client. */
 export interface WindowsHelperSourceTimeouts {
@@ -111,6 +136,13 @@ export interface WindowsHelperDescriptorPreloadTimer {
 
     /** Clears a previously scheduled retry. */
     clear(handle: WindowsHelperDescriptorPreloadTimerHandle): void;
+}
+
+export type WindowsHelperServiceStatus = "unknown" | "notInstalled" | "installedStopped" | "running";
+
+/** Reads packaged Windows service status without touching the metric pipe. */
+export interface WindowsHelperServiceStatusReader {
+    readStatus(): Promise<WindowsHelperServiceStatus>;
 }
 
 /** Options passed to a source IPC transport request. */
@@ -140,6 +172,7 @@ export interface WindowsHelperSourceClientOptions {
     readonly timeouts?: Partial<WindowsHelperSourceTimeouts>;
     readonly descriptorPreloadRetryMilliseconds?: number;
     readonly descriptorPreloadTimer?: WindowsHelperDescriptorPreloadTimer;
+    readonly serviceStatusReader?: WindowsHelperServiceStatusReader;
 }
 
 /** Encodes one source IPC protobuf payload using uint32 little-endian framing. */
@@ -181,11 +214,16 @@ export class WindowsHelperSourceClient implements SourceClient {
     private readonly timeouts: WindowsHelperSourceTimeouts;
     private readonly descriptorPreloadRetryMilliseconds: number;
     private readonly descriptorPreloadTimer: WindowsHelperDescriptorPreloadTimer;
+    private readonly serviceStatusReader: WindowsHelperServiceStatusReader;
     private protocolCompatibility: "unknown" | "supported" = "unknown";
     private protocolCheckPromise: Promise<void> | undefined;
     private unsupportedProtocolRetryAfterMilliseconds = 0;
     private helperUnavailableRetryAfterMilliseconds = 0;
     private helperUnavailableFailureCount = 0;
+    private activeHelperDemandStartedAtTimestampMilliseconds: number | undefined;
+    private serviceStatusProbePromise: Promise<void> | undefined;
+    private serviceStatusCacheExpiresAtTimestampMilliseconds = 0;
+    private cachedServiceStatus: WindowsHelperServiceStatus = "unknown";
     private status: SourceClientStatus = { state: "unknown" };
     private descriptorFingerprint: string | undefined;
     private hasCompleteDescriptorSnapshot = false;
@@ -211,9 +249,11 @@ export class WindowsHelperSourceClient implements SourceClient {
         this.descriptorPreloadRetryMilliseconds = options.descriptorPreloadRetryMilliseconds
             ?? DEFAULT_DESCRIPTOR_PRELOAD_RETRY_MILLISECONDS;
         this.descriptorPreloadTimer = options.descriptorPreloadTimer ?? nodeDescriptorPreloadTimer;
+        this.serviceStatusReader = options.serviceStatusReader ?? windowsServiceStatusReader;
     }
 
-    async readSnapshot(metricKeys: readonly string[]): Promise<MetricSnapshot> {
+    async readSnapshot(metricKeys: readonly string[]): Promise<SourceSnapshotReadResult> {
+        this.markHelperDemandActive();
         await this.ensureProtocolSupported();
 
         const requestStartedAtTimestampMilliseconds = this.now();
@@ -235,7 +275,8 @@ export class WindowsHelperSourceClient implements SourceClient {
             throw new Error(`Unexpected Windows source response: ${response.payload.case ?? "empty"}.`);
         }
 
-        const snapshot = response.payload.value.snapshot;
+        const readResponse = response.payload.value;
+        const snapshot = readResponse.snapshot;
         if (!snapshot) {
             throw new Error("Windows source returned a snapshot response without a snapshot.");
         }
@@ -253,8 +294,18 @@ export class WindowsHelperSourceClient implements SourceClient {
 
         this.recordHelperRequestSuccess();
         this.logSnapshotRead(metricKeys, snapshot, requestStartedAtTimestampMilliseconds, timestampMilliseconds);
+        const sourceMetadata = toRuntimeSnapshotMetadata({
+            requestedMetricKeys: metricKeys,
+            snapshot,
+            valueAttributions: readResponse.valueAttributions,
+            unavailableMetrics: readResponse.unavailableMetrics,
+        });
 
-        return snapshot;
+        return {
+            snapshot,
+            valueAttributions: sourceMetadata.valueAttributions,
+            unavailableMetrics: sourceMetadata.unavailableMetrics,
+        };
     }
 
     resolveMetricPollingGroups(
@@ -264,6 +315,7 @@ export class WindowsHelperSourceClient implements SourceClient {
     }
 
     async listMetricDescriptors(metricKeys: readonly string[]): Promise<MetricDescriptorSnapshot> {
+        this.markHelperDemandActive();
         await this.ensureProtocolSupported();
 
         return await this.readMetricDescriptors(metricKeys);
@@ -271,6 +323,7 @@ export class WindowsHelperSourceClient implements SourceClient {
 
     subscribeSourceMetadataInvalidations(listener: SourceMetadataInvalidationListener): () => void {
         this.sourceMetadataInvalidationListeners.add(listener);
+        this.markHelperDemandActive();
 
         if (this.hasCompleteDescriptorSnapshot && this.descriptorFingerprint !== undefined) {
             listener(this.buildSourceMetadataInvalidation("descriptorLoaded"));
@@ -315,7 +368,10 @@ export class WindowsHelperSourceClient implements SourceClient {
         this.recordHelperRequestSuccess();
 
         const runtimeDescriptorSnapshot = {
-            descriptors: descriptorSnapshot.descriptors.map(toRuntimeMetricDescriptor),
+            descriptors: descriptorSnapshot.descriptors.flatMap(descriptor => {
+                const runtimeDescriptor = toRuntimeMetricDescriptor(descriptor);
+                return runtimeDescriptor ? [runtimeDescriptor] : [];
+            }),
             descriptorFingerprint: descriptorSnapshot.descriptorFingerprint,
         };
         const invalidationReason = this.recordDescriptorSnapshot(
@@ -340,7 +396,7 @@ export class WindowsHelperSourceClient implements SourceClient {
 
         if (health.protocolVersion === SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION) {
             this.protocolCompatibility = "supported";
-            this.recordHelperRequestSuccess();
+            this.recordHelperRequestSuccess(health);
         } else {
             this.recordUnsupportedProtocol("unsupported_protocol");
         }
@@ -640,27 +696,107 @@ export class WindowsHelperSourceClient implements SourceClient {
         const nowMilliseconds = this.now();
         const failure = classifyHelperRequestFailure(error);
         const cooldownMilliseconds = failure.reason === "pipeMissing"
-            ? PIPE_NOT_FOUND_RETRY_COOLDOWN_MILLISECONDS
+            ? this.selectPipeMissingRetryCooldownMilliseconds(nowMilliseconds)
             : this.nextUnavailableRetryCooldownMilliseconds();
 
         this.helperUnavailableRetryAfterMilliseconds = nowMilliseconds + cooldownMilliseconds;
         this.status = {
             state: "unavailable",
-            reason: failure.reason,
+            reason: this.refinePipeMissingReason(failure.reason),
             retryAfterTimestampMilliseconds: this.helperUnavailableRetryAfterMilliseconds,
             ...(failure.errorCode ? { lastErrorCode: failure.errorCode } : {}),
+            lastErrorMessage: toError(error).message,
             lastFailureAtTimestampMilliseconds: nowMilliseconds,
         };
+
+        if (failure.reason === "pipeMissing") {
+            this.refreshCachedServiceStatus();
+        }
     }
 
-    private recordHelperRequestSuccess(): void {
+    private recordHelperRequestSuccess(health?: SourceHealth): void {
         this.unsupportedProtocolRetryAfterMilliseconds = 0;
         this.helperUnavailableRetryAfterMilliseconds = 0;
         this.helperUnavailableFailureCount = 0;
+        this.activeHelperDemandStartedAtTimestampMilliseconds = undefined;
+        this.cachedServiceStatus = "running";
+        this.serviceStatusCacheExpiresAtTimestampMilliseconds = this.now()
+            + HELPER_SERVICE_STATUS_CACHE_MILLISECONDS;
         this.status = {
             state: "available",
+            protocolVersion: health?.protocolVersion ?? this.status.protocolVersion ?? SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION,
+            ...(health?.helperVersion ? { helperVersion: health.helperVersion } : {}),
             lastSuccessAtTimestampMilliseconds: this.now(),
         };
+    }
+
+    private markHelperDemandActive(): void {
+        if (this.activeHelperDemandStartedAtTimestampMilliseconds !== undefined) {
+            return;
+        }
+
+        this.activeHelperDemandStartedAtTimestampMilliseconds = this.now();
+        this.refreshCachedServiceStatus();
+    }
+
+    private selectPipeMissingRetryCooldownMilliseconds(nowMilliseconds: number): number {
+        const activeWindowStartedAt = this.activeHelperDemandStartedAtTimestampMilliseconds;
+
+        if (
+            activeWindowStartedAt !== undefined
+            && nowMilliseconds - activeWindowStartedAt < ACTIVE_HELPER_PIPE_RETRY_WINDOW_MILLISECONDS
+        ) {
+            return ACTIVE_HELPER_PIPE_RETRY_MILLISECONDS;
+        }
+
+        return PIPE_NOT_FOUND_RETRY_COOLDOWN_MILLISECONDS;
+    }
+
+    private refinePipeMissingReason(reason: SourceClientStatusReason): SourceClientStatusReason {
+        if (reason !== "pipeMissing") {
+            return reason;
+        }
+
+        if (this.cachedServiceStatus === "notInstalled") {
+            return "helperNotInstalled";
+        }
+
+        if (this.cachedServiceStatus === "installedStopped") {
+            return "helperStopped";
+        }
+
+        return "pipeMissing";
+    }
+
+    private refreshCachedServiceStatus(): void {
+        const nowMilliseconds = this.now();
+
+        if (nowMilliseconds < this.serviceStatusCacheExpiresAtTimestampMilliseconds
+            || this.serviceStatusProbePromise) {
+            return;
+        }
+
+        this.serviceStatusProbePromise = this.serviceStatusReader.readStatus()
+            .then(status => {
+                this.cachedServiceStatus = status;
+                this.serviceStatusCacheExpiresAtTimestampMilliseconds =
+                    this.now() + HELPER_SERVICE_STATUS_CACHE_MILLISECONDS;
+
+                if (this.status.state === "unavailable") {
+                    this.status = {
+                        ...this.status,
+                        reason: this.refinePipeMissingReason(this.status.reason ?? "pipeMissing"),
+                    };
+                }
+            })
+            .catch(error => {
+                log.atDebug()
+                    .everyMs("service-status-probe-failed", HELPER_SERVICE_STATUS_CACHE_MILLISECONDS)
+                    .log(() => `Windows helper service status probe failed: ${String(error)}`);
+            })
+            .finally(() => {
+                this.serviceStatusProbePromise = undefined;
+            });
     }
 
     private nextUnavailableRetryCooldownMilliseconds(): number {
@@ -730,6 +866,52 @@ const nodeDescriptorPreloadTimer: WindowsHelperDescriptorPreloadTimer = {
         clearTimeout(handle as ReturnType<typeof setTimeout>);
     },
 };
+
+const windowsServiceStatusReader: WindowsHelperServiceStatusReader = {
+    async readStatus(): Promise<WindowsHelperServiceStatus> {
+        try {
+            const { stdout } = await execFileAsync(
+                "sc.exe",
+                ["query", WINDOWS_HELPER_SERVICE_NAME],
+                { windowsHide: true },
+            );
+            const output = stdout.toLowerCase();
+
+            if (output.includes("running")) {
+                return "running";
+            }
+
+            if (output.includes("stopped")
+                || output.includes("stop_pending")
+                || output.includes("start_pending")) {
+                return "installedStopped";
+            }
+
+            logUnknownServiceStatus("unrecognizedOutput");
+            return "unknown";
+        } catch (error) {
+            const message = toError(error).message.toLowerCase();
+            if (message.includes("1060") || message.includes("does not exist")) {
+                return "notInstalled";
+            }
+
+            logUnknownServiceStatus("queryFailed");
+            return "unknown";
+        }
+    },
+};
+
+function logUnknownServiceStatus(reason: "queryFailed" | "unrecognizedOutput"): void {
+    log.atWarn()
+        .everyMs(
+            `service-status-unknown:${reason}`,
+            HELPER_SERVICE_STATUS_CACHE_MILLISECONDS,
+        )
+        .log(() => [
+            "windowsHelperServiceStatusUnknown",
+            `reason=${reason}`,
+        ].join(" "));
+}
 
 function selectHelperUnavailableRetryCooldownMilliseconds(failureCount: number): number {
     const maximumBackoffMilliseconds = HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS[2];
@@ -941,23 +1123,219 @@ function toRuntimeSourceHealth(response: GetSourceHealthResponse): SourceHealth 
     };
 }
 
-function toRuntimeMetricDescriptor(descriptor: ProtoMetricDescriptor): MetricDescriptor {
+function toRuntimeSnapshotMetadata(options: {
+    readonly requestedMetricKeys: readonly string[];
+    readonly snapshot: MetricSnapshot;
+    readonly valueAttributions: readonly ProtoMetricValueAttribution[];
+    readonly unavailableMetrics: readonly ProtoMetricUnavailableReport[];
+}): {
+    readonly valueAttributions: readonly MetricValueAttribution[];
+    readonly unavailableMetrics: readonly MetricUnavailableReport[];
+} {
+    const emittedMetricIds = new Set(Object.keys(options.snapshot.metrics));
+    const requestedMetricIds = new Set(options.requestedMetricKeys);
+    const validateRequestedMetricIds = requestedMetricIds.size > 0;
+    const seenValueAttributionMetricIds = new Set<string>();
+    const seenUnavailableMetricIds = new Set<string>();
+    const valueAttributions: MetricValueAttribution[] = [];
+    const unavailableMetrics: MetricUnavailableReport[] = [];
+
+    for (const attribution of options.valueAttributions) {
+        if (!emittedMetricIds.has(attribution.metricId)) {
+            logDroppedWireRecord("valueAttribution", attribution.metricId, "orphan");
+            continue;
+        }
+
+        if (seenValueAttributionMetricIds.has(attribution.metricId)) {
+            logDroppedWireRecord("valueAttribution", attribution.metricId, "duplicate");
+            continue;
+        }
+
+        seenValueAttributionMetricIds.add(attribution.metricId);
+        valueAttributions.push(toRuntimeMetricValueAttribution(attribution));
+    }
+
+    for (const unavailableReport of options.unavailableMetrics) {
+        if (validateRequestedMetricIds && !requestedMetricIds.has(unavailableReport.metricId)) {
+            logDroppedWireRecord("unavailableMetric", unavailableReport.metricId, "notRequested");
+            continue;
+        }
+
+        if (emittedMetricIds.has(unavailableReport.metricId)) {
+            logDroppedWireRecord("unavailableMetric", unavailableReport.metricId, "emitted");
+            continue;
+        }
+
+        if (seenUnavailableMetricIds.has(unavailableReport.metricId)) {
+            logDroppedWireRecord("unavailableMetric", unavailableReport.metricId, "duplicate");
+            continue;
+        }
+
+        seenUnavailableMetricIds.add(unavailableReport.metricId);
+        unavailableMetrics.push(toRuntimeMetricUnavailableReport(unavailableReport));
+    }
+
+    return {
+        valueAttributions,
+        unavailableMetrics,
+    };
+}
+
+function logDroppedWireRecord(
+    recordKind: "valueAttribution" | "unavailableMetric",
+    metricId: string,
+    reason: "orphan" | "duplicate" | "notRequested" | "emitted",
+): void {
+    log.atWarn()
+        .everyMs(
+            `wireInvariantDropped:${recordKind}:${reason}:${metricId}`,
+            WIRE_INVARIANT_WARNING_INTERVAL_MILLISECONDS,
+        )
+        .log(() => [
+            "windowsHelperWireRecordDropped",
+            `recordKind=${recordKind}`,
+            `reason=${reason}`,
+            `metricId=${metricId}`,
+        ].join(" "));
+}
+
+function logUnknownWireEnum(
+    fieldName: string,
+    metricId: string,
+    value: number,
+    fallback: string,
+): void {
+    log.atWarn()
+        .everyMs(
+            `wireEnumFallback:${fieldName}:${value}:${metricId}`,
+            WIRE_INVARIANT_WARNING_INTERVAL_MILLISECONDS,
+        )
+        .log(() => [
+            "windowsHelperWireEnumFallback",
+            `fieldName=${fieldName}`,
+            `metricId=${metricId}`,
+            `value=${value}`,
+            `fallback=${fallback}`,
+        ].join(" "));
+}
+
+function logDroppedDescriptor(metricId: string, reason: string): void {
+    log.atWarn()
+        .everyMs(
+            `descriptorDropped:${reason}:${metricId}`,
+            WIRE_INVARIANT_WARNING_INTERVAL_MILLISECONDS,
+        )
+        .log(() => [
+            "windowsHelperDescriptorDropped",
+            `reason=${reason}`,
+            `metricId=${metricId}`,
+        ].join(" "));
+}
+
+function toRuntimeMetricDescriptor(descriptor: ProtoMetricDescriptor): MetricDescriptor | undefined {
+    const rawSensorIdentity = readRequiredRawSensorIdentity(descriptor.rawSensorIdentity, descriptor.metricId);
+    const pollingGroupId = readRequiredDescriptorString({
+        fieldName: "polling_group_id",
+        fieldValue: descriptor.pollingGroupId,
+        metricId: descriptor.metricId,
+    });
+
+    if (!rawSensorIdentity || !pollingGroupId) {
+        // Helper/plugin versions may be skewed. A malformed descriptor should
+        // not make the whole helper source unavailable; drop the bad record and
+        // keep the support log from the field reader.
+        return undefined;
+    }
+
     return {
         metricId: descriptor.metricId,
-        sourceSensorId: descriptor.sourceSensorId,
-        pollingGroupId: readRequiredDescriptorString({
-            fieldName: "polling_group_id",
-            fieldValue: descriptor.pollingGroupId,
-            metricId: descriptor.metricId,
-        }),
-        hardwareId: descriptor.hardwareId,
-        hardwareName: descriptor.hardwareName,
-        hardwareType: descriptor.hardwareType,
-        sensorName: descriptor.sensorName,
-        sourceSensorType: descriptor.sourceSensorType,
+        rawSensorIdentity,
         valueKind: descriptor.valueKind,
         unit: descriptor.unit,
         metricIdKind: descriptor.metricIdKind,
+        pollingGroupId,
+    };
+}
+
+function toRuntimeMetricValueAttribution(
+    attribution: ProtoMetricValueAttribution,
+): MetricValueAttribution {
+    return {
+        metricId: attribution.metricId,
+        ...(attribution.rawSensorIdentity
+            ? { rawSensorIdentity: toRuntimeRawSensorIdentity(attribution.rawSensorIdentity) }
+            : {}),
+        valueFreshness: normalizeMetricValueFreshness(attribution.valueFreshness, attribution.metricId),
+        ...(attribution.retainedAgeMilliseconds === undefined
+            ? {}
+            : { retainedAgeMilliseconds: attribution.retainedAgeMilliseconds }),
+    };
+}
+
+function toRuntimeMetricUnavailableReport(
+    unavailableReport: ProtoMetricUnavailableReport,
+): MetricUnavailableReport {
+    return {
+        metricId: unavailableReport.metricId,
+        reason: normalizeMetricUnavailableReason(unavailableReport.reason, unavailableReport.metricId),
+        ...(unavailableReport.rawSensorIdentity
+            ? { rawSensorIdentity: toRuntimeRawSensorIdentity(unavailableReport.rawSensorIdentity) }
+            : {}),
+    };
+}
+
+function normalizeMetricValueFreshness(freshness: MetricValueFreshness, metricId: string): MetricValueFreshness {
+    switch (freshness) {
+        case MetricValueFreshness.FRESH:
+        case MetricValueFreshness.RETAINED:
+            return freshness;
+        case MetricValueFreshness.UNSPECIFIED:
+            logUnknownWireEnum("valueFreshness", metricId, freshness, "retained");
+            return MetricValueFreshness.RETAINED;
+    }
+
+    logUnknownWireEnum("valueFreshness", metricId, freshness, "retained");
+    return MetricValueFreshness.RETAINED;
+}
+
+function normalizeMetricUnavailableReason(
+    reason: MetricUnavailableReason,
+    metricId: string,
+): MetricUnavailableReason {
+    switch (reason) {
+        case MetricUnavailableReason.NO_SENSOR:
+        case MetricUnavailableReason.INVALID_VALUE:
+        case MetricUnavailableReason.EXPIRED:
+            return reason;
+        case MetricUnavailableReason.UNSPECIFIED:
+            logUnknownWireEnum("unavailableReason", metricId, reason, "debugOnly");
+            return reason;
+    }
+
+    logUnknownWireEnum("unavailableReason", metricId, reason, "debugOnly");
+    return reason;
+}
+
+function readRequiredRawSensorIdentity(
+    rawSensorIdentity: ProtoRawSensorIdentity | undefined,
+    metricId: string,
+): RawSensorIdentity | undefined {
+    if (!rawSensorIdentity) {
+        logDroppedDescriptor(metricId, "missingRawSensorIdentity");
+        return undefined;
+    }
+
+    return toRuntimeRawSensorIdentity(rawSensorIdentity);
+}
+
+function toRuntimeRawSensorIdentity(rawSensorIdentity: ProtoRawSensorIdentity): RawSensorIdentity {
+    return {
+        sourceSensorId: rawSensorIdentity.sourceSensorId,
+        hardwareId: rawSensorIdentity.hardwareId,
+        hardwareName: rawSensorIdentity.hardwareName,
+        hardwareType: rawSensorIdentity.hardwareType,
+        sensorName: rawSensorIdentity.sensorName,
+        sourceSensorType: rawSensorIdentity.sourceSensorType,
     };
 }
 
@@ -965,15 +1343,12 @@ function readRequiredDescriptorString(options: {
     readonly fieldName: string;
     readonly fieldValue: string;
     readonly metricId: string;
-}): string {
+}): string | undefined {
     const value = options.fieldValue.trim();
 
     if (value.length === 0) {
-        throw new WindowsHelperSourceClientError(
-            `Windows source descriptor '${options.metricId}' is missing ${options.fieldName}.`,
-            `missing_${options.fieldName}`,
-            "protocolMismatch",
-        );
+        logDroppedDescriptor(options.metricId, `missing_${options.fieldName}`);
+        return undefined;
     }
 
     return value;

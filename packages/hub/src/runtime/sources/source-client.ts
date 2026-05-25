@@ -1,9 +1,16 @@
-import type {
+import {
     MetricIdKind,
+    MetricUnavailableReason,
+    MetricValueFreshness,
+    MetricValueKind,
+    type MetricDescriptor as ProtoMetricDescriptor,
+    type MetricUnavailableReport as ProtoMetricUnavailableReport,
+    type MetricValueAttribution as ProtoMetricValueAttribution,
+    type RawSensorIdentity as ProtoRawSensorIdentity,
+} from "../../generated/shometrics/v1/source_api_pb.js";
+import type {
     MetricSnapshot,
     MetricSource,
-    MetricUnit,
-    MetricValueKind,
 } from "./metric-source";
 import type { SourceMetricPollingGroupResolver } from "./source-polling-groups";
 import type { SourceMetadataInvalidationListener } from "./source-planning-metadata";
@@ -13,7 +20,7 @@ export interface SourceWarning {
     /** Stable warning code owned by the source adapter boundary. */
     readonly code: string;
 
-    /** Human-readable diagnostic text for logs and support. */
+    /** Human-readable support text for logs and DEBUG views. */
     readonly message: string;
 
     /** Metric id affected by the warning when the warning is metric-specific. */
@@ -23,6 +30,26 @@ export interface SourceWarning {
     readonly sourceSensorId?: string;
 }
 
+export { MetricIdKind, MetricUnavailableReason, MetricValueFreshness, MetricValueKind };
+
+// Source-runtime payloads intentionally derive from the source API proto so the
+// wire shape and runtime facade cannot drift. Strip protobuf-es implementation
+// fields here; adapters still own wire invariant and version-skew handling.
+type RuntimeProtoPayload<T> = Readonly<{
+    [Key in keyof T as Key extends `$${string}` ? never : Key]: T[Key];
+}>;
+type RuntimeProtoPayloadWithRequiredRawSensor<T> = Readonly<
+    Omit<RuntimeProtoPayload<T>, "rawSensorIdentity">
+    & { readonly rawSensorIdentity: RawSensorIdentity }
+>;
+type RuntimeProtoPayloadWithOptionalRawSensor<T> = Readonly<
+    Omit<RuntimeProtoPayload<T>, "rawSensorIdentity">
+    & { readonly rawSensorIdentity?: RawSensorIdentity }
+>;
+
+/** Source-owned raw sensor identity for descriptors and source attribution. */
+export type RawSensorIdentity = RuntimeProtoPayload<ProtoRawSensorIdentity>;
+
 /** Runtime health metadata returned by a source client. */
 export interface SourceHealth {
     /** Source id owned by the runtime source registry. */
@@ -31,7 +58,7 @@ export interface SourceHealth {
     /** Source API compatibility version when the source uses a versioned protocol. */
     readonly protocolVersion?: string;
 
-    /** Installed helper or agent version for diagnostics only. */
+    /** Installed helper or agent version for support and DEBUG views only. */
     readonly helperVersion?: string;
 
     /** Non-fatal health warnings reported by the source. */
@@ -47,9 +74,12 @@ export type SourceClientStatusReason =
     | "timeout"
     | "healthFailed"
     | "sourceError"
-    | "protocolMismatch";
+    | "protocolMismatch"
+    | "helperNotInstalled"
+    | "helperStopped"
+    | "driverUnavailable";
 
-/** Runtime-only source status for diagnostics and future Property Inspector debug views. */
+/** Runtime-only source status for support and future Property Inspector DEBUG views. */
 export interface SourceClientStatus {
     /** Current availability state known by this client. */
     readonly state: SourceClientStatusState;
@@ -63,6 +93,15 @@ export interface SourceClientStatus {
     /** Stable source or OS error code for the last failure when one is known. */
     readonly lastErrorCode?: string;
 
+    /** Human-readable last failure detail for the DEBUG view. */
+    readonly lastErrorMessage?: string;
+
+    /** Installed helper or agent version for the DEBUG view. */
+    readonly helperVersion?: string;
+
+    /** Source API compatibility version for the DEBUG view. */
+    readonly protocolVersion?: string;
+
     /** Absolute Unix timestamp in milliseconds for the latest successful request. */
     readonly lastSuccessAtTimestampMilliseconds?: number;
 
@@ -71,40 +110,7 @@ export interface SourceClientStatus {
 }
 
 /** Runtime descriptor for a metric exposed by a source. */
-export interface MetricDescriptor {
-    /** ShoMetrics canonical metric key consumed by actions and MetricStore. */
-    readonly metricId: string;
-
-    /** Opaque sensor id owned by the source adapter. */
-    readonly sourceSensorId: string;
-
-    /** Source-owned collector cost group. Runtime planning treats it as opaque. */
-    readonly pollingGroupId: string;
-
-    /** Opaque hardware id owned by the source adapter. */
-    readonly hardwareId: string;
-
-    /** Human-readable hardware name from the source. */
-    readonly hardwareName: string;
-
-    /** Source-owned hardware type for display and diagnostics only. */
-    readonly hardwareType: string;
-
-    /** Human-readable sensor name from the source. */
-    readonly sensorName: string;
-
-    /** Source sensor type, such as Load, Temperature, or Power, for display and diagnostics only. */
-    readonly sourceSensorType: string;
-
-    /** Metric value kind exposed by the source descriptor. */
-    readonly valueKind: MetricValueKind;
-
-    /** Canonical unit used by scalar metric values. */
-    readonly unit: MetricUnit;
-
-    /** Origin of the metric id exposed by this descriptor. */
-    readonly metricIdKind: MetricIdKind;
-}
+export type MetricDescriptor = RuntimeProtoPayloadWithRequiredRawSensor<ProtoMetricDescriptor>;
 
 /** Source-owned descriptor snapshot read through the source client boundary. */
 export interface MetricDescriptorSnapshot {
@@ -120,13 +126,26 @@ export interface MetricDescriptorSnapshot {
     readonly descriptorFingerprint: string;
 }
 
+/** Runtime source snapshot plus source-owned per-metric metadata. */
+export interface SourceSnapshotReadResult {
+    readonly snapshot: MetricSnapshot;
+    readonly valueAttributions: readonly MetricValueAttribution[];
+    readonly unavailableMetrics: readonly MetricUnavailableReport[];
+}
+
+/** Source-owned attribution for a metric value included in a snapshot. */
+export type MetricValueAttribution = RuntimeProtoPayloadWithOptionalRawSensor<ProtoMetricValueAttribution>;
+
+/** Source-reported reason for a requested metric omitted from a snapshot. */
+export type MetricUnavailableReport = RuntimeProtoPayloadWithOptionalRawSensor<ProtoMetricUnavailableReport>;
+
 /** Runtime source adapter consumed by background metric collection. */
 export interface SourceClient extends SourceMetricPollingGroupResolver {
     /** Source id owned by the runtime source registry. */
     readonly sourceId: string;
 
     /** Reads one snapshot containing the requested ShoMetrics metric keys. */
-    readSnapshot(metricKeys: readonly string[]): Promise<MetricSnapshot>;
+    readSnapshot(metricKeys: readonly string[]): Promise<SourceSnapshotReadResult>;
 
     /** Lists descriptors for requested metric keys or for all known metrics. */
     listMetricDescriptors?(metricKeys: readonly string[]): Promise<MetricDescriptorSnapshot>;
@@ -155,7 +174,13 @@ export interface SourceClient extends SourceMetricPollingGroupResolver {
 export function createMetricSourceClient(source: MetricSource): SourceClient {
     return {
         sourceId: source.sourceId,
-        readSnapshot: metricKeys => source.pollMetrics ? source.pollMetrics(metricKeys) : source.poll(),
+        readSnapshot: async metricKeys => ({
+            snapshot: source.pollMetrics
+                ? await source.pollMetrics(metricKeys)
+                : await source.poll(),
+            valueAttributions: [],
+            unavailableMetrics: [],
+        }),
         resolveMetricPollingGroups: source.resolveMetricPollingGroups.bind(source),
         dispose: () => source.dispose?.(),
     };

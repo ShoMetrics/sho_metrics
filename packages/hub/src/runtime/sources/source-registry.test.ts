@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { MetricSnapshot } from "./metric-source";
-import type { SourceClient } from "./source-client";
+import type { SourceClient, SourceSnapshotReadResult } from "./source-client";
 import type { SourceMetadataInvalidation, SourceMetadataInvalidationListener } from "./source-planning-metadata";
 import type { SourceMetricPollingGroupResolution } from "./source-polling-groups";
 import { createDefaultSourceRegistry, DefaultSourceRegistry } from "./source-registry";
@@ -77,7 +76,7 @@ class FakeSourceClient implements SourceClient {
 
     constructor(readonly sourceId: string) {}
 
-    async readSnapshot(): Promise<MetricSnapshot> {
+    async readSnapshot(): Promise<SourceSnapshotReadResult> {
         throw new Error("FakeSourceClient does not serve snapshots.");
     }
 

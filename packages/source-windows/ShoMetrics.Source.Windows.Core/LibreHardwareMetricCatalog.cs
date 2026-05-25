@@ -8,6 +8,8 @@ internal static class LibreHardwareMetricCatalog
 {
     internal const string RamAvailableMetricId = "ram.available";
     internal const string RamTotalMetricId = "ram.total";
+    internal const string CpuTemperatureMetricId = "cpu.temp";
+    internal const string CpuPowerMetricId = "cpu.power";
     internal const string DiskReadThroughputMetricId = "disk.throughput.read";
     internal const string DiskWriteThroughputMetricId = "disk.throughput.write";
     internal const string DiskTotalThroughputMetricId = "disk.throughput.total";
@@ -98,6 +100,82 @@ internal static class LibreHardwareMetricCatalog
         return descriptors;
     }
 
+    internal static bool TryCreateCpuStableAliasReadingCandidate(
+        IHardware hardware,
+        ISensor sensor,
+        [NotNullWhen(true)] out RankedMetricReading? candidate)
+    {
+        candidate = null;
+
+        if (!TryClassifyCpuStableAliasSensor(hardware, sensor, out string? metricId, out int rank)
+            || sensor.Value is not { } value
+            || !float.IsFinite(value)
+            || !TryConvertValue(sensor.SensorType, value, out double convertedValue, out MetricUnit unit)
+            || !IsValidStableMetricValue(metricId, convertedValue))
+        {
+            return false;
+        }
+
+        candidate = new RankedMetricReading
+        {
+            Rank = rank,
+            Reading = CreateReading(hardware, sensor, metricId, convertedValue, unit),
+        };
+        return true;
+    }
+
+    internal static bool TryCreateCpuStableAliasDescriptorCandidate(
+        IHardware hardware,
+        ISensor sensor,
+        [NotNullWhen(true)] out RankedHardwareMetricDescriptor? candidate)
+    {
+        candidate = null;
+
+        if (!TryClassifyCpuStableAliasSensor(hardware, sensor, out string? metricId, out int rank)
+            || !TryGetCanonicalMetricUnit(sensor.SensorType, out MetricUnit unit))
+        {
+            return false;
+        }
+
+        candidate = new RankedHardwareMetricDescriptor
+        {
+            Rank = rank,
+            Descriptor = CreateDescriptor(hardware, sensor, metricId, unit, MetricIdKind.StableAlias),
+        };
+        return true;
+    }
+
+    internal static bool TryClassifyCpuStableAliasSensor(
+        IHardware hardware,
+        ISensor sensor,
+        [NotNullWhen(true)] out string? metricId,
+        out int rank)
+    {
+        metricId = null;
+        rank = 0;
+
+        if (hardware.HardwareType is not HardwareType.Cpu)
+        {
+            return false;
+        }
+
+        if (sensor.SensorType is SensorType.Temperature
+            && TryGetCpuTemperatureRank(sensor.Name, out rank))
+        {
+            metricId = CpuTemperatureMetricId;
+            return true;
+        }
+
+        if (sensor.SensorType is SensorType.Power
+            && TryGetCpuPowerRank(sensor.Name, out rank))
+        {
+            metricId = CpuPowerMetricId;
+            return true;
+        }
+
+        return false;
+    }
+
     private static MetricReading CreateReading(
         IHardware hardware,
         ISensor sensor,
@@ -176,6 +254,11 @@ internal static class LibreHardwareMetricCatalog
         return metricId.Equals(RamAvailableMetricId, StringComparison.Ordinal);
     }
 
+    internal static bool IsSourceSensorMetricId(string metricId)
+    {
+        return metricId.StartsWith(DynamicMetricIdPrefix, StringComparison.Ordinal);
+    }
+
     internal static bool ShouldAggregateMetric(string metricId)
     {
         return metricId is "net.down" or "net.up" or DiskReadThroughputMetricId or DiskWriteThroughputMetricId;
@@ -186,7 +269,7 @@ internal static class LibreHardwareMetricCatalog
         return TryGetCanonicalMetricUnit(sensorType, out _);
     }
 
-    private static bool TryGetStableMetricId(IHardware hardware, ISensor sensor, [NotNullWhen(true)] out string? metricId)
+    internal static bool TryGetStableMetricId(IHardware hardware, ISensor sensor, [NotNullWhen(true)] out string? metricId)
     {
         metricId = hardware.HardwareType switch
         {
@@ -201,7 +284,7 @@ internal static class LibreHardwareMetricCatalog
         return metricId is not null;
     }
 
-    private static string BuildDynamicMetricId(ISensor sensor)
+    internal static string BuildDynamicMetricId(ISensor sensor)
     {
         return $"{DynamicMetricIdPrefix}{sensor.Identifier}";
     }
@@ -224,6 +307,9 @@ internal static class LibreHardwareMetricCatalog
 
     private static string? GetCpuMetricId(ISensor sensor)
     {
+        // CPU temperature and power stable aliases are ranked across sensors in
+        // LibreHardwareMonitorSession. Keep this one-sensor mapper limited to
+        // aliases that are safe without cross-sensor selection.
         return sensor.SensorType switch
         {
             SensorType.Load when sensor.Name.Equals("CPU Total", StringComparison.Ordinal) => "cpu.usage_percent",
@@ -332,6 +418,11 @@ internal static class LibreHardwareMetricCatalog
         return metricId switch
         {
             "cpu.usage_percent" or "gpu.usage_percent" => value is >= 0 and <= 100,
+            // Do not copy LHM/LiteMonitor's machine-specific temperature
+            // thresholds here. A finite value is enough for v1; impossible
+            // sensor names are filtered by ranked alias selection.
+            CpuTemperatureMetricId => double.IsFinite(value),
+            CpuPowerMetricId => value >= 0,
             "gpu.temp" => value > 0,
             "gpu.power" => value >= 0,
             "gpu.vram_used" or "ram.used" or RamAvailableMetricId => value >= 0,
@@ -339,6 +430,102 @@ internal static class LibreHardwareMetricCatalog
             "net.down" or "net.up" or DiskReadThroughputMetricId or DiskWriteThroughputMetricId => value >= 0,
             _ => throw new UnreachableException($"Missing validation rule for metric '{metricId}'."),
         };
+    }
+
+    private static bool TryGetCpuTemperatureRank(string sensorName, out int rank)
+    {
+        string normalizedName = sensorName.Trim().ToLowerInvariant();
+        rank = 0;
+
+        if (ContainsAny(
+            normalizedName,
+            "vrm",
+            "fan",
+            "pump",
+            "liquid",
+            "coolant",
+            "distance",
+            "motherboard",
+            "controller")
+            // "SoC" is a different thermal domain, but "socket" is a valid CPU
+            // package hint. Match SoC as a token instead of a substring.
+            || ContainsToken(normalizedName, "soc"))
+        {
+            return false;
+        }
+
+        rank = normalizedName switch
+        {
+            "core (tctl/tdie)" => 0,
+            "core (tdie)" => 1,
+            "cpu package" => 2,
+            "core (tctl)" => 4,
+            "core max" => 6,
+            "core average" => 7,
+            "cpu cores" => 8,
+            _ when normalizedName.Contains("package", StringComparison.Ordinal) => 3,
+            _ when normalizedName.Contains("ccds max", StringComparison.Ordinal) => 5,
+            _ when normalizedName.Contains("ccds average", StringComparison.Ordinal) => 7,
+            _ when IsIndividualCoreTemperatureName(normalizedName) => 9,
+            _ => -1,
+        };
+
+        return rank >= 0;
+    }
+
+    private static bool TryGetCpuPowerRank(string sensorName, out int rank)
+    {
+        string normalizedName = sensorName.Trim().ToLowerInvariant();
+        rank = 0;
+
+        if (ContainsAny(
+            normalizedName,
+            "graphics",
+            "gpu",
+            "dram",
+            "memory",
+            "controller",
+            "platform",
+            "vrm",
+            "psu")
+            // Keep SoC/VRM/DRAM rails out of CPU package power, while allowing
+            // names such as "CPU Socket" to participate in package ranking.
+            || ContainsToken(normalizedName, "soc"))
+        {
+            return false;
+        }
+
+        rank = normalizedName switch
+        {
+            "cpu package" or "package" or "cpu package power" => 0,
+            "cpu ppt" or "ppt" => 2,
+            "cpu cores" or "cores" or "cpu cores power" => 3,
+            _ when normalizedName.Contains("package", StringComparison.Ordinal)
+                || normalizedName.Contains("socket", StringComparison.Ordinal) => 1,
+            _ when normalizedName.Contains("ppt", StringComparison.Ordinal) => 2,
+            _ => -1,
+        };
+
+        return rank >= 0;
+    }
+
+    private static bool IsIndividualCoreTemperatureName(string normalizedName)
+    {
+        return normalizedName.StartsWith("cpu core #", StringComparison.Ordinal)
+            || normalizedName.StartsWith("core #", StringComparison.Ordinal)
+            || normalizedName.StartsWith("cpu core ", StringComparison.Ordinal);
+    }
+
+    private static bool ContainsAny(string value, params string[] fragments)
+    {
+        return fragments.Any(fragment => value.Contains(fragment, StringComparison.Ordinal));
+    }
+
+    private static bool ContainsToken(string value, string token)
+    {
+        return value
+            .Split([' ', '(', ')', '[', ']', '{', '}', '-', '_', '/', '\\', '#'], StringSplitOptions.RemoveEmptyEntries)
+            .Contains(token, StringComparer.Ordinal);
     }
 
     private static bool IsValidSensorValue(SensorType sensorType, double value)

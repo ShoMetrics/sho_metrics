@@ -137,11 +137,42 @@ const restrictedGeneratedSettingsProtoImports = {
   ],
 };
 
+const sourceProtoBoundaryFiles = [
+  'src/runtime/sources/metric-source.ts',
+  'src/runtime/sources/source-client.ts',
+  'src/runtime/sources/windows-helper/windows-helper-source-client.ts',
+  'src/runtime/sources/windows-helper/windows-helper-source-client.test.ts',
+];
+
+const restrictedGeneratedSourceProtoImports = {
+  patterns: [
+    {
+      group: [
+        '**/generated/shometrics/v1/source_api_pb',
+        '**/generated/shometrics/v1/source_api_pb.js',
+        '**/generated/shometrics/v1/source_ipc_pb',
+        '**/generated/shometrics/v1/source_ipc_pb.js',
+        '**/generated/shometrics/v1/snapshot_pb',
+        '**/generated/shometrics/v1/snapshot_pb.js',
+      ],
+      message: 'Generated source IPC/API proto may only be imported by runtime source boundary files.',
+    },
+  ],
+};
+
 const restrictedNonStorageSchemaHardeningImports = {
   paths: [...restrictedSchemaHardeningImports.paths],
   patterns: [
     ...restrictedSchemaHardeningImports.patterns,
     ...restrictedGeneratedSettingsProtoImports.patterns,
+  ],
+};
+
+const restrictedNonStorageSchemaAndSourceProtoImports = {
+  paths: [...restrictedNonStorageSchemaHardeningImports.paths],
+  patterns: [
+    ...restrictedNonStorageSchemaHardeningImports.patterns,
+    ...restrictedGeneratedSourceProtoImports.patterns,
   ],
 };
 
@@ -196,7 +227,7 @@ const restrictedActionDisplayBuilderImports = {
       message: 'Display builders must receive resolved global settings from actions.',
     },
   ],
-  patterns: [...restrictedNonStorageSchemaHardeningImports.patterns],
+  patterns: [...restrictedNonStorageSchemaAndSourceProtoImports.patterns],
 };
 
 const restrictedConcreteActionSettingsWriteSyntax = [
@@ -207,19 +238,19 @@ const restrictedConcreteActionSettingsWriteSyntax = [
 ];
 
 const restrictedRendererImportRules = {
-  paths: [...restrictedNonStorageSchemaHardeningImports.paths],
+  paths: [...restrictedNonStorageSchemaAndSourceProtoImports.paths],
   patterns: [
-    ...restrictedNonStorageSchemaHardeningImports.patterns,
+    ...restrictedNonStorageSchemaAndSourceProtoImports.patterns,
     ...restrictedRendererSettingsImports.patterns,
   ],
 };
 
 const restrictedConcreteActionImportRules = {
   paths: [
-    ...restrictedNonStorageSchemaHardeningImports.paths,
+    ...restrictedNonStorageSchemaAndSourceProtoImports.paths,
     ...restrictedConcreteActionSettingsImports.paths,
   ],
-  patterns: [...restrictedNonStorageSchemaHardeningImports.patterns],
+  patterns: [...restrictedNonStorageSchemaAndSourceProtoImports.patterns],
 };
 
 const restrictedRuntimeSourceClientImports = {
@@ -315,9 +346,9 @@ export default tseslint.config(
   },
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/settings/storage/**/*'],
+    ignores: ['src/settings/storage/**/*', ...sourceProtoBoundaryFiles],
     rules: {
-      'no-restricted-imports': ['error', restrictedNonStorageSchemaHardeningImports],
+      'no-restricted-imports': ['error', restrictedNonStorageSchemaAndSourceProtoImports],
     },
   },
   {
@@ -363,12 +394,25 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/runtime/sources/**/*.{ts,tsx}'],
+    ignores: sourceProtoBoundaryFiles,
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [...restrictedNonStorageSchemaAndSourceProtoImports.paths],
+        patterns: [
+          ...restrictedNonStorageSchemaAndSourceProtoImports.patterns,
+          ...restrictedRuntimeSourceClientImports.patterns,
+        ],
+      }],
+    },
+  },
+  {
     files: ['src/runtime/source-routing/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': ['error', {
-        paths: [...restrictedNonStorageSchemaHardeningImports.paths],
+        paths: [...restrictedNonStorageSchemaAndSourceProtoImports.paths],
         patterns: [
-          ...restrictedNonStorageSchemaHardeningImports.patterns,
+          ...restrictedNonStorageSchemaAndSourceProtoImports.patterns,
           ...restrictedRuntimeSourceRoutingImports.patterns,
         ],
       }],
@@ -378,9 +422,9 @@ export default tseslint.config(
     files: ['src/runtime/metric-collection/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': ['error', {
-        paths: [...restrictedNonStorageSchemaHardeningImports.paths],
+        paths: [...restrictedNonStorageSchemaAndSourceProtoImports.paths],
         patterns: [
-          ...restrictedNonStorageSchemaHardeningImports.patterns,
+          ...restrictedNonStorageSchemaAndSourceProtoImports.patterns,
           ...restrictedRuntimeMetricCollectionImports.patterns,
         ],
       }],

@@ -3,6 +3,7 @@ import test from "node:test";
 import { MetricStore } from "./metric-store";
 import { LOCAL_SOURCE_SCOPE_ID } from "./source-routing/metric-read-plan";
 import { buildMetricSnapshot, buildScalarMetricValue, buildTextMetricValue, MetricUnit } from "./sources/metric-source";
+import { MetricValueFreshness } from "./sources/source-client";
 
 test("missing metric returns render-safe numeric defaults without a sample timestamp", () => {
     const metricStore = new MetricStore();
@@ -49,6 +50,43 @@ test("scalar samples keep history, latest value, progress, and timestamp", () =>
         progress: 0.5,
         history: [25, 50],
         unit: "%",
+        label: "CPU",
+        sampleTimestampMilliseconds: 2000,
+    });
+});
+
+test("retained scalar samples update the current value without adding history points", () => {
+    const metricStore = new MetricStore();
+    const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
+
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            "cpu.temperature": buildScalarMetricValue(51, { unit: MetricUnit.CELSIUS }),
+        },
+    }));
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        timestampMilliseconds: 2000,
+        metrics: {
+            "cpu.temperature": buildScalarMetricValue(50, { unit: MetricUnit.CELSIUS }),
+        },
+    }), {
+        valueAttributions: [{
+            metricId: "cpu.temperature",
+            valueFreshness: MetricValueFreshness.RETAINED,
+        }],
+    });
+
+    assert.deepEqual(metrics.getWidgetData(
+        "cpu.temperature",
+        "CPU",
+        "C",
+        100,
+    ), {
+        current: 50,
+        progress: 0.5,
+        history: [51],
+        unit: "C",
         label: "CPU",
         sampleTimestampMilliseconds: 2000,
     });
