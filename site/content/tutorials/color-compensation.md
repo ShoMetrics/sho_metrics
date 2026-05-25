@@ -1,4 +1,8 @@
-# Color Compensation
++++
+title = "Color Compensation"
+description = "Make ShoMetrics widget colors on physical Stream Deck keys look closer to your monitor."
+weight = 20
++++
 
 Color Compensation helps ShoMetrics widgets on your physical Stream Deck keys
 look closer to the colors on your monitor.
@@ -30,7 +34,7 @@ current monitor, Stream Deck brightness, and room lighting.
 
 ### Check Your Key
 
-![Check Your Key](./assets/color-compensation/check-your-key.png)
+![Check Your Key](../../images/tutorials/color-compensation/check-your-key.png)
 
 First, find the Stream Deck key that shows the setup image. This key is the
 hardware preview target for the rest of setup.
@@ -40,7 +44,7 @@ blocked for that key and setup will not work correctly.
 
 ### Step 1: Color Strength (Saturation)
 
-![Color Strength](./assets/color-compensation/color-strength.png)
+![Color Strength](../../images/tutorials/color-compensation/color-strength.png)
 
 Look at the colored blocks on your monitor, then look at the colored blocks on
 the Stream Deck key. Move the slider until the key looks about as colorful as
@@ -55,7 +59,7 @@ cannot create colors the key hardware cannot display.
 
 ### Step 2: Midtones (Gamma)
 
-![Midtones](./assets/color-compensation/midtones.png)
+![Midtones](../../images/tutorials/color-compensation/midtones.png)
 
 Look at the gray gradient on your monitor, then compare it with the gray
 gradient on the Stream Deck key. Move the slider until the middle gray levels on
@@ -66,7 +70,7 @@ colors.
 
 ### Step 3: Dark Detail (Shadows)
 
-![Dark Detail](./assets/color-compensation/dark-detail.png)
+![Dark Detail](../../images/tutorials/color-compensation/dark-detail.png)
 
 Look at the dark blocks on your monitor, then compare them with the dark blocks
 on the Stream Deck key. Move the slider until the dark blocks are still visible
@@ -85,7 +89,7 @@ If the result is close but not quite right, open fine-tune manually.
 
 #### Overall Brightness
 
-![Overall Brightness manual fine-tune](./assets/color-compensation/manual-overall-brightness.png)
+![Overall Brightness manual fine-tune](../../images/tutorials/color-compensation/manual-overall-brightness.png)
 
 Overall Brightness is available in manual fine-tuning, not in the guided setup
 steps.
