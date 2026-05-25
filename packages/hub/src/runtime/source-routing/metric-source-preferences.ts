@@ -41,6 +41,8 @@ const WINDOWS_HELPER_ONLY_METRIC_KEYS = [
     CPU_POWER_METRIC_KEY,
 ] as const;
 
+// Windows disk throughput waits for a native per-disk descriptor path. Do not
+// route first-class disk throughput through LHM storage traversal.
 const WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEYS = [...GPU_METRIC_KEYS] as const;
 
 /**
