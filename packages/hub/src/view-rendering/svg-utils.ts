@@ -1,4 +1,13 @@
-export { adjustHexColorBrightness } from "../shared/color-utils";
+import { adjustHexColorBrightness } from "../shared/color-utils";
+import {
+    DEFAULT_RENDER_TEXT_CLIP_HEIGHT_EM,
+    DEFAULT_RENDER_TEXT_MINIMUM_FONT_SCALE,
+    DEFAULT_RENDER_TEXT_WIDTH_SCALE,
+    resolveRenderTextStyleFontSize,
+    type RenderTextStyle,
+} from "./render-text-style";
+
+export { adjustHexColorBrightness };
 
 export function escapeSvgText(value: string): string {
     return value
@@ -27,7 +36,24 @@ export interface ConstrainedSvgTextOptions {
     fontWeight: number | string;
     textAnchor?: SvgTextAnchor;
     dominantBaseline?: "middle" | "auto";
+    /** Legacy title-card escape hatch. New callers should prefer clipHeightEm. */
     clipHeight?: number;
+    clipHeightEm?: number;
+    extraAttributes?: readonly string[];
+    fitOptions?: SvgTextFitOptions;
+}
+
+export interface StyledSvgTextOptions {
+    id: string;
+    text: string;
+    xCoordinate: number;
+    yCoordinate: number;
+    maxWidth: number;
+    baseFontSize: number;
+    fill: string;
+    textStyle: RenderTextStyle;
+    textAnchor?: SvgTextAnchor;
+    dominantBaseline?: "middle" | "auto";
     extraAttributes?: readonly string[];
     fitOptions?: SvgTextFitOptions;
 }
@@ -35,6 +61,7 @@ export interface ConstrainedSvgTextOptions {
 export interface SvgTextFitOptions {
     minimumFontScale?: number;
     widthGuardRatio?: number;
+    widthScale?: number;
 }
 
 export interface SvgTextFitRun {
@@ -49,8 +76,33 @@ export interface SvgTextFitResult {
 }
 
 const MINIMUM_TEXT_WIDTH = 1;
-const DEFAULT_MINIMUM_TEXT_FONT_SCALE = 0.78;
 const DEFAULT_TEXT_WIDTH_GUARD_RATIO = 1.08;
+
+export function renderStyledSvgText(options: StyledSvgTextOptions): string {
+    const fontSize = resolveRenderTextStyleFontSize(options.baseFontSize, options.textStyle);
+    const yCoordinate = options.yCoordinate + fontSize * options.textStyle.baselineShiftEm;
+
+    return renderConstrainedSvgText({
+        id: options.id,
+        text: options.text,
+        xCoordinate: options.xCoordinate,
+        yCoordinate,
+        maxWidth: options.maxWidth,
+        fontSize,
+        fill: options.fill,
+        fontFamily: options.textStyle.fontFamily,
+        fontWeight: options.textStyle.fontWeight,
+        textAnchor: options.textAnchor,
+        dominantBaseline: options.dominantBaseline,
+        clipHeightEm: options.textStyle.clipHeightEm,
+        extraAttributes: options.extraAttributes,
+        fitOptions: {
+            ...options.fitOptions,
+            minimumFontScale: options.textStyle.minimumFontScale,
+            widthScale: options.textStyle.widthScale,
+        },
+    });
+}
 
 /**
  * Renders text inside an explicit SVG box. This helper intentionally does not
@@ -71,7 +123,7 @@ export function renderConstrainedSvgText(options: ConstrainedSvgTextOptions): st
         fitOptions: options.fitOptions,
     });
     const fontSize = options.fontSize * textFit.fontScale;
-    const clipHeight = options.clipHeight ?? fontSize * 1.45;
+    const clipHeight = options.clipHeight ?? fontSize * (options.clipHeightEm ?? DEFAULT_RENDER_TEXT_CLIP_HEIGHT_EM);
     const clipXCoordinate = resolveTextClipXCoordinate(options.xCoordinate, maxWidth, textAnchor);
     const clipYCoordinate = dominantBaseline === "middle"
         ? options.yCoordinate - clipHeight / 2
@@ -107,6 +159,10 @@ export function renderConstrainedSvgText(options: ConstrainedSvgTextOptions): st
  * intentionally conservative: near-boundary text gets a small font reduction
  * plus SVG textLength as a hard final guard. Very long user text can still be
  * compressed, but it cannot spill outside the widget.
+ *
+ * `widthScale` adjusts the raw estimated width before `widthGuardRatio` is
+ * applied. Final guarded width is
+ * `rawEstimate * widthScale * widthGuardRatio`.
  */
 export function resolveSvgTextFit(options: {
     runs: readonly SvgTextFitRun[];
@@ -116,7 +172,7 @@ export function resolveSvgTextFit(options: {
 }): SvgTextFitResult {
     const maxWidth = Math.max(MINIMUM_TEXT_WIDTH, options.maxWidth);
     const minimumFontScale = clamp(
-        options.fitOptions?.minimumFontScale ?? DEFAULT_MINIMUM_TEXT_FONT_SCALE,
+        options.fitOptions?.minimumFontScale ?? DEFAULT_RENDER_TEXT_MINIMUM_FONT_SCALE,
         0.35,
         1,
     );
@@ -125,11 +181,16 @@ export function resolveSvgTextFit(options: {
         1,
         2,
     );
+    const widthScale = clamp(
+        options.fitOptions?.widthScale ?? DEFAULT_RENDER_TEXT_WIDTH_SCALE,
+        0.5,
+        2,
+    );
     const estimatedWidth = options.runs.reduce(
         (widthTotal, textRun) => widthTotal + estimateSvgTextRunWidth(textRun),
         Math.max(0, options.extraWidth ?? 0),
     );
-    const guardedWidth = estimatedWidth * widthGuardRatio;
+    const guardedWidth = estimatedWidth * widthScale * widthGuardRatio;
 
     if (guardedWidth <= maxWidth) {
         return {
