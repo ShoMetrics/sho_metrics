@@ -5,11 +5,34 @@ import {
 } from "./render-svg-effects";
 
 export interface RenderTextStyle {
+    /** Font family string written to SVG text elements. */
     readonly fontFamily: string;
+    /** Numeric SVG font weight used for this text role. */
     readonly fontWeight: number;
+    /** Multiplier applied to the primitive-authored base font size. */
     readonly fontSizeScale: number;
+    /** Positive values increase the SVG y coordinate and move text downward. */
+    readonly baselineShiftEm: number;
+    /** Vertical clip box height, expressed as a multiple of resolved font size. */
+    readonly clipHeightEm: number;
+    /** Multiplier applied to estimated text width before the guard ratio. */
+    readonly widthScale: number;
+    /** Smallest font-size scale allowed before SVG textLength compression guards the text. */
+    readonly minimumFontScale: number;
+    /** Optional SVG filter reference applied to this text role. */
     readonly filter: string | undefined;
 }
+
+type RenderTextStyleMetrics = Pick<
+    RenderTextStyle,
+    "baselineShiftEm" | "clipHeightEm" | "widthScale" | "minimumFontScale"
+>;
+
+// Internal preset input only. Keep this private so runtime renderers consume
+// complete RenderTextStyle objects instead of partial style definitions.
+type RenderTextStylePreset =
+    & Omit<RenderTextStyle, keyof RenderTextStyleMetrics>
+    & Partial<RenderTextStyleMetrics>;
 
 export interface RenderTextStyles {
     readonly value: RenderTextStyle;
@@ -21,6 +44,10 @@ export interface RenderTextStyles {
 
 const MINIMUM_TEXT_STYLE_FONT_SIZE_SCALE = 0.9;
 const MAXIMUM_TEXT_STYLE_FONT_SIZE_SCALE = 1.12;
+export const DEFAULT_RENDER_TEXT_BASELINE_SHIFT_EM = 0;
+export const DEFAULT_RENDER_TEXT_CLIP_HEIGHT_EM = 1.45;
+export const DEFAULT_RENDER_TEXT_WIDTH_SCALE = 1;
+export const DEFAULT_RENDER_TEXT_MINIMUM_FONT_SCALE = 0.78;
 const DEFAULT_RENDER_FONT_FAMILY = "'SF Pro Display','Helvetica Neue','Inter','Segoe UI',sans-serif";
 const TERMINAL_FONT_FAMILY = "'Share Tech Mono','SF Pro Display','Helvetica Neue','Inter','Segoe UI',monospace";
 export const JAPANESE_SERIF_RENDER_FONT_FAMILY = [
@@ -44,6 +71,8 @@ export const JAPANESE_SERIF_RENDER_FONT_FAMILY = [
     "serif",
 ].join(",");
 
+// Renderer-owned text style presets stay in this file so metrics defaults do
+// not drift through hand-written RenderTextStyle literals in production code.
 export const DEFAULT_RENDER_TEXT_STYLES = {
     value: createRenderTextStyle({
         fontFamily: DEFAULT_RENDER_FONT_FAMILY,
@@ -147,12 +176,16 @@ export function resolveRenderTextStyleFontSize(baseFontSize: number, textStyle: 
     return baseFontSize * textStyle.fontSizeScale;
 }
 
-function createRenderTextStyle(textStyle: RenderTextStyle): RenderTextStyle {
+function createRenderTextStyle(textStyle: RenderTextStylePreset): RenderTextStyle {
     return {
         ...textStyle,
         fontSizeScale: Math.min(
             Math.max(textStyle.fontSizeScale, MINIMUM_TEXT_STYLE_FONT_SIZE_SCALE),
             MAXIMUM_TEXT_STYLE_FONT_SIZE_SCALE,
         ),
+        baselineShiftEm: textStyle.baselineShiftEm ?? DEFAULT_RENDER_TEXT_BASELINE_SHIFT_EM,
+        clipHeightEm: textStyle.clipHeightEm ?? DEFAULT_RENDER_TEXT_CLIP_HEIGHT_EM,
+        widthScale: textStyle.widthScale ?? DEFAULT_RENDER_TEXT_WIDTH_SCALE,
+        minimumFontScale: textStyle.minimumFontScale ?? DEFAULT_RENDER_TEXT_MINIMUM_FONT_SCALE,
     };
 }

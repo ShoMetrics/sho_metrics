@@ -343,7 +343,9 @@ Field semantics:
 - `widthScale`: adjusts the low-cost width estimator for wider or narrower font
   families. It multiplies the raw estimated text width before the width guard
   is applied:
-  `effectiveEstimatedWidth = rawEstimatedWidth * widthScale`.
+  `guardedWidth = rawEstimatedWidth * widthScale * widthGuardRatio`.
+  When tuning a measured font width ratio, set `widthScale` to that ratio and
+  do not pre-divide it by the guard ratio.
 - `minimumFontScale`: lets a theme choose how aggressively text may shrink
   before `textLength` compression is used.
 - `filter`: keeps existing theme glow/filter behavior.
@@ -785,6 +787,9 @@ Required unit tests:
 - `clipHeightEm` changes clip height without changing font size;
 - `widthScale` changes fit decisions;
 - `minimumFontScale` is clamped to safe bounds.
+- The legacy absolute `clipHeight` option remains only for existing title-card
+  callers that are outside this migration. Do not add new callers. Delete the
+  absolute option once all remaining callers can use `clipHeightEm`.
 
 ### Step 6: Migrate Primitive Text In Small Groups
 
