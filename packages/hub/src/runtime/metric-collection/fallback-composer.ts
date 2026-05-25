@@ -7,11 +7,11 @@ import {
 } from "../source-routing/metric-read-plan";
 
 export interface FallbackMetricStoreReaderOptions {
-    /** Returns the current timestamp used to decide whether a candidate sample is still fresh. */
+    /** Returns the current timestamp used to decide whether a candidate value is still fresh. */
     readonly now?: () => number;
 
     /**
-     * Maximum scalar sample age accepted from a source candidate.
+     * Maximum scalar value age accepted from a source candidate.
      *
      * Callers must set this from the visible action's collection interval plus
      * a small grace window. A fixed global value would make low-frequency
@@ -23,8 +23,8 @@ export interface FallbackMetricStoreReaderOptions {
 /**
  * Creates a synchronous reader that applies a read plan's source fallback order.
  *
- * Background collectors write source/profile-scoped samples. Rendering still
- * reads synchronously, so fallback here only chooses among samples already in
+ * Background collectors write source/profile-scoped values. Rendering still
+ * reads synchronously, so fallback here only chooses among values already in
  * MetricStore; it never starts source I/O.
  */
 export function createFallbackMetricStoreReader(
@@ -70,9 +70,17 @@ export function createFallbackMetricStoreReader(
     ): MetricWidgetDataReadResult {
         const currentTimestampMilliseconds = now();
         const sourceReaders = sourceReadersByMetricKey.get(metricKey) ?? [];
+        let firstUnavailableMetric: MetricWidgetDataReadResult["unavailableMetric"];
 
         for (const sourceReader of sourceReaders) {
             const readResult = sourceReader.getWidgetDataWithAttribution(metricKey, label, unit, maxValue);
+
+            // Prefer the earliest source-reported unavailable reason. With normal
+            // source order this keeps the preferred source's reason ahead of
+            // fallback-source reasons.
+            if (firstUnavailableMetric === undefined && readResult.unavailableMetric !== undefined) {
+                firstUnavailableMetric = readResult.unavailableMetric;
+            }
 
             if (isFreshWidgetData(
                 readResult.widgetData,
@@ -86,6 +94,7 @@ export function createFallbackMetricStoreReader(
         return {
             widgetData: buildNoDataWidgetData({ label, unit }),
             selectedSourceId: undefined,
+            ...(firstUnavailableMetric === undefined ? {} : { unavailableMetric: firstUnavailableMetric }),
         };
     }
 }
@@ -95,13 +104,13 @@ function isFreshWidgetData(
     currentTimestampMilliseconds: number,
     maximumSampleAgeMilliseconds: number,
 ): boolean {
-    const sampleTimestampMilliseconds = widgetData.sampleTimestampMilliseconds;
+    const valueTimestampMilliseconds = widgetData.sampleTimestampMilliseconds;
 
-    if (sampleTimestampMilliseconds === undefined) {
+    if (valueTimestampMilliseconds === undefined) {
         return false;
     }
 
-    return currentTimestampMilliseconds - sampleTimestampMilliseconds
+    return currentTimestampMilliseconds - valueTimestampMilliseconds
         <= maximumSampleAgeMilliseconds;
 }
 

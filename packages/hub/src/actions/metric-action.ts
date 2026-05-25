@@ -6,7 +6,7 @@ import streamDeck, {
     PropertyInspectorDidAppearEvent,
     type SendToPluginEvent,
 } from "@elgato/streamdeck";
-import { metricStore, type MetricStoreReader } from "../runtime/metric-store";
+import { metricStore, type MetricStoreReader, type MetricWidgetDataReadResult } from "../runtime/metric-store";
 import {
     normalizeMetricReadPlan,
     selectMetricReadRouteSourceCandidates,
@@ -28,6 +28,8 @@ import {
     type WidgetRuntimeCache,
     type WidgetRuntimeCacheMessage,
     type WidgetRuntimeCachePatch,
+    type DisplayedMetricReadOutcome,
+    type DisplayedRawSensorIdentity,
     WidgetRuntimeCacheStore,
 } from "../runtime/widget-runtime-cache";
 import {
@@ -41,7 +43,10 @@ import {
 import { createFallbackMetricStoreReader } from "../runtime/metric-collection/fallback-composer";
 import { backgroundMetricCollection } from "../runtime/metric-collection/background-metric-collection";
 import type { MetricSubscription } from "../runtime/metric-collection/metric-subscription-registry";
-import type { SourceClientStatus } from "../runtime/sources/source-client";
+import {
+    type RawSensorIdentity,
+    type SourceClientStatus,
+} from "../runtime/sources/source-client";
 
 const log = logger.for("MetricAction");
 
@@ -199,13 +204,13 @@ export abstract class MetricAction extends SingletonAction {
 
     protected getMetricReader(event: WillAppearEvent): MetricStoreReader {
         const readPlan = this.resolveMetricReadPlan(event);
-        const fallbackSampleFreshnessBudgetMilliseconds = resolveFallbackSampleFreshnessBudgetMilliseconds(
+        const fallbackReadingFreshnessBudgetMilliseconds = resolveFallbackReadingFreshnessBudgetMilliseconds(
             this.resolveSettings(event).preferences.pollingFrequencySeconds,
         );
 
         return createFallbackMetricStoreReader(metricStore, readPlan, {
             now: () => this.currentTimestampMilliseconds(),
-            maximumSampleAgeMilliseconds: fallbackSampleFreshnessBudgetMilliseconds,
+            maximumSampleAgeMilliseconds: fallbackReadingFreshnessBudgetMilliseconds,
         });
     }
 
@@ -273,7 +278,7 @@ export abstract class MetricAction extends SingletonAction {
         const { event } = activeActionState;
         const pollingFrequencySeconds = this.resolveSettings(event).preferences.pollingFrequencySeconds;
         const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(pollingFrequencySeconds);
-        const maximumSampleAgeMilliseconds = resolveFallbackSampleFreshnessBudgetMilliseconds(pollingFrequencySeconds);
+        const maximumSampleAgeMilliseconds = resolveFallbackReadingFreshnessBudgetMilliseconds(pollingFrequencySeconds);
         const metricKeys = this.getMetricKeys(event);
         const readPlan = this.buildMetricCollectionReadPlan(event, metricKeys);
         const metricCollectionBinding = this.getOrCreateMetricCollectionBinding(event.action.id);
@@ -353,10 +358,12 @@ export abstract class MetricAction extends SingletonAction {
         this.updateRuntimeCache(event, {
             displayedMetricReadAttribution: {
                 metricKey: displayedMetricKey,
-                preferredSourceId,
+                routing: {
+                    preferredSourceId,
+                    selectedSourceId: readResult.selectedSourceId,
+                },
                 ...(preferredSourceStatus ? { preferredSourceStatus } : {}),
-                selectedSourceId: readResult.selectedSourceId,
-                sampleTimestampMilliseconds: readResult.widgetData.sampleTimestampMilliseconds,
+                outcome: buildDisplayedMetricReadOutcome(readResult),
             },
         }).catch(error => {
             log.error(() => `Failed to publish displayed metric source attribution: ${String(error)}`);
@@ -407,8 +414,8 @@ export abstract class MetricAction extends SingletonAction {
 
 const DEFAULT_POLLING_INTERVAL_MILLISECONDS = 1000;
 const ALLOWED_POLLING_FREQUENCY_SECONDS = new Set([1, 2, 3, 5, 10, 15, 30, 60]);
-// Gives the background collector one missed interval before fallback render treats its sample as expired.
-const FALLBACK_SAMPLE_FRESHNESS_GRACE_MILLISECONDS = 5000;
+// Gives the background collector one missed interval before fallback render treats its reading as expired.
+const FALLBACK_READING_FRESHNESS_GRACE_MILLISECONDS = 5000;
 
 function resolvePollingIntervalMilliseconds(pollingFrequencySeconds: number): number {
     if (ALLOWED_POLLING_FREQUENCY_SECONDS.has(pollingFrequencySeconds)) {
@@ -418,9 +425,9 @@ function resolvePollingIntervalMilliseconds(pollingFrequencySeconds: number): nu
     return DEFAULT_POLLING_INTERVAL_MILLISECONDS;
 }
 
-function resolveFallbackSampleFreshnessBudgetMilliseconds(pollingFrequencySeconds: number): number {
+function resolveFallbackReadingFreshnessBudgetMilliseconds(pollingFrequencySeconds: number): number {
     return resolvePollingIntervalMilliseconds(pollingFrequencySeconds)
-        + FALLBACK_SAMPLE_FRESHNESS_GRACE_MILLISECONDS;
+        + FALLBACK_READING_FRESHNESS_GRACE_MILLISECONDS;
 }
 
 function buildMetricSubscriptions(options: {
@@ -438,6 +445,56 @@ function buildMetricSubscriptions(options: {
         failureMode: metric.failureMode,
         intervalMilliseconds: options.intervalMilliseconds,
     }));
+}
+
+function buildDisplayedMetricReadOutcome(readResult: MetricWidgetDataReadResult): DisplayedMetricReadOutcome | undefined {
+    if (readResult.unavailableMetric !== undefined) {
+        return {
+            kind: "unavailable",
+            reason: readResult.unavailableMetric.reason,
+            lastValueTimestampMilliseconds: readResult.widgetData.sampleTimestampMilliseconds,
+            ...(readResult.unavailableMetric.rawSensorIdentity === undefined
+                ? {}
+                : { rawSensorIdentity: pickDisplayedRawSensorIdentity(readResult.unavailableMetric.rawSensorIdentity) }),
+        };
+    }
+
+    const valueTimestampMilliseconds = readResult.widgetData.sampleTimestampMilliseconds;
+    if (valueTimestampMilliseconds === undefined) {
+        return undefined;
+    }
+
+    return {
+        kind: "value",
+        valueTimestampMilliseconds,
+        freshness: readResult.valueAttribution?.valueFreshness ?? "fresh",
+        ...(readResult.valueAttribution?.valueFreshness === "retained"
+            && readResult.valueAttribution.retainedAgeMilliseconds !== undefined
+            ? { retainedAgeMilliseconds: readResult.valueAttribution.retainedAgeMilliseconds }
+            : {}),
+        ...(readResult.valueAttribution?.rawSensorIdentity === undefined
+            ? {}
+            : { rawSensorIdentity: pickDisplayedRawSensorIdentity(readResult.valueAttribution.rawSensorIdentity) }),
+    };
+}
+
+function pickDisplayedRawSensorIdentity(rawSensorIdentity: RawSensorIdentity): DisplayedRawSensorIdentity {
+    const displayedRawSensorIdentity = {
+        ...(rawSensorIdentity.sourceSensorId.length === 0
+            ? {}
+            : { sourceSensorId: rawSensorIdentity.sourceSensorId }),
+        ...(rawSensorIdentity.hardwareId.length === 0
+            ? {}
+            : { hardwareId: rawSensorIdentity.hardwareId }),
+        ...(rawSensorIdentity.sensorName.length === 0
+            ? {}
+            : { sensorName: rawSensorIdentity.sensorName }),
+        ...(rawSensorIdentity.hardwareName.length === 0
+            ? {}
+            : { hardwareName: rawSensorIdentity.hardwareName }),
+    };
+
+    return displayedRawSensorIdentity;
 }
 
 function formatSettingValue(value: unknown): string {

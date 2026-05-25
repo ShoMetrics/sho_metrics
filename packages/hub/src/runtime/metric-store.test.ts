@@ -3,9 +3,8 @@ import test from "node:test";
 import { MetricStore } from "./metric-store";
 import { LOCAL_SOURCE_SCOPE_ID } from "./source-routing/metric-read-plan";
 import { buildMetricSnapshot, buildScalarMetricValue, buildTextMetricValue, MetricUnit } from "./sources/metric-source";
-import { MetricValueFreshness } from "./sources/source-client";
 
-test("missing metric returns render-safe numeric defaults without a sample timestamp", () => {
+test("missing metric returns render-safe numeric defaults without a value timestamp", () => {
     const metricStore = new MetricStore();
     const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
@@ -23,7 +22,7 @@ test("missing metric returns render-safe numeric defaults without a sample times
     });
 });
 
-test("scalar samples keep history, latest value, progress, and timestamp", () => {
+test("scalar values keep history, latest value, progress, and timestamp", () => {
     const metricStore = new MetricStore();
     const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
@@ -55,7 +54,7 @@ test("scalar samples keep history, latest value, progress, and timestamp", () =>
     });
 });
 
-test("retained scalar samples update the current value without adding history points", () => {
+test("retained scalar values update the current value without adding history points", () => {
     const metricStore = new MetricStore();
     const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
@@ -73,7 +72,7 @@ test("retained scalar samples update the current value without adding history po
     }), {
         valueAttributions: [{
             metricId: "cpu.temperature",
-            valueFreshness: MetricValueFreshness.RETAINED,
+            valueFreshness: "retained",
         }],
     });
 
@@ -89,6 +88,127 @@ test("retained scalar samples update the current value without adding history po
         unit: "C",
         label: "CPU",
         sampleTimestampMilliseconds: 2000,
+    });
+});
+
+test("widget reads expose value attribution from the latest value", () => {
+    const metricStore = new MetricStore();
+    const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
+
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            "cpu.temperature": buildScalarMetricValue(51, { unit: MetricUnit.CELSIUS }),
+        },
+    }), {
+        valueAttributions: [{
+            metricId: "cpu.temperature",
+            rawSensorIdentity: {
+                sourceSensorId: "lhm.sensor:/intelcpu/0/temperature/26",
+                hardwareId: "/intelcpu/0",
+                hardwareName: "CPU",
+                hardwareType: "Cpu",
+                sensorName: "CPU Package",
+                sourceSensorType: "Temperature",
+            },
+            valueFreshness: "fresh",
+        }],
+    });
+
+    const readResult = metrics.getWidgetDataWithAttribution("cpu.temperature", "CPU", "C", 100);
+
+    assert.equal(readResult.selectedSourceId, LOCAL_SOURCE_SCOPE_ID);
+    assert.deepEqual(readResult.valueAttribution, {
+        metricId: "cpu.temperature",
+        rawSensorIdentity: {
+            sourceSensorId: "lhm.sensor:/intelcpu/0/temperature/26",
+            hardwareId: "/intelcpu/0",
+            hardwareName: "CPU",
+            hardwareType: "Cpu",
+            sensorName: "CPU Package",
+            sourceSensorType: "Temperature",
+        },
+        valueFreshness: "fresh",
+    });
+});
+
+test("widget reads expose unavailable reports without mutating metric history", () => {
+    const metricStore = new MetricStore();
+    const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
+
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {},
+    }), {
+        unavailableMetrics: [{
+            metricId: "cpu.temperature",
+            reason: "noSensorData",
+        }],
+    });
+
+    const readResult = metrics.getWidgetDataWithAttribution("cpu.temperature", "CPU", "C", 100);
+
+    assert.equal(readResult.selectedSourceId, undefined);
+    assert.equal(readResult.widgetData.sampleTimestampMilliseconds, undefined);
+    assert.deepEqual(readResult.unavailableMetric, {
+        metricId: "cpu.temperature",
+        reason: "noSensorData",
+    });
+
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        timestampMilliseconds: 2000,
+        metrics: {
+            "cpu.temperature": buildScalarMetricValue(50, { unit: MetricUnit.CELSIUS }),
+        },
+    }));
+
+    const recoveredReadResult = metrics.getWidgetDataWithAttribution("cpu.temperature", "CPU", "C", 100);
+
+    assert.equal(recoveredReadResult.selectedSourceId, LOCAL_SOURCE_SCOPE_ID);
+    assert.equal(recoveredReadResult.unavailableMetric, undefined);
+});
+
+test("unavailable reports replace stale value attribution without deleting the last value", () => {
+    const metricStore = new MetricStore();
+    const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
+
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            "cpu.temperature": buildScalarMetricValue(51, { unit: MetricUnit.CELSIUS }),
+        },
+    }), {
+        valueAttributions: [{
+            metricId: "cpu.temperature",
+            rawSensorIdentity: {
+                sourceSensorId: "lhm.sensor:/intelcpu/0/temperature/26",
+                hardwareId: "/intelcpu/0",
+                hardwareName: "CPU",
+                hardwareType: "Cpu",
+                sensorName: "CPU Package",
+                sourceSensorType: "Temperature",
+            },
+            valueFreshness: "fresh",
+        }],
+    });
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        timestampMilliseconds: 2000,
+        metrics: {},
+    }), {
+        unavailableMetrics: [{
+            metricId: "cpu.temperature",
+            reason: "invalidValue",
+        }],
+    });
+
+    const readResult = metrics.getWidgetDataWithAttribution("cpu.temperature", "CPU", "C", 100);
+
+    assert.equal(readResult.selectedSourceId, LOCAL_SOURCE_SCOPE_ID);
+    assert.equal(readResult.widgetData.sampleTimestampMilliseconds, 1000);
+    assert.equal(readResult.valueAttribution, undefined);
+    assert.deepEqual(readResult.unavailableMetric, {
+        metricId: "cpu.temperature",
+        reason: "invalidValue",
     });
 });
 
@@ -114,7 +234,7 @@ test("widget progress is clamped to the render domain", () => {
     );
 });
 
-test("text samples are retrievable without numeric widget history", () => {
+test("text values are retrievable without numeric widget history", () => {
     const metricStore = new MetricStore();
     const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
@@ -136,7 +256,7 @@ test("text samples are retrievable without numeric widget history", () => {
     });
 });
 
-test("invalid scalar and empty text samples are ignored", () => {
+test("invalid scalar and empty text values are ignored", () => {
     const metricStore = new MetricStore();
     const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 

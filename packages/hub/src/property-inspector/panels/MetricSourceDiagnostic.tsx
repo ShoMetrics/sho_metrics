@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { InspectorItem } from "../components/InspectorItem";
-import type { DisplayedMetricReadAttribution } from "../../runtime/widget-runtime-cache";
+import type {
+    DisplayedMetricReadAttribution,
+    DisplayedMetricUnavailableReason,
+} from "../../runtime/widget-runtime-cache";
 import { SettingsSection } from "./SettingsSection";
 import {
     NODE_SYSTEM_SOURCE_ID,
@@ -16,6 +19,13 @@ interface MetricSourceDiagnosticProps {
 declare const __BUILD_MODE__: "development" | "staging" | "production" | undefined;
 
 const RELATIVE_TIME_REFRESH_MILLISECONDS = 500;
+
+const metricUnavailableTextByReason = {
+    noSensorData: "no sensor data",
+    invalidValue: "invalid value",
+    expired: "expired",
+    unknown: "unknown",
+} satisfies Record<DisplayedMetricUnavailableReason, string>;
 
 export function MetricSourceDiagnostic({
     attribution,
@@ -39,17 +49,19 @@ export function MetricSourceDiagnostic({
 
     const metricKey = attribution?.metricKey;
     const currentSourceText = formatCurrentSourceLabel(attribution);
-    const preferredSourceText = attribution?.preferredSourceId
-        ? formatSourceLabel(attribution.preferredSourceId, metricKey)
+    const preferredSourceText = attribution?.routing.preferredSourceId
+        ? formatSourceLabel(attribution.routing.preferredSourceId, metricKey)
         : undefined;
-    const fallbackText = attribution?.preferredSourceId !== undefined
-        && attribution.selectedSourceId !== undefined
-        && attribution.preferredSourceId !== attribution.selectedSourceId
+    const fallbackText = attribution?.routing.preferredSourceId !== undefined
+        && attribution.routing.selectedSourceId !== undefined
+        && attribution.routing.preferredSourceId !== attribution.routing.selectedSourceId
         ? "Using fallback; preferred source has no fresh data."
         : undefined;
-    const helperStatusText = attribution?.preferredSourceId === WINDOWS_HELPER_SOURCE_ID
+    const helperStatusText = attribution?.routing.preferredSourceId === WINDOWS_HELPER_SOURCE_ID
         ? formatHelperStatusText(attribution)
         : undefined;
+    const sensorText = formatSensorText(attribution);
+    const metricStateText = formatMetricStateText(attribution);
 
     return (
         <SettingsSection title="DEBUG">
@@ -76,14 +88,26 @@ export function MetricSourceDiagnostic({
                                         <br />
                                     </>
                                 )}
-                                Last sample age: {formatSampleAgeText(
-                                    attribution?.sampleTimestampMilliseconds,
+                                Last value age: {formatValueAgeText(
+                                    readLastValueTimestampMilliseconds(attribution),
                                     currentTimestampMilliseconds,
                                 )}
                                 {helperStatusText !== undefined && (
                                     <>
                                         <br />
                                         Helper status: {helperStatusText}
+                                    </>
+                                )}
+                                {sensorText !== undefined && (
+                                    <>
+                                        <br />
+                                        Sensor: {sensorText}
+                                    </>
+                                )}
+                                {metricStateText !== undefined && (
+                                    <>
+                                        <br />
+                                        Metric: {metricStateText}
                                     </>
                                 )}
                                 {fallbackText !== undefined && (
@@ -106,7 +130,7 @@ function isDevelopmentBuild(): boolean {
 }
 
 function formatHelperStatusText(attribution: DisplayedMetricReadAttribution): string {
-    if (attribution.selectedSourceId === WINDOWS_HELPER_SOURCE_ID) {
+    if (attribution.routing.selectedSourceId === WINDOWS_HELPER_SOURCE_ID) {
         return "Ready";
     }
 
@@ -134,11 +158,11 @@ function formatHelperStatusText(attribution: DisplayedMetricReadAttribution): st
 }
 
 function formatCurrentSourceLabel(attribution: DisplayedMetricReadAttribution | undefined): string {
-    if (attribution?.selectedSourceId === undefined) {
+    if (attribution?.routing.selectedSourceId === undefined) {
         return "No fresh source";
     }
 
-    return formatSourceLabel(attribution.selectedSourceId, attribution.metricKey);
+    return formatSourceLabel(attribution.routing.selectedSourceId, attribution.metricKey);
 }
 
 function formatSourceLabel(sourceId: string, metricKey: string | undefined): string {
@@ -154,26 +178,73 @@ function formatSourceLabel(sourceId: string, metricKey: string | undefined): str
     }
 }
 
-function formatSampleAgeText(
-    sampleTimestampMilliseconds: number | undefined,
-    currentTimestampMilliseconds: number,
-): string {
-    if (sampleTimestampMilliseconds === undefined) {
-        return "No data yet";
+function formatSensorText(attribution: DisplayedMetricReadAttribution | undefined): string | undefined {
+    if (attribution === undefined) {
+        return undefined;
     }
 
-    const elapsedMilliseconds = Math.max(0, currentTimestampMilliseconds - sampleTimestampMilliseconds);
-    const elapsedSeconds = elapsedMilliseconds / 1000;
+    const rawSensorIdentity = attribution.outcome?.rawSensorIdentity;
+    const name = rawSensorIdentity?.sensorName ?? rawSensorIdentity?.hardwareName;
+    const id = rawSensorIdentity?.sourceSensorId ?? rawSensorIdentity?.hardwareId;
 
+    if (name === undefined && id === undefined) {
+        return undefined;
+    }
+
+    if (name !== undefined && id !== undefined) {
+        return `${name} (${id})`;
+    }
+
+    return name ?? id;
+}
+
+function formatMetricStateText(attribution: DisplayedMetricReadAttribution | undefined): string | undefined {
+    switch (attribution?.outcome?.kind) {
+        case "value":
+            if (attribution.outcome.freshness === "fresh") {
+                return "fresh";
+            }
+
+            return attribution.outcome.retainedAgeMilliseconds === undefined
+                ? "retained"
+                : `retained ${formatElapsedSecondsText(attribution.outcome.retainedAgeMilliseconds)}`;
+        case "unavailable":
+            return metricUnavailableTextByReason[attribution.outcome.reason];
+        case undefined:
+            return undefined;
+    }
+}
+
+function readLastValueTimestampMilliseconds(
+    attribution: DisplayedMetricReadAttribution | undefined,
+): number | undefined {
+    switch (attribution?.outcome?.kind) {
+        case "value":
+            return attribution.outcome.valueTimestampMilliseconds;
+        case "unavailable":
+            return attribution.outcome.lastValueTimestampMilliseconds;
+        case undefined:
+            return undefined;
+    }
+}
+
+function formatValueAgeText(
+    valueTimestampMilliseconds: number | undefined,
+    currentTimestampMilliseconds: number,
+): string {
+    if (valueTimestampMilliseconds === undefined) {
+        return "none";
+    }
+
+    const elapsedMilliseconds = Math.max(0, currentTimestampMilliseconds - valueTimestampMilliseconds);
+    return formatElapsedSecondsText(elapsedMilliseconds);
+}
+
+function formatElapsedSecondsText(elapsedMilliseconds: number): string {
+    const elapsedSeconds = elapsedMilliseconds / 1000;
     if (elapsedSeconds < 1) {
         return `${elapsedSeconds.toFixed(1)}s`;
     }
 
-    if (elapsedSeconds < 60) {
-        return `${Math.floor(elapsedSeconds)}s`;
-    }
-
-    const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-    const remainingSeconds = Math.floor(elapsedSeconds % 60);
-    return `${elapsedMinutes}m ${remainingSeconds}s`;
+    return `${Math.floor(elapsedSeconds)}s`;
 }

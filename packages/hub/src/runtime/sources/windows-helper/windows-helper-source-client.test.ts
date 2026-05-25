@@ -5,11 +5,11 @@ import {
     GetSourceHealthResponseSchema,
     ListMetricDescriptorsResponseSchema,
     MetricIdKind as ProtoMetricIdKind,
-    MetricUnavailableReason,
+    MetricUnavailableReason as ProtoMetricUnavailableReason,
     MetricUnavailableReportSchema,
     MetricValueAttributionSchema,
     MetricValueKind as ProtoMetricValueKind,
-    MetricValueFreshness,
+    MetricValueFreshness as ProtoMetricValueFreshness,
     ReadMetricSnapshotResponseSchema,
     SourceErrorSchema,
     type MetricUnavailableReport as ProtoMetricUnavailableReport,
@@ -498,7 +498,7 @@ test("windows helper source client sends requested metric ids and returns a runt
     );
 });
 
-test("windows helper source client maps sample and unavailable metric reports", async () => {
+test("windows helper source client maps value attribution and unavailable metric reports", async () => {
     const transport = new FakeWindowsHelperPipeTransport(request => {
         switch (request.payload.case) {
             case "getSourceHealth":
@@ -516,14 +516,14 @@ test("windows helper source client maps sample and unavailable metric reports", 
                                 sensorName: "CPU Total",
                                 sourceSensorType: "Load",
                             },
-                            valueFreshness: MetricValueFreshness.RETAINED,
+                            valueFreshness: ProtoMetricValueFreshness.RETAINED,
                             retainedAgeMilliseconds: 1500,
                         }),
                     ],
                     unavailableMetrics: [
                         create(MetricUnavailableReportSchema, {
                             metricId: "cpu.power",
-                            reason: MetricUnavailableReason.NO_SENSOR,
+                            reason: ProtoMetricUnavailableReason.NO_SENSOR,
                         }),
                     ],
                 });
@@ -545,12 +545,12 @@ test("windows helper source client maps sample and unavailable metric reports", 
             sensorName: "CPU Total",
             sourceSensorType: "Load",
         },
-        valueFreshness: MetricValueFreshness.RETAINED,
+        valueFreshness: "retained",
         retainedAgeMilliseconds: 1500,
     }]);
     assert.deepEqual(readResult.unavailableMetrics, [{
         metricId: "cpu.power",
-        reason: MetricUnavailableReason.NO_SENSOR,
+        reason: "noSensorData",
     }]);
 });
 
@@ -565,7 +565,7 @@ test("windows helper source client drops inconsistent source metric reports", as
             sensorName: "CPU Total",
             sourceSensorType: "Load",
         },
-        valueFreshness: MetricValueFreshness.FRESH,
+        valueFreshness: ProtoMetricValueFreshness.FRESH,
     });
     const transport = new FakeWindowsHelperPipeTransport(request => {
         switch (request.payload.case) {
@@ -578,25 +578,25 @@ test("windows helper source client drops inconsistent source metric reports", as
                         validAttribution,
                         create(MetricValueAttributionSchema, {
                             metricId: "cpu.power",
-                            valueFreshness: MetricValueFreshness.FRESH,
+                            valueFreshness: ProtoMetricValueFreshness.FRESH,
                         }),
                     ],
                     unavailableMetrics: [
                         create(MetricUnavailableReportSchema, {
                             metricId: "cpu.usage_percent",
-                            reason: MetricUnavailableReason.INVALID_VALUE,
+                            reason: ProtoMetricUnavailableReason.INVALID_VALUE,
                         }),
                         create(MetricUnavailableReportSchema, {
                             metricId: "cpu.power",
-                            reason: MetricUnavailableReason.NO_SENSOR,
+                            reason: ProtoMetricUnavailableReason.NO_SENSOR,
                         }),
                         create(MetricUnavailableReportSchema, {
                             metricId: "cpu.power",
-                            reason: MetricUnavailableReason.EXPIRED,
+                            reason: ProtoMetricUnavailableReason.EXPIRED,
                         }),
                         create(MetricUnavailableReportSchema, {
                             metricId: "not.requested",
-                            reason: MetricUnavailableReason.NO_SENSOR,
+                            reason: ProtoMetricUnavailableReason.NO_SENSOR,
                         }),
                     ],
                 });
@@ -618,11 +618,11 @@ test("windows helper source client drops inconsistent source metric reports", as
             sensorName: "CPU Total",
             sourceSensorType: "Load",
         },
-        valueFreshness: MetricValueFreshness.FRESH,
+        valueFreshness: "fresh",
     }]);
     assert.deepEqual(readResult.unavailableMetrics, [{
         metricId: "cpu.power",
-        reason: MetricUnavailableReason.NO_SENSOR,
+        reason: "noSensorData",
     }]);
 });
 
@@ -636,7 +636,7 @@ test("windows helper source client treats future freshness enum values as displa
                     valueAttributions: [
                         create(MetricValueAttributionSchema, {
                             metricId: "cpu.usage_percent",
-                            valueFreshness: 99 as MetricValueFreshness,
+                            valueFreshness: 99 as ProtoMetricValueFreshness,
                         }),
                     ],
                 });
@@ -650,11 +650,11 @@ test("windows helper source client treats future freshness enum values as displa
 
     assert.deepEqual(readResult.valueAttributions, [{
         metricId: "cpu.usage_percent",
-        valueFreshness: MetricValueFreshness.RETAINED,
+        valueFreshness: "retained",
     }]);
 });
 
-test("windows helper source client preserves future unavailable reasons as debug metadata", async () => {
+test("windows helper source client normalizes future unavailable reasons to unknown debug metadata", async () => {
     const transport = new FakeWindowsHelperPipeTransport(request => {
         switch (request.payload.case) {
             case "getSourceHealth":
@@ -664,7 +664,7 @@ test("windows helper source client preserves future unavailable reasons as debug
                     unavailableMetrics: [
                         create(MetricUnavailableReportSchema, {
                             metricId: "cpu.temp",
-                            reason: 99 as MetricUnavailableReason,
+                            reason: 99 as ProtoMetricUnavailableReason,
                         }),
                     ],
                 });
@@ -678,7 +678,7 @@ test("windows helper source client preserves future unavailable reasons as debug
 
     assert.deepEqual(readResult.unavailableMetrics, [{
         metricId: "cpu.temp",
-        reason: 99,
+        reason: "unknown",
     }]);
 });
 

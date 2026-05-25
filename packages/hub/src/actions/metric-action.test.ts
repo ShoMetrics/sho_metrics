@@ -269,7 +269,7 @@ test("metric collection subscriptions preserve each metric route's source candid
     }
 });
 
-test("metric collection reads source-candidate samples through synchronous fallback", () => {
+test("metric collection reads source-candidate values through synchronous fallback", () => {
     metricStore.clear();
     const action = new TestMetricReaderAction();
     const streamDeckAction = new FakeStreamDeckAction("background-fallback-action");
@@ -310,9 +310,15 @@ test("metric action publishes displayed metric source attribution from the fallb
             {
                 displayedMetricReadAttribution: {
                     metricKey: "net.down",
-                    preferredSourceId: NODE_SYSTEM_SOURCE_ID,
-                    selectedSourceId: NODE_SYSTEM_SOURCE_ID,
-                    sampleTimestampMilliseconds: TEST_CURRENT_TIMESTAMP_MILLISECONDS,
+                    routing: {
+                        preferredSourceId: NODE_SYSTEM_SOURCE_ID,
+                        selectedSourceId: NODE_SYSTEM_SOURCE_ID,
+                    },
+                    outcome: {
+                        kind: "value",
+                        valueTimestampMilliseconds: TEST_CURRENT_TIMESTAMP_MILLISECONDS,
+                        freshness: "fresh",
+                    },
                 },
             },
         ]);
@@ -322,7 +328,65 @@ test("metric action publishes displayed metric source attribution from the fallb
     }
 });
 
-test("metric action reports no selected source when displayed metric has no fresh sample", () => {
+test("metric action publishes displayed metric value attribution", () => {
+    metricStore.clear();
+    const action = new TestDisplayedAttributionAction();
+    const streamDeckAction = new FakeStreamDeckAction("displayed-value-attribution-action");
+
+    metricStore.ingest(NODE_SYSTEM_SOURCE_ID, buildMetricSnapshot({
+        timestampMilliseconds: TEST_CURRENT_TIMESTAMP_MILLISECONDS,
+        metrics: {
+            "net.down": buildScalarMetricValue(123),
+        },
+    }), {
+        valueAttributions: [{
+            metricId: "net.down",
+            rawSensorIdentity: {
+                sourceSensorId: "source.sensor:/net/down",
+                hardwareId: "adapter-1",
+                hardwareName: "Ethernet",
+                hardwareType: "Network",
+                sensorName: "Download",
+                sourceSensorType: "Throughput",
+            },
+            valueFreshness: "retained",
+            retainedAgeMilliseconds: 1500,
+        }],
+    });
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
+
+        assert.deepEqual(action.runtimeCachePatchList, [
+            {
+                displayedMetricReadAttribution: {
+                    metricKey: "net.down",
+                    routing: {
+                        preferredSourceId: NODE_SYSTEM_SOURCE_ID,
+                        selectedSourceId: NODE_SYSTEM_SOURCE_ID,
+                    },
+                    outcome: {
+                        kind: "value",
+                        valueTimestampMilliseconds: TEST_CURRENT_TIMESTAMP_MILLISECONDS,
+                        freshness: "retained",
+                        retainedAgeMilliseconds: 1500,
+                        rawSensorIdentity: {
+                            sourceSensorId: "source.sensor:/net/down",
+                            hardwareId: "adapter-1",
+                            sensorName: "Download",
+                            hardwareName: "Ethernet",
+                        },
+                    },
+                },
+            },
+        ]);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+        metricStore.clear();
+    }
+});
+
+test("metric action reports no selected source when displayed metric has no fresh value", () => {
     metricStore.clear();
     const action = new TestDisplayedAttributionAction();
     const streamDeckAction = new FakeStreamDeckAction("displayed-no-source-action");
@@ -334,9 +398,65 @@ test("metric action reports no selected source when displayed metric has no fres
             {
                 displayedMetricReadAttribution: {
                     metricKey: "net.down",
-                    preferredSourceId: NODE_SYSTEM_SOURCE_ID,
-                    selectedSourceId: undefined,
-                    sampleTimestampMilliseconds: undefined,
+                    routing: {
+                        preferredSourceId: NODE_SYSTEM_SOURCE_ID,
+                        selectedSourceId: undefined,
+                    },
+                    outcome: undefined,
+                },
+            },
+        ]);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+        metricStore.clear();
+    }
+});
+
+test("metric action publishes unavailable metric attribution when no fresh value exists", () => {
+    metricStore.clear();
+    const action = new TestDisplayedAttributionAction();
+    const streamDeckAction = new FakeStreamDeckAction("displayed-unavailable-attribution-action");
+
+    metricStore.ingest(NODE_SYSTEM_SOURCE_ID, buildMetricSnapshot({
+        timestampMilliseconds: TEST_CURRENT_TIMESTAMP_MILLISECONDS,
+        metrics: {},
+    }), {
+        unavailableMetrics: [{
+            metricId: "net.down",
+            reason: "invalidValue",
+            rawSensorIdentity: {
+                sourceSensorId: "source.sensor:/net/down",
+                hardwareId: "adapter-1",
+                hardwareName: "Ethernet",
+                hardwareType: "Network",
+                sensorName: "Download",
+                sourceSensorType: "Throughput",
+            },
+        }],
+    });
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
+
+        assert.deepEqual(action.runtimeCachePatchList, [
+            {
+                displayedMetricReadAttribution: {
+                    metricKey: "net.down",
+                    routing: {
+                        preferredSourceId: NODE_SYSTEM_SOURCE_ID,
+                        selectedSourceId: undefined,
+                    },
+                    outcome: {
+                        kind: "unavailable",
+                        reason: "invalidValue",
+                        lastValueTimestampMilliseconds: undefined,
+                        rawSensorIdentity: {
+                            sourceSensorId: "source.sensor:/net/down",
+                            hardwareId: "adapter-1",
+                            sensorName: "Download",
+                            hardwareName: "Ethernet",
+                        },
+                    },
                 },
             },
         ]);
