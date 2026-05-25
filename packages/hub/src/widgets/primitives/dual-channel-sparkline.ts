@@ -4,10 +4,9 @@ import {
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     type RenderThemeEffectTokens,
 } from "../../view-rendering/render-svg-effects";
-import { adjustHexColorBrightness, clamp, renderConstrainedSvgText } from "../../view-rendering/svg-utils";
+import { adjustHexColorBrightness, clamp, renderStyledSvgText } from "../../view-rendering/svg-utils";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
-    resolveRenderTextStyleFontSize,
     type RenderTextStyles,
 } from "../../view-rendering/render-text-style";
 import type { WidgetBaseConfig } from "../widget-contract";
@@ -458,15 +457,14 @@ function renderTitle(options: {
 
     return `
         ${iconSvg}
-        ${renderConstrainedSvgText({
+        ${renderStyledSvgText({
             id: "dual-sparkline-title",
             text: options.titleText,
             xCoordinate: titleXCoordinate,
             yCoordinate: options.layout.yCoordinate,
             maxWidth: titleMaxWidth,
-            fontSize: resolveRenderTextStyleFontSize(options.layout.fontSize, titleTextStyle),
-            fontFamily: titleTextStyle.fontFamily,
-            fontWeight: titleTextStyle.fontWeight,
+            baseFontSize: options.layout.fontSize,
+            textStyle: titleTextStyle,
             fill: options.textColor,
             extraAttributes: buildSvgFilterAttributes(titleTextStyle.filter),
         })}
@@ -537,9 +535,8 @@ function renderChannelRow(options: {
             },
             value: {
                 text: options.valueText,
-                fontSize: resolveRenderTextStyleFontSize(options.layout.valueFontSize, valueTextStyle),
-                fontFamily: valueTextStyle.fontFamily,
-                fontWeight: valueTextStyle.fontWeight,
+                baseFontSize: options.layout.valueFontSize,
+                textStyle: valueTextStyle,
                 fill: options.valueTextColor,
                 extraAttributes: [
                     "font-variant-numeric=\"tabular-nums\"",
@@ -548,9 +545,8 @@ function renderChannelRow(options: {
             },
             unit: {
                 text: options.unitText,
-                fontSize: resolveRenderTextStyleFontSize(options.layout.unitFontSize, unitTextStyle),
-                fontFamily: unitTextStyle.fontFamily,
-                fontWeight: unitTextStyle.fontWeight,
+                baseFontSize: options.layout.unitFontSize,
+                textStyle: unitTextStyle,
                 fill: options.unitTextColor,
                 baselineOffset: 2,
                 extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),

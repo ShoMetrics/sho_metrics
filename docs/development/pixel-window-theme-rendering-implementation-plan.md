@@ -346,8 +346,11 @@ Field semantics:
   `guardedWidth = rawEstimatedWidth * widthScale * widthGuardRatio`.
   When tuning a measured font width ratio, set `widthScale` to that ratio and
   do not pre-divide it by the guard ratio.
-- `minimumFontScale`: lets a theme choose how aggressively text may shrink
-  before `textLength` compression is used.
+- `minimumFontScale`: sets the default lower bound for font shrinking before
+  `textLength` compression is used. A primitive may pass a layout-specific
+  minimum when the available text box is intentionally tighter than the role
+  default. Keep `widthScale` font-owned; do not use per-call `widthScale`
+  overrides as font workarounds.
 - `filter`: keeps existing theme glow/filter behavior.
 
 Neutral defaults must preserve the current layout. The values below are
@@ -462,6 +465,8 @@ Migrate text drawing in these areas:
   - current value
   - unit
   - small labels
+- `widgets/primitives/mirrored-traffic.ts`
+  - top channel labels
 - `widgets/primitives/title-card-text-metric.ts`
   - no pixel-font migration in this plan
   - keep current Japanese serif typography stable
@@ -469,10 +474,13 @@ Migrate text drawing in these areas:
 
 Title-card currently uses `JAPANESE_SERIF_RENDER_FONT_FAMILY` directly in many
 text elements. For this plan, that is acceptable because title-card is not the
-font-safe driver and remains a strongly styled view. Do not add title-card
-specific fields to the generic `RenderTextStyle` contract. If the direct usages
-are touched for nearby work, keep the font choice renderer-owned and explicit,
-but do not force title-card into the pixel theme font chain.
+font-safe driver and remains a strongly styled view. This is an intentional
+scope decision, not an accidental missed migration: title-card keeps its current
+Japanese serif typography until a separate product decision changes that view's
+identity. Do not add title-card-specific fields to the generic `RenderTextStyle`
+contract. If the direct usages are touched for nearby work, keep the font choice
+renderer-owned and explicit, but do not force title-card into the pixel theme
+font chain.
 
 ## Visual Test Standard
 
@@ -800,6 +808,7 @@ Migrate primitives group by group:
 3. `dual-channel-progress-circle.ts`
 4. `progress-bar.ts`
 5. `sparkline.ts`
+6. `mirrored-traffic.ts`
 
 After each group:
 
@@ -844,6 +853,13 @@ This step must not:
 
 If the pixel font still clips after metrics tuning, adjust the metrics preset or
 shared helper. Do not add local `if pixel font` branches to primitives.
+
+Required pixel-font verification:
+
+- Render `metric-text-row` with the pixel preset and non-zero
+  `baselineShiftEm` values. Verify the unit `tspan` is not clipped. If it clips,
+  revisit row clip-centering strategy at that point instead of adding
+  primitive-local pixel-font patches.
 
 ### Step 8: Document Future User Font Path
 
@@ -909,8 +925,9 @@ Initial text call-site inventory found the expected high-risk areas:
   `widgets/primitives/dual-channel-sparkline.ts`: title/value/unit/small labels
   share chart space with plot geometry, so vertical metric drift can collide
   with graph regions.
-- `widgets/primitives/mirrored-traffic.ts`: uses direct `<text>` elements with
-  fixed `y` coordinates instead of the constrained text helper.
+- `widgets/primitives/mirrored-traffic.ts`: top labels used direct `<text>`
+  elements with fixed `y` coordinates; include them in the styled text migration
+  so they are not a second font island.
 - `widgets/primitives/title-card-text-metric.ts`: uses
   `JAPANESE_SERIF_RENDER_FONT_FAMILY` directly. It remains a managed exception
   for this plan and should not drive the pixel-font metrics contract.

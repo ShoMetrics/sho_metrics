@@ -7,10 +7,9 @@ import {
 } from "../../view-rendering/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
-    resolveRenderTextStyleFontSize,
     type RenderTextStyles,
 } from "../../view-rendering/render-text-style";
-import { escapeSvgText } from "../../view-rendering/svg-utils";
+import { renderStyledSvgText } from "../../view-rendering/svg-utils";
 
 export interface MirroredTrafficConfig {
     positiveColorConfig: ColorConfig;
@@ -98,20 +97,35 @@ export function renderMirroredTraffic(
     const labelTextStyle = config.textStyles.smallLabel;
     const labelTextFilterAttributes = buildSvgFilterAttributes(labelTextStyle.filter);
     const subtleFilterAttributes = buildSvgFilterAttributes(config.themeEffects.subtleFilter);
+    const labelMaxWidth = Math.max(1, keySize.width / 2 - 14);
 
     return `
         <!-- Mirrored Traffic: labels -->
-        <text x="10" y="14" font-family="${escapeSvgText(labelTextStyle.fontFamily)}"
-            font-size="${resolveRenderTextStyleFontSize(11, labelTextStyle)}"
-            font-weight="${escapeSvgText(String(labelTextStyle.fontWeight))}"
-            fill="${config.labelTextColor}" ${labelTextFilterAttributes.join(" ")}>
-            ▼ ${escapeSvgText(positiveLabel)}</text>
-        <text x="${keySize.width - 10}" y="14" text-anchor="end"
-            font-family="${escapeSvgText(labelTextStyle.fontFamily)}"
-            font-size="${resolveRenderTextStyleFontSize(11, labelTextStyle)}"
-            font-weight="${escapeSvgText(String(labelTextStyle.fontWeight))}"
-            fill="${config.labelTextColor}" ${labelTextFilterAttributes.join(" ")}>
-            ▲ ${escapeSvgText(negativeLabel)}</text>
+        ${renderStyledSvgText({
+            id: "mirrored-traffic-positive-label",
+            text: `▼ ${positiveLabel}`,
+            xCoordinate: 10,
+            yCoordinate: 14,
+            maxWidth: labelMaxWidth,
+            baseFontSize: 11,
+            fill: config.labelTextColor,
+            textStyle: labelTextStyle,
+            dominantBaseline: "auto",
+            extraAttributes: labelTextFilterAttributes,
+        })}
+        ${renderStyledSvgText({
+            id: "mirrored-traffic-negative-label",
+            text: `▲ ${negativeLabel}`,
+            xCoordinate: keySize.width - 10,
+            yCoordinate: 14,
+            maxWidth: labelMaxWidth,
+            baseFontSize: 11,
+            fill: config.labelTextColor,
+            textStyle: labelTextStyle,
+            textAnchor: "end",
+            dominantBaseline: "auto",
+            extraAttributes: labelTextFilterAttributes,
+        })}
         <!-- Mirrored Traffic: center line -->
         <line x1="${padding.left}" y1="${centerY}" x2="${keySize.width - padding.right}" y2="${centerY}"
             stroke="${config.dividerColor}" stroke-width="1" stroke-dasharray="4,3" ${subtleFilterAttributes.join(" ")} />

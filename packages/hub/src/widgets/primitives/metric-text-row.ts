@@ -7,6 +7,10 @@ import {
     type SvgTextAnchor,
     type SvgTextFitOptions,
 } from "../../view-rendering/svg-utils";
+import {
+    resolveRenderTextStyleFontSize,
+    type RenderTextStyle,
+} from "../../view-rendering/render-text-style";
 
 interface MetricTextRowOptions {
     readonly id: string;
@@ -26,9 +30,8 @@ interface MetricTextRowLayout {
 
 interface MetricTextSegment {
     readonly text: string;
-    readonly fontSize: number;
-    readonly fontFamily: string;
-    readonly fontWeight: number | string;
+    readonly baseFontSize: number;
+    readonly textStyle: RenderTextStyle;
     readonly fill: string;
     readonly extraAttributes?: readonly string[];
 }
@@ -49,32 +52,49 @@ export function renderMetricTextRow(options: MetricTextRowOptions): string {
     const width = Math.max(MINIMUM_ROW_WIDTH, options.layout.width);
     const textAnchor = options.layout.textAnchor ?? "start";
     const unitTier = resolveUnitTier(options.unit.text);
-    const rawUnitFontSize = options.unit.fontSize * unitTier.fontScale;
+    const rawValueFontSize = resolveRenderTextStyleFontSize(options.value.baseFontSize, options.value.textStyle);
+    const rawUnitFontSize = resolveRenderTextStyleFontSize(options.unit.baseFontSize, options.unit.textStyle)
+        * unitTier.fontScale;
     const textFit = resolveSvgTextFit({
         runs: [
             {
                 text: options.value.text,
-                fontSize: options.value.fontSize,
-                fontWeight: options.value.fontWeight,
+                fontSize: rawValueFontSize,
+                fontWeight: options.value.textStyle.fontWeight,
             },
             {
                 text: options.unit.text,
                 fontSize: rawUnitFontSize,
-                fontWeight: options.unit.fontWeight,
+                fontWeight: options.unit.textStyle.fontWeight,
             },
         ],
         maxWidth: width,
         extraWidth: options.unit.text.length > 0 ? unitTier.gap : 0,
-        fitOptions: options.fitOptions,
+        fitOptions: {
+            ...options.fitOptions,
+            minimumFontScale: options.fitOptions?.minimumFontScale ?? resolveRowMinimumFontScale(
+                options.value.textStyle,
+                options.unit.textStyle,
+            ),
+            widthScale: resolveRowWidthScale(options.value.textStyle, options.unit.textStyle),
+        },
     });
-    const valueFontSize = options.value.fontSize * textFit.fontScale;
+    const valueFontSize = rawValueFontSize * textFit.fontScale;
     const unitFontSize = rawUnitFontSize * textFit.fontScale;
     const unitGap = unitTier.gap * textFit.fontScale;
+    const yCoordinate = options.layout.yCoordinate + valueFontSize * options.value.textStyle.baselineShiftEm;
+    const unitBaselineShift = unitFontSize * options.unit.textStyle.baselineShiftEm
+        - valueFontSize * options.value.textStyle.baselineShiftEm;
+    const unitBaselineOffset = (options.unit.baselineOffset ?? 0) + unitBaselineShift;
+    // The clip remains centered on the value run so existing row geometry stays stable.
     const clipHeight = options.layout.clipHeight
-        ?? Math.max(valueFontSize, unitFontSize) * 1.45;
+        ?? Math.max(
+            valueFontSize * options.value.textStyle.clipHeightEm,
+            unitFontSize * options.unit.textStyle.clipHeightEm,
+        );
     const clipPathId = sanitizeSvgId(options.id, "metric-text-row");
     const clipXCoordinate = resolveClipXCoordinate(options.layout.xCoordinate, width, textAnchor);
-    const clipYCoordinate = options.layout.yCoordinate - clipHeight / 2;
+    const clipYCoordinate = yCoordinate - clipHeight / 2;
     const valueAttributes = options.value.extraAttributes?.length
         ? ` ${options.value.extraAttributes.join(" ")}`
         : "";
@@ -82,16 +102,16 @@ export function renderMetricTextRow(options: MetricTextRowOptions): string {
         ? ` ${options.unit.extraAttributes.join(" ")}`
         : "";
     const unitTspan = options.unit.text.length > 0
-        ? `<tspan dx="${formatSvgNumber(unitGap)}" dy="${formatSvgNumber(options.unit.baselineOffset ?? 0)}"
-                font-family="${escapeSvgText(options.unit.fontFamily)}" font-size="${formatSvgNumber(unitFontSize)}"
-                font-weight="${escapeSvgText(String(options.unit.fontWeight))}"
+        ? `<tspan dx="${formatSvgNumber(unitGap)}" dy="${formatSvgNumber(unitBaselineOffset)}"
+                font-family="${escapeSvgText(options.unit.textStyle.fontFamily)}" font-size="${formatSvgNumber(unitFontSize)}"
+                font-weight="${escapeSvgText(String(options.unit.textStyle.fontWeight))}"
                 fill="${escapeSvgText(options.unit.fill)}"${unitAttributes}>${escapeSvgText(options.unit.text)}</tspan>`
         : "";
     const textFitAttributes = formatSvgTextFitAttributes(textFit);
-    const textElement = `<text x="${formatSvgNumber(options.layout.xCoordinate)}" y="${formatSvgNumber(options.layout.yCoordinate)}"
+    const textElement = `<text x="${formatSvgNumber(options.layout.xCoordinate)}" y="${formatSvgNumber(yCoordinate)}"
                 text-anchor="${textAnchor}" dominant-baseline="middle"${textFitAttributes}><tspan
-                    font-family="${escapeSvgText(options.value.fontFamily)}" font-size="${formatSvgNumber(valueFontSize)}"
-                    font-weight="${escapeSvgText(String(options.value.fontWeight))}"
+                    font-family="${escapeSvgText(options.value.textStyle.fontFamily)}" font-size="${formatSvgNumber(valueFontSize)}"
+                    font-weight="${escapeSvgText(String(options.value.textStyle.fontWeight))}"
                     fill="${escapeSvgText(options.value.fill)}"${valueAttributes}>${escapeSvgText(options.value.text)}</tspan>${unitTspan}</text>`;
 
     return `
@@ -105,6 +125,21 @@ export function renderMetricTextRow(options: MetricTextRowOptions): string {
             ${textElement}
         </g>
     `;
+}
+
+function resolveRowMinimumFontScale(valueTextStyle: RenderTextStyle, unitTextStyle: RenderTextStyle): number {
+    // A shared row font scale must honor the stricter lower bound from either run.
+    return Math.max(
+        valueTextStyle.minimumFontScale,
+        unitTextStyle.minimumFontScale,
+    );
+}
+
+function resolveRowWidthScale(valueTextStyle: RenderTextStyle, unitTextStyle: RenderTextStyle): number {
+    return Math.max(
+        valueTextStyle.widthScale,
+        unitTextStyle.widthScale,
+    );
 }
 
 function resolveUnitTier(unitText: string): { gap: number; fontScale: number } {

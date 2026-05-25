@@ -7,13 +7,12 @@ import {
 } from "../../view-rendering/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
-    resolveRenderTextStyleFontSize,
     type RenderTextStyles,
 } from "../../view-rendering/render-text-style";
 import {
     adjustHexColorBrightness,
     clamp,
-    renderConstrainedSvgText,
+    renderStyledSvgText,
 } from "../../view-rendering/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget-contract";
 import { renderMetricTextRow } from "./metric-text-row";
@@ -396,15 +395,14 @@ function renderTitle(options: {
 
     return `
         ${iconSvg}
-        ${renderConstrainedSvgText({
+        ${renderStyledSvgText({
             id: options.clipId,
             text: options.titleText,
             xCoordinate: titleXCoordinate,
             yCoordinate: options.layout.yCoordinate,
             maxWidth: titleMaxWidth,
-            fontSize: resolveRenderTextStyleFontSize(options.layout.fontSize, titleTextStyle),
-            fontFamily: titleTextStyle.fontFamily,
-            fontWeight: titleTextStyle.fontWeight,
+            baseFontSize: options.layout.fontSize,
+            textStyle: titleTextStyle,
             fill: options.textColor,
             extraAttributes: buildSvgFilterAttributes(titleTextStyle.filter),
         })}
@@ -433,9 +431,8 @@ function renderValueWithUnit(options: {
         },
         value: {
             text: options.valueText,
-            fontSize: resolveRenderTextStyleFontSize(options.layout.fontSize, valueTextStyle),
-            fontFamily: valueTextStyle.fontFamily,
-            fontWeight: valueTextStyle.fontWeight,
+            baseFontSize: options.layout.fontSize,
+            textStyle: valueTextStyle,
             fill: options.valueTextColor,
             extraAttributes: [
                 "font-variant-numeric=\"tabular-nums\"",
@@ -444,9 +441,8 @@ function renderValueWithUnit(options: {
         },
         unit: {
             text: options.unitText,
-            fontSize: resolveRenderTextStyleFontSize(options.layout.unitFontSize, unitTextStyle),
-            fontFamily: unitTextStyle.fontFamily,
-            fontWeight: unitTextStyle.fontWeight,
+            baseFontSize: options.layout.unitFontSize,
+            textStyle: unitTextStyle,
             fill: options.unitTextColor,
             baselineOffset: 2,
             extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
@@ -467,15 +463,14 @@ function renderSecondaryText(options: {
     }
     const textStyle = options.textStyles.smallLabel;
 
-    return renderConstrainedSvgText({
+    return renderStyledSvgText({
         id: options.clipId,
         text: options.text,
         xCoordinate: options.layout.xCoordinate,
         yCoordinate: options.layout.yCoordinate,
         maxWidth: options.layout.maxWidth,
-        fontSize: resolveRenderTextStyleFontSize(options.layout.fontSize, textStyle),
-        fontFamily: textStyle.fontFamily,
-        fontWeight: textStyle.fontWeight,
+        baseFontSize: options.layout.fontSize,
+        textStyle,
         fill: options.textColor,
         extraAttributes: buildSvgFilterAttributes(textStyle.filter),
     });
