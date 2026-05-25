@@ -120,6 +120,10 @@ function formatHelperStatusText(attribution: DisplayedMetricReadAttribution): st
     }
 
     if (status.state === "unavailable") {
+        if (status.reason === "helperNotInstalled") {
+            return "Required";
+        }
+
         return status.reason === "pipeMissing"
             && status.lastSuccessAtTimestampMilliseconds === undefined
             ? "Required"

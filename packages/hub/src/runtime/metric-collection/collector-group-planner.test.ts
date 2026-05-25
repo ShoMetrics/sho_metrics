@@ -2,8 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { CollectorGroupPlanner } from "./collector-group-planner";
 import type { MetricSubscription } from "./metric-subscription-registry";
-import type { MetricSnapshot } from "../sources/metric-source";
-import type { SourceClient } from "../sources/source-client";
+import type { SourceClient, SourceSnapshotReadResult } from "../sources/source-client";
 import type { SourceMetricPollingGroupResolution } from "../sources/source-polling-groups";
 import type { SourceRegistry } from "../sources/source-registry";
 
@@ -269,7 +268,7 @@ class FakeSourceClient implements SourceClient {
         private readonly resolveMetricKey: (metricKey: string) => SourceMetricPollingGroupResolution,
     ) {}
 
-    async readSnapshot(): Promise<MetricSnapshot> {
+    async readSnapshot(): Promise<SourceSnapshotReadResult> {
         throw new Error("FakeSourceClient does not serve snapshots.");
     }
 

@@ -187,7 +187,11 @@ export class BackgroundMetricCollection {
         }
 
         try {
-            metricStore.ingest(sourceCandidate.sourceId, await sourceClient.readSnapshot(metricKeys));
+            const readResult = await sourceClient.readSnapshot(metricKeys);
+            metricStore.ingest(sourceCandidate.sourceId, readResult.snapshot, {
+                valueAttributions: readResult.valueAttributions,
+                unavailableMetrics: readResult.unavailableMetrics,
+            });
         } catch (error) {
             log.warn(() => [
                 "runtimeOptionRefreshFailed",

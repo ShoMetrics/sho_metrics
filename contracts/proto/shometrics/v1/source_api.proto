@@ -33,6 +33,15 @@ message ReadMetricSnapshotResponse {
   MetricSnapshot snapshot = 1;
   MetricDescriptorSnapshot descriptor_snapshot = 2;
   repeated SourceWarning warnings = 3;
+
+  // Source metadata for values emitted in snapshot.metrics. A metric id should
+  // appear in exactly one of value_attributions or unavailable_metrics.
+  repeated MetricValueAttribution value_attributions = 4;
+
+  // Source-reported reasons for requested metrics omitted from snapshot.metrics.
+  // A metric id should appear in exactly one of value_attributions or
+  // unavailable_metrics.
+  repeated MetricUnavailableReport unavailable_metrics = 5;
 }
 
 message MetricDescriptorSnapshot {
@@ -57,4 +66,110 @@ message SourceWarning {
 message SourceError {
   string code = 1;
   string message = 2;
+}
+
+// Catalog metadata for a metric the source can produce.
+message MetricDescriptor {
+  // ShoMetrics metric id, for example "cpu.temp" or
+  // "lhm.sensor:/intelcpu/0/temperature/26".
+  string metric_id = 1;
+
+  RawSensorIdentity raw_sensor_identity = 2;
+  MetricValueKind value_kind = 3;
+  MetricUnit unit = 4;
+  MetricIdKind metric_id_kind = 5;
+
+  // Source-owned collector cost group. Consumers treat this as opaque.
+  string polling_group_id = 6;
+}
+
+// Source attribution for a metric value emitted in this response snapshot.
+message MetricValueAttribution {
+  // ShoMetrics metric id. Must match a key in MetricSnapshot.metrics for the
+  // same response.
+  string metric_id = 1;
+
+  RawSensorIdentity raw_sensor_identity = 2;
+  MetricValueFreshness value_freshness = 3;
+
+  // Present only when value_freshness is METRIC_VALUE_FRESHNESS_RETAINED.
+  //
+  // Retained values are display continuity values. Hub may update the current
+  // display value from them, but must not append them to real sample history.
+  optional uint32 retained_age_milliseconds = 4;
+}
+
+// Source-reported reason for a requested metric that this source did not emit.
+//
+// This is mainly for DEBUG and supportability. Hub must still detect missing
+// values from the request/result shape it owns: a requested metric is missing
+// when it has no entry in MetricSnapshot.metrics. Hub also still owns
+// transport/source health, source fallback, and stale-source handling.
+message MetricUnavailableReport {
+  // ShoMetrics metric id requested by ReadMetricSnapshotRequest.metric_ids.
+  string metric_id = 1;
+
+  MetricUnavailableReason reason = 2;
+
+  // Set when the source selected or retained a raw sensor but omitted the value
+  // because that sensor's current value was invalid or expired. Omitted when no
+  // matching source sensor exists.
+  RawSensorIdentity raw_sensor_identity = 3;
+}
+
+message RawSensorIdentity {
+  // Source-owned opaque sensor id. Hub must not parse this value.
+  string source_sensor_id = 1;
+
+  // Source-owned opaque hardware id. Hub must not parse this value.
+  string hardware_id = 2;
+
+  string hardware_name = 3;
+
+  // Source-owned raw hardware type label. Generic Hub runtime must not parse it.
+  string hardware_type = 4;
+
+  string sensor_name = 5;
+
+  // Source-owned raw sensor type label. Generic Hub runtime must not parse it.
+  string source_sensor_type = 6;
+}
+
+enum MetricValueKind {
+  METRIC_VALUE_KIND_UNSPECIFIED = 0;
+  METRIC_VALUE_KIND_SCALAR = 1;
+  METRIC_VALUE_KIND_TEXT = 2;
+}
+
+enum MetricIdKind {
+  METRIC_ID_KIND_UNSPECIFIED = 0;
+
+  // ShoMetrics-owned stable alias such as cpu.temp or cpu.usage_percent.
+  METRIC_ID_KIND_STABLE_ALIAS = 1;
+
+  // Source-owned raw sensor id such as lhm.sensor:/intelcpu/0/temperature/26.
+  METRIC_ID_KIND_SOURCE_SENSOR = 2;
+}
+
+enum MetricValueFreshness {
+  METRIC_VALUE_FRESHNESS_UNSPECIFIED = 0;
+
+  // The emitted value came from the source's current read pass.
+  METRIC_VALUE_FRESHNESS_FRESH = 1;
+
+  // The emitted value is a bounded last-good value retained by the source.
+  METRIC_VALUE_FRESHNESS_RETAINED = 2;
+}
+
+enum MetricUnavailableReason {
+  METRIC_UNAVAILABLE_REASON_UNSPECIFIED = 0;
+
+  // The source could not find a matching sensor for the requested metric.
+  METRIC_UNAVAILABLE_REASON_NO_SENSOR = 1;
+
+  // A matching sensor exists, but its current value is absent or invalid.
+  METRIC_UNAVAILABLE_REASON_INVALID_VALUE = 2;
+
+  // A retained last-good value exists but exceeded the source retention window.
+  METRIC_UNAVAILABLE_REASON_EXPIRED = 3;
 }

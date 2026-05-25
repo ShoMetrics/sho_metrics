@@ -7,15 +7,24 @@ using CoreDescriptor = ShoMetrics.Source.Windows.Core.HardwareMetricDescriptor;
 using CoreDescriptorSnapshot = ShoMetrics.Source.Windows.Core.HardwareMetricDescriptorSnapshot;
 using CoreMetricIdKind = ShoMetrics.Source.Windows.Core.MetricIdKind;
 using CoreMetricReading = ShoMetrics.Source.Windows.Core.MetricReading;
+using CoreMetricUnavailableReport = ShoMetrics.Source.Windows.Core.MetricUnavailableReport;
+using CoreMetricUnavailableReason = ShoMetrics.Source.Windows.Core.MetricUnavailableReason;
 using CoreMetricSnapshot = ShoMetrics.Source.Windows.Core.MetricSnapshot;
 using CoreMetricUnit = ShoMetrics.Source.Windows.Core.MetricUnit;
+using CoreMetricValueFreshness = ShoMetrics.Source.Windows.Core.MetricValueFreshness;
 using CoreMetricValueKind = ShoMetrics.Source.Windows.Core.MetricValueKind;
+using CoreRawSensorIdentity = ShoMetrics.Source.Windows.Core.RawSensorIdentity;
 using ProtoMetricDescriptor = ShoMetrics.Contracts.V1.MetricDescriptor;
 using ProtoMetricIdKind = ShoMetrics.Contracts.V1.MetricIdKind;
+using ProtoMetricUnavailableReport = ShoMetrics.Contracts.V1.MetricUnavailableReport;
 using ProtoMetricSnapshot = ShoMetrics.Contracts.V1.MetricSnapshot;
+using ProtoMetricValueAttribution = ShoMetrics.Contracts.V1.MetricValueAttribution;
+using ProtoMetricValueFreshness = ShoMetrics.Contracts.V1.MetricValueFreshness;
 using ProtoMetricUnit = ShoMetrics.Contracts.V1.MetricUnit;
 using ProtoMetricValue = ShoMetrics.Contracts.V1.MetricValue;
 using ProtoMetricValueKind = ShoMetrics.Contracts.V1.MetricValueKind;
+using ProtoMetricUnavailableReason = ShoMetrics.Contracts.V1.MetricUnavailableReason;
+using ProtoRawSensorIdentity = ShoMetrics.Contracts.V1.RawSensorIdentity;
 using SourceWarningList = Google.Protobuf.Collections.RepeatedField<ShoMetrics.Contracts.V1.SourceWarning>;
 
 namespace ShoMetrics.Source.Windows.Service;
@@ -72,6 +81,8 @@ internal sealed class SourceProtocolMapper
             readResponse.Warnings,
             requestedMetricIds,
             snapshot.Readings.Select(reading => reading.MetricId));
+        AddValueAttributions(readResponse, snapshot.Readings);
+        AddUnavailableMetrics(readResponse, snapshot.UnavailableMetrics);
 
         if (descriptorSnapshot is not null)
         {
@@ -194,21 +205,101 @@ internal sealed class SourceProtocolMapper
         };
     }
 
+    private static void AddValueAttributions(
+        ReadMetricSnapshotResponse readResponse,
+        IReadOnlyList<CoreMetricReading> readings)
+    {
+        foreach (CoreMetricReading reading in readings)
+        {
+            ProtoMetricValueAttribution attribution = new()
+            {
+                MetricId = reading.MetricId,
+                RawSensorIdentity = BuildRawSensorIdentity(reading),
+                ValueFreshness = MapMetricValueFreshness(reading.ValueFreshness),
+            };
+
+            if (reading.RetainedAge is not null)
+            {
+                attribution.RetainedAgeMilliseconds = (uint)Math.Clamp(
+                        reading.RetainedAge.Value.TotalMilliseconds,
+                        0,
+                        uint.MaxValue);
+            }
+
+            readResponse.ValueAttributions.Add(attribution);
+        }
+    }
+
+    private static void AddUnavailableMetrics(
+        ReadMetricSnapshotResponse readResponse,
+        IReadOnlyList<CoreMetricUnavailableReport> diagnostics)
+    {
+        foreach (CoreMetricUnavailableReport diagnostic in diagnostics)
+        {
+            ProtoMetricUnavailableReport unavailableReport = new()
+            {
+                MetricId = diagnostic.MetricId,
+                Reason = MapMetricUnavailableReason(diagnostic.Reason),
+            };
+
+            if (diagnostic.RawSensorIdentity is not null)
+            {
+                unavailableReport.RawSensorIdentity = BuildRawSensorIdentity(diagnostic.RawSensorIdentity);
+            }
+
+            readResponse.UnavailableMetrics.Add(unavailableReport);
+        }
+    }
+
     private static ProtoMetricDescriptor BuildMetricDescriptor(CoreDescriptor descriptor)
     {
         return new ProtoMetricDescriptor
         {
             MetricId = descriptor.MetricId,
-            SourceSensorId = descriptor.SourceSensorId,
+            RawSensorIdentity = BuildRawSensorIdentity(descriptor),
             PollingGroupId = descriptor.PollingGroupId,
+            ValueKind = MapMetricValueKind(descriptor.ValueKind),
+            Unit = MapMetricUnit(descriptor.Unit),
+            MetricIdKind = MapMetricIdKind(descriptor.MetricIdKind),
+        };
+    }
+
+    private static ProtoRawSensorIdentity BuildRawSensorIdentity(CoreDescriptor descriptor)
+    {
+        return new ProtoRawSensorIdentity
+        {
+            SourceSensorId = descriptor.SourceSensorId,
             HardwareId = descriptor.HardwareId,
             HardwareName = descriptor.HardwareName,
             HardwareType = descriptor.HardwareType,
             SensorName = descriptor.SensorName,
             SourceSensorType = descriptor.SourceSensorType,
-            ValueKind = MapMetricValueKind(descriptor.ValueKind),
-            Unit = MapMetricUnit(descriptor.Unit),
-            MetricIdKind = MapMetricIdKind(descriptor.MetricIdKind),
+        };
+    }
+
+    private static ProtoRawSensorIdentity BuildRawSensorIdentity(CoreMetricReading reading)
+    {
+        return new ProtoRawSensorIdentity
+        {
+            SourceSensorId = reading.SensorId,
+            HardwareId = reading.HardwareId,
+            HardwareName = reading.HardwareName,
+            HardwareType = reading.HardwareType,
+            SensorName = reading.SensorName,
+            SourceSensorType = reading.SourceSensorType,
+        };
+    }
+
+    private static ProtoRawSensorIdentity BuildRawSensorIdentity(CoreRawSensorIdentity identity)
+    {
+        return new ProtoRawSensorIdentity
+        {
+            SourceSensorId = identity.SourceSensorId,
+            HardwareId = identity.HardwareId,
+            HardwareName = identity.HardwareName,
+            HardwareType = identity.HardwareType,
+            SensorName = identity.SensorName,
+            SourceSensorType = identity.SourceSensorType,
         };
     }
 
@@ -255,6 +346,27 @@ internal sealed class SourceProtocolMapper
             CoreMetricIdKind.SourceSensor => ProtoMetricIdKind.SourceSensor,
             CoreMetricIdKind.Unspecified => throw new UnreachableException("Metric descriptors must use a specified metric id kind."),
             _ => throw new UnreachableException($"Missing protobuf metric id kind mapping for '{metricIdKind}'."),
+        };
+    }
+
+    private static ProtoMetricValueFreshness MapMetricValueFreshness(CoreMetricValueFreshness state)
+    {
+        return state switch
+        {
+            CoreMetricValueFreshness.Fresh => ProtoMetricValueFreshness.Fresh,
+            CoreMetricValueFreshness.Retained => ProtoMetricValueFreshness.Retained,
+            _ => throw new UnreachableException($"Missing protobuf value freshness mapping for '{state}'."),
+        };
+    }
+
+    private static ProtoMetricUnavailableReason MapMetricUnavailableReason(CoreMetricUnavailableReason reason)
+    {
+        return reason switch
+        {
+            CoreMetricUnavailableReason.NoSensor => ProtoMetricUnavailableReason.NoSensor,
+            CoreMetricUnavailableReason.InvalidValue => ProtoMetricUnavailableReason.InvalidValue,
+            CoreMetricUnavailableReason.Expired => ProtoMetricUnavailableReason.Expired,
+            _ => throw new UnreachableException($"Missing protobuf unavailable metric reason mapping for '{reason}'."),
         };
     }
 

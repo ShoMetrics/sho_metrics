@@ -9,6 +9,7 @@ import {
     type MetricSnapshot,
 } from "../sources/metric-source";
 import { BackoffPolicy } from "../sources/backoff-policy";
+import type { SourceSnapshotReadResult } from "../sources/source-client";
 
 const ASYNC_TIMER_DRAIN_MICROTASK_TICKS = 10;
 
@@ -221,7 +222,7 @@ class FakeSourceClient {
 
     constructor(private readonly responses: readonly (MetricSnapshot | Promise<MetricSnapshot>)[]) {}
 
-    async readSnapshot(metricKeys: readonly string[]): Promise<MetricSnapshot> {
+    async readSnapshot(metricKeys: readonly string[]): Promise<SourceSnapshotReadResult> {
         this.requestedMetricKeys.push([...metricKeys]);
         const response = this.responses[this.responseIndex];
         this.responseIndex += 1;
@@ -230,7 +231,11 @@ class FakeSourceClient {
             throw new Error("No fake source response queued.");
         }
 
-        return response;
+        return {
+            snapshot: await response,
+            valueAttributions: [],
+            unavailableMetrics: [],
+        };
     }
 }
 

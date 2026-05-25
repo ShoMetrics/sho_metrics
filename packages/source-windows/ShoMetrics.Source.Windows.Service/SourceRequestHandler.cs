@@ -36,6 +36,12 @@ internal sealed class SourceRequestHandler(
         }
         catch (OperationCanceledException) when (operationCancellationTokenSource.IsCancellationRequested)
         {
+            logger.LogWarning(
+                "Source IPC request {PayloadCase} with request id {RequestId} timed out after {Timeout}.",
+                request.PayloadCase,
+                request.RequestId,
+                operationTimeout);
+
             return protocolMapper.BuildTimeoutResponse(request.RequestId);
         }
         catch (Exception exception)
@@ -70,8 +76,18 @@ internal sealed class SourceRequestHandler(
                     request.RequestId,
                     request.ListMetricDescriptors,
                     cancellationToken).ConfigureAwait(false),
-            _ => protocolMapper.BuildInvalidRequestResponse(request.RequestId),
+            _ => BuildInvalidRequestResponse(request),
         };
+    }
+
+    private SourceIpcResponse BuildInvalidRequestResponse(SourceIpcRequest request)
+    {
+        logger.LogWarning(
+            "Rejected unsupported or empty Source IPC request payload {PayloadCase} with request id {RequestId}. This may indicate helper/plugin protocol version skew.",
+            request.PayloadCase,
+            request.RequestId);
+
+        return protocolMapper.BuildInvalidRequestResponse(request.RequestId);
     }
 
     private async Task<SourceIpcResponse> HandleReadMetricSnapshotAsync(

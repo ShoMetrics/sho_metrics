@@ -73,6 +73,10 @@ function resolveHelperBackedUnavailableDisplayValue(helperStatus: SourceClientSt
     }
 
     if (helperStatus.state === "unavailable") {
+        if (helperStatus.reason === "helperNotInstalled") {
+            return "Helper required";
+        }
+
         if (helperStatus.reason === "pipeMissing") {
             return helperStatus.lastSuccessAtTimestampMilliseconds === undefined
                 ? "Helper required"

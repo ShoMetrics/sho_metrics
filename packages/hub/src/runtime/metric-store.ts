@@ -1,6 +1,11 @@
 import { RingBuffer } from "./ring-buffer";
 import type { WidgetData } from "../view-rendering/widget-data";
 import { readRequiredMetricSnapshotTimestampMilliseconds, type MetricSnapshot } from "./sources/metric-source";
+import type {
+    MetricUnavailableReport,
+    MetricValueAttribution,
+} from "./sources/source-client";
+import { MetricValueFreshness } from "./sources/source-client";
 
 /** Read-only view of metric history bound to one source scope. */
 export interface MetricStoreReader {
@@ -10,7 +15,7 @@ export interface MetricStoreReader {
     /**
      * Builds renderer-facing widget data and reports which source scope supplied it.
      *
-     * Fallback readers use this to expose runtime diagnostics without
+     * Fallback readers use this to expose runtime attribution without
      * reimplementing source selection outside the fallback decision point.
      */
     getWidgetDataWithAttribution(
@@ -24,7 +29,7 @@ export interface MetricStoreReader {
     getTextValue(metricKey: string): string | undefined;
 }
 
-/** Renderer-facing metric data plus source attribution for diagnostics. */
+/** Renderer-facing metric data plus source attribution. */
 export interface MetricWidgetDataReadResult {
     readonly widgetData: WidgetData;
     readonly selectedSourceId: string | undefined;
@@ -42,6 +47,7 @@ export class MetricStore {
     // - inner key: ShoMetrics metric id inside that source scope, for example "cpu.usage_percent" or "disk.throughput.read".
     // No separator or escaped string format is reserved here; adapters own validation before values reach this store.
     private store = new Map<string, SourceMetricStore>();
+    private unavailableMetricsBySourceScopeId = new Map<string, Map<string, MetricUnavailableReport>>();
 
     private static readonly HISTORY_SIZE = 60;
 
@@ -82,9 +88,19 @@ export class MetricStore {
     }
 
     /** Ingests a snapshot into the history owned by one runtime source scope. */
-    ingest(sourceScopeId: string, snapshot: MetricSnapshot): void {
+    ingest(
+        sourceScopeId: string,
+        snapshot: MetricSnapshot,
+        sourceMetadata: {
+            readonly valueAttributions?: readonly MetricValueAttribution[];
+            readonly unavailableMetrics?: readonly MetricUnavailableReport[];
+        } = {},
+    ): void {
         const sampleTimestampMilliseconds = readRequiredMetricSnapshotTimestampMilliseconds(snapshot);
         const sourceStore = this.ensureSourceStore(sourceScopeId);
+        const valueAttributionsByMetricKey = new Map(
+            sourceMetadata.valueAttributions?.map(attribution => [attribution.metricId, attribution]) ?? [],
+        );
 
         for (const [metricKey, value] of Object.entries(snapshot.metrics)) {
             if (value.value.case === "scalar") {
@@ -95,7 +111,16 @@ export class MetricStore {
                     continue;
                 }
 
-                this.record(sourceStore, metricKey, value.value.value, sampleTimestampMilliseconds);
+                const valueAttribution = valueAttributionsByMetricKey.get(metricKey);
+                this.record(
+                    sourceStore,
+                    metricKey,
+                    value.value.value,
+                    sampleTimestampMilliseconds,
+                    valueAttribution === undefined
+                        ? "fresh"
+                        : readMetricStoreValueFreshness(valueAttribution.valueFreshness),
+                );
                 continue;
             }
 
@@ -107,6 +132,10 @@ export class MetricStore {
                 this.recordText(sourceStore, metricKey, value.value.value, sampleTimestampMilliseconds);
             }
         }
+
+        if (sourceMetadata.unavailableMetrics) {
+            this.recordUnavailableMetrics(sourceScopeId, sourceMetadata.unavailableMetrics);
+        }
     }
 
     private record(
@@ -114,19 +143,25 @@ export class MetricStore {
         metricKey: string,
         value: number,
         timestampMilliseconds: number,
+        valueFreshness: "fresh" | "retained",
     ): void {
         let metricRecord = sourceStore.get(metricKey);
         if (metricRecord?.kind !== "scalar") {
             metricRecord = {
                 kind: "scalar",
                 buffer: new RingBuffer<number>(MetricStore.HISTORY_SIZE),
+                current: value,
                 timestampMilliseconds,
             };
             sourceStore.set(metricKey, metricRecord);
         }
 
-        metricRecord.buffer.push(value);
+        metricRecord.current = value;
         metricRecord.timestampMilliseconds = timestampMilliseconds;
+
+        if (valueFreshness === "fresh") {
+            metricRecord.buffer.push(value);
+        }
     }
 
     private recordText(
@@ -150,7 +185,7 @@ export class MetricStore {
         maxValue = 100,
     ): WidgetData {
         const metricRecord = this.readRecord(sourceScopeId, metricKey);
-        const current = metricRecord?.kind === "scalar" ? metricRecord.buffer.latest ?? 0 : 0;
+        const current = metricRecord?.kind === "scalar" ? metricRecord.current : 0;
 
         return {
             current,
@@ -170,6 +205,7 @@ export class MetricStore {
     /** Clears all sampled metric history and text values. Intended for isolated tests and source resets. */
     clear(): void {
         this.store.clear();
+        this.unavailableMetricsBySourceScopeId.clear();
     }
 
     private ensureSourceStore(sourceScopeId: string): SourceMetricStore {
@@ -185,6 +221,25 @@ export class MetricStore {
     private readRecord(sourceScopeId: string, metricKey: string): MetricRecord | undefined {
         return this.store.get(sourceScopeId)?.get(metricKey);
     }
+
+    private recordUnavailableMetrics(
+        sourceScopeId: string,
+        unavailableMetrics: readonly MetricUnavailableReport[],
+    ): void {
+        let unavailableMetricsByMetricKey = this.unavailableMetricsBySourceScopeId.get(sourceScopeId);
+        if (!unavailableMetricsByMetricKey) {
+            unavailableMetricsByMetricKey = new Map<string, MetricUnavailableReport>();
+            this.unavailableMetricsBySourceScopeId.set(sourceScopeId, unavailableMetricsByMetricKey);
+        }
+
+        for (const unavailableMetric of unavailableMetrics) {
+            unavailableMetricsByMetricKey.set(unavailableMetric.metricId, unavailableMetric);
+        }
+    }
+}
+
+function readMetricStoreValueFreshness(valueFreshness: MetricValueFreshness): "fresh" | "retained" {
+    return valueFreshness === MetricValueFreshness.FRESH ? "fresh" : "retained";
 }
 
 type SourceMetricStore = Map<string, MetricRecord>;
@@ -194,6 +249,7 @@ type MetricRecord = ScalarMetricRecord | TextMetricRecord;
 interface ScalarMetricRecord {
     kind: "scalar";
     buffer: RingBuffer<number>;
+    current: number;
     timestampMilliseconds: number;
 }
 

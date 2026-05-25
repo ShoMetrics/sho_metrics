@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { SourceClient } from "../sources/source-client";
+import type { SourceClient, SourceSnapshotReadResult } from "../sources/source-client";
 import type { SourceRegistry } from "../sources/source-registry";
 import type { SourceMetricPollingGroupResolution } from "../sources/source-polling-groups";
 import type { SourceMetadataInvalidation, SourceMetadataInvalidationListener } from "../sources/source-planning-metadata";
@@ -349,7 +349,7 @@ class FakeSourceClient implements SourceClient {
         } = {},
     ) {}
 
-    async readSnapshot(metricKeys: readonly string[]) {
+    async readSnapshot(metricKeys: readonly string[]): Promise<SourceSnapshotReadResult> {
         if (this.options.servesSnapshots !== true) {
             throw new Error("FakeSourceClient does not serve snapshots.");
         }
@@ -357,10 +357,14 @@ class FakeSourceClient implements SourceClient {
         this.readSnapshotCallCount += 1;
         this.latestReadMetricKeys = metricKeys;
 
-        return buildMetricSnapshot({
-            timestampMilliseconds: 1000,
-            metrics: {},
-        });
+        return {
+            snapshot: buildMetricSnapshot({
+                timestampMilliseconds: 1000,
+                metrics: {},
+            }),
+            valueAttributions: [],
+            unavailableMetrics: [],
+        };
     }
 
     resolveMetricPollingGroups(

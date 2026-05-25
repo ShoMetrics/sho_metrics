@@ -19,4 +19,8 @@ public sealed record MetricReading
     public required double Value { get; init; }
 
     public required MetricUnit Unit { get; init; }
+
+    public MetricValueFreshness ValueFreshness { get; init; } = MetricValueFreshness.Fresh;
+
+    public TimeSpan? RetainedAge { get; init; }
 }

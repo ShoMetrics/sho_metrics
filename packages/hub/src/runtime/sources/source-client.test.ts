@@ -14,9 +14,11 @@ test("metric source client uses pollMetrics when the source supports requested k
     const source = new FakeMetricSource();
     const sourceClient = createMetricSourceClient(source);
 
-    const snapshot = await sourceClient.readSnapshot(["cpu.usage_percent"]);
+    const readResult = await sourceClient.readSnapshot(["cpu.usage_percent"]);
 
-    assert.equal(snapshot, source.snapshot);
+    assert.equal(readResult.snapshot, source.snapshot);
+    assert.deepEqual(readResult.valueAttributions, []);
+    assert.deepEqual(readResult.unavailableMetrics, []);
     assert.deepEqual(source.polledMetricKeyListList, [["cpu.usage_percent"]]);
 });
 
@@ -24,9 +26,9 @@ test("metric source client falls back to poll for poll-only sources", async () =
     const source = new PollOnlyMetricSource();
     const sourceClient = createMetricSourceClient(source);
 
-    const snapshot = await sourceClient.readSnapshot(["cpu.usage_percent"]);
+    const readResult = await sourceClient.readSnapshot(["cpu.usage_percent"]);
 
-    assert.equal(snapshot, source.snapshot);
+    assert.equal(readResult.snapshot, source.snapshot);
     assert.equal(source.pollCount, 1);
 });
 

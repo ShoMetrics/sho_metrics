@@ -11,14 +11,17 @@ public sealed class LibreHardwareMonitorSession : IDisposable
     // Empty means the helper has no complete descriptor catalog yet. The Hub
     // treats the later non-empty descriptor fingerprint as a real change.
     private const string UnavailableDescriptorFingerprint = "";
+    private const int RetainedSampleTickLimit = 3;
 
     private readonly Computer? _computer;
     private readonly HardwareMetricDescriptorSnapshot _cachedDescriptorSnapshot;
     private readonly IReadOnlyDictionary<string, string> _pollingGroupIdsByMetricId;
+    private readonly HardwareMetricRetentionCache _retentionCache = new(RetainedSampleTickLimit);
     private readonly ConcurrentDictionary<string, MetricSnapshot> _latestSnapshotsByPollingGroupId =
         new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _readGate = new(1, 1);
     private MetricSnapshot _latestSnapshot;
+    private long _sourceTick;
     private bool _isDisposed;
 
     public LibreHardwareMonitorSession()
@@ -131,7 +134,12 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         {
             ObjectDisposedException.ThrowIf(_isDisposed, this);
 
+            long sourceTick = ++_sourceTick;
+            DateTimeOffset capturedAt = DateTimeOffset.UtcNow;
             Dictionary<string, MetricReading> readingsByMetricId = new(StringComparer.Ordinal);
+            Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId = new(StringComparer.Ordinal);
+            List<RankedMetricReading> cpuTemperatureCandidates = [];
+            List<RankedMetricReading> cpuPowerCandidates = [];
             List<string> warnings = [];
 
             foreach (IHardware hardware in _computer.Hardware)
@@ -139,20 +147,53 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                 ReadHardware(
                     hardware,
                     readingsByMetricId,
+                    unavailableReportsByMetricId,
+                    cpuTemperatureCandidates,
+                    cpuPowerCandidates,
+                    capturedAt,
+                    sourceTick,
                     warnings,
                     cancellationToken);
             }
 
+            AddRankedStableAliasReading(
+                LibreHardwareMetricCatalog.CpuTemperatureMetricId,
+                cpuTemperatureCandidates,
+                readingsByMetricId,
+                unavailableReportsByMetricId,
+                capturedAt,
+                sourceTick);
+            AddRankedStableAliasReading(
+                LibreHardwareMetricCatalog.CpuPowerMetricId,
+                cpuPowerCandidates,
+                readingsByMetricId,
+                unavailableReportsByMetricId,
+                capturedAt,
+                sourceTick);
+            PublishStableAliasPollingGroupSnapshot(
+                LibreHardwareMetricCatalog.CpuTemperatureMetricId,
+                readingsByMetricId,
+                unavailableReportsByMetricId,
+                capturedAt);
+            PublishStableAliasPollingGroupSnapshot(
+                LibreHardwareMetricCatalog.CpuPowerMetricId,
+                readingsByMetricId,
+                unavailableReportsByMetricId,
+                capturedAt);
             AddDerivedReadings(readingsByMetricId);
-            PublishAggregatePollingGroupSnapshots(readingsByMetricId);
+            PublishAggregatePollingGroupSnapshots(readingsByMetricId, capturedAt);
 
             List<MetricReading> readings = FilterReadings(readingsByMetricId, requestedMetricIds: null);
+            List<MetricUnavailableReport> unavailableReports = FilterUnavailableMetrics(
+                unavailableReportsByMetricId,
+                requestedMetricIds: null);
             AddMissingMetricWarnings(readings, warnings);
 
             MetricSnapshot snapshot = new()
             {
-                CapturedAt = DateTimeOffset.UtcNow,
+                CapturedAt = capturedAt,
                 Readings = readings,
+                UnavailableMetrics = unavailableReports,
                 Warnings = warnings,
             };
             Volatile.Write(ref _latestSnapshot, snapshot);
@@ -241,13 +282,29 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         CancellationToken cancellationToken)
     {
         Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId = new(StringComparer.Ordinal);
+        List<RankedHardwareMetricDescriptor> cpuTemperatureDescriptorCandidates = [];
+        List<RankedHardwareMetricDescriptor> cpuPowerDescriptorCandidates = [];
         List<string> warnings = [];
 
         foreach (IHardware hardware in computer.Hardware)
         {
-            ReadHardwareDescriptors(hardware, descriptorsByMetricId, warnings, cancellationToken);
+            ReadHardwareDescriptors(
+                hardware,
+                descriptorsByMetricId,
+                cpuTemperatureDescriptorCandidates,
+                cpuPowerDescriptorCandidates,
+                warnings,
+                cancellationToken);
         }
 
+        AddRankedStableAliasDescriptor(
+            LibreHardwareMetricCatalog.CpuTemperatureMetricId,
+            cpuTemperatureDescriptorCandidates,
+            descriptorsByMetricId);
+        AddRankedStableAliasDescriptor(
+            LibreHardwareMetricCatalog.CpuPowerMetricId,
+            cpuPowerDescriptorCandidates,
+            descriptorsByMetricId);
         AddDerivedDescriptors(descriptorsByMetricId);
 
         List<HardwareMetricDescriptor> descriptors = FilterDescriptors(descriptorsByMetricId, requestedMetricIds: null);
@@ -273,6 +330,11 @@ public sealed class LibreHardwareMonitorSession : IDisposable
     private void ReadHardware(
         IHardware hardware,
         Dictionary<string, MetricReading> readingsByMetricId,
+        Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId,
+        List<RankedMetricReading> cpuTemperatureCandidates,
+        List<RankedMetricReading> cpuPowerCandidates,
+        DateTimeOffset capturedAt,
+        long sourceTick,
         List<string> warnings,
         CancellationToken cancellationToken)
     {
@@ -310,11 +372,16 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                 AddUnsupportedSensorTypeWarning(sensor, warnings);
                 AddUnsupportedSensorTypeWarning(sensor, hardwareWarnings);
 
-                foreach (MetricReading reading in LibreHardwareMetricCatalog.CreateReadings(hardware, sensor))
-                {
-                    AddReading(hardwareReadingsByMetricId, reading);
-                    AddReading(readingsByMetricId, reading);
-                }
+                AddSensorReadings(
+                    hardware,
+                    sensor,
+                    hardwareReadingsByMetricId,
+                    readingsByMetricId,
+                    unavailableReportsByMetricId,
+                    cpuTemperatureCandidates,
+                    cpuPowerCandidates,
+                    capturedAt,
+                    sourceTick);
             }
         }
 
@@ -322,7 +389,9 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         PublishPollingGroupSnapshot(
             LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(hardware),
             hardwareReadingsByMetricId,
-            hardwareWarnings);
+            hardwareWarnings,
+            capturedAt,
+            unavailableReportsByMetricId.Values.ToList());
 
         if (updateError is not null)
         {
@@ -334,6 +403,11 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             ReadHardware(
                 childHardware,
                 readingsByMetricId,
+                unavailableReportsByMetricId,
+                cpuTemperatureCandidates,
+                cpuPowerCandidates,
+                capturedAt,
+                sourceTick,
                 warnings,
                 cancellationToken);
         }
@@ -342,6 +416,8 @@ public sealed class LibreHardwareMonitorSession : IDisposable
     private static void ReadHardwareDescriptors(
         IHardware hardware,
         Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId,
+        List<RankedHardwareMetricDescriptor> cpuTemperatureDescriptorCandidates,
+        List<RankedHardwareMetricDescriptor> cpuPowerDescriptorCandidates,
         List<string> warnings,
         CancellationToken cancellationToken)
     {
@@ -372,13 +448,176 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                 {
                     descriptorsByMetricId.TryAdd(descriptor.MetricId, descriptor);
                 }
+
+                if (LibreHardwareMetricCatalog.TryCreateCpuStableAliasDescriptorCandidate(
+                    hardware,
+                    sensor,
+                    out RankedHardwareMetricDescriptor? cpuStableAliasDescriptorCandidate))
+                {
+                    if (cpuStableAliasDescriptorCandidate.Descriptor.MetricId.Equals(
+                        LibreHardwareMetricCatalog.CpuTemperatureMetricId,
+                        StringComparison.Ordinal))
+                    {
+                        cpuTemperatureDescriptorCandidates.Add(cpuStableAliasDescriptorCandidate);
+                    }
+                    else
+                    {
+                        cpuPowerDescriptorCandidates.Add(cpuStableAliasDescriptorCandidate);
+                    }
+                }
             }
         }
 
         foreach (IHardware childHardware in hardware.SubHardware)
         {
-            ReadHardwareDescriptors(childHardware, descriptorsByMetricId, warnings, cancellationToken);
+            ReadHardwareDescriptors(
+                childHardware,
+                descriptorsByMetricId,
+                cpuTemperatureDescriptorCandidates,
+                cpuPowerDescriptorCandidates,
+                warnings,
+                cancellationToken);
         }
+    }
+
+    private void AddSensorReadings(
+        IHardware hardware,
+        ISensor sensor,
+        Dictionary<string, MetricReading> hardwareReadingsByMetricId,
+        Dictionary<string, MetricReading> readingsByMetricId,
+        Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId,
+        List<RankedMetricReading> cpuTemperatureCandidates,
+        List<RankedMetricReading> cpuPowerCandidates,
+        DateTimeOffset capturedAt,
+        long sourceTick)
+    {
+        bool hadFreshReading = false;
+
+        foreach (MetricReading reading in LibreHardwareMetricCatalog.CreateReadings(hardware, sensor))
+        {
+            hadFreshReading = true;
+            RecordFreshReading(reading, sourceTick, capturedAt);
+            AddReading(hardwareReadingsByMetricId, reading);
+            AddReading(readingsByMetricId, reading);
+        }
+
+        if (LibreHardwareMetricCatalog.TryCreateCpuStableAliasReadingCandidate(
+            hardware,
+            sensor,
+            out RankedMetricReading? cpuStableAliasCandidate))
+        {
+            hadFreshReading = true;
+            if (cpuStableAliasCandidate.Reading.MetricId.Equals(
+                LibreHardwareMetricCatalog.CpuTemperatureMetricId,
+                StringComparison.Ordinal))
+            {
+                cpuTemperatureCandidates.Add(cpuStableAliasCandidate);
+            }
+            else
+            {
+                cpuPowerCandidates.Add(cpuStableAliasCandidate);
+            }
+        }
+
+        if (hadFreshReading)
+        {
+            return;
+        }
+
+        string sourceSensorMetricId = LibreHardwareMetricCatalog.BuildDynamicMetricId(sensor);
+        if (_retentionCache.TryReadSourceSensor(
+            sensor.Identifier.ToString(),
+            sourceTick,
+            capturedAt,
+            out MetricReading retainedCatalogReading,
+            out bool sourceSensorExpired))
+        {
+            AddReading(hardwareReadingsByMetricId, retainedCatalogReading);
+            AddReading(readingsByMetricId, retainedCatalogReading);
+        }
+        else if (LibreHardwareMetricCatalog.HasCanonicalMetricUnit(sensor.SensorType))
+        {
+            unavailableReportsByMetricId[sourceSensorMetricId] = BuildUnavailableReport(
+                sourceSensorMetricId,
+                sourceSensorExpired ? MetricUnavailableReason.Expired : MetricUnavailableReason.InvalidValue,
+                sourceSensorExpired
+                    ? BuildRawSensorIdentity(retainedCatalogReading)
+                    : BuildRawSensorIdentity(hardware, sensor));
+        }
+
+        if (LibreHardwareMetricCatalog.TryGetStableMetricId(hardware, sensor, out string? stableMetricId))
+        {
+            if (_retentionCache.TryReadStableAlias(
+                stableMetricId,
+                sourceTick,
+                capturedAt,
+                out MetricReading retainedStableReading,
+                out bool stableAliasExpired))
+            {
+                AddReading(hardwareReadingsByMetricId, retainedStableReading);
+                AddReading(readingsByMetricId, retainedStableReading);
+                unavailableReportsByMetricId.Remove(stableMetricId);
+                return;
+            }
+
+            unavailableReportsByMetricId[stableMetricId] = BuildUnavailableReport(
+                stableMetricId,
+                stableAliasExpired ? MetricUnavailableReason.Expired : MetricUnavailableReason.InvalidValue,
+                stableAliasExpired
+                    ? BuildRawSensorIdentity(retainedStableReading)
+                    : BuildRawSensorIdentity(hardware, sensor));
+        }
+    }
+
+    private void RecordFreshReading(MetricReading reading, long sourceTick, DateTimeOffset capturedAt)
+    {
+        if (LibreHardwareMetricCatalog.IsSourceSensorMetricId(reading.MetricId))
+        {
+            _retentionCache.RecordFreshSourceSensor(reading, sourceTick, capturedAt);
+            return;
+        }
+
+        _retentionCache.RecordFreshStableAlias(reading, sourceTick, capturedAt);
+    }
+
+    private void AddRankedStableAliasReading(
+        string metricId,
+        List<RankedMetricReading> candidates,
+        Dictionary<string, MetricReading> readingsByMetricId,
+        Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId,
+        DateTimeOffset capturedAt,
+        long sourceTick)
+    {
+        RankedMetricReading? selectedCandidate = candidates
+            .OrderBy(candidate => candidate.Rank)
+            .ThenBy(candidate => candidate.Reading.HardwareId, StringComparer.Ordinal)
+            .ThenBy(candidate => candidate.Reading.SensorId, StringComparer.Ordinal)
+            .FirstOrDefault();
+
+        if (selectedCandidate is not null)
+        {
+            RecordFreshReading(selectedCandidate.Reading, sourceTick, capturedAt);
+            AddReading(readingsByMetricId, selectedCandidate.Reading);
+            unavailableReportsByMetricId.Remove(metricId);
+            return;
+        }
+
+        if (_retentionCache.TryReadStableAlias(
+            metricId,
+            sourceTick,
+            capturedAt,
+            out MetricReading retainedReading,
+            out bool isExpired))
+        {
+            AddReading(readingsByMetricId, retainedReading);
+            unavailableReportsByMetricId.Remove(metricId);
+            return;
+        }
+
+        unavailableReportsByMetricId[metricId] = BuildUnavailableReport(
+            metricId,
+            isExpired ? MetricUnavailableReason.Expired : MetricUnavailableReason.NoSensor,
+            isExpired ? BuildRawSensorIdentity(retainedReading) : null);
     }
 
     private static void AddReading(Dictionary<string, MetricReading> readingsByMetricId, MetricReading reading)
@@ -398,7 +637,9 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         }
     }
 
-    private void PublishAggregatePollingGroupSnapshots(Dictionary<string, MetricReading> readingsByMetricId)
+    private void PublishAggregatePollingGroupSnapshots(
+        Dictionary<string, MetricReading> readingsByMetricId,
+        DateTimeOffset capturedAt)
     {
         // Aggregate groups are computed from the full traversal, but their
         // snapshots must not inherit unrelated hardware warnings. A GPU update
@@ -406,34 +647,61 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         PublishPollingGroupSnapshot(
             LibreHardwareMetricCatalog.NetworkAggregatePollingGroupId,
             readingsByMetricId,
-            []);
+            [],
+            capturedAt);
         PublishPollingGroupSnapshot(
             LibreHardwareMetricCatalog.StorageAggregatePollingGroupId,
             readingsByMetricId,
-            []);
+            [],
+            capturedAt);
     }
 
     private void PublishPollingGroupSnapshot(
         string pollingGroupId,
         Dictionary<string, MetricReading> readingsByMetricId,
-        IReadOnlyList<string> warnings)
+        IReadOnlyList<string> warnings,
+        DateTimeOffset capturedAt,
+        IReadOnlyList<MetricUnavailableReport>? unavailableReports = null)
     {
         List<MetricReading> readings = readingsByMetricId.Values
             .Where(reading => !LibreHardwareMetricCatalog.IsInternalMetricId(reading.MetricId)
                 && IsMetricInPollingGroup(reading.MetricId, pollingGroupId))
             .ToList();
+        List<MetricUnavailableReport> filteredUnavailableMetrics = unavailableReports?
+            .Where(diagnostic => IsMetricInPollingGroup(diagnostic.MetricId, pollingGroupId))
+            .ToList() ?? [];
 
-        if (readings.Count == 0 && warnings.Count == 0)
+        if (readings.Count == 0 && warnings.Count == 0 && filteredUnavailableMetrics.Count == 0)
         {
             return;
         }
 
         _latestSnapshotsByPollingGroupId[pollingGroupId] = new MetricSnapshot
         {
-            CapturedAt = DateTimeOffset.UtcNow,
+            CapturedAt = capturedAt,
             Readings = readings,
+            UnavailableMetrics = filteredUnavailableMetrics,
             Warnings = warnings.ToList(),
         };
+    }
+
+    private void PublishStableAliasPollingGroupSnapshot(
+        string metricId,
+        Dictionary<string, MetricReading> readingsByMetricId,
+        Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId,
+        DateTimeOffset capturedAt)
+    {
+        if (!_pollingGroupIdsByMetricId.TryGetValue(metricId, out string? pollingGroupId))
+        {
+            return;
+        }
+
+        PublishPollingGroupSnapshot(
+            pollingGroupId,
+            readingsByMetricId,
+            [],
+            capturedAt,
+            unavailableReportsByMetricId.Values.ToList());
     }
 
     private bool IsMetricInPollingGroup(string metricId, string pollingGroupId)
@@ -520,6 +788,26 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         }
     }
 
+    private static void AddRankedStableAliasDescriptor(
+        string metricId,
+        List<RankedHardwareMetricDescriptor> candidates,
+        Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId)
+    {
+        // Descriptors have no current sensor value. Runtime reads may choose a
+        // different ranked sensor when this descriptor's sensor is temporarily
+        // invalid and another candidate is fresh.
+        RankedHardwareMetricDescriptor? selectedCandidate = candidates
+            .OrderBy(candidate => candidate.Rank)
+            .ThenBy(candidate => candidate.Descriptor.HardwareId, StringComparer.Ordinal)
+            .ThenBy(candidate => candidate.Descriptor.SourceSensorId, StringComparer.Ordinal)
+            .FirstOrDefault();
+
+        if (selectedCandidate is not null)
+        {
+            descriptorsByMetricId[metricId] = selectedCandidate.Descriptor;
+        }
+    }
+
     private static List<MetricReading> FilterReadings(
         Dictionary<string, MetricReading> readingsByMetricId,
         HashSet<string>? requestedMetricIds)
@@ -544,6 +832,82 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             Readings = snapshot.Readings
                 .Where(reading => requestedMetricIds.Contains(reading.MetricId))
                 .ToList(),
+            UnavailableMetrics = BuildFilteredUnavailableMetrics(snapshot, requestedMetricIds),
+        };
+    }
+
+    private static List<MetricUnavailableReport> BuildFilteredUnavailableMetrics(
+        MetricSnapshot snapshot,
+        HashSet<string> requestedMetricIds)
+    {
+        HashSet<string> returnedMetricIds = new(
+            snapshot.Readings.Select(reading => reading.MetricId),
+            StringComparer.Ordinal);
+        Dictionary<string, MetricUnavailableReport> diagnosticsByMetricId = snapshot.UnavailableMetrics
+            .Where(diagnostic => requestedMetricIds.Contains(diagnostic.MetricId))
+            .ToDictionary(diagnostic => diagnostic.MetricId, StringComparer.Ordinal);
+
+        foreach (string requestedMetricId in requestedMetricIds)
+        {
+            if (returnedMetricIds.Contains(requestedMetricId)
+                || diagnosticsByMetricId.ContainsKey(requestedMetricId))
+            {
+                continue;
+            }
+
+            diagnosticsByMetricId[requestedMetricId] = BuildUnavailableReport(
+                requestedMetricId,
+                MetricUnavailableReason.NoSensor);
+        }
+
+        return diagnosticsByMetricId.Values.ToList();
+    }
+
+    private static List<MetricUnavailableReport> FilterUnavailableMetrics(
+        Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId,
+        HashSet<string>? requestedMetricIds)
+    {
+        return unavailableReportsByMetricId.Values
+            .Where(diagnostic => IsRequestedMetric(requestedMetricIds, diagnostic.MetricId))
+            .ToList();
+    }
+
+    private static MetricUnavailableReport BuildUnavailableReport(
+        string metricId,
+        MetricUnavailableReason reason,
+        RawSensorIdentity? rawSensorIdentity = null)
+    {
+        return new MetricUnavailableReport
+        {
+            MetricId = metricId,
+            Reason = reason,
+            RawSensorIdentity = rawSensorIdentity,
+        };
+    }
+
+    private static RawSensorIdentity BuildRawSensorIdentity(IHardware hardware, ISensor sensor)
+    {
+        return new RawSensorIdentity
+        {
+            SourceSensorId = sensor.Identifier.ToString(),
+            HardwareId = hardware.Identifier.ToString(),
+            HardwareName = hardware.Name,
+            HardwareType = hardware.HardwareType.ToString(),
+            SensorName = sensor.Name,
+            SourceSensorType = sensor.SensorType.ToString(),
+        };
+    }
+
+    private static RawSensorIdentity BuildRawSensorIdentity(MetricReading reading)
+    {
+        return new RawSensorIdentity
+        {
+            SourceSensorId = reading.SensorId,
+            HardwareId = reading.HardwareId,
+            HardwareName = reading.HardwareName,
+            HardwareType = reading.HardwareType,
+            SensorName = reading.SensorName,
+            SourceSensorType = reading.SourceSensorType,
         };
     }
 

@@ -8,6 +8,7 @@ import {
     buildScalarMetricValue,
     type MetricSnapshot,
 } from "../sources/metric-source";
+import type { SourceSnapshotReadResult } from "../sources/source-client";
 import { BackoffPolicy } from "../sources/backoff-policy";
 import type { SourceClient } from "../sources/source-client";
 import type { SourceMetricPollingGroupResolution } from "../sources/source-polling-groups";
@@ -260,7 +261,7 @@ class FakeSourceClient implements SourceClient {
         private readonly responses: readonly (MetricSnapshot | Promise<MetricSnapshot>)[],
     ) {}
 
-    async readSnapshot(metricKeys: readonly string[]): Promise<MetricSnapshot> {
+    async readSnapshot(metricKeys: readonly string[]): Promise<SourceSnapshotReadResult> {
         this.requestedMetricKeys.push([...metricKeys]);
         const response = this.responses[this.responseIndex];
         this.responseIndex += 1;
@@ -269,7 +270,11 @@ class FakeSourceClient implements SourceClient {
             throw new Error("No fake source response queued.");
         }
 
-        return response;
+        return {
+            snapshot: await response,
+            valueAttributions: [],
+            unavailableMetrics: [],
+        };
     }
 
     resolveMetricPollingGroups(

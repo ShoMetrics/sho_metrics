@@ -4,8 +4,16 @@ import test from "node:test";
 import {
     GetSourceHealthResponseSchema,
     ListMetricDescriptorsResponseSchema,
+    MetricIdKind as ProtoMetricIdKind,
+    MetricUnavailableReason,
+    MetricUnavailableReportSchema,
+    MetricValueAttributionSchema,
+    MetricValueKind as ProtoMetricValueKind,
+    MetricValueFreshness,
     ReadMetricSnapshotResponseSchema,
     SourceErrorSchema,
+    type MetricUnavailableReport as ProtoMetricUnavailableReport,
+    type MetricValueAttribution as ProtoMetricValueAttribution,
 } from "../../../generated/shometrics/v1/source_api_pb.js";
 import {
     SourceIpcRequestSchema,
@@ -16,18 +24,16 @@ import {
 import {
     buildMetricSnapshot,
     buildScalarMetricValue,
-    MetricIdKind,
     MetricUnit,
-    MetricValueKind,
     readRequiredMetricSnapshotTimestampMilliseconds,
 } from "../metric-source";
 import type { SourceMetadataInvalidation } from "../source-planning-metadata";
 import {
     decodeSourceIpcFrame,
     encodeSourceIpcFrame,
+    ACTIVE_HELPER_PIPE_RETRY_MILLISECONDS,
     HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS,
     MAXIMUM_SOURCE_IPC_FRAME_BYTES,
-    PIPE_NOT_FOUND_RETRY_COOLDOWN_MILLISECONDS,
     SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION,
     UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS,
     WindowsHelperSourceClient,
@@ -46,6 +52,7 @@ const [
 
 const CPU_HELPER_POLLING_GROUP_ID = "lhm:hardware:cpu";
 const GPU_HELPER_POLLING_GROUP_ID = "lhm:hardware:gpu";
+const UNKNOWN_SERVICE_STATUS_READER = { readStatus: async () => "unknown" as const };
 
 test("source IPC frame codec round-trips payload bytes", () => {
     const payload = new Uint8Array([1, 2, 3]);
@@ -77,6 +84,7 @@ test("source IPC frame codec rejects oversized payloads before decoding", () => 
 test("windows helper waits for descriptor metadata before declaring helper groups", () => {
     const client = new WindowsHelperSourceClient({
         transport: new RejectingTransport(new Error("unused")),
+        serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
     });
 
     const resolutions = client.resolveMetricPollingGroups([
@@ -475,16 +483,203 @@ test("windows helper source client sends requested metric ids and returns a runt
     });
     const client = createClient(transport);
 
-    const snapshot = await client.readSnapshot(["cpu.usage_percent"]);
+    const readResult = await client.readSnapshot(["cpu.usage_percent"]);
+    const snapshot = readResult.snapshot;
 
     assert.equal(readRequiredMetricSnapshotTimestampMilliseconds(snapshot), 1000);
     assert.equal(snapshot.metrics["cpu.usage_percent"]?.value.case, "scalar");
     assert.equal(snapshot.metrics["cpu.usage_percent"]?.value.value, 42);
+    assert.deepEqual(readResult.valueAttributions, []);
+    assert.deepEqual(readResult.unavailableMetrics, []);
     assert.equal(client.getCachedStatus().state, "available");
     assert.deepEqual(
         transport.requests.map(request => request.payload.case),
         ["getSourceHealth", "readMetricSnapshot"],
     );
+});
+
+test("windows helper source client maps sample and unavailable metric reports", async () => {
+    const transport = new FakeWindowsHelperPipeTransport(request => {
+        switch (request.payload.case) {
+            case "getSourceHealth":
+                return buildHealthResponse(request.requestId);
+            case "readMetricSnapshot":
+                return buildSnapshotResponse(request.requestId, {
+                    valueAttributions: [
+                        create(MetricValueAttributionSchema, {
+                            metricId: "cpu.usage_percent",
+                            rawSensorIdentity: {
+                                sourceSensorId: "lhm:/cpu/0/load/0",
+                                hardwareId: "/cpu/0",
+                                hardwareName: "CPU",
+                                hardwareType: "Cpu",
+                                sensorName: "CPU Total",
+                                sourceSensorType: "Load",
+                            },
+                            valueFreshness: MetricValueFreshness.RETAINED,
+                            retainedAgeMilliseconds: 1500,
+                        }),
+                    ],
+                    unavailableMetrics: [
+                        create(MetricUnavailableReportSchema, {
+                            metricId: "cpu.power",
+                            reason: MetricUnavailableReason.NO_SENSOR,
+                        }),
+                    ],
+                });
+            default:
+                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport);
+
+    const readResult = await client.readSnapshot(["cpu.usage_percent", "cpu.power"]);
+
+    assert.deepEqual(readResult.valueAttributions, [{
+        metricId: "cpu.usage_percent",
+        rawSensorIdentity: {
+            sourceSensorId: "lhm:/cpu/0/load/0",
+            hardwareId: "/cpu/0",
+            hardwareName: "CPU",
+            hardwareType: "Cpu",
+            sensorName: "CPU Total",
+            sourceSensorType: "Load",
+        },
+        valueFreshness: MetricValueFreshness.RETAINED,
+        retainedAgeMilliseconds: 1500,
+    }]);
+    assert.deepEqual(readResult.unavailableMetrics, [{
+        metricId: "cpu.power",
+        reason: MetricUnavailableReason.NO_SENSOR,
+    }]);
+});
+
+test("windows helper source client drops inconsistent source metric reports", async () => {
+    const validAttribution = create(MetricValueAttributionSchema, {
+        metricId: "cpu.usage_percent",
+        rawSensorIdentity: {
+            sourceSensorId: "lhm:/cpu/0/load/0",
+            hardwareId: "/cpu/0",
+            hardwareName: "CPU",
+            hardwareType: "Cpu",
+            sensorName: "CPU Total",
+            sourceSensorType: "Load",
+        },
+        valueFreshness: MetricValueFreshness.FRESH,
+    });
+    const transport = new FakeWindowsHelperPipeTransport(request => {
+        switch (request.payload.case) {
+            case "getSourceHealth":
+                return buildHealthResponse(request.requestId);
+            case "readMetricSnapshot":
+                return buildSnapshotResponse(request.requestId, {
+                    valueAttributions: [
+                        validAttribution,
+                        validAttribution,
+                        create(MetricValueAttributionSchema, {
+                            metricId: "cpu.power",
+                            valueFreshness: MetricValueFreshness.FRESH,
+                        }),
+                    ],
+                    unavailableMetrics: [
+                        create(MetricUnavailableReportSchema, {
+                            metricId: "cpu.usage_percent",
+                            reason: MetricUnavailableReason.INVALID_VALUE,
+                        }),
+                        create(MetricUnavailableReportSchema, {
+                            metricId: "cpu.power",
+                            reason: MetricUnavailableReason.NO_SENSOR,
+                        }),
+                        create(MetricUnavailableReportSchema, {
+                            metricId: "cpu.power",
+                            reason: MetricUnavailableReason.EXPIRED,
+                        }),
+                        create(MetricUnavailableReportSchema, {
+                            metricId: "not.requested",
+                            reason: MetricUnavailableReason.NO_SENSOR,
+                        }),
+                    ],
+                });
+            default:
+                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport);
+
+    const readResult = await client.readSnapshot(["cpu.usage_percent", "cpu.power"]);
+
+    assert.deepEqual(readResult.valueAttributions, [{
+        metricId: "cpu.usage_percent",
+        rawSensorIdentity: {
+            sourceSensorId: "lhm:/cpu/0/load/0",
+            hardwareId: "/cpu/0",
+            hardwareName: "CPU",
+            hardwareType: "Cpu",
+            sensorName: "CPU Total",
+            sourceSensorType: "Load",
+        },
+        valueFreshness: MetricValueFreshness.FRESH,
+    }]);
+    assert.deepEqual(readResult.unavailableMetrics, [{
+        metricId: "cpu.power",
+        reason: MetricUnavailableReason.NO_SENSOR,
+    }]);
+});
+
+test("windows helper source client treats future freshness enum values as display-only", async () => {
+    const transport = new FakeWindowsHelperPipeTransport(request => {
+        switch (request.payload.case) {
+            case "getSourceHealth":
+                return buildHealthResponse(request.requestId);
+            case "readMetricSnapshot":
+                return buildSnapshotResponse(request.requestId, {
+                    valueAttributions: [
+                        create(MetricValueAttributionSchema, {
+                            metricId: "cpu.usage_percent",
+                            valueFreshness: 99 as MetricValueFreshness,
+                        }),
+                    ],
+                });
+            default:
+                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport);
+
+    const readResult = await client.readSnapshot(["cpu.usage_percent"]);
+
+    assert.deepEqual(readResult.valueAttributions, [{
+        metricId: "cpu.usage_percent",
+        valueFreshness: MetricValueFreshness.RETAINED,
+    }]);
+});
+
+test("windows helper source client preserves future unavailable reasons as debug metadata", async () => {
+    const transport = new FakeWindowsHelperPipeTransport(request => {
+        switch (request.payload.case) {
+            case "getSourceHealth":
+                return buildHealthResponse(request.requestId);
+            case "readMetricSnapshot":
+                return buildSnapshotResponse(request.requestId, {
+                    unavailableMetrics: [
+                        create(MetricUnavailableReportSchema, {
+                            metricId: "cpu.temp",
+                            reason: 99 as MetricUnavailableReason,
+                        }),
+                    ],
+                });
+            default:
+                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport);
+
+    const readResult = await client.readSnapshot(["cpu.temp"]);
+
+    assert.deepEqual(readResult.unavailableMetrics, [{
+        metricId: "cpu.temp",
+        reason: 99,
+    }]);
 });
 
 test("windows helper source client returns descriptors with the catalog fingerprint", async () => {
@@ -506,20 +701,22 @@ test("windows helper source client returns descriptors with the catalog fingerpr
     assert.equal(descriptorSnapshot.descriptorFingerprint, "catalog-sha256-test");
     assert.deepEqual(descriptorSnapshot.descriptors, [{
         metricId: "cpu.usage_percent",
-        sourceSensorId: "lhm:/cpu.usage_percent",
+        rawSensorIdentity: {
+            sourceSensorId: "lhm:/cpu.usage_percent",
+            hardwareId: "hardware-1",
+            hardwareName: "CPU",
+            hardwareType: "Cpu",
+            sensorName: "CPU Total",
+            sourceSensorType: "Load",
+        },
         pollingGroupId: CPU_HELPER_POLLING_GROUP_ID,
-        hardwareId: "hardware-1",
-        hardwareName: "CPU",
-        hardwareType: "Cpu",
-        sensorName: "CPU Total",
-        sourceSensorType: "Load",
-        valueKind: MetricValueKind.SCALAR,
+        valueKind: ProtoMetricValueKind.SCALAR,
         unit: MetricUnit.PERCENT,
-        metricIdKind: MetricIdKind.STABLE_ALIAS,
+        metricIdKind: ProtoMetricIdKind.STABLE_ALIAS,
     }]);
 });
 
-test("windows helper source client rejects descriptors without polling group ids", async () => {
+test("windows helper source client drops descriptors without polling group ids", async () => {
     const transport = new FakeWindowsHelperPipeTransport(request => {
         switch (request.payload.case) {
             case "getSourceHealth":
@@ -537,10 +734,10 @@ test("windows helper source client rejects descriptors without polling group ids
     });
     const client = createClient(transport);
 
-    await assert.rejects(
-        async () => await client.listMetricDescriptors(["cpu.usage_percent"]),
-        /missing polling_group_id/u,
-    );
+    const descriptorSnapshot = await client.listMetricDescriptors(["cpu.usage_percent"]);
+
+    assert.equal(descriptorSnapshot.descriptorFingerprint, "catalog-sha256-test");
+    assert.deepEqual(descriptorSnapshot.descriptors, []);
 });
 
 test("windows helper source client rejects mismatched response request ids", async () => {
@@ -585,6 +782,7 @@ test("windows helper source client cools down unsupported protocol retries", asy
         transport,
         now: () => nowMilliseconds,
         requestIdFactory: createRequestIdFactory(),
+        serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
         timeouts: {
             healthMilliseconds: 10,
             readSnapshotMilliseconds: 10,
@@ -618,6 +816,7 @@ test("windows helper source client cools down unavailable helper retries", async
         transport,
         now: () => nowMilliseconds,
         requestIdFactory: createRequestIdFactory(),
+        serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
     });
 
     await assert.rejects(
@@ -640,13 +839,14 @@ test("windows helper source client cools down unavailable helper retries", async
     assert.equal(transport.requestCount, 2);
 });
 
-test("windows helper source client uses a long cooldown when the pipe is missing", async () => {
+test("windows helper source client uses active fast retry when the pipe is missing", async () => {
     let nowMilliseconds = 1000;
     const transport = new RejectingTransport(createNodeError("ENOENT", "pipe not found"));
     const client = new WindowsHelperSourceClient({
         transport,
         now: () => nowMilliseconds,
         requestIdFactory: createRequestIdFactory(),
+        serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
     });
 
     await assert.rejects(
@@ -662,18 +862,45 @@ test("windows helper source client uses a long cooldown when the pipe is missing
     assert.deepEqual(client.getCachedStatus(), {
         state: "unavailable",
         reason: "pipeMissing",
-        retryAfterTimestampMilliseconds: 1000 + PIPE_NOT_FOUND_RETRY_COOLDOWN_MILLISECONDS,
+        retryAfterTimestampMilliseconds: 1000 + ACTIVE_HELPER_PIPE_RETRY_MILLISECONDS,
         lastErrorCode: "ENOENT",
+        lastErrorMessage: "pipe not found",
         lastFailureAtTimestampMilliseconds: 1000,
     });
 
-    nowMilliseconds += PIPE_NOT_FOUND_RETRY_COOLDOWN_MILLISECONDS;
+    nowMilliseconds += ACTIVE_HELPER_PIPE_RETRY_MILLISECONDS;
 
     await assert.rejects(
         async () => await client.readSnapshot(["cpu.usage_percent"]),
         /pipe not found/u,
     );
     assert.equal(transport.requestCount, 2);
+});
+
+test("windows helper source client refines missing pipe status with service install state", async () => {
+    const nowMilliseconds = 1000;
+    const transport = new RejectingTransport(createNodeError("ENOENT", "pipe not found"));
+    const client = new WindowsHelperSourceClient({
+        transport,
+        now: () => nowMilliseconds,
+        requestIdFactory: createRequestIdFactory(),
+        serviceStatusReader: { readStatus: async () => "notInstalled" },
+    });
+
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /pipe not found/u,
+    );
+    await drainAsyncOperations();
+
+    assert.deepEqual(client.getCachedStatus(), {
+        state: "unavailable",
+        reason: "helperNotInstalled",
+        retryAfterTimestampMilliseconds: nowMilliseconds + ACTIVE_HELPER_PIPE_RETRY_MILLISECONDS,
+        lastErrorCode: "ENOENT",
+        lastErrorMessage: "pipe not found",
+        lastFailureAtTimestampMilliseconds: nowMilliseconds,
+    });
 });
 
 test("windows helper source client backs off repeated transient failures", async () => {
@@ -683,6 +910,7 @@ test("windows helper source client backs off repeated transient failures", async
         transport,
         now: () => nowMilliseconds,
         requestIdFactory: createRequestIdFactory(),
+        serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
     });
 
     await assert.rejects(
@@ -747,6 +975,7 @@ test("windows helper source client resets transient backoff after successful rea
         transport,
         now: () => nowMilliseconds,
         requestIdFactory: createRequestIdFactory(),
+        serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
     });
 
     await assert.rejects(
@@ -762,6 +991,7 @@ test("windows helper source client resets transient backoff after successful rea
     await client.readSnapshot(["cpu.usage_percent"]);
     assert.deepEqual(client.getCachedStatus(), {
         state: "available",
+        protocolVersion: SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION,
         lastSuccessAtTimestampMilliseconds: nowMilliseconds,
     });
 
@@ -851,13 +1081,14 @@ function createClient(
     timeouts: WindowsHelperSourceClientOptions["timeouts"] = {},
     options: Pick<
         WindowsHelperSourceClientOptions,
-        "descriptorPreloadRetryMilliseconds" | "descriptorPreloadTimer" | "now"
+        "descriptorPreloadRetryMilliseconds" | "descriptorPreloadTimer" | "now" | "serviceStatusReader"
     > = {},
 ): WindowsHelperSourceClient {
     return new WindowsHelperSourceClient({
         transport,
         requestIdFactory: createRequestIdFactory(),
         timeouts,
+        serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
         ...options,
     });
 }
@@ -899,7 +1130,13 @@ function buildHealthResponse(
     });
 }
 
-function buildSnapshotResponse(requestId: string): SourceIpcResponse {
+function buildSnapshotResponse(
+    requestId: string,
+    options: {
+        readonly valueAttributions?: readonly ProtoMetricValueAttribution[];
+        readonly unavailableMetrics?: readonly ProtoMetricUnavailableReport[];
+    } = {},
+): SourceIpcResponse {
     return create(SourceIpcResponseSchema, {
         requestId,
         payload: {
@@ -911,6 +1148,8 @@ function buildSnapshotResponse(requestId: string): SourceIpcResponse {
                         "cpu.usage_percent": buildScalarMetricValue(42, { unit: MetricUnit.PERCENT }),
                     },
                 }),
+                valueAttributions: [...(options.valueAttributions ?? [])],
+                unavailableMetrics: [...(options.unavailableMetrics ?? [])],
             }),
         },
     });
@@ -942,29 +1181,33 @@ function buildDescriptor(options: {
     readonly pollingGroupId?: string;
 }): {
     readonly metricId: string;
-    readonly sourceSensorId: string;
+    readonly rawSensorIdentity: {
+        readonly sourceSensorId: string;
+        readonly hardwareId: string;
+        readonly hardwareName: string;
+        readonly hardwareType: string;
+        readonly sensorName: string;
+        readonly sourceSensorType: string;
+    };
     readonly pollingGroupId: string;
-    readonly hardwareId: string;
-    readonly hardwareName: string;
-    readonly hardwareType: string;
-    readonly sensorName: string;
-    readonly sourceSensorType: string;
-    readonly valueKind: MetricValueKind;
+    readonly valueKind: ProtoMetricValueKind;
     readonly unit: MetricUnit;
-    readonly metricIdKind: MetricIdKind;
+    readonly metricIdKind: ProtoMetricIdKind;
 } {
     return {
         metricId: options.metricId,
-        sourceSensorId: `lhm:/${options.metricId}`,
+        rawSensorIdentity: {
+            sourceSensorId: `lhm:/${options.metricId}`,
+            hardwareId: "hardware-1",
+            hardwareName: "CPU",
+            hardwareType: "Cpu",
+            sensorName: "CPU Total",
+            sourceSensorType: "Load",
+        },
         pollingGroupId: options.pollingGroupId ?? defaultHelperPollingGroupId(options.metricId),
-        hardwareId: "hardware-1",
-        hardwareName: "CPU",
-        hardwareType: "Cpu",
-        sensorName: "CPU Total",
-        sourceSensorType: "Load",
-        valueKind: MetricValueKind.SCALAR,
+        valueKind: ProtoMetricValueKind.SCALAR,
         unit: MetricUnit.PERCENT,
-        metricIdKind: MetricIdKind.STABLE_ALIAS,
+        metricIdKind: ProtoMetricIdKind.STABLE_ALIAS,
     };
 }
 
