@@ -49,15 +49,15 @@ export function MetricSourceDiagnostic({
 
     const metricKey = attribution?.metricKey;
     const currentSourceText = formatCurrentSourceLabel(attribution);
-    const preferredSourceText = attribution?.routing.preferredSourceId
+    const preferredSourceText = attribution?.routing?.preferredSourceId
         ? formatSourceLabel(attribution.routing.preferredSourceId, metricKey)
         : undefined;
-    const fallbackText = attribution?.routing.preferredSourceId !== undefined
-        && attribution.routing.selectedSourceId !== undefined
+    const fallbackText = attribution?.routing?.preferredSourceId !== undefined
+        && attribution.routing?.selectedSourceId !== undefined
         && attribution.routing.preferredSourceId !== attribution.routing.selectedSourceId
         ? "Using fallback; preferred source has no fresh data."
         : undefined;
-    const helperStatusText = attribution?.routing.preferredSourceId === WINDOWS_HELPER_SOURCE_ID
+    const helperStatusText = attribution?.routing?.preferredSourceId === WINDOWS_HELPER_SOURCE_ID
         ? formatHelperStatusText(attribution)
         : undefined;
     const sensorText = formatSensorText(attribution);
@@ -130,7 +130,7 @@ function isDevelopmentBuild(): boolean {
 }
 
 function formatHelperStatusText(attribution: DisplayedMetricReadAttribution): string {
-    if (attribution.routing.selectedSourceId === WINDOWS_HELPER_SOURCE_ID) {
+    if (attribution.routing?.selectedSourceId === WINDOWS_HELPER_SOURCE_ID) {
         return "Ready";
     }
 
@@ -158,7 +158,7 @@ function formatHelperStatusText(attribution: DisplayedMetricReadAttribution): st
 }
 
 function formatCurrentSourceLabel(attribution: DisplayedMetricReadAttribution | undefined): string {
-    if (attribution?.routing.selectedSourceId === undefined) {
+    if (attribution?.routing?.selectedSourceId === undefined) {
         return "No fresh source";
     }
 
