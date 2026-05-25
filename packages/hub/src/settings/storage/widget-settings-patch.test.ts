@@ -216,6 +216,21 @@ test("widget patch writes terminal theme", () => {
     assert.equal(appearance?.theme?.selectedTheme, StoredMetricTheme.TERMINAL);
 });
 
+test("widget patch writes pixel window theme", () => {
+    const cpuSettings = resolveQuickStartStoredWidgetSettings(undefined, "cpu").rawSettings;
+
+    const nextSettings = writeStoredWidgetSettingsPatch(cpuSettings, {
+        appearance: {
+            theme: {
+                selectedTheme: "pixel-window",
+            },
+        },
+    });
+
+    const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
+    assert.equal(appearance?.theme?.selectedTheme, StoredMetricTheme.PIXEL_WINDOW);
+});
+
 test("widget patch writes text view variant", () => {
     const cpuSettings = resolveQuickStartStoredWidgetSettings(undefined, "cpu").rawSettings;
 

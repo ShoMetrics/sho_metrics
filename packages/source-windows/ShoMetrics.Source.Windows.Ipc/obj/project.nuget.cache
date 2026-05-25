@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "9c4uEsVAzIA=",
+  "success": true,
+  "projectFilePath": "c:\\Users\\i2dmp\\app\\code\\sho_metrics\\.git-rewrite\\t\\packages\\source-windows\\ShoMetrics.Source.Windows.Ipc\\ShoMetrics.Source.Windows.Ipc.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\i2dmp\\.nuget\\packages\\google.protobuf\\3.34.1\\google.protobuf.3.34.1.nupkg.sha512",
+    "C:\\Users\\i2dmp\\.nuget\\packages\\grpc.tools\\2.80.0\\grpc.tools.2.80.0.nupkg.sha512"
+  ],
+  "logs": []
+}

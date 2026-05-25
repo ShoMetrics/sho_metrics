@@ -3,6 +3,7 @@ import type { ThemePresetName } from "../widgets/widget-contract";
 import { colorFilledStyle } from "../widgets/styles/color-filled";
 import { cupertinoGlassStyle } from "../widgets/styles/cupertino-glass";
 import { flatStyle } from "../widgets/styles/flat";
+import { pixelWindowStyle } from "../widgets/styles/pixel-window";
 import { terminalCleanStyle, terminalVintageStyle } from "../widgets/styles/terminal";
 import type { ThemeStylePaints } from "../widgets/styles/theme-style";
 
@@ -56,6 +57,8 @@ function resolveThemePreset(themePreset: ThemePresetName) {
             return cupertinoGlassStyle;
         case "flat":
             return flatStyle;
+        case "pixel-window":
+            return pixelWindowStyle;
         case "terminal-clean":
             return terminalCleanStyle;
         case "terminal-vintage":

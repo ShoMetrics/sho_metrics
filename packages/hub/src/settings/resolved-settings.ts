@@ -18,7 +18,7 @@
 export type MetricView = "circle" | "text" | "bar" | "line";
 export type CircleViewVariant = "full-ring" | "minimal" | "gauge";
 export type TextViewVariant = "centered" | "title-card";
-export type MetricTheme = "flat" | "cupertino-glass" | "color-filled" | "terminal";
+export type MetricTheme = "flat" | "cupertino-glass" | "color-filled" | "terminal" | "pixel-window";
 export type TerminalThemeVariant = "clean" | "vintage";
 export type TerminalPalettePreset = "green" | "amber" | "cyan" | "white";
 export type ColorMode = "multi-color" | "solid" | "black-white";

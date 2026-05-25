@@ -61,3 +61,16 @@ test("global settings patch writes nested view theme and paint overrides", () =>
     assert.equal(overrides?.paint?.metric?.colorMode, StoredColorMode.BLACK_WHITE);
     assert.equal(overrides?.paint?.terminal?.preset, StoredTerminalPalettePreset.CYAN);
 });
+
+test("global settings patch writes pixel window theme", () => {
+    const nextSettings = writeStoredGlobalSettingsPatch(undefined, {
+        themeOverrideEnabled: true,
+        theme: {
+            selectedTheme: "pixel-window",
+        },
+    });
+
+    const settings = readStoredGlobalSettings(nextSettings).settings;
+    assert.equal(settings.overrides?.theme?.enabled, true);
+    assert.equal(settings.overrides?.theme?.theme?.selectedTheme, StoredMetricTheme.PIXEL_WINDOW);
+});

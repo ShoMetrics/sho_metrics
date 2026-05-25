@@ -207,6 +207,7 @@ const metricThemeByProto = {
     [StoredMetricTheme.CUPERTINO_GLASS]: "cupertino-glass",
     [StoredMetricTheme.COLOR_FILLED]: "color-filled",
     [StoredMetricTheme.TERMINAL]: "terminal",
+    [StoredMetricTheme.PIXEL_WINDOW]: "pixel-window",
 } satisfies Record<StoredMetricTheme, MetricTheme | undefined>;
 
 const terminalThemeVariantByProto = {
@@ -785,6 +786,7 @@ function resolveAppearanceDefaultsForViewAndTheme(
             };
         case "color-filled":
         case "terminal":
+        case "pixel-window":
             return targetDefaults;
     }
 }
@@ -1087,6 +1089,8 @@ function applyGlobalPaintOverride(
                     },
                 },
             };
+        case "pixel-window":
+            return appearance;
     }
 }
 

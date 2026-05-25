@@ -21,6 +21,7 @@ export function resolveRenderThemeEffects(settings: ResolvedAppearanceSettings):
         case "flat":
         case "cupertino-glass":
         case "color-filled":
+        case "pixel-window":
             return DEFAULT_RENDER_THEME_EFFECT_TOKENS;
     }
 }

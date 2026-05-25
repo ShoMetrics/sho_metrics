@@ -7,9 +7,11 @@ import {
 } from "../view-rendering/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
+    PIXEL_RENDER_TEXT_STYLES,
     TERMINAL_CLEAN_RENDER_TEXT_STYLES,
     TERMINAL_VINTAGE_RENDER_TEXT_STYLES,
 } from "../view-rendering/render-text-style";
+import { DEFAULT_PIXEL_WINDOW_PALETTE } from "../view-rendering/pixel-window-theme-tokens";
 import { buildMetricRenderAppearance } from "./render-appearance-builder";
 import { buildDefaultAppearanceSettings as buildAppearanceSettings } from "./default-appearance-settings";
 
@@ -59,12 +61,16 @@ test("theme maps resolved appearance settings to renderer theme presets", () => 
     const terminalVintageSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         theme: { selectedTheme: "terminal", terminal: { variant: "vintage" } },
     }));
+    const pixelWindowSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: { selectedTheme: "pixel-window" },
+    }));
     const defaultSettings = buildMetricRenderAppearance(buildAppearanceSettings());
 
     assert.equal(cupertinoGlassSettings.themePreset, "cupertino-glass");
     assert.equal(colorFilledSettings.themePreset, "color-filled");
     assert.equal(terminalCleanSettings.themePreset, "terminal-clean");
     assert.equal(terminalVintageSettings.themePreset, "terminal-vintage");
+    assert.equal(pixelWindowSettings.themePreset, "pixel-window");
     assert.equal(defaultSettings.themePreset, "flat");
 });
 
@@ -76,10 +82,14 @@ test("text styles map resolved appearance settings to renderer text roles", () =
     const terminalVintageSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         theme: { selectedTheme: "terminal", terminal: { variant: "vintage" } },
     }));
+    const pixelWindowSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: { selectedTheme: "pixel-window" },
+    }));
 
     assert.deepEqual(visualSettings.textStyles, DEFAULT_RENDER_TEXT_STYLES);
     assert.deepEqual(terminalCleanSettings.textStyles, TERMINAL_CLEAN_RENDER_TEXT_STYLES);
     assert.deepEqual(terminalVintageSettings.textStyles, TERMINAL_VINTAGE_RENDER_TEXT_STYLES);
+    assert.deepEqual(pixelWindowSettings.textStyles, PIXEL_RENDER_TEXT_STYLES);
 });
 
 test("theme effects map resolved appearance settings to renderer effect tokens", () => {
@@ -90,10 +100,14 @@ test("theme effects map resolved appearance settings to renderer effect tokens",
     const terminalVintageSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         theme: { selectedTheme: "terminal", terminal: { variant: "vintage" } },
     }));
+    const pixelWindowSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: { selectedTheme: "pixel-window" },
+    }));
 
     assert.deepEqual(visualSettings.themeEffects, DEFAULT_RENDER_THEME_EFFECT_TOKENS);
     assert.deepEqual(terminalCleanSettings.themeEffects, TERMINAL_CLEAN_RENDER_THEME_EFFECT_TOKENS);
     assert.deepEqual(terminalVintageSettings.themeEffects, TERMINAL_VINTAGE_RENDER_THEME_EFFECT_TOKENS);
+    assert.deepEqual(pixelWindowSettings.themeEffects, DEFAULT_RENDER_THEME_EFFECT_TOKENS);
 });
 
 test("solid color mode uses resolved appearance color", () => {
@@ -260,6 +274,29 @@ test("terminal palette changes the phosphor paint", () => {
     assert.equal(amberSettings.paints.primaryText, "#ffd166");
     assert.equal(cyanVintageSettings.paints.primaryMetric.solidColor, "#00b8d8");
     assert.equal(cyanVintageSettings.paints.primaryText, "#5eead4");
+});
+
+test("pixel window theme uses bundled pixel text and no-gradient paint", () => {
+    const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: {
+            selectedTheme: "pixel-window",
+            flat: {
+                paint: {
+                    colorMode: "black-white",
+                },
+            },
+        },
+    }));
+
+    assert.equal(visualSettings.paintConstraint, "none");
+    assert.deepEqual(visualSettings.paints.primaryMetric, {
+        mode: "solid",
+        solidColor: DEFAULT_PIXEL_WINDOW_PALETTE.bodyAccent,
+        thresholds: [],
+        isGradientEnabled: false,
+    });
+    assert.equal(visualSettings.paints.backgroundFill, undefined);
+    assert.equal(visualSettings.paints.primaryText, DEFAULT_PIXEL_WINDOW_PALETTE.bodyText);
 });
 
 test("color filled solid mode uses theme background color and neutral foreground paint", () => {
