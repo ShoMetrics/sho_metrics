@@ -50,6 +50,7 @@ export const DEFAULT_RENDER_TEXT_WIDTH_SCALE = 1;
 export const DEFAULT_RENDER_TEXT_MINIMUM_FONT_SCALE = 0.78;
 const DEFAULT_RENDER_FONT_FAMILY = "'SF Pro Display','Helvetica Neue','Inter','Segoe UI',sans-serif";
 const TERMINAL_FONT_FAMILY = "'Share Tech Mono','SF Pro Display','Helvetica Neue','Inter','Segoe UI',monospace";
+export const PIXEL_RENDER_FONT_FAMILY = "'DotGothic16','Inter','Segoe UI',sans-serif";
 export const JAPANESE_SERIF_RENDER_FONT_FAMILY = [
     "'Yu Mincho'",
     "'YuMincho'",
@@ -168,6 +169,52 @@ export const TERMINAL_VINTAGE_RENDER_TEXT_STYLES = {
         fontFamily: TERMINAL_FONT_FAMILY,
         fontWeight: 620,
         fontSizeScale: 1.08,
+        filter: undefined,
+    }),
+} satisfies RenderTextStyles;
+
+// Initial DotGothic16 metrics from the Slice 2 font-driver spike.
+// DotGothic16 ships as Regular only; these weights preserve role intent and
+// fallback behavior, but they do not make primary DotGothic16 glyphs bolder.
+export const PIXEL_RENDER_TEXT_STYLES = {
+    value: createRenderTextStyle({
+        fontFamily: PIXEL_RENDER_FONT_FAMILY,
+        fontWeight: 900,
+        fontSizeScale: 1,
+        baselineShiftEm: 0.02,
+        widthScale: 0.9,
+        filter: undefined,
+    }),
+    unit: createRenderTextStyle({
+        fontFamily: PIXEL_RENDER_FONT_FAMILY,
+        fontWeight: 800,
+        fontSizeScale: 1,
+        baselineShiftEm: 0.08,
+        widthScale: 0.9,
+        filter: undefined,
+    }),
+    title: createRenderTextStyle({
+        fontFamily: PIXEL_RENDER_FONT_FAMILY,
+        fontWeight: 850,
+        fontSizeScale: 1,
+        baselineShiftEm: 0.02,
+        widthScale: 0.9,
+        filter: undefined,
+    }),
+    label: createRenderTextStyle({
+        fontFamily: PIXEL_RENDER_FONT_FAMILY,
+        fontWeight: 800,
+        fontSizeScale: 1,
+        baselineShiftEm: 0.02,
+        widthScale: 0.9,
+        filter: undefined,
+    }),
+    smallLabel: createRenderTextStyle({
+        fontFamily: PIXEL_RENDER_FONT_FAMILY,
+        fontWeight: 750,
+        fontSizeScale: 1,
+        baselineShiftEm: 0.03,
+        widthScale: 0.9,
         filter: undefined,
     }),
 } satisfies RenderTextStyles;

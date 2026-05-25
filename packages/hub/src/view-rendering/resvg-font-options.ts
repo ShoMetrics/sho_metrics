@@ -4,13 +4,14 @@ import type { ResvgRenderOptions } from "@resvg/resvg-js";
 import { JAPANESE_SERIF_RENDER_FONT_FAMILY } from "./render-text-style";
 
 export type FontScript = "han" | "kana" | "hangul" | "symbol";
-export type BundledFontFamily = "share-tech-mono";
+export type BundledFontFamily = "share-tech-mono" | "dotgothic16";
 
 export interface ResvgFontResolverEnvironment {
     platform: NodeJS.Platform;
     fileExists: (fontFile: string) => boolean;
     bundledInterFontFile?: string;
     bundledShareTechMonoFontFile?: string;
+    bundledDotGothic16FontFile?: string;
 }
 
 const DEFAULT_FONT_RESOLVER_ENVIRONMENT: ResvgFontResolverEnvironment = {
@@ -18,6 +19,7 @@ const DEFAULT_FONT_RESOLVER_ENVIRONMENT: ResvgFontResolverEnvironment = {
     fileExists: existsSync,
     bundledInterFontFile: resolveBundledFontFile("inter", "InterVariable.ttf"),
     bundledShareTechMonoFontFile: resolveBundledFontFile("share-tech-mono", "ShareTechMono-Regular.ttf"),
+    bundledDotGothic16FontFile: resolveBundledFontFile("dotgothic16", "DotGothic16-Regular.ttf"),
 };
 
 const fontFileCacheByKey = new Map<string, readonly string[]>();
@@ -62,6 +64,7 @@ export function resolveResvgFontOptions(
         environment.platform,
         environment.bundledInterFontFile ?? "",
         environment.bundledShareTechMonoFontFile ?? "",
+        environment.bundledDotGothic16FontFile ?? "",
         usesJapaneseSerifFontFamily ? "japanese-serif" : "",
         ...bundledFontFamilyList,
         ...scriptList,
@@ -114,6 +117,10 @@ export function detectBundledFontFamiliesFromSvg(svgString: string): readonly Bu
         bundledFontFamilyList.push("share-tech-mono");
     }
 
+    if (/\bDotGothic16\b/iu.test(svgString)) {
+        bundledFontFamilyList.push("dotgothic16");
+    }
+
     return bundledFontFamilyList;
 }
 
@@ -150,6 +157,7 @@ function resolveFontFiles(
         environment.platform,
         environment.bundledInterFontFile ?? "",
         environment.bundledShareTechMonoFontFile ?? "",
+        environment.bundledDotGothic16FontFile ?? "",
         usesJapaneseSerifFontFamily ? "japanese-serif" : "",
         ...bundledFontFamilyList,
         ...scriptList,
@@ -197,6 +205,9 @@ function resolveBundledFontFileCandidates(
     switch (bundledFontFamily) {
         case "share-tech-mono":
             return [environment.bundledShareTechMonoFontFile]
+                .filter((fontFile): fontFile is string => Boolean(fontFile));
+        case "dotgothic16":
+            return [environment.bundledDotGothic16FontFile]
                 .filter((fontFile): fontFile is string => Boolean(fontFile));
     }
 }

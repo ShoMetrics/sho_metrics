@@ -74,7 +74,8 @@ Use these fonts as concrete drivers and references:
     and less width-hostile than display fonts such as Press Start 2P.
 - Secondary comparison driver: `Pixelify Sans`.
   - License: SIL Open Font License 1.1.
-  - Role: Latin fallback candidate and second font metrics pressure test.
+  - Role: Latin fallback candidate and second font metrics pressure test, not a
+    Slice 5 production asset.
   - Reason: It is a normal OFL pixel-like Latin font with different proportions
     from DotGothic16, useful for proving the helper is not tuned to one font.
 - Candidate reference: `PixelMplus10`.
@@ -1013,6 +1014,38 @@ Conclusions for Slice 3:
 
 Step 4 neutral defaults must use the measured current helper values above, not
 the illustrative placeholders in the target contract section.
+
+## Slice 5 Implementation Note
+
+Slice 5 added the primary pixel font asset and renderer preset without adding a
+selectable product theme:
+
+- Font asset: `packages/hub/assets/fonts/dotgothic16/DotGothic16-Regular.ttf`
+- Source artifact: `DotGothic16-Version1.101.zip` from
+  `fontworks-fonts/DotGothic16`
+- License: SIL Open Font License 1.1, stored beside the font as `LICENSE.txt`
+- TTF size: `2,069,236` bytes
+
+The initial `PIXEL_RENDER_TEXT_STYLES` preset uses DotGothic16 as the primary
+font family and keeps Inter as the bundled Latin fallback. The preset records
+only renderer-owned metrics:
+
+- `value.baselineShiftEm: 0.02`
+- `unit.baselineShiftEm: 0.08`
+- `title.baselineShiftEm: 0.02`
+- `label.baselineShiftEm: 0.02`
+- `smallLabel.baselineShiftEm: 0.03`
+- `widthScale: 0.9`
+
+DotGothic16 is a single-weight font. The preset keeps role-specific
+`fontWeight` values so fallback glyphs and future multi-weight pixel candidates
+retain role intent, but primary DotGothic16 glyphs render at the available
+Regular weight.
+
+`metric-text-row` was verified with this non-zero baseline preset in unit tests.
+The row clip remains value-centered for now; if future visual tuning finds unit
+clipping, revisit the row clip-centering strategy instead of adding
+primitive-local pixel-font branches.
 
 ## Required Verification
 

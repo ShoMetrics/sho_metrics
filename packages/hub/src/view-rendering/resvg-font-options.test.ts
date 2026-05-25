@@ -9,10 +9,11 @@ import {
     usesJapaneseSerifRenderFontFamily,
     type ResvgFontResolverEnvironment,
 } from "./resvg-font-options";
-import { JAPANESE_SERIF_RENDER_FONT_FAMILY } from "./render-text-style";
+import { JAPANESE_SERIF_RENDER_FONT_FAMILY, PIXEL_RENDER_FONT_FAMILY } from "./render-text-style";
 
 const BUNDLED_INTER_FONT_FILE = "C:\\Plugin\\assets\\fonts\\inter\\InterVariable.ttf";
 const BUNDLED_SHARE_TECH_MONO_FONT_FILE = "C:\\Plugin\\assets\\fonts\\share-tech-mono\\ShareTechMono-Regular.ttf";
+const BUNDLED_DOT_GOTHIC_16_FONT_FILE = "C:\\Plugin\\assets\\fonts\\dotgothic16\\DotGothic16-Regular.ttf";
 const MACOS_HELVETICA_NEUE_FONT_FILE = "/System/Library/Fonts/HelveticaNeue.ttc";
 const MACOS_HIRAGINO_MINCHO_FONT_FILE = "/System/Library/Fonts/\u30d2\u30e9\u30ae\u30ce\u660e\u671d ProN.ttc";
 const WINDOWS_YU_MINCHO_FONT_FILE = "C:\\Windows\\Fonts\\yumin.ttf";
@@ -37,6 +38,16 @@ test("bundled font family detection finds terminal font-family usage", () => {
     ].join("");
 
     assert.deepEqual(detectBundledFontFamiliesFromSvg(svgString), ["share-tech-mono"]);
+});
+
+test("bundled font family detection finds pixel font-family usage", () => {
+    const svgString = [
+        '<svg xmlns="http://www.w3.org/2000/svg">',
+        `<text font-family="${PIXEL_RENDER_FONT_FAMILY}">999 MB/s</text>`,
+        "</svg>",
+    ].join("");
+
+    assert.deepEqual(detectBundledFontFamiliesFromSvg(svgString), ["dotgothic16"]);
 });
 
 test("Japanese serif font family detection finds serif family usage", () => {
@@ -182,6 +193,28 @@ test("font options load Japanese serif candidates only when requested", () => {
         BUNDLED_INTER_FONT_FILE,
         "C:\\Windows\\Fonts\\seguisym.ttf",
         "C:\\Windows\\Fonts\\msyh.ttc",
+    ]);
+});
+
+test("font options load DotGothic16 before primary fonts when SVG asks for it", () => {
+    const fontOptions = resolveResvgFontOptions(
+        buildTextSvgWithFontFamily("999 MB/s", PIXEL_RENDER_FONT_FAMILY),
+        buildEnvironment({
+            platform: "win32",
+            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledDotGothic16FontFile: BUNDLED_DOT_GOTHIC_16_FONT_FILE,
+            existingFontFiles: [
+                BUNDLED_INTER_FONT_FILE,
+                BUNDLED_DOT_GOTHIC_16_FONT_FILE,
+                "C:\\Windows\\Fonts\\seguisym.ttf",
+            ],
+        }),
+    );
+
+    assert.deepEqual(fontOptions.fontFiles, [
+        BUNDLED_DOT_GOTHIC_16_FONT_FILE,
+        BUNDLED_INTER_FONT_FILE,
+        "C:\\Windows\\Fonts\\seguisym.ttf",
     ]);
 });
 
@@ -441,6 +474,7 @@ function buildEnvironment(options: {
     existingFontFiles: readonly string[];
     bundledInterFontFile?: string;
     bundledShareTechMonoFontFile?: string;
+    bundledDotGothic16FontFile?: string;
     onFileExists?: (fontFile: string) => void;
 }): ResvgFontResolverEnvironment {
     const existingFontFileSet = new Set(options.existingFontFiles);
@@ -449,6 +483,7 @@ function buildEnvironment(options: {
         platform: options.platform,
         bundledInterFontFile: options.bundledInterFontFile,
         bundledShareTechMonoFontFile: options.bundledShareTechMonoFontFile,
+        bundledDotGothic16FontFile: options.bundledDotGothic16FontFile,
         fileExists: (fontFile: string) => {
             options.onFileExists?.(fontFile);
             return existingFontFileSet.has(fontFile);

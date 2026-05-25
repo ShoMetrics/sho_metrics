@@ -60,6 +60,9 @@ function copyRuntimeAssets() {
         ["assets/fonts/share-tech-mono/ShareTechMono-Regular.ttf", `${sdPlugin}/assets/fonts/share-tech-mono/ShareTechMono-Regular.ttf`],
         ["assets/fonts/share-tech-mono/LICENSE.txt", `${sdPlugin}/assets/fonts/share-tech-mono/LICENSE.txt`],
         ["assets/fonts/share-tech-mono/README.md", `${sdPlugin}/assets/fonts/share-tech-mono/README.md`],
+        ["assets/fonts/dotgothic16/DotGothic16-Regular.ttf", `${sdPlugin}/assets/fonts/dotgothic16/DotGothic16-Regular.ttf`],
+        ["assets/fonts/dotgothic16/LICENSE.txt", `${sdPlugin}/assets/fonts/dotgothic16/LICENSE.txt`],
+        ["assets/fonts/dotgothic16/README.md", `${sdPlugin}/assets/fonts/dotgothic16/README.md`],
     ];
 
     return {
