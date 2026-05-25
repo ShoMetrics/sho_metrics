@@ -8,7 +8,7 @@ import { createFallbackMetricStoreReader } from "./fallback-composer";
 const TEST_NOW_MILLISECONDS = 3000;
 const TEST_MAXIMUM_SAMPLE_AGE_MILLISECONDS = 5000;
 
-test("fallback reader uses the first source candidate with a scalar sample", () => {
+test("fallback reader uses the first source candidate with a scalar value", () => {
     const metricStore = new MetricStore();
     const readPlan = buildReadPlan();
 
@@ -30,7 +30,7 @@ test("fallback reader uses the first source candidate with a scalar sample", () 
     assert.equal(reader.getWidgetData("ram.used", "RAM", "B").current, 25);
 });
 
-test("fallback reader attributes the first fresh scalar sample to its source", () => {
+test("fallback reader attributes the first fresh scalar value to its source", () => {
     const metricStore = new MetricStore();
     const readPlan = buildReadPlan();
 
@@ -54,7 +54,35 @@ test("fallback reader attributes the first fresh scalar sample to its source", (
     assert.equal(readResult.widgetData.current, 25);
 });
 
-test("fallback reader uses the next source candidate when the primary has no scalar sample", () => {
+test("fallback reader forwards value attribution from the rendered source value", () => {
+    const metricStore = new MetricStore();
+    const readPlan = buildReadPlan();
+
+    metricStore.ingest("windows-helper", buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            "ram.used": buildScalarMetricValue(25),
+        },
+    }), {
+        valueAttributions: [{
+            metricId: "ram.used",
+            valueFreshness: "retained",
+            retainedAgeMilliseconds: 1500,
+        }],
+    });
+
+    const reader = createTestFallbackReader(metricStore, readPlan);
+    const readResult = reader.getWidgetDataWithAttribution("ram.used", "RAM", "B");
+
+    assert.equal(readResult.selectedSourceId, "windows-helper");
+    assert.deepEqual(readResult.valueAttribution, {
+        metricId: "ram.used",
+        valueFreshness: "retained",
+        retainedAgeMilliseconds: 1500,
+    });
+});
+
+test("fallback reader uses the next source candidate when the primary has no scalar value", () => {
     const metricStore = new MetricStore();
     const readPlan = buildReadPlan();
 
@@ -120,7 +148,7 @@ test("fallback reader uses each metric route's own source order", () => {
     assert.equal(reader.getWidgetData("gpu.temp", "GPU", "C").current, 70);
 });
 
-test("fallback reader uses fallback when the primary scalar sample is stale", () => {
+test("fallback reader uses fallback when the primary scalar value is stale", () => {
     const metricStore = new MetricStore();
     const readPlan = buildReadPlan();
 
@@ -145,7 +173,7 @@ test("fallback reader uses fallback when the primary scalar sample is stale", ()
     assert.equal(reader.getWidgetData("ram.used", "RAM", "B").current, 50);
 });
 
-test("fallback reader attributes fallback samples to the selected fallback source", () => {
+test("fallback reader attributes fallback values to the selected fallback source", () => {
     const metricStore = new MetricStore();
     const readPlan = buildReadPlan();
 
@@ -172,7 +200,7 @@ test("fallback reader attributes fallback samples to the selected fallback sourc
     assert.equal(readResult.widgetData.current, 50);
 });
 
-test("fallback reader uses node when a helper-preferred metric's helper sample is stale", () => {
+test("fallback reader uses node when a helper-preferred metric's helper value is stale", () => {
     const metricStore = new MetricStore();
     const readPlan = buildReadPlan({ metricKey: "gpu.temp" });
 
@@ -197,7 +225,7 @@ test("fallback reader uses node when a helper-preferred metric's helper sample i
     assert.equal(reader.getWidgetData("gpu.temp", "GPU", "C").current, 60);
 });
 
-test("fallback reader returns no data when every scalar sample is stale", () => {
+test("fallback reader returns no data when every scalar value is stale", () => {
     const metricStore = new MetricStore();
     const readPlan = buildReadPlan();
 
@@ -240,7 +268,31 @@ test("fallback reader returns no data when every scalar sample is stale", () => 
     });
 });
 
-test("fallback reader uses fallback when the primary source writes invalid samples", () => {
+test("fallback reader forwards unavailable metadata when no source has a fresh value", () => {
+    const metricStore = new MetricStore();
+    const readPlan = buildReadPlan({ metricKey: "cpu.temp" });
+
+    metricStore.ingest("windows-helper", buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {},
+    }), {
+        unavailableMetrics: [{
+            metricId: "cpu.temp",
+            reason: "noSensorData",
+        }],
+    });
+
+    const reader = createTestFallbackReader(metricStore, readPlan);
+    const readResult = reader.getWidgetDataWithAttribution("cpu.temp", "CPU", "C");
+
+    assert.equal(readResult.selectedSourceId, undefined);
+    assert.deepEqual(readResult.unavailableMetric, {
+        metricId: "cpu.temp",
+        reason: "noSensorData",
+    });
+});
+
+test("fallback reader uses fallback when the primary source writes invalid values", () => {
     const metricStore = new MetricStore();
     const readPlan = buildReadPlan();
 
@@ -281,7 +333,7 @@ test("fallback reader uses only the primary candidate in empty failure mode", ()
     );
 });
 
-test("fallback reader uses the next source candidate when the primary has no text sample", () => {
+test("fallback reader uses the next source candidate when the primary has no text value", () => {
     const metricStore = new MetricStore();
     const readPlan = buildReadPlan({ metricKey: "cpu.model" });
 
@@ -297,7 +349,7 @@ test("fallback reader uses the next source candidate when the primary has no tex
     assert.equal(reader.getTextValue("cpu.model"), "Example CPU");
 });
 
-test("fallback reader returns render-safe defaults when no candidate has a sample", () => {
+test("fallback reader returns render-safe defaults when no candidate has a value", () => {
     const metricStore = new MetricStore();
     const readPlan = buildReadPlan();
     const reader = createTestFallbackReader(metricStore, readPlan);

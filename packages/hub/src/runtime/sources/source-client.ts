@@ -1,7 +1,5 @@
 import {
     MetricIdKind,
-    MetricUnavailableReason,
-    MetricValueFreshness,
     MetricValueKind,
     type MetricDescriptor as ProtoMetricDescriptor,
     type MetricUnavailableReport as ProtoMetricUnavailableReport,
@@ -30,7 +28,7 @@ export interface SourceWarning {
     readonly sourceSensorId?: string;
 }
 
-export { MetricIdKind, MetricUnavailableReason, MetricValueFreshness, MetricValueKind };
+export { MetricIdKind, MetricValueKind };
 
 // Source-runtime payloads intentionally derive from the source API proto so the
 // wire shape and runtime facade cannot drift. Strip protobuf-es implementation
@@ -49,6 +47,16 @@ type RuntimeProtoPayloadWithOptionalRawSensor<T> = Readonly<
 
 /** Source-owned raw sensor identity for descriptors and source attribution. */
 export type RawSensorIdentity = RuntimeProtoPayload<ProtoRawSensorIdentity>;
+
+/** Runtime freshness state after source adapter enum compatibility handling. */
+export type MetricValueFreshness = "fresh" | "retained";
+
+/** Runtime unavailable reason after source adapter enum compatibility handling. */
+export type MetricUnavailableReason =
+    | "noSensorData"
+    | "invalidValue"
+    | "expired"
+    | "unknown";
 
 /** Runtime health metadata returned by a source client. */
 export interface SourceHealth {
@@ -134,10 +142,16 @@ export interface SourceSnapshotReadResult {
 }
 
 /** Source-owned attribution for a metric value included in a snapshot. */
-export type MetricValueAttribution = RuntimeProtoPayloadWithOptionalRawSensor<ProtoMetricValueAttribution>;
+export type MetricValueAttribution = Readonly<
+    Omit<RuntimeProtoPayloadWithOptionalRawSensor<ProtoMetricValueAttribution>, "valueFreshness">
+    & { readonly valueFreshness: MetricValueFreshness }
+>;
 
 /** Source-reported reason for a requested metric omitted from a snapshot. */
-export type MetricUnavailableReport = RuntimeProtoPayloadWithOptionalRawSensor<ProtoMetricUnavailableReport>;
+export type MetricUnavailableReport = Readonly<
+    Omit<RuntimeProtoPayloadWithOptionalRawSensor<ProtoMetricUnavailableReport>, "reason">
+    & { readonly reason: MetricUnavailableReason }
+>;
 
 /** Runtime source adapter consumed by background metric collection. */
 export interface SourceClient extends SourceMetricPollingGroupResolver {
@@ -162,7 +176,7 @@ export interface SourceClient extends SourceMetricPollingGroupResolver {
      * Source clients must call the listener only after descriptor, capability,
      * and planning-relevant profile metadata has reached a complete snapshot.
      * This hook must not report source health, connection recovery, partial
-     * descriptor traversal, or sample freshness.
+     * descriptor traversal, or reading freshness.
      */
     subscribeSourceMetadataInvalidations?(listener: SourceMetadataInvalidationListener): () => void;
 

@@ -394,16 +394,22 @@ test("widget advanced controls render current metric source attribution", () => 
         runtimeCache: {
             displayedMetricReadAttribution: {
                 metricKey: "cpu.usage_percent",
-                preferredSourceId: NODE_SYSTEM_SOURCE_ID,
-                selectedSourceId: NODE_SYSTEM_SOURCE_ID,
-                sampleTimestampMilliseconds: Date.now(),
+                routing: {
+                    preferredSourceId: NODE_SYSTEM_SOURCE_ID,
+                    selectedSourceId: NODE_SYSTEM_SOURCE_ID,
+                },
+                outcome: {
+                    kind: "value",
+                    valueTimestampMilliseconds: Date.now(),
+                    freshness: "fresh",
+                },
             },
         },
     });
 
     assert.match(markup, /Current source: Built-in/);
     assert.match(markup, /Preferred source: Built-in/);
-    assert.match(markup, /Last sample age:/);
+    assert.match(markup, /Last value age:/);
 });
 
 test("widget advanced controls report fallback source attribution", () => {
@@ -412,9 +418,15 @@ test("widget advanced controls report fallback source attribution", () => {
         runtimeCache: {
             displayedMetricReadAttribution: {
                 metricKey: "gpu.temp",
-                preferredSourceId: WINDOWS_HELPER_SOURCE_ID,
-                selectedSourceId: NODE_SYSTEM_SOURCE_ID,
-                sampleTimestampMilliseconds: Date.now(),
+                routing: {
+                    preferredSourceId: WINDOWS_HELPER_SOURCE_ID,
+                    selectedSourceId: NODE_SYSTEM_SOURCE_ID,
+                },
+                outcome: {
+                    kind: "value",
+                    valueTimestampMilliseconds: Date.now(),
+                    freshness: "fresh",
+                },
             },
         },
     });
@@ -430,13 +442,15 @@ test("widget advanced controls report helper source status", () => {
         runtimeCache: {
             displayedMetricReadAttribution: {
                 metricKey: "cpu.temp",
-                preferredSourceId: WINDOWS_HELPER_SOURCE_ID,
+                routing: {
+                    preferredSourceId: WINDOWS_HELPER_SOURCE_ID,
+                    selectedSourceId: undefined,
+                },
                 preferredSourceStatus: {
                     state: "unavailable",
                     reason: "pipeMissing",
                 },
-                selectedSourceId: undefined,
-                sampleTimestampMilliseconds: undefined,
+                outcome: undefined,
             },
         },
     });
@@ -444,6 +458,61 @@ test("widget advanced controls report helper source status", () => {
     assert.match(markup, /Current source: No fresh source/);
     assert.match(markup, /Preferred source: Helper/);
     assert.match(markup, /Helper status: Required/);
+});
+
+test("widget advanced controls report sensor identity and metric state", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "cpu",
+        runtimeCache: {
+            displayedMetricReadAttribution: {
+                metricKey: "cpu.temp",
+                routing: {
+                    preferredSourceId: WINDOWS_HELPER_SOURCE_ID,
+                    selectedSourceId: WINDOWS_HELPER_SOURCE_ID,
+                },
+                outcome: {
+                    kind: "value",
+                    valueTimestampMilliseconds: Date.now(),
+                    freshness: "retained",
+                    retainedAgeMilliseconds: 1500,
+                    rawSensorIdentity: {
+                        sourceSensorId: "lhm.sensor:/intelcpu/0/temperature/26",
+                        sensorName: "CPU Package",
+                    },
+                },
+            },
+        },
+    });
+
+    assert.match(markup, /Sensor: CPU Package \(lhm\.sensor:\/intelcpu\/0\/temperature\/26\)/);
+    assert.match(markup, /Metric: retained 1s/);
+});
+
+test("widget advanced controls report unavailable metric state", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "cpu",
+        runtimeCache: {
+            displayedMetricReadAttribution: {
+                metricKey: "cpu.temp",
+                routing: {
+                    preferredSourceId: WINDOWS_HELPER_SOURCE_ID,
+                    selectedSourceId: undefined,
+                },
+                outcome: {
+                    kind: "unavailable",
+                    reason: "invalidValue",
+                    lastValueTimestampMilliseconds: undefined,
+                    rawSensorIdentity: {
+                        sensorName: "CPU Package",
+                    },
+                },
+            },
+        },
+    });
+
+    assert.match(markup, /Last value age: none/);
+    assert.match(markup, /Sensor: CPU Package/);
+    assert.match(markup, /Metric: invalid value/);
 });
 
 test("domain action does not render a mismatched stored target panel", () => {

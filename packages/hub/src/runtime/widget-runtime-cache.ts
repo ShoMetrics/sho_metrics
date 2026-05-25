@@ -1,7 +1,11 @@
 import { deepEqual } from "fast-equals";
 import type { DiskVolumeOption } from "./disk-volumes";
 import type { NetworkInterfaceOption } from "./network-interfaces";
-import type { SourceClientStatus } from "./sources/source-client";
+import type {
+    MetricUnavailableReason,
+    MetricValueFreshness,
+    SourceClientStatus,
+} from "./sources/source-client";
 
 /**
  * Ephemeral per-action runtime facts.
@@ -24,11 +28,45 @@ export interface WidgetRuntimeCache {
 /** Latest render-path source attribution for the primary metric displayed by an action. */
 export interface DisplayedMetricReadAttribution {
     readonly metricKey: string;
-    readonly preferredSourceId: string | undefined;
+    readonly routing: DisplayedMetricReadRouting;
     readonly preferredSourceStatus?: SourceClientStatus;
-    readonly selectedSourceId: string | undefined;
-    readonly sampleTimestampMilliseconds: number | undefined;
+    readonly outcome: DisplayedMetricReadOutcome | undefined;
 }
+
+export interface DisplayedMetricReadRouting {
+    readonly preferredSourceId: string | undefined;
+    readonly selectedSourceId: string | undefined;
+}
+
+export type DisplayedMetricReadOutcome =
+    | DisplayedMetricValueOutcome
+    | DisplayedMetricUnavailableOutcome;
+
+export interface DisplayedMetricValueOutcome {
+    readonly kind: "value";
+    readonly valueTimestampMilliseconds: number;
+    readonly freshness: DisplayedMetricValueState;
+    readonly retainedAgeMilliseconds?: number;
+    readonly rawSensorIdentity?: DisplayedRawSensorIdentity;
+}
+
+export interface DisplayedMetricUnavailableOutcome {
+    readonly kind: "unavailable";
+    readonly reason: DisplayedMetricUnavailableReason;
+    readonly lastValueTimestampMilliseconds: number | undefined;
+    readonly rawSensorIdentity?: DisplayedRawSensorIdentity;
+}
+
+export interface DisplayedRawSensorIdentity {
+    readonly sourceSensorId?: string;
+    readonly hardwareId?: string;
+    readonly sensorName?: string;
+    readonly hardwareName?: string;
+}
+
+export type DisplayedMetricValueState = MetricValueFreshness;
+
+export type DisplayedMetricUnavailableReason = MetricUnavailableReason;
 
 export type WidgetRuntimeCachePatch = Partial<WidgetRuntimeCache>;
 

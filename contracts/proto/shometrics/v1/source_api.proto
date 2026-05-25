@@ -95,7 +95,7 @@ message MetricValueAttribution {
   // Present only when value_freshness is METRIC_VALUE_FRESHNESS_RETAINED.
   //
   // Retained values are display continuity values. Hub may update the current
-  // display value from them, but must not append them to real sample history.
+  // display value from them, but must not append them to real value history.
   optional uint32 retained_age_milliseconds = 4;
 }
 

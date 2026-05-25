@@ -5,7 +5,6 @@ import type {
     MetricUnavailableReport,
     MetricValueAttribution,
 } from "./sources/source-client";
-import { MetricValueFreshness } from "./sources/source-client";
 
 /** Read-only view of metric history bound to one source scope. */
 export interface MetricStoreReader {
@@ -33,6 +32,8 @@ export interface MetricStoreReader {
 export interface MetricWidgetDataReadResult {
     readonly widgetData: WidgetData;
     readonly selectedSourceId: string | undefined;
+    readonly valueAttribution?: MetricValueAttribution;
+    readonly unavailableMetric?: MetricUnavailableReport;
 }
 
 /**
@@ -40,13 +41,14 @@ export interface MetricWidgetDataReadResult {
  */
 export class MetricStore {
     // Store layout is private to MetricStore:
-    // - outer key: runtime source scope id. Composed samples may use logical
+    // - outer key: runtime source scope id. Composed readings may use logical
     //   scopes such as "local"; background collection writes source or profile
     //   scopes such as "node-system" so read-time fallback can compare
     //   candidates without overwriting them.
     // - inner key: ShoMetrics metric id inside that source scope, for example "cpu.usage_percent" or "disk.throughput.read".
     // No separator or escaped string format is reserved here; adapters own validation before values reach this store.
     private store = new Map<string, SourceMetricStore>();
+    private valueAttributionsBySourceScopeId = new Map<string, Map<string, MetricValueAttribution>>();
     private unavailableMetricsBySourceScopeId = new Map<string, Map<string, MetricUnavailableReport>>();
 
     private static readonly HISTORY_SIZE = 60;
@@ -66,12 +68,18 @@ export class MetricStore {
                 unit,
                 maxValue,
             );
+            const valueAttribution = widgetData.sampleTimestampMilliseconds === undefined
+                ? undefined
+                : this.readValueAttribution(sourceScopeId, metricKey);
+            const unavailableMetric = this.readUnavailableMetric(sourceScopeId, metricKey);
 
             return {
                 widgetData,
                 selectedSourceId: widgetData.sampleTimestampMilliseconds === undefined
                     ? undefined
                     : sourceScopeId,
+                ...(valueAttribution === undefined ? {} : { valueAttribution }),
+                ...(unavailableMetric === undefined ? {} : { unavailableMetric }),
             };
         };
 
@@ -96,7 +104,7 @@ export class MetricStore {
             readonly unavailableMetrics?: readonly MetricUnavailableReport[];
         } = {},
     ): void {
-        const sampleTimestampMilliseconds = readRequiredMetricSnapshotTimestampMilliseconds(snapshot);
+        const snapshotTimestampMilliseconds = readRequiredMetricSnapshotTimestampMilliseconds(snapshot);
         const sourceStore = this.ensureSourceStore(sourceScopeId);
         const valueAttributionsByMetricKey = new Map(
             sourceMetadata.valueAttributions?.map(attribution => [attribution.metricId, attribution]) ?? [],
@@ -104,7 +112,7 @@ export class MetricStore {
 
         for (const [metricKey, value] of Object.entries(snapshot.metrics)) {
             if (value.value.case === "scalar") {
-                // Renderer-facing history accepts only finite scalar samples.
+                // Renderer-facing history accepts only finite scalar values.
                 // NaN and +/-Infinity keep the previous valid value available
                 // instead of poisoning progress/history calculations.
                 if (!Number.isFinite(value.value.value)) {
@@ -112,14 +120,16 @@ export class MetricStore {
                 }
 
                 const valueAttribution = valueAttributionsByMetricKey.get(metricKey);
+                this.recordValueAttribution(sourceScopeId, metricKey, valueAttribution);
+                this.clearUnavailableMetric(sourceScopeId, metricKey);
                 this.record(
                     sourceStore,
                     metricKey,
                     value.value.value,
-                    sampleTimestampMilliseconds,
+                    snapshotTimestampMilliseconds,
                     valueAttribution === undefined
                         ? "fresh"
-                        : readMetricStoreValueFreshness(valueAttribution.valueFreshness),
+                        : valueAttribution.valueFreshness,
                 );
                 continue;
             }
@@ -129,7 +139,9 @@ export class MetricStore {
                     continue;
                 }
 
-                this.recordText(sourceStore, metricKey, value.value.value, sampleTimestampMilliseconds);
+                this.recordText(sourceStore, metricKey, value.value.value, snapshotTimestampMilliseconds);
+                this.recordValueAttribution(sourceScopeId, metricKey, valueAttributionsByMetricKey.get(metricKey));
+                this.clearUnavailableMetric(sourceScopeId, metricKey);
             }
         }
 
@@ -202,9 +214,10 @@ export class MetricStore {
         return metricRecord?.kind === "text" ? metricRecord.text : undefined;
     }
 
-    /** Clears all sampled metric history and text values. Intended for isolated tests and source resets. */
+    /** Clears all metric history and text values. Intended for isolated tests and source resets. */
     clear(): void {
         this.store.clear();
+        this.valueAttributionsBySourceScopeId.clear();
         this.unavailableMetricsBySourceScopeId.clear();
     }
 
@@ -222,6 +235,40 @@ export class MetricStore {
         return this.store.get(sourceScopeId)?.get(metricKey);
     }
 
+    private readValueAttribution(
+        sourceScopeId: string,
+        metricKey: string,
+    ): MetricValueAttribution | undefined {
+        return this.valueAttributionsBySourceScopeId.get(sourceScopeId)?.get(metricKey);
+    }
+
+    private readUnavailableMetric(
+        sourceScopeId: string,
+        metricKey: string,
+    ): MetricUnavailableReport | undefined {
+        return this.unavailableMetricsBySourceScopeId.get(sourceScopeId)?.get(metricKey);
+    }
+
+    private recordValueAttribution(
+        sourceScopeId: string,
+        metricKey: string,
+        valueAttribution: MetricValueAttribution | undefined,
+    ): void {
+        let valueAttributionsByMetricKey = this.valueAttributionsBySourceScopeId.get(sourceScopeId);
+
+        if (valueAttribution === undefined) {
+            valueAttributionsByMetricKey?.delete(metricKey);
+            return;
+        }
+
+        if (!valueAttributionsByMetricKey) {
+            valueAttributionsByMetricKey = new Map<string, MetricValueAttribution>();
+            this.valueAttributionsBySourceScopeId.set(sourceScopeId, valueAttributionsByMetricKey);
+        }
+
+        valueAttributionsByMetricKey.set(metricKey, valueAttribution);
+    }
+
     private recordUnavailableMetrics(
         sourceScopeId: string,
         unavailableMetrics: readonly MetricUnavailableReport[],
@@ -233,13 +280,17 @@ export class MetricStore {
         }
 
         for (const unavailableMetric of unavailableMetrics) {
+            // Value attribution and unavailable reports are mutually exclusive
+            // for the latest source report; keep the last value separately in
+            // MetricStore so rendering can still use it during the freshness window.
+            this.recordValueAttribution(sourceScopeId, unavailableMetric.metricId, undefined);
             unavailableMetricsByMetricKey.set(unavailableMetric.metricId, unavailableMetric);
         }
     }
-}
 
-function readMetricStoreValueFreshness(valueFreshness: MetricValueFreshness): "fresh" | "retained" {
-    return valueFreshness === MetricValueFreshness.FRESH ? "fresh" : "retained";
+    private clearUnavailableMetric(sourceScopeId: string, metricKey: string): void {
+        this.unavailableMetricsBySourceScopeId.get(sourceScopeId)?.delete(metricKey);
+    }
 }
 
 type SourceMetricStore = Map<string, MetricRecord>;

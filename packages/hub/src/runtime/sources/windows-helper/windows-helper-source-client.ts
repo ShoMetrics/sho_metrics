@@ -10,8 +10,10 @@ import {
     ReadMetricSnapshotRequestSchema,
     type GetSourceHealthResponse,
     type MetricDescriptor as ProtoMetricDescriptor,
+    MetricUnavailableReason as ProtoMetricUnavailableReason,
     type MetricUnavailableReport as ProtoMetricUnavailableReport,
     type MetricValueAttribution as ProtoMetricValueAttribution,
+    MetricValueFreshness as ProtoMetricValueFreshness,
     type RawSensorIdentity as ProtoRawSensorIdentity,
     type SourceWarning as ProtoSourceWarning,
 } from "../../../generated/shometrics/v1/source_api_pb.js";
@@ -26,11 +28,11 @@ import {
     type MetricSnapshot,
 } from "../metric-source";
 import {
-    MetricUnavailableReason,
-    MetricValueFreshness,
     type MetricDescriptor,
     type MetricDescriptorSnapshot,
+    type MetricUnavailableReason,
     type MetricUnavailableReport,
+    type MetricValueFreshness,
     type MetricValueAttribution,
     type RawSensorIdentity,
     type SourceClient,
@@ -1284,36 +1286,42 @@ function toRuntimeMetricUnavailableReport(
     };
 }
 
-function normalizeMetricValueFreshness(freshness: MetricValueFreshness, metricId: string): MetricValueFreshness {
+function normalizeMetricValueFreshness(
+    freshness: ProtoMetricValueFreshness,
+    metricId: string,
+): MetricValueFreshness {
     switch (freshness) {
-        case MetricValueFreshness.FRESH:
-        case MetricValueFreshness.RETAINED:
-            return freshness;
-        case MetricValueFreshness.UNSPECIFIED:
+        case ProtoMetricValueFreshness.FRESH:
+            return "fresh";
+        case ProtoMetricValueFreshness.RETAINED:
+            return "retained";
+        case ProtoMetricValueFreshness.UNSPECIFIED:
             logUnknownWireEnum("valueFreshness", metricId, freshness, "retained");
-            return MetricValueFreshness.RETAINED;
+            return "retained";
     }
 
     logUnknownWireEnum("valueFreshness", metricId, freshness, "retained");
-    return MetricValueFreshness.RETAINED;
+    return "retained";
 }
 
 function normalizeMetricUnavailableReason(
-    reason: MetricUnavailableReason,
+    reason: ProtoMetricUnavailableReason,
     metricId: string,
 ): MetricUnavailableReason {
     switch (reason) {
-        case MetricUnavailableReason.NO_SENSOR:
-        case MetricUnavailableReason.INVALID_VALUE:
-        case MetricUnavailableReason.EXPIRED:
-            return reason;
-        case MetricUnavailableReason.UNSPECIFIED:
+        case ProtoMetricUnavailableReason.NO_SENSOR:
+            return "noSensorData";
+        case ProtoMetricUnavailableReason.INVALID_VALUE:
+            return "invalidValue";
+        case ProtoMetricUnavailableReason.EXPIRED:
+            return "expired";
+        case ProtoMetricUnavailableReason.UNSPECIFIED:
             logUnknownWireEnum("unavailableReason", metricId, reason, "debugOnly");
-            return reason;
+            return "unknown";
     }
 
     logUnknownWireEnum("unavailableReason", metricId, reason, "debugOnly");
-    return reason;
+    return "unknown";
 }
 
 function readRequiredRawSensorIdentity(
