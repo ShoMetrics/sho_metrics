@@ -4,6 +4,7 @@ import type {
     RenderPaintConstraint,
     RenderPaintTokens,
 } from "../view-rendering/render-appearance";
+import { DEFAULT_PIXEL_WINDOW_PALETTE } from "../view-rendering/pixel-window-theme-tokens";
 import type { MetricColorChannel } from "./appearance-overrides";
 import type {
     ColorMode,
@@ -165,6 +166,8 @@ export function buildColorConfigFromAppearance(
             };
         case "terminal":
             return terminalColorConfig(appearance.theme.terminal);
+        case "pixel-window":
+            return pixelWindowColorConfig();
     }
 }
 
@@ -199,6 +202,7 @@ export function resolveActiveMetricAccentPaint(
             return appearance.theme.cupertinoGlass.paint;
         case "color-filled":
         case "terminal":
+        case "pixel-window":
             return undefined;
     }
 }
@@ -307,10 +311,45 @@ function buildRenderPaintTokens(
         };
     }
 
+    if (settings.theme.selectedTheme === "pixel-window") {
+        return {
+            ...pixelWindowRenderPaintTokens(),
+            backgroundFill: undefined,
+            primaryMetric,
+        };
+    }
+
     return {
         ...DEFAULT_RENDER_PAINT_TOKENS,
         backgroundFill,
         primaryMetric,
+    };
+}
+
+function pixelWindowColorConfig(): ColorConfig {
+    return {
+        mode: "solid",
+        solidColor: DEFAULT_PIXEL_WINDOW_PALETTE.bodyAccent,
+        thresholds: [],
+        isGradientEnabled: false,
+    };
+}
+
+function pixelWindowRenderPaintTokens(): Omit<RenderPaintTokens, "backgroundFill" | "primaryMetric"> {
+    return {
+        background: DEFAULT_PIXEL_WINDOW_PALETTE.clientBackground,
+        surface: DEFAULT_PIXEL_WINDOW_PALETTE.controlButton,
+        primaryText: DEFAULT_PIXEL_WINDOW_PALETTE.bodyText,
+        secondaryText: DEFAULT_PIXEL_WINDOW_PALETTE.bodySubtleText,
+        mutedText: DEFAULT_PIXEL_WINDOW_PALETTE.bodyMutedText,
+        icon: DEFAULT_PIXEL_WINDOW_PALETTE.bodyAccent,
+        barTitleText: DEFAULT_PIXEL_WINDOW_PALETTE.bodyText,
+        barValueText: DEFAULT_PIXEL_WINDOW_PALETTE.bodyText,
+        barUnitText: DEFAULT_PIXEL_WINDOW_PALETTE.bodySubtleText,
+        barSecondaryText: DEFAULT_PIXEL_WINDOW_PALETTE.bodySubtleText,
+        track: DEFAULT_PIXEL_WINDOW_PALETTE.bodyTrack,
+        grid: DEFAULT_PIXEL_WINDOW_PALETTE.bodyGrid,
+        divider: DEFAULT_PIXEL_WINDOW_PALETTE.bodyDivider,
     };
 }
 
@@ -411,6 +450,7 @@ function activePaintColorMode(settings: ResolvedAppearanceSettings): ColorMode {
         case "color-filled":
             return settings.theme.colorFilled.paint.colorMode;
         case "terminal":
+        case "pixel-window":
             return "solid";
     }
 }

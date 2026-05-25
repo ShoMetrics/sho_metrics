@@ -17,5 +17,6 @@ export type ThemePresetName =
     | "flat"
     | "cupertino-glass"
     | "color-filled"
+    | "pixel-window"
     | "terminal-clean"
     | "terminal-vintage";

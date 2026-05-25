@@ -195,6 +195,7 @@ export function buildMetricAccentPaintAppearanceOverride(
             return { theme: { cupertinoGlass: { paint } } };
         case "color-filled":
         case "terminal":
+        case "pixel-window":
             return undefined;
     }
 }

@@ -65,6 +65,7 @@ export const storedThemeByResolved = {
     "cupertino-glass": StoredMetricTheme.CUPERTINO_GLASS,
     "color-filled": StoredMetricTheme.COLOR_FILLED,
     "terminal": StoredMetricTheme.TERMINAL,
+    "pixel-window": StoredMetricTheme.PIXEL_WINDOW,
 } satisfies Record<MetricTheme, StoredMetricTheme>;
 
 export const storedTerminalThemeVariantByResolved = {

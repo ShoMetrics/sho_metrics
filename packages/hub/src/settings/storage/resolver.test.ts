@@ -572,6 +572,28 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.slot.appearance.theme.terminal.paint.preset, "amber");
     });
 
+    it("resolves pixel window as a selectable theme", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    overrides: {
+                        appearance: {
+                            theme: {
+                                selectedTheme: "METRIC_THEME_PIXEL_WINDOW",
+                            },
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+        });
+
+        assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "pixel-window");
+    });
+
     it("applies global paint override without replacing widget view and theme", () => {
         const storedGlobalSettings = readStoredGlobalSettings({
             overrides: {
@@ -670,6 +692,46 @@ describe("stored settings proto resolver", () => {
 
         assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "terminal");
         assert.equal(settings.widget.slot.appearance.theme.terminal.paint.preset, "cyan");
+    });
+
+    it("does not apply global metric paint override to pixel window widgets", () => {
+        const storedGlobalSettings = readStoredGlobalSettings({
+            overrides: {
+                enabled: true,
+                view: {
+                    enabled: false,
+                },
+                theme: {
+                    enabled: false,
+                },
+                paint: {
+                    metric: {
+                        colorMode: "COLOR_MODE_BLACK_WHITE",
+                    },
+                },
+            },
+        }).settings;
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    overrides: {
+                        appearance: {
+                            theme: {
+                                selectedTheme: "METRIC_THEME_PIXEL_WINDOW",
+                            },
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+            storedGlobalSettings,
+        });
+
+        assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "pixel-window");
+        assert.equal(settings.widget.slot.appearance.theme.flat.paint.colorMode, "multi-color");
     });
 
     it("uses kind switches for disk metric branches", () => {
