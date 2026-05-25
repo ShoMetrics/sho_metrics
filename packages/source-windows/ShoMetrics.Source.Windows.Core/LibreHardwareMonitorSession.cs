@@ -14,6 +14,10 @@ public sealed class LibreHardwareMonitorSession : IDisposable
     private const int RetainedSampleTickLimit = 3;
 
     private readonly Computer? _computer;
+    // Disk throughput stays native even though this session uses LHM for other
+    // sensors; enabling LHM storage traverses broader disk paths than
+    // throughput. See the Windows disk throughput plan:
+    // docs/development/runtime-sources/03-windows-helper/03-lhm-storage-reading-implementation-plan.md.
     private readonly WindowsSystemTotalDiskThroughputProvider _diskThroughputProvider;
     private readonly HardwareMetricDescriptorSnapshot _cachedDescriptorSnapshot;
     private readonly IReadOnlyDictionary<string, string> _pollingGroupIdsByMetricId;

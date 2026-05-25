@@ -81,11 +81,11 @@ test("local auto source preference uses only Windows helper for helper-owned sta
     }
 });
 
-test("local auto source preference does not route Windows disk throughput through LHM", () => {
+test("local auto source preference routes Windows disk throughput to helper", () => {
     for (const direction of ["read", "write", "total"] as const) {
         assert.deepEqual(
             resolveLocalAutoMetricSourceCandidates(getDiskThroughputMetricKey(direction), "win32"),
-            NODE_SYSTEM_CANDIDATES,
+            WINDOWS_HELPER_CANDIDATES,
             direction,
         );
     }

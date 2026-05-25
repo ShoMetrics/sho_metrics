@@ -17,7 +17,7 @@ test("Property Inspector context reads resolved disk polling defaults without pe
     assert.equal(storedSettings.preferences, undefined);
 });
 
-test("Property Inspector context uses resolver platform rules for scenario visibility", () => {
+test("Property Inspector context preserves stored disk throughput kind on Windows", () => {
     const diskSettings = writeStoredWidgetSettingsPatch(
         resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings,
         {
@@ -39,6 +39,6 @@ test("Property Inspector context uses resolver platform rules for scenario visib
     assert.equal(target.domain, "disk");
 
     if (target.domain === "disk") {
-        assert.equal(target.reading.kind, "usage");
+        assert.equal(target.reading.kind, "throughput");
     }
 });

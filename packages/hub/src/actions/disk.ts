@@ -55,16 +55,11 @@ export class Disk extends MetricAction {
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event);
         const diskTarget = readResolvedMetricTarget(settings, "disk");
-        const volumeSelection = resolveDiskVolumeSelection(diskTarget.volumeId);
+        const volumeSelection = resolveDiskVolumeSelectionForTarget(diskTarget);
         const metrics = this.getMetricReader(event);
 
         this.publishDiskVolumeOptions(event);
         this.publishDiskThroughputRuntimeMaximum(event, diskTarget, volumeSelection, metrics);
-
-        if (diskTarget.reading.kind === "throughput" && process.platform !== "darwin") {
-            showDiskThroughputUnavailable(event);
-            return;
-        }
 
         setMetricView(buildDiskViewOptions({
             event,
@@ -140,6 +135,14 @@ export class Disk extends MetricAction {
     }
 }
 
+function resolveDiskVolumeSelectionForTarget(diskTarget: ResolvedDiskMetricTarget): DiskVolumeSelection {
+    if (diskTarget.reading.kind === "throughput") {
+        return { kind: "none" };
+    }
+
+    return resolveDiskVolumeSelection(diskTarget.volumeId);
+}
+
 function resolveDiskVolumeSelection(volumeId: string | undefined): DiskVolumeSelection {
     if (volumeId && volumeId.length > 0) {
         const selectedVolume = diskVolumeRegistry.findById(volumeId);
@@ -171,16 +174,4 @@ function resolveRuntimeDiskMaximumThroughputMebibytesPerSecond(options: {
     const runtimeMaximum = Math.ceil(observedMebibytesPerSecond * 1.1);
 
     return Math.max(currentMaximum, runtimeMaximum);
-}
-
-function showDiskThroughputUnavailable(event: WillAppearEvent): void {
-    if (event.action.isDial()) {
-        event.action.setFeedback({
-            title: "Disk",
-            value: "N/A",
-        });
-        return;
-    }
-
-    event.action.setTitle("Disk\nN/A");
 }

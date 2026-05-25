@@ -1,5 +1,6 @@
 import {
     getDefaultDiskUsageMetricKey,
+    getDiskThroughputMetricKey,
     isDiskUsageMetricKey,
 } from "../disk-metric-keys";
 import {
@@ -39,10 +40,11 @@ const NODE_SYSTEM_ONLY_METRIC_KEYS = [
 const WINDOWS_HELPER_ONLY_METRIC_KEYS = [
     CPU_TEMP_METRIC_KEY,
     CPU_POWER_METRIC_KEY,
+    getDiskThroughputMetricKey("read"),
+    getDiskThroughputMetricKey("write"),
+    getDiskThroughputMetricKey("total"),
 ] as const;
 
-// Windows disk throughput waits for a native per-disk descriptor path. Do not
-// route first-class disk throughput through LHM storage traversal.
 const WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEYS = [...GPU_METRIC_KEYS] as const;
 
 /**

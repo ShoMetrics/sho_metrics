@@ -442,7 +442,7 @@ function resolveMetricTarget(
         case "network":
             return resolveNetworkMetricTarget(storedMetricSelection.target.value, networkDisplay);
         case "disk":
-            return resolveDiskMetricTarget(storedMetricSelection.target.value, diskThroughputDisplay, runtime);
+            return resolveDiskMetricTarget(storedMetricSelection.target.value, diskThroughputDisplay);
         case "gpu":
             return resolveGpuMetricTarget(storedMetricSelection.target.value, runtime);
         case "catalog":
@@ -530,25 +530,19 @@ function resolveNetworkMetricTarget(
 function resolveDiskMetricTarget(
     storedTarget: StoredDiskMetricTarget,
     display: ResolvedDiskThroughputDisplaySettings,
-    runtime: ResolveStoredSettingsRuntimeContext | undefined,
 ): ResolvedMetricTarget {
     return {
         domain: "disk",
         volumeId: storedTarget.volumeId,
-        reading: resolveDiskReading(storedTarget, display, runtime),
+        reading: resolveDiskReading(storedTarget, display),
     };
 }
 
 function resolveDiskReading(
     storedTarget: StoredDiskMetricTarget,
     display: ResolvedDiskThroughputDisplaySettings,
-    runtime: ResolveStoredSettingsRuntimeContext | undefined,
 ): ResolvedDiskReading {
-    const kind = runtime?.isWindows === true && storedTarget.kind === StoredDiskMetricKind.THROUGHPUT
-        ? StoredDiskMetricKind.USAGE
-        : storedTarget.kind;
-
-    switch (kind) {
+    switch (storedTarget.kind) {
         case StoredDiskMetricKind.THROUGHPUT:
             return {
                 kind: "throughput",

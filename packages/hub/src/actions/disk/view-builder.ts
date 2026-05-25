@@ -45,6 +45,8 @@ interface BuildDiskViewOptions {
 type DiskUsageReading = Extract<ResolvedDiskMetricTarget["reading"], { readonly kind: "usage" }>;
 type DiskThroughputReading = Extract<ResolvedDiskMetricTarget["reading"], { readonly kind: "throughput" }>;
 
+const SYSTEM_TOTAL_DISK_THROUGHPUT_LABEL = "DISK";
+
 export function buildDiskViewOptions(options: BuildDiskViewOptions): MetricViewOptions {
     if (options.target.reading.kind === "throughput") {
         return buildDiskThroughputViewOptions({
@@ -147,10 +149,8 @@ function buildDiskThroughputViewOptions(
 
     const singleThroughputDirection = throughputDirection === "both" ? "total" : throughputDirection;
     const throughputMetricKey = getDiskThroughputMetricKey(singleThroughputDirection);
-    const selectedVolume = resolveAvailableDiskVolume(options.volumeSelection);
-    const throughputLabel = selectedVolume
-        ? formatCompactDiskVolumeLabel({ kind: "available", volume: selectedVolume })
-        : "DISK";
+    // Throughput is system-total; volume selection is usage-only.
+    const throughputLabel = SYSTEM_TOTAL_DISK_THROUGHPUT_LABEL;
     const bytesPerSecondWidgetData = options.metrics.getWidgetData(
         throughputMetricKey,
         throughputLabel,
@@ -168,7 +168,7 @@ function buildDiskThroughputViewOptions(
             maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond(
                 singleThroughputDirection,
                 options.reading,
-                selectedVolume,
+                null,
             ),
             label: throughputLabel,
         }),
@@ -205,14 +205,13 @@ function buildDualThroughputViewOptions(
     } else if (selectedView === "text") {
         dualRenderPrimitive = "text";
     }
-    const selectedVolume = resolveAvailableDiskVolume(options.volumeSelection);
     const readWidgetData = buildDiskThroughputWidgetData({
         bytesPerSecondWidgetData: options.metrics.getWidgetData(
             readMetricKey,
             "READ",
             "B/s",
         ),
-        maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("read", options.reading, selectedVolume),
+        maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("read", options.reading, null),
         label: "READ",
     });
     const writeWidgetData = buildDiskThroughputWidgetData({
@@ -221,7 +220,7 @@ function buildDualThroughputViewOptions(
             "WRIT",
             "B/s",
         ),
-        maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("write", options.reading, selectedVolume),
+        maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("write", options.reading, null),
         label: "WRIT",
     });
     const readColor = resolveDiskWidgetChannelColor("read", options.settings, readWidgetData);

@@ -726,7 +726,7 @@ describe("stored settings proto resolver", () => {
         assert.equal(target.reading.maximumWatts, 450);
     });
 
-    it("keeps Windows disk throughput unsupported as runtime context", () => {
+    it("resolves Windows disk throughput as system-total throughput", () => {
         const storedWidgetSettings = readStoredWidgetSettings({
             singleMetric: {
                 slot: {
@@ -748,8 +748,8 @@ describe("stored settings proto resolver", () => {
         const target = settings.widget.slot.metric.target;
 
         assert.equal(target.domain, "disk");
-        assert.equal(target.reading.kind, "usage");
-        assert.equal(settings.preferences.pollingFrequencySeconds, 60);
+        assert.equal(target.reading.kind, "throughput");
+        assert.equal(settings.preferences.pollingFrequencySeconds, 1);
     });
 
     it("resolves source profiles and source policy ids", () => {
