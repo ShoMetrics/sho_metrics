@@ -40,7 +40,7 @@ the `nvidia-smi` process timeout; it records source timing and lets the child-pr
 boundary own process cancellation. The TTL is intentionally below 10 seconds to avoid
 showing old values for too long on monitoring-focused Stream Deck profiles.
 
-Phase 6 follow-up: [Phase 6 Source Capability, GPU, And History](runtime-source-performance/04-phase-6-source-capability-gpu-and-history.md)
+Phase 6 follow-up: [Phase 6 Source Capability, GPU, And History](runtime-sources/01-runtime-collection/04-source-capability-gpu-and-history.md)
 reaffirms that ShoMetrics should not add a Node-owned long-lived
 `nvidia-smi --loop-ms` spawn/loop path. If GPU process churn becomes a product
 issue, the preferred direction is helper/native telemetry, not another

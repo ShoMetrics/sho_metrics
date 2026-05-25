@@ -38,9 +38,9 @@ native ids. The helper owns those mappings.
 
 Read these before coding:
 
-- `docs/development/runtime-source-performance/05-windows-source-latency-findings.md`
-- `docs/development/runtime-source-performance/06-metric-level-source-routing.md`
-- `docs/development/runtime-source-performance/07-runtime-source-future-work.md`
+- `docs/development/runtime-sources/02-source-routing/01-windows-source-latency-findings.md`
+- `docs/development/runtime-sources/02-source-routing/02-metric-level-source-routing.md`
+- `docs/development/runtime-sources/02-source-routing/03-runtime-source-future-work.md`
 - `contracts/proto/shometrics/v1/settings.proto`
 - `packages/hub/src/runtime/source-routing/metric-source-preferences.ts`
 - `packages/hub/src/runtime/sources/windows-helper/windows-helper-source-client.ts`
