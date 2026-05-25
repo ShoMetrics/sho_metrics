@@ -169,6 +169,22 @@ test("styled SVG text applies clip height without changing font size", () => {
     assert.match(styledText, /font-size="20"/);
 });
 
+test("styled SVG text lets layout fit options override the style minimum font scale", () => {
+    const styledText = renderStyledSvgText({
+        id: "layout-fit",
+        text: "VeryLongTelemetryLabel",
+        xCoordinate: 42,
+        yCoordinate: 30,
+        maxWidth: 1,
+        baseFontSize: 20,
+        fill: "#fff",
+        textStyle: DEFAULT_RENDER_TEXT_STYLES.label,
+        fitOptions: { minimumFontScale: 0.5 },
+    });
+
+    assert.match(styledText, /font-size="10"/);
+});
+
 test("SVG text fitting applies width scale before the guard ratio", () => {
     const roomyFit = resolveSvgTextFit({
         runs: [{ text: "Net Speed", fontSize: 18, fontWeight: 850 }],

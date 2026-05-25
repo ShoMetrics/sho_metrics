@@ -7,12 +7,11 @@ import {
 } from "../../view-rendering/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
-    resolveRenderTextStyleFontSize,
     type RenderTextStyles,
 } from "../../view-rendering/render-text-style";
 import {
     clamp,
-    renderConstrainedSvgText,
+    renderStyledSvgText,
     type SvgTextAnchor,
 } from "../../view-rendering/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget-contract";
@@ -545,15 +544,14 @@ function renderGaugeValueRow(options: {
     const unitTextStyle = options.config.textStyles.unit;
 
     if (options.unitText.length === 0) {
-        return renderConstrainedSvgText({
+        return renderStyledSvgText({
             id: "progress-circle-value",
             text: options.valueText,
             xCoordinate: options.centerXCoordinate,
             yCoordinate,
             maxWidth: options.centerTextMaxWidth,
-            fontSize: resolveRenderTextStyleFontSize(options.valueFontSize, valueTextStyle),
-            fontFamily: valueTextStyle.fontFamily,
-            fontWeight: valueTextStyle.fontWeight,
+            baseFontSize: options.valueFontSize,
+            textStyle: valueTextStyle,
             fill: options.config.valueTextColor,
             textAnchor: "middle",
             extraAttributes: [
@@ -578,15 +576,14 @@ function renderGaugeValueRow(options: {
     const unitFontSize = isShortUnit ? options.unitFontSize : layout.longUnitFontSize;
 
     return `
-        ${renderConstrainedSvgText({
+        ${renderStyledSvgText({
             id: "progress-circle-value",
             text: options.valueText,
             xCoordinate: valuePlacement.xCoordinate,
             yCoordinate,
             maxWidth: valuePlacement.maxWidth,
-            fontSize: resolveRenderTextStyleFontSize(valuePlacement.fontSize, valueTextStyle),
-            fontFamily: valueTextStyle.fontFamily,
-            fontWeight: valueTextStyle.fontWeight,
+            baseFontSize: valuePlacement.fontSize,
+            textStyle: valueTextStyle,
             fill: options.config.valueTextColor,
             textAnchor: valuePlacement.textAnchor,
             extraAttributes: [
@@ -594,15 +591,14 @@ function renderGaugeValueRow(options: {
                 ...buildSvgFilterAttributes(valueTextStyle.filter),
             ],
         })}
-        ${renderConstrainedSvgText({
+        ${renderStyledSvgText({
             id: "progress-circle-unit",
             text: options.unitText,
             xCoordinate: unitXCoordinate,
             yCoordinate,
             maxWidth: isShortUnit ? layout.shortUnitMaxWidth : layout.longUnitMaxWidth,
-            fontSize: resolveRenderTextStyleFontSize(unitFontSize, unitTextStyle),
-            fontFamily: unitTextStyle.fontFamily,
-            fontWeight: unitTextStyle.fontWeight,
+            baseFontSize: unitFontSize,
+            textStyle: unitTextStyle,
             fill: options.config.unitTextColor,
             textAnchor: "start",
             extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
@@ -713,15 +709,14 @@ function renderGaugeBottomLabel(options: {
     const iconXCoordinate = labelXCoordinate + estimatedLabelWidth / 2 + iconGap + iconSize / 2;
 
     return `
-        ${renderConstrainedSvgText({
+        ${renderStyledSvgText({
             id: "progress-circle-bottom-label",
             text: options.labelText,
             xCoordinate: labelXCoordinate,
             yCoordinate: options.yCoordinate,
             maxWidth: Math.max(12, options.maxWidth - iconSize - iconGap),
-            fontSize: resolveRenderTextStyleFontSize(fontSize, labelTextStyle),
-            fontFamily: labelTextStyle.fontFamily,
-            fontWeight: labelTextStyle.fontWeight,
+            baseFontSize: fontSize,
+            textStyle: labelTextStyle,
             fill: options.config.labelTextColor,
             textAnchor: "middle",
             extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
@@ -758,15 +753,14 @@ function renderCenterValue(options: {
     const unitTextStyle = options.config.textStyles.unit;
 
     return `
-        ${renderConstrainedSvgText({
+        ${renderStyledSvgText({
             id: "arc-label",
             text: options.labelText,
             xCoordinate: options.centerXCoordinate,
             yCoordinate: options.labelYCoordinate,
             maxWidth: options.labelMaxWidth,
-            fontSize: resolveRenderTextStyleFontSize(options.labelFontSize, labelTextStyle),
-            fontFamily: labelTextStyle.fontFamily,
-            fontWeight: labelTextStyle.fontWeight,
+            baseFontSize: options.labelFontSize,
+            textStyle: labelTextStyle,
             fill: options.config.labelTextColor,
             textAnchor: "middle",
             extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
@@ -781,9 +775,8 @@ function renderCenterValue(options: {
             },
             value: {
                 text: options.valueText,
-                fontSize: resolveRenderTextStyleFontSize(options.valueFontSize, valueTextStyle),
-                fontFamily: valueTextStyle.fontFamily,
-                fontWeight: valueTextStyle.fontWeight,
+                baseFontSize: options.valueFontSize,
+                textStyle: valueTextStyle,
                 fill: options.config.valueTextColor,
                 extraAttributes: [
                     "font-variant-numeric=\"tabular-nums\"",
@@ -792,9 +785,8 @@ function renderCenterValue(options: {
             },
             unit: {
                 text: options.unitText,
-                fontSize: resolveRenderTextStyleFontSize(options.unitFontSize, unitTextStyle),
-                fontFamily: unitTextStyle.fontFamily,
-                fontWeight: unitTextStyle.fontWeight,
+                baseFontSize: options.unitFontSize,
+                textStyle: unitTextStyle,
                 fill: options.config.unitTextColor,
                 extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
             },

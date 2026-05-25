@@ -697,16 +697,22 @@ test("metric text row escapes values and clamps non-finite coordinates", () => {
         },
         value: {
             text: `<N/A>`,
-            fontSize: 20,
-            fontFamily: `"Inter"`,
-            fontWeight: 900,
+            baseFontSize: 20,
+            textStyle: {
+                ...DEFAULT_RENDER_TEXT_STYLES.value,
+                fontFamily: `"Inter"`,
+                fontWeight: 900,
+            },
             fill: `#fff"`,
         },
         unit: {
             text: `MB/s &`,
-            fontSize: 12,
-            fontFamily: `"Inter"`,
-            fontWeight: 700,
+            baseFontSize: 12,
+            textStyle: {
+                ...DEFAULT_RENDER_TEXT_STYLES.unit,
+                fontFamily: `"Inter"`,
+                fontWeight: 700,
+            },
             fill: "#aaa",
         },
     });
@@ -728,16 +734,22 @@ test("metric text row shrinks long values and units into the row width", () => {
         },
         value: {
             text: "999.9",
-            fontSize: 24,
-            fontFamily: "Inter",
-            fontWeight: 900,
+            baseFontSize: 24,
+            textStyle: {
+                ...DEFAULT_RENDER_TEXT_STYLES.value,
+                fontFamily: "Inter",
+                fontWeight: 900,
+            },
             fill: "white",
         },
         unit: {
             text: "MB/s",
-            fontSize: 14,
-            fontFamily: "Inter",
-            fontWeight: 800,
+            baseFontSize: 14,
+            textStyle: {
+                ...DEFAULT_RENDER_TEXT_STYLES.unit,
+                fontFamily: "Inter",
+                fontWeight: 800,
+            },
             fill: "#aaa",
         },
     });

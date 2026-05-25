@@ -7,13 +7,12 @@ import {
 } from "../../view-rendering/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
-    resolveRenderTextStyleFontSize,
     type RenderTextStyles,
 } from "../../view-rendering/render-text-style";
 import {
     adjustHexColorBrightness,
     clamp,
-    renderConstrainedSvgText,
+    renderStyledSvgText,
     type SvgTextAnchor,
 } from "../../view-rendering/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget-contract";
@@ -228,9 +227,8 @@ export const sparkline: Widget<SparklineConfig> = {
                 },
                 value: {
                     text: valueText,
-                    fontSize: resolveRenderTextStyleFontSize(layoutPlan.value.fontSize, config.textStyles.value),
-                    fontFamily: config.textStyles.value.fontFamily,
-                    fontWeight: config.textStyles.value.fontWeight,
+                    baseFontSize: layoutPlan.value.fontSize,
+                    textStyle: config.textStyles.value,
                     fill: config.paints.primaryText,
                     extraAttributes: [
                         "font-variant-numeric=\"tabular-nums\"",
@@ -239,9 +237,8 @@ export const sparkline: Widget<SparklineConfig> = {
                 },
                 unit: {
                     text: data.unit,
-                    fontSize: resolveRenderTextStyleFontSize(layoutPlan.value.unitFontSize, config.textStyles.unit),
-                    fontFamily: config.textStyles.unit.fontFamily,
-                    fontWeight: config.textStyles.unit.fontWeight,
+                    baseFontSize: layoutPlan.value.unitFontSize,
+                    textStyle: config.textStyles.unit,
                     fill: config.paints.supportingText,
                     baselineOffset: 2,
                     extraAttributes: buildSvgFilterAttributes(config.textStyles.unit.filter),
@@ -342,15 +339,14 @@ function renderTitle(options: {
 
     return `
         ${iconSvg}
-        ${renderConstrainedSvgText({
+        ${renderStyledSvgText({
             id: "sparkline-title",
             text: options.titleText,
             xCoordinate: titleXCoordinate,
             yCoordinate: options.layout.yCoordinate,
             maxWidth: titleMaxWidth,
-            fontSize: resolveRenderTextStyleFontSize(options.layout.fontSize, titleTextStyle),
-            fontFamily: titleTextStyle.fontFamily,
-            fontWeight: titleTextStyle.fontWeight,
+            baseFontSize: options.layout.fontSize,
+            textStyle: titleTextStyle,
             fill: options.textColor,
             extraAttributes: buildSvgFilterAttributes(titleTextStyle.filter),
         })}
@@ -558,15 +554,14 @@ function renderVerticalGridLines(options: {
                 x2="${formatSvgNumber(xCoordinate)}" y2="${formatSvgNumber(baselineYCoordinate + TIME_GUIDE_TICK_HEIGHT)}"
                 stroke="${options.paints.grid}" stroke-width="${TIME_GUIDE_LINE_WIDTH}"
                 stroke-linecap="round" ${buildSvgFilterAttributes(options.themeEffects.subtleFilter).join(" ")} />
-            ${renderConstrainedSvgText({
+            ${renderStyledSvgText({
                 id: `sparkline-time-${tickIndex}`,
                 text: `${labelSeconds}s`,
                 xCoordinate,
                 yCoordinate: baselineYCoordinate + CHART_LABEL_BAND_HEIGHT - 2,
                 maxWidth: 24,
-                fontSize: resolveRenderTextStyleFontSize(10, smallLabelTextStyle),
-                fontFamily: smallLabelTextStyle.fontFamily,
-                fontWeight: smallLabelTextStyle.fontWeight,
+                baseFontSize: 10,
+                textStyle: smallLabelTextStyle,
                 fill: options.paints.mutedText,
                 textAnchor: "middle",
                 extraAttributes: buildSvgFilterAttributes(smallLabelTextStyle.filter),

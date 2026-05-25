@@ -98,7 +98,7 @@ export function renderStyledSvgText(options: StyledSvgTextOptions): string {
         extraAttributes: options.extraAttributes,
         fitOptions: {
             ...options.fitOptions,
-            minimumFontScale: options.textStyle.minimumFontScale,
+            minimumFontScale: options.fitOptions?.minimumFontScale ?? options.textStyle.minimumFontScale,
             widthScale: options.textStyle.widthScale,
         },
     });

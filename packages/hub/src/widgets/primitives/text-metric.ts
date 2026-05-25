@@ -7,11 +7,10 @@ import {
 } from "../../view-rendering/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
-    resolveRenderTextStyleFontSize,
     type RenderTextStyles,
 } from "../../view-rendering/render-text-style";
 import {
-    renderConstrainedSvgText,
+    renderStyledSvgText,
 } from "../../view-rendering/svg-utils";
 import type { WidgetBaseConfig } from "../widget-contract";
 
@@ -143,28 +142,26 @@ function renderSquareCenteredTextMetric(data: WidgetData, config: TextMetricConf
     const unitTextStyle = config.textStyles.unit;
 
     return `
-        ${renderConstrainedSvgText({
+        ${renderStyledSvgText({
             id: "text-metric-label",
             text: data.label,
             xCoordinate: centerXCoordinate,
             yCoordinate: keySize.height * SINGLE_TEXT_SQUARE_LAYOUT.labelYRatio,
             maxWidth: textWidth,
-            fontSize: resolveRenderTextStyleFontSize(SINGLE_TEXT_SQUARE_LAYOUT.labelFontSize, labelTextStyle),
-            fontFamily: labelTextStyle.fontFamily,
-            fontWeight: labelTextStyle.fontWeight,
+            baseFontSize: SINGLE_TEXT_SQUARE_LAYOUT.labelFontSize,
+            textStyle: labelTextStyle,
             fill: config.labelTextColor,
             textAnchor: "middle",
             extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
-        ${renderConstrainedSvgText({
+        ${renderStyledSvgText({
             id: "text-metric-value",
             text: valueText,
             xCoordinate: centerXCoordinate,
             yCoordinate: keySize.height * SINGLE_TEXT_SQUARE_LAYOUT.valueYRatio,
             maxWidth: textWidth,
-            fontSize: resolveRenderTextStyleFontSize(SINGLE_TEXT_SQUARE_LAYOUT.valueFontSize, valueTextStyle),
-            fontFamily: valueTextStyle.fontFamily,
-            fontWeight: valueTextStyle.fontWeight,
+            baseFontSize: SINGLE_TEXT_SQUARE_LAYOUT.valueFontSize,
+            textStyle: valueTextStyle,
             fill: valueTextColor,
             textAnchor: "middle",
             extraAttributes: [
@@ -200,28 +197,26 @@ function renderWideCenteredTextMetric(data: WidgetData, config: TextMetricConfig
     const valueXCoordinate = keySize.width * SINGLE_TEXT_WIDE_LAYOUT.valueXRatio;
 
     return `
-        ${renderConstrainedSvgText({
+        ${renderStyledSvgText({
             id: "text-metric-label",
             text: data.label,
             xCoordinate: SINGLE_TEXT_WIDE_LAYOUT.labelXOffset,
             yCoordinate: keySize.height * SINGLE_TEXT_WIDE_LAYOUT.labelYRatio,
             maxWidth: SINGLE_TEXT_WIDE_LAYOUT.labelWidth,
-            fontSize: resolveRenderTextStyleFontSize(SINGLE_TEXT_WIDE_LAYOUT.labelFontSize, labelTextStyle),
-            fontFamily: labelTextStyle.fontFamily,
-            fontWeight: labelTextStyle.fontWeight,
+            baseFontSize: SINGLE_TEXT_WIDE_LAYOUT.labelFontSize,
+            textStyle: labelTextStyle,
             fill: config.labelTextColor,
             textAnchor: "start",
             extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
-        ${renderConstrainedSvgText({
+        ${renderStyledSvgText({
             id: "text-metric-value",
             text: valueText,
             xCoordinate: valueXCoordinate,
             yCoordinate: keySize.height * SINGLE_TEXT_WIDE_LAYOUT.valueYRatio,
             maxWidth: valueWidth,
-            fontSize: resolveRenderTextStyleFontSize(SINGLE_TEXT_WIDE_LAYOUT.valueFontSize, valueTextStyle),
-            fontFamily: valueTextStyle.fontFamily,
-            fontWeight: valueTextStyle.fontWeight,
+            baseFontSize: SINGLE_TEXT_WIDE_LAYOUT.valueFontSize,
+            textStyle: valueTextStyle,
             fill: valueTextColor,
             textAnchor: "middle",
             extraAttributes: [
@@ -253,15 +248,14 @@ function renderSquareCenteredDualTextMetric(
     const labelTextStyle = config.textStyles.label;
 
     return `
-        ${renderConstrainedSvgText({
+        ${renderStyledSvgText({
             id: "text-metric-dual-title",
             text: content.titleText,
             xCoordinate: keySize.width / 2,
             yCoordinate: keySize.height * DUAL_TEXT_SQUARE_LAYOUT.titleYRatio,
             maxWidth: keySize.width * 0.74,
-            fontSize: resolveRenderTextStyleFontSize(DUAL_TEXT_SQUARE_LAYOUT.titleFontSize, labelTextStyle),
-            fontFamily: labelTextStyle.fontFamily,
-            fontWeight: labelTextStyle.fontWeight,
+            baseFontSize: DUAL_TEXT_SQUARE_LAYOUT.titleFontSize,
+            textStyle: labelTextStyle,
             fill: config.labelTextColor,
             textAnchor: "middle",
             extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
@@ -316,15 +310,14 @@ function renderWideCenteredDualTextMetric(
     const labelTextStyle = config.textStyles.label;
 
     return `
-        ${renderConstrainedSvgText({
+        ${renderStyledSvgText({
             id: "text-metric-dual-title",
             text: content.titleText,
             xCoordinate: DUAL_TEXT_WIDE_LAYOUT.titleXOffset,
             yCoordinate: keySize.height * DUAL_TEXT_WIDE_LAYOUT.titleYRatio,
             maxWidth: SINGLE_TEXT_WIDE_LAYOUT.labelWidth,
-            fontSize: resolveRenderTextStyleFontSize(DUAL_TEXT_WIDE_LAYOUT.titleFontSize, labelTextStyle),
-            fontFamily: labelTextStyle.fontFamily,
-            fontWeight: labelTextStyle.fontWeight,
+            baseFontSize: DUAL_TEXT_WIDE_LAYOUT.titleFontSize,
+            textStyle: labelTextStyle,
             fill: config.labelTextColor,
             textAnchor: "start",
             extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
@@ -395,28 +388,26 @@ function renderDualTextRow(options: {
     const unitTextStyle = options.config.textStyles.unit;
 
     return `
-        ${renderConstrainedSvgText({
+        ${renderStyledSvgText({
             id: `${options.rowId}-label`,
             text: options.labelText,
             xCoordinate: options.labelXCoordinate,
             yCoordinate: options.yCoordinate,
             maxWidth: options.labelWidth,
-            fontSize: resolveRenderTextStyleFontSize(options.labelFontSize, labelTextStyle),
-            fontFamily: labelTextStyle.fontFamily,
-            fontWeight: labelTextStyle.fontWeight,
+            baseFontSize: options.labelFontSize,
+            textStyle: labelTextStyle,
             fill: options.config.labelTextColor,
             textAnchor: "start",
             extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
-        ${renderConstrainedSvgText({
+        ${renderStyledSvgText({
             id: `${options.rowId}-value`,
             text: valueText,
             xCoordinate: options.valueXCoordinate,
             yCoordinate: options.yCoordinate,
             maxWidth: options.valueWidth,
-            fontSize: resolveRenderTextStyleFontSize(options.valueFontSize, valueTextStyle),
-            fontFamily: valueTextStyle.fontFamily,
-            fontWeight: valueTextStyle.fontWeight,
+            baseFontSize: options.valueFontSize,
+            textStyle: valueTextStyle,
             fill: options.valueFill,
             textAnchor: "end",
             extraAttributes: [
@@ -425,15 +416,14 @@ function renderDualTextRow(options: {
             ],
             fitOptions: VALUE_TEXT_FIT_OPTIONS,
         })}
-        ${renderConstrainedSvgText({
+        ${renderStyledSvgText({
             id: `${options.rowId}-unit`,
             text: options.unitText,
             xCoordinate: options.unitXCoordinate,
             yCoordinate: options.yCoordinate + options.unitYOffset,
             maxWidth: options.unitWidth,
-            fontSize: resolveRenderTextStyleFontSize(options.unitFontSize, unitTextStyle),
-            fontFamily: unitTextStyle.fontFamily,
-            fontWeight: unitTextStyle.fontWeight,
+            baseFontSize: options.unitFontSize,
+            textStyle: unitTextStyle,
             fill: options.config.unitTextColor,
             textAnchor: "end",
             extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
@@ -457,15 +447,14 @@ function renderUnitText(options: {
         return "";
     }
 
-    return renderConstrainedSvgText({
+    return renderStyledSvgText({
         id: options.id,
         text: options.unitText,
         xCoordinate: options.xCoordinate,
         yCoordinate: options.yCoordinate,
         maxWidth: options.textWidth,
-        fontSize: resolveRenderTextStyleFontSize(options.fontSize, options.textStyle),
-        fontFamily: options.textStyle.fontFamily,
-        fontWeight: options.textStyle.fontWeight,
+        baseFontSize: options.fontSize,
+        textStyle: options.textStyle,
         fill: options.config.unitTextColor,
         textAnchor: options.textAnchor,
         extraAttributes: buildSvgFilterAttributes(options.textStyle.filter),
