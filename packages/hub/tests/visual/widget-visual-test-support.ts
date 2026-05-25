@@ -1,10 +1,15 @@
 import { Resvg } from "@resvg/resvg-js";
 import { renderDualMetricBodyView } from "../../src/view-rendering/dual-metric-view";
 import { renderMetricFrame } from "../../src/view-rendering/metric-frame";
+import {
+    composeMetricViewFrame,
+    type MetricRenderTarget,
+} from "../../src/view-rendering/metric-view-frame";
 import { resolveResvgFontOptions } from "../../src/view-rendering/resvg-font-options";
 import { renderSingleMetricBodyView } from "../../src/view-rendering/single-metric-view";
 import type { TextMetricVariant } from "../../src/view-rendering/render-appearance";
 import type { ColorConfig } from "../../src/view-rendering/color-resolver";
+import { resolveColorForThresholdValue } from "../../src/view-rendering/color-resolver";
 import type {
     DualChannelWidgetData,
     KeySize,
@@ -14,6 +19,7 @@ import { WIDGET_LOGICAL_SIZE } from "../../src/view-rendering/widget-data";
 import type { ResolvedAppearanceSettingsOverride } from "../../src/settings/appearance-overrides";
 import { buildDefaultAppearanceSettings } from "../../src/settings/default-appearance-settings";
 import { buildMetricRenderAppearance } from "../../src/settings/render-appearance-builder";
+import { buildColorConfigFromAppearance } from "../../src/settings/render-paint-resolver";
 import { getDiskIconFragment, getHardwareIconFragment } from "../../src/widgets/icons/hardware-icons";
 import {
     getNetworkDirectionStatusIcon,
@@ -22,6 +28,7 @@ import {
 import type { ProgressCircleStatusIcon, CircleVariant } from "../../src/widgets/primitives/progress-circle";
 import type { DualChannelProgressCircleCenterContent } from "../../src/widgets/primitives/dual-channel-progress-circle";
 import type { DualChannelSparklineMode } from "../../src/widgets/primitives/dual-channel-sparkline";
+import { getMetricStatusIcon } from "../../src/widgets/icons/metric-status-icons";
 
 const NETWORK_DIRECTION_ICON_SIZE = 30;
 
@@ -149,6 +156,7 @@ export interface SingleMetricVisualTestCase {
     readonly snapshotName: string;
     readonly appearance: ResolvedAppearanceSettingsOverride;
     readonly data: WidgetData;
+    readonly renderTarget?: MetricRenderTarget;
     readonly keySize?: KeySize;
     readonly centerIcon?: string;
     readonly footerIcon?: string;
@@ -162,6 +170,7 @@ export interface DualMetricVisualTestCase {
     readonly appearance: ResolvedAppearanceSettingsOverride;
     readonly data: DualChannelWidgetData;
     readonly selectedView: DualVisualMetricView;
+    readonly renderTarget?: MetricRenderTarget;
     readonly keySize?: KeySize;
     readonly chartMode?: DualChannelSparklineMode;
     readonly centerContent?: DualChannelProgressCircleCenterContent;
@@ -259,6 +268,10 @@ export function buildColorFilledAppearanceOverride(options: {
 }
 
 export function renderSingleMetricWidgetPngBuffer(testCase: SingleMetricVisualTestCase): Buffer {
+    if (testCase.renderTarget) {
+        return renderSingleMetricFramePngBuffer(testCase);
+    }
+
     const keySize = testCase.keySize ?? WIDGET_LOGICAL_SIZE;
     const visualSettings = buildMetricRenderAppearance(buildDefaultAppearanceSettings(testCase.appearance));
     const body = renderSingleMetricBodyView({
@@ -282,6 +295,10 @@ export function renderSingleMetricWidgetPngBuffer(testCase: SingleMetricVisualTe
 }
 
 export function renderDualMetricWidgetPngBuffer(testCase: DualMetricVisualTestCase): Buffer {
+    if (testCase.renderTarget) {
+        return renderDualMetricFramePngBuffer(testCase);
+    }
+
     const keySize = testCase.keySize ?? WIDGET_LOGICAL_SIZE;
     const visualSettings = buildMetricRenderAppearance(buildDefaultAppearanceSettings(testCase.appearance));
     const positiveColorConfig = buildSolidColorConfig(VISUAL_TEST_COLORS.networkUpload);
@@ -333,6 +350,71 @@ export function renderSvgToPngBuffer(svg: string, keySize: KeySize): Buffer {
     }).render();
 
     return Buffer.from(renderedImage.asPng());
+}
+
+function renderSingleMetricFramePngBuffer(testCase: SingleMetricVisualTestCase): Buffer {
+    const resolvedSettings = buildDefaultAppearanceSettings(testCase.appearance);
+    const frame = composeMetricViewFrame({
+        renderTarget: testCase.renderTarget ?? "key",
+        viewOptions: {
+            resolvedSettings,
+            widgetData: testCase.data,
+            centerIconFragment: testCase.centerIcon ?? "",
+            footerIconFragment: testCase.footerIcon,
+            topIconFragment: testCase.topIcon,
+            statusIcon: testCase.statusIcon ?? getMetricStatusIcon("percentage"),
+            circleVariantOverride: resolvedSettings.view.circleVariant,
+        },
+    });
+
+    return renderSvgToPngBuffer(frame.svg, frame.renderPlan.pngSize);
+}
+
+function renderDualMetricFramePngBuffer(testCase: DualMetricVisualTestCase): Buffer {
+    const resolvedSettings = buildDefaultAppearanceSettings(testCase.appearance);
+    const positiveColorConfig = buildColorConfigFromAppearance(resolvedSettings, "upload");
+    const negativeColorConfig = buildColorConfigFromAppearance(resolvedSettings, "download");
+    const positiveColor = resolveColorForThresholdValue(testCase.data.positive.progress * 100, positiveColorConfig);
+    const negativeColor = resolveColorForThresholdValue(testCase.data.negative.progress * 100, negativeColorConfig);
+    const frame = composeMetricViewFrame({
+        renderTarget: testCase.renderTarget ?? "key",
+        viewOptions: {
+            resolvedSettings,
+            widgetData: testCase.data,
+            titleText: testCase.selectedView === "text" ? "NET" : "NETWORK",
+            dualRenderPrimitive: toDualRenderPrimitive(testCase.selectedView),
+            chartMode: testCase.chartMode,
+            centerIconFragment: NETWORK_CENTER_ICON_FRAGMENT,
+            statusIcon: NETWORK_UPLOAD_STATUS_ICON,
+            circleVariantOverride: resolvedSettings.view.circleVariant,
+            positiveColor,
+            negativeColor,
+            positiveColorConfig,
+            negativeColorConfig,
+            positiveLabelText: "UP",
+            negativeLabelText: "DN",
+            positiveIconFragment: renderNetworkDirectionIconFragment({
+                direction: "upload",
+                color: positiveColor,
+                size: NETWORK_DIRECTION_ICON_SIZE,
+            }),
+            negativeIconFragment: renderNetworkDirectionIconFragment({
+                direction: "download",
+                color: negativeColor,
+                size: NETWORK_DIRECTION_ICON_SIZE,
+            }),
+            positiveStatusIcon: getNetworkDirectionStatusIcon({
+                direction: "upload",
+                color: positiveColor,
+            }),
+            negativeStatusIcon: getNetworkDirectionStatusIcon({
+                direction: "download",
+                color: negativeColor,
+            }),
+        },
+    });
+
+    return renderSvgToPngBuffer(frame.svg, frame.renderPlan.pngSize);
 }
 
 function buildSolidColorConfig(color: string): ColorConfig {
