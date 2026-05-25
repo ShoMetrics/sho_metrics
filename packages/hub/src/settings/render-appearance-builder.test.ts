@@ -294,6 +294,20 @@ test("color filled solid mode uses theme background color and neutral foreground
     });
 });
 
+test("color filled default uses the default solid blue background", () => {
+    const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: {
+            selectedTheme: "color-filled",
+        },
+    }));
+
+    assert.deepEqual(visualSettings.paints.backgroundFill, {
+        fillKind: "solid",
+        color: "#3b82f6",
+        isGradientEnabled: true,
+    });
+});
+
 test("color filled multi-color mode uses soft triangle colors without threshold positions", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         theme: {

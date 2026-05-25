@@ -38,6 +38,7 @@ export const cupertinoGlassStyle: ThemeStyle = {
         const inset = 2;
         const radius = 18;
         return `
+            <rect width="${keySize.width}" height="${keySize.height}" fill="${paints.background}" />
             <!-- Glass: frosted background -->
             <rect x="${inset}" y="${inset}"
                 width="${keySize.width - inset * 2}" height="${keySize.height - inset * 2}"

@@ -67,7 +67,7 @@ const DEFAULT_METRIC_ACCENT_PAINT_SETTINGS: ResolvedMetricPaintSettings = {
 };
 
 const DEFAULT_COLOR_FILLED_PAINT_SETTINGS: ResolvedColorFilledPaintSettings = {
-    colorMode: "multi-color",
+    colorMode: "solid",
     solid: {
         color: "#3b82f6",
         isGradientEnabled: true,

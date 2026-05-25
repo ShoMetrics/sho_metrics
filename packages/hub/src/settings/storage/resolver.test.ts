@@ -23,6 +23,8 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.slot.appearance.view.textVariant, "centered");
         assert.equal(settings.widget.slot.appearance.theme.flat.paint.colorMode, "multi-color");
         assert.equal(settings.widget.slot.appearance.theme.flat.paint.solid.colors.usageColor, "#3b82f6");
+        assert.equal(settings.widget.slot.appearance.theme.colorFilled.paint.colorMode, "solid");
+        assert.equal(settings.widget.slot.appearance.theme.colorFilled.paint.solid.color, "#3b82f6");
         assert.equal(settings.widget.slot.appearance.theme.terminal.variant, "clean");
         assert.equal(settings.widget.slot.appearance.theme.terminal.paint.preset, "green");
     });
