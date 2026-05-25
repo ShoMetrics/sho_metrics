@@ -165,4 +165,24 @@ public sealed class LibreHardwareMetricCatalogTests
         Assert.False(classified);
         Assert.Null(candidate);
     }
+
+    [Fact]
+    public void StorageThroughputDoesNotCreateFirstClassDiskAliases()
+    {
+        IReadOnlyList<MetricReading> readings = LibreHardwareMetricCatalog.CreateReadings(
+            FakeHardware.Storage(),
+            FakeSensor.Throughput("Read Rate", value: 1024));
+        IReadOnlyList<HardwareMetricDescriptor> descriptors = LibreHardwareMetricCatalog.CreateDescriptors(
+            FakeHardware.Storage(),
+            FakeSensor.Throughput("Read Rate", value: null));
+
+        Assert.DoesNotContain(
+            readings,
+            reading => reading.MetricId == WindowsSystemTotalDiskThroughputProvider.ReadThroughputMetricId);
+        Assert.DoesNotContain(
+            descriptors,
+            descriptor => descriptor.MetricId == WindowsSystemTotalDiskThroughputProvider.ReadThroughputMetricId);
+        Assert.Contains(readings, reading => LibreHardwareMetricCatalog.IsSourceSensorMetricId(reading.MetricId));
+        Assert.Contains(descriptors, descriptor => LibreHardwareMetricCatalog.IsSourceSensorMetricId(descriptor.MetricId));
+    }
 }

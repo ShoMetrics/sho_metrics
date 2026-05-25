@@ -26,6 +26,8 @@ public static partial class MetricSourceComparisonProbe
     private const string ProbeSourcesOptionName = "--probe-sources";
     private const string NativeProbeSourceName = "native";
     private const string LhmDllProbeSourceName = "lhm-dll";
+    private const string LhmStorageWarning =
+        "LHM storage probing is enabled for diagnostics and may wake or disturb disks.";
 
     /// <summary>
     /// Runs the probe with CLI-style arguments and writes NDJSON events to stdout.
@@ -33,7 +35,7 @@ public static partial class MetricSourceComparisonProbe
     public static async Task<int> RunAsync(IReadOnlyList<string> args)
     {
         ProbeOptions options = ReadOptions(args);
-        Computer? computer = options.ShouldReadLhmDll ? LibreHardwareComputerFactory.Create() : null;
+        Computer? computer = options.ShouldReadLhmDll ? LibreHardwareComputerFactory.CreateForDiagnosticProbe() : null;
         NativeSampler? nativeSampler = options.ShouldReadNative ? new NativeSampler() : null;
         DateTimeOffset startedAt = DateTimeOffset.UtcNow;
         Stopwatch stopwatch = Stopwatch.StartNew();
@@ -50,6 +52,7 @@ public static partial class MetricSourceComparisonProbe
                 durationMilliseconds = options.Duration.TotalMilliseconds,
                 intervalMilliseconds = options.Interval.TotalMilliseconds,
                 probeSources = options.ProbeSourceNames,
+                lhmStorageWarning = options.ShouldReadLhmDll ? LhmStorageWarning : null,
             });
 
             while (stopwatch.Elapsed < options.Duration)
@@ -255,9 +258,9 @@ public static partial class MetricSourceComparisonProbe
                 RamTotalBytes: ReadValue(readingsByMetricId, LibreHardwareMetricCatalog.RamTotalMetricId),
                 NetworkDownloadBytesPerSecond: ReadValue(readingsByMetricId, "net.down"),
                 NetworkUploadBytesPerSecond: ReadValue(readingsByMetricId, "net.up"),
-                DiskReadBytesPerSecond: ReadValue(readingsByMetricId, LibreHardwareMetricCatalog.DiskReadThroughputMetricId),
-                DiskWriteBytesPerSecond: ReadValue(readingsByMetricId, LibreHardwareMetricCatalog.DiskWriteThroughputMetricId),
-                DiskTotalBytesPerSecond: ReadValue(readingsByMetricId, LibreHardwareMetricCatalog.DiskTotalThroughputMetricId),
+                DiskReadBytesPerSecond: ReadValue(readingsByMetricId, WindowsSystemTotalDiskThroughputProvider.ReadThroughputMetricId),
+                DiskWriteBytesPerSecond: ReadValue(readingsByMetricId, WindowsSystemTotalDiskThroughputProvider.WriteThroughputMetricId),
+                DiskTotalBytesPerSecond: ReadValue(readingsByMetricId, WindowsSystemTotalDiskThroughputProvider.TotalThroughputMetricId),
                 GpuUsagePercent: ReadValue(readingsByMetricId, "gpu.usage_percent"),
                 GpuTemperatureCelsius: ReadValue(readingsByMetricId, "gpu.temp"),
                 GpuPowerWatts: ReadValue(readingsByMetricId, "gpu.power"),
@@ -293,6 +296,12 @@ public static partial class MetricSourceComparisonProbe
             foreach (MetricReading reading in LibreHardwareMetricCatalog.CreateReadings(hardware, sensor))
             {
                 AddReading(readingsByMetricId, reading);
+            }
+
+            if (TryCreateProbeStorageReading(hardware, sensor, out MetricReading? storageReading)
+                && storageReading is not null)
+            {
+                AddReading(readingsByMetricId, storageReading);
             }
 
             if (hardware.HardwareType == HardwareType.Cpu
@@ -332,6 +341,49 @@ public static partial class MetricSourceComparisonProbe
         return currentValue ?? candidateValue;
     }
 
+    private static bool TryCreateProbeStorageReading(
+        IHardware hardware,
+        ISensor sensor,
+        out MetricReading? reading)
+    {
+        reading = null;
+
+        if (hardware.HardwareType is not HardwareType.Storage
+            || sensor.SensorType is not SensorType.Throughput
+            || sensor.Value is not { } value
+            || !float.IsFinite(value)
+            || value < 0)
+        {
+            return false;
+        }
+
+        string? metricId = sensor.Name switch
+        {
+            "Read Rate" => WindowsSystemTotalDiskThroughputProvider.ReadThroughputMetricId,
+            "Write Rate" => WindowsSystemTotalDiskThroughputProvider.WriteThroughputMetricId,
+            _ => null,
+        };
+
+        if (metricId is null)
+        {
+            return false;
+        }
+
+        reading = new MetricReading
+        {
+            MetricId = metricId,
+            HardwareId = hardware.Identifier.ToString(),
+            HardwareName = hardware.Name,
+            HardwareType = hardware.HardwareType.ToString(),
+            SensorId = sensor.Identifier.ToString(),
+            SensorName = sensor.Name,
+            SourceSensorType = sensor.SensorType.ToString(),
+            Value = value,
+            Unit = MetricUnit.BytesPerSecond,
+        };
+        return true;
+    }
+
     private static double? ReadValue(Dictionary<string, MetricReading> readingsByMetricId, string metricId)
     {
         return readingsByMetricId.TryGetValue(metricId, out MetricReading? reading) ? reading.Value : null;
@@ -345,7 +397,8 @@ public static partial class MetricSourceComparisonProbe
             return;
         }
 
-        if (LibreHardwareMetricCatalog.ShouldAggregateMetric(reading.MetricId))
+        if (LibreHardwareMetricCatalog.ShouldAggregateMetric(reading.MetricId)
+            || IsProbeDiskThroughputMetric(reading.MetricId))
         {
             // This intentionally preserves the naive LHM aggregate shape for
             // diagnostics. Production network aggregation still needs adapter
@@ -355,6 +408,12 @@ public static partial class MetricSourceComparisonProbe
                 Value = existingReading.Value + reading.Value,
             };
         }
+    }
+
+    private static bool IsProbeDiskThroughputMetric(string metricId)
+    {
+        return metricId is WindowsSystemTotalDiskThroughputProvider.ReadThroughputMetricId
+            or WindowsSystemTotalDiskThroughputProvider.WriteThroughputMetricId;
     }
 
     private static void AddDerivedReadings(Dictionary<string, MetricReading> readingsByMetricId)
@@ -370,15 +429,15 @@ public static partial class MetricSourceComparisonProbe
             };
         }
 
-        MetricReading? diskRead = readingsByMetricId.GetValueOrDefault(LibreHardwareMetricCatalog.DiskReadThroughputMetricId);
-        MetricReading? diskWrite = readingsByMetricId.GetValueOrDefault(LibreHardwareMetricCatalog.DiskWriteThroughputMetricId);
+        MetricReading? diskRead = readingsByMetricId.GetValueOrDefault(WindowsSystemTotalDiskThroughputProvider.ReadThroughputMetricId);
+        MetricReading? diskWrite = readingsByMetricId.GetValueOrDefault(WindowsSystemTotalDiskThroughputProvider.WriteThroughputMetricId);
 
         if (diskRead is not null || diskWrite is not null)
         {
             MetricReading baseReading = diskRead ?? diskWrite!;
-            readingsByMetricId[LibreHardwareMetricCatalog.DiskTotalThroughputMetricId] = baseReading with
+            readingsByMetricId[WindowsSystemTotalDiskThroughputProvider.TotalThroughputMetricId] = baseReading with
             {
-                MetricId = LibreHardwareMetricCatalog.DiskTotalThroughputMetricId,
+                MetricId = WindowsSystemTotalDiskThroughputProvider.TotalThroughputMetricId,
                 SensorName = "Disk Total Throughput",
                 Value = (diskRead?.Value ?? 0) + (diskWrite?.Value ?? 0),
             };
@@ -392,7 +451,7 @@ public static partial class MetricSourceComparisonProbe
 
     private sealed class NativeSampler : IDisposable
     {
-        private readonly NativeDiskSampler _diskSampler = new();
+        private readonly WindowsPdhSystemTotalDiskThroughputCounterReader _diskCounterReader = new();
         private CpuTimes? _previousCpuTimes;
         private NetworkCounterSample? _previousNetworkCounterSample;
 
@@ -404,7 +463,7 @@ public static partial class MetricSourceComparisonProbe
             (double? networkDownloadBytesPerSecond, double? networkUploadBytesPerSecond, double networkReadMilliseconds) =
                 ReadNetworkRates();
             (double? diskReadBytesPerSecond, double? diskWriteBytesPerSecond, double diskReadMilliseconds) =
-                _diskSampler.Read();
+                ReadDiskRates();
 
             return new NativeSample(
                 Values: new ProbeMetricValues(
@@ -431,7 +490,7 @@ public static partial class MetricSourceComparisonProbe
 
         public void Dispose()
         {
-            _diskSampler.Dispose();
+            _diskCounterReader.Dispose();
         }
 
         private (double? CpuUsagePercent, double ReadMilliseconds) ReadCpuUsagePercent()
@@ -512,83 +571,14 @@ public static partial class MetricSourceComparisonProbe
 
             return (downloadBytesPerSecond, uploadBytesPerSecond, stopwatch.Elapsed.TotalMilliseconds);
         }
-    }
 
-    private sealed class NativeDiskSampler : IDisposable
-    {
-        private const string TotalPhysicalDiskReadCounterPath = @"\PhysicalDisk(_Total)\Disk Read Bytes/sec";
-        private const string TotalPhysicalDiskWriteCounterPath = @"\PhysicalDisk(_Total)\Disk Write Bytes/sec";
-
-        private nint _queryHandle;
-        private nint _readCounterHandle;
-        private nint _writeCounterHandle;
-        private bool _isAvailable;
-
-        public NativeDiskSampler()
-        {
-            // Use the _Total instance directly. The network POC showed why
-            // summing all instances can double-count aggregate counters.
-            if (PdhOpenQuery(null, nuint.Zero, out _queryHandle) != 0)
-            {
-                return;
-            }
-
-            if (PdhAddEnglishCounter(
-                    _queryHandle,
-                    TotalPhysicalDiskReadCounterPath,
-                    nuint.Zero,
-                    out _readCounterHandle) != 0
-                || PdhAddEnglishCounter(
-                    _queryHandle,
-                    TotalPhysicalDiskWriteCounterPath,
-                    nuint.Zero,
-                    out _writeCounterHandle) != 0)
-            {
-                Dispose();
-                return;
-            }
-
-            _isAvailable = PdhCollectQueryData(_queryHandle) == 0;
-        }
-
-        public (double? ReadBytesPerSecond, double? WriteBytesPerSecond, double ReadMilliseconds) Read()
+        private (double? ReadBytesPerSecond, double? WriteBytesPerSecond, double ReadMilliseconds) ReadDiskRates()
         {
             Stopwatch stopwatch = Stopwatch.StartNew();
 
-            if (!_isAvailable || PdhCollectQueryData(_queryHandle) != 0)
-            {
-                return (null, null, stopwatch.Elapsed.TotalMilliseconds);
-            }
-
-            return (
-                TryReadCounterValue(_readCounterHandle),
-                TryReadCounterValue(_writeCounterHandle),
-                stopwatch.Elapsed.TotalMilliseconds);
-        }
-
-        public void Dispose()
-        {
-            if (_queryHandle != nint.Zero)
-            {
-                _ = PdhCloseQuery(_queryHandle);
-                _queryHandle = nint.Zero;
-            }
-        }
-
-        private static double? TryReadCounterValue(nint counterHandle)
-        {
-            if (PdhGetFormattedCounterValue(
-                    counterHandle,
-                    PdhFmtDouble,
-                    out _,
-                    out PdhFmtCounterValue value) != 0)
-            {
-                return null;
-            }
-
-            return value.CStatus == 0 && double.IsFinite(value.DoubleValue)
-                ? Math.Max(0, value.DoubleValue)
-                : null;
+            return _diskCounterReader.TryRead(out WindowsSystemTotalDiskThroughputCounterSample sample)
+                ? (sample.ReadBytesPerSecond, sample.WriteBytesPerSecond, stopwatch.Elapsed.TotalMilliseconds)
+                : (null, null, stopwatch.Elapsed.TotalMilliseconds);
         }
     }
 
@@ -649,31 +639,6 @@ public static partial class MetricSourceComparisonProbe
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GlobalMemoryStatusEx(ref MemoryStatusEx buffer);
-
-    [DllImport("pdh.dll", CharSet = CharSet.Unicode)]
-    private static extern int PdhOpenQuery(string? dataSource, nuint userData, out nint queryHandle);
-
-    [DllImport("pdh.dll", CharSet = CharSet.Unicode)]
-    private static extern int PdhAddEnglishCounter(
-        nint queryHandle,
-        string fullCounterPath,
-        nuint userData,
-        out nint counterHandle);
-
-    [DllImport("pdh.dll")]
-    private static extern int PdhCollectQueryData(nint queryHandle);
-
-    [DllImport("pdh.dll")]
-    private static extern int PdhGetFormattedCounterValue(
-        nint counterHandle,
-        uint format,
-        out uint type,
-        out PdhFmtCounterValue value);
-
-    [DllImport("pdh.dll")]
-    private static extern int PdhCloseQuery(nint queryHandle);
-
-    private const uint PdhFmtDouble = 0x00000200;
 
     private sealed record LhmDllSample(
         ProbeMetricValues Values,
@@ -777,11 +742,4 @@ public static partial class MetricSourceComparisonProbe
         public ulong AvailExtendedVirtual;
     }
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct PdhFmtCounterValue
-    {
-        public uint CStatus;
-
-        public double DoubleValue;
-    }
 }

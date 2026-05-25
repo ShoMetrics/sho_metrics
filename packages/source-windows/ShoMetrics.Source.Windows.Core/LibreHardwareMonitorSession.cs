@@ -14,6 +14,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
     private const int RetainedSampleTickLimit = 3;
 
     private readonly Computer? _computer;
+    private readonly WindowsSystemTotalDiskThroughputProvider _diskThroughputProvider;
     private readonly HardwareMetricDescriptorSnapshot _cachedDescriptorSnapshot;
     private readonly IReadOnlyDictionary<string, string> _pollingGroupIdsByMetricId;
     private readonly HardwareMetricRetentionCache _retentionCache = new(RetainedSampleTickLimit);
@@ -26,6 +27,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
 
     public LibreHardwareMonitorSession()
     {
+        _diskThroughputProvider = new WindowsSystemTotalDiskThroughputProvider();
         Computer computer = LibreHardwareComputerFactory.Create();
         List<HardwareSourceWarning> warnings = [];
         HardwareMetricDescriptorSnapshot? cachedDescriptorSnapshot = null;
@@ -53,7 +55,10 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         {
             try
             {
-                cachedDescriptorSnapshot = BuildMetricDescriptorSnapshot(computer, CancellationToken.None);
+                cachedDescriptorSnapshot = BuildMetricDescriptorSnapshot(
+                    computer,
+                    _diskThroughputProvider,
+                    CancellationToken.None);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -65,7 +70,8 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             }
         }
 
-        cachedDescriptorSnapshot ??= BuildUnavailableDescriptorSnapshot(
+        cachedDescriptorSnapshot ??= BuildNativeOnlyDescriptorSnapshot(
+            _diskThroughputProvider,
             warnings.Select(warning => warning.Message).ToList());
         InitializationWarnings = warnings;
         _cachedDescriptorSnapshot = cachedDescriptorSnapshot;
@@ -76,7 +82,23 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         _latestSnapshot = BuildUnavailableSnapshot();
     }
 
-    public bool IsAvailable => _computer is not null;
+    internal LibreHardwareMonitorSession(
+        WindowsSystemTotalDiskThroughputProvider diskThroughputProvider,
+        IReadOnlyList<HardwareSourceWarning>? initializationWarnings = null)
+    {
+        _diskThroughputProvider = diskThroughputProvider;
+        InitializationWarnings = initializationWarnings ?? [];
+        _cachedDescriptorSnapshot = BuildNativeOnlyDescriptorSnapshot(
+            _diskThroughputProvider,
+            InitializationWarnings.Select(warning => warning.Message).ToList());
+        _pollingGroupIdsByMetricId = _cachedDescriptorSnapshot.Descriptors.ToDictionary(
+            descriptor => descriptor.MetricId,
+            descriptor => descriptor.PollingGroupId,
+            StringComparer.Ordinal);
+        _latestSnapshot = BuildUnavailableSnapshot();
+    }
+
+    public bool IsAvailable => _computer is not null || _diskThroughputProvider.HasCounterBinding;
 
     public IReadOnlyList<HardwareSourceWarning> InitializationWarnings { get; }
 
@@ -119,13 +141,9 @@ public sealed class LibreHardwareMonitorSession : IDisposable
 
         if (_computer is null)
         {
-            // LHM-unavailable refreshes intentionally stamp a fresh timestamp.
-            // This allocates once per refresh while unavailable, which is tiny
-            // compared with the normal LHM traversal path and keeps source
-            // health observable through the latest cached snapshot.
-            MetricSnapshot unavailableSnapshot = BuildUnavailableSnapshot();
-            Volatile.Write(ref _latestSnapshot, unavailableSnapshot);
-            return unavailableSnapshot;
+            MetricSnapshot nativeOnlySnapshot = RefreshNativeOnlySnapshot();
+            Volatile.Write(ref _latestSnapshot, nativeOnlySnapshot);
+            return nativeOnlySnapshot;
         }
 
         await _readGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -181,6 +199,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                 unavailableReportsByMetricId,
                 capturedAt);
             AddDerivedReadings(readingsByMetricId);
+            AddNativeDiskThroughputReadings(readingsByMetricId);
             PublishAggregatePollingGroupSnapshots(readingsByMetricId, capturedAt);
 
             List<MetricReading> readings = FilterReadings(readingsByMetricId, requestedMetricIds: null);
@@ -223,8 +242,25 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         }
 
         _computer?.Close();
+        _diskThroughputProvider.Dispose();
         _readGate.Dispose();
         _isDisposed = true;
+    }
+
+    private MetricSnapshot RefreshNativeOnlySnapshot()
+    {
+        DateTimeOffset capturedAt = DateTimeOffset.UtcNow;
+        Dictionary<string, MetricReading> readingsByMetricId = new(StringComparer.Ordinal);
+
+        AddNativeDiskThroughputReadings(readingsByMetricId);
+        PublishAggregatePollingGroupSnapshots(readingsByMetricId, capturedAt);
+
+        return new MetricSnapshot
+        {
+            CapturedAt = capturedAt,
+            Readings = FilterReadings(readingsByMetricId, requestedMetricIds: null),
+            Warnings = InitializationWarnings.Select(warning => warning.Message).ToList(),
+        };
     }
 
     private MetricSnapshot BuildUnavailableSnapshot()
@@ -279,6 +315,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
 
     private static HardwareMetricDescriptorSnapshot BuildMetricDescriptorSnapshot(
         Computer computer,
+        WindowsSystemTotalDiskThroughputProvider diskThroughputProvider,
         CancellationToken cancellationToken)
     {
         Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId = new(StringComparer.Ordinal);
@@ -306,6 +343,30 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             cpuPowerDescriptorCandidates,
             descriptorsByMetricId);
         AddDerivedDescriptors(descriptorsByMetricId);
+        AddNativeDiskThroughputDescriptors(descriptorsByMetricId, diskThroughputProvider);
+
+        List<HardwareMetricDescriptor> descriptors = FilterDescriptors(descriptorsByMetricId, requestedMetricIds: null);
+
+        return new HardwareMetricDescriptorSnapshot
+        {
+            DescriptorFingerprint = BuildDescriptorFingerprint(descriptors),
+            Descriptors = descriptors,
+            Warnings = warnings,
+        };
+    }
+
+    private static HardwareMetricDescriptorSnapshot BuildNativeOnlyDescriptorSnapshot(
+        WindowsSystemTotalDiskThroughputProvider diskThroughputProvider,
+        IReadOnlyList<string> warnings)
+    {
+        Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId = new(StringComparer.Ordinal);
+
+        AddNativeDiskThroughputDescriptors(descriptorsByMetricId, diskThroughputProvider);
+
+        if (descriptorsByMetricId.Count == 0)
+        {
+            return BuildUnavailableDescriptorSnapshot(warnings);
+        }
 
         List<HardwareMetricDescriptor> descriptors = FilterDescriptors(descriptorsByMetricId, requestedMetricIds: null);
 
@@ -650,7 +711,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             [],
             capturedAt);
         PublishPollingGroupSnapshot(
-            LibreHardwareMetricCatalog.StorageAggregatePollingGroupId,
+            WindowsSystemTotalDiskThroughputProvider.PollingGroupId,
             readingsByMetricId,
             [],
             capturedAt);
@@ -713,7 +774,6 @@ public sealed class LibreHardwareMonitorSession : IDisposable
     private static void AddDerivedReadings(Dictionary<string, MetricReading> readingsByMetricId)
     {
         AddMemoryDerivedReadings(readingsByMetricId);
-        AddDiskDerivedReadings(readingsByMetricId);
     }
 
     private static void AddMemoryDerivedReadings(Dictionary<string, MetricReading> readingsByMetricId)
@@ -737,23 +797,11 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         }
     }
 
-    private static void AddDiskDerivedReadings(Dictionary<string, MetricReading> readingsByMetricId)
+    private void AddNativeDiskThroughputReadings(Dictionary<string, MetricReading> readingsByMetricId)
     {
-        MetricReading? diskRead = readingsByMetricId.GetValueOrDefault(LibreHardwareMetricCatalog.DiskReadThroughputMetricId);
-        MetricReading? diskWrite = readingsByMetricId.GetValueOrDefault(LibreHardwareMetricCatalog.DiskWriteThroughputMetricId);
-
-        if (diskRead is not null || diskWrite is not null)
+        foreach (MetricReading reading in _diskThroughputProvider.Read())
         {
-            MetricReading baseReading = diskRead ?? diskWrite!;
-
-            readingsByMetricId[LibreHardwareMetricCatalog.DiskTotalThroughputMetricId] = baseReading with
-            {
-                MetricId = LibreHardwareMetricCatalog.DiskTotalThroughputMetricId,
-                SensorId = JoinSourceSensorIds(diskRead?.SensorId, diskWrite?.SensorId),
-                SensorName = "Disk Throughput Total",
-                Value = (diskRead?.Value ?? 0) + (diskWrite?.Value ?? 0),
-                Unit = MetricUnit.BytesPerSecond,
-            };
+            readingsByMetricId[reading.MetricId] = reading;
         }
     }
 
@@ -770,21 +818,15 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                 Unit = MetricUnit.Bytes,
             };
         }
+    }
 
-        HardwareMetricDescriptor? diskRead = descriptorsByMetricId.GetValueOrDefault(LibreHardwareMetricCatalog.DiskReadThroughputMetricId);
-        HardwareMetricDescriptor? diskWrite = descriptorsByMetricId.GetValueOrDefault(LibreHardwareMetricCatalog.DiskWriteThroughputMetricId);
-
-        if (diskRead is not null || diskWrite is not null)
+    private static void AddNativeDiskThroughputDescriptors(
+        Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId,
+        WindowsSystemTotalDiskThroughputProvider diskThroughputProvider)
+    {
+        foreach (HardwareMetricDescriptor descriptor in diskThroughputProvider.CreateDescriptors())
         {
-            HardwareMetricDescriptor baseDescriptor = diskRead ?? diskWrite!;
-
-            descriptorsByMetricId[LibreHardwareMetricCatalog.DiskTotalThroughputMetricId] = baseDescriptor with
-            {
-                MetricId = LibreHardwareMetricCatalog.DiskTotalThroughputMetricId,
-                SourceSensorId = JoinSourceSensorIds(diskRead?.SourceSensorId, diskWrite?.SourceSensorId),
-                SensorName = "Disk Throughput Total",
-                Unit = MetricUnit.BytesPerSecond,
-            };
+            descriptorsByMetricId[descriptor.MetricId] = descriptor;
         }
     }
 
