@@ -3,7 +3,7 @@ import type { SourceClientStatus } from "../../runtime/sources/source-client";
 import type { WidgetData } from "../../view-rendering/widget-data";
 
 // Hub-side stale-sample guard. Source-side fresh/retained attribution in
-// docs/development/runtime-source-performance/10-helper-source-reliability-implementation-plan.md
+// docs/development/runtime-sources/03-windows-helper/02-helper-source-reliability-implementation-plan.md
 // will make this a fallback check instead of the primary helper freshness signal.
 const HELPER_BACKED_SAMPLE_FRESHNESS_MILLISECONDS = 7000;
 

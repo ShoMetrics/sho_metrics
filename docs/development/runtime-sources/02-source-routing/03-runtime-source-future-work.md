@@ -2,9 +2,9 @@
 
 This document extracts the forward-looking items from:
 
-1. [Phase 6 Source Capability, GPU, And History](04-phase-6-source-capability-gpu-and-history.md)
-2. [Windows Source Latency Findings](05-windows-source-latency-findings.md)
-3. [Metric-Level Source Routing](06-metric-level-source-routing.md)
+1. [Phase 6 Source Capability, GPU, And History](../01-runtime-collection/04-source-capability-gpu-and-history.md)
+2. [Windows Source Latency Findings](01-windows-source-latency-findings.md)
+3. [Metric-Level Source Routing](02-metric-level-source-routing.md)
 
 It is an execution guide, not a replacement for those design documents. Keep
 the detailed rationale in the original documents; use this file to decide what

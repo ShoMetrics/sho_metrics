@@ -2,8 +2,8 @@
 
 This document designs the next runtime source routing change after:
 
-1. [Phase 6 Source Capability, GPU, And History](04-phase-6-source-capability-gpu-and-history.md)
-2. [Windows Source Latency Findings](05-windows-source-latency-findings.md)
+1. [Phase 6 Source Capability, GPU, And History](../01-runtime-collection/04-source-capability-gpu-and-history.md)
+2. [Windows Source Latency Findings](01-windows-source-latency-findings.md)
 
 The goal is narrow: move source candidate preference from the read-plan level
 to the metric level.
