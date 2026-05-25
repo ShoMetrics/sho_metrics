@@ -41,9 +41,12 @@ view case x theme x render surface x data state
   persistence as out of scope for this plan.
 - Future font support only targets normal fonts. It does not promise support for
   extreme fonts whose glyphs are several times larger than a normal UI font.
-- Use **DotGothic16** as the real pixel-font driver for this work.
-- Use **Pixelify Sans** as the production Latin fallback in the pixel theme font
-  chain and as the second pressure-test font.
+- Use **DotGothic16** as the primary balanced pixel-font driver for this work.
+- Treat **Pixelify Sans** and **PixelMplus10** as secondary comparison/fallback
+  candidates, not mandatory production assets.
+- Font assets do not have to use OFL/SIL specifically. They must be freely
+  usable in this product, have clear redistribution terms, and be sourced from
+  an upstream package that includes the applicable license text.
 - Do not rely on operating-system pixel fonts as theme fonts.
 - Keep broad resvg system font loading disabled.
 - Do not use title-card as the first font-safe typography driver. Title-card may
@@ -53,35 +56,62 @@ view case x theme x render surface x data state
 ## Font Driver Decision
 
 The implementation must not design the metrics contract without a real font.
-Use these fonts as concrete drivers:
+The current product priority is:
+
+- text must stay visible inside small pixel-themed widget frames;
+- the font should evoke the game's small framed UI, not dialogue text;
+- license clarity and redistribution safety are required, but OFL/SIL is not
+  the only acceptable license family.
+
+Use these fonts as concrete drivers and references:
 
 - Primary driver: `DotGothic16-Regular.ttf`.
   - License: SIL Open Font License 1.1.
-  - Role: Japanese pixel UI font and primary Win98/NSO-style typography
-    pressure test.
-  - Reason: It is visually closer to the target style than Silkscreen in the
-    current small widget previews, and it covers the static title-card Japanese
-    text currently used by ShoMetrics.
-- Secondary driver: `Pixelify Sans`.
+  - Role: primary small-widget pixel UI font and primary Win98/NSO-style
+    typography pressure test.
+  - Reason: It is the best current balance of legibility and visible pixel
+    character in the small widget previews. It is less soft than PixelMplus10
+    and less width-hostile than display fonts such as Press Start 2P.
+- Secondary comparison driver: `Pixelify Sans`.
   - License: SIL Open Font License 1.1.
-  - Role: production Latin fallback for the pixel theme font chain and second
-    font metrics pressure test.
+  - Role: Latin fallback candidate and second font metrics pressure test.
   - Reason: It is a normal OFL pixel-like Latin font with different proportions
     from DotGothic16, useful for proving the helper is not tuned to one font.
+- Candidate reference: `PixelMplus10`.
+  - License: M+ Font License.
+  - Role: license-acceptable pixel UI comparison font and possible fallback
+    candidate if later visual review prefers it for a specific role.
+  - Reason: The Rainmeter reference uses `PixelMplus10` heavily for settings,
+    tooltip, and body-style UI text. It is not the main small Task Manager
+    value/title font in the reference, and current visual review finds it less
+    pixel-forward than DotGothic16 on the small widget surfaces.
+- Reference-only value font: `Press Start 2P`.
+  - License: SIL Open Font License 1.1 when sourced from Google Fonts or the
+    upstream project.
+  - Role: future value-role reference, not a general UI font.
+  - Reason: The Rainmeter Task Manager skin uses it for large numeric values.
+    It is visually close for numbers, but too wide and display-oriented to be
+    the default font for labels, units, or dense small-widget text.
 
 Silkscreen is not the production driver for this plan. It remains a possible
 future accent font, but current visual review found several small glyphs too
 blurred for the widget surfaces.
 
 Do not use fonts from the Rainmeter reference package as production assets
-unless their redistribution license is independently verified. Known examples:
+unless their redistribution license is independently verified and the upstream
+source is used. Known examples:
 
 - `zpix` is not acceptable for this plan because its public licensing terms are
-  not OFL and include commercial product licensing requirements.
-- `PixelMplus` is not OFL. It may be legal under its own license, but it does
-  not satisfy the current OFL/SIL gate.
-- `DinkieBitmap-7px` and `PerfectDOSVGA437` require further license
-  verification and are not approved drivers for this plan.
+  not free for this product's redistribution requirements and include commercial
+  product licensing requirements.
+- `PixelMplus10` is acceptable as a candidate when sourced from the upstream
+  PixelMplus package and distributed with the M+ Font License. It is not blocked
+  merely because it is not OFL.
+- `DinkieBitmap-7px` is a visual reference only. Its public source describes
+  commercial licensing through the author, so do not bundle it unless a product
+  license is purchased and recorded.
+- `PerfectDOSVGA437` requires further license verification and is not an
+  approved driver for this plan.
 
 ### System Font Fallback Policy
 
@@ -226,8 +256,9 @@ In scope:
 - Add shared text layout helpers for baseline, clip height, and width fitting.
 - Migrate high-risk text drawing call sites to the shared helpers.
 - Add theme-owned font metrics presets.
-- Add bundled theme font resolver support for DotGothic16 and Pixelify Sans
-  once their asset locations are part of the implementation.
+- Add bundled theme font resolver support for DotGothic16 and any selected
+  secondary fallback fonts once their asset locations are part of the
+  implementation.
 - Add production-grade visual coverage for the full current render matrix.
 - Prove existing layouts are stable before and after the refactor.
 - Keep title-card's current Japanese serif typography stable and visually
@@ -302,12 +333,17 @@ Field semantics:
 
 - `fontSizeScale`: scales the primitive-authored font size.
 - `baselineShiftEm`: moves the text baseline by a font-relative amount after
-  font size is resolved. Implement this by calculating the final SVG `y`
-  coordinate, not by relying on SVG `baseline-shift`.
+  font size is resolved. Positive values move the final SVG `y` coordinate
+  downward. Implement this by calculating the final SVG `y` coordinate, not by
+  relying on SVG `baseline-shift`. This is a per-role correction calibrated
+  against the current renderer's visual/bbox-center anchor; it is not a
+  per-string cap-height or glyph-shape layout engine.
 - `clipHeightEm`: controls the vertical clip box height for text that uses the
   shared constrained-text helper.
 - `widthScale`: adjusts the low-cost width estimator for wider or narrower font
-  families.
+  families. It multiplies the raw estimated text width before the width guard
+  is applied:
+  `effectiveEstimatedWidth = rawEstimatedWidth * widthScale`.
 - `minimumFontScale`: lets a theme choose how aggressively text may shrink
   before `textLength` compression is used.
 - `filter`: keeps existing theme glow/filter behavior.
@@ -335,6 +371,10 @@ note:
 Neutral metrics must reproduce those measured values. The first metrics commit
 should produce no intentional visual changes.
 
+Neutral `widthScale` is `1`. That default relies on the current width guard
+ratio of `1.08`; do not lower the guard ratio without remeasuring current and
+pixel-font strings.
+
 `getBBox()` is allowed for spike and test measurement only. It should not run in
 the hot widget render path because it requires constructing a `Resvg` instance
 and repeats SVG parse/layout/font shaping work before the real render.
@@ -343,6 +383,10 @@ and repeats SVG parse/layout/font shaping work before the real render.
 pixel, and broadly regular UI fonts. It is not a precise model for proportional
 fonts whose relative width changes by character mix. SVG `textLength` remains
 the final fit guard.
+
+If later primitive measurements show `requiredClipHeightEm > 1.30` for any
+normal role, treat that as a review trigger for `clipHeightEm` rather than
+waiting for visible clipping in snapshots.
 
 ## Shared Text Layout Helpers
 
@@ -426,7 +470,7 @@ text elements. For this plan, that is acceptable because title-card is not the
 font-safe driver and remains a strongly styled view. Do not add title-card
 specific fields to the generic `RenderTextStyle` contract. If the direct usages
 are touched for nearby work, keep the font choice renderer-owned and explicit,
-but do not force title-card into the DotGothic16/Pixelify Sans theme font chain.
+but do not force title-card into the pixel theme font chain.
 
 ## Visual Test Standard
 
@@ -769,18 +813,18 @@ Completion criteria for each group:
 ### Step 7: Add Theme-Owned Pixel Font Metrics
 
 Only after the neutral migration is stable, add the DotGothic16 primary preset
-and Pixelify Sans fallback needed by the future pixel theme.
+needed by the future pixel theme.
 
-Pixelify Sans is a production fallback in this plan, not only a dev-time checker.
-The reason is to keep the pixel theme font chain fully bundled and deterministic
-while giving Latin text a second OFL pixel-style option if DotGothic16 metrics or
-glyph shapes are not ideal. When adding the asset, record the added font file
-size in the implementation note. If product direction later removes the Latin
-fallback, delete the Pixelify Sans resolver entry before shipping.
+Secondary fonts are optional product choices, not automatic bundle additions.
+`Pixelify Sans`, `PixelMplus10`, and `Press Start 2P` may be used as comparison
+or role-specific candidates, but do not ship them merely because they were used
+for measurement. When adding any font asset, record its upstream source,
+license, and file size in the implementation note.
 
 This step may include:
 
-- bundled DotGothic16 and Pixelify Sans font assets;
+- bundled DotGothic16 font assets;
+- selected secondary font assets, only when a product decision chooses them;
 - font resolver entries in `resvg-font-options.ts`;
 - a `PIXEL_RENDER_TEXT_STYLES` preset;
 - visual snapshots for the pixel theme or temporary preview harness.
@@ -880,6 +924,74 @@ text layout, remove legacy cases that are fully covered by the matrix and merge
 any unique fixtures into the matrix so `composeMetricViewFrame()` becomes the
 visual source of truth for production widget rendering.
 
+## Slice 2 Font Driver Spike Note
+
+Slice 2 added a local test-only spike under `packages/hub/tests/visual`:
+
+- `font-driver-spike.visual.spec.ts`
+- `font-driver-spike-assets/`
+- `font-driver-spike-output/`
+
+The spike artifacts are intentionally not production renderer code. They must
+either be deleted or converted into formal matrix coverage before this plan is
+finished.
+
+The spike used:
+
+- `DotGothic16-Regular.ttf` from `fontworks-fonts/DotGothic16`;
+- `PixelifySans-Regular.ttf` from `eifetx/Pixelify-Sans`;
+- the existing bundled `InterVariable.ttf` as the current neutral reference.
+
+The selected primitive was centered text metric with the stress value
+`999 MB/s`. Measurement strings included Latin value/unit stress cases,
+`100%`, `N/A`, `UP DN RD WR`, and a non-blocking DotGothic16-only Japanese
+sample `温度`. The spike rendered preview PNGs and used `@resvg/resvg-js`
+`getBBox()` in the test path only. `getBBox()` remains disallowed in the hot
+render path.
+
+Measured current helper source values:
+
+- default clip height: `1.45em`;
+- default width guard ratio: `1.08`;
+- default minimum font scale: `0.78`, recorded for centralization only. This
+  spike did not prove a font-specific minimum scale.
+
+Measured summary:
+
+| Font driver | Max required clip height | Max center offset | Inferred width scale range |
+| --- | ---: | ---: | ---: |
+| Inter current neutral | `0.978em` | `0.091em` | `0.902-1.052` |
+| DotGothic16 | `1.160em` | `0.141em` | `0.753-0.941` |
+| Pixelify Sans | `0.812em` | `0.085em` | `0.854-0.947` |
+
+Conclusions for Slice 3:
+
+- `baselineShiftEm` is justified. In shared Latin runs, DotGothic16 differs
+  from Inter by about `0.019-0.088em`, depending on glyph mix. Per-role
+  adjustment should recover most of that drift, but it will not remove
+  per-string residuals caused by `/`, descenders, or other glyph-shape details.
+- `widthScale` is justified. The current estimator is conservative for both
+  pixel drivers, especially DotGothic16. The `100%` run measured `0.753` for
+  DotGothic16, which would otherwise cause unnecessary shrinking or
+  `textLength` compression. Implement `widthScale` as a multiplier on raw
+  estimated text width before applying the width guard.
+- `clipHeightEm` should start as neutral for the selected primitive. Neither
+  DotGothic16 nor Pixelify Sans exceeded the current `1.45em` clip in this
+  centered-text spike, and the DotGothic16 `温度` run also stayed inside the
+  current clip. Keep the field only as the renderer-owned expression of the
+  existing clip multiplier and tune it later only if another migrated primitive
+  proves a real need.
+- `minimumFontScale` was not proven to need a font-specific value in this
+  spike. If Slice 3 keeps this field, the reason should be preserving and
+  centralizing existing fit behavior, not because DotGothic16 requires a custom
+  minimum scale in the selected primitive.
+- Visual preview review: Inter remains the neutral reference; DotGothic16 is
+  legible and close to the target pixel feel in the centered text preview;
+  Pixelify Sans is blockier and remains useful as a secondary comparison font.
+
+Step 4 neutral defaults must use the measured current helper values above, not
+the illustrative placeholders in the target contract section.
+
 ## Required Verification
 
 For the full work:
@@ -914,8 +1026,8 @@ The work is complete when all of these are true:
 - Title-card keeps its current Japanese serif typography and remains covered by
   visual snapshots.
 - DotGothic16 renders the selected high-risk primitive without text clipping.
-- Pixelify Sans renders the same selected primitive without primitive geometry
-  edits.
+- At least one selected secondary comparison font renders the same selected
+  primitive without primitive geometry edits.
 - Title-card font-family usage remains limited to
   `JAPANESE_SERIF_RENDER_FONT_FAMILY`; no title-card-specific fields are added
   to the generic text metrics contract.
@@ -936,8 +1048,8 @@ Before approving implementation, verify:
 - Matrix coverage is manifest-driven and auditable.
 - Default text metrics are neutral.
 - Default snapshots did not move unexpectedly.
-- DotGothic16 and Pixelify Sans were used before finalizing the metrics
-  contract.
+- DotGothic16 and at least one secondary comparison font were used before
+  finalizing the metrics contract.
 - Step 4 neutral defaults came from Step 3 measurements, not illustrative
   values in the contract section.
 - `getBBox()` is used only in spike/test measurement, not runtime rendering.
