@@ -10,13 +10,9 @@ internal static class LibreHardwareMetricCatalog
     internal const string RamTotalMetricId = "ram.total";
     internal const string CpuTemperatureMetricId = "cpu.temp";
     internal const string CpuPowerMetricId = "cpu.power";
-    internal const string DiskReadThroughputMetricId = "disk.throughput.read";
-    internal const string DiskWriteThroughputMetricId = "disk.throughput.write";
-    internal const string DiskTotalThroughputMetricId = "disk.throughput.total";
 
     private const string DynamicMetricIdPrefix = "lhm.sensor:";
     internal const string NetworkAggregatePollingGroupId = "lhm:aggregate:network";
-    internal const string StorageAggregatePollingGroupId = "lhm:aggregate:storage";
     private const double BytesPerGibibyte = 1024d * 1024d * 1024d;
     private const double BytesPerMebibyte = 1024d * 1024d;
     private const double HertzPerMegahertz = 1000d * 1000d;
@@ -261,7 +257,7 @@ internal static class LibreHardwareMetricCatalog
 
     internal static bool ShouldAggregateMetric(string metricId)
     {
-        return metricId is "net.down" or "net.up" or DiskReadThroughputMetricId or DiskWriteThroughputMetricId;
+        return metricId is "net.down" or "net.up";
     }
 
     internal static bool HasCanonicalMetricUnit(SensorType sensorType)
@@ -277,7 +273,6 @@ internal static class LibreHardwareMetricCatalog
             HardwareType.Memory => GetMemoryMetricId(hardware, sensor),
             HardwareType.GpuAmd or HardwareType.GpuIntel or HardwareType.GpuNvidia => GetGpuMetricId(sensor),
             HardwareType.Network => GetNetworkMetricId(sensor),
-            HardwareType.Storage => GetStorageMetricId(sensor),
             _ => null,
         };
 
@@ -294,8 +289,6 @@ internal static class LibreHardwareMetricCatalog
         return metricId switch
         {
             "net.down" or "net.up" => NetworkAggregatePollingGroupId,
-            DiskReadThroughputMetricId or DiskWriteThroughputMetricId or DiskTotalThroughputMetricId =>
-                StorageAggregatePollingGroupId,
             _ => BuildHardwarePollingGroupId(hardware),
         };
     }
@@ -375,16 +368,6 @@ internal static class LibreHardwareMetricCatalog
         };
     }
 
-    private static string? GetStorageMetricId(ISensor sensor)
-    {
-        return sensor.SensorType switch
-        {
-            SensorType.Throughput when sensor.Name.Equals("Read Rate", StringComparison.Ordinal) => DiskReadThroughputMetricId,
-            SensorType.Throughput when sensor.Name.Equals("Write Rate", StringComparison.Ordinal) => DiskWriteThroughputMetricId,
-            _ => null,
-        };
-    }
-
     private static bool TryConvertValue(
         SensorType sensorType,
         double value,
@@ -427,7 +410,7 @@ internal static class LibreHardwareMetricCatalog
             "gpu.power" => value >= 0,
             "gpu.vram_used" or "ram.used" or RamAvailableMetricId => value >= 0,
             "gpu.vram_total" => value > 0,
-            "net.down" or "net.up" or DiskReadThroughputMetricId or DiskWriteThroughputMetricId => value >= 0,
+            "net.down" or "net.up" => value >= 0,
             _ => throw new UnreachableException($"Missing validation rule for metric '{metricId}'."),
         };
     }

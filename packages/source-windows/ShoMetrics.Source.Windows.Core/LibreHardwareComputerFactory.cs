@@ -6,6 +6,16 @@ internal static class LibreHardwareComputerFactory
 {
     internal static Computer Create()
     {
+        return Create(enableStorage: false);
+    }
+
+    internal static Computer CreateForDiagnosticProbe()
+    {
+        return Create(enableStorage: true);
+    }
+
+    private static Computer Create(bool enableStorage)
+    {
         return new Computer
         {
             IsCpuEnabled = true,
@@ -13,7 +23,7 @@ internal static class LibreHardwareComputerFactory
             IsMemoryEnabled = true,
             IsMotherboardEnabled = true,
             IsNetworkEnabled = true,
-            IsStorageEnabled = true,
+            IsStorageEnabled = enableStorage,
         };
     }
 }
