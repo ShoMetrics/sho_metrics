@@ -95,8 +95,11 @@ function renderBodyViewportClipPath(clipId: string, viewport: ThemeBodyViewport)
 }
 
 function renderPlacedBody(body: string, viewport: ThemeBodyViewport, clipId: string): string {
+    const xCoordinate = viewport.xCoordinate + viewport.body.xOffset;
+    const yCoordinate = viewport.yCoordinate + viewport.body.yOffset;
+
     return `<g clip-path="url(#${clipId})">
-            <g transform="translate(${viewport.xCoordinate} ${viewport.yCoordinate})">${body}</g>
+            <g transform="translate(${xCoordinate} ${yCoordinate})">${body}</g>
         </g>`;
 }
 

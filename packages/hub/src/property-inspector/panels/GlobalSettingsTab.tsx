@@ -250,6 +250,10 @@ function ActivePaintOverrideControls({
         );
     }
 
+    if (selectedTheme === "pixel-window") {
+        return <></>;
+    }
+
     return (
         <MetricColorControls
             colorMode={paintOverride.metric.colorMode}

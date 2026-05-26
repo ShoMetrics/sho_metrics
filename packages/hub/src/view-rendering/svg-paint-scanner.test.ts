@@ -267,6 +267,7 @@ function buildBlackWhiteRenderAppearance(options: {
             mutedText: "rgba(255,255,255,0.48)",
             icon: "rgba(255,255,255,0.88)",
             barTitleText: "rgba(255,255,255,0.88)",
+            metricValueText: "white",
             barValueText: "white",
             barUnitText: "rgba(255,255,255,0.76)",
             barSecondaryText: "rgba(255,255,255,0.78)",
@@ -279,6 +280,10 @@ function buildBlackWhiteRenderAppearance(options: {
             track: "rgba(255,255,255,0.14)",
             grid: "rgba(255,255,255,0.18)",
             divider: "rgba(255,255,255,0.18)",
+        },
+        layoutTokens: {
+            singleProgressCircleCenterIconScale: 1,
+            dualProgressCircleCenterIconScale: 0.86,
         },
         textStyles: DEFAULT_RENDER_TEXT_STYLES,
         themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,

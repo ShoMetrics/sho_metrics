@@ -2,7 +2,7 @@ import { PIXEL_RENDER_FONT_FAMILY } from "../../view-rendering/render-text-style
 import { clamp, escapeSvgText } from "../../view-rendering/svg-utils";
 import { DEFAULT_PIXEL_WINDOW_PALETTE } from "../../view-rendering/pixel-window-theme-tokens";
 import type { KeySize } from "../../view-rendering/widget-data";
-import type { ThemeBodyViewport, ThemeStyle } from "./theme-style";
+import type { ThemeBodyPlacement, ThemeBodyViewport, ThemeStyle } from "./theme-style";
 
 interface PixelWindowRect {
     readonly xCoordinate: number;
@@ -18,8 +18,8 @@ interface PixelWindowGeometry {
     readonly bodyViewport: ThemeBodyViewport;
 }
 
-const PIXEL_WINDOW_OUTER_BORDER_THICKNESS = 2;
-const PIXEL_WINDOW_INNER_BORDER_THICKNESS = 2;
+const PIXEL_WINDOW_OUTER_BORDER_THICKNESS = 1;
+const PIXEL_WINDOW_INNER_BORDER_THICKNESS = 1;
 const PIXEL_WINDOW_TITLE_TEXT = "ShoMetrics";
 
 export const pixelWindowStyle: ThemeStyle = {
@@ -63,8 +63,8 @@ export const pixelWindowStyle: ThemeStyle = {
 
 function resolvePixelWindowGeometry(keySize: KeySize): PixelWindowGeometry {
     const minimumSize = Math.min(keySize.width, keySize.height);
-    const outerMargin = clamp(Math.round(minimumSize * 0.03), 3, 6);
-    const titleBarHeight = clamp(Math.round(keySize.height * 0.125), 14, 20);
+    const outerMargin = clamp(Math.round(minimumSize * 0.02), 3, 5);
+    const titleBarHeight = clamp(Math.round(keySize.height * 0.1), 12, 16);
     const clientInset = outerMargin + PIXEL_WINDOW_OUTER_BORDER_THICKNESS + PIXEL_WINDOW_INNER_BORDER_THICKNESS;
     const frameWidth = Math.max(1, keySize.width - outerMargin * 2);
     const frameHeight = Math.max(1, keySize.height - outerMargin * 2);
@@ -72,11 +72,17 @@ function resolvePixelWindowGeometry(keySize: KeySize): PixelWindowGeometry {
     const innerYCoordinate = outerMargin + PIXEL_WINDOW_OUTER_BORDER_THICKNESS;
     const innerWidth = Math.max(1, keySize.width - innerXCoordinate * 2);
     const innerHeight = Math.max(1, keySize.height - innerYCoordinate * 2);
+    const bodyViewportWidth = Math.max(1, keySize.width - clientInset * 2);
+    const bodyViewportHeight = Math.max(1, keySize.height - clientInset * 2 - titleBarHeight);
     const bodyViewport = {
         xCoordinate: clientInset,
         yCoordinate: clientInset + titleBarHeight,
-        width: Math.max(1, keySize.width - clientInset * 2),
-        height: Math.max(1, keySize.height - clientInset * 2 - titleBarHeight),
+        width: bodyViewportWidth,
+        height: bodyViewportHeight,
+        body: resolveBodyPlacement(keySize, {
+            width: bodyViewportWidth,
+            height: bodyViewportHeight,
+        }),
         clipRadius: 0,
     } satisfies ThemeBodyViewport;
 
@@ -100,6 +106,33 @@ function resolvePixelWindowGeometry(keySize: KeySize): PixelWindowGeometry {
             height: titleBarHeight,
         },
         bodyViewport,
+    };
+}
+
+function resolveBodyPlacement(
+    keySize: KeySize,
+    viewportSize: Pick<PixelWindowRect, "width" | "height">,
+): ThemeBodyPlacement {
+    if (keySize.width > keySize.height) {
+        return {
+            xOffset: 0,
+            yOffset: 0,
+            renderSize: {
+                width: viewportSize.width,
+                height: viewportSize.height,
+            },
+        };
+    }
+
+    const bodySize = Math.min(viewportSize.width, viewportSize.height);
+
+    return {
+        xOffset: Math.floor((viewportSize.width - bodySize) / 2),
+        yOffset: Math.floor((viewportSize.height - bodySize) / 2),
+        renderSize: {
+            width: bodySize,
+            height: bodySize,
+        },
     };
 }
 

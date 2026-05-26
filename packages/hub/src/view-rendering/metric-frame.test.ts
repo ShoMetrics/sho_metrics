@@ -43,10 +43,15 @@ test("pixel window frame clips and translates the body viewport without scaling"
     const svg = renderMetricFrame({
         body: "<g id=\"metric-body\"></g>",
         bodyViewport: {
-            xCoordinate: 8,
-            yCoordinate: 26,
-            width: 128,
-            height: 110,
+            xCoordinate: 5,
+            yCoordinate: 19,
+            width: 134,
+            height: 120,
+            body: {
+                xOffset: 7,
+                yOffset: 0,
+                renderSize: { width: 120, height: 120 },
+            },
             clipRadius: 0,
         },
         themePreset: "pixel-window",
@@ -55,10 +60,10 @@ test("pixel window frame clips and translates the body viewport without scaling"
         size: { width: 144, height: 144 },
     });
 
-    assert.match(svg, /clipPath id="pixel-window-body-viewport-128-110"/);
-    assert.match(svg, /<rect x="8" y="26"\s+width="128" height="110"\s+rx="0" \/>/);
-    assert.match(svg, /<g clip-path="url\(#pixel-window-body-viewport-128-110\)">/);
-    assert.match(svg, /<g transform="translate\(8 26\)">/);
+    assert.match(svg, /clipPath id="pixel-window-body-viewport-134-120"/);
+    assert.match(svg, /<rect x="5" y="19"\s+width="134" height="120"\s+rx="0" \/>/);
+    assert.match(svg, /<g clip-path="url\(#pixel-window-body-viewport-134-120\)">/);
+    assert.match(svg, /<g transform="translate\(12 19\)">/);
     assert.match(svg, /metric-body/);
     assert.doesNotMatch(svg, /scale\(/);
 });
@@ -67,10 +72,15 @@ test("muted pixel window frame keeps filtering inside the viewport placement", (
     const svg = renderMetricFrame({
         body: "<g id=\"metric-body\"></g>",
         bodyViewport: {
-            xCoordinate: 8,
-            yCoordinate: 26,
-            width: 128,
-            height: 110,
+            xCoordinate: 5,
+            yCoordinate: 19,
+            width: 134,
+            height: 120,
+            body: {
+                xOffset: 7,
+                yOffset: 0,
+                renderSize: { width: 120, height: 120 },
+            },
         },
         themePreset: "pixel-window",
         muted: true,
@@ -79,6 +89,6 @@ test("muted pixel window frame keeps filtering inside the viewport placement", (
     });
 
     assert.match(svg, /filter id="muted-widget-144-144"/);
-    assert.match(svg, /<g clip-path="url\(#pixel-window-body-viewport-128-110\)">/);
-    assert.match(svg, /<g transform="translate\(8 26\)">\s*<g filter="url\(#muted-widget-144-144\)">/);
+    assert.match(svg, /<g clip-path="url\(#pixel-window-body-viewport-134-120\)">/);
+    assert.match(svg, /<g transform="translate\(12 19\)">\s*<g filter="url\(#muted-widget-144-144\)">/);
 });

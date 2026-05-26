@@ -9,6 +9,7 @@ import {
     DEFAULT_RENDER_TEXT_STYLES,
     type RenderTextStyles,
 } from "../../view-rendering/render-text-style";
+import { DEFAULT_RENDER_LAYOUT_TOKENS } from "../../view-rendering/render-layout-tokens";
 import {
     clamp,
     renderStyledSvgText,
@@ -30,6 +31,7 @@ export interface DualChannelProgressCircleConfig extends WidgetBaseConfig {
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
     centerContent: DualChannelProgressCircleCenterContent;
+    centerIconScale: number;
     circleVariant: CircleVariant;
     titleText?: string;
     centerIconFragment?: string;
@@ -54,6 +56,7 @@ export const DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG: DualChannelProgressCir
     textStyles: DEFAULT_RENDER_TEXT_STYLES,
     themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     centerContent: "value",
+    centerIconScale: DEFAULT_RENDER_LAYOUT_TOKENS.dualProgressCircleCenterIconScale,
     circleVariant: "full-ring",
     titleText: "",
     positiveColor: "#3b82f6",
@@ -101,7 +104,6 @@ const ARC_LAYOUT = {
     gaugeBottomLabelFontSize: 17,
     gaugeBottomLabelYOffset: 45,
     gaugeBottomLabelMaxWidthRatio: 1.10,
-    centerIconScale: 0.86,
     notchIconSizeRatio: 2.15,
     notchGapWidthRatio: 4.4,
     notchIconRadialInsetRatio: 0.72,
@@ -479,6 +481,7 @@ function renderCenterContent(options: {
         return renderCenterIcon({
             centerIconFragment: options.config.centerIconFragment,
             geometry: options.geometry,
+            centerIconScale: options.config.centerIconScale,
             iconColor: options.config.iconColor,
             iconFilter: options.config.themeEffects.iconFilter,
         });
@@ -494,6 +497,7 @@ function renderCenterContent(options: {
 function renderCenterIcon(options: {
     centerIconFragment: string | undefined;
     geometry: RingGeometry;
+    centerIconScale: number;
     iconColor: string;
     iconFilter: string | undefined;
 }): string {
@@ -502,7 +506,7 @@ function renderCenterIcon(options: {
     }
 
     return `
-        <g color="${options.iconColor}" transform="translate(${formatSvgNumber(options.geometry.centerXCoordinate)} ${formatSvgNumber(options.geometry.centerYCoordinate)}) scale(${formatSvgNumber(ARC_LAYOUT.centerIconScale)})" ${buildSvgFilterAttributes(options.iconFilter).join(" ")}>
+        <g color="${options.iconColor}" transform="translate(${formatSvgNumber(options.geometry.centerXCoordinate)} ${formatSvgNumber(options.geometry.centerYCoordinate)}) scale(${formatSvgNumber(options.centerIconScale)})" ${buildSvgFilterAttributes(options.iconFilter).join(" ")}>
             ${options.centerIconFragment}
         </g>
     `;

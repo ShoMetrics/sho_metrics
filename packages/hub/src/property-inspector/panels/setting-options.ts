@@ -20,6 +20,7 @@ export const themeOptionList = [
     { value: "cupertino-glass", label: "Cupertino Glass Style" },
     { value: "color-filled", label: "Color Filled" },
     { value: "terminal", label: "Terminal" },
+    { value: "pixel-window", label: "Pixel Window" },
 ] as const satisfies readonly SelectOption[];
 
 export const terminalVariantOptionList = [

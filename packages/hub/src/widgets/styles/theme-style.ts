@@ -6,11 +6,18 @@ export interface ThemeStylePaints {
     readonly surface: string;
 }
 
+export interface ThemeBodyPlacement {
+    readonly xOffset: number;
+    readonly yOffset: number;
+    readonly renderSize: KeySize;
+}
+
 export interface ThemeBodyViewport {
     readonly xCoordinate: number;
     readonly yCoordinate: number;
     readonly width: number;
     readonly height: number;
+    readonly body: ThemeBodyPlacement;
     readonly clipRadius?: number;
 }
 

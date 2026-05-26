@@ -169,10 +169,7 @@ export function buildMetricViewRenderPlan(options: {
         renderSize,
         bodyRenderSize: bodyViewport === undefined
             ? renderSize
-            : {
-                width: bodyViewport.width,
-                height: bodyViewport.height,
-            },
+            : bodyViewport.body.renderSize,
         bodyViewport,
         pngSize: touchStripMetricLayout?.pngSize ?? KEYPAD_PNG_SIZE,
     };

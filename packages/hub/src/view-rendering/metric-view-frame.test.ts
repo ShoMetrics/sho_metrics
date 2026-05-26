@@ -294,7 +294,7 @@ test("key render plan uses keypad PNG dimensions and no touch strip layout", () 
     assert.deepEqual(renderPlan.pngSize, KEYPAD_PNG_SIZE);
 });
 
-test("pixel window renders widget body at the client viewport size", () => {
+test("pixel window renders square widget body inside the client viewport", () => {
     const frame = composeMetricViewFrame({
         viewOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData({
@@ -310,21 +310,26 @@ test("pixel window renders widget body at the client viewport size", () => {
     });
 
     assert.deepEqual(frame.renderPlan.renderSize, WIDGET_LOGICAL_SIZE);
-    assert.deepEqual(frame.renderPlan.bodyRenderSize, { width: 128, height: 110 });
+    assert.deepEqual(frame.renderPlan.bodyRenderSize, { width: 120, height: 120 });
     assert.deepEqual(frame.renderPlan.bodyViewport, {
-        xCoordinate: 8,
-        yCoordinate: 26,
-        width: 128,
-        height: 110,
+        xCoordinate: 5,
+        yCoordinate: 19,
+        width: 134,
+        height: 120,
+        body: {
+            xOffset: 7,
+            yOffset: 0,
+            renderSize: { width: 120, height: 120 },
+        },
         clipRadius: 0,
     });
     assert.match(frame.svg, /width="144" height="144"/);
     assert.match(frame.svg, /viewBox="0 0 144 144"/);
-    assert.match(frame.svg, /<g transform="translate\(8 26\)">/);
+    assert.match(frame.svg, /<g transform="translate\(12 19\)">/);
     assert.doesNotMatch(frame.svg, /scale\(/);
 });
 
-test("pixel window touch strip render plan keeps a usable client viewport", () => {
+test("pixel window wide touch strip uses the full client viewport as body render size", () => {
     const renderPlan = buildMetricViewRenderPlan({
         viewOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
@@ -338,13 +343,18 @@ test("pixel window touch strip render plan keeps a usable client viewport", () =
 
     assert.equal(renderPlan.touchStripMetricLayout?.kind, "wide");
     assert.deepEqual(renderPlan.renderSize, TOUCH_STRIP_LOGICAL_SIZE);
-    assert.deepEqual(renderPlan.bodyRenderSize, { width: 186, height: 72 });
+    assert.deepEqual(renderPlan.bodyRenderSize, { width: 190, height: 78 });
     assert.ok(renderPlan.bodyViewport);
     assert.deepEqual(renderPlan.bodyViewport, {
-        xCoordinate: 7,
-        yCoordinate: 21,
-        width: 186,
-        height: 72,
+        xCoordinate: 5,
+        yCoordinate: 17,
+        width: 190,
+        height: 78,
+        body: {
+            xOffset: 0,
+            yOffset: 0,
+            renderSize: { width: 190, height: 78 },
+        },
         clipRadius: 0,
     });
     assert.ok(renderPlan.bodyViewport.height >= 60);

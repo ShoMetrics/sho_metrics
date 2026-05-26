@@ -11,7 +11,11 @@ import {
     TERMINAL_CLEAN_RENDER_TEXT_STYLES,
     TERMINAL_VINTAGE_RENDER_TEXT_STYLES,
 } from "../view-rendering/render-text-style";
-import { DEFAULT_PIXEL_WINDOW_PALETTE } from "../view-rendering/pixel-window-theme-tokens";
+import { DEFAULT_RENDER_LAYOUT_TOKENS } from "../view-rendering/render-layout-tokens";
+import {
+    DEFAULT_PIXEL_WINDOW_LAYOUT_TOKENS,
+    DEFAULT_PIXEL_WINDOW_PALETTE,
+} from "../view-rendering/pixel-window-theme-tokens";
 import { buildMetricRenderAppearance } from "./render-appearance-builder";
 import { buildDefaultAppearanceSettings as buildAppearanceSettings } from "./default-appearance-settings";
 
@@ -108,6 +112,16 @@ test("theme effects map resolved appearance settings to renderer effect tokens",
     assert.deepEqual(terminalCleanSettings.themeEffects, TERMINAL_CLEAN_RENDER_THEME_EFFECT_TOKENS);
     assert.deepEqual(terminalVintageSettings.themeEffects, TERMINAL_VINTAGE_RENDER_THEME_EFFECT_TOKENS);
     assert.deepEqual(pixelWindowSettings.themeEffects, DEFAULT_RENDER_THEME_EFFECT_TOKENS);
+});
+
+test("layout tokens map resolved appearance settings to renderer layout roles", () => {
+    const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings());
+    const pixelWindowSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: { selectedTheme: "pixel-window" },
+    }));
+
+    assert.deepEqual(visualSettings.layoutTokens, DEFAULT_RENDER_LAYOUT_TOKENS);
+    assert.deepEqual(pixelWindowSettings.layoutTokens, DEFAULT_PIXEL_WINDOW_LAYOUT_TOKENS);
 });
 
 test("solid color mode uses resolved appearance color", () => {
@@ -297,6 +311,7 @@ test("pixel window theme uses bundled pixel text and no-gradient paint", () => {
     });
     assert.equal(visualSettings.paints.backgroundFill, undefined);
     assert.equal(visualSettings.paints.primaryText, DEFAULT_PIXEL_WINDOW_PALETTE.bodyText);
+    assert.equal(visualSettings.paints.metricValueText, DEFAULT_PIXEL_WINDOW_PALETTE.bodyText);
 });
 
 test("color filled solid mode uses theme background color and neutral foreground paint", () => {

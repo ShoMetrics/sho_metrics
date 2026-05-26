@@ -57,7 +57,13 @@ test("text variant preview URIs render every Property Inspector text variant wit
 });
 
 test("metric theme preview URIs render every Property Inspector theme without throwing", () => {
-    const metricThemes: readonly MetricTheme[] = ["flat", "cupertino-glass", "color-filled", "terminal"];
+    const metricThemes: readonly MetricTheme[] = [
+        "flat",
+        "cupertino-glass",
+        "color-filled",
+        "terminal",
+        "pixel-window",
+    ];
 
     for (const metricTheme of metricThemes) {
         const previewUri = buildMetricThemePreviewUri(metricTheme, buildGpuPreviewInput());
