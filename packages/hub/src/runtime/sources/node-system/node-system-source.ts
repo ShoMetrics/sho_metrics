@@ -52,6 +52,7 @@ import {
 } from "./node-system-disk";
 import {
     getActiveNvidiaSmiQueryCount,
+    pollDarwinIoAcceleratorGpuTelemetry,
     pollSystemInformationGpuTelemetry,
     pollWindowsNvidiaGpuTelemetry,
     reserveNodeSystemGpuPollDebugSequence,
@@ -110,6 +111,7 @@ interface NodeSystemSourceDependencies {
     platform?: NodeJS.Platform;
     now?: () => number;
     pollWindowsGpuTelemetry?: () => Promise<NodeSystemGpuTelemetryData | null>;
+    pollDarwinGpuTelemetry?: () => Promise<NodeSystemGpuTelemetryData | null>;
     pollSystemInformationGpuTelemetry?: (
         systemInformation: NodeSystemInformationClient,
     ) => Promise<NodeSystemGpuTelemetryData | null>;
@@ -137,6 +139,7 @@ export class NodeSystemSource implements MetricSource {
     private readonly platform: NodeJS.Platform;
     private readonly now: () => number;
     private readonly pollWindowsGpuTelemetry: () => Promise<NodeSystemGpuTelemetryData | null>;
+    private readonly pollDarwinGpuTelemetry: () => Promise<NodeSystemGpuTelemetryData | null>;
     private readonly pollSystemInformationGpuTelemetry: (
         systemInformation: NodeSystemInformationClient,
     ) => Promise<NodeSystemGpuTelemetryData | null>;
@@ -174,6 +177,7 @@ export class NodeSystemSource implements MetricSource {
         this.platform = dependencies.platform ?? process.platform;
         this.now = dependencies.now ?? Date.now;
         this.pollWindowsGpuTelemetry = dependencies.pollWindowsGpuTelemetry ?? pollWindowsNvidiaGpuTelemetry;
+        this.pollDarwinGpuTelemetry = dependencies.pollDarwinGpuTelemetry ?? pollDarwinIoAcceleratorGpuTelemetry;
         this.pollSystemInformationGpuTelemetry = dependencies.pollSystemInformationGpuTelemetry
             ?? pollSystemInformationGpuTelemetry;
         this.networkInterfaceCache = new RefreshableCache({
@@ -205,13 +209,24 @@ export class NodeSystemSource implements MetricSource {
     resolveMetricPollingGroups(
         metricKeys: readonly string[],
     ): ReadonlyMap<string, SourceMetricPollingGroupResolution> {
-        return new Map(metricKeys.map(metricKey => {
+        const resolutions = new Map<string, SourceMetricPollingGroupResolution>();
+
+        for (const metricKey of metricKeys) {
+            if (this.platform === "darwin"
+                && isGpuMetricKey(metricKey)
+                && metricKey !== GPU_USAGE_METRIC_KEY) {
+                resolutions.set(metricKey, { state: "unsupported" });
+                continue;
+            }
+
             const metricGroup = resolveNodeSystemMetricGroup(metricKey);
 
-            return [metricKey, metricGroup
+            resolutions.set(metricKey, metricGroup
                 ? { state: "owned", pollingGroupId: metricGroup }
-                : { state: "unknown" }];
-        }));
+                : { state: "unknown" });
+        }
+
+        return resolutions;
     }
 
     async pollMetrics(metricKeys: readonly string[]): Promise<MetricSnapshot> {
@@ -230,21 +245,29 @@ export class NodeSystemSource implements MetricSource {
         Object.assign(metrics, cpuMetrics, memoryMetrics, diskMetrics, networkMetrics);
 
         if (gpu) {
-            metrics[GPU_USAGE_METRIC_KEY] = buildScalarMetricValue(gpu.utilizationGpu ?? 0, {
-                unit: MetricUnit.PERCENT,
-            });
+            if (typeof gpu.utilizationGpu === "number" && Number.isFinite(gpu.utilizationGpu)) {
+                metrics[GPU_USAGE_METRIC_KEY] = buildScalarMetricValue(gpu.utilizationGpu, {
+                    unit: MetricUnit.PERCENT,
+                });
+            }
             if (gpu.modelText) {
                 metrics[GPU_MODEL_METRIC_KEY] = buildTextMetricValue(gpu.modelText);
             }
-            metrics[GPU_TEMP_METRIC_KEY] = buildScalarMetricValue(gpu.temperatureGpu ?? 0, { unit: MetricUnit.CELSIUS });
-            metrics[GPU_VRAM_USED_METRIC_KEY] = buildScalarMetricValue(
-                (gpu.memoryUsed ?? 0) * BYTES_PER_MEBIBYTE,
-                { unit: MetricUnit.BYTES },
-            );
-            metrics[GPU_VRAM_TOTAL_METRIC_KEY] = buildScalarMetricValue(
-                (gpu.memoryTotal ?? 0) * BYTES_PER_MEBIBYTE,
-                { unit: MetricUnit.BYTES },
-            );
+            if (typeof gpu.temperatureGpu === "number" && Number.isFinite(gpu.temperatureGpu)) {
+                metrics[GPU_TEMP_METRIC_KEY] = buildScalarMetricValue(gpu.temperatureGpu, { unit: MetricUnit.CELSIUS });
+            }
+            if (typeof gpu.memoryUsed === "number" && Number.isFinite(gpu.memoryUsed)) {
+                metrics[GPU_VRAM_USED_METRIC_KEY] = buildScalarMetricValue(
+                    gpu.memoryUsed * BYTES_PER_MEBIBYTE,
+                    { unit: MetricUnit.BYTES },
+                );
+            }
+            if (typeof gpu.memoryTotal === "number" && Number.isFinite(gpu.memoryTotal)) {
+                metrics[GPU_VRAM_TOTAL_METRIC_KEY] = buildScalarMetricValue(
+                    gpu.memoryTotal * BYTES_PER_MEBIBYTE,
+                    { unit: MetricUnit.BYTES },
+                );
+            }
             if (typeof gpu.powerDraw === "number" && Number.isFinite(gpu.powerDraw)) {
                 metrics[GPU_POWER_METRIC_KEY] = buildScalarMetricValue(gpu.powerDraw, { unit: MetricUnit.WATTS });
             }
@@ -670,9 +693,7 @@ export class NodeSystemSource implements MetricSource {
 
         this.pendingGpuPromise = (async () => {
             try {
-                const gpuData = this.platform === "win32"
-                    ? await this.pollWindowsGpuTelemetry()
-                    : await this.pollSystemInformationGpuTelemetry(this.systemInformation);
+                const gpuData = await this.pollPlatformGpuTelemetry();
 
                 if (gpuData) {
                     this.cachedGpuData = gpuData;
@@ -690,6 +711,18 @@ export class NodeSystemSource implements MetricSource {
         })();
 
         return this.pendingGpuPromise;
+    }
+
+    private async pollPlatformGpuTelemetry(): Promise<NodeSystemGpuTelemetryData | null> {
+        if (this.platform === "win32") {
+            return await this.pollWindowsGpuTelemetry();
+        }
+
+        if (this.platform === "darwin") {
+            return await this.pollDarwinGpuTelemetry();
+        }
+
+        return await this.pollSystemInformationGpuTelemetry(this.systemInformation);
     }
 }
 

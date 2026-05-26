@@ -24,6 +24,7 @@ import {
     toDiskVolumeOption,
 } from "./node-system-disk";
 import {
+    parseIoAcceleratorPerformanceStatistics,
     parseNvidiaSmiNumber,
     parseNvidiaSmiTelemetryLine,
 } from "./node-system-gpu";
@@ -82,6 +83,31 @@ test("node system source declares polling groups for owned metric keys", () => {
     });
     assert.deepEqual(resolutions.get("unknown.metric"), {
         state: "unknown",
+    });
+});
+
+test("node system source declares only GPU usage as supported on macOS", () => {
+    const source = new NodeSystemSource({ platform: "darwin" });
+
+    const resolutions = source.resolveMetricPollingGroups([
+        "gpu.usage_percent",
+        "gpu.temp",
+        "gpu.vram_used",
+        "gpu.power",
+    ]);
+
+    assert.deepEqual(resolutions.get("gpu.usage_percent"), {
+        state: "owned",
+        pollingGroupId: "gpu",
+    });
+    assert.deepEqual(resolutions.get("gpu.temp"), {
+        state: "unsupported",
+    });
+    assert.deepEqual(resolutions.get("gpu.vram_used"), {
+        state: "unsupported",
+    });
+    assert.deepEqual(resolutions.get("gpu.power"), {
+        state: "unsupported",
     });
 });
 
@@ -573,6 +599,66 @@ test("node system source maps injected GPU telemetry without polling systeminfor
     assert.equal(callCounts.currentLoad, 0);
 });
 
+test("node system source maps injected macOS GPU usage without polling systeminformation", async () => {
+    const callCounts = buildCallCounts();
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts),
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollDarwinGpuTelemetry: async () => {
+            callCounts.darwinGpu += 1;
+            return {
+                utilizationGpu: 63,
+            };
+        },
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+        platform: "darwin",
+    });
+
+    const snapshot = await source.pollMetrics(["gpu.usage_percent"]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.deepEqual(metrics, {
+        "gpu.usage_percent": {
+            scalar: 63,
+            unit: MetricUnit.PERCENT,
+        },
+    });
+    assert.equal(callCounts.darwinGpu, 1);
+    assert.equal(callCounts.windowsGpu, 0);
+    assert.equal(callCounts.systemGpu, 0);
+    assert.equal(callCounts.graphics, 0);
+});
+
+test("node system source omits unavailable GPU telemetry fields", async () => {
+    const callCounts = buildCallCounts();
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts),
+        pollWindowsGpuTelemetry: async () => {
+            callCounts.windowsGpu += 1;
+            return {
+                utilizationGpu: 75,
+                modelText: "NVIDIA RTX",
+            };
+        },
+        pollDarwinGpuTelemetry: buildNoDarwinGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+        platform: "win32",
+    });
+
+    const snapshot = await source.pollMetrics(["gpu.usage_percent"]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.deepEqual(metrics, {
+        "gpu.usage_percent": {
+            scalar: 75,
+            unit: MetricUnit.PERCENT,
+        },
+        "gpu.model": {
+            text: "NVIDIA RTX",
+        },
+    });
+});
+
 test("first network counter sample produces a zero rate", () => {
     const networkRate = calculateNetworkRate({
         interfaceId: "en0",
@@ -718,6 +804,50 @@ test("nvidia-smi telemetry line maps all supported fields", () => {
 
 test("nvidia-smi telemetry line returns null when every field is absent", () => {
     const telemetryData = parseNvidiaSmiTelemetryLine("N/A, N/A, N/A, N/A, N/A, N/A, N/A");
+
+    assert.equal(telemetryData, null);
+});
+
+test("IOAccelerator performance statistics parse GPU device utilization", () => {
+    const telemetryData = parseIoAcceleratorPerformanceStatistics(`
++-o AGXAcceleratorG13X  <class AGXAcceleratorG13X>
+    {
+      "PerformanceStatistics" = {"Renderer Utilization %"=11,"Device Utilization %"=42,"Tiler Utilization %"=7}
+      "model" = "Apple M1 Pro"
+    }
+`);
+
+    assert.deepEqual(telemetryData, {
+        utilizationGpu: 42,
+    });
+});
+
+test("IOAccelerator performance statistics use the highest valid device utilization", () => {
+    const telemetryData = parseIoAcceleratorPerformanceStatistics(`
+      "PerformanceStatistics" = {"Device Utilization %"=18}
+      "PerformanceStatistics" = {"Device Utilization %"=75}
+      "PerformanceStatistics" = {"Device Utilization %"=101}
+`);
+
+    assert.deepEqual(telemetryData, {
+        utilizationGpu: 75,
+    });
+});
+
+test("IOAccelerator performance statistics fall back to GPU activity", () => {
+    const telemetryData = parseIoAcceleratorPerformanceStatistics(`
+      "PerformanceStatistics" = {"GPU Activity(%)"=38}
+`);
+
+    assert.deepEqual(telemetryData, {
+        utilizationGpu: 38,
+    });
+});
+
+test("IOAccelerator performance statistics return null when device utilization is absent", () => {
+    const telemetryData = parseIoAcceleratorPerformanceStatistics(`
+      "PerformanceStatistics" = {"Renderer Utilization %"=32,"Tiler Utilization %"=24}
+`);
 
     assert.equal(telemetryData, null);
 });
@@ -927,6 +1057,7 @@ interface NodeSystemSourceCallCounts {
     networkStats: number;
     graphics: number;
     windowsGpu: number;
+    darwinGpu: number;
     systemGpu: number;
 }
 
@@ -943,6 +1074,7 @@ function buildCallCounts(): NodeSystemSourceCallCounts {
         networkStats: 0,
         graphics: 0,
         windowsGpu: 0,
+        darwinGpu: 0,
         systemGpu: 0,
     };
 }
@@ -1001,6 +1133,15 @@ function buildNoGpuPoller(
 ): () => Promise<NodeSystemGpuTelemetryData | null> {
     return async () => {
         callCounts.windowsGpu += 1;
+        return null;
+    };
+}
+
+function buildNoDarwinGpuPoller(
+    callCounts: NodeSystemSourceCallCounts,
+): () => Promise<NodeSystemGpuTelemetryData | null> {
+    return async () => {
+        callCounts.darwinGpu += 1;
         return null;
     };
 }

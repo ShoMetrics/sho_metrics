@@ -27,6 +27,15 @@ const NVIDIA_SMI_ARGUMENTS = [
 
 const NVIDIA_SMI_TIMEOUT_MS = 3000;
 const NVIDIA_SMI_FAILURE_LOG_INTERVAL_MS = 30000;
+// Do not add `-k PerformanceStatistics`: on Apple Silicon it can return zeroed
+// utilization counters while the unfiltered IOAccelerator object has live values.
+const IOREG_ARGUMENTS = ["-r", "-c", "IOAccelerator", "-d", "1", "-w", "0"] as const;
+const IOREG_TIMEOUT_MS = 1000;
+const IOREG_MAX_BUFFER_BYTES = 2 * 1024 * 1024;
+const IOREG_FAILURE_LOG_INTERVAL_MS = 30000;
+const IOREG_TELEMETRY_DEBUG_LOG_INTERVAL_MS = 5000;
+
+let lastIoregFailureLogTimestampMilliseconds = 0;
 
 export function reserveNodeSystemGpuPollDebugSequence(): number {
     return nextGpuPollDebugSequence++;
@@ -67,6 +76,22 @@ export async function pollWindowsNvidiaGpuTelemetry(): Promise<NodeSystemGpuTele
     return gpuData;
 }
 
+export async function pollDarwinIoAcceleratorGpuTelemetry(): Promise<NodeSystemGpuTelemetryData | null> {
+    const output = await runIoregIoAcceleratorQuery();
+
+    if (!output) {
+        gpuLog.debug("ioregEmptyOutput");
+        return null;
+    }
+
+    const statisticGroups = readIoAcceleratorPerformanceStatisticGroups(output);
+    const telemetryData = parseIoAcceleratorPerformanceStatisticsFromGroups(statisticGroups);
+
+    logIoAcceleratorTelemetryDebug(statisticGroups, telemetryData);
+
+    return telemetryData;
+}
+
 export async function pollSystemInformationGpuTelemetry(
     systemInformation: NodeSystemInformationClient,
 ): Promise<NodeSystemGpuTelemetryData | null> {
@@ -89,6 +114,30 @@ export async function pollSystemInformationGpuTelemetry(
         powerDraw: nvidiaController.powerDraw,
         powerLimit: nvidiaController.powerLimit,
     };
+}
+
+function runIoregIoAcceleratorQuery(): Promise<string | null> {
+    return new Promise(resolve => {
+        const queryStartTimestampMilliseconds = Date.now();
+
+        execFile(
+            "ioreg",
+            [...IOREG_ARGUMENTS],
+            {
+                timeout: IOREG_TIMEOUT_MS,
+                maxBuffer: IOREG_MAX_BUFFER_BYTES,
+            },
+            (error: ExecFileException | null, stdout: string) => {
+                if (error) {
+                    logIoregFailure(error, Date.now() - queryStartTimestampMilliseconds);
+                    resolve(null);
+                    return;
+                }
+
+                resolve(stdout);
+            },
+        );
+    });
 }
 
 function runNvidiaSmiTelemetryQuery(): Promise<string | null> {
@@ -139,6 +188,27 @@ function runNvidiaSmiTelemetryQuery(): Promise<string | null> {
             },
         );
     });
+}
+
+function logIoregFailure(error: ExecFileException, elapsedMilliseconds: number): void {
+    const currentTimestampMilliseconds = Date.now();
+
+    if (
+        currentTimestampMilliseconds - lastIoregFailureLogTimestampMilliseconds
+        < IOREG_FAILURE_LOG_INTERVAL_MS
+    ) {
+        return;
+    }
+
+    lastIoregFailureLogTimestampMilliseconds = currentTimestampMilliseconds;
+    gpuLog.warn(() => [
+        "ioreg IOAccelerator GPU telemetry query failed",
+        `elapsedMs=${elapsedMilliseconds}`,
+        `timeoutMs=${IOREG_TIMEOUT_MS}`,
+        `code=${String(error.code ?? "unknown")}`,
+        `signal=${String(error.signal ?? "none")}`,
+        `message=${error.message}`,
+    ].join(" "));
 }
 
 function logNvidiaSmiFailure(options: {
@@ -210,4 +280,81 @@ export function parseNvidiaSmiNumber(value: string | undefined): number | undefi
     const numericValue = Number(value);
 
     return Number.isFinite(numericValue) ? numericValue : undefined;
+}
+
+export function parseIoAcceleratorPerformanceStatistics(output: string): NodeSystemGpuTelemetryData | null {
+    const statisticGroups = readIoAcceleratorPerformanceStatisticGroups(output);
+    return parseIoAcceleratorPerformanceStatisticsFromGroups(statisticGroups);
+}
+
+function parseIoAcceleratorPerformanceStatisticsFromGroups(
+    statisticGroups: readonly IoAcceleratorPerformanceStatistics[],
+): NodeSystemGpuTelemetryData | null {
+    const deviceUtilizationPercentages = statisticGroups
+        .map(statistics => statistics.utilization)
+        .filter((value): value is number => value !== undefined && value >= 0 && value <= 100);
+
+    if (deviceUtilizationPercentages.length === 0) {
+        return null;
+    }
+
+    return {
+        utilizationGpu: Math.max(...deviceUtilizationPercentages),
+    };
+}
+
+interface IoAcceleratorPerformanceStatistics {
+    readonly utilization: number | undefined;
+    readonly deviceUtilization: number | undefined;
+    readonly gpuActivity: number | undefined;
+    readonly rendererUtilization: number | undefined;
+    readonly tilerUtilization: number | undefined;
+}
+
+function readIoAcceleratorPerformanceStatisticGroups(output: string): IoAcceleratorPerformanceStatistics[] {
+    // IOAccelerator exposes PerformanceStatistics as a flat dictionary today.
+    // Nested dictionaries would require a structured parser instead of this regex.
+    return [...output.matchAll(/"PerformanceStatistics"\s*=\s*\{(?<statistics>[^}]*)\}/g)]
+        .map(match => match.groups?.statistics ?? "")
+        .map(readIoAcceleratorPerformanceStatistics);
+}
+
+function readIoAcceleratorPerformanceStatistics(statistics: string): IoAcceleratorPerformanceStatistics {
+    const deviceUtilization = readIoAcceleratorStatisticValue(statistics, "Device Utilization %");
+    const gpuActivity = readIoAcceleratorStatisticValue(statistics, "GPU Activity(%)");
+
+    return {
+        utilization: deviceUtilization ?? gpuActivity,
+        deviceUtilization,
+        gpuActivity,
+        rendererUtilization: readIoAcceleratorStatisticValue(statistics, "Renderer Utilization %"),
+        tilerUtilization: readIoAcceleratorStatisticValue(statistics, "Tiler Utilization %"),
+    };
+}
+
+function readIoAcceleratorStatisticValue(statistics: string, key: string): number | undefined {
+    const statisticsEntries = [...statistics.matchAll(/"(?<key>[^"]+)"=(?<value>-?\d+(?:\.\d+)?)/g)];
+    const matchingEntry = statisticsEntries.find(entry => entry.groups?.key === key);
+    const rawValue = matchingEntry?.groups?.value;
+
+    if (rawValue === undefined) {
+        return undefined;
+    }
+
+    const value = Number(rawValue);
+
+    return Number.isFinite(value) ? value : undefined;
+}
+
+function logIoAcceleratorTelemetryDebug(
+    statisticGroups: readonly IoAcceleratorPerformanceStatistics[],
+    telemetryData: NodeSystemGpuTelemetryData | null,
+): void {
+    gpuLog.atDebug()
+        .everyMs("ioreg-telemetry", IOREG_TELEMETRY_DEBUG_LOG_INTERVAL_MS)
+        .log(() => [
+            "ioregTelemetry",
+            `parsedUsage=${String(telemetryData?.utilizationGpu ?? "none")}`,
+            `statistics=${JSON.stringify(statisticGroups)}`,
+        ].join(" "));
 }
