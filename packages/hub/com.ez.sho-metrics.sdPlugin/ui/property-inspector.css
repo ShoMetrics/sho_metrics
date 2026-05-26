@@ -1,4 +1,5 @@
 html {
+    overflow-x: clip;
     overflow-y: auto;
     scrollbar-gutter: stable;
 }
@@ -30,6 +31,7 @@ body {
 #property-inspector-root {
     max-width: 100%;
     min-width: 0;
+    overflow-x: clip;
 }
 
 .usage-range {
