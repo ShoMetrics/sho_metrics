@@ -61,11 +61,13 @@ export function renderMetricTextRow(options: MetricTextRowOptions): string {
                 text: options.value.text,
                 fontSize: rawValueFontSize,
                 fontWeight: options.value.textStyle.fontWeight,
+                letterSpacing: rawValueFontSize * options.value.textStyle.letterSpacingEm,
             },
             {
                 text: options.unit.text,
                 fontSize: rawUnitFontSize,
                 fontWeight: options.unit.textStyle.fontWeight,
+                letterSpacing: rawUnitFontSize * options.unit.textStyle.letterSpacingEm,
             },
         ],
         maxWidth: width,
@@ -81,6 +83,8 @@ export function renderMetricTextRow(options: MetricTextRowOptions): string {
     });
     const valueFontSize = rawValueFontSize * textFit.fontScale;
     const unitFontSize = rawUnitFontSize * textFit.fontScale;
+    const valueLetterSpacing = valueFontSize * options.value.textStyle.letterSpacingEm;
+    const unitLetterSpacing = unitFontSize * options.unit.textStyle.letterSpacingEm;
     const unitGap = unitTier.gap * textFit.fontScale;
     const yCoordinate = options.layout.yCoordinate + valueFontSize * options.value.textStyle.baselineShiftEm;
     const unitBaselineShift = unitFontSize * options.unit.textStyle.baselineShiftEm
@@ -101,18 +105,20 @@ export function renderMetricTextRow(options: MetricTextRowOptions): string {
     const unitAttributes = options.unit.extraAttributes?.length
         ? ` ${options.unit.extraAttributes.join(" ")}`
         : "";
+    const valueLetterSpacingAttribute = formatSvgLetterSpacingAttribute(valueLetterSpacing);
+    const unitLetterSpacingAttribute = formatSvgLetterSpacingAttribute(unitLetterSpacing);
     const unitTspan = options.unit.text.length > 0
         ? `<tspan dx="${formatSvgNumber(unitGap)}" dy="${formatSvgNumber(unitBaselineOffset)}"
                 font-family="${escapeSvgText(options.unit.textStyle.fontFamily)}" font-size="${formatSvgNumber(unitFontSize)}"
                 font-weight="${escapeSvgText(String(options.unit.textStyle.fontWeight))}"
-                fill="${escapeSvgText(options.unit.fill)}"${unitAttributes}>${escapeSvgText(options.unit.text)}</tspan>`
+                fill="${escapeSvgText(options.unit.fill)}"${unitLetterSpacingAttribute}${unitAttributes}>${escapeSvgText(options.unit.text)}</tspan>`
         : "";
     const textFitAttributes = formatSvgTextFitAttributes(textFit);
     const textElement = `<text x="${formatSvgNumber(options.layout.xCoordinate)}" y="${formatSvgNumber(yCoordinate)}"
                 text-anchor="${textAnchor}" dominant-baseline="middle"${textFitAttributes}><tspan
                     font-family="${escapeSvgText(options.value.textStyle.fontFamily)}" font-size="${formatSvgNumber(valueFontSize)}"
                     font-weight="${escapeSvgText(String(options.value.textStyle.fontWeight))}"
-                    fill="${escapeSvgText(options.value.fill)}"${valueAttributes}>${escapeSvgText(options.value.text)}</tspan>${unitTspan}</text>`;
+                    fill="${escapeSvgText(options.value.fill)}"${valueLetterSpacingAttribute}${valueAttributes}>${escapeSvgText(options.value.text)}</tspan>${unitTspan}</text>`;
 
     return `
         <defs>
@@ -181,4 +187,12 @@ function formatSvgNumber(value: number): string {
     const roundedValue = clamp(finiteValue, -10000, 10000);
 
     return Number.isInteger(roundedValue) ? String(roundedValue) : roundedValue.toFixed(2);
+}
+
+function formatSvgLetterSpacingAttribute(letterSpacing: number): string {
+    if (letterSpacing === 0) {
+        return "";
+    }
+
+    return ` letter-spacing="${formatSvgNumber(letterSpacing)}"`;
 }

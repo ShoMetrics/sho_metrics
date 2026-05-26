@@ -1,6 +1,4 @@
 import type { MetricRenderAppearance } from "../view-rendering/render-appearance";
-import { DEFAULT_RENDER_LAYOUT_TOKENS, type RenderLayoutTokens } from "../view-rendering/render-layout-tokens";
-import { DEFAULT_PIXEL_WINDOW_LAYOUT_TOKENS } from "../view-rendering/pixel-window-theme-tokens";
 import type { ThemePresetName } from "../widgets/widget-contract";
 import type {
     MetricView,
@@ -29,21 +27,12 @@ export function buildMetricRenderAppearance(
         themePreset: resolveThemePresetName(settings.theme),
         paintConstraint: renderPaint.paintConstraint,
         paints: renderPaint.paintTokens,
-        layoutTokens: resolveRenderLayoutTokens(settings.theme),
         textStyles: resolveRenderTextStyles(settings),
         themeEffects: resolveRenderThemeEffects(settings),
         lineSmoothingPercent: settings.line.lineSmoothingPercent,
         gridLineVisibility: settings.line.gridLineVisibility,
         gridLineType: settings.line.gridLineType,
     };
-}
-
-function resolveRenderLayoutTokens(theme: ResolvedAppearanceThemeSettings): RenderLayoutTokens {
-    if (theme.selectedTheme === "pixel-window") {
-        return DEFAULT_PIXEL_WINDOW_LAYOUT_TOKENS;
-    }
-
-    return DEFAULT_RENDER_LAYOUT_TOKENS;
 }
 
 function resolveRenderPrimitive(view: MetricView): MetricRenderAppearance["renderPrimitive"] {

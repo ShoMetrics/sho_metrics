@@ -281,10 +281,6 @@ function buildBlackWhiteRenderAppearance(options: {
             grid: "rgba(255,255,255,0.18)",
             divider: "rgba(255,255,255,0.18)",
         },
-        layoutTokens: {
-            singleProgressCircleCenterIconScale: 1,
-            dualProgressCircleCenterIconScale: 0.86,
-        },
         textStyles: DEFAULT_RENDER_TEXT_STYLES,
         themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
         lineSmoothingPercent: 75,

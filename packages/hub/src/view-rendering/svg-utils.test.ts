@@ -169,6 +169,24 @@ test("styled SVG text applies clip height without changing font size", () => {
     assert.match(styledText, /font-size="20"/);
 });
 
+test("styled SVG text applies font-relative letter spacing", () => {
+    const styledText = renderStyledSvgText({
+        id: "letter-spacing",
+        text: "NET",
+        xCoordinate: 42,
+        yCoordinate: 30,
+        maxWidth: 120,
+        baseFontSize: 20,
+        fill: "#fff",
+        textStyle: {
+            ...DEFAULT_RENDER_TEXT_STYLES.label,
+            letterSpacingEm: 0.08,
+        },
+    });
+
+    assert.match(styledText, /letter-spacing="1\.60"/);
+});
+
 test("styled SVG text lets layout fit options override the style minimum font scale", () => {
     const styledText = renderStyledSvgText({
         id: "layout-fit",
@@ -200,6 +218,23 @@ test("SVG text fitting applies width scale before the guard ratio", () => {
     assert.equal(roomyFit.textLength, null);
     assert.equal(strictFit.textLength, 87);
     assert.ok(strictFit.fontScale < roomyFit.fontScale);
+});
+
+test("SVG text fitting includes letter spacing in estimated width", () => {
+    const normalFit = resolveSvgTextFit({
+        runs: [{ text: "NET", fontSize: 18, fontWeight: 850 }],
+        maxWidth: 38,
+        fitOptions: { widthGuardRatio: 1 },
+    });
+    const spacedFit = resolveSvgTextFit({
+        runs: [{ text: "NET", fontSize: 18, fontWeight: 850, letterSpacing: 2 }],
+        maxWidth: 38,
+        fitOptions: { widthGuardRatio: 1 },
+    });
+
+    assert.equal(normalFit.textLength, null);
+    assert.equal(spacedFit.textLength, 38);
+    assert.ok(spacedFit.fontScale < normalFit.fontScale);
 });
 
 test("SVG text fitting clamps minimum font scale to safe bounds", () => {

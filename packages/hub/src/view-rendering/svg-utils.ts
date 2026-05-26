@@ -1,6 +1,7 @@
 import { adjustHexColorBrightness } from "../shared/color-utils";
 import {
     DEFAULT_RENDER_TEXT_CLIP_HEIGHT_EM,
+    DEFAULT_RENDER_TEXT_LETTER_SPACING_EM,
     DEFAULT_RENDER_TEXT_MINIMUM_FONT_SCALE,
     DEFAULT_RENDER_TEXT_WIDTH_SCALE,
     resolveRenderTextStyleFontSize,
@@ -39,6 +40,7 @@ export interface ConstrainedSvgTextOptions {
     /** Legacy title-card escape hatch. New callers should prefer clipHeightEm. */
     clipHeight?: number;
     clipHeightEm?: number;
+    letterSpacingEm?: number;
     extraAttributes?: readonly string[];
     fitOptions?: SvgTextFitOptions;
 }
@@ -68,6 +70,7 @@ export interface SvgTextFitRun {
     text: string;
     fontSize: number;
     fontWeight?: number | string;
+    letterSpacing?: number;
 }
 
 export interface SvgTextFitResult {
@@ -95,6 +98,7 @@ export function renderStyledSvgText(options: StyledSvgTextOptions): string {
         textAnchor: options.textAnchor,
         dominantBaseline: options.dominantBaseline,
         clipHeightEm: options.textStyle.clipHeightEm,
+        letterSpacingEm: options.textStyle.letterSpacingEm,
         extraAttributes: options.extraAttributes,
         fitOptions: {
             ...options.fitOptions,
@@ -118,11 +122,13 @@ export function renderConstrainedSvgText(options: ConstrainedSvgTextOptions): st
             text: options.text,
             fontSize: options.fontSize,
             fontWeight: options.fontWeight,
+            letterSpacing: options.fontSize * (options.letterSpacingEm ?? DEFAULT_RENDER_TEXT_LETTER_SPACING_EM),
         }],
         maxWidth,
         fitOptions: options.fitOptions,
     });
     const fontSize = options.fontSize * textFit.fontScale;
+    const letterSpacing = fontSize * (options.letterSpacingEm ?? DEFAULT_RENDER_TEXT_LETTER_SPACING_EM);
     const clipHeight = options.clipHeight ?? fontSize * (options.clipHeightEm ?? DEFAULT_RENDER_TEXT_CLIP_HEIGHT_EM);
     const clipXCoordinate = resolveTextClipXCoordinate(options.xCoordinate, maxWidth, textAnchor);
     const clipYCoordinate = dominantBaseline === "middle"
@@ -133,6 +139,7 @@ export function renderConstrainedSvgText(options: ConstrainedSvgTextOptions): st
         ? ` ${options.extraAttributes.join(" ")}`
         : "";
     const textFitAttributes = formatSvgTextFitAttributes(textFit);
+    const letterSpacingAttribute = formatSvgLetterSpacingAttribute(letterSpacing);
 
     return `
         <defs>
@@ -146,7 +153,7 @@ export function renderConstrainedSvgText(options: ConstrainedSvgTextOptions): st
                 text-anchor="${textAnchor}" dominant-baseline="${dominantBaseline}"
                 font-family="${escapeSvgText(options.fontFamily)}"
                 font-size="${formatSvgNumber(fontSize)}" font-weight="${escapeSvgText(String(options.fontWeight))}"
-                fill="${escapeSvgText(options.fill)}"${textFitAttributes}${extraAttributes}>${escapeSvgText(options.text)}</text>
+                fill="${escapeSvgText(options.fill)}"${letterSpacingAttribute}${textFitAttributes}${extraAttributes}>${escapeSvgText(options.text)}</text>
         </g>
     `;
 }
@@ -231,10 +238,12 @@ function resolveTextClipXCoordinate(xCoordinate: number, maxWidth: number, textA
 function estimateSvgTextRunWidth(textRun: SvgTextFitRun): number {
     const fontWeight = typeof textRun.fontWeight === "number" ? textRun.fontWeight : 400;
     const weightRatio = fontWeight >= 850 ? 1.03 : fontWeight >= 700 ? 1.015 : 1;
+    const characterCount = Array.from(textRun.text).length;
+    const letterSpacingWidth = Math.max(0, characterCount - 1) * (textRun.letterSpacing ?? 0);
 
     return Array.from(textRun.text).reduce((widthTotal, character) => {
         return widthTotal + estimateSvgCharacterWidthRatio(character) * textRun.fontSize * weightRatio;
-    }, 0);
+    }, letterSpacingWidth);
 }
 
 function estimateSvgCharacterWidthRatio(character: string): number {
@@ -281,4 +290,12 @@ export function sanitizeSvgId(id: string, fallbackId: string): string {
 
 function formatSvgNumber(value: number): string {
     return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function formatSvgLetterSpacingAttribute(letterSpacing: number): string {
+    if (letterSpacing === 0) {
+        return "";
+    }
+
+    return ` letter-spacing="${formatSvgNumber(letterSpacing)}"`;
 }

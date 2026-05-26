@@ -113,26 +113,14 @@ function resolveBodyPlacement(
     keySize: KeySize,
     viewportSize: Pick<PixelWindowRect, "width" | "height">,
 ): ThemeBodyPlacement {
-    if (keySize.width > keySize.height) {
-        return {
-            xOffset: 0,
-            yOffset: 0,
-            renderSize: {
-                width: viewportSize.width,
-                height: viewportSize.height,
-            },
-        };
-    }
-
-    const bodySize = Math.min(viewportSize.width, viewportSize.height);
+    const scale = Math.min(viewportSize.width / keySize.width, viewportSize.height / keySize.height);
+    const scaledWidth = keySize.width * scale;
+    const scaledHeight = keySize.height * scale;
 
     return {
-        xOffset: Math.floor((viewportSize.width - bodySize) / 2),
-        yOffset: Math.floor((viewportSize.height - bodySize) / 2),
-        renderSize: {
-            width: bodySize,
-            height: bodySize,
-        },
+        xOffset: Math.floor((viewportSize.width - scaledWidth) / 2),
+        yOffset: Math.floor((viewportSize.height - scaledHeight) / 2),
+        renderSize: keySize,
     };
 }
 

@@ -1,5 +1,4 @@
 import type { ColorConfig } from "./color-resolver";
-import type { RenderLayoutTokens } from "./render-layout-tokens";
 import type { RenderTextStyles } from "./render-text-style";
 import type { RenderThemeEffectTokens } from "./render-svg-effects";
 import type { CircleVariant } from "../widgets/primitives/progress-circle";
@@ -49,7 +48,6 @@ export interface MetricRenderAppearance {
     readonly themePreset: ThemePresetName;
     readonly paintConstraint: RenderPaintConstraint;
     readonly paints: RenderPaintTokens;
-    readonly layoutTokens: RenderLayoutTokens;
     readonly textStyles: RenderTextStyles;
     readonly themeEffects: RenderThemeEffectTokens;
     readonly lineSmoothingPercent: number;

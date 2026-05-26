@@ -310,7 +310,7 @@ test("pixel window renders square widget body inside the client viewport", () =>
     });
 
     assert.deepEqual(frame.renderPlan.renderSize, WIDGET_LOGICAL_SIZE);
-    assert.deepEqual(frame.renderPlan.bodyRenderSize, { width: 120, height: 120 });
+    assert.deepEqual(frame.renderPlan.bodyRenderSize, WIDGET_LOGICAL_SIZE);
     assert.deepEqual(frame.renderPlan.bodyViewport, {
         xCoordinate: 5,
         yCoordinate: 19,
@@ -319,17 +319,16 @@ test("pixel window renders square widget body inside the client viewport", () =>
         body: {
             xOffset: 7,
             yOffset: 0,
-            renderSize: { width: 120, height: 120 },
+            renderSize: WIDGET_LOGICAL_SIZE,
         },
         clipRadius: 0,
     });
     assert.match(frame.svg, /width="144" height="144"/);
     assert.match(frame.svg, /viewBox="0 0 144 144"/);
-    assert.match(frame.svg, /<g transform="translate\(12 19\)">/);
-    assert.doesNotMatch(frame.svg, /scale\(/);
+    assert.match(frame.svg, /<g transform="translate\(12 19\) scale\(0\.8333\)">/);
 });
 
-test("pixel window wide touch strip uses the full client viewport as body render size", () => {
+test("pixel window wide touch strip scales the original body into the client viewport", () => {
     const renderPlan = buildMetricViewRenderPlan({
         viewOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
@@ -343,7 +342,7 @@ test("pixel window wide touch strip uses the full client viewport as body render
 
     assert.equal(renderPlan.touchStripMetricLayout?.kind, "wide");
     assert.deepEqual(renderPlan.renderSize, TOUCH_STRIP_LOGICAL_SIZE);
-    assert.deepEqual(renderPlan.bodyRenderSize, { width: 190, height: 78 });
+    assert.deepEqual(renderPlan.bodyRenderSize, TOUCH_STRIP_LOGICAL_SIZE);
     assert.ok(renderPlan.bodyViewport);
     assert.deepEqual(renderPlan.bodyViewport, {
         xCoordinate: 5,
@@ -351,9 +350,9 @@ test("pixel window wide touch strip uses the full client viewport as body render
         width: 190,
         height: 78,
         body: {
-            xOffset: 0,
+            xOffset: 17,
             yOffset: 0,
-            renderSize: { width: 190, height: 78 },
+            renderSize: TOUCH_STRIP_LOGICAL_SIZE,
         },
         clipRadius: 0,
     });

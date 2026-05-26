@@ -97,12 +97,23 @@ function renderBodyViewportClipPath(clipId: string, viewport: ThemeBodyViewport)
 function renderPlacedBody(body: string, viewport: ThemeBodyViewport, clipId: string): string {
     const xCoordinate = viewport.xCoordinate + viewport.body.xOffset;
     const yCoordinate = viewport.yCoordinate + viewport.body.yOffset;
+    const scale = Math.min(
+        viewport.width / viewport.body.renderSize.width,
+        viewport.height / viewport.body.renderSize.height,
+    );
+    const transform = scale === 1
+        ? `translate(${formatSvgNumber(xCoordinate)} ${formatSvgNumber(yCoordinate)})`
+        : `translate(${formatSvgNumber(xCoordinate)} ${formatSvgNumber(yCoordinate)}) scale(${formatSvgNumber(scale)})`;
 
     return `<g clip-path="url(#${clipId})">
-            <g transform="translate(${xCoordinate} ${yCoordinate})">${body}</g>
+            <g transform="${transform}">${body}</g>
         </g>`;
 }
 
 function bodyViewportClipId(themePreset: ThemePresetName, viewport: ThemeBodyViewport): string {
     return `${themePreset}-body-viewport-${viewport.width}-${viewport.height}`;
+}
+
+function formatSvgNumber(value: number): string {
+    return Number.isInteger(value) ? String(value) : value.toFixed(4).replace(/0+$/u, "").replace(/\.$/u, "");
 }
