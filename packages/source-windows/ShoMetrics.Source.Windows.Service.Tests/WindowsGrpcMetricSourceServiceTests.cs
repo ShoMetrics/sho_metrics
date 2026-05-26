@@ -128,6 +128,43 @@ public sealed class WindowsGrpcMetricSourceServiceTests
         Assert.Equal(StatusCode.Cancelled, exception.StatusCode);
     }
 
+    [Fact]
+    public async Task GetSourceHealthRethrowsRpcException()
+    {
+        var expectedException = new RpcException(new Status(
+            StatusCode.FailedPrecondition,
+            "Source precondition failed."));
+        var handler = new FakeSourceRequestHandler
+        {
+            GetSourceHealth = _ => throw expectedException,
+        };
+        var service = new WindowsGrpcMetricSourceService(
+            handler,
+            NullLogger<WindowsGrpcMetricSourceService>.Instance);
+
+        RpcException exception = await Assert.ThrowsAsync<RpcException>(() =>
+            service.GetSourceHealth(new GetSourceHealthRequest(), new TestServerCallContext()));
+
+        Assert.Same(expectedException, exception);
+    }
+
+    [Fact]
+    public async Task GetSourceHealthMapsUnexpectedExceptionToInternal()
+    {
+        var handler = new FakeSourceRequestHandler
+        {
+            GetSourceHealth = _ => throw new InvalidOperationException("Unexpected handler failure."),
+        };
+        var service = new WindowsGrpcMetricSourceService(
+            handler,
+            NullLogger<WindowsGrpcMetricSourceService>.Instance);
+
+        RpcException exception = await Assert.ThrowsAsync<RpcException>(() =>
+            service.GetSourceHealth(new GetSourceHealthRequest(), new TestServerCallContext()));
+
+        Assert.Equal(StatusCode.Internal, exception.StatusCode);
+    }
+
     private sealed class FakeSourceRequestHandler : ISourceRequestHandler
     {
         public Func<CancellationToken, Task<GetSourceHealthResponse>> GetSourceHealth { get; init; } =

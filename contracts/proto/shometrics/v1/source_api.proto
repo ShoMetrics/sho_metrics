@@ -11,6 +11,9 @@ option csharp_namespace = "ShoMetrics.Contracts.V1";
 // The production Windows transport is gRPC over a Windows named pipe. Keep this
 // API narrow and read-only; privileged helper control belongs in a separate
 // authorization design.
+//
+// Windows helper and Hub implementations currently cap send/receive messages
+// at 1 MiB.
 service MetricSourceService {
   rpc GetSourceHealth(GetSourceHealthRequest) returns (GetSourceHealthResponse);
   rpc ListMetricDescriptors(ListMetricDescriptorsRequest) returns (ListMetricDescriptorsResponse);

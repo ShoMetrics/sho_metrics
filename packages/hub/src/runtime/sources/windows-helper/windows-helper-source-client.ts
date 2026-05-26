@@ -1,28 +1,12 @@
-import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
-import { randomUUID } from "node:crypto";
-import { execFile } from "node:child_process";
-import { createConnection, type Socket } from "node:net";
-import { promisify } from "node:util";
+import { create } from "@bufbuild/protobuf";
 import { logger } from "../../../logging/logger";
 import {
     GetSourceHealthRequestSchema,
     ListMetricDescriptorsRequestSchema,
     ReadMetricSnapshotRequestSchema,
-    type GetSourceHealthResponse,
-    type MetricDescriptor as ProtoMetricDescriptor,
-    MetricUnavailableReason as ProtoMetricUnavailableReason,
-    type MetricUnavailableReport as ProtoMetricUnavailableReport,
-    type MetricValueAttribution as ProtoMetricValueAttribution,
-    MetricValueFreshness as ProtoMetricValueFreshness,
-    type RawSensorIdentity as ProtoRawSensorIdentity,
-    type SourceWarning as ProtoSourceWarning,
+    type ListMetricDescriptorsResponse,
+    type ReadMetricSnapshotResponse,
 } from "../../../generated/shometrics/v1/source_api_pb.js";
-import {
-    SourceIpcRequestSchema,
-    SourceIpcResponseSchema,
-    type SourceIpcRequest,
-    type SourceIpcResponse,
-} from "../../../generated/shometrics/v1/source_ipc_pb.js";
 import {
     readMetricSnapshotTimestampMilliseconds,
     type MetricSnapshot,
@@ -30,17 +14,11 @@ import {
 import {
     type MetricDescriptor,
     type MetricDescriptorSnapshot,
-    type MetricUnavailableReason,
-    type MetricUnavailableReport,
-    type MetricValueFreshness,
-    type MetricValueAttribution,
-    type RawSensorIdentity,
     type SourceClient,
     type SourceClientStatus,
     type SourceClientStatusReason,
     type SourceHealth,
     type SourceSnapshotReadResult,
-    type SourceWarning,
 } from "../source-client";
 import type {
     SourceMetadataInvalidation,
@@ -52,17 +30,37 @@ import {
     WINDOWS_HELPER_SOURCE_ID,
 } from "../source-ids";
 import type { SourceMetricPollingGroupResolution } from "../source-polling-groups";
+import {
+    DEFAULT_WINDOWS_HELPER_GRPC_PIPE_NAME,
+    NodeWindowsHelperGrpcTransport,
+    buildWindowsNamedPipeGrpcTarget,
+    type WindowsHelperGrpcTransport,
+} from "./windows-helper-grpc-transport";
+import {
+    WindowsHelperSourceClientError,
+    classifyHelperRequestFailure,
+    isUnsupportedProtocolError,
+    normalizeGrpcRequestError,
+    shouldResetGrpcChannelAfterError,
+    toError,
+    toWindowsHelperSourceClientError,
+} from "./windows-helper-grpc-errors";
+import {
+    toRuntimeMetricDescriptor,
+    toRuntimeSnapshotMetadata,
+    toRuntimeSourceHealth,
+} from "./windows-helper-source-api-mapper";
+import {
+    HELPER_SERVICE_STATUS_CACHE_MILLISECONDS,
+    windowsServiceStatusReader,
+    type WindowsHelperServiceStatus,
+    type WindowsHelperServiceStatusReader,
+} from "./windows-helper-service-status";
 
 const log = logger.for("Source:WindowsHelper");
 
-/** Named pipe path used by the Windows helper service. */
-export const DEFAULT_WINDOWS_HELPER_PIPE_PATH = "\\\\.\\pipe\\ShoMetrics.Source.Windows.v1";
-
 /** Source API version supported by this Node adapter. */
 export const SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION = "1";
-
-/** Maximum protobuf payload size accepted by the local source IPC frame codec. */
-export const MAXIMUM_SOURCE_IPC_FRAME_BYTES = 1024 * 1024;
 
 /** Minimum cooldown before retrying helper health after protocol incompatibility. */
 export const UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS = 60000;
@@ -76,21 +74,13 @@ export const ACTIVE_HELPER_PIPE_RETRY_MILLISECONDS = 2000;
 /** Fast pipe retry window for active helper-backed demand. */
 export const ACTIVE_HELPER_PIPE_RETRY_WINDOW_MILLISECONDS = 60000;
 
-/** Cache duration for Windows service status probes. */
-export const HELPER_SERVICE_STATUS_CACHE_MILLISECONDS = 30000;
-
 /** Retry cooldowns for transient helper failures, indexed by consecutive failure count. */
 export const HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS = [5000, 15000, 60000] as const;
 
-const SOURCE_IPC_LENGTH_PREFIX_BYTES = 4;
 const CPU_USAGE_METRIC_KEY = "cpu.usage_percent";
 const DEFAULT_HEALTH_TIMEOUT_MILLISECONDS = 750;
 const DEFAULT_READ_SNAPSHOT_TIMEOUT_MILLISECONDS = 2000;
 const DEFAULT_LIST_DESCRIPTORS_TIMEOUT_MILLISECONDS = 5000;
-// Mirrors `ServiceName` in
-// packages/source-windows/ShoMetrics.Source.Windows.Ipc/SourceIpcConstants.cs.
-const WINDOWS_HELPER_SERVICE_NAME = "ShoMetrics Source Windows";
-const execFileAsync = promisify(execFile);
 
 /**
  * Startup retry interval for descriptor preload. This closes the common
@@ -116,7 +106,6 @@ const DEFAULT_DESCRIPTOR_PRELOAD_RETRY_MILLISECONDS = 10000;
  * minute while the helper is starting, missing, or temporarily unavailable.
  */
 const DESCRIPTOR_PRELOAD_WARNING_INTERVAL_MILLISECONDS = 60000;
-const WIRE_INVARIANT_WARNING_INTERVAL_MILLISECONDS = 30000;
 
 /** Timeout configuration for the Windows helper source client. */
 export interface WindowsHelperSourceTimeouts {
@@ -140,36 +129,10 @@ export interface WindowsHelperDescriptorPreloadTimer {
     clear(handle: WindowsHelperDescriptorPreloadTimerHandle): void;
 }
 
-export type WindowsHelperServiceStatus = "unknown" | "notInstalled" | "installedStopped" | "running";
-
-/** Reads packaged Windows service status without touching the metric pipe. */
-export interface WindowsHelperServiceStatusReader {
-    readStatus(): Promise<WindowsHelperServiceStatus>;
-}
-
-/** Options passed to a source IPC transport request. */
-export interface WindowsHelperPipeTransportRequestOptions {
-    readonly pipePath: string;
-    readonly timeoutMilliseconds: number;
-}
-
-/** Byte transport used by the Windows helper source client. */
-export interface WindowsHelperPipeTransport {
-    /** Sends one protobuf payload and resolves with one protobuf response payload. */
-    send(
-        payload: Uint8Array,
-        options: WindowsHelperPipeTransportRequestOptions,
-    ): Promise<Uint8Array>;
-
-    /** Releases transport-owned sockets or handles. */
-    dispose?(): void;
-}
-
 /** Options for the Windows helper source client. */
 export interface WindowsHelperSourceClientOptions {
-    readonly pipePath?: string;
-    readonly transport?: WindowsHelperPipeTransport;
-    readonly requestIdFactory?: () => string;
+    readonly pipeName?: string;
+    readonly transport?: WindowsHelperGrpcTransport;
     readonly now?: () => number;
     readonly timeouts?: Partial<WindowsHelperSourceTimeouts>;
     readonly descriptorPreloadRetryMilliseconds?: number;
@@ -177,41 +140,11 @@ export interface WindowsHelperSourceClientOptions {
     readonly serviceStatusReader?: WindowsHelperServiceStatusReader;
 }
 
-/** Encodes one source IPC protobuf payload using uint32 little-endian framing. */
-export function encodeSourceIpcFrame(payload: Uint8Array): Uint8Array {
-    validateSourceIpcPayloadLength(payload.byteLength);
-
-    const frame = Buffer.allocUnsafe(SOURCE_IPC_LENGTH_PREFIX_BYTES + payload.byteLength);
-    frame.writeUInt32LE(payload.byteLength, 0);
-    frame.set(payload, SOURCE_IPC_LENGTH_PREFIX_BYTES);
-
-    return frame;
-}
-
-/** Decodes one exact source IPC frame and returns the protobuf payload bytes. */
-export function decodeSourceIpcFrame(frame: Uint8Array): Uint8Array {
-    if (frame.byteLength < SOURCE_IPC_LENGTH_PREFIX_BYTES) {
-        throw new Error("Source IPC frame is missing the length prefix.");
-    }
-
-    const payloadLength = readLittleEndianUint32(frame, 0);
-    validateSourceIpcPayloadLength(payloadLength);
-
-    const expectedFrameLength = SOURCE_IPC_LENGTH_PREFIX_BYTES + payloadLength;
-    if (frame.byteLength !== expectedFrameLength) {
-        throw new Error("Source IPC frame length does not match the payload length prefix.");
-    }
-
-    return frame.subarray(SOURCE_IPC_LENGTH_PREFIX_BYTES);
-}
-
 /** Sends source API requests to the installed Windows helper over a named pipe. */
 export class WindowsHelperSourceClient implements SourceClient {
     readonly sourceId = WINDOWS_HELPER_SOURCE_ID;
 
-    private readonly pipePath: string;
-    private readonly transport: WindowsHelperPipeTransport;
-    private readonly requestIdFactory: () => string;
+    private readonly transport: WindowsHelperGrpcTransport;
     private readonly now: () => number;
     private readonly timeouts: WindowsHelperSourceTimeouts;
     private readonly descriptorPreloadRetryMilliseconds: number;
@@ -236,10 +169,13 @@ export class WindowsHelperSourceClient implements SourceClient {
     private readonly sourceMetadataInvalidationListeners = new Set<SourceMetadataInvalidationListener>();
 
     constructor(options: WindowsHelperSourceClientOptions = {}) {
-        this.pipePath = options.pipePath ?? DEFAULT_WINDOWS_HELPER_PIPE_PATH;
-        this.transport = options.transport ?? new NodeWindowsHelperPipeTransport();
-        this.requestIdFactory = options.requestIdFactory ?? randomUUID;
-        this.now = options.now ?? Date.now;
+        const now = options.now ?? Date.now;
+
+        this.transport = options.transport ?? new NodeWindowsHelperGrpcTransport(
+            buildWindowsNamedPipeGrpcTarget(options.pipeName ?? DEFAULT_WINDOWS_HELPER_GRPC_PIPE_NAME),
+            now,
+        );
+        this.now = now;
         this.timeouts = {
             healthMilliseconds: options.timeouts?.healthMilliseconds
                 ?? DEFAULT_HEALTH_TIMEOUT_MILLISECONDS,
@@ -259,25 +195,24 @@ export class WindowsHelperSourceClient implements SourceClient {
         await this.ensureProtocolSupported();
 
         const requestStartedAtTimestampMilliseconds = this.now();
-        let response: SourceIpcResponse;
+        let readResponse: ReadMetricSnapshotResponse;
         try {
-            response = await this.sendSourceIpcRequest({
-                case: "readMetricSnapshot",
-                value: create(ReadMetricSnapshotRequestSchema, {
-                    metricIds: [...metricKeys],
-                    includeDescriptors: false,
-                }),
-            }, this.timeouts.readSnapshotMilliseconds);
+            readResponse = await this.sendGrpcRequest(
+                "ReadMetricSnapshot",
+                this.timeouts.readSnapshotMilliseconds,
+                timeoutMilliseconds => this.transport.readMetricSnapshot(
+                    create(ReadMetricSnapshotRequestSchema, {
+                        metricIds: [...metricKeys],
+                        includeDescriptors: false,
+                    }),
+                    { timeoutMilliseconds },
+                ),
+            );
         } catch (error) {
             this.recordHelperRequestFailure(error);
             throw error;
         }
 
-        if (response.payload.case !== "readMetricSnapshot") {
-            throw new Error(`Unexpected Windows source response: ${response.payload.case ?? "empty"}.`);
-        }
-
-        const readResponse = response.payload.value;
         const snapshot = readResponse.snapshot;
         if (!snapshot) {
             throw new Error("Windows source returned a snapshot response without a snapshot.");
@@ -345,24 +280,24 @@ export class WindowsHelperSourceClient implements SourceClient {
 
     private async readMetricDescriptors(metricKeys: readonly string[]): Promise<MetricDescriptorSnapshot> {
         const isCompleteCatalogResponse = metricKeys.length === 0;
-        let response: SourceIpcResponse;
+        let listResponse: ListMetricDescriptorsResponse;
         try {
-            response = await this.sendSourceIpcRequest({
-                case: "listMetricDescriptors",
-                value: create(ListMetricDescriptorsRequestSchema, {
-                    metricIds: [...metricKeys],
-                }),
-            }, this.timeouts.listDescriptorsMilliseconds);
+            listResponse = await this.sendGrpcRequest(
+                "ListMetricDescriptors",
+                this.timeouts.listDescriptorsMilliseconds,
+                timeoutMilliseconds => this.transport.listMetricDescriptors(
+                    create(ListMetricDescriptorsRequestSchema, {
+                        metricIds: [...metricKeys],
+                    }),
+                    { timeoutMilliseconds },
+                ),
+            );
         } catch (error) {
             this.recordHelperRequestFailure(error);
             throw error;
         }
 
-        if (response.payload.case !== "listMetricDescriptors") {
-            throw new Error(`Unexpected Windows source response: ${response.payload.case ?? "empty"}.`);
-        }
-
-        const descriptorSnapshot = response.payload.value.descriptorSnapshot;
+        const descriptorSnapshot = listResponse.descriptorSnapshot;
         if (!descriptorSnapshot) {
             throw new Error("Windows source returned a descriptor response without a descriptor snapshot.");
         }
@@ -407,16 +342,16 @@ export class WindowsHelperSourceClient implements SourceClient {
     }
 
     private async readSourceHealth(): Promise<SourceHealth> {
-        const response = await this.sendSourceIpcRequest({
-            case: "getSourceHealth",
-            value: create(GetSourceHealthRequestSchema),
-        }, this.timeouts.healthMilliseconds);
+        const response = await this.sendGrpcRequest(
+            "GetSourceHealth",
+            this.timeouts.healthMilliseconds,
+            timeoutMilliseconds => this.transport.getSourceHealth(
+                create(GetSourceHealthRequestSchema),
+                { timeoutMilliseconds },
+            ),
+        );
 
-        if (response.payload.case !== "getSourceHealth") {
-            throw new Error(`Unexpected Windows source response: ${response.payload.case ?? "empty"}.`);
-        }
-
-        return toRuntimeSourceHealth(response.payload.value);
+        return toRuntimeSourceHealth(response);
     }
 
     private startDescriptorPreload(): void {
@@ -619,61 +554,45 @@ export class WindowsHelperSourceClient implements SourceClient {
         }
     }
 
-    private async sendSourceIpcRequest(
-        payload: SourceIpcRequest["payload"],
+    private async sendGrpcRequest<TResponse>(
+        methodName: string,
         timeoutMilliseconds: number,
-    ): Promise<SourceIpcResponse> {
-        const requestId = this.requestIdFactory();
+        request: (timeoutMilliseconds: number) => Promise<TResponse>,
+    ): Promise<TResponse> {
         const requestStartedAtTimestampMilliseconds = this.now();
-        const request = create(SourceIpcRequestSchema, {
-            requestId,
-            payload,
-        });
-        const requestBytes = toBinary(SourceIpcRequestSchema, request);
-        const responseBytes = await this.transport.send(requestBytes, {
-            pipePath: this.pipePath,
-            timeoutMilliseconds,
-        });
-        const response = parseSourceIpcResponse(responseBytes);
 
-        if (response.requestId !== requestId) {
-            throw new Error("Windows source response request id mismatched the pending request.");
-        }
+        try {
+            const response = await request(timeoutMilliseconds);
+            const requestCompletedAtTimestampMilliseconds = this.now();
 
-        if (response.payload.case === "error") {
-            if (response.payload.value.code === "unsupported_protocol") {
-                this.recordUnsupportedProtocol(response.payload.value.code);
-                throw new WindowsHelperSourceClientError([
-                    "Windows source returned an error.",
-                    `code=${response.payload.value.code}`,
-                    `message=${response.payload.value.message}`,
-                ].join(" "), response.payload.value.code, "protocolMismatch");
+            log.debug(() => [
+                "windowsHelperGrpcRequestCompleted",
+                "layer=client",
+                `method=${methodName}`,
+                `durationMs=${requestCompletedAtTimestampMilliseconds - requestStartedAtTimestampMilliseconds}`,
+                `timeoutMs=${timeoutMilliseconds}`,
+            ].join(" "));
+
+            return response;
+        } catch (error) {
+            const normalizedError = normalizeGrpcRequestError(error, methodName);
+            if (shouldResetGrpcChannelAfterError(normalizedError)) {
+                this.transport.reset?.();
             }
 
-            throw new WindowsHelperSourceClientError([
-                "Windows source returned an error.",
-                `code=${response.payload.value.code}`,
-                `message=${response.payload.value.message}`,
-            ].join(" "), response.payload.value.code, "sourceError");
+            const requestCompletedAtTimestampMilliseconds = this.now();
+
+            log.debug(() => [
+                "windowsHelperGrpcRequestFailed",
+                "layer=client",
+                `method=${methodName}`,
+                `durationMs=${requestCompletedAtTimestampMilliseconds - requestStartedAtTimestampMilliseconds}`,
+                `timeoutMs=${timeoutMilliseconds}`,
+                `error=${normalizedError.message}`,
+            ].join(" "));
+
+            throw normalizedError;
         }
-
-        if (response.payload.case === undefined) {
-            throw new Error("Windows source returned an empty response payload.");
-        }
-
-        const requestCompletedAtTimestampMilliseconds = this.now();
-        // TODO: Remove this temporary IPC timing log after the per-group
-        // helper cache is implemented and measured.
-        log.debug(() => [
-            "sourceIpcRequestCompleted",
-            `requestId=${requestId}`,
-            `payloadCase=${payload.case ?? "empty"}`,
-            `durationMs=${requestCompletedAtTimestampMilliseconds - requestStartedAtTimestampMilliseconds}`,
-            `requestBytes=${requestBytes.byteLength}`,
-            `responseBytes=${responseBytes.byteLength}`,
-        ].join(" "));
-
-        return response;
     }
 
     private recordUnsupportedProtocol(errorCode: string): void {
@@ -692,6 +611,7 @@ export class WindowsHelperSourceClient implements SourceClient {
 
     private recordHelperRequestFailure(error: unknown): void {
         if (isUnsupportedProtocolError(error)) {
+            this.recordUnsupportedProtocol(toWindowsHelperSourceClientError(error).code);
             return;
         }
 
@@ -869,52 +789,6 @@ const nodeDescriptorPreloadTimer: WindowsHelperDescriptorPreloadTimer = {
     },
 };
 
-const windowsServiceStatusReader: WindowsHelperServiceStatusReader = {
-    async readStatus(): Promise<WindowsHelperServiceStatus> {
-        try {
-            const { stdout } = await execFileAsync(
-                "sc.exe",
-                ["query", WINDOWS_HELPER_SERVICE_NAME],
-                { windowsHide: true },
-            );
-            const output = stdout.toLowerCase();
-
-            if (output.includes("running")) {
-                return "running";
-            }
-
-            if (output.includes("stopped")
-                || output.includes("stop_pending")
-                || output.includes("start_pending")) {
-                return "installedStopped";
-            }
-
-            logUnknownServiceStatus("unrecognizedOutput");
-            return "unknown";
-        } catch (error) {
-            const message = toError(error).message.toLowerCase();
-            if (message.includes("1060") || message.includes("does not exist")) {
-                return "notInstalled";
-            }
-
-            logUnknownServiceStatus("queryFailed");
-            return "unknown";
-        }
-    },
-};
-
-function logUnknownServiceStatus(reason: "queryFailed" | "unrecognizedOutput"): void {
-    log.atWarn()
-        .everyMs(
-            `service-status-unknown:${reason}`,
-            HELPER_SERVICE_STATUS_CACHE_MILLISECONDS,
-        )
-        .log(() => [
-            "windowsHelperServiceStatusUnknown",
-            `reason=${reason}`,
-        ].join(" "));
-}
-
 function selectHelperUnavailableRetryCooldownMilliseconds(failureCount: number): number {
     const maximumBackoffMilliseconds = HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS[2];
     const backoffIndex = Math.min(
@@ -923,512 +797,4 @@ function selectHelperUnavailableRetryCooldownMilliseconds(failureCount: number):
     );
 
     return HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS[backoffIndex] ?? maximumBackoffMilliseconds;
-}
-
-class NodeWindowsHelperPipeTransport implements WindowsHelperPipeTransport {
-    private readonly activeSockets = new Set<Socket>();
-
-    async send(
-        payload: Uint8Array,
-        options: WindowsHelperPipeTransportRequestOptions,
-    ): Promise<Uint8Array> {
-        const requestFrame = encodeSourceIpcFrame(payload);
-        const requestStartedAtTimestampMilliseconds = Date.now();
-
-        return await new Promise<Uint8Array>((resolve, reject) => {
-            const socket = createConnection(options.pipePath);
-            const frameAccumulator = new SourceIpcFrameAccumulator();
-            let isSettled = false;
-            let connectedAtTimestampMilliseconds: number | undefined;
-            let writeCompletedAtTimestampMilliseconds: number | undefined;
-            let firstDataAtTimestampMilliseconds: number | undefined;
-            const timeout = setTimeout(() => {
-                fail(new Error("Windows source pipe request timed out."));
-            }, options.timeoutMilliseconds);
-
-            this.activeSockets.add(socket);
-
-            const cleanup = (): void => {
-                clearTimeout(timeout);
-                socket.removeAllListeners();
-                this.activeSockets.delete(socket);
-                socket.destroy();
-            };
-
-            const fail = (error: Error): void => {
-                if (isSettled) {
-                    return;
-                }
-
-                isSettled = true;
-                // TODO: Remove this temporary pipe timing log after the
-                // per-group helper cache is implemented and measured.
-                log.debug(() => [
-                    "sourcePipeRequestFailed",
-                    `durationMs=${Date.now() - requestStartedAtTimestampMilliseconds}`,
-                    `connectMs=${formatOptionalDuration(
-                        connectedAtTimestampMilliseconds,
-                        requestStartedAtTimestampMilliseconds,
-                    )}`,
-                    `writeCompleteMs=${formatOptionalDuration(
-                        writeCompletedAtTimestampMilliseconds,
-                        requestStartedAtTimestampMilliseconds,
-                    )}`,
-                    `firstDataMs=${formatOptionalDuration(
-                        firstDataAtTimestampMilliseconds,
-                        requestStartedAtTimestampMilliseconds,
-                    )}`,
-                    `requestBytes=${requestFrame.byteLength}`,
-                    `timeoutMs=${options.timeoutMilliseconds}`,
-                    `error=${error.message}`,
-                ].join(" "));
-                cleanup();
-                reject(error);
-            };
-
-            socket.once("connect", () => {
-                connectedAtTimestampMilliseconds = Date.now();
-                socket.write(requestFrame, error => {
-                    if (error) {
-                        fail(error);
-                        return;
-                    }
-
-                    writeCompletedAtTimestampMilliseconds = Date.now();
-                });
-            });
-            socket.on("data", chunk => {
-                firstDataAtTimestampMilliseconds ??= Date.now();
-                try {
-                    const responsePayload = frameAccumulator.push(chunk);
-                    if (!responsePayload) {
-                        return;
-                    }
-
-                    if (isSettled) {
-                        return;
-                    }
-
-                    isSettled = true;
-                    // TODO: Remove this temporary pipe timing log after the
-                    // per-group helper cache is implemented and measured.
-                    log.debug(() => [
-                        "sourcePipeRequestCompleted",
-                        `durationMs=${Date.now() - requestStartedAtTimestampMilliseconds}`,
-                        `connectMs=${formatOptionalDuration(
-                            connectedAtTimestampMilliseconds,
-                            requestStartedAtTimestampMilliseconds,
-                        )}`,
-                        `writeCompleteMs=${formatOptionalDuration(
-                            writeCompletedAtTimestampMilliseconds,
-                            requestStartedAtTimestampMilliseconds,
-                        )}`,
-                        `firstDataMs=${formatOptionalDuration(
-                            firstDataAtTimestampMilliseconds,
-                            requestStartedAtTimestampMilliseconds,
-                        )}`,
-                        `requestBytes=${requestFrame.byteLength}`,
-                        `responseBytes=${responsePayload.byteLength}`,
-                        `timeoutMs=${options.timeoutMilliseconds}`,
-                    ].join(" "));
-                    cleanup();
-                    resolve(responsePayload);
-                } catch (error) {
-                    fail(toError(error));
-                }
-            });
-            socket.once("error", fail);
-            socket.once("end", () => {
-                fail(new Error("Windows source pipe ended before a response frame was read."));
-            });
-        });
-    }
-
-    dispose(): void {
-        for (const socket of this.activeSockets) {
-            socket.destroy();
-        }
-
-        this.activeSockets.clear();
-    }
-}
-
-function formatOptionalDuration(
-    timestampMilliseconds: number | undefined,
-    startTimestampMilliseconds: number,
-): string {
-    return timestampMilliseconds === undefined
-        ? ""
-        : String(timestampMilliseconds - startTimestampMilliseconds);
-}
-
-class SourceIpcFrameAccumulator {
-    private readonly chunks: Buffer[] = [];
-    private receivedByteCount = 0;
-    private expectedFrameLength: number | undefined;
-
-    push(chunk: Buffer): Uint8Array | undefined {
-        this.chunks.push(chunk);
-        this.receivedByteCount += chunk.byteLength;
-
-        if (this.expectedFrameLength === undefined
-            && this.receivedByteCount >= SOURCE_IPC_LENGTH_PREFIX_BYTES) {
-            const receivedBytes = Buffer.concat(this.chunks, this.receivedByteCount);
-            const payloadLength = readLittleEndianUint32(receivedBytes, 0);
-            validateSourceIpcPayloadLength(payloadLength);
-            this.expectedFrameLength = SOURCE_IPC_LENGTH_PREFIX_BYTES + payloadLength;
-        }
-
-        if (this.expectedFrameLength === undefined
-            || this.receivedByteCount < this.expectedFrameLength) {
-            return undefined;
-        }
-
-        const frame = Buffer.concat(this.chunks, this.receivedByteCount);
-        if (frame.byteLength !== this.expectedFrameLength) {
-            throw new Error("Windows source pipe returned trailing bytes after one response frame.");
-        }
-
-        return decodeSourceIpcFrame(frame);
-    }
-}
-
-function parseSourceIpcResponse(bytes: Uint8Array): SourceIpcResponse {
-    try {
-        return fromBinary(SourceIpcResponseSchema, bytes);
-    } catch (error) {
-        throw new Error(`Malformed Windows source IPC response: ${toError(error).message}`);
-    }
-}
-
-function validateSourceIpcPayloadLength(payloadLength: number): void {
-    if (payloadLength === 0) {
-        throw new Error("Source IPC frame payload length must be greater than zero.");
-    }
-
-    if (payloadLength > MAXIMUM_SOURCE_IPC_FRAME_BYTES) {
-        throw new Error("Source IPC frame payload length exceeds the maximum.");
-    }
-}
-
-function readLittleEndianUint32(bytes: Uint8Array, offset: number): number {
-    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    return view.getUint32(offset, true);
-}
-
-function toRuntimeSourceHealth(response: GetSourceHealthResponse): SourceHealth {
-    return {
-        sourceId: response.sourceId,
-        protocolVersion: response.protocolVersion,
-        helperVersion: response.helperVersion,
-        warnings: response.warnings.map(toRuntimeSourceWarning),
-    };
-}
-
-function toRuntimeSnapshotMetadata(options: {
-    readonly requestedMetricKeys: readonly string[];
-    readonly snapshot: MetricSnapshot;
-    readonly valueAttributions: readonly ProtoMetricValueAttribution[];
-    readonly unavailableMetrics: readonly ProtoMetricUnavailableReport[];
-}): {
-    readonly valueAttributions: readonly MetricValueAttribution[];
-    readonly unavailableMetrics: readonly MetricUnavailableReport[];
-} {
-    const emittedMetricIds = new Set(Object.keys(options.snapshot.metrics));
-    const requestedMetricIds = new Set(options.requestedMetricKeys);
-    const validateRequestedMetricIds = requestedMetricIds.size > 0;
-    const seenValueAttributionMetricIds = new Set<string>();
-    const seenUnavailableMetricIds = new Set<string>();
-    const valueAttributions: MetricValueAttribution[] = [];
-    const unavailableMetrics: MetricUnavailableReport[] = [];
-
-    for (const attribution of options.valueAttributions) {
-        if (!emittedMetricIds.has(attribution.metricId)) {
-            logDroppedWireRecord("valueAttribution", attribution.metricId, "orphan");
-            continue;
-        }
-
-        if (seenValueAttributionMetricIds.has(attribution.metricId)) {
-            logDroppedWireRecord("valueAttribution", attribution.metricId, "duplicate");
-            continue;
-        }
-
-        seenValueAttributionMetricIds.add(attribution.metricId);
-        valueAttributions.push(toRuntimeMetricValueAttribution(attribution));
-    }
-
-    for (const unavailableReport of options.unavailableMetrics) {
-        if (validateRequestedMetricIds && !requestedMetricIds.has(unavailableReport.metricId)) {
-            logDroppedWireRecord("unavailableMetric", unavailableReport.metricId, "notRequested");
-            continue;
-        }
-
-        if (emittedMetricIds.has(unavailableReport.metricId)) {
-            logDroppedWireRecord("unavailableMetric", unavailableReport.metricId, "emitted");
-            continue;
-        }
-
-        if (seenUnavailableMetricIds.has(unavailableReport.metricId)) {
-            logDroppedWireRecord("unavailableMetric", unavailableReport.metricId, "duplicate");
-            continue;
-        }
-
-        seenUnavailableMetricIds.add(unavailableReport.metricId);
-        unavailableMetrics.push(toRuntimeMetricUnavailableReport(unavailableReport));
-    }
-
-    return {
-        valueAttributions,
-        unavailableMetrics,
-    };
-}
-
-function logDroppedWireRecord(
-    recordKind: "valueAttribution" | "unavailableMetric",
-    metricId: string,
-    reason: "orphan" | "duplicate" | "notRequested" | "emitted",
-): void {
-    log.atWarn()
-        .everyMs(
-            `wireInvariantDropped:${recordKind}:${reason}:${metricId}`,
-            WIRE_INVARIANT_WARNING_INTERVAL_MILLISECONDS,
-        )
-        .log(() => [
-            "windowsHelperWireRecordDropped",
-            `recordKind=${recordKind}`,
-            `reason=${reason}`,
-            `metricId=${metricId}`,
-        ].join(" "));
-}
-
-function logUnknownWireEnum(
-    fieldName: string,
-    metricId: string,
-    value: number,
-    fallback: string,
-): void {
-    log.atWarn()
-        .everyMs(
-            `wireEnumFallback:${fieldName}:${value}:${metricId}`,
-            WIRE_INVARIANT_WARNING_INTERVAL_MILLISECONDS,
-        )
-        .log(() => [
-            "windowsHelperWireEnumFallback",
-            `fieldName=${fieldName}`,
-            `metricId=${metricId}`,
-            `value=${value}`,
-            `fallback=${fallback}`,
-        ].join(" "));
-}
-
-function logDroppedDescriptor(metricId: string, reason: string): void {
-    log.atWarn()
-        .everyMs(
-            `descriptorDropped:${reason}:${metricId}`,
-            WIRE_INVARIANT_WARNING_INTERVAL_MILLISECONDS,
-        )
-        .log(() => [
-            "windowsHelperDescriptorDropped",
-            `reason=${reason}`,
-            `metricId=${metricId}`,
-        ].join(" "));
-}
-
-function toRuntimeMetricDescriptor(descriptor: ProtoMetricDescriptor): MetricDescriptor | undefined {
-    const rawSensorIdentity = readRequiredRawSensorIdentity(descriptor.rawSensorIdentity, descriptor.metricId);
-    const pollingGroupId = readRequiredDescriptorString({
-        fieldName: "polling_group_id",
-        fieldValue: descriptor.pollingGroupId,
-        metricId: descriptor.metricId,
-    });
-
-    if (!rawSensorIdentity || !pollingGroupId) {
-        // Helper/plugin versions may be skewed. A malformed descriptor should
-        // not make the whole helper source unavailable; drop the bad record and
-        // keep the support log from the field reader.
-        return undefined;
-    }
-
-    return {
-        metricId: descriptor.metricId,
-        rawSensorIdentity,
-        valueKind: descriptor.valueKind,
-        unit: descriptor.unit,
-        metricIdKind: descriptor.metricIdKind,
-        pollingGroupId,
-    };
-}
-
-function toRuntimeMetricValueAttribution(
-    attribution: ProtoMetricValueAttribution,
-): MetricValueAttribution {
-    return {
-        metricId: attribution.metricId,
-        ...(attribution.rawSensorIdentity
-            ? { rawSensorIdentity: toRuntimeRawSensorIdentity(attribution.rawSensorIdentity) }
-            : {}),
-        valueFreshness: normalizeMetricValueFreshness(attribution.valueFreshness, attribution.metricId),
-        ...(attribution.retainedAgeMilliseconds === undefined
-            ? {}
-            : { retainedAgeMilliseconds: attribution.retainedAgeMilliseconds }),
-    };
-}
-
-function toRuntimeMetricUnavailableReport(
-    unavailableReport: ProtoMetricUnavailableReport,
-): MetricUnavailableReport {
-    return {
-        metricId: unavailableReport.metricId,
-        reason: normalizeMetricUnavailableReason(unavailableReport.reason, unavailableReport.metricId),
-        ...(unavailableReport.rawSensorIdentity
-            ? { rawSensorIdentity: toRuntimeRawSensorIdentity(unavailableReport.rawSensorIdentity) }
-            : {}),
-    };
-}
-
-function normalizeMetricValueFreshness(
-    freshness: ProtoMetricValueFreshness,
-    metricId: string,
-): MetricValueFreshness {
-    switch (freshness) {
-        case ProtoMetricValueFreshness.FRESH:
-            return "fresh";
-        case ProtoMetricValueFreshness.RETAINED:
-            return "retained";
-        case ProtoMetricValueFreshness.UNSPECIFIED:
-            logUnknownWireEnum("valueFreshness", metricId, freshness, "retained");
-            return "retained";
-    }
-
-    logUnknownWireEnum("valueFreshness", metricId, freshness, "retained");
-    return "retained";
-}
-
-function normalizeMetricUnavailableReason(
-    reason: ProtoMetricUnavailableReason,
-    metricId: string,
-): MetricUnavailableReason {
-    switch (reason) {
-        case ProtoMetricUnavailableReason.NO_SENSOR:
-            return "noSensorData";
-        case ProtoMetricUnavailableReason.INVALID_VALUE:
-            return "invalidValue";
-        case ProtoMetricUnavailableReason.EXPIRED:
-            return "expired";
-        case ProtoMetricUnavailableReason.UNSPECIFIED:
-            logUnknownWireEnum("unavailableReason", metricId, reason, "debugOnly");
-            return "unknown";
-    }
-
-    logUnknownWireEnum("unavailableReason", metricId, reason, "debugOnly");
-    return "unknown";
-}
-
-function readRequiredRawSensorIdentity(
-    rawSensorIdentity: ProtoRawSensorIdentity | undefined,
-    metricId: string,
-): RawSensorIdentity | undefined {
-    if (!rawSensorIdentity) {
-        logDroppedDescriptor(metricId, "missingRawSensorIdentity");
-        return undefined;
-    }
-
-    return toRuntimeRawSensorIdentity(rawSensorIdentity);
-}
-
-function toRuntimeRawSensorIdentity(rawSensorIdentity: ProtoRawSensorIdentity): RawSensorIdentity {
-    return {
-        sourceSensorId: rawSensorIdentity.sourceSensorId,
-        hardwareId: rawSensorIdentity.hardwareId,
-        hardwareName: rawSensorIdentity.hardwareName,
-        hardwareType: rawSensorIdentity.hardwareType,
-        sensorName: rawSensorIdentity.sensorName,
-        sourceSensorType: rawSensorIdentity.sourceSensorType,
-    };
-}
-
-function readRequiredDescriptorString(options: {
-    readonly fieldName: string;
-    readonly fieldValue: string;
-    readonly metricId: string;
-}): string | undefined {
-    const value = options.fieldValue.trim();
-
-    if (value.length === 0) {
-        logDroppedDescriptor(options.metricId, `missing_${options.fieldName}`);
-        return undefined;
-    }
-
-    return value;
-}
-
-function toRuntimeSourceWarning(warning: ProtoSourceWarning): SourceWarning {
-    return {
-        code: warning.code,
-        message: warning.message,
-        ...(warning.metricId ? { metricId: warning.metricId } : {}),
-        ...(warning.sourceSensorId ? { sourceSensorId: warning.sourceSensorId } : {}),
-    };
-}
-
-class WindowsHelperSourceClientError extends Error {
-    override readonly name = "WindowsHelperSourceClientError";
-
-    constructor(
-        message: string,
-        readonly code: string,
-        readonly reason: SourceClientStatusReason,
-    ) {
-        super(message);
-    }
-}
-
-function isUnsupportedProtocolError(error: unknown): boolean {
-    return error instanceof WindowsHelperSourceClientError
-        && error.reason === "protocolMismatch";
-}
-
-function classifyHelperRequestFailure(error: unknown): {
-    readonly reason: SourceClientStatusReason;
-    readonly errorCode?: string;
-} {
-    if (error instanceof WindowsHelperSourceClientError) {
-        return {
-            reason: error.reason,
-            errorCode: error.code,
-        };
-    }
-
-    const errorCode = readErrorCode(error);
-    if (errorCode === "ENOENT") {
-        return {
-            reason: "pipeMissing",
-            errorCode,
-        };
-    }
-
-    if (errorCode === "ETIMEDOUT" || toError(error).message.toLowerCase().includes("timed out")) {
-        return {
-            reason: "timeout",
-            ...(errorCode ? { errorCode } : {}),
-        };
-    }
-
-    return {
-        reason: "healthFailed",
-        ...(errorCode ? { errorCode } : {}),
-    };
-}
-
-function readErrorCode(error: unknown): string | undefined {
-    if (!error || typeof error !== "object" || !("code" in error)) {
-        return undefined;
-    }
-
-    const code = (error as { readonly code?: unknown }).code;
-    return typeof code === "string" ? code : undefined;
-}
-
-function toError(error: unknown): Error {
-    return error instanceof Error ? error : new Error(String(error));
 }

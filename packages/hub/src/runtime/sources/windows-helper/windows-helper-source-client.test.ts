@@ -1,4 +1,5 @@
-import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
+import { create } from "@bufbuild/protobuf";
+import { status as grpcStatus } from "@grpc/grpc-js";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -11,16 +12,15 @@ import {
     MetricValueKind as ProtoMetricValueKind,
     MetricValueFreshness as ProtoMetricValueFreshness,
     ReadMetricSnapshotResponseSchema,
-    SourceErrorSchema,
+    type GetSourceHealthRequest,
+    type GetSourceHealthResponse,
+    type ListMetricDescriptorsRequest,
+    type ListMetricDescriptorsResponse,
     type MetricUnavailableReport as ProtoMetricUnavailableReport,
     type MetricValueAttribution as ProtoMetricValueAttribution,
+    type ReadMetricSnapshotRequest,
+    type ReadMetricSnapshotResponse,
 } from "../../../generated/shometrics/v1/source_api_pb.js";
-import {
-    SourceIpcRequestSchema,
-    SourceIpcResponseSchema,
-    type SourceIpcRequest,
-    type SourceIpcResponse,
-} from "../../../generated/shometrics/v1/source_ipc_pb.js";
 import {
     buildMetricSnapshot,
     buildScalarMetricValue,
@@ -29,19 +29,20 @@ import {
 } from "../metric-source";
 import type { SourceMetadataInvalidation } from "../source-planning-metadata";
 import {
-    decodeSourceIpcFrame,
-    encodeSourceIpcFrame,
     ACTIVE_HELPER_PIPE_RETRY_MILLISECONDS,
     HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS,
-    MAXIMUM_SOURCE_IPC_FRAME_BYTES,
     SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION,
     UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS,
     WindowsHelperSourceClient,
     type WindowsHelperDescriptorPreloadTimer,
     type WindowsHelperDescriptorPreloadTimerHandle,
-    type WindowsHelperPipeTransport,
     type WindowsHelperSourceClientOptions,
 } from "./windows-helper-source-client";
+import {
+    buildWindowsNamedPipeGrpcTarget,
+    type WindowsHelperGrpcRequestOptions,
+    type WindowsHelperGrpcTransport,
+} from "./windows-helper-grpc-transport";
 import { WINDOWS_HELPER_SOURCE_ID } from "../source-ids";
 
 const [
@@ -54,31 +55,16 @@ const CPU_HELPER_POLLING_GROUP_ID = "lhm:hardware:cpu";
 const GPU_HELPER_POLLING_GROUP_ID = "lhm:hardware:gpu";
 const UNKNOWN_SERVICE_STATUS_READER = { readStatus: async () => "unknown" as const };
 
-test("source IPC frame codec round-trips payload bytes", () => {
-    const payload = new Uint8Array([1, 2, 3]);
-
-    const frame = encodeSourceIpcFrame(payload);
-
-    assert.deepEqual([...decodeSourceIpcFrame(frame)], [...payload]);
-});
-
-test("source IPC frame codec rejects empty payloads", () => {
-    const frame = Buffer.alloc(4);
-
-    assert.throws(
-        () => decodeSourceIpcFrame(frame),
-        /payload length must be greater than zero/u,
+test("windows helper builds the grpc-js Windows named-pipe target string", () => {
+    assert.equal(
+        buildWindowsNamedPipeGrpcTarget("ShoMetrics.GrpcBatch0"),
+        "unix:\\\\.\\pipe\\ShoMetrics.GrpcBatch0",
     );
-});
 
-test("source IPC frame codec rejects oversized payloads before decoding", () => {
-    const frame = Buffer.alloc(4);
-    frame.writeUInt32LE(MAXIMUM_SOURCE_IPC_FRAME_BYTES + 1, 0);
-
-    assert.throws(
-        () => decodeSourceIpcFrame(frame),
-        /exceeds the maximum/u,
-    );
+    // Known-bad forms from the Batch 0 spike:
+    // - unix://\\.\pipe\ShoMetrics.GrpcBatch0
+    // - unix:///\\.\pipe\ShoMetrics.GrpcBatch0
+    // - \\.\pipe\ShoMetrics.GrpcBatch0
 });
 
 test("windows helper waits for descriptor metadata before declaring helper groups", () => {
@@ -103,14 +89,14 @@ test("windows helper waits for descriptor metadata before declaring helper group
 });
 
 test("windows helper declares cached descriptor metrics with descriptor polling groups", async () => {
-    const transport = new FakeWindowsHelperPipeTransport(request => {
-        switch (request.payload.case) {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
             case "getSourceHealth":
-                return buildHealthResponse(request.requestId);
+                return buildHealthResponse();
             case "listMetricDescriptors":
-                return buildDescriptorResponse(request.requestId);
+                return buildDescriptorResponse();
             default:
-                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
     });
     const client = createClient(transport);
@@ -133,15 +119,15 @@ test("windows helper declares cached descriptor metrics with descriptor polling 
 });
 
 test("windows helper marks missing metrics unsupported after complete descriptor preload", async () => {
-    const transport = new FakeWindowsHelperPipeTransport(request => {
-        switch (request.payload.case) {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
             case "getSourceHealth":
-                return buildHealthResponse(request.requestId);
+                return buildHealthResponse();
             case "listMetricDescriptors":
-                assert.deepEqual(request.payload.value.metricIds, []);
-                return buildDescriptorResponse(request.requestId);
+                assert.deepEqual(request.value.metricIds, []);
+                return buildDescriptorResponse();
             default:
-                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
     });
     const client = createClient(transport);
@@ -164,16 +150,16 @@ test("windows helper marks missing metrics unsupported after complete descriptor
 });
 
 test("windows helper keeps filtered descriptors when the catalog fingerprint is unchanged", async () => {
-    const transport = new FakeWindowsHelperPipeTransport(request => {
-        switch (request.payload.case) {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
             case "getSourceHealth":
-                return buildHealthResponse(request.requestId);
+                return buildHealthResponse();
             case "listMetricDescriptors":
-                return buildDescriptorResponse(request.requestId, {
-                    descriptors: request.payload.value.metricIds.map(metricId => buildDescriptor({ metricId })),
+                return buildDescriptorResponse({
+                    descriptors: request.value.metricIds.map(metricId => buildDescriptor({ metricId })),
                 });
             default:
-                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
     });
     const client = createClient(transport);
@@ -199,23 +185,23 @@ test("windows helper keeps filtered descriptors when the catalog fingerprint is 
 
 test("windows helper clears cached descriptors when the catalog fingerprint changes", async () => {
     let descriptorRequestCount = 0;
-    const transport = new FakeWindowsHelperPipeTransport(request => {
-        switch (request.payload.case) {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
             case "getSourceHealth":
-                return buildHealthResponse(request.requestId);
+                return buildHealthResponse();
             case "listMetricDescriptors":
                 descriptorRequestCount += 1;
                 return descriptorRequestCount === 1
-                    ? buildDescriptorResponse(request.requestId, {
+                    ? buildDescriptorResponse({
                         descriptorFingerprint: "catalog-sha256-before",
                         descriptors: [buildDescriptor({ metricId: "cpu.usage_percent" })],
                     })
-                    : buildDescriptorResponse(request.requestId, {
+                    : buildDescriptorResponse({
                         descriptorFingerprint: "catalog-sha256-after",
                         descriptors: [buildDescriptor({ metricId: "gpu.temp" })],
                     });
             default:
-                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
     });
     const client = createClient(transport);
@@ -239,15 +225,15 @@ test("windows helper clears cached descriptors when the catalog fingerprint chan
 });
 
 test("windows helper preloads descriptors and emits source metadata invalidation on subscribe", async () => {
-    const transport = new FakeWindowsHelperPipeTransport(request => {
-        switch (request.payload.case) {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
             case "getSourceHealth":
-                return buildHealthResponse(request.requestId);
+                return buildHealthResponse();
             case "listMetricDescriptors":
-                assert.deepEqual(request.payload.value.metricIds, []);
-                return buildDescriptorResponse(request.requestId);
+                assert.deepEqual(request.value.metricIds, []);
+                return buildDescriptorResponse();
             default:
-                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
     });
     const client = createClient(transport);
@@ -259,7 +245,7 @@ test("windows helper preloads descriptors and emits source metadata invalidation
     await drainAsyncOperations();
 
     assert.deepEqual(
-        transport.requests.map(request => request.payload.case),
+        transport.requests.map(request => request.method),
         ["getSourceHealth", "listMetricDescriptors"],
     );
     assert.deepEqual(invalidations, [{
@@ -275,19 +261,19 @@ test("windows helper preloads descriptors and emits source metadata invalidation
 test("windows helper retries descriptor preload after failure and emits descriptorLoaded", async () => {
     let healthRequestCount = 0;
     const retryTimer = new FakeDescriptorPreloadTimer();
-    const transport = new FakeWindowsHelperPipeTransport(request => {
-        switch (request.payload.case) {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
             case "getSourceHealth":
                 healthRequestCount += 1;
                 if (healthRequestCount === 1) {
                     throw new Error("helper is still starting");
                 }
 
-                return buildHealthResponse(request.requestId);
+                return buildHealthResponse();
             case "listMetricDescriptors":
-                return buildDescriptorResponse(request.requestId);
+                return buildDescriptorResponse();
             default:
-                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
     });
     const client = createClient(transport, {}, {
@@ -308,7 +294,7 @@ test("windows helper retries descriptor preload after failure and emits descript
     await drainAsyncOperations();
 
     assert.deepEqual(
-        transport.requests.map(request => request.payload.case),
+        transport.requests.map(request => request.method),
         ["getSourceHealth", "getSourceHealth", "listMetricDescriptors"],
     );
     assert.deepEqual(invalidations, [{
@@ -324,12 +310,12 @@ test("windows helper retries descriptor preload after failure and emits descript
 test("windows helper uses fast descriptor preload retry only during startup window", async () => {
     let currentTimestampMilliseconds = 1000;
     const retryTimer = new FakeDescriptorPreloadTimer();
-    const transport = new FakeWindowsHelperPipeTransport(request => {
-        switch (request.payload.case) {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
             case "getSourceHealth":
                 throw new Error("helper unavailable");
             default:
-                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
     });
     const client = createClient(transport, {}, {
@@ -354,12 +340,12 @@ test("windows helper uses fast descriptor preload retry only during startup wind
 
 test("windows helper dispose stops descriptor preload retry timer", async () => {
     const retryTimer = new FakeDescriptorPreloadTimer();
-    const transport = new FakeWindowsHelperPipeTransport(request => {
-        switch (request.payload.case) {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
             case "getSourceHealth":
                 throw new Error("helper unavailable");
             default:
-                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
     });
     const client = createClient(transport, {}, {
@@ -377,20 +363,20 @@ test("windows helper dispose stops descriptor preload retry timer", async () => 
 
     assert.equal(retryTimer.activeHandleCount(), 0);
     assert.deepEqual(
-        transport.requests.map(request => request.payload.case),
+        transport.requests.map(request => request.method),
         ["getSourceHealth"],
     );
 });
 
 test("windows helper forwards descriptor metadata invalidation to every listener", async () => {
-    const transport = new FakeWindowsHelperPipeTransport(request => {
-        switch (request.payload.case) {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
             case "getSourceHealth":
-                return buildHealthResponse(request.requestId);
+                return buildHealthResponse();
             case "listMetricDescriptors":
-                return buildDescriptorResponse(request.requestId);
+                return buildDescriptorResponse();
             default:
-                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
     });
     const client = createClient(transport);
@@ -414,7 +400,7 @@ test("windows helper forwards descriptor metadata invalidation to every listener
     assert.deepEqual(firstListenerInvalidations, expectedInvalidations);
     assert.deepEqual(secondListenerInvalidations, expectedInvalidations);
     assert.deepEqual(
-        transport.requests.map(request => request.payload.case),
+        transport.requests.map(request => request.method),
         ["getSourceHealth", "listMetricDescriptors"],
     );
 
@@ -424,21 +410,21 @@ test("windows helper forwards descriptor metadata invalidation to every listener
 
 test("windows helper emits descriptor metadata changes only when fingerprint changes", async () => {
     let descriptorRequestCount = 0;
-    const transport = new FakeWindowsHelperPipeTransport(request => {
-        switch (request.payload.case) {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
             case "getSourceHealth":
-                return buildHealthResponse(request.requestId);
+                return buildHealthResponse();
             case "listMetricDescriptors":
                 descriptorRequestCount += 1;
                 return descriptorRequestCount <= 2
-                    ? buildDescriptorResponse(request.requestId, {
+                    ? buildDescriptorResponse({
                         descriptorFingerprint: "catalog-sha256-before",
                     })
-                    : buildDescriptorResponse(request.requestId, {
+                    : buildDescriptorResponse({
                         descriptorFingerprint: "catalog-sha256-after",
                     });
             default:
-                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
     });
     const client = createClient(transport);
@@ -470,15 +456,15 @@ test("windows helper emits descriptor metadata changes only when fingerprint cha
 });
 
 test("windows helper source client sends requested metric ids and returns a runtime snapshot", async () => {
-    const transport = new FakeWindowsHelperPipeTransport(request => {
-        switch (request.payload.case) {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
             case "getSourceHealth":
-                return buildHealthResponse(request.requestId);
+                return buildHealthResponse();
             case "readMetricSnapshot":
-                assert.deepEqual(request.payload.value.metricIds, ["cpu.usage_percent"]);
-                return buildSnapshotResponse(request.requestId);
+                assert.deepEqual(request.value.metricIds, ["cpu.usage_percent"]);
+                return buildSnapshotResponse();
             default:
-                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
     });
     const client = createClient(transport);
@@ -493,18 +479,18 @@ test("windows helper source client sends requested metric ids and returns a runt
     assert.deepEqual(readResult.unavailableMetrics, []);
     assert.equal(client.getCachedStatus().state, "available");
     assert.deepEqual(
-        transport.requests.map(request => request.payload.case),
+        transport.requests.map(request => request.method),
         ["getSourceHealth", "readMetricSnapshot"],
     );
 });
 
 test("windows helper source client maps value attribution and unavailable metric reports", async () => {
-    const transport = new FakeWindowsHelperPipeTransport(request => {
-        switch (request.payload.case) {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
             case "getSourceHealth":
-                return buildHealthResponse(request.requestId);
+                return buildHealthResponse();
             case "readMetricSnapshot":
-                return buildSnapshotResponse(request.requestId, {
+                return buildSnapshotResponse({
                     valueAttributions: [
                         create(MetricValueAttributionSchema, {
                             metricId: "cpu.usage_percent",
@@ -528,7 +514,7 @@ test("windows helper source client maps value attribution and unavailable metric
                     ],
                 });
             default:
-                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
     });
     const client = createClient(transport);
@@ -567,12 +553,12 @@ test("windows helper source client drops inconsistent source metric reports", as
         },
         valueFreshness: ProtoMetricValueFreshness.FRESH,
     });
-    const transport = new FakeWindowsHelperPipeTransport(request => {
-        switch (request.payload.case) {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
             case "getSourceHealth":
-                return buildHealthResponse(request.requestId);
+                return buildHealthResponse();
             case "readMetricSnapshot":
-                return buildSnapshotResponse(request.requestId, {
+                return buildSnapshotResponse({
                     valueAttributions: [
                         validAttribution,
                         validAttribution,
@@ -601,7 +587,7 @@ test("windows helper source client drops inconsistent source metric reports", as
                     ],
                 });
             default:
-                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
     });
     const client = createClient(transport);
@@ -627,12 +613,12 @@ test("windows helper source client drops inconsistent source metric reports", as
 });
 
 test("windows helper source client treats future freshness enum values as display-only", async () => {
-    const transport = new FakeWindowsHelperPipeTransport(request => {
-        switch (request.payload.case) {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
             case "getSourceHealth":
-                return buildHealthResponse(request.requestId);
+                return buildHealthResponse();
             case "readMetricSnapshot":
-                return buildSnapshotResponse(request.requestId, {
+                return buildSnapshotResponse({
                     valueAttributions: [
                         create(MetricValueAttributionSchema, {
                             metricId: "cpu.usage_percent",
@@ -641,7 +627,7 @@ test("windows helper source client treats future freshness enum values as displa
                     ],
                 });
             default:
-                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
     });
     const client = createClient(transport);
@@ -655,12 +641,12 @@ test("windows helper source client treats future freshness enum values as displa
 });
 
 test("windows helper source client normalizes future unavailable reasons to unknown debug metadata", async () => {
-    const transport = new FakeWindowsHelperPipeTransport(request => {
-        switch (request.payload.case) {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
             case "getSourceHealth":
-                return buildHealthResponse(request.requestId);
+                return buildHealthResponse();
             case "readMetricSnapshot":
-                return buildSnapshotResponse(request.requestId, {
+                return buildSnapshotResponse({
                     unavailableMetrics: [
                         create(MetricUnavailableReportSchema, {
                             metricId: "cpu.temp",
@@ -669,7 +655,7 @@ test("windows helper source client normalizes future unavailable reasons to unkn
                     ],
                 });
             default:
-                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
     });
     const client = createClient(transport);
@@ -683,15 +669,15 @@ test("windows helper source client normalizes future unavailable reasons to unkn
 });
 
 test("windows helper source client returns descriptors with the catalog fingerprint", async () => {
-    const transport = new FakeWindowsHelperPipeTransport(request => {
-        switch (request.payload.case) {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
             case "getSourceHealth":
-                return buildHealthResponse(request.requestId);
+                return buildHealthResponse();
             case "listMetricDescriptors":
-                assert.deepEqual(request.payload.value.metricIds, ["cpu.usage_percent"]);
-                return buildDescriptorResponse(request.requestId);
+                assert.deepEqual(request.value.metricIds, ["cpu.usage_percent"]);
+                return buildDescriptorResponse();
             default:
-                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
     });
     const client = createClient(transport);
@@ -717,19 +703,19 @@ test("windows helper source client returns descriptors with the catalog fingerpr
 });
 
 test("windows helper source client drops descriptors without polling group ids", async () => {
-    const transport = new FakeWindowsHelperPipeTransport(request => {
-        switch (request.payload.case) {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
             case "getSourceHealth":
-                return buildHealthResponse(request.requestId);
+                return buildHealthResponse();
             case "listMetricDescriptors":
-                return buildDescriptorResponse(request.requestId, {
+                return buildDescriptorResponse({
                     descriptors: [buildDescriptor({
                         metricId: "cpu.usage_percent",
                         pollingGroupId: "",
                     })],
                 });
             default:
-                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
     });
     const client = createClient(transport);
@@ -738,26 +724,6 @@ test("windows helper source client drops descriptors without polling group ids",
 
     assert.equal(descriptorSnapshot.descriptorFingerprint, "catalog-sha256-test");
     assert.deepEqual(descriptorSnapshot.descriptors, []);
-});
-
-test("windows helper source client rejects mismatched response request ids", async () => {
-    const transport = new FakeWindowsHelperPipeTransport(request => buildHealthResponse(`${request.requestId}-other`));
-    const client = createClient(transport);
-
-    await assert.rejects(
-        async () => await client.checkHealth(),
-        /request id mismatched/u,
-    );
-});
-
-test("windows helper source client rejects malformed protobuf responses", async () => {
-    const transport = new RawResponseTransport(new Uint8Array([255]));
-    const client = createClient(transport);
-
-    await assert.rejects(
-        async () => await client.checkHealth(),
-        /Malformed Windows source IPC response/u,
-    );
 });
 
 test("windows helper source client passes request timeouts to the transport", async () => {
@@ -777,11 +743,10 @@ test("windows helper source client passes request timeouts to the transport", as
 
 test("windows helper source client cools down unsupported protocol retries", async () => {
     let nowMilliseconds = 1000;
-    const transport = new FakeWindowsHelperPipeTransport(request => buildHealthResponse(request.requestId, "2"));
+    const transport = new FakeWindowsHelperGrpcTransport(request => buildHealthResponse("2"));
     const client = new WindowsHelperSourceClient({
         transport,
         now: () => nowMilliseconds,
-        requestIdFactory: createRequestIdFactory(),
         serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
         timeouts: {
             healthMilliseconds: 10,
@@ -815,7 +780,6 @@ test("windows helper source client cools down unavailable helper retries", async
     const client = new WindowsHelperSourceClient({
         transport,
         now: () => nowMilliseconds,
-        requestIdFactory: createRequestIdFactory(),
         serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
     });
 
@@ -841,11 +805,11 @@ test("windows helper source client cools down unavailable helper retries", async
 
 test("windows helper source client uses active fast retry when the pipe is missing", async () => {
     let nowMilliseconds = 1000;
-    const transport = new RejectingTransport(createNodeError("ENOENT", "pipe not found"));
+    const pipeMissingError = createGrpcServiceError(grpcStatus.UNAVAILABLE, "ENOENT: pipe not found");
+    const transport = new RejectingTransport(pipeMissingError);
     const client = new WindowsHelperSourceClient({
         transport,
         now: () => nowMilliseconds,
-        requestIdFactory: createRequestIdFactory(),
         serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
     });
 
@@ -864,7 +828,12 @@ test("windows helper source client uses active fast retry when the pipe is missi
         reason: "pipeMissing",
         retryAfterTimestampMilliseconds: 1000 + ACTIVE_HELPER_PIPE_RETRY_MILLISECONDS,
         lastErrorCode: "ENOENT",
-        lastErrorMessage: "pipe not found",
+        lastErrorMessage: [
+            "Windows helper gRPC request failed.",
+            "method=GetSourceHealth",
+            "status=UNAVAILABLE",
+            "details=ENOENT: pipe not found",
+        ].join(" "),
         lastFailureAtTimestampMilliseconds: 1000,
     });
 
@@ -879,11 +848,13 @@ test("windows helper source client uses active fast retry when the pipe is missi
 
 test("windows helper source client refines missing pipe status with service install state", async () => {
     const nowMilliseconds = 1000;
-    const transport = new RejectingTransport(createNodeError("ENOENT", "pipe not found"));
+    const transport = new RejectingTransport(createGrpcServiceError(
+        grpcStatus.UNAVAILABLE,
+        "ENOENT: pipe not found",
+    ));
     const client = new WindowsHelperSourceClient({
         transport,
         now: () => nowMilliseconds,
-        requestIdFactory: createRequestIdFactory(),
         serviceStatusReader: { readStatus: async () => "notInstalled" },
     });
 
@@ -898,7 +869,12 @@ test("windows helper source client refines missing pipe status with service inst
         reason: "helperNotInstalled",
         retryAfterTimestampMilliseconds: nowMilliseconds + ACTIVE_HELPER_PIPE_RETRY_MILLISECONDS,
         lastErrorCode: "ENOENT",
-        lastErrorMessage: "pipe not found",
+        lastErrorMessage: [
+            "Windows helper gRPC request failed.",
+            "method=GetSourceHealth",
+            "status=UNAVAILABLE",
+            "details=ENOENT: pipe not found",
+        ].join(" "),
         lastFailureAtTimestampMilliseconds: nowMilliseconds,
     });
 });
@@ -909,7 +885,6 @@ test("windows helper source client backs off repeated transient failures", async
     const client = new WindowsHelperSourceClient({
         transport,
         now: () => nowMilliseconds,
-        requestIdFactory: createRequestIdFactory(),
         serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
     });
 
@@ -956,25 +931,24 @@ test("windows helper source client backs off repeated transient failures", async
 test("windows helper source client resets transient backoff after successful reads", async () => {
     let nowMilliseconds = 1000;
     let readRequestCount = 0;
-    const transport = new FakeWindowsHelperPipeTransport(request => {
-        switch (request.payload.case) {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
             case "getSourceHealth":
-                return buildHealthResponse(request.requestId);
+                return buildHealthResponse();
             case "readMetricSnapshot":
                 readRequestCount += 1;
                 if (readRequestCount === 1 || readRequestCount === 3) {
                     throw createNodeError("ECONNRESET", "connection reset");
                 }
 
-                return buildSnapshotResponse(request.requestId);
+                return buildSnapshotResponse();
             default:
-                throw new Error(`Unexpected request: ${request.payload.case ?? "empty"}`);
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
     });
     const client = new WindowsHelperSourceClient({
         transport,
         now: () => nowMilliseconds,
-        requestIdFactory: createRequestIdFactory(),
         serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
     });
 
@@ -1005,57 +979,140 @@ test("windows helper source client resets transient backoff after successful rea
     );
 });
 
-test("windows helper source client rejects source error responses", async () => {
-    const transport = new FakeWindowsHelperPipeTransport(request => create(SourceIpcResponseSchema, {
-        requestId: request.requestId,
-        payload: {
-            case: "error",
-            value: create(SourceErrorSchema, {
-                code: "source_unavailable",
-                message: "LHM unavailable",
-            }),
-        },
-    }));
+test("windows helper source client maps grpc unavailable source errors", async () => {
+    const transport = new RejectingTransport(createGrpcServiceError(
+        grpcStatus.UNAVAILABLE,
+        "Windows source reader is unavailable.",
+    ));
     const client = createClient(transport);
 
     await assert.rejects(
         async () => await client.checkHealth(),
-        /source_unavailable/u,
+        /UNAVAILABLE/u,
     );
+    assert.equal(client.getCachedStatus().reason, "sourceError");
+    assert.equal(transport.resetCount, 1);
 });
 
-class FakeWindowsHelperPipeTransport implements WindowsHelperPipeTransport {
-    readonly requests: SourceIpcRequest[] = [];
+test("windows helper source client keeps the channel after grpc deadline exceeded", async () => {
+    const transport = new RejectingTransport(createGrpcServiceError(
+        grpcStatus.DEADLINE_EXCEEDED,
+        "Deadline exceeded.",
+    ));
+    const client = createClient(transport);
 
-    constructor(private readonly responseFactory: (request: SourceIpcRequest) => SourceIpcResponse) {}
+    await assert.rejects(
+        async () => await client.checkHealth(),
+        /DEADLINE_EXCEEDED/u,
+    );
 
-    async send(payload: Uint8Array): Promise<Uint8Array> {
-        const request = fromBinary(SourceIpcRequestSchema, payload);
-        this.requests.push(request);
+    assert.equal(client.getCachedStatus().reason, "timeout");
+    assert.equal(transport.resetCount, 0);
+});
 
-        return toBinary(SourceIpcResponseSchema, this.responseFactory(request));
+test("windows helper source client keeps the channel after grpc invalid argument", async () => {
+    const transport = new RejectingTransport(createGrpcServiceError(
+        grpcStatus.INVALID_ARGUMENT,
+        "Invalid request.",
+    ));
+    const client = createClient(transport);
+
+    await assert.rejects(
+        async () => await client.checkHealth(),
+        /INVALID_ARGUMENT/u,
+    );
+
+    assert.equal(client.getCachedStatus().reason, "sourceError");
+    assert.equal(transport.resetCount, 0);
+});
+
+test("windows helper source client maps grpc unimplemented to protocol mismatch", async () => {
+    const transport = new RejectingTransport(createGrpcServiceError(
+        grpcStatus.UNIMPLEMENTED,
+        "Method is not implemented.",
+    ));
+    const client = createClient(transport);
+
+    await assert.rejects(
+        async () => await client.checkHealth(),
+        /UNIMPLEMENTED/u,
+    );
+
+    assert.equal(client.getCachedStatus().state, "unsupported");
+    assert.equal(client.getCachedStatus().reason, "protocolMismatch");
+    assert.equal(transport.resetCount, 1);
+});
+
+type FakeWindowsHelperGrpcRequest =
+    | { readonly method: "getSourceHealth"; readonly value: GetSourceHealthRequest }
+    | { readonly method: "listMetricDescriptors"; readonly value: ListMetricDescriptorsRequest }
+    | { readonly method: "readMetricSnapshot"; readonly value: ReadMetricSnapshotRequest };
+
+type FakeWindowsHelperGrpcResponse =
+    | GetSourceHealthResponse
+    | ListMetricDescriptorsResponse
+    | ReadMetricSnapshotResponse;
+
+class FakeWindowsHelperGrpcTransport implements WindowsHelperGrpcTransport {
+    readonly requests: FakeWindowsHelperGrpcRequest[] = [];
+
+    constructor(private readonly responseFactory: (
+        request: FakeWindowsHelperGrpcRequest,
+    ) => FakeWindowsHelperGrpcResponse) {}
+
+    async getSourceHealth(request: GetSourceHealthRequest): Promise<GetSourceHealthResponse> {
+        const fakeRequest = { method: "getSourceHealth", value: request } as const;
+        this.requests.push(fakeRequest);
+
+        return this.responseFactory(fakeRequest) as GetSourceHealthResponse;
+    }
+
+    async listMetricDescriptors(
+        request: ListMetricDescriptorsRequest,
+    ): Promise<ListMetricDescriptorsResponse> {
+        const fakeRequest = { method: "listMetricDescriptors", value: request } as const;
+        this.requests.push(fakeRequest);
+
+        return this.responseFactory(fakeRequest) as ListMetricDescriptorsResponse;
+    }
+
+    async readMetricSnapshot(request: ReadMetricSnapshotRequest): Promise<ReadMetricSnapshotResponse> {
+        const fakeRequest = { method: "readMetricSnapshot", value: request } as const;
+        this.requests.push(fakeRequest);
+
+        return this.responseFactory(fakeRequest) as ReadMetricSnapshotResponse;
     }
 }
 
-class RawResponseTransport implements WindowsHelperPipeTransport {
-    constructor(private readonly responseBytes: Uint8Array) {}
-
-    async send(): Promise<Uint8Array> {
-        return this.responseBytes;
-    }
-}
-
-class NeverResolvingTransport implements WindowsHelperPipeTransport {
+class NeverResolvingTransport implements WindowsHelperGrpcTransport {
     timeoutMilliseconds = 0;
     private rejectRequest: ((error: Error) => void) | undefined;
 
-    async send(
-        _payload: Uint8Array,
-        options: { readonly timeoutMilliseconds: number },
-    ): Promise<Uint8Array> {
+    async getSourceHealth(
+        _request: GetSourceHealthRequest,
+        options: WindowsHelperGrpcRequestOptions,
+    ): Promise<GetSourceHealthResponse> {
+        return await this.startRequest(options);
+    }
+
+    async listMetricDescriptors(
+        _request: ListMetricDescriptorsRequest,
+        options: WindowsHelperGrpcRequestOptions,
+    ): Promise<ListMetricDescriptorsResponse> {
+        return await this.startRequest(options);
+    }
+
+    async readMetricSnapshot(
+        _request: ReadMetricSnapshotRequest,
+        options: WindowsHelperGrpcRequestOptions,
+    ): Promise<ReadMetricSnapshotResponse> {
+        return await this.startRequest(options);
+    }
+
+    private async startRequest<TResponse>(options: WindowsHelperGrpcRequestOptions): Promise<TResponse> {
         this.timeoutMilliseconds = options.timeoutMilliseconds;
 
-        return await new Promise<Uint8Array>((_resolve, reject) => {
+        return await new Promise<TResponse>((_resolve, reject) => {
             this.rejectRequest = reject;
         });
     }
@@ -1065,19 +1122,36 @@ class NeverResolvingTransport implements WindowsHelperPipeTransport {
     }
 }
 
-class RejectingTransport implements WindowsHelperPipeTransport {
+class RejectingTransport implements WindowsHelperGrpcTransport {
     requestCount = 0;
+    resetCount = 0;
 
     constructor(private readonly error: Error) {}
 
-    async send(): Promise<Uint8Array> {
+    async getSourceHealth(): Promise<GetSourceHealthResponse> {
+        return await this.reject();
+    }
+
+    async listMetricDescriptors(): Promise<ListMetricDescriptorsResponse> {
+        return await this.reject();
+    }
+
+    async readMetricSnapshot(): Promise<ReadMetricSnapshotResponse> {
+        return await this.reject();
+    }
+
+    private async reject<TResponse>(): Promise<TResponse> {
         this.requestCount += 1;
         throw this.error;
+    }
+
+    reset(): void {
+        this.resetCount += 1;
     }
 }
 
 function createClient(
-    transport: WindowsHelperPipeTransport,
+    transport: WindowsHelperGrpcTransport,
     timeouts: WindowsHelperSourceClientOptions["timeouts"] = {},
     options: Pick<
         WindowsHelperSourceClientOptions,
@@ -1086,24 +1160,25 @@ function createClient(
 ): WindowsHelperSourceClient {
     return new WindowsHelperSourceClient({
         transport,
-        requestIdFactory: createRequestIdFactory(),
         timeouts,
         serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
         ...options,
     });
 }
 
-function createRequestIdFactory(): () => string {
-    let requestIndex = 0;
-    return () => {
-        requestIndex += 1;
-        return `request-${requestIndex}`;
-    };
-}
-
 function createNodeError(code: string, message: string): Error {
     const error = new Error(message) as Error & { code: string };
     error.code = code;
+    return error;
+}
+
+function createGrpcServiceError(code: grpcStatus, details: string): Error {
+    const error = new Error(details) as Error & {
+        code: grpcStatus;
+        details: string;
+    };
+    error.code = code;
+    error.details = details;
     return error;
 }
 
@@ -1114,64 +1189,43 @@ async function drainAsyncOperations(): Promise<void> {
 }
 
 function buildHealthResponse(
-    requestId: string,
     protocolVersion = SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION,
-): SourceIpcResponse {
-    return create(SourceIpcResponseSchema, {
-        requestId,
-        payload: {
-            case: "getSourceHealth",
-            value: create(GetSourceHealthResponseSchema, {
-                sourceId: WINDOWS_HELPER_SOURCE_ID,
-                protocolVersion,
-                helperVersion: "0.0.0-test",
-            }),
-        },
+): GetSourceHealthResponse {
+    return create(GetSourceHealthResponseSchema, {
+        sourceId: WINDOWS_HELPER_SOURCE_ID,
+        protocolVersion,
+        helperVersion: "0.0.0-test",
     });
 }
 
 function buildSnapshotResponse(
-    requestId: string,
     options: {
         readonly valueAttributions?: readonly ProtoMetricValueAttribution[];
         readonly unavailableMetrics?: readonly ProtoMetricUnavailableReport[];
     } = {},
-): SourceIpcResponse {
-    return create(SourceIpcResponseSchema, {
-        requestId,
-        payload: {
-            case: "readMetricSnapshot",
-            value: create(ReadMetricSnapshotResponseSchema, {
-                snapshot: buildMetricSnapshot({
-                    timestampMilliseconds: 1000,
-                    metrics: {
-                        "cpu.usage_percent": buildScalarMetricValue(42, { unit: MetricUnit.PERCENT }),
-                    },
-                }),
-                valueAttributions: [...(options.valueAttributions ?? [])],
-                unavailableMetrics: [...(options.unavailableMetrics ?? [])],
-            }),
-        },
+): ReadMetricSnapshotResponse {
+    return create(ReadMetricSnapshotResponseSchema, {
+        snapshot: buildMetricSnapshot({
+            timestampMilliseconds: 1000,
+            metrics: {
+                "cpu.usage_percent": buildScalarMetricValue(42, { unit: MetricUnit.PERCENT }),
+            },
+        }),
+        valueAttributions: [...(options.valueAttributions ?? [])],
+        unavailableMetrics: [...(options.unavailableMetrics ?? [])],
     });
 }
 
 function buildDescriptorResponse(
-    requestId: string,
     options: {
         readonly descriptorFingerprint?: string;
         readonly descriptors?: readonly ReturnType<typeof buildDescriptor>[];
     } = {},
-): SourceIpcResponse {
-    return create(SourceIpcResponseSchema, {
-        requestId,
-        payload: {
-            case: "listMetricDescriptors",
-            value: create(ListMetricDescriptorsResponseSchema, {
-                descriptorSnapshot: {
-                    descriptorFingerprint: options.descriptorFingerprint ?? "catalog-sha256-test",
-                    descriptors: [...(options.descriptors ?? [buildDescriptor({ metricId: "cpu.usage_percent" })])],
-                },
-            }),
+): ListMetricDescriptorsResponse {
+    return create(ListMetricDescriptorsResponseSchema, {
+        descriptorSnapshot: {
+            descriptorFingerprint: options.descriptorFingerprint ?? "catalog-sha256-test",
+            descriptors: [...(options.descriptors ?? [buildDescriptor({ metricId: "cpu.usage_percent" })])],
         },
     });
 }
