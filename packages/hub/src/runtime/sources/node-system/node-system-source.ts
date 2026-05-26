@@ -45,7 +45,7 @@ import {
 import { formatCpuModelText, isFinitePositiveNumber } from "./node-system-cpu";
 import {
     calculatePercent,
-    isUsableFileSystem,
+    filterUsableFileSystems,
     normalizeNullableRate,
     resolveDefaultDiskVolume,
     toDiskVolumeOption,
@@ -335,8 +335,7 @@ export class NodeSystemSource implements MetricSource {
                 return [] as Systeminformation.DiskLayoutData[];
             }),
         ]);
-        const diskVolumes = fileSystems
-            .filter(isUsableFileSystem)
+        const diskVolumes = filterUsableFileSystems(fileSystems, this.platform)
             .map(fileSystem => toDiskVolumeOption(fileSystem, blockDevices, diskLayout));
         const defaultDiskVolume = resolveDefaultDiskVolume(diskVolumes);
 
