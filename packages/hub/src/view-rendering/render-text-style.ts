@@ -42,7 +42,10 @@ export interface RenderTextStyles {
     readonly smallLabel: RenderTextStyle;
 }
 
-const MINIMUM_TEXT_STYLE_FONT_SIZE_SCALE = 0.9;
+// TODO(font-safe): Revisit this global clamp before adding another non-default
+// font preset. Pixel Window needs sub-0.9 scales, but the original clamp was a
+// guardrail for ordinary UI fonts.
+const MINIMUM_TEXT_STYLE_FONT_SIZE_SCALE = 0.7;
 const MAXIMUM_TEXT_STYLE_FONT_SIZE_SCALE = 1.12;
 export const DEFAULT_RENDER_TEXT_BASELINE_SHIFT_EM = 0;
 export const DEFAULT_RENDER_TEXT_CLIP_HEIGHT_EM = 1.45;
@@ -180,7 +183,7 @@ export const PIXEL_RENDER_TEXT_STYLES = {
     value: createRenderTextStyle({
         fontFamily: PIXEL_RENDER_FONT_FAMILY,
         fontWeight: 900,
-        fontSizeScale: 1,
+        fontSizeScale: 0.78,
         baselineShiftEm: 0.02,
         widthScale: 0.9,
         filter: undefined,
@@ -188,7 +191,7 @@ export const PIXEL_RENDER_TEXT_STYLES = {
     unit: createRenderTextStyle({
         fontFamily: PIXEL_RENDER_FONT_FAMILY,
         fontWeight: 800,
-        fontSizeScale: 1,
+        fontSizeScale: 0.86,
         baselineShiftEm: 0.08,
         widthScale: 0.9,
         filter: undefined,
@@ -196,7 +199,7 @@ export const PIXEL_RENDER_TEXT_STYLES = {
     title: createRenderTextStyle({
         fontFamily: PIXEL_RENDER_FONT_FAMILY,
         fontWeight: 850,
-        fontSizeScale: 1,
+        fontSizeScale: 0.88,
         baselineShiftEm: 0.02,
         widthScale: 0.9,
         filter: undefined,
@@ -204,7 +207,7 @@ export const PIXEL_RENDER_TEXT_STYLES = {
     label: createRenderTextStyle({
         fontFamily: PIXEL_RENDER_FONT_FAMILY,
         fontWeight: 800,
-        fontSizeScale: 1,
+        fontSizeScale: 0.85,
         baselineShiftEm: 0.02,
         widthScale: 0.9,
         filter: undefined,
@@ -212,7 +215,7 @@ export const PIXEL_RENDER_TEXT_STYLES = {
     smallLabel: createRenderTextStyle({
         fontFamily: PIXEL_RENDER_FONT_FAMILY,
         fontWeight: 750,
-        fontSizeScale: 1,
+        fontSizeScale: 0.86,
         baselineShiftEm: 0.03,
         widthScale: 0.9,
         filter: undefined,

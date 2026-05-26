@@ -1,4 +1,4 @@
-import type { RenderPaintTokens, TextMetricVariant } from "./render-appearance";
+import type { MetricRenderAppearance, RenderPaintTokens, TextMetricVariant } from "./render-appearance";
 import type { RenderTextStyles } from "./render-text-style";
 import type { RenderThemeEffectTokens } from "./render-svg-effects";
 import type { KeySize, WidgetData } from "./widget-data";
@@ -38,6 +38,8 @@ export interface SingleMetricBodyViewProps {
         lineSmoothingPercent: number;
         gridLineVisibility: SparklineGridLineVisibility;
         gridLineType: SparklineGridLineType;
+        themePreset: MetricRenderAppearance["themePreset"];
+        layoutTokens: MetricRenderAppearance["layoutTokens"];
     };
     renderSize: KeySize;
     centerIcon: string;
@@ -71,6 +73,7 @@ function renderSingleCircularMetric(options: SingleMetricBodyViewProps): string 
         iconColor: options.visual.paints.icon,
         textStyles: options.visual.textStyles,
         themeEffects: options.visual.themeEffects,
+        centerIconScale: options.visual.layoutTokens.singleProgressCircleCenterIconScale,
         circleVariant: options.circleVariant,
         centerIconFragment: options.centerIcon,
         footerIconFragment: options.footerIcon,
@@ -83,6 +86,7 @@ function renderSingleTextMetric(options: SingleMetricBodyViewProps): string {
         ...DEFAULT_TEXT_METRIC_CONFIG,
         colorConfig: options.visual.paints.primaryMetric,
         labelTextColor: options.visual.paints.secondaryText,
+        valueTextColor: options.visual.paints.metricValueText,
         unitTextColor: options.visual.paints.secondaryText,
         secondaryTextColor: options.visual.paints.mutedText,
         textStyles: options.visual.textStyles,

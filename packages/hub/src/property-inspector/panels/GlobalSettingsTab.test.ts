@@ -53,6 +53,21 @@ test("global override renders terminal palette controls for terminal theme", () 
     assert.doesNotMatch(markup, /Color Mode:/);
 });
 
+test("global override hides ordinary color controls for pixel window theme", () => {
+    const markup = renderToStaticMarkup(createElement(GlobalSettingsTab, {
+        resolvedSettings: buildGlobalSettings("pixel-window"),
+        colorCompensationProfile: DEFAULT_COLOR_COMPENSATION_PROFILE,
+        onSettingsPatch: () => undefined,
+        onOpenColorCompensation: () => undefined,
+    }));
+
+    assert.match(markup, /Pixel Window/);
+    assert.match(markup, /Color Override/);
+    assert.doesNotMatch(markup, /Theme Variant:/);
+    assert.doesNotMatch(markup, /Color Mode:/);
+    assert.doesNotMatch(markup, /Phosphor:/);
+});
+
 test("global override renders text view variant controls for text view", () => {
     const markup = renderToStaticMarkup(createElement(GlobalSettingsTab, {
         resolvedSettings: buildGlobalSettings("flat", "text"),

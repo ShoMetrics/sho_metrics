@@ -110,28 +110,42 @@ palette is resolved, not a rewrite of the frame renderer.
 
 The pixel-window title bar and border consume pixels that current primitives
 expect to own. Do not fix that by editing each primitive. Add a frame-level body
-viewport owned by `ThemeStyle`, and let the view frame render the existing widget
-body directly at the viewport size.
+viewport owned by `ThemeStyle`, and let the view frame place the existing widget
+body inside that viewport.
 
 Do not use arbitrary SVG scale for Pixel Window body content. DotGothic16 is a
 pixel font, and non-integer SVG scaling blurs the glyph grid. The client body
-should be rendered at its final logical size, then placed into the frame with an
-integer translate and a clip path.
+should be rendered at a theme-owned logical body size, then placed into the frame
+with an integer translate and a clip path.
 
 Chosen body layout approach:
 
-- Treat the client viewport as the body render surface.
-- Render primitives directly at `viewport.width` x `viewport.height`.
+- Treat the client viewport as the frame clip/client area.
+- Keep the primitive body render size as a separate value from the viewport
+  size.
+- For square surfaces, render the body at a square logical size equal to
+  `min(viewport.width, viewport.height)`, then center that square inside the
+  viewport. For a `144x144` key, the expected viewport is `134x120`, and the
+  expected primitive body render size is `120x120` placed at `x=12`, `y=19`
+  after the viewport offset is applied.
+- For wide touch-strip surfaces, render the body at the viewport size so wide
+  primitives keep using their wide layouts.
+- The surface classification is exact: `renderSize.width === renderSize.height`
+  is square, and `renderSize.width > renderSize.height` is wide. Do not use
+  aspect-ratio tolerance or fuzzy thresholds in this slice. If a future
+  production surface has `height > width`, stop and add an explicit layout
+  contract for that surface.
 - Place the rendered body into the frame with integer `translate(...)`.
 - Clip the body to the viewport.
 - Do not apply SVG `scale(...)` to the body.
 - Do not apply different X/Y scale factors.
 
 This is not stretching or flattening the widget body. Existing primitives receive
-a smaller logical canvas and run their normal responsive layout against that
-canvas. Circular views should continue to derive circular geometry from
-`min(width, height)`; text should be laid out for the viewport instead of being
-scaled after raster-style composition.
+a smaller logical canvas and run their normal responsive layout against that body
+size. Do not pass a slightly rectangular keypad client area, such as `128x110`,
+directly to primitives as the body render size. Several existing primitives use
+`width > height` to select wide/touch-strip layouts; passing `128x110` makes
+keypad centered text and title-card views incorrectly switch to wide layouts.
 
 Rejected alternatives:
 
@@ -1163,11 +1177,18 @@ packages/hub/src/view-rendering/metric-frame.test.ts
 Add a renderer-owned body viewport type:
 
 ```ts
+export interface ThemeBodyPlacement {
+    readonly xOffset: number;
+    readonly yOffset: number;
+    readonly renderSize: KeySize;
+}
+
 export interface ThemeBodyViewport {
     readonly xCoordinate: number;
     readonly yCoordinate: number;
     readonly width: number;
     readonly height: number;
+    readonly body: ThemeBodyPlacement;
     readonly clipRadius?: number;
 }
 ```
@@ -1184,6 +1205,12 @@ Contract:
 - Coordinates are in the same SVG logical coordinate system as `keySize`.
 - The viewport describes the client area available to widget body content after
   the frame/title bar is drawn.
+- `body.renderSize` is the logical size passed to primitives.
+- `body.xOffset` and `body.yOffset` place the rendered primitive body inside the
+  viewport. They are relative to `xCoordinate` and `yCoordinate`.
+- Square body offsets must use `Math.floor((viewportDimension - bodyDimension)
+  / 2)`. If the leftover space is odd, the body is biased left/up by one pixel
+  instead of using fractional placement.
 - The viewport owns geometry only. It must not carry colors, fonts, theme names,
   or primitive-specific layout instructions.
 - `paints` is included only for signature consistency with other `ThemeStyle`
@@ -1191,10 +1218,10 @@ Contract:
   this slice.
 
 Update `metric-view-frame.ts` and `metric-frame.ts` so themes with a body
-viewport render the body at the viewport size, then translate and clip it into
-the frame. Do not render at `144x144` and apply a fractional SVG scale. The
-viewport size is a new logical render surface for primitives, not a post-render
-image scale.
+viewport render the body at `body.renderSize`, then translate and clip it into
+the frame. Do not render at `144x144` and apply a fractional SVG scale. Do not
+use the viewport width and height as the primitive body render size unless the
+theme explicitly sets `body.renderSize` to that size.
 
 Required data flow:
 
@@ -1202,15 +1229,13 @@ Required data flow:
    `buildMetricViewRenderPlan()`.
 2. Resolve the active theme's `bodyViewport` before rendering the primitive
    body.
-3. Use the viewport dimensions as the body render size when a viewport exists:
+3. Use the viewport body placement as the body render size when a viewport
+   exists:
 
    ```ts
    const bodyRenderSize = bodyViewport == null
        ? renderSize
-       : {
-           width: bodyViewport.width,
-           height: bodyViewport.height,
-       };
+       : bodyViewport.body.renderSize;
    ```
 
    Pass `bodyRenderSize` to `renderSingleMetricBodyView()` or
@@ -1221,8 +1246,8 @@ Required data flow:
 The body placement wrapper should be a pure integer translate plus clip:
 
 ```txt
-translateX = viewport.xCoordinate
-translateY = viewport.yCoordinate
+translateX = viewport.xCoordinate + viewport.body.xOffset
+translateY = viewport.yCoordinate + viewport.body.yOffset
 ```
 
 ```svg
@@ -1232,7 +1257,8 @@ translateY = viewport.yCoordinate
 ```
 
 All viewport geometry should resolve to integer values. If any calculation
-produces a fractional result, round before it becomes `ThemeBodyViewport`.
+produces a fractional result, round before it becomes `ThemeBodyViewport` or
+`ThemeBodyPlacement`.
 
 The viewport clip path belongs in `<defs>`. Keep the id deterministic and
 derived from the theme preset and viewport size, for example:
@@ -1251,6 +1277,10 @@ Required tests:
 - Existing muted flat frame output still wraps the body in the muted filter.
 - Existing non-Pixel Window view-frame tests keep using the full outer render
   size for primitive body rendering.
+- Pixel Window square frame output places a `120x120` body inside the `134x120`
+  viewport for a `144x144` key.
+- Pixel Window wide touch-strip output keeps a wide body render size instead of
+  forcing a square body.
 
 Expected code size: `130-240 LOC`.
 
@@ -1308,14 +1338,14 @@ export const DEFAULT_PIXEL_WINDOW_PALETTE = {
 Suggested geometry for `144x144` keypad renders:
 
 ```txt
-outer margin: 4
-border thickness: 2
-title bar height: 18
-client padding: 4
-client viewport x: 8
-client viewport y: 26
-client viewport width: 128
-client viewport height: 110
+outer margin: 3
+border thickness: 1 outer + 1 inner
+title bar height: 14
+client padding: 3
+client viewport x: 5
+client viewport y: 19
+client viewport width: 134
+client viewport height: 120
 clip radius: 0 or 2
 ```
 
@@ -1323,17 +1353,17 @@ For non-square touch-strip sizes, derive values from dimensions but keep them
 bounded:
 
 ```txt
-outer margin: clamp(round(min(width, height) * 0.03), 3, 6)
-border thickness: 2
-title bar height: clamp(round(height * 0.13), 14, 20)
-client padding: 4
+outer margin: clamp(round(min(width, height) * 0.02), 3, 5)
+border thickness: 1 outer + 1 inner
+title bar height: clamp(round(height * 0.10), 12, 16)
+client padding: 3
 ```
 
 Expected body viewport examples:
 
 ```txt
-144x144 key: body render size 128x110, placed at x=8, y=26, no scale
-200x100 touch strip: body render size about 184x78, placed at integer x/y, no scale
+144x144 key: viewport 134x120 at x=5, y=19; body render size 120x120, placed at x=12, y=19
+200x100 wide touch strip: viewport/body render size about 190x78, placed at integer x/y
 ```
 
 If a viewport makes a specific visual case too cramped, tune the Pixel Window
@@ -1354,8 +1384,10 @@ Required tests:
   `scale(...)`.
 - Muted Pixel Window output still contains both viewport clipping and muted
   filtering.
-- A view-frame test proves Pixel Window passes the viewport size as the body
-  render size while keeping the outer frame render size unchanged.
+- A view-frame test proves Pixel Window passes a square body render size for a
+  square outer render size while keeping the outer frame render size unchanged.
+- A view-frame test proves Pixel Window keeps the wide body render size for a
+  wide touch-strip render size.
 
 Expected code size: `120-260 LOC`.
 
@@ -1430,7 +1462,85 @@ Acceptance criteria:
 
 Expected code size: `10-40 LOC`, excluding snapshots.
 
-#### Step 9.8: Verify
+#### Step 9.8: Fix Pixel Window Body Layout Contract
+
+The first Pixel Window visual matrix pass exposed a contract bug:
+
+- `text-metric.ts` and `title-card-text-metric.ts` use `width > height` to
+  select wide layouts.
+- Pixel Window passed the `128x110` keypad viewport directly as the primitive
+  body render size.
+- That made keypad centered text and title-card cases incorrectly use wide
+  layouts.
+- Circle views kept square geometry, but their ring shrank against the `110`
+  height while text constants remained tuned for the original square body,
+  making gauge and full-ring text look too large.
+- Minimal circle center icons were fixed-size fragments, so they stayed too
+  large after the body surface became smaller.
+- Title-card decorative text used the default text-metric value color, which is
+  white, and became unreadable on Pixel Window's light client background.
+
+Do not accept the current `pixel-window-*` snapshots as the final visual
+baseline until this fix is complete.
+
+Required changes:
+
+1. Implement the body placement/render-size contract defined in Step 9.4. If the
+   current code still has only viewport `x/y/width/height`, replace it with the
+   Step 9.4 `ThemeBodyPlacement` shape.
+2. Update `buildMetricViewRenderPlan()` so `bodyRenderSize` comes from
+   `bodyViewport.body.renderSize`, not from `bodyViewport.width` and
+   `bodyViewport.height`.
+3. Update `renderMetricFrame()` so the body is translated by
+   `viewport.xCoordinate + viewport.body.xOffset` and
+   `viewport.yCoordinate + viewport.body.yOffset`.
+4. Update `pixelWindowStyle.resolveBodyViewport()`:
+   - `renderSize.width === renderSize.height` is the only square-surface
+     condition;
+   - square surfaces use a square body render size equal to
+     `min(viewport.width, viewport.height)`;
+   - the square body is centered inside the viewport with integer offsets using
+     `Math.floor((viewportDimension - bodyDimension) / 2)`;
+   - `renderSize.width > renderSize.height` is the only wide-surface condition;
+   - wide surfaces use the full viewport as the body render size.
+5. Update metric-frame and metric-view-frame tests to assert the square and wide
+   cases above.
+6. Tune Pixel Window chrome geometry if the body is still too cramped. The
+   accepted keypad target is `134x120` viewport with a `120x120` square body.
+7. Tune `PIXEL_RENDER_TEXT_STYLES` font-size scale values if Pixel Window text
+   remains too large. Keep this as a theme typography preset change, not
+   primitive-local coordinate patches.
+8. Add a renderer-owned Pixel Window circle center icon scale token if minimal
+   circle icons remain too large. Feed it through the existing progress-circle
+   config; do not branch inside the primitive.
+9. Ensure title-card code/caption text uses renderer paint tokens such as
+   `paints.primaryText`, not the default white text-metric fallback.
+10. Re-run the Pixel Window visual matrix. The centered-text keypad case must
+   return to the vertical square layout. The title-card keypad case must not use
+   the wide title-card coordinates.
+
+If circle text is still visually too large after the square body fix, tune an
+existing renderer-owned sizing input, such as a Pixel Window text-size token in
+`pixel-window-theme-tokens.ts`, or the primitive's general responsive layout. Do
+not add `pixel-window` conditionals to primitives.
+
+If title-card text remains hard to read after the square body fix, treat that as
+a title-card paint/readability issue, not as a body viewport issue. The current
+product decision is still that title-card may keep its fixed Japanese serif
+font path for this slice.
+
+Expected code size: `80-180 LOC`, excluding snapshot churn.
+
+Snapshot handling:
+
+- Do not commit `pixel-window-*` snapshots generated before this fix.
+- If those snapshots already exist locally, delete or regenerate them after the
+  9.8 contract fix.
+- It is acceptable for an intermediate 9.6/9.7 code commit to lack final
+  Pixel Window snapshots, because visual tests are opt-in. The final Pixel
+  Window theme commit must include the corrected `pixel-window-*` snapshots.
+
+#### Step 9.9: Verify
 
 Run:
 
@@ -1454,11 +1564,13 @@ Review all generated `pixel-window-*` snapshots before accepting them. Do not
 update unrelated existing snapshots unless the diff is intentionally caused by
 this theme work and documented.
 
-Because Pixel Window gives primitives a smaller body render surface, Step 9.8
+Because Pixel Window gives primitives a smaller body render surface, Step 9.9
 must specifically review whether any primitive has a hidden square or minimum
-height assumption that fails at viewport sizes such as `128x110`. If that
-happens, fix the primitive's existing responsive layout or tune Pixel Window
-viewport geometry. Do not reintroduce body scaling as the workaround.
+height assumption that fails at the Pixel Window body sizes. Primitives may also
+have hidden absolute-pixel font-size assumptions that need to scale with
+`renderSize`. If that happens, fix the primitive's existing responsive layout or
+tune Pixel Window viewport geometry. Do not reintroduce body scaling as the
+workaround.
 
 #### Step 9 Completion Criteria
 
@@ -1470,8 +1582,11 @@ Step 9 is complete when:
 - Pixel Window maps to renderer preset `pixel-window`.
 - Pixel Window uses `PIXEL_RENDER_TEXT_STYLES`.
 - Pixel Window draws an outer frame and title bar.
-- Existing widget bodies render at the client-area size and are clipped into the
-  frame without SVG scaling.
+- Existing widget bodies render at the theme-owned body render size and are
+  clipped into the frame without SVG scaling.
+- Pixel Window square surfaces keep square body layout intent inside the smaller
+  client viewport.
+- Pixel Window wide touch-strip surfaces keep wide body layout intent.
 - Default colors are centralized in `pixel-window-theme-tokens.ts`.
 - Pixel Window does not expose custom color controls yet.
 - Existing selectable themes still render without a body viewport.

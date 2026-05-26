@@ -17,3 +17,11 @@ export const DEFAULT_PIXEL_WINDOW_PALETTE = {
     bodyGrid: "#82d7f4",
     bodyDivider: "#5931e6",
 } as const;
+
+export const DEFAULT_PIXEL_WINDOW_LAYOUT_TOKENS = {
+    // TODO(pixel-window): Review single/dual circle icon scale separately
+    // after the visual design pass. They are intentionally equal for the
+    // first Pixel Window baseline, unlike the default theme.
+    singleProgressCircleCenterIconScale: 0.72,
+    dualProgressCircleCenterIconScale: 0.72,
+} as const;

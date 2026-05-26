@@ -210,6 +210,27 @@ test("terminal theme renders palette controls without metric color controls", ()
     assert.doesNotMatch(markup, /Color - Upload/);
 });
 
+test("pixel window theme hides ordinary metric color controls", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "network",
+        settings: buildWidgetSettings("network", {
+            appearance: {
+                theme: { selectedTheme: "pixel-window" },
+            },
+            network: {
+                direction: "both",
+            },
+        }),
+    });
+
+    assert.match(markup, /Pixel Window/);
+    assert.doesNotMatch(markup, /Theme Variant:/);
+    assert.doesNotMatch(markup, /Color Mode:/);
+    assert.doesNotMatch(markup, /Color - Download/);
+    assert.doesNotMatch(markup, /Color - Upload/);
+    assert.doesNotMatch(markup, /Phosphor:/);
+});
+
 test("network mirrored trend disables grid controls in the panel", () => {
     const markup = renderWidgetSettings({
         actionKind: "network",

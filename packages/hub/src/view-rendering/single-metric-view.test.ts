@@ -88,6 +88,41 @@ test("single metric view dispatches text variants to centered and title-card ren
     assert.doesNotMatch(titleCardSvg, /text-metric-label/);
 });
 
+test("single text metric value uses the render metric value paint", () => {
+    const svg = renderSingleMetricBodyView({
+        data: buildWidgetData(),
+        visual: {
+            ...buildMetricRenderAppearance(),
+            renderPrimitive: "text",
+            textVariant: "title-card",
+        },
+        renderSize: { width: 120, height: 120 },
+        centerIcon: "<path id=\"center-icon\" />",
+        circleVariant: "full-ring",
+    });
+
+    assert.match(svg, /fill="#metric-value-text-token"[\s\S]*CPU/);
+});
+
+test("single circle applies the render layout center icon scale", () => {
+    const svg = renderSingleMetricBodyView({
+        data: buildWidgetData(),
+        visual: {
+            ...buildMetricRenderAppearance(),
+            renderPrimitive: "circle",
+            layoutTokens: {
+                ...buildMetricRenderAppearance().layoutTokens,
+                singleProgressCircleCenterIconScale: 0.72,
+            },
+        },
+        renderSize: { width: 120, height: 120 },
+        centerIcon: "<path id=\"center-icon\" />",
+        circleVariant: "minimal",
+    });
+
+    assert.match(svg, /transform="translate\(60 60\) scale\(0\.72\)"/);
+});
+
 function buildMetricRenderAppearance(): MetricRenderAppearance {
     return {
         renderPrimitive: "circle",
@@ -104,6 +139,7 @@ function buildMetricRenderAppearance(): MetricRenderAppearance {
             mutedText: "#muted-text-token",
             icon: "#icon-token",
             barTitleText: "#bar-title-text-token",
+            metricValueText: "#metric-value-text-token",
             barValueText: "#bar-value-text-token",
             barUnitText: "#bar-unit-text-token",
             barSecondaryText: "#bar-secondary-text-token",
@@ -116,6 +152,10 @@ function buildMetricRenderAppearance(): MetricRenderAppearance {
             track: "#track-token",
             grid: "#grid-token",
             divider: "#divider-token",
+        },
+        layoutTokens: {
+            singleProgressCircleCenterIconScale: 1,
+            dualProgressCircleCenterIconScale: 0.86,
         },
         textStyles: {
             ...DEFAULT_RENDER_TEXT_STYLES,

@@ -1,5 +1,5 @@
 import type { ColorConfig } from "./color-resolver";
-import type { RenderPaintTokens, TextMetricVariant } from "./render-appearance";
+import type { MetricRenderAppearance, RenderPaintTokens, TextMetricVariant } from "./render-appearance";
 import type { RenderTextStyles } from "./render-text-style";
 import type { RenderThemeEffectTokens } from "./render-svg-effects";
 import type { DualChannelWidgetData, KeySize } from "./widget-data";
@@ -48,6 +48,8 @@ export interface DualMetricBodyViewProps {
         lineSmoothingPercent: number;
         gridLineVisibility: SparklineGridLineVisibility;
         gridLineType: SparklineGridLineType;
+        themePreset: MetricRenderAppearance["themePreset"];
+        layoutTokens: MetricRenderAppearance["layoutTokens"];
     };
     renderPrimitive: DualMetricRenderPrimitive;
     renderSize: KeySize;
@@ -83,6 +85,7 @@ function renderDualCircularMetric(options: DualMetricBodyViewProps): string {
         themeEffects: options.visual.themeEffects,
         positiveColor: options.positive.color,
         negativeColor: options.negative.color,
+        centerIconScale: options.visual.layoutTokens.dualProgressCircleCenterIconScale,
         positiveColorConfig: options.positive.colorConfig,
         negativeColorConfig: options.negative.colorConfig,
         titleText: options.titleText,
@@ -100,6 +103,7 @@ function renderDualTextMetricView(options: DualMetricBodyViewProps): string {
     const config = {
         ...DEFAULT_TEXT_METRIC_CONFIG,
         labelTextColor: options.visual.paints.secondaryText,
+        valueTextColor: options.visual.paints.metricValueText,
         unitTextColor: options.visual.paints.secondaryText,
         secondaryTextColor: options.visual.paints.mutedText,
         textStyles: options.visual.textStyles,
