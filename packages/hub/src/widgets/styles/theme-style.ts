@@ -6,6 +6,14 @@ export interface ThemeStylePaints {
     readonly surface: string;
 }
 
+export interface ThemeBodyViewport {
+    readonly xCoordinate: number;
+    readonly yCoordinate: number;
+    readonly width: number;
+    readonly height: number;
+    readonly clipRadius?: number;
+}
+
 export type ThemeBackgroundFill =
     | {
         readonly fillKind: "solid";
@@ -38,6 +46,14 @@ export interface ThemeStyle {
 
     /** Optional texture rendered on the display panel above widget content. */
     renderPanelOverlay?(keySize: KeySize, paints: ThemeStylePaints): string;
+
+    /**
+     * Resolves the client area used to render and place widget body content.
+     *
+     * The `paints` parameter is present for ThemeStyle signature consistency.
+     * Viewport geometry should not depend on theme colors.
+     */
+    resolveBodyViewport?(keySize: KeySize, paints: ThemeStylePaints): ThemeBodyViewport;
 
     /** Overlay layer rendered ABOVE widget content (e.g. glass sheen). */
     renderOverlay(keySize: KeySize, paints: ThemeStylePaints): string;
