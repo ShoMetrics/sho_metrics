@@ -6,4 +6,5 @@
   <Project Path="ShoMetrics.Source.Windows.Ipc/ShoMetrics.Source.Windows.Ipc.csproj" />
   <Project Path="ShoMetrics.Source.Windows.Ipc.Tests/ShoMetrics.Source.Windows.Ipc.Tests.csproj" />
   <Project Path="ShoMetrics.Source.Windows.Service/ShoMetrics.Source.Windows.Service.csproj" />
+  <Project Path="ShoMetrics.Source.Windows.Service.Tests/ShoMetrics.Source.Windows.Service.Tests.csproj" />
 </Solution>

@@ -6,6 +6,17 @@ import "shometrics/v1/snapshot.proto";
 
 option csharp_namespace = "ShoMetrics.Contracts.V1";
 
+// Local metric source API for helper <-> plugin/control-panel IPC.
+//
+// The production Windows transport is gRPC over a Windows named pipe. Keep this
+// API narrow and read-only; privileged helper control belongs in a separate
+// authorization design.
+service MetricSourceService {
+  rpc GetSourceHealth(GetSourceHealthRequest) returns (GetSourceHealthResponse);
+  rpc ListMetricDescriptors(ListMetricDescriptorsRequest) returns (ListMetricDescriptorsResponse);
+  rpc ReadMetricSnapshot(ReadMetricSnapshotRequest) returns (ReadMetricSnapshotResponse);
+}
+
 message GetSourceHealthRequest {}
 
 message GetSourceHealthResponse {

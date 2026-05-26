@@ -9,7 +9,7 @@ namespace ShoMetrics.Source.Windows.Service;
 internal sealed class SourceRequestHandler(
     LibreHardwareMonitorSession monitorSession,
     SourceProtocolMapper protocolMapper,
-    ILogger<SourceRequestHandler> logger)
+    ILogger<SourceRequestHandler> logger) : ISourceRequestHandler
 {
     private static readonly TimeSpan HealthTimeout = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan ReadSnapshotTimeout = TimeSpan.FromSeconds(3);
@@ -17,32 +17,27 @@ internal sealed class SourceRequestHandler(
 
     public async Task<SourceIpcResponse> HandleAsync(SourceIpcRequest request, CancellationToken cancellationToken)
     {
-        TimeSpan operationTimeout = ResolveOperationTimeout(request.PayloadCase);
-
-        using CancellationTokenSource operationCancellationTokenSource =
-            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-
-        operationCancellationTokenSource.CancelAfter(operationTimeout);
-
         try
         {
-            return await DispatchAsync(
-                request,
-                operationCancellationTokenSource.Token).ConfigureAwait(false);
+            return await DispatchAsync(request, cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (OperationCanceledException) when (operationCancellationTokenSource.IsCancellationRequested)
+        catch (SourceRequestException exception) when (exception.FailureKind == SourceRequestFailureKind.Timeout)
         {
             logger.LogWarning(
-                "Source IPC request {PayloadCase} with request id {RequestId} timed out after {Timeout}.",
+                "Source IPC request {PayloadCase} with request id {RequestId} timed out.",
                 request.PayloadCase,
-                request.RequestId,
-                operationTimeout);
+                request.RequestId);
 
             return protocolMapper.BuildTimeoutResponse(request.RequestId);
+        }
+        catch (SourceRequestException exception) when (exception.FailureKind == SourceRequestFailureKind.SourceUnavailable)
+        {
+            logger.LogDebug(
+                "Source IPC request {PayloadCase} with request id {RequestId} found the source unavailable.",
+                request.PayloadCase,
+                request.RequestId);
+
+            return protocolMapper.BuildSourceUnavailableResponse(request.RequestId);
         }
         catch (Exception exception)
         {
@@ -56,6 +51,39 @@ internal sealed class SourceRequestHandler(
         }
     }
 
+    public Task<GetSourceHealthResponse> GetSourceHealthAsync(
+        GetSourceHealthRequest request,
+        CancellationToken cancellationToken)
+    {
+        return HandleOperationAsync(
+            nameof(GetSourceHealthAsync),
+            HealthTimeout,
+            _ => Task.FromResult(protocolMapper.BuildHealthResponse(monitorSession.InitializationWarnings)),
+            cancellationToken);
+    }
+
+    public Task<ReadMetricSnapshotResponse> ReadMetricSnapshotAsync(
+        ReadMetricSnapshotRequest request,
+        CancellationToken cancellationToken)
+    {
+        return HandleOperationAsync(
+            nameof(ReadMetricSnapshotAsync),
+            ReadSnapshotTimeout,
+            operationCancellationToken => ReadMetricSnapshotCoreAsync(request, operationCancellationToken),
+            cancellationToken);
+    }
+
+    public Task<ListMetricDescriptorsResponse> ListMetricDescriptorsAsync(
+        ListMetricDescriptorsRequest request,
+        CancellationToken cancellationToken)
+    {
+        return HandleOperationAsync(
+            nameof(ListMetricDescriptorsAsync),
+            ListDescriptorsTimeout,
+            operationCancellationToken => ListMetricDescriptorsCoreAsync(request, operationCancellationToken),
+            cancellationToken);
+    }
+
     private async Task<SourceIpcResponse> DispatchAsync(
         SourceIpcRequest request,
         CancellationToken cancellationToken)
@@ -64,18 +92,27 @@ internal sealed class SourceRequestHandler(
 
         return request.PayloadCase switch
         {
-            SourceIpcRequest.PayloadOneofCase.GetSourceHealth =>
-                protocolMapper.BuildHealthResponse(request.RequestId, monitorSession.InitializationWarnings),
-            SourceIpcRequest.PayloadOneofCase.ReadMetricSnapshot =>
-                await HandleReadMetricSnapshotAsync(
-                    request.RequestId,
+            SourceIpcRequest.PayloadOneofCase.GetSourceHealth => new SourceIpcResponse
+            {
+                RequestId = request.RequestId,
+                GetSourceHealth = await GetSourceHealthAsync(
+                    request.GetSourceHealth,
+                    cancellationToken).ConfigureAwait(false),
+            },
+            SourceIpcRequest.PayloadOneofCase.ReadMetricSnapshot => new SourceIpcResponse
+            {
+                RequestId = request.RequestId,
+                ReadMetricSnapshot = await ReadMetricSnapshotAsync(
                     request.ReadMetricSnapshot,
                     cancellationToken).ConfigureAwait(false),
-            SourceIpcRequest.PayloadOneofCase.ListMetricDescriptors =>
-                await HandleListMetricDescriptorsAsync(
-                    request.RequestId,
+            },
+            SourceIpcRequest.PayloadOneofCase.ListMetricDescriptors => new SourceIpcResponse
+            {
+                RequestId = request.RequestId,
+                ListMetricDescriptors = await ListMetricDescriptorsAsync(
                     request.ListMetricDescriptors,
                     cancellationToken).ConfigureAwait(false),
+            },
             _ => BuildInvalidRequestResponse(request),
         };
     }
@@ -90,14 +127,15 @@ internal sealed class SourceRequestHandler(
         return protocolMapper.BuildInvalidRequestResponse(request.RequestId);
     }
 
-    private async Task<SourceIpcResponse> HandleReadMetricSnapshotAsync(
-        string requestId,
+    private async Task<ReadMetricSnapshotResponse> ReadMetricSnapshotCoreAsync(
         ReadMetricSnapshotRequest request,
         CancellationToken cancellationToken)
     {
         if (!monitorSession.IsAvailable)
         {
-            return protocolMapper.BuildSourceUnavailableResponse(requestId);
+            throw new SourceRequestException(
+                SourceRequestFailureKind.SourceUnavailable,
+                "Windows source reader is unavailable.");
         }
 
         CoreMetricSnapshot snapshot = await monitorSession
@@ -113,20 +151,20 @@ internal sealed class SourceRequestHandler(
         }
 
         return protocolMapper.BuildReadMetricSnapshotResponse(
-            requestId,
             snapshot,
             request.MetricIds,
             descriptorSnapshot);
     }
 
-    private async Task<SourceIpcResponse> HandleListMetricDescriptorsAsync(
-        string requestId,
+    private async Task<ListMetricDescriptorsResponse> ListMetricDescriptorsCoreAsync(
         ListMetricDescriptorsRequest request,
         CancellationToken cancellationToken)
     {
         if (!monitorSession.IsAvailable)
         {
-            return protocolMapper.BuildSourceUnavailableResponse(requestId);
+            throw new SourceRequestException(
+                SourceRequestFailureKind.SourceUnavailable,
+                "Windows source reader is unavailable.");
         }
 
         CoreDescriptorSnapshot descriptorSnapshot = await monitorSession
@@ -134,19 +172,39 @@ internal sealed class SourceRequestHandler(
             .ConfigureAwait(false);
 
         return protocolMapper.BuildListMetricDescriptorsResponse(
-            requestId,
             descriptorSnapshot,
             request.MetricIds);
     }
 
-    private static TimeSpan ResolveOperationTimeout(SourceIpcRequest.PayloadOneofCase payloadCase)
+    private async Task<TResponse> HandleOperationAsync<TResponse>(
+        string operationName,
+        TimeSpan operationTimeout,
+        Func<CancellationToken, Task<TResponse>> operation,
+        CancellationToken cancellationToken)
     {
-        return payloadCase switch
+        using CancellationTokenSource operationCancellationTokenSource =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        operationCancellationTokenSource.CancelAfter(operationTimeout);
+
+        try
         {
-            SourceIpcRequest.PayloadOneofCase.GetSourceHealth => HealthTimeout,
-            SourceIpcRequest.PayloadOneofCase.ReadMetricSnapshot => ReadSnapshotTimeout,
-            SourceIpcRequest.PayloadOneofCase.ListMetricDescriptors => ListDescriptorsTimeout,
-            _ => HealthTimeout,
-        };
+            return await operation(operationCancellationTokenSource.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OperationCanceledException) when (operationCancellationTokenSource.IsCancellationRequested)
+        {
+            logger.LogWarning(
+                "Source request operation {OperationName} timed out after {Timeout}.",
+                operationName,
+                operationTimeout);
+
+            throw new SourceRequestException(
+                SourceRequestFailureKind.Timeout,
+                $"Source request operation {operationName} exceeded the service timeout.");
+        }
     }
 }

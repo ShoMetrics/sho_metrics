@@ -40,22 +40,18 @@ internal sealed class SourceProtocolMapper
     private const string MetricUnavailableWarningCode = "metric_unavailable";
     private const string InternalErrorCode = "internal_error";
 
-    public SourceIpcResponse BuildHealthResponse(string requestId, IReadOnlyList<HardwareSourceWarning> warnings)
+    public GetSourceHealthResponse BuildHealthResponse(IReadOnlyList<HardwareSourceWarning> warnings)
     {
-        SourceIpcResponse response = new()
+        GetSourceHealthResponse response = new()
         {
-            RequestId = requestId,
-            GetSourceHealth = new GetSourceHealthResponse
-            {
-                SourceId = WindowsSourceServiceIdentity.SourceId,
-                ProtocolVersion = WindowsSourceServiceIdentity.ProtocolVersion,
-                HelperVersion = WindowsSourceServiceIdentity.HelperVersion,
-            },
+            SourceId = WindowsSourceServiceIdentity.SourceId,
+            ProtocolVersion = WindowsSourceServiceIdentity.ProtocolVersion,
+            HelperVersion = WindowsSourceServiceIdentity.HelperVersion,
         };
 
         foreach (HardwareSourceWarning warning in warnings)
         {
-            response.GetSourceHealth.Warnings.Add(new SourceWarning
+            response.Warnings.Add(new SourceWarning
             {
                 Code = warning.Code,
                 Message = warning.Message,
@@ -65,8 +61,16 @@ internal sealed class SourceProtocolMapper
         return response;
     }
 
-    public SourceIpcResponse BuildReadMetricSnapshotResponse(
-        string requestId,
+    public SourceIpcResponse BuildHealthResponse(string requestId, IReadOnlyList<HardwareSourceWarning> warnings)
+    {
+        return new SourceIpcResponse
+        {
+            RequestId = requestId,
+            GetSourceHealth = BuildHealthResponse(warnings),
+        };
+    }
+
+    public ReadMetricSnapshotResponse BuildReadMetricSnapshotResponse(
         CoreMetricSnapshot snapshot,
         IReadOnlyCollection<string> requestedMetricIds,
         CoreDescriptorSnapshot? descriptorSnapshot)
@@ -91,15 +95,26 @@ internal sealed class SourceProtocolMapper
             AddHardwareWarnings(readResponse.Warnings, descriptorSnapshot.Warnings);
         }
 
+        return readResponse;
+    }
+
+    public SourceIpcResponse BuildReadMetricSnapshotResponse(
+        string requestId,
+        CoreMetricSnapshot snapshot,
+        IReadOnlyCollection<string> requestedMetricIds,
+        CoreDescriptorSnapshot? descriptorSnapshot)
+    {
         return new SourceIpcResponse
         {
             RequestId = requestId,
-            ReadMetricSnapshot = readResponse,
+            ReadMetricSnapshot = BuildReadMetricSnapshotResponse(
+                snapshot,
+                requestedMetricIds,
+                descriptorSnapshot),
         };
     }
 
-    public SourceIpcResponse BuildListMetricDescriptorsResponse(
-        string requestId,
+    public ListMetricDescriptorsResponse BuildListMetricDescriptorsResponse(
         CoreDescriptorSnapshot descriptorSnapshot,
         IReadOnlyCollection<string> requestedMetricIds)
     {
@@ -114,10 +129,18 @@ internal sealed class SourceProtocolMapper
             requestedMetricIds,
             descriptorSnapshot.Descriptors.Select(descriptor => descriptor.MetricId));
 
+        return listResponse;
+    }
+
+    public SourceIpcResponse BuildListMetricDescriptorsResponse(
+        string requestId,
+        CoreDescriptorSnapshot descriptorSnapshot,
+        IReadOnlyCollection<string> requestedMetricIds)
+    {
         return new SourceIpcResponse
         {
             RequestId = requestId,
-            ListMetricDescriptors = listResponse,
+            ListMetricDescriptors = BuildListMetricDescriptorsResponse(descriptorSnapshot, requestedMetricIds),
         };
     }
 
