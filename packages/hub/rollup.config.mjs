@@ -53,32 +53,37 @@ function replaceCompileTimeConstants() {
 }
 
 function copyRuntimeAssets() {
-    const assetFiles = [
-        ["assets/fonts/inter/InterVariable.ttf", `${sdPlugin}/assets/fonts/inter/InterVariable.ttf`],
-        ["assets/fonts/inter/LICENSE.txt", `${sdPlugin}/assets/fonts/inter/LICENSE.txt`],
-        ["assets/fonts/inter/README.md", `${sdPlugin}/assets/fonts/inter/README.md`],
-        ["assets/fonts/share-tech-mono/ShareTechMono-Regular.ttf", `${sdPlugin}/assets/fonts/share-tech-mono/ShareTechMono-Regular.ttf`],
-        ["assets/fonts/share-tech-mono/LICENSE.txt", `${sdPlugin}/assets/fonts/share-tech-mono/LICENSE.txt`],
-        ["assets/fonts/share-tech-mono/README.md", `${sdPlugin}/assets/fonts/share-tech-mono/README.md`],
-        ["assets/fonts/dotgothic16/DotGothic16-Regular.ttf", `${sdPlugin}/assets/fonts/dotgothic16/DotGothic16-Regular.ttf`],
-        ["assets/fonts/dotgothic16/LICENSE.txt", `${sdPlugin}/assets/fonts/dotgothic16/LICENSE.txt`],
-        ["assets/fonts/dotgothic16/README.md", `${sdPlugin}/assets/fonts/dotgothic16/README.md`],
+    const assetDirectories = [
+        ["assets/fonts", `${sdPlugin}/assets/fonts`],
     ];
 
     return {
         name: "copy-runtime-assets",
         buildStart() {
-            for (const [sourceFile] of assetFiles) {
-                this.addWatchFile(sourceFile);
+            for (const [sourceDirectory] of assetDirectories) {
+                for (const sourceFile of listRuntimeAssetFiles(sourceDirectory)) {
+                    this.addWatchFile(sourceFile);
+                }
             }
         },
         writeBundle() {
-            for (const [sourceFile, destinationFile] of assetFiles) {
-                fs.mkdirSync(path.dirname(destinationFile), { recursive: true });
-                fs.copyFileSync(sourceFile, destinationFile);
+            for (const [sourceDirectory, destinationDirectory] of assetDirectories) {
+                fs.rmSync(destinationDirectory, { recursive: true, force: true });
+                fs.cpSync(sourceDirectory, destinationDirectory, { recursive: true });
             }
         },
     };
+}
+
+function listRuntimeAssetFiles(sourceDirectory) {
+    return fs.readdirSync(sourceDirectory, { withFileTypes: true })
+        .flatMap(directoryEntry => {
+            const sourcePath = path.join(sourceDirectory, directoryEntry.name);
+
+            return directoryEntry.isDirectory()
+                ? listRuntimeAssetFiles(sourcePath)
+                : [sourcePath];
+        });
 }
 
 function normalizeBuildMode(value) {
