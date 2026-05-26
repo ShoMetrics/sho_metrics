@@ -456,7 +456,7 @@ test("widget advanced controls report fallback source attribution", () => {
         },
     });
 
-    assert.match(markup, /Current source: Built-in \(nvidia-smi\)/);
+    assert.match(markup, /Current source: Built-in GPU/);
     assert.match(markup, /Preferred source: Helper/);
     assert.match(markup, /Using fallback; preferred source has no fresh data/);
 });

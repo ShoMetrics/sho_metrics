@@ -171,7 +171,7 @@ function formatSourceLabel(sourceId: string, metricKey: string | undefined): str
             return "Helper";
         case NODE_SYSTEM_SOURCE_ID:
             return metricKey !== undefined && isGpuMetricKey(metricKey)
-                ? "Built-in (nvidia-smi)"
+                ? "Built-in GPU"
                 : "Built-in";
         default:
             return sourceId;

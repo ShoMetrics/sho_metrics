@@ -1,4 +1,4 @@
-import type { DiskVolumeOption } from "../../runtime/disk-volumes";
+import { DARWIN_ROOT_DATA_VOLUME_MOUNT, type DiskVolumeOption } from "../../runtime/disk-volumes";
 
 // Carries a disk volume after registry lookup while preserving an explicit
 // saved volume id that is currently unavailable.
@@ -41,6 +41,10 @@ function formatCompactDiskVolumeText(value: string): string {
 
     if (windowsDriveMatch) {
         return `${windowsDriveMatch[1].toUpperCase()}:`;
+    }
+
+    if (trimmedValue === DARWIN_ROOT_DATA_VOLUME_MOUNT) {
+        return "/";
     }
 
     const pathParts = trimmedValue.split(/[\\/]/).filter(pathPart => pathPart.length > 0);
