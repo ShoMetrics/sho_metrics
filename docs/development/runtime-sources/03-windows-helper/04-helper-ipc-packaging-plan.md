@@ -495,6 +495,8 @@ named pipe without changing source/Core ownership.
    - `SourceIpcFrameCodec`
    - `SourceIpcFrameException`
    - `SourceIpcRequest` / `SourceIpcResponse` usage
+   - `SourceRequestHandler.HandleAsync` and `DispatchAsync` old envelope dispatch
+   - `SourceProtocolMapper` request-id overloads and old envelope response builders
    - `WindowsPipeSourceServer`
    - frame accumulator and length-prefix handling tests
 

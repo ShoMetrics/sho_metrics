@@ -6,4 +6,5 @@ public static class SourceIpcConstants
     public const string GrpcPipeName = "ShoMetrics.Source.Windows.Grpc.v1";
     public const string ServiceName = "ShoMetrics Source Windows";
     public const int MaximumFrameBytes = 1024 * 1024;
+    public const int MaximumGrpcMessageBytes = 1024 * 1024;
 }

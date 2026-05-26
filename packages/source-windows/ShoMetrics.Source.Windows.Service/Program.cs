@@ -69,7 +69,11 @@ internal static class Program
                 })
                 .ConfigureServices(services =>
                 {
-                    services.AddGrpc();
+                    services.AddGrpc(options =>
+                    {
+                        options.MaxReceiveMessageSize = SourceIpcConstants.MaximumGrpcMessageBytes;
+                        options.MaxSendMessageSize = SourceIpcConstants.MaximumGrpcMessageBytes;
+                    });
                     services.AddSingleton<LibreHardwareMonitorSession>();
                     services.AddSingleton<WindowsPipeClientVerifier>();
                     services.AddSingleton<SourceIpcFrameCodec>();
