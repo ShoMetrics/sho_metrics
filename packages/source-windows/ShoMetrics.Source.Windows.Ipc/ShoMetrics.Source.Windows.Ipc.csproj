@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Google.Protobuf" Version="[3.34.1]" />
+    <PackageReference Include="Grpc.Core.Api" Version="[2.71.0]" />
     <PackageReference Include="Grpc.Tools" Version="[2.80.0]" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
   </ItemGroup>
 
@@ -17,7 +18,7 @@
               GrpcServices="None" />
     <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\source_api.proto"
               ProtoRoot="..\..\..\contracts\proto"
-              GrpcServices="None" />
+              GrpcServices="Both" />
     <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\source_ipc.proto"
               ProtoRoot="..\..\..\contracts\proto"
               GrpcServices="None" />

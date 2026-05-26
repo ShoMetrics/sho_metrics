@@ -1,3 +1,10 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Connections.Features;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.AspNetCore.Server.Kestrel.Transport.NamedPipes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
@@ -56,14 +63,20 @@ internal static class Program
             using IHost host = Host.CreateDefaultBuilder(args)
                 .UseWindowsService(options => options.ServiceName = SourceIpcConstants.ServiceName)
                 .UseSerilog((_, _, loggerConfiguration) => ConfigureSerilog(loggerConfiguration, mode))
+                .ConfigureWebHostDefaults(webBuilder =>
+                {
+                    ConfigureGrpcNamedPipeHost(webBuilder);
+                })
                 .ConfigureServices(services =>
                 {
+                    services.AddGrpc();
                     services.AddSingleton<LibreHardwareMonitorSession>();
-                    services.AddSingleton<WindowsPipeSecurity>();
                     services.AddSingleton<WindowsPipeClientVerifier>();
                     services.AddSingleton<SourceIpcFrameCodec>();
                     services.AddSingleton<SourceProtocolMapper>();
                     services.AddSingleton<SourceRequestHandler>();
+                    services.AddSingleton<ISourceRequestHandler>(provider =>
+                        provider.GetRequiredService<SourceRequestHandler>());
                     services.AddSingleton<WindowsPipeSourceServer>();
                     services.AddHostedService<WindowsMetricSnapshotWorker>();
                     services.AddHostedService<WindowsSourceWorker>();
@@ -84,6 +97,60 @@ internal static class Program
         {
             await Log.CloseAndFlushAsync().ConfigureAwait(false);
         }
+    }
+
+    private static void ConfigureGrpcNamedPipeHost(IWebHostBuilder webBuilder)
+    {
+        webBuilder.UseNamedPipes(options =>
+        {
+            // Kestrel's named-pipe transport defaults to same user + same
+            // elevation. The service can run elevated/LocalSystem while the
+            // Stream Deck plugin runs as the interactive user, so access is
+            // intentionally controlled by the explicit pipe ACL instead.
+            options.CurrentUserOnly = false;
+            options.PipeSecurity = WindowsPipeSecurity.CreatePipeSecurity();
+        });
+
+        webBuilder.ConfigureKestrel(options =>
+        {
+            options.ListenNamedPipe(SourceIpcConstants.GrpcPipeName, listenOptions =>
+            {
+                listenOptions.Protocols = HttpProtocols.Http2;
+            });
+        });
+
+        webBuilder.Configure(app =>
+        {
+            app.Use(VerifyNamedPipeClientAsync);
+            app.UseRouting();
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapGrpcService<WindowsGrpcMetricSourceService>();
+            });
+        });
+    }
+
+    private static async Task VerifyNamedPipeClientAsync(HttpContext context, Func<Task> next)
+    {
+        IConnectionNamedPipeFeature? namedPipeFeature = context.Features.Get<IConnectionNamedPipeFeature>();
+        if (namedPipeFeature is not null)
+        {
+            WindowsPipeClientVerifier pipeClientVerifier =
+                context.RequestServices.GetRequiredService<WindowsPipeClientVerifier>();
+
+            if (!pipeClientVerifier.IsLocalClient(namedPipeFeature.NamedPipe))
+            {
+                Log.Warning(
+                    "Rejected remote gRPC named pipe client for {PipeName}.",
+                    SourceIpcConstants.GrpcPipeName);
+
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+
+                return;
+            }
+        }
+
+        await next().ConfigureAwait(false);
     }
 
     private static ILogger CreateBootstrapLogger()

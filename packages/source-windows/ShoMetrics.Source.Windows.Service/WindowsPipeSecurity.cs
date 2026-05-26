@@ -4,9 +4,9 @@ using System.Security.Principal;
 
 namespace ShoMetrics.Source.Windows.Service;
 
-internal sealed class WindowsPipeSecurity
+internal static class WindowsPipeSecurity
 {
-    public PipeSecurity CreatePipeSecurity()
+    public static PipeSecurity CreatePipeSecurity()
     {
         var pipeSecurity = new PipeSecurity();
 

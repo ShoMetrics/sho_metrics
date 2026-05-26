@@ -6,7 +6,6 @@ using ShoMetrics.Source.Windows.Ipc;
 namespace ShoMetrics.Source.Windows.Service;
 
 internal sealed class WindowsPipeSourceServer(
-    WindowsPipeSecurity pipeSecurity,
     WindowsPipeClientVerifier pipeClientVerifier,
     SourceIpcFrameCodec frameCodec,
     SourceProtocolMapper protocolMapper,
@@ -66,7 +65,7 @@ internal sealed class WindowsPipeSourceServer(
             PipeOptions.Asynchronous,
             inBufferSize: 0,
             outBufferSize: 0,
-            pipeSecurity.CreatePipeSecurity());
+            WindowsPipeSecurity.CreatePipeSecurity());
     }
 
     private async Task HandleClientConnectionAsync(NamedPipeServerStream pipeServerStream, CancellationToken cancellationToken)
