@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="ShoMetrics.Source.Windows.ControlPanel/ShoMetrics.Source.Windows.ControlPanel.csproj" />
+  <Project Path="ShoMetrics.Source.Windows.ControlPanel.Tests/ShoMetrics.Source.Windows.ControlPanel.Tests.csproj" />
   <Project Path="ShoMetrics.Source.Windows.Core/ShoMetrics.Source.Windows.Core.csproj" />
   <Project Path="ShoMetrics.Source.Windows.Core.Tests/ShoMetrics.Source.Windows.Core.Tests.csproj" />
   <Project Path="ShoMetrics.Source.Windows.Helper/ShoMetrics.Source.Windows.Helper.csproj" />

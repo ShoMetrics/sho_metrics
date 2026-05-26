@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="[17.14.1]" />
+    <!-- Override old transitive minimums that fail the repo's NuGet signature trust policy. -->
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="[10.0.8]" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="[10.0.8]" />
+    <PackageReference Include="xunit.v3" Version="[3.2.2]" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="[3.1.5]" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ShoMetrics.Source.Windows.ControlPanel\ShoMetrics.Source.Windows.ControlPanel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>
