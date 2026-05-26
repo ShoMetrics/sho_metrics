@@ -3,7 +3,12 @@ using ShoMetrics.Source.Windows.Ipc;
 
 namespace ShoMetrics.Source.Windows.ControlPanel;
 
-internal sealed partial class WindowsServiceStatusReader
+internal interface IWindowsServiceStatusReader
+{
+    WindowsServiceStatusKind ReadStatus();
+}
+
+internal sealed partial class WindowsServiceStatusReader : IWindowsServiceStatusReader
 {
     private const uint ScManagerConnect = 0x0001;
     private const uint ServiceQueryStatus = 0x0004;

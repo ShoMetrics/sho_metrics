@@ -24,6 +24,7 @@ public partial class MainWindow : Window
         SystemBackdrop = new MicaBackdrop();
         SetWindowSizeInDips(width: 1100, height: 720);
         ApplyStatus(HelperControlPanelStatus.Initial());
+        Closed += OnClosed;
         _ = RefreshStatusAsync();
     }
 
@@ -112,6 +113,11 @@ public partial class MainWindow : Window
         ErrorText.Text = status.ErrorText;
         LogFolderText.Text = WindowsSourceServicePaths.ResolveLogDirectoryPath();
         CheckedAtItem.Content = $"Checked {FormatCheckedAge(status.CheckedAt, DateTimeOffset.Now)}";
+    }
+
+    private void OnClosed(object sender, WindowEventArgs args)
+    {
+        _statusReader.Dispose();
     }
 
     private void OnNavigationSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)

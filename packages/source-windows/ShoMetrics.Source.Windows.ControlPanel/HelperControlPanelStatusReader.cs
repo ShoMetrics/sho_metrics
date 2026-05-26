@@ -1,16 +1,30 @@
-using System.IO;
+using Grpc.Core;
 using ShoMetrics.Contracts.V1;
-using ShoMetrics.Source.Windows.Ipc;
 
 namespace ShoMetrics.Source.Windows.ControlPanel;
 
-internal sealed class HelperControlPanelStatusReader
+internal sealed class HelperControlPanelStatusReader : IDisposable
 {
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromMilliseconds(800);
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(3);
 
-    private readonly WindowsServiceStatusReader _serviceStatusReader = new();
-    private readonly WindowsSourceIpcClient _ipcClient = new(new SourceIpcFrameCodec());
+    private readonly IWindowsServiceStatusReader _serviceStatusReader;
+    private readonly IHelperControlPanelSourceClient _sourceClient;
+
+    public HelperControlPanelStatusReader()
+        : this(
+            new WindowsServiceStatusReader(),
+            new HelperControlPanelSourceClient(ConnectTimeout))
+    {
+    }
+
+    internal HelperControlPanelStatusReader(
+        IWindowsServiceStatusReader serviceStatusReader,
+        IHelperControlPanelSourceClient sourceClient)
+    {
+        _serviceStatusReader = serviceStatusReader;
+        _sourceClient = sourceClient;
+    }
 
     public async Task<HelperControlPanelStatus> ReadAsync(CancellationToken cancellationToken)
     {
@@ -22,16 +36,32 @@ internal sealed class HelperControlPanelStatusReader
             // TODO: If the control panel starts refreshing automatically, replace
             // these separate diagnostic requests with one batch status RPC.
             GetSourceHealthResponse health = await ReadHealthAsync(cancellationToken).ConfigureAwait(false);
-            ListMetricDescriptorsResponse descriptors = await ReadDescriptorsAsync(cancellationToken).ConfigureAwait(false);
-            ReadMetricSnapshotResponse snapshot = await ReadSnapshotAsync(cancellationToken).ConfigureAwait(false);
+            DiagnosticReadResult<ListMetricDescriptorsResponse> descriptors = await TryReadDiagnosticAsync(
+                "Descriptor read failed",
+                ReadDescriptorsAsync,
+                cancellationToken).ConfigureAwait(false);
+            DiagnosticReadResult<ReadMetricSnapshotResponse> snapshot = await TryReadDiagnosticAsync(
+                "Snapshot read failed",
+                ReadSnapshotAsync,
+                cancellationToken).ConfigureAwait(false);
 
             List<string> warningMessages = [
                 .. FormatWarnings(health.Warnings),
-                .. FormatWarnings(descriptors.Warnings),
-                .. FormatWarnings(snapshot.Warnings),
+                .. FormatWarnings(descriptors.Response?.Warnings ?? []),
+                .. FormatWarnings(snapshot.Response?.Warnings ?? []),
             ];
+            List<string> errorMessages = [];
+            if (descriptors.ErrorText is not null)
+            {
+                errorMessages.Add(descriptors.ErrorText);
+            }
 
-            DateTimeOffset? sampleCapturedAt = snapshot.Snapshot?.CapturedAt?.ToDateTimeOffset();
+            if (snapshot.ErrorText is not null)
+            {
+                errorMessages.Add(snapshot.ErrorText);
+            }
+
+            DateTimeOffset? sampleCapturedAt = snapshot.Response?.Snapshot?.CapturedAt?.ToDateTimeOffset();
 
             return new HelperControlPanelStatus
             {
@@ -39,17 +69,21 @@ internal sealed class HelperControlPanelStatusReader
                 ServiceStatusText = FormatServiceStatus(serviceStatus),
                 ServiceInstallText = FormatServiceInstallStatus(serviceStatus),
                 ServiceRuntimeText = FormatServiceRuntimeStatus(serviceStatus),
-                ConnectionStatusText = "Connected",
+                ConnectionStatusText = errorMessages.Count == 0 ? "Connected" : "Connected with errors",
                 PawnIoDriverText = ResolvePawnIoDriverText(warningMessages),
                 HelperVersionText = string.IsNullOrWhiteSpace(health.HelperVersion) ? "Unknown" : health.HelperVersion,
                 ProtocolVersionText = string.IsNullOrWhiteSpace(health.ProtocolVersion) ? "Unknown" : health.ProtocolVersion,
-                LastSampleText = HelperControlPanelStatus.FormatSampleAge(sampleCapturedAt, checkedAt),
-                DescriptorCountText = descriptors.DescriptorSnapshot?.Descriptors.Count.ToString() ?? "0",
+                LastSampleText = snapshot.Response is null
+                    ? "Unknown"
+                    : HelperControlPanelStatus.FormatSampleAge(sampleCapturedAt, checkedAt),
+                DescriptorCountText = descriptors.Response is null
+                    ? "Unknown"
+                    : descriptors.Response.DescriptorSnapshot?.Descriptors.Count.ToString() ?? "0",
                 WarningCountText = warningMessages.Count.ToString(),
                 WarningDetailsText = warningMessages.Count == 0
                     ? "No warnings."
                     : string.Join(Environment.NewLine, warningMessages),
-                ErrorText = "",
+                ErrorText = string.Join(Environment.NewLine, errorMessages),
             };
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
@@ -68,66 +102,49 @@ internal sealed class HelperControlPanelStatusReader
                 DescriptorCountText = "Unknown",
                 WarningCountText = "Unknown",
                 WarningDetailsText = "No warnings.",
-                ErrorText = FormatConnectionError(exception),
+                ErrorText = FormatHelperRequestError(exception),
             };
         }
     }
 
     private async Task<GetSourceHealthResponse> ReadHealthAsync(CancellationToken cancellationToken)
     {
-        SourceIpcResponse response = await SendAsync(
-            new SourceIpcRequest
-            {
-                RequestId = CreateRequestId(),
-                GetSourceHealth = new GetSourceHealthRequest(),
-            },
-            cancellationToken).ConfigureAwait(false);
-
-        return response.GetSourceHealth ?? throw new InvalidOperationException("Windows source service did not return a health response.");
+        return await _sourceClient
+            .GetSourceHealthAsync(RequestTimeout, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private async Task<ListMetricDescriptorsResponse> ReadDescriptorsAsync(CancellationToken cancellationToken)
     {
-        SourceIpcResponse response = await SendAsync(
-            new SourceIpcRequest
-            {
-                RequestId = CreateRequestId(),
-                ListMetricDescriptors = new ListMetricDescriptorsRequest(),
-            },
-            cancellationToken).ConfigureAwait(false);
-
-        return response.ListMetricDescriptors
-            ?? throw new InvalidOperationException("Windows source service did not return a descriptor response.");
+        return await _sourceClient
+            .ListMetricDescriptorsAsync(RequestTimeout, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private async Task<ReadMetricSnapshotResponse> ReadSnapshotAsync(CancellationToken cancellationToken)
     {
-        SourceIpcResponse response = await SendAsync(
-            new SourceIpcRequest
-            {
-                RequestId = CreateRequestId(),
-                ReadMetricSnapshot = new ReadMetricSnapshotRequest(),
-            },
-            cancellationToken).ConfigureAwait(false);
-
-        return response.ReadMetricSnapshot
-            ?? throw new InvalidOperationException("Windows source service did not return a snapshot response.");
+        return await _sourceClient
+            .ReadMetricSnapshotAsync(RequestTimeout, cancellationToken)
+            .ConfigureAwait(false);
     }
 
-    private async Task<SourceIpcResponse> SendAsync(
-        SourceIpcRequest request,
+    private static async Task<DiagnosticReadResult<TResponse>> TryReadDiagnosticAsync<TResponse>(
+        string failurePrefix,
+        Func<CancellationToken, Task<TResponse>> readAsync,
         CancellationToken cancellationToken)
+        where TResponse : class
     {
-        SourceIpcResponse response = await _ipcClient
-            .SendAsync(request, ConnectTimeout, RequestTimeout, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (response.Error is not null)
+        try
         {
-            throw new InvalidOperationException($"{response.Error.Code}: {response.Error.Message}");
+            TResponse response = await readAsync(cancellationToken).ConfigureAwait(false);
+            return new DiagnosticReadResult<TResponse>(response, ErrorText: null);
         }
-
-        return response;
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            return new DiagnosticReadResult<TResponse>(
+                Response: null,
+                ErrorText: $"{failurePrefix}: {FormatHelperRequestError(exception)}");
+        }
     }
 
     private static IEnumerable<string> FormatWarnings(IEnumerable<SourceWarning> warnings)
@@ -196,18 +213,41 @@ internal sealed class HelperControlPanelStatusReader
         return "Unknown";
     }
 
-    private static string CreateRequestId()
+    public void Dispose()
     {
-        return Guid.NewGuid().ToString("N");
+        _sourceClient.Dispose();
+        (_serviceStatusReader as IDisposable)?.Dispose();
     }
 
-    private static string FormatConnectionError(Exception exception)
+    private static string FormatHelperRequestError(Exception exception)
     {
         return exception switch
         {
+            RpcException rpcException => FormatGrpcError(rpcException),
             OperationCanceledException => "Connection timed out. The helper service may be stopped or still starting.",
-            IOException => $"IPC connection failed: {exception.Message}",
             _ => HelperControlPanelStatus.FormatException(exception),
         };
     }
+
+    private static string FormatGrpcError(RpcException exception)
+    {
+        string detail = string.IsNullOrWhiteSpace(exception.Status.Detail)
+            ? exception.Message
+            : exception.Status.Detail;
+
+        return exception.StatusCode switch
+        {
+            StatusCode.Unavailable => $"gRPC connection unavailable: {detail}",
+            StatusCode.DeadlineExceeded => $"gRPC request timed out: {detail}",
+            StatusCode.Unimplemented => $"Helper does not support this Control Panel request: {detail}",
+            StatusCode.FailedPrecondition => $"Helper precondition failed: {detail}",
+            StatusCode.InvalidArgument => $"Control Panel sent an invalid helper request: {detail}",
+            _ => $"gRPC {exception.StatusCode}: {detail}",
+        };
+    }
+
+    private readonly record struct DiagnosticReadResult<TResponse>(
+        TResponse? Response,
+        string? ErrorText)
+        where TResponse : class;
 }

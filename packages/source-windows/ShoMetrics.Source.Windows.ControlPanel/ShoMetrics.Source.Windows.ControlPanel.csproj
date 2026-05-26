@@ -19,6 +19,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Grpc.Net.Client" Version="[2.71.0]" />
+    <!-- Override Grpc.Net.Client's old minimum dependency, which fails the repo's NuGet signature trust policy. -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="[10.0.8]" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="[2.1.3]" />
   </ItemGroup>
 
