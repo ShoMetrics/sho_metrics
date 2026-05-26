@@ -339,7 +339,7 @@ function pixelWindowColorConfig(): ColorConfig {
 function pixelWindowRenderPaintTokens(): Omit<RenderPaintTokens, "backgroundFill" | "primaryMetric"> {
     return {
         background: DEFAULT_PIXEL_WINDOW_PALETTE.clientBackground,
-        surface: DEFAULT_PIXEL_WINDOW_PALETTE.controlButton,
+        surface: DEFAULT_PIXEL_WINDOW_PALETTE.bodySurface,
         primaryText: DEFAULT_PIXEL_WINDOW_PALETTE.bodyText,
         secondaryText: DEFAULT_PIXEL_WINDOW_PALETTE.bodySubtleText,
         mutedText: DEFAULT_PIXEL_WINDOW_PALETTE.bodyMutedText,

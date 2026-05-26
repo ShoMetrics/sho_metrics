@@ -147,7 +147,7 @@ function renderWindowControl(geometry: PixelWindowGeometry): string {
 
     return `
         <rect x="${xCoordinate}" y="${yCoordinate}" width="${controlSize}" height="${controlSize}"
-            fill="${DEFAULT_PIXEL_WINDOW_PALETTE.controlButton}"
+            fill="${DEFAULT_PIXEL_WINDOW_PALETTE.clientBackground}"
             stroke="${DEFAULT_PIXEL_WINDOW_PALETTE.titleText}" stroke-width="1" />
         <path d="M ${startXCoordinate} ${startYCoordinate} L ${endXCoordinate} ${endYCoordinate}
             M ${endXCoordinate} ${startYCoordinate} L ${startXCoordinate} ${endYCoordinate}"
