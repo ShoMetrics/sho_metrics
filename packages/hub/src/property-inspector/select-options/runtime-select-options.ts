@@ -1,4 +1,8 @@
-import type { DiskVolumeOption } from "../../runtime/disk-volumes";
+import {
+    DARWIN_ROOT_DATA_VOLUME_MOUNT,
+    resolveDefaultDiskVolumeOption,
+    type DiskVolumeOption,
+} from "../../runtime/disk-volumes";
 import type { NetworkInterfaceOption } from "../../runtime/network-interfaces";
 import type { SelectOption, VisibilityContext } from "../inspector/types";
 
@@ -99,9 +103,7 @@ export function resolveSelectedDiskVolume(context: VisibilityContext): DiskVolum
         return diskVolumes.find(diskVolume => diskVolume.id === selectedDiskVolumeId) ?? null;
     }
 
-    return diskVolumes.find(diskVolume => diskVolume.mount === "/" || /^[A-Z]:\\?$/i.test(diskVolume.mount))
-        ?? diskVolumes[0]
-        ?? null;
+    return resolveDefaultDiskVolumeOption(diskVolumes);
 }
 
 function formatDiskVolumeDisplayLabel(diskVolume: DiskVolumeOption): string {
@@ -144,6 +146,10 @@ function formatDiskVolumeSelectionText(value: string): string {
     }
 
     if (mountLabel === "/") {
+        return "/";
+    }
+
+    if (mountLabel === DARWIN_ROOT_DATA_VOLUME_MOUNT) {
         return "/";
     }
 

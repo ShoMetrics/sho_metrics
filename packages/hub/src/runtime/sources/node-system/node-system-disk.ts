@@ -1,12 +1,34 @@
 import type { Systeminformation } from "systeminformation";
-import { type DiskStorageKind, type DiskVolumeOption } from "../../disk-volumes";
+import {
+    DARWIN_ROOT_DATA_VOLUME_MOUNT,
+    resolveDefaultDiskVolumeOption,
+    type DiskStorageKind,
+    type DiskVolumeOption,
+} from "../../disk-volumes";
 
 export function isUsableFileSystem(fileSystem: Systeminformation.FsSizeData): boolean {
     return fileSystem.size > 0
         && fileSystem.mount.length > 0
-        && isUserFacingFileSystemMount(fileSystem.mount)
         && fileSystem.available >= 0
         && fileSystem.used >= 0;
+}
+
+export function filterUsableFileSystems(
+    fileSystems: readonly Systeminformation.FsSizeData[],
+    platform: NodeJS.Platform,
+): Systeminformation.FsSizeData[] {
+    const hasDarwinRootDataVolume = platform === "darwin"
+        && fileSystems.some(fileSystem =>
+            fileSystem.mount === DARWIN_ROOT_DATA_VOLUME_MOUNT && isUsableFileSystem(fileSystem)
+        );
+
+    return fileSystems.filter(fileSystem =>
+        isUsableFileSystem(fileSystem)
+        && isUserFacingFileSystemMount(fileSystem.mount, {
+            hasDarwinRootDataVolume,
+            platform,
+        })
+    );
 }
 
 export function toDiskVolumeOption(
@@ -25,7 +47,7 @@ export function toDiskVolumeOption(
         fs: fileSystem.fs,
         mount: fileSystem.mount,
         sizeBytes: fileSystem.size,
-        usedBytes: fileSystem.used,
+        usedBytes: calculateDiskUsedBytes(fileSystem.size, fileSystem.available),
         availableBytes: fileSystem.available,
         storageKind: isNetworkVolume ? "network" : resolveDiskStorageKind(physicalDisk, blockDevice),
         diskName: physicalDisk?.name ?? blockDevice?.model ?? fileSystem.fs,
@@ -115,13 +137,16 @@ export function isLocalBlockDevice(blockDevice: Systeminformation.BlockDevicesDa
 }
 
 export function resolveDefaultDiskVolume(diskVolumes: readonly DiskVolumeOption[]): DiskVolumeOption | null {
-    return diskVolumes.find(diskVolume => diskVolume.mount === "/" || /^[A-Z]:\\?$/i.test(diskVolume.mount))
-        ?? diskVolumes[0]
-        ?? null;
+    return resolveDefaultDiskVolumeOption(diskVolumes);
 }
 
 export function calculatePercent(value: number, total: number): number {
     return total > 0 ? (value / total) * 100 : 0;
+}
+
+export function calculateDiskUsedBytes(totalBytes: number, availableBytes: number): number {
+    // Capacity usage follows filesystem free-space semantics instead of allocated-block usage.
+    return Math.max(totalBytes - availableBytes, 0);
 }
 
 export function normalizeNullableRate(value: number | null): number {
@@ -134,7 +159,16 @@ export function isNetworkFileSystem(fileSystem: Systeminformation.FsSizeData): b
         || fileSystem.type.toLowerCase() === "smbfs";
 }
 
-function isUserFacingFileSystemMount(mount: string): boolean {
+interface UserFacingFileSystemMountOptions {
+    readonly platform: NodeJS.Platform;
+    readonly hasDarwinRootDataVolume: boolean;
+}
+
+function isUserFacingFileSystemMount(mount: string, options: UserFacingFileSystemMountOptions): boolean {
+    if (options.platform === "darwin") {
+        return isUserFacingDarwinFileSystemMount(mount, options.hasDarwinRootDataVolume);
+    }
+
     if (mount === "/" || /^[A-Z]:\\?$/i.test(mount)) {
         return true;
     }
@@ -144,6 +178,18 @@ function isUserFacingFileSystemMount(mount: string): boolean {
     }
 
     return !mount.startsWith("/System/Volumes/");
+}
+
+function isUserFacingDarwinFileSystemMount(mount: string, hasRootDataVolume: boolean): boolean {
+    if (mount === DARWIN_ROOT_DATA_VOLUME_MOUNT) {
+        return true;
+    }
+
+    if (mount === "/") {
+        return !hasRootDataVolume;
+    }
+
+    return mount.startsWith("/Volumes/");
 }
 
 function normalizeDiskDevicePath(devicePath: string | undefined): string | null {

@@ -13,7 +13,9 @@ import {
     normalizeNonEmptyText,
 } from "./node-system-cpu";
 import {
+    calculateDiskUsedBytes,
     calculatePercent,
+    filterUsableFileSystems,
     isNetworkFileSystem,
     isLocalBlockDevice,
     isUsableFileSystem,
@@ -485,6 +487,55 @@ test("node system source maps disk usage metrics and updates injected disk regis
     assert.equal(callCounts.fsStats, 0);
 });
 
+test("node system source uses macOS root data volume for default disk usage", async () => {
+    const callCounts = buildCallCounts();
+    const diskRegistryUpdates: DiskVolumeOption[][] = [];
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            fsSize: async () => {
+                callCounts.fsSize += 1;
+                return [
+                    buildFileSystem({
+                        fs: "/dev/disk3s1s1",
+                        mount: "/",
+                        size: 1000,
+                        used: 100,
+                        available: 50,
+                    }),
+                    buildFileSystem({
+                        fs: "/dev/disk3s2",
+                        mount: "/System/Volumes/Preboot",
+                        size: 1000,
+                        used: 20,
+                        available: 50,
+                    }),
+                    buildFileSystem({
+                        fs: "/dev/disk3s5",
+                        mount: "/System/Volumes/Data",
+                        size: 1000,
+                        used: 400,
+                        available: 50,
+                    }),
+                ];
+            },
+        }),
+        diskRegistry: {
+            update: options => diskRegistryUpdates.push([...options]),
+        },
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+        platform: "darwin",
+    });
+
+    const snapshot = await source.pollMetrics(["disk.usage.percent"]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.equal(metrics["disk.usage.used"]?.scalar, 950);
+    assert.equal(metrics["disk.usage.available"]?.scalar, 50);
+    assert.equal(metrics["disk.usage.percent"]?.scalar, 95);
+    assert.deepEqual(diskRegistryUpdates[0].map(volume => volume.mount), ["/System/Volumes/Data"]);
+});
+
 test("node system source polls disk throughput only on darwin", async () => {
     const callCounts = buildCallCounts();
     const source = new NodeSystemSource({
@@ -877,13 +928,65 @@ test("file system usability requires positive size, mount, and non-negative usag
     assert.equal(isUsableFileSystem(buildFileSystem({ mount: "" })), false);
     assert.equal(isUsableFileSystem(buildFileSystem({ available: -1 })), false);
     assert.equal(isUsableFileSystem(buildFileSystem({ used: -1 })), false);
-    assert.equal(isUsableFileSystem(buildFileSystem({ mount: "/System/Volumes/Data" })), false);
-    assert.equal(isUsableFileSystem(buildFileSystem({ mount: "/Volumes/media" })), true);
+});
+
+test("usable file system filtering prefers macOS root data volume over sealed root", () => {
+    const rootSystemVolume = buildFileSystem({
+        fs: "/dev/disk3s1s1",
+        mount: "/",
+        used: 12,
+        available: 18,
+    });
+    const rootDataVolume = buildFileSystem({
+        fs: "/dev/disk3s5",
+        mount: "/System/Volumes/Data",
+        used: 430,
+        available: 18,
+    });
+    const prebootVolume = buildFileSystem({
+        fs: "/dev/disk3s2",
+        mount: "/System/Volumes/Preboot",
+    });
+    const externalVolume = buildFileSystem({
+        fs: "/dev/disk4s1",
+        mount: "/Volumes/media",
+    });
+
+    const usableFileSystems = filterUsableFileSystems([
+        rootSystemVolume,
+        prebootVolume,
+        rootDataVolume,
+        externalVolume,
+    ], "darwin");
+
+    assert.deepEqual(usableFileSystems, [rootDataVolume, externalVolume]);
+});
+
+test("usable file system filtering keeps macOS root on pre-Catalina layouts", () => {
+    const rootVolume = buildFileSystem({ fs: "/dev/disk1s1", mount: "/" });
+    const externalVolume = buildFileSystem({ fs: "/dev/disk2s1", mount: "/Volumes/media" });
+
+    const usableFileSystems = filterUsableFileSystems([rootVolume, externalVolume], "darwin");
+
+    assert.deepEqual(usableFileSystems, [rootVolume, externalVolume]);
+});
+
+test("usable file system filtering keeps macOS root when root data volume is unusable", () => {
+    const rootVolume = buildFileSystem({ fs: "/dev/disk3s1s1", mount: "/" });
+    const unusableRootDataVolume = buildFileSystem({
+        fs: "/dev/disk3s5",
+        mount: "/System/Volumes/Data",
+        size: 0,
+    });
+
+    const usableFileSystems = filterUsableFileSystems([rootVolume, unusableRootDataVolume], "darwin");
+
+    assert.deepEqual(usableFileSystems, [rootVolume]);
 });
 
 test("disk volume option maps file system block device and physical disk metadata", () => {
     const diskVolumeOption = toDiskVolumeOption(
-        buildFileSystem({ fs: "C:", mount: "C:", size: 1000, used: 400, available: 600 }),
+        buildFileSystem({ fs: "C:", mount: "C:", size: 1000, used: 123, available: 600 }),
         [buildBlockDevice({
             name: "C:",
             mount: "C:",
@@ -1002,8 +1105,11 @@ test("disk storage kind resolves local disk types and network block devices", ()
 test("default disk volume prefers root mounts before first fallback", () => {
     const secondaryVolume = buildDiskVolume({ id: "secondary", mount: "D:\\Games" });
     const rootVolume = buildDiskVolume({ id: "root", mount: "C:" });
+    const macRootVolume = buildDiskVolume({ id: "mac-root", mount: "/" });
+    const macRootDataVolume = buildDiskVolume({ id: "mac-data", mount: "/System/Volumes/Data" });
 
     assert.equal(resolveDefaultDiskVolume([secondaryVolume, rootVolume]), rootVolume);
+    assert.equal(resolveDefaultDiskVolume([macRootVolume, macRootDataVolume]), macRootDataVolume);
     assert.equal(resolveDefaultDiskVolume([secondaryVolume]), secondaryVolume);
     assert.equal(resolveDefaultDiskVolume([]), null);
 });
@@ -1011,6 +1117,8 @@ test("default disk volume prefers root mounts before first fallback", () => {
 test("numeric helpers normalize percentages finite rates and positive values", () => {
     assert.equal(calculatePercent(25, 100), 25);
     assert.equal(calculatePercent(25, 0), 0);
+    assert.equal(calculateDiskUsedBytes(100, 25), 75);
+    assert.equal(calculateDiskUsedBytes(100, 125), 0);
     assert.equal(normalizeNullableRate(12), 12);
     assert.equal(normalizeNullableRate(-12), 0);
     assert.equal(normalizeNullableRate(null), 0);
