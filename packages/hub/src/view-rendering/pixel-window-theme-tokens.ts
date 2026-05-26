@@ -9,19 +9,9 @@ export const DEFAULT_PIXEL_WINDOW_PALETTE = {
     controlButton: "#f6edff",
     bodyAccent: "#5b31d8",
     bodyText: "#5b31d8",
-    // TODO(pixel-window): Re-check small-text contrast and palette cohesion
-    // against the 9.7 visual matrix before accepting final snapshots.
-    bodySubtleText: "#78bee8",
+    bodySubtleText: "#2f6f99",
     bodyMutedText: "#9a8ab5",
     bodyTrack: "#d8b6eb",
     bodyGrid: "#82d7f4",
     bodyDivider: "#5931e6",
-} as const;
-
-export const DEFAULT_PIXEL_WINDOW_LAYOUT_TOKENS = {
-    // TODO(pixel-window): Review single/dual circle icon scale separately
-    // after the visual design pass. They are intentionally equal for the
-    // first Pixel Window baseline, unlike the default theme.
-    singleProgressCircleCenterIconScale: 0.72,
-    dualProgressCircleCenterIconScale: 0.72,
 } as const;

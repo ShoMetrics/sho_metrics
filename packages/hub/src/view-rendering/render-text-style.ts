@@ -17,6 +17,8 @@ export interface RenderTextStyle {
     readonly clipHeightEm: number;
     /** Multiplier applied to estimated text width before the guard ratio. */
     readonly widthScale: number;
+    /** Additional glyph spacing, expressed as a multiple of resolved font size. */
+    readonly letterSpacingEm: number;
     /** Smallest font-size scale allowed before SVG textLength compression guards the text. */
     readonly minimumFontScale: number;
     /** Optional SVG filter reference applied to this text role. */
@@ -25,7 +27,7 @@ export interface RenderTextStyle {
 
 type RenderTextStyleMetrics = Pick<
     RenderTextStyle,
-    "baselineShiftEm" | "clipHeightEm" | "widthScale" | "minimumFontScale"
+    "baselineShiftEm" | "clipHeightEm" | "widthScale" | "letterSpacingEm" | "minimumFontScale"
 >;
 
 // Internal preset input only. Keep this private so runtime renderers consume
@@ -42,14 +44,12 @@ export interface RenderTextStyles {
     readonly smallLabel: RenderTextStyle;
 }
 
-// TODO(font-safe): Revisit this global clamp before adding another non-default
-// font preset. Pixel Window needs sub-0.9 scales, but the original clamp was a
-// guardrail for ordinary UI fonts.
-const MINIMUM_TEXT_STYLE_FONT_SIZE_SCALE = 0.7;
+const MINIMUM_TEXT_STYLE_FONT_SIZE_SCALE = 0.9;
 const MAXIMUM_TEXT_STYLE_FONT_SIZE_SCALE = 1.12;
 export const DEFAULT_RENDER_TEXT_BASELINE_SHIFT_EM = 0;
 export const DEFAULT_RENDER_TEXT_CLIP_HEIGHT_EM = 1.45;
 export const DEFAULT_RENDER_TEXT_WIDTH_SCALE = 1;
+export const DEFAULT_RENDER_TEXT_LETTER_SPACING_EM = 0;
 export const DEFAULT_RENDER_TEXT_MINIMUM_FONT_SCALE = 0.78;
 const DEFAULT_RENDER_FONT_FAMILY = "'SF Pro Display','Helvetica Neue','Inter','Segoe UI',sans-serif";
 const TERMINAL_FONT_FAMILY = "'Share Tech Mono','SF Pro Display','Helvetica Neue','Inter','Segoe UI',monospace";
@@ -183,7 +183,7 @@ export const PIXEL_RENDER_TEXT_STYLES = {
     value: createRenderTextStyle({
         fontFamily: PIXEL_RENDER_FONT_FAMILY,
         fontWeight: 900,
-        fontSizeScale: 0.78,
+        fontSizeScale: 1,
         baselineShiftEm: 0.02,
         widthScale: 0.9,
         filter: undefined,
@@ -191,7 +191,7 @@ export const PIXEL_RENDER_TEXT_STYLES = {
     unit: createRenderTextStyle({
         fontFamily: PIXEL_RENDER_FONT_FAMILY,
         fontWeight: 800,
-        fontSizeScale: 0.86,
+        fontSizeScale: 1,
         baselineShiftEm: 0.08,
         widthScale: 0.9,
         filter: undefined,
@@ -199,25 +199,28 @@ export const PIXEL_RENDER_TEXT_STYLES = {
     title: createRenderTextStyle({
         fontFamily: PIXEL_RENDER_FONT_FAMILY,
         fontWeight: 850,
-        fontSizeScale: 0.88,
+        fontSizeScale: 1,
         baselineShiftEm: 0.02,
         widthScale: 0.9,
+        letterSpacingEm: 0.1,
         filter: undefined,
     }),
     label: createRenderTextStyle({
         fontFamily: PIXEL_RENDER_FONT_FAMILY,
         fontWeight: 800,
-        fontSizeScale: 0.85,
+        fontSizeScale: 1,
         baselineShiftEm: 0.02,
         widthScale: 0.9,
+        letterSpacingEm: 0.2,
         filter: undefined,
     }),
     smallLabel: createRenderTextStyle({
         fontFamily: PIXEL_RENDER_FONT_FAMILY,
         fontWeight: 750,
-        fontSizeScale: 0.86,
+        fontSizeScale: 1,
         baselineShiftEm: 0.03,
         widthScale: 0.9,
+        letterSpacingEm: 0.2,
         filter: undefined,
     }),
 } satisfies RenderTextStyles;
@@ -236,6 +239,7 @@ function createRenderTextStyle(textStyle: RenderTextStylePreset): RenderTextStyl
         baselineShiftEm: textStyle.baselineShiftEm ?? DEFAULT_RENDER_TEXT_BASELINE_SHIFT_EM,
         clipHeightEm: textStyle.clipHeightEm ?? DEFAULT_RENDER_TEXT_CLIP_HEIGHT_EM,
         widthScale: textStyle.widthScale ?? DEFAULT_RENDER_TEXT_WIDTH_SCALE,
+        letterSpacingEm: textStyle.letterSpacingEm ?? DEFAULT_RENDER_TEXT_LETTER_SPACING_EM,
         minimumFontScale: textStyle.minimumFontScale ?? DEFAULT_RENDER_TEXT_MINIMUM_FONT_SCALE,
     };
 }

@@ -39,7 +39,7 @@ test("metric frame applies the muted filter around the body", () => {
     assert.match(svg, /<feColorMatrix type="saturate" values="0" \/>/);
 });
 
-test("pixel window frame clips and translates the body viewport without scaling", () => {
+test("pixel window frame clips and scales the body viewport", () => {
     const svg = renderMetricFrame({
         body: "<g id=\"metric-body\"></g>",
         bodyViewport: {
@@ -50,7 +50,7 @@ test("pixel window frame clips and translates the body viewport without scaling"
             body: {
                 xOffset: 7,
                 yOffset: 0,
-                renderSize: { width: 120, height: 120 },
+                renderSize: { width: 144, height: 144 },
             },
             clipRadius: 0,
         },
@@ -63,9 +63,8 @@ test("pixel window frame clips and translates the body viewport without scaling"
     assert.match(svg, /clipPath id="pixel-window-body-viewport-134-120"/);
     assert.match(svg, /<rect x="5" y="19"\s+width="134" height="120"\s+rx="0" \/>/);
     assert.match(svg, /<g clip-path="url\(#pixel-window-body-viewport-134-120\)">/);
-    assert.match(svg, /<g transform="translate\(12 19\)">/);
+    assert.match(svg, /<g transform="translate\(12 19\) scale\(0\.8333\)">/);
     assert.match(svg, /metric-body/);
-    assert.doesNotMatch(svg, /scale\(/);
 });
 
 test("muted pixel window frame keeps filtering inside the viewport placement", () => {
@@ -79,7 +78,7 @@ test("muted pixel window frame keeps filtering inside the viewport placement", (
             body: {
                 xOffset: 7,
                 yOffset: 0,
-                renderSize: { width: 120, height: 120 },
+                renderSize: { width: 144, height: 144 },
             },
         },
         themePreset: "pixel-window",
@@ -90,5 +89,5 @@ test("muted pixel window frame keeps filtering inside the viewport placement", (
 
     assert.match(svg, /filter id="muted-widget-144-144"/);
     assert.match(svg, /<g clip-path="url\(#pixel-window-body-viewport-134-120\)">/);
-    assert.match(svg, /<g transform="translate\(12 19\)">\s*<g filter="url\(#muted-widget-144-144\)">/);
+    assert.match(svg, /<g transform="translate\(12 19\) scale\(0\.8333\)">\s*<g filter="url\(#muted-widget-144-144\)">/);
 });

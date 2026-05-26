@@ -781,9 +781,9 @@ test("metric text row keeps pixel unit text inside the shifted clip box", () => 
     });
 
     assert.match(svgFragment, /DotGothic16/);
-    assert.match(svgFragment, /y="61\.37"/);
-    assert.match(svgFragment, /dy="0\.47"/);
-    assert.match(svgFragment, /height="27\.14"/);
+    assert.match(svgFragment, /y="61\.48"/);
+    assert.match(svgFragment, /dy="0\.51"/);
+    assert.match(svgFragment, /height="34\.80"/);
 });
 
 test("mirrored traffic renders labels, center line, and both channel graphs", () => {

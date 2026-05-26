@@ -9,7 +9,6 @@ import {
     DEFAULT_RENDER_TEXT_STYLES,
     type RenderTextStyles,
 } from "../../view-rendering/render-text-style";
-import { DEFAULT_RENDER_LAYOUT_TOKENS } from "../../view-rendering/render-layout-tokens";
 import {
     clamp,
     renderStyledSvgText,
@@ -54,7 +53,6 @@ export interface ProgressCircleConfig extends WidgetBaseConfig {
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
     innerTextScale: number;
-    centerIconScale: number;
     circleVariant: CircleVariant;
     gaugeRangeBlendProgress: number;
     centerIconFragment?: string;
@@ -78,14 +76,11 @@ export const DEFAULT_PROGRESS_CIRCLE_CONFIG: ProgressCircleConfig = {
     themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     gradientHeadAdjustmentPercent: -42,
     innerTextScale: 1,
-    centerIconScale: DEFAULT_RENDER_LAYOUT_TOKENS.singleProgressCircleCenterIconScale,
     circleVariant: "full-ring",
     gaugeRangeBlendProgress: 0.16,
 };
 
 const ARC_LAYOUT = {
-    // TODO(progress-circle): Move fixed offsets and font sizes to a 144px
-    // reference-scale layout before accepting Pixel Window circle visuals.
     outerMargin: 7,
     minimumRadius: 20,
     label: {
@@ -298,7 +293,6 @@ function renderCenterContent(options: {
                 options.centerIconFragment,
                 options.centerXCoordinate,
                 options.centerYCoordinate,
-                options.config.centerIconScale,
                 options.config.iconColor,
                 options.config.themeEffects.iconFilter,
             )}
@@ -482,7 +476,6 @@ function renderCenterIcon(
     centerIconFragment: string | undefined,
     centerXCoordinate: number,
     centerYCoordinate: number,
-    centerIconScale: number,
     iconColor: string,
     iconFilter: string | undefined,
 ): string {
@@ -490,7 +483,7 @@ function renderCenterIcon(
         return "";
     }
 
-    return `<g color="${iconColor}" transform="translate(${centerXCoordinate} ${centerYCoordinate}) scale(${formatSvgNumber(centerIconScale)})" ${buildSvgFilterAttributes(iconFilter).join(" ")}>${centerIconFragment}</g>`;
+    return `<g color="${iconColor}" transform="translate(${centerXCoordinate} ${centerYCoordinate})" ${buildSvgFilterAttributes(iconFilter).join(" ")}>${centerIconFragment}</g>`;
 }
 
 function renderGaugeInlineIcon(options: {
@@ -805,7 +798,6 @@ function renderCenterValue(options: {
             options.footerIconFragment,
             options.centerXCoordinate,
             options.centerYCoordinate + ARC_LAYOUT.footerIcon.yOffset,
-            1,
             options.config.iconColor,
             options.config.themeEffects.iconFilter,
         )}

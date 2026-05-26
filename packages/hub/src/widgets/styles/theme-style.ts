@@ -7,8 +7,11 @@ export interface ThemeStylePaints {
 }
 
 export interface ThemeBodyPlacement {
+    /** Offset inside the viewport after the body render size is scaled to fit. */
     readonly xOffset: number;
+    /** Offset inside the viewport after the body render size is scaled to fit. */
     readonly yOffset: number;
+    /** Logical size used to render the body before viewport placement scales it. */
     readonly renderSize: KeySize;
 }
 

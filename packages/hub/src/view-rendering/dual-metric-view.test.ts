@@ -94,30 +94,6 @@ test("dual text metric value uses the render metric value paint", () => {
     assert.match(svg, /fill="#metric-value-text-token"[\s\S]*N/);
 });
 
-test("dual circle applies the render layout center icon scale", () => {
-    const svg = renderDualMetricBodyView({
-        data: buildDualChannelData(),
-        visual: {
-            ...buildMetricRenderAppearance(),
-            layoutTokens: {
-                singleProgressCircleCenterIconScale: 1,
-                dualProgressCircleCenterIconScale: 0.72,
-            },
-        },
-        renderPrimitive: "circle",
-        renderSize: { width: 120, height: 120 },
-        titleText: "NET",
-        chartMode: "overlay",
-        centerContent: "icon",
-        circleVariant: "minimal",
-        topIcon: "<path id=\"dual-center-icon\" />",
-        positive: { labelText: "UP", unitText: "M", color: "#3b82f6" },
-        negative: { labelText: "DN", unitText: "M", color: "#ef4444" },
-    });
-
-    assert.match(svg, /transform="translate\(60 60\) scale\(0\.72\)"/);
-});
-
 test("dual text metric compacts data-rate units in the view layer", () => {
     const svg = renderDualMetricBodyView({
         data: buildDualChannelData(),
@@ -171,10 +147,6 @@ function buildMetricRenderAppearance(): MetricRenderAppearance {
             track: "rgba(255,255,255,0.14)",
             grid: "rgba(255,255,255,0.18)",
             divider: "rgba(255,255,255,0.18)",
-        },
-        layoutTokens: {
-            singleProgressCircleCenterIconScale: 1,
-            dualProgressCircleCenterIconScale: 0.86,
         },
         textStyles: {
             ...DEFAULT_RENDER_TEXT_STYLES,
