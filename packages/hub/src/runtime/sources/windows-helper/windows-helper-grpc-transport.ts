@@ -25,7 +25,7 @@ const log = logger.for("Source:WindowsHelper");
 /** Named pipe name used by the Windows helper gRPC source API. */
 export const DEFAULT_WINDOWS_HELPER_GRPC_PIPE_NAME = "ShoMetrics.Source.Windows.Grpc.v1";
 
-/** Mirrors `MaximumGrpcMessageBytes` in the Windows helper IPC constants. */
+/** Mirrors `MaximumGrpcMessageBytes` in the Windows helper service constants. */
 export const MAXIMUM_SOURCE_GRPC_MESSAGE_BYTES = 1024 * 1024;
 
 /** Options passed to a gRPC source API request. */

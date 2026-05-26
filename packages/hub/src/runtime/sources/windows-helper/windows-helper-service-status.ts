@@ -10,7 +10,7 @@ const execFileAsync = promisify(execFile);
 export const HELPER_SERVICE_STATUS_CACHE_MILLISECONDS = 30000;
 
 // Mirrors `ServiceName` in
-// packages/source-windows/ShoMetrics.Source.Windows.Ipc/SourceIpcConstants.cs.
+// packages/source-windows/ShoMetrics.Source.Windows.Ipc/WindowsSourceServiceConstants.cs.
 const WINDOWS_HELPER_SERVICE_NAME = "ShoMetrics Source Windows";
 
 export type WindowsHelperServiceStatus = "unknown" | "notInstalled" | "installedStopped" | "running";

@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 
 import { execFile, spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { createConnection } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
@@ -35,11 +33,9 @@ const metricNames = [
 ];
 
 const allMetricGroups = new Set(["cpu", "ram", "network", "disk", "gpu"]);
-const allSources = new Set(["node", "windows-helper", "lhm-json", "external-probe"]);
+const allSources = new Set(["node", "lhm-json", "external-probe"]);
 const defaultSources = ["node"];
-const defaultWindowsHelperPipePath = "\\\\.\\pipe\\ShoMetrics.Source.Windows.v1";
 const defaultWarmupMilliseconds = 30000;
-const windowsHelperReadSnapshotTimeoutMilliseconds = 3000;
 
 const metricKeysByGroup = {
     cpu: ["cpu.usage_percent"],
@@ -81,7 +77,6 @@ async function runComparison(comparisonOptions) {
     const startedAt = new Date();
     const startedAtPerformanceMilliseconds = performance.now();
     const nodeSamples = [];
-    const windowsHelperSamples = [];
     const lhmJsonSamples = [];
     const externalProbeSamples = [];
     const workloadEvents = [];
@@ -93,17 +88,6 @@ async function runComparison(comparisonOptions) {
             intervalMilliseconds: comparisonOptions.intervalMilliseconds,
             metricGroups: comparisonOptions.metricGroups,
             samples: nodeSamples,
-            startedAtPerformanceMilliseconds,
-        }));
-    }
-
-    if (comparisonOptions.sources.has("windows-helper")) {
-        work.push(readWindowsHelperSamples({
-            durationMilliseconds: comparisonOptions.durationMilliseconds,
-            intervalMilliseconds: comparisonOptions.intervalMilliseconds,
-            metricGroups: comparisonOptions.metricGroups,
-            pipePath: comparisonOptions.windowsHelperPipePath,
-            samples: windowsHelperSamples,
             startedAtPerformanceMilliseconds,
         }));
     }
@@ -152,7 +136,6 @@ async function runComparison(comparisonOptions) {
         sources: [...comparisonOptions.sources].sort(),
         schemaNotes: {
             node: "Uses the same Node libraries and nvidia-smi shape as the hub source, but this script is a diagnostic sampler, not the production source class.",
-            windowsHelper: "Reads the running Windows helper named pipe with the same source IPC frame shape as the hub source client. The summary intentionally does not persist the pipe path.",
             lhmJson: "Reads a running LHM desktop HTTP JSON cache. It measures value visibility through that cache, not LHM hardware update cost.",
             externalProbe: "Consumes optional NDJSON samples from a local probe. Output is summarized without hostnames, local paths, LAN IPs, or hardware labels.",
         },
@@ -166,19 +149,16 @@ async function runComparison(comparisonOptions) {
             lhmJsonSamples,
             nodeSamples,
             options: comparisonOptions,
-            windowsHelperSamples,
             workloadEvents,
         }),
         errors: {
             node: summarizeErrors(nodeSamples),
-            windowsHelper: summarizeErrors(windowsHelperSamples),
             lhmJson: summarizeErrors(lhmJsonSamples),
             externalProbe: summarizeErrors(externalProbeSamples),
         },
         metricValues: {
             node: summarizeMetricValues(nodeSamples, sample => sample.values, comparisonOptions),
             nodeBareMemory: summarizeMetricValues(nodeSamples, sample => sample.bareMemoryValues, comparisonOptions),
-            windowsHelper: summarizeMetricValues(windowsHelperSamples, sample => sample.values, comparisonOptions),
             lhmJson: summarizeMetricValues(lhmJsonSamples, sample => sample.values, comparisonOptions),
             externalProbeLhmDll: summarizeMetricValues(externalProbeSamples, sample => sample.lhmDll?.Values, comparisonOptions),
             externalProbeNative: summarizeMetricValues(externalProbeSamples, sample => sample.native?.Values, comparisonOptions),
@@ -190,18 +170,6 @@ async function runComparison(comparisonOptions) {
             nodeBareMemoryReadMilliseconds: summarizeDurationSeriesFromSamples(nodeSamples, sample => sample.bareMemoryReadMilliseconds, comparisonOptions),
             nodeNetworkReadMilliseconds: summarizeDurationSeriesFromSamples(nodeSamples, sample => sample.networkReadMilliseconds, comparisonOptions),
             nodeGpuReadMilliseconds: summarizeDurationSeriesFromSamples(nodeSamples, sample => sample.gpuReadMilliseconds, comparisonOptions),
-            windowsHelperReadMilliseconds: summarizeDurationSeriesFromSamples(windowsHelperSamples, sample => sample.readMilliseconds, comparisonOptions),
-            windowsHelperReadMillisecondsByGroup: summarizeWindowsHelperGroupSeries(
-                windowsHelperSamples,
-                sample => sample.readMillisecondsByGroup,
-                comparisonOptions,
-            ),
-            windowsHelperSampleAgeMilliseconds: summarizeDurationSeriesFromSamples(windowsHelperSamples, sample => sample.sampleAgeMilliseconds, comparisonOptions),
-            windowsHelperSampleAgeMillisecondsByGroup: summarizeWindowsHelperGroupSeries(
-                windowsHelperSamples,
-                sample => sample.sampleAgeMillisecondsByGroup,
-                comparisonOptions,
-            ),
             lhmJsonReadMilliseconds: summarizeDurationSeriesFromSamples(lhmJsonSamples, sample => sample.readMilliseconds, comparisonOptions),
             externalProbeLhmDllUpdateMilliseconds: summarizeDurationSeriesFromSamples(externalProbeSamples, sample => sample.lhmDll?.UpdateMilliseconds, comparisonOptions),
             externalProbeLhmDllHardwareUpdateMillisecondsByType: summarizeExternalProbeHardwareUpdates(externalProbeSamples, comparisonOptions),
@@ -298,421 +266,12 @@ async function readNodeSamples(options) {
     }
 }
 
-async function readWindowsHelperSamples(options) {
-    const endAtPerformanceMilliseconds = options.startedAtPerformanceMilliseconds + options.durationMilliseconds;
-    const metricGroups = [...options.metricGroups].sort();
-    let nextTickAtPerformanceMilliseconds = options.startedAtPerformanceMilliseconds;
-    let sampleIndex = 0;
-
-    while (performance.now() < endAtPerformanceMilliseconds) {
-        const tickStartedAtPerformanceMilliseconds = performance.now();
-        const values = {};
-        const readMillisecondsByGroup = {};
-        const sampleAgeMillisecondsByGroup = {};
-        const errors = [];
-        const groupResults = await Promise.all(metricGroups.map(async metricGroup => {
-            const groupStartedAt = performance.now();
-
-            try {
-                const snapshot = await readWindowsHelperSnapshot({
-                    metricKeys: metricKeysByGroup[metricGroup] ?? [],
-                    pipePath: options.pipePath,
-                    timeoutMilliseconds: windowsHelperReadSnapshotTimeoutMilliseconds,
-                });
-
-                return {
-                    metricGroup,
-                    values: readWindowsHelperMetricValues(snapshot.metrics),
-                    readMilliseconds: performance.now() - groupStartedAt,
-                    sampleAgeMilliseconds: snapshot.capturedAtMilliseconds === undefined
-                        ? undefined
-                        : Date.now() - snapshot.capturedAtMilliseconds,
-                };
-            } catch (caughtError) {
-                return {
-                    metricGroup,
-                    readMilliseconds: performance.now() - groupStartedAt,
-                    error: String(caughtError),
-                };
-            }
-        }));
-
-        for (const groupResult of groupResults) {
-            assignDefinedValues(values, groupResult.values);
-            readMillisecondsByGroup[groupResult.metricGroup] = round(groupResult.readMilliseconds);
-
-            if (groupResult.sampleAgeMilliseconds !== undefined) {
-                sampleAgeMillisecondsByGroup[groupResult.metricGroup] = round(groupResult.sampleAgeMilliseconds);
-            }
-
-            if (groupResult.error) {
-                errors.push(`${groupResult.metricGroup}: ${groupResult.error}`);
-            }
-        }
-
-        options.samples.push({
-            sampleIndex,
-            elapsedMilliseconds: Math.round(tickStartedAtPerformanceMilliseconds - options.startedAtPerformanceMilliseconds),
-            values: Object.keys(values).length > 0 ? values : undefined,
-            readMilliseconds: round(performance.now() - tickStartedAtPerformanceMilliseconds),
-            readMillisecondsByGroup,
-            sampleAgeMilliseconds: readMaximumOptionalValue(Object.values(sampleAgeMillisecondsByGroup)),
-            sampleAgeMillisecondsByGroup,
-            error: errors.length > 0 ? errors.join("; ") : undefined,
-        });
-
-        sampleIndex += 1;
-        nextTickAtPerformanceMilliseconds += options.intervalMilliseconds;
-        await delay(Math.max(0, nextTickAtPerformanceMilliseconds - performance.now()));
-    }
-}
-
 function assignDefinedValues(target, values) {
     for (const [key, value] of Object.entries(values ?? {})) {
         if (value !== undefined) {
             target[key] = value;
         }
     }
-}
-
-function readWindowsHelperMetricValues(metrics) {
-    return {
-        cpuUsagePercent: readSnapshotScalar(metrics, "cpu.usage_percent"),
-        ramUsedBytes: readSnapshotScalar(metrics, "ram.used"),
-        ramTotalBytes: readSnapshotScalar(metrics, "ram.total"),
-        networkDownloadBytesPerSecond: readSnapshotScalar(metrics, "net.down"),
-        networkUploadBytesPerSecond: readSnapshotScalar(metrics, "net.up"),
-        diskReadBytesPerSecond: readSnapshotScalar(metrics, "disk.throughput.read"),
-        diskWriteBytesPerSecond: readSnapshotScalar(metrics, "disk.throughput.write"),
-        diskTotalBytesPerSecond: readSnapshotScalar(metrics, "disk.throughput.total"),
-        gpuUsagePercent: readSnapshotScalar(metrics, "gpu.usage_percent"),
-        gpuTemperatureCelsius: readSnapshotScalar(metrics, "gpu.temp"),
-        gpuPowerWatts: readSnapshotScalar(metrics, "gpu.power"),
-        gpuVramUsedBytes: readSnapshotScalar(metrics, "gpu.vram_used"),
-        gpuVramTotalBytes: readSnapshotScalar(metrics, "gpu.vram_total"),
-    };
-}
-
-async function readWindowsHelperSnapshot(options) {
-    const requestId = randomUUID();
-    const requestPayload = encodeSourceIpcRequest({
-        requestId,
-        metricKeys: options.metricKeys,
-    });
-    const responsePayload = await sendWindowsHelperPipeRequest({
-        payload: requestPayload,
-        pipePath: options.pipePath,
-        timeoutMilliseconds: options.timeoutMilliseconds,
-    });
-    const response = decodeSourceIpcResponse(responsePayload);
-
-    if (response.requestId !== requestId) {
-        throw new Error("Windows helper response request id mismatched the pending request.");
-    }
-
-    if (response.error) {
-        throw new Error(`Windows helper returned ${response.error.code}: ${response.error.message}`);
-    }
-
-    if (!response.snapshot) {
-        throw new Error("Windows helper response did not include a metric snapshot.");
-    }
-
-    return response.snapshot;
-}
-
-function sendWindowsHelperPipeRequest(options) {
-    return new Promise((resolve, reject) => {
-        const requestFrame = encodeSourceIpcFrame(options.payload);
-        const socket = createConnection(options.pipePath);
-        const chunks = [];
-        let receivedByteCount = 0;
-        let expectedFrameLength;
-        let isSettled = false;
-
-        const timeout = setTimeout(() => {
-            fail(new Error("Windows helper pipe request timed out."));
-        }, options.timeoutMilliseconds);
-
-        const cleanup = () => {
-            clearTimeout(timeout);
-            socket.removeAllListeners();
-            socket.destroy();
-        };
-
-        const fail = error => {
-            if (isSettled) {
-                return;
-            }
-
-            isSettled = true;
-            cleanup();
-            reject(error);
-        };
-
-        socket.once("connect", () => {
-            socket.write(requestFrame, error => {
-                if (error) {
-                    fail(error);
-                }
-            });
-        });
-        socket.on("data", chunk => {
-            chunks.push(chunk);
-            receivedByteCount += chunk.byteLength;
-
-            if (expectedFrameLength === undefined && receivedByteCount >= 4) {
-                const prefixBytes = Buffer.concat(chunks, receivedByteCount);
-                const payloadLength = prefixBytes.readUInt32LE(0);
-                expectedFrameLength = 4 + payloadLength;
-            }
-
-            if (expectedFrameLength === undefined || receivedByteCount < expectedFrameLength) {
-                return;
-            }
-
-            if (isSettled) {
-                return;
-            }
-
-            const responseFrame = Buffer.concat(chunks, receivedByteCount);
-            isSettled = true;
-            cleanup();
-            resolve(responseFrame.subarray(4, expectedFrameLength));
-        });
-        socket.once("error", fail);
-        socket.once("end", () => {
-            fail(new Error("Windows helper pipe ended before a response frame was read."));
-        });
-    });
-}
-
-function encodeSourceIpcFrame(payload) {
-    const frame = Buffer.allocUnsafe(4 + payload.byteLength);
-    frame.writeUInt32LE(payload.byteLength, 0);
-    frame.set(payload, 4);
-
-    return frame;
-}
-
-function encodeSourceIpcRequest(options) {
-    return encodeMessage([
-        encodeStringField(1, options.requestId),
-        encodeMessageField(4, encodeReadMetricSnapshotRequest(options.metricKeys)),
-    ]);
-}
-
-function encodeReadMetricSnapshotRequest(metricKeys) {
-    return encodeMessage(metricKeys.map(metricKey => encodeStringField(1, metricKey)));
-}
-
-function decodeSourceIpcResponse(bytes) {
-    const fields = decodeFields(bytes);
-    const errorBytes = fields.find(field => field.fieldNumber === 5)?.bytesValue;
-
-    return {
-        requestId: fields.find(field => field.fieldNumber === 1)?.stringValue ?? "",
-        snapshot: decodeReadMetricSnapshotResponse(
-            fields.find(field => field.fieldNumber === 4)?.bytesValue,
-        ),
-        error: errorBytes ? decodeSourceError(errorBytes) : undefined,
-    };
-}
-
-function decodeSourceError(bytes) {
-    const fields = decodeFields(bytes);
-
-    return {
-        code: fields.find(field => field.fieldNumber === 1)?.stringValue ?? "",
-        message: fields.find(field => field.fieldNumber === 2)?.stringValue ?? "",
-    };
-}
-
-function decodeReadMetricSnapshotResponse(bytes) {
-    if (!bytes) {
-        return undefined;
-    }
-
-    const snapshotBytes = decodeFields(bytes).find(field => field.fieldNumber === 1)?.bytesValue;
-
-    return snapshotBytes ? decodeMetricSnapshot(snapshotBytes) : undefined;
-}
-
-function decodeMetricSnapshot(bytes) {
-    const fields = decodeFields(bytes);
-    const timestampBytes = fields.find(field => field.fieldNumber === 1)?.bytesValue;
-    const metrics = {};
-
-    for (const metricField of fields.filter(field => field.fieldNumber === 2)) {
-        if (!metricField.bytesValue) {
-            continue;
-        }
-
-        const entry = decodeMetricMapEntry(metricField.bytesValue);
-        if (entry) {
-            metrics[entry.key] = entry.value;
-        }
-    }
-
-    return {
-        capturedAtMilliseconds: timestampBytes ? decodeTimestampMilliseconds(timestampBytes) : undefined,
-        metrics,
-    };
-}
-
-function decodeTimestampMilliseconds(bytes) {
-    const fields = decodeFields(bytes);
-    const seconds = fields.find(field => field.fieldNumber === 1)?.numberValue;
-    const nanos = fields.find(field => field.fieldNumber === 2)?.numberValue ?? 0;
-
-    return seconds === undefined
-        ? undefined
-        : (seconds * 1000) + Math.floor(nanos / 1000000);
-}
-
-function decodeMetricMapEntry(bytes) {
-    const fields = decodeFields(bytes);
-    const key = fields.find(field => field.fieldNumber === 1)?.stringValue;
-    const valueBytes = fields.find(field => field.fieldNumber === 2)?.bytesValue;
-
-    if (!key || !valueBytes) {
-        return undefined;
-    }
-
-    return {
-        key,
-        value: decodeMetricValue(valueBytes),
-    };
-}
-
-function decodeMetricValue(bytes) {
-    const fields = decodeFields(bytes);
-    const scalar = fields.find(field => field.fieldNumber === 1)?.doubleValue;
-    const text = fields.find(field => field.fieldNumber === 2)?.stringValue;
-
-    return {
-        ...(scalar === undefined ? {} : { scalar }),
-        ...(text === undefined ? {} : { text }),
-    };
-}
-
-function encodeMessage(fields) {
-    return Buffer.concat(fields);
-}
-
-function encodeMessageField(fieldNumber, value) {
-    return Buffer.concat([
-        encodeVarint((fieldNumber << 3) | 2),
-        encodeVarint(value.byteLength),
-        value,
-    ]);
-}
-
-function encodeStringField(fieldNumber, value) {
-    const valueBytes = Buffer.from(value, "utf8");
-
-    return Buffer.concat([
-        encodeVarint((fieldNumber << 3) | 2),
-        encodeVarint(valueBytes.byteLength),
-        valueBytes,
-    ]);
-}
-
-function decodeFields(bytes) {
-    const fields = [];
-    let offset = 0;
-
-    while (offset < bytes.byteLength) {
-        const tag = decodeVarint(bytes, offset);
-        offset = tag.offset;
-
-        const fieldNumber = Math.floor(tag.value / 8);
-        const wireType = tag.value & 7;
-
-        if (wireType === 0) {
-            const value = decodeVarint(bytes, offset);
-            offset = value.offset;
-            fields.push({ fieldNumber, numberValue: value.value });
-            continue;
-        }
-
-        if (wireType === 1) {
-            const view = new DataView(bytes.buffer, bytes.byteOffset + offset, 8);
-            fields.push({ fieldNumber, doubleValue: view.getFloat64(0, true) });
-            offset += 8;
-            continue;
-        }
-
-        if (wireType === 2) {
-            const length = decodeVarint(bytes, offset);
-            offset = length.offset;
-            const endOffset = offset + length.value;
-            const valueBytes = bytes.subarray(offset, endOffset);
-            fields.push({
-                fieldNumber,
-                bytesValue: valueBytes,
-                stringValue: Buffer.from(valueBytes).toString("utf8"),
-            });
-            offset = endOffset;
-            continue;
-        }
-
-        if (wireType === 5) {
-            offset += 4;
-            continue;
-        }
-
-        throw new Error(`Unsupported protobuf wire type in diagnostic source IPC decoder: ${wireType}.`);
-    }
-
-    return fields;
-}
-
-function encodeVarint(value) {
-    const bytes = [];
-    let remainingValue = value;
-
-    do {
-        let byteValue = remainingValue & 0x7f;
-        remainingValue = Math.floor(remainingValue / 128);
-
-        if (remainingValue > 0) {
-            byteValue |= 0x80;
-        }
-
-        bytes.push(byteValue);
-    } while (remainingValue > 0);
-
-    return Buffer.from(bytes);
-}
-
-function decodeVarint(bytes, offset) {
-    let value = 0;
-    let shift = 0;
-    let currentOffset = offset;
-
-    while (currentOffset < bytes.byteLength) {
-        const byteValue = bytes[currentOffset];
-        value += (byteValue & 0x7f) * (2 ** shift);
-        currentOffset += 1;
-
-        if ((byteValue & 0x80) === 0) {
-            return {
-                value,
-                offset: currentOffset,
-            };
-        }
-
-        shift += 7;
-    }
-
-    throw new Error("Malformed protobuf varint in diagnostic source IPC decoder.");
-}
-
-function readSnapshotScalar(metrics, metricKey) {
-    const metricValue = metrics[metricKey];
-
-    return typeof metricValue?.scalar === "number" ? metricValue.scalar : undefined;
 }
 
 function readNodeNetworkRates(networkStats, previousStatsByInterface) {
@@ -1102,24 +661,6 @@ function summarizeExternalProbeHardwareUpdates(samples, options) {
     );
 }
 
-function summarizeWindowsHelperGroupSeries(samples, readValuesByGroup, options) {
-    const summaries = {};
-
-    for (const metricGroup of allMetricGroups) {
-        const summary = summarizeDurationSeriesFromSamples(
-            samples,
-            sample => readValuesByGroup(sample)?.[metricGroup],
-            options,
-        );
-
-        if (summary.count > 0 || summary.errorCount > 0) {
-            summaries[metricGroup] = summary;
-        }
-    }
-
-    return summaries;
-}
-
 function summarizeReaction(options) {
     if (!options.options.reactionMetricName || options.options.reactionThreshold === undefined) {
         return undefined;
@@ -1149,13 +690,6 @@ function summarizeReaction(options) {
             nodeBareMemory: summarizeReactionSource(
                 options.nodeSamples,
                 sample => sample.bareMemoryValues,
-                options.options.reactionMetricName,
-                options.options.reactionThreshold,
-                workloadStartMilliseconds,
-            ),
-            windowsHelper: summarizeReactionSource(
-                options.windowsHelperSamples,
-                sample => sample.values,
                 options.options.reactionMetricName,
                 options.options.reactionThreshold,
                 workloadStartMilliseconds,
@@ -1470,7 +1004,6 @@ function readOptions(args) {
         stressDurationMilliseconds: readInteger(values, "stress-duration-ms", readInteger(values, "duration-ms", 30000)),
         stressWorkers: readInteger(values, "stress-workers", Math.max(1, os.cpus().length - 1)),
         warmupMilliseconds: readNonNegativeInteger(values, "warmup-ms", defaultWarmupMilliseconds),
-        windowsHelperPipePath: values.get("windows-helper-pipe") ?? defaultWindowsHelperPipePath,
         workloadArgs: readListOption(values, "workload-args", []),
         workloadExe: values.get("workload-exe"),
         workloadStartMilliseconds: readNonNegativeInteger(values, "workload-start-ms", 5000),
@@ -1565,17 +1098,15 @@ function printUsage() {
 
 Sources:
   --sources=node
-  --sources=node,windows-helper
   --sources=node,lhm-json
   --sources=node,external-probe
-  --sources=node,windows-helper,lhm-json,external-probe
+  --sources=node,lhm-json,external-probe
 
 Options:
   --metrics=cpu,ram,network,disk,gpu
   --duration-ms=30000
   --interval-ms=1000
   --warmup-ms=30000
-  --windows-helper-pipe=\\\\.\\pipe\\ShoMetrics.Source.Windows.v1
   --lhm-json-url=http://127.0.0.1:8085/data.json
   --external-probe-exe=C:\\path\\to\\probe.exe
   --external-probe-args=--metric-source-probe

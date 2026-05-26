@@ -150,8 +150,6 @@ const restrictedGeneratedSourceProtoImports = {
       group: [
         '**/generated/shometrics/v1/source_api_pb',
         '**/generated/shometrics/v1/source_api_pb.js',
-        '**/generated/shometrics/v1/source_ipc_pb',
-        '**/generated/shometrics/v1/source_ipc_pb.js',
         '**/generated/shometrics/v1/snapshot_pb',
         '**/generated/shometrics/v1/snapshot_pb.js',
       ],

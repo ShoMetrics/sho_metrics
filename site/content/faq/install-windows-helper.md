@@ -28,9 +28,14 @@ detected.
 ## If the helper does not work
 
 Open the ShoMetrics control panel first. It reports whether the helper service
-is running, the IPC connection state, and the PawnIO driver status — most
+is running, the helper connection state, and the PawnIO driver status — most
 issues are visible there.
 
 If the panel shows the helper running but a specific metric is still empty,
 your machine may not expose that sensor. The helper can only show what your
 hardware, drivers, and LibreHardwareMonitor can read.
+
+When reporting helper issues, include the helper version, plugin version,
+source protocol version, and any gRPC status shown by the control panel or
+Stream Deck logs. The helper and plugin can be different versions if only one
+of them was updated.

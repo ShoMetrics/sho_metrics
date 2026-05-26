@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using ShoMetrics.Source.Windows.Ipc;
 
 namespace ShoMetrics.Source.Windows.ControlPanel;
@@ -31,7 +31,7 @@ internal sealed partial class WindowsServiceStatusReader : IWindowsServiceStatus
         {
             nint serviceHandle = OpenService(
                 serviceControlManagerHandle,
-                SourceIpcConstants.ServiceName,
+                WindowsSourceServiceConstants.ServiceName,
                 ServiceQueryStatus);
 
             if (serviceHandle == nint.Zero)
