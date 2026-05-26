@@ -11,16 +11,17 @@ Keep `contracts/proto/shometrics/v1/snapshot.proto` as a separate proto file.
 Reason:
 
 - `snapshot.proto` owns the source-agnostic metric snapshot payload.
-- `source_api.proto` owns request/response operations, warnings, errors, descriptors, and helper health.
-- `source_ipc.proto` owns local IPC routing and correlation.
-- Future remote gRPC and local IPC should share the metric snapshot payload without inheriting named-pipe envelope fields.
+- `source_api.proto` owns request/response operations, warnings, errors,
+  descriptors, helper health, and the local gRPC service surface.
+- Local and future remote source APIs should share the metric snapshot payload
+  without putting transport or source health fields into `snapshot.proto`.
 
 The file must stay narrow. It must not grow source selection, fallback, helper health, runtime source scope, rendering progress, or UI formatting policy. Metric descriptors live in this file because descriptors are part of the metric catalog, not a specific request/response operation.
 
 Do not rename `snapshot.proto` in this refactor. `metric_snapshot.proto` is a possible future rename, but it is outside this plan. Do not merge `snapshot.proto` into `source_api.proto`; keep this dependency direction:
 
 ```txt
-source_ipc.proto -> source_api.proto -> snapshot.proto
+source_api.proto -> snapshot.proto
 ```
 
 ## Current Problems

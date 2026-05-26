@@ -1,4 +1,4 @@
-using System.IO.Pipes;
+﻿using System.IO.Pipes;
 using System.Net;
 using System.Net.Http;
 using System.Security.Principal;
@@ -25,7 +25,7 @@ internal sealed class HelperControlPanelSourceClient : IHelperControlPanelSource
 
     public HelperControlPanelSourceClient(TimeSpan connectTimeout)
     {
-        var connectionFactory = new NamedPipeGrpcConnectionFactory(SourceIpcConstants.GrpcPipeName);
+        var connectionFactory = new NamedPipeGrpcConnectionFactory(WindowsSourceServiceConstants.GrpcPipeName);
         var httpHandler = new SocketsHttpHandler
         {
             ConnectCallback = connectionFactory.ConnectAsync,
@@ -35,8 +35,8 @@ internal sealed class HelperControlPanelSourceClient : IHelperControlPanelSource
         _channel = GrpcChannel.ForAddress("http://localhost", new GrpcChannelOptions
         {
             HttpHandler = httpHandler,
-            MaxReceiveMessageSize = SourceIpcConstants.MaximumGrpcMessageBytes,
-            MaxSendMessageSize = SourceIpcConstants.MaximumGrpcMessageBytes,
+            MaxReceiveMessageSize = WindowsSourceServiceConstants.MaximumGrpcMessageBytes,
+            MaxSendMessageSize = WindowsSourceServiceConstants.MaximumGrpcMessageBytes,
         });
         _client = new MetricSourceService.MetricSourceServiceClient(_channel);
     }

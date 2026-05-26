@@ -61,7 +61,7 @@ internal static class Program
         try
         {
             using IHost host = Host.CreateDefaultBuilder(args)
-                .UseWindowsService(options => options.ServiceName = SourceIpcConstants.ServiceName)
+                .UseWindowsService(options => options.ServiceName = WindowsSourceServiceConstants.ServiceName)
                 .UseSerilog((_, _, loggerConfiguration) => ConfigureSerilog(loggerConfiguration, mode))
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
@@ -71,21 +71,24 @@ internal static class Program
                 {
                     services.AddGrpc(options =>
                     {
-                        options.MaxReceiveMessageSize = SourceIpcConstants.MaximumGrpcMessageBytes;
-                        options.MaxSendMessageSize = SourceIpcConstants.MaximumGrpcMessageBytes;
+                        options.MaxReceiveMessageSize = WindowsSourceServiceConstants.MaximumGrpcMessageBytes;
+                        options.MaxSendMessageSize = WindowsSourceServiceConstants.MaximumGrpcMessageBytes;
                     });
                     services.AddSingleton<LibreHardwareMonitorSession>();
                     services.AddSingleton<WindowsPipeClientVerifier>();
-                    services.AddSingleton<SourceIpcFrameCodec>();
                     services.AddSingleton<SourceProtocolMapper>();
                     services.AddSingleton<SourceRequestHandler>();
                     services.AddSingleton<ISourceRequestHandler>(provider =>
                         provider.GetRequiredService<SourceRequestHandler>());
-                    services.AddSingleton<WindowsPipeSourceServer>();
                     services.AddHostedService<WindowsMetricSnapshotWorker>();
-                    services.AddHostedService<WindowsSourceWorker>();
                 })
                 .Build();
+
+            Log.Information(
+                "Starting ShoMetrics Windows source gRPC service for source {SourceId}, protocol {ProtocolVersion}, and pipe {PipeName}.",
+                WindowsSourceServiceIdentity.SourceId,
+                WindowsSourceServiceIdentity.ProtocolVersion,
+                WindowsSourceServiceConstants.GrpcPipeName);
 
             await host.RunAsync().ConfigureAwait(false);
 
@@ -117,7 +120,7 @@ internal static class Program
 
         webBuilder.ConfigureKestrel(options =>
         {
-            options.ListenNamedPipe(SourceIpcConstants.GrpcPipeName, listenOptions =>
+            options.ListenNamedPipe(WindowsSourceServiceConstants.GrpcPipeName, listenOptions =>
             {
                 listenOptions.Protocols = HttpProtocols.Http2;
             });
@@ -146,7 +149,7 @@ internal static class Program
             {
                 Log.Warning(
                     "Rejected remote gRPC named pipe client for {PipeName}.",
-                    SourceIpcConstants.GrpcPipeName);
+                    WindowsSourceServiceConstants.GrpcPipeName);
 
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
 
@@ -192,7 +195,7 @@ internal static class Program
         if (mode == ServiceExecutableMode.WindowsService)
         {
             loggerConfiguration.WriteTo.EventLog(
-                SourceIpcConstants.ServiceName,
+                WindowsSourceServiceConstants.ServiceName,
                 logName: "Application",
                 manageEventSource: true,
                 restrictedToMinimumLevel: LogEventLevel.Warning);

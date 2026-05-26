@@ -19,9 +19,6 @@
     <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\source_api.proto"
               ProtoRoot="..\..\..\contracts\proto"
               GrpcServices="Both" />
-    <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\source_ipc.proto"
-              ProtoRoot="..\..\..\contracts\proto"
-              GrpcServices="None" />
   </ItemGroup>
 
 </Project>

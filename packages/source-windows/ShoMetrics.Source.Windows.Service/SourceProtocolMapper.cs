@@ -2,7 +2,6 @@ using System.Diagnostics;
 using Google.Protobuf.WellKnownTypes;
 using ShoMetrics.Contracts.V1;
 using ShoMetrics.Source.Windows.Core;
-using ShoMetrics.Source.Windows.Ipc;
 using CoreDescriptor = ShoMetrics.Source.Windows.Core.HardwareMetricDescriptor;
 using CoreDescriptorSnapshot = ShoMetrics.Source.Windows.Core.HardwareMetricDescriptorSnapshot;
 using CoreMetricIdKind = ShoMetrics.Source.Windows.Core.MetricIdKind;
@@ -32,13 +31,7 @@ namespace ShoMetrics.Source.Windows.Service;
 internal sealed class SourceProtocolMapper
 {
     private const string HardwareWarningCode = "lhm_warning";
-    private const string InvalidRequestErrorCode = "invalid_request";
-    private const string MalformedRequestErrorCode = "malformed_request";
-    private const string FrameTooLargeErrorCode = "frame_too_large";
-    private const string TimeoutErrorCode = "timeout";
-    private const string SourceUnavailableErrorCode = "source_unavailable";
     private const string MetricUnavailableWarningCode = "metric_unavailable";
-    private const string InternalErrorCode = "internal_error";
 
     public GetSourceHealthResponse BuildHealthResponse(IReadOnlyList<HardwareSourceWarning> warnings)
     {
@@ -59,15 +52,6 @@ internal sealed class SourceProtocolMapper
         }
 
         return response;
-    }
-
-    public SourceIpcResponse BuildHealthResponse(string requestId, IReadOnlyList<HardwareSourceWarning> warnings)
-    {
-        return new SourceIpcResponse
-        {
-            RequestId = requestId,
-            GetSourceHealth = BuildHealthResponse(warnings),
-        };
     }
 
     public ReadMetricSnapshotResponse BuildReadMetricSnapshotResponse(
@@ -98,22 +82,6 @@ internal sealed class SourceProtocolMapper
         return readResponse;
     }
 
-    public SourceIpcResponse BuildReadMetricSnapshotResponse(
-        string requestId,
-        CoreMetricSnapshot snapshot,
-        IReadOnlyCollection<string> requestedMetricIds,
-        CoreDescriptorSnapshot? descriptorSnapshot)
-    {
-        return new SourceIpcResponse
-        {
-            RequestId = requestId,
-            ReadMetricSnapshot = BuildReadMetricSnapshotResponse(
-                snapshot,
-                requestedMetricIds,
-                descriptorSnapshot),
-        };
-    }
-
     public ListMetricDescriptorsResponse BuildListMetricDescriptorsResponse(
         CoreDescriptorSnapshot descriptorSnapshot,
         IReadOnlyCollection<string> requestedMetricIds)
@@ -130,63 +98,6 @@ internal sealed class SourceProtocolMapper
             descriptorSnapshot.Descriptors.Select(descriptor => descriptor.MetricId));
 
         return listResponse;
-    }
-
-    public SourceIpcResponse BuildListMetricDescriptorsResponse(
-        string requestId,
-        CoreDescriptorSnapshot descriptorSnapshot,
-        IReadOnlyCollection<string> requestedMetricIds)
-    {
-        return new SourceIpcResponse
-        {
-            RequestId = requestId,
-            ListMetricDescriptors = BuildListMetricDescriptorsResponse(descriptorSnapshot, requestedMetricIds),
-        };
-    }
-
-    public SourceIpcResponse BuildInvalidRequestResponse(string requestId)
-    {
-        return BuildErrorResponse(
-            requestId,
-            InvalidRequestErrorCode,
-            "Source IPC request payload is empty or unsupported.");
-    }
-
-    public SourceIpcResponse BuildSourceUnavailableResponse(string requestId)
-    {
-        return BuildErrorResponse(
-            requestId,
-            SourceUnavailableErrorCode,
-            "Windows source reader is unavailable.");
-    }
-
-    public SourceIpcResponse BuildTimeoutResponse(string requestId)
-    {
-        return BuildErrorResponse(
-            requestId,
-            TimeoutErrorCode,
-            "Source IPC request exceeded the service timeout.");
-    }
-
-    public SourceIpcResponse BuildInternalErrorResponse(string requestId)
-    {
-        return BuildErrorResponse(
-            requestId,
-            InternalErrorCode,
-            "Source IPC request failed unexpectedly.");
-    }
-
-    public SourceIpcResponse BuildFrameErrorResponse(SourceIpcFrameException exception)
-    {
-        string errorCode = exception.Error switch
-        {
-            SourceIpcFrameError.MalformedPayload => MalformedRequestErrorCode,
-            SourceIpcFrameError.IncompleteFrame => MalformedRequestErrorCode,
-            SourceIpcFrameError.FrameTooLarge => FrameTooLargeErrorCode,
-            _ => MalformedRequestErrorCode,
-        };
-
-        return BuildErrorResponse("", errorCode, exception.Message);
     }
 
     private static ProtoMetricSnapshot BuildMetricSnapshot(CoreMetricSnapshot snapshot)
@@ -435,16 +346,4 @@ internal sealed class SourceProtocolMapper
         }
     }
 
-    private static SourceIpcResponse BuildErrorResponse(string requestId, string code, string message)
-    {
-        return new SourceIpcResponse
-        {
-            RequestId = requestId,
-            Error = new SourceError
-            {
-                Code = code,
-                Message = message,
-            },
-        };
-    }
 }
