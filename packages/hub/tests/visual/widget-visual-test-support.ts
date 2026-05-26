@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { Resvg } from "@resvg/resvg-js";
 import { renderDualMetricBodyView } from "../../src/view-rendering/dual-metric-view";
 import { renderMetricFrame } from "../../src/view-rendering/metric-frame";
@@ -30,6 +32,28 @@ import type { DualChannelProgressCircleCenterContent } from "../../src/widgets/p
 import type { DualChannelSparklineMode } from "../../src/widgets/primitives/dual-channel-sparkline";
 import { getMetricStatusIcon } from "../../src/widgets/icons/metric-status-icons";
 
+const VISUAL_TEST_INTER_FONT_FILE = path.resolve(process.cwd(), "assets", "fonts", "inter", "InterVariable.ttf");
+const VISUAL_TEST_SHARE_TECH_MONO_FONT_FILE = path.resolve(
+    process.cwd(),
+    "assets",
+    "fonts",
+    "share-tech-mono",
+    "ShareTechMono-Regular.ttf",
+);
+const VISUAL_TEST_DOT_GOTHIC_16_FONT_FILE = path.resolve(
+    process.cwd(),
+    "assets",
+    "fonts",
+    "dotgothic16",
+    "DotGothic16-Regular.ttf",
+);
+const VISUAL_TEST_BIZ_UDP_MINCHO_FONT_FILE = path.resolve(
+    process.cwd(),
+    "assets",
+    "fonts",
+    "biz-udpmincho",
+    "BIZUDPMincho-Regular.ttf",
+);
 const NETWORK_DIRECTION_ICON_SIZE = 30;
 
 type VisualMetricView = "circle" | "text" | "bar" | "line";
@@ -346,7 +370,15 @@ export function renderSvgToPngBuffer(svg: string, keySize: KeySize): Buffer {
             mode: "width",
             value: keySize.width,
         },
-        font: resolveResvgFontOptions(svg),
+        font: resolveResvgFontOptions(svg, {
+            platform: process.platform,
+            fileExists: existsSync,
+            bundledInterFontFile: VISUAL_TEST_INTER_FONT_FILE,
+            bundledShareTechMonoFontFile: VISUAL_TEST_SHARE_TECH_MONO_FONT_FILE,
+            bundledDotGothic16FontFile: VISUAL_TEST_DOT_GOTHIC_16_FONT_FILE,
+            bundledJapaneseSerifFontFile: VISUAL_TEST_BIZ_UDP_MINCHO_FONT_FILE,
+            preferBundledJapaneseSerifFont: true,
+        }),
     }).render();
 
     return Buffer.from(renderedImage.asPng());
