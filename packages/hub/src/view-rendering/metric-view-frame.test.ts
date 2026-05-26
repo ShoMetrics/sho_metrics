@@ -289,7 +289,65 @@ test("key render plan uses keypad PNG dimensions and no touch strip layout", () 
 
     assert.equal(renderPlan.touchStripMetricLayout, null);
     assert.deepEqual(renderPlan.renderSize, WIDGET_LOGICAL_SIZE);
+    assert.deepEqual(renderPlan.bodyRenderSize, WIDGET_LOGICAL_SIZE);
+    assert.equal(renderPlan.bodyViewport, undefined);
     assert.deepEqual(renderPlan.pngSize, KEYPAD_PNG_SIZE);
+});
+
+test("pixel window renders widget body at the client viewport size", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData({
+                displayValue: "42",
+                sampleTimestampMilliseconds: 1000,
+            }),
+            resolvedSettings: {
+                theme: { selectedTheme: "pixel-window" },
+                view: { selectedView: "text" },
+            },
+        }),
+        renderTarget: "key",
+    });
+
+    assert.deepEqual(frame.renderPlan.renderSize, WIDGET_LOGICAL_SIZE);
+    assert.deepEqual(frame.renderPlan.bodyRenderSize, { width: 128, height: 110 });
+    assert.deepEqual(frame.renderPlan.bodyViewport, {
+        xCoordinate: 8,
+        yCoordinate: 26,
+        width: 128,
+        height: 110,
+        clipRadius: 0,
+    });
+    assert.match(frame.svg, /width="144" height="144"/);
+    assert.match(frame.svg, /viewBox="0 0 144 144"/);
+    assert.match(frame.svg, /<g transform="translate\(8 26\)">/);
+    assert.doesNotMatch(frame.svg, /scale\(/);
+});
+
+test("pixel window touch strip render plan keeps a usable client viewport", () => {
+    const renderPlan = buildMetricViewRenderPlan({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
+            resolvedSettings: {
+                theme: { selectedTheme: "pixel-window" },
+                view: { selectedView: "line" },
+            },
+        }),
+        renderTarget: "touch-strip",
+    });
+
+    assert.equal(renderPlan.touchStripMetricLayout?.kind, "wide");
+    assert.deepEqual(renderPlan.renderSize, TOUCH_STRIP_LOGICAL_SIZE);
+    assert.deepEqual(renderPlan.bodyRenderSize, { width: 186, height: 72 });
+    assert.ok(renderPlan.bodyViewport);
+    assert.deepEqual(renderPlan.bodyViewport, {
+        xCoordinate: 7,
+        yCoordinate: 21,
+        width: 186,
+        height: 72,
+        clipRadius: 0,
+    });
+    assert.ok(renderPlan.bodyViewport.height >= 60);
 });
 
 test("touch strip layout uses square rendering for circle branches", () => {
@@ -305,6 +363,7 @@ test("touch strip layout uses square rendering for circle branches", () => {
 
     assert.equal(renderPlan.touchStripMetricLayout?.kind, "square");
     assert.deepEqual(renderPlan.renderSize, WIDGET_LOGICAL_SIZE);
+    assert.deepEqual(renderPlan.bodyRenderSize, WIDGET_LOGICAL_SIZE);
     assert.deepEqual(renderPlan.pngSize, TOUCH_STRIP_SINGLE_METRIC_SQUARE_PNG_SIZE);
 });
 

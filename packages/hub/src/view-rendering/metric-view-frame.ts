@@ -1,6 +1,6 @@
 import type { ColorConfig } from "./color-resolver";
 import { renderDualMetricBodyView } from "./dual-metric-view";
-import { renderMetricFrame } from "./metric-frame";
+import { renderMetricFrame, resolveThemeBodyViewport } from "./metric-frame";
 import type { MetricRenderAppearance } from "./render-appearance";
 import { formatRenderUnitText } from "./text-content/render-unit-text";
 import { renderSingleMetricBodyView } from "./single-metric-view";
@@ -21,6 +21,7 @@ import {
 import { buildMetricRenderAppearance } from "../settings/render-appearance-builder";
 import type { ResolvedAppearanceSettings } from "../settings/resolved-settings";
 import type { ProgressCircleStatusIcon } from "../widgets/primitives/progress-circle";
+import type { ThemeBodyViewport } from "../widgets/styles/theme-style";
 
 interface BaseMetricRenderOptions {
     centerIconFragment: string;
@@ -73,6 +74,8 @@ export interface MetricViewRenderPlan {
     shouldRenderMutedIconPlaceholder: boolean;
     touchStripMetricLayout: TouchStripMetricLayout | null;
     renderSize: KeySize;
+    bodyRenderSize: KeySize;
+    bodyViewport: ThemeBodyViewport | undefined;
     pngSize: KeySize;
 }
 
@@ -119,6 +122,7 @@ export function composeMetricViewFrame(options: {
             muted: body.muted,
             paints: renderPlan.renderAppearance.paints,
             size: renderPlan.renderSize,
+            bodyViewport: renderPlan.bodyViewport,
         }),
         renderedMetricData: body.renderedMetricData,
         renderPlan,
@@ -148,6 +152,12 @@ export function buildMetricViewRenderPlan(options: {
     const touchStripMetricLayout = options.renderTarget === "touch-strip"
         ? resolveTouchStripMetricLayout(renderAppearance)
         : null;
+    const renderSize = touchStripMetricLayout?.renderSize ?? WIDGET_LOGICAL_SIZE;
+    const bodyViewport = resolveThemeBodyViewport({
+        themePreset: renderAppearance.themePreset,
+        paints: renderAppearance.paints,
+        size: renderSize,
+    });
 
     return {
         renderAppearance,
@@ -156,7 +166,14 @@ export function buildMetricViewRenderPlan(options: {
         viewHasData,
         shouldRenderMutedIconPlaceholder,
         touchStripMetricLayout,
-        renderSize: touchStripMetricLayout?.renderSize ?? WIDGET_LOGICAL_SIZE,
+        renderSize,
+        bodyRenderSize: bodyViewport === undefined
+            ? renderSize
+            : {
+                width: bodyViewport.width,
+                height: bodyViewport.height,
+            },
+        bodyViewport,
         pngSize: touchStripMetricLayout?.pngSize ?? KEYPAD_PNG_SIZE,
     };
 }
@@ -271,7 +288,7 @@ function composeSingleMetricBody(
         svg: renderSingleMetricBodyView({
             data: renderedMetricData,
             visual: renderPlan.renderAppearance,
-            renderSize: renderPlan.renderSize,
+            renderSize: renderPlan.bodyRenderSize,
             centerIcon: options.centerIconFragment,
             footerIcon: options.footerIconFragment,
             topIcon: options.topIconFragment,
@@ -297,7 +314,7 @@ function composeDualMetricBody(
             data: renderedMetricData,
             visual: renderPlan.renderAppearance,
             renderPrimitive: options.dualRenderPrimitive ?? "sparkline",
-            renderSize: renderPlan.renderSize,
+            renderSize: renderPlan.bodyRenderSize,
             titleText: options.titleText,
             chartMode: options.chartMode ?? "overlay",
             centerContent: renderPlan.centerContent,
