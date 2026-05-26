@@ -12,6 +12,17 @@ export interface ResvgFontResolverEnvironment {
     bundledInterFontFile?: string;
     bundledShareTechMonoFontFile?: string;
     bundledDotGothic16FontFile?: string;
+    /**
+     * Bundled fallback for title-card Japanese serif text when no preferred
+     * system Japanese serif font file is available.
+     */
+    bundledJapaneseSerifFontFile?: string;
+    /**
+     * Whether deterministic visual tests should use the bundled Japanese serif
+     * font before system candidates. Production rendering should leave this
+     * unset so user machines keep their system Japanese serif rendering.
+     */
+    preferBundledJapaneseSerifFont?: boolean;
 }
 
 const DEFAULT_FONT_RESOLVER_ENVIRONMENT: ResvgFontResolverEnvironment = {
@@ -20,6 +31,7 @@ const DEFAULT_FONT_RESOLVER_ENVIRONMENT: ResvgFontResolverEnvironment = {
     bundledInterFontFile: resolveBundledFontFile("inter", "InterVariable.ttf"),
     bundledShareTechMonoFontFile: resolveBundledFontFile("share-tech-mono", "ShareTechMono-Regular.ttf"),
     bundledDotGothic16FontFile: resolveBundledFontFile("dotgothic16", "DotGothic16-Regular.ttf"),
+    bundledJapaneseSerifFontFile: resolveBundledFontFile("biz-udpmincho", "BIZUDPMincho-Regular.ttf"),
 };
 
 const fontFileCacheByKey = new Map<string, readonly string[]>();
@@ -65,6 +77,8 @@ export function resolveResvgFontOptions(
         environment.bundledInterFontFile ?? "",
         environment.bundledShareTechMonoFontFile ?? "",
         environment.bundledDotGothic16FontFile ?? "",
+        environment.bundledJapaneseSerifFontFile ?? "",
+        environment.preferBundledJapaneseSerifFont ? "prefer-bundled-japanese-serif" : "",
         usesJapaneseSerifFontFamily ? "japanese-serif" : "",
         ...bundledFontFamilyList,
         ...scriptList,
@@ -158,6 +172,8 @@ function resolveFontFiles(
         environment.bundledInterFontFile ?? "",
         environment.bundledShareTechMonoFontFile ?? "",
         environment.bundledDotGothic16FontFile ?? "",
+        environment.bundledJapaneseSerifFontFile ?? "",
+        environment.preferBundledJapaneseSerifFont ? "prefer-bundled-japanese-serif" : "",
         usesJapaneseSerifFontFamily ? "japanese-serif" : "",
         ...bundledFontFamilyList,
         ...scriptList,
@@ -288,6 +304,12 @@ function resolveKanaFontFileCandidates(platform: NodeJS.Platform): readonly stri
 }
 
 function resolveJapaneseSerifFontFiles(environment: ResvgFontResolverEnvironment): readonly string[] {
+    const bundledFontFiles = resolveBundledJapaneseSerifFontFileCandidates(environment);
+
+    if (environment.preferBundledJapaneseSerifFont && bundledFontFiles.length > 0) {
+        return bundledFontFiles;
+    }
+
     const preferredFontFiles = resolveJapaneseSerifPreferredFontFileCandidates(environment.platform)
         .filter(fontFile => environment.fileExists(fontFile));
 
@@ -295,8 +317,20 @@ function resolveJapaneseSerifFontFiles(environment: ResvgFontResolverEnvironment
         return preferredFontFiles;
     }
 
-    return resolveJapaneseSerifFallbackFontFileCandidates(environment.platform)
+    const fallbackFontFiles = resolveJapaneseSerifFallbackFontFileCandidates(environment.platform)
         .filter(fontFile => environment.fileExists(fontFile));
+
+    if (fallbackFontFiles.length > 0) {
+        return fallbackFontFiles;
+    }
+
+    return bundledFontFiles;
+}
+
+function resolveBundledJapaneseSerifFontFileCandidates(environment: ResvgFontResolverEnvironment): readonly string[] {
+    const fontFile = environment.bundledJapaneseSerifFontFile;
+
+    return fontFile && environment.fileExists(fontFile) ? [fontFile] : [];
 }
 
 function resolveJapaneseSerifPreferredFontFileCandidates(platform: NodeJS.Platform): readonly string[] {

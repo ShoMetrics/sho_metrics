@@ -14,6 +14,7 @@ import { JAPANESE_SERIF_RENDER_FONT_FAMILY, PIXEL_RENDER_FONT_FAMILY } from "./r
 const BUNDLED_INTER_FONT_FILE = "C:\\Plugin\\assets\\fonts\\inter\\InterVariable.ttf";
 const BUNDLED_SHARE_TECH_MONO_FONT_FILE = "C:\\Plugin\\assets\\fonts\\share-tech-mono\\ShareTechMono-Regular.ttf";
 const BUNDLED_DOT_GOTHIC_16_FONT_FILE = "C:\\Plugin\\assets\\fonts\\dotgothic16\\DotGothic16-Regular.ttf";
+const BUNDLED_BIZ_UDP_MINCHO_FONT_FILE = "C:\\Plugin\\assets\\fonts\\biz-udpmincho\\BIZUDPMincho-Regular.ttf";
 const MACOS_HELVETICA_NEUE_FONT_FILE = "/System/Library/Fonts/HelveticaNeue.ttc";
 const MACOS_HIRAGINO_MINCHO_FONT_FILE = "/System/Library/Fonts/\u30d2\u30e9\u30ae\u30ce\u660e\u671d ProN.ttc";
 const WINDOWS_YU_MINCHO_FONT_FILE = "C:\\Windows\\Fonts\\yumin.ttf";
@@ -261,6 +262,51 @@ test("font options use broad Japanese serif fallback when preferred fonts are mi
     ]);
 });
 
+test("font options use bundled Japanese serif only after system candidates are missing", () => {
+    const fontOptions = resolveResvgFontOptions(
+        buildTextSvgWithFontFamily("温度計", JAPANESE_SERIF_RENDER_FONT_FAMILY),
+        buildEnvironment({
+            platform: "linux",
+            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledJapaneseSerifFontFile: BUNDLED_BIZ_UDP_MINCHO_FONT_FILE,
+            existingFontFiles: [
+                BUNDLED_INTER_FONT_FILE,
+                BUNDLED_BIZ_UDP_MINCHO_FONT_FILE,
+            ],
+        }),
+    );
+
+    assert.deepEqual(fontOptions.fontFiles, [
+        BUNDLED_INTER_FONT_FILE,
+        BUNDLED_BIZ_UDP_MINCHO_FONT_FILE,
+    ]);
+});
+
+test("font options prefer bundled Japanese serif for deterministic visual tests", () => {
+    const fontOptions = resolveResvgFontOptions(
+        buildTextSvgWithFontFamily("温度計", JAPANESE_SERIF_RENDER_FONT_FAMILY),
+        buildEnvironment({
+            platform: "win32",
+            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledJapaneseSerifFontFile: BUNDLED_BIZ_UDP_MINCHO_FONT_FILE,
+            preferBundledJapaneseSerifFont: true,
+            existingFontFiles: [
+                BUNDLED_INTER_FONT_FILE,
+                "C:\\Windows\\Fonts\\seguisym.ttf",
+                BUNDLED_BIZ_UDP_MINCHO_FONT_FILE,
+                WINDOWS_YU_MINCHO_FONT_FILE,
+                "C:\\Windows\\Fonts\\simsun.ttc",
+            ],
+        }),
+    );
+
+    assert.deepEqual(fontOptions.fontFiles, [
+        BUNDLED_INTER_FONT_FILE,
+        "C:\\Windows\\Fonts\\seguisym.ttf",
+        BUNDLED_BIZ_UDP_MINCHO_FONT_FILE,
+    ]);
+});
+
 test("font options degrade safely when Windows CJK fallback font files are missing", () => {
     const fontOptions = resolveResvgFontOptions(
         buildTextSvg("&#32593;&#32476;&#19979;&#36733;"),
@@ -475,6 +521,8 @@ function buildEnvironment(options: {
     bundledInterFontFile?: string;
     bundledShareTechMonoFontFile?: string;
     bundledDotGothic16FontFile?: string;
+    bundledJapaneseSerifFontFile?: string;
+    preferBundledJapaneseSerifFont?: boolean;
     onFileExists?: (fontFile: string) => void;
 }): ResvgFontResolverEnvironment {
     const existingFontFileSet = new Set(options.existingFontFiles);
@@ -484,6 +532,8 @@ function buildEnvironment(options: {
         bundledInterFontFile: options.bundledInterFontFile,
         bundledShareTechMonoFontFile: options.bundledShareTechMonoFontFile,
         bundledDotGothic16FontFile: options.bundledDotGothic16FontFile,
+        bundledJapaneseSerifFontFile: options.bundledJapaneseSerifFontFile,
+        preferBundledJapaneseSerifFont: options.preferBundledJapaneseSerifFont,
         fileExists: (fontFile: string) => {
             options.onFileExists?.(fontFile);
             return existingFontFileSet.has(fontFile);
