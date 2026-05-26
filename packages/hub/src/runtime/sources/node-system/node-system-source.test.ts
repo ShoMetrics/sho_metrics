@@ -13,7 +13,9 @@ import {
     normalizeNonEmptyText,
 } from "./node-system-cpu";
 import {
+    calculateDiskUsedBytes,
     calculatePercent,
+    filterUsableFileSystems,
     isNetworkFileSystem,
     isLocalBlockDevice,
     isUsableFileSystem,
@@ -24,6 +26,7 @@ import {
     toDiskVolumeOption,
 } from "./node-system-disk";
 import {
+    parseIoAcceleratorPerformanceStatistics,
     parseNvidiaSmiNumber,
     parseNvidiaSmiTelemetryLine,
 } from "./node-system-gpu";
@@ -82,6 +85,31 @@ test("node system source declares polling groups for owned metric keys", () => {
     });
     assert.deepEqual(resolutions.get("unknown.metric"), {
         state: "unknown",
+    });
+});
+
+test("node system source declares only GPU usage as supported on macOS", () => {
+    const source = new NodeSystemSource({ platform: "darwin" });
+
+    const resolutions = source.resolveMetricPollingGroups([
+        "gpu.usage_percent",
+        "gpu.temp",
+        "gpu.vram_used",
+        "gpu.power",
+    ]);
+
+    assert.deepEqual(resolutions.get("gpu.usage_percent"), {
+        state: "owned",
+        pollingGroupId: "gpu",
+    });
+    assert.deepEqual(resolutions.get("gpu.temp"), {
+        state: "unsupported",
+    });
+    assert.deepEqual(resolutions.get("gpu.vram_used"), {
+        state: "unsupported",
+    });
+    assert.deepEqual(resolutions.get("gpu.power"), {
+        state: "unsupported",
     });
 });
 
@@ -459,6 +487,55 @@ test("node system source maps disk usage metrics and updates injected disk regis
     assert.equal(callCounts.fsStats, 0);
 });
 
+test("node system source uses macOS root data volume for default disk usage", async () => {
+    const callCounts = buildCallCounts();
+    const diskRegistryUpdates: DiskVolumeOption[][] = [];
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            fsSize: async () => {
+                callCounts.fsSize += 1;
+                return [
+                    buildFileSystem({
+                        fs: "/dev/disk3s1s1",
+                        mount: "/",
+                        size: 1000,
+                        used: 100,
+                        available: 50,
+                    }),
+                    buildFileSystem({
+                        fs: "/dev/disk3s2",
+                        mount: "/System/Volumes/Preboot",
+                        size: 1000,
+                        used: 20,
+                        available: 50,
+                    }),
+                    buildFileSystem({
+                        fs: "/dev/disk3s5",
+                        mount: "/System/Volumes/Data",
+                        size: 1000,
+                        used: 400,
+                        available: 50,
+                    }),
+                ];
+            },
+        }),
+        diskRegistry: {
+            update: options => diskRegistryUpdates.push([...options]),
+        },
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+        platform: "darwin",
+    });
+
+    const snapshot = await source.pollMetrics(["disk.usage.percent"]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.equal(metrics["disk.usage.used"]?.scalar, 950);
+    assert.equal(metrics["disk.usage.available"]?.scalar, 50);
+    assert.equal(metrics["disk.usage.percent"]?.scalar, 95);
+    assert.deepEqual(diskRegistryUpdates[0].map(volume => volume.mount), ["/System/Volumes/Data"]);
+});
+
 test("node system source polls disk throughput only on darwin", async () => {
     const callCounts = buildCallCounts();
     const source = new NodeSystemSource({
@@ -571,6 +648,66 @@ test("node system source maps injected GPU telemetry without polling systeminfor
     assert.equal(callCounts.windowsGpu, 1);
     assert.equal(callCounts.systemGpu, 0);
     assert.equal(callCounts.currentLoad, 0);
+});
+
+test("node system source maps injected macOS GPU usage without polling systeminformation", async () => {
+    const callCounts = buildCallCounts();
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts),
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollDarwinGpuTelemetry: async () => {
+            callCounts.darwinGpu += 1;
+            return {
+                utilizationGpu: 63,
+            };
+        },
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+        platform: "darwin",
+    });
+
+    const snapshot = await source.pollMetrics(["gpu.usage_percent"]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.deepEqual(metrics, {
+        "gpu.usage_percent": {
+            scalar: 63,
+            unit: MetricUnit.PERCENT,
+        },
+    });
+    assert.equal(callCounts.darwinGpu, 1);
+    assert.equal(callCounts.windowsGpu, 0);
+    assert.equal(callCounts.systemGpu, 0);
+    assert.equal(callCounts.graphics, 0);
+});
+
+test("node system source omits unavailable GPU telemetry fields", async () => {
+    const callCounts = buildCallCounts();
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts),
+        pollWindowsGpuTelemetry: async () => {
+            callCounts.windowsGpu += 1;
+            return {
+                utilizationGpu: 75,
+                modelText: "NVIDIA RTX",
+            };
+        },
+        pollDarwinGpuTelemetry: buildNoDarwinGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+        platform: "win32",
+    });
+
+    const snapshot = await source.pollMetrics(["gpu.usage_percent"]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.deepEqual(metrics, {
+        "gpu.usage_percent": {
+            scalar: 75,
+            unit: MetricUnit.PERCENT,
+        },
+        "gpu.model": {
+            text: "NVIDIA RTX",
+        },
+    });
 });
 
 test("first network counter sample produces a zero rate", () => {
@@ -722,6 +859,50 @@ test("nvidia-smi telemetry line returns null when every field is absent", () => 
     assert.equal(telemetryData, null);
 });
 
+test("IOAccelerator performance statistics parse GPU device utilization", () => {
+    const telemetryData = parseIoAcceleratorPerformanceStatistics(`
++-o AGXAcceleratorG13X  <class AGXAcceleratorG13X>
+    {
+      "PerformanceStatistics" = {"Renderer Utilization %"=11,"Device Utilization %"=42,"Tiler Utilization %"=7}
+      "model" = "Apple M1 Pro"
+    }
+`);
+
+    assert.deepEqual(telemetryData, {
+        utilizationGpu: 42,
+    });
+});
+
+test("IOAccelerator performance statistics use the highest valid device utilization", () => {
+    const telemetryData = parseIoAcceleratorPerformanceStatistics(`
+      "PerformanceStatistics" = {"Device Utilization %"=18}
+      "PerformanceStatistics" = {"Device Utilization %"=75}
+      "PerformanceStatistics" = {"Device Utilization %"=101}
+`);
+
+    assert.deepEqual(telemetryData, {
+        utilizationGpu: 75,
+    });
+});
+
+test("IOAccelerator performance statistics fall back to GPU activity", () => {
+    const telemetryData = parseIoAcceleratorPerformanceStatistics(`
+      "PerformanceStatistics" = {"GPU Activity(%)"=38}
+`);
+
+    assert.deepEqual(telemetryData, {
+        utilizationGpu: 38,
+    });
+});
+
+test("IOAccelerator performance statistics return null when device utilization is absent", () => {
+    const telemetryData = parseIoAcceleratorPerformanceStatistics(`
+      "PerformanceStatistics" = {"Renderer Utilization %"=32,"Tiler Utilization %"=24}
+`);
+
+    assert.equal(telemetryData, null);
+});
+
 test("CPU model text combines manufacturer and brand while dropping empty parts", () => {
     const fullModelText = formatCpuModelText(buildCpuData({
         manufacturer: "AMD",
@@ -747,13 +928,65 @@ test("file system usability requires positive size, mount, and non-negative usag
     assert.equal(isUsableFileSystem(buildFileSystem({ mount: "" })), false);
     assert.equal(isUsableFileSystem(buildFileSystem({ available: -1 })), false);
     assert.equal(isUsableFileSystem(buildFileSystem({ used: -1 })), false);
-    assert.equal(isUsableFileSystem(buildFileSystem({ mount: "/System/Volumes/Data" })), false);
-    assert.equal(isUsableFileSystem(buildFileSystem({ mount: "/Volumes/media" })), true);
+});
+
+test("usable file system filtering prefers macOS root data volume over sealed root", () => {
+    const rootSystemVolume = buildFileSystem({
+        fs: "/dev/disk3s1s1",
+        mount: "/",
+        used: 12,
+        available: 18,
+    });
+    const rootDataVolume = buildFileSystem({
+        fs: "/dev/disk3s5",
+        mount: "/System/Volumes/Data",
+        used: 430,
+        available: 18,
+    });
+    const prebootVolume = buildFileSystem({
+        fs: "/dev/disk3s2",
+        mount: "/System/Volumes/Preboot",
+    });
+    const externalVolume = buildFileSystem({
+        fs: "/dev/disk4s1",
+        mount: "/Volumes/media",
+    });
+
+    const usableFileSystems = filterUsableFileSystems([
+        rootSystemVolume,
+        prebootVolume,
+        rootDataVolume,
+        externalVolume,
+    ], "darwin");
+
+    assert.deepEqual(usableFileSystems, [rootDataVolume, externalVolume]);
+});
+
+test("usable file system filtering keeps macOS root on pre-Catalina layouts", () => {
+    const rootVolume = buildFileSystem({ fs: "/dev/disk1s1", mount: "/" });
+    const externalVolume = buildFileSystem({ fs: "/dev/disk2s1", mount: "/Volumes/media" });
+
+    const usableFileSystems = filterUsableFileSystems([rootVolume, externalVolume], "darwin");
+
+    assert.deepEqual(usableFileSystems, [rootVolume, externalVolume]);
+});
+
+test("usable file system filtering keeps macOS root when root data volume is unusable", () => {
+    const rootVolume = buildFileSystem({ fs: "/dev/disk3s1s1", mount: "/" });
+    const unusableRootDataVolume = buildFileSystem({
+        fs: "/dev/disk3s5",
+        mount: "/System/Volumes/Data",
+        size: 0,
+    });
+
+    const usableFileSystems = filterUsableFileSystems([rootVolume, unusableRootDataVolume], "darwin");
+
+    assert.deepEqual(usableFileSystems, [rootVolume]);
 });
 
 test("disk volume option maps file system block device and physical disk metadata", () => {
     const diskVolumeOption = toDiskVolumeOption(
-        buildFileSystem({ fs: "C:", mount: "C:", size: 1000, used: 400, available: 600 }),
+        buildFileSystem({ fs: "C:", mount: "C:", size: 1000, used: 123, available: 600 }),
         [buildBlockDevice({
             name: "C:",
             mount: "C:",
@@ -872,8 +1105,11 @@ test("disk storage kind resolves local disk types and network block devices", ()
 test("default disk volume prefers root mounts before first fallback", () => {
     const secondaryVolume = buildDiskVolume({ id: "secondary", mount: "D:\\Games" });
     const rootVolume = buildDiskVolume({ id: "root", mount: "C:" });
+    const macRootVolume = buildDiskVolume({ id: "mac-root", mount: "/" });
+    const macRootDataVolume = buildDiskVolume({ id: "mac-data", mount: "/System/Volumes/Data" });
 
     assert.equal(resolveDefaultDiskVolume([secondaryVolume, rootVolume]), rootVolume);
+    assert.equal(resolveDefaultDiskVolume([macRootVolume, macRootDataVolume]), macRootDataVolume);
     assert.equal(resolveDefaultDiskVolume([secondaryVolume]), secondaryVolume);
     assert.equal(resolveDefaultDiskVolume([]), null);
 });
@@ -881,6 +1117,8 @@ test("default disk volume prefers root mounts before first fallback", () => {
 test("numeric helpers normalize percentages finite rates and positive values", () => {
     assert.equal(calculatePercent(25, 100), 25);
     assert.equal(calculatePercent(25, 0), 0);
+    assert.equal(calculateDiskUsedBytes(100, 25), 75);
+    assert.equal(calculateDiskUsedBytes(100, 125), 0);
     assert.equal(normalizeNullableRate(12), 12);
     assert.equal(normalizeNullableRate(-12), 0);
     assert.equal(normalizeNullableRate(null), 0);
@@ -927,6 +1165,7 @@ interface NodeSystemSourceCallCounts {
     networkStats: number;
     graphics: number;
     windowsGpu: number;
+    darwinGpu: number;
     systemGpu: number;
 }
 
@@ -943,6 +1182,7 @@ function buildCallCounts(): NodeSystemSourceCallCounts {
         networkStats: 0,
         graphics: 0,
         windowsGpu: 0,
+        darwinGpu: 0,
         systemGpu: 0,
     };
 }
@@ -1001,6 +1241,15 @@ function buildNoGpuPoller(
 ): () => Promise<NodeSystemGpuTelemetryData | null> {
     return async () => {
         callCounts.windowsGpu += 1;
+        return null;
+    };
+}
+
+function buildNoDarwinGpuPoller(
+    callCounts: NodeSystemSourceCallCounts,
+): () => Promise<NodeSystemGpuTelemetryData | null> {
+    return async () => {
+        callCounts.darwinGpu += 1;
         return null;
     };
 }
