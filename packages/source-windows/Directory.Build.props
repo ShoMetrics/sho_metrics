@@ -1,6 +1,9 @@
 <Project>
   <PropertyGroup>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(UpdatePackageLocks)' != 'true'">true</RestoreLockedMode>
+    <!-- Default packages.lock.json is the dev graph. Publish sets this to keep RID locks separate. -->
+    <NuGetLockFilePath Condition="'$(SourceWindowsPackageLockFlavor)' != ''">$(MSBuildProjectDirectory)\packages.$(SourceWindowsPackageLockFlavor).lock.json</NuGetLockFilePath>
     <NuGetAudit>true</NuGetAudit>
     <NuGetAuditMode>all</NuGetAuditMode>
   </PropertyGroup>

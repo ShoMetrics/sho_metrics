@@ -732,6 +732,12 @@
           "LibreHardwareMonitorLib": "[0.9.6, 0.9.6]"
         }
       },
+      "shometrics.source.windows.diagnostics": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Extensions.Logging.Abstractions": "[10.0.8, 10.0.8]"
+        }
+      },
       "shometrics.source.windows.ipc": {
         "type": "Project",
         "dependencies": {
@@ -749,6 +755,7 @@
           "Serilog.Sinks.EventLog": "[4.0.0, 4.0.0]",
           "Serilog.Sinks.File": "[7.0.0, 7.0.0]",
           "ShoMetrics.Source.Windows.Core": "[1.0.0, )",
+          "ShoMetrics.Source.Windows.Diagnostics": "[1.0.0, )",
           "ShoMetrics.Source.Windows.Ipc": "[1.0.0, )",
           "System.IO.Pipes.AccessControl": "[5.0.0, 5.0.0]"
         }
