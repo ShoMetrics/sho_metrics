@@ -169,7 +169,7 @@
         "resolved": "9.0.0",
         "contentHash": "hyJB4UlpAi19Xr9AXzu2NuagKC4lPfHObNMEAA0HmqFz2rX7wKgzeYzO/jM/eBHDhnUGFFEjk5cOoJaxqg5J4A=="
       },
-      "shometrics.source.windows.ipc": {
+      "shometrics.source.windows.contracts": {
         "type": "Project",
         "dependencies": {
           "Google.Protobuf": "[3.34.1, 3.34.1]",

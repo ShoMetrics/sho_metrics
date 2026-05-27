@@ -1,5 +1,5 @@
 ﻿using System.Runtime.InteropServices;
-using ShoMetrics.Source.Windows.Ipc;
+using ShoMetrics.Source.Windows.Contracts;
 
 namespace ShoMetrics.Source.Windows.ControlPanel;
 

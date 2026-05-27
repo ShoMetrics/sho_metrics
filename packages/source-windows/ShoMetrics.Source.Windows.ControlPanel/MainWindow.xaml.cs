@@ -6,7 +6,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
-using ShoMetrics.Source.Windows.Ipc;
+using ShoMetrics.Source.Windows.Contracts;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Graphics;
 using WinRT.Interop;

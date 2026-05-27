@@ -15,7 +15,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ShoMetrics.Source.Windows.Ipc\ShoMetrics.Source.Windows.Ipc.csproj" />
+    <ProjectReference Include="..\ShoMetrics.Source.Windows.Contracts\ShoMetrics.Source.Windows.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -10,7 +10,7 @@ using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
 using ShoMetrics.Source.Windows.Core;
-using ShoMetrics.Source.Windows.Ipc;
+using ShoMetrics.Source.Windows.Contracts;
 
 namespace ShoMetrics.Source.Windows.Service;
 

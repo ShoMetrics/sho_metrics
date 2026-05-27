@@ -423,7 +423,7 @@ report.
    Required behavior:
 
    - In packaged production, use the service identity from
-     `packages/source-windows/ShoMetrics.Source.Windows.Ipc/WindowsSourceServiceConstants.cs`
+     `packages/source-windows/ShoMetrics.Source.Windows.Contracts/WindowsSourceServiceConstants.cs`
      (`ServiceName = "ShoMetrics Source Windows"`) to distinguish at least
      `notInstalled`, `installedStopped`, and `running`.
    - Cache this probe result for 30 seconds while helper-backed demand is
