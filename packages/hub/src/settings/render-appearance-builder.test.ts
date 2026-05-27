@@ -13,6 +13,7 @@ import {
 } from "../view-rendering/render-text-style";
 import { DEFAULT_PIXEL_WINDOW_PALETTE } from "../view-rendering/pixel-window-theme-tokens";
 import { buildMetricRenderAppearance } from "./render-appearance-builder";
+import { buildColorConfigFromAppearance } from "./render-paint-resolver";
 import { buildDefaultAppearanceSettings as buildAppearanceSettings } from "./default-appearance-settings";
 
 test("metric view maps resolved appearance settings to renderer branch values", () => {
@@ -300,7 +301,7 @@ test("pixel window theme uses bundled pixel text and no-gradient paint", () => {
     assert.equal(visualSettings.paints.metricValueText, DEFAULT_PIXEL_WINDOW_PALETTE.bodyText);
 });
 
-test("color filled solid mode uses theme background color and neutral foreground paint", () => {
+test("color filled solid mode uses theme background color and readable foreground paint", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         theme: {
             selectedTheme: "color-filled",
@@ -326,10 +327,64 @@ test("color filled solid mode uses theme background color and neutral foreground
     });
     assert.deepEqual(visualSettings.paints.primaryMetric, {
         mode: "solid",
-        solidColor: "#e6e6e6",
+        solidColor: "#ffffff",
         thresholds: [],
         isGradientEnabled: false,
     });
+    assert.equal(visualSettings.paints.primaryText, "#ffffff");
+    assert.equal(visualSettings.paints.metricValueText, "#ffffff");
+    assert.equal(visualSettings.paints.icon, "rgba(255,255,255,0.88)");
+    assert.equal(visualSettings.paints.track, "rgba(255,255,255,0.2)");
+});
+
+test("color filled solid mode keeps white foreground paint for default blue backgrounds", () => {
+    const appearance = buildAppearanceSettings({
+        theme: {
+            selectedTheme: "color-filled",
+        },
+    });
+    const visualSettings = buildMetricRenderAppearance(appearance);
+
+    assert.deepEqual(visualSettings.paints.backgroundFill, {
+        fillKind: "solid",
+        color: "#3b82f6",
+        isGradientEnabled: true,
+    });
+    assert.deepEqual(visualSettings.paints.primaryMetric, {
+        mode: "solid",
+        solidColor: "#ffffff",
+        thresholds: [],
+        isGradientEnabled: false,
+    });
+    assert.equal(visualSettings.paints.primaryText, "#ffffff");
+    assert.equal(buildColorConfigFromAppearance(appearance, "download").solidColor, "#ffffff");
+});
+
+test("color filled solid mode uses dark foreground paint for bright backgrounds", () => {
+    const appearance = buildAppearanceSettings({
+        theme: {
+            selectedTheme: "color-filled",
+            colorFilled: {
+                paint: {
+                    colorMode: "solid",
+                    solid: { color: "#facc15" },
+                },
+            },
+        },
+    });
+    const visualSettings = buildMetricRenderAppearance(appearance);
+
+    assert.deepEqual(visualSettings.paints.primaryMetric, {
+        mode: "solid",
+        solidColor: "#111827",
+        thresholds: [],
+        isGradientEnabled: false,
+    });
+    assert.equal(visualSettings.paints.primaryText, "#111827");
+    assert.equal(visualSettings.paints.metricValueText, "#111827");
+    assert.equal(visualSettings.paints.icon, "rgba(17,24,39,0.88)");
+    assert.equal(visualSettings.paints.track, "rgba(17,24,39,0.2)");
+    assert.equal(buildColorConfigFromAppearance(appearance, "download").solidColor, "#111827");
 });
 
 test("color filled default uses the default solid blue background", () => {
