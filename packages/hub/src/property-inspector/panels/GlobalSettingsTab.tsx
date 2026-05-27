@@ -122,7 +122,7 @@ function GlobalOverrideSection({
                         <span>Global override</span>
                     </label>
                     <p className="section-note">
-                        Apply selected view, theme, and color settings to every widget.
+                        Temporarily override every widget without changing individual settings.
                     </p>
                 </div>
             </InspectorItem>
