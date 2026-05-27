@@ -1,8 +1,10 @@
 import type { TerminalThemeVariant } from "../../settings/resolved-settings";
 import { terminalVariantOptionList } from "../panels/setting-options";
 import { buildTerminalVariantPreviewUri, type MetricPreviewInput } from "../previews/metric-option-preview";
-import { PreviewOptionSetting } from "./PreviewOptionSetting";
+import { SelectSetting } from "./SelectSetting";
 import type { SettingControlProps } from "./setting-control";
+
+const VARIANT_PREVIEW_SIZE_PIXELS = 32;
 
 interface TerminalVariantSettingProps extends SettingControlProps {
     readonly value: TerminalThemeVariant;
@@ -12,11 +14,12 @@ interface TerminalVariantSettingProps extends SettingControlProps {
 
 export function TerminalVariantSetting(props: TerminalVariantSettingProps): React.JSX.Element {
     return (
-        <PreviewOptionSetting
+        <SelectSetting
             {...props}
             label="Theme Variant"
             optionList={terminalVariantOptionList}
-            buildPreviewUri={(variant) => buildTerminalVariantPreviewUri(variant, props.preview)}
+            buildOptionPreviewUri={(variant) => buildTerminalVariantPreviewUri(variant, props.preview)}
+            optionPreviewSizePixels={VARIANT_PREVIEW_SIZE_PIXELS}
         />
     );
 }

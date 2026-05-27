@@ -46,7 +46,7 @@ test("global override renders terminal palette controls for terminal theme", () 
     assert.match(markup, /Terminal/);
     assert.match(markup, /Theme Variant:/);
     assert.match(markup, /Clean/);
-    assert.match(markup, /Vintage/);
+    assert.match(markup, /custom-select-preview/);
     assert.match(markup, /Color Override/);
     assert.match(markup, /Phosphor:/);
     assert.match(markup, /Green/);
@@ -78,8 +78,27 @@ test("global override renders text view variant controls for text view", () => {
 
     assert.match(markup, /View Variant:/);
     assert.match(markup, /Centered/);
-    assert.match(markup, /Title Card/);
+    assert.match(markup, /custom-select-preview/);
+    assert.doesNotMatch(markup, /Full Ring/);
 });
+
+test("global override hides view variant controls for views without variants", () => {
+    const markup = renderToStaticMarkup(createElement(GlobalSettingsTab, {
+        resolvedSettings: buildGlobalSettings("flat", "bar"),
+        colorCompensationProfile: DEFAULT_COLOR_COMPENSATION_PROFILE,
+        onSettingsPatch: () => undefined,
+        onOpenColorCompensation: () => undefined,
+    }));
+
+    assert.match(markup, previewOptionLabelPattern("Bar"));
+    assert.doesNotMatch(markup, /View Variant:/);
+    assert.doesNotMatch(markup, /Full Ring/);
+    assert.doesNotMatch(markup, /Centered/);
+});
+
+function previewOptionLabelPattern(text: string): RegExp {
+    return new RegExp(`<span class="preview-option-label">${text}</span>`);
+}
 
 function buildGlobalSettings(selectedTheme: MetricTheme = "flat", selectedView: MetricView = "circle"): ResolvedGlobalSettings {
     return {

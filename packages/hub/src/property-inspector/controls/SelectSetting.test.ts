@@ -37,6 +37,22 @@ test("custom select renders a combobox without native select markup", () => {
     assert.doesNotMatch(markup, /screen-reader-only/);
 });
 
+test("custom select can render the selected option preview", () => {
+    const markup = renderToStaticMarkup(createElement(SelectSetting, {
+        label: "Variant",
+        value: "solid",
+        optionList: colorModeOptions,
+        buildOptionPreviewUri: (value) => `data:image/svg+xml,${value}`,
+        optionPreviewSizePixels: 32,
+        onValueChange: () => undefined,
+    }));
+
+    assert.match(markup, /data-has-preview="true"/);
+    assert.match(markup, /--custom-select-preview-size:32px/);
+    assert.match(markup, /--custom-select-option-height:40px/);
+    assert.match(markup, /class="custom-select-preview" src="data:image\/svg\+xml,solid"/);
+});
+
 test("custom select navigation skips disabled options without wrapping", () => {
     const optionList = [
         { value: "a", label: "Alpha" },
@@ -151,6 +167,21 @@ test("custom select layout shows polling frequency options without forced scroll
         viewportHeight: 520,
     }), {
         maxHeight: 232,
+        placement: "bottom",
+    });
+});
+
+test("custom select layout uses the caller option height", () => {
+    assert.deepEqual(resolveSelectListboxLayout({
+        optionCount: 2,
+        optionHeightPixels: 40,
+        triggerRect: {
+            bottom: 120,
+            top: 92,
+        },
+        viewportHeight: 520,
+    }), {
+        maxHeight: 88,
         placement: "bottom",
     });
 });

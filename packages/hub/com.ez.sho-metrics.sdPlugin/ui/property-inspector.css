@@ -312,6 +312,10 @@ body {
     width: 100%;
 }
 
+.custom-select[data-has-preview="true"] .custom-select-trigger {
+    grid-template-columns: var(--custom-select-preview-column-width, 24px) minmax(0, 1fr) 16px;
+}
+
 .custom-select-trigger:focus-visible {
     border-color: #7ab7ff;
     outline: 1px solid #7ab7ff;
@@ -327,6 +331,15 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.custom-select-preview,
+.custom-select-option-preview {
+    aspect-ratio: 1;
+    border-radius: 3px;
+    display: block;
+    height: var(--custom-select-preview-size, 22px);
+    width: var(--custom-select-preview-size, 22px);
 }
 
 .custom-select-indicator {
@@ -378,10 +391,20 @@ body {
 .custom-select-option {
     align-items: center;
     cursor: pointer;
-    display: flex;
-    min-height: 28px;
+    display: grid;
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr);
+    min-height: var(--custom-select-option-height, 28px);
     overflow-wrap: anywhere;
     padding: 4px 8px;
+}
+
+.custom-select[data-has-preview="true"] .custom-select-option {
+    grid-template-columns: var(--custom-select-preview-column-width, 24px) minmax(0, 1fr);
+}
+
+.custom-select-option-label {
+    min-width: 0;
 }
 
 .custom-select-option[data-active="true"] {
