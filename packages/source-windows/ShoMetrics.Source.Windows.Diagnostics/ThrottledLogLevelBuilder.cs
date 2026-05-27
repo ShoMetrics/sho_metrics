@@ -40,13 +40,13 @@ public readonly struct ThrottledLogLevelBuilder
     /// </summary>
     /// <remarks>
     /// Prefer <see cref="Every(TimeSpan, string, string, int)" /> for ordinary
-    /// call-site throttling. Use explicit keys only when several related log
+    /// call-site throttling. Use explicit buckets only when several related log
     /// statements intentionally share a throttle bucket, or when one log
-    /// statement needs a separate bucket per stable low-cardinality value. Do
-    /// not include hardware ids, sensor ids, user input, or other high-cardinality
-    /// values in the key.
+    /// statement needs a separate bucket per stable low-cardinality value such
+    /// as a fixed RPC method name. Do not include hardware ids, sensor ids, user
+    /// input, or other high-cardinality values in the key.
     /// </remarks>
-    public ThrottledLogSite Every(string key, TimeSpan interval)
+    public ThrottledLogSite EveryBucket(string key, TimeSpan interval)
     {
         return _owner.CreateSite(_level, key, interval);
     }

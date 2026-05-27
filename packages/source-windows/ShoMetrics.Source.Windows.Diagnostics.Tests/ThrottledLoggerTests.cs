@@ -40,19 +40,19 @@ public sealed class ThrottledLoggerTests
 
         throttledLogger
             .AtDebug()
-            .Every("refresh-summary", TimeSpan.FromSeconds(30))
+            .EveryBucket("refresh-summary", TimeSpan.FromSeconds(30))
             .Log(context => ThrottledLogEntry.Create(
                 "Refresh summary suppressed={SuppressedCount}",
                 context.SuppressedCount));
         throttledLogger
             .AtDebug()
-            .Every("refresh-summary", TimeSpan.FromSeconds(30))
+            .EveryBucket("refresh-summary", TimeSpan.FromSeconds(30))
             .Log(context => ThrottledLogEntry.Create(
                 "Refresh summary suppressed={SuppressedCount}",
                 context.SuppressedCount));
         throttledLogger
             .AtDebug()
-            .Every("refresh-summary", TimeSpan.FromSeconds(30))
+            .EveryBucket("refresh-summary", TimeSpan.FromSeconds(30))
             .Log(context => ThrottledLogEntry.Create(
                 "Refresh summary suppressed={SuppressedCount}",
                 context.SuppressedCount));
@@ -61,7 +61,7 @@ public sealed class ThrottledLoggerTests
 
         throttledLogger
             .AtDebug()
-            .Every("refresh-summary", TimeSpan.FromSeconds(30))
+            .EveryBucket("refresh-summary", TimeSpan.FromSeconds(30))
             .Log(context => ThrottledLogEntry.Create(
                 "Refresh summary suppressed={SuppressedCount}",
                 context.SuppressedCount));
@@ -136,7 +136,7 @@ public sealed class ThrottledLoggerTests
 
         throttledLogger
             .AtDebug()
-            .Every("debug-detail", TimeSpan.FromSeconds(30))
+            .EveryBucket("debug-detail", TimeSpan.FromSeconds(30))
             .Log(_ =>
             {
                 factoryCalls++;
@@ -158,11 +158,11 @@ public sealed class ThrottledLoggerTests
 
         firstThrottledLogger
             .AtDebug()
-            .Every("same-key", TimeSpan.FromSeconds(30))
+            .EveryBucket("same-key", TimeSpan.FromSeconds(30))
             .Log("First owner");
         secondThrottledLogger
             .AtDebug()
-            .Every("same-key", TimeSpan.FromSeconds(30))
+            .EveryBucket("same-key", TimeSpan.FromSeconds(30))
             .Log("Second owner");
 
         Assert.Single(firstLogger.Entries);

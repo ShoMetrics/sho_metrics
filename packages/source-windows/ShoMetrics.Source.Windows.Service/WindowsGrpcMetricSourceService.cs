@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 using ShoMetrics.Contracts.V1;
+using ShoMetrics.Source.Windows.Diagnostics;
 
 namespace ShoMetrics.Source.Windows.Service;
 
@@ -8,6 +10,11 @@ internal sealed class WindowsGrpcMetricSourceService(
     ISourceRequestHandler requestHandler,
     ILogger<WindowsGrpcMetricSourceService> logger) : MetricSourceService.MetricSourceServiceBase
 {
+    private static readonly TimeSpan SlowUnaryDebugThreshold = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan UnaryLogThrottleInterval = TimeSpan.FromSeconds(30);
+
+    private readonly ThrottledLogger _log = new(logger);
+
     public override Task<GetSourceHealthResponse> GetSourceHealth(
         GetSourceHealthRequest request,
         ServerCallContext context)
@@ -43,22 +50,28 @@ internal sealed class WindowsGrpcMetricSourceService(
         ServerCallContext context,
         Func<CancellationToken, Task<TResponse>> operation)
     {
+        long requestStartedTimestamp = Stopwatch.GetTimestamp();
+
         try
         {
-            return await operation(context.CancellationToken).ConfigureAwait(false);
+            TResponse response = await operation(context.CancellationToken).ConfigureAwait(false);
+            LogSlowUnaryCompleted(methodName, Stopwatch.GetElapsedTime(requestStartedTimestamp));
+            return response;
         }
         catch (SourceRequestException exception)
         {
-            LogSourceRequestFailure(methodName, exception);
-
             throw new RpcException(new Status(MapStatusCode(exception.FailureKind), exception.Message));
         }
-        catch (OperationCanceledException exception) when (context.CancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
         {
-            logger.LogDebug(
-                exception,
-                "gRPC source request {MethodName} was cancelled by the client.",
-                methodName);
+            TimeSpan duration = Stopwatch.GetElapsedTime(requestStartedTimestamp);
+            _log.AtDebug()
+                .EveryBucket($"grpc-client-cancel:{methodName}", UnaryLogThrottleInterval)
+                .Log(logContext => ThrottledLogEntry.Create(
+                    "gRPC source request was cancelled by the client. methodName={MethodName} durationMs={DurationMs} suppressedLogCount={SuppressedLogCount}",
+                    methodName,
+                    duration.TotalMilliseconds,
+                    logContext.SuppressedCount));
 
             throw new RpcException(new Status(StatusCode.Cancelled, "Request was cancelled."));
         }
@@ -70,43 +83,28 @@ internal sealed class WindowsGrpcMetricSourceService(
         {
             logger.LogError(
                 exception,
-                "gRPC source request {MethodName} failed unexpectedly.",
-                methodName);
+                "gRPC source request {MethodName} failed unexpectedly. durationMs={DurationMs}",
+                methodName,
+                Stopwatch.GetElapsedTime(requestStartedTimestamp).TotalMilliseconds);
 
             throw new RpcException(new Status(StatusCode.Internal, "Source request failed unexpectedly."));
         }
     }
 
-    private void LogSourceRequestFailure(string methodName, SourceRequestException exception)
+    private void LogSlowUnaryCompleted(string methodName, TimeSpan duration)
     {
-        switch (exception.FailureKind)
+        if (duration < SlowUnaryDebugThreshold)
         {
-            case SourceRequestFailureKind.SourceUnavailable:
-                logger.LogDebug(
-                    "gRPC source request {MethodName} found the source unavailable.",
-                    methodName);
-                break;
-            case SourceRequestFailureKind.Timeout:
-                logger.LogWarning(
-                    exception,
-                    "gRPC source request {MethodName} timed out.",
-                    methodName);
-                break;
-            case SourceRequestFailureKind.InvalidArgument:
-            case SourceRequestFailureKind.FailedPrecondition:
-                logger.LogWarning(
-                    exception,
-                    "gRPC source request {MethodName} failed pre-dispatch validation.",
-                    methodName);
-                break;
-            default:
-                logger.LogError(
-                    exception,
-                    "gRPC source request {MethodName} failed with an unmapped request failure kind {FailureKind}.",
-                    methodName,
-                    exception.FailureKind);
-                break;
+            return;
         }
+
+        _log.AtDebug()
+            .EveryBucket($"grpc-unary-slow:{methodName}", UnaryLogThrottleInterval)
+            .Log(context => ThrottledLogEntry.Create(
+                "gRPC source request completed slowly. methodName={MethodName} durationMs={DurationMs} suppressedLogCount={SuppressedLogCount}",
+                methodName,
+                duration.TotalMilliseconds,
+                context.SuppressedCount));
     }
 
     private static StatusCode MapStatusCode(SourceRequestFailureKind failureKind)
