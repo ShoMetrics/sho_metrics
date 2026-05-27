@@ -5,6 +5,7 @@ import type {
     RenderPaintTokens,
 } from "../view-rendering/render-appearance";
 import { DEFAULT_PIXEL_WINDOW_PALETTE } from "../view-rendering/pixel-window-theme-tokens";
+import { parseHexColor, resolveRelativeLuminance } from "../shared/color-utils";
 import type { MetricColorChannel } from "./appearance-overrides";
 import type {
     ColorMode,
@@ -27,6 +28,11 @@ const BLACK_WHITE_SOFT_TRIANGLE_MEDIUM_PAINT = "#2c2c2c";
 const BLACK_WHITE_SOFT_TRIANGLE_HIGH_PAINT = "#444444";
 const TERMINAL_CLEAN_BLACK_GLASS_PAINT = "#010705";
 const TERMINAL_VINTAGE_BLACK_GLASS_PAINT = "#010301";
+const COLOR_FILLED_DARK_FOREGROUND_PAINT = "#111827";
+const COLOR_FILLED_LIGHT_FOREGROUND_PAINT = "#ffffff";
+// Color Filled keeps saturated mid-luminance backgrounds, such as the default blue,
+// on a white foreground for theme character instead of switching at the WCAG text threshold.
+const COLOR_FILLED_DARK_FOREGROUND_LUMINANCE_THRESHOLD = 0.62;
 
 interface TerminalPaletteVariantPaints {
     readonly bright: string;
@@ -159,12 +165,10 @@ export function buildColorConfigFromAppearance(
         case "cupertino-glass":
             return buildColorConfigFromMetricPaint(appearance.theme.cupertinoGlass.paint, channel);
         case "color-filled":
-            return {
-                mode: "solid",
-                solidColor: BLACK_WHITE_PAINT,
-                thresholds: [],
-                isGradientEnabled: false,
-            };
+            return colorFilledColorConfig({
+                backgroundFill: buildRenderBackgroundFill(appearance),
+                colorMode: appearance.theme.colorFilled.paint.colorMode,
+            });
         case "terminal":
             return terminalColorConfig(appearance.theme.terminal);
         case "pixel-window":
@@ -320,6 +324,14 @@ function buildRenderPaintTokens(
         };
     }
 
+    if (settings.theme.selectedTheme === "color-filled") {
+        return {
+            ...colorFilledRenderPaintTokens(backgroundFill),
+            backgroundFill,
+            primaryMetric,
+        };
+    }
+
     return {
         ...DEFAULT_RENDER_PAINT_TOKENS,
         backgroundFill,
@@ -334,6 +346,81 @@ function pixelWindowColorConfig(): ColorConfig {
         thresholds: [],
         isGradientEnabled: false,
     };
+}
+
+function colorFilledColorConfig(options: {
+    backgroundFill: RenderBackgroundFill | undefined;
+    colorMode: ColorMode;
+}): ColorConfig {
+    return {
+        mode: "solid",
+        solidColor: options.colorMode === "black-white"
+            ? BLACK_WHITE_PAINT
+            : resolveColorFilledForegroundColor(options.backgroundFill),
+        thresholds: [],
+        isGradientEnabled: false,
+    };
+}
+
+function colorFilledRenderPaintTokens(
+    backgroundFill: RenderBackgroundFill | undefined,
+): Omit<RenderPaintTokens, "backgroundFill" | "primaryMetric"> {
+    const foregroundColor = resolveColorFilledForegroundColor(backgroundFill);
+    const foregroundRgbChannels = formatRgbChannels(foregroundColor);
+
+    return {
+        background: DEFAULT_BACKGROUND_PAINT,
+        surface: rgba(foregroundRgbChannels, 0.10),
+        primaryText: foregroundColor,
+        secondaryText: rgba(foregroundRgbChannels, 0.74),
+        mutedText: rgba(foregroundRgbChannels, 0.52),
+        icon: rgba(foregroundRgbChannels, 0.88),
+        barTitleText: rgba(foregroundRgbChannels, 0.86),
+        metricValueText: foregroundColor,
+        barValueText: foregroundColor,
+        barUnitText: rgba(foregroundRgbChannels, 0.74),
+        barSecondaryText: rgba(foregroundRgbChannels, 0.76),
+        track: rgba(foregroundRgbChannels, 0.20),
+        grid: rgba(foregroundRgbChannels, 0.22),
+        divider: rgba(foregroundRgbChannels, 0.20),
+    };
+}
+
+function resolveColorFilledForegroundColor(backgroundFill: RenderBackgroundFill | undefined): "#111827" | "#ffffff" {
+    if (backgroundFill === undefined) {
+        return COLOR_FILLED_LIGHT_FOREGROUND_PAINT;
+    }
+
+    return resolveColorFilledBackgroundLuminance(backgroundFill) > COLOR_FILLED_DARK_FOREGROUND_LUMINANCE_THRESHOLD
+        ? COLOR_FILLED_DARK_FOREGROUND_PAINT
+        : COLOR_FILLED_LIGHT_FOREGROUND_PAINT;
+}
+
+function resolveColorFilledBackgroundLuminance(backgroundFill: RenderBackgroundFill): number {
+    if (backgroundFill.fillKind === "solid") {
+        return resolveHexColorLuminance(backgroundFill.color);
+    }
+
+    return [
+        backgroundFill.lowColor,
+        backgroundFill.mediumColor,
+        backgroundFill.highColor,
+    ].reduce((total, color) => total + resolveHexColorLuminance(color), 0) / 3;
+}
+
+function resolveHexColorLuminance(color: string): number {
+    const rgbColor = parseHexColor(color);
+    return rgbColor ? resolveRelativeLuminance(rgbColor) : 0;
+}
+
+function formatRgbChannels(color: string): string {
+    const parsedColor = parseHexColor(color);
+
+    if (!parsedColor) {
+        return "255,255,255";
+    }
+
+    return `${parsedColor.red},${parsedColor.green},${parsedColor.blue}`;
 }
 
 function pixelWindowRenderPaintTokens(): Omit<RenderPaintTokens, "backgroundFill" | "primaryMetric"> {
