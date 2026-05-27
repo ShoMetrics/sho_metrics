@@ -107,6 +107,38 @@ public sealed class WindowsGrpcMetricSourceServiceTests
     }
 
     [Fact]
+    public async Task ReadMetricSnapshotMapsResourceExhaustedToResourceExhausted()
+    {
+        var handler = new FakeSourceRequestHandler
+        {
+            ReadMetricSnapshot = _ => throw new SourceRequestException(
+                SourceRequestFailureKind.ResourceExhausted,
+                "Read snapshot request was rate limited."),
+        };
+        var service = new WindowsGrpcMetricSourceService(
+            handler,
+            NullLogger<WindowsGrpcMetricSourceService>.Instance);
+
+        RpcException exception = await Assert.ThrowsAsync<RpcException>(() =>
+            service.ReadMetricSnapshot(new ReadMetricSnapshotRequest(), new TestServerCallContext()));
+
+        Assert.Equal(StatusCode.ResourceExhausted, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task SetMetricRefreshDemandReturnsUnimplemented()
+    {
+        var service = new WindowsGrpcMetricSourceService(
+            new FakeSourceRequestHandler(),
+            NullLogger<WindowsGrpcMetricSourceService>.Instance);
+
+        RpcException exception = await Assert.ThrowsAsync<RpcException>(() =>
+            service.SetMetricRefreshDemand(new SetMetricRefreshDemandRequest(), new TestServerCallContext()));
+
+        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+    }
+
+    [Fact]
     public async Task GetSourceHealthMapsClientCancellationToCancelled()
     {
         using var cancellationTokenSource = new CancellationTokenSource();

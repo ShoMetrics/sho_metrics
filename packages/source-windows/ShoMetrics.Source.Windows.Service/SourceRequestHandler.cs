@@ -181,6 +181,7 @@ internal sealed class SourceRequestHandler(
                 break;
             case SourceRequestFailureKind.InvalidArgument:
             case SourceRequestFailureKind.FailedPrecondition:
+            case SourceRequestFailureKind.ResourceExhausted:
                 logger.AtWarning()
                     .EveryBucket($"source-operation-rejected:{operationName}:{exception.FailureKind}", OperationLogThrottleInterval)
                     .Log(context => ThrottledLogEntry.Create(

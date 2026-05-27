@@ -4,6 +4,7 @@ import {
     GetSourceHealthRequestSchema,
     ListMetricDescriptorsRequestSchema,
     ReadMetricSnapshotRequestSchema,
+    SetMetricRefreshDemandRequestSchema,
     type ListMetricDescriptorsResponse,
     type ReadMetricSnapshotResponse,
 } from "../../../generated/shometrics/v1/source_api_pb.js";
@@ -17,6 +18,7 @@ import {
     type SourceClient,
     type SourceClientStatus,
     type SourceClientStatusReason,
+    type SourceRefreshDemandGroup,
     type SourceHealth,
     type SourceSnapshotReadResult,
 } from "../source-client";
@@ -81,6 +83,7 @@ const CPU_USAGE_METRIC_KEY = "cpu.usage_percent";
 const DEFAULT_HEALTH_TIMEOUT_MILLISECONDS = 750;
 const DEFAULT_READ_SNAPSHOT_TIMEOUT_MILLISECONDS = 2000;
 const DEFAULT_LIST_DESCRIPTORS_TIMEOUT_MILLISECONDS = 5000;
+const DEFAULT_SET_REFRESH_DEMAND_TIMEOUT_MILLISECONDS = 1000;
 
 /**
  * Startup retry interval for descriptor preload. This closes the common
@@ -107,11 +110,14 @@ const DEFAULT_DESCRIPTOR_PRELOAD_RETRY_MILLISECONDS = 10000;
  */
 const DESCRIPTOR_PRELOAD_WARNING_INTERVAL_MILLISECONDS = 60000;
 
+const REFRESH_DEMAND_UNIMPLEMENTED_WARNING_INTERVAL_MILLISECONDS = 60000;
+
 /** Timeout configuration for the Windows helper source client. */
 export interface WindowsHelperSourceTimeouts {
     readonly healthMilliseconds: number;
     readonly readSnapshotMilliseconds: number;
     readonly listDescriptorsMilliseconds: number;
+    readonly setRefreshDemandMilliseconds: number;
 }
 
 /** Timer handle used by descriptor preload retry scheduling. */
@@ -183,6 +189,8 @@ export class WindowsHelperSourceClient implements SourceClient {
                 ?? DEFAULT_READ_SNAPSHOT_TIMEOUT_MILLISECONDS,
             listDescriptorsMilliseconds: options.timeouts?.listDescriptorsMilliseconds
                 ?? DEFAULT_LIST_DESCRIPTORS_TIMEOUT_MILLISECONDS,
+            setRefreshDemandMilliseconds: options.timeouts?.setRefreshDemandMilliseconds
+                ?? DEFAULT_SET_REFRESH_DEMAND_TIMEOUT_MILLISECONDS,
         };
         this.descriptorPreloadRetryMilliseconds = options.descriptorPreloadRetryMilliseconds
             ?? DEFAULT_DESCRIPTOR_PRELOAD_RETRY_MILLISECONDS;
@@ -256,6 +264,47 @@ export class WindowsHelperSourceClient implements SourceClient {
         await this.ensureProtocolSupported();
 
         return await this.readMetricDescriptors(metricKeys);
+    }
+
+    async setMetricRefreshDemand(groups: readonly SourceRefreshDemandGroup[]): Promise<void> {
+        this.markHelperDemandActive();
+        await this.ensureProtocolSupported();
+
+        try {
+            await this.sendGrpcRequest(
+                "SetMetricRefreshDemand",
+                this.timeouts.setRefreshDemandMilliseconds,
+                timeoutMilliseconds => this.transport.setMetricRefreshDemand(
+                    create(SetMetricRefreshDemandRequestSchema, {
+                        groups: groups.map(group => ({
+                            pollingGroupId: group.pollingGroupId,
+                            metricIds: [...group.metricKeys],
+                            requestedIntervalMilliseconds: group.intervalMilliseconds,
+                        })),
+                    }),
+                    { timeoutMilliseconds },
+                ),
+                shouldResetRefreshDemandChannelAfterError,
+            );
+            this.recordHelperRequestSuccess();
+        } catch (error) {
+            if (isRefreshDemandUnsupportedError(error)) {
+                log.atWarn()
+                    .everyMs(
+                        "refresh-demand-unimplemented",
+                        REFRESH_DEMAND_UNIMPLEMENTED_WARNING_INTERVAL_MILLISECONDS,
+                    )
+                    .log("Windows helper does not support refresh demand control yet.");
+                return;
+            }
+
+            if (isRefreshDemandControlPlaneError(error)) {
+                throw error;
+            }
+
+            this.recordHelperRequestFailure(error);
+            throw error;
+        }
     }
 
     subscribeSourceMetadataInvalidations(listener: SourceMetadataInvalidationListener): () => void {
@@ -558,6 +607,7 @@ export class WindowsHelperSourceClient implements SourceClient {
         methodName: string,
         timeoutMilliseconds: number,
         request: (timeoutMilliseconds: number) => Promise<TResponse>,
+        shouldResetChannelAfterError: (error: Error) => boolean = shouldResetGrpcChannelAfterError,
     ): Promise<TResponse> {
         const requestStartedAtTimestampMilliseconds = this.now();
 
@@ -576,7 +626,7 @@ export class WindowsHelperSourceClient implements SourceClient {
             return response;
         } catch (error) {
             const normalizedError = normalizeGrpcRequestError(error, methodName);
-            if (shouldResetGrpcChannelAfterError(normalizedError)) {
+            if (shouldResetChannelAfterError(normalizedError)) {
                 this.transport.reset?.();
             }
 
@@ -774,6 +824,22 @@ export class WindowsHelperSourceClient implements SourceClient {
 
 function buildWindowsHelperPlanningFingerprint(descriptorFingerprint: string): string {
     return `windows-helper-descriptor:${descriptorFingerprint}`;
+}
+
+function isRefreshDemandUnsupportedError(error: unknown): boolean {
+    const clientError = toWindowsHelperSourceClientError(error);
+    return clientError.code === "grpc_unimplemented";
+}
+
+function isRefreshDemandControlPlaneError(error: unknown): boolean {
+    const clientError = toWindowsHelperSourceClientError(error);
+    return clientError.code === "grpc_invalid_argument"
+        || clientError.code === "grpc_resource_exhausted";
+}
+
+function shouldResetRefreshDemandChannelAfterError(error: Error): boolean {
+    return !isRefreshDemandUnsupportedError(error)
+        && shouldResetGrpcChannelAfterError(error);
 }
 
 function readScalarMetricValue(snapshot: MetricSnapshot, metricKey: string): number | undefined {

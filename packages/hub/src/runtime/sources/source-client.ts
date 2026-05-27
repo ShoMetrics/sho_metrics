@@ -141,6 +141,18 @@ export interface SourceSnapshotReadResult {
     readonly unavailableMetrics: readonly MetricUnavailableReport[];
 }
 
+/** Source refresh demand for one source-owned polling group. */
+export interface SourceRefreshDemandGroup {
+    /** Source-owned descriptor polling group id. Hub must not parse it. */
+    readonly pollingGroupId: string;
+
+    /** ShoMetrics metric keys that caused this group to be demanded. */
+    readonly metricKeys: readonly string[];
+
+    /** Hub-requested cadence. Sources may clamp it to their own safe limits. */
+    readonly intervalMilliseconds: number;
+}
+
 /** Source-owned attribution for a metric value included in a snapshot. */
 export type MetricValueAttribution = Readonly<
     Omit<RuntimeProtoPayloadWithOptionalRawSensor<ProtoMetricValueAttribution>, "valueFreshness">
@@ -163,6 +175,9 @@ export interface SourceClient extends SourceMetricPollingGroupResolver {
 
     /** Lists descriptors for requested metric keys or for all known metrics. */
     listMetricDescriptors?(metricKeys: readonly string[]): Promise<MetricDescriptorSnapshot>;
+
+    /** Sends the complete active refresh demand for source-owned polling groups. */
+    setMetricRefreshDemand?(groups: readonly SourceRefreshDemandGroup[]): Promise<void>;
 
     /** Checks source health by performing source-owned I/O. */
     checkHealth?(): Promise<SourceHealth>;

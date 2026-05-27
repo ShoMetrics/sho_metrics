@@ -12,6 +12,7 @@ import {
     MetricValueKind as ProtoMetricValueKind,
     MetricValueFreshness as ProtoMetricValueFreshness,
     ReadMetricSnapshotResponseSchema,
+    SetMetricRefreshDemandResponseSchema,
     type GetSourceHealthRequest,
     type GetSourceHealthResponse,
     type ListMetricDescriptorsRequest,
@@ -20,6 +21,8 @@ import {
     type MetricValueAttribution as ProtoMetricValueAttribution,
     type ReadMetricSnapshotRequest,
     type ReadMetricSnapshotResponse,
+    type SetMetricRefreshDemandRequest,
+    type SetMetricRefreshDemandResponse,
 } from "../../../generated/shometrics/v1/source_api_pb.js";
 import {
     buildMetricSnapshot,
@@ -116,6 +119,99 @@ test("windows helper declares cached descriptor metrics with descriptor polling 
             state: "pendingMetadata",
         }],
     ]);
+});
+
+test("windows helper sends refresh demand through the grpc transport", async () => {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
+            case "getSourceHealth":
+                return buildHealthResponse();
+            case "setMetricRefreshDemand":
+                return create(SetMetricRefreshDemandResponseSchema, {
+                    acceptedGroupCount: 1,
+                    effectiveMinimumIntervalMilliseconds: 1000,
+                    demandTtlMilliseconds: 15000,
+                });
+            default:
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport);
+
+    await client.setMetricRefreshDemand?.([{
+        pollingGroupId: CPU_HELPER_POLLING_GROUP_ID,
+        metricKeys: ["cpu.temp", "cpu.power"],
+        intervalMilliseconds: 1000,
+    }]);
+
+    const demandRequest = transport.requests[1];
+    if (demandRequest?.method !== "setMetricRefreshDemand") {
+        assert.fail(`Unexpected request: ${demandRequest?.method ?? "empty"}`);
+    }
+
+    assert.equal(demandRequest.value.groups.length, 1);
+    assert.equal(demandRequest.value.groups[0]?.pollingGroupId, CPU_HELPER_POLLING_GROUP_ID);
+    assert.deepEqual(demandRequest.value.groups[0]?.metricIds, ["cpu.temp", "cpu.power"]);
+    assert.equal(demandRequest.value.groups[0]?.requestedIntervalMilliseconds, 1000);
+});
+
+test("windows helper treats unimplemented refresh demand as optional version skew", async () => {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
+            case "getSourceHealth":
+                return buildHealthResponse();
+            case "setMetricRefreshDemand":
+                throw createGrpcServiceError(
+                    grpcStatus.UNIMPLEMENTED,
+                    "Method is not implemented.",
+                );
+            default:
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport);
+
+    await client.setMetricRefreshDemand([
+        {
+            pollingGroupId: CPU_HELPER_POLLING_GROUP_ID,
+            metricKeys: ["cpu.temp"],
+            intervalMilliseconds: 1000,
+        },
+    ]);
+
+    assert.equal(client.getCachedStatus().state, "available");
+    assert.equal(transport.resetCount, 0);
+});
+
+test("windows helper does not mark the source unavailable when refresh demand is rate limited", async () => {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
+            case "getSourceHealth":
+                return buildHealthResponse();
+            case "setMetricRefreshDemand":
+                throw createGrpcServiceError(
+                    grpcStatus.RESOURCE_EXHAUSTED,
+                    "Rate limit exceeded.",
+                );
+            default:
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport);
+
+    await assert.rejects(
+        async () => await client.setMetricRefreshDemand([
+            {
+                pollingGroupId: CPU_HELPER_POLLING_GROUP_ID,
+                metricKeys: ["cpu.temp"],
+                intervalMilliseconds: 1000,
+            },
+        ]),
+        /RESOURCE_EXHAUSTED/u,
+    );
+
+    assert.equal(client.getCachedStatus().state, "available");
+    assert.equal(transport.resetCount, 0);
 });
 
 test("windows helper marks missing metrics unsupported after complete descriptor preload", async () => {
@@ -1046,15 +1142,18 @@ test("windows helper source client maps grpc unimplemented to protocol mismatch"
 type FakeWindowsHelperGrpcRequest =
     | { readonly method: "getSourceHealth"; readonly value: GetSourceHealthRequest }
     | { readonly method: "listMetricDescriptors"; readonly value: ListMetricDescriptorsRequest }
-    | { readonly method: "readMetricSnapshot"; readonly value: ReadMetricSnapshotRequest };
+    | { readonly method: "readMetricSnapshot"; readonly value: ReadMetricSnapshotRequest }
+    | { readonly method: "setMetricRefreshDemand"; readonly value: SetMetricRefreshDemandRequest };
 
 type FakeWindowsHelperGrpcResponse =
     | GetSourceHealthResponse
     | ListMetricDescriptorsResponse
-    | ReadMetricSnapshotResponse;
+    | ReadMetricSnapshotResponse
+    | SetMetricRefreshDemandResponse;
 
 class FakeWindowsHelperGrpcTransport implements WindowsHelperGrpcTransport {
     readonly requests: FakeWindowsHelperGrpcRequest[] = [];
+    resetCount = 0;
 
     constructor(private readonly responseFactory: (
         request: FakeWindowsHelperGrpcRequest,
@@ -1082,6 +1181,19 @@ class FakeWindowsHelperGrpcTransport implements WindowsHelperGrpcTransport {
 
         return this.responseFactory(fakeRequest) as ReadMetricSnapshotResponse;
     }
+
+    async setMetricRefreshDemand(
+        request: SetMetricRefreshDemandRequest,
+    ): Promise<SetMetricRefreshDemandResponse> {
+        const fakeRequest = { method: "setMetricRefreshDemand", value: request } as const;
+        this.requests.push(fakeRequest);
+
+        return this.responseFactory(fakeRequest) as SetMetricRefreshDemandResponse;
+    }
+
+    reset(): void {
+        this.resetCount += 1;
+    }
 }
 
 class NeverResolvingTransport implements WindowsHelperGrpcTransport {
@@ -1106,6 +1218,13 @@ class NeverResolvingTransport implements WindowsHelperGrpcTransport {
         _request: ReadMetricSnapshotRequest,
         options: WindowsHelperGrpcRequestOptions,
     ): Promise<ReadMetricSnapshotResponse> {
+        return await this.startRequest(options);
+    }
+
+    async setMetricRefreshDemand(
+        _request: SetMetricRefreshDemandRequest,
+        options: WindowsHelperGrpcRequestOptions,
+    ): Promise<SetMetricRefreshDemandResponse> {
         return await this.startRequest(options);
     }
 
@@ -1137,6 +1256,10 @@ class RejectingTransport implements WindowsHelperGrpcTransport {
     }
 
     async readMetricSnapshot(): Promise<ReadMetricSnapshotResponse> {
+        return await this.reject();
+    }
+
+    async setMetricRefreshDemand(): Promise<SetMetricRefreshDemandResponse> {
         return await this.reject();
     }
 

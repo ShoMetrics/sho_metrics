@@ -4,6 +4,7 @@ internal enum SourceRequestFailureKind
 {
     InvalidArgument,
     FailedPrecondition,
+    ResourceExhausted,
     SourceUnavailable,
     Timeout,
 }
