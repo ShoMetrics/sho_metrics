@@ -8,6 +8,28 @@ Read this after:
 2. [Windows Helper gRPC IPC And Self-Contained Packaging Plan](04-helper-ipc-packaging-plan.md)
 3. [Runtime Collection Demand-Driven Background Collection](../../runtime-collection/03-demand-driven-background-collection.md)
 
+## Status
+
+Implemented and live-verified on 2026-05-27.
+
+Verification covered:
+
+- `SetMetricRefreshDemand` exists on the restarted helper build.
+- Hub sends and renews Windows helper demand from collector planning.
+- Helper refreshes demanded polling groups instead of running full LHM refresh.
+- Empty demand stops LHM refresh after demand TTL when Stream Deck is not
+  renewing active demand.
+- Helper rejects unsafe demand input and `ReadMetricSnapshot` floods.
+
+Reusable safety probe:
+
+```powershell
+node packages/hub/scripts/diagnostics/windows-helper-demand-safety-probe.mjs
+```
+
+The probe temporarily changes helper refresh demand and sends an empty demand
+at the end. Run it only against a local development helper.
+
 ## Objective
 
 Make the Windows helper refresh only the helper hardware groups currently needed
@@ -822,6 +844,10 @@ Verification:
 - Test `UNIMPLEMENTED` does not fail collection.
 
 ### Step 5: End-To-End Safety And Performance Checks
+
+Use `packages/hub/scripts/diagnostics/windows-helper-demand-safety-probe.mjs`
+for the request-safety checks in items 6-9. The remaining checks use live
+helper and Stream Deck logs.
 
 1. Run helper with no Stream Deck demand for at least 2 minutes; verify no LHM
    refresh loop runs after TTL.
