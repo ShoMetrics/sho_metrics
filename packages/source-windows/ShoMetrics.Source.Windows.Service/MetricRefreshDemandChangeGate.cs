@@ -35,9 +35,10 @@ internal sealed class MetricRefreshDemandChangeGate
                 && _lastAcceptedDemandFingerprint is not null
                 && _timeProvider.GetElapsedTime(_lastDemandChangeTimestamp) < _minimumChangeInterval)
             {
+                // This can be normal while the Hub is shutting down or clearing demand.
                 throw new SourceRequestException(
                     SourceRequestFailureKind.ResourceExhausted,
-                    "Refresh demand changed too quickly.");
+                    "Refresh demand changed too quickly; this can be normal while shutting down.");
             }
 
             T result = action();
