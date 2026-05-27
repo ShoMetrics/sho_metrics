@@ -1,0 +1,34 @@
+name: Windows Source CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: pwsh
+    working-directory: packages/source-windows
+
+jobs:
+  tests:
+    name: C# tests
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore ShoMetrics.Source.Windows.slnx
+
+      - name: Run tests
+        run: dotnet test ShoMetrics.Source.Windows.slnx --configuration Release --no-restore
