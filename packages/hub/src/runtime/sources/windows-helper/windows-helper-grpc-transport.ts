@@ -8,10 +8,7 @@ import {
 import * as grpc from "@grpc/grpc-js";
 import { logger } from "../../../logging/logger";
 import {
-    GetSourceHealthRequestSchema,
-    ListMetricDescriptorsRequestSchema,
     MetricSourceService,
-    ReadMetricSnapshotRequestSchema,
     type GetSourceHealthRequest,
     type GetSourceHealthResponse,
     type ListMetricDescriptorsRequest,

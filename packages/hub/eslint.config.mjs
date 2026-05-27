@@ -140,6 +140,8 @@ const restrictedGeneratedSettingsProtoImports = {
 const sourceProtoBoundaryFiles = [
   'src/runtime/sources/metric-source.ts',
   'src/runtime/sources/source-client.ts',
+  'src/runtime/sources/windows-helper/windows-helper-grpc-transport.ts',
+  'src/runtime/sources/windows-helper/windows-helper-source-api-mapper.ts',
   'src/runtime/sources/windows-helper/windows-helper-source-client.ts',
   'src/runtime/sources/windows-helper/windows-helper-source-client.test.ts',
 ];
