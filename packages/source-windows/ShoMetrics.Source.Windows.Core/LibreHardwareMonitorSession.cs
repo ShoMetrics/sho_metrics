@@ -20,19 +20,31 @@ public sealed class LibreHardwareMonitorSession : IDisposable
     // throughput. See the Windows disk throughput plan:
     // docs/development/runtime-sources/03-windows-helper/03-lhm-storage-reading-implementation-plan.md.
     private readonly WindowsSystemTotalDiskThroughputProvider _diskThroughputProvider;
+    private readonly TimeProvider _timeProvider;
+    private readonly IReadOnlyList<IHardware> _rootHardware = [];
     private readonly HardwareMetricDescriptorSnapshot _cachedDescriptorSnapshot;
     private readonly IReadOnlyDictionary<string, string> _pollingGroupIdsByMetricId;
+    private readonly MetricRefreshTargetIndex _refreshTargetIndex;
     private readonly MetricRefreshDemandState _refreshDemandState;
     private readonly HardwareMetricRetentionCache _retentionCache = new(RetainedSampleTickLimit);
     private readonly ConcurrentDictionary<string, MetricSnapshot> _latestSnapshotsByPollingGroupId =
         new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _readGate = new(1, 1);
     private MetricSnapshot _latestSnapshot;
+    private long _lastLhmRefreshTimestamp = -1;
     private long _sourceTick;
     private bool _isDisposed;
 
     public LibreHardwareMonitorSession()
+        : this(TimeProvider.System)
     {
+    }
+
+    public LibreHardwareMonitorSession(TimeProvider timeProvider)
+    {
+        ArgumentNullException.ThrowIfNull(timeProvider);
+
+        _timeProvider = timeProvider;
         _diskThroughputProvider = new WindowsSystemTotalDiskThroughputProvider();
         Computer computer = LibreHardwareComputerFactory.Create();
         List<HardwareSourceWarning> warnings = [];
@@ -46,6 +58,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             // duplicate LHM buffer as soon as the catalog is opened.
             DisableSensorHistoryForComputer(computer);
             _computer = computer;
+            _rootHardware = computer.Hardware.ToList();
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -62,7 +75,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             try
             {
                 cachedDescriptorSnapshot = BuildMetricDescriptorSnapshot(
-                    computer,
+                    _rootHardware,
                     _diskThroughputProvider,
                     CancellationToken.None);
             }
@@ -85,14 +98,17 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             descriptor => descriptor.MetricId,
             descriptor => descriptor.PollingGroupId,
             StringComparer.Ordinal);
+        _refreshTargetIndex = MetricRefreshTargetIndex.Build(_rootHardware, cachedDescriptorSnapshot);
         _refreshDemandState = new MetricRefreshDemandState(ReadKnownPollingGroupIds(cachedDescriptorSnapshot));
         _latestSnapshot = BuildUnavailableSnapshot();
     }
 
     internal LibreHardwareMonitorSession(
         WindowsSystemTotalDiskThroughputProvider diskThroughputProvider,
-        IReadOnlyList<HardwareSourceWarning>? initializationWarnings = null)
+        IReadOnlyList<HardwareSourceWarning>? initializationWarnings = null,
+        TimeProvider? timeProvider = null)
     {
+        _timeProvider = timeProvider ?? TimeProvider.System;
         _diskThroughputProvider = diskThroughputProvider;
         InitializationWarnings = initializationWarnings ?? [];
         _cachedDescriptorSnapshot = BuildNativeOnlyDescriptorSnapshot(
@@ -102,11 +118,35 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             descriptor => descriptor.MetricId,
             descriptor => descriptor.PollingGroupId,
             StringComparer.Ordinal);
+        _refreshTargetIndex = MetricRefreshTargetIndex.Build(_rootHardware, _cachedDescriptorSnapshot);
         _refreshDemandState = new MetricRefreshDemandState(ReadKnownPollingGroupIds(_cachedDescriptorSnapshot));
         _latestSnapshot = BuildUnavailableSnapshot();
     }
 
-    public bool IsAvailable => _computer is not null || _diskThroughputProvider.HasCounterBinding;
+    internal LibreHardwareMonitorSession(
+        IReadOnlyList<IHardware> rootHardware,
+        WindowsSystemTotalDiskThroughputProvider diskThroughputProvider,
+        TimeProvider? timeProvider = null,
+        IReadOnlyList<HardwareSourceWarning>? initializationWarnings = null)
+    {
+        _timeProvider = timeProvider ?? TimeProvider.System;
+        _rootHardware = rootHardware;
+        _diskThroughputProvider = diskThroughputProvider;
+        InitializationWarnings = initializationWarnings ?? [];
+        _cachedDescriptorSnapshot = BuildMetricDescriptorSnapshot(
+            _rootHardware,
+            _diskThroughputProvider,
+            CancellationToken.None);
+        _pollingGroupIdsByMetricId = _cachedDescriptorSnapshot.Descriptors.ToDictionary(
+            descriptor => descriptor.MetricId,
+            descriptor => descriptor.PollingGroupId,
+            StringComparer.Ordinal);
+        _refreshTargetIndex = MetricRefreshTargetIndex.Build(_rootHardware, _cachedDescriptorSnapshot);
+        _refreshDemandState = new MetricRefreshDemandState(ReadKnownPollingGroupIds(_cachedDescriptorSnapshot));
+        _latestSnapshot = BuildUnavailableSnapshot();
+    }
+
+    public bool IsAvailable => _rootHardware.Count > 0 || _diskThroughputProvider.HasCounterBinding;
 
     public IReadOnlyList<HardwareSourceWarning> InitializationWarnings { get; }
 
@@ -158,21 +198,94 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         ObjectDisposedException.ThrowIf(_isDisposed, this);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (_computer is null)
+        if (_rootHardware.Count == 0)
         {
-            MetricSnapshot nativeOnlySnapshot = RefreshNativeOnlySnapshot();
-            Volatile.Write(ref _latestSnapshot, nativeOnlySnapshot);
+            return RefreshNativeOnlySnapshot(pollingGroupId: null);
+        }
+
+        return await RefreshLibreHardwareMonitorTargetAsync(
+            pollingGroupId: null,
+            _rootHardware,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<MetricSnapshot> RefreshPollingGroupAsync(
+        string pollingGroupId,
+        CancellationToken cancellationToken)
+    {
+        MetricSnapshotRefreshResult result = await RefreshPollingGroupWithDiagnosticsAsync(
+                pollingGroupId,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return result.Snapshot;
+    }
+
+    public async Task<MetricSnapshotRefreshResult> RefreshPollingGroupWithDiagnosticsAsync(
+        string pollingGroupId,
+        CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!_refreshTargetIndex.TryRead(pollingGroupId, out MetricRefreshTarget? refreshTarget))
+        {
+            MetricSnapshot snapshot = ReadCachedSnapshotForPollingGroup(pollingGroupId);
             return BuildRefreshResult(
-                nativeOnlySnapshot,
+                snapshot,
+                pollingGroupId,
                 usesLibreHardwareMonitor: false,
+                skippedByCoreGateway: false,
+                coreGatewayAge: null,
                 hardwareUpdates: []);
         }
 
+        if (refreshTarget.Kind == MetricRefreshTargetKind.NativeDisk)
+        {
+            return RefreshNativeOnlySnapshot(pollingGroupId);
+        }
+
+        return await RefreshLibreHardwareMonitorTargetAsync(
+            pollingGroupId,
+            refreshTarget.Hardware,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<MetricSnapshotRefreshResult> RefreshLibreHardwareMonitorTargetAsync(
+        string? pollingGroupId,
+        IReadOnlyList<IHardware> hardwareTargets,
+        CancellationToken cancellationToken)
+    {
         await _readGate.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
             ObjectDisposedException.ThrowIf(_isDisposed, this);
+
+            long currentTimestamp = _timeProvider.GetTimestamp();
+            TimeSpan coreGatewayAge = _lastLhmRefreshTimestamp < 0
+                ? TimeSpan.MaxValue
+                : _timeProvider.GetElapsedTime(_lastLhmRefreshTimestamp, currentTimestamp);
+
+            // This is the final Core-owned guard before runtime IHardware.Update()
+            // calls. Keep it inside _readGate so timestamp state cannot race and
+            // future callers cannot hammer LHM by bypassing Service-level limits.
+            if (coreGatewayAge < MetricRefreshDemandConstants.MinimumCoreLhmRefreshInterval)
+            {
+                MetricSnapshot cachedSnapshot = pollingGroupId is null
+                    ? Volatile.Read(ref _latestSnapshot)
+                    : ReadCachedSnapshotForPollingGroup(pollingGroupId);
+
+                return BuildRefreshResult(
+                    cachedSnapshot,
+                    pollingGroupId,
+                    usesLibreHardwareMonitor: true,
+                    skippedByCoreGateway: true,
+                    coreGatewayAge,
+                    hardwareUpdates: []);
+            }
+
+            _lastLhmRefreshTimestamp = currentTimestamp;
 
             long sourceTick = ++_sourceTick;
             DateTimeOffset capturedAt = DateTimeOffset.UtcNow;
@@ -183,7 +296,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             List<HardwareRefreshDiagnostic> hardwareUpdates = [];
             List<string> warnings = [];
 
-            foreach (IHardware hardware in _computer.Hardware)
+            foreach (IHardware hardware in hardwareTargets)
             {
                 ReadHardware(
                     hardware,
@@ -223,26 +336,56 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                 unavailableReportsByMetricId,
                 capturedAt);
             AddDerivedReadings(readingsByMetricId);
-            AddNativeDiskThroughputReadings(readingsByMetricId);
-            PublishAggregatePollingGroupSnapshots(readingsByMetricId, capturedAt);
 
-            List<MetricReading> readings = FilterReadings(readingsByMetricId, requestedMetricIds: null);
-            List<MetricUnavailableReport> unavailableReports = FilterUnavailableMetrics(
-                unavailableReportsByMetricId,
-                requestedMetricIds: null);
-            AddMissingMetricWarnings(readings, warnings);
-
-            MetricSnapshot snapshot = new()
+            if (pollingGroupId is null)
             {
-                CapturedAt = capturedAt,
-                Readings = readings,
-                UnavailableMetrics = unavailableReports,
-                Warnings = warnings,
-            };
-            Volatile.Write(ref _latestSnapshot, snapshot);
+                AddNativeDiskThroughputReadings(readingsByMetricId);
+                PublishAggregatePollingGroupSnapshots(readingsByMetricId, capturedAt);
+            }
+            else if (pollingGroupId.Equals(LibreHardwareMetricCatalog.NetworkAggregatePollingGroupId, StringComparison.Ordinal))
+            {
+                PublishPollingGroupSnapshot(
+                    LibreHardwareMetricCatalog.NetworkAggregatePollingGroupId,
+                    readingsByMetricId,
+                    [],
+                    capturedAt,
+                    unavailableReportsByMetricId.Values.ToList());
+            }
+
+            MetricSnapshot snapshot;
+
+            if (pollingGroupId is null)
+            {
+                List<MetricReading> readings = FilterReadings(readingsByMetricId, requestedMetricIds: null);
+                List<MetricUnavailableReport> unavailableReports = FilterUnavailableMetrics(
+                    unavailableReportsByMetricId,
+                    requestedMetricIds: null);
+                AddMissingMetricWarnings(readings, warnings);
+
+                snapshot = new MetricSnapshot
+                {
+                    CapturedAt = capturedAt,
+                    Readings = readings,
+                    UnavailableMetrics = unavailableReports,
+                    Warnings = warnings,
+                };
+            }
+            else
+            {
+                snapshot = ReadCachedSnapshotForPollingGroup(pollingGroupId);
+            }
+
+            if (pollingGroupId is null)
+            {
+                Volatile.Write(ref _latestSnapshot, snapshot);
+            }
+
             return BuildRefreshResult(
                 snapshot,
+                pollingGroupId,
                 usesLibreHardwareMonitor: true,
+                skippedByCoreGateway: false,
+                coreGatewayAge: null,
                 hardwareUpdates);
         }
         finally
@@ -286,20 +429,56 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         _isDisposed = true;
     }
 
-    private MetricSnapshot RefreshNativeOnlySnapshot()
+    private MetricSnapshotRefreshResult RefreshNativeOnlySnapshot(string? pollingGroupId)
     {
         DateTimeOffset capturedAt = DateTimeOffset.UtcNow;
         Dictionary<string, MetricReading> readingsByMetricId = new(StringComparer.Ordinal);
 
         AddNativeDiskThroughputReadings(readingsByMetricId);
-        PublishAggregatePollingGroupSnapshots(readingsByMetricId, capturedAt);
-
-        return new MetricSnapshot
+        if (pollingGroupId is null)
         {
-            CapturedAt = capturedAt,
-            Readings = FilterReadings(readingsByMetricId, requestedMetricIds: null),
-            Warnings = InitializationWarnings.Select(warning => warning.Message).ToList(),
-        };
+            PublishAggregatePollingGroupSnapshots(readingsByMetricId, capturedAt);
+        }
+        else
+        {
+            PublishPollingGroupSnapshot(
+                pollingGroupId,
+                readingsByMetricId,
+                [],
+                capturedAt);
+        }
+
+        MetricSnapshot snapshot = pollingGroupId is null
+            ? new MetricSnapshot
+            {
+                CapturedAt = capturedAt,
+                Readings = FilterReadings(readingsByMetricId, requestedMetricIds: null),
+                Warnings = InitializationWarnings.Select(warning => warning.Message).ToList(),
+            }
+            : ReadCachedSnapshotForPollingGroup(pollingGroupId);
+
+        if (pollingGroupId is null)
+        {
+            Volatile.Write(ref _latestSnapshot, snapshot);
+        }
+
+        return BuildRefreshResult(
+            snapshot,
+            pollingGroupId,
+            usesLibreHardwareMonitor: false,
+            skippedByCoreGateway: false,
+            coreGatewayAge: null,
+            hardwareUpdates: []);
+    }
+
+    private MetricSnapshot ReadCachedSnapshotForPollingGroup(string pollingGroupId)
+    {
+        if (_latestSnapshotsByPollingGroupId.TryGetValue(pollingGroupId, out MetricSnapshot? groupSnapshot))
+        {
+            return groupSnapshot;
+        }
+
+        return Volatile.Read(ref _latestSnapshot);
     }
 
     private MetricSnapshot BuildUnavailableSnapshot()
@@ -353,7 +532,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
     }
 
     private static HardwareMetricDescriptorSnapshot BuildMetricDescriptorSnapshot(
-        Computer computer,
+        IReadOnlyList<IHardware> rootHardware,
         WindowsSystemTotalDiskThroughputProvider diskThroughputProvider,
         CancellationToken cancellationToken)
     {
@@ -362,7 +541,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         List<RankedHardwareMetricDescriptor> cpuPowerDescriptorCandidates = [];
         List<string> warnings = [];
 
-        foreach (IHardware hardware in computer.Hardware)
+        foreach (IHardware hardware in rootHardware)
         {
             ReadHardwareDescriptors(
                 hardware,
@@ -539,7 +718,10 @@ public sealed class LibreHardwareMonitorSession : IDisposable
 
     private static MetricSnapshotRefreshResult BuildRefreshResult(
         MetricSnapshot snapshot,
+        string? pollingGroupId,
         bool usesLibreHardwareMonitor,
+        bool skippedByCoreGateway,
+        TimeSpan? coreGatewayAge,
         IReadOnlyList<HardwareRefreshDiagnostic> hardwareUpdates)
     {
         return new MetricSnapshotRefreshResult
@@ -547,7 +729,10 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             Snapshot = snapshot,
             Diagnostics = new MetricSnapshotRefreshDiagnostics
             {
+                PollingGroupId = pollingGroupId,
                 UsesLibreHardwareMonitor = usesLibreHardwareMonitor,
+                SkippedByCoreGateway = skippedByCoreGateway,
+                CoreGatewayAge = coreGatewayAge,
                 HardwareUpdates = hardwareUpdates,
                 ReadingCount = snapshot.Readings.Count,
                 UnavailableMetricCount = snapshot.UnavailableMetrics.Count,

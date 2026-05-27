@@ -25,6 +25,8 @@ internal sealed class FakeHardware : IHardware
         return new FakeHardware(HardwareType.Storage, "storage/0");
     }
 
+    public int UpdateCount { get; private set; }
+
     public HardwareType HardwareType { get; }
 
     public Identifier Identifier { get; }
@@ -67,6 +69,12 @@ internal sealed class FakeHardware : IHardware
 
     public void Update()
     {
+        UpdateCount++;
+    }
+
+    public void ResetUpdateCount()
+    {
+        UpdateCount = 0;
     }
 }
 
@@ -96,6 +104,11 @@ internal sealed class FakeSensor : ISensor
     public static FakeSensor Throughput(string name, float? value)
     {
         return new FakeSensor(SensorType.Throughput, name, value);
+    }
+
+    public static FakeSensor Load(string name, float? value)
+    {
+        return new FakeSensor(SensorType.Load, name, value);
     }
 
     public IHardware Hardware => _hardware;
