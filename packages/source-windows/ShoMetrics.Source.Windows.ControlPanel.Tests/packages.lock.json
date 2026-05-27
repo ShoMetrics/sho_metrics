@@ -329,20 +329,20 @@
           "xunit.v3.runner.common": "[3.2.2]"
         }
       },
+      "shometrics.source.windows.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "Google.Protobuf": "[3.34.1, 3.34.1]",
+          "Grpc.Core.Api": "[2.71.0, 2.71.0]"
+        }
+      },
       "shometrics.source.windows.controlpanel": {
         "type": "Project",
         "dependencies": {
           "Grpc.Net.Client": "[2.71.0, 2.71.0]",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.8, 10.0.8]",
           "Microsoft.WindowsAppSDK": "[2.1.3, 2.1.3]",
-          "ShoMetrics.Source.Windows.Ipc": "[1.0.0, )"
-        }
-      },
-      "shometrics.source.windows.ipc": {
-        "type": "Project",
-        "dependencies": {
-          "Google.Protobuf": "[3.34.1, 3.34.1]",
-          "Grpc.Core.Api": "[2.71.0, 2.71.0]"
+          "ShoMetrics.Source.Windows.Contracts": "[1.0.0, )"
         }
       }
     }

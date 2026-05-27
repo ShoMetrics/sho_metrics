@@ -1,4 +1,4 @@
-namespace ShoMetrics.Source.Windows.Ipc;
+namespace ShoMetrics.Source.Windows.Contracts;
 
 public static class WindowsSourceServiceConstants
 {

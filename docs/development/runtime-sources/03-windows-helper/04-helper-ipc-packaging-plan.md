@@ -2,6 +2,13 @@
 
 This plan is written for a new coding session with no conversation context.
 
+Status: implementation complete for the helper/plugin/control-panel IPC
+migration. The production path is now gRPC over a Windows named pipe; the old
+`source_ipc.proto` envelope, custom frame codec, custom pipe server, and custom
+pipe clients have been removed. Remaining items in this document are release
+validation gates and historical rationale, not instructions to keep both IPC
+paths alive.
+
 Read this after:
 
 1. [Helper Source Reliability Implementation Plan](02-helper-source-reliability-implementation-plan.md)
@@ -155,6 +162,45 @@ caveats:
    `unix:\\.\pipe\<pipe-name>`.
 2. The 65-second idle test is not a substitute for the 35-minute idle/recovery
    gate listed below. Keep the longer test before release.
+
+### Production Idle Soak Result
+
+After the production gRPC path landed, a long idle soak was run against the
+real helper pipe:
+
+```text
+script:
+  packages/hub/scripts/diagnostics/windows-helper-grpc-idle-soak.mjs
+
+helper:
+  ShoMetrics.Source.Windows.Service --dev-pipe
+
+client:
+  Node v24.15.0
+  @grpc/grpc-js 1.14.0
+
+target:
+  unix:\\.\pipe\ShoMetrics.Source.Windows.Grpc.v1
+
+checkpoints:
+  1m, 2m, 5m, 35m, 60m
+```
+
+Observed result:
+
+| Checkpoint | Result |
+| --- | --- |
+| Warmup | Success, about 9 ms. |
+| 1 minute idle | Success, about 2 ms. |
+| 2 minute idle | First call hit `DEADLINE_EXCEEDED` at the 750 ms client deadline; channel reset and retry succeeded in about 127 ms. Helper/Kestrel logs showed a long server-side send/heartbeat delay around the same time, so this looked like transient helper/server stall rather than an unrecoverable `grpc-js` idle bug. |
+| 5 minute idle | Success, about 320 ms. |
+| 35 minute idle | Success, about 3 ms after the channel had entered `IDLE`. |
+| 60 minute idle | Success, about 2 ms after the channel had entered `IDLE`. |
+
+Conclusion: the production `@grpc/grpc-js` named-pipe target survived the known
+35+ minute idle/recovery risk. The single 2-minute deadline miss confirms that
+Hub must continue treating request deadlines as normal transient failures and
+must be able to recover by resetting/recreating the channel.
 
 ### Security Model
 
@@ -379,8 +425,8 @@ batch unless it is the chosen client adapter skeleton.
 
 4. Update proto generation:
 
-   - C# `ShoMetrics.Source.Windows.Ipc.csproj` should generate server/client
-     gRPC code for `source_api.proto`.
+   - C# `ShoMetrics.Source.Windows.Contracts.csproj` should generate
+     server/client gRPC code for `source_api.proto`.
    - Hub TypeScript should keep using generated message types at the source
      adapter boundary only. Do not let generated gRPC/proto types leak into PI,
      actions, rendering, or settings.
@@ -802,6 +848,10 @@ validation requirements the eventual installer must satisfy.
 
 ## Final Acceptance Checklist
 
+Implementation checklist status: the migration code is landed. Before release,
+rerun the command/test gates below against the current build and installer
+candidate.
+
 - `npm.cmd run proto:lint`
 - `npm.cmd run proto:build`
 - `npm.cmd run test:unit`
@@ -818,7 +868,9 @@ validation requirements the eventual installer must satisfy.
 - Hub has a unit-tested named-pipe gRPC target-string helper using the
   `unix:\\.\pipe\<pipe-name>` form proven by Batch 0.
 - Hub gRPC client survives 35+ minutes of idle plus a follow-up call, either by
-  recovery or by lazy channel recreation.
+  recovery or by lazy channel recreation. Verified locally with the production
+  gRPC path at 35 minutes and 60 minutes; rerun when bumping `@grpc/grpc-js`,
+  `@grpc/proto-loader`, .NET, or Kestrel hosting dependencies.
 - Stream Deck plugin running as a normal user can call the elevated/LocalSystem
   helper without launching Stream Deck as administrator.
 - Self-contained `win-x64` publish succeeds.

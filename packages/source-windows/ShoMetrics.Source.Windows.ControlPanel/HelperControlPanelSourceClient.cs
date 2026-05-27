@@ -5,7 +5,7 @@ using System.Security.Principal;
 using Grpc.Core;
 using Grpc.Net.Client;
 using ShoMetrics.Contracts.V1;
-using ShoMetrics.Source.Windows.Ipc;
+using ShoMetrics.Source.Windows.Contracts;
 
 namespace ShoMetrics.Source.Windows.ControlPanel;
 
