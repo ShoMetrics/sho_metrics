@@ -8,6 +8,10 @@ import {
 import * as grpc from "@grpc/grpc-js";
 import { logger } from "../../../logging/logger";
 import {
+    monotonicNowMilliseconds,
+    wallClockNowMilliseconds,
+} from "../../../shared/clock";
+import {
     MetricSourceService,
     type GetSourceHealthRequest,
     type GetSourceHealthResponse,
@@ -71,7 +75,8 @@ export class NodeWindowsHelperGrpcTransport implements WindowsHelperGrpcTranspor
 
     constructor(
         private readonly target: string,
-        private readonly now: () => number,
+        private readonly monotonicNow: () => number = monotonicNowMilliseconds,
+        private readonly wallClockNow: () => number = wallClockNowMilliseconds,
     ) {}
 
     getSourceHealth(
@@ -137,7 +142,7 @@ export class NodeWindowsHelperGrpcTransport implements WindowsHelperGrpcTranspor
         request: MessageShape<TRequest>,
         options: WindowsHelperGrpcRequestOptions,
     ): Promise<MessageShape<TResponse>> {
-        const requestStartedAtTimestampMilliseconds = this.now();
+        const requestStartedAtMonotonicMilliseconds = this.monotonicNow();
         const client = this.getClient();
 
         return awaitGrpcUnary<MessageShape<TResponse>>(callback => {
@@ -146,7 +151,7 @@ export class NodeWindowsHelperGrpcTransport implements WindowsHelperGrpcTranspor
                 value => Buffer.from(toBinary(method.input, value)),
                 bytes => fromBinary(method.output, bytes),
                 request,
-                { deadline: requestStartedAtTimestampMilliseconds + options.timeoutMilliseconds },
+                { deadline: this.wallClockNow() + options.timeoutMilliseconds },
                 callback,
             );
         }).finally(() => {
@@ -154,7 +159,7 @@ export class NodeWindowsHelperGrpcTransport implements WindowsHelperGrpcTranspor
                 "windowsHelperGrpcUnaryCompleted",
                 "layer=transport",
                 `method=${method.name}`,
-                `durationMs=${this.now() - requestStartedAtTimestampMilliseconds}`,
+                `durationMs=${this.monotonicNow() - requestStartedAtMonotonicMilliseconds}`,
                 `timeoutMs=${options.timeoutMilliseconds}`,
             ].join(" "));
         });
@@ -165,7 +170,7 @@ export class NodeWindowsHelperGrpcTransport implements WindowsHelperGrpcTranspor
             return this.client;
         }
 
-        const channelCreatedAtTimestampMilliseconds = this.now();
+        const channelCreatedAtMonotonicMilliseconds = this.monotonicNow();
         this.client = new grpc.Client(
             this.target,
             grpc.credentials.createInsecure(),
@@ -177,7 +182,7 @@ export class NodeWindowsHelperGrpcTransport implements WindowsHelperGrpcTranspor
         log.debug(() => [
             "windowsHelperGrpcChannelCreated",
             `target=${this.target}`,
-            `createdAtMs=${channelCreatedAtTimestampMilliseconds}`,
+            `createdAtMonotonicMs=${channelCreatedAtMonotonicMilliseconds}`,
         ].join(" "));
 
         return this.client;

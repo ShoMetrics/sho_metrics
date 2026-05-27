@@ -9,6 +9,10 @@ import {
     type MetricValue,
 } from "../metric-source";
 import { logger } from "../../../logging/logger";
+import {
+    monotonicNowMilliseconds,
+    wallClockNowMilliseconds,
+} from "../../../shared/clock";
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../../network-interfaces";
 import {
     getNetworkAggregateMetricKey,
@@ -109,7 +113,14 @@ interface NodeSystemSourceDependencies {
     networkRegistry?: NodeSystemNetworkInterfaceRegistry;
     diskRegistry?: NodeSystemDiskVolumeRegistry;
     platform?: NodeJS.Platform;
-    now?: () => number;
+    /**
+     * Monotonic test seam used for elapsed-time/cache/backoff decisions.
+     */
+    monotonicNow?: () => number;
+    /**
+     * Wall-clock test seam used only for metric snapshot captured_at.
+     */
+    wallClockNow?: () => number;
     pollWindowsGpuTelemetry?: () => Promise<NodeSystemGpuTelemetryData | null>;
     pollDarwinGpuTelemetry?: () => Promise<NodeSystemGpuTelemetryData | null>;
     pollSystemInformationGpuTelemetry?: (
@@ -137,7 +148,8 @@ export class NodeSystemSource implements MetricSource {
     private readonly networkRegistry: NodeSystemNetworkInterfaceRegistry;
     private readonly diskRegistry: NodeSystemDiskVolumeRegistry;
     private readonly platform: NodeJS.Platform;
-    private readonly now: () => number;
+    private readonly monotonicNow: () => number;
+    private readonly wallClockNow: () => number;
     private readonly pollWindowsGpuTelemetry: () => Promise<NodeSystemGpuTelemetryData | null>;
     private readonly pollDarwinGpuTelemetry: () => Promise<NodeSystemGpuTelemetryData | null>;
     private readonly pollSystemInformationGpuTelemetry: (
@@ -148,9 +160,9 @@ export class NodeSystemSource implements MetricSource {
     private readonly cpuInformationCache: RefreshableCache<CachedCpuInformation>;
     private readonly cpuInformationRefreshBackoff: BackoffPolicy;
     private lastNetworkStatsByInterface = new Map<string, NodeSystemNetworkCounterSample>();
-    private lastNetworkPollDebugLogTimestampMilliseconds = 0;
+    private lastNetworkPollDebugLogMonotonicMilliseconds = 0;
     private cachedGpuData: NodeSystemGpuTelemetryData | null = null;
-    private cachedGpuTimestampMilliseconds = 0;
+    private cachedGpuMonotonicMilliseconds = 0;
     private pendingGpuPromise: Promise<NodeSystemGpuTelemetryData | null> | null = null;
 
     private static readonly GPU_CACHE_MS = 1000;
@@ -175,29 +187,30 @@ export class NodeSystemSource implements MetricSource {
         this.networkRegistry = dependencies.networkRegistry ?? networkInterfaceRegistry;
         this.diskRegistry = dependencies.diskRegistry ?? diskVolumeRegistry;
         this.platform = dependencies.platform ?? process.platform;
-        this.now = dependencies.now ?? Date.now;
+        this.monotonicNow = dependencies.monotonicNow ?? monotonicNowMilliseconds;
+        this.wallClockNow = dependencies.wallClockNow ?? wallClockNowMilliseconds;
         this.pollWindowsGpuTelemetry = dependencies.pollWindowsGpuTelemetry ?? pollWindowsNvidiaGpuTelemetry;
         this.pollDarwinGpuTelemetry = dependencies.pollDarwinGpuTelemetry ?? pollDarwinIoAcceleratorGpuTelemetry;
         this.pollSystemInformationGpuTelemetry = dependencies.pollSystemInformationGpuTelemetry
             ?? pollSystemInformationGpuTelemetry;
         this.networkInterfaceCache = new RefreshableCache({
-            now: this.now,
+            now: this.monotonicNow,
             ttlMilliseconds: NodeSystemSource.NETWORK_INTERFACE_CACHE_MS,
             maximumStaleMilliseconds: NodeSystemSource.NETWORK_INTERFACE_STALE_MAX_MS,
             refresh: () => this.refreshUsableNetworkInterfaces(),
         });
         this.networkInterfaceRefreshBackoff = BackoffPolicy.flat(
-            this.now,
+            this.monotonicNow,
             NodeSystemSource.NETWORK_INTERFACE_REFRESH_RETRY_MS,
         );
         this.cpuInformationCache = new RefreshableCache({
-            now: this.now,
+            now: this.monotonicNow,
             ttlMilliseconds: Number.POSITIVE_INFINITY,
             maximumStaleMilliseconds: Number.POSITIVE_INFINITY,
             refresh: () => this.readCpuInformation(),
         });
         this.cpuInformationRefreshBackoff = BackoffPolicy.flat(
-            this.now,
+            this.monotonicNow,
             NodeSystemSource.CPU_INFORMATION_RETRY_MS,
         );
     }
@@ -232,7 +245,7 @@ export class NodeSystemSource implements MetricSource {
     async pollMetrics(metricKeys: readonly string[]): Promise<MetricSnapshot> {
         const metrics: Record<string, MetricValue> = {};
         const metricGroups = resolveCollectorGroups(metricKeys);
-        const pollStartTimestampMilliseconds = this.now();
+        const snapshotTimestampMilliseconds = this.wallClockNow();
 
         const [cpuMetrics, memoryMetrics, diskMetrics, networkMetrics, gpu] = await Promise.all([
             metricGroups.has("cpu") ? this.pollCpu() : Promise.resolve({}),
@@ -277,7 +290,7 @@ export class NodeSystemSource implements MetricSource {
         }
 
         return buildMetricSnapshot({
-            timestampMilliseconds: pollStartTimestampMilliseconds,
+            timestampMilliseconds: snapshotTimestampMilliseconds,
             metrics,
         });
     }
@@ -470,7 +483,7 @@ export class NodeSystemSource implements MetricSource {
         const networkStats = usableInterfaceIds.size > 0
             ? await this.systemInformation.networkStats([...usableInterfaceIds].join(","))
             : [];
-        const currentTimestampMilliseconds = this.now();
+        const currentMonotonicMilliseconds = this.monotonicNow();
         let aggregateDownloadBytesPerSecond = 0;
         let aggregateUploadBytesPerSecond = 0;
         const rateCalculations: NodeSystemNetworkRateCalculation[] = [];
@@ -486,13 +499,13 @@ export class NodeSystemSource implements MetricSource {
                 interfaceId: networkStat.iface,
                 direction: "download",
                 currentBytes: networkStat.rx_bytes,
-                currentTimestampMilliseconds,
+                currentMonotonicMilliseconds,
             });
             const uploadRate = this.calculateNetworkRate({
                 interfaceId: networkStat.iface,
                 direction: "upload",
                 currentBytes: networkStat.tx_bytes,
-                currentTimestampMilliseconds,
+                currentMonotonicMilliseconds,
             });
             const downloadBytesPerSecond = downloadRate.bytesPerSecond;
             const uploadBytesPerSecond = uploadRate.bytesPerSecond;
@@ -528,7 +541,7 @@ export class NodeSystemSource implements MetricSource {
             rateCalculations,
             aggregateDownloadBytesPerSecond,
             aggregateUploadBytesPerSecond,
-            currentTimestampMilliseconds,
+            currentMonotonicMilliseconds,
         });
 
         return metrics;
@@ -597,13 +610,13 @@ export class NodeSystemSource implements MetricSource {
         interfaceId: string;
         direction: NetworkMetricDirection;
         currentBytes: number;
-        currentTimestampMilliseconds: number;
+        currentMonotonicMilliseconds: number;
     }): NodeSystemNetworkRateCalculation {
         const sampleKey = `${options.interfaceId}:${options.direction}`;
         const previousSample = this.lastNetworkStatsByInterface.get(sampleKey);
         this.lastNetworkStatsByInterface.set(sampleKey, {
             bytes: options.currentBytes,
-            timestampMilliseconds: options.currentTimestampMilliseconds,
+            monotonicMilliseconds: options.currentMonotonicMilliseconds,
         });
 
         return calculateNetworkRate({
@@ -619,13 +632,13 @@ export class NodeSystemSource implements MetricSource {
         rateCalculations: readonly NodeSystemNetworkRateCalculation[];
         aggregateDownloadBytesPerSecond: number;
         aggregateUploadBytesPerSecond: number;
-        currentTimestampMilliseconds: number;
+        currentMonotonicMilliseconds: number;
     }): void {
         const hasPreviousSample = options.rateCalculations.some(rateCalculation => rateCalculation.hadPreviousSample);
         const hasUsableInterfaces = options.interfaceOptions.length > 0;
         const hasStats = options.networkStats.length > 0;
         const isAggregateZero = options.aggregateDownloadBytesPerSecond === 0 && options.aggregateUploadBytesPerSecond === 0;
-        const shouldLogPeriodic = options.currentTimestampMilliseconds - this.lastNetworkPollDebugLogTimestampMilliseconds
+        const shouldLogPeriodic = options.currentMonotonicMilliseconds - this.lastNetworkPollDebugLogMonotonicMilliseconds
             >= NodeSystemSource.NETWORK_DEBUG_LOG_INTERVAL_MS;
         const shouldLogSuspiciousZero = hasUsableInterfaces && hasStats && hasPreviousSample && isAggregateZero;
 
@@ -633,7 +646,7 @@ export class NodeSystemSource implements MetricSource {
             return;
         }
 
-        this.lastNetworkPollDebugLogTimestampMilliseconds = options.currentTimestampMilliseconds;
+        this.lastNetworkPollDebugLogMonotonicMilliseconds = options.currentMonotonicMilliseconds;
 
         networkLog.debug(() => [
             `reason=${shouldLogSuspiciousZero ? "suspicious-zero" : "periodic"}`,
@@ -648,7 +661,7 @@ export class NodeSystemSource implements MetricSource {
 
     private async pollGpu(): Promise<NodeSystemGpuTelemetryData | null> {
         const pollSequence = reserveNodeSystemGpuPollDebugSequence();
-        const pollStartTimestampMilliseconds = this.now();
+        const pollStartedAtMonotonicMilliseconds = this.monotonicNow();
         gpuLog.debug(() => [
             "sourceStart",
             `pollId=${pollSequence}`,
@@ -661,7 +674,7 @@ export class NodeSystemSource implements MetricSource {
             gpuLog.debug(() => [
                 "sourceSuccess",
                 `pollId=${pollSequence}`,
-                `elapsedMs=${this.now() - pollStartTimestampMilliseconds}`,
+                `elapsedMs=${this.monotonicNow() - pollStartedAtMonotonicMilliseconds}`,
             ].join(" "));
             return gpuData;
         }
@@ -669,18 +682,18 @@ export class NodeSystemSource implements MetricSource {
         gpuLog.debug(() => [
             "sourceNoData",
             `pollId=${pollSequence}`,
-            `elapsedMs=${this.now() - pollStartTimestampMilliseconds}`,
+            `elapsedMs=${this.monotonicNow() - pollStartedAtMonotonicMilliseconds}`,
         ].join(" "));
         return null;
     }
 
     private async readGpuTelemetry(): Promise<NodeSystemGpuTelemetryData | null> {
-        const currentTimestampMilliseconds = this.now();
+        const currentMonotonicMilliseconds = this.monotonicNow();
 
-        if (this.cachedGpuData && (currentTimestampMilliseconds - this.cachedGpuTimestampMilliseconds) < NodeSystemSource.GPU_CACHE_MS) {
+        if (this.cachedGpuData && (currentMonotonicMilliseconds - this.cachedGpuMonotonicMilliseconds) < NodeSystemSource.GPU_CACHE_MS) {
             gpuLog.debug(() => [
                 "cacheHit",
-                `cacheAgeMs=${currentTimestampMilliseconds - this.cachedGpuTimestampMilliseconds}`,
+                `cacheAgeMs=${currentMonotonicMilliseconds - this.cachedGpuMonotonicMilliseconds}`,
             ].join(" "));
             return this.cachedGpuData;
         }
@@ -696,7 +709,7 @@ export class NodeSystemSource implements MetricSource {
 
                 if (gpuData) {
                     this.cachedGpuData = gpuData;
-                    this.cachedGpuTimestampMilliseconds = this.now();
+                    this.cachedGpuMonotonicMilliseconds = this.monotonicNow();
                     return gpuData;
                 }
 
@@ -793,7 +806,7 @@ function formatNetworkInterfaceRefreshFailureMessage(
         return "Network interface refresh failed; using stale interfaces";
     }
 
-    return result.timestampMilliseconds == null
+    return result.storedAtMonotonicMilliseconds == null
         ? "Network interface refresh failed; no cached interfaces"
         : "Network interface refresh failed; stale interfaces expired";
 }

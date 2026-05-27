@@ -1,4 +1,8 @@
 export interface BackoffPolicyOptions {
+    /**
+     * Monotonic timestamp provider. This must not be wall-clock time, because
+     * retry windows should not change when the user adjusts the system clock.
+     */
     readonly now: () => number;
     readonly initialDelayMilliseconds: number;
     readonly maximumDelayMilliseconds: number;
@@ -20,7 +24,7 @@ export interface BackoffPolicyOptions {
  */
 export class BackoffPolicy {
     private consecutiveFailureCount = 0;
-    private nextAttemptAllowedTimestampMilliseconds = 0;
+    private nextAttemptAllowedAtMonotonicMilliseconds = 0;
 
     public static flat(now: () => number, delayMilliseconds: number): BackoffPolicy {
         return new BackoffPolicy({
@@ -38,23 +42,23 @@ export class BackoffPolicy {
     }
 
     public canAttempt(): boolean {
-        return this.options.now() >= this.nextAttemptAllowedTimestampMilliseconds;
+        return this.options.now() >= this.nextAttemptAllowedAtMonotonicMilliseconds;
     }
 
     public remainingDelayMilliseconds(): number {
-        return Math.max(0, this.nextAttemptAllowedTimestampMilliseconds - this.options.now());
+        return Math.max(0, this.nextAttemptAllowedAtMonotonicMilliseconds - this.options.now());
     }
 
     public recordSuccess(): void {
         this.consecutiveFailureCount = 0;
-        this.nextAttemptAllowedTimestampMilliseconds = 0;
+        this.nextAttemptAllowedAtMonotonicMilliseconds = 0;
     }
 
     public recordFailure(): number {
         const delayMilliseconds = this.calculateDelayMilliseconds();
 
         this.consecutiveFailureCount += 1;
-        this.nextAttemptAllowedTimestampMilliseconds = this.options.now() + delayMilliseconds;
+        this.nextAttemptAllowedAtMonotonicMilliseconds = this.options.now() + delayMilliseconds;
 
         return delayMilliseconds;
     }

@@ -1,6 +1,10 @@
 import { create } from "@bufbuild/protobuf";
 import { logger } from "../../../logging/logger";
 import {
+    monotonicNowMilliseconds,
+    wallClockNowMilliseconds,
+} from "../../../shared/clock";
+import {
     GetSourceHealthRequestSchema,
     ListMetricDescriptorsRequestSchema,
     ReadMetricSnapshotRequestSchema,
@@ -139,7 +143,10 @@ export interface WindowsHelperDescriptorPreloadTimer {
 export interface WindowsHelperSourceClientOptions {
     readonly pipeName?: string;
     readonly transport?: WindowsHelperGrpcTransport;
-    readonly now?: () => number;
+    /** Monotonic test seam for cooldowns, durations, and retry windows. */
+    readonly monotonicNow?: () => number;
+    /** Wall-clock test seam for user-visible status and sample age timestamps. */
+    readonly wallClockNow?: () => number;
     readonly timeouts?: Partial<WindowsHelperSourceTimeouts>;
     readonly descriptorPreloadRetryMilliseconds?: number;
     readonly descriptorPreloadTimer?: WindowsHelperDescriptorPreloadTimer;
@@ -151,37 +158,41 @@ export class WindowsHelperSourceClient implements SourceClient {
     readonly sourceId = WINDOWS_HELPER_SOURCE_ID;
 
     private readonly transport: WindowsHelperGrpcTransport;
-    private readonly now: () => number;
+    private readonly monotonicNow: () => number;
+    private readonly wallClockNow: () => number;
     private readonly timeouts: WindowsHelperSourceTimeouts;
     private readonly descriptorPreloadRetryMilliseconds: number;
     private readonly descriptorPreloadTimer: WindowsHelperDescriptorPreloadTimer;
     private readonly serviceStatusReader: WindowsHelperServiceStatusReader;
     private protocolCompatibility: "unknown" | "supported" = "unknown";
     private protocolCheckPromise: Promise<void> | undefined;
-    private unsupportedProtocolRetryAfterMilliseconds = 0;
-    private helperUnavailableRetryAfterMilliseconds = 0;
+    private unsupportedProtocolRetryAfterMonotonicMilliseconds = 0;
+    private helperUnavailableRetryAfterMonotonicMilliseconds = 0;
     private helperUnavailableFailureCount = 0;
-    private activeHelperDemandStartedAtTimestampMilliseconds: number | undefined;
+    private activeHelperDemandStartedAtMonotonicMilliseconds: number | undefined;
     private serviceStatusProbePromise: Promise<void> | undefined;
-    private serviceStatusCacheExpiresAtTimestampMilliseconds = 0;
+    private serviceStatusCacheExpiresAtMonotonicMilliseconds = 0;
     private cachedServiceStatus: WindowsHelperServiceStatus = "unknown";
     private status: SourceClientStatus = { state: "unknown" };
     private descriptorFingerprint: string | undefined;
     private hasCompleteDescriptorSnapshot = false;
-    private descriptorPreloadStartedAtTimestampMilliseconds: number | undefined;
+    private descriptorPreloadStartedAtMonotonicMilliseconds: number | undefined;
     private descriptorPreloadPromise: Promise<void> | undefined;
     private descriptorPreloadRetryTimer: WindowsHelperDescriptorPreloadTimerHandle | undefined;
     private readonly descriptorsByMetricId = new Map<string, MetricDescriptor>();
     private readonly sourceMetadataInvalidationListeners = new Set<SourceMetadataInvalidationListener>();
 
     constructor(options: WindowsHelperSourceClientOptions = {}) {
-        const now = options.now ?? Date.now;
+        const monotonicNow = options.monotonicNow ?? monotonicNowMilliseconds;
+        const wallClockNow = options.wallClockNow ?? wallClockNowMilliseconds;
 
         this.transport = options.transport ?? new NodeWindowsHelperGrpcTransport(
             buildWindowsNamedPipeGrpcTarget(options.pipeName ?? DEFAULT_WINDOWS_HELPER_GRPC_PIPE_NAME),
-            now,
+            monotonicNow,
+            wallClockNow,
         );
-        this.now = now;
+        this.monotonicNow = monotonicNow;
+        this.wallClockNow = wallClockNow;
         this.timeouts = {
             healthMilliseconds: options.timeouts?.healthMilliseconds
                 ?? DEFAULT_HEALTH_TIMEOUT_MILLISECONDS,
@@ -202,7 +213,7 @@ export class WindowsHelperSourceClient implements SourceClient {
         this.markHelperDemandActive();
         await this.ensureProtocolSupported();
 
-        const requestStartedAtTimestampMilliseconds = this.now();
+        const requestStartedAtMonotonicMilliseconds = this.monotonicNow();
         let readResponse: ReadMetricSnapshotResponse;
         try {
             readResponse = await this.sendGrpcRequest(
@@ -238,7 +249,7 @@ export class WindowsHelperSourceClient implements SourceClient {
         }
 
         this.recordHelperRequestSuccess();
-        this.logSnapshotRead(metricKeys, snapshot, requestStartedAtTimestampMilliseconds, timestampMilliseconds);
+        this.logSnapshotRead(metricKeys, snapshot, requestStartedAtMonotonicMilliseconds, timestampMilliseconds);
         const sourceMetadata = toRuntimeSnapshotMetadata({
             requestedMetricKeys: metricKeys,
             snapshot,
@@ -322,7 +333,7 @@ export class WindowsHelperSourceClient implements SourceClient {
 
             if (this.sourceMetadataInvalidationListeners.size === 0) {
                 this.clearDescriptorPreloadRetry();
-                this.descriptorPreloadStartedAtTimestampMilliseconds = undefined;
+                this.descriptorPreloadStartedAtMonotonicMilliseconds = undefined;
             }
         };
     }
@@ -408,7 +419,7 @@ export class WindowsHelperSourceClient implements SourceClient {
             return;
         }
 
-        this.descriptorPreloadStartedAtTimestampMilliseconds ??= this.now();
+        this.descriptorPreloadStartedAtMonotonicMilliseconds ??= this.monotonicNow();
         this.clearDescriptorPreloadRetry();
 
         this.descriptorPreloadPromise = this.preloadDescriptorMetadata()
@@ -456,12 +467,12 @@ export class WindowsHelperSourceClient implements SourceClient {
     }
 
     private selectDescriptorPreloadRetryMilliseconds(): number {
-        const descriptorPreloadStartedAtTimestampMilliseconds = this.descriptorPreloadStartedAtTimestampMilliseconds;
+        const descriptorPreloadStartedAtMonotonicMilliseconds = this.descriptorPreloadStartedAtMonotonicMilliseconds;
 
         if (
-            descriptorPreloadStartedAtTimestampMilliseconds !== undefined
+            descriptorPreloadStartedAtMonotonicMilliseconds !== undefined
             && (
-                this.now() - descriptorPreloadStartedAtTimestampMilliseconds
+                this.monotonicNow() - descriptorPreloadStartedAtMonotonicMilliseconds
             ) < DESCRIPTOR_PRELOAD_STARTUP_RETRY_WINDOW_MILLISECONDS
         ) {
             return DESCRIPTOR_PRELOAD_STARTUP_RETRY_MILLISECONDS;
@@ -523,7 +534,7 @@ export class WindowsHelperSourceClient implements SourceClient {
         const hadCompleteDescriptorSnapshot = this.hasCompleteDescriptorSnapshot;
         const descriptorFingerprintChanged = this.descriptorFingerprint !== descriptorSnapshot.descriptorFingerprint;
 
-        this.descriptorPreloadStartedAtTimestampMilliseconds = undefined;
+        this.descriptorPreloadStartedAtMonotonicMilliseconds = undefined;
 
         if (descriptorFingerprintChanged) {
             this.descriptorFingerprint = descriptorSnapshot.descriptorFingerprint;
@@ -559,7 +570,7 @@ export class WindowsHelperSourceClient implements SourceClient {
 
     dispose(): void {
         this.clearDescriptorPreloadRetry();
-        this.descriptorPreloadStartedAtTimestampMilliseconds = undefined;
+        this.descriptorPreloadStartedAtMonotonicMilliseconds = undefined;
         this.sourceMetadataInvalidationListeners.clear();
         this.transport.dispose?.();
     }
@@ -569,13 +580,13 @@ export class WindowsHelperSourceClient implements SourceClient {
     }
 
     private async ensureProtocolSupported(): Promise<void> {
-        const nowMilliseconds = this.now();
+        const nowMilliseconds = this.monotonicNow();
 
-        if (nowMilliseconds < this.unsupportedProtocolRetryAfterMilliseconds) {
+        if (nowMilliseconds < this.unsupportedProtocolRetryAfterMonotonicMilliseconds) {
             throw new Error("Windows source protocol is unsupported and still inside retry cooldown.");
         }
 
-        if (nowMilliseconds < this.helperUnavailableRetryAfterMilliseconds) {
+        if (nowMilliseconds < this.helperUnavailableRetryAfterMonotonicMilliseconds) {
             throw new Error("Windows helper is unavailable and still inside retry cooldown.");
         }
 
@@ -609,17 +620,17 @@ export class WindowsHelperSourceClient implements SourceClient {
         request: (timeoutMilliseconds: number) => Promise<TResponse>,
         shouldResetChannelAfterError: (error: Error) => boolean = shouldResetGrpcChannelAfterError,
     ): Promise<TResponse> {
-        const requestStartedAtTimestampMilliseconds = this.now();
+        const requestStartedAtMonotonicMilliseconds = this.monotonicNow();
 
         try {
             const response = await request(timeoutMilliseconds);
-            const requestCompletedAtTimestampMilliseconds = this.now();
+            const requestCompletedAtMonotonicMilliseconds = this.monotonicNow();
 
             log.debug(() => [
                 "windowsHelperGrpcRequestCompleted",
                 "layer=client",
                 `method=${methodName}`,
-                `durationMs=${requestCompletedAtTimestampMilliseconds - requestStartedAtTimestampMilliseconds}`,
+                `durationMs=${requestCompletedAtMonotonicMilliseconds - requestStartedAtMonotonicMilliseconds}`,
                 `timeoutMs=${timeoutMilliseconds}`,
             ].join(" "));
 
@@ -630,13 +641,13 @@ export class WindowsHelperSourceClient implements SourceClient {
                 this.transport.reset?.();
             }
 
-            const requestCompletedAtTimestampMilliseconds = this.now();
+            const requestCompletedAtMonotonicMilliseconds = this.monotonicNow();
 
             log.debug(() => [
                 "windowsHelperGrpcRequestFailed",
                 "layer=client",
                 `method=${methodName}`,
-                `durationMs=${requestCompletedAtTimestampMilliseconds - requestStartedAtTimestampMilliseconds}`,
+                `durationMs=${requestCompletedAtMonotonicMilliseconds - requestStartedAtMonotonicMilliseconds}`,
                 `timeoutMs=${timeoutMilliseconds}`,
                 `error=${normalizedError.message}`,
             ].join(" "));
@@ -646,16 +657,18 @@ export class WindowsHelperSourceClient implements SourceClient {
     }
 
     private recordUnsupportedProtocol(errorCode: string): void {
-        const nowMilliseconds = this.now();
+        const nowMilliseconds = this.monotonicNow();
+        const wallClockNowMilliseconds = this.wallClockNow();
         this.protocolCompatibility = "unknown";
-        this.unsupportedProtocolRetryAfterMilliseconds = nowMilliseconds
+        this.unsupportedProtocolRetryAfterMonotonicMilliseconds = nowMilliseconds
             + UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS;
         this.status = {
             state: "unsupported",
             reason: "protocolMismatch",
-            retryAfterTimestampMilliseconds: this.unsupportedProtocolRetryAfterMilliseconds,
+            retryAfterTimestampMilliseconds: wallClockNowMilliseconds
+                + UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS,
             lastErrorCode: errorCode,
-            lastFailureAtTimestampMilliseconds: nowMilliseconds,
+            lastFailureAtTimestampMilliseconds: wallClockNowMilliseconds,
         };
     }
 
@@ -665,20 +678,21 @@ export class WindowsHelperSourceClient implements SourceClient {
             return;
         }
 
-        const nowMilliseconds = this.now();
+        const nowMilliseconds = this.monotonicNow();
+        const wallClockNowMilliseconds = this.wallClockNow();
         const failure = classifyHelperRequestFailure(error);
         const cooldownMilliseconds = failure.reason === "pipeMissing"
             ? this.selectPipeMissingRetryCooldownMilliseconds(nowMilliseconds)
             : this.nextUnavailableRetryCooldownMilliseconds();
 
-        this.helperUnavailableRetryAfterMilliseconds = nowMilliseconds + cooldownMilliseconds;
+        this.helperUnavailableRetryAfterMonotonicMilliseconds = nowMilliseconds + cooldownMilliseconds;
         this.status = {
             state: "unavailable",
             reason: this.refinePipeMissingReason(failure.reason),
-            retryAfterTimestampMilliseconds: this.helperUnavailableRetryAfterMilliseconds,
+            retryAfterTimestampMilliseconds: wallClockNowMilliseconds + cooldownMilliseconds,
             ...(failure.errorCode ? { lastErrorCode: failure.errorCode } : {}),
             lastErrorMessage: toError(error).message,
-            lastFailureAtTimestampMilliseconds: nowMilliseconds,
+            lastFailureAtTimestampMilliseconds: wallClockNowMilliseconds,
         };
 
         if (failure.reason === "pipeMissing") {
@@ -687,32 +701,32 @@ export class WindowsHelperSourceClient implements SourceClient {
     }
 
     private recordHelperRequestSuccess(health?: SourceHealth): void {
-        this.unsupportedProtocolRetryAfterMilliseconds = 0;
-        this.helperUnavailableRetryAfterMilliseconds = 0;
+        this.unsupportedProtocolRetryAfterMonotonicMilliseconds = 0;
+        this.helperUnavailableRetryAfterMonotonicMilliseconds = 0;
         this.helperUnavailableFailureCount = 0;
-        this.activeHelperDemandStartedAtTimestampMilliseconds = undefined;
+        this.activeHelperDemandStartedAtMonotonicMilliseconds = undefined;
         this.cachedServiceStatus = "running";
-        this.serviceStatusCacheExpiresAtTimestampMilliseconds = this.now()
+        this.serviceStatusCacheExpiresAtMonotonicMilliseconds = this.monotonicNow()
             + HELPER_SERVICE_STATUS_CACHE_MILLISECONDS;
         this.status = {
             state: "available",
             protocolVersion: health?.protocolVersion ?? this.status.protocolVersion ?? SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION,
             ...(health?.helperVersion ? { helperVersion: health.helperVersion } : {}),
-            lastSuccessAtTimestampMilliseconds: this.now(),
+            lastSuccessAtTimestampMilliseconds: this.wallClockNow(),
         };
     }
 
     private markHelperDemandActive(): void {
-        if (this.activeHelperDemandStartedAtTimestampMilliseconds !== undefined) {
+        if (this.activeHelperDemandStartedAtMonotonicMilliseconds !== undefined) {
             return;
         }
 
-        this.activeHelperDemandStartedAtTimestampMilliseconds = this.now();
+        this.activeHelperDemandStartedAtMonotonicMilliseconds = this.monotonicNow();
         this.refreshCachedServiceStatus();
     }
 
     private selectPipeMissingRetryCooldownMilliseconds(nowMilliseconds: number): number {
-        const activeWindowStartedAt = this.activeHelperDemandStartedAtTimestampMilliseconds;
+        const activeWindowStartedAt = this.activeHelperDemandStartedAtMonotonicMilliseconds;
 
         if (
             activeWindowStartedAt !== undefined
@@ -741,9 +755,9 @@ export class WindowsHelperSourceClient implements SourceClient {
     }
 
     private refreshCachedServiceStatus(): void {
-        const nowMilliseconds = this.now();
+        const nowMilliseconds = this.monotonicNow();
 
-        if (nowMilliseconds < this.serviceStatusCacheExpiresAtTimestampMilliseconds
+        if (nowMilliseconds < this.serviceStatusCacheExpiresAtMonotonicMilliseconds
             || this.serviceStatusProbePromise) {
             return;
         }
@@ -751,8 +765,8 @@ export class WindowsHelperSourceClient implements SourceClient {
         this.serviceStatusProbePromise = this.serviceStatusReader.readStatus()
             .then(status => {
                 this.cachedServiceStatus = status;
-                this.serviceStatusCacheExpiresAtTimestampMilliseconds =
-                    this.now() + HELPER_SERVICE_STATUS_CACHE_MILLISECONDS;
+                this.serviceStatusCacheExpiresAtMonotonicMilliseconds =
+                    this.monotonicNow() + HELPER_SERVICE_STATUS_CACHE_MILLISECONDS;
 
                 if (this.status.state === "unavailable") {
                     this.status = {
@@ -803,10 +817,11 @@ export class WindowsHelperSourceClient implements SourceClient {
     private logSnapshotRead(
         metricKeys: readonly string[],
         snapshot: MetricSnapshot,
-        requestStartedAtTimestampMilliseconds: number,
+        requestStartedAtMonotonicMilliseconds: number,
         sampleTimestampMilliseconds: number,
     ): void {
-        const completedAtTimestampMilliseconds = this.now();
+        const completedAtMonotonicMilliseconds = this.monotonicNow();
+        const completedAtWallClockTimestampMilliseconds = this.wallClockNow();
 
         // TODO: Remove this temporary helper snapshot latency log after the
         // per-group helper cache is implemented and measured.
@@ -814,8 +829,8 @@ export class WindowsHelperSourceClient implements SourceClient {
             "helperSnapshotRead",
             `metricCount=${metricKeys.length}`,
             `metricKeys=${metricKeys.join(",")}`,
-            `durationMs=${completedAtTimestampMilliseconds - requestStartedAtTimestampMilliseconds}`,
-            `sampleAgeMs=${completedAtTimestampMilliseconds - sampleTimestampMilliseconds}`,
+            `durationMs=${completedAtMonotonicMilliseconds - requestStartedAtMonotonicMilliseconds}`,
+            `sampleAgeMs=${completedAtWallClockTimestampMilliseconds - sampleTimestampMilliseconds}`,
             `snapshotMetricCount=${Object.keys(snapshot.metrics).length}`,
             `cpuUsagePercent=${readScalarMetricValue(snapshot, CPU_USAGE_METRIC_KEY) ?? ""}`,
         ].join(" "));

@@ -1,4 +1,5 @@
 import streamDeck from "@elgato/streamdeck";
+import { monotonicNowMilliseconds } from "../shared/clock";
 
 export type LogLevel = "error" | "warn" | "info" | "debug" | "trace";
 export type LogEntryData = unknown[] | [string, ...unknown[]];
@@ -214,7 +215,7 @@ class ScopedLogBuilder implements LogBuilder {
  * Scope-bound logger implementation with level checks before lazy formatting.
  */
 class ScopedLoggerImpl implements ScopedLogger {
-    private readonly lastWriteTimestampByKey = new Map<string, number>();
+    private readonly lastWriteMonotonicMillisecondsByKey = new Map<string, number>();
 
     public constructor(
         private readonly sink: LoggerSink,
@@ -275,21 +276,21 @@ class ScopedLoggerImpl implements ScopedLogger {
      * Records and checks keyed throttling for this scoped logger instance.
      */
     public shouldWriteThrottled(key: string, milliseconds: number): boolean {
-        const currentTimestampMilliseconds = Date.now();
-        const lastWriteTimestampMilliseconds = this.lastWriteTimestampByKey.get(key);
+        const currentMonotonicMilliseconds = monotonicNowMilliseconds();
+        const lastWriteMonotonicMilliseconds = this.lastWriteMonotonicMillisecondsByKey.get(key);
 
         if (
-            lastWriteTimestampMilliseconds != null
-            && currentTimestampMilliseconds - lastWriteTimestampMilliseconds < milliseconds
+            lastWriteMonotonicMilliseconds != null
+            && currentMonotonicMilliseconds - lastWriteMonotonicMilliseconds < milliseconds
         ) {
             return false;
         }
 
         rememberThrottleTimestamp(
-            this.lastWriteTimestampByKey,
+            this.lastWriteMonotonicMillisecondsByKey,
             key,
-            currentTimestampMilliseconds,
-            lastWriteTimestampMilliseconds == null,
+            currentMonotonicMilliseconds,
+            lastWriteMonotonicMilliseconds == null,
         );
         return true;
     }
@@ -346,19 +347,19 @@ const MAXIMUM_THROTTLE_KEY_COUNT = 128;
  * Keeps throttle state bounded when callers accidentally use dynamic keys.
  */
 function rememberThrottleTimestamp(
-    lastWriteTimestampByKey: Map<string, number>,
+    lastWriteMonotonicMillisecondsByKey: Map<string, number>,
     key: string,
-    timestampMilliseconds: number,
+    monotonicMilliseconds: number,
     isNewKey: boolean,
 ): void {
-    if (isNewKey && lastWriteTimestampByKey.size >= MAXIMUM_THROTTLE_KEY_COUNT) {
-        const oldestThrottleKey = lastWriteTimestampByKey.keys().next().value;
+    if (isNewKey && lastWriteMonotonicMillisecondsByKey.size >= MAXIMUM_THROTTLE_KEY_COUNT) {
+        const oldestThrottleKey = lastWriteMonotonicMillisecondsByKey.keys().next().value;
         if (oldestThrottleKey != null) {
-            lastWriteTimestampByKey.delete(oldestThrottleKey);
+            lastWriteMonotonicMillisecondsByKey.delete(oldestThrottleKey);
         }
     }
 
-    lastWriteTimestampByKey.set(key, timestampMilliseconds);
+    lastWriteMonotonicMillisecondsByKey.set(key, monotonicMilliseconds);
 }
 
 /**

@@ -19,6 +19,7 @@ import {
 } from "./network/view-builder";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
+import { wallClockNowMilliseconds } from "../shared/clock";
 
 const log = logger.for("Action:Network");
 const NETWORK_INTERFACE_LIST_REFRESH_METRIC_KEYS = [getNetworkAggregateMetricKey("download")] as const;
@@ -59,7 +60,7 @@ export class Network extends MetricAction {
             target: networkTarget,
             metrics,
             selectedNetworkInterface,
-            currentTimestampMilliseconds: Date.now(),
+            currentTimestampMilliseconds: wallClockNowMilliseconds(),
         });
 
         if (viewUpdate.debugInfo) {

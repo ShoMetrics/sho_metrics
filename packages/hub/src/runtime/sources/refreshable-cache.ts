@@ -7,19 +7,22 @@ export type RefreshableCacheReadResult<T> =
 export interface RefreshableCacheAvailableResult<T> {
     readonly state: "fresh" | "stale";
     readonly value: Awaited<T>;
-    readonly timestampMilliseconds: number;
+    readonly storedAtMonotonicMilliseconds: number;
     readonly ageMilliseconds: number;
     readonly error?: unknown;
 }
 
 export interface RefreshableCacheUnavailableResult {
     readonly state: "unavailable";
-    readonly timestampMilliseconds: number | null;
+    readonly storedAtMonotonicMilliseconds: number | null;
     readonly ageMilliseconds: number | null;
     readonly error?: unknown;
 }
 
 export interface RefreshableCacheOptions<T> {
+    /**
+     * Monotonic timestamp provider for TTL/staleness checks.
+     */
     readonly now: () => number;
     readonly ttlMilliseconds: number;
     readonly maximumStaleMilliseconds: number;
@@ -28,7 +31,7 @@ export interface RefreshableCacheOptions<T> {
 
 interface RefreshableCacheEntry<T> {
     readonly value: Awaited<T>;
-    readonly timestampMilliseconds: number;
+    readonly storedAtMonotonicMilliseconds: number;
 }
 
 const CACHE_KEY = "value";
@@ -60,7 +63,7 @@ export class RefreshableCache<T> {
             },
             fetchMethod: async () => ({
                 value: await options.refresh(),
-                timestampMilliseconds: options.now(),
+                storedAtMonotonicMilliseconds: options.now(),
             }),
         });
     }
@@ -109,19 +112,19 @@ export class RefreshableCache<T> {
         if (!cachedEntry) {
             return {
                 state: "unavailable",
-                timestampMilliseconds: null,
+                storedAtMonotonicMilliseconds: null,
                 ageMilliseconds: null,
                 ...(error === undefined ? {} : { error }),
             };
         }
 
-        const ageMilliseconds = this.options.now() - cachedEntry.timestampMilliseconds;
+        const ageMilliseconds = this.options.now() - cachedEntry.storedAtMonotonicMilliseconds;
 
         if (ageMilliseconds < this.options.ttlMilliseconds) {
             return {
                 state: "fresh",
                 value: cachedEntry.value,
-                timestampMilliseconds: cachedEntry.timestampMilliseconds,
+                storedAtMonotonicMilliseconds: cachedEntry.storedAtMonotonicMilliseconds,
                 ageMilliseconds,
                 ...(error === undefined ? {} : { error }),
             };
@@ -131,7 +134,7 @@ export class RefreshableCache<T> {
             return {
                 state: "stale",
                 value: cachedEntry.value,
-                timestampMilliseconds: cachedEntry.timestampMilliseconds,
+                storedAtMonotonicMilliseconds: cachedEntry.storedAtMonotonicMilliseconds,
                 ageMilliseconds,
                 ...(error === undefined ? {} : { error }),
             };
@@ -139,7 +142,7 @@ export class RefreshableCache<T> {
 
         return {
             state: "unavailable",
-            timestampMilliseconds: cachedEntry.timestampMilliseconds,
+            storedAtMonotonicMilliseconds: cachedEntry.storedAtMonotonicMilliseconds,
             ageMilliseconds,
             ...(error === undefined ? {} : { error }),
         };

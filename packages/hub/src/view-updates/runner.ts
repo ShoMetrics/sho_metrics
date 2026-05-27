@@ -27,6 +27,7 @@ import {
 } from "../color-compensation/runtime-store";
 import { wrapSvgWithColorCompensationFilter } from "../view-rendering/color-compensation-filter";
 import { hasColorCompensationProfileEffect } from "../color-compensation/types";
+import { wallClockNowMilliseconds } from "../shared/clock";
 
 const log = logger.for("MetricViewUpdateRunner");
 
@@ -117,7 +118,7 @@ export class MetricViewUpdateRunner {
         metricViewActionState.pendingSettingsSignature = null;
         this.activeMetricViewUpdateCount += 1;
 
-        const renderStartTimestampMilliseconds = Date.now();
+        const renderStartTimestampMilliseconds = wallClockNowMilliseconds();
         const frame = composeMetricViewFrame({
             viewOptions: options,
             renderTarget: options.event.action.isDial() ? "touch-strip" : "key",
@@ -161,7 +162,7 @@ export class MetricViewUpdateRunner {
             });
         }
 
-        const composeEndTimestampMilliseconds = Date.now();
+        const composeEndTimestampMilliseconds = wallClockNowMilliseconds();
 
         if (renderedSvgSignature === metricViewActionState.lastRenderedSvgSignature) {
             if (updateReason === "settings-change") {
@@ -181,7 +182,7 @@ export class MetricViewUpdateRunner {
                 `actionId=${options.event.action.id}`,
                 `metricKey=${options.metricKey}`,
                 `composeMs=${composeEndTimestampMilliseconds - renderStartTimestampMilliseconds}`,
-                `renderToSkipMs=${Date.now() - renderStartTimestampMilliseconds}`,
+                `renderToSkipMs=${wallClockNowMilliseconds() - renderStartTimestampMilliseconds}`,
             ].join(" "));
             recordMetricViewPerformanceSample({
                 event: options.event,
@@ -212,9 +213,9 @@ export class MetricViewUpdateRunner {
                 updateTimestampMilliseconds,
                 renderStartTimestampMilliseconds,
                 composeEndTimestampMilliseconds,
-                rasterizeEndTimestampMilliseconds: Date.now(),
+                rasterizeEndTimestampMilliseconds: wallClockNowMilliseconds(),
                 updateStartTimestampMilliseconds: null,
-                updateEndTimestampMilliseconds: Date.now(),
+                updateEndTimestampMilliseconds: wallClockNowMilliseconds(),
                 queueLength: this.metricViewActionQueue.length,
                 activeActionCount: this.metricViewActionStates.size,
             });
@@ -225,7 +226,7 @@ export class MetricViewUpdateRunner {
         const hardwarePngDataUrl = hardwareSvg === softwareSvg
             ? softwarePngDataUrl
             : rasterizeSvgToPngDataUrl(hardwareSvg, renderPlan.pngSize);
-        const rasterizeEndTimestampMilliseconds = Date.now();
+        const rasterizeEndTimestampMilliseconds = wallClockNowMilliseconds();
 
         if (!hardwarePngDataUrl) {
             recordMetricViewPerformanceSample({
@@ -247,7 +248,7 @@ export class MetricViewUpdateRunner {
         }
 
         log.debug(() => {
-            const currentTimestampMilliseconds = Date.now();
+            const currentTimestampMilliseconds = wallClockNowMilliseconds();
             return [
                 "rendered",
                 `actionId=${options.event.action.id}`,
@@ -302,7 +303,7 @@ export class MetricViewUpdateRunner {
 
                 if (updateReason === "settings-change") {
                     log.info(() => {
-                        const currentTimestampMilliseconds = Date.now();
+                        const currentTimestampMilliseconds = wallClockNowMilliseconds();
                         return [
                             "settingsViewUpdateDone",
                             `phase=${dispatchResult.donePhase}`,
@@ -319,7 +320,7 @@ export class MetricViewUpdateRunner {
                 }
 
                 log.debug(() => {
-                    const currentTimestampMilliseconds = Date.now();
+                    const currentTimestampMilliseconds = wallClockNowMilliseconds();
                     return [
                         dispatchResult.donePhase,
                         `actionId=${options.event.action.id}`,
@@ -368,7 +369,7 @@ export class MetricViewUpdateRunner {
         const settingsSignature = buildMetricViewSettingsSignature(options.resolvedSettings);
         const isSettingsChange = metricViewActionState.lastScheduledSettingsSignature !== null
             && metricViewActionState.lastScheduledSettingsSignature !== settingsSignature.signature;
-        const updateTimestampMilliseconds = Date.now();
+        const updateTimestampMilliseconds = wallClockNowMilliseconds();
 
         metricViewActionState.lastScheduledSettingsSignature = settingsSignature.signature;
 

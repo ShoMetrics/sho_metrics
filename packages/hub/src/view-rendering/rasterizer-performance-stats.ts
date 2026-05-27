@@ -5,6 +5,7 @@ import {
     type DurationAccumulator,
     type DurationSummary,
 } from "../shared/duration-accumulator";
+import { wallClockNowMilliseconds } from "../shared/clock";
 
 export interface RasterizerPerformanceSample {
     success: boolean;
@@ -72,7 +73,7 @@ export class RasterizerPerformanceStats {
 
     record(
         sample: RasterizerPerformanceSample,
-        timestampMilliseconds = Date.now(),
+        timestampMilliseconds = wallClockNowMilliseconds(),
     ): RasterizerPerformanceSummary | null {
         const performanceWindow = this.performanceWindow
             ?? createRasterizerPerformanceWindow(timestampMilliseconds);

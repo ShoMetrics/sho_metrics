@@ -1,11 +1,12 @@
 import { execFile, type ExecFileException } from "node:child_process";
 import { logger } from "../../../logging/logger";
+import { monotonicNowMilliseconds } from "../../../shared/clock";
 import { normalizeNonEmptyText } from "./node-system-cpu";
 import type { NodeSystemGpuTelemetryData, NodeSystemInformationClient } from "./node-system-source-types";
 
 const gpuLog = logger.for("Source:NodeSystem:GPU");
 
-let lastNvidiaSmiFailureLogTimestampMilliseconds = 0;
+let lastNvidiaSmiFailureLogMonotonicMilliseconds = 0;
 let nextGpuPollDebugSequence = 1;
 let nextNvidiaSmiQueryDebugSequence = 1;
 let activeNvidiaSmiQueryCount = 0;
@@ -35,7 +36,7 @@ const IOREG_MAX_BUFFER_BYTES = 2 * 1024 * 1024;
 const IOREG_FAILURE_LOG_INTERVAL_MS = 30000;
 const IOREG_TELEMETRY_DEBUG_LOG_INTERVAL_MS = 5000;
 
-let lastIoregFailureLogTimestampMilliseconds = 0;
+let lastIoregFailureLogMonotonicMilliseconds = 0;
 
 export function reserveNodeSystemGpuPollDebugSequence(): number {
     return nextGpuPollDebugSequence++;
@@ -118,7 +119,7 @@ export async function pollSystemInformationGpuTelemetry(
 
 function runIoregIoAcceleratorQuery(): Promise<string | null> {
     return new Promise(resolve => {
-        const queryStartTimestampMilliseconds = Date.now();
+        const queryStartedAtMonotonicMilliseconds = monotonicNowMilliseconds();
 
         execFile(
             "ioreg",
@@ -129,7 +130,7 @@ function runIoregIoAcceleratorQuery(): Promise<string | null> {
             },
             (error: ExecFileException | null, stdout: string) => {
                 if (error) {
-                    logIoregFailure(error, Date.now() - queryStartTimestampMilliseconds);
+                    logIoregFailure(error, monotonicNowMilliseconds() - queryStartedAtMonotonicMilliseconds);
                     resolve(null);
                     return;
                 }
@@ -142,7 +143,7 @@ function runIoregIoAcceleratorQuery(): Promise<string | null> {
 
 function runNvidiaSmiTelemetryQuery(): Promise<string | null> {
     return new Promise(resolve => {
-        const queryStartTimestampMilliseconds = Date.now();
+        const queryStartedAtMonotonicMilliseconds = monotonicNowMilliseconds();
         const querySequence = nextNvidiaSmiQueryDebugSequence++;
         activeNvidiaSmiQueryCount += 1;
         gpuLog.debug(() => [
@@ -161,7 +162,7 @@ function runNvidiaSmiTelemetryQuery(): Promise<string | null> {
                 maxBuffer: 32 * 1024,
             },
             (error: ExecFileException | null, stdout: string) => {
-                const elapsedMilliseconds = Date.now() - queryStartTimestampMilliseconds;
+                const elapsedMilliseconds = monotonicNowMilliseconds() - queryStartedAtMonotonicMilliseconds;
                 activeNvidiaSmiQueryCount = Math.max(0, activeNvidiaSmiQueryCount - 1);
 
                 if (error) {
@@ -191,16 +192,16 @@ function runNvidiaSmiTelemetryQuery(): Promise<string | null> {
 }
 
 function logIoregFailure(error: ExecFileException, elapsedMilliseconds: number): void {
-    const currentTimestampMilliseconds = Date.now();
+    const currentMonotonicMilliseconds = monotonicNowMilliseconds();
 
     if (
-        currentTimestampMilliseconds - lastIoregFailureLogTimestampMilliseconds
+        currentMonotonicMilliseconds - lastIoregFailureLogMonotonicMilliseconds
         < IOREG_FAILURE_LOG_INTERVAL_MS
     ) {
         return;
     }
 
-    lastIoregFailureLogTimestampMilliseconds = currentTimestampMilliseconds;
+    lastIoregFailureLogMonotonicMilliseconds = currentMonotonicMilliseconds;
     gpuLog.warn(() => [
         "ioreg IOAccelerator GPU telemetry query failed",
         `elapsedMs=${elapsedMilliseconds}`,
@@ -216,16 +217,16 @@ function logNvidiaSmiFailure(options: {
     elapsedMilliseconds: number;
     querySequence: number;
 }): void {
-    const currentTimestampMilliseconds = Date.now();
+    const currentMonotonicMilliseconds = monotonicNowMilliseconds();
 
     if (
-        currentTimestampMilliseconds - lastNvidiaSmiFailureLogTimestampMilliseconds
+        currentMonotonicMilliseconds - lastNvidiaSmiFailureLogMonotonicMilliseconds
         < NVIDIA_SMI_FAILURE_LOG_INTERVAL_MS
     ) {
         return;
     }
 
-    lastNvidiaSmiFailureLogTimestampMilliseconds = currentTimestampMilliseconds;
+    lastNvidiaSmiFailureLogMonotonicMilliseconds = currentMonotonicMilliseconds;
     gpuLog.warn(() => [
         "nvidia-smi GPU telemetry query failed",
         `queryId=${options.querySequence}`,

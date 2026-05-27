@@ -7,7 +7,7 @@ export type NodeSystemMetricGroup = "cpu" | "memory" | "disk" | "network" | "gpu
 
 export interface NodeSystemNetworkCounterSample {
     bytes: number;
-    timestampMilliseconds: number;
+    monotonicMilliseconds: number;
 }
 
 export interface NodeSystemNetworkRateCalculation {

@@ -25,6 +25,7 @@ import {
     readAdjustmentValue,
     type ColorCompensationReviewMode,
 } from "./color-compensation-reducer";
+import { wallClockNowMilliseconds } from "../../shared/clock";
 
 interface ColorCompensationWizardProps {
     readonly client: StreamDeckPropertyInspectorClient;
@@ -561,5 +562,5 @@ function readErrorMessage(error: unknown): string {
 }
 
 function createColorCompensationSessionId(): string {
-    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    return `${wallClockNowMilliseconds().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }

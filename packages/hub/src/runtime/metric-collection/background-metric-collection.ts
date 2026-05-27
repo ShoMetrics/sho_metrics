@@ -23,6 +23,7 @@ import {
     sourcePlanningMetadataRegistry,
 } from "./source-planning-metadata-registry";
 import type { SourceMetadataInvalidation } from "../sources/source-planning-metadata";
+import { monotonicNowMilliseconds } from "../../shared/clock";
 
 const log = logger.for("BackgroundMetricCollection");
 const BACKOFF_RETRY_MILLISECONDS = 2000;
@@ -211,7 +212,7 @@ export const backgroundMetricCollection = new BackgroundMetricCollection({
     collectorGroupSupervisor: new CollectorGroupSupervisor({
         sourceRegistry: backgroundSourceRegistry,
         snapshotStore: metricStore,
-        createBackoffPolicy: () => BackoffPolicy.flat(Date.now, BACKOFF_RETRY_MILLISECONDS),
+        createBackoffPolicy: () => BackoffPolicy.flat(monotonicNowMilliseconds, BACKOFF_RETRY_MILLISECONDS),
     }),
     sourceMetadataRegistry: sourcePlanningMetadataRegistry,
     sourceRegistry: backgroundSourceRegistry,

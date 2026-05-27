@@ -100,6 +100,13 @@ const restrictedRenderTimingVocabularySyntax = [
   },
 ];
 
+const restrictedDirectDateNowSyntax = [
+  {
+    selector: 'MemberExpression[object.name="Date"][property.name="now"]',
+    message: 'Do not call Date.now() directly. Use shared/clock wallClockNowMilliseconds() or monotonicNowMilliseconds() so timing intent is explicit.',
+  },
+];
+
 const restrictedSchemaHardeningImports = {
   paths: [
     {
@@ -353,7 +360,7 @@ export default tseslint.config(
   },
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/**/*.test.ts'],
+    ignores: ['src/**/*.test.ts', 'src/shared/clock.ts'],
     rules: {
       ...sourceSafetyRules,
       ...typeAwareSourceSafetyRules,
@@ -362,6 +369,7 @@ export default tseslint.config(
         ...restrictedLegacySettingSyntax,
         ...restrictedSettingsCompatibilitySyntax,
         ...restrictedRenderTimingVocabularySyntax,
+        ...restrictedDirectDateNowSyntax,
       ],
     },
   },

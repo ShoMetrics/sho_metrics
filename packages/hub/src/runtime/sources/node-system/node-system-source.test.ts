@@ -134,7 +134,8 @@ test("node system source polls only the requested CPU group and exposes cached C
         }),
         pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
         pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
-        now: () => 1234,
+        monotonicNow: () => 1234,
+        wallClockNow: () => 1234,
     });
 
     const firstSnapshot = await source.pollMetrics(["cpu.usage_percent"]);
@@ -191,7 +192,7 @@ test("node system source retries static CPU information after a transient failur
         }),
         pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
         pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
-        now: () => currentTimestampMilliseconds,
+        monotonicNow: () => currentTimestampMilliseconds,
     });
 
     await source.pollMetrics(["cpu.usage_percent"]);
@@ -405,7 +406,7 @@ test("node system source maintains network counter state and updates injected in
         },
         pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
         pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
-        now: () => currentTimestampMilliseconds,
+        monotonicNow: () => currentTimestampMilliseconds,
     });
 
     const firstSnapshot = await source.pollMetrics(["net.down"]);
@@ -715,7 +716,7 @@ test("first network counter sample produces a zero rate", () => {
         interfaceId: "en0",
         direction: "download",
         currentBytes: 1000,
-        currentTimestampMilliseconds: 2000,
+        currentMonotonicMilliseconds: 2000,
         previousSample: undefined,
     });
 
@@ -736,10 +737,10 @@ test("network counter delta is converted to bytes per second", () => {
         interfaceId: "en0",
         direction: "upload",
         currentBytes: 3000,
-        currentTimestampMilliseconds: 3000,
+        currentMonotonicMilliseconds: 3000,
         previousSample: {
             bytes: 1000,
-            timestampMilliseconds: 1000,
+            monotonicMilliseconds: 1000,
         },
     });
 
@@ -760,10 +761,10 @@ test("network counter reset clamps negative rates to zero", () => {
         interfaceId: "en0",
         direction: "download",
         currentBytes: 100,
-        currentTimestampMilliseconds: 3000,
+        currentMonotonicMilliseconds: 3000,
         previousSample: {
             bytes: 1000,
-            timestampMilliseconds: 1000,
+            monotonicMilliseconds: 1000,
         },
     });
 
