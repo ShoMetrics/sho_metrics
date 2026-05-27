@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ShoMetrics.Source.Windows.Core;
@@ -8,24 +7,28 @@ namespace ShoMetrics.Source.Windows.Service;
 
 internal sealed class WindowsMetricSnapshotWorker(
     LibreHardwareMonitorSession monitorSession,
+    TimeProvider timeProvider,
     ILogger<WindowsMetricSnapshotWorker> logger) : BackgroundService
 {
-    private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan MaximumDemandCheckDelay = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan MinimumDemandCheckDelay = TimeSpan.FromMilliseconds(1);
     private static readonly TimeSpan SlowRefreshWarningThreshold = TimeSpan.FromMilliseconds(750);
     private static readonly TimeSpan RefreshWarningThrottleInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan RefreshDebugSummaryInterval = TimeSpan.FromSeconds(30);
     private const int SummaryHardwareLimit = 3;
     private const int SummaryWarningLimit = 3;
 
+    private readonly Dictionary<string, long> _lastRefreshTimestampsByPollingGroupId = new(StringComparer.Ordinal);
     private long _refreshCount;
     private long _slowRefreshCount;
+    private long _coreGatewaySkipCount;
     private double _maxRefreshDurationMs;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation(
-            "Starting Windows metric snapshot refresh worker. intervalMs={IntervalMs} debugLoggingEnabled={DebugLoggingEnabled}",
-            RefreshInterval.TotalMilliseconds,
+            "Starting Windows metric snapshot refresh worker. mode=demand-driven maxDemandCheckDelayMs={MaxDemandCheckDelayMs} debugLoggingEnabled={DebugLoggingEnabled}",
+            MaximumDemandCheckDelay.TotalMilliseconds,
             logger.IsEnabled(LogLevel.Debug));
         LogInitializationWarnings();
 
@@ -41,24 +44,50 @@ internal sealed class WindowsMetricSnapshotWorker(
 
     private async Task RefreshUntilStoppedAsync(CancellationToken stoppingToken)
     {
-        await RefreshOnceAsync(stoppingToken).ConfigureAwait(false);
-
-        using PeriodicTimer timer = new(RefreshInterval);
-
-        while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
+        while (!stoppingToken.IsCancellationRequested)
         {
-            await RefreshOnceAsync(stoppingToken).ConfigureAwait(false);
+            IReadOnlyList<EffectiveMetricRefreshDemand> activeDemands = monitorSession.ReadMetricRefreshDemands();
+            RemoveInactiveRefreshTimestamps(activeDemands);
+
+            IReadOnlyList<EffectiveMetricRefreshDemand> dueDemands =
+                ReadDueRefreshDemands(activeDemands, timeProvider.GetTimestamp());
+
+            for (int index = 0; index < dueDemands.Count; index++)
+            {
+                RefreshAttemptResult refreshAttempt = await RefreshOnceAsync(dueDemands[index], stoppingToken)
+                    .ConfigureAwait(false);
+
+                if (index < dueDemands.Count - 1
+                    && refreshAttempt.TraversedLibreHardwareMonitor
+                    && refreshAttempt.Duration < MetricRefreshDemandConstants.MinimumCoreLhmRefreshInterval)
+                {
+                    await Task.Delay(
+                            MetricRefreshDemandConstants.MinimumCoreLhmRefreshInterval - refreshAttempt.Duration,
+                            timeProvider,
+                            stoppingToken)
+                        .ConfigureAwait(false);
+                }
+            }
+
+            TimeSpan delay = ComputeNextDelay(activeDemands, timeProvider.GetTimestamp());
+            await Task.Delay(delay, timeProvider, stoppingToken).ConfigureAwait(false);
         }
     }
 
-    private async Task RefreshOnceAsync(CancellationToken stoppingToken)
+    private async Task<RefreshAttemptResult> RefreshOnceAsync(
+        EffectiveMetricRefreshDemand demand,
+        CancellationToken stoppingToken)
     {
-        long refreshStartedTimestamp = Stopwatch.GetTimestamp();
+        long refreshStartedTimestamp = timeProvider.GetTimestamp();
         MetricSnapshotRefreshResult? result = null;
+        bool shouldMarkRefresh = false;
 
         try
         {
-            result = await monitorSession.RefreshSnapshotWithDiagnosticsAsync(stoppingToken).ConfigureAwait(false);
+            result = await monitorSession
+                .RefreshPollingGroupWithDiagnosticsAsync(demand.PollingGroupId, stoppingToken)
+                .ConfigureAwait(false);
+            shouldMarkRefresh = !result.Diagnostics.SkippedByCoreGateway;
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
@@ -66,11 +95,13 @@ internal sealed class WindowsMetricSnapshotWorker(
         }
         catch (Exception exception)
         {
-            TimeSpan duration = Stopwatch.GetElapsedTime(refreshStartedTimestamp);
+            shouldMarkRefresh = true;
+            TimeSpan duration = timeProvider.GetElapsedTime(refreshStartedTimestamp);
             logger.AtWarning()
                 .Every(RefreshWarningThrottleInterval)
                 .Log(context => ThrottledLogEntry.Create(
-                    "Windows metric snapshot refresh failed. durationMs={DurationMs} errorType={ErrorType} suppressedLogCount={SuppressedLogCount}",
+                    "Windows metric snapshot refresh failed. pollingGroupId={PollingGroupId} durationMs={DurationMs} errorType={ErrorType} suppressedLogCount={SuppressedLogCount}",
+                    demand.PollingGroupId,
                     duration.TotalMilliseconds,
                     exception.GetType().Name,
                     context.SuppressedCount));
@@ -78,15 +109,111 @@ internal sealed class WindowsMetricSnapshotWorker(
                 .Every(RefreshWarningThrottleInterval)
                 .Log(context => ThrottledLogEntry.Create(
                     exception,
-                    "Windows metric snapshot refresh failure detail. durationMs={DurationMs} suppressedLogCount={SuppressedLogCount}",
+                    "Windows metric snapshot refresh failure detail. pollingGroupId={PollingGroupId} durationMs={DurationMs} suppressedLogCount={SuppressedLogCount}",
+                    demand.PollingGroupId,
                     duration.TotalMilliseconds,
                     context.SuppressedCount));
         }
         finally
         {
+            if (shouldMarkRefresh)
+            {
+                _lastRefreshTimestampsByPollingGroupId[demand.PollingGroupId] = timeProvider.GetTimestamp();
+            }
+
             if (result is not null)
             {
-                LogRefreshCompleted(result, Stopwatch.GetElapsedTime(refreshStartedTimestamp));
+                LogRefreshCompleted(result, timeProvider.GetElapsedTime(refreshStartedTimestamp));
+            }
+        }
+
+        TimeSpan totalDuration = timeProvider.GetElapsedTime(refreshStartedTimestamp);
+        return new RefreshAttemptResult(
+            result?.Diagnostics is { UsesLibreHardwareMonitor: true, SkippedByCoreGateway: false },
+            totalDuration);
+    }
+
+    private IReadOnlyList<EffectiveMetricRefreshDemand> ReadDueRefreshDemands(
+        IReadOnlyList<EffectiveMetricRefreshDemand> activeDemands,
+        long currentTimestamp)
+    {
+        if (activeDemands.Count == 0)
+        {
+            return [];
+        }
+
+        List<EffectiveMetricRefreshDemand> dueDemands = [];
+
+        foreach (EffectiveMetricRefreshDemand demand in activeDemands
+            .OrderBy(demand => demand.PollingGroupId, StringComparer.Ordinal))
+        {
+            if (!_lastRefreshTimestampsByPollingGroupId.TryGetValue(
+                    demand.PollingGroupId,
+                    out long lastRefreshTimestamp)
+                || timeProvider.GetElapsedTime(lastRefreshTimestamp, currentTimestamp) >= demand.RefreshInterval)
+            {
+                dueDemands.Add(demand);
+            }
+        }
+
+        return dueDemands;
+    }
+
+    private TimeSpan ComputeNextDelay(
+        IReadOnlyList<EffectiveMetricRefreshDemand> activeDemands,
+        long currentTimestamp)
+    {
+        if (activeDemands.Count == 0)
+        {
+            return MaximumDemandCheckDelay;
+        }
+
+        TimeSpan minimumRemainingDelay = MaximumDemandCheckDelay;
+
+        foreach (EffectiveMetricRefreshDemand demand in activeDemands)
+        {
+            if (!_lastRefreshTimestampsByPollingGroupId.TryGetValue(
+                    demand.PollingGroupId,
+                    out long lastRefreshTimestamp))
+            {
+                return MinimumDemandCheckDelay;
+            }
+
+            TimeSpan elapsed = timeProvider.GetElapsedTime(lastRefreshTimestamp, currentTimestamp);
+            TimeSpan remainingDelay = demand.RefreshInterval - elapsed;
+
+            if (remainingDelay <= TimeSpan.Zero)
+            {
+                return MinimumDemandCheckDelay;
+            }
+
+            if (remainingDelay < minimumRemainingDelay)
+            {
+                minimumRemainingDelay = remainingDelay;
+            }
+        }
+
+        if (minimumRemainingDelay < MinimumDemandCheckDelay)
+        {
+            return MinimumDemandCheckDelay;
+        }
+
+        return minimumRemainingDelay > MaximumDemandCheckDelay
+            ? MaximumDemandCheckDelay
+            : minimumRemainingDelay;
+    }
+
+    private void RemoveInactiveRefreshTimestamps(IReadOnlyList<EffectiveMetricRefreshDemand> activeDemands)
+    {
+        HashSet<string> activePollingGroupIds = activeDemands
+            .Select(demand => demand.PollingGroupId)
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (string pollingGroupId in _lastRefreshTimestampsByPollingGroupId.Keys.ToList())
+        {
+            if (!activePollingGroupIds.Contains(pollingGroupId))
+            {
+                _lastRefreshTimestampsByPollingGroupId.Remove(pollingGroupId);
             }
         }
     }
@@ -94,6 +221,20 @@ internal sealed class WindowsMetricSnapshotWorker(
     private void LogRefreshCompleted(MetricSnapshotRefreshResult result, TimeSpan duration)
     {
         _refreshCount++;
+
+        if (result.Diagnostics.SkippedByCoreGateway)
+        {
+            _coreGatewaySkipCount++;
+
+            logger.AtDebug()
+                .Every(RefreshWarningThrottleInterval)
+                .Log(context => ThrottledLogEntry.Create(
+                    "Windows metric snapshot refresh skipped by Core LHM gateway. pollingGroupId={PollingGroupId} ageMs={AgeMs} minimumIntervalMs={MinimumIntervalMs} suppressedLogCount={SuppressedLogCount}",
+                    result.Diagnostics.PollingGroupId ?? "all",
+                    result.Diagnostics.CoreGatewayAge?.TotalMilliseconds,
+                    MetricRefreshDemandConstants.MinimumCoreLhmRefreshInterval.TotalMilliseconds,
+                    context.SuppressedCount));
+        }
 
         double durationMs = duration.TotalMilliseconds;
         if (durationMs > _maxRefreshDurationMs)
@@ -155,7 +296,8 @@ internal sealed class WindowsMetricSnapshotWorker(
         MetricSnapshotRefreshDiagnostics diagnostics = result.Diagnostics;
 
         return ThrottledLogEntry.Create(
-            "Windows metric snapshot refresh was slow. durationMs={DurationMs} readings={ReadingCount} unavailableMetrics={UnavailableMetricCount} unavailableReasons={UnavailableReasons} warnings={WarningCount} hardwareUpdates={HardwareUpdateCount} failedHardwareUpdates={FailedHardwareUpdateCount} slowHardwareTypes={SlowHardwareTypes} suppressedLogCount={SuppressedLogCount}",
+            "Windows metric snapshot refresh was slow. pollingGroupId={PollingGroupId} durationMs={DurationMs} readings={ReadingCount} unavailableMetrics={UnavailableMetricCount} unavailableReasons={UnavailableReasons} warnings={WarningCount} hardwareUpdates={HardwareUpdateCount} failedHardwareUpdates={FailedHardwareUpdateCount} slowHardwareTypes={SlowHardwareTypes} suppressedLogCount={SuppressedLogCount}",
+            diagnostics.PollingGroupId ?? "all",
             duration.TotalMilliseconds,
             diagnostics.ReadingCount,
             diagnostics.UnavailableMetricCount,
@@ -174,18 +316,22 @@ internal sealed class WindowsMetricSnapshotWorker(
     {
         long refreshCount = _refreshCount;
         long slowRefreshCount = _slowRefreshCount;
+        long coreGatewaySkipCount = _coreGatewaySkipCount;
         double maxRefreshDurationMs = _maxRefreshDurationMs;
 
         _refreshCount = 0;
         _slowRefreshCount = 0;
+        _coreGatewaySkipCount = 0;
         _maxRefreshDurationMs = 0;
 
         return ThrottledLogEntry.Create(
-            "Windows metric snapshot refresh debug summary. refreshes={RefreshCount} slowRefreshes={SlowRefreshCount} maxDurationMs={MaxDurationMs} latestDurationMs={LatestDurationMs} readings={ReadingCount} unavailableMetrics={UnavailableMetricCount} unavailableReasons={UnavailableReasons} warnings={WarningCount} warningSamples={WarningSamples} hardwareUpdates={HardwareUpdateCount} failedHardwareUpdates={FailedHardwareUpdateCount} slowHardware={SlowHardware} suppressedLogCount={SuppressedLogCount}",
+            "Windows metric snapshot refresh debug summary. refreshes={RefreshCount} slowRefreshes={SlowRefreshCount} coreGatewaySkips={CoreGatewaySkipCount} maxDurationMs={MaxDurationMs} latestDurationMs={LatestDurationMs} latestPollingGroupId={LatestPollingGroupId} readings={ReadingCount} unavailableMetrics={UnavailableMetricCount} unavailableReasons={UnavailableReasons} warnings={WarningCount} warningSamples={WarningSamples} hardwareUpdates={HardwareUpdateCount} failedHardwareUpdates={FailedHardwareUpdateCount} slowHardware={SlowHardware} suppressedLogCount={SuppressedLogCount}",
             refreshCount,
             slowRefreshCount,
+            coreGatewaySkipCount,
             maxRefreshDurationMs,
             latestDuration.TotalMilliseconds,
+            result.Diagnostics.PollingGroupId ?? "all",
             result.Diagnostics.ReadingCount,
             result.Diagnostics.UnavailableMetricCount,
             BuildUnavailableReasonSummary(result.Snapshot.UnavailableMetrics),
@@ -289,4 +435,8 @@ internal sealed class WindowsMetricSnapshotWorker(
         int Count,
         int FailureCount,
         double MaxDurationMs);
+
+    private readonly record struct RefreshAttemptResult(
+        bool TraversedLibreHardwareMonitor,
+        TimeSpan Duration);
 }
