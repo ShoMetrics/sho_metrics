@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -140,6 +141,17 @@ public sealed class LibreHardwareMonitorSession : IDisposable
     /// </summary>
     public async Task<MetricSnapshot> RefreshSnapshotAsync(CancellationToken cancellationToken)
     {
+        MetricSnapshotRefreshResult result = await RefreshSnapshotWithDiagnosticsAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return result.Snapshot;
+    }
+
+    /// <summary>
+    /// Refreshes the cached snapshot and returns transport-independent refresh diagnostics.
+    /// </summary>
+    public async Task<MetricSnapshotRefreshResult> RefreshSnapshotWithDiagnosticsAsync(CancellationToken cancellationToken)
+    {
         ObjectDisposedException.ThrowIf(_isDisposed, this);
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -147,7 +159,10 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         {
             MetricSnapshot nativeOnlySnapshot = RefreshNativeOnlySnapshot();
             Volatile.Write(ref _latestSnapshot, nativeOnlySnapshot);
-            return nativeOnlySnapshot;
+            return BuildRefreshResult(
+                nativeOnlySnapshot,
+                usesLibreHardwareMonitor: false,
+                hardwareUpdates: []);
         }
 
         await _readGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -162,6 +177,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId = new(StringComparer.Ordinal);
             List<RankedMetricReading> cpuTemperatureCandidates = [];
             List<RankedMetricReading> cpuPowerCandidates = [];
+            List<HardwareRefreshDiagnostic> hardwareUpdates = [];
             List<string> warnings = [];
 
             foreach (IHardware hardware in _computer.Hardware)
@@ -174,6 +190,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                     cpuPowerCandidates,
                     capturedAt,
                     sourceTick,
+                    hardwareUpdates,
                     warnings,
                     cancellationToken);
             }
@@ -220,7 +237,10 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                 Warnings = warnings,
             };
             Volatile.Write(ref _latestSnapshot, snapshot);
-            return snapshot;
+            return BuildRefreshResult(
+                snapshot,
+                usesLibreHardwareMonitor: true,
+                hardwareUpdates);
         }
         finally
         {
@@ -400,12 +420,14 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         List<RankedMetricReading> cpuPowerCandidates,
         DateTimeOffset capturedAt,
         long sourceTick,
+        List<HardwareRefreshDiagnostic> hardwareUpdates,
         List<string> warnings,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         string? updateError = null;
+        long updateStartedTimestamp = Stopwatch.GetTimestamp();
 
         try
         {
@@ -416,6 +438,19 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             updateError = $"{exception.GetType().Name}: {exception.Message}";
             warnings.Add($"Hardware update failed for {hardware.Name}: {updateError}");
         }
+
+        TimeSpan updateDuration = Stopwatch.GetElapsedTime(updateStartedTimestamp);
+        hardwareUpdates.Add(new HardwareRefreshDiagnostic
+        {
+            HardwareId = hardware.Identifier.ToString(),
+            HardwareName = hardware.Name,
+            HardwareType = hardware.HardwareType.ToString(),
+            UpdateDuration = updateDuration,
+            UpdateSucceeded = updateError is null,
+            UpdateError = updateError,
+            SensorCount = hardware.Sensors.Length,
+            SubHardwareCount = hardware.SubHardware.Length,
+        });
 
         Dictionary<string, MetricReading> hardwareReadingsByMetricId = new(StringComparer.Ordinal);
         List<string> hardwareWarnings = [];
@@ -473,9 +508,29 @@ public sealed class LibreHardwareMonitorSession : IDisposable
                 cpuPowerCandidates,
                 capturedAt,
                 sourceTick,
+                hardwareUpdates,
                 warnings,
                 cancellationToken);
         }
+    }
+
+    private static MetricSnapshotRefreshResult BuildRefreshResult(
+        MetricSnapshot snapshot,
+        bool usesLibreHardwareMonitor,
+        IReadOnlyList<HardwareRefreshDiagnostic> hardwareUpdates)
+    {
+        return new MetricSnapshotRefreshResult
+        {
+            Snapshot = snapshot,
+            Diagnostics = new MetricSnapshotRefreshDiagnostics
+            {
+                UsesLibreHardwareMonitor = usesLibreHardwareMonitor,
+                HardwareUpdates = hardwareUpdates,
+                ReadingCount = snapshot.Readings.Count,
+                UnavailableMetricCount = snapshot.UnavailableMetrics.Count,
+                WarningCount = snapshot.Warnings.Count,
+            },
+        };
     }
 
     private static void ReadHardwareDescriptors(

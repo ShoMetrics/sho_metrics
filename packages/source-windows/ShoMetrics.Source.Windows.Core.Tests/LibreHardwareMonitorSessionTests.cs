@@ -20,6 +20,22 @@ public sealed class LibreHardwareMonitorSessionTests
     }
 
     [Fact]
+    public async Task NativeOnlySessionPublishesRefreshDiagnostics()
+    {
+        using var provider = new WindowsSystemTotalDiskThroughputProvider(
+            new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
+        using var session = new LibreHardwareMonitorSession(provider);
+
+        MetricSnapshotRefreshResult result = await session.RefreshSnapshotWithDiagnosticsAsync(CancellationToken.None);
+
+        Assert.False(result.Diagnostics.UsesLibreHardwareMonitor);
+        Assert.Empty(result.Diagnostics.HardwareUpdates);
+        Assert.Equal(result.Snapshot.Readings.Count, result.Diagnostics.ReadingCount);
+        Assert.Equal(result.Snapshot.UnavailableMetrics.Count, result.Diagnostics.UnavailableMetricCount);
+        Assert.Equal(result.Snapshot.Warnings.Count, result.Diagnostics.WarningCount);
+    }
+
+    [Fact]
     public async Task NativeOnlySessionListsSystemTotalDiskThroughputDescriptors()
     {
         using var provider = new WindowsSystemTotalDiskThroughputProvider(

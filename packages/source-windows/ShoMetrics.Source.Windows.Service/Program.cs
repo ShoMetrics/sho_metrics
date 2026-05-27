@@ -56,7 +56,7 @@ internal static class Program
 
     private static async Task<int> RunHostAsync(string[] args, ServiceExecutableMode mode)
     {
-        Log.Logger = CreateBootstrapLogger();
+        Log.Logger = CreateBootstrapLogger(mode);
 
         try
         {
@@ -160,13 +160,15 @@ internal static class Program
         await next().ConfigureAwait(false);
     }
 
-    private static ILogger CreateBootstrapLogger()
+    private static ILogger CreateBootstrapLogger(ServiceExecutableMode mode)
     {
+        LogEventLevel minimumLevel = ResolveMinimumLogLevel(mode);
+
         return new LoggerConfiguration()
-            .MinimumLevel.Debug()
+            .MinimumLevel.Is(minimumLevel)
             .WriteTo.File(
                 WindowsSourceServicePaths.ResolveLogFilePath(),
-                restrictedToMinimumLevel: LogEventLevel.Debug,
+                restrictedToMinimumLevel: minimumLevel,
                 outputTemplate: LogOutputTemplate,
                 rollingInterval: RollingInterval.Day,
                 rollOnFileSizeLimit: true,
@@ -178,14 +180,16 @@ internal static class Program
 
     private static void ConfigureSerilog(LoggerConfiguration loggerConfiguration, ServiceExecutableMode mode)
     {
+        LogEventLevel minimumLevel = ResolveMinimumLogLevel(mode);
+
         loggerConfiguration
-            .MinimumLevel.Debug()
+            .MinimumLevel.Is(minimumLevel)
             .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
             .MinimumLevel.Override("System", LogEventLevel.Warning)
             .Enrich.FromLogContext()
             .WriteTo.File(
                 WindowsSourceServicePaths.ResolveLogFilePath(),
-                restrictedToMinimumLevel: LogEventLevel.Debug,
+                restrictedToMinimumLevel: minimumLevel,
                 outputTemplate: LogOutputTemplate,
                 rollingInterval: RollingInterval.Day,
                 rollOnFileSizeLimit: true,
@@ -205,6 +209,13 @@ internal static class Program
         {
             loggerConfiguration.WriteTo.Console(outputTemplate: LogOutputTemplate);
         }
+    }
+
+    private static LogEventLevel ResolveMinimumLogLevel(ServiceExecutableMode mode)
+    {
+        return mode == ServiceExecutableMode.DevPipe
+            ? LogEventLevel.Debug
+            : LogEventLevel.Information;
     }
 
     private static int WriteHelp()

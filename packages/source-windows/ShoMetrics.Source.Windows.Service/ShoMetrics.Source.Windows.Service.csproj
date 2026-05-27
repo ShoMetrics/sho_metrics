@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ShoMetrics.Source.Windows.Core\ShoMetrics.Source.Windows.Core.csproj" />
+    <ProjectReference Include="..\ShoMetrics.Source.Windows.Diagnostics\ShoMetrics.Source.Windows.Diagnostics.csproj" />
     <ProjectReference Include="..\ShoMetrics.Source.Windows.Ipc\ShoMetrics.Source.Windows.Ipc.csproj" />
   </ItemGroup>
 
