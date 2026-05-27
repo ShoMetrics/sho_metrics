@@ -8,6 +8,7 @@ namespace ShoMetrics.Source.Windows.Service;
 
 internal sealed class WindowsGrpcMetricSourceService(
     ISourceRequestHandler requestHandler,
+    SourceMethodRateLimiter rateLimiter,
     ILogger<WindowsGrpcMetricSourceService> logger) : MetricSourceService.MetricSourceServiceBase
 {
     private static readonly TimeSpan SlowUnaryDebugThreshold = TimeSpan.FromMilliseconds(100);
@@ -47,9 +48,10 @@ internal sealed class WindowsGrpcMetricSourceService(
         SetMetricRefreshDemandRequest request,
         ServerCallContext context)
     {
-        throw new RpcException(new Status(
-            StatusCode.Unimplemented,
-            "Metric refresh demand control is not implemented yet."));
+        return HandleUnaryAsync(
+            nameof(SetMetricRefreshDemand),
+            context,
+            cancellationToken => requestHandler.SetMetricRefreshDemandAsync(request, cancellationToken));
     }
 
     private async Task<TResponse> HandleUnaryAsync<TResponse>(
@@ -61,6 +63,20 @@ internal sealed class WindowsGrpcMetricSourceService(
 
         try
         {
+            if (!rateLimiter.TryAcquire(methodName))
+            {
+                logger.AtWarning()
+                    .EveryBucket($"grpc-rate-limit:{methodName}", UnaryLogThrottleInterval)
+                    .Log(context => ThrottledLogEntry.Create(
+                        "gRPC source request was rate limited. methodName={MethodName} suppressedLogCount={SuppressedLogCount}",
+                        methodName,
+                        context.SuppressedCount));
+
+                throw new SourceRequestException(
+                    SourceRequestFailureKind.ResourceExhausted,
+                    "Source request rate limit exceeded.");
+            }
+
             TResponse response = await operation(context.CancellationToken).ConfigureAwait(false);
             LogSlowUnaryCompleted(methodName, Stopwatch.GetElapsedTime(requestStartedTimestamp));
             return response;

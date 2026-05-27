@@ -11,13 +11,19 @@ namespace ShoMetrics.Source.Windows.Service;
 internal sealed class SourceRequestHandler(
     LibreHardwareMonitorSession monitorSession,
     SourceProtocolMapper protocolMapper,
-    ILogger<SourceRequestHandler> logger) : ISourceRequestHandler
+    ILogger<SourceRequestHandler> logger,
+    TimeProvider timeProvider) : ISourceRequestHandler
 {
     private static readonly TimeSpan HealthTimeout = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan ReadSnapshotTimeout = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan ListDescriptorsTimeout = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan SetRefreshDemandTimeout = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan SlowOperationDebugThreshold = TimeSpan.FromMilliseconds(100);
     private static readonly TimeSpan OperationLogThrottleInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan MinimumDemandApplyInterval = TimeSpan.FromMilliseconds(250);
+
+    private readonly MetricRefreshDemandChangeGate _demandChangeGate =
+        new(timeProvider, MinimumDemandApplyInterval);
 
     public Task<GetSourceHealthResponse> GetSourceHealthAsync(
         GetSourceHealthRequest request,
@@ -49,6 +55,17 @@ internal sealed class SourceRequestHandler(
             nameof(ListMetricDescriptorsAsync),
             ListDescriptorsTimeout,
             operationCancellationToken => ListMetricDescriptorsCoreAsync(request, operationCancellationToken),
+            cancellationToken);
+    }
+
+    public Task<SetMetricRefreshDemandResponse> SetMetricRefreshDemandAsync(
+        SetMetricRefreshDemandRequest request,
+        CancellationToken cancellationToken)
+    {
+        return HandleOperationAsync(
+            nameof(SetMetricRefreshDemandAsync),
+            SetRefreshDemandTimeout,
+            _ => Task.FromResult(SetMetricRefreshDemandCore(request)),
             cancellationToken);
     }
 
@@ -99,6 +116,18 @@ internal sealed class SourceRequestHandler(
         return protocolMapper.BuildListMetricDescriptorsResponse(
             descriptorSnapshot,
             request.MetricIds);
+    }
+
+    private SetMetricRefreshDemandResponse SetMetricRefreshDemandCore(SetMetricRefreshDemandRequest request)
+    {
+        IReadOnlyList<MetricRefreshDemand> demands =
+            MetricRefreshDemandRequestValidator.ValidateAndMap(request);
+
+        return _demandChangeGate.RunIfAccepted(demands, () =>
+        {
+            MetricRefreshDemandApplyResult result = monitorSession.ApplyMetricRefreshDemand(demands);
+            return protocolMapper.BuildSetMetricRefreshDemandResponse(result);
+        });
     }
 
     private async Task<TResponse> HandleOperationAsync<TResponse>(

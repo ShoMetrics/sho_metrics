@@ -74,9 +74,11 @@ internal static class Program
                         options.MaxReceiveMessageSize = WindowsSourceServiceConstants.MaximumGrpcMessageBytes;
                         options.MaxSendMessageSize = WindowsSourceServiceConstants.MaximumGrpcMessageBytes;
                     });
+                    services.AddSingleton(TimeProvider.System);
                     services.AddSingleton<LibreHardwareMonitorSession>();
                     services.AddSingleton<WindowsPipeClientVerifier>();
                     services.AddSingleton<SourceProtocolMapper>();
+                    services.AddSingleton<SourceMethodRateLimiter>();
                     services.AddSingleton<SourceRequestHandler>();
                     services.AddSingleton<ISourceRequestHandler>(provider =>
                         provider.GetRequiredService<SourceRequestHandler>());
