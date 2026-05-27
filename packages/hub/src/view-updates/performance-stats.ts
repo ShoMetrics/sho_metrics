@@ -5,6 +5,7 @@ import {
     type DurationAccumulator,
     type DurationSummary as SharedDurationSummary,
 } from "../shared/duration-accumulator";
+import { wallClockNowMilliseconds } from "../shared/clock";
 
 type MetricViewPerformanceReason = "settings-change" | "metric-tick";
 export type MetricViewPerformanceActionKind = "key" | "dial" | "unknown";
@@ -84,7 +85,7 @@ export class MetricViewPerformanceStats {
 
     record(
         sample: MetricViewPerformanceSample,
-        timestampMilliseconds = Date.now(),
+        timestampMilliseconds = wallClockNowMilliseconds(),
     ): MetricViewPerformanceSummary | null {
         const performanceWindow = this.performanceWindow
             ?? createMetricViewPerformanceWindow(timestampMilliseconds);

@@ -10,6 +10,7 @@ import {
     type RenderTextStyles,
 } from "../../view-rendering/render-text-style";
 import { renderStyledSvgText } from "../../view-rendering/svg-utils";
+import { wallClockNowMilliseconds } from "../../shared/clock";
 
 export interface MirroredTrafficConfig {
     positiveColorConfig: ColorConfig;
@@ -64,7 +65,7 @@ export function renderMirroredTraffic(
         });
 
         const polyline = points.map(point => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
-        const gradientId = `mirrored-${channelId}-${Date.now()}`;
+        const gradientId = `mirrored-${channelId}-${wallClockNowMilliseconds()}`;
         const stops = buildGradientStops(values, colorConfig);
         const channelPaint = colorConfig.isGradientEnabled
             ? `url(#${gradientId})`

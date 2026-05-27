@@ -1,6 +1,7 @@
 import { Resvg } from "@resvg/resvg-js";
 import type { KeySize } from "./widget-data";
 import { logger } from "../logging/logger";
+import { wallClockNowMilliseconds } from "../shared/clock";
 import {
     RasterizerPerformanceStats,
     formatRasterizerPerformanceSummary,
@@ -17,7 +18,7 @@ const rasterizerPerformanceStats = new RasterizerPerformanceStats();
  * Uses @resvg/resvg-js (Rust N-API) for pixel-perfect, cross-platform rendering.
  */
 export function rasterizeSvgToPngDataUrl(svgString: string, renderSize: KeySize): string {
-    const rasterizeStartTimestampMilliseconds = Date.now();
+    const rasterizeStartTimestampMilliseconds = wallClockNowMilliseconds();
     const svgByteLength = Buffer.byteLength(svgString, "utf8");
 
     try {
@@ -26,13 +27,13 @@ export function rasterizeSvgToPngDataUrl(svgString: string, renderSize: KeySize)
             fitTo: { mode: "width" as const, value: renderSize.width },
             font: fontOptions,
         });
-        const constructEndTimestampMilliseconds = Date.now();
+        const constructEndTimestampMilliseconds = wallClockNowMilliseconds();
         const rendered = resvgInstance.render();
-        const renderEndTimestampMilliseconds = Date.now();
+        const renderEndTimestampMilliseconds = wallClockNowMilliseconds();
         const pngBuffer = rendered.asPng();
-        const asPngEndTimestampMilliseconds = Date.now();
+        const asPngEndTimestampMilliseconds = wallClockNowMilliseconds();
         const base64 = Buffer.from(pngBuffer).toString("base64");
-        const base64EndTimestampMilliseconds = Date.now();
+        const base64EndTimestampMilliseconds = wallClockNowMilliseconds();
 
         recordRasterizerPerformanceSample({
             success: true,
@@ -49,7 +50,7 @@ export function rasterizeSvgToPngDataUrl(svgString: string, renderSize: KeySize)
         });
         return `data:image/png;base64,${base64}`;
     } catch (error) {
-        const failureTimestampMilliseconds = Date.now();
+        const failureTimestampMilliseconds = wallClockNowMilliseconds();
         recordRasterizerPerformanceSample({
             success: false,
             renderWidth: renderSize.width,

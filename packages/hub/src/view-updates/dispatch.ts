@@ -1,4 +1,5 @@
 import { Target, type WillAppearEvent } from "@elgato/streamdeck";
+import { wallClockNowMilliseconds } from "../shared/clock";
 import type { TouchStripMetricLayout } from "../view-rendering/metric-view-frame";
 
 export interface TouchStripMetricLayoutState {
@@ -47,7 +48,7 @@ export async function dispatchMetricViewImage(options: {
         failureMessage: "Unsupported Stream Deck action type",
         error: new Error("Unsupported Stream Deck action type"),
         updateStartTimestampMilliseconds: null,
-        updateEndTimestampMilliseconds: Date.now(),
+        updateEndTimestampMilliseconds: wallClockNowMilliseconds(),
     };
 }
 
@@ -67,18 +68,18 @@ async function dispatchTouchStripMetricImage(options: {
             return {
                 status: "inactive",
                 updateStartTimestampMilliseconds: null,
-                updateEndTimestampMilliseconds: Date.now(),
+                updateEndTimestampMilliseconds: wallClockNowMilliseconds(),
             };
         }
 
-        updateStartTimestampMilliseconds = Date.now();
+        updateStartTimestampMilliseconds = wallClockNowMilliseconds();
         await options.event.action.setFeedback({ metricImage: options.hardwarePngDataUrl });
 
         return {
             status: "rendered",
             donePhase: "setFeedbackDone",
             updateStartTimestampMilliseconds,
-            updateEndTimestampMilliseconds: Date.now(),
+            updateEndTimestampMilliseconds: wallClockNowMilliseconds(),
         };
     } catch (error) {
         return {
@@ -88,7 +89,7 @@ async function dispatchTouchStripMetricImage(options: {
                 : "Failed to set touch strip feedback",
             error,
             updateStartTimestampMilliseconds,
-            updateEndTimestampMilliseconds: Date.now(),
+            updateEndTimestampMilliseconds: wallClockNowMilliseconds(),
         };
     }
 }
@@ -98,7 +99,7 @@ async function dispatchKeyMetricImage(options: {
     readonly softwarePngDataUrl: string;
     readonly hardwarePngDataUrl: string;
 }): Promise<MetricViewDispatchResult> {
-    const updateStartTimestampMilliseconds = Date.now();
+    const updateStartTimestampMilliseconds = wallClockNowMilliseconds();
 
     try {
         if (options.softwarePngDataUrl === options.hardwarePngDataUrl) {
@@ -112,7 +113,7 @@ async function dispatchKeyMetricImage(options: {
             status: "rendered",
             donePhase: "setImageDone",
             updateStartTimestampMilliseconds,
-            updateEndTimestampMilliseconds: Date.now(),
+            updateEndTimestampMilliseconds: wallClockNowMilliseconds(),
         };
     } catch (error) {
         return {
@@ -120,7 +121,7 @@ async function dispatchKeyMetricImage(options: {
             failureMessage: "Failed to set key image",
             error,
             updateStartTimestampMilliseconds,
-            updateEndTimestampMilliseconds: Date.now(),
+            updateEndTimestampMilliseconds: wallClockNowMilliseconds(),
         };
     }
 }

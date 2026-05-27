@@ -417,7 +417,8 @@ test("windows helper uses fast descriptor preload retry only during startup wind
     const client = createClient(transport, {}, {
         descriptorPreloadRetryMilliseconds: 25_000,
         descriptorPreloadTimer: retryTimer,
-        now: () => currentTimestampMilliseconds,
+        monotonicNow: () => currentTimestampMilliseconds,
+        wallClockNow: () => currentTimestampMilliseconds,
     });
 
     const unsubscribe = client.subscribeSourceMetadataInvalidations(() => undefined);
@@ -842,7 +843,8 @@ test("windows helper source client cools down unsupported protocol retries", asy
     const transport = new FakeWindowsHelperGrpcTransport(() => buildHealthResponse("2"));
     const client = new WindowsHelperSourceClient({
         transport,
-        now: () => nowMilliseconds,
+        monotonicNow: () => nowMilliseconds,
+        wallClockNow: () => nowMilliseconds,
         serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
         timeouts: {
             healthMilliseconds: 10,
@@ -875,7 +877,8 @@ test("windows helper source client cools down unavailable helper retries", async
     const transport = new RejectingTransport(new Error("pipe unavailable"));
     const client = new WindowsHelperSourceClient({
         transport,
-        now: () => nowMilliseconds,
+        monotonicNow: () => nowMilliseconds,
+        wallClockNow: () => nowMilliseconds,
         serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
     });
 
@@ -905,7 +908,8 @@ test("windows helper source client uses active fast retry when the pipe is missi
     const transport = new RejectingTransport(pipeMissingError);
     const client = new WindowsHelperSourceClient({
         transport,
-        now: () => nowMilliseconds,
+        monotonicNow: () => nowMilliseconds,
+        wallClockNow: () => nowMilliseconds,
         serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
     });
 
@@ -950,7 +954,8 @@ test("windows helper source client refines missing pipe status with service inst
     ));
     const client = new WindowsHelperSourceClient({
         transport,
-        now: () => nowMilliseconds,
+        monotonicNow: () => nowMilliseconds,
+        wallClockNow: () => nowMilliseconds,
         serviceStatusReader: { readStatus: async () => "notInstalled" },
     });
 
@@ -980,7 +985,8 @@ test("windows helper source client backs off repeated transient failures", async
     const transport = new RejectingTransport(createNodeError("ECONNRESET", "connection reset"));
     const client = new WindowsHelperSourceClient({
         transport,
-        now: () => nowMilliseconds,
+        monotonicNow: () => nowMilliseconds,
+        wallClockNow: () => nowMilliseconds,
         serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
     });
 
@@ -1044,7 +1050,8 @@ test("windows helper source client resets transient backoff after successful rea
     });
     const client = new WindowsHelperSourceClient({
         transport,
-        now: () => nowMilliseconds,
+        monotonicNow: () => nowMilliseconds,
+        wallClockNow: () => nowMilliseconds,
         serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
     });
 
@@ -1278,7 +1285,7 @@ function createClient(
     timeouts: WindowsHelperSourceClientOptions["timeouts"] = {},
     options: Pick<
         WindowsHelperSourceClientOptions,
-        "descriptorPreloadRetryMilliseconds" | "descriptorPreloadTimer" | "now" | "serviceStatusReader"
+        "descriptorPreloadRetryMilliseconds" | "descriptorPreloadTimer" | "monotonicNow" | "serviceStatusReader" | "wallClockNow"
     > = {},
 ): WindowsHelperSourceClient {
     return new WindowsHelperSourceClient({

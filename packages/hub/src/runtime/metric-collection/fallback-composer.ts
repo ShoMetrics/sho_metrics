@@ -5,6 +5,7 @@ import {
     type MetricReadPlan,
     selectMetricReadRouteSourceCandidates,
 } from "../source-routing/metric-read-plan";
+import { wallClockNowMilliseconds } from "../../shared/clock";
 
 export interface FallbackMetricStoreReaderOptions {
     /** Returns the current timestamp used to decide whether a candidate value is still fresh. */
@@ -38,7 +39,7 @@ export function createFallbackMetricStoreReader(
         selectMetricReadRouteSourceCandidates(metric)
             .map(candidate => metricStore.forScope(candidate.sourceId)),
     ]));
-    const now = options.now ?? Date.now;
+    const now = options.now ?? wallClockNowMilliseconds;
 
     return {
         getWidgetData: (metricKey, label, unit, maxValue) =>

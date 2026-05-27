@@ -50,7 +50,7 @@ test("node system source refreshes cached network interfaces after the cache int
         } as NodeSystemInformationClient,
         pollWindowsGpuTelemetry: buildNoGpuPoller,
         pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller,
-        now: () => currentTimestampMilliseconds,
+        monotonicNow: () => currentTimestampMilliseconds,
     });
 
     await source.pollMetrics(["net.down"]);
@@ -92,7 +92,7 @@ test("node system source uses stale network interfaces when refresh fails", asyn
         } as NodeSystemInformationClient,
         pollWindowsGpuTelemetry: buildNoGpuPoller,
         pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller,
-        now: () => currentTimestampMilliseconds,
+        monotonicNow: () => currentTimestampMilliseconds,
     });
 
     await source.pollMetrics(["net.down"]);
@@ -133,7 +133,7 @@ test("node system source stops using stale network interfaces after the freshnes
         } as NodeSystemInformationClient,
         pollWindowsGpuTelemetry: buildNoGpuPoller,
         pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller,
-        now: () => currentTimestampMilliseconds,
+        monotonicNow: () => currentTimestampMilliseconds,
     });
 
     await source.pollMetrics(["net.down"]);
@@ -162,7 +162,7 @@ test("node system source returns aggregate zero when cached interfaces have no s
         } as NodeSystemInformationClient,
         pollWindowsGpuTelemetry: buildNoGpuPoller,
         pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller,
-        now: () => 1000,
+        monotonicNow: () => 1000,
     });
 
     const snapshot = await source.pollMetrics(["net.down"]);

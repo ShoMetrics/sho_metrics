@@ -7,6 +7,7 @@ import type {
 import { BackoffPolicy } from "../sources/backoff-policy";
 import type { PlannedCollectorGroup } from "./collector-group-planner";
 import { logger } from "../../logging/logger";
+import { monotonicNowMilliseconds } from "../../shared/clock";
 
 export type CollectorGroupRefreshStatus =
     | "refreshed"
@@ -106,33 +107,33 @@ export class CollectorGroupRunner {
     }
 
     async refreshNow(): Promise<CollectorGroupRefreshResult> {
-        const refreshStartTimestampMilliseconds = Date.now();
+        const refreshStartedAtMonotonicMilliseconds = monotonicNowMilliseconds();
 
         if (this.isStopped) {
             return this.recordRefreshResult(
                 { status: "stopped" },
-                refreshStartTimestampMilliseconds,
+                refreshStartedAtMonotonicMilliseconds,
             );
         }
 
         if (this.pendingRefreshPromise !== null) {
             return this.recordRefreshResult(
                 { status: "skippedPending" },
-                refreshStartTimestampMilliseconds,
+                refreshStartedAtMonotonicMilliseconds,
             );
         }
 
         if (!this.backoffPolicy.canAttempt()) {
             return this.recordRefreshResult(
                 { status: "skippedBackoff" },
-                refreshStartTimestampMilliseconds,
+                refreshStartedAtMonotonicMilliseconds,
             );
         }
 
         const refreshGeneration = this.generation;
 
         this.pendingRefreshPromise = this.refresh(refreshGeneration)
-            .then(result => this.recordRefreshResult(result, refreshStartTimestampMilliseconds))
+            .then(result => this.recordRefreshResult(result, refreshStartedAtMonotonicMilliseconds))
             .finally(() => {
                 this.pendingRefreshPromise = null;
             });
@@ -171,9 +172,9 @@ export class CollectorGroupRunner {
 
     private recordRefreshResult(
         result: CollectorGroupRefreshResult,
-        refreshStartTimestampMilliseconds: number,
+        refreshStartedAtMonotonicMilliseconds: number,
     ): CollectorGroupRefreshResult {
-        const durationMilliseconds = Date.now() - refreshStartTimestampMilliseconds;
+        const durationMilliseconds = monotonicNowMilliseconds() - refreshStartedAtMonotonicMilliseconds;
         const logMessage = () => [
             "collectorGroupRefresh",
             `status=${result.status}`,

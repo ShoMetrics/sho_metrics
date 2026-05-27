@@ -161,10 +161,10 @@ export function calculateNetworkRate(options: {
     interfaceId: string;
     direction: NetworkMetricDirection;
     currentBytes: number;
-    currentTimestampMilliseconds: number;
+    currentMonotonicMilliseconds: number;
     previousSample: NodeSystemNetworkCounterSample | undefined;
 }): NodeSystemNetworkRateCalculation {
-    if (!options.previousSample || options.currentTimestampMilliseconds <= options.previousSample.timestampMilliseconds) {
+    if (!options.previousSample || options.currentMonotonicMilliseconds <= options.previousSample.monotonicMilliseconds) {
         return {
             interfaceId: options.interfaceId,
             direction: options.direction,
@@ -172,14 +172,14 @@ export function calculateNetworkRate(options: {
             previousBytes: options.previousSample?.bytes ?? null,
             bytesDelta: null,
             elapsedMilliseconds: options.previousSample
-                ? options.currentTimestampMilliseconds - options.previousSample.timestampMilliseconds
+                ? options.currentMonotonicMilliseconds - options.previousSample.monotonicMilliseconds
                 : null,
             bytesPerSecond: 0,
             hadPreviousSample: options.previousSample != null,
         };
     }
 
-    const elapsedSeconds = (options.currentTimestampMilliseconds - options.previousSample.timestampMilliseconds) / 1000;
+    const elapsedSeconds = (options.currentMonotonicMilliseconds - options.previousSample.monotonicMilliseconds) / 1000;
     const bytesDelta = options.currentBytes - options.previousSample.bytes;
 
     return {
@@ -188,7 +188,7 @@ export function calculateNetworkRate(options: {
         currentBytes: options.currentBytes,
         previousBytes: options.previousSample.bytes,
         bytesDelta,
-        elapsedMilliseconds: options.currentTimestampMilliseconds - options.previousSample.timestampMilliseconds,
+        elapsedMilliseconds: options.currentMonotonicMilliseconds - options.previousSample.monotonicMilliseconds,
         bytesPerSecond: Math.max(0, bytesDelta / elapsedSeconds),
         hadPreviousSample: true,
     };

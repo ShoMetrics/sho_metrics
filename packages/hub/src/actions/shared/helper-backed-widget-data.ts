@@ -1,5 +1,6 @@
 import type { MetricStoreReader } from "../../runtime/metric-store";
 import type { SourceClientStatus } from "../../runtime/sources/source-client";
+import { wallClockNowMilliseconds } from "../../shared/clock";
 import type { WidgetData } from "../../view-rendering/widget-data";
 
 // Hub-side stale-sample guard. Source-side fresh/retained attribution in
@@ -56,7 +57,8 @@ function isFreshHelperBackedWidgetData(widgetData: WidgetData): boolean {
         return false;
     }
 
-    return Date.now() - widgetData.sampleTimestampMilliseconds <= HELPER_BACKED_SAMPLE_FRESHNESS_MILLISECONDS;
+    return wallClockNowMilliseconds() - widgetData.sampleTimestampMilliseconds
+        <= HELPER_BACKED_SAMPLE_FRESHNESS_MILLISECONDS;
 }
 
 function resolveHelperBackedUnavailableDisplayValue(helperStatus: SourceClientStatus | undefined): string | undefined {

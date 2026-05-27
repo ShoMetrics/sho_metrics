@@ -10,6 +10,7 @@ import {
     WINDOWS_HELPER_SOURCE_ID,
 } from "../../runtime/sources/source-ids";
 import { isGpuMetricKey } from "../../runtime/metric-keys";
+import { wallClockNowMilliseconds } from "../../shared/clock";
 
 interface MetricSourceDiagnosticProps {
     readonly attribution: DisplayedMetricReadAttribution | undefined;
@@ -31,7 +32,7 @@ export function MetricSourceDiagnostic({
     attribution,
 }: MetricSourceDiagnosticProps): React.JSX.Element {
     const [isDebugVisible, setIsDebugVisible] = useState(isDevelopmentBuild);
-    const [currentTimestampMilliseconds, setCurrentTimestampMilliseconds] = useState(Date.now);
+    const [currentTimestampMilliseconds, setCurrentTimestampMilliseconds] = useState(wallClockNowMilliseconds);
 
     useEffect(() => {
         if (!isDebugVisible) {
@@ -39,7 +40,7 @@ export function MetricSourceDiagnostic({
         }
 
         const intervalId = globalThis.setInterval(() => {
-            setCurrentTimestampMilliseconds(Date.now());
+            setCurrentTimestampMilliseconds(wallClockNowMilliseconds());
         }, RELATIVE_TIME_REFRESH_MILLISECONDS);
 
         return () => {

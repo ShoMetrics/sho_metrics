@@ -47,6 +47,7 @@ import {
     type RawSensorIdentity,
     type SourceClientStatus,
 } from "../runtime/sources/source-client";
+import { wallClockNowMilliseconds } from "../shared/clock";
 
 const log = logger.for("MetricAction");
 
@@ -320,7 +321,7 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     protected currentTimestampMilliseconds(): number {
-        return Date.now();
+        return wallClockNowMilliseconds();
     }
 
     protected readCachedSourceStatus(sourceId: string): SourceClientStatus | undefined {
