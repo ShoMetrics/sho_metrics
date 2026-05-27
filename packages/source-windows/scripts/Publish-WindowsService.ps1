@@ -43,6 +43,7 @@ New-Item -ItemType Directory -Path $outputFullPath -Force | Out-Null
     -r $RuntimeIdentifier `
     --self-contained true `
     -o $outputFullPath `
+    /p:SourceWindowsPackageLockFlavor=$RuntimeIdentifier `
     /p:PublishSingleFile=false `
     /p:PublishTrimmed=false
 
