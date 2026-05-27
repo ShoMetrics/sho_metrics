@@ -743,7 +743,7 @@ test("windows helper source client passes request timeouts to the transport", as
 
 test("windows helper source client cools down unsupported protocol retries", async () => {
     let nowMilliseconds = 1000;
-    const transport = new FakeWindowsHelperGrpcTransport(request => buildHealthResponse("2"));
+    const transport = new FakeWindowsHelperGrpcTransport(() => buildHealthResponse("2"));
     const client = new WindowsHelperSourceClient({
         transport,
         now: () => nowMilliseconds,

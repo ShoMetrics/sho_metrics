@@ -37,24 +37,6 @@ const allSources = new Set(["node", "lhm-json", "external-probe"]);
 const defaultSources = ["node"];
 const defaultWarmupMilliseconds = 30000;
 
-const metricKeysByGroup = {
-    cpu: ["cpu.usage_percent"],
-    ram: ["ram.used", "ram.total"],
-    network: ["net.down", "net.up"],
-    disk: [
-        "disk.throughput.read",
-        "disk.throughput.write",
-        "disk.throughput.total",
-    ],
-    gpu: [
-        "gpu.usage_percent",
-        "gpu.temp",
-        "gpu.power",
-        "gpu.vram_used",
-        "gpu.vram_total",
-    ],
-};
-
 const options = readOptions(process.argv.slice(2));
 
 if (options.help) {
@@ -263,14 +245,6 @@ async function readNodeSamples(options) {
         sampleIndex += 1;
         nextTickAtPerformanceMilliseconds += options.intervalMilliseconds;
         await delay(Math.max(0, nextTickAtPerformanceMilliseconds - performance.now()));
-    }
-}
-
-function assignDefinedValues(target, values) {
-    for (const [key, value] of Object.entries(values ?? {})) {
-        if (value !== undefined) {
-            target[key] = value;
-        }
     }
 }
 
@@ -852,14 +826,6 @@ function sumNullable(firstValue, secondValue) {
     return firstValue === undefined && secondValue === undefined
         ? undefined
         : (firstValue ?? 0) + (secondValue ?? 0);
-}
-
-function readMaximumOptionalValue(values) {
-    const finiteValues = values.filter(value => typeof value === "number" && Number.isFinite(value));
-
-    return finiteValues.length === 0
-        ? undefined
-        : Math.max(...finiteValues);
 }
 
 function parseFiniteNumber(value) {
