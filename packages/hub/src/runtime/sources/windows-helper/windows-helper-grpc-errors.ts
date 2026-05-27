@@ -21,6 +21,26 @@ export function isUnsupportedProtocolError(error: unknown): boolean {
         && error.reason === "protocolMismatch";
 }
 
+export function isInvalidRefreshDemandRequestError(error: unknown): boolean {
+    return error instanceof WindowsHelperSourceClientError
+        && error.code === "grpc_invalid_argument";
+}
+
+export function isRefreshDemandUnsupportedError(error: unknown): boolean {
+    return toWindowsHelperSourceClientError(error).code === "grpc_unimplemented";
+}
+
+export function isRefreshDemandControlPlaneError(error: unknown): boolean {
+    const clientError = toWindowsHelperSourceClientError(error);
+    return clientError.code === "grpc_invalid_argument"
+        || clientError.code === "grpc_resource_exhausted";
+}
+
+export function shouldResetRefreshDemandChannelAfterError(error: unknown): boolean {
+    return !isRefreshDemandUnsupportedError(error)
+        && shouldResetGrpcChannelAfterError(error);
+}
+
 export function toWindowsHelperSourceClientError(error: unknown): WindowsHelperSourceClientError {
     return error instanceof WindowsHelperSourceClientError
         ? error
@@ -120,20 +140,12 @@ export function toError(error: unknown): Error {
 }
 
 function readGrpcStatusCode(error: unknown): number | undefined {
-    if (!error || typeof error !== "object" || !("code" in error)) {
-        return undefined;
-    }
-
-    const code = (error as { readonly code?: unknown }).code;
+    const code = readUnknownErrorProperty(error, "code");
     return typeof code === "number" ? code : undefined;
 }
 
 function readGrpcDetails(error: unknown): string {
-    if (!error || typeof error !== "object" || !("details" in error)) {
-        return toError(error).message;
-    }
-
-    const details = (error as { readonly details?: unknown }).details;
+    const details = readUnknownErrorProperty(error, "details");
     return typeof details === "string" ? details : toError(error).message;
 }
 
@@ -180,10 +192,14 @@ function formatGrpcStatusCode(grpcStatusCode: number): string {
 }
 
 function readErrorCode(error: unknown): string | undefined {
-    if (!error || typeof error !== "object" || !("code" in error)) {
+    const code = readUnknownErrorProperty(error, "code");
+    return typeof code === "string" ? code : undefined;
+}
+
+function readUnknownErrorProperty(error: unknown, propertyName: string): unknown {
+    if (error === null || typeof error !== "object" || !(propertyName in error)) {
         return undefined;
     }
 
-    const code = (error as { readonly code?: unknown }).code;
-    return typeof code === "string" ? code : undefined;
+    return (error as Record<string, unknown>)[propertyName];
 }

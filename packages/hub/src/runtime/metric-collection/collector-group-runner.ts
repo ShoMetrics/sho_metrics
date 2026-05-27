@@ -45,6 +45,10 @@ export interface CollectorGroupRunnerOptions {
     readonly snapshotStore: CollectorGroupSnapshotStore;
     readonly backoffPolicy: BackoffPolicy;
     readonly timer?: CollectorGroupRunnerTimer;
+    readonly onRefreshResult?: (
+        collectorGroup: PlannedCollectorGroup,
+        result: CollectorGroupRefreshResult,
+    ) => void;
 }
 
 const defaultTimer: CollectorGroupRunnerTimer = {
@@ -69,6 +73,10 @@ export class CollectorGroupRunner {
     private readonly snapshotStore: CollectorGroupSnapshotStore;
     private readonly backoffPolicy: BackoffPolicy;
     private readonly timer: CollectorGroupRunnerTimer;
+    private readonly onRefreshResult?: (
+        collectorGroup: PlannedCollectorGroup,
+        result: CollectorGroupRefreshResult,
+    ) => void;
     private timerHandle: unknown | null = null;
     private pendingRefreshPromise: Promise<CollectorGroupRefreshResult> | null = null;
     private generation = 0;
@@ -80,6 +88,7 @@ export class CollectorGroupRunner {
         this.snapshotStore = options.snapshotStore;
         this.backoffPolicy = options.backoffPolicy;
         this.timer = options.timer ?? defaultTimer;
+        this.onRefreshResult = options.onRefreshResult;
     }
 
     start(): void {
@@ -188,6 +197,8 @@ export class CollectorGroupRunner {
             `backoffDelayMs=${result.backoffDelayMilliseconds ?? 0}`,
             `error=${result.error == null ? "" : String(result.error)}`,
         ].join(" ");
+
+        this.onRefreshResult?.(this.collectorGroup, result);
 
         if (result.status === "failed") {
             log.atWarn()
