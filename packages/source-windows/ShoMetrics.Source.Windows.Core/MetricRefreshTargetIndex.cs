@@ -17,7 +17,7 @@ internal sealed class MetricRefreshTargetIndex
         HardwareMetricDescriptorSnapshot descriptorSnapshot)
     {
         HashSet<string> knownPollingGroupIds = new(
-            ReadKnownPollingGroupIds(descriptorSnapshot),
+            HardwareMetricDescriptorSnapshotBuilder.ReadKnownPollingGroupIds(descriptorSnapshot),
             StringComparer.Ordinal);
         Dictionary<string, MetricRefreshTarget> targetsByPollingGroupId = new(StringComparer.Ordinal);
         List<IHardware> networkHardware = [];
@@ -55,14 +55,6 @@ internal sealed class MetricRefreshTargetIndex
     public bool TryRead(string pollingGroupId, [NotNullWhen(true)] out MetricRefreshTarget? refreshTarget)
     {
         return _targetsByPollingGroupId.TryGetValue(pollingGroupId, out refreshTarget);
-    }
-
-    private static IReadOnlyList<string> ReadKnownPollingGroupIds(HardwareMetricDescriptorSnapshot descriptorSnapshot)
-    {
-        return descriptorSnapshot.Descriptors
-            .Select(descriptor => descriptor.PollingGroupId)
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
     }
 
     private static IEnumerable<IHardware> EnumerateHardwareTree(IReadOnlyList<IHardware> rootHardware)
