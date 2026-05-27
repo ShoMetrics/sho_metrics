@@ -3,6 +3,7 @@ import {
     useId,
     useRef,
     useState,
+    type CSSProperties,
     type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { InspectorItem } from "../components/InspectorItem";
@@ -22,16 +23,26 @@ import {
 } from "./select-navigation";
 import {
     DEFAULT_SELECT_LISTBOX_LAYOUT,
+    DEFAULT_SELECT_OPTION_HEIGHT_PIXELS,
     resolveSelectListboxLayout,
     type SelectListboxLayout,
 } from "./select-layout";
 
 const TYPEAHEAD_RESET_MS = 700;
+const SELECT_OPTION_VERTICAL_PADDING_PIXELS = 8;
+
+type SelectPreviewStyle = CSSProperties & {
+    readonly "--custom-select-preview-size"?: string;
+    readonly "--custom-select-preview-column-width"?: string;
+    readonly "--custom-select-option-height"?: string;
+};
 
 interface SelectSettingProps<TValue extends SelectOptionValue> extends SettingControlProps {
     label: string;
     value: TValue;
     optionList: readonly SelectOption<TValue>[];
+    buildOptionPreviewUri?: ((value: TValue) => string) | undefined;
+    optionPreviewSizePixels?: number | undefined;
     onValueChange: (value: TValue) => void;
 }
 
@@ -44,6 +55,8 @@ export function SelectSetting<TValue extends SelectOptionValue>({
     label,
     value,
     optionList,
+    buildOptionPreviewUri,
+    optionPreviewSizePixels,
     onValueChange,
     disabled = false,
 }: SelectSettingProps<TValue>): React.JSX.Element {
@@ -59,6 +72,20 @@ export function SelectSetting<TValue extends SelectOptionValue>({
     const hasEnabledOption = findFirstEnabledOptionIndex(optionList) >= 0;
     const isControlDisabled = disabled || !hasEnabledOption;
     const selectedOptionLabel = selectedOption?.label ?? "";
+    const selectedOptionPreviewUri = selectedOption
+        ? buildOptionPreviewUri?.(selectedOption.value)
+        : undefined;
+    const hasOptionPreview = buildOptionPreviewUri !== undefined;
+    const optionHeightPixels = hasOptionPreview && optionPreviewSizePixels !== undefined
+        ? Math.max(DEFAULT_SELECT_OPTION_HEIGHT_PIXELS, optionPreviewSizePixels + SELECT_OPTION_VERTICAL_PADDING_PIXELS)
+        : DEFAULT_SELECT_OPTION_HEIGHT_PIXELS;
+    const rootStyle: SelectPreviewStyle | undefined = optionPreviewSizePixels === undefined
+        ? undefined
+        : {
+            "--custom-select-preview-size": `${optionPreviewSizePixels}px`,
+            "--custom-select-preview-column-width": `${optionPreviewSizePixels + 2}px`,
+            "--custom-select-option-height": `${optionHeightPixels}px`,
+        };
     const [isOpen, setIsOpen] = useState(false);
     const [activeOptionIndex, setActiveOptionIndex] = useState(() =>
         resolveActiveOptionIndex(optionList, selectedValue),
@@ -158,6 +185,8 @@ export function SelectSetting<TValue extends SelectOptionValue>({
                 className="custom-select"
                 data-open={isOpen ? "true" : "false"}
                 data-disabled={isControlDisabled ? "true" : "false"}
+                data-has-preview={hasOptionPreview ? "true" : "false"}
+                style={rootStyle}
             >
                 <button
                     id={triggerId}
@@ -183,6 +212,14 @@ export function SelectSetting<TValue extends SelectOptionValue>({
                         handleTriggerKeyDown(event);
                     }}
                 >
+                    {selectedOptionPreviewUri && (
+                        <img
+                            className="custom-select-preview"
+                            src={selectedOptionPreviewUri}
+                            alt=""
+                            aria-hidden="true"
+                        />
+                    )}
                     <span id={triggerValueId} className="custom-select-value">{selectedOptionLabel}</span>
                     <span className="custom-select-indicator" aria-hidden="true" />
                 </button>
@@ -199,6 +236,7 @@ export function SelectSetting<TValue extends SelectOptionValue>({
                             const isDisabledOption = isOptionDisabled(option);
                             const isActiveOption = index === activeOptionIndex;
                             const isSelectedOption = option.value === selectedValue && !isDisabledOption;
+                            const previewUri = buildOptionPreviewUri?.(option.value);
 
                             return (
                                 <div
@@ -225,7 +263,15 @@ export function SelectSetting<TValue extends SelectOptionValue>({
                                         }
                                     }}
                                 >
-                                    {option.label}
+                                    {previewUri && (
+                                        <img
+                                            className="custom-select-option-preview"
+                                            src={previewUri}
+                                            alt=""
+                                            aria-hidden="true"
+                                        />
+                                    )}
+                                    <span className="custom-select-option-label">{option.label}</span>
                                 </div>
                             );
                         })}
@@ -253,6 +299,7 @@ export function SelectSetting<TValue extends SelectOptionValue>({
 
         return resolveSelectListboxLayout({
             optionCount: optionList.length,
+            optionHeightPixels,
             triggerRect: triggerElement.getBoundingClientRect(),
             viewportHeight: window.visualViewport?.height ?? window.innerHeight,
         });

@@ -7,6 +7,7 @@ export interface SelectListboxLayout {
 
 interface SelectListboxLayoutInput {
     readonly optionCount: number;
+    readonly optionHeightPixels?: number | undefined;
     readonly triggerRect: Pick<DOMRectReadOnly, "bottom" | "top">;
     readonly viewportHeight: number;
 }
@@ -16,7 +17,8 @@ const LISTBOX_FALLBACK_MAX_HEIGHT_PIXELS = 320;
 const LISTBOX_VIEWPORT_MARGIN_PIXELS = 8;
 const LISTBOX_BORDER_PIXELS = 2;
 const LISTBOX_VERTICAL_PADDING_PIXELS = 6;
-const OPTION_MIN_HEIGHT_PIXELS = 28;
+
+export const DEFAULT_SELECT_OPTION_HEIGHT_PIXELS = 28;
 
 export const DEFAULT_SELECT_LISTBOX_LAYOUT: SelectListboxLayout = {
     maxHeight: LISTBOX_FALLBACK_MAX_HEIGHT_PIXELS,
@@ -25,10 +27,11 @@ export const DEFAULT_SELECT_LISTBOX_LAYOUT: SelectListboxLayout = {
 
 export function resolveSelectListboxLayout({
     optionCount,
+    optionHeightPixels = DEFAULT_SELECT_OPTION_HEIGHT_PIXELS,
     triggerRect,
     viewportHeight,
 }: SelectListboxLayoutInput): SelectListboxLayout {
-    const desiredHeight = optionCount * OPTION_MIN_HEIGHT_PIXELS
+    const desiredHeight = optionCount * optionHeightPixels
         + LISTBOX_VERTICAL_PADDING_PIXELS
         + LISTBOX_BORDER_PIXELS;
     const spaceBelow = Math.max(

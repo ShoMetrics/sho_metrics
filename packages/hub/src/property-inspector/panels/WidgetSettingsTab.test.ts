@@ -202,7 +202,7 @@ test("terminal theme renders palette controls without metric color controls", ()
     assert.match(markup, /Terminal/);
     assert.match(markup, /Theme Variant:/);
     assert.match(markup, /Clean/);
-    assert.match(markup, /Vintage/);
+    assert.match(markup, /custom-select-preview/);
     assert.match(markup, /Phosphor:/);
     assert.match(markup, /Green/);
     assert.doesNotMatch(markup, /Color Mode:/);
@@ -619,7 +619,7 @@ test("widget settings keep warnings first and reset in advanced controls", () =>
     });
 
     assertTextOrder(markup, "Some settings are disabled", "GPU Metric:");
-    assertTextOrder(markup, "GPU Metric:", "Appearance");
+    assertTextOrder(markup, "GPU Metric:", "View:");
     assertTextOrder(markup, "Polling Frequency", "Advanced");
     assertTextOrder(markup, "Advanced", "Color Compensation");
     assertTextOrder(markup, "Color Compensation", "Reset Widget Settings");
@@ -642,6 +642,9 @@ test("widget view controls keep view before theme order", () => {
     assertTextOrder(markup, "View:", "View Variant:");
     assertTextOrder(markup, "View Variant:", "Theme:");
     assertTextOrder(markup, "Theme:", "Theme Variant:");
+    assert.match(markup, sectionTitlePattern("View"));
+    assert.match(markup, sectionTitlePattern("Theme"));
+    assert.doesNotMatch(markup, sectionTitlePattern("Appearance"));
     assert.match(markup, /Theme Variant:/);
 });
 
@@ -658,8 +661,8 @@ test("widget text view renders text variant controls", () => {
     assertTextOrder(markup, "View:", "View Variant:");
     assertTextOrder(markup, "View Variant:", "Theme:");
     assert.match(markup, /Centered/);
-    assert.match(markup, /Title Card/);
     assert.doesNotMatch(markup, /Full Ring/);
+    assert.match(markup, /custom-select-preview/);
 });
 
 function renderWidgetSettings(options: {
@@ -699,6 +702,10 @@ function assertTextOrder(markup: string, earlierText: string, laterText: string)
 
 function sectionHeadingPattern(text: string): RegExp {
     return new RegExp(`class="section-heading"[^>]*>${text}<`);
+}
+
+function sectionTitlePattern(text: string): RegExp {
+    return new RegExp(`class="section-title"[^>]*>${text}<`);
 }
 
 function buildWidgetSettings(

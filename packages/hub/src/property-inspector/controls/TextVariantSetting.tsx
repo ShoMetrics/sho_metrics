@@ -1,12 +1,14 @@
 import type { TextViewVariant } from "../inspector/settings-types";
 import { buildTextVariantPreviewUri, type MetricPreviewInput } from "../previews/metric-option-preview";
-import { PreviewOptionSetting } from "./PreviewOptionSetting";
+import { SelectSetting } from "./SelectSetting";
 import type { SettingControlProps } from "./setting-control";
 
 const textVariantOptionList = [
     { value: "centered", label: "Centered" },
     { value: "title-card", label: "Title Card" },
 ] as const;
+
+const VARIANT_PREVIEW_SIZE_PIXELS = 32;
 
 interface TextVariantSettingProps extends SettingControlProps {
     value: TextViewVariant;
@@ -16,11 +18,12 @@ interface TextVariantSettingProps extends SettingControlProps {
 
 export function TextVariantSetting(props: TextVariantSettingProps): React.JSX.Element {
     return (
-        <PreviewOptionSetting
+        <SelectSetting
             {...props}
             label="View Variant"
             optionList={textVariantOptionList}
-            buildPreviewUri={(textVariant) => buildTextVariantPreviewUri(textVariant, props.preview)}
+            buildOptionPreviewUri={(textVariant) => buildTextVariantPreviewUri(textVariant, props.preview)}
+            optionPreviewSizePixels={VARIANT_PREVIEW_SIZE_PIXELS}
         />
     );
 }

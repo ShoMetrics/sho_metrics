@@ -1,6 +1,6 @@
 import type { CircleViewVariant } from "../inspector/settings-types";
 import { buildCircleVariantPreviewUri, type MetricPreviewInput } from "../previews/metric-option-preview";
-import { PreviewOptionSetting } from "./PreviewOptionSetting";
+import { SelectSetting } from "./SelectSetting";
 import type { SettingControlProps } from "./setting-control";
 
 const circleVariantOptionList = [
@@ -8,6 +8,8 @@ const circleVariantOptionList = [
     { value: "minimal", label: "Minimal" },
     { value: "gauge", label: "Gauge" },
 ] as const;
+
+const VARIANT_PREVIEW_SIZE_PIXELS = 32;
 
 interface CircleVariantSettingProps extends SettingControlProps {
     value: CircleViewVariant;
@@ -17,11 +19,12 @@ interface CircleVariantSettingProps extends SettingControlProps {
 
 export function CircleVariantSetting(props: CircleVariantSettingProps): React.JSX.Element {
     return (
-        <PreviewOptionSetting
+        <SelectSetting
             {...props}
             label="View Variant"
             optionList={circleVariantOptionList}
-            buildPreviewUri={(circleVariant) => buildCircleVariantPreviewUri(circleVariant, props.preview)}
+            buildOptionPreviewUri={(circleVariant) => buildCircleVariantPreviewUri(circleVariant, props.preview)}
+            optionPreviewSizePixels={VARIANT_PREVIEW_SIZE_PIXELS}
         />
     );
 }

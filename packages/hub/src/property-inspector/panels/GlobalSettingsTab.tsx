@@ -11,6 +11,7 @@ import {
     MetricColorControls,
     TerminalPaintControls,
 } from "./ColorSettings";
+import { buildDefaultAppearanceSettings } from "../../settings/default-appearance-settings";
 import { SettingsSection } from "./SettingsSection";
 import {
     networkUnitBaseOptionList,
@@ -23,11 +24,13 @@ import type {
     ResolvedGlobalSettings,
     ResolvedGlobalThemeOverride,
     ResolvedGlobalViewOverride,
+    ResolvedMetricTarget,
     ResolvedNetworkDisplaySettings,
 } from "../../settings/resolved-settings";
 import type { StoredGlobalSettingsPatch } from "../../settings/storage/global-settings-patch";
 import type { ColorCompensationProfile } from "../../color-compensation/types";
 import { ColorCompensationControls } from "./ColorCompensationControls";
+import type { MetricPreviewInput } from "../previews/metric-option-preview";
 
 interface GlobalSettingsTabProps {
     resolvedSettings: ResolvedGlobalSettings;
@@ -35,6 +38,11 @@ interface GlobalSettingsTabProps {
     onSettingsPatch: (patch: StoredGlobalSettingsPatch) => void;
     onOpenColorCompensation: () => void;
 }
+
+const GLOBAL_OVERRIDE_PREVIEW_TARGET = {
+    domain: "cpu",
+    reading: { kind: "usage" },
+} satisfies ResolvedMetricTarget;
 
 export function GlobalSettingsTab({
     resolvedSettings,
@@ -52,12 +60,14 @@ export function GlobalSettingsTab({
                 <>
                     <ViewOverrideSection
                         viewOverride={resolvedSettings.viewOverride}
+                        themeOverride={resolvedSettings.themeOverride}
                         onOverrideChange={(viewOverrideEnabled) => onSettingsPatch({
                             viewOverrideEnabled,
                         })}
                         onViewPatch={(view) => onSettingsPatch({ view })}
                     />
                     <ThemeOverrideSection
+                        viewOverride={resolvedSettings.viewOverride}
                         themeOverride={resolvedSettings.themeOverride}
                         onOverrideChange={(themeOverrideEnabled) => onSettingsPatch({
                             themeOverrideEnabled,
@@ -122,13 +132,17 @@ function GlobalOverrideSection({
 
 function ViewOverrideSection({
     viewOverride,
+    themeOverride,
     onOverrideChange,
     onViewPatch,
 }: {
     viewOverride: ResolvedGlobalViewOverride | undefined;
+    themeOverride: ResolvedGlobalThemeOverride | undefined;
     onOverrideChange: (isEnabled: boolean) => void;
     onViewPatch: (patch: NonNullable<StoredGlobalSettingsPatch["view"]>) => void;
 }): React.JSX.Element {
+    const preview = buildGlobalOverridePreview(viewOverride, themeOverride);
+
     return (
         <SettingsSection title="View Override">
             <OverrideSubsectionToggle
@@ -140,18 +154,23 @@ function ViewOverrideSection({
                 <>
                     <MetricViewSetting
                         value={viewOverride.view.selectedView}
+                        preview={preview}
                         onValueChange={(selectedView) => onViewPatch({ selectedView })}
                     />
-                    <CircleVariantSetting
-                        value={viewOverride.view.circleVariant}
-                        onValueChange={(circleVariant) => onViewPatch({ circleVariant })}
-                        disabled={viewOverride.view.selectedView !== "circle"}
-                    />
-                    <TextVariantSetting
-                        value={viewOverride.view.textVariant}
-                        onValueChange={(textVariant) => onViewPatch({ textVariant })}
-                        disabled={viewOverride.view.selectedView !== "text"}
-                    />
+                    {viewOverride.view.selectedView === "circle" && (
+                        <CircleVariantSetting
+                            value={viewOverride.view.circleVariant}
+                            preview={preview}
+                            onValueChange={(circleVariant) => onViewPatch({ circleVariant })}
+                        />
+                    )}
+                    {viewOverride.view.selectedView === "text" && (
+                        <TextVariantSetting
+                            value={viewOverride.view.textVariant}
+                            preview={preview}
+                            onValueChange={(textVariant) => onViewPatch({ textVariant })}
+                        />
+                    )}
                 </>
             )}
         </SettingsSection>
@@ -159,14 +178,18 @@ function ViewOverrideSection({
 }
 
 function ThemeOverrideSection({
+    viewOverride,
     themeOverride,
     onOverrideChange,
     onThemePatch,
 }: {
+    viewOverride: ResolvedGlobalViewOverride | undefined;
     themeOverride: ResolvedGlobalThemeOverride | undefined;
     onOverrideChange: (isEnabled: boolean) => void;
     onThemePatch: (patch: NonNullable<StoredGlobalSettingsPatch["theme"]>) => void;
 }): React.JSX.Element {
+    const preview = buildGlobalOverridePreview(viewOverride, themeOverride);
+
     return (
         <SettingsSection title="Theme Override">
             <OverrideSubsectionToggle
@@ -178,11 +201,13 @@ function ThemeOverrideSection({
                 <>
                     <ThemeSetting
                         value={themeOverride.theme.selectedTheme}
+                        preview={preview}
                         onValueChange={(selectedTheme) => onThemePatch({ selectedTheme })}
                     />
                     {themeOverride.theme.selectedTheme === "terminal" && (
                         <TerminalVariantSetting
                             value={themeOverride.theme.terminal.variant}
+                            preview={preview}
                             onValueChange={(variant) => onThemePatch({ terminal: { variant } })}
                         />
                     )}
@@ -190,6 +215,19 @@ function ThemeOverrideSection({
             )}
         </SettingsSection>
     );
+}
+
+function buildGlobalOverridePreview(
+    viewOverride: ResolvedGlobalViewOverride | undefined,
+    themeOverride: ResolvedGlobalThemeOverride | undefined,
+): MetricPreviewInput {
+    return {
+        appearance: buildDefaultAppearanceSettings({
+            view: viewOverride?.view,
+            theme: themeOverride?.theme,
+        }),
+        target: GLOBAL_OVERRIDE_PREVIEW_TARGET,
+    };
 }
 
 function PaintOverrideSection({
