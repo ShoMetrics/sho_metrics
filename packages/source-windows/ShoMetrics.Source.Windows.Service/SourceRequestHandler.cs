@@ -19,8 +19,6 @@ internal sealed class SourceRequestHandler(
     private static readonly TimeSpan SlowOperationDebugThreshold = TimeSpan.FromMilliseconds(100);
     private static readonly TimeSpan OperationLogThrottleInterval = TimeSpan.FromSeconds(30);
 
-    private readonly ThrottledLogger _log = new(logger);
-
     public Task<GetSourceHealthResponse> GetSourceHealthAsync(
         GetSourceHealthRequest request,
         CancellationToken cancellationToken)
@@ -122,7 +120,7 @@ internal sealed class SourceRequestHandler(
 
             if (duration >= SlowOperationDebugThreshold)
             {
-                _log.AtDebug()
+                logger.AtDebug()
                     .EveryBucket($"source-operation-slow:{operationName}", OperationLogThrottleInterval)
                     .Log(context => ThrottledLogEntry.Create(
                         "Source request operation completed slowly. operationName={OperationName} durationMs={DurationMs} timeoutMs={TimeoutMs} suppressedLogCount={SuppressedLogCount}",
@@ -149,7 +147,7 @@ internal sealed class SourceRequestHandler(
         catch (OperationCanceledException) when (operationCancellationTokenSource.IsCancellationRequested)
         {
             TimeSpan duration = Stopwatch.GetElapsedTime(operationStartedTimestamp);
-            _log.AtWarning()
+            logger.AtWarning()
                 .EveryBucket($"source-operation-timeout:{operationName}", OperationLogThrottleInterval)
                 .Log(context => ThrottledLogEntry.Create(
                     "Source request operation timed out. operationName={OperationName} durationMs={DurationMs} timeoutMs={TimeoutMs} suppressedLogCount={SuppressedLogCount}",
@@ -172,7 +170,7 @@ internal sealed class SourceRequestHandler(
         switch (exception.FailureKind)
         {
             case SourceRequestFailureKind.SourceUnavailable:
-                _log.AtWarning()
+                logger.AtWarning()
                     .EveryBucket($"source-operation-unavailable:{operationName}", OperationLogThrottleInterval)
                     .Log(context => ThrottledLogEntry.Create(
                         "Source request operation found the source unavailable. operationName={OperationName} durationMs={DurationMs} failureMessage={FailureMessage} suppressedLogCount={SuppressedLogCount}",
@@ -183,7 +181,7 @@ internal sealed class SourceRequestHandler(
                 break;
             case SourceRequestFailureKind.InvalidArgument:
             case SourceRequestFailureKind.FailedPrecondition:
-                _log.AtWarning()
+                logger.AtWarning()
                     .EveryBucket($"source-operation-rejected:{operationName}:{exception.FailureKind}", OperationLogThrottleInterval)
                     .Log(context => ThrottledLogEntry.Create(
                         "Source request operation was rejected. operationName={OperationName} failureKind={FailureKind} durationMs={DurationMs} failureMessage={FailureMessage} suppressedLogCount={SuppressedLogCount}",
@@ -194,7 +192,7 @@ internal sealed class SourceRequestHandler(
                         context.SuppressedCount));
                 break;
             default:
-                _log.AtError()
+                logger.AtError()
                     .EveryBucket($"source-operation-failure:{operationName}:{exception.FailureKind}", OperationLogThrottleInterval)
                     .Log(context => ThrottledLogEntry.Create(
                         exception,

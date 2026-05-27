@@ -9,8 +9,8 @@ namespace ShoMetrics.Source.Windows.Diagnostics;
 /// <remarks>
 /// The call-site shape intentionally keeps the same ordering as fluent logging
 /// APIs: choose a level, add throttling, then write the message. Throttle state
-/// is owned by the surrounding <see cref="ThrottledLogger" /> instance, not by
-/// global static state.
+/// is owned by the <see cref="ILogger" /> instance when created through
+/// <see cref="LoggerThrottleExtensions" />.
 /// </remarks>
 public readonly struct ThrottledLogLevelBuilder
 {

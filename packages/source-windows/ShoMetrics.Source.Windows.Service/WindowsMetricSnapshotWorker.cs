@@ -17,7 +17,6 @@ internal sealed class WindowsMetricSnapshotWorker(
     private const int SummaryHardwareLimit = 3;
     private const int SummaryWarningLimit = 3;
 
-    private readonly ThrottledLogger _log = new(logger);
     private long _refreshCount;
     private long _slowRefreshCount;
     private double _maxRefreshDurationMs;
@@ -68,14 +67,14 @@ internal sealed class WindowsMetricSnapshotWorker(
         catch (Exception exception)
         {
             TimeSpan duration = Stopwatch.GetElapsedTime(refreshStartedTimestamp);
-            _log.AtWarning()
+            logger.AtWarning()
                 .Every(RefreshWarningThrottleInterval)
                 .Log(context => ThrottledLogEntry.Create(
                     "Windows metric snapshot refresh failed. durationMs={DurationMs} errorType={ErrorType} suppressedLogCount={SuppressedLogCount}",
                     duration.TotalMilliseconds,
                     exception.GetType().Name,
                     context.SuppressedCount));
-            _log.AtDebug()
+            logger.AtDebug()
                 .Every(RefreshWarningThrottleInterval)
                 .Log(context => ThrottledLogEntry.Create(
                     exception,
@@ -106,12 +105,12 @@ internal sealed class WindowsMetricSnapshotWorker(
         {
             _slowRefreshCount++;
 
-            _log.AtWarning()
+            logger.AtWarning()
                 .Every(RefreshWarningThrottleInterval)
                 .Log(context => CreateSlowRefreshEntry(context, result, duration));
         }
 
-        _log.AtDebug()
+        logger.AtDebug()
             .Every(RefreshDebugSummaryInterval)
             .Log(context => CreateRefreshSummaryEntry(context, result, duration));
     }

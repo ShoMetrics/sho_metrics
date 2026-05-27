@@ -169,6 +169,40 @@ public sealed class ThrottledLoggerTests
         Assert.Single(secondLogger.Entries);
     }
 
+    [Fact]
+    public void ExtensionThrottleStateIsOwnedByLoggerInstance()
+    {
+        var firstLogger = new CapturingLogger(LogLevel.Debug);
+        var secondLogger = new CapturingLogger(LogLevel.Debug);
+
+        firstLogger
+            .AtDebug()
+            .EveryBucket("same-key", TimeSpan.FromSeconds(30))
+            .Log("First owner");
+        firstLogger
+            .AtDebug()
+            .EveryBucket("same-key", TimeSpan.FromSeconds(30))
+            .Log("Suppressed first owner");
+        secondLogger
+            .AtDebug()
+            .EveryBucket("same-key", TimeSpan.FromSeconds(30))
+            .Log("Second owner");
+
+        Assert.Single(firstLogger.Entries);
+        Assert.Single(secondLogger.Entries);
+    }
+
+    [Fact]
+    public void ExtensionThrottleStateIsSharedForTheSameLoggerInstance()
+    {
+        var logger = new CapturingLogger(LogLevel.Debug);
+
+        LogFromExtensionCallSite(logger);
+        LogFromExtensionCallSite(logger);
+
+        Assert.Single(logger.Entries);
+    }
+
     private sealed class ManualTimeProvider : TimeProvider
     {
         private DateTimeOffset _utcNow = new(2026, 5, 26, 0, 0, 0, TimeSpan.Zero);
@@ -276,5 +310,13 @@ public sealed class ThrottledLoggerTests
             .AtWarning()
             .Every(TimeSpan.FromSeconds(30))
             .Log(exception, "Plain failure");
+    }
+
+    private static void LogFromExtensionCallSite(ILogger logger)
+    {
+        logger
+            .AtDebug()
+            .Every(TimeSpan.FromSeconds(30))
+            .Log("Extension call site");
     }
 }
