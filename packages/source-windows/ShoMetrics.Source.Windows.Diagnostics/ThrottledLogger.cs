@@ -9,8 +9,9 @@ namespace ShoMetrics.Source.Windows.Diagnostics;
 /// <remarks>
 /// This type does not replace <see cref="ILogger" /> or Serilog. It only owns
 /// per-call-site throttling state before delegating to the normal .NET logging
-/// pipeline. Keep one instance as a field on the class that owns the log sites;
-/// do not share one process-wide instance.
+/// pipeline. Application code should normally use the <see cref="ILogger" />
+/// extension methods in <see cref="LoggerThrottleExtensions" /> instead of
+/// storing this wrapper as a second logger field.
 /// </remarks>
 public sealed class ThrottledLogger
 {

@@ -13,8 +13,6 @@ internal sealed class WindowsGrpcMetricSourceService(
     private static readonly TimeSpan SlowUnaryDebugThreshold = TimeSpan.FromMilliseconds(100);
     private static readonly TimeSpan UnaryLogThrottleInterval = TimeSpan.FromSeconds(30);
 
-    private readonly ThrottledLogger _log = new(logger);
-
     public override Task<GetSourceHealthResponse> GetSourceHealth(
         GetSourceHealthRequest request,
         ServerCallContext context)
@@ -65,7 +63,7 @@ internal sealed class WindowsGrpcMetricSourceService(
         catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
         {
             TimeSpan duration = Stopwatch.GetElapsedTime(requestStartedTimestamp);
-            _log.AtDebug()
+            logger.AtDebug()
                 .EveryBucket($"grpc-client-cancel:{methodName}", UnaryLogThrottleInterval)
                 .Log(logContext => ThrottledLogEntry.Create(
                     "gRPC source request was cancelled by the client. methodName={MethodName} durationMs={DurationMs} suppressedLogCount={SuppressedLogCount}",
@@ -98,7 +96,7 @@ internal sealed class WindowsGrpcMetricSourceService(
             return;
         }
 
-        _log.AtDebug()
+        logger.AtDebug()
             .EveryBucket($"grpc-unary-slow:{methodName}", UnaryLogThrottleInterval)
             .Log(context => ThrottledLogEntry.Create(
                 "gRPC source request completed slowly. methodName={MethodName} durationMs={DurationMs} suppressedLogCount={SuppressedLogCount}",
