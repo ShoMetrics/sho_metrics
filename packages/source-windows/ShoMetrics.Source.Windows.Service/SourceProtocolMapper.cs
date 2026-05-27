@@ -100,6 +100,29 @@ internal sealed class SourceProtocolMapper
         return listResponse;
     }
 
+    public SetMetricRefreshDemandResponse BuildSetMetricRefreshDemandResponse(
+        MetricRefreshDemandApplyResult result)
+    {
+        SetMetricRefreshDemandResponse response = new()
+        {
+            AcceptedGroupCount = ToUInt32(result.AcceptedGroupCount),
+            IgnoredGroupCount = ToUInt32(result.IgnoredGroupCount),
+            EffectiveMinimumIntervalMilliseconds = ToUInt32(result.EffectiveMinimumRefreshInterval.TotalMilliseconds),
+            DemandTtlMilliseconds = ToUInt32(result.DemandTtl.TotalMilliseconds),
+        };
+
+        foreach (HardwareSourceWarning warning in result.Warnings)
+        {
+            response.Warnings.Add(new SourceWarning
+            {
+                Code = warning.Code,
+                Message = warning.Message,
+            });
+        }
+
+        return response;
+    }
+
     private static ProtoMetricSnapshot BuildMetricSnapshot(CoreMetricSnapshot snapshot)
     {
         ProtoMetricSnapshot protoSnapshot = new()
@@ -346,4 +369,13 @@ internal sealed class SourceProtocolMapper
         }
     }
 
+    private static uint ToUInt32(double value)
+    {
+        return (uint)Math.Clamp(value, 0, uint.MaxValue);
+    }
+
+    private static uint ToUInt32(int value)
+    {
+        return (uint)Math.Clamp(value, 0, int.MaxValue);
+    }
 }

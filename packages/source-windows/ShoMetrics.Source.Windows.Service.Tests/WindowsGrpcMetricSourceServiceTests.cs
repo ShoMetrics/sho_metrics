@@ -18,9 +18,7 @@ public sealed class WindowsGrpcMetricSourceServiceTests
                 HelperVersion = "test",
             }),
         };
-        var service = new WindowsGrpcMetricSourceService(
-            handler,
-            NullLogger<WindowsGrpcMetricSourceService>.Instance);
+        WindowsGrpcMetricSourceService service = CreateService(handler);
 
         GetSourceHealthResponse response = await service
             .GetSourceHealth(new GetSourceHealthRequest(), new TestServerCallContext());
@@ -39,9 +37,7 @@ public sealed class WindowsGrpcMetricSourceServiceTests
                 SourceRequestFailureKind.SourceUnavailable,
                 "Windows source reader is unavailable."),
         };
-        var service = new WindowsGrpcMetricSourceService(
-            handler,
-            NullLogger<WindowsGrpcMetricSourceService>.Instance);
+        WindowsGrpcMetricSourceService service = CreateService(handler);
 
         RpcException exception = await Assert.ThrowsAsync<RpcException>(() =>
             service.ReadMetricSnapshot(new ReadMetricSnapshotRequest(), new TestServerCallContext()));
@@ -58,9 +54,7 @@ public sealed class WindowsGrpcMetricSourceServiceTests
                 SourceRequestFailureKind.Timeout,
                 "Descriptor read timed out."),
         };
-        var service = new WindowsGrpcMetricSourceService(
-            handler,
-            NullLogger<WindowsGrpcMetricSourceService>.Instance);
+        WindowsGrpcMetricSourceService service = CreateService(handler);
 
         RpcException exception = await Assert.ThrowsAsync<RpcException>(() =>
             service.ListMetricDescriptors(new ListMetricDescriptorsRequest(), new TestServerCallContext()));
@@ -77,9 +71,7 @@ public sealed class WindowsGrpcMetricSourceServiceTests
                 SourceRequestFailureKind.InvalidArgument,
                 "Read snapshot request is invalid."),
         };
-        var service = new WindowsGrpcMetricSourceService(
-            handler,
-            NullLogger<WindowsGrpcMetricSourceService>.Instance);
+        WindowsGrpcMetricSourceService service = CreateService(handler);
 
         RpcException exception = await Assert.ThrowsAsync<RpcException>(() =>
             service.ReadMetricSnapshot(new ReadMetricSnapshotRequest(), new TestServerCallContext()));
@@ -96,9 +88,7 @@ public sealed class WindowsGrpcMetricSourceServiceTests
                 SourceRequestFailureKind.FailedPrecondition,
                 "Descriptor request precondition is missing."),
         };
-        var service = new WindowsGrpcMetricSourceService(
-            handler,
-            NullLogger<WindowsGrpcMetricSourceService>.Instance);
+        WindowsGrpcMetricSourceService service = CreateService(handler);
 
         RpcException exception = await Assert.ThrowsAsync<RpcException>(() =>
             service.ListMetricDescriptors(new ListMetricDescriptorsRequest(), new TestServerCallContext()));
@@ -115,9 +105,7 @@ public sealed class WindowsGrpcMetricSourceServiceTests
                 SourceRequestFailureKind.ResourceExhausted,
                 "Read snapshot request was rate limited."),
         };
-        var service = new WindowsGrpcMetricSourceService(
-            handler,
-            NullLogger<WindowsGrpcMetricSourceService>.Instance);
+        WindowsGrpcMetricSourceService service = CreateService(handler);
 
         RpcException exception = await Assert.ThrowsAsync<RpcException>(() =>
             service.ReadMetricSnapshot(new ReadMetricSnapshotRequest(), new TestServerCallContext()));
@@ -126,16 +114,39 @@ public sealed class WindowsGrpcMetricSourceServiceTests
     }
 
     [Fact]
-    public async Task SetMetricRefreshDemandReturnsUnimplemented()
+    public async Task SetMetricRefreshDemandReturnsHandlerResponse()
     {
-        var service = new WindowsGrpcMetricSourceService(
-            new FakeSourceRequestHandler(),
-            NullLogger<WindowsGrpcMetricSourceService>.Instance);
+        var handler = new FakeSourceRequestHandler
+        {
+            SetMetricRefreshDemand = _ => Task.FromResult(new SetMetricRefreshDemandResponse
+            {
+                AcceptedGroupCount = 1,
+                EffectiveMinimumIntervalMilliseconds = 1000,
+                DemandTtlMilliseconds = 15000,
+            }),
+        };
+        WindowsGrpcMetricSourceService service = CreateService(handler);
+
+        SetMetricRefreshDemandResponse response = await service
+            .SetMetricRefreshDemand(new SetMetricRefreshDemandRequest(), new TestServerCallContext());
+
+        Assert.Equal(1u, response.AcceptedGroupCount);
+        Assert.Equal(1000u, response.EffectiveMinimumIntervalMilliseconds);
+        Assert.Equal(15000u, response.DemandTtlMilliseconds);
+    }
+
+    [Fact]
+    public async Task SetMetricRefreshDemandAppliesServiceRateLimit()
+    {
+        WindowsGrpcMetricSourceService service = CreateService(new FakeSourceRequestHandler());
+
+        await service.SetMetricRefreshDemand(new SetMetricRefreshDemandRequest(), new TestServerCallContext());
+        await service.SetMetricRefreshDemand(new SetMetricRefreshDemandRequest(), new TestServerCallContext());
 
         RpcException exception = await Assert.ThrowsAsync<RpcException>(() =>
             service.SetMetricRefreshDemand(new SetMetricRefreshDemandRequest(), new TestServerCallContext()));
 
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+        Assert.Equal(StatusCode.ResourceExhausted, exception.StatusCode);
     }
 
     [Fact]
@@ -148,9 +159,7 @@ public sealed class WindowsGrpcMetricSourceServiceTests
         {
             GetSourceHealth = cancellationToken => throw new OperationCanceledException(cancellationToken),
         };
-        var service = new WindowsGrpcMetricSourceService(
-            handler,
-            NullLogger<WindowsGrpcMetricSourceService>.Instance);
+        WindowsGrpcMetricSourceService service = CreateService(handler);
 
         RpcException exception = await Assert.ThrowsAsync<RpcException>(() =>
             service.GetSourceHealth(
@@ -170,9 +179,7 @@ public sealed class WindowsGrpcMetricSourceServiceTests
         {
             GetSourceHealth = _ => throw expectedException,
         };
-        var service = new WindowsGrpcMetricSourceService(
-            handler,
-            NullLogger<WindowsGrpcMetricSourceService>.Instance);
+        WindowsGrpcMetricSourceService service = CreateService(handler);
 
         RpcException exception = await Assert.ThrowsAsync<RpcException>(() =>
             service.GetSourceHealth(new GetSourceHealthRequest(), new TestServerCallContext()));
@@ -187,9 +194,7 @@ public sealed class WindowsGrpcMetricSourceServiceTests
         {
             GetSourceHealth = _ => throw new InvalidOperationException("Unexpected handler failure."),
         };
-        var service = new WindowsGrpcMetricSourceService(
-            handler,
-            NullLogger<WindowsGrpcMetricSourceService>.Instance);
+        WindowsGrpcMetricSourceService service = CreateService(handler);
 
         RpcException exception = await Assert.ThrowsAsync<RpcException>(() =>
             service.GetSourceHealth(new GetSourceHealthRequest(), new TestServerCallContext()));
@@ -207,6 +212,9 @@ public sealed class WindowsGrpcMetricSourceServiceTests
 
         public Func<CancellationToken, Task<ReadMetricSnapshotResponse>> ReadMetricSnapshot { get; init; } =
             _ => Task.FromResult(new ReadMetricSnapshotResponse());
+
+        public Func<CancellationToken, Task<SetMetricRefreshDemandResponse>> SetMetricRefreshDemand { get; init; } =
+            _ => Task.FromResult(new SetMetricRefreshDemandResponse());
 
         public Task<GetSourceHealthResponse> GetSourceHealthAsync(
             GetSourceHealthRequest request,
@@ -228,6 +236,25 @@ public sealed class WindowsGrpcMetricSourceServiceTests
         {
             return ReadMetricSnapshot(cancellationToken);
         }
+
+        public Task<SetMetricRefreshDemandResponse> SetMetricRefreshDemandAsync(
+            SetMetricRefreshDemandRequest request,
+            CancellationToken cancellationToken)
+        {
+            return SetMetricRefreshDemand(cancellationToken);
+        }
+    }
+
+    private static WindowsGrpcMetricSourceService CreateService(
+        ISourceRequestHandler handler,
+        TimeProvider? timeProvider = null)
+    {
+        TimeProvider resolvedTimeProvider = timeProvider ?? TimeProvider.System;
+
+        return new WindowsGrpcMetricSourceService(
+            handler,
+            new SourceMethodRateLimiter(resolvedTimeProvider),
+            NullLogger<WindowsGrpcMetricSourceService>.Instance);
     }
 
     private sealed class TestServerCallContext(CancellationToken cancellationToken = default) : ServerCallContext

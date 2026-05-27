@@ -22,6 +22,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
     private readonly WindowsSystemTotalDiskThroughputProvider _diskThroughputProvider;
     private readonly HardwareMetricDescriptorSnapshot _cachedDescriptorSnapshot;
     private readonly IReadOnlyDictionary<string, string> _pollingGroupIdsByMetricId;
+    private readonly MetricRefreshDemandState _refreshDemandState;
     private readonly HardwareMetricRetentionCache _retentionCache = new(RetainedSampleTickLimit);
     private readonly ConcurrentDictionary<string, MetricSnapshot> _latestSnapshotsByPollingGroupId =
         new(StringComparer.Ordinal);
@@ -84,6 +85,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             descriptor => descriptor.MetricId,
             descriptor => descriptor.PollingGroupId,
             StringComparer.Ordinal);
+        _refreshDemandState = new MetricRefreshDemandState(ReadKnownPollingGroupIds(cachedDescriptorSnapshot));
         _latestSnapshot = BuildUnavailableSnapshot();
     }
 
@@ -100,6 +102,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             descriptor => descriptor.MetricId,
             descriptor => descriptor.PollingGroupId,
             StringComparer.Ordinal);
+        _refreshDemandState = new MetricRefreshDemandState(ReadKnownPollingGroupIds(_cachedDescriptorSnapshot));
         _latestSnapshot = BuildUnavailableSnapshot();
     }
 
@@ -258,6 +261,18 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         return Task.FromResult(FilterDescriptorSnapshot(_cachedDescriptorSnapshot, BuildRequestedMetricSet(metricIds)));
     }
 
+    public MetricRefreshDemandApplyResult ApplyMetricRefreshDemand(IReadOnlyList<MetricRefreshDemand> demands)
+    {
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
+        return _refreshDemandState.Apply(demands);
+    }
+
+    public IReadOnlyList<EffectiveMetricRefreshDemand> ReadMetricRefreshDemands()
+    {
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
+        return _refreshDemandState.Snapshot();
+    }
+
     public void Dispose()
     {
         if (_isDisposed)
@@ -410,6 +425,14 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             Descriptors = [],
             Warnings = warnings,
         };
+    }
+
+    private static IReadOnlyList<string> ReadKnownPollingGroupIds(HardwareMetricDescriptorSnapshot descriptorSnapshot)
+    {
+        return descriptorSnapshot.Descriptors
+            .Select(descriptor => descriptor.PollingGroupId)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
     }
 
     private void ReadHardware(

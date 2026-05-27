@@ -15,4 +15,8 @@ internal interface ISourceRequestHandler
     Task<ReadMetricSnapshotResponse> ReadMetricSnapshotAsync(
         ReadMetricSnapshotRequest request,
         CancellationToken cancellationToken);
+
+    Task<SetMetricRefreshDemandResponse> SetMetricRefreshDemandAsync(
+        SetMetricRefreshDemandRequest request,
+        CancellationToken cancellationToken);
 }
