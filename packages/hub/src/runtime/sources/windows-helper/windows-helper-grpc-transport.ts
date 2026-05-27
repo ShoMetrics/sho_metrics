@@ -15,6 +15,8 @@ import {
     type ListMetricDescriptorsResponse,
     type ReadMetricSnapshotRequest,
     type ReadMetricSnapshotResponse,
+    type SetMetricRefreshDemandRequest,
+    type SetMetricRefreshDemandResponse,
 } from "../../../generated/shometrics/v1/source_api_pb.js";
 
 const log = logger.for("Source:WindowsHelper");
@@ -46,6 +48,11 @@ export interface WindowsHelperGrpcTransport {
         request: ReadMetricSnapshotRequest,
         options: WindowsHelperGrpcRequestOptions,
     ): Promise<ReadMetricSnapshotResponse>;
+
+    setMetricRefreshDemand(
+        request: SetMetricRefreshDemandRequest,
+        options: WindowsHelperGrpcRequestOptions,
+    ): Promise<SetMetricRefreshDemandResponse>;
 
     /** Closes the active channel so the next request recreates it. */
     reset?(): void;
@@ -95,6 +102,17 @@ export class NodeWindowsHelperGrpcTransport implements WindowsHelperGrpcTranspor
     ): Promise<ReadMetricSnapshotResponse> {
         return this.invokeUnary(
             MetricSourceService.method.readMetricSnapshot,
+            request,
+            options,
+        );
+    }
+
+    setMetricRefreshDemand(
+        request: SetMetricRefreshDemandRequest,
+        options: WindowsHelperGrpcRequestOptions,
+    ): Promise<SetMetricRefreshDemandResponse> {
+        return this.invokeUnary(
+            MetricSourceService.method.setMetricRefreshDemand,
             request,
             options,
         );

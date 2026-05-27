@@ -43,6 +43,15 @@ internal sealed class WindowsGrpcMetricSourceService(
             cancellationToken => requestHandler.ReadMetricSnapshotAsync(request, cancellationToken));
     }
 
+    public override Task<SetMetricRefreshDemandResponse> SetMetricRefreshDemand(
+        SetMetricRefreshDemandRequest request,
+        ServerCallContext context)
+    {
+        throw new RpcException(new Status(
+            StatusCode.Unimplemented,
+            "Metric refresh demand control is not implemented yet."));
+    }
+
     private async Task<TResponse> HandleUnaryAsync<TResponse>(
         string methodName,
         ServerCallContext context,
@@ -111,6 +120,7 @@ internal sealed class WindowsGrpcMetricSourceService(
         {
             SourceRequestFailureKind.InvalidArgument => StatusCode.InvalidArgument,
             SourceRequestFailureKind.FailedPrecondition => StatusCode.FailedPrecondition,
+            SourceRequestFailureKind.ResourceExhausted => StatusCode.ResourceExhausted,
             SourceRequestFailureKind.SourceUnavailable => StatusCode.Unavailable,
             SourceRequestFailureKind.Timeout => StatusCode.DeadlineExceeded,
             _ => StatusCode.Internal,

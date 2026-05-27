@@ -5,6 +5,8 @@ Read these documents in order:
 1. [LibreHardwareMonitor Desktop Source Reading](01-lhm-desktop-source-reading.md)
 2. [Helper Source Reliability Implementation Plan](02-helper-source-reliability-implementation-plan.md)
 3. [Windows Disk Throughput Implementation Plan](03-lhm-storage-reading-implementation-plan.md)
+4. [Windows Helper gRPC IPC And Self-Contained Packaging Plan](04-helper-ipc-packaging-plan.md)
+5. [Windows Helper Demand-Driven Refresh Plan](05-helper-demand-driven-refresh-plan.md)
 
 ## Scope
 
@@ -14,4 +16,5 @@ version-skew handling, and LHM storage traversal policy.
 
 Read this folder before changing helper-owned metrics, LHM traversal, source
 sample attribution, helper no-data copy, descriptor preload, or disk probing
-behavior.
+behavior. Read the demand-driven refresh plan before changing helper refresh
+cadence, collector group demand, or source polling-group scheduling.

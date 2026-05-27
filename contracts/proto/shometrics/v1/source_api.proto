@@ -18,6 +18,7 @@ service MetricSourceService {
   rpc GetSourceHealth(GetSourceHealthRequest) returns (GetSourceHealthResponse);
   rpc ListMetricDescriptors(ListMetricDescriptorsRequest) returns (ListMetricDescriptorsResponse);
   rpc ReadMetricSnapshot(ReadMetricSnapshotRequest) returns (ReadMetricSnapshotResponse);
+  rpc SetMetricRefreshDemand(SetMetricRefreshDemandRequest) returns (SetMetricRefreshDemandResponse);
 }
 
 message GetSourceHealthRequest {}
@@ -56,6 +57,36 @@ message ReadMetricSnapshotResponse {
   // A metric id should appear in exactly one of value_attributions or
   // unavailable_metrics.
   repeated MetricUnavailableReport unavailable_metrics = 5;
+}
+
+// Full replacement for the helper refresh demand computed by the Hub.
+//
+// The helper validates all counts, lengths, and intervals before mutating its
+// demand state. Hub must treat polling_group_id as opaque source-owned data.
+message SetMetricRefreshDemandRequest {
+  repeated MetricRefreshDemandGroup groups = 1;
+}
+
+message MetricRefreshDemandGroup {
+  // Source-owned descriptor polling group id returned by MetricDescriptor.
+  // Hub must not parse this value.
+  string polling_group_id = 1;
+
+  // ShoMetrics metric ids that caused this group to be demanded. The helper
+  // uses these only for validation and diagnostics; polling_group_id still owns
+  // the hardware refresh mapping.
+  repeated string metric_ids = 2;
+
+  // Hub-requested cadence. Helper clamps this to its own safe min/max range.
+  uint32 requested_interval_milliseconds = 3;
+}
+
+message SetMetricRefreshDemandResponse {
+  uint32 accepted_group_count = 1;
+  uint32 ignored_group_count = 2;
+  uint32 effective_minimum_interval_milliseconds = 3;
+  uint32 demand_ttl_milliseconds = 4;
+  repeated SourceWarning warnings = 5;
 }
 
 message MetricDescriptorSnapshot {

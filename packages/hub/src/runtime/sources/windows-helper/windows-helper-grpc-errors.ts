@@ -62,6 +62,7 @@ export function shouldResetGrpcChannelAfterError(error: unknown): boolean {
                 return true;
             case "grpc_deadline_exceeded":
             case "grpc_invalid_argument":
+            case "grpc_resource_exhausted":
             case "grpc_cancelled":
             case "grpc_internal":
             case "grpc_unknown":
@@ -157,6 +158,7 @@ function selectGrpcStatusReason(
         case grpcStatus.FAILED_PRECONDITION:
             return "protocolMismatch";
         case grpcStatus.INVALID_ARGUMENT:
+        case grpcStatus.RESOURCE_EXHAUSTED:
         case grpcStatus.INTERNAL:
         case grpcStatus.UNKNOWN:
         case grpcStatus.CANCELLED:
