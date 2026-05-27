@@ -153,6 +153,23 @@ export interface SourceRefreshDemandGroup {
     readonly intervalMilliseconds: number;
 }
 
+/** Source-owned refresh demand failure exposed to the collection supervisor. */
+export class SourceRefreshDemandError extends Error {
+    override readonly name = "SourceRefreshDemandError";
+
+    constructor(
+        readonly reason: "invalidDemand",
+        message: string,
+    ) {
+        super(message);
+    }
+}
+
+export function isInvalidSourceRefreshDemandError(error: unknown): boolean {
+    return error instanceof SourceRefreshDemandError
+        && error.reason === "invalidDemand";
+}
+
 /** Source-owned attribution for a metric value included in a snapshot. */
 export type MetricValueAttribution = Readonly<
     Omit<RuntimeProtoPayloadWithOptionalRawSensor<ProtoMetricValueAttribution>, "valueFreshness">
@@ -176,7 +193,14 @@ export interface SourceClient extends SourceMetricPollingGroupResolver {
     /** Lists descriptors for requested metric keys or for all known metrics. */
     listMetricDescriptors?(metricKeys: readonly string[]): Promise<MetricDescriptorSnapshot>;
 
-    /** Sends the complete active refresh demand for source-owned polling groups. */
+    /**
+     * Sends the complete active refresh demand for source-owned polling groups.
+     *
+     * Some sources keep snapshots in an async cache instead of collecting
+     * hardware during `readSnapshot`. Demand tells those sources which polling
+     * groups should stay warm and at what cadence while visible subscriptions
+     * exist.
+     */
     setMetricRefreshDemand?(groups: readonly SourceRefreshDemandGroup[]): Promise<void>;
 
     /** Checks source health by performing source-owned I/O. */

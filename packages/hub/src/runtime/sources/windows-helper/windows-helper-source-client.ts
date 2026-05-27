@@ -17,6 +17,7 @@ import {
     type MetricSnapshot,
 } from "../metric-source";
 import {
+    SourceRefreshDemandError,
     type MetricDescriptor,
     type MetricDescriptorSnapshot,
     type SourceClient,
@@ -45,9 +46,13 @@ import {
 import {
     WindowsHelperSourceClientError,
     classifyHelperRequestFailure,
+    isInvalidRefreshDemandRequestError,
+    isRefreshDemandControlPlaneError,
+    isRefreshDemandUnsupportedError,
     isUnsupportedProtocolError,
     normalizeGrpcRequestError,
     shouldResetGrpcChannelAfterError,
+    shouldResetRefreshDemandChannelAfterError,
     toError,
     toWindowsHelperSourceClientError,
 } from "./windows-helper-grpc-errors";
@@ -307,6 +312,10 @@ export class WindowsHelperSourceClient implements SourceClient {
                     )
                     .log("Windows helper does not support refresh demand control yet.");
                 return;
+            }
+
+            if (isInvalidRefreshDemandRequestError(error)) {
+                throw new SourceRefreshDemandError("invalidDemand", toError(error).message);
             }
 
             if (isRefreshDemandControlPlaneError(error)) {
@@ -839,22 +848,6 @@ export class WindowsHelperSourceClient implements SourceClient {
 
 function buildWindowsHelperPlanningFingerprint(descriptorFingerprint: string): string {
     return `windows-helper-descriptor:${descriptorFingerprint}`;
-}
-
-function isRefreshDemandUnsupportedError(error: unknown): boolean {
-    const clientError = toWindowsHelperSourceClientError(error);
-    return clientError.code === "grpc_unimplemented";
-}
-
-function isRefreshDemandControlPlaneError(error: unknown): boolean {
-    const clientError = toWindowsHelperSourceClientError(error);
-    return clientError.code === "grpc_invalid_argument"
-        || clientError.code === "grpc_resource_exhausted";
-}
-
-function shouldResetRefreshDemandChannelAfterError(error: Error): boolean {
-    return !isRefreshDemandUnsupportedError(error)
-        && shouldResetGrpcChannelAfterError(error);
 }
 
 function readScalarMetricValue(snapshot: MetricSnapshot, metricKey: string): number | undefined {

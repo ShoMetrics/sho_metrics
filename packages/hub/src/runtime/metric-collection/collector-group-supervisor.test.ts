@@ -8,10 +8,15 @@ import {
     buildScalarMetricValue,
     type MetricSnapshot,
 } from "../sources/metric-source";
-import type { SourceSnapshotReadResult } from "../sources/source-client";
+import {
+    SourceRefreshDemandError,
+    type SourceClient,
+    type SourceRefreshDemandGroup,
+    type SourceSnapshotReadResult,
+} from "../sources/source-client";
 import { BackoffPolicy } from "../sources/backoff-policy";
-import type { SourceClient } from "../sources/source-client";
 import type { SourceMetricPollingGroupResolution } from "../sources/source-polling-groups";
+import { WINDOWS_HELPER_SOURCE_ID } from "../sources/source-ids";
 
 // The runner callback chains through timer -> refreshNow -> readSnapshot ->
 // ingest -> finally. Ten turns leaves margin for small async instrumentation.
@@ -234,6 +239,235 @@ test("slow collector groups do not block unrelated groups", async () => {
     );
 });
 
+test("reconcile sends Windows helper refresh demand from source-declared groups", async () => {
+    const fakeTimer = new FakeTimer();
+    const sourceClient = new FakeSourceClient(WINDOWS_HELPER_SOURCE_ID, [
+        buildSnapshot(1000, { "cpu.temperature": 55 }),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: fakeTimer,
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({
+            sourceId: WINDOWS_HELPER_SOURCE_ID,
+            pollingGroupId: "lhm:hardware:cpu",
+            metricKeys: ["cpu.temperature"],
+            intervalMilliseconds: 1000,
+        }),
+    ]);
+    await fakeTimer.drainMicrotasks();
+
+    assert.deepEqual(sourceClient.refreshDemandGroups, [[{
+        pollingGroupId: "lhm:hardware:cpu",
+        metricKeys: ["cpu.temperature"],
+        intervalMilliseconds: 1000,
+    }]]);
+});
+
+test("reconcile coalesces unchanged Windows helper refresh demand", async () => {
+    const fakeTimer = new FakeTimer();
+    const sourceClient = new FakeSourceClient(WINDOWS_HELPER_SOURCE_ID, [
+        buildSnapshot(1000, { "cpu.temperature": 55 }),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: fakeTimer,
+    });
+    const collectorGroup = buildCollectorGroup({
+        sourceId: WINDOWS_HELPER_SOURCE_ID,
+        pollingGroupId: "lhm:hardware:cpu",
+        metricKeys: ["cpu.temperature"],
+    });
+
+    supervisor.reconcile([collectorGroup]);
+    await fakeTimer.drainMicrotasks();
+    supervisor.reconcile([collectorGroup]);
+    await fakeTimer.drainMicrotasks();
+
+    assert.equal(sourceClient.refreshDemandGroups.length, 1);
+});
+
+test("Windows helper refresh demand renews while unchanged demand stays active", async () => {
+    const fakeTimer = new FakeTimer();
+    const sourceClient = new FakeSourceClient(WINDOWS_HELPER_SOURCE_ID, [
+        buildSnapshot(1000, { "cpu.temperature": 55 }),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 0),
+        timer: fakeTimer,
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({
+            sourceId: WINDOWS_HELPER_SOURCE_ID,
+            pollingGroupId: "lhm:hardware:cpu",
+            metricKeys: ["cpu.temperature"],
+        }),
+    ]);
+    await fakeTimer.drainMicrotasks();
+    await fakeTimer.runNextWithDelay(8000);
+
+    assert.equal(sourceClient.refreshDemandGroups.length, 2);
+    assert.deepEqual(sourceClient.refreshDemandGroups[1], sourceClient.refreshDemandGroups[0]);
+});
+
+test("failed Windows helper refresh demand renewal schedules a retry", async () => {
+    const fakeTimer = new FakeTimer();
+    const sourceClient = new FakeSourceClient(WINDOWS_HELPER_SOURCE_ID, [
+        buildSnapshot(1000, { "cpu.temperature": 55 }),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: fakeTimer,
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({
+            sourceId: WINDOWS_HELPER_SOURCE_ID,
+            pollingGroupId: "lhm:hardware:cpu",
+            metricKeys: ["cpu.temperature"],
+        }),
+    ]);
+    await fakeTimer.drainMicrotasks();
+
+    sourceClient.queueRefreshDemandFailure(new Error("resource exhausted"));
+    await fakeTimer.runNextWithDelay(8000);
+
+    assert.equal(sourceClient.refreshDemandGroups.length, 2);
+    assert.equal(fakeTimer.recordedDelaysMilliseconds.at(-1), 2000);
+});
+
+test("invalid Windows helper refresh demand does not retry after helper recovery", async () => {
+    const fakeTimer = new FakeTimer();
+    const sourceClient = new FakeSourceClient(WINDOWS_HELPER_SOURCE_ID, [
+        buildSnapshot(1000, { "cpu.temperature": 55 }),
+        new Error("helper unavailable"),
+        buildSnapshot(2000, { "cpu.temperature": 56 }),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 0),
+        timer: fakeTimer,
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({
+            sourceId: WINDOWS_HELPER_SOURCE_ID,
+            pollingGroupId: "lhm:hardware:cpu",
+            metricKeys: ["cpu.temperature"],
+        }),
+    ]);
+    await fakeTimer.drainMicrotasks();
+    await fakeTimer.runNextWithDelay(0);
+    await fakeTimer.runNextWithDelay(1000);
+
+    sourceClient.queueRefreshDemandFailure(new SourceRefreshDemandError("invalidDemand", "invalid demand"));
+    await fakeTimer.runNextWithDelay(8000);
+    await fakeTimer.runNextWithDelay(1000);
+
+    assert.equal(sourceClient.refreshDemandGroups.length, 2);
+    assert.equal(await fakeTimer.runNextWithDelay(2000), false);
+});
+
+test("Windows helper recovery resends the latest active refresh demand", async () => {
+    const fakeTimer = new FakeTimer();
+    const sourceClient = new FakeSourceClient(WINDOWS_HELPER_SOURCE_ID, [
+        buildSnapshot(1000, { "cpu.temperature": 55 }),
+        new Error("helper unavailable"),
+        buildSnapshot(2000, { "cpu.temperature": 56 }),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 0),
+        timer: fakeTimer,
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({
+            sourceId: WINDOWS_HELPER_SOURCE_ID,
+            pollingGroupId: "lhm:hardware:cpu",
+            metricKeys: ["cpu.temperature"],
+        }),
+    ]);
+    await fakeTimer.drainMicrotasks();
+    await fakeTimer.runNextWithDelay(0);
+    await fakeTimer.runNextWithDelay(1000);
+    await fakeTimer.runNextWithDelay(1000);
+
+    assert.equal(sourceClient.refreshDemandGroups.length, 2);
+    assert.deepEqual(sourceClient.refreshDemandGroups[1], sourceClient.refreshDemandGroups[0]);
+});
+
+test("reconcile sends empty Windows helper refresh demand when helper groups disappear", async () => {
+    const fakeTimer = new FakeTimer();
+    const sourceClient = new FakeSourceClient(WINDOWS_HELPER_SOURCE_ID, [
+        buildSnapshot(1000, { "cpu.temperature": 55 }),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: fakeTimer,
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({
+            sourceId: WINDOWS_HELPER_SOURCE_ID,
+            pollingGroupId: "lhm:hardware:cpu",
+            metricKeys: ["cpu.temperature"],
+        }),
+    ]);
+    await fakeTimer.drainMicrotasks();
+    supervisor.reconcile([]);
+    await fakeTimer.drainMicrotasks();
+
+    assert.deepEqual(sourceClient.refreshDemandGroups.at(-1), []);
+    assert.equal(await fakeTimer.runNextWithDelay(8000), false);
+});
+
+test("Windows helper refresh demand failure does not prevent collection runners", async () => {
+    const fakeTimer = new FakeTimer();
+    const sourceClient = new FakeSourceClient(WINDOWS_HELPER_SOURCE_ID, [
+        buildSnapshot(1000, { "cpu.temperature": 55 }),
+    ]);
+    sourceClient.queueRefreshDemandFailure(new Error("transient refresh demand failure"));
+    const metricStore = new MetricStore();
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: metricStore,
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: fakeTimer,
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({
+            sourceId: WINDOWS_HELPER_SOURCE_ID,
+            pollingGroupId: "lhm:hardware:cpu",
+            metricKeys: ["cpu.temperature"],
+        }),
+    ]);
+    await fakeTimer.drainMicrotasks();
+    await fakeTimer.runNextWithDelay(0);
+
+    assert.equal(sourceClient.refreshDemandGroups.length, 2);
+    assert.equal(
+        metricStore.forScope(WINDOWS_HELPER_SOURCE_ID).getWidgetData("cpu.temperature", "CPU", "C").current,
+        55,
+    );
+});
+
 class FakeSourceRegistry {
     private readonly sourceClientsById = new Map<string, SourceClient>();
 
@@ -254,11 +488,13 @@ class FakeSourceRegistry {
 
 class FakeSourceClient implements SourceClient {
     readonly requestedMetricKeys: string[][] = [];
+    readonly refreshDemandGroups: SourceRefreshDemandGroup[][] = [];
+    private readonly refreshDemandFailures: unknown[] = [];
     private responseIndex = 0;
 
     constructor(
         readonly sourceId: string,
-        private readonly responses: readonly (MetricSnapshot | Promise<MetricSnapshot>)[],
+        private readonly responses: readonly (MetricSnapshot | Promise<MetricSnapshot> | Error)[],
     ) {}
 
     async readSnapshot(metricKeys: readonly string[]): Promise<SourceSnapshotReadResult> {
@@ -270,11 +506,32 @@ class FakeSourceClient implements SourceClient {
             throw new Error("No fake source response queued.");
         }
 
+        if (response instanceof Error) {
+            throw response;
+        }
+
         return {
             snapshot: await response,
             valueAttributions: [],
             unavailableMetrics: [],
         };
+    }
+
+    async setMetricRefreshDemand(groups: readonly SourceRefreshDemandGroup[]): Promise<void> {
+        this.refreshDemandGroups.push(groups.map(group => ({
+            pollingGroupId: group.pollingGroupId,
+            metricKeys: [...group.metricKeys],
+            intervalMilliseconds: group.intervalMilliseconds,
+        })));
+
+        const failure = this.refreshDemandFailures.shift();
+        if (failure !== undefined) {
+            throw failure;
+        }
+    }
+
+    queueRefreshDemandFailure(error: unknown): void {
+        this.refreshDemandFailures.push(error);
     }
 
     resolveMetricPollingGroups(
@@ -318,6 +575,7 @@ class FakeTimer {
         const handle = {
             active: true,
             callback,
+            delayMilliseconds,
         };
         this.handles.push(handle);
         this.recordedDelaysMilliseconds.push(delayMilliseconds);
@@ -339,6 +597,26 @@ class FakeTimer {
         await this.drainMicrotasks();
     }
 
+    async runNextWithDelay(delayMilliseconds: number): Promise<boolean> {
+        const handleIndex = this.handles.findIndex(handle => (
+            handle.active && handle.delayMilliseconds === delayMilliseconds
+        ));
+
+        if (handleIndex === -1) {
+            return false;
+        }
+
+        const [handle] = this.handles.splice(handleIndex, 1);
+
+        if (!handle) {
+            return false;
+        }
+
+        handle.callback();
+        await this.drainMicrotasks();
+        return true;
+    }
+
     async drainMicrotasks(): Promise<void> {
         for (let tick = 0; tick < ASYNC_TIMER_DRAIN_MICROTASK_TICKS; tick += 1) {
             await Promise.resolve();
@@ -348,6 +626,7 @@ class FakeTimer {
 
 interface FakeTimerHandle {
     active: boolean;
+    delayMilliseconds: number;
     callback(): void;
 }
 
