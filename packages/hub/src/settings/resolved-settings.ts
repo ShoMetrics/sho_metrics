@@ -4,7 +4,7 @@
 //
 // This file intentionally tracks the current stored proto shape at the app
 // boundary. Future product directions such as rotation, text dashboards,
-// touch-strip layouts, per-core CPU metrics, process network metrics, ping, and
+// touch-strip layouts, per-core CPU metrics, process network metrics, and
 // system status belong in comments until the stored contract can express them.
 //
 // Quick-start actions such as CPU, GPU, Network, and Disk should resolve to
@@ -98,18 +98,20 @@ export type ResolvedMemoryReading =
 
 export interface ResolvedNetworkMetricTarget {
     readonly domain: "network";
-    readonly interfaceId: string | undefined;
     readonly reading: ResolvedNetworkReading;
 }
 
-// Future process network traffic and ping should be added here only after
-// NetworkMetricTarget in proto can store their selectors and parameters.
 export type ResolvedNetworkReading =
     | {
         readonly kind: "traffic";
+        readonly interfaceId: string | undefined;
         readonly direction: NetworkDirection;
         readonly trafficDisplayMode: NetworkTrafficDisplayMode;
         readonly display: ResolvedNetworkDisplaySettings;
+    }
+    | {
+        readonly kind: "ping";
+        readonly targetHost: string;
     };
 
 export interface ResolvedDiskMetricTarget {

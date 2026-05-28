@@ -136,28 +136,47 @@ message MemoryMetricTarget {
 }
 
 message NetworkMetricTarget {
-  enum Direction {
-    DIRECTION_UNSPECIFIED = 0;
-    DIRECTION_BOTH = 1;
-    DIRECTION_DOWNLOAD = 2;
-    DIRECTION_UPLOAD = 3;
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_TRAFFIC = 1;
+    KIND_PING = 2;
   }
 
-  enum TrafficDisplayMode {
-    TRAFFIC_DISPLAY_MODE_UNSPECIFIED = 0;
-    TRAFFIC_DISPLAY_MODE_MIRRORED = 1;
-    TRAFFIC_DISPLAY_MODE_OVERLAY = 2;
-  }
-
-  optional Direction direction = 1 [(buf.validate.field).enum = {
+  optional Kind kind = 1 [(buf.validate.field).enum = {
     defined_only: true
     not_in: [0]
   }];
-  optional string interface_id = 2 [(buf.validate.field).string.max_len = 256];
-  optional TrafficDisplayMode traffic_display_mode = 3 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
+  optional Traffic traffic = 2;
+  optional Ping ping = 3;
+
+  message Traffic {
+    enum Direction {
+      DIRECTION_UNSPECIFIED = 0;
+      DIRECTION_BOTH = 1;
+      DIRECTION_DOWNLOAD = 2;
+      DIRECTION_UPLOAD = 3;
+    }
+
+    enum TrafficDisplayMode {
+      TRAFFIC_DISPLAY_MODE_UNSPECIFIED = 0;
+      TRAFFIC_DISPLAY_MODE_MIRRORED = 1;
+      TRAFFIC_DISPLAY_MODE_OVERLAY = 2;
+    }
+
+    optional Direction direction = 1 [(buf.validate.field).enum = {
+      defined_only: true
+      not_in: [0]
+    }];
+    optional string interface_id = 2 [(buf.validate.field).string.max_len = 256];
+    optional TrafficDisplayMode traffic_display_mode = 3 [(buf.validate.field).enum = {
+      defined_only: true
+      not_in: [0]
+    }];
+  }
+
+  message Ping {
+    optional string target_host = 1 [(buf.validate.field).string.max_len = 253];
+  }
 }
 
 message DiskMetricTarget {

@@ -39,6 +39,7 @@
         "@types/node": "~24.1.0",
         "@types/react": "^19.0.0",
         "@types/react-dom": "^19.0.0",
+        "@types/validator": "13.15.10",
         "eslint": "^9.39.4",
         "globals": "^17.5.0",
         "rollup": "^4.0.2",
@@ -59,6 +60,7 @@
         "lucide": "^1.11.0",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
-        "systeminformation": "^5.31.5"
+        "systeminformation": "^5.31.5",
+        "validator": "13.15.35"
     }
 }

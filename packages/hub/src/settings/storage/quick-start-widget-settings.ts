@@ -11,7 +11,9 @@ import {
     MemoryMetricTargetSchema,
     MetricSelectionSchema,
     MetricSlotSchema,
-    NetworkMetricTarget_Direction as StoredNetworkDirection,
+    NetworkMetricTarget_Kind as StoredNetworkMetricKind,
+    NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
+    NetworkMetricTarget_TrafficSchema,
     NetworkMetricTargetSchema,
     SingleMetricWidgetSchema,
     type MetricSelection,
@@ -83,7 +85,12 @@ function buildQuickStartMetricTarget(actionKind: ActionKind): MetricSelection["t
         case "network":
             return {
                 case: "network",
-                value: create(NetworkMetricTargetSchema, { direction: StoredNetworkDirection.BOTH }),
+                value: create(NetworkMetricTargetSchema, {
+                    kind: StoredNetworkMetricKind.TRAFFIC,
+                    traffic: create(NetworkMetricTarget_TrafficSchema, {
+                        direction: StoredNetworkDirection.BOTH,
+                    }),
+                }),
             };
         case "disk":
             return {
