@@ -9,7 +9,6 @@ import {
     KEYPAD_PNG_SIZE,
     TOUCH_STRIP_LOGICAL_SIZE,
     TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE,
-    TOUCH_STRIP_SINGLE_METRIC_SQUARE_PNG_SIZE,
     WIDGET_LOGICAL_SIZE,
     type DualChannelWidgetData,
     type WidgetData,
@@ -359,7 +358,7 @@ test("pixel window wide touch strip scales the original body into the client vie
     assert.ok(renderPlan.bodyViewport.height >= 60);
 });
 
-test("touch strip layout uses square rendering for circle branches", () => {
+test("touch strip layout uses a wide frame with square body for circle branches", () => {
     const renderPlan = buildMetricViewRenderPlan({
         viewOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
@@ -370,10 +369,55 @@ test("touch strip layout uses square rendering for circle branches", () => {
         renderTarget: "touch-strip",
     });
 
-    assert.equal(renderPlan.touchStripMetricLayout?.kind, "square");
-    assert.deepEqual(renderPlan.renderSize, WIDGET_LOGICAL_SIZE);
+    assert.equal(renderPlan.touchStripMetricLayout?.kind, "wide-frame-square-body");
+    assert.deepEqual(renderPlan.renderSize, TOUCH_STRIP_LOGICAL_SIZE);
     assert.deepEqual(renderPlan.bodyRenderSize, WIDGET_LOGICAL_SIZE);
-    assert.deepEqual(renderPlan.pngSize, TOUCH_STRIP_SINGLE_METRIC_SQUARE_PNG_SIZE);
+    assert.deepEqual(renderPlan.bodyViewport, {
+        xCoordinate: 50,
+        yCoordinate: 0,
+        width: 100,
+        height: 100,
+        body: {
+            xOffset: 0,
+            yOffset: 0,
+            renderSize: WIDGET_LOGICAL_SIZE,
+        },
+        clipRadius: undefined,
+    });
+    assert.deepEqual(renderPlan.pngSize, TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE);
+});
+
+test("pixel window circle touch strip places a square body inside the client viewport", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
+            resolvedSettings: {
+                theme: { selectedTheme: "pixel-window" },
+                view: { selectedView: "circle" },
+            },
+        }),
+        renderTarget: "touch-strip",
+    });
+
+    assert.equal(frame.renderPlan.touchStripMetricLayout?.kind, "wide-frame-square-body");
+    assert.deepEqual(frame.renderPlan.renderSize, TOUCH_STRIP_LOGICAL_SIZE);
+    assert.deepEqual(frame.renderPlan.bodyRenderSize, WIDGET_LOGICAL_SIZE);
+    assert.deepEqual(frame.renderPlan.bodyViewport, {
+        xCoordinate: 61,
+        yCoordinate: 17,
+        width: 78,
+        height: 78,
+        body: {
+            xOffset: 0,
+            yOffset: 0,
+            renderSize: WIDGET_LOGICAL_SIZE,
+        },
+        clipRadius: 0,
+    });
+    assert.deepEqual(frame.renderPlan.pngSize, TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE);
+    assert.match(frame.svg, /width="200" height="100"/);
+    assert.match(frame.svg, /viewBox="0 0 200 100"/);
+    assert.match(frame.svg, /<g transform="translate\(61 17\) scale\(0\.5417\)">/);
 });
 
 test("touch strip layout uses wide rendering for non-circle branches", () => {
