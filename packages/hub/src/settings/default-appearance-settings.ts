@@ -106,7 +106,7 @@ export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
     },
     line: {
         lineSmoothingPercent: 75,
-        gridLineVisibility: "adaptive",
+        gridLineVisibility: "none",
         gridLineType: "horizontal",
     },
 };

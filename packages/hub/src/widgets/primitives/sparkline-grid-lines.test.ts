@@ -32,7 +32,7 @@ test("always visibility uses fixed horizontal opacity and skips adaptive activit
         progressList: [0, 1, 0, 1, 0, 1, 0, 1],
     });
 
-    assert.equal(metrics.opacity, 0.24);
+    assert.equal(metrics.opacity, 1);
     assert.equal(metrics.activity, 0);
     assert.equal(metrics.verticalRange, 0);
     assert.equal(metrics.averageStep, 0);
@@ -57,7 +57,7 @@ test("adaptive horizontal treats a steady full history as maximally supported", 
         progressList: Array.from({ length: 60 }, () => 0.43),
     });
 
-    assert.equal(metrics.opacity, 0.18);
+    assert.equal(metrics.opacity, 0.75);
     assert.equal(metrics.activity, 0);
     assert.equal(metrics.verticalRange, 0);
     assert.equal(metrics.averageStep, 0);
@@ -71,7 +71,7 @@ test("adaptive horizontal treats insufficient samples as steady", () => {
         progressList: [0.43, 0.43],
     });
 
-    assert.equal(metrics.opacity, 0.18);
+    assert.equal(metrics.opacity, 0.75);
     assert.equal(metrics.activity, 0);
     assert.equal(metrics.pointCount, 2);
 });
@@ -83,7 +83,7 @@ test("adaptive horizontal makes highly active charts quiet", () => {
         progressList: [0, 1, 0, 1, 0, 1, 0, 1],
     });
 
-    assertApproximatelyEqual(metrics.opacity, 0.055);
+    assertApproximatelyEqual(metrics.opacity, 0.32);
     assert.equal(metrics.activity, 1);
     assert.equal(metrics.verticalRange, 1);
     assert.equal(metrics.averageStep, 1);
@@ -98,8 +98,8 @@ test("adaptive horizontal smoothly interpolates for moderate activity", () => {
 
     assert.ok(metrics.activity > 0.06, `Expected activity above steady threshold, got ${metrics.activity}.`);
     assert.ok(metrics.activity < 0.32, `Expected activity below active threshold, got ${metrics.activity}.`);
-    assert.ok(metrics.opacity > 0.055, `Expected opacity above active opacity, got ${metrics.opacity}.`);
-    assert.ok(metrics.opacity < 0.18, `Expected opacity below steady opacity, got ${metrics.opacity}.`);
+    assert.ok(metrics.opacity > 0.32, `Expected opacity above active opacity, got ${metrics.opacity}.`);
+    assert.ok(metrics.opacity < 0.75, `Expected opacity below steady opacity, got ${metrics.opacity}.`);
 });
 
 test("adaptive vertical uses vertical opacity range for steady charts", () => {
@@ -109,7 +109,7 @@ test("adaptive vertical uses vertical opacity range for steady charts", () => {
         progressList: Array.from({ length: 12 }, () => 0.43),
     });
 
-    assert.equal(metrics.opacity, 1);
+    assert.equal(metrics.opacity, 0.75);
     assert.equal(metrics.activity, 0);
 });
 
@@ -131,7 +131,7 @@ test("adaptive vertical treats insufficient samples as steady", () => {
         progressList: [0.43, 0.43],
     });
 
-    assert.equal(metrics.opacity, 1);
+    assert.equal(metrics.opacity, 0.75);
     assert.equal(metrics.pointCount, 2);
 });
 
@@ -142,7 +142,7 @@ test("adaptive handles empty histories as steady instead of producing NaN", () =
         progressList: [],
     });
 
-    assert.equal(metrics.opacity, 0.18);
+    assert.equal(metrics.opacity, 0.75);
     assert.equal(metrics.activity, 0);
     assert.equal(metrics.verticalRange, 0);
     assert.equal(metrics.averageStep, 0);
@@ -157,7 +157,7 @@ test("adaptive handles invalid plot height as steady instead of producing NaN", 
         plotLayoutOverride: { ...plotLayout, height: 0 },
     });
 
-    assert.equal(metrics.opacity, 0.18);
+    assert.equal(metrics.opacity, 0.75);
     assert.equal(metrics.activity, 0);
     assert.equal(metrics.verticalRange, 0);
     assert.equal(metrics.averageStep, 0);

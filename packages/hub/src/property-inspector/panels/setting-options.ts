@@ -49,7 +49,7 @@ export const colorFilledColorModeOptionList = [
 ] as const satisfies readonly SelectOption[];
 
 export const gridLineVisibilityOptionList = [
-    { value: "adaptive", label: "Adaptive" },
+    { value: "adaptive", label: "Adaptive to Activity" },
     { value: "always", label: "Always" },
     { value: "none", label: "None" },
 ] as const satisfies readonly SelectOption[];

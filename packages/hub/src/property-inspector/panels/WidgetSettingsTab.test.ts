@@ -301,6 +301,24 @@ test("network mirrored trend disables grid controls in the panel", () => {
     assert.match(markup, /Grid line settings are not supported/);
 });
 
+test("line trend settings keep adaptive grid visibility explanation in the option label", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "network",
+        settings: buildWidgetSettings("network", {
+            appearance: {
+                view: { selectedView: "line" },
+                line: { gridLineVisibility: "adaptive" },
+            },
+            network: {
+                direction: "download",
+            },
+        }),
+    });
+
+    assert.match(markup, /Adaptive to Activity/);
+    assert.doesNotMatch(markup, /grid line visibility adapts to chart activity/);
+});
+
 test("disk throughput bar view settings render read/write colors", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",

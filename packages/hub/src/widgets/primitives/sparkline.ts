@@ -64,7 +64,7 @@ export const DEFAULT_SPARKLINE_CONFIG: SparklineConfig = {
     lineWidth: 2,
     fillOpacity: 0.58,
     lineSmoothingPercent: 75,
-    gridLineVisibility: "adaptive",
+    gridLineVisibility: "none",
     gridLineType: "horizontal",
     timeGuideTickCount: 5,
     historyWindowSeconds: 60,

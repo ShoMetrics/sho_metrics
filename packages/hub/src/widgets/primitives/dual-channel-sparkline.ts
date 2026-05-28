@@ -65,7 +65,7 @@ export const DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG: DualChannelSparklineConfig =
     lineWidth: 2,
     fillOpacity: 0.46,
     lineSmoothingPercent: 75,
-    gridLineVisibility: "adaptive",
+    gridLineVisibility: "none",
     gridLineType: "horizontal",
     timeGuideTickCount: 5,
     historyWindowSeconds: 60,
@@ -155,7 +155,7 @@ export function renderDualChannelSparkline(
     });
     const positiveModel = channelModels.find(channel => channel.channelId === "positive");
     const negativeModel = channelModels.find(channel => channel.channelId === "negative");
-    const gridLineSvg = config.chartMode === "mirrored"
+    const gridLineFragment = config.chartMode === "mirrored"
         ? ""
         : renderGridLines({
             plotLayout,
@@ -167,6 +167,7 @@ export function renderDualChannelSparkline(
             themeEffects: config.themeEffects,
         });
 
+    // Grid lines are rendered between channel fills and line strokes below.
     return `
         <defs>
             ${config.colorConfig.isGradientEnabled ? `
@@ -218,22 +219,30 @@ export function renderDualChannelSparkline(
             textStyles: config.textStyles,
             themeEffects: config.themeEffects,
         })}
-        ${gridLineSvg}
         ${config.chartMode === "mirrored" ? renderMirroredBaseline(plotLayout, config.paints.baseline, config.themeEffects.subtleFilter) : ""}
-        ${renderChannelPathGroup({
+        ${renderChannelAreaPath({
             model: positiveModel,
-            linePaint: config.colorConfig.isGradientEnabled ? `url(#${positiveLineGradientId})` : config.positiveColor,
             areaPaint: config.colorConfig.isGradientEnabled ? `url(#${positiveAreaGradientId})` : config.positiveColor,
             areaOpacity: config.colorConfig.isGradientEnabled ? undefined : config.fillOpacity,
+            themeEffects: config.themeEffects,
+        })}
+        ${renderChannelAreaPath({
+            model: negativeModel,
+            areaPaint: config.colorConfig.isGradientEnabled ? `url(#${negativeAreaGradientId})` : config.negativeColor,
+            areaOpacity: config.colorConfig.isGradientEnabled ? undefined : config.fillOpacity * 0.82,
+            themeEffects: config.themeEffects,
+        })}
+        ${gridLineFragment}
+        ${renderChannelLinePaths({
+            model: positiveModel,
+            linePaint: config.colorConfig.isGradientEnabled ? `url(#${positiveLineGradientId})` : config.positiveColor,
             lineWidth: config.lineWidth,
             glowFilterId,
             themeEffects: config.themeEffects,
         })}
-        ${renderChannelPathGroup({
+        ${renderChannelLinePaths({
             model: negativeModel,
             linePaint: config.colorConfig.isGradientEnabled ? `url(#${negativeLineGradientId})` : config.negativeColor,
-            areaPaint: config.colorConfig.isGradientEnabled ? `url(#${negativeAreaGradientId})` : config.negativeColor,
-            areaOpacity: config.colorConfig.isGradientEnabled ? undefined : config.fillOpacity * 0.82,
             lineWidth: config.lineWidth,
             glowFilterId,
             themeEffects: config.themeEffects,
@@ -555,13 +564,10 @@ function renderChannelRow(options: {
     `;
 }
 
-function renderChannelPathGroup(options: {
+function renderChannelAreaPath(options: {
     model: { linePath: string; areaPath: string } | undefined;
-    linePaint: string;
     areaPaint: string;
     areaOpacity: number | undefined;
-    lineWidth: number;
-    glowFilterId: string;
     themeEffects: RenderThemeEffectTokens;
 }): string {
     if (!options.model) {
@@ -574,6 +580,21 @@ function renderChannelPathGroup(options: {
 
     return `
         <path d="${options.model.areaPath}" fill="${options.areaPaint}"${areaOpacity} ${buildSvgFilterAttributes(options.themeEffects.subtleFilter).join(" ")} />
+    `;
+}
+
+function renderChannelLinePaths(options: {
+    model: { linePath: string; areaPath: string } | undefined;
+    linePaint: string;
+    lineWidth: number;
+    glowFilterId: string;
+    themeEffects: RenderThemeEffectTokens;
+}): string {
+    if (!options.model) {
+        return "";
+    }
+
+    return `
         <path d="${options.model.linePath}" fill="none" stroke="${options.linePaint}"
             stroke-width="${Math.max(1, options.lineWidth + 1.2)}" stroke-linejoin="round"
             stroke-linecap="round" filter="url(#${options.glowFilterId})" opacity="0.46" />
