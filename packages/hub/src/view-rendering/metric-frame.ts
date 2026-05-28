@@ -7,17 +7,23 @@ import { pixelWindowStyle } from "../widgets/styles/pixel-window";
 import { terminalCleanStyle, terminalVintageStyle } from "../widgets/styles/terminal";
 import type { ThemeBodyViewport, ThemeStyle, ThemeStylePaints } from "../widgets/styles/theme-style";
 
+export interface MetricFrameBody {
+    readonly svg: string;
+    readonly bodyViewport?: ThemeBodyViewport | undefined;
+    readonly muted: boolean;
+}
+
 export function renderMetricFrame(options: {
-    body: string;
-    bodyViewport?: ThemeBodyViewport | undefined;
+    bodies: readonly MetricFrameBody[];
     themePreset: ThemePresetName;
-    muted: boolean;
     paints: ThemeStylePaints;
     size: KeySize;
 }): string {
     const style = resolveThemePreset(options.themePreset);
     const filterId = `muted-widget-${options.size.width}-${options.size.height}`;
-    const mutedDefs = options.muted
+    // The filter definition is shared, but each body chooses independently
+    // whether its own SVG is wrapped with the muted filter.
+    const mutedDefs = options.bodies.some(body => body.muted)
         ? `
             <filter id="${filterId}" color-interpolation-filters="sRGB">
                 <feColorMatrix type="saturate" values="0" />
@@ -27,18 +33,22 @@ export function renderMetricFrame(options: {
             </filter>
         `
         : "";
-    const body = options.muted
-        ? `<g filter="url(#${filterId})">${options.body}</g>`
-        : options.body;
-    const viewportClipId = options.bodyViewport === undefined
-        ? ""
-        : bodyViewportClipId(options.themePreset, options.bodyViewport);
-    const viewportDefs = options.bodyViewport === undefined
-        ? ""
-        : renderBodyViewportClipPath(viewportClipId, options.bodyViewport);
-    const placedBody = options.bodyViewport === undefined
-        ? body
-        : renderPlacedBody(body, options.bodyViewport, viewportClipId);
+    const viewportDefs = options.bodies
+        .map((body, index) => body.bodyViewport === undefined
+            ? ""
+            : renderBodyViewportClipPath(
+                bodyViewportClipId(options.themePreset, body.bodyViewport, index),
+                body.bodyViewport,
+            ))
+        .join("");
+    const placedBodies = options.bodies
+        .map((body, index) => renderFrameBody({
+            body,
+            filterId,
+            index,
+            themePreset: options.themePreset,
+        }))
+        .join("");
     const panelAttributes = style.renderPanelAttributes?.(options.size, options.paints) ?? [];
     const panelStart = panelAttributes.length === 0
         ? ""
@@ -52,7 +62,7 @@ export function renderMetricFrame(options: {
         <defs>${style.renderDefs(options.size, options.paints)}${viewportDefs}${mutedDefs}</defs>
         ${panelStart}
         ${style.renderBackground(options.size, options.paints)}
-        ${placedBody}
+        ${placedBodies}
         ${panelOverlay}
         ${panelEnd}
         ${style.renderOverlay(options.size, options.paints)}
@@ -94,6 +104,25 @@ function renderBodyViewportClipPath(clipId: string, viewport: ThemeBodyViewport)
         </clipPath>`;
 }
 
+function renderFrameBody(options: {
+    body: MetricFrameBody;
+    filterId: string;
+    index: number;
+    themePreset: ThemePresetName;
+}): string {
+    const bodySvg = options.body.muted
+        ? `<g filter="url(#${options.filterId})">${options.body.svg}</g>`
+        : options.body.svg;
+
+    if (options.body.bodyViewport === undefined) {
+        return bodySvg;
+    }
+
+    const clipId = bodyViewportClipId(options.themePreset, options.body.bodyViewport, options.index);
+
+    return renderPlacedBody(bodySvg, options.body.bodyViewport, clipId);
+}
+
 function renderPlacedBody(body: string, viewport: ThemeBodyViewport, clipId: string): string {
     const xCoordinate = viewport.xCoordinate + viewport.body.xOffset;
     const yCoordinate = viewport.yCoordinate + viewport.body.yOffset;
@@ -110,10 +139,8 @@ function renderPlacedBody(body: string, viewport: ThemeBodyViewport, clipId: str
         </g>`;
 }
 
-function bodyViewportClipId(themePreset: ThemePresetName, viewport: ThemeBodyViewport): string {
-    // Current frames emit one body viewport. Multi-body layouts must add a slot
-    // identity or coordinates here before they introduce multiple clip paths.
-    return `${themePreset}-body-viewport-${viewport.width}-${viewport.height}`;
+function bodyViewportClipId(themePreset: ThemePresetName, viewport: ThemeBodyViewport, index: number): string {
+    return `${themePreset}-body-viewport-${index}-${viewport.xCoordinate}-${viewport.yCoordinate}-${viewport.width}-${viewport.height}`;
 }
 
 function formatSvgNumber(value: number): string {

@@ -372,6 +372,7 @@ test("touch strip layout uses a wide frame with square body for circle branches"
     assert.equal(renderPlan.touchStripMetricLayout?.kind, "wide-frame-square-body");
     assert.deepEqual(renderPlan.renderSize, TOUCH_STRIP_LOGICAL_SIZE);
     assert.deepEqual(renderPlan.bodyRenderSize, WIDGET_LOGICAL_SIZE);
+    assert.equal(renderPlan.bodyViewports.length, 1);
     assert.deepEqual(renderPlan.bodyViewport, {
         xCoordinate: 50,
         yCoordinate: 0,
@@ -402,6 +403,7 @@ test("pixel window circle touch strip places a square body inside the client vie
     assert.equal(frame.renderPlan.touchStripMetricLayout?.kind, "wide-frame-square-body");
     assert.deepEqual(frame.renderPlan.renderSize, TOUCH_STRIP_LOGICAL_SIZE);
     assert.deepEqual(frame.renderPlan.bodyRenderSize, WIDGET_LOGICAL_SIZE);
+    assert.equal(frame.renderPlan.bodyViewports.length, 1);
     assert.deepEqual(frame.renderPlan.bodyViewport, {
         xCoordinate: 61,
         yCoordinate: 17,
@@ -420,15 +422,160 @@ test("pixel window circle touch strip places a square body inside the client vie
     assert.match(frame.svg, /<g transform="translate\(61 17\) scale\(0\.5417\)">/);
 });
 
+test("dual circle touch strip renders two square body slots", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildDualMetricRenderOptions({
+            widgetData: buildDualChannelWidgetData({
+                positive: buildWidgetData({
+                    current: 42,
+                    progress: 0.42,
+                    label: "UP",
+                    sampleTimestampMilliseconds: 1000,
+                }),
+                negative: buildWidgetData({
+                    current: 17,
+                    progress: 0.17,
+                    label: "DN",
+                    sampleTimestampMilliseconds: 1000,
+                }),
+            }),
+            selectedView: "circle",
+            dualRenderPrimitive: "circle",
+        }),
+        renderTarget: "touch-strip",
+    });
+
+    assert.equal(frame.renderPlan.touchStripMetricLayout?.kind, "wide-frame-two-square-bodies");
+    assert.deepEqual(frame.renderPlan.renderSize, TOUCH_STRIP_LOGICAL_SIZE);
+    assert.deepEqual(frame.renderPlan.bodyRenderSize, WIDGET_LOGICAL_SIZE);
+    assert.deepEqual(frame.renderPlan.bodyViewports, [
+        {
+            xCoordinate: 0,
+            yCoordinate: 0,
+            width: 100,
+            height: 100,
+            body: {
+                xOffset: 0,
+                yOffset: 0,
+                renderSize: WIDGET_LOGICAL_SIZE,
+            },
+            clipRadius: undefined,
+        },
+        {
+            xCoordinate: 100,
+            yCoordinate: 0,
+            width: 100,
+            height: 100,
+            body: {
+                xOffset: 0,
+                yOffset: 0,
+                renderSize: WIDGET_LOGICAL_SIZE,
+            },
+            clipRadius: undefined,
+        },
+    ]);
+    assert.match(frame.svg, /flat-body-viewport-0-0-0-100-100/);
+    assert.match(frame.svg, /flat-body-viewport-1-100-0-100-100/);
+    assert.match(frame.svg, /translate\(0 0\) scale\(0\.6944\)/);
+    assert.match(frame.svg, /translate\(100 0\) scale\(0\.6944\)/);
+});
+
+test("pixel window dual circle touch strip places two square body slots inside the client viewport", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildDualMetricRenderOptions({
+            widgetData: buildDualChannelWidgetData({
+                positive: buildWidgetData({ label: "UP", sampleTimestampMilliseconds: 1000 }),
+                negative: buildWidgetData({ label: "DN", sampleTimestampMilliseconds: 1000 }),
+            }),
+            resolvedSettings: {
+                theme: { selectedTheme: "pixel-window" },
+                view: { selectedView: "circle" },
+            },
+            dualRenderPrimitive: "circle",
+        }),
+        renderTarget: "touch-strip",
+    });
+
+    assert.equal(frame.renderPlan.touchStripMetricLayout?.kind, "wide-frame-two-square-bodies");
+    assert.deepEqual(frame.renderPlan.bodyViewports, [
+        {
+            xCoordinate: 13,
+            yCoordinate: 17,
+            width: 78,
+            height: 78,
+            body: {
+                xOffset: 0,
+                yOffset: 0,
+                renderSize: WIDGET_LOGICAL_SIZE,
+            },
+            clipRadius: 0,
+        },
+        {
+            xCoordinate: 108,
+            yCoordinate: 17,
+            width: 78,
+            height: 78,
+            body: {
+                xOffset: 0,
+                yOffset: 0,
+                renderSize: WIDGET_LOGICAL_SIZE,
+            },
+            clipRadius: 0,
+        },
+    ]);
+    assert.match(frame.svg, /pixel-window-body-viewport-0-13-17-78-78/);
+    assert.match(frame.svg, /pixel-window-body-viewport-1-108-17-78-78/);
+    assert.match(frame.svg, /translate\(13 17\) scale\(0\.5417\)/);
+    assert.match(frame.svg, /translate\(108 17\) scale\(0\.5417\)/);
+});
+
 test("touch strip layout uses wide rendering for non-circle branches", () => {
     const renderAppearance = buildMetricRenderAppearance(
         buildDefaultAppearanceSettings({ view: { selectedView: "line" } }),
     );
-    const touchStripMetricLayout = resolveTouchStripMetricLayout(renderAppearance);
+    const touchStripMetricLayout = resolveTouchStripMetricLayout({
+        renderPrimitive: renderAppearance.renderPrimitive,
+        circleVariant: renderAppearance.circleVariant,
+    });
 
     assert.equal(touchStripMetricLayout.kind, "wide");
     assert.deepEqual(touchStripMetricLayout.renderSize, TOUCH_STRIP_LOGICAL_SIZE);
     assert.deepEqual(touchStripMetricLayout.pngSize, TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE);
+});
+
+test("dual circle gauge touch strip keeps one square body until split gauge lanes exist", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildDualMetricRenderOptions({
+            widgetData: buildDualChannelWidgetData({
+                positive: buildWidgetData({ label: "UP", sampleTimestampMilliseconds: 1000 }),
+                negative: buildWidgetData({ label: "DN", sampleTimestampMilliseconds: 1000 }),
+            }),
+            selectedView: "circle",
+            dualRenderPrimitive: "circle",
+            resolvedSettings: {
+                view: {
+                    selectedView: "circle",
+                    circleVariant: "gauge",
+                },
+            },
+        }),
+        renderTarget: "touch-strip",
+    });
+
+    assert.equal(frame.renderPlan.touchStripMetricLayout?.kind, "wide-frame-square-body");
+    assert.equal(frame.renderPlan.bodyViewports.length, 1);
+    assert.deepEqual(frame.renderPlan.bodyViewports[0], {
+        xCoordinate: 50,
+        yCoordinate: 0,
+        width: 100,
+        height: 100,
+        body: {
+            xOffset: 0,
+            yOffset: 0,
+            renderSize: WIDGET_LOGICAL_SIZE,
+        },
+        clipRadius: undefined,
+    });
 });
 
 function buildSingleMetricRenderOptions(options: {
@@ -445,19 +592,23 @@ function buildSingleMetricRenderOptions(options: {
 
 function buildDualMetricRenderOptions(options: {
     widgetData: DualChannelWidgetData;
+    resolvedSettings?: ResolvedAppearanceSettingsOverride;
+    selectedView?: "circle" | "text" | "line";
+    dualRenderPrimitive?: "circle" | "text" | "sparkline";
 }): DualMetricRenderOptions {
     return {
         centerIconFragment: "",
         statusIcon: buildStatusIcon(),
         widgetData: options.widgetData,
         titleText: "NET",
-        dualRenderPrimitive: "text",
+        dualRenderPrimitive: options.dualRenderPrimitive ?? "text",
         positiveColor: "#ffffff",
         negativeColor: "#ffffff",
         positiveLabelText: "UP",
         negativeLabelText: "DN",
         resolvedSettings: buildDefaultAppearanceSettings({
-            view: { selectedView: "text" },
+            view: { selectedView: options.selectedView ?? "text" },
+            ...options.resolvedSettings,
         }),
     };
 }

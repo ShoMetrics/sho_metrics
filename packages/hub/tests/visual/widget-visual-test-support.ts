@@ -310,9 +310,13 @@ export function renderSingleMetricWidgetPngBuffer(testCase: SingleMetricVisualTe
     });
 
     return renderSvgToPngBuffer(renderMetricFrame({
-        body,
+        bodies: [
+            {
+                svg: body,
+                muted: testCase.muted ?? false,
+            },
+        ],
         themePreset: visualSettings.themePreset,
-        muted: testCase.muted ?? false,
         paints: visualSettings.paints,
         size: keySize,
     }), keySize);
@@ -356,9 +360,13 @@ export function renderDualMetricWidgetPngBuffer(testCase: DualMetricVisualTestCa
     });
 
     return renderSvgToPngBuffer(renderMetricFrame({
-        body,
+        bodies: [
+            {
+                svg: body,
+                muted: testCase.muted ?? false,
+            },
+        ],
         themePreset: visualSettings.themePreset,
-        muted: testCase.muted ?? false,
         paints: visualSettings.paints,
         size: keySize,
     }), keySize);
