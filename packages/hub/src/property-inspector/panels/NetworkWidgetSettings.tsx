@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { InspectorItem } from "../components/InspectorItem";
 import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
+import { TextSetting } from "../controls/TextSetting";
 import { resolveNetworkInterfaceOptions } from "../select-options/runtime-select-options";
 import {
     NetworkChannelColorSettings,
@@ -11,9 +13,17 @@ import { PollingSettings } from "./PollingSettings";
 import { LineSettings } from "./LineSettings";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
-import type { ResolvedNetworkMetricTarget } from "../../settings/resolved-settings";
+import type {
+    ResolvedNetworkMetricTarget,
+    ResolvedNetworkReading,
+} from "../../settings/resolved-settings";
+import {
+    DEFAULT_NETWORK_PING_TARGET_HOST,
+    normalizeNetworkPingTargetInput,
+} from "../../settings/network-ping-target";
 import {
     networkDirectionOptionList,
+    networkMetricKindOptionList,
     networkUnitBaseOptionList,
     scaleModeOptionList,
 } from "./setting-options";
@@ -22,14 +32,28 @@ type NetworkWidgetSettingsProps = WidgetSettingsPanelProps & {
     target: ResolvedNetworkMetricTarget;
 };
 
+const PING_TARGET_VALIDATION_MESSAGE = "Enter an IP address, hostname, or URL.";
+
+type ResolvedNetworkTrafficMetricTarget = ResolvedNetworkMetricTarget & {
+    readonly reading: Extract<ResolvedNetworkReading, { readonly kind: "traffic" }>;
+};
+
+type NetworkTrafficWidgetSettingsProps = Omit<NetworkWidgetSettingsProps, "target"> & {
+    target: ResolvedNetworkTrafficMetricTarget;
+};
+
 export function NetworkWidgetSettings(props: NetworkWidgetSettingsProps): React.JSX.Element {
+    const trafficTarget = readNetworkTrafficMetricTarget(props.target);
+
     return (
         <>
             <NetworkMetricSettings {...props} />
             <AppearanceSettings {...props} />
-            <NetworkScaleSettings {...props} />
+            {trafficTarget && (
+                <NetworkScaleSettings {...props} target={trafficTarget} />
+            )}
             <LineSettings {...props} />
-            {props.target.reading.direction === "both" ? (
+            {trafficTarget && trafficTarget.reading.direction === "both" ? (
                 <NetworkChannelColorSettings {...props} />
             ) : (
                 <StandardColorSettings {...props} />
@@ -44,11 +68,110 @@ function NetworkMetricSettings({
     target,
     onSettingsPatch,
 }: NetworkWidgetSettingsProps): React.JSX.Element {
+    const trafficTarget = readNetworkTrafficMetricTarget(target);
+    const pingTargetHost = target.reading.kind === "ping"
+        ? target.reading.targetHost
+        : DEFAULT_NETWORK_PING_TARGET_HOST;
+
     return (
         <SettingsSection title="Metric">
             <SelectSetting
                 label="Network Metric"
-                value={target.reading.direction}
+                value={target.reading.kind}
+                optionList={networkMetricKindOptionList}
+                onValueChange={(kind) => onSettingsPatch({
+                    network: { kind },
+                })}
+            />
+            {trafficTarget ? (
+                <NetworkTrafficMetricSettings
+                    context={context}
+                    target={trafficTarget}
+                    onSettingsPatch={onSettingsPatch}
+                />
+            ) : (
+                <NetworkPingTargetSetting
+                    targetHost={pingTargetHost}
+                    onSettingsPatch={onSettingsPatch}
+                />
+            )}
+        </SettingsSection>
+    );
+}
+
+function NetworkPingTargetSetting({
+    targetHost,
+    onSettingsPatch,
+}: Pick<NetworkWidgetSettingsProps, "onSettingsPatch"> & {
+    readonly targetHost: string;
+}): React.JSX.Element {
+    const [draftTargetHost, setDraftTargetHost] = useState(targetHost);
+    const [isEditing, setIsEditing] = useState(false);
+    const [validationMessage, setValidationMessage] = useState("");
+    const textValue = isEditing
+        ? draftTargetHost
+        : targetHost;
+
+    useEffect(() => {
+        if (!isEditing) {
+            setDraftTargetHost(targetHost);
+        }
+    }, [isEditing, targetHost]);
+
+    return (
+        <TextSetting
+            label="Ping Target"
+            value={textValue}
+            placeholder={DEFAULT_NETWORK_PING_TARGET_HOST}
+            validationMessage={validationMessage}
+            onFocus={() => setIsEditing(true)}
+            onValueChange={(value) => {
+                setDraftTargetHost(value);
+                setValidationMessage(readPingTargetValidationMessage(value));
+            }}
+            onBlur={() => {
+                const normalizedTarget = normalizeNetworkPingTargetInput(draftTargetHost);
+                setIsEditing(false);
+
+                if (normalizedTarget.status === "normalized" || draftTargetHost.trim().length === 0) {
+                    setValidationMessage("");
+                    setDraftTargetHost(normalizedTarget.targetHost);
+                    onSettingsPatch({
+                        network: {
+                            pingTargetHost: normalizedTarget.targetHost,
+                        },
+                    });
+                    return;
+                }
+
+                setValidationMessage(PING_TARGET_VALIDATION_MESSAGE);
+            }}
+        />
+    );
+}
+
+function readPingTargetValidationMessage(value: string): string {
+    if (value.trim().length === 0) {
+        return "";
+    }
+
+    return normalizeNetworkPingTargetInput(value).status === "normalized"
+        ? ""
+        : PING_TARGET_VALIDATION_MESSAGE;
+}
+
+function NetworkTrafficMetricSettings({
+    context,
+    target,
+    onSettingsPatch,
+}: NetworkTrafficWidgetSettingsProps): React.JSX.Element {
+    const reading = target.reading;
+
+    return (
+        <>
+            <SelectSetting
+                label="Direction"
+                value={reading.direction}
                 optionList={networkDirectionOptionList}
                 onValueChange={(direction) => onSettingsPatch({
                     network: { direction },
@@ -61,20 +184,20 @@ function NetworkMetricSettings({
             )}
             <SelectSetting
                 label="Network Interface"
-                value={target.interfaceId ?? ""}
+                value={reading.interfaceId ?? ""}
                 optionList={resolveNetworkInterfaceOptions(context)}
                 onValueChange={(interfaceId) => onSettingsPatch({
                     network: { interfaceId },
                 })}
             />
-        </SettingsSection>
+        </>
     );
 }
 
 function NetworkScaleSettings({
     target,
     onSettingsPatch,
-}: NetworkWidgetSettingsProps): React.JSX.Element {
+}: NetworkTrafficWidgetSettingsProps): React.JSX.Element {
     const display = target.reading.display;
     const isAutoScale = display.scaleMode === "auto";
 
@@ -126,4 +249,14 @@ function NetworkScaleSettings({
             />
         </SettingsSection>
     );
+}
+
+function readNetworkTrafficMetricTarget(
+    target: ResolvedNetworkMetricTarget,
+): ResolvedNetworkTrafficMetricTarget | undefined {
+    return isNetworkTrafficMetricTarget(target) ? target : undefined;
+}
+
+function isNetworkTrafficMetricTarget(target: ResolvedNetworkMetricTarget): target is ResolvedNetworkTrafficMetricTarget {
+    return target.reading.kind === "traffic";
 }

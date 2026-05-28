@@ -665,6 +665,9 @@ class TestMetricAction extends MetricAction {
 
     resolveNetworkDownloadMaximumForTest(event: WillAppearEvent): number | undefined {
         const networkTarget = readResolvedMetricTarget(this.resolveSettings(event), "network");
+        if (networkTarget.reading.kind !== "traffic") {
+            return undefined;
+        }
 
         return networkTarget.reading.display.maximumDownloadSpeedMegabitsPerSecond;
     }

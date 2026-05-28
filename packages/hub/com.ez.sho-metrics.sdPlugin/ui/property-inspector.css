@@ -255,6 +255,22 @@ body {
     width: 100%;
 }
 
+.native-input[aria-invalid="true"] {
+    border-color: #d66;
+}
+
+.text-field {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.input-validation-message {
+    color: #f0a0a0;
+    font-size: 11px;
+    line-height: 1.25;
+}
+
 .native-color-input {
     background: var(--inspector-control-bg);
     border: 1px solid var(--inspector-control-border);

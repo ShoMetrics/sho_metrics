@@ -41,6 +41,10 @@ export function normalizeNetworkPingTargetInput(input: string): NormalizedNetwor
     }
 
     const dnsHost = host.toLowerCase().replace(/\.$/u, "");
+    if (isInvalidIpv4LikeDnsHost(dnsHost)) {
+        return defaultNetworkPingTarget();
+    }
+
     if (!isValidDnsHost(dnsHost)) {
         return defaultNetworkPingTarget();
     }
@@ -75,6 +79,20 @@ function isValidDnsHost(host: string): boolean {
             allow_underscores: false,
             allow_trailing_dot: false,
         });
+}
+
+function isInvalidIpv4LikeDnsHost(host: string): boolean {
+    const labels = host.split(".");
+    if (labels.length !== 4) {
+        return false;
+    }
+
+    if (labels.every(label => /^\d+$/u.test(label))) {
+        return true;
+    }
+
+    return labels.slice(0, 3).every(label => /^\d+$/u.test(label))
+        && /^\d/u.test(labels[3]);
 }
 
 function defaultNetworkPingTarget(): NormalizedNetworkPingTarget {

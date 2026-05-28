@@ -1,5 +1,6 @@
 import type { SelectOption } from "../inspector/types";
 import type {
+    ResolvedNetworkReading,
     TerminalPalettePreset,
     TerminalThemeVariant,
 } from "../../settings/resolved-settings";
@@ -67,6 +68,11 @@ export const networkDirectionOptionList = [
     { value: "upload", label: "Upload" },
     { value: "download", label: "Download" },
 ] as const satisfies readonly SelectOption[];
+
+export const networkMetricKindOptionList = [
+    { value: "traffic", label: "Traffic" },
+    { value: "ping", label: "Ping" },
+] as const satisfies readonly SelectOption<ResolvedNetworkReading["kind"]>[];
 
 export const networkTrafficDisplayModeOptionList = [
     { value: "overlay", label: "Overlay" },

@@ -159,6 +159,50 @@ test("network single-channel settings render standard usage colors", () => {
     assert.doesNotMatch(markup, /Color - Upload/);
 });
 
+test("network ping settings render ping target and hide traffic controls", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "network",
+        settings: buildWidgetSettings("network", {
+            network: {
+                kind: "ping",
+                pingTargetHost: "8.8.8.8",
+            },
+        }),
+    });
+
+    assert.match(markup, /Network Metric:/);
+    assert.match(markup, /Ping Target:/);
+    assert.match(markup, /Solid Color:/);
+    assert.match(markup, /Polling Frequency:/);
+    assert.doesNotMatch(markup, /Direction:/);
+    assert.doesNotMatch(markup, /Network Interface:/);
+    assert.doesNotMatch(markup, /Scale:/);
+    assert.doesNotMatch(markup, /Upload Max/);
+    assert.doesNotMatch(markup, /Download Max/);
+    assert.doesNotMatch(markup, /Traffic Mode:/);
+    assert.doesNotMatch(markup, /Color - Download/);
+    assert.doesNotMatch(markup, /Color - Upload/);
+});
+
+test("network traffic settings render traffic controls", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "network",
+        settings: buildWidgetSettings("network", {
+            network: {
+                kind: "traffic",
+                direction: "download",
+            },
+        }),
+    });
+
+    assert.match(markup, /Network Metric:/);
+    assert.match(markup, /Direction:/);
+    assert.match(markup, /Network Interface:/);
+    assert.match(markup, /Scale:/);
+    assert.match(markup, /Unit:/);
+    assert.doesNotMatch(markup, /Ping Target:/);
+});
+
 test("color filled theme renders color mix without range controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "network",

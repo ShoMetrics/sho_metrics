@@ -1,4 +1,4 @@
-import { ChevronsLeftRightEllipsis, Download, GlobeOff, Network, Upload, Wifi } from "lucide";
+import { Activity, ChevronsLeftRightEllipsis, Download, GlobeOff, Network, Upload, Wifi } from "lucide";
 import type { IconNode } from "lucide";
 import type { ProgressCircleStatusIcon } from "../../primitives/progress-circle";
 import type { NetworkInterfaceOption } from "../../../runtime/network-interfaces";
@@ -54,6 +54,32 @@ export function renderNetworkInterfaceIconFragment(options: {
     });
 
     return renderCenteredIconFragment(iconDefinition, options.size);
+}
+
+export function renderNetworkPingIconFragment(options: {
+    size: number;
+}): string {
+    const iconDefinition = createLucideIconDefinition({
+        id: "network.ping",
+        node: Activity,
+        strokeWidth: 2.35,
+        opticalScale: 1.08,
+    });
+
+    return renderCenteredIconFragment(iconDefinition, options.size);
+}
+
+export function getNetworkPingStatusIcon(): ProgressCircleStatusIcon {
+    return {
+        ...createLucideIconDefinition({
+            id: "network.ping.status",
+            node: Activity,
+            strokeWidth: 2.45,
+            opticalScale: 1.02,
+        }),
+        sizeRatio: NETWORK_DIRECTION_STATUS_SIZE_RATIO,
+        opticalYOffsetRatio: NETWORK_DIRECTION_STATUS_OPTICAL_Y_OFFSET_RATIO,
+    };
 }
 
 function resolveNetworkInterfaceIconNode(networkInterface: NetworkInterfaceOption | null): IconNode {

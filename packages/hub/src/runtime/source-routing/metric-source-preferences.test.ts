@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import test from "node:test";
 import {
     getDefaultDiskUsageMetricKey,
@@ -18,6 +18,7 @@ import {
 import {
     getNetworkAggregateMetricKey,
     getNetworkInterfaceMetricKey,
+    getNetworkPingLatencyMetricKey,
 } from "../network-metric-keys";
 import {
     BUILT_IN_STABLE_METRIC_KEYS,
@@ -47,6 +48,8 @@ test("local auto source preference keeps OS aggregate metrics on node-system", (
         getNetworkAggregateMetricKey("upload"),
         getNetworkInterfaceMetricKey("download", "Ethernet"),
         getNetworkInterfaceMetricKey("upload", "Ethernet"),
+        getNetworkPingLatencyMetricKey("8.8.8.8"),
+        getNetworkPingLatencyMetricKey("example.com"),
         getDefaultDiskUsageMetricKey("used"),
         getDefaultDiskUsageMetricKey("total"),
         getDefaultDiskUsageMetricKey("available"),
@@ -64,6 +67,15 @@ test("local auto source preference keeps OS aggregate metrics on node-system", (
             metricKey,
         );
     }
+});
+
+test("local auto source preference routes ping keys to node-system on all supported platforms", () => {
+    const pingMetricKey = getNetworkPingLatencyMetricKey("8.8.8.8");
+
+    assert.equal(hasExplicitLocalAutoMetricSourcePreference(pingMetricKey), true);
+    assert.deepEqual(resolveLocalAutoMetricSourceCandidates(pingMetricKey, "win32"), NODE_SYSTEM_CANDIDATES);
+    assert.deepEqual(resolveLocalAutoMetricSourceCandidates(pingMetricKey, "darwin"), NODE_SYSTEM_CANDIDATES);
+    assert.deepEqual(resolveLocalAutoMetricSourceCandidates(pingMetricKey, "linux"), NODE_SYSTEM_CANDIDATES);
 });
 
 test("local auto source preference uses only Windows helper for helper-owned stable metrics", () => {
@@ -130,3 +142,4 @@ test("local auto source preference covers every known stable built-in metric key
         );
     }
 });
+

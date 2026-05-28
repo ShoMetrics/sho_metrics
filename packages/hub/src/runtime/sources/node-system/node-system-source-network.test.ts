@@ -1,7 +1,8 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import test from "node:test";
 import type { Systeminformation } from "systeminformation";
 import { MetricUnit } from "../metric-source";
+import { getNetworkPingLatencyMetricKey } from "../../network-metric-keys";
 import { NodeSystemSource } from "./node-system-source";
 import {
     buildEmptyNodeSystemInformation,
@@ -172,6 +173,67 @@ test("node system source returns aggregate zero when cached interfaces have no s
     assert.equal(snapshot.metrics["net.down.eth0"], undefined);
 });
 
+test("node system source polls ping without traffic interface discovery", async () => {
+    const inetLatencyCalls: string[] = [];
+    let networkInterfacesPollCount = 0;
+    let networkStatsPollCount = 0;
+    const pingMetricKey = getNetworkPingLatencyMetricKey("8.8.8.8");
+    const source = new NodeSystemSource({
+        systemInformation: {
+            ...buildEmptyNodeSystemInformation(),
+            inetLatency: (async (host?: string) => {
+                if (host) {
+                    inetLatencyCalls.push(host);
+                }
+                return 23;
+            }) as NodeSystemInformationClient["inetLatency"],
+            networkInterfaces: async () => {
+                networkInterfacesPollCount += 1;
+                return [buildNetworkInterface({ iface: "eth0" })];
+            },
+            networkStats: (async () => {
+                networkStatsPollCount += 1;
+                return [buildNetworkStats({ iface: "eth0" })];
+            }) as NodeSystemInformationClient["networkStats"],
+        } as NodeSystemInformationClient,
+        pollWindowsGpuTelemetry: buildNoGpuPoller,
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller,
+        monotonicNow: () => 1000,
+    });
+
+    const snapshot = await source.pollMetrics([pingMetricKey]);
+
+    assert.deepEqual(inetLatencyCalls, ["8.8.8.8"]);
+    assert.equal(networkInterfacesPollCount, 0);
+    assert.equal(networkStatsPollCount, 0);
+    assert.equal(readScalarMetric(snapshot, pingMetricKey, MetricUnit.MILLISECONDS), 23);
+});
+
+test("node system source does not poll ping for empty or traffic-only requests", async () => {
+    const inetLatencyCalls: string[] = [];
+    const source = new NodeSystemSource({
+        systemInformation: {
+            ...buildEmptyNodeSystemInformation(),
+            inetLatency: (async (host?: string) => {
+                if (host) {
+                    inetLatencyCalls.push(host);
+                }
+                return 23;
+            }) as NodeSystemInformationClient["inetLatency"],
+            networkInterfaces: async () => [buildNetworkInterface({ iface: "eth0" })],
+            networkStats: (async () => [buildNetworkStats({ iface: "eth0" })]) as NodeSystemInformationClient["networkStats"],
+        } as NodeSystemInformationClient,
+        pollWindowsGpuTelemetry: buildNoGpuPoller,
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller,
+        monotonicNow: () => 1000,
+    });
+
+    await source.pollMetrics([]);
+    await source.pollMetrics(["net.down"]);
+
+    assert.deepEqual(inetLatencyCalls, []);
+});
+
 async function buildNoGpuPoller(): Promise<NodeSystemGpuTelemetryData | null> {
     return null;
 }
@@ -183,11 +245,13 @@ async function buildNoSystemGpuPoller(): Promise<NodeSystemGpuTelemetryData | nu
 function readScalarMetric(
     snapshot: Awaited<ReturnType<NodeSystemSource["pollMetrics"]>>,
     metricKey: string,
+    unit: MetricUnit = MetricUnit.BYTES_PER_SECOND,
 ): number | undefined {
     const metricValue = snapshot.metrics[metricKey];
-    if (!metricValue || metricValue.value.case !== "scalar" || metricValue.unit !== MetricUnit.BYTES_PER_SECOND) {
+    if (!metricValue || metricValue.value.case !== "scalar" || metricValue.unit !== unit) {
         return undefined;
     }
 
     return metricValue.value.value;
 }
+

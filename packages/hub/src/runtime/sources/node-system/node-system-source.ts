@@ -18,6 +18,7 @@ import {
     getNetworkAggregateMetricKey,
     getNetworkInterfaceMetricKey,
     isNetworkMetricKey,
+    isNetworkTrafficMetricKey,
     type NetworkMetricDirection,
 } from "../../network-metric-keys";
 import { diskVolumeRegistry, type DiskVolumeOption } from "../../disk-volumes";
@@ -70,6 +71,7 @@ import {
     isUsableNetworkInterface,
     toNetworkInterfaceOption,
 } from "./node-system-network";
+import { pollNetworkPingMetrics } from "./node-system-network-ping";
 import type {
     NodeSystemGpuTelemetryData,
     NodeSystemInformationClient,
@@ -251,7 +253,7 @@ export class NodeSystemSource implements MetricSource {
             metricGroups.has("cpu") ? this.pollCpu() : Promise.resolve({}),
             metricGroups.has("memory") ? this.pollMemory() : Promise.resolve({}),
             metricGroups.has("disk") ? this.pollDiskSafely(metricKeys) : Promise.resolve({}),
-            metricGroups.has("network") ? this.pollNetworkSafely() : Promise.resolve({}),
+            metricGroups.has("network") ? this.pollNetworkSafely(metricKeys) : Promise.resolve({}),
             metricGroups.has("gpu") ? this.pollGpu() : Promise.resolve(null),
         ]);
 
@@ -461,16 +463,32 @@ export class NodeSystemSource implements MetricSource {
         };
     }
 
-    private async pollNetworkSafely(): Promise<Record<string, MetricValue>> {
+    private async pollNetworkSafely(metricKeys: readonly string[]): Promise<Record<string, MetricValue>> {
         try {
-            return await this.pollNetwork();
+            return await this.pollNetwork(metricKeys);
         } catch (error) {
             networkLog.error(() => `Network poll error: ${String(error)}`);
             return {};
         }
     }
 
-    private async pollNetwork(): Promise<Record<string, MetricValue>> {
+    private async pollNetwork(metricKeys: readonly string[]): Promise<Record<string, MetricValue>> {
+        const metrics: Record<string, MetricValue> = {};
+        const shouldPollTraffic = metricKeys.length === 0 || metricKeys.some(isNetworkTrafficMetricKey);
+
+        if (shouldPollTraffic) {
+            Object.assign(metrics, await this.pollNetworkTraffic());
+        }
+
+        Object.assign(metrics, await pollNetworkPingMetrics({
+            metricKeys,
+            systemInformation: this.systemInformation,
+        }));
+
+        return metrics;
+    }
+
+    private async pollNetworkTraffic(): Promise<Record<string, MetricValue>> {
         const metrics: Record<string, MetricValue> = {};
         const cachedNetworkInterfaces = await this.readUsableNetworkInterfaces();
         if (!cachedNetworkInterfaces) {

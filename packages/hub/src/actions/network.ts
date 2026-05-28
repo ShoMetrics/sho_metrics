@@ -16,6 +16,7 @@ import {
     resolveNetworkMaximumBytesPerSecond,
     resolveNetworkMaximumMegabitsPerSecond,
     type NetworkViewDebugInfo,
+    type ResolvedNetworkTrafficMetricTarget,
 } from "./network/view-builder";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
@@ -38,17 +39,21 @@ export class Network extends MetricAction {
         const networkTarget = readResolvedMetricTarget(settings, "network");
         return resolveNetworkMetricSubscriptionKeys({
             selectedView: settings.widget.slot.appearance.view.selectedView,
-            networkDirection: networkTarget.reading.direction,
-            networkInterfaceId: networkTarget.interfaceId,
+            reading: networkTarget.reading,
         });
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event);
         const networkTarget = readResolvedMetricTarget(settings, "network");
-        const networkInterfaceId = networkTarget.interfaceId ?? "";
-        const isAutomaticNetworkInterface = networkInterfaceId.length === 0;
-        const selectedNetworkInterface = networkInterfaceRegistry.resolveSelection(networkInterfaceId);
+        const networkInterfaceId = networkTarget.reading.kind === "traffic"
+            ? networkTarget.reading.interfaceId ?? ""
+            : "";
+        const isAutomaticNetworkInterface = networkTarget.reading.kind === "traffic"
+            && networkInterfaceId.length === 0;
+        const selectedNetworkInterface = networkTarget.reading.kind === "traffic"
+            ? networkInterfaceRegistry.resolveSelection(networkInterfaceId)
+            : null;
         const metrics = this.getMetricReader(event);
 
         this.publishNetworkInterfaceOptions(event);
@@ -64,7 +69,7 @@ export class Network extends MetricAction {
         });
 
         if (viewUpdate.debugInfo) {
-            logNetworkSpeedDebug({
+            logNetworkDebug({
                 target: networkTarget,
                 selectedNetworkInterface,
                 isAutomaticNetworkInterface,
@@ -100,12 +105,16 @@ export class Network extends MetricAction {
         target: ResolvedNetworkMetricTarget,
         metrics: MetricStoreReader,
     ): void {
+        if (!isNetworkTrafficMetricTarget(target)) {
+            return;
+        }
+
         if (target.reading.display.scaleMode === "custom") {
             return;
         }
 
-        const downloadMetricKey = resolveNetworkMetricKey("download", target.interfaceId);
-        const uploadMetricKey = resolveNetworkMetricKey("upload", target.interfaceId);
+        const downloadMetricKey = resolveNetworkMetricKey("download", target.reading.interfaceId);
+        const uploadMetricKey = resolveNetworkMetricKey("upload", target.reading.interfaceId);
         const nextDownloadMaximum = resolveRuntimeNetworkMaximumMegabitsPerSecond({
             direction: "download",
             target,
@@ -136,11 +145,34 @@ export class Network extends MetricAction {
 
 const DEBUG_LOG_INTERVAL_MILLISECONDS = 5000;
 
-function logNetworkSpeedDebug(options: {
+function logNetworkDebug(options: {
     target: ResolvedNetworkMetricTarget;
     selectedNetworkInterface: NetworkInterfaceOption | null;
     isAutomaticNetworkInterface: boolean;
     debugInfo: NetworkViewDebugInfo;
+}): void {
+    if (options.debugInfo.kind === "ping") {
+        logNetworkPingDebug(options.debugInfo);
+        return;
+    }
+
+    if (!isNetworkTrafficMetricTarget(options.target)) {
+        return;
+    }
+
+    logNetworkSpeedDebug({
+        target: options.target,
+        selectedNetworkInterface: options.selectedNetworkInterface,
+        isAutomaticNetworkInterface: options.isAutomaticNetworkInterface,
+        debugInfo: options.debugInfo,
+    });
+}
+
+function logNetworkSpeedDebug(options: {
+    target: ResolvedNetworkTrafficMetricTarget;
+    selectedNetworkInterface: NetworkInterfaceOption | null;
+    isAutomaticNetworkInterface: boolean;
+    debugInfo: Extract<NetworkViewDebugInfo, { readonly kind: "traffic" }>;
 }): void {
     log.atDebug().everyMs("speed-sample", DEBUG_LOG_INTERVAL_MILLISECONDS).log(() => [
         `direction=${options.debugInfo.direction}`,
@@ -164,6 +196,16 @@ function logNetworkSpeedDebug(options: {
     ].join(" "));
 }
 
+function logNetworkPingDebug(debugInfo: Extract<NetworkViewDebugInfo, { readonly kind: "ping" }>): void {
+    log.atDebug().everyMs("ping-sample", DEBUG_LOG_INTERVAL_MILLISECONDS).log(() => [
+        `targetHost=${debugInfo.targetHost}`,
+        `metricKey=${debugInfo.networkMetricKey}`,
+        `currentLatencyMilliseconds=${debugInfo.sourceWidgetData.current.toFixed(0)}`,
+        `progress=${debugInfo.viewWidgetData.progress.toFixed(4)}`,
+        `sampleTimestampMilliseconds=${String(debugInfo.viewWidgetData.sampleTimestampMilliseconds ?? "")}`,
+    ].join(" "));
+}
+
 function formatNetworkInterfaceDebugValue(networkInterface: NetworkInterfaceOption | null): string {
     if (!networkInterface) {
         return "none";
@@ -180,7 +222,7 @@ function formatNetworkInterfaceDebugValue(networkInterface: NetworkInterfaceOpti
 
 function resolveRuntimeNetworkMaximumMegabitsPerSecond(options: {
     direction: NetworkMetricDirection;
-    target: ResolvedNetworkMetricTarget;
+    target: ResolvedNetworkTrafficMetricTarget;
     observedBytesPerSecond: number;
 }): number {
     const currentMaximum = resolveNetworkMaximumMegabitsPerSecond(options.direction, options.target);
@@ -188,4 +230,8 @@ function resolveRuntimeNetworkMaximumMegabitsPerSecond(options: {
     const runtimeMaximum = Math.ceil(observedMegabitsPerSecond * 1.1);
 
     return Math.max(currentMaximum, runtimeMaximum);
+}
+
+function isNetworkTrafficMetricTarget(target: ResolvedNetworkMetricTarget): target is ResolvedNetworkTrafficMetricTarget {
+    return target.reading.kind === "traffic";
 }

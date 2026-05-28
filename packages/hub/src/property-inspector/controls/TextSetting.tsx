@@ -8,6 +8,9 @@ interface TextSettingProps extends SettingControlProps {
     onValueChange: (value: string) => void;
     placeholder?: string;
     actionButton?: React.JSX.Element;
+    validationMessage?: string;
+    onFocus?: () => void;
+    onBlur?: () => void;
 }
 
 export function TextSetting({
@@ -16,9 +19,13 @@ export function TextSetting({
     onValueChange,
     placeholder,
     actionButton,
+    validationMessage,
+    onFocus,
+    onBlur,
     disabled = false,
 }: TextSettingProps): React.JSX.Element {
     const inputId = useId();
+    const validationMessageId = validationMessage ? `${inputId}-validation` : undefined;
     const input = (
         <input
             id={inputId}
@@ -27,18 +34,29 @@ export function TextSetting({
             placeholder={placeholder ?? ""}
             value={value}
             disabled={disabled}
+            aria-invalid={validationMessage ? "true" : undefined}
+            aria-describedby={validationMessageId}
             onChange={(event) => onValueChange(event.currentTarget.value)}
+            onFocus={onFocus}
+            onBlur={onBlur}
         />
     );
 
     return (
         <InspectorItem label={label} labelFor={inputId}>
-            {actionButton ? (
-                <div className="text-field-with-action">
-                    {input}
-                    {actionButton}
-                </div>
-            ) : input}
+            <div className="text-field">
+                {actionButton ? (
+                    <div className="text-field-with-action">
+                        {input}
+                        {actionButton}
+                    </div>
+                ) : input}
+                {validationMessage && (
+                    <div id={validationMessageId} className="input-validation-message">
+                        {validationMessage}
+                    </div>
+                )}
+            </div>
         </InspectorItem>
     );
 }
