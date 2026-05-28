@@ -45,14 +45,14 @@ test("disk throughput text view both mode subscribes to read and write", () => {
     assert.deepEqual(subscriptionKeys, ["disk.throughput.read", "disk.throughput.write"]);
 });
 
-test("disk throughput bar view both mode falls back to total", () => {
+test("disk throughput bar view both mode subscribes to read and write", () => {
     const subscriptionKeys = resolveDiskMetricSubscriptionKeys({
         diskMetricKind: "throughput",
         selectedView: "bar",
         diskThroughputDirection: "both",
     });
 
-    assert.deepEqual(subscriptionKeys, ["disk.throughput.total"]);
+    assert.deepEqual(subscriptionKeys, ["disk.throughput.read", "disk.throughput.write"]);
 });
 
 test("disk usage automatic volume subscribes to default usage keys", () => {

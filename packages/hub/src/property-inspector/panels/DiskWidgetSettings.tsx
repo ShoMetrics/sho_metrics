@@ -42,8 +42,7 @@ const DISK_THROUGHPUT_SYSTEM_TOTAL_NOTE =
 export function DiskWidgetSettings(props: DiskWidgetSettingsProps): React.JSX.Element {
     const reading = props.target.reading;
     const usesThroughputChannelColors = reading.kind === "throughput"
-        && reading.direction === "both"
-        && props.context.resolved.widget.slot.appearance.view.selectedView !== "bar";
+        && reading.direction === "both";
 
     return (
         <>

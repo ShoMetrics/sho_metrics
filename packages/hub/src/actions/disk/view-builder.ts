@@ -18,9 +18,6 @@ import { getMetricStatusIcon } from "../../widgets/icons/metric-status-icons";
 import { escapeSvgText } from "../../view-rendering/svg-utils";
 import type { WidgetData } from "../../view-rendering/widget-data";
 import {
-    isDualDiskThroughputView,
-} from "./metric-subscriptions";
-import {
     formatCompactDiskVolumeLabel,
     resolveAvailableDiskVolume,
     type DiskVolumeSelection,
@@ -143,7 +140,14 @@ function buildDiskThroughputViewOptions(
     const appearance = options.settings.widget.slot.appearance;
     const selectedView = appearance.view.selectedView;
 
-    if (isDualDiskThroughputView(selectedView, throughputDirection)) {
+    if (selectedView === "bar" && throughputDirection === "both") {
+        return buildDiskThroughputBarViewOptions(options);
+    }
+
+    if (
+        throughputDirection === "both"
+        && (selectedView === "circle" || selectedView === "text" || selectedView === "line")
+    ) {
         return buildDualThroughputViewOptions(options);
     }
 
@@ -265,6 +269,88 @@ function buildDualThroughputViewOptions(
             {
                 colorMode: solidMetricColorMode,
                 solid: { colors: { usageColor: readColor } },
+            },
+        ),
+    };
+}
+
+function buildDiskThroughputBarViewOptions(
+    options: BuildDiskViewOptions & { reading: DiskThroughputReading },
+): MetricViewOptions {
+    const readMetricKey = getDiskThroughputMetricKey("read");
+    const writeMetricKey = getDiskThroughputMetricKey("write");
+    const readWidgetData = buildDiskThroughputWidgetData({
+        bytesPerSecondWidgetData: options.metrics.getWidgetData(
+            readMetricKey,
+            "READ",
+            "B/s",
+        ),
+        maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("read", options.reading, null),
+        label: "READ",
+    });
+    const writeWidgetData = buildDiskThroughputWidgetData({
+        bytesPerSecondWidgetData: options.metrics.getWidgetData(
+            writeMetricKey,
+            "WRIT",
+            "B/s",
+        ),
+        maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("write", options.reading, null),
+        label: "WRIT",
+    });
+    const readColor = resolveDiskWidgetChannelColor("read", options.settings, readWidgetData);
+    const writeColor = resolveDiskWidgetChannelColor("write", options.settings, writeWidgetData);
+    const appearance = options.settings.widget.slot.appearance;
+
+    return {
+        event: options.event,
+        resolvedSettings: appearance,
+        metricKey: `${readMetricKey},${writeMetricKey}`,
+        widgetData: {
+            current: readWidgetData.current,
+            progress: readWidgetData.progress,
+            history: readWidgetData.history,
+            unit: readWidgetData.unit,
+            label: SYSTEM_TOTAL_DISK_THROUGHPUT_LABEL,
+            barLabel: SYSTEM_TOTAL_DISK_THROUGHPUT_LABEL,
+            barChannels: [
+                {
+                    label: "READ",
+                    displayValue: readWidgetData.displayValue ?? readWidgetData.current.toFixed(0),
+                    unit: readWidgetData.unit,
+                    progress: readWidgetData.progress,
+                    color: readColor,
+                    iconFragment: renderDiskThroughputDirectionIconFragment({
+                        direction: "read",
+                        size: DISK_THROUGHPUT_DIRECTION_ICON_SIZE,
+                    }),
+                },
+                {
+                    label: "WRIT",
+                    displayValue: writeWidgetData.displayValue ?? writeWidgetData.current.toFixed(0),
+                    unit: writeWidgetData.unit,
+                    progress: writeWidgetData.progress,
+                    color: writeColor,
+                    iconFragment: renderDiskThroughputDirectionIconFragment({
+                        direction: "write",
+                        size: DISK_THROUGHPUT_DIRECTION_ICON_SIZE,
+                    }),
+                },
+            ],
+            sampleTimestampMilliseconds: readWidgetData.sampleTimestampMilliseconds
+                ?? writeWidgetData.sampleTimestampMilliseconds,
+        },
+        centerIconFragment: getDiskIconFragment("unknown"),
+        topIconFragment: getDiskIconFragment("unknown"),
+        statusIcon: getMetricStatusIcon("percentage"),
+        appearanceOverride: buildMetricAccentPaintAppearanceOverride(
+            appearance.theme.selectedTheme,
+            {
+                colorMode: resolveSolidMetricColorMode(resolveActiveMetricAccentColorMode(appearance)),
+                solid: {
+                    colors: {
+                        usageColor: readColor,
+                    },
+                },
             },
         ),
     };
