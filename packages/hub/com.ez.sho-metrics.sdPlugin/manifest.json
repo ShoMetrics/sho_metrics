@@ -6,7 +6,7 @@
 		{
 			"Name": "CPU",
 			"UUID": "com.ez.sho-metrics.cpu",
-			"Icon": "imgs/actions/counter/icon",
+			"Icon": "imgs/actions/cpu/icon",
 			"Tooltip": "Displays CPU metrics.",
 			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
@@ -14,12 +14,13 @@
 				"Encoder"
 			],
 			"Encoder": {
+				"Icon": "imgs/actions/sho-metrics/icon",
 				"layout": "$B1"
 			},
 			"UserTitleEnabled": false,
 			"States": [
 				{
-					"Image": "imgs/actions/counter/key",
+					"Image": "imgs/actions/sho-metrics/key",
 					"ShowTitle": false,
 					"TitleAlignment": "middle"
 				}
@@ -28,7 +29,7 @@
 		{
 			"Name": "GPU",
 			"UUID": "com.ez.sho-metrics.gpu",
-			"Icon": "imgs/actions/counter/icon",
+			"Icon": "imgs/actions/gpu/icon",
 			"Tooltip": "Displays GPU metrics.",
 			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
@@ -36,12 +37,13 @@
 				"Encoder"
 			],
 			"Encoder": {
+				"Icon": "imgs/actions/sho-metrics/icon",
 				"layout": "$B1"
 			},
 			"UserTitleEnabled": false,
 			"States": [
 				{
-					"Image": "imgs/actions/counter/key",
+					"Image": "imgs/actions/sho-metrics/key",
 					"ShowTitle": false,
 					"TitleAlignment": "middle"
 				}
@@ -50,7 +52,7 @@
 		{
 			"Name": "Memory",
 			"UUID": "com.ez.sho-metrics.memory",
-			"Icon": "imgs/actions/counter/icon",
+			"Icon": "imgs/actions/memory/icon",
 			"Tooltip": "Displays memory metrics.",
 			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
@@ -58,12 +60,13 @@
 				"Encoder"
 			],
 			"Encoder": {
+				"Icon": "imgs/actions/sho-metrics/icon",
 				"layout": "$B1"
 			},
 			"UserTitleEnabled": false,
 			"States": [
 				{
-					"Image": "imgs/actions/counter/key",
+					"Image": "imgs/actions/sho-metrics/key",
 					"ShowTitle": false,
 					"TitleAlignment": "middle"
 				}
@@ -72,7 +75,7 @@
 		{
 			"Name": "Disk",
 			"UUID": "com.ez.sho-metrics.disk",
-			"Icon": "imgs/actions/counter/icon",
+			"Icon": "imgs/actions/disk/icon",
 			"Tooltip": "Displays disk metrics.",
 			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
@@ -80,12 +83,13 @@
 				"Encoder"
 			],
 			"Encoder": {
+				"Icon": "imgs/actions/sho-metrics/icon",
 				"layout": "$B1"
 			},
 			"UserTitleEnabled": false,
 			"States": [
 				{
-					"Image": "imgs/actions/counter/key",
+					"Image": "imgs/actions/sho-metrics/key",
 					"ShowTitle": false,
 					"TitleAlignment": "middle"
 				}
@@ -94,7 +98,7 @@
 		{
 			"Name": "Network",
 			"UUID": "com.ez.sho-metrics.network",
-			"Icon": "imgs/actions/counter/icon",
+			"Icon": "imgs/actions/network/icon",
 			"Tooltip": "Displays network metrics.",
 			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
@@ -102,12 +106,13 @@
 				"Encoder"
 			],
 			"Encoder": {
+				"Icon": "imgs/actions/sho-metrics/icon",
 				"layout": "$B1"
 			},
 			"UserTitleEnabled": false,
 			"States": [
 				{
-					"Image": "imgs/actions/counter/key",
+					"Image": "imgs/actions/sho-metrics/key",
 					"ShowTitle": false,
 					"TitleAlignment": "middle"
 				}
