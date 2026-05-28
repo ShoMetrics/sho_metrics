@@ -1,10 +1,11 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import test from "node:test";
 import type { WillAppearEvent } from "@elgato/streamdeck";
 import { MetricStore } from "../../runtime/metric-store";
 import {
     getNetworkAggregateMetricKey,
     getNetworkInterfaceMetricKey,
+    getNetworkPingLatencyMetricKey,
 } from "../../runtime/network-metric-keys";
 import type { NetworkInterfaceOption } from "../../runtime/network-interfaces";
 import { LOCAL_SOURCE_SCOPE_ID } from "../../runtime/source-routing/metric-read-plan";
@@ -243,6 +244,140 @@ test("network bar keeps upload as the first channel", () => {
     assert.deepEqual(widgetData.barChannels?.map(channel => channel.color), ["#F97316", "#2563EB"]);
 });
 
+test("network ping view reads a single ping metric key", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
+        {
+            network: {
+                kind: "ping",
+                pingTargetHost: "8.8.8.8",
+            },
+        },
+    );
+    const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
+    const target = settings.widget.slot.metric.target;
+
+    assert.equal(target.domain, "network");
+    if (target.domain !== "network") {
+        assert.fail("Expected network target.");
+    }
+
+    const pingMetricKey = getNetworkPingLatencyMetricKey("8.8.8.8");
+    const metricStore = new MetricStore();
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            [pingMetricKey]: buildScalarMetricValue(42.4, {
+                unit: MetricUnit.MILLISECONDS,
+            }),
+        },
+    }));
+
+    const viewUpdate = buildNetworkViewUpdate({
+        event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
+        settings,
+        target,
+        metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
+        selectedNetworkInterface: null,
+        currentTimestampMilliseconds: 2000,
+    });
+    const widgetData = viewUpdate.viewOptions.widgetData;
+
+    assert.equal(viewUpdate.viewOptions.metricKey, pingMetricKey);
+    if ("positive" in widgetData) {
+        assert.fail("Expected single metric ping view.");
+    }
+    assert.equal(widgetData.label, "PING");
+    assert.equal(widgetData.unit, "ms");
+    assert.equal(widgetData.displayValue, "42");
+    assert.equal(widgetData.current, 42.4);
+    assert.equal(widgetData.sampleTimestampMilliseconds, 1000);
+});
+
+test("network ping view treats expired latency samples as no data", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
+        {
+            network: {
+                kind: "ping",
+                pingTargetHost: "8.8.8.8",
+            },
+        },
+    );
+    const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
+    const target = settings.widget.slot.metric.target;
+
+    assert.equal(target.domain, "network");
+    if (target.domain !== "network") {
+        assert.fail("Expected network target.");
+    }
+
+    const pingMetricKey = getNetworkPingLatencyMetricKey("8.8.8.8");
+    const metricStore = new MetricStore();
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            [pingMetricKey]: buildScalarMetricValue(42, {
+                unit: MetricUnit.MILLISECONDS,
+            }),
+        },
+    }));
+
+    const viewUpdate = buildNetworkViewUpdate({
+        event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
+        settings,
+        target,
+        metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
+        selectedNetworkInterface: null,
+        currentTimestampMilliseconds: 7001,
+    });
+    const widgetData = viewUpdate.viewOptions.widgetData;
+
+    if ("positive" in widgetData) {
+        assert.fail("Expected single metric ping view.");
+    }
+    assert.equal(widgetData.sampleTimestampMilliseconds, undefined);
+    assert.equal(widgetData.current, 0);
+    assert.deepEqual(widgetData.history, []);
+});
+
+test("network ping bar view shows target host as secondary text", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
+        {
+            appearance: {
+                view: { selectedView: "bar" },
+            },
+            network: {
+                kind: "ping",
+                pingTargetHost: "example.com",
+            },
+        },
+    );
+    const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
+    const target = settings.widget.slot.metric.target;
+
+    assert.equal(target.domain, "network");
+    if (target.domain !== "network") {
+        assert.fail("Expected network target.");
+    }
+
+    const viewUpdate = buildNetworkViewUpdate({
+        event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
+        settings,
+        target,
+        metrics: new MetricStore().forScope(LOCAL_SOURCE_SCOPE_ID),
+        selectedNetworkInterface: null,
+        currentTimestampMilliseconds: 2000,
+    });
+    const widgetData = viewUpdate.viewOptions.widgetData;
+
+    if ("positive" in widgetData) {
+        assert.fail("Expected single metric ping view.");
+    }
+    assert.equal(widgetData.secondaryDisplayValue, "example.com");
+});
+
 function buildNetworkInterfaceOption(id: string): NetworkInterfaceOption {
     return {
         id,
@@ -268,3 +403,4 @@ function buildNetworkMetricStore(): MetricStore {
     }));
     return metricStore;
 }
+

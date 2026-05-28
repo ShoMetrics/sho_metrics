@@ -22,7 +22,9 @@ export function LineSettings({
         return null;
     }
 
-    const isNetworkBoth = target.domain === "network" && target.reading.direction === "both";
+    const isNetworkBoth = target.domain === "network"
+        && target.reading.kind === "traffic"
+        && target.reading.direction === "both";
     const isMirroredNetworkTraffic = isNetworkBoth
         && target.reading.trafficDisplayMode === "mirrored";
 

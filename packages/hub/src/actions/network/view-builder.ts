@@ -1,7 +1,8 @@
-import type { WillAppearEvent } from "@elgato/streamdeck";
+﻿import type { WillAppearEvent } from "@elgato/streamdeck";
 import type { MetricStoreReader } from "../../runtime/metric-store";
 import type { NetworkInterfaceOption } from "../../runtime/network-interfaces";
 import {
+    getNetworkPingLatencyMetricKey,
     resolveNetworkMetricKey,
     type NetworkMetricDirection,
 } from "../../runtime/network-metric-keys";
@@ -9,8 +10,10 @@ import type { WidgetData } from "../../view-rendering/widget-data";
 import { resolveColorForThresholdValue, type ColorConfig } from "../../view-rendering/color-resolver";
 import type {
     ResolvedNetworkMetricTarget,
+    ResolvedNetworkReading,
     ResolvedWidgetSettings,
 } from "../../settings/resolved-settings";
+import { buildNetworkPingWidgetData } from "../../metrics/network-ping-widget-data";
 import {
     buildNetworkSpeedWidgetData,
     convertMegabitsPerSecondToBytesPerSecond,
@@ -18,8 +21,10 @@ import {
 import { PROGRESS_CIRCLE_LABELS } from "../../widgets/primitives/progress-circle-label";
 import {
     getNetworkDirectionStatusIcon,
+    getNetworkPingStatusIcon,
     renderNetworkDirectionIconFragment,
     renderNetworkInterfaceIconFragment,
+    renderNetworkPingIconFragment,
 } from "../../widgets/icons/catalog/network";
 import type { MetricViewOptions } from "../../view-updates/runner";
 import {
@@ -34,12 +39,23 @@ export interface NetworkViewUpdate {
     debugInfo?: NetworkViewDebugInfo;
 }
 
-export interface NetworkViewDebugInfo {
-    direction: NetworkMetricDirection;
-    networkMetricKey: string;
-    sourceWidgetData: WidgetData;
-    viewWidgetData: WidgetData;
+export interface NetworkTrafficViewDebugInfo {
+    readonly kind: "traffic";
+    readonly direction: NetworkMetricDirection;
+    readonly networkMetricKey: string;
+    readonly sourceWidgetData: WidgetData;
+    readonly viewWidgetData: WidgetData;
 }
+
+export interface NetworkPingViewDebugInfo {
+    readonly kind: "ping";
+    readonly targetHost: string;
+    readonly networkMetricKey: string;
+    readonly sourceWidgetData: WidgetData;
+    readonly viewWidgetData: WidgetData;
+}
+
+export type NetworkViewDebugInfo = NetworkTrafficViewDebugInfo | NetworkPingViewDebugInfo;
 
 interface BuildNetworkViewOptions {
     event: WillAppearEvent;
@@ -50,11 +66,52 @@ interface BuildNetworkViewOptions {
     currentTimestampMilliseconds: number;
 }
 
+type ResolvedNetworkTrafficReading = Extract<ResolvedNetworkReading, { readonly kind: "traffic" }>;
+type ResolvedNetworkPingReading = Extract<ResolvedNetworkReading, { readonly kind: "ping" }>;
+
+export type ResolvedNetworkTrafficMetricTarget = ResolvedNetworkMetricTarget & {
+    readonly reading: ResolvedNetworkTrafficReading;
+};
+
+type ResolvedNetworkPingMetricTarget = ResolvedNetworkMetricTarget & {
+    readonly reading: ResolvedNetworkPingReading;
+};
+
+type BuildTrafficNetworkViewOptions = Omit<BuildNetworkViewOptions, "target"> & {
+    readonly target: ResolvedNetworkTrafficMetricTarget;
+};
+
+type BuildPingNetworkViewOptions = Omit<BuildNetworkViewOptions, "target"> & {
+    readonly target: ResolvedNetworkPingMetricTarget;
+};
+
 // Network throughput is a 1 Hz hot reading. Keep a last-good value through a few
 // missed ticks, then let the renderer show N/A instead of a misleading old rate.
 const NETWORK_SAMPLE_STALE_MS = 5000;
 
 export function buildNetworkViewUpdate(options: BuildNetworkViewOptions): NetworkViewUpdate {
+    const networkReading = options.target.reading;
+
+    if (networkReading.kind === "ping") {
+        return buildPingNetworkViewUpdate({
+            ...options,
+            target: {
+                ...options.target,
+                reading: networkReading,
+            },
+        });
+    }
+
+    return buildTrafficNetworkViewUpdate({
+        ...options,
+        target: {
+            ...options.target,
+            reading: networkReading,
+        },
+    });
+}
+
+function buildTrafficNetworkViewUpdate(options: BuildTrafficNetworkViewOptions): NetworkViewUpdate {
     const appearance = options.settings.widget.slot.appearance;
     const networkReading = options.target.reading;
     const selectedView = appearance.view.selectedView;
@@ -81,7 +138,7 @@ export function buildNetworkViewUpdate(options: BuildNetworkViewOptions): Networ
         };
     }
 
-    const networkMetricKey = resolveNetworkMetricKey(networkDirection, options.target.interfaceId);
+    const networkMetricKey = resolveNetworkMetricKey(networkDirection, options.target.reading.interfaceId);
     const sourceWidgetData = options.metrics.getWidgetData(
         networkMetricKey,
         getNetworkDirectionLabel(networkDirection),
@@ -133,7 +190,60 @@ export function buildNetworkViewUpdate(options: BuildNetworkViewOptions): Networ
             ),
         },
         debugInfo: {
+            kind: "traffic",
             direction: networkDirection,
+            networkMetricKey,
+            sourceWidgetData,
+            viewWidgetData,
+        },
+    };
+}
+
+function buildPingNetworkViewUpdate(options: BuildPingNetworkViewOptions): NetworkViewUpdate {
+    const appearance = options.settings.widget.slot.appearance;
+    const targetHost = options.target.reading.targetHost;
+    const networkMetricKey = getNetworkPingLatencyMetricKey(targetHost);
+    const sourceWidgetData = options.metrics.getWidgetData(
+        networkMetricKey,
+        "PING",
+        "ms",
+        200,
+    );
+    const freshSourceWidgetData = isFreshNetworkWidgetData(
+        sourceWidgetData,
+        options.currentTimestampMilliseconds,
+    )
+        ? sourceWidgetData
+        : {
+            ...sourceWidgetData,
+            current: 0,
+            progress: 0,
+            history: [],
+            sampleTimestampMilliseconds: undefined,
+        };
+    const viewWidgetData = buildNetworkPingWidgetData({
+        latencyMilliseconds: freshSourceWidgetData.current,
+        historyLatencyMilliseconds: freshSourceWidgetData.history,
+        sampleTimestampMilliseconds: freshSourceWidgetData.sampleTimestampMilliseconds,
+    });
+    const renderedWidgetData = appearance.view.selectedView === "bar"
+        ? { ...viewWidgetData, secondaryDisplayValue: targetHost }
+        : viewWidgetData;
+
+    return {
+        viewOptions: {
+            event: options.event,
+            resolvedSettings: appearance,
+            metricKey: networkMetricKey,
+            widgetData: renderedWidgetData,
+            centerIconFragment: renderNetworkPingIconFragment({
+                size: NETWORK_CENTER_ICON_SIZE,
+            }),
+            statusIcon: getNetworkPingStatusIcon(),
+        },
+        debugInfo: {
+            kind: "ping",
+            targetHost,
             networkMetricKey,
             sourceWidgetData,
             viewWidgetData,
@@ -143,14 +253,14 @@ export function buildNetworkViewUpdate(options: BuildNetworkViewOptions): Networ
 
 export function resolveNetworkMaximumBytesPerSecond(
     direction: NetworkMetricDirection,
-    target: ResolvedNetworkMetricTarget,
+    target: ResolvedNetworkTrafficMetricTarget,
 ): number {
     return convertMegabitsPerSecondToBytesPerSecond(resolveNetworkMaximumMegabitsPerSecond(direction, target));
 }
 
 export function resolveNetworkMaximumMegabitsPerSecond(
     direction: NetworkMetricDirection,
-    target: ResolvedNetworkMetricTarget,
+    target: ResolvedNetworkTrafficMetricTarget,
 ): number {
     const customMaximumMegabitsPerSecond = direction === "download"
         ? target.reading.display.maximumDownloadSpeedMegabitsPerSecond
@@ -169,10 +279,10 @@ export function resolveNetworkMaximumMegabitsPerSecond(
 }
 
 function buildDualNetworkCircleOrTextViewOptions(
-    options: BuildNetworkViewOptions & { dualRenderPrimitive: "circle" | "text" },
+    options: BuildTrafficNetworkViewOptions & { dualRenderPrimitive: "circle" | "text" },
 ): MetricViewOptions {
-    const uploadMetricKey = resolveNetworkMetricKey("upload", options.target.interfaceId);
-    const downloadMetricKey = resolveNetworkMetricKey("download", options.target.interfaceId);
+    const uploadMetricKey = resolveNetworkMetricKey("upload", options.target.reading.interfaceId);
+    const downloadMetricKey = resolveNetworkMetricKey("download", options.target.reading.interfaceId);
     const uploadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
             uploadMetricKey,
@@ -253,9 +363,9 @@ function buildDualNetworkCircleOrTextViewOptions(
     };
 }
 
-function buildDualNetworkLineViewOptions(options: BuildNetworkViewOptions): MetricViewOptions {
-    const uploadMetricKey = resolveNetworkMetricKey("upload", options.target.interfaceId);
-    const downloadMetricKey = resolveNetworkMetricKey("download", options.target.interfaceId);
+function buildDualNetworkLineViewOptions(options: BuildTrafficNetworkViewOptions): MetricViewOptions {
+    const uploadMetricKey = resolveNetworkMetricKey("upload", options.target.reading.interfaceId);
+    const downloadMetricKey = resolveNetworkMetricKey("download", options.target.reading.interfaceId);
     const uploadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
             uploadMetricKey,
@@ -321,9 +431,9 @@ function buildDualNetworkLineViewOptions(options: BuildNetworkViewOptions): Metr
     };
 }
 
-function buildBarNetworkViewOptions(options: BuildNetworkViewOptions): MetricViewOptions {
-    const uploadMetricKey = resolveNetworkMetricKey("upload", options.target.interfaceId);
-    const downloadMetricKey = resolveNetworkMetricKey("download", options.target.interfaceId);
+function buildBarNetworkViewOptions(options: BuildTrafficNetworkViewOptions): MetricViewOptions {
+    const uploadMetricKey = resolveNetworkMetricKey("upload", options.target.reading.interfaceId);
+    const downloadMetricKey = resolveNetworkMetricKey("download", options.target.reading.interfaceId);
     const uploadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
             uploadMetricKey,
@@ -416,7 +526,7 @@ function buildBarNetworkViewOptions(options: BuildNetworkViewOptions): MetricVie
 function buildNetworkWidgetData(options: {
     sourceWidgetData: WidgetData;
     direction: NetworkMetricDirection;
-    target: ResolvedNetworkMetricTarget;
+    target: ResolvedNetworkTrafficMetricTarget;
     currentTimestampMilliseconds: number;
 }): WidgetData {
     const sourceWidgetData = isFreshNetworkWidgetData(
@@ -501,3 +611,4 @@ const NETWORK_SPEED_MAXIMUM_DISPLAY_DIGITS = 3;
 const NETWORK_CENTER_ICON_SIZE = 58;
 const NETWORK_TOP_ICON_SIZE = 30;
 const NETWORK_FOOTER_ICON_SIZE = 21;
+

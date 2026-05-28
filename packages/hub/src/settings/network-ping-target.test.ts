@@ -40,6 +40,8 @@ describe("network ping target normalization", () => {
         "bad_host",
         "-example.com",
         "example-.com",
+        "8.8.0.8s",
+        "999.8.0.8",
         "example.com/path with spaces",
         "example.com\tpath",
     ];
