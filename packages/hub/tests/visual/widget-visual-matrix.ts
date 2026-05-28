@@ -49,7 +49,7 @@ export type VisualMatrixThemeCaseId =
 export type VisualMatrixSurfaceCaseId =
     | "keypad-square"
     | "touch-strip-wide"
-    | "touch-strip-square";
+    | "touch-strip-wide-frame-square-body";
 
 export type VisualMatrixDataCaseId = "data" | "no-data";
 
@@ -143,7 +143,7 @@ export const VISUAL_MATRIX_THEME_CASES: readonly VisualMatrixThemeCaseId[] = [
 export const VISUAL_MATRIX_SURFACE_CASES: readonly VisualMatrixSurfaceCaseId[] = [
     "keypad-square",
     "touch-strip-wide",
-    "touch-strip-square",
+    "touch-strip-wide-frame-square-body",
 ];
 
 export const VISUAL_MATRIX_DATA_CASES: readonly VisualMatrixDataCaseId[] = [
@@ -443,10 +443,10 @@ const SURFACE_CASE_DEFINITIONS: readonly SurfaceCaseDefinition[] = [
         surfaceCase: "touch-strip-wide",
         renderTarget: "touch-strip",
         supportsViewCase: viewCaseDefinition => viewCaseDefinition.selectedView !== "circle",
-        unsupportedReason: "Circle views use the production touch-strip-square layout from resolveTouchStripMetricLayout.",
+        unsupportedReason: "Circle views use the production touch-strip-wide-frame-square-body layout from resolveTouchStripMetricLayout.",
     },
     {
-        surfaceCase: "touch-strip-square",
+        surfaceCase: "touch-strip-wide-frame-square-body",
         renderTarget: "touch-strip",
         supportsViewCase: viewCaseDefinition => viewCaseDefinition.selectedView === "circle",
         unsupportedReason: "Non-circle views use the production touch-strip-wide layout from resolveTouchStripMetricLayout.",

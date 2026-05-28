@@ -111,6 +111,8 @@ function renderPlacedBody(body: string, viewport: ThemeBodyViewport, clipId: str
 }
 
 function bodyViewportClipId(themePreset: ThemePresetName, viewport: ThemeBodyViewport): string {
+    // Current frames emit one body viewport. Multi-body layouts must add a slot
+    // identity or coordinates here before they introduce multiple clip paths.
     return `${themePreset}-body-viewport-${viewport.width}-${viewport.height}`;
 }
 

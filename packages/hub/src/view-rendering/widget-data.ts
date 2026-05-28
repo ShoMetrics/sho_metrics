@@ -69,6 +69,3 @@ export const KEYPAD_PNG_SIZE: KeySize = { width: 288, height: 288 };
 
 /** Full-width Stream Deck+ touch strip action region, used by wide bar views. */
 export const TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE: KeySize = { width: 200, height: 100 };
-
-/** Centered square region inside a Stream Deck+ touch strip quarter, used by circle views. */
-export const TOUCH_STRIP_SINGLE_METRIC_SQUARE_PNG_SIZE: KeySize = { width: 100, height: 100 };

@@ -8,7 +8,6 @@ import {
     KEYPAD_PNG_SIZE,
     TOUCH_STRIP_LOGICAL_SIZE,
     TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE,
-    TOUCH_STRIP_SINGLE_METRIC_SQUARE_PNG_SIZE,
     WIDGET_LOGICAL_SIZE,
     type DualChannelWidgetData,
     type KeySize,
@@ -57,7 +56,7 @@ export interface DualMetricRenderOptions extends BaseMetricRenderOptions {
 export type MetricRenderOptions = SingleMetricRenderOptions | DualMetricRenderOptions;
 export type MetricRenderTarget = "key" | "touch-strip";
 
-export type TouchStripMetricLayoutKind = "square" | "wide";
+export type TouchStripMetricLayoutKind = "wide" | "wide-frame-square-body";
 
 export interface TouchStripMetricLayout {
     kind: TouchStripMetricLayoutKind;
@@ -91,15 +90,23 @@ interface RenderedMetricBody {
     readonly muted: boolean;
 }
 
+interface BodyArea {
+    readonly xCoordinate: number;
+    readonly yCoordinate: number;
+    readonly width: number;
+    readonly height: number;
+    readonly clipRadius?: number;
+}
+
 const TOUCH_STRIP_METRIC_LAYOUTS: Record<TouchStripMetricLayoutKind, TouchStripMetricLayout> = {
-    square: {
-        kind: "square",
-        layoutPath: "layouts/single-metric-touchstrip-square.json",
-        renderSize: WIDGET_LOGICAL_SIZE,
-        pngSize: TOUCH_STRIP_SINGLE_METRIC_SQUARE_PNG_SIZE,
-    },
     wide: {
         kind: "wide",
+        layoutPath: "layouts/single-metric-touchstrip-wide.json",
+        renderSize: TOUCH_STRIP_LOGICAL_SIZE,
+        pngSize: TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE,
+    },
+    "wide-frame-square-body": {
+        kind: "wide-frame-square-body",
         layoutPath: "layouts/single-metric-touchstrip-wide.json",
         renderSize: TOUCH_STRIP_LOGICAL_SIZE,
         pngSize: TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE,
@@ -153,10 +160,15 @@ export function buildMetricViewRenderPlan(options: {
         ? resolveTouchStripMetricLayout(renderAppearance)
         : null;
     const renderSize = touchStripMetricLayout?.renderSize ?? WIDGET_LOGICAL_SIZE;
-    const bodyViewport = resolveThemeBodyViewport({
+    const themeBodyViewport = resolveThemeBodyViewport({
         themePreset: renderAppearance.themePreset,
         paints: renderAppearance.paints,
         size: renderSize,
+    });
+    const bodyViewport = resolveMetricBodyViewport({
+        renderSize,
+        themeBodyViewport,
+        touchStripMetricLayout,
     });
 
     return {
@@ -262,13 +274,55 @@ export function resolveMetricViewSampleTimestampMilliseconds(widgetData: WidgetD
 
 export function resolveTouchStripMetricLayout(settings: MetricRenderAppearance): TouchStripMetricLayout {
     if (settings.renderPrimitive === "circle") {
-        return TOUCH_STRIP_METRIC_LAYOUTS.square;
+        return TOUCH_STRIP_METRIC_LAYOUTS["wide-frame-square-body"];
     }
 
     // Touch strip layouts encode both Stream Deck feedback rect and render target
-    // size. Add a new layout kind when a future visual needs a different contract,
-    // for example two centered circles in one 200x100 touch strip region.
+    // size. A future two-circle touch strip view should add a distinct layout kind.
     return TOUCH_STRIP_METRIC_LAYOUTS.wide;
+}
+
+function resolveMetricBodyViewport(options: {
+    renderSize: KeySize;
+    themeBodyViewport: ThemeBodyViewport | undefined;
+    touchStripMetricLayout: TouchStripMetricLayout | null;
+}): ThemeBodyViewport | undefined {
+    if (options.touchStripMetricLayout?.kind !== "wide-frame-square-body") {
+        return options.themeBodyViewport;
+    }
+
+    return resolveWideFrameSquareBodyViewport({
+        renderSize: options.renderSize,
+        themeBodyViewport: options.themeBodyViewport,
+    });
+}
+
+function resolveWideFrameSquareBodyViewport(options: {
+    renderSize: KeySize;
+    themeBodyViewport: ThemeBodyViewport | undefined;
+}): ThemeBodyViewport {
+    // Only the theme-owned rectangle is reused here. Its nested body placement is
+    // replaced by the centered square slot required by this touch strip mode.
+    const availableBodyArea: BodyArea = options.themeBodyViewport ?? {
+        xCoordinate: 0,
+        yCoordinate: 0,
+        width: options.renderSize.width,
+        height: options.renderSize.height,
+    };
+    const slotSize = Math.min(availableBodyArea.width, availableBodyArea.height);
+
+    return {
+        xCoordinate: availableBodyArea.xCoordinate + Math.floor((availableBodyArea.width - slotSize) / 2),
+        yCoordinate: availableBodyArea.yCoordinate + Math.floor((availableBodyArea.height - slotSize) / 2),
+        width: slotSize,
+        height: slotSize,
+        body: {
+            xOffset: 0,
+            yOffset: 0,
+            renderSize: WIDGET_LOGICAL_SIZE,
+        },
+        clipRadius: availableBodyArea.clipRadius,
+    };
 }
 
 function composeSingleMetricBody(
