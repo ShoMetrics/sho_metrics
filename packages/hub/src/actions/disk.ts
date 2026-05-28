@@ -44,7 +44,6 @@ export class Disk extends MetricAction {
         if (metricKind === "throughput") {
             return resolveDiskMetricSubscriptionKeys({
                 diskMetricKind: metricKind,
-                selectedView: settings.widget.slot.appearance.view.selectedView,
                 diskThroughputDirection: diskTarget.reading.direction,
             });
         }
@@ -160,7 +159,7 @@ function resolveDiskVolumeSelection(volumeId: string | undefined): DiskVolumeSel
 }
 
 function resolveRuntimeDiskMaximumThroughputMebibytesPerSecond(options: {
-    direction: Exclude<DiskThroughputMetricDirection, "total">;
+    direction: DiskThroughputMetricDirection;
     reading: Extract<ResolvedDiskMetricTarget["reading"], { readonly kind: "throughput" }>;
     selectedVolume: DiskVolumeOption | null;
     observedBytesPerSecond: number;

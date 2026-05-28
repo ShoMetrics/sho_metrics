@@ -42,7 +42,6 @@ const WINDOWS_HELPER_ONLY_METRIC_KEYS = [
     CPU_POWER_METRIC_KEY,
     getDiskThroughputMetricKey("read"),
     getDiskThroughputMetricKey("write"),
-    getDiskThroughputMetricKey("total"),
 ] as const;
 
 const WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEYS = [...GPU_METRIC_KEYS] as const;

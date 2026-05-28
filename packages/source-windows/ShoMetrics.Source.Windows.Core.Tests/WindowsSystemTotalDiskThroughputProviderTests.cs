@@ -1,9 +1,9 @@
-namespace ShoMetrics.Source.Windows.Core.Tests;
+﻿namespace ShoMetrics.Source.Windows.Core.Tests;
 
 public sealed class WindowsSystemTotalDiskThroughputProviderTests
 {
     [Fact]
-    public void ReadReturnsReadWriteAndTotalMetrics()
+    public void ReadReturnsReadAndWriteMetrics()
     {
         using var provider = new WindowsSystemTotalDiskThroughputProvider(
             new FakeDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(100, 40)));
@@ -14,7 +14,6 @@ public sealed class WindowsSystemTotalDiskThroughputProviderTests
 
         Assert.Equal(100, readings[WindowsSystemTotalDiskThroughputProvider.ReadThroughputMetricId].Value);
         Assert.Equal(40, readings[WindowsSystemTotalDiskThroughputProvider.WriteThroughputMetricId].Value);
-        Assert.Equal(140, readings[WindowsSystemTotalDiskThroughputProvider.TotalThroughputMetricId].Value);
         Assert.All(readings.Values, reading => Assert.Equal(MetricUnit.BytesPerSecond, reading.Unit));
     }
 
@@ -28,7 +27,7 @@ public sealed class WindowsSystemTotalDiskThroughputProviderTests
     }
 
     [Fact]
-    public void CreateDescriptorsReturnsStableSystemTotalDescriptors()
+    public void CreateDescriptorsReturnsStableAggregateDiskDescriptors()
     {
         using var provider = new WindowsSystemTotalDiskThroughputProvider(
             new FakeDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(100, 40)));
@@ -45,7 +44,7 @@ public sealed class WindowsSystemTotalDiskThroughputProviderTests
             descriptors[WindowsSystemTotalDiskThroughputProvider.WriteThroughputMetricId].MetricIdKind);
         Assert.Equal(
             MetricUnit.BytesPerSecond,
-            descriptors[WindowsSystemTotalDiskThroughputProvider.TotalThroughputMetricId].Unit);
+            descriptors[WindowsSystemTotalDiskThroughputProvider.WriteThroughputMetricId].Unit);
     }
 
     [Fact]

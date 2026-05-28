@@ -94,7 +94,7 @@ test("local auto source preference uses only Windows helper for helper-owned sta
 });
 
 test("local auto source preference routes Windows disk throughput to helper", () => {
-    for (const direction of ["read", "write", "total"] as const) {
+    for (const direction of ["read", "write"] as const) {
         assert.deepEqual(
             resolveLocalAutoMetricSourceCandidates(getDiskThroughputMetricKey(direction), "win32"),
             WINDOWS_HELPER_CANDIDATES,

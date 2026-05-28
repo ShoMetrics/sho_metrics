@@ -4,12 +4,10 @@ import {
 } from "../../runtime/disk-metric-keys";
 import type {
     DiskThroughputDirection as ResolvedDiskThroughputDirection,
-    MetricView,
 } from "../../settings/resolved-settings";
 
 export interface DiskMetricSubscriptionSettings {
     diskMetricKind: "usage" | "throughput";
-    selectedView: MetricView;
     diskThroughputDirection: ResolvedDiskThroughputDirection;
 }
 
@@ -20,14 +18,14 @@ export function resolveDiskMetricSubscriptionKeys(settings: DiskMetricSubscripti
 
     const throughputDirection = settings.diskThroughputDirection;
 
-    if (shouldSubscribeToDiskThroughputChannels(settings.selectedView, throughputDirection)) {
+    if (throughputDirection === "both") {
         return [
             getDiskThroughputMetricKey("read"),
             getDiskThroughputMetricKey("write"),
         ];
     }
 
-    return [getDiskThroughputMetricKey(throughputDirection === "both" ? "total" : throughputDirection)];
+    return [getDiskThroughputMetricKey(throughputDirection)];
 }
 
 export function resolveDiskUsageMetricSubscriptionKeys(volumeId: string | undefined): readonly string[] {
@@ -36,12 +34,4 @@ export function resolveDiskUsageMetricSubscriptionKeys(volumeId: string | undefi
         resolveDiskUsageMetricKey("total", volumeId),
         resolveDiskUsageMetricKey("available", volumeId),
     ];
-}
-
-function shouldSubscribeToDiskThroughputChannels(
-    selectedView: MetricView | undefined,
-    direction: ResolvedDiskThroughputDirection,
-): boolean {
-    return direction === "both"
-        && (selectedView === "bar" || selectedView === "circle" || selectedView === "text" || selectedView === "line");
 }

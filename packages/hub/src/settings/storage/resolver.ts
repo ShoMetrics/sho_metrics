@@ -295,7 +295,6 @@ const diskUsageDisplayModeByProto = {
 const diskThroughputDirectionByProto = {
     [StoredDiskThroughputDirection.UNSPECIFIED]: undefined,
     [StoredDiskThroughputDirection.BOTH]: "both",
-    [StoredDiskThroughputDirection.TOTAL]: "total",
     [StoredDiskThroughputDirection.READ]: "read",
     [StoredDiskThroughputDirection.WRITE]: "write",
 } satisfies Record<StoredDiskThroughputDirection, DiskThroughputDirection | undefined>;

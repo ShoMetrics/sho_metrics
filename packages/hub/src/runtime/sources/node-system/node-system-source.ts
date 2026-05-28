@@ -391,10 +391,6 @@ export class NodeSystemSource implements MetricSource {
                 normalizeNullableRate(fileSystemStats.wx_sec),
                 { unit: MetricUnit.BYTES_PER_SECOND },
             ),
-            [getDiskThroughputMetricKey("total")]: buildScalarMetricValue(
-                normalizeNullableRate(fileSystemStats.tx_sec),
-                { unit: MetricUnit.BYTES_PER_SECOND },
-            ),
         };
     }
 

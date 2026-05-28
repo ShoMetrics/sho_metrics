@@ -4,7 +4,7 @@ import { renderCenteredIconFragment } from "../render-icon";
 import type { DiskThroughputMetricDirection } from "../../../runtime/disk-metric-keys";
 
 export function renderDiskThroughputDirectionIconFragment(options: {
-    direction: Exclude<DiskThroughputMetricDirection, "total">;
+    direction: DiskThroughputMetricDirection;
     color?: string;
     size: number;
 }): string {

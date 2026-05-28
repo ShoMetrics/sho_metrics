@@ -859,7 +859,7 @@ describe("stored settings proto resolver", () => {
         assert.equal(target.reading.maximumWatts, 450);
     });
 
-    it("resolves Windows disk throughput as system-total throughput", () => {
+    it("resolves Windows disk throughput as aggregate throughput", () => {
         const storedWidgetSettings = readStoredWidgetSettings({
             singleMetric: {
                 slot: {

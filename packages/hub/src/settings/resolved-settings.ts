@@ -31,7 +31,7 @@ export type NetworkDirection = "both" | "download" | "upload";
 export type NetworkTrafficDisplayMode = "mirrored" | "overlay";
 export type NetworkUnitBase = "byte" | "bit";
 export type DiskUsageDisplayMode = "percentage" | "space";
-export type DiskThroughputDirection = "both" | "total" | "read" | "write";
+export type DiskThroughputDirection = "both" | "read" | "write";
 
 export interface ResolvedWidgetSettings {
     readonly widget: ResolvedWidget;

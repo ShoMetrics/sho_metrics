@@ -12,7 +12,7 @@ test("title-card single metric content maps known metric display labels outside 
         { name: "RAM usage", label: "RAM", unit: "%", captionText: "記憶量", codeText: "RAM", compactCodeText: "RAM", unitText: "%" },
         { name: "VRAM usage", label: "VRAM", unit: "%", captionText: "記憶量", codeText: "VRAM", compactCodeText: "VRM", unitText: "%" },
         { name: "disk usage", label: "C:", unit: "%", captionText: "蓄積量", codeText: "C:", compactCodeText: "C:", unitText: "%" },
-        { name: "disk total throughput", label: "DISK", unit: "B/s", captionText: "転送速", codeText: "DISK", compactCodeText: "DSK", unitText: "B" },
+        { name: "disk throughput", label: "DISK", unit: "B/s", captionText: "転送速", codeText: "DISK", compactCodeText: "DSK", unitText: "B" },
         { name: "disk read throughput", label: "READ", unit: "B/s", captionText: "読込速", codeText: "READ", compactCodeText: "REA", unitText: "B" },
         { name: "disk write throughput", label: "WRIT", unit: "B/s", captionText: "書込速", codeText: "WRIT", compactCodeText: "WRI", unitText: "B" },
         { name: "network throughput", label: "NET", unit: "B/s", captionText: "転送速", codeText: "NET", compactCodeText: "NET", unitText: "B" },

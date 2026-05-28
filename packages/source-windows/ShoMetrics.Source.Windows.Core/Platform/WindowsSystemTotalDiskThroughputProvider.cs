@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
 namespace ShoMetrics.Source.Windows.Core;
 
@@ -6,7 +6,6 @@ internal sealed class WindowsSystemTotalDiskThroughputProvider : IDisposable
 {
     internal const string ReadThroughputMetricId = "disk.throughput.read";
     internal const string WriteThroughputMetricId = "disk.throughput.write";
-    internal const string TotalThroughputMetricId = "disk.throughput.total";
     internal const string PollingGroupId = "windows-native:aggregate:disk";
 
     private const string HardwareId = "windows-native:disk-total";
@@ -39,7 +38,6 @@ internal sealed class WindowsSystemTotalDiskThroughputProvider : IDisposable
         [
             CreateDescriptor(ReadThroughputMetricId, "windows-native:disk-total:throughput:read", "Disk Read Bytes/sec"),
             CreateDescriptor(WriteThroughputMetricId, "windows-native:disk-total:throughput:write", "Disk Write Bytes/sec"),
-            CreateDescriptor(TotalThroughputMetricId, "windows-native:disk-total:throughput:total", "Disk Total Bytes/sec"),
         ];
     }
 
@@ -51,8 +49,6 @@ internal sealed class WindowsSystemTotalDiskThroughputProvider : IDisposable
         {
             return [];
         }
-
-        double totalBytesPerSecond = sample.ReadBytesPerSecond + sample.WriteBytesPerSecond;
 
         return
         [
@@ -66,11 +62,6 @@ internal sealed class WindowsSystemTotalDiskThroughputProvider : IDisposable
                 "windows-native:disk-total:throughput:write",
                 "Disk Write Bytes/sec",
                 sample.WriteBytesPerSecond),
-            CreateReading(
-                TotalThroughputMetricId,
-                "windows-native:disk-total:throughput:total",
-                "Disk Total Bytes/sec",
-                totalBytesPerSecond),
         ];
     }
 

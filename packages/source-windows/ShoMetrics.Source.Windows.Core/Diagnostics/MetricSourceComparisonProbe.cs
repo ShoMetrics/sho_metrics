@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -260,7 +260,6 @@ public static partial class MetricSourceComparisonProbe
                 NetworkUploadBytesPerSecond: ReadValue(readingsByMetricId, "net.up"),
                 DiskReadBytesPerSecond: ReadValue(readingsByMetricId, WindowsSystemTotalDiskThroughputProvider.ReadThroughputMetricId),
                 DiskWriteBytesPerSecond: ReadValue(readingsByMetricId, WindowsSystemTotalDiskThroughputProvider.WriteThroughputMetricId),
-                DiskTotalBytesPerSecond: ReadValue(readingsByMetricId, WindowsSystemTotalDiskThroughputProvider.TotalThroughputMetricId),
                 GpuUsagePercent: ReadValue(readingsByMetricId, "gpu.usage_percent"),
                 GpuTemperatureCelsius: ReadValue(readingsByMetricId, "gpu.temp"),
                 GpuPowerWatts: ReadValue(readingsByMetricId, "gpu.power"),
@@ -429,19 +428,6 @@ public static partial class MetricSourceComparisonProbe
             };
         }
 
-        MetricReading? diskRead = readingsByMetricId.GetValueOrDefault(WindowsSystemTotalDiskThroughputProvider.ReadThroughputMetricId);
-        MetricReading? diskWrite = readingsByMetricId.GetValueOrDefault(WindowsSystemTotalDiskThroughputProvider.WriteThroughputMetricId);
-
-        if (diskRead is not null || diskWrite is not null)
-        {
-            MetricReading baseReading = diskRead ?? diskWrite!;
-            readingsByMetricId[WindowsSystemTotalDiskThroughputProvider.TotalThroughputMetricId] = baseReading with
-            {
-                MetricId = WindowsSystemTotalDiskThroughputProvider.TotalThroughputMetricId,
-                SensorName = "Disk Total Throughput",
-                Value = (diskRead?.Value ?? 0) + (diskWrite?.Value ?? 0),
-            };
-        }
     }
 
     private static void WriteJson<T>(T value)
@@ -475,7 +461,6 @@ public static partial class MetricSourceComparisonProbe
                     NetworkUploadBytesPerSecond: networkUploadBytesPerSecond,
                     DiskReadBytesPerSecond: diskReadBytesPerSecond,
                     DiskWriteBytesPerSecond: diskWriteBytesPerSecond,
-                    DiskTotalBytesPerSecond: SumNullable(diskReadBytesPerSecond, diskWriteBytesPerSecond),
                     GpuUsagePercent: null,
                     GpuTemperatureCelsius: null,
                     GpuPowerWatts: null,
@@ -622,13 +607,6 @@ public static partial class MetricSourceComparisonProbe
         return (currentValue - previousValue) / elapsedSeconds;
     }
 
-    private static double? SumNullable(double? firstValue, double? secondValue)
-    {
-        return firstValue is null && secondValue is null
-            ? null
-            : (firstValue ?? 0) + (secondValue ?? 0);
-    }
-
     [DllImport("kernel32.dll", SetLastError = false)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetSystemTimes(
@@ -699,7 +677,6 @@ public static partial class MetricSourceComparisonProbe
         double? NetworkUploadBytesPerSecond,
         double? DiskReadBytesPerSecond,
         double? DiskWriteBytesPerSecond,
-        double? DiskTotalBytesPerSecond,
         double? GpuUsagePercent,
         double? GpuTemperatureCelsius,
         double? GpuPowerWatts,
