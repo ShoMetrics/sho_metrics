@@ -101,7 +101,6 @@ export const diskUsageDisplayModeOptionList = [
 
 export const diskThroughputDirectionOptionList = [
     { value: "both", label: "Read & Write" },
-    { value: "total", label: "Total" },
     { value: "read", label: "Read" },
     { value: "write", label: "Write" },
 ] as const satisfies readonly SelectOption[];

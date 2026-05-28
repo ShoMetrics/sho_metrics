@@ -546,7 +546,6 @@ test("node system source polls disk throughput only on darwin", async () => {
                 return {
                     rx_sec: 10,
                     wx_sec: 20,
-                    tx_sec: 30,
                 } as Systeminformation.FsStatsData;
             },
         }),
@@ -560,7 +559,10 @@ test("node system source polls disk throughput only on darwin", async () => {
 
     assert.equal(metrics["disk.throughput.read"]?.scalar, 10);
     assert.equal(metrics["disk.throughput.write"]?.scalar, 20);
-    assert.equal(metrics["disk.throughput.total"]?.scalar, 30);
+    assert.deepEqual(resolveDiskThroughputMetricKeys(metrics), [
+        "disk.throughput.read",
+        "disk.throughput.write",
+    ]);
     assert.equal(callCounts.fsStats, 1);
     assert.equal(callCounts.fsSize, 0);
 });
@@ -577,7 +579,6 @@ test("node system source normalizes null darwin disk throughput rates to zero", 
                     tx: 8260716584960,
                     rx_sec: null,
                     wx_sec: null,
-                    tx_sec: null,
                     ms: 0,
                 } as Systeminformation.FsStatsData;
             },
@@ -592,7 +593,10 @@ test("node system source normalizes null darwin disk throughput rates to zero", 
 
     assert.equal(metrics["disk.throughput.read"]?.scalar, 0);
     assert.equal(metrics["disk.throughput.write"]?.scalar, 0);
-    assert.equal(metrics["disk.throughput.total"]?.scalar, 0);
+    assert.deepEqual(resolveDiskThroughputMetricKeys(metrics), [
+        "disk.throughput.read",
+        "disk.throughput.write",
+    ]);
     assert.equal(callCounts.fsStats, 1);
 });
 
@@ -1309,6 +1313,12 @@ function buildFileSystem(overrides: Partial<Systeminformation.FsSizeData> = {}):
         rw: true,
         ...overrides,
     } as Systeminformation.FsSizeData;
+}
+
+function resolveDiskThroughputMetricKeys(metrics: Record<string, unknown>): string[] {
+    return Object.keys(metrics)
+        .filter(metricKey => metricKey.startsWith("disk.throughput."))
+        .sort();
 }
 
 type BlockDeviceTestOverrides =

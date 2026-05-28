@@ -1,4 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using LibreHardwareMonitor.Hardware;
 
 namespace ShoMetrics.Source.Windows.Core;

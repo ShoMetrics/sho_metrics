@@ -1,5 +1,5 @@
 export type DiskUsageMetric = "used" | "total" | "available" | "percent";
-export type DiskThroughputMetricDirection = "read" | "write" | "total";
+export type DiskThroughputMetricDirection = "read" | "write";
 
 const DEFAULT_DISK_USAGE_PREFIX = "disk.usage";
 const DISK_VOLUME_PREFIX = "disk.volume";

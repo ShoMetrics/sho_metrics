@@ -1,9 +1,9 @@
-namespace ShoMetrics.Source.Windows.Core.Tests;
+﻿namespace ShoMetrics.Source.Windows.Core.Tests;
 
 public sealed class LibreHardwareMonitorSessionTests
 {
     [Fact]
-    public async Task NativeOnlySessionPublishesSystemTotalDiskThroughputReadings()
+    public async Task NativeOnlySessionPublishesAggregateDiskThroughputReadings()
     {
         using var provider = new WindowsSystemTotalDiskThroughputProvider(
             new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
@@ -16,7 +16,6 @@ public sealed class LibreHardwareMonitorSessionTests
             StringComparer.Ordinal);
         Assert.Equal(120, readings[WindowsSystemTotalDiskThroughputProvider.ReadThroughputMetricId].Value);
         Assert.Equal(30, readings[WindowsSystemTotalDiskThroughputProvider.WriteThroughputMetricId].Value);
-        Assert.Equal(150, readings[WindowsSystemTotalDiskThroughputProvider.TotalThroughputMetricId].Value);
     }
 
     [Fact]
@@ -36,7 +35,7 @@ public sealed class LibreHardwareMonitorSessionTests
     }
 
     [Fact]
-    public async Task NativeOnlySessionListsSystemTotalDiskThroughputDescriptors()
+    public async Task NativeOnlySessionListsAggregateDiskThroughputDescriptors()
     {
         using var provider = new WindowsSystemTotalDiskThroughputProvider(
             new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
@@ -52,7 +51,7 @@ public sealed class LibreHardwareMonitorSessionTests
             descriptors[WindowsSystemTotalDiskThroughputProvider.ReadThroughputMetricId].PollingGroupId);
         Assert.Equal(
             "WindowsNativeSystemTotalDisk",
-            descriptors[WindowsSystemTotalDiskThroughputProvider.TotalThroughputMetricId].HardwareType);
+            descriptors[WindowsSystemTotalDiskThroughputProvider.WriteThroughputMetricId].HardwareType);
     }
 
     [Fact]
@@ -140,7 +139,7 @@ public sealed class LibreHardwareMonitorSessionTests
         Assert.False(result.Diagnostics.UsesLibreHardwareMonitor);
         Assert.Contains(
             result.Snapshot.Readings,
-            reading => reading.MetricId == WindowsSystemTotalDiskThroughputProvider.TotalThroughputMetricId);
+            reading => reading.MetricId == WindowsSystemTotalDiskThroughputProvider.ReadThroughputMetricId);
     }
 
     [Fact]
@@ -161,13 +160,13 @@ public sealed class LibreHardwareMonitorSessionTests
             CancellationToken.None);
 
         MetricSnapshot snapshot = await session.ReadSnapshotAsync(
-            ["cpu.usage_percent", WindowsSystemTotalDiskThroughputProvider.TotalThroughputMetricId],
+            ["cpu.usage_percent", WindowsSystemTotalDiskThroughputProvider.ReadThroughputMetricId],
             CancellationToken.None);
 
         Assert.Contains(snapshot.Readings, reading => reading.MetricId == "cpu.usage_percent");
         Assert.Contains(
             snapshot.Readings,
-            reading => reading.MetricId == WindowsSystemTotalDiskThroughputProvider.TotalThroughputMetricId);
+            reading => reading.MetricId == WindowsSystemTotalDiskThroughputProvider.ReadThroughputMetricId);
     }
 
     [Fact]

@@ -69,7 +69,7 @@ test("disk usage settings preserve selected unavailable volume", () => {
     assert.match(markup, /E: \(Unavailable\)/);
 });
 
-test("windows disk throughput settings show system-total controls", () => {
+test("windows disk throughput settings show aggregate controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",
         isWindows: true,
@@ -86,9 +86,9 @@ test("windows disk throughput settings show system-total controls", () => {
     assert.match(markup, /Disk Metric:/);
     assert.match(markup, /Direction:/);
     assert.match(markup, /Volume:/);
-    assert.match(markup, /Volume:<\/label>[\s\S]*data-disabled="true"[\s\S]*System total/);
-    assert.match(markup, /System total/);
-    assert.match(markup, /Showing total system disk read\/write/);
+    assert.match(markup, /Volume:<\/label>[\s\S]*data-disabled="true"[\s\S]*All disks/);
+    assert.match(markup, /All disks/);
+    assert.match(markup, /Showing aggregate disk read\/write/);
     assert.match(markup, /Read Max/);
     assert.match(markup, /Write Max/);
 });

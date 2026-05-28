@@ -33,11 +33,11 @@ type DiskWidgetSettingsProps = WidgetSettingsPanelProps & {
     target: ResolvedDiskMetricTarget;
 };
 
-const systemTotalDiskVolumeOptionList = [
-    { value: "", label: "System total" },
+const aggregateDiskVolumeOptionList = [
+    { value: "", label: "All disks" },
 ] as const;
-const DISK_THROUGHPUT_SYSTEM_TOTAL_NOTE =
-    "Showing total system disk read/write. Per-disk monitoring is not available in this version.";
+const DISK_THROUGHPUT_AGGREGATE_NOTE =
+    "Showing aggregate disk read/write. Per-disk monitoring is not available in this version.";
 
 export function DiskWidgetSettings(props: DiskWidgetSettingsProps): React.JSX.Element {
     const reading = props.target.reading;
@@ -122,13 +122,13 @@ function DiskThroughputSettings(props: DiskWidgetSettingsProps & {
                 <SelectSetting
                     label="Volume"
                     value=""
-                    optionList={systemTotalDiskVolumeOptionList}
+                    optionList={aggregateDiskVolumeOptionList}
                     onValueChange={() => undefined}
                     disabled
                 />
                 <InspectorItem>
                     <div className="readonly-inline">
-                        <span className="readonly-text">{DISK_THROUGHPUT_SYSTEM_TOTAL_NOTE}</span>
+                        <span className="readonly-text">{DISK_THROUGHPUT_AGGREGATE_NOTE}</span>
                     </div>
                 </InspectorItem>
             </SettingsSection>

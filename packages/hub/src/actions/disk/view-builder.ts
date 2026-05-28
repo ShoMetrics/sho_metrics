@@ -59,7 +59,7 @@ export function buildDiskViewOptions(options: BuildDiskViewOptions): MetricViewO
 }
 
 export function resolveDiskMaximumThroughputMebibytesPerSecond(
-    direction: Exclude<DiskThroughputMetricDirection, "total">,
+    direction: DiskThroughputMetricDirection,
     reading: DiskThroughputReading,
     selectedVolume: DiskVolumeOption | null,
 ): number {
@@ -140,21 +140,16 @@ function buildDiskThroughputViewOptions(
     const appearance = options.settings.widget.slot.appearance;
     const selectedView = appearance.view.selectedView;
 
-    const singleThroughputDirection = throughputDirection === "both" ? "total" : throughputDirection;
-
     switch (selectedView) {
         case "bar":
             if (throughputDirection === "both") {
                 return buildDiskThroughputBarViewOptions(options);
             }
 
-            if (singleThroughputDirection === "read" || singleThroughputDirection === "write") {
-                return buildDiskThroughputSingleBarViewOptions({
-                    ...options,
-                    direction: singleThroughputDirection,
-                });
-            }
-            break;
+            return buildDiskThroughputSingleBarViewOptions({
+                ...options,
+                direction: throughputDirection,
+            });
         case "circle":
         case "text":
         case "line":
@@ -166,8 +161,9 @@ function buildDiskThroughputViewOptions(
             return assertNever(selectedView);
     }
 
+    const singleThroughputDirection: DiskThroughputMetricDirection = throughputDirection;
     const throughputMetricKey = getDiskThroughputMetricKey(singleThroughputDirection);
-    // Throughput is system-total; volume selection is usage-only.
+    // Throughput is aggregate; volume selection is usage-only.
     const throughputLabel = SYSTEM_TOTAL_DISK_THROUGHPUT_LABEL;
     const bytesPerSecondWidgetData = options.metrics.getWidgetData(
         throughputMetricKey,
@@ -373,7 +369,7 @@ function buildDiskThroughputBarViewOptions(
 function buildDiskThroughputSingleBarViewOptions(
     options: BuildDiskViewOptions & {
         reading: DiskThroughputReading;
-        direction: Exclude<DiskThroughputMetricDirection, "both" | "total">;
+        direction: DiskThroughputMetricDirection;
     },
 ): MetricViewOptions {
     const throughputMetricKey = getDiskThroughputMetricKey(options.direction);
@@ -487,11 +483,7 @@ function buildDiskGaugeFooterIconFragment(diskVolume: DiskVolumeOption | null): 
     );
 }
 
-function buildDiskThroughputFooterIconFragment(direction: DiskThroughputMetricDirection): string | undefined {
-    if (direction !== "read" && direction !== "write") {
-        return undefined;
-    }
-
+function buildDiskThroughputFooterIconFragment(direction: DiskThroughputMetricDirection): string {
     return renderDiskThroughputDirectionIconFragment({
         direction,
         size: DISK_THROUGHPUT_DIRECTION_ICON_SIZE,
@@ -507,15 +499,13 @@ function resolveDiskMaximumThroughputBytesPerSecond(
     const maximumWriteMebibytesPerSecond = resolveDiskMaximumThroughputMebibytesPerSecond("write", reading, selectedVolume);
     const maximumMebibytesPerSecond = direction === "write"
         ? maximumWriteMebibytesPerSecond
-        : direction === "total"
-            ? maximumReadMebibytesPerSecond + maximumWriteMebibytesPerSecond
-            : maximumReadMebibytesPerSecond;
+        : maximumReadMebibytesPerSecond;
 
     return maximumMebibytesPerSecond * 1024 * 1024;
 }
 
 function resolveDefaultDiskMaximumThroughputMebibytesPerSecond(
-    direction: Exclude<DiskThroughputMetricDirection, "total">,
+    direction: DiskThroughputMetricDirection,
     selectedVolume: DiskVolumeOption | null,
 ): number {
     if (selectedVolume?.storageKind === "hdd") {
@@ -540,7 +530,7 @@ function resolveDefaultDiskMaximumThroughputMebibytesPerSecond(
 }
 
 function resolveDiskWidgetChannelColor(
-    direction: Exclude<DiskThroughputMetricDirection, "total">,
+    direction: DiskThroughputMetricDirection,
     settings: ResolvedWidgetSettings,
     widgetData: { progress: number },
 ): string {
@@ -548,7 +538,7 @@ function resolveDiskWidgetChannelColor(
 }
 
 function buildDiskChannelColorConfig(
-    direction: Exclude<DiskThroughputMetricDirection, "total">,
+    direction: DiskThroughputMetricDirection,
     settings: ResolvedWidgetSettings,
 ): ColorConfig {
     if (direction === "read") {

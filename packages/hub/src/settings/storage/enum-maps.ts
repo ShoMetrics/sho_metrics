@@ -132,7 +132,6 @@ export const storedDiskMetricKindByResolved = {
 
 export const storedDiskThroughputDirectionByResolved = {
     both: StoredDiskThroughputDirection.BOTH,
-    total: StoredDiskThroughputDirection.TOTAL,
     read: StoredDiskThroughputDirection.READ,
     write: StoredDiskThroughputDirection.WRITE,
 } satisfies Record<DiskThroughputDirection, StoredDiskThroughputDirection>;
