@@ -687,6 +687,18 @@ test("progress bar renders at most two channel bars", () => {
     assert.doesNotMatch(svgFragment, /progress-bar-channel-2-value/);
 });
 
+test("progress bar renders single value icon", () => {
+    const svgFragment = progressBar.render({
+        ...buildWidgetData(),
+        barValueIconFragment: "<path id=\"direction-icon\" />",
+        barValueIconColor: "#38bdf8",
+    }, DEFAULT_PROGRESS_BAR_CONFIG, keySize);
+
+    assert.match(svgFragment, /direction-icon/);
+    assert.match(svgFragment, /color="#38bdf8"/);
+    assert.match(svgFragment, /progress-bar-single-value/);
+});
+
 test("metric text row escapes values and clamps non-finite coordinates", () => {
     const svgFragment = renderMetricTextRow({
         id: "metric:value",

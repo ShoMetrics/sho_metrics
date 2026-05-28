@@ -257,6 +257,57 @@ test("disk throughput bar both mode renders read and write channels", () => {
     assert.equal(widgetData.sampleTimestampMilliseconds, 1000);
 });
 
+test("disk throughput bar single direction renders direction icon value row", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings,
+        {
+            appearance: {
+                view: { selectedView: "bar" },
+                theme: { flat: { paint: { colorMode: "solid" } } },
+            },
+            disk: {
+                kind: "throughput",
+                throughputDirection: "read",
+            },
+        },
+    );
+    const settings = resolveInitialActionSettings(rawSettings, "disk").resolvedSettings;
+    const target = settings.widget.slot.metric.target;
+
+    assert.equal(target.domain, "disk");
+    if (target.domain !== "disk") {
+        assert.fail("Expected disk target.");
+    }
+
+    const metricStore = new MetricStore();
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            [getDiskThroughputMetricKey("read")]: buildScalarMetricValue(1024, {
+                unit: MetricUnit.BYTES_PER_SECOND,
+            }),
+        },
+    }));
+
+    const viewOptions = buildDiskViewOptions({
+        event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
+        settings,
+        target,
+        metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
+        volumeSelection: { kind: "available", volume: buildDiskVolumeOption("E:\\") },
+    });
+    const widgetData = viewOptions.widgetData;
+
+    assert.equal(viewOptions.metricKey, getDiskThroughputMetricKey("read"));
+    if ("positiveColor" in viewOptions || "positive" in widgetData) {
+        assert.fail("Expected disk throughput single bar view.");
+    }
+    assert.equal(widgetData.barChannels, undefined);
+    assert.equal(widgetData.barLabel, "DISK");
+    assert.match(widgetData.barValueIconFragment ?? "", /path/);
+    assert.equal(widgetData.barValueIconColor, "#38bdf8");
+});
+
 function buildDiskVolumeOption(id: string): DiskVolumeOption {
     return {
         id,

@@ -140,18 +140,32 @@ function buildDiskThroughputViewOptions(
     const appearance = options.settings.widget.slot.appearance;
     const selectedView = appearance.view.selectedView;
 
-    if (selectedView === "bar" && throughputDirection === "both") {
-        return buildDiskThroughputBarViewOptions(options);
-    }
-
-    if (
-        throughputDirection === "both"
-        && (selectedView === "circle" || selectedView === "text" || selectedView === "line")
-    ) {
-        return buildDualThroughputViewOptions(options);
-    }
-
     const singleThroughputDirection = throughputDirection === "both" ? "total" : throughputDirection;
+
+    switch (selectedView) {
+        case "bar":
+            if (throughputDirection === "both") {
+                return buildDiskThroughputBarViewOptions(options);
+            }
+
+            if (singleThroughputDirection === "read" || singleThroughputDirection === "write") {
+                return buildDiskThroughputSingleBarViewOptions({
+                    ...options,
+                    direction: singleThroughputDirection,
+                });
+            }
+            break;
+        case "circle":
+        case "text":
+        case "line":
+            if (throughputDirection === "both") {
+                return buildDualThroughputViewOptions(options);
+            }
+            break;
+        default:
+            return assertNever(selectedView);
+    }
+
     const throughputMetricKey = getDiskThroughputMetricKey(singleThroughputDirection);
     // Throughput is system-total; volume selection is usage-only.
     const throughputLabel = SYSTEM_TOTAL_DISK_THROUGHPUT_LABEL;
@@ -356,6 +370,59 @@ function buildDiskThroughputBarViewOptions(
     };
 }
 
+function buildDiskThroughputSingleBarViewOptions(
+    options: BuildDiskViewOptions & {
+        reading: DiskThroughputReading;
+        direction: Exclude<DiskThroughputMetricDirection, "both" | "total">;
+    },
+): MetricViewOptions {
+    const throughputMetricKey = getDiskThroughputMetricKey(options.direction);
+    const widgetData = buildDiskThroughputWidgetData({
+        bytesPerSecondWidgetData: options.metrics.getWidgetData(
+            throughputMetricKey,
+            SYSTEM_TOTAL_DISK_THROUGHPUT_LABEL,
+            "B/s",
+        ),
+        maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond(
+            options.direction,
+            options.reading,
+            null,
+        ),
+        label: SYSTEM_TOTAL_DISK_THROUGHPUT_LABEL,
+    });
+    const color = resolveDiskWidgetChannelColor(options.direction, options.settings, widgetData);
+    const appearance = options.settings.widget.slot.appearance;
+
+    return {
+        event: options.event,
+        resolvedSettings: appearance,
+        metricKey: throughputMetricKey,
+        widgetData: {
+            ...widgetData,
+            barLabel: SYSTEM_TOTAL_DISK_THROUGHPUT_LABEL,
+            barValueIconFragment: renderDiskThroughputDirectionIconFragment({
+                direction: options.direction,
+                size: DISK_THROUGHPUT_DIRECTION_ICON_SIZE,
+            }),
+            barValueIconColor: color,
+        },
+        centerIconFragment: getDiskIconFragment("unknown"),
+        topIconFragment: getDiskIconFragment("unknown"),
+        statusIcon: getMetricStatusIcon("percentage"),
+        appearanceOverride: buildMetricAccentPaintAppearanceOverride(
+            appearance.theme.selectedTheme,
+            {
+                colorMode: resolveSolidMetricColorMode(resolveActiveMetricAccentColorMode(appearance)),
+                solid: {
+                    colors: {
+                        usageColor: color,
+                    },
+                },
+            },
+        ),
+    };
+}
+
 function buildDiskBarLabel(diskVolume: DiskVolumeOption | null, fallbackLabel: string): string {
     if (!diskVolume) {
         return fallbackLabel;
@@ -489,6 +556,10 @@ function buildDiskChannelColorConfig(
     }
 
     return buildColorConfigFromAppearance(settings.widget.slot.appearance, "diskWrite");
+}
+
+function assertNever(value: never): never {
+    throw new Error(`Unexpected disk throughput view: ${String(value)}`);
 }
 
 const DEFAULT_HDD_READ_THROUGHPUT_MEBIBYTES_PER_SECOND = 220;

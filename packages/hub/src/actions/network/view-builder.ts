@@ -117,25 +117,36 @@ function buildTrafficNetworkViewUpdate(options: BuildTrafficNetworkViewOptions):
     const selectedView = appearance.view.selectedView;
     const networkDirection = networkReading.direction;
 
-    if (selectedView === "bar") {
-        return {
-            viewOptions: buildBarNetworkViewOptions(options),
-        };
-    }
-
-    if (selectedView === "line" && networkDirection === "both") {
-        return {
-            viewOptions: buildDualNetworkLineViewOptions(options),
-        };
-    }
-
-    if (networkDirection === "both") {
-        return {
-            viewOptions: buildDualNetworkCircleOrTextViewOptions({
-                ...options,
-                dualRenderPrimitive: selectedView === "text" ? "text" : "circle",
-            }),
-        };
+    switch (selectedView) {
+        case "bar":
+            return {
+                viewOptions: networkDirection === "both"
+                    ? buildDualBarNetworkViewOptions(options)
+                    : buildSingleBarNetworkViewOptions({
+                        ...options,
+                        networkDirection,
+                    }),
+            };
+        case "line":
+            if (networkDirection === "both") {
+                return {
+                    viewOptions: buildDualNetworkLineViewOptions(options),
+                };
+            }
+            break;
+        case "circle":
+        case "text":
+            if (networkDirection === "both") {
+                return {
+                    viewOptions: buildDualNetworkCircleOrTextViewOptions({
+                        ...options,
+                        dualRenderPrimitive: selectedView === "text" ? "text" : "circle",
+                    }),
+                };
+            }
+            break;
+        default:
+            return assertNever(selectedView);
     }
 
     const networkMetricKey = resolveNetworkMetricKey(networkDirection, options.target.reading.interfaceId);
@@ -431,7 +442,7 @@ function buildDualNetworkLineViewOptions(options: BuildTrafficNetworkViewOptions
     };
 }
 
-function buildBarNetworkViewOptions(options: BuildTrafficNetworkViewOptions): MetricViewOptions {
+function buildDualBarNetworkViewOptions(options: BuildTrafficNetworkViewOptions): MetricViewOptions {
     const uploadMetricKey = resolveNetworkMetricKey("upload", options.target.reading.interfaceId);
     const downloadMetricKey = resolveNetworkMetricKey("download", options.target.reading.interfaceId);
     const uploadWidgetData = buildNetworkWidgetData({
@@ -523,6 +534,66 @@ function buildBarNetworkViewOptions(options: BuildTrafficNetworkViewOptions): Me
     };
 }
 
+function buildSingleBarNetworkViewOptions(
+    options: BuildTrafficNetworkViewOptions & {
+        networkDirection: Exclude<NetworkMetricDirection, "both">;
+    },
+): MetricViewOptions {
+    const networkDirection = options.networkDirection;
+    const networkMetricKey = resolveNetworkMetricKey(networkDirection, options.target.reading.interfaceId);
+    const widgetData = buildNetworkWidgetData({
+        sourceWidgetData: options.metrics.getWidgetData(
+            networkMetricKey,
+            getNetworkDirectionLabel(networkDirection),
+            "B/s",
+        ),
+        direction: networkDirection,
+        target: options.target,
+        currentTimestampMilliseconds: options.currentTimestampMilliseconds,
+    });
+    const color = resolveNetworkWidgetChannelColor(networkDirection, options.settings, widgetData);
+
+    return {
+        event: options.event,
+        resolvedSettings: options.settings.widget.slot.appearance,
+        metricKey: networkMetricKey,
+        widgetData: {
+            ...widgetData,
+            barLabel: "Net Speed",
+            barValueIconFragment: renderNetworkDirectionIconFragment({
+                direction: networkDirection,
+                size: NETWORK_TOP_ICON_SIZE,
+            }),
+            barValueIconColor: color,
+        },
+        centerIconFragment: buildNetworkCenterIconFragment({
+            circleVariant: "minimal",
+            direction: networkDirection,
+            selectedNetworkInterface: options.selectedNetworkInterface,
+        }),
+        topIconFragment: renderNetworkInterfaceIconFragment({
+            networkInterface: options.selectedNetworkInterface,
+            size: NETWORK_CENTER_ICON_SIZE,
+        }),
+        statusIcon: getNetworkDirectionStatusIcon({
+            direction: networkDirection,
+        }),
+        appearanceOverride: buildMetricAccentPaintAppearanceOverride(
+            options.settings.widget.slot.appearance.theme.selectedTheme,
+            {
+                colorMode: resolveSolidMetricColorMode(resolveActiveMetricAccentColorMode(
+                    options.settings.widget.slot.appearance,
+                )),
+                solid: {
+                    colors: {
+                        usageColor: color,
+                    },
+                },
+            },
+        ),
+    };
+}
+
 function buildNetworkWidgetData(options: {
     sourceWidgetData: WidgetData;
     direction: NetworkMetricDirection;
@@ -603,6 +674,10 @@ function buildNetworkChannelColorConfig(
     }
 
     return buildColorConfigFromAppearance(settings.widget.slot.appearance, "upload");
+}
+
+function assertNever(value: never): never {
+    throw new Error(`Unexpected network traffic view: ${String(value)}`);
 }
 
 const DEFAULT_DOWNLOAD_MAXIMUM_SPEED_MEGABITS_PER_SECOND = 100;
