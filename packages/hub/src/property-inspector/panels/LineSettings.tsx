@@ -85,9 +85,6 @@ export function LineSettings({
                             appearance: { line: { gridLineVisibility } },
                         })}
                     />
-                    <InspectorItem className="note-item note-item-caption">
-                        <p className="section-note">Adaptive: grid line visibility adapts to chart activity.</p>
-                    </InspectorItem>
                     <SelectSetting
                         label="Grid Line Type"
                         value={appearance.line.gridLineType}
