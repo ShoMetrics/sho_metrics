@@ -10,6 +10,8 @@ export interface WidgetData {
     barLabel?: string;
     barDisplayValue?: string;
     barUnit?: string;
+    barValueIconFragment?: string;
+    barValueIconColor?: string;
     barChannels?: readonly BarChannelWidgetData[];
     sparklineScale?: SparklineScale;
     sampleTimestampMilliseconds?: number;

@@ -244,6 +244,47 @@ test("network bar keeps upload as the first channel", () => {
     assert.deepEqual(widgetData.barChannels?.map(channel => channel.color), ["#F97316", "#2563EB"]);
 });
 
+test("network bar single direction renders one direction icon value row", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
+        {
+            appearance: {
+                view: { selectedView: "bar" },
+                theme: { flat: { paint: { colorMode: "solid" } } },
+            },
+            network: {
+                direction: "upload",
+            },
+        },
+    );
+    const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
+    const target = settings.widget.slot.metric.target;
+
+    assert.equal(target.domain, "network");
+    if (target.domain !== "network") {
+        assert.fail("Expected network target.");
+    }
+
+    const viewUpdate = buildNetworkViewUpdate({
+        event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
+        settings,
+        target,
+        metrics: buildNetworkMetricStore().forScope(LOCAL_SOURCE_SCOPE_ID),
+        selectedNetworkInterface: buildNetworkInterfaceOption("Ethernet"),
+        currentTimestampMilliseconds: 2000,
+    });
+    const widgetData = viewUpdate.viewOptions.widgetData;
+
+    if ("positive" in widgetData) {
+        assert.fail("Expected single metric network view.");
+    }
+
+    assert.equal(viewUpdate.viewOptions.metricKey, getNetworkAggregateMetricKey("upload"));
+    assert.equal(widgetData.barChannels, undefined);
+    assert.match(widgetData.barValueIconFragment ?? "", /path/);
+    assert.equal(widgetData.barValueIconColor, "#F97316");
+});
+
 test("network ping view reads a single ping metric key", () => {
     const rawSettings = writeStoredWidgetSettingsPatch(
         resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,

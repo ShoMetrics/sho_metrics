@@ -78,6 +78,21 @@ test("network explicit interface subscribes to interface keys without registry l
     assert.deepEqual(subscriptionKeys, ["net.up.Ethernet", "net.down.Ethernet"]);
 });
 
+test("network bar view single mode subscribes to one direction", () => {
+    const subscriptionKeys = resolveNetworkMetricSubscriptionKeys({
+        selectedView: "bar",
+        reading: {
+            kind: "traffic",
+            direction: "download",
+            interfaceId: "",
+            trafficDisplayMode: "mirrored",
+            display: buildNetworkDisplaySettings(),
+        },
+    });
+
+    assert.deepEqual(subscriptionKeys, ["net.down"]);
+});
+
 test("network ping mode subscribes to the ping target key", () => {
     const subscriptionKeys = resolveNetworkMetricSubscriptionKeys({
         selectedView: "line",

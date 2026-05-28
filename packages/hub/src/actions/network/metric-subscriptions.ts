@@ -16,10 +16,7 @@ export function resolveNetworkMetricSubscriptionKeys(settings: NetworkMetricSubs
 
     const networkDirection = settings.reading.direction;
 
-    if (
-        settings.selectedView === "bar"
-        || networkDirection === "both"
-    ) {
+    if (networkDirection === "both") {
         return [
             resolveNetworkMetricKey("upload", settings.reading.interfaceId),
             resolveNetworkMetricKey("download", settings.reading.interfaceId),

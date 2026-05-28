@@ -210,6 +210,9 @@ function renderSingleBar(
     const valueText = data.barDisplayValue ?? data.displayValue ?? data.current.toFixed(0);
     const unitText = data.barUnit ?? data.unit;
     const titleText = data.barLabel ?? data.label;
+    const valueLayout = data.barValueIconFragment
+        ? buildSingleValueLayoutWithIcon(layoutPlan.singleValue, layoutPlan)
+        : layoutPlan.singleValue;
 
     return `
         ${config.colorConfig.isGradientEnabled ? `<defs>
@@ -230,11 +233,18 @@ function renderSingleBar(
             textStyles: config.textStyles,
             themeEffects: config.themeEffects,
         })}
+        ${data.barValueIconFragment ? renderSingleValueIcon({
+            iconFragment: data.barValueIconFragment,
+            iconColor: data.barValueIconColor ?? barColor,
+            yCoordinate: layoutPlan.singleValue.yCoordinate,
+            layoutPlan,
+            themeEffects: config.themeEffects,
+        }) : ""}
         ${renderValueWithUnit({
             clipId: "progress-bar-single-value",
             valueText,
             unitText,
-            layout: layoutPlan.singleValue,
+            layout: valueLayout,
             valueTextColor: config.paints.primaryText,
             unitTextColor: config.paints.supportingText,
             textStyles: config.textStyles,
@@ -251,6 +261,37 @@ function renderSingleBar(
             themeEffects: config.themeEffects,
         })}
     `;
+}
+
+function buildSingleValueLayoutWithIcon(
+    valueLayout: ValueLineLayout,
+    layoutPlan: ProgressBarLayoutPlan,
+): ValueLineLayout {
+    // Match the existing channel-row icon/value spacing so single-channel
+    // throughput bars align with the two-channel bar layout.
+    const iconOffset = layoutPlan.mode === "wide" ? 26 : 31;
+
+    return {
+        ...valueLayout,
+        xCoordinate: valueLayout.xCoordinate + iconOffset,
+        maxWidth: Math.max(1, valueLayout.maxWidth - iconOffset),
+    };
+}
+
+function renderSingleValueIcon(options: {
+    iconFragment: string;
+    iconColor: string;
+    yCoordinate: number;
+    layoutPlan: ProgressBarLayoutPlan;
+    themeEffects: RenderThemeEffectTokens;
+}): string {
+    // Match the existing channel-row icon placement for square and wide bars.
+    const iconCenterXCoordinate = options.layoutPlan.padding + 9;
+    const iconScale = options.layoutPlan.mode === "wide" ? 0.46 : 0.54;
+
+    return `<g color="${options.iconColor}" transform="translate(${iconCenterXCoordinate} ${options.yCoordinate}) scale(${iconScale})" ${buildSvgFilterAttributes(options.themeEffects.iconFilter).join(" ")}>
+        ${options.iconFragment}
+    </g>`;
 }
 
 function renderChannelBars(
