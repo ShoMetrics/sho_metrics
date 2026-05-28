@@ -53,6 +53,9 @@ test("disk usage circle view settings render usage display controls", () => {
 
     assert.match(markup, /Usage Display:/);
     assert.doesNotMatch(markup, /Custom Label:/);
+    assertTextOrder(markup, "Disk Metric:", "View:");
+    assertTextOrder(markup, "View:", "Theme:");
+    assertTextOrder(markup, "Theme:", "Usage Display:");
 });
 
 test("disk usage settings preserve selected unavailable volume", () => {
@@ -91,6 +94,9 @@ test("windows disk throughput settings show aggregate controls", () => {
     assert.match(markup, /Showing aggregate disk read\/write/);
     assert.match(markup, /Read Max/);
     assert.match(markup, /Write Max/);
+    assertTextOrder(markup, "Disk Metric:", "View:");
+    assertTextOrder(markup, "View:", "Theme:");
+    assertTextOrder(markup, "Theme:", "Scale:");
 });
 
 test("network dual-channel settings render channel colors instead of usage colors", () => {

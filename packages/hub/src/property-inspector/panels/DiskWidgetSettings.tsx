@@ -47,11 +47,17 @@ export function DiskWidgetSettings(props: DiskWidgetSettingsProps): React.JSX.El
     return (
         <>
             {reading.kind === "throughput" ? (
-                <DiskThroughputSettings {...props} reading={reading} />
+                <DiskThroughputMetricSettings {...props} reading={reading} />
             ) : (
-                <DiskUsageSettings {...props} reading={reading} />
+                <DiskUsageMetricSettings {...props} reading={reading} />
             )}
             <AppearanceSettings {...props} />
+            <LineSettings {...props} />
+            {reading.kind === "throughput" ? (
+                <DiskThroughputScaleSettings {...props} reading={reading} />
+            ) : (
+                <DiskUsageExtraSettings {...props} reading={reading} />
+            )}
             {usesThroughputChannelColors ? (
                 <DiskThroughputChannelColorSettings {...props} />
             ) : (
@@ -62,27 +68,35 @@ export function DiskWidgetSettings(props: DiskWidgetSettingsProps): React.JSX.El
     );
 }
 
-function DiskUsageSettings(props: DiskWidgetSettingsProps & {
+function DiskUsageMetricSettings(props: DiskWidgetSettingsProps & {
     reading: DiskUsageReading;
 }): React.JSX.Element {
-    const selectedView = props.context.resolved.widget.slot.appearance.view.selectedView;
     const selectedDiskVolumeId = props.target.volumeId
         ?? resolveSelectedDiskVolume(props.context)?.id
         ?? "";
 
     return (
+        <SettingsSection title="Metric">
+            <DiskMetricKindSetting {...props} currentKind={props.reading.kind} />
+            <SelectSetting
+                label="Volume"
+                value={selectedDiskVolumeId}
+                optionList={resolveDiskVolumeOptions(props.context, selectedDiskVolumeId)}
+                onValueChange={(volumeId) => props.onSettingsPatch({
+                    disk: { volumeId },
+                })}
+            />
+        </SettingsSection>
+    );
+}
+
+function DiskUsageExtraSettings(props: DiskWidgetSettingsProps & {
+    reading: DiskUsageReading;
+}): React.JSX.Element {
+    const selectedView = props.context.resolved.widget.slot.appearance.view.selectedView;
+
+    return (
         <>
-            <SettingsSection title="Metric">
-                <DiskMetricKindSetting {...props} currentKind={props.reading.kind} />
-                <SelectSetting
-                    label="Volume"
-                    value={selectedDiskVolumeId}
-                    optionList={resolveDiskVolumeOptions(props.context, selectedDiskVolumeId)}
-                    onValueChange={(volumeId) => props.onSettingsPatch({
-                        disk: { volumeId },
-                    })}
-                />
-            </SettingsSection>
             {(selectedView === "circle" || selectedView === "text") && (
                 <SettingsSection title="Scale & Units">
                     <SelectSetting
@@ -96,82 +110,85 @@ function DiskUsageSettings(props: DiskWidgetSettingsProps & {
                 </SettingsSection>
             )}
             {selectedView === "bar" && <DiskUsageBarLabelSettings {...props} />}
-            <LineSettings {...props} />
         </>
     );
 }
 
-function DiskThroughputSettings(props: DiskWidgetSettingsProps & {
+function DiskThroughputMetricSettings(props: DiskWidgetSettingsProps & {
+    reading: DiskThroughputReading;
+}): React.JSX.Element {
+    return (
+        <SettingsSection title="Metric">
+            <DiskMetricKindSetting {...props} currentKind={props.reading.kind} />
+            <SelectSetting
+                label="Direction"
+                value={props.reading.direction}
+                optionList={diskThroughputDirectionOptionList}
+                onValueChange={(throughputDirection) => props.onSettingsPatch({
+                    disk: { throughputDirection },
+                })}
+            />
+            <SelectSetting
+                label="Volume"
+                value=""
+                optionList={aggregateDiskVolumeOptionList}
+                onValueChange={() => undefined}
+                disabled
+            />
+            <InspectorItem>
+                <div className="readonly-inline">
+                    <span className="readonly-text">{DISK_THROUGHPUT_AGGREGATE_NOTE}</span>
+                </div>
+            </InspectorItem>
+        </SettingsSection>
+    );
+}
+
+function DiskThroughputScaleSettings(props: DiskWidgetSettingsProps & {
     reading: DiskThroughputReading;
 }): React.JSX.Element {
     const display = props.reading.display;
     const isAutoScale = display.scaleMode === "auto";
 
     return (
-        <>
-            <SettingsSection title="Metric">
-                <DiskMetricKindSetting {...props} currentKind={props.reading.kind} />
-                <SelectSetting
-                    label="Direction"
-                    value={props.reading.direction}
-                    optionList={diskThroughputDirectionOptionList}
-                    onValueChange={(throughputDirection) => props.onSettingsPatch({
-                        disk: { throughputDirection },
-                    })}
-                />
-                <SelectSetting
-                    label="Volume"
-                    value=""
-                    optionList={aggregateDiskVolumeOptionList}
-                    onValueChange={() => undefined}
-                    disabled
-                />
-                <InspectorItem>
-                    <div className="readonly-inline">
-                        <span className="readonly-text">{DISK_THROUGHPUT_AGGREGATE_NOTE}</span>
-                    </div>
-                </InspectorItem>
-            </SettingsSection>
-            <SettingsSection title="Scale & Units">
-                <SelectSetting
-                    label="Scale"
-                    value={display.scaleMode}
-                    optionList={scaleModeOptionList}
-                    onValueChange={(scaleMode) => props.onSettingsPatch({
-                        disk: { scaleMode },
-                    })}
-                />
-                <NumberSetting
-                    label="Read Max (MiB/s)"
-                    value={display.maximumReadThroughputMebibytesPerSecond}
-                    onValueChange={(maximumReadThroughputMebibytesPerSecond) => props.onSettingsPatch({
-                        disk: {
-                            scaleMode: "custom",
-                            maximumReadThroughputMebibytesPerSecond,
-                        },
-                    })}
-                    minimum={1}
-                    step={1}
-                    optional
-                    disabled={isAutoScale}
-                />
-                <NumberSetting
-                    label="Write Max (MiB/s)"
-                    value={display.maximumWriteThroughputMebibytesPerSecond}
-                    onValueChange={(maximumWriteThroughputMebibytesPerSecond) => props.onSettingsPatch({
-                        disk: {
-                            scaleMode: "custom",
-                            maximumWriteThroughputMebibytesPerSecond,
-                        },
-                    })}
-                    minimum={1}
-                    step={1}
-                    optional
-                    disabled={isAutoScale}
-                />
-            </SettingsSection>
-            <LineSettings {...props} />
-        </>
+        <SettingsSection title="Scale & Units">
+            <SelectSetting
+                label="Scale"
+                value={display.scaleMode}
+                optionList={scaleModeOptionList}
+                onValueChange={(scaleMode) => props.onSettingsPatch({
+                    disk: { scaleMode },
+                })}
+            />
+            <NumberSetting
+                label="Read Max (MiB/s)"
+                value={display.maximumReadThroughputMebibytesPerSecond}
+                onValueChange={(maximumReadThroughputMebibytesPerSecond) => props.onSettingsPatch({
+                    disk: {
+                        scaleMode: "custom",
+                        maximumReadThroughputMebibytesPerSecond,
+                    },
+                })}
+                minimum={1}
+                step={1}
+                optional
+                disabled={isAutoScale}
+            />
+            <NumberSetting
+                label="Write Max (MiB/s)"
+                value={display.maximumWriteThroughputMebibytesPerSecond}
+                onValueChange={(maximumWriteThroughputMebibytesPerSecond) => props.onSettingsPatch({
+                    disk: {
+                        scaleMode: "custom",
+                        maximumWriteThroughputMebibytesPerSecond,
+                    },
+                })}
+                minimum={1}
+                step={1}
+                optional
+                disabled={isAutoScale}
+            />
+        </SettingsSection>
     );
 }
 
