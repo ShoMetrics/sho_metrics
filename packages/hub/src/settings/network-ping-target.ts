@@ -1,5 +1,6 @@
 import isFQDN from "validator/lib/isFQDN";
 import isIP from "validator/lib/isIP";
+import stripLow from "validator/lib/stripLow";
 
 export const DEFAULT_NETWORK_PING_TARGET_HOST = "8.8.8.8";
 
@@ -14,12 +15,11 @@ export interface NormalizedNetworkPingTarget {
 
 const HOSTNAME_MAX_LENGTH = 253;
 const HTTP_SCHEME_PATTERN = /^https?:\/\//iu;
-const INVALID_INPUT_CHARACTER_PATTERN = /[\u0000-\u001F\u007F\s]/u;
 
 export function normalizeNetworkPingTargetInput(input: string): NormalizedNetworkPingTarget {
     const trimmedInput = input.trim();
 
-    if (trimmedInput.length === 0 || INVALID_INPUT_CHARACTER_PATTERN.test(trimmedInput)) {
+    if (trimmedInput.length === 0 || hasInvalidPingTargetCharacter(trimmedInput)) {
         return defaultNetworkPingTarget();
     }
 
@@ -53,6 +53,20 @@ export function normalizeNetworkPingTargetInput(input: string): NormalizedNetwor
         targetHost: dnsHost,
         status: "normalized",
     };
+}
+
+function hasInvalidPingTargetCharacter(input: string): boolean {
+    if (stripLow(input) !== input) {
+        return true;
+    }
+
+    for (const character of input) {
+        if (character.trim().length === 0) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function parseNetworkPingTargetHostname(input: string): string | undefined {
