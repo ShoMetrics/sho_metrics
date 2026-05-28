@@ -163,7 +163,6 @@ export function buildMetricViewRenderPlan(options: {
     const touchStripMetricLayout = options.renderTarget === "touch-strip"
         ? resolveTouchStripMetricLayout({
             renderPrimitive: renderAppearance.renderPrimitive,
-            circleVariant,
             dualRenderPrimitive: isDualMetricRenderOptions(options.viewOptions)
                 ? options.viewOptions.dualRenderPrimitive
                 : undefined,
@@ -286,10 +285,9 @@ export function resolveMetricViewSampleTimestampMilliseconds(widgetData: WidgetD
 
 export function resolveTouchStripMetricLayout(options: {
     renderPrimitive: MetricRenderAppearance["renderPrimitive"];
-    circleVariant: MetricRenderAppearance["circleVariant"];
     dualRenderPrimitive?: DualMetricRenderOptions["dualRenderPrimitive"];
 }): TouchStripMetricLayout {
-    if (options.dualRenderPrimitive === "circle" && options.circleVariant !== "gauge") {
+    if (options.dualRenderPrimitive === "circle") {
         return TOUCH_STRIP_METRIC_LAYOUTS["wide-frame-two-square-bodies"];
     }
 
@@ -531,10 +529,12 @@ function renderDualTouchStripCircleBody(options: {
     fallbackStatusIcon: ProgressCircleStatusIcon;
     renderPlan: MetricViewRenderPlan;
 }): string {
+    const labelText = options.labelText ?? options.widgetData.label;
+
     return renderSingleMetricBodyView({
         data: {
             ...options.widgetData,
-            label: options.labelText ?? options.widgetData.label,
+            label: labelText,
         },
         visual: withMetricPaint(
             options.renderPlan.renderAppearance,

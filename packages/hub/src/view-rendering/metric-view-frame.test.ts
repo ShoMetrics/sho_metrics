@@ -535,7 +535,6 @@ test("touch strip layout uses wide rendering for non-circle branches", () => {
     );
     const touchStripMetricLayout = resolveTouchStripMetricLayout({
         renderPrimitive: renderAppearance.renderPrimitive,
-        circleVariant: renderAppearance.circleVariant,
     });
 
     assert.equal(touchStripMetricLayout.kind, "wide");
@@ -543,7 +542,7 @@ test("touch strip layout uses wide rendering for non-circle branches", () => {
     assert.deepEqual(touchStripMetricLayout.pngSize, TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE);
 });
 
-test("dual circle gauge touch strip keeps one square body until split gauge lanes exist", () => {
+test("dual circle gauge touch strip renders two complete gauge bodies", () => {
     const frame = composeMetricViewFrame({
         viewOptions: buildDualMetricRenderOptions({
             widgetData: buildDualChannelWidgetData({
@@ -562,20 +561,13 @@ test("dual circle gauge touch strip keeps one square body until split gauge lane
         renderTarget: "touch-strip",
     });
 
-    assert.equal(frame.renderPlan.touchStripMetricLayout?.kind, "wide-frame-square-body");
-    assert.equal(frame.renderPlan.bodyViewports.length, 1);
-    assert.deepEqual(frame.renderPlan.bodyViewports[0], {
-        xCoordinate: 50,
-        yCoordinate: 0,
-        width: 100,
-        height: 100,
-        body: {
-            xOffset: 0,
-            yOffset: 0,
-            renderSize: WIDGET_LOGICAL_SIZE,
-        },
-        clipRadius: undefined,
-    });
+    assert.equal(frame.renderPlan.touchStripMetricLayout?.kind, "wide-frame-two-square-bodies");
+    assert.equal(frame.renderPlan.bodyViewports.length, 2);
+    assert.match(frame.svg, /flat-body-viewport-0-0-0-100-100/);
+    assert.match(frame.svg, /flat-body-viewport-1-100-0-100-100/);
+    assert.match(frame.svg, /progress-circle-range-segment/);
+    assert.doesNotMatch(frame.svg, /dual-arc-positive-range-/);
+    assert.doesNotMatch(frame.svg, /dual-arc-negative-range-/);
 });
 
 function buildSingleMetricRenderOptions(options: {

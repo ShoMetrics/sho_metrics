@@ -450,22 +450,16 @@ const SURFACE_CASE_DEFINITIONS: readonly SurfaceCaseDefinition[] = [
     {
         surfaceCase: "touch-strip-wide-frame-square-body",
         renderTarget: "touch-strip",
-        supportsViewCase: viewCaseDefinition =>
-            viewCaseDefinition.selectedView === "circle"
-            && (
-                viewCaseDefinition.metricKind === "single"
-                || viewCaseDefinition.circleVariant === "gauge"
-            ),
-        unsupportedReason: "Single circle views and dual gauge circle views use the production touch-strip-wide-frame-square-body layout.",
+        supportsViewCase: viewCaseDefinition => viewCaseDefinition.selectedView === "circle" && viewCaseDefinition.metricKind === "single",
+        unsupportedReason: "Only single circle views use the production touch-strip-wide-frame-square-body layout.",
     },
     {
         surfaceCase: "touch-strip-wide-two-square-bodies",
         renderTarget: "touch-strip",
         supportsViewCase: viewCaseDefinition =>
             viewCaseDefinition.selectedView === "circle"
-            && viewCaseDefinition.metricKind === "dual"
-            && viewCaseDefinition.circleVariant !== "gauge",
-        unsupportedReason: "Only non-gauge dual circle views use the production touch-strip-wide-two-square-bodies layout.",
+            && viewCaseDefinition.metricKind === "dual",
+        unsupportedReason: "Only dual circle views use the production touch-strip-wide-two-square-bodies layout.",
     },
 ];
 
