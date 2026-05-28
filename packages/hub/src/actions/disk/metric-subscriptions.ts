@@ -20,7 +20,7 @@ export function resolveDiskMetricSubscriptionKeys(settings: DiskMetricSubscripti
 
     const throughputDirection = settings.diskThroughputDirection;
 
-    if (isDualDiskThroughputView(settings.selectedView, throughputDirection)) {
+    if (shouldSubscribeToDiskThroughputChannels(settings.selectedView, throughputDirection)) {
         return [
             getDiskThroughputMetricKey("read"),
             getDiskThroughputMetricKey("write"),
@@ -38,10 +38,10 @@ export function resolveDiskUsageMetricSubscriptionKeys(volumeId: string | undefi
     ];
 }
 
-export function isDualDiskThroughputView(
+function shouldSubscribeToDiskThroughputChannels(
     selectedView: MetricView | undefined,
     direction: ResolvedDiskThroughputDirection,
 ): boolean {
     return direction === "both"
-        && (selectedView === "circle" || selectedView === "text" || selectedView === "line");
+        && (selectedView === "bar" || selectedView === "circle" || selectedView === "text" || selectedView === "line");
 }

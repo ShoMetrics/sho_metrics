@@ -295,7 +295,7 @@ test("network mirrored trend disables grid controls in the panel", () => {
     assert.match(markup, /Grid line settings are not supported/);
 });
 
-test("disk throughput bar view settings use standard colors", () => {
+test("disk throughput bar view settings render read/write colors", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",
         settings: buildWidgetSettings("disk", {
@@ -310,9 +310,8 @@ test("disk throughput bar view settings use standard colors", () => {
         }),
     });
 
-    assert.match(markup, /Solid Color:/);
-    assert.doesNotMatch(markup, sectionHeadingPattern("Read"));
-    assert.doesNotMatch(markup, sectionHeadingPattern("Write"));
+    assert.match(markup, sectionHeadingPattern("Read"));
+    assert.match(markup, sectionHeadingPattern("Write"));
 });
 
 test("disk throughput dual-channel settings render read/write colors", () => {
