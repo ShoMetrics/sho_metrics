@@ -27,8 +27,8 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Restore
-        run: dotnet restore ShoMetrics.Source.Windows.slnx
+      - name: Run lint
+        run: ./scripts/Test-SourceWindowsLint.ps1
 
       - name: Run tests
         run: dotnet test ShoMetrics.Source.Windows.slnx --configuration Release --no-restore

@@ -1,0 +1,61 @@
+#!/bin/sh
+set -eu
+
+staged_files="$(git diff --cached --name-only --diff-filter=ACMR)"
+
+if [ -z "$staged_files" ]; then
+    exit 0
+fi
+
+has_staged_path() {
+    printf '%s\n' "$staged_files" | grep -Eq "$1"
+}
+
+require_command() {
+    if ! command -v "$1" >/dev/null 2>&1; then
+        echo "pre-commit: missing required command: $1" >&2
+        exit 127
+    fi
+}
+
+run_hub_lint() {
+    if command -v npm.cmd >/dev/null 2>&1; then
+        npm_command="npm.cmd"
+    elif command -v npm >/dev/null 2>&1; then
+        npm_command="npm"
+    else
+        echo "pre-commit: missing required command: npm.cmd or npm" >&2
+        exit 127
+    fi
+
+    (
+        cd packages/hub
+        "$npm_command" run lint
+    )
+}
+
+run_source_windows_lint() {
+    require_command dotnet
+
+    (
+        cd packages/source-windows
+        if command -v pwsh >/dev/null 2>&1; then
+            pwsh -NoProfile -File scripts/Test-SourceWindowsLint.ps1
+        elif command -v powershell.exe >/dev/null 2>&1; then
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test-SourceWindowsLint.ps1
+        else
+            echo "pre-commit: missing required command: pwsh or powershell.exe" >&2
+            exit 127
+        fi
+    )
+}
+
+if has_staged_path '^(packages/hub/|contracts/proto/)'; then
+    echo "pre-commit: running Hub lint"
+    run_hub_lint
+fi
+
+if has_staged_path '^packages/source-windows/.*\.(cs|xaml|csproj|props|targets|slnx|json|config|ps1)$'; then
+    echo "pre-commit: running Source Windows lint"
+    run_source_windows_lint
+fi
