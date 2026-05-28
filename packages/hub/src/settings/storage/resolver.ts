@@ -10,8 +10,9 @@ import {
     MetricSourcePolicy_FailureMode as StoredSourceFailureMode,
     MetricTheme as StoredMetricTheme,
     NetworkDisplaySettings_UnitBase as StoredNetworkUnitBase,
-    NetworkMetricTarget_Direction as StoredNetworkDirection,
-    NetworkMetricTarget_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
+    NetworkMetricTarget_Kind as StoredNetworkMetricKind,
+    NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
+    NetworkMetricTarget_Traffic_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
     TerminalPalettePreset as StoredTerminalPalettePreset,
     TerminalThemeVariant as StoredTerminalThemeVariant,
     TextViewVariant as StoredTextViewVariant,
@@ -118,6 +119,10 @@ import {
     buildDefaultAppearanceSettings,
     DEFAULT_APPEARANCE_SETTINGS,
 } from "../default-appearance-settings";
+import {
+    DEFAULT_NETWORK_PING_TARGET_HOST,
+    normalizeNetworkPingTargetInput,
+} from "../network-ping-target";
 
 export interface ResolveStoredWidgetSettingsOptions {
     readonly storedWidgetSettings: StoredWidgetSettings;
@@ -262,6 +267,12 @@ const networkDirectionByProto = {
     [StoredNetworkDirection.DOWNLOAD]: "download",
     [StoredNetworkDirection.UPLOAD]: "upload",
 } satisfies Record<StoredNetworkDirection, NetworkDirection | undefined>;
+
+const networkMetricKindByProto = {
+    [StoredNetworkMetricKind.UNSPECIFIED]: undefined,
+    [StoredNetworkMetricKind.TRAFFIC]: "traffic",
+    [StoredNetworkMetricKind.PING]: "ping",
+} satisfies Record<StoredNetworkMetricKind, ResolvedNetworkReading["kind"] | undefined>;
 
 const networkTrafficDisplayModeByProto = {
     [StoredNetworkTrafficDisplayMode.UNSPECIFIED]: undefined,
@@ -510,22 +521,41 @@ function resolveNetworkMetricTarget(
     storedTarget: StoredNetworkMetricTarget,
     display: ResolvedNetworkDisplaySettings,
 ): ResolvedMetricTarget {
-    const reading: ResolvedNetworkReading = {
-        kind: "traffic",
-        direction: resolveStoredEnum(storedTarget.direction, networkDirectionByProto, "both"),
-        trafficDisplayMode: resolveStoredEnum(
-            storedTarget.trafficDisplayMode,
-            networkTrafficDisplayModeByProto,
-            "mirrored",
-        ),
-        display,
-    };
-
     return {
         domain: "network",
-        interfaceId: storedTarget.interfaceId,
-        reading,
+        reading: resolveNetworkReading(storedTarget, display),
     };
+}
+
+function resolveNetworkReading(
+    storedTarget: StoredNetworkMetricTarget,
+    display: ResolvedNetworkDisplaySettings,
+): ResolvedNetworkReading {
+    const kind = resolveStoredEnum(storedTarget.kind, networkMetricKindByProto, "traffic");
+
+    switch (kind) {
+        case "ping":
+            return {
+                kind: "ping",
+                // Stored settings may be hand-edited or recovered from stale JSON.
+                // The patch writer stores normalized hosts; the resolver keeps this boundary safe.
+                targetHost: normalizeNetworkPingTargetInput(
+                    storedTarget.ping?.targetHost ?? DEFAULT_NETWORK_PING_TARGET_HOST,
+                ).targetHost,
+            };
+        case "traffic":
+            return {
+                kind: "traffic",
+                interfaceId: storedTarget.traffic?.interfaceId,
+                direction: resolveStoredEnum(storedTarget.traffic?.direction, networkDirectionByProto, "both"),
+                trafficDisplayMode: resolveStoredEnum(
+                    storedTarget.traffic?.trafficDisplayMode,
+                    networkTrafficDisplayModeByProto,
+                    "mirrored",
+                ),
+                display,
+            };
+    }
 }
 
 function resolveDiskMetricTarget(

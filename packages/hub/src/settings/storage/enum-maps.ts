@@ -8,8 +8,9 @@ import {
     GpuMetricTarget_Kind as StoredGpuMetricKind,
     MetricTheme as StoredMetricTheme,
     NetworkDisplaySettings_UnitBase as StoredNetworkUnitBase,
-    NetworkMetricTarget_Direction as StoredNetworkDirection,
-    NetworkMetricTarget_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
+    NetworkMetricTarget_Kind as StoredNetworkMetricKind,
+    NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
+    NetworkMetricTarget_Traffic_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
     TerminalPalettePreset as StoredTerminalPalettePreset,
     TerminalThemeVariant as StoredTerminalThemeVariant,
     TextViewVariant as StoredTextViewVariant,
@@ -31,6 +32,7 @@ import type {
     GridLineVisibility,
     MetricTheme,
     NetworkDirection,
+    ResolvedNetworkReading,
     NetworkTrafficDisplayMode,
     NetworkUnitBase,
     TerminalPalettePreset,
@@ -107,6 +109,11 @@ export const storedNetworkDirectionByResolved = {
     download: StoredNetworkDirection.DOWNLOAD,
     upload: StoredNetworkDirection.UPLOAD,
 } satisfies Record<NetworkDirection, StoredNetworkDirection>;
+
+export const storedNetworkMetricKindByResolved = {
+    traffic: StoredNetworkMetricKind.TRAFFIC,
+    ping: StoredNetworkMetricKind.PING,
+} satisfies Record<ResolvedNetworkReading["kind"], StoredNetworkMetricKind>;
 
 export const storedNetworkTrafficDisplayModeByResolved = {
     mirrored: StoredNetworkTrafficDisplayMode.MIRRORED,

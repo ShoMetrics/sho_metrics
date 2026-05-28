@@ -228,6 +228,11 @@ describe("stored settings proto resolver", () => {
         });
 
         assert.equal(settings.widget.slot.metric.target.domain, "network");
+        assert.equal(settings.widget.slot.metric.target.reading.kind, "traffic");
+        if (settings.widget.slot.metric.target.reading.kind === "traffic") {
+            assert.equal(settings.widget.slot.metric.target.reading.direction, "both");
+            assert.equal(settings.widget.slot.metric.target.reading.trafficDisplayMode, "mirrored");
+        }
         assert.equal(settings.widget.slot.appearance.theme.flat.paint.colorMode, "solid");
         assert.equal(settings.widget.slot.appearance.theme.flat.paint.solid.colors.downloadColor, "#2563EB");
         assert.equal(settings.widget.slot.appearance.theme.flat.paint.solid.colors.uploadColor, "#F97316");
@@ -357,8 +362,11 @@ describe("stored settings proto resolver", () => {
                 slot: {
                     metric: {
                         network: {
-                            direction: "DIRECTION_DOWNLOAD",
-                            trafficDisplayMode: "TRAFFIC_DISPLAY_MODE_OVERLAY",
+                            kind: "KIND_TRAFFIC",
+                            traffic: {
+                                direction: "DIRECTION_DOWNLOAD",
+                                trafficDisplayMode: "TRAFFIC_DISPLAY_MODE_OVERLAY",
+                            },
                         },
                     },
                     overrides: {
@@ -400,6 +408,67 @@ describe("stored settings proto resolver", () => {
         assert.equal(target.reading.display.unitBase, "bit");
         assert.equal(target.reading.display.maximumDownloadSpeedMegabitsPerSecond, 800);
         assert.equal(target.reading.display.maximumUploadSpeedMegabitsPerSecond, 50);
+    });
+
+    it("resolves ping network targets with normalized host input", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    metric: {
+                        network: {
+                            kind: "KIND_PING",
+                            ping: {
+                                targetHost: "https://Example.COM/path?q=1",
+                            },
+                        },
+                    },
+                    overrides: {
+                        network: {
+                            maximumUploadSpeedMegabitsPerSecond: 50,
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+        });
+        const target = settings.widget.slot.metric.target;
+
+        assert.equal(target.domain, "network");
+        assert.equal(target.reading.kind, "ping");
+        if (target.reading.kind === "ping") {
+            assert.equal(target.reading.targetHost, "example.com");
+        }
+    });
+
+    it("defaults invalid ping target hosts to the public DNS target", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    metric: {
+                        network: {
+                            kind: "KIND_PING",
+                            ping: {
+                                targetHost: "bad host",
+                            },
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+        });
+        const target = settings.widget.slot.metric.target;
+
+        assert.equal(target.domain, "network");
+        assert.equal(target.reading.kind, "ping");
+        if (target.reading.kind === "ping") {
+            assert.equal(target.reading.targetHost, "8.8.8.8");
+        }
     });
 
     it("applies global override without changing non-appearance settings", () => {

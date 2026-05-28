@@ -7,6 +7,9 @@ import {
     GpuMetricTarget_Kind as StoredGpuMetricKind,
     MetricSourcePolicy_FailureMode as StoredSourceFailureMode,
     MetricTheme as StoredMetricTheme,
+    NetworkDisplaySettings_UnitBase as StoredNetworkUnitBase,
+    NetworkMetricTarget_Kind as StoredNetworkMetricKind,
+    NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
     TerminalPalettePreset as StoredTerminalPalettePreset,
     TerminalThemeVariant as StoredTerminalThemeVariant,
     TemperatureUnit as StoredTemperatureUnit,
@@ -77,6 +80,103 @@ test("widget patch writes black-white color mode", () => {
 
     const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
     assert.equal(appearance?.theme?.flat?.paint?.colorMode, StoredColorMode.BLACK_WHITE);
+});
+
+test("widget patch switches network traffic to ping and writes target host", () => {
+    const networkSettings = resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings;
+
+    const nextSettings = writeStoredWidgetSettingsPatch(networkSettings, {
+        network: {
+            kind: "ping",
+            pingTargetHost: "https://Example.COM/path?q=1",
+        },
+    });
+
+    const target = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.metric?.target;
+    assert.equal(target?.case, "network");
+    if (target?.case === "network") {
+        assert.equal(target.value.kind, StoredNetworkMetricKind.PING);
+        assert.equal(target.value.ping?.targetHost, "example.com");
+        assert.equal(target.value.traffic, undefined);
+    }
+});
+
+test("widget patch switches network ping to traffic and writes traffic settings", () => {
+    const pingSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
+        {
+            network: {
+                kind: "ping",
+                pingTargetHost: "example.com",
+            },
+        },
+    );
+
+    const nextSettings = writeStoredWidgetSettingsPatch(pingSettings, {
+        network: {
+            kind: "traffic",
+            direction: "download",
+            interfaceId: "Ethernet",
+        },
+    });
+
+    const target = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.metric?.target;
+    assert.equal(target?.case, "network");
+    if (target?.case === "network") {
+        assert.equal(target.value.kind, StoredNetworkMetricKind.TRAFFIC);
+        assert.equal(target.value.traffic?.direction, StoredNetworkDirection.DOWNLOAD);
+        assert.equal(target.value.traffic?.interfaceId, "Ethernet");
+        assert.equal(target.value.ping, undefined);
+    }
+});
+
+test("widget patch keeps network display overrides traffic-only", () => {
+    const networkSettings = resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings;
+
+    const pingSettings = writeStoredWidgetSettingsPatch(networkSettings, {
+        network: {
+            kind: "ping",
+            pingTargetHost: "example.com",
+        },
+    });
+    const trafficSettings = writeStoredWidgetSettingsPatch(networkSettings, {
+        network: {
+            unitBase: "bit",
+        },
+    });
+
+    const pingOverrides = readStoredWidgetSettings(pingSettings).settings.widget.value?.slot?.overrides;
+    const trafficOverrides = readStoredWidgetSettings(trafficSettings).settings.widget.value?.slot?.overrides;
+
+    assert.equal(pingOverrides?.network, undefined);
+    assert.equal(trafficOverrides?.network?.unitBase, StoredNetworkUnitBase.BIT);
+});
+
+test("widget patch does not write traffic display overrides while stored network target is ping", () => {
+    const pingSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
+        {
+            network: {
+                kind: "ping",
+                pingTargetHost: "example.com",
+            },
+        },
+    );
+
+    const nextSettings = writeStoredWidgetSettingsPatch(pingSettings, {
+        network: {
+            unitBase: "bit",
+        },
+    });
+
+    const storedSettings = readStoredWidgetSettings(nextSettings).settings;
+    const target = storedSettings.widget.value?.slot?.metric?.target;
+    assert.equal(target?.case, "network");
+    if (target?.case === "network") {
+        assert.equal(target.value.kind, StoredNetworkMetricKind.PING);
+        assert.equal(target.value.ping?.targetHost, "example.com");
+    }
+    assert.equal(storedSettings.widget.value?.slot?.overrides?.network, undefined);
 });
 
 test("widget patch updates CPU reading within the CPU action domain", () => {

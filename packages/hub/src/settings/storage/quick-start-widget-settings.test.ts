@@ -6,7 +6,8 @@ import {
     DiskMetricTarget_Kind as StoredDiskMetricKind,
     GpuMetricTarget_Kind as StoredGpuMetricKind,
     MemoryMetricTarget_Kind as StoredMemoryMetricKind,
-    NetworkMetricTarget_Direction as StoredNetworkDirection,
+    NetworkMetricTarget_Kind as StoredNetworkMetricKind,
+    NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
     type StoredWidgetSettings,
 } from "../../generated/shometrics/v1/settings_pb";
 import type { ActionKind } from "../../shared/stream-deck-actions";
@@ -79,7 +80,8 @@ describe("quick-start stored widget settings", () => {
                     if (target?.case !== "network") {
                         assert.fail(`Expected network target, received ${String(target?.case)}`);
                     }
-                    assert.equal(target.value.direction, StoredNetworkDirection.BOTH);
+                    assert.equal(target.value.kind, StoredNetworkMetricKind.TRAFFIC);
+                    assert.equal(target.value.traffic?.direction, StoredNetworkDirection.BOTH);
                     if (settings.widget.case !== "singleMetric") {
                         assert.fail(`Expected singleMetric widget, received ${String(settings.widget.case)}`);
                     }

@@ -18,6 +18,9 @@ import {
     MetricSolidPaintSettingsSchema,
     MultiColorSetSchema,
     NetworkDisplaySettingsSchema,
+    NetworkMetricTarget_Kind as StoredNetworkMetricKind,
+    NetworkMetricTarget_PingSchema,
+    NetworkMetricTarget_TrafficSchema,
     TerminalPaintSettingsSchema,
     TerminalThemeSettingsSchema,
     SlotOverridesSchema,
@@ -44,6 +47,7 @@ import type {
     NetworkDirection,
     NetworkTrafficDisplayMode,
     NetworkUnitBase,
+    ResolvedNetworkReading,
     ResolvedCpuReading,
     ResolvedGpuReading,
     ScaleMode,
@@ -56,6 +60,7 @@ import type {
     ResolvedMetricPaintSettingsOverride,
     ResolvedMultiColorSetOverride,
 } from "../appearance-overrides";
+import { normalizeNetworkPingTargetInput } from "../network-ping-target";
 import {
     readStoredWidgetSettings,
     writeStoredWidgetSettings,
@@ -79,6 +84,7 @@ import {
     storedTextViewVariantByResolved,
     storedScaleModeByResolved,
     storedMetricViewByResolved,
+    storedNetworkMetricKindByResolved,
     storedSourceFailureModeByResolved,
     storedTemperatureUnitByResolved,
     storedThemeByResolved,
@@ -96,9 +102,11 @@ export interface StoredWidgetSettingsPatch {
     } | undefined;
     readonly appearance?: ResolvedAppearanceSettingsOverride | undefined;
     readonly network?: Partial<{
+        readonly kind: ResolvedNetworkReading["kind"];
         readonly direction: NetworkDirection;
         readonly interfaceId: string;
         readonly trafficDisplayMode: NetworkTrafficDisplayMode;
+        readonly pingTargetHost: string;
         readonly scaleMode: ScaleMode;
         readonly maximumDownloadSpeedMegabitsPerSecond: number | undefined;
         readonly maximumUploadSpeedMegabitsPerSecond: number | undefined;
@@ -366,12 +374,38 @@ function applyNetworkPatch(
     overrides: StoredSlotOverrides,
     patch: NonNullable<StoredWidgetSettingsPatch["network"]>,
 ): void {
-    if (patch.direction !== undefined) {
-        target.direction = storedNetworkDirectionByResolved[patch.direction];
+    if (patch.kind !== undefined) {
+        target.kind = storedNetworkMetricKindByResolved[patch.kind];
+        if (patch.kind === "traffic") {
+            target.traffic ??= create(NetworkMetricTarget_TrafficSchema);
+            target.ping = undefined;
+        } else {
+            target.ping ??= create(NetworkMetricTarget_PingSchema);
+            target.traffic = undefined;
+        }
     }
-    applyDefinedValue(target, "interfaceId", patch.interfaceId);
+
+    if (patch.direction !== undefined) {
+        const traffic = ensureNetworkTrafficTarget(target);
+        traffic.direction = storedNetworkDirectionByResolved[patch.direction];
+    }
+    if (patch.interfaceId !== undefined) {
+        const traffic = ensureNetworkTrafficTarget(target);
+        traffic.interfaceId = patch.interfaceId;
+    }
     if (patch.trafficDisplayMode !== undefined) {
-        target.trafficDisplayMode = storedNetworkTrafficDisplayModeByResolved[patch.trafficDisplayMode];
+        const traffic = ensureNetworkTrafficTarget(target);
+        traffic.trafficDisplayMode = storedNetworkTrafficDisplayModeByResolved[patch.trafficDisplayMode];
+    }
+
+    if (patch.pingTargetHost !== undefined) {
+        target.kind = StoredNetworkMetricKind.PING;
+        const ping = target.ping ??= create(NetworkMetricTarget_PingSchema);
+        ping.targetHost = normalizeNetworkPingTargetInput(patch.pingTargetHost).targetHost;
+    }
+
+    if (target.kind === StoredNetworkMetricKind.PING || !hasNetworkDisplayPatch(patch)) {
+        return;
     }
 
     const display = overrides.network ??= create(NetworkDisplaySettingsSchema);
@@ -388,6 +422,24 @@ function applyNetworkPatch(
     if (patch.unitBase !== undefined) {
         display.unitBase = storedNetworkUnitBaseByResolved[patch.unitBase];
     }
+}
+
+function ensureNetworkTrafficTarget(
+    target: StoredNetworkMetricTarget,
+): NonNullable<StoredNetworkMetricTarget["traffic"]> {
+    if (target.kind !== StoredNetworkMetricKind.TRAFFIC) {
+        target.kind = StoredNetworkMetricKind.TRAFFIC;
+        target.ping = undefined;
+    }
+
+    return target.traffic ??= create(NetworkMetricTarget_TrafficSchema);
+}
+
+function hasNetworkDisplayPatch(patch: NonNullable<StoredWidgetSettingsPatch["network"]>): boolean {
+    return patch.scaleMode !== undefined
+        || "maximumDownloadSpeedMegabitsPerSecond" in patch
+        || "maximumUploadSpeedMegabitsPerSecond" in patch
+        || patch.unitBase !== undefined;
 }
 
 function applyDiskPatch(
