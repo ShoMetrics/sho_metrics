@@ -5,6 +5,7 @@ import type { DualChannelWidgetData, WidgetData } from "../../src/view-rendering
 import type { CircleVariant } from "../../src/widgets/primitives/progress-circle";
 import type { DualChannelProgressCircleCenterContent } from "../../src/widgets/primitives/dual-channel-progress-circle";
 import type { DualChannelSparklineMode } from "../../src/widgets/primitives/dual-channel-sparkline";
+import { renderNetworkPingIconFragment } from "../../src/widgets/icons/catalog/network";
 import {
     CPU_CENTER_ICON_FRAGMENT,
     CPU_USAGE_BAR_WIDGET_DATA,
@@ -26,6 +27,7 @@ export type VisualMatrixViewCaseId =
     | "single-centered-text"
     | "single-title-card-text"
     | "single-progress-bar"
+    | "single-progress-bar-ping"
     | "single-sparkline"
     | "dual-circle-full-ring"
     | "dual-circle-minimal"
@@ -117,6 +119,7 @@ export const VISUAL_MATRIX_VIEW_CASES: readonly VisualMatrixViewCaseId[] = [
     "single-centered-text",
     "single-title-card-text",
     "single-progress-bar",
+    "single-progress-bar-ping",
     "single-sparkline",
     "dual-circle-full-ring",
     "dual-circle-minimal",
@@ -153,6 +156,26 @@ const SINGLE_NO_DATA_BAR_WIDGET_DATA: WidgetData = {
     barLabel: "CPU Load",
     barDisplayValue: "N/A",
     barUnit: "",
+};
+
+const SINGLE_PING_BAR_WIDGET_DATA: WidgetData = {
+    current: 37,
+    progress: 0.185,
+    history: [22, 24, 31, 28, 35, 40, 37],
+    unit: "ms",
+    label: "PING",
+    displayValue: "37",
+    secondaryDisplayValue: "example.com",
+    sampleTimestampMilliseconds: 1,
+};
+
+const SINGLE_PING_NO_DATA_BAR_WIDGET_DATA: WidgetData = {
+    ...SINGLE_PING_BAR_WIDGET_DATA,
+    current: 0,
+    progress: 0,
+    history: [],
+    displayValue: "N/A",
+    sampleTimestampMilliseconds: undefined,
 };
 
 const SINGLE_TITLE_CARD_DATA: WidgetData = {
@@ -273,6 +296,13 @@ const VIEW_CASE_DEFINITIONS: readonly ViewCaseDefinition[] = [
         selectedView: "bar",
         dataByState: buildSingleDataStates(CPU_USAGE_BAR_WIDGET_DATA, SINGLE_NO_DATA_BAR_WIDGET_DATA),
         topIcon: CPU_CENTER_ICON_FRAGMENT,
+    },
+    {
+        viewCase: "single-progress-bar-ping",
+        metricKind: "single",
+        selectedView: "bar",
+        dataByState: buildSingleDataStates(SINGLE_PING_BAR_WIDGET_DATA, SINGLE_PING_NO_DATA_BAR_WIDGET_DATA),
+        topIcon: renderNetworkPingIconFragment({ size: 58 }),
     },
     {
         viewCase: "single-sparkline",
