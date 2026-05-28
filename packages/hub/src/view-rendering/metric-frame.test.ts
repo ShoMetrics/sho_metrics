@@ -139,6 +139,35 @@ test("metric frame keeps viewport clip paths distinct for multiple bodies", () =
 
     assert.match(svg, /clipPath id="flat-body-viewport-0-0-0-100-100"/);
     assert.match(svg, /clipPath id="flat-body-viewport-1-100-0-100-100"/);
-    assert.match(svg, /<g transform="translate\(0 0\) scale\(0\.6944\)">\s*<g id="left-body"><\/g>/);
-    assert.match(svg, /<g transform="translate\(100 0\) scale\(0\.6944\)">\s*<g id="right-body"><\/g>/);
+    assert.match(svg, /<g transform="translate\(0 0\) scale\(0\.6944\)">\s*<g id="body-0-left-body"><\/g>/);
+    assert.match(svg, /<g transform="translate\(100 0\) scale\(0\.6944\)">\s*<g id="body-1-right-body"><\/g>/);
+});
+
+test("metric frame namespaces local body ids when composing multiple bodies", () => {
+    const svg = renderMetricFrame({
+        bodies: [
+            {
+                svg: `<defs><linearGradient id="metric-gradient"></linearGradient></defs><path id="metric-path" stroke="url(#metric-gradient)" filter="url(#external-filter)" />`,
+                muted: false,
+            },
+            {
+                svg: `<defs><linearGradient id="metric-gradient"></linearGradient></defs><path id="metric-path" stroke="url(#metric-gradient)" />`,
+                muted: false,
+            },
+        ],
+        themePreset: "flat",
+        paints: framePaints,
+        size: { width: 200, height: 100 },
+    });
+
+    assert.match(svg, /id="body-0-metric-gradient"/);
+    assert.match(svg, /id="body-0-metric-path"/);
+    assert.match(svg, /stroke="url\(#body-0-metric-gradient\)"/);
+    assert.match(svg, /id="body-1-metric-gradient"/);
+    assert.match(svg, /id="body-1-metric-path"/);
+    assert.match(svg, /stroke="url\(#body-1-metric-gradient\)"/);
+    assert.match(svg, /filter="url\(#external-filter\)"/);
+    assert.doesNotMatch(svg, /id="metric-gradient"/);
+    assert.doesNotMatch(svg, /id="metric-path"/);
+    assert.doesNotMatch(svg, /url\(#metric-gradient\)/);
 });

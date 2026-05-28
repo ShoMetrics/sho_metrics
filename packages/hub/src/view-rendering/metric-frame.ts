@@ -8,6 +8,14 @@ import { terminalCleanStyle, terminalVintageStyle } from "../widgets/styles/term
 import type { ThemeBodyViewport, ThemeStyle, ThemeStylePaints } from "../widgets/styles/theme-style";
 
 export interface MetricFrameBody {
+    /**
+     * SVG fragment that may include body-local defs, ids, and url(#...) refs.
+     *
+     * When one frame composes multiple bodies, the frame renderer namespaces
+     * ids found inside each body and rewrites matching local refs. Body
+     * fragments must not use <style> blocks with #id selectors; use inline SVG
+     * references instead so the frame can isolate them.
+     */
     readonly svg: string;
     readonly bodyViewport?: ThemeBodyViewport | undefined;
     readonly muted: boolean;
@@ -46,6 +54,7 @@ export function renderMetricFrame(options: {
             body,
             filterId,
             index,
+            namespaceBodyIds: options.bodies.length > 1,
             themePreset: options.themePreset,
         }))
         .join("");
@@ -108,11 +117,15 @@ function renderFrameBody(options: {
     body: MetricFrameBody;
     filterId: string;
     index: number;
+    namespaceBodyIds: boolean;
     themePreset: ThemePresetName;
 }): string {
-    const bodySvg = options.body.muted
+    const wrappedBodySvg = options.body.muted
         ? `<g filter="url(#${options.filterId})">${options.body.svg}</g>`
         : options.body.svg;
+    const bodySvg = options.namespaceBodyIds
+        ? namespaceSvgFragmentIds(wrappedBodySvg, `body-${options.index}`)
+        : wrappedBodySvg;
 
     if (options.body.bodyViewport === undefined) {
         return bodySvg;
@@ -141,6 +154,26 @@ function renderPlacedBody(body: string, viewport: ThemeBodyViewport, clipId: str
 
 function bodyViewportClipId(themePreset: ThemePresetName, viewport: ThemeBodyViewport, index: number): string {
     return `${themePreset}-body-viewport-${index}-${viewport.xCoordinate}-${viewport.yCoordinate}-${viewport.width}-${viewport.height}`;
+}
+
+function namespaceSvgFragmentIds(svg: string, namespace: string): string {
+    const localIds = new Set(
+        Array.from(svg.matchAll(/\bid="([^"]+)"/gu), match => match[1] ?? ""),
+    );
+
+    if (localIds.size === 0) {
+        return svg;
+    }
+
+    const resolveNamespacedId = (id: string): string => localIds.has(id)
+        ? `${namespace}-${id}`
+        : id;
+
+    return svg
+        .replace(/\bid="([^"]+)"/gu, (_match, id: string) => `id="${resolveNamespacedId(id)}"`)
+        .replace(/url\(#([^)]+)\)/gu, (_match, id: string) => `url(#${resolveNamespacedId(id)})`)
+        .replace(/\b(xlink:href|href)="#([^"]+)"/gu, (_match, attributeName: string, id: string) =>
+            `${attributeName}="#${resolveNamespacedId(id)}"`);
 }
 
 function formatSvgNumber(value: number): string {
