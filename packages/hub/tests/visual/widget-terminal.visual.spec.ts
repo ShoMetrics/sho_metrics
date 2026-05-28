@@ -204,9 +204,8 @@ function renderSingleMetricWidgetSvg(options: {
     });
 
     return renderMetricFrame({
-        body,
+        bodies: [{ svg: body, muted: false }],
         themePreset: visualSettings.themePreset,
-        muted: false,
         paints: visualSettings.paints,
         size: options.keySize,
     });

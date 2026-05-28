@@ -1,6 +1,6 @@
 import type { ColorConfig } from "./color-resolver";
 import { renderDualMetricBodyView } from "./dual-metric-view";
-import { renderMetricFrame, resolveThemeBodyViewport } from "./metric-frame";
+import { renderMetricFrame, resolveThemeBodyViewport, type MetricFrameBody } from "./metric-frame";
 import type { MetricRenderAppearance } from "./render-appearance";
 import { formatRenderUnitText } from "./text-content/render-unit-text";
 import { renderSingleMetricBodyView } from "./single-metric-view";
@@ -56,7 +56,7 @@ export interface DualMetricRenderOptions extends BaseMetricRenderOptions {
 export type MetricRenderOptions = SingleMetricRenderOptions | DualMetricRenderOptions;
 export type MetricRenderTarget = "key" | "touch-strip";
 
-export type TouchStripMetricLayoutKind = "wide" | "wide-frame-square-body";
+export type TouchStripMetricLayoutKind = "wide" | "wide-frame-square-body" | "wide-frame-two-square-bodies";
 
 export interface TouchStripMetricLayout {
     kind: TouchStripMetricLayoutKind;
@@ -75,6 +75,7 @@ export interface MetricViewRenderPlan {
     renderSize: KeySize;
     bodyRenderSize: KeySize;
     bodyViewport: ThemeBodyViewport | undefined;
+    bodyViewports: readonly ThemeBodyViewport[];
     pngSize: KeySize;
 }
 
@@ -84,10 +85,9 @@ export interface MetricViewFrame {
     readonly renderPlan: MetricViewRenderPlan;
 }
 
-interface RenderedMetricBody {
-    readonly svg: string;
+interface RenderedMetricBodies {
+    readonly bodies: readonly MetricFrameBody[];
     readonly renderedMetricData: WidgetData | DualChannelWidgetData;
-    readonly muted: boolean;
 }
 
 interface BodyArea {
@@ -111,6 +111,12 @@ const TOUCH_STRIP_METRIC_LAYOUTS: Record<TouchStripMetricLayoutKind, TouchStripM
         renderSize: TOUCH_STRIP_LOGICAL_SIZE,
         pngSize: TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE,
     },
+    "wide-frame-two-square-bodies": {
+        kind: "wide-frame-two-square-bodies",
+        layoutPath: "layouts/single-metric-touchstrip-wide.json",
+        renderSize: TOUCH_STRIP_LOGICAL_SIZE,
+        pngSize: TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE,
+    },
 };
 
 export function composeMetricViewFrame(options: {
@@ -124,12 +130,10 @@ export function composeMetricViewFrame(options: {
 
     return {
         svg: renderMetricFrame({
-            body: body.svg,
+            bodies: body.bodies,
             themePreset: renderPlan.renderAppearance.themePreset,
-            muted: body.muted,
             paints: renderPlan.renderAppearance.paints,
             size: renderPlan.renderSize,
-            bodyViewport: renderPlan.bodyViewport,
         }),
         renderedMetricData: body.renderedMetricData,
         renderPlan,
@@ -157,7 +161,13 @@ export function buildMetricViewRenderPlan(options: {
         && renderAppearance.renderPrimitive === "circle"
         && circleVariant === "minimal";
     const touchStripMetricLayout = options.renderTarget === "touch-strip"
-        ? resolveTouchStripMetricLayout(renderAppearance)
+        ? resolveTouchStripMetricLayout({
+            renderPrimitive: renderAppearance.renderPrimitive,
+            circleVariant,
+            dualRenderPrimitive: isDualMetricRenderOptions(options.viewOptions)
+                ? options.viewOptions.dualRenderPrimitive
+                : undefined,
+        })
         : null;
     const renderSize = touchStripMetricLayout?.renderSize ?? WIDGET_LOGICAL_SIZE;
     const themeBodyViewport = resolveThemeBodyViewport({
@@ -165,11 +175,12 @@ export function buildMetricViewRenderPlan(options: {
         paints: renderAppearance.paints,
         size: renderSize,
     });
-    const bodyViewport = resolveMetricBodyViewport({
+    const bodyViewports = resolveMetricBodyViewports({
         renderSize,
         themeBodyViewport,
         touchStripMetricLayout,
     });
+    const bodyViewport = bodyViewports[0];
 
     return {
         renderAppearance,
@@ -183,6 +194,7 @@ export function buildMetricViewRenderPlan(options: {
             ? renderSize
             : bodyViewport.body.renderSize,
         bodyViewport,
+        bodyViewports,
         pngSize: touchStripMetricLayout?.pngSize ?? KEYPAD_PNG_SIZE,
     };
 }
@@ -272,29 +284,46 @@ export function resolveMetricViewSampleTimestampMilliseconds(widgetData: WidgetD
     return widgetData.sampleTimestampMilliseconds;
 }
 
-export function resolveTouchStripMetricLayout(settings: MetricRenderAppearance): TouchStripMetricLayout {
-    if (settings.renderPrimitive === "circle") {
+export function resolveTouchStripMetricLayout(options: {
+    renderPrimitive: MetricRenderAppearance["renderPrimitive"];
+    circleVariant: MetricRenderAppearance["circleVariant"];
+    dualRenderPrimitive?: DualMetricRenderOptions["dualRenderPrimitive"];
+}): TouchStripMetricLayout {
+    if (options.dualRenderPrimitive === "circle" && options.circleVariant !== "gauge") {
+        return TOUCH_STRIP_METRIC_LAYOUTS["wide-frame-two-square-bodies"];
+    }
+
+    if (options.renderPrimitive === "circle") {
         return TOUCH_STRIP_METRIC_LAYOUTS["wide-frame-square-body"];
     }
 
     // Touch strip layouts encode both Stream Deck feedback rect and render target
-    // size. A future two-circle touch strip view should add a distinct layout kind.
+    // size. Add a distinct kind whenever the body placement contract changes.
     return TOUCH_STRIP_METRIC_LAYOUTS.wide;
 }
 
-function resolveMetricBodyViewport(options: {
+function resolveMetricBodyViewports(options: {
     renderSize: KeySize;
     themeBodyViewport: ThemeBodyViewport | undefined;
     touchStripMetricLayout: TouchStripMetricLayout | null;
-}): ThemeBodyViewport | undefined {
-    if (options.touchStripMetricLayout?.kind !== "wide-frame-square-body") {
-        return options.themeBodyViewport;
+}): readonly ThemeBodyViewport[] {
+    if (options.touchStripMetricLayout?.kind === "wide-frame-square-body") {
+        return [
+            resolveWideFrameSquareBodyViewport({
+                renderSize: options.renderSize,
+                themeBodyViewport: options.themeBodyViewport,
+            }),
+        ];
     }
 
-    return resolveWideFrameSquareBodyViewport({
-        renderSize: options.renderSize,
-        themeBodyViewport: options.themeBodyViewport,
-    });
+    if (options.touchStripMetricLayout?.kind === "wide-frame-two-square-bodies") {
+        return resolveWideFrameTwoSquareBodyViewports({
+            renderSize: options.renderSize,
+            themeBodyViewport: options.themeBodyViewport,
+        });
+    }
+
+    return options.themeBodyViewport === undefined ? [] : [options.themeBodyViewport];
 }
 
 function resolveWideFrameSquareBodyViewport(options: {
@@ -309,6 +338,41 @@ function resolveWideFrameSquareBodyViewport(options: {
         width: options.renderSize.width,
         height: options.renderSize.height,
     };
+
+    return resolveSquareBodyViewport(availableBodyArea);
+}
+
+function resolveWideFrameTwoSquareBodyViewports(options: {
+    renderSize: KeySize;
+    themeBodyViewport: ThemeBodyViewport | undefined;
+}): readonly [ThemeBodyViewport, ThemeBodyViewport] {
+    // Only the theme-owned rectangle is reused here. Its nested body placement is
+    // replaced by the two square slots required by this touch strip mode.
+    const availableBodyArea: BodyArea = options.themeBodyViewport ?? {
+        xCoordinate: 0,
+        yCoordinate: 0,
+        width: options.renderSize.width,
+        height: options.renderSize.height,
+    };
+    const leftAreaWidth = Math.floor(availableBodyArea.width / 2);
+    const rightAreaWidth = availableBodyArea.width - leftAreaWidth;
+    const leftBodyArea: BodyArea = {
+        ...availableBodyArea,
+        width: leftAreaWidth,
+    };
+    const rightBodyArea: BodyArea = {
+        ...availableBodyArea,
+        xCoordinate: availableBodyArea.xCoordinate + leftAreaWidth,
+        width: rightAreaWidth,
+    };
+
+    return [
+        resolveSquareBodyViewport(leftBodyArea),
+        resolveSquareBodyViewport(rightBodyArea),
+    ];
+}
+
+function resolveSquareBodyViewport(availableBodyArea: BodyArea): ThemeBodyViewport {
     const slotSize = Math.min(availableBodyArea.width, availableBodyArea.height);
 
     return {
@@ -328,7 +392,7 @@ function resolveWideFrameSquareBodyViewport(options: {
 function composeSingleMetricBody(
     options: SingleMetricRenderOptions,
     renderPlan: MetricViewRenderPlan,
-): RenderedMetricBody {
+): RenderedMetricBodies {
     const renderedMetricData = buildRenderWidgetData({
         widgetData: options.widgetData,
         hasData: renderPlan.viewHasData,
@@ -336,60 +400,171 @@ function composeSingleMetricBody(
     });
 
     return {
-        svg: renderSingleMetricBodyView({
-            data: renderedMetricData,
-            visual: renderPlan.renderAppearance,
-            renderSize: renderPlan.bodyRenderSize,
-            centerIcon: options.centerIconFragment,
-            footerIcon: options.footerIconFragment,
-            topIcon: options.topIconFragment,
-            statusIcon: options.statusIcon,
-            circleVariant: renderPlan.circleVariant,
-        }),
+        bodies: [
+            {
+                svg: renderSingleMetricBodyView({
+                    data: renderedMetricData,
+                    visual: renderPlan.renderAppearance,
+                    renderSize: renderPlan.bodyRenderSize,
+                    centerIcon: options.centerIconFragment,
+                    footerIcon: options.footerIconFragment,
+                    topIcon: options.topIconFragment,
+                    statusIcon: options.statusIcon,
+                    circleVariant: renderPlan.circleVariant,
+                }),
+                bodyViewport: renderPlan.bodyViewport,
+                muted: renderPlan.shouldRenderMutedIconPlaceholder,
+            },
+        ],
         renderedMetricData,
-        muted: renderPlan.shouldRenderMutedIconPlaceholder,
     };
 }
 
 function composeDualMetricBody(
     options: DualMetricRenderOptions,
     renderPlan: MetricViewRenderPlan,
-): RenderedMetricBody {
+): RenderedMetricBodies {
     const renderedMetricData = buildRenderDualChannelWidgetData({
         widgetData: options.widgetData,
         hasData: renderPlan.viewHasData,
     });
 
+    if (renderPlan.bodyViewports.length === 2) {
+        return composeDualTouchStripCircleBodies({
+            viewOptions: options,
+            renderedMetricData,
+            renderPlan,
+        });
+    }
+
     return {
-        svg: renderDualMetricBodyView({
-            data: renderedMetricData,
-            visual: renderPlan.renderAppearance,
-            renderPrimitive: options.dualRenderPrimitive ?? "sparkline",
-            renderSize: renderPlan.bodyRenderSize,
-            titleText: options.titleText,
-            chartMode: options.chartMode ?? "overlay",
-            centerContent: renderPlan.centerContent,
-            circleVariant: renderPlan.circleVariant,
-            topIcon: options.centerIconFragment,
-            positive: {
-                labelText: options.positiveLabelText ?? renderedMetricData.positive.label,
-                unitText: renderedMetricData.positive.unit,
-                color: options.positiveColor,
-                colorConfig: options.positiveColorConfig,
-                icon: options.positiveIconFragment,
-                statusIcon: options.positiveStatusIcon,
+        bodies: [
+            {
+                svg: renderDualMetricBodyView({
+                    data: renderedMetricData,
+                    visual: renderPlan.renderAppearance,
+                    renderPrimitive: options.dualRenderPrimitive ?? "sparkline",
+                    renderSize: renderPlan.bodyRenderSize,
+                    titleText: options.titleText,
+                    chartMode: options.chartMode ?? "overlay",
+                    centerContent: renderPlan.centerContent,
+                    circleVariant: renderPlan.circleVariant,
+                    topIcon: options.centerIconFragment,
+                    positive: {
+                        labelText: options.positiveLabelText ?? renderedMetricData.positive.label,
+                        unitText: renderedMetricData.positive.unit,
+                        color: options.positiveColor,
+                        colorConfig: options.positiveColorConfig,
+                        icon: options.positiveIconFragment,
+                        statusIcon: options.positiveStatusIcon,
+                    },
+                    negative: {
+                        labelText: options.negativeLabelText ?? renderedMetricData.negative.label,
+                        unitText: renderedMetricData.negative.unit,
+                        color: options.negativeColor,
+                        colorConfig: options.negativeColorConfig,
+                        icon: options.negativeIconFragment,
+                        statusIcon: options.negativeStatusIcon,
+                    },
+                }),
+                bodyViewport: renderPlan.bodyViewport,
+                muted: false,
             },
-            negative: {
-                labelText: options.negativeLabelText ?? renderedMetricData.negative.label,
-                unitText: renderedMetricData.negative.unit,
-                color: options.negativeColor,
-                colorConfig: options.negativeColorConfig,
-                icon: options.negativeIconFragment,
-                statusIcon: options.negativeStatusIcon,
-            },
-        }),
+        ],
         renderedMetricData,
-        muted: false,
+    };
+}
+
+function composeDualTouchStripCircleBodies(options: {
+    viewOptions: DualMetricRenderOptions;
+    renderedMetricData: DualChannelWidgetData;
+    renderPlan: MetricViewRenderPlan;
+}): RenderedMetricBodies {
+    const positiveViewport = options.renderPlan.bodyViewports[0];
+    const negativeViewport = options.renderPlan.bodyViewports[1];
+
+    return {
+        bodies: [
+            {
+                svg: renderDualTouchStripCircleBody({
+                    widgetData: options.renderedMetricData.positive,
+                    labelText: options.viewOptions.positiveLabelText,
+                    color: options.viewOptions.positiveColor,
+                    colorConfig: options.viewOptions.positiveColorConfig,
+                    iconFragment: options.viewOptions.positiveIconFragment,
+                    statusIcon: options.viewOptions.positiveStatusIcon,
+                    fallbackIconFragment: options.viewOptions.centerIconFragment,
+                    fallbackStatusIcon: options.viewOptions.statusIcon,
+                    renderPlan: options.renderPlan,
+                }),
+                bodyViewport: positiveViewport,
+                muted: false,
+            },
+            {
+                svg: renderDualTouchStripCircleBody({
+                    widgetData: options.renderedMetricData.negative,
+                    labelText: options.viewOptions.negativeLabelText,
+                    color: options.viewOptions.negativeColor,
+                    colorConfig: options.viewOptions.negativeColorConfig,
+                    iconFragment: options.viewOptions.negativeIconFragment,
+                    statusIcon: options.viewOptions.negativeStatusIcon,
+                    fallbackIconFragment: options.viewOptions.centerIconFragment,
+                    fallbackStatusIcon: options.viewOptions.statusIcon,
+                    renderPlan: options.renderPlan,
+                }),
+                bodyViewport: negativeViewport,
+                muted: false,
+            },
+        ],
+        renderedMetricData: options.renderedMetricData,
+    };
+}
+
+function renderDualTouchStripCircleBody(options: {
+    widgetData: WidgetData;
+    labelText: string | undefined;
+    color: string;
+    colorConfig: ColorConfig | undefined;
+    iconFragment: string | undefined;
+    statusIcon: ProgressCircleStatusIcon | undefined;
+    fallbackIconFragment: string;
+    fallbackStatusIcon: ProgressCircleStatusIcon;
+    renderPlan: MetricViewRenderPlan;
+}): string {
+    return renderSingleMetricBodyView({
+        data: {
+            ...options.widgetData,
+            label: options.labelText ?? options.widgetData.label,
+        },
+        visual: withMetricPaint(
+            options.renderPlan.renderAppearance,
+            options.color,
+            options.colorConfig,
+        ),
+        renderSize: options.renderPlan.bodyRenderSize,
+        centerIcon: options.iconFragment ?? options.fallbackIconFragment,
+        footerIcon: options.iconFragment,
+        statusIcon: options.statusIcon ?? options.fallbackStatusIcon,
+        circleVariant: options.renderPlan.circleVariant,
+    });
+}
+
+function withMetricPaint(
+    renderAppearance: MetricRenderAppearance,
+    color: string,
+    colorConfig: ColorConfig | undefined,
+): MetricRenderAppearance {
+    return {
+        ...renderAppearance,
+        paints: {
+            ...renderAppearance.paints,
+            primaryMetric: colorConfig ?? {
+                mode: "solid",
+                solidColor: color,
+                thresholds: [],
+                isGradientEnabled: false,
+            },
+        },
     };
 }
 

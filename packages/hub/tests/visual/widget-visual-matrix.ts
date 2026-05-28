@@ -49,7 +49,8 @@ export type VisualMatrixThemeCaseId =
 export type VisualMatrixSurfaceCaseId =
     | "keypad-square"
     | "touch-strip-wide"
-    | "touch-strip-wide-frame-square-body";
+    | "touch-strip-wide-frame-square-body"
+    | "touch-strip-wide-two-square-bodies";
 
 export type VisualMatrixDataCaseId = "data" | "no-data";
 
@@ -144,6 +145,7 @@ export const VISUAL_MATRIX_SURFACE_CASES: readonly VisualMatrixSurfaceCaseId[] =
     "keypad-square",
     "touch-strip-wide",
     "touch-strip-wide-frame-square-body",
+    "touch-strip-wide-two-square-bodies",
 ];
 
 export const VISUAL_MATRIX_DATA_CASES: readonly VisualMatrixDataCaseId[] = [
@@ -443,13 +445,27 @@ const SURFACE_CASE_DEFINITIONS: readonly SurfaceCaseDefinition[] = [
         surfaceCase: "touch-strip-wide",
         renderTarget: "touch-strip",
         supportsViewCase: viewCaseDefinition => viewCaseDefinition.selectedView !== "circle",
-        unsupportedReason: "Circle views use the production touch-strip-wide-frame-square-body layout from resolveTouchStripMetricLayout.",
+        unsupportedReason: "Circle views use a production circle-specific touch strip layout from resolveTouchStripMetricLayout.",
     },
     {
         surfaceCase: "touch-strip-wide-frame-square-body",
         renderTarget: "touch-strip",
-        supportsViewCase: viewCaseDefinition => viewCaseDefinition.selectedView === "circle",
-        unsupportedReason: "Non-circle views use the production touch-strip-wide layout from resolveTouchStripMetricLayout.",
+        supportsViewCase: viewCaseDefinition =>
+            viewCaseDefinition.selectedView === "circle"
+            && (
+                viewCaseDefinition.metricKind === "single"
+                || viewCaseDefinition.circleVariant === "gauge"
+            ),
+        unsupportedReason: "Single circle views and dual gauge circle views use the production touch-strip-wide-frame-square-body layout.",
+    },
+    {
+        surfaceCase: "touch-strip-wide-two-square-bodies",
+        renderTarget: "touch-strip",
+        supportsViewCase: viewCaseDefinition =>
+            viewCaseDefinition.selectedView === "circle"
+            && viewCaseDefinition.metricKind === "dual"
+            && viewCaseDefinition.circleVariant !== "gauge",
+        unsupportedReason: "Only non-gauge dual circle views use the production touch-strip-wide-two-square-bodies layout.",
     },
 ];
 

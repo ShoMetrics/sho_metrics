@@ -11,9 +11,8 @@ const framePaints: ThemeStylePaints = {
 
 test("metric frame wraps body with the selected key size and style", () => {
     const svg = renderMetricFrame({
-        body: "<g id=\"metric-body\"></g>",
+        bodies: [{ svg: "<g id=\"metric-body\"></g>", muted: false }],
         themePreset: "flat",
-        muted: false,
         paints: framePaints,
         size: { width: 144, height: 144 },
     });
@@ -27,9 +26,8 @@ test("metric frame wraps body with the selected key size and style", () => {
 
 test("metric frame applies the muted filter around the body", () => {
     const svg = renderMetricFrame({
-        body: "<g id=\"metric-body\"></g>",
+        bodies: [{ svg: "<g id=\"metric-body\"></g>", muted: true }],
         themePreset: "flat",
-        muted: true,
         paints: framePaints,
         size: { width: 100, height: 100 },
     });
@@ -41,53 +39,106 @@ test("metric frame applies the muted filter around the body", () => {
 
 test("pixel window frame clips and scales the body viewport", () => {
     const svg = renderMetricFrame({
-        body: "<g id=\"metric-body\"></g>",
-        bodyViewport: {
-            xCoordinate: 5,
-            yCoordinate: 19,
-            width: 134,
-            height: 120,
-            body: {
-                xOffset: 7,
-                yOffset: 0,
-                renderSize: { width: 144, height: 144 },
+        bodies: [
+            {
+                svg: "<g id=\"metric-body\"></g>",
+                bodyViewport: {
+                    xCoordinate: 5,
+                    yCoordinate: 19,
+                    width: 134,
+                    height: 120,
+                    body: {
+                        xOffset: 7,
+                        yOffset: 0,
+                        renderSize: { width: 144, height: 144 },
+                    },
+                    clipRadius: 0,
+                },
+                muted: false,
             },
-            clipRadius: 0,
-        },
+        ],
         themePreset: "pixel-window",
-        muted: false,
         paints: framePaints,
         size: { width: 144, height: 144 },
     });
 
-    assert.match(svg, /clipPath id="pixel-window-body-viewport-134-120"/);
+    assert.match(svg, /clipPath id="pixel-window-body-viewport-0-5-19-134-120"/);
     assert.match(svg, /<rect x="5" y="19"\s+width="134" height="120"\s+rx="0" \/>/);
-    assert.match(svg, /<g clip-path="url\(#pixel-window-body-viewport-134-120\)">/);
+    assert.match(svg, /<g clip-path="url\(#pixel-window-body-viewport-0-5-19-134-120\)">/);
     assert.match(svg, /<g transform="translate\(12 19\) scale\(0\.8333\)">/);
     assert.match(svg, /metric-body/);
 });
 
 test("muted pixel window frame keeps filtering inside the viewport placement", () => {
     const svg = renderMetricFrame({
-        body: "<g id=\"metric-body\"></g>",
-        bodyViewport: {
-            xCoordinate: 5,
-            yCoordinate: 19,
-            width: 134,
-            height: 120,
-            body: {
-                xOffset: 7,
-                yOffset: 0,
-                renderSize: { width: 144, height: 144 },
+        bodies: [
+            {
+                svg: "<g id=\"metric-body\"></g>",
+                bodyViewport: {
+                    xCoordinate: 5,
+                    yCoordinate: 19,
+                    width: 134,
+                    height: 120,
+                    body: {
+                        xOffset: 7,
+                        yOffset: 0,
+                        renderSize: { width: 144, height: 144 },
+                    },
+                },
+                muted: true,
             },
-        },
+        ],
         themePreset: "pixel-window",
-        muted: true,
         paints: framePaints,
         size: { width: 144, height: 144 },
     });
 
     assert.match(svg, /filter id="muted-widget-144-144"/);
-    assert.match(svg, /<g clip-path="url\(#pixel-window-body-viewport-134-120\)">/);
+    assert.match(svg, /<g clip-path="url\(#pixel-window-body-viewport-0-5-19-134-120\)">/);
     assert.match(svg, /<g transform="translate\(12 19\) scale\(0\.8333\)">\s*<g filter="url\(#muted-widget-144-144\)">/);
+});
+
+test("metric frame keeps viewport clip paths distinct for multiple bodies", () => {
+    const svg = renderMetricFrame({
+        bodies: [
+            {
+                svg: "<g id=\"left-body\"></g>",
+                bodyViewport: {
+                    xCoordinate: 0,
+                    yCoordinate: 0,
+                    width: 100,
+                    height: 100,
+                    body: {
+                        xOffset: 0,
+                        yOffset: 0,
+                        renderSize: { width: 144, height: 144 },
+                    },
+                },
+                muted: false,
+            },
+            {
+                svg: "<g id=\"right-body\"></g>",
+                bodyViewport: {
+                    xCoordinate: 100,
+                    yCoordinate: 0,
+                    width: 100,
+                    height: 100,
+                    body: {
+                        xOffset: 0,
+                        yOffset: 0,
+                        renderSize: { width: 144, height: 144 },
+                    },
+                },
+                muted: false,
+            },
+        ],
+        themePreset: "flat",
+        paints: framePaints,
+        size: { width: 200, height: 100 },
+    });
+
+    assert.match(svg, /clipPath id="flat-body-viewport-0-0-0-100-100"/);
+    assert.match(svg, /clipPath id="flat-body-viewport-1-100-0-100-100"/);
+    assert.match(svg, /<g transform="translate\(0 0\) scale\(0\.6944\)">\s*<g id="left-body"><\/g>/);
+    assert.match(svg, /<g transform="translate\(100 0\) scale\(0\.6944\)">\s*<g id="right-body"><\/g>/);
 });

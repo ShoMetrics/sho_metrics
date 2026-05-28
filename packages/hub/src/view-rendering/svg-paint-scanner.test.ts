@@ -176,9 +176,8 @@ function renderSingleFinalSvg(options: {
     });
 
     return renderMetricFrame({
-        body,
+        bodies: [{ svg: body, muted: false }],
         themePreset: visualSettings.themePreset,
-        muted: false,
         paints: visualSettings.paints,
         size: WIDGET_LOGICAL_SIZE,
     });
@@ -230,9 +229,8 @@ function renderDualFinalSvg(options: {
     });
 
     return renderMetricFrame({
-        body,
+        bodies: [{ svg: body, muted: false }],
         themePreset: visualSettings.themePreset,
-        muted: false,
         paints: visualSettings.paints,
         size: WIDGET_LOGICAL_SIZE,
     });
