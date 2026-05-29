@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { PropertyInspectorDidAppearEvent, WillAppearEvent, WillDisappearEvent } from "@elgato/streamdeck";
-import { CustomMetric } from "./custom-metric";
+import {
+    buildCustomMetricNoSelectionViewOptions,
+    buildCustomMetricSelectedViewOptions,
+    CustomMetric,
+} from "./custom-metric";
 import type { MetricCollectionBinding } from "./metric-action";
+import type { MetricStoreReader, MetricWidgetDataReadResult } from "../runtime/metric-store";
 import { listMetricReadPlanKeys } from "../runtime/source-routing/metric-read-plan";
 import { MetricUnit } from "../runtime/sources/metric-source";
 import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
@@ -13,8 +18,11 @@ import {
     type MetricDescriptorSnapshot,
 } from "../runtime/sources/source-client";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
+import type { WidgetData } from "../view-rendering/widget-data";
+import { wallClockNowMilliseconds } from "../shared/clock";
 import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../settings/storage/widget-settings-patch";
+import { resolveInitialActionSettings } from "./settings/action-settings-resolver";
 
 test("custom metric without selected metric does not register collection", () => {
     const action = new TestCustomMetric();
@@ -97,6 +105,130 @@ test("custom metric publishes failed descriptor status", async () => {
     }
 });
 
+test("custom metric no-selection view renders placeholder without reading metrics", () => {
+    const rawSettings = buildCatalogWidgetSettings("");
+    const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
+    const metricReader = new CapturingMetricStoreReader({});
+
+    const viewOptions = buildCustomMetricNoSelectionViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("custom-render-empty-action"), rawSettings),
+        settings,
+    });
+
+    assert.equal(viewOptions.metricKey, "catalog.unselected");
+    assert.equal(viewOptions.widgetData.unavailableDisplayValue, "Choose metric");
+    assert.deepEqual(metricReader.widgetDataCalls, []);
+});
+
+test("custom metric selected view uses stored fallback label unit and unit maximum", () => {
+    const rawSettings = buildCatalogWidgetSettings("source.sensor:/gpu/0/power", {
+        fallbackLabel: "GPU Board Power",
+        fallbackUnit: "W",
+    });
+    const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
+    const target = readCatalogTarget(settings);
+    const metricReader = new CapturingMetricStoreReader({
+        current: 150,
+        sampleTimestampMilliseconds: wallClockNowMilliseconds(),
+    });
+
+    const viewOptions = buildCustomMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("custom-render-selected-action"), rawSettings),
+        settings,
+        target,
+        metrics: metricReader,
+        helperStatus: { state: "available" },
+    });
+
+    assert.equal(viewOptions.metricKey, "source.sensor:/gpu/0/power");
+    assert.deepEqual(metricReader.widgetDataCalls, [
+        {
+            metricKey: "source.sensor:/gpu/0/power",
+            label: "GPU Board Power",
+            unit: "W",
+            maxValue: 300,
+        },
+    ]);
+    assert.equal(viewOptions.widgetData.current, 150);
+    assert.equal(viewOptions.widgetData.progress, 0.5);
+    assert.equal(viewOptions.widgetData.label, "GPU Board Power");
+    assert.equal(viewOptions.widgetData.unit, "W");
+});
+
+test("custom metric selected view reports no sensor data through helper backed copy", () => {
+    const rawSettings = buildCatalogWidgetSettings("source.sensor:/gpu/0/temperature", {
+        fallbackLabel: "GPU Hot Spot",
+        fallbackUnit: "C",
+    });
+    const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
+    const target = readCatalogTarget(settings);
+    const metricReader = new CapturingMetricStoreReader({
+        current: 72,
+        sampleTimestampMilliseconds: undefined,
+    });
+
+    const viewOptions = buildCustomMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("custom-render-no-data-action"), rawSettings),
+        settings,
+        target,
+        metrics: metricReader,
+        helperStatus: { state: "available" },
+    });
+
+    assert.equal(viewOptions.widgetData.current, 0);
+    assert.equal(viewOptions.widgetData.progress, 0);
+    assert.deepEqual(viewOptions.widgetData.history, []);
+    assert.equal(viewOptions.widgetData.unavailableDisplayValue, "No sensor data");
+});
+
+test("custom metric selected view uses 100 as the percent maximum", () => {
+    const rawSettings = buildCatalogWidgetSettings("source.sensor:/network/load", {
+        fallbackLabel: "Network Utilization",
+        fallbackUnit: "%",
+    });
+    const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
+    const target = readCatalogTarget(settings);
+    const metricReader = new CapturingMetricStoreReader({
+        current: 42,
+        sampleTimestampMilliseconds: wallClockNowMilliseconds(),
+    });
+
+    const viewOptions = buildCustomMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("custom-render-percent-action"), rawSettings),
+        settings,
+        target,
+        metrics: metricReader,
+        helperStatus: { state: "available" },
+    });
+
+    assert.equal(metricReader.widgetDataCalls[0]?.maxValue, 100);
+    assert.equal(viewOptions.widgetData.progress, 0.42);
+});
+
+test("custom metric selected view renders non-percent scalar units without descriptor metadata", () => {
+    const rawSettings = buildCatalogWidgetSettings("source.sensor:/fan/0/rpm", {
+        fallbackLabel: "Fan",
+        fallbackUnit: "RPM",
+    });
+    const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
+    const target = readCatalogTarget(settings);
+    const metricReader = new CapturingMetricStoreReader({
+        current: 1500,
+        sampleTimestampMilliseconds: wallClockNowMilliseconds(),
+    });
+
+    const viewOptions = buildCustomMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("custom-render-rpm-action"), rawSettings),
+        settings,
+        target,
+        metrics: metricReader,
+        helperStatus: { state: "available" },
+    });
+
+    assert.equal(metricReader.widgetDataCalls[0]?.maxValue, 3000);
+    assert.equal(viewOptions.widgetData.progress, 0.5);
+});
+
 class TestCustomMetric extends CustomMetric {
     readonly bindings: FakeMetricCollectionBinding[] = [];
     readonly runtimeCachePatchList: WidgetRuntimeCachePatch[] = [];
@@ -147,6 +279,51 @@ class TestCustomMetric extends CustomMetric {
     }
 }
 
+interface WidgetDataCall {
+    readonly metricKey: string;
+    readonly label: string;
+    readonly unit: string;
+    readonly maxValue: number | undefined;
+}
+
+class CapturingMetricStoreReader implements MetricStoreReader {
+    readonly widgetDataCalls: WidgetDataCall[] = [];
+
+    constructor(private readonly widgetDataOptions: Partial<WidgetData>) {}
+
+    getWidgetData(metricKey: string, label: string, unit: string, maxValue?: number): WidgetData {
+        this.widgetDataCalls.push({ metricKey, label, unit, maxValue });
+
+        const current = this.widgetDataOptions.current ?? 0;
+        const safeMaxValue = maxValue ?? 100;
+
+        return {
+            current,
+            progress: Math.min(Math.max(current / safeMaxValue, 0), 1),
+            history: this.widgetDataOptions.history ?? [current],
+            label,
+            unit,
+            sampleTimestampMilliseconds: this.widgetDataOptions.sampleTimestampMilliseconds,
+        };
+    }
+
+    getWidgetDataWithAttribution(
+        metricKey: string,
+        label: string,
+        unit: string,
+        maxValue?: number,
+    ): MetricWidgetDataReadResult {
+        return {
+            widgetData: this.getWidgetData(metricKey, label, unit, maxValue),
+            selectedSourceId: WINDOWS_HELPER_SOURCE_ID,
+        };
+    }
+
+    getTextValue(): string | undefined {
+        return undefined;
+    }
+}
+
 class FakeMetricCollectionBinding implements MetricCollectionBinding {
     readonly refreshOptionsList: Parameters<MetricCollectionBinding["refresh"]>[0][] = [];
     disposeCallCount = 0;
@@ -171,7 +348,13 @@ class FakeStreamDeckAction {
     }
 }
 
-function buildCatalogWidgetSettings(metricId: string): unknown {
+function buildCatalogWidgetSettings(
+    metricId: string,
+    options: {
+        readonly fallbackLabel?: string;
+        readonly fallbackUnit?: string;
+    } = {},
+): unknown {
     const quickStartSettings = resolveQuickStartStoredWidgetSettings(undefined, "catalog").rawSettings;
 
     if (metricId.length === 0) {
@@ -181,10 +364,20 @@ function buildCatalogWidgetSettings(metricId: string): unknown {
     return writeStoredWidgetSettingsPatch(quickStartSettings, {
         catalog: {
             metricId,
-            fallbackLabel: "GPU Hot Spot",
-            fallbackUnit: "C",
+            fallbackLabel: options.fallbackLabel ?? "GPU Hot Spot",
+            fallbackUnit: options.fallbackUnit ?? "C",
         },
     });
+}
+
+function readCatalogTarget(settings: ReturnType<typeof resolveInitialActionSettings>["resolvedSettings"]) {
+    const target = settings.widget.slot.metric.target;
+
+    if (target.domain !== "catalog") {
+        assert.fail(`Expected catalog target, received ${target.domain}.`);
+    }
+
+    return target;
 }
 
 function buildMetricDescriptor(metricId: string): MetricDescriptor {
