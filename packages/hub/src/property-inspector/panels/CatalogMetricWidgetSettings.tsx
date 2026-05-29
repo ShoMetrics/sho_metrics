@@ -2,11 +2,11 @@ import { InspectorItem } from "../components/InspectorItem";
 import { SelectSetting } from "../controls/SelectSetting";
 import type { SelectOption } from "../inspector/types";
 import {
-    buildCustomMetricCatalogOptions,
-    type CustomMetricCatalogOptions,
-    type CustomMetricCatalogSelection,
-    type CustomMetricCatalogTypeId,
-} from "../select-options/custom-metric-catalog-options";
+    buildCatalogMetricOptions,
+    type CatalogMetricOptions,
+    type CatalogMetricSelection,
+    type CatalogMetricTypeId,
+} from "../select-options/catalog-metric-options";
 import type { MetricDescriptor } from "../../runtime/sources/source-client";
 import type { ResolvedCatalogMetricTarget } from "../../settings/resolved-settings";
 import type { StoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
@@ -17,14 +17,14 @@ import { LineSettings } from "./LineSettings";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 
-type CustomMetricWidgetSettingsProps = WidgetSettingsPanelProps & {
+type CatalogMetricWidgetSettingsProps = WidgetSettingsPanelProps & {
     target: ResolvedCatalogMetricTarget;
 };
 
-export function CustomMetricWidgetSettings(props: CustomMetricWidgetSettingsProps): React.JSX.Element {
+export function CatalogMetricWidgetSettings(props: CatalogMetricWidgetSettingsProps): React.JSX.Element {
     return (
         <>
-            <CustomMetricCatalogSettings {...props} />
+            <CatalogMetricPicker {...props} />
             <AppearanceSettings {...props} />
             <LineSettings {...props} />
             <StandardColorSettings {...props} />
@@ -33,15 +33,15 @@ export function CustomMetricWidgetSettings(props: CustomMetricWidgetSettingsProp
     );
 }
 
-function CustomMetricCatalogSettings({
+function CatalogMetricPicker({
     context,
     target,
     onSettingsPatch,
-}: CustomMetricWidgetSettingsProps): React.JSX.Element {
+}: CatalogMetricWidgetSettingsProps): React.JSX.Element {
     // Keep showing cached descriptors during a transient pending refresh so the
     // picker does not blank out every time the Property Inspector reopens.
     const descriptors = context.runtimeCache.availableCatalogMetricDescriptors;
-    const options = buildCustomMetricCatalogOptions(descriptors, {
+    const options = buildCatalogMetricOptions(descriptors, {
         metricId: target.metricId,
     });
     const selection = options.resolvedSelection;
@@ -49,7 +49,7 @@ function CustomMetricCatalogSettings({
     return (
         <SettingsSection title="Metric">
             {descriptors.length === 0 ? (
-                <CustomMetricDescriptorStatusNote status={context.runtimeCacheStatus.catalogMetricDescriptorStatus} />
+                <CatalogMetricDescriptorStatusNote status={context.runtimeCacheStatus.catalogMetricDescriptorStatus} />
             ) : (
                 <>
                     {shouldShowTypeSetting(options) && (
@@ -108,7 +108,7 @@ function CustomMetricCatalogSettings({
     );
 }
 
-function CustomMetricDescriptorStatusNote({
+function CatalogMetricDescriptorStatusNote({
     status,
 }: {
     status: "pending" | "ready" | "failed";
@@ -127,7 +127,7 @@ function CustomMetricDescriptorStatusNote({
 }
 
 function shouldShowTypeSetting(
-    options: CustomMetricCatalogOptions,
+    options: CatalogMetricOptions,
 ): boolean {
     return options.resolvedSelection.typeId.length === 0 || countTypeOptions(options.typeOptions) > 1;
 }
@@ -135,7 +135,7 @@ function shouldShowTypeSetting(
 function writeSelectedCatalogMetric(
     onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void,
     descriptors: readonly MetricDescriptor[],
-    selection: Partial<CustomMetricCatalogSelection>,
+    selection: Partial<CatalogMetricSelection>,
 ): void {
     if (selection.typeId === "") {
         onSettingsPatch({
@@ -148,7 +148,7 @@ function writeSelectedCatalogMetric(
         return;
     }
 
-    const options = buildCustomMetricCatalogOptions(descriptors, selection);
+    const options = buildCatalogMetricOptions(descriptors, selection);
     const selectedMetric = options.selectedMetric;
     if (!selectedMetric) {
         // A descriptor refresh can make a DOM event stale between render and
@@ -166,7 +166,7 @@ function writeSelectedCatalogMetric(
     });
 }
 
-function countTypeOptions(options: readonly SelectOption<CustomMetricCatalogTypeId | "">[]): number {
+function countTypeOptions(options: readonly SelectOption<CatalogMetricTypeId | "">[]): number {
     return options.filter(option => option.value !== "" && option.disabled !== true).length;
 }
 

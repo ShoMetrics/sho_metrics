@@ -16,7 +16,7 @@ export const STREAM_DECK_ACTION_UUID_BY_KIND = {
     gpu: `${STREAM_DECK_PLUGIN_UUID}.gpu`,
     memory: `${STREAM_DECK_PLUGIN_UUID}.memory`,
     disk: `${STREAM_DECK_PLUGIN_UUID}.disk`,
-    catalog: `${STREAM_DECK_PLUGIN_UUID}.catalog`,
+    catalog: `${STREAM_DECK_PLUGIN_UUID}.catalog-metric`,
     network: `${STREAM_DECK_PLUGIN_UUID}.network`,
 } as const satisfies Record<StreamDeckActionKind, string>;
 

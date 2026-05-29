@@ -487,7 +487,7 @@ test("GPU source preference control preserves custom source selections", () => {
     assert.match(markup, /Custom Source/);
 });
 
-test("custom metric settings show catalog load state without descriptor inference", () => {
+test("catalog metric settings show catalog load state without descriptor inference", () => {
     const pendingMarkup = renderWidgetSettings({
         actionKind: "catalog",
         runtimeCacheStatus: {
@@ -505,7 +505,7 @@ test("custom metric settings show catalog load state without descriptor inferenc
     assert.match(failedMarkup, /Metrics unavailable/);
 });
 
-test("custom metric settings render the initial guided picker without writing a default", () => {
+test("catalog metric settings render the initial guided picker without writing a default", () => {
     const markup = renderWidgetSettings({
         actionKind: "catalog",
         runtimeCache: {
@@ -536,7 +536,7 @@ test("custom metric settings render the initial guided picker without writing a 
     assert.doesNotMatch(markup, /Metric:/);
 });
 
-test("custom metric settings hide single-option levels and show ambiguous metric choices", () => {
+test("catalog metric settings hide single-option levels and show ambiguous metric choices", () => {
     const markup = renderWidgetSettings({
         actionKind: "catalog",
         settings: buildWidgetSettings("catalog", {

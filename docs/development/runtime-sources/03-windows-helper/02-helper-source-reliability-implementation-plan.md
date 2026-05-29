@@ -32,10 +32,10 @@ cache boundaries.
 | Stable aliases and catalog metrics use the same short last-good rule. | A raw catalog metric flickering between `51 C`, no value, and `50 C` is still a bad user experience. | Apply bounded source-side retention to all LHM scalar metrics. Stable aliases may switch to another ranked sensor; catalog ids may only retain the same raw sensor. |
 | Do not oversample LHM to hide null ticks. | LHM itself does not secretly run faster than the selected UI interval; it formats null as `-` and relies on UI/history behavior. | Keep normal helper polling cadence. Add a bounded retention policy instead of a second hidden sampling loop. |
 | Retained samples are not fresh history samples. | A retained value is a display continuity choice, not a new hardware read. | `MetricStore` may use a retained value for current/progress display, but rolling history should append only fresh scalar samples. |
-| CPU temperature is a helper-owned stable alias. | Ordinary users expect "CPU temperature", not a choice between package, Tctl, Tdie, CCD, and individual core sensors. | The helper ranks and selects the source sensor. Hub must not parse raw LHM ids. |
+| CPU temperature is a helper-produced stable alias. | Ordinary users expect "CPU temperature", not a choice between package, Tctl, Tdie, CCD, and individual core sensors. | ShoMetrics owns the alias id; the helper owns raw sensor ranking and selection. Hub must not parse raw LHM ids. |
 | CPU power means CPU package/socket total power. | Hardware users generally expect whole-CPU package/socket power, not graphics, DRAM, platform, or SoC rails. | Rank package/socket total first; only use an existing aggregate CPU-cores power fallback when no total-like sensor exists. Do not synthesize a sum from individual core sensors in this plan. |
 | CPU usage remains an OS aggregate metric. | LHM CPU load has source-cost and metric-definition traps; Task Manager semantics require explicit OS counter choices. | Do not route `cpu.usage_percent` through LHM. Future Windows native CPU usage should document `% Processor Utility` semantics. |
-| Disk throughput is handled in its own plan. | First-class Windows disk throughput should be system-total native I/O; per-disk LHM storage belongs to custom catalog with risk copy. | Do not enable Windows disk throughput through LHM. Re-enable stable `disk.throughput.*` only through the native system-total provider. |
+| Disk throughput is handled in its own plan. | First-class Windows disk throughput should be system-total native I/O; per-disk LHM storage belongs to Advanced Sensor with risk copy. | Do not enable Windows disk throughput through LHM. Re-enable stable `disk.throughput.*` only through the native system-total provider. |
 | Multi-GPU hardware selection is not in this batch. | Source choice and hardware choice are separate concepts; mixing them would confuse the PI model. | Keep current source selector work. Add hardware selector later when descriptor-backed hardware choices are ready. |
 
 ## Evidence Mapping
@@ -47,10 +47,10 @@ cache boundaries.
 | `08` Section 8, Storage And Network | Storage metadata and throughput have different cadences; storage can wake/probe disks. | Do not route first-class disk throughput through generic LHM traversal. |
 | `08` Section 10, Motherboard, Controllers, Memory, Battery, And PSU | Board/controller values have chip-specific null/range rules. | Keep raw sensors advanced/catalog first; do not promote more stable aliases without source-owned ranking and diagnostics. |
 | `08` Section 12, LiteMonitor Cross-Check | LiteMonitor adds last-valid maps, caches, and metric-key facade over LHM. | Adopt bounded source-side last-good; reject unbounded global last-valid maps. |
-| `09` What To Adopt 1, Source-Owned Stable Alias Ranking | LiteMonitor maps raw sensors to app-level keys using source-owned rules. | Implement CPU stable alias ranking in C# helper/Core. |
+| `09` What To Adopt 1, Source-Side Stable Alias Ranking | Raw sensors can map to app-level keys using source-owned ranking rules. | Implement CPU stable alias ranking in C# helper/Core. |
 | `09` What To Adopt 3, Driver/Helper Readiness Needs Its Own Status Layer | Driver/helper readiness differs from no sample. | Add cached helper install/service/driver/status diagnostics separate from MetricStore samples. |
 | `09` What To Adopt 4, CPU Usage Needs An Explicit Definition | Task Manager uses `% Processor Utility`; LHM total load is not a ShoMetrics default. | Keep CPU usage on `node-system` or future Windows native, not LHM. |
-| `09` What To Adopt 5, Disk Probing Must Stay Conservative | Disk monitoring can disturb external storage. | Keep first-class disk throughput off LHM storage. Use native system-total counters for the ordinary widget and custom catalog for explicit LHM per-disk sensors. |
+| `09` What To Adopt 5, Disk Probing Must Stay Conservative | Disk monitoring can disturb external storage. | Keep first-class disk throughput off LHM storage. Use native system-total counters for the ordinary widget and Advanced Sensor for explicit LHM per-disk sensors. |
 | `09` What To Experiment With 1, Bounded Last-Good Caching | Last-good helps flicker but can hide dead sensors if unbounded. | Use a short TTL with DEBUG attribution. |
 | `09` What To Reject | Reject unbounded last-valid, raw LHM id parsing in Hub, broad disk probing, pipe failure as install status. | Keep all new behavior bounded and owned by the source/helper boundary. |
 
@@ -641,7 +641,7 @@ The full disk read/write speed plan now lives in
 
 Keep this document focused on helper-owned CPU/power reliability. Disk
 throughput has its own plan because it spans LHM storage safety, native Windows
-system-total counters, custom catalog risk copy, and Disk action subscriptions.
+system-total counters, Advanced Sensor risk copy, and Disk action subscriptions.
 
 ## Verification Matrix
 
@@ -683,7 +683,7 @@ For disk:
 
 These are intentionally not part of this implementation plan:
 
-- Descriptor-backed advanced catalog picker UI.
+- Descriptor-backed catalog metric picker UI.
 - Multi-GPU hardware selector.
 - First-class per-disk throughput selector.
 - Windows native CPU usage using `% Processor Utility`.

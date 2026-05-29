@@ -6,7 +6,7 @@ import {
 } from "../../runtime/sources/source-client";
 import type { SelectOption } from "../inspector/types";
 
-export type CustomMetricCatalogTypeId =
+export type CatalogMetricTypeId =
     | "cpu"
     | "gpu"
     | "memory"
@@ -14,24 +14,24 @@ export type CustomMetricCatalogTypeId =
     | "network"
     | "other";
 
-export interface CustomMetricCatalogSelection {
-    readonly typeId: CustomMetricCatalogTypeId | "";
+export interface CatalogMetricSelection {
+    readonly typeId: CatalogMetricTypeId | "";
     readonly hardwareId: string;
     readonly readingId: string;
     readonly metricId: string;
 }
 
-export interface CustomMetricCatalogOptions {
-    readonly typeOptions: readonly SelectOption<CustomMetricCatalogTypeId | "">[];
+export interface CatalogMetricOptions {
+    readonly typeOptions: readonly SelectOption<CatalogMetricTypeId | "">[];
     readonly hardwareOptions: readonly SelectOption[];
     readonly readingOptions: readonly SelectOption[];
     readonly metricOptions: readonly SelectOption[];
-    readonly resolvedSelection: CustomMetricCatalogSelection;
+    readonly resolvedSelection: CatalogMetricSelection;
     readonly selectedDescriptor: MetricDescriptor | undefined;
-    readonly selectedMetric: CustomMetricCatalogSelectedMetric | undefined;
+    readonly selectedMetric: SelectedCatalogMetric | undefined;
 }
 
-export interface CustomMetricCatalogSelectedMetric {
+export interface SelectedCatalogMetric {
     readonly metricId: string;
     readonly label: string;
     readonly unit: string;
@@ -39,7 +39,7 @@ export interface CustomMetricCatalogSelectedMetric {
 
 interface CatalogMetricEntry {
     readonly descriptor: MetricDescriptor;
-    readonly typeId: CustomMetricCatalogTypeId;
+    readonly typeId: CatalogMetricTypeId;
     readonly hardwareId: string;
     readonly hardwareBaseLabel: string;
     readonly hardwareLabel: string;
@@ -52,14 +52,14 @@ interface CatalogMetricEntry {
 }
 
 interface HardwareDisplay {
-    readonly typeId: CustomMetricCatalogTypeId;
+    readonly typeId: CatalogMetricTypeId;
     readonly hardwareId: string;
     readonly baseLabel: string;
     readonly label: string;
     readonly isNoisy: boolean;
 }
 
-const CATALOG_TYPE_ORDER: readonly CustomMetricCatalogTypeId[] = [
+const CATALOG_TYPE_ORDER: readonly CatalogMetricTypeId[] = [
     "cpu",
     "gpu",
     "memory",
@@ -75,7 +75,7 @@ const TYPE_LABEL_BY_ID = {
     disk: "Disk",
     network: "Network",
     other: "Other",
-} as const satisfies Record<CustomMetricCatalogTypeId, string>;
+} as const satisfies Record<CatalogMetricTypeId, string>;
 
 const READING_ORDER = [
     "temperature",
@@ -138,10 +138,10 @@ const COMMON_NOISY_TOKENS = [
 ] as const;
 
 /** Builds PI-only picker options from helper descriptors without changing source demand. */
-export function buildCustomMetricCatalogOptions(
+export function buildCatalogMetricOptions(
     descriptors: readonly MetricDescriptor[],
-    selection: Partial<CustomMetricCatalogSelection> = {},
-): CustomMetricCatalogOptions {
+    selection: Partial<CatalogMetricSelection> = {},
+): CatalogMetricOptions {
     const entries = buildCatalogMetricEntries(descriptors);
     const storedMetricEntry = selection.metricId
         ? entries.find(entry => entry.descriptor.metricId === selection.metricId)
@@ -248,9 +248,9 @@ function buildSourceReadingKey(descriptor: MetricDescriptor): string | undefined
 }
 
 function shouldReplaceDescriptor(existingDescriptor: MetricDescriptor, nextDescriptor: MetricDescriptor): boolean {
-    // Built-in widgets own stable aliases with ranked failover. Custom Metric
-    // intentionally exposes the raw long-tail sensor when both describe the
-    // same source reading, so users are choosing the exact sensor they saw.
+    // Built-in widgets own stable aliases with ranked failover. The catalog
+    // picker intentionally exposes the raw long-tail sensor when both describe
+    // the same source reading, so users are choosing the exact sensor they saw.
     if (
         existingDescriptor.metricIdKind === MetricIdKind.STABLE_ALIAS
         && nextDescriptor.metricIdKind === MetricIdKind.SOURCE_SENSOR
@@ -268,7 +268,7 @@ function shouldReplaceDescriptor(existingDescriptor: MetricDescriptor, nextDescr
     return false;
 }
 
-function classifyDescriptorType(descriptor: MetricDescriptor): CustomMetricCatalogTypeId {
+function classifyDescriptorType(descriptor: MetricDescriptor): CatalogMetricTypeId {
     const normalizedHardwareType = normalizeIdentifier(descriptor.rawSensorIdentity.hardwareType);
     const hardwareTypeBucket = classifyNormalizedHardwareType(normalizedHardwareType);
 
@@ -279,7 +279,7 @@ function classifyDescriptorType(descriptor: MetricDescriptor): CustomMetricCatal
     return classifyMetricIdPrefix(descriptor.metricId) ?? "other";
 }
 
-function classifyNormalizedHardwareType(value: string): CustomMetricCatalogTypeId | undefined {
+function classifyNormalizedHardwareType(value: string): CatalogMetricTypeId | undefined {
     switch (value) {
         case "cpu":
             return "cpu";
@@ -298,7 +298,7 @@ function classifyNormalizedHardwareType(value: string): CustomMetricCatalogTypeI
     }
 }
 
-function classifyMetricIdPrefix(metricId: string): CustomMetricCatalogTypeId | undefined {
+function classifyMetricIdPrefix(metricId: string): CatalogMetricTypeId | undefined {
     if (metricId.startsWith("cpu.")) {
         return "cpu";
     }
@@ -348,7 +348,7 @@ function classifyReading(sourceSensorType: string): ReadingId {
 
 function resolveHardwareOptionId(
     descriptor: MetricDescriptor,
-    typeId: CustomMetricCatalogTypeId,
+    typeId: CatalogMetricTypeId,
     hardwareBaseLabel: string,
 ): string {
     const hardwareId = descriptor.rawSensorIdentity.hardwareId.trim();
@@ -453,7 +453,7 @@ function disambiguateMetricLabels(entries: readonly CatalogMetricEntry[]): reado
 
 function buildTypeOptions(
     entries: readonly CatalogMetricEntry[],
-): readonly SelectOption<CustomMetricCatalogTypeId | "">[] {
+): readonly SelectOption<CatalogMetricTypeId | "">[] {
     const presentTypeIds = new Set(entries.map(entry => entry.typeId));
 
     return [
@@ -469,7 +469,7 @@ function buildTypeOptions(
 
 function buildHardwareOptions(
     entries: readonly CatalogMetricEntry[],
-    typeId: CustomMetricCatalogTypeId | "",
+    typeId: CatalogMetricTypeId | "",
 ): readonly SelectOption[] {
     if (typeId.length === 0) {
         return [EMPTY_HARDWARE_OPTION];
@@ -490,7 +490,7 @@ function buildHardwareOptions(
 
 function buildReadingOptions(
     entries: readonly CatalogMetricEntry[],
-    typeId: CustomMetricCatalogTypeId | "",
+    typeId: CatalogMetricTypeId | "",
     hardwareId: string,
 ): readonly SelectOption[] {
     if (typeId.length === 0 || hardwareId.length === 0) {
@@ -512,7 +512,7 @@ function buildReadingOptions(
 
 function buildMetricOptions(
     entries: readonly CatalogMetricEntry[],
-    typeId: CustomMetricCatalogTypeId | "",
+    typeId: CatalogMetricTypeId | "",
     hardwareId: string,
     readingId: string,
 ): readonly SelectOption[] {
@@ -537,9 +537,9 @@ function buildMetricOptions(
 
 function resolveSelection(
     entries: readonly CatalogMetricEntry[],
-    selection: Partial<CustomMetricCatalogSelection>,
+    selection: Partial<CatalogMetricSelection>,
     storedMetricEntry: CatalogMetricEntry | undefined,
-): CustomMetricCatalogSelection {
+): CatalogMetricSelection {
     if (storedMetricEntry) {
         return {
             typeId: storedMetricEntry.typeId,
@@ -613,7 +613,7 @@ function normalizeIdentifier(value: string): string {
     return value.toLowerCase().replace(/[\s_.-]+/g, "");
 }
 
-function isNoisyHardware(typeId: CustomMetricCatalogTypeId, descriptor: MetricDescriptor): boolean {
+function isNoisyHardware(typeId: CatalogMetricTypeId, descriptor: MetricDescriptor): boolean {
     const labels = [
         descriptor.rawSensorIdentity.hardwareName,
         descriptor.rawSensorIdentity.sensorName,
@@ -697,7 +697,7 @@ function compareMetricEntries(left: CatalogMetricEntry, right: CatalogMetricEntr
         || left.descriptor.metricId.localeCompare(right.descriptor.metricId);
 }
 
-function compareTypeId(left: CustomMetricCatalogTypeId, right: CustomMetricCatalogTypeId): number {
+function compareTypeId(left: CatalogMetricTypeId, right: CatalogMetricTypeId): number {
     return compareValues(CATALOG_TYPE_ORDER.indexOf(left), CATALOG_TYPE_ORDER.indexOf(right));
 }
 
@@ -711,7 +711,7 @@ function readReadingOrder(readingId: string): number {
     return index < 0 ? READING_ORDER.length : index;
 }
 
-function hardwareMapKey(typeId: CustomMetricCatalogTypeId, hardwareId: string): string {
+function hardwareMapKey(typeId: CatalogMetricTypeId, hardwareId: string): string {
     return `${typeId}\u001f${hardwareId}`;
 }
 

@@ -119,10 +119,10 @@
 			]
 		},
 		{
-			"Name": "Custom Metric",
-			"UUID": "com.ez.sho-metrics.catalog",
+			"Name": "Advanced Sensor",
+			"UUID": "com.ez.sho-metrics.catalog-metric",
 			"Icon": "imgs/actions/sho-metrics/icon",
-			"Tooltip": "Displays a selected custom metric.",
+			"Tooltip": "Displays one selected metric.",
 			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
 				"Keypad",

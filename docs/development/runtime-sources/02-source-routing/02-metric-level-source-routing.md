@@ -662,7 +662,7 @@ Do not include these in the metric-level routing commit:
 - User-facing per-metric source preference settings.
 - A rule engine or metric taxonomy.
 - Widget-level data resolution. Routing must stay metric-level so future
-  rotation, multi-metric widgets, and custom catalog sources compose naturally.
+  rotation, multi-metric widgets, and catalog metric sources compose naturally.
 
 ## Future Work
 

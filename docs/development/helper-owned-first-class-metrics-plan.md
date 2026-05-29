@@ -570,7 +570,7 @@ no-data/debug copy exist.
 ## Non-Goals
 
 - No GPU proto cleanup.
-- No advanced catalog picker.
+- No catalog metric picker.
 - No per-core CPU selector.
 - No per-disk throughput selector.
 - No multi-socket CPU package aggregation.

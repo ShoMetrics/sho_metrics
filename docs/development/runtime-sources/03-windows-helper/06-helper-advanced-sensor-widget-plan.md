@@ -1,4 +1,4 @@
-# Windows Helper Custom Metric Widget Plan
+# Windows Helper Advanced Sensor Widget Plan
 
 This plan is written for a new coding session with no conversation context.
 
@@ -8,10 +8,10 @@ Status: **implemented through v1 and manually smoke-tested**.
 
 Completed v1 scope:
 
-- `Custom Metric` Stream Deck action is registered.
+- `Advanced Sensor` Stream Deck action is registered.
 - Empty initial selection renders a placeholder and does not register
   collection.
-- Custom Metric quick-start stores helper-only source policy.
+- Advanced Sensor quick-start stores helper-only source policy.
 - PI loads Windows helper descriptors into runtime cache with explicit
   `pending` / `ready` / `failed` state.
 - PI guided picker uses `Type -> Hardware -> Reading -> Metric`.
@@ -22,12 +22,12 @@ Completed v1 scope:
 
 Manual smoke result:
 
-- A profile with built-in CPU, RAM, and Disk widgets plus Custom Metric widgets
+- A profile with built-in CPU, RAM, and Disk widgets plus Advanced Sensor widgets
   for Intel GPU and Other/Voltage refreshed only the demanded helper polling
   groups observed in helper logs.
-- Removing a Custom Metric RAM widget removed its RAM demand.
+- Removing an Advanced Sensor RAM widget removed its RAM demand.
 - Built-in Quick Start widgets continue to create their own helper demand where
-  applicable; they are not Custom Metric widgets.
+  applicable; they are not Advanced Sensor widgets.
 
 Deferred by design:
 
@@ -58,7 +58,7 @@ Metric sources
 
 ## Objective
 
-Add a new Stream Deck action named **Custom Metric**.
+Add a new Stream Deck action named **Advanced Sensor**.
 
 The first version lets a user pick one scalar metric from the Windows helper
 descriptor catalog through a guided picker:
@@ -83,7 +83,10 @@ This is not a new telemetry pipeline. It should reuse:
 
 Hard decisions for v1:
 
-- Product action name: `Custom Metric`.
+- Manifest action display name: `Advanced Sensor`.
+- Stream Deck action UUID: `com.ez.sho-metrics.catalog-metric`.
+- Internal action kind: existing `"catalog"` so action dispatch still matches
+  the resolved target domain.
 - Internal stored target: existing `CatalogMetricTarget`.
 - Internal resolved target domain: existing `"catalog"`.
 - One widget shows one metric only.
@@ -97,7 +100,7 @@ Hard decisions for v1:
   treat it as selected.
 - If a picker level has multiple options, select the first valid option during
   auto-complete and let the user change it.
-- Do not add HTTP/custom endpoint UI in this batch.
+- Do not add HTTP endpoint UI in this batch.
 - Do not add a Node/systeminformation fallback for catalog metrics.
 - Reserve `CatalogMetricTarget` for machine telemetry discovered from local or
   remote metric sources. Built-in weather/time widgets and user-authored HTTP
@@ -184,16 +187,16 @@ Implications:
 ## Non-Goals
 
 - Do not change Windows helper C# descriptor generation for this batch.
-- Do not change `source_api.proto` for custom picker display metadata in v1.
+- Do not change `source_api.proto` for picker display metadata in v1.
 - Do not add per-sensor helper refresh logic beyond the existing polling-group
   demand path.
 - Do not add a source picker.
 - Do not expose `Windows Helper`, `Node System`, source profile ids, or helper
-  transport details in the Custom Metric UI.
+  transport details in the Advanced Sensor UI.
 - Do not parse `hardware_id` or `source_sensor_id`.
 - Do not let generic runtime source routing parse LHM ids, hardware ids, or
   sensor ids.
-- Do not implement custom user label editing in this batch.
+- Do not implement user-editable label overrides in this batch.
 - Do not add user-defined HTTP metrics in this batch.
 - Do not introduce a new catalog scheduler, transformer layer, or registry.
 
@@ -201,28 +204,28 @@ Implications:
 
 | Choice | Pros | Cons | Decision |
 | --- | --- | --- | --- |
-| Use internal action kind `"customMetric"`. | Matches product name. | Requires a special action-kind-to-target-domain mapping because the stored/resolved target already uses `"catalog"`. | Reject. |
-| Use internal action kind `"catalog"` and product name `Custom Metric`. | Matches existing `CatalogMetricTarget` and keeps `WidgetSettingsTab` dispatch simple. | Internal logs/UUID use `catalog`, not the product label. | Choose. |
-| Add a new stored `CustomMetricTarget`. | Product name is explicit in proto. | Duplicates existing `CatalogMetricTarget`, creates another model for the same concept. | Reject. |
-| Reuse existing `CatalogMetricTarget`. | Matches current settings contract and existing catalog preview branch. It can cover Windows/macOS/Linux helpers and remote machine agents. | Requires implementers to remember that product `Custom Metric` maps to internal `catalog`. | Choose. |
+| Use internal action kind `"catalogMetric"`. | Matches the action UUID more closely. | Requires a special action-kind-to-target-domain mapping because the stored/resolved target already uses `"catalog"`. | Reject. |
+| Use internal action kind `"catalog"` and product name `Advanced Sensor`. | Matches existing `CatalogMetricTarget` and keeps `WidgetSettingsTab` dispatch simple. | The manifest display name differs from the internal target/domain name. | Choose. |
+| Add a new stored `AdvancedSensorTarget`. | Product display name is explicit in proto. | Duplicates existing `CatalogMetricTarget`, creates another model for the same target shape, and leaks mutable product copy into persisted data. | Reject. |
+| Reuse existing `CatalogMetricTarget`. | Matches current settings contract and existing catalog preview branch. It can cover Windows/macOS/Linux helpers and remote machine agents. | Requires implementers to remember that manifest name `Advanced Sensor` maps to internal `catalog`. | Choose. |
 | Use `CatalogMetricTarget` for built-in weather/time or user-authored HTTP endpoints. | One generic target for all future non-built-in metrics. | Turns catalog into a junk drawer; those products need different settings such as location, timezone, URL, auth, and parsing. | Reject. |
 | Flat searchable metric dropdown. | Simple UI code. | 468 descriptors in POC, CPU 134, Network 192; overwhelming and hard to navigate. | Reject. |
 | Third-party searchable combobox. | Better search for long lists. | New dependency and styling/accessibility surface before the cascade is proven insufficient. | Reject for v1. |
 | Existing `SelectSetting` cascade. | No new dependency; invalid combinations are impossible because options come from descriptors. | Less powerful search. | Choose. |
-| Curated recommended list inside Custom Metric. | Shorter common paths. | Duplicates built-in widget responsibility and makes "custom" semantics confusing. | Reject. |
+| Curated recommended list inside Advanced Sensor. | Shorter common paths. | Duplicates built-in widget responsibility and blurs the picker with curated product widgets. | Reject. |
 | Store helper-only source policy in settings. | Source routing stays explicit and existing collection code works unchanged. | Stored source policy is required even before a metric is selected. | Choose. |
-| Override source routing only inside `CustomMetric` action. | Fewer stored settings fields. | Hides source ownership outside the normal settings/source-routing path. | Reject. |
+| Override source routing only inside `CatalogMetric` action. | Fewer stored settings fields. | Hides source ownership outside the normal settings/source-routing path. | Reject. |
 | Add helper-owned display tree to `source_api.proto`. | Helper could provide perfect grouping and labels. | More contract work before v1 proves the current descriptor fields are insufficient. | Reject for v1. |
 | Persist picker path fields such as type/hardware/reading. | Restores the exact cascade state. | Duplicates descriptor-derived UI state and can drift after hardware changes. | Reject. |
-| Keep stable aliases when a matching raw source-sensor descriptor exists. | Preserves helper-ranked alias failover such as CPU temperature/package power inside Custom Metric. | Repeats curated built-in widget metrics in the raw picker and hides the more specific raw sensors users came to Custom Metric to choose. | Reject. Built-in CPU/GPU widgets own curated aliases and their failover behavior; Custom Metric owns fine-grained source descriptors, accepting that selected raw sensors may be less stable. |
-| Hide noisy virtual/filter/software hardware from Custom Metric. | Shorter lists. | Can hide real user-needed readings and makes support/debug harder. | Reject for v1. Demote and label clearly instead of hiding. |
+| Keep stable aliases when a matching raw source-sensor descriptor exists. | Preserves helper-ranked alias failover such as CPU temperature/package power inside Advanced Sensor. | Repeats curated built-in widget metrics in the raw picker and hides the more specific raw sensors users came to Advanced Sensor to choose. | Reject. Built-in CPU/GPU widgets own curated aliases and their failover behavior; Advanced Sensor owns fine-grained source descriptors, accepting that selected raw sensors may be less stable. |
+| Hide noisy virtual/filter/software hardware from Advanced Sensor. | Shorter lists. | Can hide real user-needed readings and makes support/debug harder. | Reject for v1. Demote and label clearly instead of hiding. |
 | Implement picker building as one long function. | Fast to write initially. | Turns filtering, classification, sorting, sanitization, and disambiguation into an unreviewable hot spot. | Reject. Keep small pure functions for classify/filter/noisy scoring/disambiguation and test them directly. |
 
 ## Existing Files And Owners
 
 ### Generated And Source API
 
-| File | Current role | Custom Metric change |
+| File | Current role | Advanced Sensor change |
 | --- | --- | --- |
 | `contracts/proto/shometrics/v1/source_api.proto` | Defines `MetricDescriptor`, `RawSensorIdentity`, polling group ids, and `ListMetricDescriptors`; imports `MetricUnit` from `snapshot.proto`. | No proto change in v1. |
 | `packages/hub/src/generated/shometrics/v1/source_api_pb.ts` | Generated source API types. | No generation expected in v1 because source API does not change. |
@@ -232,7 +235,7 @@ Implications:
 
 ### Runtime Collection
 
-| File | Current role | Custom Metric change |
+| File | Current role | Advanced Sensor change |
 | --- | --- | --- |
 | `packages/hub/src/runtime/sources/source-ids.ts` | Defines built-in source ids and source profile ids. | Use `BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID` for catalog settings. |
 | `packages/hub/src/runtime/source-routing/metric-read-plan-builder.ts` | Converts resolved source policy into source candidates. | No special catalog branch if settings store helper-only source policy. |
@@ -244,41 +247,41 @@ Implications:
 
 ### Settings
 
-| File | Current role | Custom Metric change |
+| File | Current role | Advanced Sensor change |
 | --- | --- | --- |
 | `contracts/proto/shometrics/v1/settings.proto` | Stored settings contract. Already has `CatalogMetricTarget`. | Reuse existing message. No proto change in v1. |
 | `packages/hub/src/settings/resolved-settings.ts` | App-owned resolved settings. Already has `ResolvedCatalogMetricTarget`. | Keep `domain: "catalog"`. |
 | `packages/hub/src/settings/storage/resolver.ts` | Converts stored settings to resolved settings. Already resolves catalog targets. | Ensure empty catalog target resolves to `metricId: ""`. |
 | `packages/hub/src/settings/storage/widget-settings-patch.ts` | Applies PI sparse patches to stored settings. | Add `catalog` patch for `metricId`, `fallbackLabel`, and `fallbackUnit`. |
-| `packages/hub/src/settings/storage/quick-start-widget-settings.ts` | Writes first settings for each Stream Deck action kind. | Extend quick-start output from target-only to target plus optional source policy, then add Custom Metric quick-start target with empty `CatalogMetricTarget` and helper-only source policy. |
+| `packages/hub/src/settings/storage/quick-start-widget-settings.ts` | Writes first settings for each Stream Deck action kind. | Extend quick-start output from target-only to target plus optional source policy, then add Advanced Sensor quick-start target with empty `CatalogMetricTarget` and helper-only source policy. |
 
 ### Actions And Rendering
 
-| File | Current role | Custom Metric change |
+| File | Current role | Advanced Sensor change |
 | --- | --- | --- |
-| `packages/hub/src/shared/stream-deck-actions.ts` | Maps Stream Deck UUIDs to internal action kinds. | Add internal action kind `"catalog"` and UUID `com.ez.sho-metrics.catalog`. |
-| `packages/hub/src/plugin.ts` | Registers action classes. | Register `new CustomMetric()`. |
-| `packages/hub/com.ez.sho-metrics.sdPlugin/manifest.json` | Stream Deck manifest action list. | Add action entry with `Name: "Custom Metric"`. |
+| `packages/hub/src/shared/stream-deck-actions.ts` | Maps Stream Deck UUIDs to internal action kinds. | Add internal action kind `"catalog"` and UUID `com.ez.sho-metrics.catalog-metric`. |
+| `packages/hub/src/plugin.ts` | Registers action classes. | Register `new CatalogMetric()`. |
+| `packages/hub/com.ez.sho-metrics.sdPlugin/manifest.json` | Stream Deck manifest action list. | Add action entry with `Name: "Advanced Sensor"`. |
 | `packages/hub/src/actions/metric-action.ts` | Base class for actions, settings, subscriptions, runtime cache, and PI cache messages. | Support zero metric keys by disposing collection instead of throwing. |
 | `packages/hub/src/actions/shared/resolved-metric-target.ts` | Helper for action-owned target assertions. Currently excludes `"catalog"`. | Either allow `"catalog"` or add a catalog-specific target reader. Prefer allowing it. |
-| `packages/hub/src/actions/custom-metric.ts` | New action entry file. | Owns custom metric subscription keys, placeholder render, descriptor catalog publication, and selected metric view options. |
+| `packages/hub/src/actions/catalog-metric.ts` | New action entry file. | Owns catalog metric subscription keys, placeholder render, descriptor catalog publication, and selected metric view options. |
 | `packages/hub/src/actions/shared/helper-backed-widget-data.ts` | Helper no-data behavior for helper-backed first-class metrics. | Reuse for selected catalog metric. |
 | `packages/hub/src/view-updates/runner.ts` | Applies single metric view updates. | No change expected. |
 | `packages/hub/src/property-inspector/previews/metric-option-preview.ts` | Already knows how to preview `target.domain === "catalog"`. | Reuse current catalog preview branch. |
 
 ### Property Inspector
 
-| File | Current role | Custom Metric change |
+| File | Current role | Advanced Sensor change |
 | --- | --- | --- |
-| `packages/hub/src/property-inspector/panels/WidgetSettingsTab.tsx` | Chooses metric settings panel by target domain. | Add `"catalog"` branch that renders `CustomMetricWidgetSettings`. |
-| `packages/hub/src/property-inspector/panels/CustomMetricWidgetSettings.tsx` | New panel. | Renders guided picker, appearance, line, color, polling, and helper status. |
-| `packages/hub/src/property-inspector/select-options/custom-metric-catalog-options.ts` | New pure PI option builder. | Builds the `Type -> Hardware -> Reading -> Metric` option tree from runtime descriptors. |
-| `packages/hub/src/property-inspector/select-options/runtime-select-options.ts` | Existing runtime option helpers for disk/network. | Leave catalog tree logic out of this file; use `custom-metric-catalog-options.ts`. |
+| `packages/hub/src/property-inspector/panels/WidgetSettingsTab.tsx` | Chooses metric settings panel by target domain. | Add `"catalog"` branch that renders `CatalogMetricWidgetSettings`. |
+| `packages/hub/src/property-inspector/panels/CatalogMetricWidgetSettings.tsx` | New panel. | Renders guided picker, appearance, line, color, polling, and helper status. |
+| `packages/hub/src/property-inspector/select-options/catalog-metric-options.ts` | New pure PI option builder. | Builds the `Type -> Hardware -> Reading -> Metric` option tree from runtime descriptors. |
+| `packages/hub/src/property-inspector/select-options/runtime-select-options.ts` | Existing runtime option helpers for disk/network. | Leave catalog tree logic out of this file; use `catalog-metric-options.ts`. |
 | `packages/hub/src/property-inspector/controls/SelectSetting.tsx` | Existing custom select with typeahead prefix search, no text filter. | Reuse unchanged in v1. |
 | `packages/hub/src/property-inspector/inspector/types.ts` | PI context and `SelectOption`. | Add runtime cache status for catalog descriptor readiness. |
 | `packages/hub/src/property-inspector/settings-sync/settings-sync-state.ts` | Tracks runtime cache readiness. | Add catalog descriptor status, similar to disk volume status. |
 
-## Life Of A Custom Metric
+## Life Of An Advanced Sensor
 
 ### 1. Stream Deck Creates The Action
 
@@ -287,15 +290,15 @@ Files:
 - `packages/hub/com.ez.sho-metrics.sdPlugin/manifest.json`
 - `packages/hub/src/shared/stream-deck-actions.ts`
 - `packages/hub/src/plugin.ts`
-- `packages/hub/src/actions/custom-metric.ts`
+- `packages/hub/src/actions/catalog-metric.ts`
 
 Flow:
 
 ```text
-User drags "Custom Metric"
-  -> manifest UUID com.ez.sho-metrics.catalog
+User drags "Advanced Sensor"
+  -> manifest UUID com.ez.sho-metrics.catalog-metric
   -> resolveStreamDeckActionKind(...) returns "catalog"
-  -> plugin.ts registered CustomMetric action receives onWillAppear
+  -> plugin.ts registered CatalogMetric action receives onWillAppear
 ```
 
 `resolveQuickStartStoredWidgetSettings(...)` must create:
@@ -324,22 +327,22 @@ Why helper-only source policy is required:
 Files:
 
 - `packages/hub/src/actions/metric-action.ts`
-- `packages/hub/src/actions/custom-metric.ts`
+- `packages/hub/src/actions/catalog-metric.ts`
 
 Flow:
 
 ```text
-CustomMetric.getMetricKeys(...)
+CatalogMetric.getMetricKeys(...)
   -> [] because target.metricId is empty
 MetricAction.refreshSubscription(...)
   -> sees [] and disposes any existing BackgroundCollectionBinding
-CustomMetric.onMetricsUpdate(...)
+CatalogMetric.onMetricsUpdate(...)
   -> renders a placeholder asking the user to choose a metric
 ```
 
 `MetricAction` currently throws when `metricKeys.length === 0`. This must change
 at the base-class boundary because an incomplete user configuration is a valid
-action state, not a custom action failure. Existing CPU/GPU/Disk/Network/Memory
+action state, not a catalog action failure. Existing CPU/GPU/Disk/Network/Memory
 actions still return non-empty metric lists, so their behavior should not
 change.
 
@@ -351,7 +354,7 @@ Implementation rule:
   before it calls `buildMetricCollectionReadPlan(...)`.
 - On empty metric keys, dispose the existing `BackgroundCollectionBinding`,
   remove it from `metricCollectionBindings`, and return.
-- `CustomMetric.onMetricsUpdate(...)` must render the no-selection placeholder
+- `CatalogMetric.onMetricsUpdate(...)` must render the no-selection placeholder
   without calling `getMetricReader(...)`.
 - `MetricAction.publishDisplayedMetricReadAttribution(...)` is already safe
   when `getDisplayedMetricKey(...)` returns `undefined`; keep that behavior.
@@ -360,7 +363,7 @@ Implementation rule:
 
 Files:
 
-- `packages/hub/src/actions/custom-metric.ts`
+- `packages/hub/src/actions/catalog-metric.ts`
 - `packages/hub/src/runtime/metric-collection/background-metric-collection.ts`
 - `packages/hub/src/runtime/sources/source-registry.ts`
 - `packages/hub/src/runtime/sources/windows-helper/windows-helper-source-client.ts`
@@ -372,7 +375,7 @@ Target flow:
 ```text
 Property Inspector opens
   -> MetricAction.onPropertyInspectorDidAppear(...)
-  -> CustomMetric.refreshRuntimeCacheForPropertyInspector(...)
+  -> CatalogMetric.refreshRuntimeCacheForPropertyInspector(...)
   -> backgroundMetricCollection lists descriptors from WINDOWS_HELPER_SOURCE_ID
   -> WindowsHelperSourceClient.listMetricDescriptors([])
   -> WidgetRuntimeCache patch carries runtime descriptors to PI
@@ -392,7 +395,7 @@ async readSourceMetricDescriptors(
 Behavior:
 
 - Throw when the source is missing, lacks `listMetricDescriptors`, or the
-  descriptor read fails. `CustomMetric` maps all descriptor-load failures to an
+  descriptor read fails. `CatalogMetric` maps all descriptor-load failures to an
   empty descriptor list plus `catalogMetricDescriptorLoadState: "failed"`.
 - Log a throttled warning at the action owner boundary on failure.
 - Do not mutate `MetricStore`.
@@ -413,27 +416,27 @@ Alternative considered:
 Files:
 
 - `packages/hub/src/runtime/widget-runtime-cache.ts`
-- `packages/hub/src/property-inspector/panels/CustomMetricWidgetSettings.tsx`
-- `packages/hub/src/property-inspector/select-options/custom-metric-catalog-options.ts`
+- `packages/hub/src/property-inspector/panels/CatalogMetricWidgetSettings.tsx`
+- `packages/hub/src/property-inspector/select-options/catalog-metric-options.ts`
 - `packages/hub/src/property-inspector/controls/SelectSetting.tsx`
 
 The option builder must be pure and unit-tested. It consumes runtime
 `MetricDescriptor[]` and current stored/resolved selection state, then returns:
 
 ```ts
-interface CustomMetricCatalogSelection {
-    readonly typeId: CustomMetricCatalogTypeId | "";
+interface CatalogMetricSelection {
+    readonly typeId: CatalogMetricTypeId | "";
     readonly hardwareId: string;
     readonly readingId: string;
     readonly metricId: string;
 }
 
-interface CustomMetricCatalogOptions {
+interface CatalogMetricOptions {
     readonly typeOptions: readonly SelectOption[];
     readonly hardwareOptions: readonly SelectOption[];
     readonly readingOptions: readonly SelectOption[];
     readonly metricOptions: readonly SelectOption[];
-    readonly completedSelection: CustomMetricCatalogSelection;
+    readonly completedSelection: CatalogMetricSelection;
     readonly selectedDescriptor: MetricDescriptor | undefined;
 }
 ```
@@ -478,7 +481,7 @@ scheduling.
 
 Reference point: LibreHardwareMonitor Windows Forms presents raw sensors as
 `HardwareNode -> TypeNode -> SensorNode` in `MainForm.cs`, `HardwareNode.cs`,
-`TypeNode.cs`, and `SensorNode.cs`. The Custom Metric picker uses the same
+`TypeNode.cs`, and `SensorNode.cs`. The Advanced Sensor picker uses the same
 hardware/reading/sensor idea, but adds the first `Type` bucket so the Stream
 Deck PI does not start with a long hardware tree.
 
@@ -574,7 +577,7 @@ Hardware filtering and labeling constraints:
 - Treat these rules as picker presentation only. They must not affect source
   routing, helper refresh demand, or persisted metric ids.
 - Do not use keyword matching to choose a "best" CPU/GPU temperature, power,
-  clock, fan, disk, or network sensor for Custom Metric. That curated matching
+  clock, fan, disk, or network sensor for Advanced Sensor. That curated matching
   belongs in built-in widgets.
 - Do not delete descriptors only because a hardware or sensor label contains
   `virtual`, `basic render`, `shared`, `d3d`, `filter`, `miniport`, `loopback`,
@@ -618,11 +621,11 @@ Fallback labels:
 
 Dedup rationale:
 
-- Helper-owned stable aliases such as CPU temperature may have ranked failover
+- Helper-produced stable aliases such as CPU temperature may have ranked failover
   inside the helper. A raw source-sensor descriptor is tied to one sensor and
   does not have that alias failover behavior.
-- This is intentional for Custom Metric. Curated aliases with failover belong
-  in built-in CPU/GPU widgets; Custom Metric should expose the fine-grained raw
+- This is intentional for Advanced Sensor. Curated aliases with failover belong
+  in built-in CPU/GPU widgets; Advanced Sensor should expose the fine-grained raw
   readings users cannot reach from the curated widgets.
 - The tradeoff is explicit: a persisted raw sensor id may be less stable across
   driver, firmware, or hardware changes than a helper-owned alias. That is
@@ -636,7 +639,7 @@ Dedup rationale:
 
 Files:
 
-- `packages/hub/src/property-inspector/panels/CustomMetricWidgetSettings.tsx`
+- `packages/hub/src/property-inspector/panels/CatalogMetricWidgetSettings.tsx`
 - `packages/hub/src/settings/storage/widget-settings-patch.ts`
 - `contracts/proto/shometrics/v1/settings.proto`
 
@@ -682,7 +685,7 @@ feature needs a separate stored field.
 
 Files:
 
-- `packages/hub/src/actions/custom-metric.ts`
+- `packages/hub/src/actions/catalog-metric.ts`
 - `packages/hub/src/actions/metric-action.ts`
 - `packages/hub/src/runtime/source-routing/metric-read-plan-builder.ts`
 - `packages/hub/src/runtime/metric-collection/collector-group-planner.ts`
@@ -695,7 +698,7 @@ Flow:
 
 ```text
 CatalogMetricTarget.metric_id is non-empty
-  -> CustomMetric.getMetricKeys(...) returns [metricId]
+  -> CatalogMetric.getMetricKeys(...) returns [metricId]
   -> MetricAction builds helper-only MetricReadPlan from source policy
   -> BackgroundCollectionBinding registers one MetricSubscription
   -> CollectorGroupPlanner asks WindowsHelperSourceClient.resolveMetricPollingGroups([metricId])
@@ -705,7 +708,7 @@ CatalogMetricTarget.metric_id is non-empty
   -> WindowsMetricSnapshotWorker refreshes only demanded helper group
   -> CollectorGroupRunner reads cached snapshot
   -> MetricStore ingests selected metric
-  -> CustomMetric.onMetricsUpdate reads MetricStore and renders
+  -> CatalogMetric.onMetricsUpdate reads MetricStore and renders
 ```
 
 If descriptor metadata is still loading:
@@ -725,7 +728,7 @@ This is expected. Do not add a `ReadSnapshot` probe for unknown catalog ids.
 
 Files:
 
-- `packages/hub/src/actions/custom-metric.ts`
+- `packages/hub/src/actions/catalog-metric.ts`
 - `packages/hub/src/actions/shared/helper-backed-widget-data.ts`
 - `packages/hub/src/runtime/metric-store.ts`
 - `packages/hub/src/view-updates/runner.ts`
@@ -761,7 +764,7 @@ can be a later focused change if users need them.
 
 Default view:
 
-- Custom Metric should default to Text view, not Circle.
+- Advanced Sensor should default to Text view, not Circle.
 - Reason: arbitrary volts, hertz, bytes, timing, and fan metrics have no
   reliable progress maximum in v1; Text avoids a misleading full/empty ring as
   the first experience.
@@ -788,16 +791,16 @@ Files:
 - `packages/hub/com.ez.sho-metrics.sdPlugin/manifest.json`
 - `packages/hub/src/shared/stream-deck-actions.ts`
 - `packages/hub/src/plugin.ts`
-- `packages/hub/src/actions/custom-metric.ts`
+- `packages/hub/src/actions/catalog-metric.ts`
 - `packages/hub/src/actions/shared/resolved-metric-target.ts`
 - `packages/hub/src/actions/metric-action.ts`
 
 Work:
 
-1. Add action kind `"catalog"` and UUID `com.ez.sho-metrics.catalog`.
-2. Add manifest action with product name `Custom Metric`.
-3. Add `CustomMetric` action class in `custom-metric.ts`.
-4. Register `new CustomMetric()` in `plugin.ts`.
+1. Add action kind `"catalog"` and UUID `com.ez.sho-metrics.catalog-metric`.
+2. Add manifest action with product name `Advanced Sensor`.
+3. Add `CatalogMetric` action class in `catalog-metric.ts`.
+4. Register `new CatalogMetric()` in `plugin.ts`.
 5. Allow action target reader to read `ResolvedCatalogMetricTarget`.
 6. Update `MetricAction.refreshSubscription(...)` so empty metric key lists
    dispose collection and skip subscription registration.
@@ -827,7 +830,7 @@ Work:
 2. Change the quick-start helper shape from target-only to target plus optional
    source policy. Existing actions continue to return only a target and keep
    resolver default source behavior.
-3. Write helper-only `MetricSourcePolicy` during Custom Metric quick-start:
+3. Write helper-only `MetricSourcePolicy` during Advanced Sensor quick-start:
    `primary_source_profile_id = "local:windows-helper"`,
    `failure_mode = SHOW_UNAVAILABLE`, no fallbacks.
 4. Add `catalog` sparse patch support.
@@ -840,10 +843,10 @@ Estimated LOC: 80-140.
 
 Verification:
 
-- Quick-start settings for Custom Metric store catalog target and helper-only
+- Quick-start settings for Advanced Sensor store catalog target and helper-only
   source policy.
 - Existing quick-start actions do not persist explicit source policy.
-- Custom Metric resolves to Text view by default.
+- Advanced Sensor resolves to Text view by default.
 - Patch updates catalog metric id/label/unit and rejects non-catalog targets.
 - Resolver returns `domain: "catalog"` with empty metric id for initial state.
 
@@ -854,7 +857,7 @@ Files:
 - `packages/hub/src/runtime/metric-collection/background-metric-collection.ts`
 - `packages/hub/src/runtime/widget-runtime-cache.ts`
 - `packages/hub/src/property-inspector/settings-sync/settings-sync-state.ts`
-- `packages/hub/src/actions/custom-metric.ts`
+- `packages/hub/src/actions/catalog-metric.ts`
 
 Work:
 
@@ -873,7 +876,7 @@ Work:
    catalogMetricDescriptorStatus: "pending" | "ready" | "failed";
    ```
 
-4. In `CustomMetric.refreshRuntimeCacheForPropertyInspector(...)`, call the
+4. In `CatalogMetric.refreshRuntimeCacheForPropertyInspector(...)`, call the
    descriptor-read method and update runtime cache.
 5. On failure, send an empty descriptor list and failed status; do not crash PI.
 
@@ -881,7 +884,7 @@ Estimated LOC: 100-170.
 
 Verification:
 
-- PI receives descriptor runtime cache after opening Custom Metric.
+- PI receives descriptor runtime cache after opening Advanced Sensor.
 - Helper descriptor load failure produces `catalogMetricDescriptorStatus:
   "failed"` instead of an indefinite loading state.
 - Helper unavailable state shows a bounded warning/no-data UI, not an exception.
@@ -891,16 +894,16 @@ Verification:
 
 Files:
 
-- `packages/hub/src/property-inspector/panels/CustomMetricWidgetSettings.tsx`
-- `packages/hub/src/property-inspector/select-options/custom-metric-catalog-options.ts`
-- `packages/hub/src/property-inspector/select-options/custom-metric-catalog-options.test.ts`
+- `packages/hub/src/property-inspector/panels/CatalogMetricWidgetSettings.tsx`
+- `packages/hub/src/property-inspector/select-options/catalog-metric-options.ts`
+- `packages/hub/src/property-inspector/select-options/catalog-metric-options.test.ts`
 - `packages/hub/src/property-inspector/panels/WidgetSettingsTab.tsx`
 - `packages/hub/src/property-inspector/panels/WidgetSettingsTab.test.ts`
 - `packages/hub/src/property-inspector/controls/SelectSetting.tsx`
 
 Work:
 
-1. Add `CustomMetricWidgetSettings`.
+1. Add `CatalogMetricWidgetSettings`.
 2. Add `renderMetricPanel(...)` branch for `target.domain === "catalog"`.
 3. Build pure catalog option tree from runtime descriptors.
 4. Keep the option builder decomposed into small pure functions for filtering,
@@ -941,8 +944,8 @@ Verification:
 
 Files:
 
-- `packages/hub/src/actions/custom-metric.ts`
-- `packages/hub/src/actions/custom-metric.test.ts`
+- `packages/hub/src/actions/catalog-metric.ts`
+- `packages/hub/src/actions/catalog-metric.test.ts`
 - `packages/hub/src/actions/shared/helper-backed-widget-data.ts`
 - `packages/hub/src/property-inspector/previews/metric-option-preview.ts`
 
@@ -978,21 +981,21 @@ Manual checks:
 
 1. Start the helper with `--dev-pipe`. Completed.
 2. Start/restart Stream Deck plugin. Completed.
-3. Drag **Custom Metric** to a key. Completed.
+3. Drag **Advanced Sensor** to a key. Completed.
 4. Confirm the key shows no-selection placeholder. Covered by unit test and
    manual startup behavior.
 5. Confirm helper logs show no `SetMetricRefreshDemand` for this action before
    metric selection. Covered by no-selection subscription tests.
 6. Open PI and confirm descriptor picker loads. Completed.
-7. Select a Custom Metric Intel GPU metric. Completed.
-8. Select a Custom Metric Other/Voltage metric. Completed.
-9. Add then remove a Custom Metric RAM metric. Completed.
-10. Confirm helper demand contains only selected Custom Metric polling groups
+7. Select an Advanced Sensor Intel GPU metric. Completed.
+8. Select an Advanced Sensor Other/Voltage metric. Completed.
+9. Add then remove an Advanced Sensor RAM metric. Completed.
+10. Confirm helper demand contains only selected Advanced Sensor polling groups
     plus independent demand from built-in Quick Start widgets. Completed with
     helper logs.
-11. Confirm removed Custom Metric RAM demand disappears. Completed with helper
+11. Confirm removed Advanced Sensor RAM demand disappears. Completed with helper
     logs.
-12. Confirm selected Custom Metric widgets update at the configured polling
+12. Confirm selected Advanced Sensor widgets update at the configured polling
     interval. Completed by live widget behavior and helper refresh logs.
 
 Automated checks:
@@ -1004,16 +1007,16 @@ Automated checks:
 
 ## Acceptance Checklist
 
-- Manifest exposes a `Custom Metric` action.
-- Stored target uses `CatalogMetricTarget`; no duplicate custom settings model.
+- Manifest exposes an `Advanced Sensor` action.
+- Stored target uses `CatalogMetricTarget`; no duplicate settings model.
 - Internal target domain remains `"catalog"`.
 - Empty initial selection is valid and does not start collection.
 - `MetricAction.buildReadPlanForMetricKeys(...)` still throws on empty metric
   keys; only subscription refresh handles no-selection as a valid state.
 - Opening PI with no selected metric does not persist a default metric.
-- Custom Metric quick-start persists helper-only source policy; existing
+- Advanced Sensor quick-start persists helper-only source policy; existing
   quick-start actions do not.
-- Custom Metric defaults to Text view.
+- Advanced Sensor defaults to Text view.
 - Selected metric is helper-only and has no Node fallback.
 - PI picker is descriptor-driven and prevents invalid combinations by
   construction.

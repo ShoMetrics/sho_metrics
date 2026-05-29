@@ -846,7 +846,7 @@ is involved.
 | Alternative | Why it is tempting | Why not |
 | --- | --- | --- |
 | Read-time unsupported only | Lowest code. | Still wastes IPC/HTTP/process calls for known-unsupported metrics. |
-| Hardcode helper support tables | Fast for current built-ins. | Recreates static metric-family dispatch and fails for LHM/custom metrics. |
+| Hardcode helper support tables | Fast for current built-ins. | Recreates static metric-family dispatch and fails for LHM/catalog metrics. |
 | Filter by source type id | Simple grouping. | Wrong isolation for multiple profiles of the same source type. Use profile id/scope. |
 | Treat offline/loading as unsupported | Avoids calling a missing source. | Can deadlock cold-start recovery if invalidation is missed. Data-plane backoff/fallback handles source availability. |
 

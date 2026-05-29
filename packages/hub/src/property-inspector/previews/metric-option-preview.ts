@@ -166,7 +166,7 @@ function buildMetricPreviewSample(target: ResolvedMetricTarget): MetricPreviewSa
                 unit: target.fallbackUnit ?? "",
                 displayValue: "42",
                 progress: 0.42,
-                secondaryDisplayValue: target.fallbackLabel ?? "Custom Metric",
+                secondaryDisplayValue: target.fallbackLabel ?? "Metric",
             });
     }
 }

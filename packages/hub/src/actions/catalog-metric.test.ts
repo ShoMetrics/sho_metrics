@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { PropertyInspectorDidAppearEvent, WillAppearEvent, WillDisappearEvent } from "@elgato/streamdeck";
 import {
-    buildCustomMetricNoSelectionViewOptions,
-    buildCustomMetricSelectedViewOptions,
-    CustomMetric,
-} from "./custom-metric";
+    buildCatalogMetricNoSelectionViewOptions,
+    buildCatalogMetricSelectedViewOptions,
+    CatalogMetric,
+} from "./catalog-metric";
 import type { MetricCollectionBinding } from "./metric-action";
 import type { MetricStoreReader, MetricWidgetDataReadResult } from "../runtime/metric-store";
 import { listMetricReadPlanKeys } from "../runtime/source-routing/metric-read-plan";
@@ -24,9 +24,9 @@ import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick
 import { writeStoredWidgetSettingsPatch } from "../settings/storage/widget-settings-patch";
 import { resolveInitialActionSettings } from "./settings/action-settings-resolver";
 
-test("custom metric without selected metric does not register collection", () => {
-    const action = new TestCustomMetric();
-    const streamDeckAction = new FakeStreamDeckAction("custom-empty-action");
+test("catalog metric without selected metric does not register collection", () => {
+    const action = new TestCatalogMetric();
+    const streamDeckAction = new FakeStreamDeckAction("catalog-empty-action");
 
     try {
         action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCatalogWidgetSettings("")));
@@ -38,9 +38,9 @@ test("custom metric without selected metric does not register collection", () =>
     }
 });
 
-test("custom metric with selected metric registers exactly one metric key", () => {
-    const action = new TestCustomMetric();
-    const streamDeckAction = new FakeStreamDeckAction("custom-selected-action");
+test("catalog metric with selected metric registers exactly one metric key", () => {
+    const action = new TestCatalogMetric();
+    const streamDeckAction = new FakeStreamDeckAction("catalog-selected-action");
 
     try {
         action.onWillAppear(buildWillAppearEvent(
@@ -63,13 +63,13 @@ test("custom metric with selected metric registers exactly one metric key", () =
     }
 });
 
-test("custom metric publishes helper descriptors to runtime cache", async () => {
+test("catalog metric publishes helper descriptors to runtime cache", async () => {
     const descriptor = buildMetricDescriptor("source.sensor:/gpu/0/temperature");
-    const action = new TestCustomMetric({
+    const action = new TestCatalogMetric({
         descriptors: [descriptor],
         descriptorFingerprint: "catalog-fingerprint",
     });
-    const streamDeckAction = new FakeStreamDeckAction("custom-descriptor-action");
+    const streamDeckAction = new FakeStreamDeckAction("catalog-descriptor-action");
 
     try {
         action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCatalogWidgetSettings("")));
@@ -86,9 +86,9 @@ test("custom metric publishes helper descriptors to runtime cache", async () => 
     }
 });
 
-test("custom metric publishes failed descriptor status", async () => {
-    const action = new TestCustomMetric(new Error("helper unavailable"));
-    const streamDeckAction = new FakeStreamDeckAction("custom-descriptor-failed-action");
+test("catalog metric publishes failed descriptor status", async () => {
+    const action = new TestCatalogMetric(new Error("helper unavailable"));
+    const streamDeckAction = new FakeStreamDeckAction("catalog-descriptor-failed-action");
 
     try {
         action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCatalogWidgetSettings("")));
@@ -105,13 +105,13 @@ test("custom metric publishes failed descriptor status", async () => {
     }
 });
 
-test("custom metric no-selection view renders placeholder without reading metrics", () => {
+test("catalog metric no-selection view renders placeholder without reading metrics", () => {
     const rawSettings = buildCatalogWidgetSettings("");
     const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
     const metricReader = new CapturingMetricStoreReader({});
 
-    const viewOptions = buildCustomMetricNoSelectionViewOptions({
-        event: buildWillAppearEvent(new FakeStreamDeckAction("custom-render-empty-action"), rawSettings),
+    const viewOptions = buildCatalogMetricNoSelectionViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-empty-action"), rawSettings),
         settings,
     });
 
@@ -120,7 +120,7 @@ test("custom metric no-selection view renders placeholder without reading metric
     assert.deepEqual(metricReader.widgetDataCalls, []);
 });
 
-test("custom metric selected view uses stored fallback label unit and unit maximum", () => {
+test("catalog metric selected view uses stored fallback label unit and unit maximum", () => {
     const rawSettings = buildCatalogWidgetSettings("source.sensor:/gpu/0/power", {
         fallbackLabel: "GPU Board Power",
         fallbackUnit: "W",
@@ -132,8 +132,8 @@ test("custom metric selected view uses stored fallback label unit and unit maxim
         sampleTimestampMilliseconds: wallClockNowMilliseconds(),
     });
 
-    const viewOptions = buildCustomMetricSelectedViewOptions({
-        event: buildWillAppearEvent(new FakeStreamDeckAction("custom-render-selected-action"), rawSettings),
+    const viewOptions = buildCatalogMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-selected-action"), rawSettings),
         settings,
         target,
         metrics: metricReader,
@@ -155,7 +155,7 @@ test("custom metric selected view uses stored fallback label unit and unit maxim
     assert.equal(viewOptions.widgetData.unit, "W");
 });
 
-test("custom metric selected view reports no sensor data through helper backed copy", () => {
+test("catalog metric selected view reports no sensor data through helper backed copy", () => {
     const rawSettings = buildCatalogWidgetSettings("source.sensor:/gpu/0/temperature", {
         fallbackLabel: "GPU Hot Spot",
         fallbackUnit: "C",
@@ -167,8 +167,8 @@ test("custom metric selected view reports no sensor data through helper backed c
         sampleTimestampMilliseconds: undefined,
     });
 
-    const viewOptions = buildCustomMetricSelectedViewOptions({
-        event: buildWillAppearEvent(new FakeStreamDeckAction("custom-render-no-data-action"), rawSettings),
+    const viewOptions = buildCatalogMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-no-data-action"), rawSettings),
         settings,
         target,
         metrics: metricReader,
@@ -181,7 +181,7 @@ test("custom metric selected view reports no sensor data through helper backed c
     assert.equal(viewOptions.widgetData.unavailableDisplayValue, "No sensor data");
 });
 
-test("custom metric selected view uses 100 as the percent maximum", () => {
+test("catalog metric selected view uses 100 as the percent maximum", () => {
     const rawSettings = buildCatalogWidgetSettings("source.sensor:/network/load", {
         fallbackLabel: "Network Utilization",
         fallbackUnit: "%",
@@ -193,8 +193,8 @@ test("custom metric selected view uses 100 as the percent maximum", () => {
         sampleTimestampMilliseconds: wallClockNowMilliseconds(),
     });
 
-    const viewOptions = buildCustomMetricSelectedViewOptions({
-        event: buildWillAppearEvent(new FakeStreamDeckAction("custom-render-percent-action"), rawSettings),
+    const viewOptions = buildCatalogMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-percent-action"), rawSettings),
         settings,
         target,
         metrics: metricReader,
@@ -205,7 +205,7 @@ test("custom metric selected view uses 100 as the percent maximum", () => {
     assert.equal(viewOptions.widgetData.progress, 0.42);
 });
 
-test("custom metric selected view renders non-percent scalar units without descriptor metadata", () => {
+test("catalog metric selected view renders non-percent scalar units without descriptor metadata", () => {
     const rawSettings = buildCatalogWidgetSettings("source.sensor:/fan/0/rpm", {
         fallbackLabel: "Fan",
         fallbackUnit: "RPM",
@@ -217,8 +217,8 @@ test("custom metric selected view renders non-percent scalar units without descr
         sampleTimestampMilliseconds: wallClockNowMilliseconds(),
     });
 
-    const viewOptions = buildCustomMetricSelectedViewOptions({
-        event: buildWillAppearEvent(new FakeStreamDeckAction("custom-render-rpm-action"), rawSettings),
+    const viewOptions = buildCatalogMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-rpm-action"), rawSettings),
         settings,
         target,
         metrics: metricReader,
@@ -229,7 +229,7 @@ test("custom metric selected view renders non-percent scalar units without descr
     assert.equal(viewOptions.widgetData.progress, 0.5);
 });
 
-class TestCustomMetric extends CustomMetric {
+class TestCatalogMetric extends CatalogMetric {
     readonly bindings: FakeMetricCollectionBinding[] = [];
     readonly runtimeCachePatchList: WidgetRuntimeCachePatch[] = [];
     metricsUpdateCallCount = 0;
