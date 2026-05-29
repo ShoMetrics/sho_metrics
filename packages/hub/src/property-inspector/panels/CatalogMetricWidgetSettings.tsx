@@ -284,6 +284,9 @@ export function buildCatalogMetricSelectionPatch(
             detectedUnit: selectedMetric.unit,
             detectedCategory: selectedMetric.category,
             detectedReadingKind: selectedMetric.readingKind,
+            // Keep user overrides only when descriptor refreshes resolve to the
+            // same metric. A different metric should not inherit stale CPU/GPU
+            // labels or scale values from the previous selection.
             ...(selectedMetric.metricId === target.metricId
                 ? {}
                 : {
