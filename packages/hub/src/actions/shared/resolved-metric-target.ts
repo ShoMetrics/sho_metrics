@@ -3,7 +3,7 @@ import type {
     ResolvedWidgetSettings,
 } from "../../settings/resolved-settings";
 
-export type ActionMetricTargetDomain = Exclude<ResolvedMetricTarget["domain"], "catalog">;
+export type ActionMetricTargetDomain = ResolvedMetricTarget["domain"];
 export type ActionMetricTarget<TDomain extends ActionMetricTargetDomain> = Extract<
     ResolvedMetricTarget,
     { readonly domain: TDomain }

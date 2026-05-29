@@ -127,6 +127,25 @@ test("changed polling plan resubscribes and forces an immediate update", () => {
     }
 });
 
+test("empty metric keys dispose collection without weakening read-plan invariants", () => {
+    const action = new TestStaticMetricKeysAction(["net.down"]);
+    const streamDeckAction = new FakeStreamDeckAction("empty-plan-action");
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
+        action.setMetricKeys([]);
+        action.onDidReceiveSettings(buildDidReceiveSettingsEvent(streamDeckAction, buildNetworkWidgetSettings()));
+
+        assert.equal(action.bindings.length, 1);
+        assert.equal(action.bindings[0].disposeCallCount, 1);
+        assert.equal(action.bindings[0].refreshOptionsList.length, 1);
+        assert.deepEqual(listMetricReadPlanKeys(action.bindings[0].refreshOptionsList[0].readPlan), ["net.down"]);
+        assert.equal(action.metricsUpdateSnapshots.length, 2);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    }
+});
+
 test("global settings changes re-resolve settings resubscribe and force an immediate update", () => {
     pluginGlobalSettingsStore.update(undefined);
     const action = new TestMetricAction();
@@ -708,6 +727,21 @@ class TestDisplayedAttributionAction extends TestMetricAction {
     protected override getDisplayedMetricKey(event: WillAppearEvent): string {
         void event;
         return "net.down";
+    }
+}
+
+class TestStaticMetricKeysAction extends TestMetricAction {
+    constructor(private metricKeys: readonly string[]) {
+        super();
+    }
+
+    setMetricKeys(metricKeys: readonly string[]): void {
+        this.metricKeys = metricKeys;
+    }
+
+    protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
+        void event;
+        return this.metricKeys;
     }
 }
 

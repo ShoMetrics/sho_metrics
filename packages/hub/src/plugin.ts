@@ -5,6 +5,7 @@ import { Network } from "./actions/network";
 import { Gpu } from "./actions/gpu";
 import { Memory } from "./actions/memory";
 import { Disk } from "./actions/disk";
+import { CustomMetric } from "./actions/custom-metric";
 import { logger } from "./logging/logger";
 import { pluginGlobalSettingsStore } from "./settings/global-settings-store";
 import { backgroundMetricCollection } from "./runtime/metric-collection/background-metric-collection";
@@ -24,6 +25,7 @@ streamDeck.actions.registerAction(new Network());
 streamDeck.actions.registerAction(new Memory());
 streamDeck.actions.registerAction(new Disk());
 streamDeck.actions.registerAction(new Gpu());
+streamDeck.actions.registerAction(new CustomMetric());
 
 process.once("exit", () => {
     backgroundMetricCollection.dispose();

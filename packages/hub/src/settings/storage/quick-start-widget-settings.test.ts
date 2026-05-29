@@ -88,6 +88,16 @@ describe("quick-start stored widget settings", () => {
                     assert.equal(settings.widget.value.slot?.overrides?.appearance, undefined);
                 },
             },
+            {
+                actionKind: "catalog",
+                verifyTarget: (settings) => {
+                    const target = readStoredMetricTarget(settings);
+                    if (target?.case !== "catalog") {
+                        assert.fail(`Expected catalog target, received ${String(target?.case)}`);
+                    }
+                    assert.equal(target.value.metricId ?? "", "");
+                },
+            },
         ];
 
         for (const testCase of testCases) {
