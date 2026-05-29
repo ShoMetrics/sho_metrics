@@ -2,6 +2,7 @@ import { deepEqual } from "fast-equals";
 import type { DiskVolumeOption } from "./disk-volumes";
 import type { NetworkInterfaceOption } from "./network-interfaces";
 import type {
+    MetricDescriptor,
     MetricUnavailableReason,
     MetricValueFreshness,
     SourceClientStatus,
@@ -17,6 +18,8 @@ import type {
 export interface WidgetRuntimeCache {
     availableNetworkInterfaces: NetworkInterfaceOption[];
     availableDiskVolumes: DiskVolumeOption[];
+    availableCatalogMetricDescriptors: readonly MetricDescriptor[];
+    catalogMetricDescriptorLoadState: WidgetRuntimeCacheLoadState;
     runtimeMaximumDownloadSpeedMbps: number | undefined;
     runtimeMaximumUploadSpeedMbps: number | undefined;
     runtimeMaximumDiskReadThroughputMebibytesPerSecond: number | undefined;
@@ -24,6 +27,8 @@ export interface WidgetRuntimeCache {
     runtimeMaximumGpuPowerWatts: number | undefined;
     displayedMetricReadAttribution: DisplayedMetricReadAttribution | undefined;
 }
+
+export type WidgetRuntimeCacheLoadState = "pending" | "ready" | "failed";
 
 /** Latest render-path source attribution for the primary metric displayed by an action. */
 export interface DisplayedMetricReadAttribution {
@@ -73,6 +78,8 @@ export type WidgetRuntimeCachePatch = Partial<WidgetRuntimeCache>;
 export const emptyWidgetRuntimeCache: WidgetRuntimeCache = {
     availableNetworkInterfaces: [],
     availableDiskVolumes: [],
+    availableCatalogMetricDescriptors: [],
+    catalogMetricDescriptorLoadState: "pending",
     runtimeMaximumDownloadSpeedMbps: undefined,
     runtimeMaximumUploadSpeedMbps: undefined,
     runtimeMaximumDiskReadThroughputMebibytesPerSecond: undefined,

@@ -350,16 +350,18 @@ Add a small method to `BackgroundMetricCollection` rather than exporting the
 source registry:
 
 ```ts
-async listSourceMetricDescriptors(
+async readSourceMetricDescriptors(
     sourceId: string,
     metricKeys: readonly string[],
-): Promise<MetricDescriptorSnapshot | undefined>
+): Promise<MetricDescriptorSnapshot>
 ```
 
 Behavior:
 
-- Return `undefined` when the source is missing or lacks `listMetricDescriptors`.
-- Log a throttled warning at the owner boundary on failure.
+- Throw when the source is missing, lacks `listMetricDescriptors`, or the
+  descriptor read fails. `CustomMetric` maps all descriptor-load failures to an
+  empty descriptor list plus `catalogMetricDescriptorLoadState: "failed"`.
+- Log a throttled warning at the action owner boundary on failure.
 - Do not mutate `MetricStore`.
 - Do not register metric subscriptions.
 - Do not trigger helper refresh demand.

@@ -11,7 +11,7 @@ import {
     createDefaultSourceRegistry,
     type SourceRegistry,
 } from "../sources/source-registry";
-import type { SourceClientStatus } from "../sources/source-client";
+import type { MetricDescriptorSnapshot, SourceClientStatus } from "../sources/source-client";
 import { CollectorGroupPlanner } from "./collector-group-planner";
 import { CollectorGroupSupervisor } from "./collector-group-supervisor";
 import {
@@ -150,6 +150,20 @@ export class BackgroundMetricCollection {
     /** Reads source-owned runtime status without performing source I/O. */
     readCachedSourceStatus(sourceId: string): SourceClientStatus | undefined {
         return this.sourceRegistry.readCachedSourceStatus(sourceId);
+    }
+
+    /** Reads source-owned metric descriptors without registering collection demand. */
+    async readSourceMetricDescriptors(
+        sourceId: string,
+        metricKeys: readonly string[] = [],
+    ): Promise<MetricDescriptorSnapshot> {
+        const sourceClient = this.sourceRegistry.resolveSourceClient(sourceId);
+
+        if (!sourceClient?.listMetricDescriptors) {
+            throw new Error(`Source ${sourceId} does not expose metric descriptors.`);
+        }
+
+        return await sourceClient.listMetricDescriptors(metricKeys);
     }
 
     /** Stops background loops and releases source resources owned by this root. */

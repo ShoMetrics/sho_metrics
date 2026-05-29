@@ -94,6 +94,7 @@ export const initialSettingsSyncState: SettingsSyncState = {
     runtimeCache: { ...emptyWidgetRuntimeCache },
     runtimeCacheStatus: {
         diskVolumeOptionsStatus: "pending",
+        catalogMetricDescriptorStatus: "pending",
     },
     rawGlobalSettings: undefined,
     globalSettingsStatus: "pending",
@@ -192,6 +193,8 @@ function updateRuntimeCacheStatus(
         diskVolumeOptionsStatus: "availableDiskVolumes" in patch
             ? "ready"
             : runtimeCacheStatus.diskVolumeOptionsStatus,
+        catalogMetricDescriptorStatus: patch.catalogMetricDescriptorLoadState
+            ?? runtimeCacheStatus.catalogMetricDescriptorStatus,
     };
 }
 

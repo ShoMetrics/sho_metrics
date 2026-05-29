@@ -51,6 +51,32 @@ test("runtimeCachePatch merges runtime cache and marks disk volume options ready
     assert.equal(nextState.runtimeCacheStatus.diskVolumeOptionsStatus, "ready");
 });
 
+test("runtimeCachePatch uses explicit catalog descriptor load state", () => {
+    const descriptorOnlyState = settingsSyncReducer(initialSettingsSyncState, {
+        type: "runtimeCachePatch",
+        patch: {
+            availableCatalogMetricDescriptors: [],
+        },
+    });
+    const failedState = settingsSyncReducer(descriptorOnlyState, {
+        type: "runtimeCachePatch",
+        patch: {
+            availableCatalogMetricDescriptors: [],
+            catalogMetricDescriptorLoadState: "failed",
+        },
+    });
+    const readyState = settingsSyncReducer(failedState, {
+        type: "runtimeCachePatch",
+        patch: {
+            catalogMetricDescriptorLoadState: "ready",
+        },
+    });
+
+    assert.equal(descriptorOnlyState.runtimeCacheStatus.catalogMetricDescriptorStatus, "pending");
+    assert.equal(failedState.runtimeCacheStatus.catalogMetricDescriptorStatus, "failed");
+    assert.equal(readyState.runtimeCacheStatus.catalogMetricDescriptorStatus, "ready");
+});
+
 test("save failure keeps optimistic widget settings and reports warning", () => {
     const rawSettings = { preferences: { pollingFrequencySeconds: 15 } };
     const patchedState = settingsSyncReducer(initialSettingsSyncState, {

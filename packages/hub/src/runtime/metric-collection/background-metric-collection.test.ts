@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { SourceClient, SourceSnapshotReadResult } from "../sources/source-client";
+import type { MetricDescriptorSnapshot, SourceClient, SourceSnapshotReadResult } from "../sources/source-client";
 import type { SourceRegistry } from "../sources/source-registry";
 import type { SourceMetricPollingGroupResolution } from "../sources/source-polling-groups";
 import type { SourceMetadataInvalidation, SourceMetadataInvalidationListener } from "../sources/source-planning-metadata";
@@ -277,6 +277,34 @@ test("refreshReadPlanOnce requests only each source candidate's routed metric ke
     assert.equal(nodeSystemSourceClient.readSnapshotCallCount, 1);
 });
 
+test("readSourceMetricDescriptors does not register collection or read snapshots", async () => {
+    const subscriptionRegistry = new MetricSubscriptionRegistry();
+    const descriptorSnapshot = {
+        descriptors: [],
+        descriptorFingerprint: "catalog-fingerprint",
+    };
+    const windowsHelperSourceClient = new FakeSourceClient("windows-helper", () => ({
+        state: "owned",
+        pollingGroupId: "helper",
+    }), {
+        descriptorSnapshot,
+    });
+    const timer = new FakeTimer();
+    const collection = buildBackgroundMetricCollection(subscriptionRegistry, {
+        sourceClients: [windowsHelperSourceClient],
+        timer,
+    });
+
+    const result = await collection.readSourceMetricDescriptors("windows-helper");
+
+    assert.equal(result, descriptorSnapshot);
+    assert.equal(windowsHelperSourceClient.listMetricDescriptorsCallCount, 1);
+    assert.deepEqual(windowsHelperSourceClient.latestDescriptorMetricKeys, []);
+    assert.equal(windowsHelperSourceClient.readSnapshotCallCount, 0);
+    assert.deepEqual(subscriptionRegistry.listSubscriptions(), []);
+    assert.deepEqual(timer.recordedDelaysMilliseconds, []);
+});
+
 function buildBackgroundMetricCollection(
     subscriptionRegistry: MetricSubscriptionRegistry,
     options?: BuildBackgroundMetricCollectionOptions,
@@ -340,12 +368,15 @@ class FakeSourceClient implements SourceClient {
     latestResolvedMetricKeys: readonly string[] = [];
     readSnapshotCallCount = 0;
     latestReadMetricKeys: readonly string[] = [];
+    listMetricDescriptorsCallCount = 0;
+    latestDescriptorMetricKeys: readonly string[] = [];
 
     constructor(
         readonly sourceId: string,
         private readonly resolveMetricKey: (metricKey: string) => SourceMetricPollingGroupResolution,
         private readonly options: {
             readonly servesSnapshots?: boolean;
+            readonly descriptorSnapshot?: MetricDescriptorSnapshot;
         } = {},
     ) {}
 
@@ -374,6 +405,17 @@ class FakeSourceClient implements SourceClient {
         this.latestResolvedMetricKeys = metricKeys;
 
         return new Map(metricKeys.map(metricKey => [metricKey, this.resolveMetricKey(metricKey)]));
+    }
+
+    async listMetricDescriptors(metricKeys: readonly string[]): Promise<MetricDescriptorSnapshot> {
+        if (this.options.descriptorSnapshot === undefined) {
+            throw new Error("FakeSourceClient does not serve descriptors.");
+        }
+
+        this.listMetricDescriptorsCallCount += 1;
+        this.latestDescriptorMetricKeys = metricKeys;
+
+        return this.options.descriptorSnapshot;
     }
 }
 
