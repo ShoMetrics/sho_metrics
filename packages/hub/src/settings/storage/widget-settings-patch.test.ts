@@ -47,6 +47,67 @@ test("widget patch fails when the patch domain does not match the current metric
     );
 });
 
+test("widget patch fails when a catalog patch targets a non-catalog metric", () => {
+    const cpuSettings = resolveQuickStartStoredWidgetSettings(undefined, "cpu").rawSettings;
+
+    assert.throws(
+        () => writeStoredWidgetSettingsPatch(cpuSettings, {
+            catalog: {
+                metricId: "source.sensor:/gpu/temperature",
+            },
+        }),
+        /non-catalog metric/,
+    );
+});
+
+test("widget patch updates catalog metric target", () => {
+    const catalogSettings = resolveQuickStartStoredWidgetSettings(undefined, "catalog").rawSettings;
+
+    const nextSettings = writeStoredWidgetSettingsPatch(catalogSettings, {
+        catalog: {
+            metricId: "source.sensor:/gpu/temperature",
+            fallbackLabel: "GPU Hot Spot",
+            fallbackUnit: "C",
+        },
+    });
+
+    const target = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.metric?.target;
+    assert.equal(target?.case, "catalog");
+    if (target?.case === "catalog") {
+        assert.equal(target.value.metricId, "source.sensor:/gpu/temperature");
+        assert.equal(target.value.fallbackLabel, "GPU Hot Spot");
+        assert.equal(target.value.fallbackUnit, "C");
+    }
+});
+
+test("widget patch can clear catalog fallback hints", () => {
+    const catalogSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "catalog").rawSettings,
+        {
+            catalog: {
+                metricId: "source.sensor:/gpu/temperature",
+                fallbackLabel: "GPU Hot Spot",
+                fallbackUnit: "C",
+            },
+        },
+    );
+
+    const nextSettings = writeStoredWidgetSettingsPatch(catalogSettings, {
+        catalog: {
+            fallbackLabel: undefined,
+            fallbackUnit: undefined,
+        },
+    });
+
+    const target = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.metric?.target;
+    assert.equal(target?.case, "catalog");
+    if (target?.case === "catalog") {
+        assert.equal(target.value.metricId, "source.sensor:/gpu/temperature");
+        assert.equal(target.value.fallbackLabel, undefined);
+        assert.equal(target.value.fallbackUnit, undefined);
+    }
+});
+
 test("widget patch updates GPU reading within the GPU action domain", () => {
     const gpuSettings = resolveQuickStartStoredWidgetSettings(undefined, "gpu").rawSettings;
 
