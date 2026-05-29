@@ -4,6 +4,9 @@ import type { WillAppearEvent, WillDisappearEvent } from "@elgato/streamdeck";
 import { CustomMetric } from "./custom-metric";
 import type { MetricCollectionBinding } from "./metric-action";
 import { listMetricReadPlanKeys } from "../runtime/source-routing/metric-read-plan";
+import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
+import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
+import { writeStoredWidgetSettingsPatch } from "../settings/storage/widget-settings-patch";
 
 test("custom metric without selected metric does not register collection", () => {
     const action = new TestCustomMetric();
@@ -35,6 +38,9 @@ test("custom metric with selected metric registers exactly one metric key", () =
             listMetricReadPlanKeys(action.bindings[0].refreshOptionsList[0].readPlan),
             ["source.sensor:/gpu/0/temperature"],
         );
+        assert.deepEqual(action.bindings[0].refreshOptionsList[0].metricSubscriptions[0]?.sourceCandidates, [
+            { sourceId: WINDOWS_HELPER_SOURCE_ID },
+        ]);
         assert.equal(action.metricsUpdateCallCount, 1);
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
@@ -87,19 +93,19 @@ class FakeStreamDeckAction {
 }
 
 function buildCatalogWidgetSettings(metricId: string): unknown {
-    return {
-        singleMetric: {
-            slot: {
-                metric: {
-                    catalog: {
-                        metricId,
-                        fallbackLabel: "GPU Hot Spot",
-                        fallbackUnit: "C",
-                    },
-                },
-            },
+    const quickStartSettings = resolveQuickStartStoredWidgetSettings(undefined, "catalog").rawSettings;
+
+    if (metricId.length === 0) {
+        return quickStartSettings;
+    }
+
+    return writeStoredWidgetSettingsPatch(quickStartSettings, {
+        catalog: {
+            metricId,
+            fallbackLabel: "GPU Hot Spot",
+            fallbackUnit: "C",
         },
-    };
+    });
 }
 
 function buildWillAppearEvent(action: FakeStreamDeckAction, settings: unknown): WillAppearEvent {

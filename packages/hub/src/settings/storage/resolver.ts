@@ -167,6 +167,12 @@ const DEFAULT_NETWORK_APPEARANCE_SETTINGS = buildDefaultAppearanceSettings({
     },
 });
 
+const DEFAULT_CATALOG_APPEARANCE_SETTINGS = buildDefaultAppearanceSettings({
+    view: {
+        selectedView: "text",
+    },
+});
+
 const TEXT_VIEW_DEFAULT_METRIC_COLOR_MODE = "black-white" satisfies ColorMode;
 
 const DEFAULT_WIDGET_PREFERENCES: ResolvedWidgetPreferences = {
@@ -417,6 +423,9 @@ function resolveMetricSlot(
 function resolveDefaultAppearanceSettings(target: ResolvedMetricTarget): ResolvedAppearanceSettings {
     if (target.domain === "network") {
         return DEFAULT_NETWORK_APPEARANCE_SETTINGS;
+    }
+    if (target.domain === "catalog") {
+        return DEFAULT_CATALOG_APPEARANCE_SETTINGS;
     }
 
     return DEFAULT_APPEARANCE_SETTINGS;

@@ -927,4 +927,28 @@ describe("stored settings proto resolver", () => {
         assert.equal(widgetSettings.widget.slot.metric.source.failureMode, "useFallback");
         assert.equal(widgetSettings.widget.slot.metric.target.domain, "catalog");
     });
+
+    it("resolves catalog target initial state with text view defaults", () => {
+        const widgetSettings = resolveStoredWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                singleMetric: {
+                    slot: {
+                        metric: {
+                            catalog: {},
+                        },
+                    },
+                },
+            }).settings,
+        });
+        const target = widgetSettings.widget.slot.metric.target;
+
+        assert.equal(target.domain, "catalog");
+        if (target.domain === "catalog") {
+            assert.equal(target.metricId, "");
+            assert.equal(target.fallbackLabel, undefined);
+            assert.equal(target.fallbackUnit, undefined);
+        }
+        assert.equal(widgetSettings.widget.slot.appearance.view.selectedView, "text");
+        assert.equal(widgetSettings.widget.slot.appearance.theme.flat.paint.colorMode, "black-white");
+    });
 });

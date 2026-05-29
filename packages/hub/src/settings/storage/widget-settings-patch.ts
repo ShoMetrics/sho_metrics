@@ -27,6 +27,7 @@ import {
     LineAppearanceSettingsSchema,
     WidgetPreferencesSchema,
     type AppearanceSettings as StoredAppearanceSettings,
+    type CatalogMetricTarget as StoredCatalogMetricTarget,
     type ColorFilledPaintSettings as StoredColorFilledPaintSettings,
     type CpuMetricTarget as StoredCpuMetricTarget,
     type DiskMetricTarget as StoredDiskMetricTarget,
@@ -134,6 +135,11 @@ export interface StoredWidgetSettingsPatch {
         readonly maximumTemperatureCelsius: number;
         readonly maximumPowerWatts: number | undefined;
     }>;
+    readonly catalog?: Partial<{
+        readonly metricId: string;
+        readonly fallbackLabel: string | undefined;
+        readonly fallbackUnit: string | undefined;
+    }>;
 }
 
 export function writeStoredWidgetSettingsPatch(
@@ -177,6 +183,10 @@ function applyPatch(settings: StoredWidgetSettings, patch: StoredWidgetSettingsP
 
     if (patch.gpu) {
         applyGpuPatch(requireGpuTarget(requireMetricSelection(requireSingleMetricSlot(settings))), patch.gpu);
+    }
+
+    if (patch.catalog) {
+        applyCatalogPatch(requireCatalogTarget(requireMetricSelection(requireSingleMetricSlot(settings))), patch.catalog);
     }
 }
 
@@ -504,6 +514,21 @@ function applyGpuPatch(
     }
 }
 
+function applyCatalogPatch(
+    target: StoredCatalogMetricTarget,
+    patch: NonNullable<StoredWidgetSettingsPatch["catalog"]>,
+): void {
+    if (patch.metricId !== undefined) {
+        target.metricId = patch.metricId;
+    }
+    if ("fallbackLabel" in patch) {
+        target.fallbackLabel = patch.fallbackLabel;
+    }
+    if ("fallbackUnit" in patch) {
+        target.fallbackUnit = patch.fallbackUnit;
+    }
+}
+
 function requireSingleMetricSlot(settings: StoredWidgetSettings): StoredMetricSlot {
     if (settings.widget.case !== "singleMetric") {
         return throwPatchTargetMismatch("Cannot patch widget settings before quick-start widget initialization.");
@@ -556,6 +581,14 @@ function requireCpuTarget(metric: StoredMetricSelection): StoredCpuMetricTarget 
 function requireGpuTarget(metric: StoredMetricSelection): StoredGpuMetricTarget {
     if (metric.target.case !== "gpu") {
         return throwPatchTargetMismatch("Cannot apply a GPU settings patch to a non-GPU metric.");
+    }
+
+    return metric.target.value;
+}
+
+function requireCatalogTarget(metric: StoredMetricSelection): StoredCatalogMetricTarget {
+    if (metric.target.case !== "catalog") {
+        return throwPatchTargetMismatch("Cannot apply a catalog settings patch to a non-catalog metric.");
     }
 
     return metric.target.value;
