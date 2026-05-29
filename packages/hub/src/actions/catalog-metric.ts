@@ -10,11 +10,12 @@ import { logger } from "../logging/logger";
 import { backgroundMetricCollection } from "../runtime/metric-collection/background-metric-collection";
 import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
 import type { MetricDescriptorSnapshot, SourceClientStatus } from "../runtime/sources/source-client";
-import { MetricUnit } from "../runtime/sources/metric-source";
 import type { ResolvedCatalogMetricTarget, ResolvedWidgetSettings } from "../settings/resolved-settings";
 import type { WidgetData } from "../view-rendering/widget-data";
 import type { SingleMetricViewOptions } from "../view-updates/runner";
 import { formatMetricUnit } from "../metrics/metric-unit-format";
+import { resolveCatalogMetricDefaultMaximumValue } from "../metrics/catalog-metric-scale";
+import { formatCatalogMetricFreshWidgetData } from "../metrics/catalog-metric-widget-data";
 
 const log = logger.for("Action:CatalogMetric");
 const CATALOG_DESCRIPTOR_LOAD_WARNING_INTERVAL_MILLISECONDS = 30_000;
@@ -115,7 +116,18 @@ export function buildCatalogMetricSelectedViewOptions(options: {
     readonly metrics: MetricStoreReader;
     readonly helperStatus: SourceClientStatus | undefined;
 }): SingleMetricViewOptions {
+    // Rendering must be self-contained after selection. The descriptor catalog
+    // may be unavailable later, so use stored detected hints plus user overrides.
     const unit = formatMetricUnit(options.target.detectedUnit);
+    const label = options.target.customLabel
+        ?? options.target.detectedLabel
+        ?? CATALOG_NO_SELECTION_LABEL;
+    const maxValue = options.target.customMaximumValue
+        ?? resolveCatalogMetricDefaultMaximumValue(
+            options.target.detectedUnit,
+            options.target.detectedCategory,
+            options.target.detectedReadingKind,
+        );
 
     return {
         event: options.event,
@@ -124,10 +136,17 @@ export function buildCatalogMetricSelectedViewOptions(options: {
         widgetData: readHelperBackedWidgetData({
             metrics: options.metrics,
             metricKey: options.target.metricId,
-            label: options.target.detectedLabel ?? CATALOG_NO_SELECTION_LABEL,
+            label,
             unit,
-            maxValue: resolveCatalogMetricMaximumValue(options.target.detectedUnit),
+            maxValue,
             helperStatus: options.helperStatus,
+            // Catalog-specific formatting runs only after the helper freshness
+            // gate accepts the sample, so helper-error and no-data copy stays intact.
+            transformFreshWidgetData: (widgetData) => formatCatalogMetricFreshWidgetData({
+                widgetData,
+                unit: options.target.detectedUnit,
+                category: options.target.detectedCategory,
+            }),
         }),
         ...buildMetricViewIcons({ hardware: "unknown", status: "percentage" }),
     };
@@ -142,27 +161,4 @@ function buildNoSelectionWidgetData(): WidgetData {
         unit: "",
         unavailableDisplayValue: CATALOG_NO_SELECTION_PLACEHOLDER,
     };
-}
-
-// TODO(step5): Replace this temporary unit-only scale with the typed
-// unit/category/reading default maximum resolver.
-function resolveCatalogMetricMaximumValue(unit: MetricUnit): number {
-    switch (unit) {
-        case MetricUnit.WATTS:
-            return 300;
-        case MetricUnit.REVOLUTIONS_PER_MINUTE:
-            return 3000;
-        case MetricUnit.MILLISECONDS:
-            return 1000;
-        case MetricUnit.PERCENT:
-        case MetricUnit.CELSIUS:
-        case MetricUnit.VOLTS:
-        case MetricUnit.AMPERES:
-        case MetricUnit.HERTZ:
-        case MetricUnit.BYTES:
-        case MetricUnit.BYTES_PER_SECOND:
-        case MetricUnit.SECONDS:
-        default:
-            return 100;
-    }
 }

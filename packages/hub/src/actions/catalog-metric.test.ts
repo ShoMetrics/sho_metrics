@@ -20,6 +20,7 @@ import {
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
 import type { WidgetData } from "../view-rendering/widget-data";
 import { wallClockNowMilliseconds } from "../shared/clock";
+import type { CatalogMetricCategory, CatalogMetricReadingKind } from "../settings/resolved-settings";
 import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../settings/storage/widget-settings-patch";
 import { resolveInitialActionSettings } from "./settings/action-settings-resolver";
@@ -124,6 +125,8 @@ test("catalog metric selected view uses stored detected label unit and unit maxi
     const rawSettings = buildCatalogWidgetSettings("source.sensor:/gpu/0/power", {
         detectedLabel: "GPU Board Power",
         detectedUnit: MetricUnit.WATTS,
+        detectedCategory: "gpu",
+        detectedReadingKind: "power",
     });
     const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
     const target = readCatalogTarget(settings);
@@ -146,13 +149,49 @@ test("catalog metric selected view uses stored detected label unit and unit maxi
             metricKey: "source.sensor:/gpu/0/power",
             label: "GPU Board Power",
             unit: "W",
-            maxValue: 300,
+            maxValue: 450,
         },
     ]);
     assert.equal(viewOptions.widgetData.current, 150);
-    assert.equal(viewOptions.widgetData.progress, 0.5);
+    assert.equal(viewOptions.widgetData.progress, 1 / 3);
     assert.equal(viewOptions.widgetData.label, "GPU Board Power");
     assert.equal(viewOptions.widgetData.unit, "W");
+});
+
+test("catalog metric selected view uses custom label and custom maximum", () => {
+    const rawSettings = buildCatalogWidgetSettings("source.sensor:/gpu/0/power", {
+        detectedLabel: "GPU Board Power",
+        detectedUnit: MetricUnit.WATTS,
+        detectedCategory: "gpu",
+        detectedReadingKind: "power",
+        customLabel: "Board",
+        customMaximumValue: 600,
+    });
+    const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
+    const target = readCatalogTarget(settings);
+    const metricReader = new CapturingMetricStoreReader({
+        current: 300,
+        sampleTimestampMilliseconds: wallClockNowMilliseconds(),
+    });
+
+    const viewOptions = buildCatalogMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-custom-action"), rawSettings),
+        settings,
+        target,
+        metrics: metricReader,
+        helperStatus: { state: "available" },
+    });
+
+    assert.deepEqual(metricReader.widgetDataCalls, [
+        {
+            metricKey: "source.sensor:/gpu/0/power",
+            label: "Board",
+            unit: "W",
+            maxValue: 600,
+        },
+    ]);
+    assert.equal(viewOptions.widgetData.progress, 0.5);
+    assert.equal(viewOptions.widgetData.label, "Board");
 });
 
 test("catalog metric selected view reports no sensor data through helper backed copy", () => {
@@ -179,6 +218,89 @@ test("catalog metric selected view reports no sensor data through helper backed 
     assert.equal(viewOptions.widgetData.progress, 0);
     assert.deepEqual(viewOptions.widgetData.history, []);
     assert.equal(viewOptions.widgetData.unavailableDisplayValue, "No sensor data");
+});
+
+test("catalog metric selected view formats large units only for fresh helper data", () => {
+    const rawSettings = buildCatalogWidgetSettings("memory.total", {
+        detectedLabel: "Total Memory",
+        detectedUnit: MetricUnit.BYTES,
+        detectedCategory: "memory",
+        detectedReadingKind: "data",
+    });
+    const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
+    const target = readCatalogTarget(settings);
+    const metricReader = new CapturingMetricStoreReader({
+        current: 64 * 1024 ** 3,
+        sampleTimestampMilliseconds: wallClockNowMilliseconds(),
+    });
+    const staleMetricReader = new CapturingMetricStoreReader({
+        current: 64 * 1024 ** 3,
+        sampleTimestampMilliseconds: undefined,
+    });
+
+    const viewOptions = buildCatalogMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-bytes-action"), rawSettings),
+        settings,
+        target,
+        metrics: metricReader,
+        helperStatus: { state: "available" },
+    });
+    const staleViewOptions = buildCatalogMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-stale-bytes-action"), rawSettings),
+        settings,
+        target,
+        metrics: staleMetricReader,
+        helperStatus: { state: "available" },
+    });
+
+    assert.equal(viewOptions.widgetData.current, 64 * 1024 ** 3);
+    assert.equal(viewOptions.widgetData.displayValue, "64");
+    assert.equal(viewOptions.widgetData.unit, "GB");
+    assert.equal(staleViewOptions.widgetData.displayValue, undefined);
+    assert.equal(staleViewOptions.widgetData.unavailableDisplayValue, "No sensor data");
+});
+
+test("catalog metric selected view formats bytes per second and hertz values", () => {
+    const networkSettings = buildCatalogWidgetSettings("network.rx", {
+        detectedLabel: "Network Receive",
+        detectedUnit: MetricUnit.BYTES_PER_SECOND,
+        detectedCategory: "network",
+        detectedReadingKind: "throughput",
+    });
+    const clockSettings = buildCatalogWidgetSettings("cpu.clock", {
+        detectedLabel: "Core Clock",
+        detectedUnit: MetricUnit.HERTZ,
+        detectedCategory: "cpu",
+        detectedReadingKind: "clock",
+    });
+    const networkResolvedSettings = resolveInitialActionSettings(networkSettings, "catalog").resolvedSettings;
+    const clockResolvedSettings = resolveInitialActionSettings(clockSettings, "catalog").resolvedSettings;
+
+    const networkViewOptions = buildCatalogMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-network-action"), networkSettings),
+        settings: networkResolvedSettings,
+        target: readCatalogTarget(networkResolvedSettings),
+        metrics: new CapturingMetricStoreReader({
+            current: 125 * 1000 ** 2,
+            sampleTimestampMilliseconds: wallClockNowMilliseconds(),
+        }),
+        helperStatus: { state: "available" },
+    });
+    const clockViewOptions = buildCatalogMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-clock-action"), clockSettings),
+        settings: clockResolvedSettings,
+        target: readCatalogTarget(clockResolvedSettings),
+        metrics: new CapturingMetricStoreReader({
+            current: 3_500_000_000,
+            sampleTimestampMilliseconds: wallClockNowMilliseconds(),
+        }),
+        helperStatus: { state: "available" },
+    });
+
+    assert.equal(networkViewOptions.widgetData.displayValue, "125");
+    assert.equal(networkViewOptions.widgetData.unit, "MB/s");
+    assert.equal(clockViewOptions.widgetData.displayValue, "3.5");
+    assert.equal(clockViewOptions.widgetData.unit, "GHz");
 });
 
 test("catalog metric selected view uses 100 as the percent maximum", () => {
@@ -353,6 +475,10 @@ function buildCatalogWidgetSettings(
     options: {
         readonly detectedLabel?: string;
         readonly detectedUnit?: MetricUnit;
+        readonly detectedCategory?: CatalogMetricCategory;
+        readonly detectedReadingKind?: CatalogMetricReadingKind;
+        readonly customLabel?: string;
+        readonly customMaximumValue?: number;
     } = {},
 ): unknown {
     const quickStartSettings = resolveQuickStartStoredWidgetSettings(undefined, "catalog").rawSettings;
@@ -366,6 +492,10 @@ function buildCatalogWidgetSettings(
             metricId,
             detectedLabel: options.detectedLabel ?? "GPU Hot Spot",
             detectedUnit: options.detectedUnit ?? MetricUnit.CELSIUS,
+            detectedCategory: options.detectedCategory,
+            detectedReadingKind: options.detectedReadingKind,
+            customLabel: options.customLabel,
+            customMaximumValue: options.customMaximumValue,
         },
     });
 }

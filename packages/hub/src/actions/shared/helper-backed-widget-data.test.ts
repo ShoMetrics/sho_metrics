@@ -23,6 +23,45 @@ test("helper-backed widget data keeps fresh samples", () => {
     assert.equal(widgetData.unavailableDisplayValue, undefined);
 });
 
+test("helper-backed widget data transforms only fresh samples", () => {
+    const freshWidgetData = readHelperBackedWidgetData({
+        metrics: buildMetricReader({
+            current: 42,
+            progress: 0.42,
+            history: [40, 42],
+            sampleTimestampMilliseconds: Date.now(),
+        }),
+        metricKey: "gpu.power",
+        label: "GPU",
+        unit: "W",
+        helperStatus: { state: "available" },
+        transformFreshWidgetData: (widgetData) => ({
+            ...widgetData,
+            displayValue: "fresh",
+        }),
+    });
+    const staleWidgetData = readHelperBackedWidgetData({
+        metrics: buildMetricReader({
+            current: 42,
+            progress: 0.42,
+            history: [40, 42],
+            sampleTimestampMilliseconds: 1,
+        }),
+        metricKey: "gpu.power",
+        label: "GPU",
+        unit: "W",
+        helperStatus: { state: "available" },
+        transformFreshWidgetData: (widgetData) => ({
+            ...widgetData,
+            displayValue: "stale",
+        }),
+    });
+
+    assert.equal(freshWidgetData.displayValue, "fresh");
+    assert.equal(staleWidgetData.displayValue, undefined);
+    assert.equal(staleWidgetData.unavailableDisplayValue, "No sensor data");
+});
+
 test("helper-backed widget data explains missing helper when sample is stale", () => {
     const widgetData = readHelperBackedWidgetData({
         metrics: buildMetricReader({

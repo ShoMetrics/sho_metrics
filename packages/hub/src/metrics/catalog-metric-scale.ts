@@ -19,6 +19,12 @@ const MAXIMUM_CUSTOM_MAXIMUM_VALUE = 1_000_000_000_000_000;
 const RAW_INPUT_MULTIPLIER = 1;
 const RAW_INPUT_STEP = 1;
 
+/**
+ * Resolves the default raw source-unit maximum for catalog metric scaling.
+ *
+ * The renderer uses this value for progress math before any display-only unit
+ * formatting is applied.
+ */
 export function resolveCatalogMetricDefaultMaximumValue(
     unit: MetricUnit,
     category: CatalogMetricCategory,
@@ -88,6 +94,8 @@ export function resolveCatalogMetricMaximumInputMaximum(
     unit: MetricUnit,
     category: CatalogMetricCategory,
 ): number {
+    // The stored proto limit is raw-unit based. Convert it to the visible PI
+    // unit so inputs such as GB, GHz, and MB/s are capped consistently.
     return MAXIMUM_CUSTOM_MAXIMUM_VALUE / resolveCatalogMetricMaximumInputUnit(unit, category).multiplier;
 }
 
@@ -104,18 +112,22 @@ function resolveCatalogMetricMaximumInputUnit(
 ): CatalogMetricMaximumInputUnit {
     switch (unit) {
         case MetricUnit.HERTZ:
+            // Source values are raw hertz. Users edit clocks in GHz.
             return {
                 label: "GHz",
                 multiplier: DECIMAL_GIGAHERTZ,
                 step: 0.1,
             };
         case MetricUnit.BYTES:
+            // Source values are raw bytes. Users edit capacity-like values in GB.
             return {
                 label: "GB",
                 multiplier: GIBIBYTE,
                 step: 1,
             };
         case MetricUnit.BYTES_PER_SECOND:
+            // Match display defaults: network uses decimal MB/s; storage-like
+            // throughput keeps the MB/s label but uses a 1024 base.
             return {
                 label: "MB/s",
                 multiplier: category === "network" ? DECIMAL_MEGABYTE : MEBIBYTE,

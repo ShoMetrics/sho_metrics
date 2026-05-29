@@ -15,6 +15,7 @@ interface HelperBackedWidgetDataReadOptions {
     readonly unit: string;
     readonly maxValue?: number;
     readonly helperStatus: SourceClientStatus | undefined;
+    readonly transformFreshWidgetData?: (widgetData: WidgetData) => WidgetData;
 }
 
 /** Reads a helper-backed metric and returns action-owned no-data copy when no fresh sample exists. */
@@ -27,7 +28,7 @@ export function readHelperBackedWidgetData(options: HelperBackedWidgetDataReadOp
     );
 
     if (isFreshHelperBackedWidgetData(widgetData)) {
-        return widgetData;
+        return options.transformFreshWidgetData?.(widgetData) ?? widgetData;
     }
 
     const {
