@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CollectorGroupSupervisor } from "./collector-group-supervisor";
+import {
+    classifyRefreshDemandPollingGroupForLog,
+    CollectorGroupSupervisor,
+} from "./collector-group-supervisor";
 import type { PlannedCollectorGroup } from "./collector-group-planner";
 import { MetricStore } from "../metric-store";
 import {
@@ -21,6 +24,23 @@ import { WINDOWS_HELPER_SOURCE_ID } from "../sources/source-ids";
 // The runner callback chains through timer -> refreshNow -> readSnapshot ->
 // ingest -> finally. Ten turns leaves margin for small async instrumentation.
 const ASYNC_TIMER_DRAIN_MICROTASK_TICKS = 10;
+
+test("refresh demand log classification uses real LHM polling group shapes", () => {
+    assert.equal(classifyRefreshDemandPollingGroupForLog("lhm:hardware:/intelcpu/0"), "cpu");
+    assert.equal(classifyRefreshDemandPollingGroupForLog("lhm:hardware:/amdcpu/0"), "cpu");
+    assert.equal(classifyRefreshDemandPollingGroupForLog("lhm:hardware:/gpu-nvidia/0"), "gpu");
+    assert.equal(classifyRefreshDemandPollingGroupForLog("lhm:hardware:/gpu-intel-integrated/pci-0"), "gpu");
+    assert.equal(classifyRefreshDemandPollingGroupForLog("lhm:hardware:/GPU-NVIDIA/0"), "gpu");
+    assert.equal(classifyRefreshDemandPollingGroupForLog("lhm:hardware:/ram"), "ram");
+    assert.equal(classifyRefreshDemandPollingGroupForLog("lhm:hardware:/nvme/0"), "storage");
+    assert.equal(classifyRefreshDemandPollingGroupForLog("lhm:hardware:/hdd/0"), "storage");
+    assert.equal(classifyRefreshDemandPollingGroupForLog("lhm:hardware:/nic/{adapter-id}"), "network");
+    assert.equal(classifyRefreshDemandPollingGroupForLog("lhm:hardware:/mainboard"), "motherboard");
+    assert.equal(classifyRefreshDemandPollingGroupForLog("lhm:hardware:/lpc/nct6701d/0"), "motherboard");
+    assert.equal(classifyRefreshDemandPollingGroupForLog("windows-native:aggregate:disk"), "disk");
+    assert.equal(classifyRefreshDemandPollingGroupForLog("lhm:aggregate:network"), "network");
+    assert.equal(classifyRefreshDemandPollingGroupForLog("unknown:shape"), "other");
+});
 
 test("reconcile starts a runner for a new collector group", async () => {
     const fakeTimer = new FakeTimer();

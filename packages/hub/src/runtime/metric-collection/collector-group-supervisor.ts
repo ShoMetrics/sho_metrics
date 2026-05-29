@@ -19,6 +19,7 @@ const MISSING_SOURCE_LOG_INTERVAL_MILLISECONDS = 30000;
 const REFRESH_DEMAND_SEND_WARNING_INTERVAL_MILLISECONDS = 30000;
 const DEMAND_RENEW_INTERVAL_MILLISECONDS = 8000;
 const DEMAND_RENEW_RETRY_DELAY_MILLISECONDS = 2000;
+const LHM_HARDWARE_POLLING_GROUP_PATTERN = /^lhm:hardware:\/([^/]+)/u;
 
 export type CollectorGroupBackoffPolicyFactory = (collectorGroup: PlannedCollectorGroup) => BackoffPolicy;
 
@@ -179,6 +180,13 @@ export class CollectorGroupSupervisor {
         this.latestWindowsHelperDemandGroups = nextDemandGroups;
         this.latestWindowsHelperDemandFingerprint = nextDemandFingerprint;
         this.shouldResendRefreshDemandAfterRecovery = false;
+        log.info(() => [
+            "windowsHelperRefreshDemandChanged",
+            `groupCount=${nextDemandGroups.length}`,
+            `metricCount=${countRefreshDemandMetrics(nextDemandGroups)}`,
+            `groupKinds=${formatRefreshDemandGroupKinds(nextDemandGroups)}`,
+            `minimumIntervalMs=${readMinimumRefreshDemandIntervalMilliseconds(nextDemandGroups)}`,
+        ].join(" "));
 
         if (nextDemandGroups.length === 0) {
             this.clearRefreshDemandTimer();
@@ -352,6 +360,101 @@ interface RefreshDemandFingerprintGroup {
     readonly pollingGroupId: string;
     readonly metricKeys: readonly string[];
     readonly intervalMilliseconds: number;
+}
+
+function countRefreshDemandMetrics(groups: readonly SourceRefreshDemandGroup[]): number {
+    return groups.reduce((metricCount, group) => metricCount + group.metricKeys.length, 0);
+}
+
+function readMinimumRefreshDemandIntervalMilliseconds(groups: readonly SourceRefreshDemandGroup[]): number {
+    if (groups.length === 0) {
+        return 0;
+    }
+
+    return Math.min(...groups.map(group => group.intervalMilliseconds));
+}
+
+function formatRefreshDemandGroupKinds(groups: readonly SourceRefreshDemandGroup[]): string {
+    if (groups.length === 0) {
+        return "none";
+    }
+
+    const countsByKind = new Map<string, number>();
+
+    for (const group of groups) {
+        const groupKind = classifyRefreshDemandPollingGroupForLog(group.pollingGroupId);
+        countsByKind.set(groupKind, (countsByKind.get(groupKind) ?? 0) + 1);
+    }
+
+    return [...countsByKind.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([kind, count]) => `${kind}:${count}`)
+        .join(",");
+}
+
+/**
+ * Classifies a source-owned polling group id into a coarse log-only bucket.
+ *
+ * This keeps demand-change logs useful without writing hardware or sensor
+ * identity that could expose local machine details.
+ * Keep this in sync with SourceRequestHandler.ClassifyDemandPollingGroupForLog.
+ * Do not use this for scheduling, routing, security, or UI/product behavior.
+ * Runtime behavior must continue to use the helper-owned polling group id.
+ */
+export function classifyRefreshDemandPollingGroupForLog(pollingGroupId: string): string {
+    const normalizedPollingGroupId = pollingGroupId.toLowerCase();
+
+    if (normalizedPollingGroupId === "windows-native:aggregate:disk") {
+        return "disk";
+    }
+
+    if (normalizedPollingGroupId === "lhm:aggregate:network") {
+        return "network";
+    }
+
+    const match = LHM_HARDWARE_POLLING_GROUP_PATTERN.exec(normalizedPollingGroupId);
+    return match ? classifyLhmHardwareIdentifierRootForLog(match[1] ?? "") : "other";
+}
+
+function classifyLhmHardwareIdentifierRootForLog(identifierRoot: string): string {
+    if (identifierRoot.startsWith("gpu")) {
+        return "gpu";
+    }
+
+    switch (identifierRoot) {
+        case "intelcpu":
+        case "amdcpu":
+        case "cpu":
+            return "cpu";
+        case "ram":
+        case "memory":
+            return "ram";
+        case "nvme":
+        case "ssd":
+        case "hdd":
+        case "storage":
+        case "ata":
+            return "storage";
+        case "nic":
+        case "network":
+            return "network";
+        case "mainboard":
+        case "motherboard":
+        case "superio":
+        case "lpc":
+            return "motherboard";
+        case "cooler":
+        case "battery":
+        case "psu":
+            return identifierRoot;
+        case "ec":
+        case "embedded-controller":
+            return "embedded-controller";
+        case "power-monitor":
+            return "power-monitor";
+        default:
+            return "hardware";
+    }
 }
 
 const nodeCollectorGroupSupervisorTimer: CollectorGroupRunnerTimer = {

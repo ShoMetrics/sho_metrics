@@ -19,7 +19,9 @@ internal sealed class MetricRefreshDemandChangeGate
         _minimumChangeInterval = minimumChangeInterval;
     }
 
-    public T RunIfAccepted<T>(IReadOnlyList<MetricRefreshDemand> demands, Func<T> action)
+    public T RunIfAccepted<T>(
+        IReadOnlyList<MetricRefreshDemand> demands,
+        Func<MetricRefreshDemandChangeStatus, T> action)
     {
         string demandFingerprint = BuildDemandFingerprint(demands);
 
@@ -41,7 +43,9 @@ internal sealed class MetricRefreshDemandChangeGate
                     "Refresh demand changed too quickly; this can be normal while shutting down.");
             }
 
-            T result = action();
+            T result = action(demandChanged
+                ? MetricRefreshDemandChangeStatus.Changed
+                : MetricRefreshDemandChangeStatus.Unchanged);
 
             if (demandChanged)
             {
@@ -83,4 +87,10 @@ internal sealed class MetricRefreshDemandChangeGate
         builder.Append('#');
         builder.Append(value);
     }
+}
+
+internal enum MetricRefreshDemandChangeStatus
+{
+    Unchanged,
+    Changed,
 }

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using ShoMetrics.Contracts.V1;
 using ShoMetrics.Source.Windows.Core;
@@ -8,7 +9,7 @@ using CoreMetricSnapshot = ShoMetrics.Source.Windows.Core.MetricSnapshot;
 
 namespace ShoMetrics.Source.Windows.Service;
 
-internal sealed class SourceRequestHandler(
+internal sealed partial class SourceRequestHandler(
     LibreHardwareMonitorSession monitorSession,
     SourceProtocolMapper protocolMapper,
     ILogger<SourceRequestHandler> logger,
@@ -123,9 +124,22 @@ internal sealed class SourceRequestHandler(
         IReadOnlyList<MetricRefreshDemand> demands =
             MetricRefreshDemandRequestValidator.ValidateAndMap(request);
 
-        return _demandChangeGate.RunIfAccepted(demands, () =>
+        return _demandChangeGate.RunIfAccepted(demands, demandChangeStatus =>
         {
             MetricRefreshDemandApplyResult result = monitorSession.ApplyMetricRefreshDemand(demands);
+            if (demandChangeStatus == MetricRefreshDemandChangeStatus.Changed)
+            {
+                logger.LogInformation(
+                    "Metric refresh demand applied. requestedGroups={RequestedGroupCount} acceptedGroups={AcceptedGroupCount} ignoredGroups={IgnoredGroupCount} metricCount={MetricCount} groupKinds={GroupKinds} minimumIntervalMs={MinimumIntervalMs} ttlMs={TtlMs}",
+                    demands.Count,
+                    result.AcceptedGroupCount,
+                    result.IgnoredGroupCount,
+                    CountDemandMetrics(demands),
+                    FormatDemandGroupKinds(demands),
+                    result.EffectiveMinimumRefreshInterval.TotalMilliseconds,
+                    result.DemandTtl.TotalMilliseconds);
+            }
+
             return protocolMapper.BuildSetMetricRefreshDemandResponse(result);
         });
     }
@@ -234,4 +248,104 @@ internal sealed class SourceRequestHandler(
                 break;
         }
     }
+
+    private static int CountDemandMetrics(IReadOnlyList<MetricRefreshDemand> demands)
+    {
+        int metricCount = 0;
+
+        foreach (MetricRefreshDemand demand in demands)
+        {
+            metricCount += demand.MetricIds.Count;
+        }
+
+        return metricCount;
+    }
+
+    private static string FormatDemandGroupKinds(IReadOnlyList<MetricRefreshDemand> demands)
+    {
+        if (demands.Count == 0)
+        {
+            return "none";
+        }
+
+        Dictionary<string, int> countsByKind = new(StringComparer.Ordinal);
+
+        foreach (MetricRefreshDemand demand in demands)
+        {
+            string groupKind = ClassifyDemandPollingGroupForLog(demand.PollingGroupId);
+            countsByKind[groupKind] = countsByKind.TryGetValue(groupKind, out int count)
+                ? count + 1
+                : 1;
+        }
+
+        return string.Join(
+            ",",
+            countsByKind
+                .OrderBy(item => item.Key, StringComparer.Ordinal)
+                .Select(item => $"{item.Key}:{item.Value}"));
+    }
+
+    internal static string ClassifyDemandPollingGroupForLog(string pollingGroupId)
+    {
+        // Demand requests carry source-owned polling group ids, not descriptor
+        // hardware types. This keeps demand-change logs useful without writing
+        // hardware or sensor identity that could expose local machine details.
+        // This is log-only; scheduling and security decisions must continue to
+        // use the original helper-owned polling group id. Keep this in sync
+        // with classifyRefreshDemandPollingGroupForLog in collector-group-supervisor.ts.
+        string normalizedPollingGroupId = pollingGroupId.ToLowerInvariant();
+
+        if (normalizedPollingGroupId.Equals("windows-native:aggregate:disk", StringComparison.Ordinal))
+        {
+            return "disk";
+        }
+
+        if (normalizedPollingGroupId.Equals("lhm:aggregate:network", StringComparison.Ordinal))
+        {
+            return "network";
+        }
+
+        Match match = LhmHardwarePollingGroupRegex().Match(normalizedPollingGroupId);
+        return match.Success
+            ? ClassifyLhmHardwareIdentifierRootForLog(match.Groups[1].Value)
+            : "other";
+    }
+
+    private static string ClassifyLhmHardwareIdentifierRootForLog(string identifierRoot)
+    {
+        if (identifierRoot.StartsWith("gpu", StringComparison.Ordinal))
+        {
+            return "gpu";
+        }
+
+        return identifierRoot switch
+        {
+            "intelcpu" => "cpu",
+            "amdcpu" => "cpu",
+            "cpu" => "cpu",
+            "ram" => "ram",
+            "memory" => "ram",
+            "nvme" => "storage",
+            "ssd" => "storage",
+            "hdd" => "storage",
+            "storage" => "storage",
+            "ata" => "storage",
+            "nic" => "network",
+            "network" => "network",
+            "mainboard" => "motherboard",
+            "motherboard" => "motherboard",
+            "superio" => "motherboard",
+            "lpc" => "motherboard",
+            "cooler" => "cooler",
+            "battery" => "battery",
+            "psu" => "psu",
+            "ec" => "embedded-controller",
+            "embedded-controller" => "embedded-controller",
+            "power-monitor" => "power-monitor",
+            _ => "hardware",
+        };
+    }
+
+    [GeneratedRegex("^lhm:hardware:/([^/]+)", RegexOptions.CultureInvariant)]
+    private static partial Regex LhmHardwarePollingGroupRegex();
 }
