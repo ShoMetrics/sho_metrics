@@ -13,7 +13,7 @@ import type { WidgetData } from "../view-rendering/widget-data";
 
 const log = logger.for("Action:CustomMetric");
 const CATALOG_DESCRIPTOR_LOAD_WARNING_INTERVAL_MILLISECONDS = 30_000;
-const CATALOG_NO_SELECTION_METRIC_KEY = "catalog.unselected";
+const CATALOG_NO_SELECTION_RENDER_KEY = "catalog.unselected";
 const CATALOG_NO_SELECTION_LABEL = "METRIC";
 const CATALOG_NO_SELECTION_PLACEHOLDER = "Choose metric";
 
@@ -36,7 +36,7 @@ export class CustomMetric extends MetricAction {
             setMetricView({
                 event,
                 resolvedSettings: settings.widget.slot.appearance,
-                metricKey: CATALOG_NO_SELECTION_METRIC_KEY,
+                metricKey: CATALOG_NO_SELECTION_RENDER_KEY,
                 widgetData: buildNoSelectionWidgetData(),
                 ...buildMetricViewIcons({ hardware: "unknown", status: "percentage" }),
             });
