@@ -8,6 +8,7 @@ Read these documents in order:
 4. [Windows Helper gRPC IPC And Self-Contained Packaging Plan](04-helper-ipc-packaging-plan.md)
 5. [Windows Helper Demand-Driven Refresh Plan](05-helper-demand-driven-refresh-plan.md)
 6. [Windows Helper Advanced Sensor Widget Plan](06-helper-advanced-sensor-widget-plan.md)
+7. [Windows Helper Advanced Sensor Label And Scale Plan](07-helper-advanced-sensor-label-scale-plan.md)
 
 ## Scope
 
@@ -21,3 +22,6 @@ behavior. Read the demand-driven refresh plan before changing helper refresh
 cadence, collector group demand, or source polling-group scheduling. Read the
 advanced sensor widget plan before changing descriptor-backed catalog
 selection, helper catalog PI options, or catalog metric collection behavior.
+Read the advanced sensor label and scale plan before changing catalog metric
+label overrides, detected display hints, unit formatting, title-card captions,
+or circle/bar scale defaults.

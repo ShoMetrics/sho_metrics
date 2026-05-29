@@ -3,6 +3,7 @@ syntax = "proto3";
 package shometrics.v1;
 
 import "buf/validate/validate.proto";
+import "shometrics/v1/snapshot.proto";
 
 option csharp_namespace = "ShoMetrics.Contracts.V1";
 
@@ -266,11 +267,47 @@ message CatalogMetricTarget {
   // mapping from its native identifiers into this id.
   optional string metric_id = 1 [(buf.validate.field).string.max_len = 1024];
 
-  // Cached display hints keep exported profiles understandable when the source
-  // is offline. The resolver treats them as hints, not authoritative telemetry
-  // metadata.
-  optional string fallback_label = 2 [(buf.validate.field).string.max_len = 128];
-  optional string fallback_unit = 3 [(buf.validate.field).string.max_len = 32];
+  // Source-derived display hints captured when the user selected this metric.
+  // These are not user overrides. They keep the widget useful when the source
+  // descriptor catalog is unavailable.
+  optional string detected_label = 2 [(buf.validate.field).string.max_len = 128];
+  optional MetricUnit detected_unit = 3 [(buf.validate.field).enum = {defined_only: true}];
+  optional CatalogMetricCategory detected_category = 4 [(buf.validate.field).enum = {defined_only: true}];
+  optional CatalogMetricReadingKind detected_reading_kind = 5 [(buf.validate.field).enum = {defined_only: true}];
+
+  // User-owned display overrides. Absence means use detected/default behavior.
+  optional string custom_label = 6 [(buf.validate.field).string.max_len = 128];
+  optional double custom_maximum_value = 7 [(buf.validate.field).double = {
+    gt: 0
+    lte: 1000000000000000
+  }];
+}
+
+enum CatalogMetricCategory {
+  CATALOG_METRIC_CATEGORY_UNSPECIFIED = 0;
+  CATALOG_METRIC_CATEGORY_CPU = 1;
+  CATALOG_METRIC_CATEGORY_GPU = 2;
+  CATALOG_METRIC_CATEGORY_MEMORY = 3;
+  CATALOG_METRIC_CATEGORY_DISK = 4;
+  CATALOG_METRIC_CATEGORY_NETWORK = 5;
+  CATALOG_METRIC_CATEGORY_OTHER = 6;
+}
+
+enum CatalogMetricReadingKind {
+  CATALOG_METRIC_READING_KIND_UNSPECIFIED = 0;
+  CATALOG_METRIC_READING_KIND_USAGE = 1;
+  CATALOG_METRIC_READING_KIND_TEMPERATURE = 2;
+  CATALOG_METRIC_READING_KIND_POWER = 3;
+  CATALOG_METRIC_READING_KIND_CLOCK = 4;
+  CATALOG_METRIC_READING_KIND_FAN = 5;
+  CATALOG_METRIC_READING_KIND_VOLTAGE = 6;
+  CATALOG_METRIC_READING_KIND_CURRENT = 7;
+  CATALOG_METRIC_READING_KIND_DATA = 8;
+  CATALOG_METRIC_READING_KIND_THROUGHPUT = 9;
+  CATALOG_METRIC_READING_KIND_TIMING = 10;
+  CATALOG_METRIC_READING_KIND_LEVEL = 11;
+  CATALOG_METRIC_READING_KIND_CONTROL = 12;
+  CATALOG_METRIC_READING_KIND_OTHER = 13;
 }
 
 // WidgetPreferences holds behavior shared by the whole widget instance.

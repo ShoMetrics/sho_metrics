@@ -10,9 +10,11 @@ import { logger } from "../logging/logger";
 import { backgroundMetricCollection } from "../runtime/metric-collection/background-metric-collection";
 import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
 import type { MetricDescriptorSnapshot, SourceClientStatus } from "../runtime/sources/source-client";
+import { MetricUnit } from "../runtime/sources/metric-source";
 import type { ResolvedCatalogMetricTarget, ResolvedWidgetSettings } from "../settings/resolved-settings";
 import type { WidgetData } from "../view-rendering/widget-data";
 import type { SingleMetricViewOptions } from "../view-updates/runner";
+import { formatMetricUnit } from "../metrics/metric-unit-format";
 
 const log = logger.for("Action:CatalogMetric");
 const CATALOG_DESCRIPTOR_LOAD_WARNING_INTERVAL_MILLISECONDS = 30_000;
@@ -113,7 +115,7 @@ export function buildCatalogMetricSelectedViewOptions(options: {
     readonly metrics: MetricStoreReader;
     readonly helperStatus: SourceClientStatus | undefined;
 }): SingleMetricViewOptions {
-    const unit = options.target.fallbackUnit ?? "";
+    const unit = formatMetricUnit(options.target.detectedUnit);
 
     return {
         event: options.event,
@@ -122,9 +124,9 @@ export function buildCatalogMetricSelectedViewOptions(options: {
         widgetData: readHelperBackedWidgetData({
             metrics: options.metrics,
             metricKey: options.target.metricId,
-            label: options.target.fallbackLabel ?? CATALOG_NO_SELECTION_LABEL,
+            label: options.target.detectedLabel ?? CATALOG_NO_SELECTION_LABEL,
             unit,
-            maxValue: resolveCatalogMetricMaximumValue(unit),
+            maxValue: resolveCatalogMetricMaximumValue(options.target.detectedUnit),
             helperStatus: options.helperStatus,
         }),
         ...buildMetricViewIcons({ hardware: "unknown", status: "percentage" }),
@@ -142,26 +144,24 @@ function buildNoSelectionWidgetData(): WidgetData {
     };
 }
 
-// Rendering cannot depend on the PI descriptor cache, so v1 scales from the
-// unit string stored with the selected catalog metric.
-// TODO: If CatalogMetricTarget stores a unit enum later, replace this string
-// mapping with the typed MetricUnit -> maximum table.
-function resolveCatalogMetricMaximumValue(unit: string): number {
+// TODO(step5): Replace this temporary unit-only scale with the typed
+// unit/category/reading default maximum resolver.
+function resolveCatalogMetricMaximumValue(unit: MetricUnit): number {
     switch (unit) {
-        case "W":
+        case MetricUnit.WATTS:
             return 300;
-        case "RPM":
+        case MetricUnit.REVOLUTIONS_PER_MINUTE:
             return 3000;
-        case "ms":
+        case MetricUnit.MILLISECONDS:
             return 1000;
-        case "%":
-        case "C":
-        case "V":
-        case "A":
-        case "Hz":
-        case "B":
-        case "B/s":
-        case "s":
+        case MetricUnit.PERCENT:
+        case MetricUnit.CELSIUS:
+        case MetricUnit.VOLTS:
+        case MetricUnit.AMPERES:
+        case MetricUnit.HERTZ:
+        case MetricUnit.BYTES:
+        case MetricUnit.BYTES_PER_SECOND:
+        case MetricUnit.SECONDS:
         default:
             return 100;
     }

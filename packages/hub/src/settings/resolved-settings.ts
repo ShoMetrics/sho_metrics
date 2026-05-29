@@ -15,6 +15,8 @@
 // primitives. Proto stays at the storage boundary; rendering gets adapted
 // contracts from resolved settings.
 
+import type { MetricUnit } from "../runtime/sources/metric-source";
+
 export type MetricView = "circle" | "text" | "bar" | "line";
 export type CircleViewVariant = "full-ring" | "minimal" | "gauge";
 export type TextViewVariant = "centered" | "title-card";
@@ -32,6 +34,22 @@ export type NetworkTrafficDisplayMode = "mirrored" | "overlay";
 export type NetworkUnitBase = "byte" | "bit";
 export type DiskUsageDisplayMode = "percentage" | "space";
 export type DiskThroughputDirection = "both" | "read" | "write";
+export type CatalogMetricCategory = "unspecified" | "cpu" | "gpu" | "memory" | "disk" | "network" | "other";
+export type CatalogMetricReadingKind =
+    | "unspecified"
+    | "usage"
+    | "temperature"
+    | "power"
+    | "clock"
+    | "fan"
+    | "voltage"
+    | "current"
+    | "data"
+    | "throughput"
+    | "timing"
+    | "level"
+    | "control"
+    | "other";
 
 export interface ResolvedWidgetSettings {
     readonly widget: ResolvedWidget;
@@ -149,8 +167,12 @@ export type ResolvedGpuReading =
 export interface ResolvedCatalogMetricTarget {
     readonly domain: "catalog";
     readonly metricId: string;
-    readonly fallbackLabel: string | undefined;
-    readonly fallbackUnit: string | undefined;
+    readonly detectedLabel: string | undefined;
+    readonly detectedUnit: MetricUnit;
+    readonly detectedCategory: CatalogMetricCategory;
+    readonly detectedReadingKind: CatalogMetricReadingKind;
+    readonly customLabel: string | undefined;
+    readonly customMaximumValue: number | undefined;
 }
 
 export interface ResolvedAppearanceSettings {

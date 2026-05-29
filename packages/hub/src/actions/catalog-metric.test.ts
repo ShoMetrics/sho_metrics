@@ -120,10 +120,10 @@ test("catalog metric no-selection view renders placeholder without reading metri
     assert.deepEqual(metricReader.widgetDataCalls, []);
 });
 
-test("catalog metric selected view uses stored fallback label unit and unit maximum", () => {
+test("catalog metric selected view uses stored detected label unit and unit maximum", () => {
     const rawSettings = buildCatalogWidgetSettings("source.sensor:/gpu/0/power", {
-        fallbackLabel: "GPU Board Power",
-        fallbackUnit: "W",
+        detectedLabel: "GPU Board Power",
+        detectedUnit: MetricUnit.WATTS,
     });
     const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
     const target = readCatalogTarget(settings);
@@ -157,8 +157,8 @@ test("catalog metric selected view uses stored fallback label unit and unit maxi
 
 test("catalog metric selected view reports no sensor data through helper backed copy", () => {
     const rawSettings = buildCatalogWidgetSettings("source.sensor:/gpu/0/temperature", {
-        fallbackLabel: "GPU Hot Spot",
-        fallbackUnit: "C",
+        detectedLabel: "GPU Hot Spot",
+        detectedUnit: MetricUnit.CELSIUS,
     });
     const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
     const target = readCatalogTarget(settings);
@@ -183,8 +183,8 @@ test("catalog metric selected view reports no sensor data through helper backed 
 
 test("catalog metric selected view uses 100 as the percent maximum", () => {
     const rawSettings = buildCatalogWidgetSettings("source.sensor:/network/load", {
-        fallbackLabel: "Network Utilization",
-        fallbackUnit: "%",
+        detectedLabel: "Network Utilization",
+        detectedUnit: MetricUnit.PERCENT,
     });
     const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
     const target = readCatalogTarget(settings);
@@ -207,8 +207,8 @@ test("catalog metric selected view uses 100 as the percent maximum", () => {
 
 test("catalog metric selected view renders non-percent scalar units without descriptor metadata", () => {
     const rawSettings = buildCatalogWidgetSettings("source.sensor:/fan/0/rpm", {
-        fallbackLabel: "Fan",
-        fallbackUnit: "RPM",
+        detectedLabel: "Fan",
+        detectedUnit: MetricUnit.REVOLUTIONS_PER_MINUTE,
     });
     const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
     const target = readCatalogTarget(settings);
@@ -351,8 +351,8 @@ class FakeStreamDeckAction {
 function buildCatalogWidgetSettings(
     metricId: string,
     options: {
-        readonly fallbackLabel?: string;
-        readonly fallbackUnit?: string;
+        readonly detectedLabel?: string;
+        readonly detectedUnit?: MetricUnit;
     } = {},
 ): unknown {
     const quickStartSettings = resolveQuickStartStoredWidgetSettings(undefined, "catalog").rawSettings;
@@ -364,8 +364,8 @@ function buildCatalogWidgetSettings(
     return writeStoredWidgetSettingsPatch(quickStartSettings, {
         catalog: {
             metricId,
-            fallbackLabel: options.fallbackLabel ?? "GPU Hot Spot",
-            fallbackUnit: options.fallbackUnit ?? "C",
+            detectedLabel: options.detectedLabel ?? "GPU Hot Spot",
+            detectedUnit: options.detectedUnit ?? MetricUnit.CELSIUS,
         },
     });
 }

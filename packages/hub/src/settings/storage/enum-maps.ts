@@ -1,5 +1,7 @@
 import {
     CircleViewVariant as StoredCircleViewVariant,
+    CatalogMetricCategory as StoredCatalogMetricCategory,
+    CatalogMetricReadingKind as StoredCatalogMetricReadingKind,
     ColorMode as StoredColorMode,
     CpuMetricTarget_Kind as StoredCpuMetricKind,
     DiskMetricTarget_Kind as StoredDiskMetricKind,
@@ -22,6 +24,8 @@ import {
     TemperatureUnit as StoredTemperatureUnit,
 } from "../../generated/shometrics/v1/settings_pb.js";
 import type {
+    CatalogMetricCategory,
+    CatalogMetricReadingKind,
     CircleViewVariant,
     ColorMode,
     DiskThroughputDirection,
@@ -124,6 +128,33 @@ export const storedNetworkUnitBaseByResolved = {
     byte: StoredNetworkUnitBase.BYTE,
     bit: StoredNetworkUnitBase.BIT,
 } satisfies Record<NetworkUnitBase, StoredNetworkUnitBase>;
+
+export const storedCatalogMetricCategoryByResolved = {
+    unspecified: StoredCatalogMetricCategory.UNSPECIFIED,
+    cpu: StoredCatalogMetricCategory.CPU,
+    gpu: StoredCatalogMetricCategory.GPU,
+    memory: StoredCatalogMetricCategory.MEMORY,
+    disk: StoredCatalogMetricCategory.DISK,
+    network: StoredCatalogMetricCategory.NETWORK,
+    other: StoredCatalogMetricCategory.OTHER,
+} satisfies Record<CatalogMetricCategory, StoredCatalogMetricCategory>;
+
+export const storedCatalogMetricReadingKindByResolved = {
+    unspecified: StoredCatalogMetricReadingKind.UNSPECIFIED,
+    usage: StoredCatalogMetricReadingKind.USAGE,
+    temperature: StoredCatalogMetricReadingKind.TEMPERATURE,
+    power: StoredCatalogMetricReadingKind.POWER,
+    clock: StoredCatalogMetricReadingKind.CLOCK,
+    fan: StoredCatalogMetricReadingKind.FAN,
+    voltage: StoredCatalogMetricReadingKind.VOLTAGE,
+    current: StoredCatalogMetricReadingKind.CURRENT,
+    data: StoredCatalogMetricReadingKind.DATA,
+    throughput: StoredCatalogMetricReadingKind.THROUGHPUT,
+    timing: StoredCatalogMetricReadingKind.TIMING,
+    level: StoredCatalogMetricReadingKind.LEVEL,
+    control: StoredCatalogMetricReadingKind.CONTROL,
+    other: StoredCatalogMetricReadingKind.OTHER,
+} satisfies Record<CatalogMetricReadingKind, StoredCatalogMetricReadingKind>;
 
 export const storedDiskMetricKindByResolved = {
     usage: StoredDiskMetricKind.USAGE,

@@ -14,6 +14,7 @@ import type {
 import { buildMetricViewIcons } from "../../widgets/icons/metric-view-icons";
 import type { HardwareIconKind } from "../../widgets/icons/hardware-icons";
 import { getNetworkDirectionStatusIcon, renderNetworkDirectionIconFragment } from "../../widgets/icons/catalog/network";
+import { formatMetricUnit } from "../../metrics/metric-unit-format";
 
 export interface MetricPreviewInput {
     readonly appearance: ResolvedAppearanceSettings;
@@ -163,10 +164,10 @@ function buildMetricPreviewSample(target: ResolvedMetricTarget): MetricPreviewSa
                 hardware: "unknown",
                 label: "DATA",
                 current: 42,
-                unit: target.fallbackUnit ?? "",
+                unit: formatMetricUnit(target.detectedUnit),
                 displayValue: "42",
                 progress: 0.42,
-                secondaryDisplayValue: target.fallbackLabel ?? "Metric",
+                secondaryDisplayValue: target.detectedLabel ?? "Metric",
             });
     }
 }

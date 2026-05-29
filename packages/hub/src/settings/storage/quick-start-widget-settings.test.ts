@@ -11,6 +11,7 @@ import {
     NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
     type StoredWidgetSettings,
 } from "../../generated/shometrics/v1/settings_pb";
+import { MetricUnit } from "../../generated/shometrics/v1/snapshot_pb";
 import { BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID } from "../../runtime/sources/source-ids";
 import type { ActionKind } from "../../shared/stream-deck-actions";
 import { resolveQuickStartStoredWidgetSettings } from "./quick-start-widget-settings";
@@ -134,8 +135,8 @@ describe("quick-start stored widget settings", () => {
                     metric: {
                         catalog: {
                             metricId: "source.sensor:/gpu/temperature/0",
-                            fallbackLabel: "GPU Temperature",
-                            fallbackUnit: "C",
+                            detectedLabel: "GPU Temperature",
+                            detectedUnit: "METRIC_UNIT_CELSIUS",
                         },
                     },
                 },
@@ -149,8 +150,8 @@ describe("quick-start stored widget settings", () => {
             assert.fail(`Expected catalog target, received ${String(target?.case)}`);
         }
         assert.equal(target.value.metricId, "source.sensor:/gpu/temperature/0");
-        assert.equal(target.value.fallbackLabel, "GPU Temperature");
-        assert.equal(target.value.fallbackUnit, "C");
+        assert.equal(target.value.detectedLabel, "GPU Temperature");
+        assert.equal(target.value.detectedUnit, MetricUnit.CELSIUS);
         assert.equal(sourcePolicy?.primarySourceProfileId, BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID);
         assert.deepEqual(sourcePolicy?.fallbackSourceProfileIds, []);
         assert.equal(sourcePolicy?.failureMode, StoredSourceFailureMode.SHOW_UNAVAILABLE);

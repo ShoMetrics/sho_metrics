@@ -9,6 +9,7 @@ import {
     resolveStoredGlobalSettings,
     resolveStoredWidgetSettings,
 } from "./resolver";
+import { MetricUnit } from "../../runtime/sources/metric-source";
 
 describe("stored settings proto resolver", () => {
     it("resolves empty stored settings to a complete single CPU widget", () => {
@@ -911,8 +912,12 @@ describe("stored settings proto resolver", () => {
                             },
                             catalog: {
                                 metricId: "gpu/0/temperature",
-                                fallbackLabel: "GPU",
-                                fallbackUnit: "C",
+                                detectedLabel: "GPU",
+                                detectedUnit: "METRIC_UNIT_CELSIUS",
+                                detectedCategory: "CATALOG_METRIC_CATEGORY_GPU",
+                                detectedReadingKind: "CATALOG_METRIC_READING_KIND_TEMPERATURE",
+                                customLabel: "Hot Spot",
+                                customMaximumValue: 120,
                             },
                         },
                     },
@@ -926,6 +931,15 @@ describe("stored settings proto resolver", () => {
         assert.deepEqual(widgetSettings.widget.slot.metric.source.fallbackSourceProfileIds, ["local"]);
         assert.equal(widgetSettings.widget.slot.metric.source.failureMode, "useFallback");
         assert.equal(widgetSettings.widget.slot.metric.target.domain, "catalog");
+        if (widgetSettings.widget.slot.metric.target.domain === "catalog") {
+            assert.equal(widgetSettings.widget.slot.metric.target.metricId, "gpu/0/temperature");
+            assert.equal(widgetSettings.widget.slot.metric.target.detectedLabel, "GPU");
+            assert.equal(widgetSettings.widget.slot.metric.target.detectedUnit, MetricUnit.CELSIUS);
+            assert.equal(widgetSettings.widget.slot.metric.target.detectedCategory, "gpu");
+            assert.equal(widgetSettings.widget.slot.metric.target.detectedReadingKind, "temperature");
+            assert.equal(widgetSettings.widget.slot.metric.target.customLabel, "Hot Spot");
+            assert.equal(widgetSettings.widget.slot.metric.target.customMaximumValue, 120);
+        }
     });
 
     it("resolves catalog target initial state with text view defaults", () => {
@@ -945,8 +959,12 @@ describe("stored settings proto resolver", () => {
         assert.equal(target.domain, "catalog");
         if (target.domain === "catalog") {
             assert.equal(target.metricId, "");
-            assert.equal(target.fallbackLabel, undefined);
-            assert.equal(target.fallbackUnit, undefined);
+            assert.equal(target.detectedLabel, undefined);
+            assert.equal(target.detectedUnit, MetricUnit.UNSPECIFIED);
+            assert.equal(target.detectedCategory, "unspecified");
+            assert.equal(target.detectedReadingKind, "unspecified");
+            assert.equal(target.customLabel, undefined);
+            assert.equal(target.customMaximumValue, undefined);
         }
         assert.equal(widgetSettings.widget.slot.appearance.view.selectedView, "text");
         assert.equal(widgetSettings.widget.slot.appearance.theme.flat.paint.colorMode, "black-white");
