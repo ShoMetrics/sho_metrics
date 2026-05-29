@@ -42,7 +42,7 @@ and not a per-sensor/per-method refresh engine.
 ## Product Decision
 
 This work does make sense and is the right next reliability/performance step
-before adding broader custom catalog widgets.
+before adding broader Advanced Sensor widgets.
 
 Reason:
 

@@ -67,6 +67,26 @@ test("old reading-level action names do not remain in source or manifest files",
     assert.deepEqual(matches, []);
 });
 
+test("Advanced Sensor display copy does not leak into source identifiers", () => {
+    const forbiddenDisplayNames = [
+        "Advanced Sensor",
+        "AdvancedSensor",
+        "advancedSensor",
+        "advanced-sensor",
+    ];
+    const scannedFiles = findTextFiles("src")
+        .filter(filePath => !filePath.endsWith("stream-deck-actions.test.ts"));
+    const matches = scannedFiles.flatMap((filePath) => {
+        const fileText = readFileSync(filePath, "utf8");
+
+        return forbiddenDisplayNames
+            .filter(name => fileText.includes(name))
+            .map(name => `${filePath}: ${name}`);
+    });
+
+    assert.deepEqual(matches, []);
+});
+
 function findTextFiles(rootPath: string): string[] {
     const filePaths: string[] = [];
 

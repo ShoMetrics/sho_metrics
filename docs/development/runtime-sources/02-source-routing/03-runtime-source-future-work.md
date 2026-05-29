@@ -77,7 +77,7 @@ Work likely needed:
 | Runtime subscription | Use existing metric-level read plan and background collection. | No new collection architecture should be needed. |
 | Empty/helper-missing state | Render `N/A` or fallback while helper descriptors/data are unavailable. | Do not block PI or render while waiting for helper. |
 
-### First Custom Catalog Source UI Shape
+### First Advanced Sensor Source UI Shape
 
 This can be designed now, but should stay behind the same source-profile
 invariant as LHM.

@@ -465,7 +465,7 @@ catalog widgets.
 
 ### Open Questions
 
-- Should future advanced catalog widgets show hidden/default-hidden sensors by
+- Should future Advanced Sensor widgets show hidden/default-hidden sensors by
   default, or require an "advanced/show hidden" toggle?
 - Should ShoMetrics use `"-"` or a product-specific no-data string for custom
   catalog metrics with a known descriptor but no current value?
@@ -518,7 +518,7 @@ LHM sensors can have user-editable parameters:
   such as Intel `TjMax`/`TSlope` and SuperIO voltage divider values.
 
 This is source-native calibration state. ShoMetrics should not expose or persist
-these parameters in first-class widgets. If advanced catalog widgets eventually
+these parameters in first-class widgets. If Advanced Sensor widgets eventually
 need calibration, it must be a helper/source-owned advanced feature with clear
 support boundaries.
 
@@ -705,7 +705,7 @@ AMD GPU code has several invalid-value guards:
   cards report `54000` degrees C for unavailable sensors
   (`AmdGpu.cs:621-640`).
 
-This is a strong signal that source-owned stable aliases must validate raw
+This is a strong signal that source-produced stable aliases must validate raw
 hardware values before emitting samples.
 
 ### Intel GPU
@@ -1205,7 +1205,7 @@ These observations do not override the LHM source-reading conclusions above.
 | Non-obvious behavior | LiteMonitor is not a simple "call LHM and show values" wrapper. It builds a metric-key facade over LHM sensors, adds manual sensor caches, tick caches, last-valid maps, Windows performance-counter startup fallbacks, source-specific hardware selection, and selective hardware update cadence. |
 | Evidence | `HardwareMonitor.cs:36` owns `_lastValidMap`; `HardwareValueProvider.cs:20`, `:27`, and `:30` own last-valid, per-tick, and manual sensor caches; `HardwareValueProvider.cs:220-254` returns startup values from last-valid or performance counters; `HardwareValueProvider.cs:259-278` uses `Monitor.TryEnter` and falls back to last-valid data if the monitor is reloading; `HardwareValueProvider.cs:502-519` writes successful generic sensor reads to last-valid and tick caches; `SensorMap.cs:45-49` rebuilds periodically; `SensorMap.cs:89-93` builds a fresh map; `SensorMap.cs:179-205` handles conflicting metric-key mappings; `NetworkManager.cs:216-317` caches the selected network adapter and falls back to last-valid throughput; `DiskManager.cs:85-200` caches/chooses disk hardware and uses last-valid values; `DiskManager.cs:242-249` centralizes safe sensor read plus last-valid fallback. |
 | Why it exists | Inference: the app appears optimized to keep a small fixed metric UI stable while LHM hardware discovery, sensor naming, and reads can be slow, missing, or temporarily inconsistent. The caches protect the UI from reloads and null ticks, while the metric-key facade hides raw LHM sensor names from normal users. |
-| ShoMetrics impact | This strengthens the case for bounded last-good experiments and source-owned stable aliases. It does not justify moving LHM raw-name parsing, hardware priority rules, or global last-valid maps into the Node hub. |
+| ShoMetrics impact | This strengthens the case for bounded last-good experiments and source-produced stable aliases. It does not justify moving LHM raw-name parsing, hardware priority rules, or global last-valid maps into the Node hub. |
 | Confidence | Medium. The source evidence is concrete, but LiteMonitor's correctness is not established by tests here and several heuristics look product-specific. |
 | Experiment needed | Compare ShoMetrics helper CPU temperature and CPU power with and without bounded last-good retention. The experiment must record source id, raw sensor id, sample age, and whether the shown value is current or retained. |
 
@@ -1232,7 +1232,7 @@ These observations do not override the LHM source-reading conclusions above.
 - Bounded last-good retention is worth testing as a generic display/data-plane
   policy. It should carry sample age and source attribution, not silently become
   "fresh" data.
-- Source-owned stable aliases are the right place for raw sensor ranking and
+- Source-side stable alias production is the right place for raw sensor ranking and
   fallback. Normal widgets should not expose CPU package/Tctl/Tdie/core naming
   details to beginner users.
 - Metric-key facades can improve UX, but the facade belongs at a clear boundary.
@@ -1257,7 +1257,7 @@ These observations do not override the LHM source-reading conclusions above.
 - What bounded retention window hides harmless LHM null ticks without hiding a
   genuinely dead sensor?
 - Should retention apply to all source-native catalog sensors, or only to
-  stable aliases whose source ranking ShoMetrics owns?
+  ShoMetrics-owned stable aliases whose source-side ranking the helper owns?
 - Should retained values render with a different DEBUG state so support can
   distinguish "fresh sample" from "last good sample"?
 - Which LiteMonitor heuristics are real hardware lessons versus UI-specific
@@ -1284,7 +1284,7 @@ value ranking as final until machine-specific diagnostics are reviewed.
   metadata refresh.
 - For network totals, require adapter filtering and workload validation before
   routing built-in widgets through helper/native aggregate paths.
-- Keep stable alias ownership in the helper/source. CPU temperature, CPU power,
+- Keep stable alias production policy in the helper/source. CPU temperature, CPU power,
   disk throughput, controller composites, and PSU totals should not be
   reconstructed in the Node hub from raw source-native ids.
 - Treat source-specific invalid-value handling as source logic. The hub can

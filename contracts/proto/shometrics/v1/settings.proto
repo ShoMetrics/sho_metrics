@@ -59,9 +59,10 @@ message MetricSelection {
   // First-class targets are metrics ShoMetrics understands semantically and
   // can tune precisely for rendering, defaults, labels, units, and presets.
   //
-  // Catalog targets are for arbitrary readings exposed by a source, such as a
-  // deep hardware monitor or custom endpoint. Do not turn every catalog
-  // reading into a new enum value or message arm.
+  // Catalog targets are for arbitrary readings exposed by a descriptor
+  // producing source, such as a deep hardware monitor, local probe, or remote
+  // machine agent. User-authored HTTP/CLI probes should use their own target
+  // shape instead of being folded into the catalog target.
   oneof target {
     CpuMetricTarget cpu = 10;
     MemoryMetricTarget memory = 11;
@@ -374,8 +375,8 @@ message MetricSourceProfile {
   optional string display_name = 2 [(buf.validate.field).string.max_len = 128];
 
   // Source type IDs are registry-owned strings, not enums. This lets the app
-  // add local probes, remote agents, and external catalog sources without
-  // changing persisted settings for every new implementation.
+  // add local probes, remote agents, and other descriptor-producing source
+  // adapters without changing persisted settings for every new implementation.
   optional string source_type_id = 3 [(buf.validate.field).string.max_len = 128];
 
   oneof connection {

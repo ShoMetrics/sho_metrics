@@ -11,7 +11,7 @@ Read this after:
 ## Objective
 
 Ship first-class Windows disk read/write speed as system-total disk I/O, while
-keeping per-disk LHM storage sensors as an explicit advanced/custom catalog path.
+keeping per-disk LHM storage sensors as an explicit advanced/catalog metric path.
 
 The first-class Disk widget must not map Node volumes to LHM storage hardware,
 must not traverse LHM storage by default, and must not pretend that a filesystem
@@ -23,9 +23,9 @@ volume selector chooses a physical disk throughput source.
 | --- | --- | --- |
 | First-class Windows disk throughput shows total system disk I/O. | This matches the current macOS-style simple widget expectation and avoids fragile per-disk identity work. | Publish `disk.throughput.read`, `disk.throughput.write`, and `disk.throughput.total` from a native Windows system-total provider. |
 | The Disk widget volume selector is disabled for throughput. | A volume such as `C:` is not the same thing as a physical disk counter. | When throughput is selected, disable the disk list and show copy explaining that the widget displays total system disk read/write. |
-| Per-disk throughput is a future advanced/custom catalog use case. | Users who need one raw disk sensor can choose it deliberately and accept source-specific behavior once custom catalog exists. | Do not build a first-class per-physical-disk selector in this plan. Until custom catalog ships, do not point users to a missing UI. |
+| Per-disk throughput is a future catalog metric use case. | Users who need one raw disk sensor can choose it deliberately and accept source-specific behavior once Advanced Sensor exists. | Do not build a first-class per-physical-disk selector in this plan. Until Advanced Sensor ships, do not point users to a missing UI. |
 | LHM storage is not the default first-class throughput source. | LHM storage traversal can enumerate, refresh, or wake storage devices. | Normal first-class `disk.throughput.*` must come from native Windows counters, not `HardwareType.Storage`. |
-| LHM storage sensors may be exposed only behind an explicit advanced path. | Advanced users can trade safety for access to per-disk raw sensors. | Future custom catalog/LHM UI must warn that storage sensors may be buggy, may wake disks, and may behave poorly with external or RAID devices. |
+| LHM storage sensors may be exposed only behind an explicit advanced path. | Advanced users can trade safety for access to per-disk raw sensors. | Future Advanced Sensor LHM UI must warn that storage sensors may be buggy, may wake disks, and may behave poorly with external or RAID devices. |
 | Disk usage/capacity stays OS volume metadata. | Usage/capacity are filesystem/volume facts, not high-frequency sensor telemetry. | Keep the current Node/systeminformation path unless a future native volume provider replaces it deliberately. |
 
 Suggested PI copy for throughput mode:
@@ -35,10 +35,10 @@ Showing total system disk read/write. Per-disk monitoring is not available in
 this version.
 ```
 
-When custom catalog ships, the copy may become:
+When Advanced Sensor ships, the copy may become:
 
 ```text
-Showing total system disk read/write. For per-disk sensors, use Custom Catalog
+Showing total system disk read/write. For per-disk sensors, use Advanced Sensor
 with LibreHardwareMonitor. LHM storage sensors may wake or disturb disks.
 ```
 
@@ -93,7 +93,7 @@ Structural risks:
 - LHM storage identity is source-native and not a safe ShoMetrics persisted disk
   selector.
 
-Therefore, LHM storage is acceptable as explicit advanced/custom catalog input,
+Therefore, LHM storage is acceptable as explicit catalog metric input,
 but not as the first-class Disk widget data source.
 
 ## Current Code Risk
@@ -213,7 +213,7 @@ Storage: disabled
   descriptors.
 - If comparison probe code still needs the old stable names, define them as
   probe-local constants inside the probe owner.
-- Do not remove the generic descriptor model; future custom catalog work may
+- Do not remove the generic descriptor model; future catalog metric picker work may
   expose LHM storage descriptors only behind an explicit advanced/risk path.
 
 #### Probe migration
@@ -252,9 +252,9 @@ Requirements:
 - Keep `volumeId` preserved when switching between usage/capacity and throughput.
   Throughput mode ignores `volumeId` but does not clear it, so switching back to
   usage/capacity restores the user's previous volume selection.
-- Per-disk LHM storage sensors remain a future custom catalog path, not a
+- Per-disk LHM storage sensors remain a future catalog metric path, not a
   first-class Disk widget path.
-- Until custom catalog exists, do not show a first-class PI link or instruction
+- Until Advanced Sensor exists, do not show a first-class PI link or instruction
   that sends users looking for it.
 
 ## Tests
@@ -325,8 +325,8 @@ joining.
 - No broad LHM storage traversal, SMART reads, temperature reads, health reads,
   or eager drive probing from ordinary widgets.
 - No hidden wake/probe behavior from creating a Disk widget.
-- No advanced catalog picker implementation in this plan.
-- No PI instruction that points users to custom catalog before custom catalog
+- No catalog metric picker implementation in this plan.
+- No PI instruction that points users to the catalog metric picker before it
   exists.
 
 ## Completion Criteria

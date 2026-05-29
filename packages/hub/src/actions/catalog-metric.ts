@@ -14,14 +14,14 @@ import type { ResolvedCatalogMetricTarget, ResolvedWidgetSettings } from "../set
 import type { WidgetData } from "../view-rendering/widget-data";
 import type { SingleMetricViewOptions } from "../view-updates/runner";
 
-const log = logger.for("Action:CustomMetric");
+const log = logger.for("Action:CatalogMetric");
 const CATALOG_DESCRIPTOR_LOAD_WARNING_INTERVAL_MILLISECONDS = 30_000;
 const CATALOG_NO_SELECTION_RENDER_KEY = "catalog.unselected";
 const CATALOG_NO_SELECTION_LABEL = "METRIC";
 const CATALOG_NO_SELECTION_PLACEHOLDER = "Choose metric";
 
 @action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.catalog })
-export class CustomMetric extends MetricAction {
+export class CatalogMetric extends MetricAction {
     protected readonly actionKind = "catalog";
 
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
@@ -36,8 +36,8 @@ export class CustomMetric extends MetricAction {
         const catalogTarget = readResolvedMetricTarget(settings, "catalog");
 
         setMetricView(catalogTarget.metricId.length === 0
-            ? buildCustomMetricNoSelectionViewOptions({ event, settings })
-            : buildCustomMetricSelectedViewOptions({
+            ? buildCatalogMetricNoSelectionViewOptions({ event, settings })
+            : buildCatalogMetricSelectedViewOptions({
                 event,
                 settings,
                 target: catalogTarget,
@@ -49,7 +49,7 @@ export class CustomMetric extends MetricAction {
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
         this.refreshCatalogMetricDescriptorsForPropertyInspector(event)
             .catch(error => {
-                log.warn(() => `Failed to refresh custom metric runtime cache: ${String(error)}`);
+                log.warn(() => `Failed to refresh catalog metric runtime cache: ${String(error)}`);
             });
     }
 
@@ -73,7 +73,7 @@ export class CustomMetric extends MetricAction {
                     "catalog-metric-descriptors-load-failed",
                     CATALOG_DESCRIPTOR_LOAD_WARNING_INTERVAL_MILLISECONDS,
                 )
-                .log(() => `Failed to load custom metric descriptors. error=${String(error)}`);
+                .log(() => `Failed to load catalog metric descriptors. error=${String(error)}`);
 
             await this.updateRuntimeCache(event, {
                 availableCatalogMetricDescriptors: [],
@@ -93,7 +93,7 @@ function resolveCatalogMetricSubscriptionKeys(
     return target.metricId.length === 0 ? [] : [target.metricId];
 }
 
-export function buildCustomMetricNoSelectionViewOptions(options: {
+export function buildCatalogMetricNoSelectionViewOptions(options: {
     readonly event: WillAppearEvent;
     readonly settings: ResolvedWidgetSettings;
 }): SingleMetricViewOptions {
@@ -106,7 +106,7 @@ export function buildCustomMetricNoSelectionViewOptions(options: {
     };
 }
 
-export function buildCustomMetricSelectedViewOptions(options: {
+export function buildCatalogMetricSelectedViewOptions(options: {
     readonly event: WillAppearEvent;
     readonly settings: ResolvedWidgetSettings;
     readonly target: ResolvedCatalogMetricTarget;
@@ -124,7 +124,7 @@ export function buildCustomMetricSelectedViewOptions(options: {
             metricKey: options.target.metricId,
             label: options.target.fallbackLabel ?? CATALOG_NO_SELECTION_LABEL,
             unit,
-            maxValue: resolveCustomMetricMaximumValue(unit),
+            maxValue: resolveCatalogMetricMaximumValue(unit),
             helperStatus: options.helperStatus,
         }),
         ...buildMetricViewIcons({ hardware: "unknown", status: "percentage" }),
@@ -146,7 +146,7 @@ function buildNoSelectionWidgetData(): WidgetData {
 // unit string stored with the selected catalog metric.
 // TODO: If CatalogMetricTarget stores a unit enum later, replace this string
 // mapping with the typed MetricUnit -> maximum table.
-function resolveCustomMetricMaximumValue(unit: string): number {
+function resolveCatalogMetricMaximumValue(unit: string): number {
     switch (unit) {
         case "W":
             return 300;

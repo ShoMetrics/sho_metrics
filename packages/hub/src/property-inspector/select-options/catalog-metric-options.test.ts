@@ -6,7 +6,7 @@ import {
     MetricValueKind,
     type MetricDescriptor,
 } from "../../runtime/sources/source-client";
-import { buildCustomMetricCatalogOptions } from "./custom-metric-catalog-options";
+import { buildCatalogMetricOptions } from "./catalog-metric-options";
 
 test("catalog options stay unselected until the user chooses a type", () => {
     const descriptors = [
@@ -32,8 +32,8 @@ test("catalog options stay unselected until the user chooses a type", () => {
         }),
     ];
 
-    const initialOptions = buildCustomMetricCatalogOptions(descriptors);
-    const cpuOptions = buildCustomMetricCatalogOptions(descriptors, { typeId: "cpu" });
+    const initialOptions = buildCatalogMetricOptions(descriptors);
+    const cpuOptions = buildCatalogMetricOptions(descriptors, { typeId: "cpu" });
 
     assert.deepEqual(initialOptions.resolvedSelection, {
         typeId: "",
@@ -71,7 +71,7 @@ test("catalog options keep raw source sensors over duplicate stable aliases", ()
         }),
     ];
 
-    const options = buildCustomMetricCatalogOptions(descriptors, { typeId: "cpu" });
+    const options = buildCatalogMetricOptions(descriptors, { typeId: "cpu" });
 
     assert.equal(options.selectedMetric?.metricId, "lhm.sensor:/cpu/0/temperature/package");
     assert.deepEqual(options.metricOptions.map(option => option.value), ["lhm.sensor:/cpu/0/temperature/package"]);
@@ -101,7 +101,7 @@ test("catalog options disambiguate duplicate hardware and metric labels determin
         }),
     ];
 
-    const options = buildCustomMetricCatalogOptions(descriptors, {
+    const options = buildCatalogMetricOptions(descriptors, {
         metricId: "lhm.sensor:/gpu/1/temperature/core",
     });
 
@@ -133,7 +133,7 @@ test("catalog options keep noisy network adapters selectable but sort them last"
         }),
     ];
 
-    const options = buildCustomMetricCatalogOptions(descriptors, { typeId: "network" });
+    const options = buildCatalogMetricOptions(descriptors, { typeId: "network" });
 
     assert.deepEqual(options.hardwareOptions.map(option => option.label), [
         "Intel Ethernet",
@@ -160,7 +160,7 @@ test("catalog options filter non-scalar descriptors and sanitize labels", () => 
         }),
     ];
 
-    const options = buildCustomMetricCatalogOptions(descriptors, { typeId: "other" });
+    const options = buildCatalogMetricOptions(descriptors, { typeId: "other" });
 
     assert.deepEqual(options.typeOptions.map(option => option.label), ["Choose type", "Other"]);
     assert.deepEqual(options.hardwareOptions.map(option => option.label), ["BoardName"]);
@@ -175,7 +175,7 @@ test("catalog options fall back to empty text for unknown metric units", () => {
         }),
     ];
 
-    const options = buildCustomMetricCatalogOptions(descriptors, { typeId: "cpu" });
+    const options = buildCatalogMetricOptions(descriptors, { typeId: "cpu" });
 
     assert.equal(options.selectedMetric?.unit, "");
 });

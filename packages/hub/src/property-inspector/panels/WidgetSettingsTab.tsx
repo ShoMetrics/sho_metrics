@@ -5,7 +5,7 @@ import type { VisibilityContext } from "../inspector/types";
 import type { ColorCompensationProfile } from "../../color-compensation/types";
 import { ColorCompensationControls } from "./ColorCompensationControls";
 import { CpuWidgetSettings } from "./CpuWidgetSettings";
-import { CustomMetricWidgetSettings } from "./CustomMetricWidgetSettings";
+import { CatalogMetricWidgetSettings } from "./CatalogMetricWidgetSettings";
 import { DefaultWidgetSettings } from "./DefaultWidgetSettings";
 import { DiskWidgetSettings } from "./DiskWidgetSettings";
 import { GpuWidgetSettings } from "./GpuWidgetSettings";
@@ -133,7 +133,7 @@ function renderMetricPanel(
         case "cpu":
             return <CpuWidgetSettings {...panelProps} target={target} />;
         case "catalog":
-            return <CustomMetricWidgetSettings {...panelProps} target={target} />;
+            return <CatalogMetricWidgetSettings {...panelProps} target={target} />;
         case "memory":
             return <DefaultWidgetSettings {...panelProps} />;
     }
