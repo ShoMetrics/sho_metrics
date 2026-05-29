@@ -43,6 +43,13 @@ test("catalog options stay unselected until the user chooses a type", () => {
     });
     assert.equal(initialOptions.selectedMetric, undefined);
     assert.equal(cpuOptions.resolvedSelection.metricId, "lhm.sensor:/cpu/0/temperature/package");
+    assert.deepEqual(cpuOptions.selectedMetric, {
+        metricId: "lhm.sensor:/cpu/0/temperature/package",
+        label: "CPU Package",
+        unit: MetricUnit.CELSIUS,
+        category: "cpu",
+        readingKind: "temperature",
+    });
     assert.deepEqual(cpuOptions.readingOptions.map(option => option.label), ["Temperature", "Usage"]);
 });
 
@@ -316,7 +323,59 @@ test("catalog options filter non-scalar descriptors and sanitize labels", () => 
     assert.equal(options.selectedMetric?.label, "Temperature #1");
 });
 
-test("catalog options fall back to empty text for unknown metric units", () => {
+test("catalog options return semantic metadata for other and unknown readings", () => {
+    const descriptors = [
+        buildDescriptor({
+            metricId: "lhm.sensor:/board/current/1",
+            sourceSensorId: "board-current",
+            hardwareId: "board0",
+            hardwareName: "Board",
+            hardwareType: "Mainboard",
+            sensorName: "Input Current",
+            sourceSensorType: "Current",
+            unit: MetricUnit.AMPERES,
+        }),
+        buildDescriptor({
+            metricId: "lhm.sensor:/board/level/1",
+            sourceSensorId: "board-level",
+            hardwareId: "board0",
+            hardwareName: "Board",
+            hardwareType: "Mainboard",
+            sensorName: "Battery Level",
+            sourceSensorType: "Level",
+            unit: MetricUnit.PERCENT,
+        }),
+        buildDescriptor({
+            metricId: "lhm.sensor:/board/custom/1",
+            sourceSensorId: "board-custom",
+            hardwareId: "board0",
+            hardwareName: "Board",
+            hardwareType: "Mainboard",
+            sensorName: "Custom Sensor",
+            sourceSensorType: "FutureKind",
+            unit: MetricUnit.UNITLESS,
+        }),
+    ];
+
+    const currentOptions = buildCatalogMetricOptions(descriptors, {
+        metricId: "lhm.sensor:/board/current/1",
+    });
+    const levelOptions = buildCatalogMetricOptions(descriptors, {
+        metricId: "lhm.sensor:/board/level/1",
+    });
+    const customOptions = buildCatalogMetricOptions(descriptors, {
+        metricId: "lhm.sensor:/board/custom/1",
+    });
+
+    assert.equal(currentOptions.selectedMetric?.category, "other");
+    assert.equal(currentOptions.selectedMetric?.readingKind, "other");
+    assert.equal(levelOptions.selectedMetric?.category, "other");
+    assert.equal(levelOptions.selectedMetric?.readingKind, "other");
+    assert.equal(customOptions.selectedMetric?.category, "other");
+    assert.equal(customOptions.selectedMetric?.readingKind, "other");
+});
+
+test("catalog options clamp unknown metric units to unspecified", () => {
     const descriptors = [
         buildDescriptor({
             metricId: "future-unit.metric",
@@ -326,7 +385,7 @@ test("catalog options fall back to empty text for unknown metric units", () => {
 
     const options = buildCatalogMetricOptions(descriptors, { typeId: "cpu" });
 
-    assert.equal(options.selectedMetric?.unit, "");
+    assert.equal(options.selectedMetric?.unit, MetricUnit.UNSPECIFIED);
 });
 
 interface MetricDescriptorFixture {

@@ -1,4 +1,6 @@
-import { formatMetricUnit } from "../../metrics/metric-unit-format";
+import { normalizeKnownMetricUnit } from "../../metrics/metric-unit-format";
+import type { CatalogMetricCategory, CatalogMetricReadingKind } from "../../settings/resolved-settings";
+import type { MetricUnit } from "../../runtime/sources/metric-source";
 import {
     MetricIdKind,
     MetricValueKind,
@@ -6,35 +8,34 @@ import {
 } from "../../runtime/sources/source-client";
 import type { SelectOption } from "../inspector/types";
 
-export type CatalogMetricTypeId =
-    | "cpu"
-    | "gpu"
-    | "memory"
-    | "disk"
-    | "network"
-    | "other";
+export type CatalogMetricTypeId = Exclude<CatalogMetricCategory, "unspecified">;
+
+// Current and level are stored reading kinds, but they are not picker groups in
+// this batch because they have no distinct label, scale, or caption behavior.
+type ReadingId = Exclude<CatalogMetricReadingKind, "unspecified" | "current" | "level">;
 
 export interface CatalogMetricSelection {
     readonly typeId: CatalogMetricTypeId | "";
     readonly hardwareId: string;
-    readonly readingId: string;
+    readonly readingId: ReadingId | "";
     readonly metricId: string;
 }
 
 export interface CatalogMetricOptions {
     readonly typeOptions: readonly SelectOption<CatalogMetricTypeId | "">[];
     readonly hardwareOptions: readonly SelectOption[];
-    readonly readingOptions: readonly SelectOption[];
+    readonly readingOptions: readonly SelectOption<ReadingId | "">[];
     readonly metricOptions: readonly SelectOption[];
     readonly resolvedSelection: CatalogMetricSelection;
-    readonly selectedDescriptor: MetricDescriptor | undefined;
     readonly selectedMetric: SelectedCatalogMetric | undefined;
 }
 
 export interface SelectedCatalogMetric {
     readonly metricId: string;
     readonly label: string;
-    readonly unit: string;
+    readonly unit: MetricUnit;
+    readonly category: CatalogMetricCategory;
+    readonly readingKind: CatalogMetricReadingKind;
 }
 
 interface CatalogMetricEntry {
@@ -44,11 +45,10 @@ interface CatalogMetricEntry {
     readonly hardwareBaseLabel: string;
     readonly hardwareLabel: string;
     readonly isNoisyHardware: boolean;
-    readonly readingId: string;
+    readonly readingId: ReadingId;
     readonly readingLabel: string;
     readonly metricBaseLabel: string;
     readonly metricLabel: string;
-    readonly unit: string;
 }
 
 interface HardwareDisplay {
@@ -59,14 +59,14 @@ interface HardwareDisplay {
     readonly isNoisy: boolean;
 }
 
-const CATALOG_TYPE_ORDER: readonly CatalogMetricTypeId[] = [
-    "cpu",
-    "gpu",
-    "memory",
-    "disk",
-    "network",
-    "other",
-];
+const CATALOG_TYPE_SORT_ORDER_BY_ID = {
+    cpu: 0,
+    gpu: 1,
+    memory: 2,
+    disk: 3,
+    network: 4,
+    other: 5,
+} as const satisfies Record<CatalogMetricTypeId, number>;
 
 const TYPE_LABEL_BY_ID = {
     cpu: "CPU",
@@ -77,21 +77,19 @@ const TYPE_LABEL_BY_ID = {
     other: "Other",
 } as const satisfies Record<CatalogMetricTypeId, string>;
 
-const READING_ORDER = [
-    "temperature",
-    "usage",
-    "clock",
-    "voltage",
-    "power",
-    "fan",
-    "control",
-    "data",
-    "throughput",
-    "timing",
-    "other",
-] as const;
-
-type ReadingId = typeof READING_ORDER[number];
+const READING_SORT_ORDER_BY_ID = {
+    temperature: 0,
+    usage: 1,
+    clock: 2,
+    voltage: 3,
+    power: 4,
+    fan: 5,
+    control: 6,
+    data: 7,
+    throughput: 8,
+    timing: 9,
+    other: 10,
+} as const satisfies Record<ReadingId, number>;
 
 const READING_LABEL_BY_ID = {
     temperature: "Temperature",
@@ -167,12 +165,13 @@ export function buildCatalogMetricOptions(
             resolvedSelection.readingId,
         ),
         resolvedSelection,
-        selectedDescriptor: selectedEntry?.descriptor,
         selectedMetric: selectedEntry
             ? {
                 metricId: selectedEntry.descriptor.metricId,
                 label: selectedEntry.metricLabel,
-                unit: selectedEntry.unit,
+                unit: normalizeKnownMetricUnit(selectedEntry.descriptor.unit),
+                category: selectedEntry.typeId,
+                readingKind: selectedEntry.readingId,
             }
             : undefined,
     };
@@ -197,7 +196,6 @@ function buildCatalogMetricEntries(descriptors: readonly MetricDescriptor[]): re
             readingLabel: READING_LABEL_BY_ID[readingId],
             metricBaseLabel,
             metricLabel: metricBaseLabel,
-            unit: formatMetricUnit(descriptor.unit),
         };
     });
     const hardwareDisplays = buildHardwareDisplays(baseEntries);
@@ -465,8 +463,8 @@ function buildTypeOptions(
 
     return [
         TOP_LEVEL_PLACEHOLDER_OPTION,
-        ...CATALOG_TYPE_ORDER
-            .filter(typeId => presentTypeIds.has(typeId))
+        ...[...presentTypeIds]
+            .sort(compareTypeId)
             .map(typeId => ({
                 value: typeId,
                 label: TYPE_LABEL_BY_ID[typeId],
@@ -499,7 +497,7 @@ function buildReadingOptions(
     entries: readonly CatalogMetricEntry[],
     typeId: CatalogMetricTypeId | "",
     hardwareId: string,
-): readonly SelectOption[] {
+): readonly SelectOption<ReadingId | "">[] {
     if (typeId.length === 0 || hardwareId.length === 0) {
         return [EMPTY_READING_OPTION];
     }
@@ -591,12 +589,15 @@ function resolveSelection(
     };
 }
 
-function selectExistingOrFirst(values: readonly string[], selectedValue: string | undefined): string {
-    if (selectedValue !== undefined && values.includes(selectedValue)) {
-        return selectedValue;
-    }
+function selectExistingOrFirst<TValue extends string>(
+    values: readonly TValue[],
+    selectedValue: string | undefined,
+): TValue | "" {
+    const existingValue = selectedValue === undefined
+        ? undefined
+        : values.find(value => value === selectedValue);
 
-    return values[0] ?? "";
+    return existingValue ?? values[0] ?? "";
 }
 
 function sanitizeLabel(value: string, fallback: string): string {
@@ -653,7 +654,7 @@ function compareHardwareEntries(left: CatalogMetricEntry, right: CatalogMetricEn
 }
 
 function compareReadingEntries(left: CatalogMetricEntry, right: CatalogMetricEntry): number {
-    return compareValues(readReadingOrder(left.readingId), readReadingOrder(right.readingId))
+    return compareValues(READING_SORT_ORDER_BY_ID[left.readingId], READING_SORT_ORDER_BY_ID[right.readingId])
         || compareNaturalText(left.readingLabel, right.readingLabel);
 }
 
@@ -663,7 +664,7 @@ function compareMetricEntries(left: CatalogMetricEntry, right: CatalogMetricEntr
 }
 
 function compareTypeId(left: CatalogMetricTypeId, right: CatalogMetricTypeId): number {
-    return compareValues(CATALOG_TYPE_ORDER.indexOf(left), CATALOG_TYPE_ORDER.indexOf(right));
+    return compareValues(CATALOG_TYPE_SORT_ORDER_BY_ID[left], CATALOG_TYPE_SORT_ORDER_BY_ID[right]);
 }
 
 function compareValues(left: number, right: number): number {
@@ -674,12 +675,6 @@ function compareNaturalText(left: string, right: string): number {
     return NATURAL_TEXT_COLLATOR.compare(left, right)
         || left.localeCompare(right, "en")
         || compareValues(left.length, right.length);
-}
-
-function readReadingOrder(readingId: string): number {
-    const index = READING_ORDER.indexOf(readingId as ReadingId);
-
-    return index < 0 ? READING_ORDER.length : index;
 }
 
 function hardwareMapKey(typeId: CatalogMetricTypeId, hardwareId: string): string {

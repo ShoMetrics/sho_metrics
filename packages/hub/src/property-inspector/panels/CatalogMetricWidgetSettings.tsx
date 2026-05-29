@@ -8,7 +8,6 @@ import {
     type CatalogMetricTypeId,
 } from "../select-options/catalog-metric-options";
 import type { MetricDescriptor } from "../../runtime/sources/source-client";
-import { normalizeKnownMetricUnit } from "../../metrics/metric-unit-format";
 import type { ResolvedCatalogMetricTarget } from "../../settings/resolved-settings";
 import type { StoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
 import { StandardColorSettings } from "./ColorSettings";
@@ -162,16 +161,13 @@ function writeSelectedCatalogMetric(
         return;
     }
 
-    const selectedDescriptor = descriptors.find(descriptor => descriptor.metricId === selectedMetric.metricId);
     onSettingsPatch({
         catalog: {
             metricId: selectedMetric.metricId,
             detectedLabel: selectedMetric.label,
-            detectedUnit: normalizeKnownMetricUnit(selectedDescriptor?.unit),
-            // TODO(step3): Store detected category and reading kind from the
-            // catalog option builder once it owns the descriptor classifiers.
-            detectedCategory: undefined,
-            detectedReadingKind: undefined,
+            detectedUnit: selectedMetric.unit,
+            detectedCategory: selectedMetric.category,
+            detectedReadingKind: selectedMetric.readingKind,
             customLabel: undefined,
             customMaximumValue: undefined,
         },
