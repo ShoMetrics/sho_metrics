@@ -132,6 +132,7 @@ function renderMetricPanel(
         case "cpu":
             return <CpuWidgetSettings {...panelProps} target={target} />;
         case "memory":
+        case "catalog":
             return <DefaultWidgetSettings {...panelProps} />;
     }
 }

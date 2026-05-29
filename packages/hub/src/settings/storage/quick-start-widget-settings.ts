@@ -2,6 +2,7 @@ import type { ActionKind } from "../../shared/stream-deck-actions";
 import { create } from "@bufbuild/protobuf";
 import {
     CpuMetricTarget_Kind as StoredCpuMetricKind,
+    CatalogMetricTargetSchema,
     CpuMetricTargetSchema,
     DiskMetricTarget_Kind as StoredDiskMetricKind,
     DiskMetricTargetSchema,
@@ -96,6 +97,11 @@ function buildQuickStartMetricTarget(actionKind: ActionKind): MetricSelection["t
             return {
                 case: "disk",
                 value: create(DiskMetricTargetSchema, { kind: StoredDiskMetricKind.USAGE }),
+            };
+        case "catalog":
+            return {
+                case: "catalog",
+                value: create(CatalogMetricTargetSchema),
             };
         case "gpu":
             return {

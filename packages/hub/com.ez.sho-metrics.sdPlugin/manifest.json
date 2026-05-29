@@ -117,6 +117,29 @@
 					"TitleAlignment": "middle"
 				}
 			]
+		},
+		{
+			"Name": "Custom Metric",
+			"UUID": "com.ez.sho-metrics.catalog",
+			"Icon": "imgs/actions/sho-metrics/icon",
+			"Tooltip": "Displays a selected custom metric.",
+			"PropertyInspectorPath": "ui/property-inspector.html",
+			"Controllers": [
+				"Keypad",
+				"Encoder"
+			],
+			"Encoder": {
+				"Icon": "imgs/actions/sho-metrics/icon",
+				"layout": "$B1"
+			},
+			"UserTitleEnabled": false,
+			"States": [
+				{
+					"Image": "imgs/actions/sho-metrics/key",
+					"ShowTitle": false,
+					"TitleAlignment": "middle"
+				}
+			]
 		}
 	],
 	"Category": "Sho Metrics",

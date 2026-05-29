@@ -281,6 +281,13 @@ export abstract class MetricAction extends SingletonAction {
         const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(pollingFrequencySeconds);
         const maximumSampleAgeMilliseconds = resolveFallbackReadingFreshnessBudgetMilliseconds(pollingFrequencySeconds);
         const metricKeys = this.getMetricKeys(event);
+
+        if (metricKeys.length === 0) {
+            this.metricCollectionBindings.get(event.action.id)?.dispose();
+            this.metricCollectionBindings.delete(event.action.id);
+            return;
+        }
+
         const readPlan = this.buildMetricCollectionReadPlan(event, metricKeys);
         const metricCollectionBinding = this.getOrCreateMetricCollectionBinding(event.action.id);
 
