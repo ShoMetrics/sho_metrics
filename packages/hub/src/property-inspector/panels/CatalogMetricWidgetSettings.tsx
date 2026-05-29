@@ -1,5 +1,7 @@
 import { InspectorItem } from "../components/InspectorItem";
+import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
+import { TextSetting } from "../controls/TextSetting";
 import type { SelectOption } from "../inspector/types";
 import {
     buildCatalogMetricOptions,
@@ -7,14 +9,23 @@ import {
     type CatalogMetricSelection,
     type CatalogMetricTypeId,
 } from "../select-options/catalog-metric-options";
+import {
+    readCatalogMetricMaximumInputValue,
+    resolveCatalogMetricDefaultMaximumValue,
+    resolveCatalogMetricMaximumInputLabel,
+    resolveCatalogMetricMaximumInputMaximum,
+    resolveCatalogMetricMaximumInputStep,
+    writeCatalogMetricMaximumInputValue,
+} from "../../metrics/catalog-metric-scale";
 import type { MetricDescriptor } from "../../runtime/sources/source-client";
-import type { ResolvedCatalogMetricTarget } from "../../settings/resolved-settings";
+import type { ResolvedCatalogMetricTarget, ScaleMode } from "../../settings/resolved-settings";
 import type { StoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
 import { StandardColorSettings } from "./ColorSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { PollingSettings } from "./PollingSettings";
 import { LineSettings } from "./LineSettings";
 import { SettingsSection } from "./SettingsSection";
+import { scaleModeOptionList } from "./setting-options";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 
 type CatalogMetricWidgetSettingsProps = WidgetSettingsPanelProps & {
@@ -26,6 +37,7 @@ export function CatalogMetricWidgetSettings(props: CatalogMetricWidgetSettingsPr
         <>
             <CatalogMetricPicker {...props} />
             <AppearanceSettings {...props} />
+            {props.target.metricId.length > 0 && <CatalogMetricLabelScaleSettings {...props} />}
             <LineSettings {...props} />
             <StandardColorSettings {...props} />
             <PollingSettings {...props} />
@@ -58,7 +70,7 @@ function CatalogMetricPicker({
                             value={selection.typeId}
                             optionList={options.typeOptions}
                             onValueChange={(typeId) => {
-                                writeSelectedCatalogMetric(onSettingsPatch, descriptors, { typeId });
+                                writeSelectedCatalogMetric(onSettingsPatch, target, descriptors, { typeId });
                             }}
                         />
                     )}
@@ -68,7 +80,7 @@ function CatalogMetricPicker({
                             value={selection.hardwareId}
                             optionList={options.hardwareOptions}
                             onValueChange={(hardwareId) => {
-                                writeSelectedCatalogMetric(onSettingsPatch, descriptors, {
+                                writeSelectedCatalogMetric(onSettingsPatch, target, descriptors, {
                                     typeId: selection.typeId,
                                     hardwareId,
                                 });
@@ -81,7 +93,7 @@ function CatalogMetricPicker({
                             value={selection.readingId}
                             optionList={options.readingOptions}
                             onValueChange={(readingId) => {
-                                writeSelectedCatalogMetric(onSettingsPatch, descriptors, {
+                                writeSelectedCatalogMetric(onSettingsPatch, target, descriptors, {
                                     typeId: selection.typeId,
                                     hardwareId: selection.hardwareId,
                                     readingId,
@@ -95,7 +107,7 @@ function CatalogMetricPicker({
                             value={selection.metricId}
                             optionList={options.metricOptions}
                             onValueChange={(metricId) => {
-                                writeSelectedCatalogMetric(onSettingsPatch, descriptors, { metricId });
+                                writeSelectedCatalogMetric(onSettingsPatch, target, descriptors, { metricId });
                             }}
                         />
                     )}
@@ -126,6 +138,99 @@ function CatalogMetricDescriptorStatusNote({
     );
 }
 
+function CatalogMetricLabelScaleSettings({
+    target,
+    onSettingsPatch,
+}: CatalogMetricWidgetSettingsProps): React.JSX.Element {
+    const scaleMode: ScaleMode = target.customMaximumValue === undefined ? "auto" : "custom";
+    const customMaximumInputValue = readCatalogMetricMaximumInputValue(
+        target.customMaximumValue,
+        target.detectedUnit,
+        target.detectedCategory,
+    );
+
+    return (
+        <SettingsSection title="Label & Scale">
+            <TextSetting
+                label="Label"
+                value={target.customLabel ?? ""}
+                placeholder={target.detectedLabel ?? "Detected label"}
+                onValueChange={(customLabel) => onSettingsPatch(buildCatalogMetricCustomLabelPatch(customLabel))}
+                actionButton={(
+                    <button
+                        className="inline-action-button"
+                        type="button"
+                        disabled={target.customLabel === undefined}
+                        onClick={() => onSettingsPatch(buildCatalogMetricUseDetectedLabelPatch())}
+                    >
+                        Use Detected
+                    </button>
+                )}
+            />
+            <SelectSetting<ScaleMode>
+                label="Scale"
+                value={scaleMode}
+                optionList={scaleModeOptionList}
+                onValueChange={(nextScaleMode) => onSettingsPatch(buildCatalogMetricScaleModePatch(
+                    target,
+                    nextScaleMode,
+                ))}
+            />
+            {scaleMode === "custom" && (
+                <NumberSetting
+                    label={resolveCatalogMetricMaximumInputLabel(target.detectedUnit, target.detectedCategory)}
+                    value={customMaximumInputValue}
+                    onValueChange={(maximumInputValue) => onSettingsPatch({
+                        catalog: {
+                            customMaximumValue: writeCatalogMetricMaximumInputValue(
+                                maximumInputValue,
+                                target.detectedUnit,
+                                target.detectedCategory,
+                            ),
+                        },
+                    })}
+                    minimum={0.001}
+                    maximum={resolveCatalogMetricMaximumInputMaximum(target.detectedUnit, target.detectedCategory)}
+                    step={resolveCatalogMetricMaximumInputStep(target.detectedUnit, target.detectedCategory)}
+                    optional
+                />
+            )}
+            <InspectorItem className="note-item note-item-caption">
+                <p className="section-note">Custom label and scale reset when you choose a different metric.</p>
+            </InspectorItem>
+        </SettingsSection>
+    );
+}
+
+export function buildCatalogMetricCustomLabelPatch(customLabel: string): StoredWidgetSettingsPatch {
+    return {
+        catalog: { customLabel: normalizeCustomLabel(customLabel) },
+    };
+}
+
+export function buildCatalogMetricUseDetectedLabelPatch(): StoredWidgetSettingsPatch {
+    return {
+        catalog: { customLabel: undefined },
+    };
+}
+
+export function buildCatalogMetricScaleModePatch(
+    target: ResolvedCatalogMetricTarget,
+    nextScaleMode: ScaleMode,
+): StoredWidgetSettingsPatch {
+    return {
+        catalog: {
+            customMaximumValue: nextScaleMode === "auto"
+                ? undefined
+                : target.customMaximumValue ?? resolveCatalogMetricDefaultMaximumValue(
+                    target.detectedUnit,
+                    target.detectedCategory,
+                    target.detectedReadingKind,
+                ),
+        },
+    };
+}
+
 function shouldShowTypeSetting(
     options: CatalogMetricOptions,
 ): boolean {
@@ -134,11 +239,23 @@ function shouldShowTypeSetting(
 
 function writeSelectedCatalogMetric(
     onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void,
+    target: ResolvedCatalogMetricTarget,
     descriptors: readonly MetricDescriptor[],
     selection: Partial<CatalogMetricSelection>,
 ): void {
+    const patch = buildCatalogMetricSelectionPatch(target, descriptors, selection);
+    if (patch) {
+        onSettingsPatch(patch);
+    }
+}
+
+export function buildCatalogMetricSelectionPatch(
+    target: ResolvedCatalogMetricTarget,
+    descriptors: readonly MetricDescriptor[],
+    selection: Partial<CatalogMetricSelection>,
+): StoredWidgetSettingsPatch | undefined {
     if (selection.typeId === "") {
-        onSettingsPatch({
+        return {
             catalog: {
                 metricId: "",
                 detectedLabel: undefined,
@@ -148,8 +265,7 @@ function writeSelectedCatalogMetric(
                 customLabel: undefined,
                 customMaximumValue: undefined,
             },
-        });
-        return;
+        };
     }
 
     const options = buildCatalogMetricOptions(descriptors, selection);
@@ -158,20 +274,28 @@ function writeSelectedCatalogMetric(
         // A descriptor refresh can make a DOM event stale between render and
         // commit. Keep the stored metric unchanged instead of writing a partial
         // or empty catalog target.
-        return;
+        return undefined;
     }
 
-    onSettingsPatch({
+    return {
         catalog: {
             metricId: selectedMetric.metricId,
             detectedLabel: selectedMetric.label,
             detectedUnit: selectedMetric.unit,
             detectedCategory: selectedMetric.category,
             detectedReadingKind: selectedMetric.readingKind,
-            customLabel: undefined,
-            customMaximumValue: undefined,
+            ...(selectedMetric.metricId === target.metricId
+                ? {}
+                : {
+                    customLabel: undefined,
+                    customMaximumValue: undefined,
+                }),
         },
-    });
+    };
+}
+
+function normalizeCustomLabel(value: string): string | undefined {
+    return value.trim().length === 0 ? undefined : value;
 }
 
 function countTypeOptions(options: readonly SelectOption<CatalogMetricTypeId | "">[]): number {

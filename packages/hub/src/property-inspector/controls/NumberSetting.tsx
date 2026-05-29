@@ -5,6 +5,7 @@ import type { SettingControlProps } from "./setting-control";
 type NumberSettingProps = SettingControlProps & {
     label: string;
     minimum?: number;
+    maximum?: number;
     step?: number;
 } & (
     | {
@@ -50,6 +51,7 @@ export function NumberSetting(props: NumberSettingProps): React.JSX.Element {
                 className="native-input"
                 type="number"
                 min={props.minimum}
+                max={props.maximum}
                 step={props.step}
                 value={draftValue}
                 disabled={props.disabled === true}
