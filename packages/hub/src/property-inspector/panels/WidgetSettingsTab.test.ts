@@ -9,7 +9,14 @@ import {
     type StoredWidgetSettingsPatch,
 } from "../../settings/storage/widget-settings-patch";
 import type { WidgetRuntimeCachePatch } from "../../runtime/widget-runtime-cache";
+import { MetricUnit } from "../../runtime/sources/metric-source";
+import {
+    MetricIdKind,
+    MetricValueKind,
+    type MetricDescriptor,
+} from "../../runtime/sources/source-client";
 import { buildVisibilityContext, type InspectorTestSettings } from "../testing/test-context";
+import type { PropertyInspectorRuntimeCacheStatus } from "../inspector/types";
 import { WidgetSettingsTab } from "./WidgetSettingsTab";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
 import {
@@ -480,6 +487,102 @@ test("GPU source preference control preserves custom source selections", () => {
     assert.match(markup, /Custom Source/);
 });
 
+test("custom metric settings show catalog load state without descriptor inference", () => {
+    const pendingMarkup = renderWidgetSettings({
+        actionKind: "catalog",
+        runtimeCacheStatus: {
+            catalogMetricDescriptorStatus: "pending",
+        },
+    });
+    const failedMarkup = renderWidgetSettings({
+        actionKind: "catalog",
+        runtimeCacheStatus: {
+            catalogMetricDescriptorStatus: "failed",
+        },
+    });
+
+    assert.match(pendingMarkup, /Loading metrics/);
+    assert.match(failedMarkup, /Metrics unavailable/);
+});
+
+test("custom metric settings render the initial guided picker without writing a default", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "catalog",
+        runtimeCache: {
+            availableCatalogMetricDescriptors: [
+                buildMetricDescriptor({
+                    metricId: "lhm.sensor:/cpu/0/temperature/package",
+                    sourceSensorId: "cpu-package-temp",
+                    hardwareId: "cpu0",
+                    hardwareName: "Intel Core",
+                    hardwareType: "Cpu",
+                    sensorName: "CPU Package",
+                    sourceSensorType: "Temperature",
+                    unit: MetricUnit.CELSIUS,
+                }),
+            ],
+            catalogMetricDescriptorLoadState: "ready",
+        },
+        runtimeCacheStatus: {
+            catalogMetricDescriptorStatus: "ready",
+        },
+    });
+
+    assert.match(markup, /Type:/);
+    assert.match(markup, /Choose type/);
+    assert.match(markup, /Source: Helper only/);
+    assert.doesNotMatch(markup, /Hardware:/);
+    assert.doesNotMatch(markup, /Reading:/);
+    assert.doesNotMatch(markup, /Metric:/);
+});
+
+test("custom metric settings hide single-option levels and show ambiguous metric choices", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "catalog",
+        settings: buildWidgetSettings("catalog", {
+            catalog: {
+                metricId: "lhm.sensor:/cpu/0/temperature/package",
+                fallbackLabel: "CPU Package",
+                fallbackUnit: "C",
+            },
+        }),
+        runtimeCache: {
+            availableCatalogMetricDescriptors: [
+                buildMetricDescriptor({
+                    metricId: "lhm.sensor:/cpu/0/temperature/package",
+                    sourceSensorId: "cpu-package-temp",
+                    hardwareId: "cpu0",
+                    hardwareName: "Intel Core",
+                    hardwareType: "Cpu",
+                    sensorName: "CPU Package",
+                    sourceSensorType: "Temperature",
+                    unit: MetricUnit.CELSIUS,
+                }),
+                buildMetricDescriptor({
+                    metricId: "lhm.sensor:/cpu/0/temperature/core1",
+                    sourceSensorId: "cpu-core1-temp",
+                    hardwareId: "cpu0",
+                    hardwareName: "Intel Core",
+                    hardwareType: "Cpu",
+                    sensorName: "Core 1",
+                    sourceSensorType: "Temperature",
+                    unit: MetricUnit.CELSIUS,
+                }),
+            ],
+            catalogMetricDescriptorLoadState: "ready",
+        },
+        runtimeCacheStatus: {
+            catalogMetricDescriptorStatus: "ready",
+        },
+    });
+
+    assert.match(markup, /Metric:/);
+    assert.match(markup, /CPU Package/);
+    assert.doesNotMatch(markup, /Type:/);
+    assert.doesNotMatch(markup, /Hardware:/);
+    assert.doesNotMatch(markup, /Reading:/);
+});
+
 test("widget advanced controls render current metric source attribution", () => {
     const markup = renderWidgetSettings({
         actionKind: "cpu",
@@ -740,6 +843,7 @@ function renderWidgetSettings(options: {
     isGlobalPaintOverrideEnabled?: boolean;
     settings?: InspectorTestSettings;
     runtimeCache?: WidgetRuntimeCachePatch;
+    runtimeCacheStatus?: Partial<PropertyInspectorRuntimeCacheStatus>;
 }): string {
     return renderToStaticMarkup(createElement(WidgetSettingsTab, {
         context: buildVisibilityContext({
@@ -747,6 +851,7 @@ function renderWidgetSettings(options: {
             isWindows: options.isWindows,
             settings: options.settings,
             runtimeCache: options.runtimeCache,
+            runtimeCacheStatus: options.runtimeCacheStatus,
         }),
         isGlobalViewOverrideEnabled: options.isGlobalViewOverrideEnabled ?? false,
         isGlobalThemeOverrideEnabled: options.isGlobalThemeOverrideEnabled ?? false,
@@ -769,6 +874,38 @@ function assertTextOrder(markup: string, earlierText: string, laterText: string)
 
 function sectionHeadingPattern(text: string): RegExp {
     return new RegExp(`class="section-heading"[^>]*>${text}<`);
+}
+
+function buildMetricDescriptor(overrides: MetricDescriptorFixture): MetricDescriptor {
+    return {
+        metricId: overrides.metricId,
+        valueKind: overrides.valueKind ?? MetricValueKind.SCALAR,
+        unit: overrides.unit ?? MetricUnit.UNSPECIFIED,
+        metricIdKind: overrides.metricIdKind ?? MetricIdKind.SOURCE_SENSOR,
+        pollingGroupId: overrides.pollingGroupId ?? "polling-group",
+        rawSensorIdentity: {
+            sourceSensorId: overrides.sourceSensorId,
+            hardwareId: overrides.hardwareId,
+            hardwareName: overrides.hardwareName,
+            hardwareType: overrides.hardwareType,
+            sensorName: overrides.sensorName,
+            sourceSensorType: overrides.sourceSensorType,
+        },
+    };
+}
+
+interface MetricDescriptorFixture {
+    readonly metricId: string;
+    readonly valueKind?: MetricValueKind;
+    readonly unit?: MetricUnit;
+    readonly metricIdKind?: MetricIdKind;
+    readonly pollingGroupId?: string;
+    readonly sourceSensorId: string;
+    readonly hardwareId: string;
+    readonly hardwareName: string;
+    readonly hardwareType: string;
+    readonly sensorName: string;
+    readonly sourceSensorType: string;
 }
 
 function sectionTitlePattern(text: string): RegExp {

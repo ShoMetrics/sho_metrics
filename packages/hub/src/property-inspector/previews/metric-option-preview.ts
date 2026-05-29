@@ -161,11 +161,12 @@ function buildMetricPreviewSample(target: ResolvedMetricTarget): MetricPreviewSa
         case "catalog":
             return buildHardwarePreviewSample({
                 hardware: "unknown",
-                label: target.fallbackLabel ?? "METRIC",
+                label: "DATA",
                 current: 42,
                 unit: target.fallbackUnit ?? "",
                 displayValue: "42",
                 progress: 0.42,
+                secondaryDisplayValue: target.fallbackLabel ?? "Custom Metric",
             });
     }
 }
