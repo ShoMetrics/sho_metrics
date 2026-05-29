@@ -137,6 +137,13 @@ const COMMON_NOISY_TOKENS = [
     "loopback",
 ] as const;
 
+// Hardware catalogs often use numbered labels such as E-Core #2, Wi-Fi 4, and
+// Voltage #11. Natural sorting keeps those labels in user-expected order.
+const NATURAL_TEXT_COLLATOR = new Intl.Collator("en", {
+    numeric: true,
+    sensitivity: "base",
+});
+
 /** Builds PI-only picker options from helper descriptors without changing source demand. */
 export function buildCatalogMetricOptions(
     descriptors: readonly MetricDescriptor[],
@@ -390,7 +397,7 @@ function buildHardwareDisplays(entries: readonly CatalogMetricEntry[]): Readonly
         }
 
         duplicateDisplays
-            .sort((left, right) => left.hardwareId.localeCompare(right.hardwareId))
+            .sort((left, right) => compareNaturalText(left.hardwareId, right.hardwareId))
             .forEach((display, index) => {
                 hardwareDisplays.set(hardwareMapKey(display.typeId, display.hardwareId), {
                     ...display,
@@ -404,8 +411,8 @@ function buildHardwareDisplays(entries: readonly CatalogMetricEntry[]): Readonly
 
 function compareBaseHardwareDisplay(entry: CatalogMetricEntry, display: HardwareDisplay): number {
     return compareValues(Number(entry.isNoisyHardware), Number(display.isNoisy))
-        || entry.hardwareBaseLabel.localeCompare(display.baseLabel)
-        || entry.hardwareId.localeCompare(display.hardwareId);
+        || compareNaturalText(entry.hardwareBaseLabel, display.baseLabel)
+        || compareNaturalText(entry.hardwareId, display.hardwareId);
 }
 
 function disambiguateMetricLabels(entries: readonly CatalogMetricEntry[]): readonly CatalogMetricEntry[] {
@@ -437,7 +444,7 @@ function disambiguateMetricLabels(entries: readonly CatalogMetricEntry[]): reado
         entry => `${entry.typeId}\u001f${entry.hardwareId}\u001f${entry.readingId}\u001f${entry.metricLabel}`,
     ).values()) {
         duplicateEntries
-            .sort((left, right) => left.descriptor.metricId.localeCompare(right.descriptor.metricId))
+            .sort((left, right) => compareNaturalText(left.descriptor.metricId, right.descriptor.metricId))
             .forEach((entry, index) => {
                 outputEntries.push(index === 0
                     ? entry
@@ -677,24 +684,24 @@ function compareCatalogMetricEntries(left: CatalogMetricEntry, right: CatalogMet
 function compareHardwareDisplays(left: HardwareDisplay, right: HardwareDisplay): number {
     return compareTypeId(left.typeId, right.typeId)
         || compareValues(Number(left.isNoisy), Number(right.isNoisy))
-        || left.label.localeCompare(right.label)
-        || left.hardwareId.localeCompare(right.hardwareId);
+        || compareNaturalText(left.label, right.label)
+        || compareNaturalText(left.hardwareId, right.hardwareId);
 }
 
 function compareHardwareEntries(left: CatalogMetricEntry, right: CatalogMetricEntry): number {
     return compareValues(Number(left.isNoisyHardware), Number(right.isNoisyHardware))
-        || left.hardwareLabel.localeCompare(right.hardwareLabel)
-        || left.hardwareId.localeCompare(right.hardwareId);
+        || compareNaturalText(left.hardwareLabel, right.hardwareLabel)
+        || compareNaturalText(left.hardwareId, right.hardwareId);
 }
 
 function compareReadingEntries(left: CatalogMetricEntry, right: CatalogMetricEntry): number {
     return compareValues(readReadingOrder(left.readingId), readReadingOrder(right.readingId))
-        || left.readingLabel.localeCompare(right.readingLabel);
+        || compareNaturalText(left.readingLabel, right.readingLabel);
 }
 
 function compareMetricEntries(left: CatalogMetricEntry, right: CatalogMetricEntry): number {
-    return left.metricLabel.localeCompare(right.metricLabel)
-        || left.descriptor.metricId.localeCompare(right.descriptor.metricId);
+    return compareNaturalText(left.metricLabel, right.metricLabel)
+        || compareNaturalText(left.descriptor.metricId, right.descriptor.metricId);
 }
 
 function compareTypeId(left: CatalogMetricTypeId, right: CatalogMetricTypeId): number {
@@ -703,6 +710,12 @@ function compareTypeId(left: CatalogMetricTypeId, right: CatalogMetricTypeId): n
 
 function compareValues(left: number, right: number): number {
     return left === right ? 0 : left < right ? -1 : 1;
+}
+
+function compareNaturalText(left: string, right: string): number {
+    return NATURAL_TEXT_COLLATOR.compare(left, right)
+        || left.localeCompare(right, "en")
+        || compareValues(left.length, right.length);
 }
 
 function readReadingOrder(readingId: string): number {
