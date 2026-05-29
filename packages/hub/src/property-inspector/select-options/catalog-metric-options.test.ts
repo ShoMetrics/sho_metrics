@@ -109,6 +109,155 @@ test("catalog options disambiguate duplicate hardware and metric labels determin
     assert.equal(options.selectedMetric?.label, "GPU Core (NVIDIA RTX #2)");
 });
 
+test("catalog options sort numbered hardware and metrics naturally", () => {
+    const descriptors = [
+        buildDescriptor({
+            metricId: "lhm.sensor:/cpu/0/temperature/ecore11",
+            sourceSensorId: "cpu-temp-ecore11",
+            hardwareId: "cpu0",
+            hardwareName: "Intel Core",
+            hardwareType: "Cpu",
+            sensorName: "E-Core #11",
+            sourceSensorType: "Temperature",
+            unit: MetricUnit.CELSIUS,
+        }),
+        buildDescriptor({
+            metricId: "lhm.sensor:/cpu/0/temperature/ecore2-distance",
+            sourceSensorId: "cpu-temp-ecore2-distance",
+            hardwareId: "cpu0",
+            hardwareName: "Intel Core",
+            hardwareType: "Cpu",
+            sensorName: "E-Core #2 Distance to TjMax",
+            sourceSensorType: "Temperature",
+            unit: MetricUnit.CELSIUS,
+        }),
+        buildDescriptor({
+            metricId: "lhm.sensor:/cpu/0/temperature/ecore2",
+            sourceSensorId: "cpu-temp-ecore2",
+            hardwareId: "cpu0",
+            hardwareName: "Intel Core",
+            hardwareType: "Cpu",
+            sensorName: "E-Core #2",
+            sourceSensorType: "Temperature",
+            unit: MetricUnit.CELSIUS,
+        }),
+        buildDescriptor({
+            metricId: "lhm.sensor:/cpu/0/temperature/ecore1",
+            sourceSensorId: "cpu-temp-ecore1",
+            hardwareId: "cpu0",
+            hardwareName: "Intel Core",
+            hardwareType: "Cpu",
+            sensorName: "E-Core #1",
+            sourceSensorType: "Temperature",
+            unit: MetricUnit.CELSIUS,
+        }),
+        buildDescriptor({
+            metricId: "lhm.sensor:/gpu/10/temperature/core",
+            sourceSensorId: "gpu10-temp",
+            hardwareId: "gpu10",
+            hardwareName: "GPU 10",
+            hardwareType: "GpuNvidia",
+            sensorName: "GPU Core",
+            sourceSensorType: "Temperature",
+            unit: MetricUnit.CELSIUS,
+        }),
+        buildDescriptor({
+            metricId: "lhm.sensor:/gpu/2/temperature/core",
+            sourceSensorId: "gpu2-temp",
+            hardwareId: "gpu2",
+            hardwareName: "GPU 2",
+            hardwareType: "GpuNvidia",
+            sensorName: "GPU Core",
+            sourceSensorType: "Temperature",
+            unit: MetricUnit.CELSIUS,
+        }),
+        buildDescriptor({
+            metricId: "lhm.sensor:/gpu/1/temperature/core",
+            sourceSensorId: "gpu1-temp",
+            hardwareId: "gpu1",
+            hardwareName: "GPU 1",
+            hardwareType: "GpuNvidia",
+            sensorName: "GPU Core",
+            sourceSensorType: "Temperature",
+            unit: MetricUnit.CELSIUS,
+        }),
+    ];
+
+    const cpuOptions = buildCatalogMetricOptions(descriptors, { typeId: "cpu" });
+    const gpuOptions = buildCatalogMetricOptions(descriptors, { typeId: "gpu" });
+
+    assert.deepEqual(cpuOptions.metricOptions.map(option => option.label), [
+        "E-Core #1",
+        "E-Core #2",
+        "E-Core #2 Distance to TjMax",
+        "E-Core #11",
+    ]);
+    assert.deepEqual(cpuOptions.metricOptions.map(option => [option.label, option.value]), [
+        ["E-Core #1", "lhm.sensor:/cpu/0/temperature/ecore1"],
+        ["E-Core #2", "lhm.sensor:/cpu/0/temperature/ecore2"],
+        ["E-Core #2 Distance to TjMax", "lhm.sensor:/cpu/0/temperature/ecore2-distance"],
+        ["E-Core #11", "lhm.sensor:/cpu/0/temperature/ecore11"],
+    ]);
+    assert.deepEqual(gpuOptions.hardwareOptions.map(option => option.label), [
+        "GPU 1",
+        "GPU 2",
+        "GPU 10",
+    ]);
+
+    const selectedCpuOptions = buildCatalogMetricOptions(descriptors, {
+        metricId: "lhm.sensor:/cpu/0/temperature/ecore11",
+    });
+
+    assert.equal(selectedCpuOptions.selectedMetric?.label, "E-Core #11");
+    assert.equal(selectedCpuOptions.resolvedSelection.metricId, "lhm.sensor:/cpu/0/temperature/ecore11");
+});
+
+test("catalog options assign duplicate hardware suffixes by natural hardware id", () => {
+    const descriptors = [
+        buildDescriptor({
+            metricId: "lhm.sensor:/gpu/10/temperature/core",
+            sourceSensorId: "gpu10-temp",
+            hardwareId: "gpu10",
+            hardwareName: "NVIDIA RTX",
+            hardwareType: "GpuNvidia",
+            sensorName: "GPU Core",
+            sourceSensorType: "Temperature",
+            unit: MetricUnit.CELSIUS,
+        }),
+        buildDescriptor({
+            metricId: "lhm.sensor:/gpu/2/temperature/core",
+            sourceSensorId: "gpu2-temp",
+            hardwareId: "gpu2",
+            hardwareName: "NVIDIA RTX",
+            hardwareType: "GpuNvidia",
+            sensorName: "GPU Core",
+            sourceSensorType: "Temperature",
+            unit: MetricUnit.CELSIUS,
+        }),
+        buildDescriptor({
+            metricId: "lhm.sensor:/gpu/1/temperature/core",
+            sourceSensorId: "gpu1-temp",
+            hardwareId: "gpu1",
+            hardwareName: "NVIDIA RTX",
+            hardwareType: "GpuNvidia",
+            sensorName: "GPU Core",
+            sourceSensorType: "Temperature",
+            unit: MetricUnit.CELSIUS,
+        }),
+    ];
+
+    const options = buildCatalogMetricOptions(descriptors, {
+        metricId: "lhm.sensor:/gpu/2/temperature/core",
+    });
+
+    assert.deepEqual(options.hardwareOptions.map(option => option.label), [
+        "NVIDIA RTX",
+        "NVIDIA RTX #2",
+        "NVIDIA RTX #3",
+    ]);
+    assert.equal(options.selectedMetric?.label, "GPU Core (NVIDIA RTX #2)");
+});
+
 test("catalog options keep noisy network adapters selectable but sort them last", () => {
     const descriptors = [
         buildDescriptor({
