@@ -17,8 +17,15 @@ import {
 } from "../../runtime/sources/source-client";
 import { buildVisibilityContext, type InspectorTestSettings } from "../testing/test-context";
 import type { PropertyInspectorRuntimeCacheStatus } from "../inspector/types";
+import {
+    buildCatalogMetricCustomLabelPatch,
+    buildCatalogMetricScaleModePatch,
+    buildCatalogMetricSelectionPatch,
+    buildCatalogMetricUseDetectedLabelPatch,
+} from "./CatalogMetricWidgetSettings";
 import { WidgetSettingsTab } from "./WidgetSettingsTab";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
+import type { ResolvedCatalogMetricTarget } from "../../settings/resolved-settings";
 import {
     BUILT_IN_NODE_SYSTEM_SOURCE_PROFILE_ID,
     BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID,
@@ -583,6 +590,161 @@ test("catalog metric settings hide single-option levels and show ambiguous metri
     assert.doesNotMatch(markup, /Reading:/);
 });
 
+test("catalog metric settings render label and scale controls after theme", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "catalog",
+        settings: buildWidgetSettings("catalog", {
+            appearance: {
+                view: { selectedView: "line" },
+            },
+            catalog: {
+                metricId: "lhm.sensor:/gpu/0/power/board",
+                detectedLabel: "GPU Board Power",
+                detectedUnit: MetricUnit.WATTS,
+                detectedCategory: "gpu",
+                detectedReadingKind: "power",
+                customLabel: "Board",
+                customMaximumValue: 450,
+            },
+        }),
+        runtimeCache: {
+            availableCatalogMetricDescriptors: [
+                buildMetricDescriptor({
+                    metricId: "lhm.sensor:/gpu/0/power/board",
+                    sourceSensorId: "gpu-board-power",
+                    hardwareId: "gpu0",
+                    hardwareName: "NVIDIA GPU",
+                    hardwareType: "GpuNvidia",
+                    sensorName: "GPU Board Power",
+                    sourceSensorType: "Power",
+                    unit: MetricUnit.WATTS,
+                }),
+            ],
+            catalogMetricDescriptorLoadState: "ready",
+        },
+        runtimeCacheStatus: {
+            catalogMetricDescriptorStatus: "ready",
+        },
+    });
+
+    assert.match(markup, /class="section-title"[^>]*>Label &amp; Scale</);
+    assert.match(markup, /Label:/);
+    assert.match(markup, /placeholder="GPU Board Power"/);
+    assert.match(markup, /value="Board"/);
+    assert.match(markup, /Use Detected/);
+    assert.match(markup, /Scale:/);
+    assert.match(markup, /Custom/);
+    assert.match(markup, /Max \(W\):/);
+    assert.match(markup, /value="450"/);
+    assert.match(markup, /Custom label and scale reset when you choose a different metric/);
+    assertTextOrder(markup, "Theme:", "Label &amp; Scale");
+    assertTextOrder(markup, "Label &amp; Scale", "Trend Line Smoothing");
+});
+
+test("catalog metric settings show readable custom maximum input units", () => {
+    const bytesMarkup = renderWidgetSettings({
+        actionKind: "catalog",
+        settings: buildWidgetSettings("catalog", {
+            catalog: {
+                metricId: "memory.total",
+                detectedLabel: "Total Memory",
+                detectedUnit: MetricUnit.BYTES,
+                detectedCategory: "memory",
+                detectedReadingKind: "data",
+                customMaximumValue: 64 * 1024 ** 3,
+            },
+        }),
+    });
+    const hertzMarkup = renderWidgetSettings({
+        actionKind: "catalog",
+        settings: buildWidgetSettings("catalog", {
+            catalog: {
+                metricId: "lhm.sensor:/cpu/0/clock/core1",
+                detectedLabel: "Core Clock",
+                detectedUnit: MetricUnit.HERTZ,
+                detectedCategory: "cpu",
+                detectedReadingKind: "clock",
+                customMaximumValue: 6_000_000_000,
+            },
+        }),
+    });
+
+    assert.match(bytesMarkup, /Max \(GB\):/);
+    assert.match(bytesMarkup, /value="64"/);
+    assert.match(hertzMarkup, /Max \(GHz\):/);
+    assert.match(hertzMarkup, /value="6"/);
+});
+
+test("catalog metric selection patch clears custom overrides only when metric changes", () => {
+    const target = buildResolvedCatalogTarget({
+        metricId: "lhm.sensor:/cpu/0/temperature/package",
+        customLabel: "Package",
+        customMaximumValue: 100,
+    });
+    const descriptors = [
+        buildMetricDescriptor({
+            metricId: "lhm.sensor:/cpu/0/temperature/package",
+            sourceSensorId: "cpu-package-temp",
+            hardwareId: "cpu0",
+            hardwareName: "Intel Core",
+            hardwareType: "Cpu",
+            sensorName: "CPU Package",
+            sourceSensorType: "Temperature",
+            unit: MetricUnit.CELSIUS,
+        }),
+        buildMetricDescriptor({
+            metricId: "lhm.sensor:/cpu/0/temperature/core1",
+            sourceSensorId: "cpu-core1-temp",
+            hardwareId: "cpu0",
+            hardwareName: "Intel Core",
+            hardwareType: "Cpu",
+            sensorName: "Core 1",
+            sourceSensorType: "Temperature",
+            unit: MetricUnit.CELSIUS,
+        }),
+    ];
+
+    const sameMetricPatch = buildCatalogMetricSelectionPatch(target, descriptors, {
+        metricId: "lhm.sensor:/cpu/0/temperature/package",
+    });
+    const changedMetricPatch = buildCatalogMetricSelectionPatch(target, descriptors, {
+        metricId: "lhm.sensor:/cpu/0/temperature/core1",
+    });
+
+    assert.equal(Object.hasOwn(sameMetricPatch?.catalog ?? {}, "customLabel"), false);
+    assert.equal(Object.hasOwn(sameMetricPatch?.catalog ?? {}, "customMaximumValue"), false);
+    assert.equal(Object.hasOwn(changedMetricPatch?.catalog ?? {}, "customLabel"), true);
+    assert.equal(Object.hasOwn(changedMetricPatch?.catalog ?? {}, "customMaximumValue"), true);
+});
+
+test("catalog metric label and scale patches keep independent overrides", () => {
+    const target = buildResolvedCatalogTarget({
+        metricId: "lhm.sensor:/gpu/0/power/board",
+        detectedUnit: MetricUnit.WATTS,
+        detectedCategory: "gpu",
+        detectedReadingKind: "power",
+        customLabel: "Board",
+    });
+
+    assert.deepEqual(buildCatalogMetricCustomLabelPatch("  Board  "), {
+        catalog: { customLabel: "  Board  " },
+    });
+    assert.deepEqual(buildCatalogMetricCustomLabelPatch("   "), {
+        catalog: { customLabel: undefined },
+    });
+    assert.deepEqual(buildCatalogMetricUseDetectedLabelPatch(), {
+        catalog: { customLabel: undefined },
+    });
+    assert.deepEqual(buildCatalogMetricScaleModePatch(target, "auto"), {
+        catalog: { customMaximumValue: undefined },
+    });
+    assert.deepEqual(buildCatalogMetricScaleModePatch(target, "custom"), {
+        catalog: { customMaximumValue: 450 },
+    });
+    assert.equal(Object.hasOwn(buildCatalogMetricUseDetectedLabelPatch().catalog ?? {}, "customMaximumValue"), false);
+    assert.equal(Object.hasOwn(buildCatalogMetricScaleModePatch(target, "custom").catalog ?? {}, "customLabel"), false);
+});
+
 test("widget advanced controls render current metric source attribution", () => {
     const markup = renderWidgetSettings({
         actionKind: "cpu",
@@ -891,6 +1053,22 @@ function buildMetricDescriptor(overrides: MetricDescriptorFixture): MetricDescri
             sensorName: overrides.sensorName,
             sourceSensorType: overrides.sourceSensorType,
         },
+    };
+}
+
+function buildResolvedCatalogTarget(
+    overrides: Partial<ResolvedCatalogMetricTarget>,
+): ResolvedCatalogMetricTarget {
+    return {
+        domain: "catalog",
+        metricId: "",
+        detectedLabel: undefined,
+        detectedUnit: MetricUnit.UNSPECIFIED,
+        detectedCategory: "unspecified",
+        detectedReadingKind: "unspecified",
+        customLabel: undefined,
+        customMaximumValue: undefined,
+        ...overrides,
     };
 }
 
