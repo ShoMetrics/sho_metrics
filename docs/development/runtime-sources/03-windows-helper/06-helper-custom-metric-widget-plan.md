@@ -2,6 +2,39 @@
 
 This plan is written for a new coding session with no conversation context.
 
+## Implementation Status
+
+Status: **implemented through v1 and manually smoke-tested**.
+
+Completed v1 scope:
+
+- `Custom Metric` Stream Deck action is registered.
+- Empty initial selection renders a placeholder and does not register
+  collection.
+- Custom Metric quick-start stores helper-only source policy.
+- PI loads Windows helper descriptors into runtime cache with explicit
+  `pending` / `ready` / `failed` state.
+- PI guided picker uses `Type -> Hardware -> Reading -> Metric`.
+- Selected catalog metric stores descriptor-derived fallback label/unit hints.
+- Selected catalog metric renders through the existing single-metric view path.
+- Selected catalog metric uses Windows helper demand-driven collection and has
+  no Node/systeminformation fallback.
+
+Manual smoke result:
+
+- A profile with built-in CPU, RAM, and Disk widgets plus Custom Metric widgets
+  for Intel GPU and Other/Voltage refreshed only the demanded helper polling
+  groups observed in helper logs.
+- Removing a Custom Metric RAM widget removed its RAM demand.
+- Built-in Quick Start widgets continue to create their own helper demand where
+  applicable; they are not Custom Metric widgets.
+
+Deferred by design:
+
+- User-editable labels are **not implemented in v1**. The current
+  `fallbackLabel` and `fallbackUnit` values are source-derived offline/rendering
+  hints, not user overrides.
+
 Read these first:
 
 1. [Phase 5c Demand-Driven Background Collection](../01-runtime-collection/03-demand-driven-background-collection.md)
@@ -943,27 +976,31 @@ Files/scripts:
 
 Manual checks:
 
-1. Start the helper with `--dev-pipe`.
-2. Start/restart Stream Deck plugin.
-3. Drag **Custom Metric** to a key.
-4. Confirm the key shows no-selection placeholder.
+1. Start the helper with `--dev-pipe`. Completed.
+2. Start/restart Stream Deck plugin. Completed.
+3. Drag **Custom Metric** to a key. Completed.
+4. Confirm the key shows no-selection placeholder. Covered by unit test and
+   manual startup behavior.
 5. Confirm helper logs show no `SetMetricRefreshDemand` for this action before
-   metric selection.
-6. Open PI and confirm descriptor picker loads.
-7. Select CPU -> Temperature -> Core/package metric.
-8. Confirm helper demand contains only the selected descriptor polling group.
-9. Confirm the widget updates at the configured polling interval.
-10. Switch to a GPU metric and confirm old CPU demand disappears after
-    reconcile/renewal.
-11. Remove the action and confirm helper demand becomes empty after active
-    demand disappears.
+   metric selection. Covered by no-selection subscription tests.
+6. Open PI and confirm descriptor picker loads. Completed.
+7. Select a Custom Metric Intel GPU metric. Completed.
+8. Select a Custom Metric Other/Voltage metric. Completed.
+9. Add then remove a Custom Metric RAM metric. Completed.
+10. Confirm helper demand contains only selected Custom Metric polling groups
+    plus independent demand from built-in Quick Start widgets. Completed with
+    helper logs.
+11. Confirm removed Custom Metric RAM demand disappears. Completed with helper
+    logs.
+12. Confirm selected Custom Metric widgets update at the configured polling
+    interval. Completed by live widget behavior and helper refresh logs.
 
 Automated checks:
 
 - Unit tests for option builder, settings patching, action subscription, and
   PI panel behavior.
-- Existing `npm.cmd run test:unit`.
-- Existing `npm.cmd run build`.
+- `npm.cmd run test:unit` passed.
+- `npm.cmd run build` was not rerun for this documentation-only closeout.
 
 ## Acceptance Checklist
 
@@ -998,6 +1035,8 @@ Automated checks:
 - Existing built-in widgets continue to work.
 - Tests cover no-selection, auto-complete, descriptor sanitization, helper-only
   source policy, and selected metric collection.
+- User-editable labels are intentionally out of v1 scope; `fallbackLabel` is a
+  source-derived fallback hint only.
 
 ## Expected Size
 
