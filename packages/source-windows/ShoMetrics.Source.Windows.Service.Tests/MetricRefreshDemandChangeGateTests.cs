@@ -11,10 +11,10 @@ public sealed class MetricRefreshDemandChangeGateTests
         var gate = new MetricRefreshDemandChangeGate(timeProvider, TimeSpan.FromMilliseconds(250));
         int acceptedCount = 0;
 
-        gate.RunIfAccepted(BuildDemand("metric.one"), () => ++acceptedCount);
+        gate.RunIfAccepted(BuildDemand("metric.one"), _ => ++acceptedCount);
 
         SourceRequestException exception = Assert.Throws<SourceRequestException>(() =>
-            gate.RunIfAccepted(BuildDemand("metric.two"), () => ++acceptedCount));
+            gate.RunIfAccepted(BuildDemand("metric.two"), _ => ++acceptedCount));
 
         Assert.Equal(SourceRequestFailureKind.ResourceExhausted, exception.FailureKind);
         Assert.Equal(1, acceptedCount);
@@ -27,8 +27,8 @@ public sealed class MetricRefreshDemandChangeGateTests
         var gate = new MetricRefreshDemandChangeGate(timeProvider, TimeSpan.FromMilliseconds(250));
         int acceptedCount = 0;
 
-        gate.RunIfAccepted(BuildDemand("metric.one"), () => ++acceptedCount);
-        gate.RunIfAccepted(BuildDemand("metric.one"), () => ++acceptedCount);
+        gate.RunIfAccepted(BuildDemand("metric.one"), _ => ++acceptedCount);
+        gate.RunIfAccepted(BuildDemand("metric.one"), _ => ++acceptedCount);
 
         Assert.Equal(2, acceptedCount);
     }
@@ -40,9 +40,9 @@ public sealed class MetricRefreshDemandChangeGateTests
         var gate = new MetricRefreshDemandChangeGate(timeProvider, TimeSpan.FromMilliseconds(250));
         int acceptedCount = 0;
 
-        gate.RunIfAccepted(BuildDemand("metric.one"), () => ++acceptedCount);
+        gate.RunIfAccepted(BuildDemand("metric.one"), _ => ++acceptedCount);
         timeProvider.Advance(TimeSpan.FromMilliseconds(250));
-        gate.RunIfAccepted(BuildDemand("metric.two"), () => ++acceptedCount);
+        gate.RunIfAccepted(BuildDemand("metric.two"), _ => ++acceptedCount);
 
         Assert.Equal(2, acceptedCount);
     }
@@ -56,9 +56,26 @@ public sealed class MetricRefreshDemandChangeGateTests
         Assert.Throws<InvalidOperationException>(() =>
             gate.RunIfAccepted<int>(
                 BuildDemand("metric.one"),
-                static () => throw new InvalidOperationException()));
+                static _ => throw new InvalidOperationException()));
 
-        gate.RunIfAccepted(BuildDemand("metric.two"), static () => true);
+        gate.RunIfAccepted(BuildDemand("metric.two"), static _ => true);
+    }
+
+    [Fact]
+    public void RunIfAcceptedReportsWhetherDemandChanged()
+    {
+        var timeProvider = new ManualTimeProvider();
+        var gate = new MetricRefreshDemandChangeGate(timeProvider, TimeSpan.FromMilliseconds(250));
+
+        MetricRefreshDemandChangeStatus firstStatus = gate.RunIfAccepted(
+            BuildDemand("metric.one"),
+            static status => status);
+        MetricRefreshDemandChangeStatus secondStatus = gate.RunIfAccepted(
+            BuildDemand("metric.one"),
+            static status => status);
+
+        Assert.Equal(MetricRefreshDemandChangeStatus.Changed, firstStatus);
+        Assert.Equal(MetricRefreshDemandChangeStatus.Unchanged, secondStatus);
     }
 
     private static IReadOnlyList<MetricRefreshDemand> BuildDemand(string metricId)
