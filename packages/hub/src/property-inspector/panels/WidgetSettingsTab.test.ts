@@ -542,8 +542,8 @@ test("catalog metric settings hide single-option levels and show ambiguous metri
         settings: buildWidgetSettings("catalog", {
             catalog: {
                 metricId: "lhm.sensor:/cpu/0/temperature/package",
-                fallbackLabel: "CPU Package",
-                fallbackUnit: "C",
+                detectedLabel: "CPU Package",
+                detectedUnit: MetricUnit.CELSIUS,
             },
         }),
         runtimeCache: {

@@ -1,4 +1,4 @@
-import { MetricUnit } from "../../runtime/sources/metric-source";
+import { formatMetricUnit } from "../../metrics/metric-unit-format";
 import {
     MetricIdKind,
     MetricValueKind,
@@ -630,48 +630,6 @@ function isNoisyHardware(typeId: CatalogMetricTypeId, descriptor: MetricDescript
         : COMMON_NOISY_TOKENS;
 
     return labels.some(label => tokens.some(token => label.includes(token)));
-}
-
-function formatMetricUnit(unit: MetricUnit): string {
-    switch (unit) {
-        case MetricUnit.PERCENT:
-            return "%";
-        case MetricUnit.CELSIUS:
-            return "C";
-        case MetricUnit.VOLTS:
-            return "V";
-        case MetricUnit.AMPERES:
-            return "A";
-        case MetricUnit.WATTS:
-            return "W";
-        case MetricUnit.HERTZ:
-            return "Hz";
-        case MetricUnit.BYTES:
-            return "B";
-        case MetricUnit.BYTES_PER_SECOND:
-            return "B/s";
-        case MetricUnit.REVOLUTIONS_PER_MINUTE:
-            return "RPM";
-        case MetricUnit.LITERS_PER_HOUR:
-            return "L/h";
-        case MetricUnit.SECONDS:
-            return "s";
-        case MetricUnit.WATT_HOURS:
-            return "Wh";
-        case MetricUnit.DECIBELS_A_WEIGHTED:
-            return "dBA";
-        case MetricUnit.SIEMENS_PER_CENTIMETER:
-            return "S/cm";
-        case MetricUnit.MILLISECONDS:
-            return "ms";
-        case MetricUnit.UNSPECIFIED:
-        case MetricUnit.UNITLESS:
-            return "";
-    }
-
-    // Protobuf enums are open at runtime. A newer helper may send a unit this
-    // plugin does not know yet; keep the picker usable and persist no unit hint.
-    return "";
 }
 
 function compareCatalogMetricEntries(left: CatalogMetricEntry, right: CatalogMetricEntry): number {

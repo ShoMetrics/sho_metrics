@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+    CatalogMetricCategory as StoredCatalogMetricCategory,
+    CatalogMetricReadingKind as StoredCatalogMetricReadingKind,
     ColorMode as StoredColorMode,
     CpuMetricTarget_Kind as StoredCpuMetricKind,
     DiskMetricTarget_Kind as StoredDiskMetricKind,
@@ -15,6 +17,7 @@ import {
     TemperatureUnit as StoredTemperatureUnit,
     TextViewVariant as StoredTextViewVariant,
 } from "../../generated/shometrics/v1/settings_pb";
+import { MetricUnit } from "../../runtime/sources/metric-source";
 import { readStoredWidgetSettings } from "./codec";
 import { resolveQuickStartStoredWidgetSettings } from "./quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "./widget-settings-patch";
@@ -66,8 +69,12 @@ test("widget patch updates catalog metric target", () => {
     const nextSettings = writeStoredWidgetSettingsPatch(catalogSettings, {
         catalog: {
             metricId: "source.sensor:/gpu/temperature",
-            fallbackLabel: "GPU Hot Spot",
-            fallbackUnit: "C",
+            detectedLabel: "GPU Hot Spot",
+            detectedUnit: MetricUnit.CELSIUS,
+            detectedCategory: "gpu",
+            detectedReadingKind: "temperature",
+            customLabel: "Hot",
+            customMaximumValue: 120,
         },
     });
 
@@ -75,27 +82,39 @@ test("widget patch updates catalog metric target", () => {
     assert.equal(target?.case, "catalog");
     if (target?.case === "catalog") {
         assert.equal(target.value.metricId, "source.sensor:/gpu/temperature");
-        assert.equal(target.value.fallbackLabel, "GPU Hot Spot");
-        assert.equal(target.value.fallbackUnit, "C");
+        assert.equal(target.value.detectedLabel, "GPU Hot Spot");
+        assert.equal(target.value.detectedUnit, MetricUnit.CELSIUS);
+        assert.equal(target.value.detectedCategory, StoredCatalogMetricCategory.GPU);
+        assert.equal(target.value.detectedReadingKind, StoredCatalogMetricReadingKind.TEMPERATURE);
+        assert.equal(target.value.customLabel, "Hot");
+        assert.equal(target.value.customMaximumValue, 120);
     }
 });
 
-test("widget patch can clear catalog fallback hints", () => {
+test("widget patch can clear catalog display hints and overrides", () => {
     const catalogSettings = writeStoredWidgetSettingsPatch(
         resolveQuickStartStoredWidgetSettings(undefined, "catalog").rawSettings,
         {
             catalog: {
                 metricId: "source.sensor:/gpu/temperature",
-                fallbackLabel: "GPU Hot Spot",
-                fallbackUnit: "C",
+                detectedLabel: "GPU Hot Spot",
+                detectedUnit: MetricUnit.CELSIUS,
+                detectedCategory: "gpu",
+                detectedReadingKind: "temperature",
+                customLabel: "Hot",
+                customMaximumValue: 120,
             },
         },
     );
 
     const nextSettings = writeStoredWidgetSettingsPatch(catalogSettings, {
         catalog: {
-            fallbackLabel: undefined,
-            fallbackUnit: undefined,
+            detectedLabel: undefined,
+            detectedUnit: undefined,
+            detectedCategory: undefined,
+            detectedReadingKind: undefined,
+            customLabel: undefined,
+            customMaximumValue: undefined,
         },
     });
 
@@ -103,8 +122,12 @@ test("widget patch can clear catalog fallback hints", () => {
     assert.equal(target?.case, "catalog");
     if (target?.case === "catalog") {
         assert.equal(target.value.metricId, "source.sensor:/gpu/temperature");
-        assert.equal(target.value.fallbackLabel, undefined);
-        assert.equal(target.value.fallbackUnit, undefined);
+        assert.equal(target.value.detectedLabel, undefined);
+        assert.equal(target.value.detectedUnit, undefined);
+        assert.equal(target.value.detectedCategory, undefined);
+        assert.equal(target.value.detectedReadingKind, undefined);
+        assert.equal(target.value.customLabel, undefined);
+        assert.equal(target.value.customMaximumValue, undefined);
     }
 });
 

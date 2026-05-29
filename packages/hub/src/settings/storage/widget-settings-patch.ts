@@ -43,6 +43,8 @@ import {
     type StoredWidgetSettings,
 } from "../../generated/shometrics/v1/settings_pb.js";
 import type {
+    CatalogMetricCategory,
+    CatalogMetricReadingKind,
     DiskThroughputDirection,
     DiskUsageDisplayMode,
     NetworkDirection,
@@ -55,6 +57,7 @@ import type {
     SourceFailureMode,
     TemperatureUnit,
 } from "../resolved-settings";
+import type { MetricUnit } from "../../runtime/sources/metric-source";
 import type {
     ResolvedAppearanceSettingsOverride,
     ResolvedColorFilledPaintSettingsOverride,
@@ -68,6 +71,8 @@ import {
     type StoredSettingsJsonObject,
 } from "./codec";
 import {
+    storedCatalogMetricCategoryByResolved,
+    storedCatalogMetricReadingKindByResolved,
     storedCircleViewVariantByResolved,
     storedColorModeByResolved,
     storedCpuMetricKindByResolved,
@@ -137,8 +142,12 @@ export interface StoredWidgetSettingsPatch {
     }>;
     readonly catalog?: Partial<{
         readonly metricId: string;
-        readonly fallbackLabel: string | undefined;
-        readonly fallbackUnit: string | undefined;
+        readonly detectedLabel: string | undefined;
+        readonly detectedUnit: MetricUnit | undefined;
+        readonly detectedCategory: CatalogMetricCategory | undefined;
+        readonly detectedReadingKind: CatalogMetricReadingKind | undefined;
+        readonly customLabel: string | undefined;
+        readonly customMaximumValue: number | undefined;
     }>;
 }
 
@@ -521,11 +530,27 @@ function applyCatalogPatch(
     if (patch.metricId !== undefined) {
         target.metricId = patch.metricId;
     }
-    if ("fallbackLabel" in patch) {
-        target.fallbackLabel = patch.fallbackLabel;
+    if ("detectedLabel" in patch) {
+        target.detectedLabel = patch.detectedLabel;
     }
-    if ("fallbackUnit" in patch) {
-        target.fallbackUnit = patch.fallbackUnit;
+    if ("detectedUnit" in patch) {
+        target.detectedUnit = patch.detectedUnit;
+    }
+    if ("detectedCategory" in patch) {
+        target.detectedCategory = patch.detectedCategory === undefined
+            ? undefined
+            : storedCatalogMetricCategoryByResolved[patch.detectedCategory];
+    }
+    if ("detectedReadingKind" in patch) {
+        target.detectedReadingKind = patch.detectedReadingKind === undefined
+            ? undefined
+            : storedCatalogMetricReadingKindByResolved[patch.detectedReadingKind];
+    }
+    if ("customLabel" in patch) {
+        target.customLabel = patch.customLabel;
+    }
+    if ("customMaximumValue" in patch) {
+        target.customMaximumValue = patch.customMaximumValue;
     }
 }
 

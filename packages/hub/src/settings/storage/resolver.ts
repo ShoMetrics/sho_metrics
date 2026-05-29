@@ -1,5 +1,7 @@
 import {
     CircleViewVariant as StoredCircleViewVariant,
+    CatalogMetricCategory as StoredCatalogMetricCategory,
+    CatalogMetricReadingKind as StoredCatalogMetricReadingKind,
     ColorMode as StoredColorMode,
     CpuMetricTarget_Kind as StoredCpuMetricKind,
     DiskMetricTarget_Kind as StoredDiskMetricKind,
@@ -56,7 +58,10 @@ import {
     type StoredGlobalSettings,
     type StoredWidgetSettings,
 } from "../../generated/shometrics/v1/settings_pb.js";
+import { MetricUnit } from "../../runtime/sources/metric-source";
 import type {
+    CatalogMetricCategory,
+    CatalogMetricReadingKind,
     CircleViewVariant,
     ColorMode,
     DiskThroughputDirection,
@@ -291,6 +296,33 @@ const networkUnitBaseByProto = {
     [StoredNetworkUnitBase.BYTE]: "byte",
     [StoredNetworkUnitBase.BIT]: "bit",
 } satisfies Record<StoredNetworkUnitBase, NetworkUnitBase | undefined>;
+
+const catalogMetricCategoryByProto = {
+    [StoredCatalogMetricCategory.UNSPECIFIED]: "unspecified",
+    [StoredCatalogMetricCategory.CPU]: "cpu",
+    [StoredCatalogMetricCategory.GPU]: "gpu",
+    [StoredCatalogMetricCategory.MEMORY]: "memory",
+    [StoredCatalogMetricCategory.DISK]: "disk",
+    [StoredCatalogMetricCategory.NETWORK]: "network",
+    [StoredCatalogMetricCategory.OTHER]: "other",
+} satisfies Record<StoredCatalogMetricCategory, CatalogMetricCategory>;
+
+const catalogMetricReadingKindByProto = {
+    [StoredCatalogMetricReadingKind.UNSPECIFIED]: "unspecified",
+    [StoredCatalogMetricReadingKind.USAGE]: "usage",
+    [StoredCatalogMetricReadingKind.TEMPERATURE]: "temperature",
+    [StoredCatalogMetricReadingKind.POWER]: "power",
+    [StoredCatalogMetricReadingKind.CLOCK]: "clock",
+    [StoredCatalogMetricReadingKind.FAN]: "fan",
+    [StoredCatalogMetricReadingKind.VOLTAGE]: "voltage",
+    [StoredCatalogMetricReadingKind.CURRENT]: "current",
+    [StoredCatalogMetricReadingKind.DATA]: "data",
+    [StoredCatalogMetricReadingKind.THROUGHPUT]: "throughput",
+    [StoredCatalogMetricReadingKind.TIMING]: "timing",
+    [StoredCatalogMetricReadingKind.LEVEL]: "level",
+    [StoredCatalogMetricReadingKind.CONTROL]: "control",
+    [StoredCatalogMetricReadingKind.OTHER]: "other",
+} satisfies Record<StoredCatalogMetricReadingKind, CatalogMetricReadingKind>;
 
 const diskUsageDisplayModeByProto = {
     [StoredDiskUsageDisplayMode.UNSPECIFIED]: undefined,
@@ -652,8 +684,20 @@ function resolveCatalogMetricTarget(storedTarget: StoredCatalogMetricTarget): Re
     return {
         domain: "catalog",
         metricId: storedTarget.metricId ?? "",
-        fallbackLabel: storedTarget.fallbackLabel,
-        fallbackUnit: storedTarget.fallbackUnit,
+        detectedLabel: storedTarget.detectedLabel,
+        detectedUnit: storedTarget.detectedUnit ?? MetricUnit.UNSPECIFIED,
+        detectedCategory: resolveStoredEnum(
+            storedTarget.detectedCategory,
+            catalogMetricCategoryByProto,
+            "unspecified",
+        ),
+        detectedReadingKind: resolveStoredEnum(
+            storedTarget.detectedReadingKind,
+            catalogMetricReadingKindByProto,
+            "unspecified",
+        ),
+        customLabel: storedTarget.customLabel,
+        customMaximumValue: storedTarget.customMaximumValue,
     };
 }
 
