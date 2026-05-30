@@ -28,6 +28,7 @@ message GetSourceHealthResponse {
   string protocol_version = 2;
   string helper_version = 3;
   repeated SourceWarning warnings = 4;
+  repeated SourceComponentStatus component_statuses = 5;
 }
 
 message ListMetricDescriptorsRequest {
@@ -106,6 +107,20 @@ message SourceWarning {
   string message = 2;
   optional string metric_id = 3;
   optional string source_sensor_id = 4;
+}
+
+message SourceComponentStatus {
+  // Known component id such as "driver:pawnio". Consumers may branch on known
+  // complete ids, not arbitrary substrings.
+  string component = 1;
+
+  // Current component state as determined by the producer that owns the
+  // component id.
+  SourceComponentState state = 2;
+
+  // Component-owned version when available, such as the PawnIO module version.
+  // This is separate from GetSourceHealthResponse.helper_version.
+  optional string version = 3;
 }
 
 message SourceError {
@@ -221,4 +236,25 @@ enum MetricUnavailableReason {
   // The metric is known and belongs to a known polling group, but that group
   // has not published its first snapshot yet.
   METRIC_UNAVAILABLE_REASON_PENDING_REFRESH = 4;
+}
+
+enum SourceComponentState {
+  // Proto default. Producers must not emit this intentionally; consumers should
+  // display it like UNKNOWN and may log it as malformed producer data.
+  SOURCE_COMPONENT_STATE_UNSPECIFIED = 0;
+
+  // The producer intentionally cannot determine this component's state.
+  SOURCE_COMPONENT_STATE_UNKNOWN = 1;
+
+  // The component is present and usable for the helper's current privileges.
+  SOURCE_COMPONENT_STATE_OK = 2;
+
+  // The component is not installed or not discoverable by the helper.
+  SOURCE_COMPONENT_STATE_NOT_INSTALLED = 3;
+
+  // The component is present, but the helper lacks required privileges.
+  SOURCE_COMPONENT_STATE_NOT_ELEVATED = 4;
+
+  // The component is present, but health checks indicate unusable output.
+  SOURCE_COMPONENT_STATE_UNUSABLE = 5;
 }

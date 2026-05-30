@@ -186,8 +186,12 @@ internal static class Program
 
         loggerConfiguration
             .MinimumLevel.Is(minimumLevel)
+            // Dev builds keep gRPC debug logs except the server call handler's
+            // per-message read/write traces, which add volume without source
+            // operation context.
             .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
             .MinimumLevel.Override("System", LogEventLevel.Warning)
+            .MinimumLevel.Override("Grpc.AspNetCore.Server.ServerCallHandler", LogEventLevel.Warning)
             .Enrich.FromLogContext()
             .WriteTo.File(
                 WindowsSourceServicePaths.ResolveLogFilePath(),

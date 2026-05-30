@@ -6,6 +6,12 @@ namespace ShoMetrics.Source.Windows.Service;
 
 internal static class WindowsPipeSecurity
 {
+    /// <summary>
+    /// Creates the named-pipe ACL for the privileged helper service.
+    /// Built-in users get read/write so the normal-user Hub and Control Panel
+    /// can read metrics and status; privileged mutation is intentionally not
+    /// exposed through this data-plane pipe.
+    /// </summary>
     public static PipeSecurity CreatePipeSecurity()
     {
         var pipeSecurity = new PipeSecurity();

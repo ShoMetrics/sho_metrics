@@ -13,6 +13,11 @@ internal static class MetricRefreshDemandRequestValidator
     public const int MaximumMetricIdLength = 512;
     public const int MaximumDemandIdentifierByteCount = 65536;
 
+    /// <summary>
+    /// Validates an untrusted wire request before it mutates helper refresh
+    /// demand. Polling-group ids remain source-owned opaque strings after
+    /// validation; this method only checks size, uniqueness, and control chars.
+    /// </summary>
     public static IReadOnlyList<MetricRefreshDemand> ValidateAndMap(SetMetricRefreshDemandRequest request)
     {
         if (request.Groups.Count > MaximumDemandGroupsPerRequest)

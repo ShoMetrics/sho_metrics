@@ -6,6 +6,11 @@ internal sealed class SourceMethodRateLimiter(TimeProvider timeProvider)
     private readonly TokenBucket _readMetricSnapshot = new(timeProvider, tokensPerSecond: 50, burstSize: 20);
     private readonly TokenBucket _setMetricRefreshDemand = new(timeProvider, tokensPerSecond: 4, burstSize: 2);
 
+    /// <summary>
+    /// Applies the service-boundary rate policy for request methods that can be
+    /// expensive or churn helper state. Unknown methods are allowed until a
+    /// specific policy is defined.
+    /// </summary>
     public bool TryAcquire(string methodName)
     {
         return methodName switch
