@@ -30,5 +30,13 @@ jobs:
       - name: Run lint
         run: ./scripts/Test-SourceWindowsLint.ps1
 
-      - name: Run tests
-        run: dotnet test ShoMetrics.Source.Windows.slnx --configuration Release --no-restore
+      - name: Run tests with coverage
+        run: dotnet test ShoMetrics.Source.Windows.slnx --configuration Release --no-restore --settings SourceWindows.coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-windows-coverage
+          path: packages/source-windows/TestResults
+          if-no-files-found: ignore

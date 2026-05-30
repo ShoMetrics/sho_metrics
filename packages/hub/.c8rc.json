@@ -1,0 +1,23 @@
+{
+    "all": true,
+    "src": [
+        "src"
+    ],
+    "reporter": [
+        "text",
+        "lcov",
+        "cobertura"
+    ],
+    "reports-dir": "coverage/unit",
+    "exclude-after-remap": true,
+    "exclude": [
+        "**/*.d.ts",
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "generated/**",
+        "src/generated/**",
+        "src/property-inspector/testing/**",
+        "src/runtime/sources/node-system/node-system-source-test-helpers.ts",
+        "tests/**"
+    ]
+}
