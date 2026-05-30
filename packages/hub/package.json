@@ -10,6 +10,7 @@
         "perf:monitor": "node scripts/diagnostics/runtime-performance-monitor.mjs",
         "diagnostics:runtime": "node scripts/diagnostics/runtime-performance-monitor.mjs",
         "diagnostics:source": "node scripts/diagnostics/metric-source-comparison.mjs",
+        "diagnostics:windows-helper-lhm-parity": "node scripts/diagnostics/windows-helper-lhm-parity.mjs",
         "benchmark:protobuf": "node scripts/run-buf.mjs generate --template scripts/benchmark/protobuf/buf.gen.yaml && node scripts/benchmark/protobuf/protobuf-performance-benchmark.mjs",
         "benchmark:resvg": "node scripts/benchmark/resvg-minimal.mjs",
         "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart com.ez.sho-metrics\"",
