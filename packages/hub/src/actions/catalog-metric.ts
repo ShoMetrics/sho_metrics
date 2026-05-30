@@ -59,16 +59,20 @@ export class CatalogMetric extends MetricAction {
     protected async refreshCatalogMetricDescriptorsForPropertyInspector(
         event: PropertyInspectorDidAppearEvent,
     ): Promise<void> {
+        const pendingSourceStatus = this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID);
         await this.updateRuntimeCache(event, {
             catalogMetricDescriptorLoadState: "pending",
+            ...(pendingSourceStatus ? { catalogMetricDescriptorSourceStatus: pendingSourceStatus } : {}),
         });
 
         try {
             const descriptorSnapshot = await this.readCatalogMetricDescriptorSnapshot();
+            const sourceStatus = this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID);
 
             await this.updateRuntimeCache(event, {
                 availableCatalogMetricDescriptors: descriptorSnapshot.descriptors,
                 catalogMetricDescriptorLoadState: "ready",
+                ...(sourceStatus ? { catalogMetricDescriptorSourceStatus: sourceStatus } : {}),
             });
         } catch (error) {
             log.atWarn()
@@ -77,10 +81,12 @@ export class CatalogMetric extends MetricAction {
                     CATALOG_DESCRIPTOR_LOAD_WARNING_INTERVAL_MILLISECONDS,
                 )
                 .log(() => `Failed to load catalog metric descriptors. error=${String(error)}`);
+            const sourceStatus = this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID);
 
             await this.updateRuntimeCache(event, {
                 availableCatalogMetricDescriptors: [],
                 catalogMetricDescriptorLoadState: "failed",
+                ...(sourceStatus ? { catalogMetricDescriptorSourceStatus: sourceStatus } : {}),
             });
         }
     }

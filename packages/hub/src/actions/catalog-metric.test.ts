@@ -16,6 +16,7 @@ import {
     MetricValueKind,
     type MetricDescriptor,
     type MetricDescriptorSnapshot,
+    type SourceClientStatus,
 } from "../runtime/sources/source-client";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
 import type { WidgetData } from "../view-rendering/widget-data";
@@ -99,6 +100,34 @@ test("catalog metric publishes failed descriptor status", async () => {
             {
                 availableCatalogMetricDescriptors: [],
                 catalogMetricDescriptorLoadState: "failed",
+            },
+        ]);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    }
+});
+
+test("catalog metric publishes helper status when descriptor loading fails", async () => {
+    const helperStatus: SourceClientStatus = {
+        state: "unavailable",
+        reason: "helperNotInstalled",
+    };
+    const action = new TestCatalogMetric(new Error("helper unavailable"), helperStatus);
+    const streamDeckAction = new FakeStreamDeckAction("catalog-descriptor-helper-status-action");
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCatalogWidgetSettings("")));
+        await action.refreshCatalogMetricDescriptorsForTest(buildPropertyInspectorDidAppearEvent(streamDeckAction));
+
+        assert.deepEqual(action.runtimeCachePatchList, [
+            {
+                catalogMetricDescriptorLoadState: "pending",
+                catalogMetricDescriptorSourceStatus: helperStatus,
+            },
+            {
+                availableCatalogMetricDescriptors: [],
+                catalogMetricDescriptorLoadState: "failed",
+                catalogMetricDescriptorSourceStatus: helperStatus,
             },
         ]);
     } finally {
@@ -356,10 +385,13 @@ class TestCatalogMetric extends CatalogMetric {
     readonly runtimeCachePatchList: WidgetRuntimeCachePatch[] = [];
     metricsUpdateCallCount = 0;
 
-    constructor(private descriptorReadResult: MetricDescriptorSnapshot | Error = {
-        descriptors: [],
-        descriptorFingerprint: "empty-catalog",
-    }) {
+    constructor(
+        private descriptorReadResult: MetricDescriptorSnapshot | Error = {
+            descriptors: [],
+            descriptorFingerprint: "empty-catalog",
+        },
+        private readonly sourceStatus: SourceClientStatus | undefined = undefined,
+    ) {
         super();
     }
 
@@ -389,6 +421,11 @@ class TestCatalogMetric extends CatalogMetric {
         }
 
         return Promise.resolve(this.descriptorReadResult);
+    }
+
+    protected override readCachedSourceStatus(sourceId: string): SourceClientStatus | undefined {
+        assert.equal(sourceId, WINDOWS_HELPER_SOURCE_ID);
+        return this.sourceStatus;
     }
 
     protected override sendRuntimeCachePatchToPropertyInspector(

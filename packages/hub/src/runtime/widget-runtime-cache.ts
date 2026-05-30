@@ -20,6 +20,7 @@ export interface WidgetRuntimeCache {
     availableDiskVolumes: DiskVolumeOption[];
     availableCatalogMetricDescriptors: readonly MetricDescriptor[];
     catalogMetricDescriptorLoadState: WidgetRuntimeCacheLoadState;
+    catalogMetricDescriptorSourceStatus: SourceClientStatus | undefined;
     runtimeMaximumDownloadSpeedMbps: number | undefined;
     runtimeMaximumUploadSpeedMbps: number | undefined;
     runtimeMaximumDiskReadThroughputMebibytesPerSecond: number | undefined;
@@ -80,6 +81,7 @@ export const emptyWidgetRuntimeCache: WidgetRuntimeCache = {
     availableDiskVolumes: [],
     availableCatalogMetricDescriptors: [],
     catalogMetricDescriptorLoadState: "pending",
+    catalogMetricDescriptorSourceStatus: undefined,
     runtimeMaximumDownloadSpeedMbps: undefined,
     runtimeMaximumUploadSpeedMbps: undefined,
     runtimeMaximumDiskReadThroughputMebibytesPerSecond: undefined,

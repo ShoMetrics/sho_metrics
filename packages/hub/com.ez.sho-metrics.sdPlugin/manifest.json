@@ -123,6 +123,9 @@
 			"UUID": "com.ez.sho-metrics.catalog-metric",
 			"Icon": "imgs/actions/sho-metrics/icon",
 			"Tooltip": "Displays one selected metric.",
+			"OS": [
+				"windows"
+			],
 			"PropertyInspectorPath": "ui/property-inspector.html",
 			"Controllers": [
 				"Keypad",
