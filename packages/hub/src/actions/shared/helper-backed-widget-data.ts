@@ -1,5 +1,8 @@
 import type { MetricStoreReader } from "../../runtime/metric-store";
-import type { SourceClientStatus } from "../../runtime/sources/source-client";
+import type {
+    MetricUnavailableReport,
+    SourceClientStatus,
+} from "../../runtime/sources/source-client";
 import { wallClockNowMilliseconds } from "../../shared/clock";
 import type { WidgetData } from "../../view-rendering/widget-data";
 
@@ -20,12 +23,13 @@ interface HelperBackedWidgetDataReadOptions {
 
 /** Reads a helper-backed metric and returns action-owned no-data copy when no fresh sample exists. */
 export function readHelperBackedWidgetData(options: HelperBackedWidgetDataReadOptions): WidgetData {
-    const widgetData = options.metrics.getWidgetData(
+    const readResult = options.metrics.getWidgetDataWithAttribution(
         options.metricKey,
         options.label,
         options.unit,
         options.maxValue ?? 100,
     );
+    const { widgetData } = readResult;
 
     if (isFreshHelperBackedWidgetData(widgetData)) {
         return options.transformFreshWidgetData?.(widgetData) ?? widgetData;
@@ -42,7 +46,10 @@ export function readHelperBackedWidgetData(options: HelperBackedWidgetDataReadOp
     void ignoredSecondaryDisplayValue;
     void ignoredSampleTimestampMilliseconds;
 
-    const unavailableDisplayValue = resolveHelperBackedUnavailableDisplayValue(options.helperStatus);
+    const unavailableDisplayValue = resolveHelperBackedUnavailableDisplayValue(
+        options.helperStatus,
+        readResult.unavailableMetric,
+    );
 
     return {
         ...baseWidgetData,
@@ -62,20 +69,11 @@ function isFreshHelperBackedWidgetData(widgetData: WidgetData): boolean {
         <= HELPER_BACKED_SAMPLE_FRESHNESS_MILLISECONDS;
 }
 
-function resolveHelperBackedUnavailableDisplayValue(helperStatus: SourceClientStatus | undefined): string | undefined {
-    if (helperStatus === undefined) {
-        return undefined;
-    }
-
-    if (helperStatus.state === "unknown") {
-        return undefined;
-    }
-
-    if (helperStatus.state === "available") {
-        return "No sensor data";
-    }
-
-    if (helperStatus.state === "unavailable") {
+function resolveHelperBackedUnavailableDisplayValue(
+    helperStatus: SourceClientStatus | undefined,
+    unavailableMetric: MetricUnavailableReport | undefined,
+): string | undefined {
+    if (helperStatus?.state === "unavailable") {
         if (helperStatus.reason === "helperNotInstalled") {
             return "Helper required";
         }
@@ -87,6 +85,18 @@ function resolveHelperBackedUnavailableDisplayValue(helperStatus: SourceClientSt
         }
 
         return "Helper error";
+    }
+
+    if (unavailableMetric?.reason === "pendingRefresh") {
+        return "Waiting...";
+    }
+
+    if (helperStatus === undefined || helperStatus.state === "unknown") {
+        return undefined;
+    }
+
+    if (helperStatus.state === "available") {
+        return "No sensor data";
     }
 
     return "Helper error";

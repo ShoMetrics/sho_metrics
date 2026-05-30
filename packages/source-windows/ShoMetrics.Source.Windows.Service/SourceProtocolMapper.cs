@@ -323,6 +323,7 @@ internal sealed class SourceProtocolMapper
             CoreMetricUnavailableReason.NoSensor => ProtoMetricUnavailableReason.NoSensor,
             CoreMetricUnavailableReason.InvalidValue => ProtoMetricUnavailableReason.InvalidValue,
             CoreMetricUnavailableReason.Expired => ProtoMetricUnavailableReason.Expired,
+            CoreMetricUnavailableReason.PendingRefresh => ProtoMetricUnavailableReason.PendingRefresh,
             _ => throw new UnreachableException($"Missing protobuf unavailable metric reason mapping for '{reason}'."),
         };
     }

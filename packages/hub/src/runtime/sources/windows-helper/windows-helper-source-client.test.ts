@@ -608,6 +608,10 @@ test("windows helper source client maps value attribution and unavailable metric
                             metricId: "cpu.power",
                             reason: ProtoMetricUnavailableReason.NO_SENSOR,
                         }),
+                        create(MetricUnavailableReportSchema, {
+                            metricId: "cpu.temp",
+                            reason: ProtoMetricUnavailableReason.PENDING_REFRESH,
+                        }),
                     ],
                 });
             default:
@@ -616,7 +620,7 @@ test("windows helper source client maps value attribution and unavailable metric
     });
     const client = createClient(transport);
 
-    const readResult = await client.readSnapshot(["cpu.usage_percent", "cpu.power"]);
+    const readResult = await client.readSnapshot(["cpu.usage_percent", "cpu.power", "cpu.temp"]);
 
     assert.deepEqual(readResult.valueAttributions, [{
         metricId: "cpu.usage_percent",
@@ -631,10 +635,16 @@ test("windows helper source client maps value attribution and unavailable metric
         valueFreshness: "retained",
         retainedAgeMilliseconds: 1500,
     }]);
-    assert.deepEqual(readResult.unavailableMetrics, [{
-        metricId: "cpu.power",
-        reason: "noSensorData",
-    }]);
+    assert.deepEqual(readResult.unavailableMetrics, [
+        {
+            metricId: "cpu.power",
+            reason: "noSensorData",
+        },
+        {
+            metricId: "cpu.temp",
+            reason: "pendingRefresh",
+        },
+    ]);
 });
 
 test("windows helper source client drops inconsistent source metric reports", async () => {

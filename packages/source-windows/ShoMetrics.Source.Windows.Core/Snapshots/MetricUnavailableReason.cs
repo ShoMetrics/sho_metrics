@@ -5,4 +5,5 @@ public enum MetricUnavailableReason
     NoSensor,
     InvalidValue,
     Expired,
+    PendingRefresh,
 }

@@ -217,4 +217,8 @@ enum MetricUnavailableReason {
 
   // A retained last-good value exists but exceeded the source retention window.
   METRIC_UNAVAILABLE_REASON_EXPIRED = 3;
+
+  // The metric is known and belongs to a known polling group, but that group
+  // has not published its first snapshot yet.
+  METRIC_UNAVAILABLE_REASON_PENDING_REFRESH = 4;
 }

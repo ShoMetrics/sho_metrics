@@ -28,7 +28,7 @@ internal sealed class MetricSnapshotCache
     public MetricSnapshot Read(IReadOnlyCollection<string> metricIds)
     {
         HashSet<string>? requestedMetricIds = BuildRequestedMetricSet(metricIds);
-        MetricSnapshot snapshot = ReadCachedSnapshot(metricIds);
+        MetricSnapshot snapshot = ReadCachedSnapshot(metricIds, requestedMetricIds);
 
         return FilterSnapshot(snapshot, requestedMetricIds);
     }
@@ -125,29 +125,44 @@ internal sealed class MetricSnapshotCache
             .ToList();
     }
 
-    private MetricSnapshot ReadCachedSnapshot(IReadOnlyCollection<string> metricIds)
+    private MetricSnapshot ReadCachedSnapshot(
+        IReadOnlyCollection<string> metricIds,
+        HashSet<string>? requestedMetricIds)
     {
-        if (TryResolveSinglePollingGroupId(metricIds, out string? pollingGroupId)
-            && pollingGroupId is not null
-            && _latestSnapshotsByPollingGroupId.TryGetValue(pollingGroupId, out MetricSnapshot? groupSnapshot))
+        // Empty reads intentionally keep the full latest snapshot path. Only a
+        // concrete metric request can prove that one polling group is still
+        // warming up.
+        if (metricIds.Count == 0)
+        {
+            return Volatile.Read(ref _latestSnapshot);
+        }
+
+        // Unknown metrics and multi-group reads keep the legacy latest-snapshot
+        // behavior. A pending-refresh report is only valid when every requested
+        // metric is known to belong to the same group.
+        if (!TryResolveKnownSinglePollingGroupId(metricIds, out string pollingGroupId))
+        {
+            return Volatile.Read(ref _latestSnapshot);
+        }
+
+        if (_latestSnapshotsByPollingGroupId.TryGetValue(pollingGroupId, out MetricSnapshot? groupSnapshot))
         {
             return groupSnapshot;
         }
 
-        return Volatile.Read(ref _latestSnapshot);
+        // The metric ids are known and all belong to one group, but that group
+        // has never published. This is startup/warmup, not "no sensor".
+        return BuildPendingRefreshSnapshot(
+            requestedMetricIds ?? [],
+            Volatile.Read(ref _latestSnapshot));
     }
 
-    private bool TryResolveSinglePollingGroupId(
+    private bool TryResolveKnownSinglePollingGroupId(
         IReadOnlyCollection<string> metricIds,
-        out string? pollingGroupId)
+        out string pollingGroupId)
     {
-        pollingGroupId = null;
-
-        if (metricIds.Count == 0)
-        {
-            return false;
-        }
-
+        pollingGroupId = string.Empty;
+        string? resolvedPollingGroupId = null;
         foreach (string metricId in metricIds)
         {
             if (!_pollingGroupIdsByMetricId.TryGetValue(metricId, out string? currentPollingGroupId))
@@ -155,19 +170,25 @@ internal sealed class MetricSnapshotCache
                 return false;
             }
 
-            if (pollingGroupId is null)
+            if (resolvedPollingGroupId is null)
             {
-                pollingGroupId = currentPollingGroupId;
+                resolvedPollingGroupId = currentPollingGroupId;
                 continue;
             }
 
-            if (!pollingGroupId.Equals(currentPollingGroupId, StringComparison.Ordinal))
+            if (!resolvedPollingGroupId.Equals(currentPollingGroupId, StringComparison.Ordinal))
             {
                 return false;
             }
         }
 
-        return pollingGroupId is not null;
+        if (resolvedPollingGroupId is null)
+        {
+            return false;
+        }
+
+        pollingGroupId = resolvedPollingGroupId;
+        return true;
     }
 
     private bool IsMetricInPollingGroup(string metricId, string pollingGroupId)
@@ -221,6 +242,28 @@ internal sealed class MetricSnapshotCache
         }
 
         return diagnosticsByMetricId.Values.ToList();
+    }
+
+    private static MetricSnapshot BuildPendingRefreshSnapshot(
+        HashSet<string> requestedMetricIds,
+        MetricSnapshot latestSnapshot)
+    {
+        // Keep warning/capture metadata from the latest source snapshot, but do
+        // not borrow readings from unrelated groups. That would collapse
+        // pending warmup back into an apparent missing sensor.
+        return new MetricSnapshot
+        {
+            CapturedAt = latestSnapshot.CapturedAt,
+            Readings = [],
+            UnavailableMetrics = requestedMetricIds
+                .Select(metricId => new MetricUnavailableReport
+                {
+                    MetricId = metricId,
+                    Reason = MetricUnavailableReason.PendingRefresh,
+                })
+                .ToList(),
+            Warnings = latestSnapshot.Warnings,
+        };
     }
 
     private static HashSet<string>? BuildRequestedMetricSet(IReadOnlyCollection<string> metricIds)

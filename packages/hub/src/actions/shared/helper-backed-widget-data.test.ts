@@ -150,6 +150,38 @@ test("helper-backed widget data reports no sensor data after the helper is reach
     );
 });
 
+test("helper-backed widget data reports pending refresh from source unavailable metadata", () => {
+    assert.equal(
+        readHelperBackedWidgetData({
+            metrics: buildMetricReader(
+                { sampleTimestampMilliseconds: undefined },
+                { metricId: "cpu.temp", reason: "pendingRefresh" },
+            ),
+            metricKey: "cpu.temp",
+            label: "CPU",
+            unit: "C",
+            helperStatus: { state: "available" },
+        }).unavailableDisplayValue,
+        "Waiting...",
+    );
+});
+
+test("helper-backed widget data prefers helper failures over pending refresh metadata", () => {
+    assert.equal(
+        readHelperBackedWidgetData({
+            metrics: buildMetricReader(
+                { sampleTimestampMilliseconds: undefined },
+                { metricId: "cpu.temp", reason: "pendingRefresh" },
+            ),
+            metricKey: "cpu.temp",
+            label: "CPU",
+            unit: "C",
+            helperStatus: { state: "unavailable", reason: "sourceError" },
+        }).unavailableDisplayValue,
+        "Helper error",
+    );
+});
+
 test("helper-backed widget data reports helper errors after helper failures", () => {
     assert.equal(
         readHelperBackedWidgetData({
@@ -163,7 +195,10 @@ test("helper-backed widget data reports helper errors after helper failures", ()
     );
 });
 
-function buildMetricReader(widgetData: Partial<WidgetData>): MetricStoreReader {
+function buildMetricReader(
+    widgetData: Partial<WidgetData>,
+    unavailableMetric?: MetricWidgetDataReadResult["unavailableMetric"],
+): MetricStoreReader {
     const fullWidgetData = buildWidgetData(widgetData);
 
     return {
@@ -171,6 +206,7 @@ function buildMetricReader(widgetData: Partial<WidgetData>): MetricStoreReader {
         getWidgetDataWithAttribution: (): MetricWidgetDataReadResult => ({
             widgetData: fullWidgetData,
             selectedSourceId: "local:windows-helper",
+            ...(unavailableMetric === undefined ? {} : { unavailableMetric }),
         }),
         getTextValue: () => undefined,
     };

@@ -9,6 +9,7 @@ Read these documents in order:
 5. [Windows Helper Demand-Driven Refresh Plan](05-helper-demand-driven-refresh-plan.md)
 6. [Windows Helper Advanced Sensor Widget Plan](06-helper-advanced-sensor-widget-plan.md)
 7. [Windows Helper Advanced Sensor Label And Scale Plan](07-helper-advanced-sensor-label-scale-plan.md)
+8. [Windows Helper Unavailable User Guidance Plan](08-helper-unavailable-user-guidance-plan.md)
 
 ## Scope
 
@@ -25,3 +26,6 @@ selection, helper catalog PI options, or catalog metric collection behavior.
 Read the advanced sensor label and scale plan before changing catalog metric
 label overrides, detected display hints, unit formatting, title-card captions,
 or circle/bar scale defaults.
+Read the unavailable user guidance plan before changing helper no-data copy,
+Control Panel helper status presentation, helper health diagnostics, or
+platform visibility for helper-backed actions.
