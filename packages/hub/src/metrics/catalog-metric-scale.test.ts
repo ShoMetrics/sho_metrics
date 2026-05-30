@@ -15,6 +15,8 @@ test("catalog metric default maximums use detected unit category and reading", (
     assert.equal(resolveCatalogMetricDefaultMaximumValue(MetricUnit.WATTS, "gpu", "power"), 450);
     assert.equal(resolveCatalogMetricDefaultMaximumValue(MetricUnit.HERTZ, "gpu", "clock"), 3_000_000_000);
     assert.equal(resolveCatalogMetricDefaultMaximumValue(MetricUnit.BYTES, "memory", "data"), 64 * 1024 ** 3);
+    assert.equal(resolveCatalogMetricDefaultMaximumValue(MetricUnit.BYTES, "gpu", "data"), 32 * 1024 ** 3);
+    assert.equal(resolveCatalogMetricDefaultMaximumValue(MetricUnit.SECONDS, "memory", "timing"), 100e-9);
     assert.equal(
         resolveCatalogMetricDefaultMaximumValue(MetricUnit.BYTES_PER_SECOND, "network", "throughput"),
         125 * 1000 ** 2,
