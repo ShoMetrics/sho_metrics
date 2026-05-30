@@ -30,3 +30,23 @@ npm.cmd run diagnostics:source -- --sources=node,windows-helper --metrics=cpu,ra
 npm.cmd run diagnostics:source -- --sources=node,lhm-json --lhm-json-url=http://127.0.0.1:8085/data.json
 npm.cmd run diagnostics:source -- --sources=node,lhm-json --metrics=cpu --stress --workload-start-ms=5000 --reaction-metric=cpuUsagePercent --reaction-threshold=80
 ```
+
+## Windows Helper LHM Parity
+
+`diagnostics/windows-helper-lhm-parity.mjs` compares every finite LHM desktop
+JSON sensor value with the running Windows helper source-sensor descriptor and
+snapshot result.
+
+It is intentionally non-hermetic: it requires a running Windows helper dev pipe
+and a running LHM desktop JSON endpoint. The script temporarily replaces helper
+refresh demand one polling group at a time, reads helper cached snapshots, then
+clears demand before exit.
+
+Reports can contain local hardware labels and source sensor ids. Write them
+under ignored `artifacts/` unless you are intentionally sharing local debug data.
+
+Example:
+
+```powershell
+npm.cmd run diagnostics:windows-helper-lhm-parity -- --lhm-json-url http://127.0.0.1:8085/ --out ../../artifacts/windows-helper-lhm-parity.json --markdown-out ../../artifacts/windows-helper-lhm-parity.md
+```
