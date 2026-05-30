@@ -194,6 +194,94 @@ public sealed class LibreHardwareMonitorSessionTests
     }
 
     [Fact]
+    public async Task RefreshPollingGroupRetainsCpuSensorAcrossUnrelatedGpuRefreshTicks()
+    {
+        var timeProvider = new ManualTimeProvider();
+        FakeSensor cpuTemperature = FakeSensor.Temperature("CPU Package", value: 55);
+        FakeHardware cpuHardware = FakeHardware.Cpu();
+        cpuHardware.Sensors = [cpuTemperature];
+        FakeHardware gpuHardware = FakeHardware.Gpu();
+        gpuHardware.Sensors =
+        [
+            FakeSensor.Load("GPU Core", value: 75),
+        ];
+        using var provider = new WindowsSystemTotalDiskThroughputProvider(
+            new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
+        using var session = new LibreHardwareMonitorSession([cpuHardware, gpuHardware], provider, timeProvider);
+        string cpuRawTemperatureMetricId = "lhm.sensor:/cpu/0/temperature/0";
+
+        await session.RefreshPollingGroupWithDiagnosticsAsync(
+            LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(cpuHardware),
+            CancellationToken.None);
+
+        cpuTemperature.Value = null;
+
+        for (int index = 0; index < 5; index++)
+        {
+            timeProvider.Advance(MetricRefreshDemandConstants.MinimumCoreLhmRefreshInterval);
+            await session.RefreshPollingGroupWithDiagnosticsAsync(
+                LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(gpuHardware),
+                CancellationToken.None);
+        }
+
+        timeProvider.Advance(MetricRefreshDemandConstants.MinimumCoreLhmRefreshInterval);
+        MetricSnapshotRefreshResult result = await session.RefreshPollingGroupWithDiagnosticsAsync(
+            LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(cpuHardware),
+            CancellationToken.None);
+
+        Assert.Contains(result.Snapshot.Readings, reading =>
+            reading is
+            {
+                MetricId: "lhm.sensor:/cpu/0/temperature/0",
+                Value: 55,
+                ValueFreshness: MetricValueFreshness.Retained,
+            });
+        Assert.Contains(result.Snapshot.Readings, reading =>
+            reading is
+            {
+                MetricId: LibreHardwareMetricCatalog.CpuTemperatureMetricId,
+                Value: 55,
+                ValueFreshness: MetricValueFreshness.Retained,
+            });
+        Assert.DoesNotContain(result.Snapshot.UnavailableMetrics, report =>
+            report.MetricId == cpuRawTemperatureMetricId
+                || report.MetricId == LibreHardwareMetricCatalog.CpuTemperatureMetricId);
+    }
+
+    [Fact]
+    public async Task RefreshPollingGroupExpiresRetainedCpuSensorAfterAgeLimit()
+    {
+        var timeProvider = new ManualTimeProvider();
+        FakeSensor cpuTemperature = FakeSensor.Temperature("CPU Package", value: 55);
+        FakeHardware cpuHardware = FakeHardware.Cpu();
+        cpuHardware.Sensors = [cpuTemperature];
+        using var provider = new WindowsSystemTotalDiskThroughputProvider(
+            new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
+        using var session = new LibreHardwareMonitorSession([cpuHardware], provider, timeProvider);
+        string cpuRawTemperatureMetricId = "lhm.sensor:/cpu/0/temperature/0";
+
+        await session.RefreshPollingGroupWithDiagnosticsAsync(
+            LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(cpuHardware),
+            CancellationToken.None);
+
+        cpuTemperature.Value = null;
+        timeProvider.Advance(TimeSpan.FromMinutes(2));
+        MetricSnapshotRefreshResult result = await session.RefreshPollingGroupWithDiagnosticsAsync(
+            LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(cpuHardware),
+            CancellationToken.None);
+
+        Assert.DoesNotContain(result.Snapshot.Readings, reading =>
+            reading.MetricId == cpuRawTemperatureMetricId
+                || reading.MetricId == LibreHardwareMetricCatalog.CpuTemperatureMetricId);
+        Assert.Contains(result.Snapshot.UnavailableMetrics, report =>
+            report.MetricId == cpuRawTemperatureMetricId
+                && report.Reason == MetricUnavailableReason.Expired);
+        Assert.Contains(result.Snapshot.UnavailableMetrics, report =>
+            report.MetricId == LibreHardwareMetricCatalog.CpuTemperatureMetricId
+                && report.Reason == MetricUnavailableReason.Expired);
+    }
+
+    [Fact]
     public async Task RefreshPollingGroupForNativeDiskDoesNotTraverseLhmStorage()
     {
         FakeHardware storageHardware = FakeHardware.Storage();

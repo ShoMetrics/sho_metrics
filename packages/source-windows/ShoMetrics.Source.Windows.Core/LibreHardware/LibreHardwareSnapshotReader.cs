@@ -12,29 +12,35 @@ namespace ShoMetrics.Source.Windows.Core;
 /// enforce demand, or own synchronization. <see cref="LibreHardwareMonitorSession" />
 /// holds the refresh gate and decides when the returned data is published. The
 /// caller must serialize calls to <see cref="Read" /> because retention cache
-/// state is source-tick based and intentionally not thread-safe.
+/// state keeps per-polling-group source ticks and intentionally is not thread-safe.
 /// </remarks>
 internal sealed class LibreHardwareSnapshotReader
 {
-    private const int RetainedSampleTickLimit = 3;
+    private readonly TimeProvider _timeProvider;
+    private readonly HardwareMetricRetentionCache _retentionCache;
 
-    private readonly HardwareMetricRetentionCache _retentionCache = new(RetainedSampleTickLimit);
-    private long _sourceTick;
+    public LibreHardwareSnapshotReader(TimeProvider? timeProvider = null)
+    {
+        _timeProvider = timeProvider ?? TimeProvider.System;
+        _retentionCache = new HardwareMetricRetentionCache(_timeProvider);
+    }
 
     public LibreHardwareSnapshotReadResult Read(
         IReadOnlyList<IHardware> hardwareTargets,
         CancellationToken cancellationToken)
     {
-        long sourceTick = ++_sourceTick;
-        DateTimeOffset capturedAt = DateTimeOffset.UtcNow;
+        long currentTimestamp = _timeProvider.GetTimestamp();
+        DateTimeOffset capturedAt = _timeProvider.GetUtcNow();
         Dictionary<string, MetricReading> readingsByMetricId = new(StringComparer.Ordinal);
         Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId = new(StringComparer.Ordinal);
         List<RankedMetricReading> cpuTemperatureCandidates = [];
         List<RankedMetricReading> cpuPowerCandidates = [];
+        List<string> cpuPollingGroupIds = [];
         List<HardwareRefreshDiagnostic> hardwareUpdates = [];
         List<TouchedPollingGroup> touchedPollingGroups = [];
         List<string> warnings = [];
-        bool readsCpuHardware = HardwareTargetsContainCpu(hardwareTargets);
+        HardwareMetricRetentionCache.ReadScope retentionRead =
+            _retentionCache.BeginRead(currentTimestamp);
 
         foreach (IHardware hardware in hardwareTargets)
         {
@@ -44,8 +50,9 @@ internal sealed class LibreHardwareSnapshotReader
                 unavailableReportsByMetricId,
                 cpuTemperatureCandidates,
                 cpuPowerCandidates,
+                cpuPollingGroupIds,
                 capturedAt,
-                sourceTick,
+                retentionRead,
                 hardwareUpdates,
                 touchedPollingGroups,
                 warnings,
@@ -55,22 +62,22 @@ internal sealed class LibreHardwareSnapshotReader
         // Ranked CPU aliases are group-level derived metrics. Non-CPU passes
         // have no CPU polling-group publication, so querying CPU alias retention
         // would only age or synthesize data that the session cannot publish.
-        if (readsCpuHardware)
+        if (cpuPollingGroupIds.Count > 0)
         {
             AddRankedStableAliasReading(
                 LibreHardwareMetricCatalog.CpuTemperatureMetricId,
                 cpuTemperatureCandidates,
+                cpuPollingGroupIds[0],
+                retentionRead,
                 readingsByMetricId,
-                unavailableReportsByMetricId,
-                capturedAt,
-                sourceTick);
+                unavailableReportsByMetricId);
             AddRankedStableAliasReading(
                 LibreHardwareMetricCatalog.CpuPowerMetricId,
                 cpuPowerCandidates,
+                cpuPollingGroupIds[0],
+                retentionRead,
                 readingsByMetricId,
-                unavailableReportsByMetricId,
-                capturedAt,
-                sourceTick);
+                unavailableReportsByMetricId);
         }
         AddMemoryDerivedReadings(readingsByMetricId);
 
@@ -94,14 +101,24 @@ internal sealed class LibreHardwareSnapshotReader
         Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId,
         List<RankedMetricReading> cpuTemperatureCandidates,
         List<RankedMetricReading> cpuPowerCandidates,
+        List<string> cpuPollingGroupIds,
         DateTimeOffset capturedAt,
-        long sourceTick,
+        HardwareMetricRetentionCache.ReadScope retentionRead,
         List<HardwareRefreshDiagnostic> hardwareUpdates,
         List<TouchedPollingGroup> touchedPollingGroups,
         List<string> warnings,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
+        string pollingGroupId = LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(hardware);
+        retentionRead.TouchPollingGroup(pollingGroupId);
+
+        if (hardware.HardwareType is HardwareType.Cpu
+            && !cpuPollingGroupIds.Contains(pollingGroupId, StringComparer.Ordinal))
+        {
+            cpuPollingGroupIds.Add(pollingGroupId);
+        }
 
         string? updateError = null;
         long updateStartedTimestamp = Stopwatch.GetTimestamp();
@@ -155,14 +172,14 @@ internal sealed class LibreHardwareSnapshotReader
                     unavailableReportsByMetricId,
                     cpuTemperatureCandidates,
                     cpuPowerCandidates,
-                    capturedAt,
-                    sourceTick);
+                    pollingGroupId,
+                    retentionRead);
             }
         }
 
         touchedPollingGroups.Add(new TouchedPollingGroup
         {
-            PollingGroupId = LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(hardware),
+            PollingGroupId = pollingGroupId,
             Warnings = hardwareWarnings,
             CapturedAt = capturedAt,
         });
@@ -180,8 +197,9 @@ internal sealed class LibreHardwareSnapshotReader
                 unavailableReportsByMetricId,
                 cpuTemperatureCandidates,
                 cpuPowerCandidates,
+                cpuPollingGroupIds,
                 capturedAt,
-                sourceTick,
+                retentionRead,
                 hardwareUpdates,
                 touchedPollingGroups,
                 warnings,
@@ -196,15 +214,16 @@ internal sealed class LibreHardwareSnapshotReader
         Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId,
         List<RankedMetricReading> cpuTemperatureCandidates,
         List<RankedMetricReading> cpuPowerCandidates,
-        DateTimeOffset capturedAt,
-        long sourceTick)
+        string hardwarePollingGroupId,
+        HardwareMetricRetentionCache.ReadScope retentionRead)
     {
         bool hadFreshReading = false;
 
         foreach (MetricReading reading in LibreHardwareMetricCatalog.CreateReadings(hardware, sensor))
         {
             hadFreshReading = true;
-            RecordFreshReading(reading, sourceTick, capturedAt);
+            string ownerPollingGroupId = LibreHardwareMetricCatalog.BuildPollingGroupId(hardware, reading.MetricId);
+            RecordFreshReading(retentionRead, reading, ownerPollingGroupId);
             AddReading(readingsByMetricId, reading);
         }
 
@@ -232,10 +251,9 @@ internal sealed class LibreHardwareSnapshotReader
         }
 
         string sourceSensorMetricId = LibreHardwareMetricCatalog.BuildDynamicMetricId(sensor);
-        if (_retentionCache.TryReadSourceSensor(
+        if (retentionRead.TryReadSourceSensor(
             sensor.Identifier.ToString(),
-            sourceTick,
-            capturedAt,
+            hardwarePollingGroupId,
             out MetricReading retainedCatalogReading,
             out bool sourceSensorExpired))
         {
@@ -254,10 +272,10 @@ internal sealed class LibreHardwareSnapshotReader
 
         if (LibreHardwareMetricCatalog.TryGetStableMetricId(hardware, sensor, out string? stableMetricId))
         {
-            if (_retentionCache.TryReadStableAlias(
+            string ownerPollingGroupId = LibreHardwareMetricCatalog.BuildPollingGroupId(hardware, stableMetricId);
+            if (retentionRead.TryReadStableAlias(
                 stableMetricId,
-                sourceTick,
-                capturedAt,
+                ownerPollingGroupId,
                 out MetricReading retainedStableReading,
                 out bool stableAliasExpired))
             {
@@ -276,24 +294,27 @@ internal sealed class LibreHardwareSnapshotReader
         }
     }
 
-    private void RecordFreshReading(MetricReading reading, long sourceTick, DateTimeOffset capturedAt)
+    private void RecordFreshReading(
+        HardwareMetricRetentionCache.ReadScope retentionRead,
+        MetricReading reading,
+        string ownerPollingGroupId)
     {
         if (LibreHardwareMetricCatalog.IsSourceSensorMetricId(reading.MetricId))
         {
-            _retentionCache.RecordFreshSourceSensor(reading, sourceTick, capturedAt);
+            retentionRead.RecordFreshSourceSensor(reading, ownerPollingGroupId);
             return;
         }
 
-        _retentionCache.RecordFreshStableAlias(reading, sourceTick, capturedAt);
+        retentionRead.RecordFreshStableAlias(reading, ownerPollingGroupId);
     }
 
     private void AddRankedStableAliasReading(
         string metricId,
         List<RankedMetricReading> candidates,
+        string fallbackPollingGroupId,
+        HardwareMetricRetentionCache.ReadScope retentionRead,
         Dictionary<string, MetricReading> readingsByMetricId,
-        Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId,
-        DateTimeOffset capturedAt,
-        long sourceTick)
+        Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId)
     {
         RankedMetricReading? selectedCandidate = candidates
             .OrderBy(candidate => candidate.Rank)
@@ -303,16 +324,15 @@ internal sealed class LibreHardwareSnapshotReader
 
         if (selectedCandidate is not null)
         {
-            RecordFreshReading(selectedCandidate.Reading, sourceTick, capturedAt);
+            RecordFreshReading(retentionRead, selectedCandidate.Reading, selectedCandidate.PollingGroupId);
             AddReading(readingsByMetricId, selectedCandidate.Reading);
             unavailableReportsByMetricId.Remove(metricId);
             return;
         }
 
-        if (_retentionCache.TryReadStableAlias(
+        if (retentionRead.TryReadStableAlias(
             metricId,
-            sourceTick,
-            capturedAt,
+            fallbackPollingGroupId,
             out MetricReading retainedReading,
             out bool isExpired))
         {
@@ -409,17 +429,6 @@ internal sealed class LibreHardwareSnapshotReader
         return string.Join(
             ';',
             new[] { firstSourceSensorId, secondSourceSensorId }.Where(id => !string.IsNullOrWhiteSpace(id)));
-    }
-
-    private static bool HardwareTargetsContainCpu(IReadOnlyList<IHardware> hardwareTargets)
-    {
-        return hardwareTargets.Any(HardwareTreeContainsCpu);
-    }
-
-    private static bool HardwareTreeContainsCpu(IHardware hardware)
-    {
-        return hardware.HardwareType is HardwareType.Cpu
-            || hardware.SubHardware.Any(HardwareTreeContainsCpu);
     }
 
     private static IReadOnlyList<MetricPollingGroupSnapshotPublication> BuildPollingGroupSnapshotPublications(
