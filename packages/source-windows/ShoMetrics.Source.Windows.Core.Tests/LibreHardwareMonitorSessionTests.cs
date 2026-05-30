@@ -119,6 +119,81 @@ public sealed class LibreHardwareMonitorSessionTests
     }
 
     [Fact]
+    public async Task RefreshPollingGroupForCpuPublishesRawSensorsAndRankedAliases()
+    {
+        FakeHardware cpuHardware = FakeHardware.Cpu();
+        cpuHardware.Sensors =
+        [
+            FakeSensor.Temperature("CPU Package", value: 55),
+            FakeSensor.Power("CPU Package", value: 88),
+        ];
+        using var provider = new WindowsSystemTotalDiskThroughputProvider(
+            new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
+        using var session = new LibreHardwareMonitorSession([cpuHardware], provider);
+
+        MetricSnapshotRefreshResult result = await session.RefreshPollingGroupWithDiagnosticsAsync(
+            LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(cpuHardware),
+            CancellationToken.None);
+
+        Assert.Contains(result.Snapshot.Readings, reading => reading.MetricId == "lhm.sensor:/cpu/0/temperature/0");
+        Assert.Contains(result.Snapshot.Readings, reading =>
+            reading is { MetricId: LibreHardwareMetricCatalog.CpuTemperatureMetricId, Value: 55 });
+        Assert.Contains(result.Snapshot.Readings, reading =>
+            reading is { MetricId: LibreHardwareMetricCatalog.CpuPowerMetricId, Value: 88 });
+        Assert.DoesNotContain(result.Snapshot.UnavailableMetrics, report =>
+            report.MetricId is LibreHardwareMetricCatalog.CpuTemperatureMetricId
+                or LibreHardwareMetricCatalog.CpuPowerMetricId);
+    }
+
+    [Fact]
+    public async Task RefreshPollingGroupForNonCpuHardwareDoesNotReplaceCpuSnapshot()
+    {
+        var timeProvider = new ManualTimeProvider();
+        FakeHardware cpuHardware = FakeHardware.Cpu();
+        cpuHardware.Sensors =
+        [
+            FakeSensor.Temperature("CPU Package", value: 55),
+            FakeSensor.Power("CPU Package", value: 88),
+        ];
+        FakeHardware gpuHardware = FakeHardware.Gpu();
+        gpuHardware.Sensors =
+        [
+            FakeSensor.Load("GPU Core", value: 75),
+        ];
+        using var provider = new WindowsSystemTotalDiskThroughputProvider(
+            new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
+        using var session = new LibreHardwareMonitorSession([cpuHardware, gpuHardware], provider, timeProvider);
+        string cpuRawTemperatureMetricId = "lhm.sensor:/cpu/0/temperature/0";
+
+        await session.RefreshPollingGroupWithDiagnosticsAsync(
+            LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(cpuHardware),
+            CancellationToken.None);
+
+        for (int index = 0; index < 5; index++)
+        {
+            timeProvider.Advance(MetricRefreshDemandConstants.MinimumCoreLhmRefreshInterval);
+            await session.RefreshPollingGroupWithDiagnosticsAsync(
+                LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(gpuHardware),
+                CancellationToken.None);
+        }
+
+        MetricSnapshot snapshot = await session.ReadSnapshotAsync(
+            [
+                cpuRawTemperatureMetricId,
+                LibreHardwareMetricCatalog.CpuTemperatureMetricId,
+                LibreHardwareMetricCatalog.CpuPowerMetricId,
+            ],
+            CancellationToken.None);
+
+        Assert.Contains(snapshot.Readings, reading => reading.MetricId == cpuRawTemperatureMetricId);
+        Assert.Contains(snapshot.Readings, reading => reading.MetricId == LibreHardwareMetricCatalog.CpuTemperatureMetricId);
+        Assert.Contains(snapshot.Readings, reading => reading.MetricId == LibreHardwareMetricCatalog.CpuPowerMetricId);
+        Assert.DoesNotContain(snapshot.UnavailableMetrics, report =>
+            report.MetricId is LibreHardwareMetricCatalog.CpuTemperatureMetricId
+                or LibreHardwareMetricCatalog.CpuPowerMetricId);
+    }
+
+    [Fact]
     public async Task RefreshPollingGroupForNativeDiskDoesNotTraverseLhmStorage()
     {
         FakeHardware storageHardware = FakeHardware.Storage();

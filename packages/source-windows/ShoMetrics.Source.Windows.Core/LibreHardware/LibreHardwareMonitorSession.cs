@@ -276,26 +276,15 @@ public sealed class LibreHardwareMonitorSession : IDisposable
 
             LibreHardwareSnapshotReadResult readResult = _snapshotReader.Read(hardwareTargets, cancellationToken);
 
-            foreach (MetricPollingGroupSnapshotUpdate pollingGroupSnapshot in readResult.PollingGroupSnapshots)
+            foreach (MetricPollingGroupSnapshotPublication publication in readResult.PollingGroupSnapshotPublications)
             {
-                _snapshotCache.PublishPollingGroupSnapshot(
-                    pollingGroupSnapshot.PollingGroupId,
-                    pollingGroupSnapshot.ReadingsByMetricId,
-                    pollingGroupSnapshot.Warnings,
-                    pollingGroupSnapshot.CapturedAt,
-                    pollingGroupSnapshot.UnavailableReports);
+                _snapshotCache.ReplaceFilteredPollingGroupSnapshot(
+                    publication.PollingGroupId,
+                    publication.TraversalReadingsByMetricId,
+                    publication.Warnings,
+                    publication.CapturedAt,
+                    publication.TraversalUnavailableReports);
             }
-
-            _snapshotCache.PublishStableAliasPollingGroupSnapshot(
-                LibreHardwareMetricCatalog.CpuTemperatureMetricId,
-                readResult.ReadingsByMetricId,
-                readResult.UnavailableReportsByMetricId,
-                readResult.CapturedAt);
-            _snapshotCache.PublishStableAliasPollingGroupSnapshot(
-                LibreHardwareMetricCatalog.CpuPowerMetricId,
-                readResult.ReadingsByMetricId,
-                readResult.UnavailableReportsByMetricId,
-                readResult.CapturedAt);
 
             if (pollingGroupId is null)
             {
@@ -306,7 +295,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             }
             else if (pollingGroupId.Equals(LibreHardwareMetricCatalog.NetworkAggregatePollingGroupId, StringComparison.Ordinal))
             {
-                _snapshotCache.PublishPollingGroupSnapshot(
+                _snapshotCache.ReplaceFilteredPollingGroupSnapshot(
                     LibreHardwareMetricCatalog.NetworkAggregatePollingGroupId,
                     readResult.ReadingsByMetricId,
                     [],
@@ -406,7 +395,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         }
         else
         {
-            _snapshotCache.PublishPollingGroupSnapshot(
+            _snapshotCache.ReplaceFilteredPollingGroupSnapshot(
                 pollingGroupId,
                 readingsByMetricId,
                 [],
