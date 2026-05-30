@@ -411,6 +411,86 @@ test("windows CPU temperature settings render helper-only source text and temper
     assert.doesNotMatch(markup, /Source:<\/label>/);
 });
 
+test("windows CPU helper-only settings guide missing helper install", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "cpu",
+        isWindows: true,
+        settings: buildWidgetSettings("cpu", {
+            cpu: { kind: "temperature" },
+        }),
+        runtimeCache: {
+            displayedMetricReadAttribution: {
+                metricKey: "cpu.temp",
+                routing: {
+                    preferredSourceId: WINDOWS_HELPER_SOURCE_ID,
+                    selectedSourceId: undefined,
+                },
+                preferredSourceStatus: {
+                    state: "unavailable",
+                    reason: "helperNotInstalled",
+                },
+                outcome: undefined,
+            },
+        },
+    });
+
+    assert.match(markup, /Source: Helper only/);
+    assert.match(markup, /Install ShoMetrics Helper to use this metric/);
+});
+
+test("windows CPU helper-only settings guide stopped helper recovery", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "cpu",
+        isWindows: true,
+        settings: buildWidgetSettings("cpu", {
+            cpu: { kind: "power" },
+        }),
+        runtimeCache: {
+            displayedMetricReadAttribution: {
+                metricKey: "cpu.power",
+                routing: {
+                    preferredSourceId: WINDOWS_HELPER_SOURCE_ID,
+                    selectedSourceId: undefined,
+                },
+                preferredSourceStatus: {
+                    state: "unavailable",
+                    reason: "helperStopped",
+                },
+                outcome: undefined,
+            },
+        },
+    });
+
+    assert.match(markup, /Source: Helper only/);
+    assert.match(markup, /Start ShoMetrics Helper from ShoMetrics Control Panel/);
+});
+
+test("windows CPU helper-only settings fall back to helper diagnostics guidance", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "cpu",
+        isWindows: true,
+        settings: buildWidgetSettings("cpu", {
+            cpu: { kind: "temperature" },
+        }),
+        runtimeCache: {
+            displayedMetricReadAttribution: {
+                metricKey: "cpu.temp",
+                routing: {
+                    preferredSourceId: WINDOWS_HELPER_SOURCE_ID,
+                    selectedSourceId: undefined,
+                },
+                preferredSourceStatus: {
+                    state: "unavailable",
+                    reason: "sourceError",
+                },
+                outcome: undefined,
+            },
+        },
+    });
+
+    assert.match(markup, /Open ShoMetrics Control Panel for helper diagnostics/);
+});
+
 test("windows CPU power settings render helper-only source text and power scale", () => {
     const markup = renderWidgetSettings({
         actionKind: "cpu",
@@ -468,6 +548,51 @@ test("windows GPU settings panel reflects helper source preference", () => {
     assert.match(markup, /Prefer Helper/);
 });
 
+test("windows GPU settings panel guides no-value GPU diagnostics without changing key policy", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "gpu",
+        isWindows: true,
+        runtimeCache: {
+            displayedMetricReadAttribution: {
+                metricKey: "gpu.usage_percent",
+                routing: {
+                    preferredSourceId: NODE_SYSTEM_SOURCE_ID,
+                    selectedSourceId: undefined,
+                },
+                outcome: undefined,
+            },
+        },
+    });
+
+    assert.match(markup, /No GPU value is available from the current source/);
+    assert.match(markup, /Intel and AMD GPU metrics usually require ShoMetrics Helper/);
+    assert.match(markup, /open ShoMetrics Control Panel for diagnostics/);
+});
+
+test("GPU settings panel hides no-value helper guidance after a value is available", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "gpu",
+        isWindows: true,
+        runtimeCache: {
+            displayedMetricReadAttribution: {
+                metricKey: "gpu.usage_percent",
+                routing: {
+                    preferredSourceId: NODE_SYSTEM_SOURCE_ID,
+                    selectedSourceId: NODE_SYSTEM_SOURCE_ID,
+                },
+                outcome: {
+                    kind: "value",
+                    valueTimestampMilliseconds: Date.now(),
+                    freshness: "fresh",
+                },
+            },
+        },
+    });
+
+    assert.doesNotMatch(markup, /No GPU value is available/);
+    assert.doesNotMatch(markup, /Intel and AMD GPU metrics usually require/);
+});
+
 test("non-windows GPU settings panel hides source preference controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
@@ -476,6 +601,26 @@ test("non-windows GPU settings panel hides source preference controls", () => {
 
     assert.doesNotMatch(markup, /Source:/);
     assert.doesNotMatch(markup, /nvidia-smi/);
+});
+
+test("non-windows GPU settings panel does not show Windows helper guidance", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "gpu",
+        isWindows: false,
+        runtimeCache: {
+            displayedMetricReadAttribution: {
+                metricKey: "gpu.usage_percent",
+                routing: {
+                    preferredSourceId: NODE_SYSTEM_SOURCE_ID,
+                    selectedSourceId: undefined,
+                },
+                outcome: undefined,
+            },
+        },
+    });
+
+    assert.doesNotMatch(markup, /Intel and AMD GPU metrics usually require ShoMetrics Helper/);
+    assert.doesNotMatch(markup, /ShoMetrics Control Panel for diagnostics/);
 });
 
 test("GPU source preference control preserves custom source selections", () => {
@@ -540,6 +685,23 @@ test("catalog metric settings explain helper setup failures", () => {
 
     assert.match(missingHelperMarkup, /Install ShoMetrics Helper to use advanced sensors/);
     assert.match(stoppedHelperMarkup, /Start ShoMetrics Helper from ShoMetrics Control Panel/);
+});
+
+test("catalog metric settings explain helper protocol mismatch", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "catalog",
+        runtimeCache: {
+            catalogMetricDescriptorSourceStatus: {
+                state: "unavailable",
+                reason: "protocolMismatch",
+            },
+        },
+        runtimeCacheStatus: {
+            catalogMetricDescriptorStatus: "failed",
+        },
+    });
+
+    assert.match(markup, /Update ShoMetrics Helper and Hub to matching versions/);
 });
 
 test("catalog metric settings render the initial guided picker without writing a default", () => {

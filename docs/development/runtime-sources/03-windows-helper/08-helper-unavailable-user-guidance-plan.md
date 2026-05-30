@@ -68,9 +68,9 @@ guidance and too imprecise for support.
 | ShoMetrics Control Panel naming | Use `ShoMetrics Control Panel` in user-facing guidance. Use `Open` only when the nearby UI already names the destination. | Bare `Control Panel` can be confused with Windows Control Panel. The product-owned name keeps support guidance unambiguous. |
 | ShoMetrics Control Panel process privilege | Run ShoMetrics Control Panel as normal user by default. Use UAC only for explicit privileged actions. | Reading helper status is safe as a normal user. Service install/start/stop, driver install/repair, or kernel-adjacent configuration changes must be separate, explicit elevated actions. |
 | `Open` action lifecycle | Treat `Open ShoMetrics Control Panel` as a fire-and-forget Windows Shell launch/focus request. | Opening from the PI should behave like the user opening the same installed app from Start Menu. Hub must not own, monitor, restart, or kill the ShoMetrics Control Panel process. |
-| Driver status source | Keep driver/sensor details in ShoMetrics Control Panel, DEBUG, and support text until a machine consumer needs structured decisions. | The key stays `N/A` for ordinary no-data states. Do not build a typed health-diagnostic contract just to display human-readable details. |
+| Driver status source | Add a minimal helper-reported component status for ShoMetrics Control Panel, but do not feed it back into key copy. | The Panel needs to stop guessing PawnIO/MSR status from warning text. The key still stays `N/A` for ordinary no-data states. |
 | Render truth source | Node/Hub data-path state remains authoritative for widget rendering; helper health is supporting diagnosis. | A helper can report "available" while a metric still has no value. Widgets must be driven by actual metric values/unavailable reports, with helper health used to choose better guidance copy. |
-| Health diagnostic contract | Defer the `kind`/`severity`/`scope` health diagnostic contract. Keep `SourceWarning` as the support/log surface for now. | Structured diagnostics are justified only when Hub or ShoMetrics Control Panel performs different machine actions based on the diagnostic kind. |
+| Health diagnostic contract | Defer the broad `kind`/`severity`/`scope` diagnostic contract. Keep `SourceWarning` as the detailed support/log surface. | A small component-status field for the Panel is enough for driver status. Do not build a general diagnostic list reducer until a machine consumer needs it. |
 | Version mismatch UX | Treat helper/Hub protocol mismatch as `versionMismatch`, not generic `helperError`. | The user action is specific: update or repair the ShoMetrics install so Hub and helper use matching protocol versions. |
 | Descriptor catalog state | Treat descriptor catalog pending/failure as "catalog not ready", not "metric does not exist". | Until the source catalog is available, Hub cannot prove that a selected metric is truly absent. |
 | Freshness owner | Do not introduce a second Hub-owned source freshness system. Hub consumes source/runtime freshness and unavailable reports, while sources own retained-value semantics. | The Windows helper already owns retained sample freshness and age. Duplicating stale logic in Hub would create conflicting truth sources. |
@@ -88,9 +88,25 @@ settings or installer work.
 | 1. Pending refresh semantics | C# per-group missing snapshot handling, proto/runtime unavailable reason, widget/PI copy for `sensorPending`, tests. | Directly fixes the `ReadPollingGroup` fallback confusion and is small enough to review alone. |
 | 2. Helper install and selection guidance | Advanced Sensor action OS gate, PI descriptor-load guidance for missing/stopped helper, helper status copy tests. | Improves first-run UX without changing driver health contracts. |
 | 3. Key no-data simplification | Render ordinary no-data states as `N/A`; render `Install helper` only through action-owned notice bodies when helper install is the next action; render `Choose metric` only through the Advanced Sensor no-selection notice body; keep `...` as the first-refresh key exception. | Avoids long-copy layout work while preserving first-run helper install, metric selection, and first-refresh guidance. |
-| 4. Support diagnostics surface | ShoMetrics Control Panel warning display, diagnostic copy, optional component labels for support text. | Keep this human/support-facing until a real machine decision requires a typed health diagnostic contract. |
+| 4. PI and Control Panel diagnostics guidance | 4A: PI no-value guidance from existing source/runtime state. 4B: minimal helper component status API for ShoMetrics Control Panel driver status. 4C: Panel display and sanitized copy diagnostics. | This keeps the original goal: users get next-action guidance in PI/Panel while key copy remains simple. |
 | 5. Privileged ShoMetrics Control Panel actions | Installer/service/driver repair entry points with explicit UAC. | Separate security design and release packaging work. |
 | 6. Platform metric filtering | Filter PI dropdown options and already-placed unsupported keys by current platform. | Prevents macOS users from selecting Windows-helper-only metrics and keeps synced Windows profiles from turning into install-helper dead ends. |
+
+### Slice 4 Breakdown
+
+Slice 4 keeps the original goal: guide users from PI and ShoMetrics Control
+Panel without expanding key copy. It can be implemented as two or three small
+changes depending on review size:
+
+| Step | Scope | Done when |
+| --- | --- | --- |
+| 4A. PI diagnostics guidance | Add ordinary PI messages for GPU no-value, helper transport/version issues, descriptor catalog pending/failure, and metric unavailable states using existing runtime state. | Opening PI gives a next action without changing key rendering. |
+| 4B. Minimal component status API | Add `SourceComponentStatus` to `GetSourceHealthResponse` for `driver:pawnio`; map Core PawnIO diagnostics through the service. | ShoMetrics Control Panel no longer infers PawnIO/MSR status by parsing warning text. |
+| 4C. Panel display and copy diagnostics | Render service, helper, component, descriptor, sample, warnings, and sanitized copy-diagnostics rows as a normal-user app. | Users can see driver/helper status and copy support details without elevation. |
+
+Do not add key resolver behavior in Slice 4. If this slice grows too large, do
+4A first because it improves user guidance without API churn, then do 4B/4C as
+the Control Panel status contract.
 
 ## User-Facing State Model
 
@@ -124,6 +140,42 @@ states render `N/A`.
 `Install helper` and `Choose metric` are rendered by action-owned notice bodies,
 not by selected metric primitives. The PI and ShoMetrics Control Panel provide
 the specific next action.
+
+### Property Inspector Guidance Policy
+
+The PI is allowed to be more explicit than the key. It should still avoid
+pretending to know hardware details that the source did not report. Use these
+ordinary PI messages before DEBUG details:
+
+| Surface/state | PI ordinary guidance | Notes |
+| --- | --- | --- |
+| Advanced Sensor, no metric selected, helper not installed | `Install ShoMetrics Helper to use advanced sensors.` | This is the install funnel. The key may also show `Install helper` after service probing confirms the helper is not installed. |
+| Advanced Sensor, no metric selected, helper installed but stopped | `Start ShoMetrics Helper from ShoMetrics Control Panel.` | Do not show `Choose metric`; the picker cannot be useful while the helper catalog is unavailable. |
+| Advanced Sensor, no metric selected, helper/catalog usable | Show the metric picker. | The key may show `Choose metric`; the PI does not need an extra warning. |
+| Selected Advanced Sensor or helper-only built-in, helper not installed | `Install ShoMetrics Helper to use this metric.` | Applies to helper-required stable metrics such as CPU temperature/power and selected catalog metrics. |
+| Selected helper-backed metric, helper stopped | `Start ShoMetrics Helper from ShoMetrics Control Panel.` | The key remains `N/A`. |
+| Helper transport error, timeout, or unknown source error | `Open ShoMetrics Control Panel for helper diagnostics.` | Keep transport details in DEBUG and Panel diagnostics. |
+| Helper/Hub protocol mismatch | `Update ShoMetrics Helper and Hub to matching versions.` | This remains a PI-level next action; the key stays `N/A`. |
+| Descriptor catalog pending | `Loading helper metrics...` | This is catalog state, not `NO_SENSOR`. |
+| Descriptor catalog failed/unavailable | `The helper metric catalog is not available yet.` | Preserve selected settings; do not clear the selection. |
+| Selected metric pending first refresh | `Waiting for this sensor group to refresh.` | Expected transient state; DEBUG may show `pending refresh`. |
+| Selected metric truly unavailable | `This metric is not available on this hardware.` | Use only when the source can prove `NO_SENSOR` or an equivalent unavailable reason. |
+| Selected metric invalid/expired | `No current value is available for this metric.` | DEBUG/Panel can show invalid/expired and raw sensor identity when available. |
+| GPU widget has no fresh value from the current source | `No GPU value is available from the current source. Intel and AMD GPU metrics usually require ShoMetrics Helper. If Helper is installed, restart it or open ShoMetrics Control Panel for diagnostics.` | Do not classify NVIDIA-SMI failure, Intel/AMD hardware, or fallback warmup in the PI unless the source later reports a structured reason. |
+| Driver/sensor-path warning exists | `Open ShoMetrics Control Panel to check sensor driver status.` | The Panel owns driver/component details. The key remains `N/A`. |
+| Unsupported platform or unsupported current selection | `This metric is not supported on this platform.` | Future platform-filtering slice; do not show install-helper guidance on macOS. |
+
+The GPU note is intentionally generic. Node-system currently reports GPU
+telemetry failure as "no value" to the rest of Hub; logs may mention
+`nvidia-smi`, but the PI should not infer hardware vendor, missing tools, or
+driver state from the absence of a value. If a future source emits a structured
+GPU API unavailable reason, the PI can refine this copy then.
+
+Implementation may share one helper-status guidance resolver for the fixed
+install subjects above: `advanced sensors` for the Advanced Sensor catalog
+onboarding path, and `this metric` for selected helper-only metrics. Do not add
+action-local helper-status copy branches that restate the same
+reason-to-guidance mapping.
 
 ### State Resolution Priority
 
@@ -194,6 +246,7 @@ layer is added later, use these as initial keys.
 | `unsupportedPlatform` | `N/A` | `N/A` | `N/A` |
 | `openControlPanel` | `Open ShoMetrics Control Panel` | `ShoMetrics コントロールパネルを開く` | `打开 ShoMetrics 控制面板` |
 | `installHelper` | `Install ShoMetrics Helper to use advanced sensors.` | `高度なセンサーを使うには ShoMetrics Helper をインストールしてください。` | `安装 ShoMetrics Helper 后才能使用高级传感器。` |
+| `installHelperForMetric` | `Install ShoMetrics Helper to use this metric.` | `このメトリックを使うには ShoMetrics Helper をインストールしてください。` | `安装 ShoMetrics Helper 后才能使用此指标。` |
 | `startHelper` | `Start ShoMetrics Helper from ShoMetrics Control Panel.` | `ShoMetrics コントロールパネルから ShoMetrics Helper を起動してください。` | `请从 ShoMetrics 控制面板启动 ShoMetrics Helper。` |
 | `checkDriver` | `Open ShoMetrics Control Panel to check sensor driver status.` | `ShoMetrics コントロールパネルでセンサードライバーの状態を確認してください。` | `打开 ShoMetrics 控制面板检查传感器驱动状态。` |
 | `updateShoMetrics` | `Update ShoMetrics Helper and Hub to matching versions.` | `ShoMetrics Helper と Hub を対応するバージョンに更新してください。` | `请将 ShoMetrics Helper 和 Hub 更新到匹配版本。` |
@@ -318,7 +371,7 @@ Implementation:
 - Keep `SourceWarning` as the current support/log surface. It may carry stable
   codes, human-readable messages, and optional metric/source-sensor/component
   hints.
-- Do not add a typed `SourceHealthDiagnosticKind` contract in Slice 1. Add one
+- Do not add a broad `SourceHealthDiagnosticKind` contract in Slice 4. Add one
   only when Hub or ShoMetrics Control Panel has a real machine decision that
   depends on the diagnostic kind.
 - If warning component hints are added, keep them small and support-facing:
@@ -365,8 +418,8 @@ Expected behavior:
 - If helper/LHM exposes the metric, render it normally.
 - If Node/NVIDIA fallback provides a fresh value, render it normally.
 - If the helper is not installed and fallback cannot provide a value, key:
-  `N/A`; PI may explain that installing the helper can enable broader GPU
-  telemetry.
+  `N/A`; PI shows the generic GPU no-value guidance and may mention that Intel
+  and AMD GPU metrics usually require ShoMetrics Helper.
 - If the specific GPU metric is unsupported, resolve to `noSensor` and show
   `N/A` key copy when the helper is installed/reachable enough to prove the
   metric is not available.
@@ -377,6 +430,9 @@ Implementation:
 - Continue to use metric unavailable reports from the read path.
 - Do not infer "NVIDIA tool failed" for non-NVIDIA hardware.
 - Do not infer `Install helper` from momentary fallback no-sample states.
+- Do not add hardware/vendor probing only to improve this copy. The PI guidance
+  is intentionally generic until the source naturally reports a structured GPU
+  unavailable reason.
 - If GPU source routing tries a NVIDIA-specific path in the future, it must be
   gated by source/hardware identity before surfacing user copy.
 
@@ -404,6 +460,9 @@ Implementation:
 - Keep helper-preferred GPU fallback metrics on `N/A` when no fallback value is
   fresh. Avoid cold-start flashes from `Install helper` to a later fallback
   value.
+- Use the same generic GPU no-value PI guidance as the Intel/AMD case. NVIDIA
+  driver or `nvidia-smi` failures remain DEBUG/log details unless the source
+  reports a structured reason.
 - Use source warnings/support details for driver/API path hints until a typed
   diagnostic contract is justified by a machine decision.
 
@@ -729,9 +788,66 @@ Version-skew handling:
 - Helper and Hub are expected to ship together for user-facing releases, but the
   wire mapping must still degrade safely during local dev and partial upgrades.
 
-### Defer Structured Health Diagnostics
+### Add Minimal Component Status For ShoMetrics Control Panel
 
-Do not add a typed health diagnostic contract in the pending-refresh slice.
+Slice 4 should add only the component status needed by ShoMetrics Control Panel
+to stop guessing driver state from warning text. It is not a general
+health-diagnostic system and must not drive key copy.
+
+Suggested shape:
+
+```proto
+message GetSourceHealthResponse {
+  string source_id = 1;
+  string protocol_version = 2;
+  string helper_version = 3;
+  repeated SourceWarning warnings = 4;
+  repeated SourceComponentStatus component_statuses = 5;
+}
+
+message SourceComponentStatus {
+  // Known component id such as "driver:pawnio". Consumers may branch on known
+  // complete ids, not arbitrary substrings.
+  string component = 1;
+  SourceComponentState state = 2;
+  optional string version = 3;
+}
+
+enum SourceComponentState {
+  SOURCE_COMPONENT_STATE_UNSPECIFIED = 0;
+  SOURCE_COMPONENT_STATE_UNKNOWN = 1;
+  SOURCE_COMPONENT_STATE_OK = 2;
+  SOURCE_COMPONENT_STATE_NOT_INSTALLED = 3;
+  SOURCE_COMPONENT_STATE_NOT_ELEVATED = 4;
+  SOURCE_COMPONENT_STATE_UNUSABLE = 5;
+}
+```
+
+Initial component:
+
+| Component | Producer | Panel display target |
+| --- | --- | --- |
+| `driver:pawnio` | Helper/Core `PawnIoDiagnostics` | PawnIO driver: OK / Not installed / Not elevated / Needs attention / Unknown, plus version when available. |
+
+Rules:
+
+- ShoMetrics Control Panel may use component status for status rows,
+  diagnostics copy, and future repair-button eligibility.
+- `UNSPECIFIED` is malformed producer data. Panel should display it like
+  `Unknown`, but it may log the malformed zero value for support/debug.
+- Hub key rendering must not use component status. Ordinary driver/sensor-path
+  failures stay `N/A` on the key.
+- PI may use component status only as next-action support text, for example
+  "Open ShoMetrics Control Panel to check sensor driver status."
+- `SourceWarning` remains the detailed support/log channel for human-readable
+  messages and per-metric context.
+- If helper is unreachable, component status is unknown. The Panel can still
+  show service installed/running state from the Windows Service Control Manager.
+
+### Defer Broad Structured Health Diagnostics
+
+Do not add the previous broad `SourceHealthDiagnosticKind` +
+`severity` + `scope` + list-reduction contract in Slice 4.
 
 Current rule:
 
@@ -739,8 +855,11 @@ Current rule:
   actions such as install, start, retry, and version repair.
 - `MetricUnavailableReason` remains structured because it drives source/runtime
   correctness, especially `PENDING_REFRESH` versus `NO_SENSOR`.
-- Driver/sensor-path detail remains support-facing `SourceWarning` text/code
-  until a real machine consumer needs different behavior per diagnostic kind.
+- `SourceComponentStatus` is allowed only for coarse Panel status rows such as
+  `driver:pawnio`.
+- Driver/sensor-path detail beyond that remains support-facing `SourceWarning`
+  text/code until a real machine consumer needs different behavior per
+  diagnostic kind.
 
 If a future slice needs machine decisions such as "driver repair button" versus
 "sensor unsupported", add the smallest structured contract needed at that time.
@@ -753,7 +872,7 @@ Node should consume diagnostics as supporting evidence:
 data path says no value
   -> metric unavailable reason chooses metric state
   -> source status chooses helper install/start/transport state
-  -> warnings/support details refine PI and ShoMetrics Control Panel guidance
+  -> warnings/component status refine PI and ShoMetrics Control Panel guidance
 ```
 
 ### Add Descriptor Catalog State
@@ -804,6 +923,32 @@ no fresher metric value exists.
 13. On non-Windows platforms, filter PI metric/source dropdowns so
     Windows-helper-only metrics are not offered as selectable options. Already
     stored unsupported selections should be preserved but shown as unavailable.
+14. Add GPU no-value PI guidance without classifying hardware vendor,
+    `nvidia-smi` availability, or fallback warmup. The key remains `N/A`.
+15. Do not consume `SourceComponentStatus` in action key rendering. It is for
+    ShoMetrics Control Panel status rows and PI next-action support only.
+
+## ShoMetrics Control Panel Runtime Changes
+
+1. Keep ShoMetrics Control Panel as a normal-user process.
+2. Continue reading helper service installed/running state through the Windows
+   Service Control Manager API.
+3. Continue reading helper health, descriptors, and snapshots through
+   `MetricSourceService` gRPC over the named pipe.
+4. Read `SourceComponentStatus` from `GetSourceHealthResponse` when available.
+5. Display the initial `driver:pawnio` component status without parsing
+   `SourceWarning.message`:
+   - `OK`: driver path appears usable.
+   - `Not installed`: PawnIO is not installed or not available to the helper.
+   - `Not elevated`: the helper lacks privileges for MSR-backed metrics.
+   - `Needs attention`: PawnIO/MSR reads are unusable or inconsistent.
+   - `Unknown`: helper is unreachable, too old, or did not report the
+     component.
+6. Keep `SourceWarning` rows visible as support details, not as the primary
+   driver status source.
+7. Copy diagnostics should include component ids, component states, versions,
+   warning codes, counts, timestamps, and protocol/helper versions by default.
+   Raw hardware/sensor identity remains advanced diagnostics only.
 
 ## C# Core Changes
 
@@ -865,12 +1010,12 @@ for source errors that have no more specific remediation.
 | Area | Required coverage |
 | --- | --- |
 | C# Core | Known single-group pending, true unknown metric, old global latest ignored for known missing group, first group refresh replaces pending. |
-| Proto/runtime mapping | `PENDING_REFRESH`, unknown unavailable enum values, old-helper/new-Hub fallback, protocol mismatch status. |
+| Proto/runtime mapping | `PENDING_REFRESH`, unknown unavailable enum values, old-helper/new-Hub fallback, protocol mismatch status, optional `SourceComponentStatus` compatibility. |
 | Hub state resolver | State priority table, stale value versus source status, `versionMismatch`, warning-assisted PI guidance. |
-| Property Inspector | Helper missing/stopped, protocol mismatch, descriptor catalog pending/unavailable, picker disabled/install guidance. |
+| Property Inspector | Helper missing/stopped, protocol mismatch, descriptor catalog pending/unavailable, picker disabled/install guidance, GPU no-value guidance without install-helper key copy. |
 | Manifest/platform | Advanced Sensor OS gate, PI dropdown filtering for unsupported metrics/source choices, and already-placed unsupported-platform fallback. |
 | Rendering | Ordinary no-data states render `N/A` in selected views; static helper-required missing-helper states render `Install helper` through action-owned notice bodies; helper-preferred fallback metrics do not infer `Install helper` from momentary no-sample states; no-selected Advanced Sensor renders `Choose metric` through the action-owned notice body; `sensorPending` renders `...` outside minimal circle; no full dedicated error SVG/body by default. |
-| ShoMetrics Control Panel | Normal-user service status, gRPC health read, sanitized diagnostics copy, no privileged mutation in data-plane service. |
+| ShoMetrics Control Panel | Normal-user service status, gRPC health read, `driver:pawnio` component status, sanitized diagnostics copy, no privileged mutation in data-plane service. |
 | Recovery | Helper install/start, protocol repair, driver repair, Windows resume/topology change, shared source-client retry/backoff reset. |
 
 ## Acceptance Criteria
@@ -904,11 +1049,16 @@ for source errors that have no more specific remediation.
 - Helper-preferred stable aliases that can fall back to Node/NVIDIA telemetry
   show fallback values when they are fresh and otherwise stay `N/A`; they do
   not flash `Install helper` while fallback data is warming up or unavailable.
+- GPU widgets with no fresh value show generic PI guidance about current-source
+  no data and helper diagnostics, without trying to classify Intel/AMD versus
+  NVIDIA-SMI failure.
 - Helper-retained values may still show `N/A` while Hub uses its temporary 7s
   timestamp freshness gate; the follow-up fix is to consume source-reported
   freshness/retained attribution.
 - Driver/sensor-path issues guide users through PI and ShoMetrics Control Panel
-  without adding a typed health diagnostic contract in this slice.
+  without adding the broad typed health diagnostic contract in this slice.
+- ShoMetrics Control Panel uses helper-reported component status for
+  `driver:pawnio` instead of parsing warning text as the primary driver status.
 - Deck unavailable copy stays short: `Install helper` for confirmed missing
   helper on static helper-required surfaces, `Choose metric` for Advanced
   Sensor metric selection, `...` for first refresh, and `N/A` for ordinary

@@ -7,6 +7,7 @@ import { AppearanceSettings } from "./AppearanceSettings";
 import { PollingSettings } from "./PollingSettings";
 import { LineSettings } from "./LineSettings";
 import { SettingsSection } from "./SettingsSection";
+import { resolveHelperStatusGuidanceText } from "./helper-status-guidance";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import {
     cpuMetricKindOptionList,
@@ -43,6 +44,12 @@ function CpuMetricSettings({
     onSettingsPatch,
 }: CpuWidgetSettingsProps): React.JSX.Element {
     const reading = target.reading;
+    const helperOnlyGuidance = reading.kind === "usage"
+        ? undefined
+        : resolveHelperStatusGuidanceText(
+            context.runtimeCache.displayedMetricReadAttribution?.preferredSourceStatus,
+            { installSubject: "this metric" },
+        );
 
     return (
         <SettingsSection title="Metric">
@@ -57,6 +64,11 @@ function CpuMetricSettings({
             {reading.kind !== "usage" && (
                 <InspectorItem className="note-item note-item-caption">
                     <p className="section-note">Source: Helper only</p>
+                </InspectorItem>
+            )}
+            {helperOnlyGuidance !== undefined && (
+                <InspectorItem className="note-item note-item-caption">
+                    <p className="section-note">{helperOnlyGuidance}</p>
                 </InspectorItem>
             )}
         </SettingsSection>

@@ -1,5 +1,7 @@
+import { InspectorItem } from "../components/InspectorItem";
 import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
+import type { DisplayedMetricReadAttribution } from "../../runtime/widget-runtime-cache";
 import type { ResolvedGpuMetricTarget, ResolvedGpuReading } from "../../settings/resolved-settings";
 import { StandardColorSettings } from "./ColorSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
@@ -41,6 +43,11 @@ function GpuMetricSettings({
     target,
     onSettingsPatch,
 }: GpuWidgetSettingsProps): React.JSX.Element {
+    const noValueGuidance = resolveGpuNoValueGuidanceText(
+        context.isWindows,
+        context.runtimeCache.displayedMetricReadAttribution,
+    );
+
     return (
         <SettingsSection title="Metric">
             <SelectSetting
@@ -57,8 +64,28 @@ function GpuMetricSettings({
                     onSettingsPatch={onSettingsPatch}
                 />
             )}
+            {noValueGuidance !== undefined && (
+                <InspectorItem className="note-item note-item-caption">
+                    <p className="section-note">{noValueGuidance}</p>
+                </InspectorItem>
+            )}
         </SettingsSection>
     );
+}
+
+function resolveGpuNoValueGuidanceText(
+    isWindows: boolean,
+    attribution: DisplayedMetricReadAttribution | undefined,
+): string | undefined {
+    if (!isWindows || attribution?.metricKey.startsWith("gpu.") !== true) {
+        return undefined;
+    }
+
+    if (attribution.outcome?.kind === "value") {
+        return undefined;
+    }
+
+    return "No GPU value is available from the current source. Intel and AMD GPU metrics usually require ShoMetrics Helper. If Helper is installed, restart it or open ShoMetrics Control Panel for diagnostics.";
 }
 
 function GpuTemperatureScaleSettings({
