@@ -116,6 +116,7 @@ internal static class LibreHardwareMetricCatalog
         {
             Rank = rank,
             Reading = CreateReading(hardware, sensor, metricId, convertedValue, unit),
+            PollingGroupId = BuildHardwarePollingGroupId(hardware),
         };
         return true;
     }
@@ -284,7 +285,7 @@ internal static class LibreHardwareMetricCatalog
         return $"{DynamicMetricIdPrefix}{sensor.Identifier}";
     }
 
-    private static string BuildPollingGroupId(IHardware hardware, string metricId)
+    internal static string BuildPollingGroupId(IHardware hardware, string metricId)
     {
         return metricId switch
         {

@@ -16,7 +16,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
     private readonly MetricRefreshTargetIndex _refreshTargetIndex;
     private readonly MetricRefreshDemandState _refreshDemandState;
     private readonly MetricSnapshotCache _snapshotCache;
-    private readonly LibreHardwareSnapshotReader _snapshotReader = new();
+    private readonly LibreHardwareSnapshotReader _snapshotReader;
     private readonly SemaphoreSlim _readGate = new(1, 1);
     private long _lastLhmRefreshTimestamp = -1;
     private bool _isDisposed;
@@ -31,6 +31,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         ArgumentNullException.ThrowIfNull(timeProvider);
 
         _timeProvider = timeProvider;
+        _snapshotReader = new LibreHardwareSnapshotReader(_timeProvider);
         _diskThroughputProvider = new WindowsSystemTotalDiskThroughputProvider();
         Computer computer = LibreHardwareComputerFactory.Create();
         List<HardwareSourceWarning> warnings = [];
@@ -96,6 +97,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         TimeProvider? timeProvider = null)
     {
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _snapshotReader = new LibreHardwareSnapshotReader(_timeProvider);
         _diskThroughputProvider = diskThroughputProvider;
         InitializationWarnings = initializationWarnings ?? [];
         _cachedDescriptorSnapshot = HardwareMetricDescriptorSnapshotBuilder.BuildNativeOnly(
@@ -118,6 +120,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
         IReadOnlyList<HardwareSourceWarning>? initializationWarnings = null)
     {
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _snapshotReader = new LibreHardwareSnapshotReader(_timeProvider);
         _rootHardware = rootHardware;
         _diskThroughputProvider = diskThroughputProvider;
         InitializationWarnings = initializationWarnings ?? [];
