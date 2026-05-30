@@ -24,7 +24,7 @@ export function resolveHelperStatusGuidanceText(
         case "helperStopped":
             return "Start ShoMetrics Helper from ShoMetrics Control Panel.";
         case "protocolMismatch":
-            return "Update ShoMetrics Helper and Hub to matching versions.";
+            return "Update ShoMetrics Helper and Hub to the latest version.";
         default:
             return "Open ShoMetrics Control Panel for helper diagnostics.";
     }

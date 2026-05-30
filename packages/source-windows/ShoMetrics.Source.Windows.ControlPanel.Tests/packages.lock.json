@@ -42,6 +42,47 @@
           "xunit.v3.mtp-v1": "[3.2.2]"
         }
       },
+      "CommunityToolkit.Common": {
+        "type": "Transitive",
+        "resolved": "8.2.1",
+        "contentHash": "LWuhy8cQKJ/MYcy3XafJ916U3gPH/YDvYoNGWyQWN11aiEKCZszzPOTJAOvBjP9yG8vHmIcCyPUt4L82OK47Iw=="
+      },
+      "CommunityToolkit.WinUI.Controls.SettingsControls": {
+        "type": "Transitive",
+        "resolved": "8.2.251219",
+        "contentHash": "BAuRi34AOBCYXK/obT9Fwzt9KtxhPrO67yNINXF6+Dit4sAiwtVgehN9y/dJHco96/zZiTX3yF85mBjRyw6AXQ==",
+        "dependencies": {
+          "CommunityToolkit.WinUI.Triggers": "8.2.251219",
+          "Microsoft.WindowsAppSDK": "1.6.250108002"
+        }
+      },
+      "CommunityToolkit.WinUI.Extensions": {
+        "type": "Transitive",
+        "resolved": "8.2.251219",
+        "contentHash": "7ydxHF7jRl889qymGihhng4Yy5hFCxTxw+iKFM4XBo27bBAJxzr45Iu7GIZrydY5lhEgsG+xE4ZCA6HccNFxNA==",
+        "dependencies": {
+          "CommunityToolkit.Common": "8.2.1",
+          "Microsoft.WindowsAppSDK": "1.6.250108002"
+        }
+      },
+      "CommunityToolkit.WinUI.Helpers": {
+        "type": "Transitive",
+        "resolved": "8.2.251219",
+        "contentHash": "Ksyd6yoItNnZSae3901n04pwM81h34kHPrR+pGYd5OxBAR7NVksFJBi1r2xcJV1Rg/bg+40blHJsZk85KgF/cw==",
+        "dependencies": {
+          "CommunityToolkit.WinUI.Extensions": "8.2.251219",
+          "Microsoft.WindowsAppSDK": "1.6.250108002"
+        }
+      },
+      "CommunityToolkit.WinUI.Triggers": {
+        "type": "Transitive",
+        "resolved": "8.2.251219",
+        "contentHash": "E1D5jZ93hI2VkDJjHFvVPdwWBYG7gubx/zw9mS3aOL60rhroGuy9Jq/WqzL+VNaKFzsXZ4CZ0ivjOP7/SLGxIg==",
+        "dependencies": {
+          "CommunityToolkit.WinUI.Helpers": "8.2.251219",
+          "Microsoft.WindowsAppSDK": "1.6.250108002"
+        }
+      },
       "Google.Protobuf": {
         "type": "Transitive",
         "resolved": "3.34.1",
@@ -339,6 +380,7 @@
       "shometrics.source.windows.controlpanel": {
         "type": "Project",
         "dependencies": {
+          "CommunityToolkit.WinUI.Controls.SettingsControls": "[8.2.251219, 8.2.251219]",
           "Grpc.Net.Client": "[2.71.0, 2.71.0]",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.8, 10.0.8]",
           "Microsoft.WindowsAppSDK": "[2.1.3, 2.1.3]",

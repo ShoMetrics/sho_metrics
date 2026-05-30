@@ -15,7 +15,15 @@ namespace ShoMetrics.Source.Windows.ControlPanel;
 
 public partial class MainWindow : Window
 {
+    private const string SuccessStatusGlyph = "\uEC61"; // Segoe MDL2 Assets: CompletedSolid.
+    private const string CautionStatusGlyph = "\uE7BA"; // Segoe MDL2 Assets: Important.
+    private const string CriticalStatusGlyph = "\uEB90"; // Segoe MDL2 Assets: StatusErrorFull.
+    private const string UnknownStatusGlyph = "\uE946"; // Segoe MDL2 Assets: Info.
+    private const string ShoMetricsReleasesUrl = "https://github.com/edwardez/sho_metrics/releases";
+    private const string PawnIoInstallUrl = "https://pawnio.eu/";
+
     private readonly HelperControlPanelStatusReader _statusReader = new();
+    private readonly DispatcherTimer _checkedAtTimer = new();
     private HelperControlPanelStatus? _currentStatus;
 
     public MainWindow()
@@ -25,6 +33,9 @@ public partial class MainWindow : Window
         SetWindowSizeInDips(width: 1100, height: 720);
         ApplyStatus(HelperControlPanelStatus.Initial());
         Closed += OnClosed;
+        _checkedAtTimer.Interval = TimeSpan.FromSeconds(1);
+        _checkedAtTimer.Tick += OnCheckedAtTimerTick;
+        _checkedAtTimer.Start();
         _ = RefreshStatusAsync();
     }
 
@@ -71,6 +82,32 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnInstallPawnIoClicked(object sender, RoutedEventArgs args)
+    {
+        OpenUrl(PawnIoInstallUrl);
+    }
+
+    private void OnInstallShoMetricsClicked(object sender, RoutedEventArgs args)
+    {
+        OpenUrl(ShoMetricsReleasesUrl);
+    }
+
+    private void OpenUrl(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception exception)
+        {
+            ErrorText.Text = HelperControlPanelStatus.FormatException(exception);
+        }
+    }
+
     private async Task RefreshStatusAsync()
     {
         RefreshButton.IsEnabled = false;
@@ -99,24 +136,88 @@ public partial class MainWindow : Window
     {
         _currentStatus = status;
 
-        ServiceStatusText.Text = status.ServiceStatusText;
-        ServiceInstallText.Text = status.ServiceInstallText;
-        ServiceRuntimeText.Text = status.ServiceRuntimeText;
-        ConnectionStatusText.Text = status.ConnectionStatusText;
-        PawnIoDriverText.Text = status.PawnIoDriverText;
-        VersionText.Text = status.HelperVersionText;
-        ProtocolText.Text = status.ProtocolVersionText;
-        LastSampleText.Text = status.LastSampleText;
-        DescriptorCountText.Text = status.DescriptorCountText;
-        WarningCountText.Text = status.WarningCountText;
-        WarningDetailsText.Text = status.WarningDetailsText;
+        ServiceTileStatusText.Text = status.Service.StatusText;
+        ServiceTileDetailText.Text = status.Service.DetailText;
+        ServiceInstallDetailText.Text = status.Service.InstallText;
+        ServiceRuntimeDetailText.Text = status.Service.RuntimeText;
+        ConnectionDetailText.Text = status.Service.ConnectionText;
+        ApplyStatusIcon(ServiceTileStatusIcon, status.Service.Tone);
+        Visibility serviceInstallVisibility = status.Service.CanInstallShoMetricsHelper
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        ServiceInstallButton.Visibility = serviceInstallVisibility;
+        ServiceInstallDetailButton.Visibility = serviceInstallVisibility;
+        ServiceStatusText.Text = status.Service.StatusText;
+        PawnIoDriverText.Text = status.PawnIoDriver.StatusText;
+        PawnIoDriverDetailText.Text = status.PawnIoDriver.DetailText;
+        PawnIoInstallButton.Visibility = status.PawnIoDriver.CanInstallPawnIoDriver
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        ApplyStatusIcon(PawnIoDriverStatusIcon, status.PawnIoDriver.Tone);
+        VersionText.Text = status.Diagnostics.HelperVersionText;
+        ProtocolText.Text = status.Diagnostics.ProtocolVersionText;
+        SensorDiagnosticsText.Text = status.Diagnostics.SensorDiagnosticsText;
+        WarningCountText.Text = status.Diagnostics.WarningCountText;
+        WarningCountSummaryText.Text = status.Diagnostics.WarningCountText;
+        DiagnosticsDetailText.Text = status.Diagnostics.DetailText;
+        DiagnosticsSummaryDetailText.Text = status.Diagnostics.DetailText;
+        WarningDetailsText.Text = status.Diagnostics.WarningDetailsText;
+        ApplyStatusIcon(DiagnosticsStatusIcon, status.Diagnostics.Tone);
+        ApplyStatusIcon(DiagnosticsSummaryStatusIcon, status.Diagnostics.Tone);
+        DiagnosticsSummaryCard.Visibility = status.Diagnostics.HasDetails ? Visibility.Collapsed : Visibility.Visible;
+        DiagnosticsDetailsExpander.Visibility = status.Diagnostics.HasDetails ? Visibility.Visible : Visibility.Collapsed;
         ErrorText.Text = status.ErrorText;
         LogFolderText.Text = WindowsSourceServicePaths.ResolveLogDirectoryPath();
-        CheckedAtItem.Content = $"Checked {FormatCheckedAge(status.CheckedAt, DateTimeOffset.Now)}";
+        UpdateCheckedAtText(DateTimeOffset.Now);
+    }
+
+    private void OnCheckedAtTimerTick(object? sender, object args)
+    {
+        UpdateCheckedAtText(DateTimeOffset.Now);
+    }
+
+    private void UpdateCheckedAtText(DateTimeOffset now)
+    {
+        if (_currentStatus is null)
+        {
+            CheckedAtItem.Content = "Not checked";
+            return;
+        }
+
+        CheckedAtItem.Content = $"Last checked: {FormatCheckedAge(_currentStatus.CheckedAt, now)}";
+    }
+
+    private void ApplyStatusIcon(FontIcon icon, ControlPanelStatusTone tone)
+    {
+        icon.Glyph = tone switch
+        {
+            ControlPanelStatusTone.Success => SuccessStatusGlyph,
+            ControlPanelStatusTone.Caution => CautionStatusGlyph,
+            ControlPanelStatusTone.Critical => CriticalStatusGlyph,
+            ControlPanelStatusTone.Unknown => UnknownStatusGlyph,
+            _ => UnknownStatusGlyph,
+        };
+
+        icon.Foreground = tone switch
+        {
+            ControlPanelStatusTone.Success => GetThemeBrush("SystemFillColorSuccessBrush", Colors.Green),
+            ControlPanelStatusTone.Caution => GetThemeBrush("SystemFillColorCautionBrush", Colors.Goldenrod),
+            ControlPanelStatusTone.Critical => GetThemeBrush("SystemFillColorCriticalBrush", Colors.Firebrick),
+            ControlPanelStatusTone.Unknown => GetThemeBrush("TextFillColorSecondaryBrush", Colors.Gray),
+            _ => GetThemeBrush("TextFillColorSecondaryBrush", Colors.Gray),
+        };
+    }
+
+    private Brush GetThemeBrush(string resourceKey, global::Windows.UI.Color fallbackColor)
+    {
+        return Application.Current.Resources.TryGetValue(resourceKey, out object? resource) && resource is Brush brush
+            ? brush
+            : new SolidColorBrush(fallbackColor);
     }
 
     private void OnClosed(object sender, WindowEventArgs args)
     {
+        _checkedAtTimer.Stop();
         _statusReader.Dispose();
     }
 

@@ -1,12 +1,31 @@
 <Application x:Class="ShoMetrics.Source.Windows.ControlPanel.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             RequestedTheme="Light">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="ControlPanelPageBackgroundBrush" Color="#F3F8FE" />
+                    <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#F3F8FE" />
+                    <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#F3F8FE" />
+                    <SolidColorBrush x:Key="NavigationViewTopPaneBackground" Color="#F3F8FE" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="ControlPanelPageBackgroundBrush" Color="#202020" />
+                    <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#202020" />
+                    <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#202020" />
+                    <SolidColorBrush x:Key="NavigationViewTopPaneBackground" Color="#202020" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="HighContrast">
+                    <SolidColorBrush x:Key="ControlPanelPageBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="NavigationViewTopPaneBackground" Color="{ThemeResource SystemColorWindowColor}" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
             <Style x:Key="StatusCardStyle" TargetType="Border">
                 <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
                 <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />

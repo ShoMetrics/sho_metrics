@@ -701,7 +701,7 @@ test("catalog metric settings explain helper protocol mismatch", () => {
         },
     });
 
-    assert.match(markup, /Update ShoMetrics Helper and Hub to matching versions/);
+    assert.match(markup, /Update ShoMetrics Helper and Hub to the latest version/);
 });
 
 test("catalog metric settings render the initial guided picker without writing a default", () => {
