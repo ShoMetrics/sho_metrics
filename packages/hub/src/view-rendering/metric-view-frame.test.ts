@@ -7,6 +7,7 @@ import type { ResolvedAppearanceSettingsOverride } from "../settings/appearance-
 import { buildMetricRenderAppearance } from "../settings/render-appearance-builder";
 import {
     KEYPAD_PNG_SIZE,
+    PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE,
     TOUCH_STRIP_LOGICAL_SIZE,
     TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE,
     WIDGET_LOGICAL_SIZE,
@@ -53,9 +54,9 @@ test("single value-capable widget without data renders an N/A placeholder copy",
     });
 });
 
-test("single value-capable widget without data can render action-owned placeholder copy", () => {
+test("single value-capable widget without data falls back to N/A for ordinary unavailable copy", () => {
     const widgetData = buildWidgetData({
-        unavailableDisplayValue: "Helper required",
+        unavailableDisplayValue: "No sensor data",
     });
 
     const renderWidgetData = buildRenderWidgetData({
@@ -64,7 +65,129 @@ test("single value-capable widget without data can render action-owned placehold
         shouldRenderMutedIconPlaceholder: false,
     });
 
-    assert.equal(renderWidgetData.displayValue, "Helper required");
+    assert.equal(renderWidgetData.displayValue, "N/A");
+});
+
+test("single value-capable widget without data can render pending refresh copy", () => {
+    const widgetData = buildWidgetData({
+        unavailableDisplayValue: PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE,
+    });
+
+    const renderWidgetData = buildRenderWidgetData({
+        widgetData,
+        hasData: false,
+        shouldRenderMutedIconPlaceholder: false,
+    });
+
+    assert.equal(renderWidgetData.displayValue, PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE);
+});
+
+test("single metric notice renders a dedicated notice body", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData(),
+            noticeText: "Install helper",
+            resolvedSettings: {
+                view: { selectedView: "text" },
+            },
+        }),
+        renderTarget: "key",
+    });
+
+    if ("positive" in frame.renderedMetricData) {
+        throw new Error("Expected single metric render data.");
+    }
+
+    assert.equal(frame.renderedMetricData.displayValue, "N/A");
+    assert.match(frame.svg, /metric-notice-line-0/);
+    assert.match(frame.svg, />Install<\/text>/);
+    assert.match(frame.svg, />helper<\/text>/);
+    assert.doesNotMatch(frame.svg, /text-metric-value/);
+});
+
+test("ordinary unavailable copy keeps the selected primitive and generic N/A display", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData({
+                unavailableDisplayValue: "No sensor data",
+            }),
+            resolvedSettings: {
+                view: { selectedView: "text" },
+            },
+        }),
+        renderTarget: "key",
+    });
+
+    if ("positive" in frame.renderedMetricData) {
+        throw new Error("Expected single metric render data.");
+    }
+
+    assert.equal(frame.renderedMetricData.displayValue, "N/A");
+    assert.doesNotMatch(frame.svg, /data-metric-unavailable-body=/);
+    assert.match(frame.svg, />N\/A<\/text>/);
+});
+
+test("pending refresh copy keeps the selected primitive and loading display", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData({
+                unavailableDisplayValue: PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE,
+            }),
+            resolvedSettings: {
+                view: { selectedView: "text" },
+            },
+        }),
+        renderTarget: "key",
+    });
+
+    if ("positive" in frame.renderedMetricData) {
+        throw new Error("Expected single metric render data.");
+    }
+
+    assert.equal(frame.renderedMetricData.displayValue, PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE);
+    assert.doesNotMatch(frame.svg, /data-metric-unavailable-body=/);
+    assert.match(frame.svg, />\.\.\.<\/text>/);
+});
+
+test("minimal circle uses notice body when notice text is present", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData(),
+            noticeText: "Install helper",
+            resolvedSettings: {
+                view: {
+                    selectedView: "circle",
+                    circleVariant: "minimal",
+                },
+            },
+        }),
+        renderTarget: "key",
+    });
+
+    assert.equal(frame.renderPlan.shouldRenderMutedIconPlaceholder, false);
+    assert.match(frame.svg, />Install<\/text>/);
+    assert.doesNotMatch(frame.svg, /muted-widget/);
+});
+
+test("minimal circle keeps the muted icon placeholder during pending refresh", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData({
+                unavailableDisplayValue: PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE,
+            }),
+            resolvedSettings: {
+                view: {
+                    selectedView: "circle",
+                    circleVariant: "minimal",
+                },
+            },
+        }),
+        renderTarget: "key",
+    });
+
+    assert.equal(frame.renderPlan.shouldRenderMutedIconPlaceholder, true);
+    assert.doesNotMatch(frame.svg, />\.\.\.<\/text>/);
+    assert.match(frame.svg, /muted-widget/);
 });
 
 test("single circle icon placeholder keeps source data and marks the render plan as muted", () => {
@@ -572,12 +695,14 @@ test("dual circle gauge touch strip renders two complete gauge bodies", () => {
 
 function buildSingleMetricRenderOptions(options: {
     widgetData: WidgetData;
+    noticeText?: string;
     resolvedSettings?: ResolvedAppearanceSettingsOverride;
 }): SingleMetricRenderOptions {
     return {
         centerIconFragment: "<path />",
         statusIcon: buildStatusIcon(),
         widgetData: options.widgetData,
+        ...(options.noticeText === undefined ? {} : { noticeText: options.noticeText }),
         resolvedSettings: buildDefaultAppearanceSettings(options.resolvedSettings),
     };
 }

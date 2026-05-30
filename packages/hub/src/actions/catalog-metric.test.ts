@@ -4,6 +4,8 @@ import type { PropertyInspectorDidAppearEvent, WillAppearEvent, WillDisappearEve
 import {
     buildCatalogMetricNoSelectionViewOptions,
     buildCatalogMetricSelectedViewOptions,
+    CATALOG_CHOOSE_METRIC_NOTICE_TEXT,
+    CATALOG_INSTALL_HELPER_NOTICE_TEXT,
     CatalogMetric,
 } from "./catalog-metric";
 import type { MetricCollectionBinding } from "./metric-action";
@@ -19,7 +21,9 @@ import {
     type SourceClientStatus,
 } from "../runtime/sources/source-client";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
-import type { WidgetData } from "../view-rendering/widget-data";
+import {
+    type WidgetData,
+} from "../view-rendering/widget-data";
 import { wallClockNowMilliseconds } from "../shared/clock";
 import type { CatalogMetricCategory, CatalogMetricReadingKind } from "../settings/resolved-settings";
 import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
@@ -83,6 +87,7 @@ test("catalog metric publishes helper descriptors to runtime cache", async () =>
                 catalogMetricDescriptorLoadState: "ready",
             },
         ]);
+        assert.equal(action.metricsUpdateCallCount, 2);
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
     }
@@ -130,12 +135,33 @@ test("catalog metric publishes helper status when descriptor loading fails", asy
                 catalogMetricDescriptorSourceStatus: helperStatus,
             },
         ]);
+        assert.equal(action.metricsUpdateCallCount, 2);
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
     }
 });
 
-test("catalog metric no-selection view renders placeholder without reading metrics", () => {
+test("catalog metric descriptor status does not refresh selected keys", async () => {
+    const action = new TestCatalogMetric(new Error("helper unavailable"), {
+        state: "unavailable",
+        reason: "helperNotInstalled",
+    });
+    const streamDeckAction = new FakeStreamDeckAction("catalog-selected-descriptor-status-action");
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(
+            streamDeckAction,
+            buildCatalogWidgetSettings("source.sensor:/gpu/0/temperature"),
+        ));
+        await action.refreshCatalogMetricDescriptorsForTest(buildPropertyInspectorDidAppearEvent(streamDeckAction));
+
+        assert.equal(action.metricsUpdateCallCount, 1);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    }
+});
+
+test("catalog metric no-selection view renders choose-metric copy when helper is available", () => {
     const rawSettings = buildCatalogWidgetSettings("");
     const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
     const metricReader = new CapturingMetricStoreReader({});
@@ -143,11 +169,41 @@ test("catalog metric no-selection view renders placeholder without reading metri
     const viewOptions = buildCatalogMetricNoSelectionViewOptions({
         event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-empty-action"), rawSettings),
         settings,
+        helperStatus: { state: "available" },
     });
 
     assert.equal(viewOptions.metricKey, "catalog.unselected");
-    assert.equal(viewOptions.widgetData.unavailableDisplayValue, "Choose metric");
+    assert.equal(viewOptions.noticeText, CATALOG_CHOOSE_METRIC_NOTICE_TEXT);
+    assert.equal(viewOptions.widgetData.unavailableDisplayValue, undefined);
     assert.deepEqual(metricReader.widgetDataCalls, []);
+});
+
+test("catalog metric no-selection view renders install-helper copy only for never-installed helper", () => {
+    const rawSettings = buildCatalogWidgetSettings("");
+    const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
+
+    const viewOptions = buildCatalogMetricNoSelectionViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-install-helper-action"), rawSettings),
+        settings,
+        helperStatus: { state: "unavailable", reason: "helperNotInstalled" },
+    });
+
+    assert.equal(viewOptions.noticeText, CATALOG_INSTALL_HELPER_NOTICE_TEXT);
+    assert.equal(viewOptions.widgetData.unavailableDisplayValue, undefined);
+});
+
+test("catalog metric no-selection view keeps generic copy when helper is installed but stopped", () => {
+    const rawSettings = buildCatalogWidgetSettings("");
+    const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
+
+    const viewOptions = buildCatalogMetricNoSelectionViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-stopped-helper-action"), rawSettings),
+        settings,
+        helperStatus: { state: "unavailable", reason: "helperStopped" },
+    });
+
+    assert.equal(viewOptions.noticeText, undefined);
+    assert.equal(viewOptions.widgetData.unavailableDisplayValue, undefined);
 });
 
 test("catalog metric selected view uses stored detected label unit and unit maximum", () => {
@@ -223,7 +279,7 @@ test("catalog metric selected view uses custom label and custom maximum", () => 
     assert.equal(viewOptions.widgetData.label, "Board");
 });
 
-test("catalog metric selected view reports no sensor data through helper backed copy", () => {
+test("catalog metric selected view leaves key copy generic when helper is available without data", () => {
     const rawSettings = buildCatalogWidgetSettings("source.sensor:/gpu/0/temperature", {
         detectedLabel: "GPU Hot Spot",
         detectedUnit: MetricUnit.CELSIUS,
@@ -246,7 +302,31 @@ test("catalog metric selected view reports no sensor data through helper backed 
     assert.equal(viewOptions.widgetData.current, 0);
     assert.equal(viewOptions.widgetData.progress, 0);
     assert.deepEqual(viewOptions.widgetData.history, []);
-    assert.equal(viewOptions.widgetData.unavailableDisplayValue, "No sensor data");
+    assert.equal(viewOptions.widgetData.unavailableDisplayValue, undefined);
+    assert.equal(viewOptions.noticeText, undefined);
+});
+
+test("catalog metric selected view renders install-helper notice when helper is not installed", () => {
+    const rawSettings = buildCatalogWidgetSettings("source.sensor:/gpu/0/temperature", {
+        detectedLabel: "GPU Hot Spot",
+        detectedUnit: MetricUnit.CELSIUS,
+    });
+    const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
+    const target = readCatalogTarget(settings);
+    const metricReader = new CapturingMetricStoreReader({
+        sampleTimestampMilliseconds: undefined,
+    });
+
+    const viewOptions = buildCatalogMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-selected-install-action"), rawSettings),
+        settings,
+        target,
+        metrics: metricReader,
+        helperStatus: { state: "unavailable", reason: "helperNotInstalled" },
+    });
+
+    assert.equal(viewOptions.noticeText, CATALOG_INSTALL_HELPER_NOTICE_TEXT);
+    assert.equal(viewOptions.widgetData.unavailableDisplayValue, undefined);
 });
 
 test("catalog metric selected view formats large units only for fresh helper data", () => {
@@ -286,7 +366,7 @@ test("catalog metric selected view formats large units only for fresh helper dat
     assert.equal(viewOptions.widgetData.displayValue, "64");
     assert.equal(viewOptions.widgetData.unit, "GB");
     assert.equal(staleViewOptions.widgetData.displayValue, undefined);
-    assert.equal(staleViewOptions.widgetData.unavailableDisplayValue, "No sensor data");
+    assert.equal(staleViewOptions.widgetData.unavailableDisplayValue, undefined);
 });
 
 test("catalog metric selected view formats bytes per second and hertz values", () => {

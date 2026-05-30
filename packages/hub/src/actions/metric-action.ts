@@ -335,6 +335,14 @@ export abstract class MetricAction extends SingletonAction {
         return backgroundMetricCollection.readCachedSourceStatus(sourceId);
     }
 
+    protected refreshActiveMetricView(event: WillAppearEvent | PropertyInspectorDidAppearEvent): void {
+        const activeActionState = this.activeActionStates.get(event.action.id);
+
+        if (activeActionState) {
+            this.refreshMetricView(activeActionState.event);
+        }
+    }
+
     private refreshMetricView(event: WillAppearEvent): void {
         this.onMetricsUpdate(event);
         this.publishDisplayedMetricReadAttribution(event);

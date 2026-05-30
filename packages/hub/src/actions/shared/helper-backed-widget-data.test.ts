@@ -1,8 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { MetricStoreReader, MetricWidgetDataReadResult } from "../../runtime/metric-store";
-import type { WidgetData } from "../../view-rendering/widget-data";
-import { readHelperBackedWidgetData } from "./helper-backed-widget-data";
+import {
+    CPU_TEMP_METRIC_KEY,
+    GPU_TEMP_METRIC_KEY,
+} from "../../runtime/metric-keys";
+import {
+    PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE,
+    type WidgetData,
+} from "../../view-rendering/widget-data";
+import {
+    HELPER_INSTALL_NOTICE_TEXT,
+    readHelperBackedWidgetData,
+    resolveBuiltInHelperInstallNoticeText,
+    resolveHelperRequiredInstallNoticeText,
+} from "./helper-backed-widget-data";
 
 test("helper-backed widget data keeps fresh samples", () => {
     const widgetData = readHelperBackedWidgetData({
@@ -59,10 +71,10 @@ test("helper-backed widget data transforms only fresh samples", () => {
 
     assert.equal(freshWidgetData.displayValue, "fresh");
     assert.equal(staleWidgetData.displayValue, undefined);
-    assert.equal(staleWidgetData.unavailableDisplayValue, "No sensor data");
+    assert.equal(staleWidgetData.unavailableDisplayValue, undefined);
 });
 
-test("helper-backed widget data explains missing helper when sample is stale", () => {
+test("helper-backed widget data keeps default N/A copy when helper was never reached", () => {
     const widgetData = readHelperBackedWidgetData({
         metrics: buildMetricReader({
             current: 42,
@@ -82,10 +94,10 @@ test("helper-backed widget data explains missing helper when sample is stale", (
     assert.deepEqual(widgetData.history, []);
     assert.equal(widgetData.displayValue, undefined);
     assert.equal(widgetData.sampleTimestampMilliseconds, undefined);
-    assert.equal(widgetData.unavailableDisplayValue, "Helper required");
+    assert.equal(widgetData.unavailableDisplayValue, undefined);
 });
 
-test("helper-backed widget data explains broken helper after a previous successful connection", () => {
+test("helper-backed widget data keeps default N/A copy after a previous helper connection", () => {
     const widgetData = readHelperBackedWidgetData({
         metrics: buildMetricReader({ sampleTimestampMilliseconds: undefined }),
         metricKey: "cpu.temp",
@@ -98,7 +110,7 @@ test("helper-backed widget data explains broken helper after a previous successf
         },
     });
 
-    assert.equal(widgetData.unavailableDisplayValue, "Helper error");
+    assert.equal(widgetData.unavailableDisplayValue, undefined);
 });
 
 test("helper-backed widget data keeps default N/A copy when helper source is not registered", () => {
@@ -137,7 +149,7 @@ test("helper-backed widget data keeps default N/A copy before helper status is k
     assert.equal(widgetData.unavailableDisplayValue, undefined);
 });
 
-test("helper-backed widget data reports no sensor data after the helper is reachable", () => {
+test("helper-backed widget data keeps default N/A copy after the helper is reachable", () => {
     assert.equal(
         readHelperBackedWidgetData({
             metrics: buildMetricReader({ sampleTimestampMilliseconds: undefined }),
@@ -146,11 +158,11 @@ test("helper-backed widget data reports no sensor data after the helper is reach
             unit: "W",
             helperStatus: { state: "available" },
         }).unavailableDisplayValue,
-        "No sensor data",
+        undefined,
     );
 });
 
-test("helper-backed widget data reports pending refresh from source unavailable metadata", () => {
+test("helper-backed widget data surfaces pending refresh as loading copy", () => {
     assert.equal(
         readHelperBackedWidgetData({
             metrics: buildMetricReader(
@@ -162,11 +174,11 @@ test("helper-backed widget data reports pending refresh from source unavailable 
             unit: "C",
             helperStatus: { state: "available" },
         }).unavailableDisplayValue,
-        "Waiting...",
+        PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE,
     );
 });
 
-test("helper-backed widget data prefers helper failures over pending refresh metadata", () => {
+test("helper-backed widget data keeps default N/A copy for helper failures over pending metadata", () => {
     assert.equal(
         readHelperBackedWidgetData({
             metrics: buildMetricReader(
@@ -178,11 +190,27 @@ test("helper-backed widget data prefers helper failures over pending refresh met
             unit: "C",
             helperStatus: { state: "unavailable", reason: "sourceError" },
         }).unavailableDisplayValue,
-        "Helper error",
+        undefined,
     );
 });
 
-test("helper-backed widget data reports helper errors after helper failures", () => {
+test("helper-backed widget data keeps default N/A copy for helper install failures over pending metadata", () => {
+    assert.equal(
+        readHelperBackedWidgetData({
+            metrics: buildMetricReader(
+                { sampleTimestampMilliseconds: undefined },
+                { metricId: "cpu.temp", reason: "pendingRefresh" },
+            ),
+            metricKey: "cpu.temp",
+            label: "CPU",
+            unit: "C",
+            helperStatus: { state: "unavailable", reason: "helperNotInstalled" },
+        }).unavailableDisplayValue,
+        undefined,
+    );
+});
+
+test("helper-backed widget data keeps default N/A copy after helper failures", () => {
     assert.equal(
         readHelperBackedWidgetData({
             metrics: buildMetricReader({ sampleTimestampMilliseconds: undefined }),
@@ -191,7 +219,53 @@ test("helper-backed widget data reports helper errors after helper failures", ()
             unit: "W",
             helperStatus: { state: "unavailable", reason: "sourceError" },
         }).unavailableDisplayValue,
-        "Helper error",
+        undefined,
+    );
+});
+
+test("helper-required install notice appears only for confirmed missing helper without a value", () => {
+    assert.equal(
+        resolveHelperRequiredInstallNoticeText({
+            helperStatus: { state: "unavailable", reason: "helperNotInstalled" },
+            widgetData: buildWidgetData({ sampleTimestampMilliseconds: undefined }),
+        }),
+        HELPER_INSTALL_NOTICE_TEXT,
+    );
+    assert.equal(
+        resolveHelperRequiredInstallNoticeText({
+            helperStatus: { state: "unavailable", reason: "helperNotInstalled" },
+            widgetData: buildWidgetData({ sampleTimestampMilliseconds: Date.now() }),
+        }),
+        undefined,
+    );
+    assert.equal(
+        resolveHelperRequiredInstallNoticeText({
+            helperStatus: { state: "unavailable", reason: "helperStopped" },
+            widgetData: buildWidgetData({ sampleTimestampMilliseconds: undefined }),
+        }),
+        undefined,
+    );
+});
+
+test("built-in install notice follows static helper-only source routing", () => {
+    const helperNotInstalledStatus = { state: "unavailable", reason: "helperNotInstalled" } as const;
+    const missingWidgetData = buildWidgetData({ sampleTimestampMilliseconds: undefined });
+
+    assert.equal(
+        resolveBuiltInHelperInstallNoticeText({
+            metricKey: CPU_TEMP_METRIC_KEY,
+            helperStatus: helperNotInstalledStatus,
+            widgetData: missingWidgetData,
+        }),
+        HELPER_INSTALL_NOTICE_TEXT,
+    );
+    assert.equal(
+        resolveBuiltInHelperInstallNoticeText({
+            metricKey: GPU_TEMP_METRIC_KEY,
+            helperStatus: helperNotInstalledStatus,
+            widgetData: missingWidgetData,
+        }),
+        undefined,
     );
 });
 

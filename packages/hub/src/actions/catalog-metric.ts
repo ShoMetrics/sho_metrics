@@ -5,7 +5,11 @@ import { setMetricView } from "../view-updates/runner";
 import { buildMetricViewIcons } from "../widgets/icons/metric-view-icons";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
-import { readHelperBackedWidgetData } from "./shared/helper-backed-widget-data";
+import {
+    HELPER_INSTALL_NOTICE_TEXT,
+    readHelperBackedWidgetData,
+    resolveHelperRequiredInstallNoticeText,
+} from "./shared/helper-backed-widget-data";
 import { logger } from "../logging/logger";
 import { backgroundMetricCollection } from "../runtime/metric-collection/background-metric-collection";
 import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
@@ -19,9 +23,11 @@ import { formatCatalogMetricFreshWidgetData } from "../metrics/catalog-metric-wi
 
 const log = logger.for("Action:CatalogMetric");
 const CATALOG_DESCRIPTOR_LOAD_WARNING_INTERVAL_MILLISECONDS = 30_000;
+const CATALOG_NO_SELECTION_DEBUG_INTERVAL_MILLISECONDS = 5_000;
 const CATALOG_NO_SELECTION_RENDER_KEY = "catalog.unselected";
 const CATALOG_NO_SELECTION_LABEL = "METRIC";
-const CATALOG_NO_SELECTION_PLACEHOLDER = "Choose metric";
+export const CATALOG_INSTALL_HELPER_NOTICE_TEXT = HELPER_INSTALL_NOTICE_TEXT;
+export const CATALOG_CHOOSE_METRIC_NOTICE_TEXT = "Choose metric";
 
 @action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.catalog })
 export class CatalogMetric extends MetricAction {
@@ -38,15 +44,21 @@ export class CatalogMetric extends MetricAction {
         const settings = this.resolveSettings(event);
         const catalogTarget = readResolvedMetricTarget(settings, "catalog");
 
-        setMetricView(catalogTarget.metricId.length === 0
-            ? buildCatalogMetricNoSelectionViewOptions({ event, settings })
-            : buildCatalogMetricSelectedViewOptions({
-                event,
-                settings,
-                target: catalogTarget,
-                metrics: this.getMetricReader(event),
-                helperStatus: this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID),
-            }));
+        const helperStatus = this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID);
+
+        if (catalogTarget.metricId.length === 0) {
+            logCatalogMetricNoSelectionRender(helperStatus);
+            setMetricView(buildCatalogMetricNoSelectionViewOptions({ event, settings, helperStatus }));
+            return;
+        }
+
+        setMetricView(buildCatalogMetricSelectedViewOptions({
+            event,
+            settings,
+            target: catalogTarget,
+            metrics: this.getMetricReader(event),
+            helperStatus,
+        }));
     }
 
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
@@ -59,6 +71,12 @@ export class CatalogMetric extends MetricAction {
     protected async refreshCatalogMetricDescriptorsForPropertyInspector(
         event: PropertyInspectorDidAppearEvent,
     ): Promise<void> {
+        const refreshNoSelectionKey = (): void => {
+            if (readResolvedMetricTarget(this.resolveSettings(event), "catalog").metricId.length === 0) {
+                this.refreshActiveMetricView(event);
+            }
+        };
+
         const pendingSourceStatus = this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID);
         await this.updateRuntimeCache(event, {
             catalogMetricDescriptorLoadState: "pending",
@@ -74,6 +92,7 @@ export class CatalogMetric extends MetricAction {
                 catalogMetricDescriptorLoadState: "ready",
                 ...(sourceStatus ? { catalogMetricDescriptorSourceStatus: sourceStatus } : {}),
             });
+            refreshNoSelectionKey();
         } catch (error) {
             log.atWarn()
                 .everyMs(
@@ -88,6 +107,7 @@ export class CatalogMetric extends MetricAction {
                 catalogMetricDescriptorLoadState: "failed",
                 ...(sourceStatus ? { catalogMetricDescriptorSourceStatus: sourceStatus } : {}),
             });
+            refreshNoSelectionKey();
         }
     }
 
@@ -102,19 +122,35 @@ function resolveCatalogMetricSubscriptionKeys(
     return target.metricId.length === 0 ? [] : [target.metricId];
 }
 
+/**
+ * Builds the catalog metric onboarding key before a metric is selected.
+ *
+ * This is the only built-in surface that may show `Choose metric`; built-in
+ * CPU/GPU widgets never use that notice because their metric is preselected.
+ */
 export function buildCatalogMetricNoSelectionViewOptions(options: {
     readonly event: WillAppearEvent;
     readonly settings: ResolvedWidgetSettings;
+    readonly helperStatus: SourceClientStatus | undefined;
 }): SingleMetricViewOptions {
+    const noticeText = resolveNoSelectionNoticeText(options.helperStatus);
+
     return {
         event: options.event,
         resolvedSettings: options.settings.widget.slot.appearance,
         metricKey: CATALOG_NO_SELECTION_RENDER_KEY,
         widgetData: buildNoSelectionWidgetData(),
+        ...(noticeText === undefined ? {} : { noticeText }),
         ...buildMetricViewIcons({ hardware: "unknown", status: "percentage" }),
     };
 }
 
+/**
+ * Builds a selected catalog metric key from stored selection hints.
+ *
+ * The descriptor catalog can be unavailable after selection, so rendering must
+ * not depend on live descriptors to preserve the user's existing key.
+ */
 export function buildCatalogMetricSelectedViewOptions(options: {
     readonly event: WillAppearEvent;
     readonly settings: ResolvedWidgetSettings;
@@ -135,25 +171,32 @@ export function buildCatalogMetricSelectedViewOptions(options: {
             options.target.detectedReadingKind,
         );
 
+    const widgetData = readHelperBackedWidgetData({
+        metrics: options.metrics,
+        metricKey: options.target.metricId,
+        label,
+        unit,
+        maxValue,
+        helperStatus: options.helperStatus,
+        // Catalog-specific formatting runs only after the helper freshness
+        // gate accepts the sample, so helper-error and no-data copy stays intact.
+        transformFreshWidgetData: (freshWidgetData) => formatCatalogMetricFreshWidgetData({
+            widgetData: freshWidgetData,
+            unit: options.target.detectedUnit,
+            category: options.target.detectedCategory,
+        }),
+    });
+    const noticeText = resolveHelperRequiredInstallNoticeText({
+        helperStatus: options.helperStatus,
+        widgetData,
+    });
+
     return {
         event: options.event,
         resolvedSettings: options.settings.widget.slot.appearance,
         metricKey: options.target.metricId,
-        widgetData: readHelperBackedWidgetData({
-            metrics: options.metrics,
-            metricKey: options.target.metricId,
-            label,
-            unit,
-            maxValue,
-            helperStatus: options.helperStatus,
-            // Catalog-specific formatting runs only after the helper freshness
-            // gate accepts the sample, so helper-error and no-data copy stays intact.
-            transformFreshWidgetData: (widgetData) => formatCatalogMetricFreshWidgetData({
-                widgetData,
-                unit: options.target.detectedUnit,
-                category: options.target.detectedCategory,
-            }),
-        }),
+        widgetData,
+        ...(noticeText === undefined ? {} : { noticeText }),
         ...buildMetricViewIcons({ hardware: "unknown", status: "percentage" }),
     };
 }
@@ -165,6 +208,43 @@ function buildNoSelectionWidgetData(): WidgetData {
         history: [],
         label: CATALOG_NO_SELECTION_LABEL,
         unit: "",
-        unavailableDisplayValue: CATALOG_NO_SELECTION_PLACEHOLDER,
     };
+}
+
+function resolveNoSelectionNoticeText(
+    helperStatus: SourceClientStatus | undefined,
+): string | undefined {
+    if (helperStatus?.state === "unavailable" && helperStatus.reason === "helperNotInstalled") {
+        return CATALOG_INSTALL_HELPER_NOTICE_TEXT;
+    }
+
+    if (helperStatus?.state === "available") {
+        return CATALOG_CHOOSE_METRIC_NOTICE_TEXT;
+    }
+
+    return undefined;
+}
+
+function logCatalogMetricNoSelectionRender(helperStatus: SourceClientStatus | undefined): void {
+    log.atDebug()
+        .everyMs("catalog-no-selection-helper-status", CATALOG_NO_SELECTION_DEBUG_INTERVAL_MILLISECONDS)
+        .log(() => [
+            "catalogNoSelectionRender",
+            `helperStatus=${formatSourceStatusForDebug(helperStatus)}`,
+            `keyCopy=${resolveNoSelectionNoticeText(helperStatus) ?? "N/A"}`,
+        ].join(" "));
+}
+
+function formatSourceStatusForDebug(sourceStatus: SourceClientStatus | undefined): string {
+    if (sourceStatus === undefined) {
+        return "undefined";
+    }
+
+    return [
+        sourceStatus.state,
+        sourceStatus.reason ?? "no-reason",
+        sourceStatus.lastSuccessAtTimestampMilliseconds === undefined
+            ? "never-success"
+            : "has-success",
+    ].join("/");
 }

@@ -23,6 +23,7 @@ import {
 import {
     BUILT_IN_STABLE_METRIC_KEYS,
     hasExplicitLocalAutoMetricSourcePreference,
+    isBuiltInMetricHelperOnly,
     resolveLocalAutoMetricSourceCandidates,
 } from "./metric-source-preferences";
 import {
@@ -91,6 +92,13 @@ test("local auto source preference uses only Windows helper for helper-owned sta
             metricKey,
         );
     }
+});
+
+test("helper-only metric classification is a static built-in routing fact", () => {
+    assert.equal(isBuiltInMetricHelperOnly(CPU_TEMP_METRIC_KEY), true);
+    assert.equal(isBuiltInMetricHelperOnly(CPU_POWER_METRIC_KEY), true);
+    assert.equal(isBuiltInMetricHelperOnly(GPU_METRIC_KEYS[0]), false);
+    assert.equal(isBuiltInMetricHelperOnly(CPU_USAGE_METRIC_KEY), false);
 });
 
 test("local auto source preference routes Windows disk throughput to helper", () => {

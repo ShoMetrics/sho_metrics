@@ -23,7 +23,10 @@ import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import type { ResolvedGpuMetricTarget, ResolvedWidgetSettings } from "../settings/resolved-settings";
 import type { SourceClientStatus } from "../runtime/sources/source-client";
 import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
-import { readHelperBackedWidgetData } from "./shared/helper-backed-widget-data";
+import {
+    readHelperBackedWidgetData,
+    resolveBuiltInHelperInstallNoticeText,
+} from "./shared/helper-backed-widget-data";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 import type { SingleMetricViewOptions } from "../view-updates/runner";
 
@@ -91,7 +94,11 @@ export function resolveGpuMetricSubscriptionKeys(target: ResolvedGpuMetricTarget
     }
 }
 
-function buildGpuViewOptions(options: {
+/**
+ * Builds GPU render options while keeping fallback-capable readings on the
+ * value-or-N/A path instead of install-helper onboarding.
+ */
+export function buildGpuViewOptions(options: {
     event: WillAppearEvent;
     settings: ResolvedWidgetSettings;
     target: ResolvedGpuMetricTarget;
@@ -104,63 +111,94 @@ function buildGpuViewOptions(options: {
     };
 
     switch (options.target.reading.kind) {
-        case "temperature":
+        case "temperature": {
+            const celsiusWidgetData = readHelperBackedWidgetData({
+                metrics: options.metrics,
+                metricKey: GPU_TEMP_METRIC_KEY,
+                label: PROGRESS_CIRCLE_LABELS.gpu,
+                unit: "C",
+                maxValue: options.target.reading.maximumCelsius,
+                helperStatus: options.helperStatus,
+            });
+            const widgetData = buildTemperatureWidgetData({
+                celsiusWidgetData,
+                maximumCelsius: options.target.reading.maximumCelsius,
+                unit: options.target.reading.unit,
+            });
+            const noticeText = resolveBuiltInHelperInstallNoticeText({
+                metricKey: GPU_TEMP_METRIC_KEY,
+                helperStatus: options.helperStatus,
+                widgetData,
+            });
+
             return {
                 ...baseOptions,
                 metricKey: GPU_TEMP_METRIC_KEY,
-                widgetData: buildTemperatureWidgetData({
-                    celsiusWidgetData: readHelperBackedWidgetData({
-                        metrics: options.metrics,
-                        metricKey: GPU_TEMP_METRIC_KEY,
-                        label: PROGRESS_CIRCLE_LABELS.gpu,
-                        unit: "C",
-                        maxValue: options.target.reading.maximumCelsius,
-                        helperStatus: options.helperStatus,
-                    }),
-                    maximumCelsius: options.target.reading.maximumCelsius,
-                    unit: options.target.reading.unit,
-                }),
+                widgetData,
+                ...(noticeText === undefined ? {} : { noticeText }),
                 ...buildMetricViewIcons({ hardware: "gpu", status: "temperature" }),
             };
-        case "vram":
+        }
+        case "vram": {
+            const usedWidgetData = readHelperBackedWidgetData({
+                metrics: options.metrics,
+                metricKey: GPU_VRAM_USED_METRIC_KEY,
+                label: PROGRESS_CIRCLE_LABELS.vram,
+                unit: "MB",
+                helperStatus: options.helperStatus,
+            });
+            const totalWidgetData = readHelperBackedWidgetData({
+                metrics: options.metrics,
+                metricKey: GPU_VRAM_TOTAL_METRIC_KEY,
+                label: PROGRESS_CIRCLE_LABELS.vram,
+                unit: "MB",
+                helperStatus: options.helperStatus,
+            });
+            const widgetData = buildGpuVramWidgetData(
+                usedWidgetData,
+                totalWidgetData.current,
+            );
+            const noticeText = resolveBuiltInHelperInstallNoticeText({
+                metricKey: GPU_VRAM_USED_METRIC_KEY,
+                helperStatus: options.helperStatus,
+                widgetData,
+            });
+
             return {
                 ...baseOptions,
                 metricKey: GPU_VRAM_USED_METRIC_KEY,
-                widgetData: buildGpuVramWidgetData(
-                    readHelperBackedWidgetData({
-                        metrics: options.metrics,
-                        metricKey: GPU_VRAM_USED_METRIC_KEY,
-                        label: PROGRESS_CIRCLE_LABELS.vram,
-                        unit: "MB",
-                        helperStatus: options.helperStatus,
-                    }),
-                    readHelperBackedWidgetData({
-                        metrics: options.metrics,
-                        metricKey: GPU_VRAM_TOTAL_METRIC_KEY,
-                        label: PROGRESS_CIRCLE_LABELS.vram,
-                        unit: "MB",
-                        helperStatus: options.helperStatus,
-                    }).current,
-                ),
+                widgetData,
+                ...(noticeText === undefined ? {} : { noticeText }),
                 ...buildMetricViewIcons({ hardware: "gpu", status: "memory" }),
             };
-        case "power":
+        }
+        case "power": {
+            const powerWidgetData = readHelperBackedWidgetData({
+                metrics: options.metrics,
+                metricKey: GPU_POWER_METRIC_KEY,
+                label: PROGRESS_CIRCLE_LABELS.gpu,
+                unit: "W",
+                maxValue: options.target.reading.maximumWatts,
+                helperStatus: options.helperStatus,
+            });
+            const widgetData = buildGpuPowerWidgetData({
+                powerWidgetData,
+                maximumPowerWatts: options.target.reading.maximumWatts,
+            });
+            const noticeText = resolveBuiltInHelperInstallNoticeText({
+                metricKey: GPU_POWER_METRIC_KEY,
+                helperStatus: options.helperStatus,
+                widgetData,
+            });
+
             return {
                 ...baseOptions,
                 metricKey: GPU_POWER_METRIC_KEY,
-                widgetData: buildGpuPowerWidgetData({
-                    powerWidgetData: readHelperBackedWidgetData({
-                        metrics: options.metrics,
-                        metricKey: GPU_POWER_METRIC_KEY,
-                        label: PROGRESS_CIRCLE_LABELS.gpu,
-                        unit: "W",
-                        maxValue: options.target.reading.maximumWatts,
-                        helperStatus: options.helperStatus,
-                    }),
-                    maximumPowerWatts: options.target.reading.maximumWatts,
-                }),
+                widgetData,
+                ...(noticeText === undefined ? {} : { noticeText }),
                 ...buildMetricViewIcons({ hardware: "gpu", status: "power" }),
             };
+        }
         case "usage": {
             const data = readHelperBackedWidgetData({
                 metrics: options.metrics,
@@ -170,18 +208,26 @@ function buildGpuViewOptions(options: {
                 helperStatus: options.helperStatus,
             });
 
+            const widgetData = {
+                ...buildGpuUsageWidgetData(data),
+                secondaryDisplayValue: data.sampleTimestampMilliseconds != null
+                    ? formatCompactHardwareModelLabel(
+                        options.metrics.getTextValue(GPU_MODEL_METRIC_KEY),
+                        "gpu",
+                    )
+                    : undefined,
+            };
+            const noticeText = resolveBuiltInHelperInstallNoticeText({
+                metricKey: GPU_USAGE_METRIC_KEY,
+                helperStatus: options.helperStatus,
+                widgetData,
+            });
+
             return {
                 ...baseOptions,
                 metricKey: GPU_USAGE_METRIC_KEY,
-                widgetData: {
-                    ...buildGpuUsageWidgetData(data),
-                    secondaryDisplayValue: data.sampleTimestampMilliseconds != null
-                        ? formatCompactHardwareModelLabel(
-                            options.metrics.getTextValue(GPU_MODEL_METRIC_KEY),
-                            "gpu",
-                        )
-                        : undefined,
-                },
+                widgetData,
+                ...(noticeText === undefined ? {} : { noticeText }),
                 ...buildMetricViewIcons({ hardware: "gpu", status: "percentage" }),
             };
         }
