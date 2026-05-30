@@ -18,7 +18,10 @@ import type { SourceClientStatus } from "../runtime/sources/source-client";
 import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import type { ResolvedCpuMetricTarget, ResolvedWidgetSettings } from "../settings/resolved-settings";
-import { readHelperBackedWidgetData } from "./shared/helper-backed-widget-data";
+import {
+    readHelperBackedWidgetData,
+    resolveBuiltInHelperInstallNoticeText,
+} from "./shared/helper-backed-widget-data";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 import type { SingleMetricViewOptions } from "../view-updates/runner";
 
@@ -59,7 +62,11 @@ export function resolveCpuMetricSubscriptionKeys(target: ResolvedCpuMetricTarget
     }
 }
 
-function buildCpuViewOptions(options: {
+/**
+ * Builds CPU render options and applies helper-install onboarding for
+ * helper-only CPU readings.
+ */
+export function buildCpuViewOptions(options: {
     event: WillAppearEvent;
     settings: ResolvedWidgetSettings;
     target: ResolvedCpuMetricTarget;
@@ -72,41 +79,61 @@ function buildCpuViewOptions(options: {
     };
 
     switch (options.target.reading.kind) {
-        case "temperature":
+        case "temperature": {
+            const celsiusWidgetData = readHelperBackedWidgetData({
+                metrics: options.metrics,
+                metricKey: CPU_TEMP_METRIC_KEY,
+                label: PROGRESS_CIRCLE_LABELS.cpu,
+                unit: "C",
+                maxValue: options.target.reading.maximumCelsius,
+                helperStatus: options.helperStatus,
+            });
+            const widgetData = buildTemperatureWidgetData({
+                celsiusWidgetData,
+                maximumCelsius: options.target.reading.maximumCelsius,
+                unit: options.target.reading.unit,
+            });
+            const noticeText = resolveBuiltInHelperInstallNoticeText({
+                metricKey: CPU_TEMP_METRIC_KEY,
+                helperStatus: options.helperStatus,
+                widgetData,
+            });
+
             return {
                 ...baseOptions,
                 metricKey: CPU_TEMP_METRIC_KEY,
-                widgetData: buildTemperatureWidgetData({
-                    celsiusWidgetData: readHelperBackedWidgetData({
-                        metrics: options.metrics,
-                        metricKey: CPU_TEMP_METRIC_KEY,
-                        label: PROGRESS_CIRCLE_LABELS.cpu,
-                        unit: "C",
-                        maxValue: options.target.reading.maximumCelsius,
-                        helperStatus: options.helperStatus,
-                    }),
-                    maximumCelsius: options.target.reading.maximumCelsius,
-                    unit: options.target.reading.unit,
-                }),
+                widgetData,
+                ...(noticeText === undefined ? {} : { noticeText }),
                 ...buildMetricViewIcons({ hardware: "cpu", status: "temperature" }),
             };
-        case "power":
+        }
+        case "power": {
+            const powerWidgetData = readHelperBackedWidgetData({
+                metrics: options.metrics,
+                metricKey: CPU_POWER_METRIC_KEY,
+                label: PROGRESS_CIRCLE_LABELS.cpu,
+                unit: "W",
+                maxValue: options.target.reading.maximumWatts,
+                helperStatus: options.helperStatus,
+            });
+            const widgetData = buildPowerWidgetData({
+                powerWidgetData,
+                maximumPowerWatts: options.target.reading.maximumWatts,
+            });
+            const noticeText = resolveBuiltInHelperInstallNoticeText({
+                metricKey: CPU_POWER_METRIC_KEY,
+                helperStatus: options.helperStatus,
+                widgetData,
+            });
+
             return {
                 ...baseOptions,
                 metricKey: CPU_POWER_METRIC_KEY,
-                widgetData: buildPowerWidgetData({
-                    powerWidgetData: readHelperBackedWidgetData({
-                        metrics: options.metrics,
-                        metricKey: CPU_POWER_METRIC_KEY,
-                        label: PROGRESS_CIRCLE_LABELS.cpu,
-                        unit: "W",
-                        maxValue: options.target.reading.maximumWatts,
-                        helperStatus: options.helperStatus,
-                    }),
-                    maximumPowerWatts: options.target.reading.maximumWatts,
-                }),
+                widgetData,
+                ...(noticeText === undefined ? {} : { noticeText }),
                 ...buildMetricViewIcons({ hardware: "cpu", status: "power" }),
             };
+        }
         case "usage": {
             const widgetData = options.metrics.getWidgetData(
                 CPU_USAGE_METRIC_KEY,

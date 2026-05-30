@@ -43,8 +43,7 @@ export const windowsServiceStatusReader: WindowsHelperServiceStatusReader = {
             logUnknownServiceStatus("unrecognizedOutput");
             return "unknown";
         } catch (error) {
-            const message = toError(error).message.toLowerCase();
-            if (message.includes("1060") || message.includes("does not exist")) {
+            if (isWindowsServiceNotInstalledQueryError(error)) {
                 return "notInstalled";
             }
 
@@ -53,6 +52,26 @@ export const windowsServiceStatusReader: WindowsHelperServiceStatusReader = {
         }
     },
 };
+
+export function isWindowsServiceNotInstalledQueryError(error: unknown): boolean {
+    // execFile stores sc.exe's process exit code on error.code. sc.exe returns
+    // the Win32 1060 code for ERROR_SERVICE_DOES_NOT_EXIST, so prefer this
+    // locale-proof signal and keep output text as a fallback only.
+    const exitCode = readUnknownProperty(error, "code");
+    if (exitCode === 1060 || exitCode === "1060") {
+        return true;
+    }
+
+    const message = [
+        toError(error).message,
+        readStringProperty(error, "stdout"),
+        readStringProperty(error, "stderr"),
+    ].filter(text => text !== undefined)
+        .join("\n")
+        .toLowerCase();
+
+    return message.includes("1060") || message.includes("does not exist");
+}
 
 function logUnknownServiceStatus(reason: "queryFailed" | "unrecognizedOutput"): void {
     log.atWarn()
@@ -64,4 +83,15 @@ function logUnknownServiceStatus(reason: "queryFailed" | "unrecognizedOutput"): 
             "windowsHelperServiceStatusUnknown",
             `reason=${reason}`,
         ].join(" "));
+}
+
+function readStringProperty(value: unknown, propertyName: string): string | undefined {
+    const propertyValue = readUnknownProperty(value, propertyName);
+    return typeof propertyValue === "string" ? propertyValue : undefined;
+}
+
+function readUnknownProperty(value: unknown, propertyName: string): unknown {
+    return typeof value === "object" && value !== null && propertyName in value
+        ? (value as Record<string, unknown>)[propertyName]
+        : undefined;
 }

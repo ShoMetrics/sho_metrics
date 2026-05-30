@@ -5,7 +5,7 @@ export interface WidgetData {
     unit: string;                  // Examples: "%", "deg C", "MB/s".
     label: string;                 // Examples: "CPU Usage", "GPU Temp".
     displayValue?: string;         // Optional preformatted value for compact metric-specific displays.
-    unavailableDisplayValue?: string; // Optional placeholder text when no fresh sample exists.
+    unavailableDisplayValue?: string; // Optional short key copy for render-owned no-data states.
     secondaryDisplayValue?: string;
     barLabel?: string;
     barDisplayValue?: string;
@@ -59,6 +59,10 @@ export interface KeySize {
     width: number;
     height: number;
 }
+
+// Render-owned no-data signal for a known metric whose helper polling group has
+// not produced its first snapshot. Do not reuse this for generic loading copy.
+export const PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE = "...";
 
 /** Logical SVG coordinate system. Visual proportions are authored against this size. */
 export const WIDGET_LOGICAL_SIZE: KeySize = { width: 144, height: 144 };

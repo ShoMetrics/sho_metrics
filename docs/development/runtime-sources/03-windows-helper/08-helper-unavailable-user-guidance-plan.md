@@ -28,9 +28,13 @@ guidance and too imprecise for support.
   - `MetricUnavailableReport` can distinguish `noSensorData`, `invalidValue`,
     and `expired`.
   - `MetricSourceDiagnostic` exposes some of this in DEBUG.
-- `readHelperBackedWidgetData(...)` currently maps helper-backed no-data to a
-  small set of widget strings: `Helper required`, `Helper error`, or
-  `No sensor data`.
+- `readHelperBackedWidgetData(...)` historically mapped helper-backed no-data
+  to several key strings such as `Helper required`, `Helper error`, or
+  `No sensor data`. The simplified policy is to reserve custom key copy for
+  helper installation (`Install helper`), explicit Advanced Sensor selection
+  onboarding (`Choose metric`), and first group refresh (`...`) only; other
+  no-data states render the normal `N/A` placeholder and put details in
+  PI/diagnostics.
 - `SourceWarning` is structured as `{ code, message, metric_id?,
   source_sensor_id? }`, but PawnIO driver status in ShoMetrics Control Panel is
   currently inferred from warning text containing `PawnIO` or `MSR`. The source
@@ -54,17 +58,23 @@ guidance and too imprecise for support.
 | Decision | Choice | Rationale |
 | --- | --- | --- |
 | Non-Windows Advanced Sensor | Hide the action from non-Windows action lists with action-level `OS: ["windows"]`. | The current feature is Windows-helper-backed. Showing it on macOS creates a dead-end first-use experience. This can be changed later when a macOS helper or catalog source exists; unlike action UUIDs, action OS visibility is not the persisted identity. |
-| Full dedicated error SVG | Do not use a full-screen, theme-breaking error SVG by default. | A sudden error page is visually jarring and can make transient source states feel worse. Keep the user's selected theme/view frame and show compact unavailable copy inside it. |
-| Error-body exercise | Keep one UX exercise for compact unavailable body rendering. | Some current views cannot fit `No sensor data` cleanly. The preferred improvement is a small theme-aware unavailable body, not a full replacement frame. |
+| Non-Windows metric options | Do not list metrics or source choices that are unsupported on the current platform. | Hiding the action list entry is not enough: synced profiles, existing widgets, and PI dropdowns must not invite users to select Windows-helper-only metrics on macOS. |
+| Dedicated unavailable SVG/body | Do not use a dedicated unavailable body for ordinary no-data states. | Users chose Circle/Text/Bar/Line; ordinary helper, sensor, and driver states should keep that view and render `N/A`. |
+| Notice surface | Use a dedicated notice body for static key guidance such as `Install helper` and Advanced Sensor `Choose metric`. | These are action guidance states, not metric values. They must not be rendered through the selected Circle/Text/Bar/Line primitive or handled by generic no-data rendering. |
+| No ambiguous setup copy | Never use `Setup required` as user-facing key copy. | It does not say whether the user must install the helper or choose a metric. Use the specific next action instead. |
+| Helper install key copy | Allow `Install helper` only for static helper-required surfaces when the helper service is confirmed not installed. | A never-installed helper is an activation funnel problem for Advanced Sensor and helper-only built-ins such as CPU temperature/power. Helper-preferred fallback metrics such as GPU telemetry stay `N/A` until a value arrives so cold-start fallback warmup does not flash the wrong install guidance. |
+| Metric selection key copy | Use `Choose metric` when Advanced Sensor is usable but no metric is selected. | Once the helper/catalog path is usable, the next action is choosing a metric, not installing or repairing helper state. |
+| First-refresh key copy | Allow `...` for `sensorPending` in non-minimal views. | It explains the short first-refresh wait without introducing a dedicated loading layout. Minimal circle stays icon-first. |
 | ShoMetrics Control Panel naming | Use `ShoMetrics Control Panel` in user-facing guidance. Use `Open` only when the nearby UI already names the destination. | Bare `Control Panel` can be confused with Windows Control Panel. The product-owned name keeps support guidance unambiguous. |
 | ShoMetrics Control Panel process privilege | Run ShoMetrics Control Panel as normal user by default. Use UAC only for explicit privileged actions. | Reading helper status is safe as a normal user. Service install/start/stop, driver install/repair, or kernel-adjacent configuration changes must be separate, explicit elevated actions. |
 | `Open` action lifecycle | Treat `Open ShoMetrics Control Panel` as a fire-and-forget Windows Shell launch/focus request. | Opening from the PI should behave like the user opening the same installed app from Start Menu. Hub must not own, monitor, restart, or kill the ShoMetrics Control Panel process. |
-| Driver status source | Keep driver/sensor details in ShoMetrics Control Panel, DEBUG, and support text until a machine consumer needs structured decisions. | The key only needs to tell the user to check ShoMetrics. Do not build a typed health-diagnostic contract just to display human-readable details. |
+| Driver status source | Keep driver/sensor details in ShoMetrics Control Panel, DEBUG, and support text until a machine consumer needs structured decisions. | The key stays `N/A` for ordinary no-data states. Do not build a typed health-diagnostic contract just to display human-readable details. |
 | Render truth source | Node/Hub data-path state remains authoritative for widget rendering; helper health is supporting diagnosis. | A helper can report "available" while a metric still has no value. Widgets must be driven by actual metric values/unavailable reports, with helper health used to choose better guidance copy. |
 | Health diagnostic contract | Defer the `kind`/`severity`/`scope` health diagnostic contract. Keep `SourceWarning` as the support/log surface for now. | Structured diagnostics are justified only when Hub or ShoMetrics Control Panel performs different machine actions based on the diagnostic kind. |
 | Version mismatch UX | Treat helper/Hub protocol mismatch as `versionMismatch`, not generic `helperError`. | The user action is specific: update or repair the ShoMetrics install so Hub and helper use matching protocol versions. |
 | Descriptor catalog state | Treat descriptor catalog pending/failure as "catalog not ready", not "metric does not exist". | Until the source catalog is available, Hub cannot prove that a selected metric is truly absent. |
 | Freshness owner | Do not introduce a second Hub-owned source freshness system. Hub consumes source/runtime freshness and unavailable reports, while sources own retained-value semantics. | The Windows helper already owns retained sample freshness and age. Duplicating stale logic in Hub would create conflicting truth sources. |
+| Hub retained-value limitation | Treat Hub's current 7s timestamp freshness gate as a known follow-up, not part of onboarding copy. | Helper-retained values may still render `N/A` until Hub consumes source-reported freshness/retained attribution. This must not turn into `Install helper` copy. |
 | i18n scope | Define copy keys and English/Japanese/Chinese target text in this plan, but render English only until the Hub has a real i18n layer. | The repo does not currently have a general i18n layer. This plan prevents hard-coded copy drift without pretending localization is implemented. |
 
 ## Implementation Slices
@@ -76,10 +86,11 @@ settings or installer work.
 | Slice | Scope | Why first or later |
 | --- | --- | --- |
 | 1. Pending refresh semantics | C# per-group missing snapshot handling, proto/runtime unavailable reason, widget/PI copy for `sensorPending`, tests. | Directly fixes the `ReadPollingGroup` fallback confusion and is small enough to review alone. |
-| 2. Helper setup guidance | Advanced Sensor action OS gate, PI descriptor-load guidance for missing/stopped helper, helper status copy tests. | Improves first-run UX without changing driver health contracts. |
-| 3. Runtime unavailable body | Shared compact unavailable body for tight themes/views. | Solves layout overflow after copy semantics are stable. |
+| 2. Helper install and selection guidance | Advanced Sensor action OS gate, PI descriptor-load guidance for missing/stopped helper, helper status copy tests. | Improves first-run UX without changing driver health contracts. |
+| 3. Key no-data simplification | Render ordinary no-data states as `N/A`; render `Install helper` only through action-owned notice bodies when helper install is the next action; render `Choose metric` only through the Advanced Sensor no-selection notice body; keep `...` as the first-refresh key exception. | Avoids long-copy layout work while preserving first-run helper install, metric selection, and first-refresh guidance. |
 | 4. Support diagnostics surface | ShoMetrics Control Panel warning display, diagnostic copy, optional component labels for support text. | Keep this human/support-facing until a real machine decision requires a typed health diagnostic contract. |
 | 5. Privileged ShoMetrics Control Panel actions | Installer/service/driver repair entry points with explicit UAC. | Separate security design and release packaging work. |
+| 6. Platform metric filtering | Filter PI dropdown options and already-placed unsupported keys by current platform. | Prevents macOS users from selecting Windows-helper-only metrics and keeps synced Windows profiles from turning into install-helper dead ends. |
 
 ## User-Facing State Model
 
@@ -88,31 +99,31 @@ system status and repair actions in ShoMetrics Control Panel.
 
 | State key | Deck copy | PI guidance | ShoMetrics Control Panel guidance |
 | --- | --- | --- | --- |
-| `setupRequired` | `Setup required` | `Install ShoMetrics Helper to use advanced sensors.` | Show service not installed. Offer install/repair once installer UX exists. |
-| `helperStopped` | `Helper stopped` | `Start ShoMetrics Helper from ShoMetrics Control Panel.` | Show service installed but not running. Offer Start with UAC if needed. |
-| `helperStarting` | `Waiting...` | `Waiting for ShoMetrics Helper to start.` | Show service start-pending or pipe missing inside a short startup window. |
-| `versionMismatch` | `Check ShoMetrics` | `Update ShoMetrics Helper and Hub to matching versions.` | Show Hub version, helper version, and protocol version. |
-| `helperError` | `Check ShoMetrics` | `Open ShoMetrics Control Panel for helper diagnostics.` | Show connection, protocol, health, and warning details. |
-| `driverIssue` | `Check ShoMetrics` | `Open ShoMetrics Control Panel to check sensor driver status.` | Show driver/sensor-path warning details and next action. |
-| `descriptorCatalogPending` | `Waiting...` | `Waiting for the helper metric catalog.` | Show descriptor request status and helper health. |
-| `descriptorCatalogUnavailable` | `Check ShoMetrics` | `The helper metric catalog is not available yet.` | Show descriptor failure details and helper health. |
-| `sensorPending` | `Waiting...` | `Waiting for this sensor group to refresh.` | No user action required unless it persists. |
-| `noSensor` | `No data` | `This metric is not available on this hardware.` | Show descriptor count, source warnings, and sensor availability details. |
-| `invalidSensorValue` | `No data` | `The sensor exists but is not returning a valid value.` | Show source warning and raw sensor identity when available. |
-| `expiredSensorValue` | `No data` | `The last valid value expired.` | Show last value age and source warning. |
-| `unsupportedPlatform` | `Windows only` | `This sensor requires the Windows helper.` | N/A |
+| `helperInstallRequired` | `Install helper` | `Install ShoMetrics Helper to use advanced sensors.` | Show service not installed. Offer install/repair once installer UX exists. |
+| `metricSelectionRequired` | `Choose metric` | `Choose an advanced sensor metric.` | N/A |
+| `helperStopped` | `N/A` | `Start ShoMetrics Helper from ShoMetrics Control Panel.` | Show service installed but not running. Offer Start with UAC if needed. |
+| `helperStarting` | `N/A` | `Waiting for ShoMetrics Helper to start.` | Show service start-pending or pipe missing inside a short startup window. |
+| `versionMismatch` | `N/A` | `Update ShoMetrics Helper and Hub to matching versions.` | Show Hub version, helper version, and protocol version. |
+| `helperError` | `N/A` | `Open ShoMetrics Control Panel for helper diagnostics.` | Show connection, protocol, health, and warning details. |
+| `driverIssue` | `N/A` | `Open ShoMetrics Control Panel to check sensor driver status.` | Show driver/sensor-path warning details and next action. |
+| `descriptorCatalogPending` | `N/A` | `Waiting for the helper metric catalog.` | Show descriptor request status and helper health. |
+| `descriptorCatalogUnavailable` | `N/A` | `The helper metric catalog is not available yet.` | Show descriptor failure details and helper health. |
+| `sensorPending` | `...` | `Waiting for this sensor group to refresh.` | No user action required unless it persists. |
+| `noSensor` | `N/A` | `This metric is not available on this hardware.` | Show descriptor count, source warnings, and sensor availability details. |
+| `invalidSensorValue` | `N/A` | `The sensor exists but is not returning a valid value.` | Show source warning and raw sensor identity when available. |
+| `expiredSensorValue` | `N/A` | `The last valid value expired.` | Show last value age and source warning. |
+| `unsupportedPlatform` | `N/A` | `This sensor requires the Windows helper.` | N/A |
 
-Keep Deck copy short enough for tight views. The PI can use longer copy because
-it has layout space and can show buttons/links. Key copy is intentionally
-coarser than the internal state model:
-
-- `Waiting...` covers expected transient startup, descriptor, and sensor-group
-  warmup states.
-- `No data` covers metric-level absence, invalid values, and expired retained
-  values.
-- `Check ShoMetrics` covers helper errors, driver/sensor-path issues, protocol
-  mismatch, and descriptor catalog failures. The PI and ShoMetrics Control
-  Panel provide the specific next action.
+Keep Deck copy short enough for every view. The PI can use longer copy because
+it has layout space and can show buttons/links. Key copy is intentionally much
+coarser than the internal state model: confirmed missing helper on static
+helper-required surfaces gets `Install helper`, usable Advanced Sensor with no
+selected metric gets `Choose metric`, first group refresh gets `...`, and
+ordinary helper, driver, unsupported, fallback warmup, and metric no-value
+states render `N/A`.
+`Install helper` and `Choose metric` are rendered by action-owned notice bodies,
+not by selected metric primitives. The PI and ShoMetrics Control Panel provide
+the specific next action.
 
 ### State Resolution Priority
 
@@ -123,14 +134,26 @@ When multiple facts are available, resolve visible state in this order:
    imported profiles.
 2. Fresh value: show the metric value. Do not replace a fresh value with helper
    health warning copy.
-3. Helper transport/setup failure: show `setupRequired`, `helperStopped`,
-   `helperStarting`, `versionMismatch`, or `helperError`.
-4. Driver/sensor-path warnings may refine PI and ShoMetrics Control Panel
-   guidance, but the key uses the shared `Check ShoMetrics` action state.
-5. Metric unavailable reason: show `sensorPending`/`descriptorCatalogPending`
-   as `Waiting...`, or metric no-value states as `No data`.
-6. Unknown no-data state: show `helperError` in PI and conservative `No data` on
-   the key.
+3. No selected metric: show `helperInstallRequired` only when Advanced Sensor
+   cannot load its catalog because `helperNotInstalled` is confirmed. Show
+   `metricSelectionRequired` when the catalog path is usable but no metric has
+   been selected. If the helper is installed but stopped, keep key copy as
+   `N/A` and show start-helper guidance in PI.
+4. Helper not installed for a static helper-required selected metric or
+   helper-only built-in: show `helperInstallRequired`. This covers CPU
+   temperature/power and selected Advanced Sensor metrics.
+5. Helper transport failure for an already selected metric: keep key copy as
+   `N/A` and show `helperStopped`, `helperStarting`, `versionMismatch`, or
+   `helperError` in PI.
+6. Helper-preferred fallback metrics such as GPU telemetry keep key copy as
+   `N/A` while fallback is warming up or unavailable. Do not infer
+   `Install helper` from a momentary lack of fallback samples.
+7. Driver/sensor-path warnings may refine PI and ShoMetrics Control Panel
+   guidance, but the key stays `N/A`.
+8. Metric unavailable reason: show `sensorPending` as `...` in non-minimal
+   views; otherwise keep the key as `N/A` and show metric no-value details in PI.
+9. Unknown no-data state: show `helperError` in PI and conservative `N/A` on the
+   key.
 
 This preserves existing values during transient warning states but still lets a
 hard helper outage override stale or missing data.
@@ -139,11 +162,11 @@ hard helper outage override stale or missing data.
 
 Transient states must not wait forever.
 
-| State | Initial copy | Deadline | Upgrade |
+| State | Key copy | Deadline | Upgrade |
 | --- | --- | --- | --- |
-| `helperStarting` | `Waiting...` | Service-status start-pending window or 15 seconds, whichever is longer once measured. | `helperError` with PI guidance to open ShoMetrics Control Panel. |
-| `sensorPending` | `Waiting...` | Three requested poll intervals plus a small grace window, capped by a fixed upper bound. | `helperError` if no refresh attempt is observed; `No data` if the group refreshes but the metric is absent. |
-| descriptor load `pending` | `Loading metrics...` in PI | Descriptor request timeout plus retry cooldown. | setup/stopped/error guidance from helper status. |
+| `helperStarting` | `N/A` | Service-status start-pending window or 15 seconds, whichever is longer once measured. | `helperError` with PI guidance to open ShoMetrics Control Panel. |
+| `sensorPending` | `...` | Three requested poll intervals plus a small grace window, capped by a fixed upper bound. | `helperError` if no refresh attempt is observed; `noSensor` PI guidance if the group refreshes but the metric is absent. |
+| descriptor load `pending` | `Loading metrics...` in PI | Descriptor request timeout plus retry cooldown. | install/start/error guidance from helper status. |
 
 Slice 1 may implement only `sensorPending` for known single-group reads, but it
 must define how the state exits.
@@ -155,28 +178,32 @@ layer is added later, use these as initial keys.
 
 | Key | English | Japanese | Chinese |
 | --- | --- | --- | --- |
-| `setupRequired` | `Setup required` | `セットアップが必要` | `需要设置` |
-| `helperStopped` | `Helper stopped` | `ヘルパー停止中` | `助手已停止` |
-| `helperStarting` | `Waiting...` | `待機中...` | `等待中...` |
-| `versionMismatch` | `Check ShoMetrics` | `ShoMetrics を確認` | `检查 ShoMetrics` |
-| `helperError` | `Check ShoMetrics` | `ShoMetrics を確認` | `检查 ShoMetrics` |
-| `driverIssue` | `Check ShoMetrics` | `ShoMetrics を確認` | `检查 ShoMetrics` |
-| `descriptorCatalogPending` | `Waiting...` | `待機中...` | `等待中...` |
-| `descriptorCatalogUnavailable` | `Check ShoMetrics` | `ShoMetrics を確認` | `检查 ShoMetrics` |
-| `sensorPending` | `Waiting...` | `待機中...` | `等待中...` |
-| `noSensor` | `No data` | `データなし` | `无数据` |
-| `invalidSensorValue` | `No data` | `データなし` | `无数据` |
-| `expiredSensorValue` | `No data` | `データなし` | `无数据` |
-| `unsupportedPlatform` | `Windows only` | `Windows のみ` | `仅限 Windows` |
+| `helperInstallRequired` | `Install helper` | `ヘルパーをインストール` | `安装 Helper` |
+| `metricSelectionRequired` | `Choose metric` | `メトリックを選択` | `选择指标` |
+| `helperStopped` | `N/A` | `N/A` | `N/A` |
+| `helperStarting` | `N/A` | `N/A` | `N/A` |
+| `versionMismatch` | `N/A` | `N/A` | `N/A` |
+| `helperError` | `N/A` | `N/A` | `N/A` |
+| `driverIssue` | `N/A` | `N/A` | `N/A` |
+| `descriptorCatalogPending` | `N/A` | `N/A` | `N/A` |
+| `descriptorCatalogUnavailable` | `N/A` | `N/A` | `N/A` |
+| `sensorPending` | `...` | `...` | `...` |
+| `noSensor` | `N/A` | `N/A` | `N/A` |
+| `invalidSensorValue` | `N/A` | `N/A` | `N/A` |
+| `expiredSensorValue` | `N/A` | `N/A` | `N/A` |
+| `unsupportedPlatform` | `N/A` | `N/A` | `N/A` |
 | `openControlPanel` | `Open ShoMetrics Control Panel` | `ShoMetrics コントロールパネルを開く` | `打开 ShoMetrics 控制面板` |
 | `installHelper` | `Install ShoMetrics Helper to use advanced sensors.` | `高度なセンサーを使うには ShoMetrics Helper をインストールしてください。` | `安装 ShoMetrics Helper 后才能使用高级传感器。` |
 | `startHelper` | `Start ShoMetrics Helper from ShoMetrics Control Panel.` | `ShoMetrics コントロールパネルから ShoMetrics Helper を起動してください。` | `请从 ShoMetrics 控制面板启动 ShoMetrics Helper。` |
 | `checkDriver` | `Open ShoMetrics Control Panel to check sensor driver status.` | `ShoMetrics コントロールパネルでセンサードライバーの状態を確認してください。` | `打开 ShoMetrics 控制面板检查传感器驱动状态。` |
 | `updateShoMetrics` | `Update ShoMetrics Helper and Hub to matching versions.` | `ShoMetrics Helper と Hub を対応するバージョンに更新してください。` | `请将 ShoMetrics Helper 和 Hub 更新到匹配版本。` |
 
-The short Deck copy intentionally avoids long words such as "unavailable" where
-possible. It also avoids "N/A" for setup and helper failures because those
-states require user action.
+The short Deck copy intentionally avoids long words such as "unavailable". It
+uses `N/A` for ordinary no-data states because the key is not the right surface
+for detailed guidance. `Install helper`, `Choose metric`, and `...` are the
+only exceptions: helper installation and metric selection are onboarding
+actions, and pending refresh is a short expected wait. Do not use
+`Setup required`; it is ambiguous.
 
 ## Critical User Journeys
 
@@ -188,9 +215,11 @@ Expected behavior:
 
 - `Advanced Sensor` is not shown in the Stream Deck action list.
 - Existing cross-platform widgets continue to appear.
-- No key should render helper setup copy for a widget the user could not add.
+- No key should render helper install copy for a widget the user could not add.
+- PI dropdowns do not list Windows-helper-only metrics or source choices on
+  non-Windows platforms.
 - If a profile created on Windows already contains an Advanced Sensor key and
-  then syncs to macOS, the key shows `Windows only`.
+  then syncs to macOS, the key shows `N/A` and PI explains Windows-only support.
 
 Implementation:
 
@@ -201,6 +230,9 @@ Implementation:
   OS gate in the manifest.
 - Do not treat action-list visibility as a complete platform guard. Runtime
   render logic must still handle already-placed unsupported keys.
+- Treat PI option filtering as a separate platform guard. Existing unsupported
+  selections may remain stored for profile portability, but they should render
+  as selected-unavailable rather than as selectable current-platform choices.
 
 ### CUJ 2: Windows User Drags Advanced Sensor Before Installing Helper
 
@@ -208,11 +240,14 @@ User sees the action, drags it to a key, and opens the PI.
 
 Expected behavior:
 
-- Key: `Choose metric` until a metric is selected.
-- PI Metric section: explains helper setup is required instead of only saying
+- Key: `Install helper` once the source client confirms
+  `helperNotInstalled`. It may temporarily show `N/A` before service probing
+  completes.
+- PI Metric section: explains that ShoMetrics Helper must be installed before
+  advanced sensors can be selected, instead of only saying
   `Metrics unavailable`.
 - DEBUG may show missing pipe or service not installed, but ordinary PI copy
-  should use setup language.
+  should use install-helper language.
 
 Implementation:
 
@@ -220,7 +255,29 @@ Implementation:
   only descriptor load state.
 - `WindowsHelperSourceClient` already refines pipe-missing status to
   `helperNotInstalled` when service probing confirms it.
-- PI should map `helperNotInstalled` to `setupRequired`.
+- PI should map `helperNotInstalled` to `helperInstallRequired`.
+- Action rendering should show `Install helper` through an action-owned notice
+  body. Do not emit install copy as a shared helper-backed
+  `unavailableDisplayValue` or from generic no-data rendering.
+
+### CUJ 2A: Windows User Drags Advanced Sensor After Helper Is Usable
+
+User sees the action, drags it to a key, and the helper/catalog path is usable,
+but no metric has been selected yet.
+
+Expected behavior:
+
+- Key: `Choose metric`.
+- PI: show the metric picker.
+- ShoMetrics Control Panel: no action required.
+
+Implementation:
+
+- The no-selected-metric path owns `Choose metric`.
+- `Choose metric` uses the Advanced Sensor no-selection notice body; it is not
+  drawn by the selected metric primitive.
+- Do not show `Install helper` when the helper is installed/running or when
+  the catalog is already usable.
 
 ### CUJ 3: Helper Installed But Service Is Not Running
 
@@ -228,7 +285,7 @@ User installed the helper earlier, but the service is stopped.
 
 Expected behavior:
 
-- Key after metric selection: `Helper stopped`.
+- Key after metric selection: `N/A`.
 - PI: `Start ShoMetrics Helper from ShoMetrics Control Panel.`
 - ShoMetrics Control Panel: service installed, runtime not running.
 
@@ -236,7 +293,8 @@ Implementation:
 
 - Keep service probing in the helper source client and ShoMetrics Control Panel.
 - Map `SourceClientStatus.reason === "helperStopped"` to `helperStopped`.
-- Do not show `Setup required`; the install already exists.
+- Do not show `Install helper`; the service exists and the user action is start
+  or repair, surfaced in PI/ShoMetrics Control Panel.
 
 ### CUJ 4: Helper Running But Driver/Sensor Path Is Unhealthy
 
@@ -249,8 +307,8 @@ Examples:
 
 Expected behavior:
 
-- Key: `Check ShoMetrics` when the selected metric has no fresh value and
-  helper warnings/status point to a driver or sensor-path issue.
+- Key: `N/A` when the selected metric has no fresh value and helper
+  warnings/status point to a driver or sensor-path issue.
 - PI: explain that ShoMetrics Control Panel can show the driver status.
 - ShoMetrics Control Panel: show driver/sensor-path warnings and support
   details without forcing the key to expose every diagnostic kind.
@@ -267,10 +325,10 @@ Implementation:
 
 | Prefix | Meaning | Generic fallback |
 | --- | --- | --- |
-| `driver:` | Driver or privileged sensor access path. | `Check ShoMetrics` key copy plus PI driver guidance. |
-| `sensor:` | Hardware sensor family. | `No data` key copy plus PI sensor guidance. |
-| `lhm` | LibreHardwareMonitor session/catalog path. | `Check ShoMetrics` or descriptor-load guidance. |
-| `service:` | Helper service/runtime path. | setup/transport guidance. |
+| `driver:` | Driver or privileged sensor access path. | `N/A` key copy plus PI driver guidance. |
+| `sensor:` | Hardware sensor family. | `N/A` key copy plus PI sensor guidance. |
+| `lhm` | LibreHardwareMonitor session/catalog path. | `N/A` key copy plus descriptor-load guidance. |
+| `service:` | Helper service/runtime path. | install/start/transport guidance. |
 
 The string after a known component prefix is source-owned and display/debug only.
 Hub may branch on the prefix, not on arbitrary suffixes.
@@ -286,7 +344,7 @@ protocol versions.
 
 Expected behavior:
 
-- Key: `Check ShoMetrics`
+- Key: `N/A`.
 - PI: `Update ShoMetrics Helper and Hub to matching versions.`
 - ShoMetrics Control Panel: show Hub version, helper version, and protocol
   version.
@@ -305,14 +363,20 @@ User has an Intel or AMD GPU and chooses a GPU metric.
 Expected behavior:
 
 - If helper/LHM exposes the metric, render it normally.
+- If Node/NVIDIA fallback provides a fresh value, render it normally.
+- If the helper is not installed and fallback cannot provide a value, key:
+  `N/A`; PI may explain that installing the helper can enable broader GPU
+  telemetry.
 - If the specific GPU metric is unsupported, resolve to `noSensor` and show
-  short `No data` key copy, not helper/check-ShoMetrics guidance.
+  `N/A` key copy when the helper is installed/reachable enough to prove the
+  metric is not available.
 - PI explains that this metric is not available on this hardware.
 
 Implementation:
 
 - Continue to use metric unavailable reports from the read path.
 - Do not infer "NVIDIA tool failed" for non-NVIDIA hardware.
+- Do not infer `Install helper` from momentary fallback no-sample states.
 - If GPU source routing tries a NVIDIA-specific path in the future, it must be
   gated by source/hardware identity before surfacing user copy.
 
@@ -323,9 +387,12 @@ API, or helper issues.
 
 Expected behavior:
 
-- Key: `Check ShoMetrics` for driver/API or transport/helper failures that
-  need user attention.
-- Key: `No data` with `noSensor` PI detail only when the source is healthy and
+- Key: normal value when Node/NVIDIA fallback provides fresh data.
+- Key: `N/A` when the helper is not installed and the fallback path also cannot
+  provide a fresh value.
+- Key: `N/A` for driver/API or transport/helper failures that need user
+  attention.
+- Key: `N/A` with `noSensor` PI detail only when the source is healthy and
   the metric is genuinely not available.
 
 Implementation:
@@ -333,6 +400,10 @@ Implementation:
 - Keep source health, transport failure, and metric unavailable reason separate.
 - Use `SourceClientStatus` for transport/helper status.
 - Use `MetricUnavailableReport` for metric-level no-value status.
+- Let fresh fallback data win over helper status copy.
+- Keep helper-preferred GPU fallback metrics on `N/A` when no fallback value is
+  fresh. Avoid cold-start flashes from `Install helper` to a later fallback
+  value.
 - Use source warnings/support details for driver/API path hints until a typed
   diagnostic contract is justified by a machine decision.
 
@@ -344,7 +415,8 @@ snapshot.
 
 Expected behavior:
 
-- Key: `Waiting...`
+- Key: `...` in non-minimal views; minimal circle may keep the muted icon
+  placeholder.
 - PI: `Waiting for this sensor group to refresh.`
 - This should not resolve to `noSensor`.
 
@@ -377,7 +449,7 @@ C# behavior:
 
 Node behavior:
 
-- Map `pendingRefresh` to `sensorPending`.
+- Map `pendingRefresh` to `sensorPending` and key copy `...`.
 - Treat it as an expected transient state. Do not log it as an error.
 - Deadline inputs must come from source-owned group refresh state, such as last
   refresh attempt, last success, last failure, descriptor generation, and the
@@ -391,7 +463,7 @@ disappears.
 
 Expected behavior:
 
-- Key: `No data`
+- Key: `N/A`
 - PI preserves the old selected metric enough for the user to replace it.
 - PI explains that the selected metric is unavailable on the current hardware.
 
@@ -410,8 +482,7 @@ hardware topology change.
 
 Expected behavior:
 
-- Key before metric selection: `Choose metric` or `Loading metrics...`,
-  depending on whether the user has selected a metric.
+- Key before metric selection: `N/A`.
 - PI: show catalog loading or catalog unavailable guidance.
 - Do not mark a selected metric as `No data` only because the catalog is not
   ready.
@@ -426,7 +497,7 @@ Implementation:
 
 ### CUJ 9: User Fixes The Helper While A Key Shows An Error
 
-User sees `Setup required`, `Helper stopped`, or `Check ShoMetrics`, then
+User sees `Install helper`, `Choose metric`, or `N/A` with PI guidance, then
 installs the helper, starts the service, updates the helper/Hub pair, or repairs
 the driver path.
 
@@ -453,7 +524,10 @@ User had a working widget. The helper stops or starts returning errors.
 Expected behavior:
 
 - During the freshness window, the last good value may remain visible.
-- Once the sample is stale, the key should show helper/setup copy, not `No data`.
+- Once the sample is stale, the key should show `Install helper` only for
+  static helper-required surfaces when the helper service is now confirmed not
+  installed. Helper-preferred fallback metrics and other stopped/error/runtime
+  failures stay `N/A`.
 - PI DEBUG shows last value age and helper status.
 
 Implementation:
@@ -506,28 +580,37 @@ Implementation:
 
 ## Widget Rendering Policy
 
-Do not implement a full dedicated error SVG as the default unavailable state.
+Do not implement a dedicated unavailable SVG/body as the default unavailable
+state.
 
 Reasons:
 
-- It breaks the user's selected theme/view in a visually abrupt way.
+- It breaks the user's selected Circle/Text/Bar/Line view in a visually abrupt
+  way.
 - It makes transient startup states look like major failures.
 - It teaches the user to ignore the selected theme whenever data is missing.
 
 Preferred improvement:
 
-- Add a theme-aware compact unavailable body at the metric frame/body layer.
-- Reuse the selected frame, colors, and icon placement where possible.
-- Give tight layouts short copy from `User-Facing State Model`.
+- Keep ordinary no-data states inside the selected primitive and render `N/A`.
+- Reserve `Install helper` for confirmed missing-helper states on static
+  helper-required surfaces.
+- Keep `Choose metric` for the no-selected-metric state when helper/catalog
+  access is usable.
+- Render `Install helper` and `Choose metric` with action-owned notice bodies.
+  This notice body is a static guidance surface, not a shared unavailable/error
+  SVG and not a selected-view primitive.
 - Put long guidance in PI and ShoMetrics Control Panel.
 
 Implementation options:
 
 | Option | Recommendation | Notes |
 | --- | --- | --- |
-| Continue putting `unavailableDisplayValue` into every current primitive | Short-term only | Existing path; known to overflow in some views. |
-| Add compact unavailable body in `metric-view-frame.ts` | Preferred | One shared render path for single-metric no-data states. |
-| Full dedicated error SVG | Avoid for default states | Can remain a future UX exercise for severe setup flows, but not preferred now. |
+| Ordinary no-data states render `N/A` in the selected primitive | Preferred | Avoids long-copy fitting and preserves the selected view. |
+| Action-owned notice body | Preferred static guidance exception | The only key surface allowed to render `Install helper` or `Choose metric`; it is action-owned and uses static, controlled copy. |
+| `Install helper`/`Choose metric` inside ordinary primitives | Avoid | This leaks onboarding copy into every Circle/Text/Bar/Line layout and recreates long-text fitting work. |
+| Shared compact body for all unavailable states | Avoid | This still feels like switching to a dedicated error/no-data layout. |
+| Full dedicated error SVG | Avoid | Too visually abrupt for helper/source states. |
 
 ## ShoMetrics Control Panel Security And Privilege Model
 
@@ -669,7 +752,7 @@ Node should consume diagnostics as supporting evidence:
 ```text
 data path says no value
   -> metric unavailable reason chooses metric state
-  -> source status chooses helper setup/transport state
+  -> source status chooses helper install/start/transport state
   -> warnings/support details refine PI and ShoMetrics Control Panel guidance
 ```
 
@@ -685,7 +768,7 @@ Minimum runtime states:
 - descriptor catalog ready
 - descriptor catalog failed or unavailable
 
-The Property Inspector uses these states for picker loading/setup guidance.
+The Property Inspector uses these states for picker loading/install guidance.
 Action rendering uses them only when the selected metric cannot be resolved and
 no fresher metric value exists.
 
@@ -698,18 +781,29 @@ no fresher metric value exists.
 2. Update `MetricSourceDiagnostic` to show the new reason.
 3. Update `readHelperBackedWidgetData(...)` to use metric unavailable reason in
    addition to helper status.
-4. Update `CatalogMetricDescriptorStatusNote` to render setup/helper guidance
+4. Update `CatalogMetricDescriptorStatusNote` to render install/start/helper guidance
    when descriptor loading fails because helper is missing or stopped.
 5. Add unsupported-platform fallback copy for already-placed Advanced Sensor
    keys on non-Windows systems.
 6. Keep DEBUG details separate from user-facing copy.
 7. Cache service-status and health probing in the source client. Action render
    paths must only read cached state.
-8. Add `versionMismatch` PI guidance for protocol mismatch. Key copy may stay
-   on the shared `Check ShoMetrics` action state.
+8. Add `versionMismatch` PI guidance for protocol mismatch. Key copy stays
+   `N/A`.
 9. Add descriptor catalog pending/unavailable handling in the PI picker path.
 10. Use source-client-owned in-flight request dedupe for service status, health,
     and descriptor refreshes. Do not create a general singleflight framework.
+11. Do not emit `Install helper` from `readHelperBackedWidgetData(...)` as an
+    unavailable display value. Shared helper-backed readers may expose a small
+    install-notice resolver, but action view builders own whether that notice is
+    passed to rendering because they know selection and fallback context.
+12. For built-in stable metrics, derive helper-required install notice
+    eligibility from the static source-routing classification in
+    `metric-source-preferences.ts`. Do not hard-code per-action booleans and do
+    not infer helper requirement from sample freshness.
+13. On non-Windows platforms, filter PI metric/source dropdowns so
+    Windows-helper-only metrics are not offered as selectable options. Already
+    stored unsupported selections should be preserved but shown as unavailable.
 
 ## C# Core Changes
 
@@ -746,17 +840,22 @@ group that has never published. That is the state collapse this plan fixes.
 | Data path | Source status | Warnings/support details | Key state |
 | --- | --- | --- | --- |
 | Fresh value | any non-fatal warning | any warning | normal metric value |
-| Stale/missing | `helperNotInstalled` | none | `setupRequired` |
-| Stale/missing | `helperStopped` | none | `helperStopped` |
-| Stale/missing | `pipeMissing` during short startup window | none | `Waiting...` via `helperStarting` |
-| Stale/missing | `protocolMismatch` | none | `Check ShoMetrics` with version guidance |
-| Stale/missing | `sourceError` / `timeout` | none | `Check ShoMetrics` |
-| Missing while descriptor catalog is pending | `available` | none | `Waiting...` via `descriptorCatalogPending` |
-| Missing while descriptor catalog failed | `available` | none | `Check ShoMetrics` |
-| Missing with `pendingRefresh` | `available` | none | `Waiting...` via `sensorPending` until deadline |
-| Missing with `noSensorData` | `available` | none | `No data` |
-| Missing with `invalidValue` | `available` | driver/sensor warning | `Check ShoMetrics` in PI when warning applies; otherwise `No data` |
-| Missing with unknown reason | `available` | none | generic `No data` |
+| No selected Advanced Sensor metric | `helperNotInstalled` | none | `Install helper` |
+| No selected Advanced Sensor metric | `available` | none | `Choose metric` |
+| No selected Advanced Sensor metric | `helperStopped` | none | `N/A` with start-helper PI guidance |
+| Advanced Sensor selected metric | `helperNotInstalled` | none | `Install helper` |
+| Helper-only built-in metric, such as CPU temperature/power | `helperNotInstalled` | none | `Install helper` |
+| Helper-preferred fallback metric, such as GPU telemetry | `helperNotInstalled` | none | `N/A` until fallback produces a value |
+| Stale/missing | `helperStopped` | none | `N/A` with `helperStopped` PI guidance |
+| Stale/missing | `pipeMissing` during short startup window | none | `N/A` with `helperStarting` PI guidance |
+| Stale/missing | `protocolMismatch` | none | `N/A` with version guidance |
+| Stale/missing | `sourceError` / `timeout` | none | `N/A` with helper error PI guidance |
+| Missing while descriptor catalog is pending | `available` | none | `N/A` with `descriptorCatalogPending` PI guidance |
+| Missing while descriptor catalog failed | `available` | none | `N/A` with catalog failure PI guidance |
+| Missing with `pendingRefresh` | `available` | none | `...` with `sensorPending` PI guidance until deadline |
+| Missing with `noSensorData` | `available` | none | `N/A` with no-sensor PI guidance |
+| Missing with `invalidValue` | `available` | driver/sensor warning | `N/A` with warning-assisted PI guidance |
+| Missing with unknown reason | `available` | none | generic `N/A` |
 
 `protocolMismatch` must resolve before generic helper errors. The generic row is
 for source errors that have no more specific remediation.
@@ -768,32 +867,52 @@ for source errors that have no more specific remediation.
 | C# Core | Known single-group pending, true unknown metric, old global latest ignored for known missing group, first group refresh replaces pending. |
 | Proto/runtime mapping | `PENDING_REFRESH`, unknown unavailable enum values, old-helper/new-Hub fallback, protocol mismatch status. |
 | Hub state resolver | State priority table, stale value versus source status, `versionMismatch`, warning-assisted PI guidance. |
-| Property Inspector | Helper missing/stopped, protocol mismatch, descriptor catalog pending/unavailable, picker disabled/setup guidance. |
-| Manifest/platform | Advanced Sensor OS gate and already-placed unsupported-platform fallback. |
-| Rendering | Compact unavailable body in tight views, CJK width sanity for short copy, no full dedicated error SVG by default. |
+| Property Inspector | Helper missing/stopped, protocol mismatch, descriptor catalog pending/unavailable, picker disabled/install guidance. |
+| Manifest/platform | Advanced Sensor OS gate, PI dropdown filtering for unsupported metrics/source choices, and already-placed unsupported-platform fallback. |
+| Rendering | Ordinary no-data states render `N/A` in selected views; static helper-required missing-helper states render `Install helper` through action-owned notice bodies; helper-preferred fallback metrics do not infer `Install helper` from momentary no-sample states; no-selected Advanced Sensor renders `Choose metric` through the action-owned notice body; `sensorPending` renders `...` outside minimal circle; no full dedicated error SVG/body by default. |
 | ShoMetrics Control Panel | Normal-user service status, gRPC health read, sanitized diagnostics copy, no privileged mutation in data-plane service. |
 | Recovery | Helper install/start, protocol repair, driver repair, Windows resume/topology change, shared source-client retry/backoff reset. |
 
 ## Acceptance Criteria
 
 - Advanced Sensor is not visible on non-Windows action lists.
-- Already-placed Advanced Sensor keys on non-Windows show Windows-only copy
-  instead of setup/helper copy.
-- A never-installed helper produces setup guidance, not generic no-data.
-- A stopped helper produces stopped guidance, not install guidance.
+- Already-placed Advanced Sensor keys on non-Windows show `N/A` on the key and
+  Windows-only guidance in PI instead of helper install copy.
+- Non-Windows PI dropdowns do not offer Windows-helper-only metrics or source
+  choices; existing unsupported selections are preserved as unavailable.
+- A never-installed helper produces key-level `Install helper` for Advanced
+  Sensor onboarding/selection and static helper-only built-ins such as CPU
+  temperature/power.
+- Built-in helper-backed widgets never show `Choose metric`; that copy belongs
+  only to Advanced Sensor no-selection.
+- A usable Advanced Sensor with no selected metric produces `Choose metric`.
+- `Install helper` and `Choose metric` render through action-owned notice
+  bodies, not through Circle/Text/Bar/Line primitives.
+- No user-facing key copy uses `Setup required`.
+- A stopped helper produces `N/A` on the key and stopped guidance in PI, not
+  install guidance.
 - A protocol mismatch produces update guidance, not generic helper error.
-- A known metric waiting for first group refresh produces waiting guidance, not
-  no-sensor guidance.
+- A known metric waiting for first group refresh produces `...` on non-minimal
+  keys and waiting guidance in PI, not no-sensor guidance.
 - Descriptor catalog pending/failure does not erase selected metrics or become
   no-sensor.
 - Pending refresh has a documented deadline and upgrade state.
 - A truly unavailable metric produces no-sensor guidance.
 - Running widgets recover automatically after helper/service/driver recovery.
-- Running widgets switch from stale value to helper/setup copy after the
-  freshness window when the helper fails.
+- Running widgets switch from stale value to `N/A` with PI guidance when helper
+  install/start/runtime state fails.
+- Helper-preferred stable aliases that can fall back to Node/NVIDIA telemetry
+  show fallback values when they are fresh and otherwise stay `N/A`; they do
+  not flash `Install helper` while fallback data is warming up or unavailable.
+- Helper-retained values may still show `N/A` while Hub uses its temporary 7s
+  timestamp freshness gate; the follow-up fix is to consume source-reported
+  freshness/retained attribution.
 - Driver/sensor-path issues guide users through PI and ShoMetrics Control Panel
   without adding a typed health diagnostic contract in this slice.
-- Deck unavailable copy stays short and theme-aware.
+- Deck unavailable copy stays short: `Install helper` for confirmed missing
+  helper on static helper-required surfaces, `Choose metric` for Advanced
+  Sensor metric selection, `...` for first refresh, and `N/A` for ordinary
+  no-data states.
 - PI gives the next action.
 - ShoMetrics Control Panel can show detailed state as a normal-user app.
 - Multiple helper-backed widgets share source status probing.
@@ -805,6 +924,7 @@ for source errors that have no more specific remediation.
 
 - Do not add a general i18n framework in this batch.
 - Do not implement installer/update flows in this batch.
-- Do not add a full-screen dedicated error SVG as the default no-data rendering.
+- Do not add a dedicated error/unavailable SVG body as the default no-data
+  rendering.
 - Do not make Stream Deck or the Hub plugin run as administrator.
 - Do not make ShoMetrics Control Panel elevated by default.

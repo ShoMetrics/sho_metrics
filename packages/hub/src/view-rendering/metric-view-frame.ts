@@ -1,11 +1,13 @@
 import type { ColorConfig } from "./color-resolver";
 import { renderDualMetricBodyView } from "./dual-metric-view";
 import { renderMetricFrame, resolveThemeBodyViewport, type MetricFrameBody } from "./metric-frame";
+import { renderMetricNoticeBody } from "./metric-notice-body";
 import type { MetricRenderAppearance } from "./render-appearance";
 import { formatRenderUnitText } from "./text-content/render-unit-text";
 import { renderSingleMetricBodyView } from "./single-metric-view";
 import {
     KEYPAD_PNG_SIZE,
+    PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE,
     TOUCH_STRIP_LOGICAL_SIZE,
     TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE,
     WIDGET_LOGICAL_SIZE,
@@ -34,6 +36,8 @@ interface BaseMetricRenderOptions {
 
 export interface SingleMetricRenderOptions extends BaseMetricRenderOptions {
     widgetData: WidgetData;
+    /** Static action-owned notice rendered instead of the selected metric primitive. */
+    noticeText?: string;
 }
 
 export interface DualMetricRenderOptions extends BaseMetricRenderOptions {
@@ -156,16 +160,21 @@ export function buildMetricViewRenderPlan(options: {
     });
     const centerContent = circleVariant === "minimal" ? "icon" : "value";
     const viewHasData = hasMetricViewData(options.viewOptions);
-    const shouldRenderMutedIconPlaceholder = !viewHasData
-        && !isDualMetricRenderOptions(options.viewOptions)
+    const singleMetricOptions = isDualMetricRenderOptions(options.viewOptions)
+        ? undefined
+        : options.viewOptions;
+    const dualRenderPrimitive = isDualMetricRenderOptions(options.viewOptions)
+        ? options.viewOptions.dualRenderPrimitive
+        : undefined;
+    const shouldRenderMutedIconPlaceholder = singleMetricOptions?.noticeText === undefined
+        && !viewHasData
+        && singleMetricOptions !== undefined
         && renderAppearance.renderPrimitive === "circle"
         && circleVariant === "minimal";
     const touchStripMetricLayout = options.renderTarget === "touch-strip"
         ? resolveTouchStripMetricLayout({
             renderPrimitive: renderAppearance.renderPrimitive,
-            dualRenderPrimitive: isDualMetricRenderOptions(options.viewOptions)
-                ? options.viewOptions.dualRenderPrimitive
-                : undefined,
+            dualRenderPrimitive,
         })
         : null;
     const renderSize = touchStripMetricLayout?.renderSize ?? WIDGET_LOGICAL_SIZE;
@@ -210,6 +219,13 @@ export function resolveEffectiveCircleVariant(options: {
     return options.circleVariantOverride ?? options.circleVariant;
 }
 
+/**
+ * Converts action WidgetData into renderer-facing single-metric data.
+ *
+ * Missing samples keep the selected primitive and render `N/A`, except for the
+ * explicit pending-refresh display value. Action-owned notice bodies bypass
+ * this value text path through `noticeText`.
+ */
 export function buildRenderWidgetData(options: {
     widgetData: WidgetData;
     hasData: boolean;
@@ -225,10 +241,11 @@ export function buildRenderWidgetData(options: {
         progress: 0,
         history: [],
         unit: "",
-        displayValue: options.widgetData.unavailableDisplayValue ?? "N/A",
+        displayValue: resolveUnavailableRenderDisplayValue(options.widgetData),
     });
 }
 
+/** Converts dual-channel missing data into per-channel N/A placeholders. */
 export function buildRenderDualChannelWidgetData(options: {
     widgetData: DualChannelWidgetData;
     hasData: boolean;
@@ -391,6 +408,29 @@ function composeSingleMetricBody(
     options: SingleMetricRenderOptions,
     renderPlan: MetricViewRenderPlan,
 ): RenderedMetricBodies {
+    if (options.noticeText !== undefined) {
+        const renderedMetricData = buildRenderWidgetData({
+            widgetData: options.widgetData,
+            hasData: false,
+            shouldRenderMutedIconPlaceholder: false,
+        });
+
+        return {
+            bodies: [
+                {
+                    svg: renderMetricNoticeBody({
+                        text: options.noticeText,
+                        visual: renderPlan.renderAppearance,
+                        renderSize: renderPlan.bodyRenderSize,
+                    }),
+                    bodyViewport: renderPlan.bodyViewport,
+                    muted: false,
+                },
+            ],
+            renderedMetricData,
+        };
+    }
+
     const renderedMetricData = buildRenderWidgetData({
         widgetData: options.widgetData,
         hasData: renderPlan.viewHasData,
@@ -416,6 +456,15 @@ function composeSingleMetricBody(
         ],
         renderedMetricData,
     };
+}
+
+function resolveUnavailableRenderDisplayValue(widgetData: WidgetData): string {
+    switch (widgetData.unavailableDisplayValue) {
+        case PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE:
+            return PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE;
+        default:
+            return "N/A";
+    }
 }
 
 function composeDualMetricBody(

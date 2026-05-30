@@ -53,9 +53,8 @@ const WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEYS = [...GPU_METRIC_KEYS] as co
  * decision lists above. Dynamic source-native catalog ids do not belong here;
  * they must carry an explicit source profile from the catalog picker.
  *
- * If a future stable built-in metric is available only from the helper, add a
- * third explicit helper-only list at that time. Do not add an empty placeholder
- * list before a real metric needs it.
+ * If a future stable built-in metric is available only from the helper, add it
+ * to the explicit helper-only list instead of adding action-local checks.
  */
 export const BUILT_IN_STABLE_METRIC_KEYS = [
     ...NODE_SYSTEM_ONLY_METRIC_KEYS,
@@ -104,6 +103,16 @@ export function resolveLocalAutoMetricSourceCandidates(
     }
 
     return NODE_SYSTEM_CANDIDATES;
+}
+
+/**
+ * Reports whether a built-in metric has no local:auto source fallback without the helper.
+ *
+ * This is a static routing fact, not a probe result. Do not use sample
+ * freshness, hardware vendor, or external tool availability to answer it.
+ */
+export function isBuiltInMetricHelperOnly(metricKey: string): boolean {
+    return WINDOWS_HELPER_ONLY_METRIC_KEY_SET.has(metricKey);
 }
 
 /**
