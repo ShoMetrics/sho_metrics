@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="[17.14.1]" />
+    <PackageReference Include="coverlet.collector" Version="[10.0.0]" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
     <!-- Override old transitive minimums that fail the repo's NuGet signature trust policy. -->
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="[10.0.8]" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="[10.0.8]" />
