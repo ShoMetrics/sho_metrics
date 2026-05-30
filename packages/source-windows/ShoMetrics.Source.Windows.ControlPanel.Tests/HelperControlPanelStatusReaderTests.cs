@@ -1,6 +1,7 @@
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using ShoMetrics.Contracts.V1;
+using ShoMetrics.Source.Windows.Contracts;
 
 namespace ShoMetrics.Source.Windows.ControlPanel.Tests;
 
@@ -17,6 +18,15 @@ public sealed class HelperControlPanelStatusReaderTests
                 SourceId = "windows-helper",
                 ProtocolVersion = "1",
                 HelperVersion = "test-helper",
+                ComponentStatuses =
+                {
+                    new SourceComponentStatus
+                    {
+                        Component = WindowsSourceServiceConstants.PawnIoDriverComponentId,
+                        State = SourceComponentState.Unusable,
+                        Version = "1.2.3",
+                    },
+                },
                 Warnings =
                 {
                     new SourceWarning
@@ -64,15 +74,108 @@ public sealed class HelperControlPanelStatusReaderTests
 
         HelperControlPanelStatus status = await reader.ReadAsync(CancellationToken.None);
 
-        Assert.Equal("Running", status.ServiceStatusText);
-        Assert.Equal("Connected", status.ConnectionStatusText);
-        Assert.Equal("Needs attention", status.PawnIoDriverText);
-        Assert.Equal("test-helper", status.HelperVersionText);
-        Assert.Equal("1", status.ProtocolVersionText);
-        Assert.Equal("1", status.DescriptorCountText);
-        Assert.Equal("1", status.WarningCountText);
-        Assert.Contains("driver: PawnIO driver warning.", status.WarningDetailsText, StringComparison.Ordinal);
-        Assert.NotEqual("No sample", status.LastSampleText);
+        Assert.Equal("Connected", status.Service.StatusText);
+        Assert.Equal("ShoMetrics Helper is running.", status.Service.DetailText);
+        Assert.Equal("Connected", status.Service.ConnectionText);
+        Assert.Equal("Needs attention (1.2.3)", status.PawnIoDriver.StatusText);
+        Assert.Equal("Restart ShoMetrics Helper. If it keeps failing, reinstall PawnIO or open logs.", status.PawnIoDriver.DetailText);
+        Assert.Equal("test-helper", status.Diagnostics.HelperVersionText);
+        Assert.Equal("1", status.Diagnostics.ProtocolVersionText);
+        Assert.Equal("1", status.Diagnostics.DescriptorCountText);
+        Assert.Equal("1 warning", status.Diagnostics.WarningCountText);
+        Assert.Contains("Last sample when checked:", status.Diagnostics.SensorDiagnosticsText, StringComparison.Ordinal);
+        Assert.Contains("Metrics discovered: 1.", status.Diagnostics.SensorDiagnosticsText, StringComparison.Ordinal);
+        Assert.Contains("driver: PawnIO driver warning.", status.Diagnostics.WarningDetailsText, StringComparison.Ordinal);
+        Assert.NotEqual("No sample", status.Diagnostics.LastSampleText);
+    }
+
+    [Theory]
+    [InlineData(SourceComponentState.Ok, "Installed")]
+    [InlineData(SourceComponentState.NotInstalled, "Not installed")]
+    [InlineData(SourceComponentState.NotElevated, "Not elevated")]
+    [InlineData(SourceComponentState.Unusable, "Needs attention")]
+    [InlineData(SourceComponentState.Unknown, "Unknown")]
+    [InlineData(SourceComponentState.Unspecified, "Unknown")]
+    public async Task ReadAsyncFormatsPawnIoComponentState(
+        SourceComponentState state,
+        string expectedText)
+    {
+        var sourceClient = new FakeHelperControlPanelSourceClient
+        {
+            Health = new GetSourceHealthResponse
+            {
+                ComponentStatuses =
+                {
+                    new SourceComponentStatus
+                    {
+                        Component = WindowsSourceServiceConstants.PawnIoDriverComponentId,
+                        State = state,
+                    },
+                },
+            },
+        };
+        var reader = new HelperControlPanelStatusReader(
+            new FakeWindowsServiceStatusReader(WindowsServiceStatusKind.Running),
+            sourceClient);
+
+        HelperControlPanelStatus status = await reader.ReadAsync(CancellationToken.None);
+
+        Assert.Equal(expectedText, status.PawnIoDriver.StatusText);
+    }
+
+    [Fact]
+    public async Task ReadAsyncDoesNotAppendPawnIoVersionWhenDriverIsNotInstalled()
+    {
+        var sourceClient = new FakeHelperControlPanelSourceClient
+        {
+            Health = new GetSourceHealthResponse
+            {
+                ComponentStatuses =
+                {
+                    new SourceComponentStatus
+                    {
+                        Component = WindowsSourceServiceConstants.PawnIoDriverComponentId,
+                        State = SourceComponentState.NotInstalled,
+                        Version = "2.2.0",
+                    },
+                },
+            },
+        };
+        var reader = new HelperControlPanelStatusReader(
+            new FakeWindowsServiceStatusReader(WindowsServiceStatusKind.Running),
+            sourceClient);
+
+        HelperControlPanelStatus status = await reader.ReadAsync(CancellationToken.None);
+
+        Assert.Equal("Not installed", status.PawnIoDriver.StatusText);
+    }
+
+    [Fact]
+    public async Task ReadAsyncDoesNotInferPawnIoDriverStatusFromWarningText()
+    {
+        var sourceClient = new FakeHelperControlPanelSourceClient
+        {
+            Health = new GetSourceHealthResponse
+            {
+                Warnings =
+                {
+                    new SourceWarning
+                    {
+                        Code = "driver",
+                        Message = "PawnIO and MSR warning text without structured status.",
+                    },
+                },
+            },
+        };
+        var reader = new HelperControlPanelStatusReader(
+            new FakeWindowsServiceStatusReader(WindowsServiceStatusKind.Running),
+            sourceClient);
+
+        HelperControlPanelStatus status = await reader.ReadAsync(CancellationToken.None);
+
+        Assert.Equal("Unknown", status.PawnIoDriver.StatusText);
+        Assert.Equal("Update ShoMetrics Helper to the latest version if driver diagnostics are unavailable.", status.PawnIoDriver.DetailText);
+        Assert.Contains("driver: PawnIO and MSR warning text", status.Diagnostics.WarningDetailsText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -85,10 +188,30 @@ public sealed class HelperControlPanelStatusReaderTests
 
         HelperControlPanelStatus status = await reader.ReadAsync(CancellationToken.None);
 
-        Assert.Equal("Stopped", status.ServiceStatusText);
-        Assert.Equal("Not running", status.ServiceRuntimeText);
-        Assert.Equal("Failed", status.ConnectionStatusText);
-        Assert.Contains("gRPC connection unavailable: No such pipe.", status.ErrorText, StringComparison.Ordinal);
+        Assert.Equal("Stopped", status.Service.StatusText);
+        Assert.Equal("Start ShoMetrics Helper to check sensors and drivers.", status.Service.DetailText);
+        Assert.Equal("Not running", status.Service.RuntimeText);
+        Assert.Equal("Failed", status.Service.ConnectionText);
+        Assert.Equal("Not checked", status.PawnIoDriver.StatusText);
+        Assert.Equal("PawnIO status cannot be checked until ShoMetrics Helper is running.", status.PawnIoDriver.DetailText);
+        Assert.Contains("Could not connect to ShoMetrics Helper: No such pipe.", status.ErrorText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReadAsyncExplainsServiceInstallMissingAsIncompleteInstall()
+    {
+        var reader = new HelperControlPanelStatusReader(
+            new FakeWindowsServiceStatusReader(WindowsServiceStatusKind.NotInstalled),
+            FakeHelperControlPanelSourceClient.Throwing(
+                new RpcException(new Status(StatusCode.Unavailable, "No such pipe."))));
+
+        HelperControlPanelStatus status = await reader.ReadAsync(CancellationToken.None);
+
+        Assert.Equal("Not installed", status.Service.StatusText);
+        Assert.Equal(
+            "Installation did not complete. Restart your PC or reinstall ShoMetrics Helper.",
+            status.Service.DetailText);
+        Assert.Equal("Not installed", status.Service.InstallText);
     }
 
     [Fact]
@@ -101,10 +224,11 @@ public sealed class HelperControlPanelStatusReaderTests
 
         HelperControlPanelStatus status = await reader.ReadAsync(CancellationToken.None);
 
-        Assert.Equal("Running", status.ServiceStatusText);
-        Assert.Equal("Failed", status.ConnectionStatusText);
+        Assert.Equal("Update required", status.Service.StatusText);
+        Assert.Equal("Update ShoMetrics Helper and Hub to the latest version.", status.Service.DetailText);
+        Assert.Equal("Failed", status.Service.ConnectionText);
         Assert.Contains(
-            "Helper does not support this Control Panel request: Unknown method.",
+            "Update ShoMetrics Helper and Hub to the latest version: Unknown method.",
             status.ErrorText,
             StringComparison.Ordinal);
     }
@@ -152,13 +276,13 @@ public sealed class HelperControlPanelStatusReaderTests
 
         HelperControlPanelStatus status = await reader.ReadAsync(CancellationToken.None);
 
-        Assert.Equal("Connected with errors", status.ConnectionStatusText);
-        Assert.Equal("test-helper", status.HelperVersionText);
-        Assert.Equal("1", status.ProtocolVersionText);
-        Assert.Equal("1", status.DescriptorCountText);
-        Assert.Equal("Unknown", status.LastSampleText);
+        Assert.Equal("Connected with errors", status.Service.ConnectionText);
+        Assert.Equal("test-helper", status.Diagnostics.HelperVersionText);
+        Assert.Equal("1", status.Diagnostics.ProtocolVersionText);
+        Assert.Equal("1", status.Diagnostics.DescriptorCountText);
+        Assert.Equal("Unknown", status.Diagnostics.LastSampleText);
         Assert.Contains(
-            "Snapshot read failed: gRPC request timed out: Snapshot timed out.",
+            "Snapshot read failed: ShoMetrics Helper did not respond in time: Snapshot timed out.",
             status.ErrorText,
             StringComparison.Ordinal);
     }
@@ -173,8 +297,8 @@ public sealed class HelperControlPanelStatusReaderTests
 
         HelperControlPanelStatus status = await reader.ReadAsync(CancellationToken.None);
 
-        Assert.Equal("Failed", status.ConnectionStatusText);
-        Assert.Contains("gRPC request timed out: Request deadline exceeded.", status.ErrorText, StringComparison.Ordinal);
+        Assert.Equal("Failed", status.Service.ConnectionText);
+        Assert.Contains("ShoMetrics Helper did not respond in time: Request deadline exceeded.", status.ErrorText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -187,8 +311,8 @@ public sealed class HelperControlPanelStatusReaderTests
 
         HelperControlPanelStatus status = await reader.ReadAsync(CancellationToken.None);
 
-        Assert.Equal("Failed", status.ConnectionStatusText);
-        Assert.Contains("Helper precondition failed: Protocol precondition failed.", status.ErrorText, StringComparison.Ordinal);
+        Assert.Equal("Failed", status.Service.ConnectionText);
+        Assert.Contains("ShoMetrics Helper cannot complete this request yet: Protocol precondition failed.", status.ErrorText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -201,9 +325,9 @@ public sealed class HelperControlPanelStatusReaderTests
 
         HelperControlPanelStatus status = await reader.ReadAsync(CancellationToken.None);
 
-        Assert.Equal("Failed", status.ConnectionStatusText);
+        Assert.Equal("Failed", status.Service.ConnectionText);
         Assert.Contains(
-            "Control Panel sent an invalid helper request: Invalid request shape.",
+            "Update ShoMetrics Helper and Hub to the latest version: Invalid request shape.",
             status.ErrorText,
             StringComparison.Ordinal);
     }
@@ -217,9 +341,9 @@ public sealed class HelperControlPanelStatusReaderTests
 
         HelperControlPanelStatus status = await reader.ReadAsync(CancellationToken.None);
 
-        Assert.Equal("Failed", status.ConnectionStatusText);
+        Assert.Equal("Failed", status.Service.ConnectionText);
         Assert.Contains(
-            "Connection timed out. The helper service may be stopped or still starting.",
+            "Connection timed out. ShoMetrics Helper may be stopped or still starting.",
             status.ErrorText,
             StringComparison.Ordinal);
     }
@@ -233,7 +357,7 @@ public sealed class HelperControlPanelStatusReaderTests
 
         HelperControlPanelStatus status = await reader.ReadAsync(CancellationToken.None);
 
-        Assert.Equal("Failed", status.ConnectionStatusText);
+        Assert.Equal("Failed", status.Service.ConnectionText);
         Assert.Contains("InvalidOperationException: Unexpected failure.", status.ErrorText, StringComparison.Ordinal);
     }
 

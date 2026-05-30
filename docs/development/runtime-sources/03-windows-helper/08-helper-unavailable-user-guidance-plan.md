@@ -69,9 +69,10 @@ guidance and too imprecise for support.
 | ShoMetrics Control Panel process privilege | Run ShoMetrics Control Panel as normal user by default. Use UAC only for explicit privileged actions. | Reading helper status is safe as a normal user. Service install/start/stop, driver install/repair, or kernel-adjacent configuration changes must be separate, explicit elevated actions. |
 | `Open` action lifecycle | Treat `Open ShoMetrics Control Panel` as a fire-and-forget Windows Shell launch/focus request. | Opening from the PI should behave like the user opening the same installed app from Start Menu. Hub must not own, monitor, restart, or kill the ShoMetrics Control Panel process. |
 | Driver status source | Add a minimal helper-reported component status for ShoMetrics Control Panel, but do not feed it back into key copy. | The Panel needs to stop guessing PawnIO/MSR status from warning text. The key still stays `N/A` for ordinary no-data states. |
+| Helper framework logs | Suppress only low-value `Grpc.AspNetCore.Server.ServerCallHandler` debug traces while keeping other gRPC and ShoMetrics-owned debug logs. | Per-message traces such as `Sending message` and `Reading message` do not identify the source operation and drown out useful diagnostics. ShoMetrics-owned gRPC logs include method names, durations, throttling, and failure context. |
 | Render truth source | Node/Hub data-path state remains authoritative for widget rendering; helper health is supporting diagnosis. | A helper can report "available" while a metric still has no value. Widgets must be driven by actual metric values/unavailable reports, with helper health used to choose better guidance copy. |
 | Health diagnostic contract | Defer the broad `kind`/`severity`/`scope` diagnostic contract. Keep `SourceWarning` as the detailed support/log surface. | A small component-status field for the Panel is enough for driver status. Do not build a general diagnostic list reducer until a machine consumer needs it. |
-| Version mismatch UX | Treat helper/Hub protocol mismatch as `versionMismatch`, not generic `helperError`. | The user action is specific: update or repair the ShoMetrics install so Hub and helper use matching protocol versions. |
+| Version mismatch UX | Treat helper/Hub protocol mismatch as `versionMismatch`, not generic `helperError`. | The user action is specific: update or repair the ShoMetrics install so Hub and helper use a compatible protocol. |
 | Descriptor catalog state | Treat descriptor catalog pending/failure as "catalog not ready", not "metric does not exist". | Until the source catalog is available, Hub cannot prove that a selected metric is truly absent. |
 | Freshness owner | Do not introduce a second Hub-owned source freshness system. Hub consumes source/runtime freshness and unavailable reports, while sources own retained-value semantics. | The Windows helper already owns retained sample freshness and age. Duplicating stale logic in Hub would create conflicting truth sources. |
 | Hub retained-value limitation | Treat Hub's current 7s timestamp freshness gate as a known follow-up, not part of onboarding copy. | Helper-retained values may still render `N/A` until Hub consumes source-reported freshness/retained attribution. This must not turn into `Install helper` copy. |
@@ -102,7 +103,7 @@ changes depending on review size:
 | --- | --- | --- |
 | 4A. PI diagnostics guidance | Add ordinary PI messages for GPU no-value, helper transport/version issues, descriptor catalog pending/failure, and metric unavailable states using existing runtime state. | Opening PI gives a next action without changing key rendering. |
 | 4B. Minimal component status API | Add `SourceComponentStatus` to `GetSourceHealthResponse` for `driver:pawnio`; map Core PawnIO diagnostics through the service. | ShoMetrics Control Panel no longer infers PawnIO/MSR status by parsing warning text. |
-| 4C. Panel display and copy diagnostics | Render service, helper, component, descriptor, sample, warnings, and sanitized copy-diagnostics rows as a normal-user app. | Users can see driver/helper status and copy support details without elevation. |
+| 4C. Panel display and copy diagnostics | Render PowerToys-style status tiles with `SettingsExpander`/`SettingsCard`, install/open-log/copy-diagnostics actions, component status, descriptor/sample diagnostics, warnings, and sanitized copy diagnostics. | Users can see driver/helper status and copy support details without elevation. |
 
 Do not add key resolver behavior in Slice 4. If this slice grows too large, do
 4A first because it improves user guidance without API churn, then do 4B/4C as
@@ -119,7 +120,7 @@ system status and repair actions in ShoMetrics Control Panel.
 | `metricSelectionRequired` | `Choose metric` | `Choose an advanced sensor metric.` | N/A |
 | `helperStopped` | `N/A` | `Start ShoMetrics Helper from ShoMetrics Control Panel.` | Show service installed but not running. Offer Start with UAC if needed. |
 | `helperStarting` | `N/A` | `Waiting for ShoMetrics Helper to start.` | Show service start-pending or pipe missing inside a short startup window. |
-| `versionMismatch` | `N/A` | `Update ShoMetrics Helper and Hub to matching versions.` | Show Hub version, helper version, and protocol version. |
+| `versionMismatch` | `N/A` | `Update ShoMetrics Helper and Hub to the latest version.` | Show Hub version, helper version, and protocol version. |
 | `helperError` | `N/A` | `Open ShoMetrics Control Panel for helper diagnostics.` | Show connection, protocol, health, and warning details. |
 | `driverIssue` | `N/A` | `Open ShoMetrics Control Panel to check sensor driver status.` | Show driver/sensor-path warning details and next action. |
 | `descriptorCatalogPending` | `N/A` | `Waiting for the helper metric catalog.` | Show descriptor request status and helper health. |
@@ -155,7 +156,7 @@ ordinary PI messages before DEBUG details:
 | Selected Advanced Sensor or helper-only built-in, helper not installed | `Install ShoMetrics Helper to use this metric.` | Applies to helper-required stable metrics such as CPU temperature/power and selected catalog metrics. |
 | Selected helper-backed metric, helper stopped | `Start ShoMetrics Helper from ShoMetrics Control Panel.` | The key remains `N/A`. |
 | Helper transport error, timeout, or unknown source error | `Open ShoMetrics Control Panel for helper diagnostics.` | Keep transport details in DEBUG and Panel diagnostics. |
-| Helper/Hub protocol mismatch | `Update ShoMetrics Helper and Hub to matching versions.` | This remains a PI-level next action; the key stays `N/A`. |
+| Helper/Hub protocol mismatch | `Update ShoMetrics Helper and Hub to the latest version.` | This remains a PI-level next action; the key stays `N/A`. |
 | Descriptor catalog pending | `Loading helper metrics...` | This is catalog state, not `NO_SENSOR`. |
 | Descriptor catalog failed/unavailable | `The helper metric catalog is not available yet.` | Preserve selected settings; do not clear the selection. |
 | Selected metric pending first refresh | `Waiting for this sensor group to refresh.` | Expected transient state; DEBUG may show `pending refresh`. |
@@ -249,7 +250,7 @@ layer is added later, use these as initial keys.
 | `installHelperForMetric` | `Install ShoMetrics Helper to use this metric.` | `このメトリックを使うには ShoMetrics Helper をインストールしてください。` | `安装 ShoMetrics Helper 后才能使用此指标。` |
 | `startHelper` | `Start ShoMetrics Helper from ShoMetrics Control Panel.` | `ShoMetrics コントロールパネルから ShoMetrics Helper を起動してください。` | `请从 ShoMetrics 控制面板启动 ShoMetrics Helper。` |
 | `checkDriver` | `Open ShoMetrics Control Panel to check sensor driver status.` | `ShoMetrics コントロールパネルでセンサードライバーの状態を確認してください。` | `打开 ShoMetrics 控制面板检查传感器驱动状态。` |
-| `updateShoMetrics` | `Update ShoMetrics Helper and Hub to matching versions.` | `ShoMetrics Helper と Hub を対応するバージョンに更新してください。` | `请将 ShoMetrics Helper 和 Hub 更新到匹配版本。` |
+| `updateShoMetrics` | `Update ShoMetrics Helper and Hub to the latest version.` | `ShoMetrics Helper と Hub を最新バージョンに更新してください。` | `请将 ShoMetrics Helper 和 Hub 更新到最新版本。` |
 
 The short Deck copy intentionally avoids long words such as "unavailable". It
 uses `N/A` for ordinary no-data states because the key is not the right surface
@@ -398,7 +399,7 @@ protocol versions.
 Expected behavior:
 
 - Key: `N/A`.
-- PI: `Update ShoMetrics Helper and Hub to matching versions.`
+- PI: `Update ShoMetrics Helper and Hub to the latest version.`
 - ShoMetrics Control Panel: show Hub version, helper version, and protocol
   version.
 
@@ -942,13 +943,112 @@ no fresher metric value exists.
    - `Not installed`: PawnIO is not installed or not available to the helper.
    - `Not elevated`: the helper lacks privileges for MSR-backed metrics.
    - `Needs attention`: PawnIO/MSR reads are unusable or inconsistent.
-   - `Unknown`: helper is unreachable, too old, or did not report the
-     component.
+   - `Unknown`: helper reported unknown state, is too old to report component
+     status, or did not report the component.
+   - `Not checked`: Panel could not reach ShoMetrics Helper, so PawnIO status
+     was not checked.
 6. Keep `SourceWarning` rows visible as support details, not as the primary
    driver status source.
 7. Copy diagnostics should include component ids, component states, versions,
    warning codes, counts, timestamps, and protocol/helper versions by default.
    Raw hardware/sensor identity remains advanced diagnostics only.
+8. Use `CommunityToolkit.WinUI.Controls.SettingsControls` for Windows-settings
+   style `SettingsExpander` and `SettingsCard` rows instead of hand-rolled
+   expansion panels.
+9. Do not auto-refresh helper status in this slice. The Panel refreshes on
+   open and when the user chooses `Refresh`. The footer timestamp updates every
+   second to show how old the last check is; it is not a live status probe.
+10. Keep the NavigationView blended with the page background, use theme
+    resources so the Panel follows the Windows light/dark system theme, and
+    hide the pane toggle button while there is only a small fixed page set.
+11. Filter noisy framework logs by exact category. In dev-pipe mode,
+    ShoMetrics-owned debug logs and ordinary gRPC debug logs remain enabled,
+    but `Grpc.AspNetCore.Server.ServerCallHandler` message read/write traces are
+    suppressed below warning level.
+
+### ShoMetrics Control Panel Tile Copy
+
+The Panel should look like a status surface, not a raw dump of internal fields.
+Use a small set of tiles. Each tile states the component, its status, and the
+next action. Technical fields may appear in details or diagnostics copy.
+
+Tile layout follows mature Windows settings surfaces:
+
+- First row: title on the left; status icon, status text, and any real action
+  button on the right.
+- Second row: short user-facing detail or next action copy.
+- Extra technical facts go in an expansion panel. Do not show an expansion
+  panel when the tile has no extra details.
+
+Do not split service and connection into separate primary tiles. Users think of
+the helper as one ShoMetrics Helper. Windows service install state, runtime
+state, and helper connection state should roll up into one `ShoMetrics Helper`
+tile, with technical details available below it.
+
+| Tile | Status | Detail copy |
+| --- | --- | --- |
+| ShoMetrics Helper | `Not installed` | `Installation did not complete. Restart your PC or reinstall ShoMetrics Helper.` |
+| ShoMetrics Helper | `Stopped` | `Start ShoMetrics Helper to check sensors and drivers.` |
+| ShoMetrics Helper | `Starting` | `Waiting for ShoMetrics Helper to become available.` |
+| ShoMetrics Helper | `Connected` | `ShoMetrics Helper is running.` |
+| ShoMetrics Helper | `Connection error` | `Could not connect to ShoMetrics Helper. Restart ShoMetrics Helper, then open logs if it keeps failing.` |
+| ShoMetrics Helper | `Update required` | `Update ShoMetrics Helper and Hub to the latest version.` |
+| PawnIO Driver | `Not checked` | `PawnIO status cannot be checked until ShoMetrics Helper is installed and running.` |
+| PawnIO Driver | `Installed` | `Required for temperature and power sensors.` |
+| PawnIO Driver | `Not installed` | `Install PawnIO to enable temperature and power sensors.` |
+| PawnIO Driver | `Not elevated` | `Restart or reinstall ShoMetrics Helper to restore the privileges required for PawnIO.` |
+| PawnIO Driver | `Needs attention` | `Restart ShoMetrics Helper. If it keeps failing, reinstall PawnIO or open logs.` |
+| PawnIO Driver | `Unknown` | `ShoMetrics Helper could not determine PawnIO status.` |
+| PawnIO Driver | `Unknown` from missing `driver:pawnio` status | `Update ShoMetrics Helper to the latest version if driver diagnostics are unavailable.` |
+| Diagnostics | `No warnings` | `No warnings were reported at the last refresh.` |
+| Diagnostics | `{n} warning(s)` | `Copy diagnostics or open logs for support details.` |
+| Diagnostics | `Unknown` | `Could not read diagnostics.` |
+
+Action buttons:
+
+- `ShoMetrics Helper` shows `Install` only when the service is not installed.
+  The button opens the ShoMetrics GitHub releases page.
+- `PawnIO Driver` shows `Install` only when PawnIO is reported as not installed.
+  The button opens the PawnIO install page.
+- `Copy diagnostics` and `Open logs` are page-level support actions, not per-tile
+  repair actions.
+
+`Telemetry` is not a primary user-facing tile. Last sample age and descriptor
+count are diagnostic facts; show them as "Last sample when checked" and
+"Metrics discovered" so they do not appear to be live values when the Panel is
+not auto-refreshing.
+
+The `ShoMetrics Helper` expander details use one row per concept:
+
+| Detail row | Meaning |
+| --- | --- |
+| `Installed` | Whether the ShoMetrics Helper Windows service is installed on this PC. |
+| `Running Status` | Whether the helper service is currently running. |
+| `Connection` | Whether the panel can talk to the running helper service. |
+
+Diagnostics details are shown only when there are warnings or failed diagnostic
+reads. `Sensor Reads` contains the last sample age and metric descriptor count
+from the last check. `Warnings` contains helper warning code/message text. Error
+text from failed diagnostic reads remains support-facing and must not be used to
+infer driver status.
+
+### Helper Logging Policy
+
+The helper should log ShoMetrics-owned operations, not every framework message.
+
+Rules:
+
+- Keep application debug logs from `ShoMetrics.Source.Windows.*` available in
+  dev-pipe mode.
+- Suppress only the low-value
+  `Grpc.AspNetCore.Server.ServerCallHandler` category below warning level.
+  Keep other gRPC debug categories available for transport debugging.
+- Do not try to add context to third-party framework messages such as
+  `Grpc.AspNetCore.Server.ServerCallHandler Sending message`; instead log
+  source-owned operation names and durations in `WindowsGrpcMetricSourceService`
+  and `SourceRequestHandler`.
+- Keep expected cancellation, deadline, and repeated helper failures throttled
+  with stable low-cardinality keys.
 
 ## C# Core Changes
 
