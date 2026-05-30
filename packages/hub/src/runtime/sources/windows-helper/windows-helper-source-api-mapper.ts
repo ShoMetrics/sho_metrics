@@ -226,6 +226,8 @@ function normalizeMetricUnavailableReason(
             return "invalidValue";
         case ProtoMetricUnavailableReason.EXPIRED:
             return "expired";
+        case ProtoMetricUnavailableReason.PENDING_REFRESH:
+            return "pendingRefresh";
         case ProtoMetricUnavailableReason.UNSPECIFIED:
             logUnknownWireEnum("unavailableReason", metricId, reason, "debugOnly");
             return "unknown";

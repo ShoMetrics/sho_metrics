@@ -56,6 +56,7 @@ export type MetricUnavailableReason =
     | "noSensorData"
     | "invalidValue"
     | "expired"
+    | "pendingRefresh"
     | "unknown";
 
 /** Runtime health metadata returned by a source client. */

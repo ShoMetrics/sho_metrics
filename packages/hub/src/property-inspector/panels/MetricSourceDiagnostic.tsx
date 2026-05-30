@@ -25,6 +25,7 @@ const metricUnavailableTextByReason = {
     noSensorData: "no sensor data",
     invalidValue: "invalid value",
     expired: "expired",
+    pendingRefresh: "pending refresh",
     unknown: "unknown",
 } satisfies Record<DisplayedMetricUnavailableReason, string>;
 
