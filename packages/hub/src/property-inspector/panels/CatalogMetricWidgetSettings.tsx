@@ -25,6 +25,7 @@ import { AppearanceSettings } from "./AppearanceSettings";
 import { PollingSettings } from "./PollingSettings";
 import { LineSettings } from "./LineSettings";
 import { SettingsSection } from "./SettingsSection";
+import { resolveHelperStatusGuidanceText } from "./helper-status-guidance";
 import { scaleModeOptionList } from "./setting-options";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 
@@ -143,14 +144,11 @@ function resolveCatalogMetricDescriptorStatusText(
     status: "pending" | "ready" | "failed",
     sourceStatus: SourceClientStatus | undefined,
 ): string {
-    if (sourceStatus?.state === "unavailable") {
-        if (sourceStatus.reason === "helperNotInstalled") {
-            return "Install ShoMetrics Helper to use advanced sensors.";
-        }
-
-        if (sourceStatus.reason === "helperStopped") {
-            return "Start ShoMetrics Helper from ShoMetrics Control Panel.";
-        }
+    const helperGuidance = resolveHelperStatusGuidanceText(sourceStatus, {
+        installSubject: "advanced sensors",
+    });
+    if (helperGuidance !== undefined) {
+        return helperGuidance;
     }
 
     return status === "failed"
