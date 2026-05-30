@@ -32,8 +32,9 @@ internal sealed class LibreHardwareSnapshotReader
         List<RankedMetricReading> cpuTemperatureCandidates = [];
         List<RankedMetricReading> cpuPowerCandidates = [];
         List<HardwareRefreshDiagnostic> hardwareUpdates = [];
-        List<MetricPollingGroupSnapshotUpdate> pollingGroupSnapshots = [];
+        List<TouchedPollingGroup> touchedPollingGroups = [];
         List<string> warnings = [];
+        bool readsCpuHardware = HardwareTargetsContainCpu(hardwareTargets);
 
         foreach (IHardware hardware in hardwareTargets)
         {
@@ -46,25 +47,31 @@ internal sealed class LibreHardwareSnapshotReader
                 capturedAt,
                 sourceTick,
                 hardwareUpdates,
-                pollingGroupSnapshots,
+                touchedPollingGroups,
                 warnings,
                 cancellationToken);
         }
 
-        AddRankedStableAliasReading(
-            LibreHardwareMetricCatalog.CpuTemperatureMetricId,
-            cpuTemperatureCandidates,
-            readingsByMetricId,
-            unavailableReportsByMetricId,
-            capturedAt,
-            sourceTick);
-        AddRankedStableAliasReading(
-            LibreHardwareMetricCatalog.CpuPowerMetricId,
-            cpuPowerCandidates,
-            readingsByMetricId,
-            unavailableReportsByMetricId,
-            capturedAt,
-            sourceTick);
+        // Ranked CPU aliases are group-level derived metrics. Non-CPU passes
+        // have no CPU polling-group publication, so querying CPU alias retention
+        // would only age or synthesize data that the session cannot publish.
+        if (readsCpuHardware)
+        {
+            AddRankedStableAliasReading(
+                LibreHardwareMetricCatalog.CpuTemperatureMetricId,
+                cpuTemperatureCandidates,
+                readingsByMetricId,
+                unavailableReportsByMetricId,
+                capturedAt,
+                sourceTick);
+            AddRankedStableAliasReading(
+                LibreHardwareMetricCatalog.CpuPowerMetricId,
+                cpuPowerCandidates,
+                readingsByMetricId,
+                unavailableReportsByMetricId,
+                capturedAt,
+                sourceTick);
+        }
         AddMemoryDerivedReadings(readingsByMetricId);
 
         return new LibreHardwareSnapshotReadResult
@@ -73,7 +80,10 @@ internal sealed class LibreHardwareSnapshotReader
             ReadingsByMetricId = readingsByMetricId,
             UnavailableReportsByMetricId = unavailableReportsByMetricId,
             HardwareUpdates = hardwareUpdates,
-            PollingGroupSnapshots = pollingGroupSnapshots,
+            PollingGroupSnapshotPublications = BuildPollingGroupSnapshotPublications(
+                touchedPollingGroups,
+                readingsByMetricId,
+                unavailableReportsByMetricId),
             Warnings = warnings,
         };
     }
@@ -87,7 +97,7 @@ internal sealed class LibreHardwareSnapshotReader
         DateTimeOffset capturedAt,
         long sourceTick,
         List<HardwareRefreshDiagnostic> hardwareUpdates,
-        List<MetricPollingGroupSnapshotUpdate> pollingGroupSnapshots,
+        List<TouchedPollingGroup> touchedPollingGroups,
         List<string> warnings,
         CancellationToken cancellationToken)
     {
@@ -119,8 +129,6 @@ internal sealed class LibreHardwareSnapshotReader
             SubHardwareCount = hardware.SubHardware.Length,
         });
 
-        Dictionary<string, MetricReading> hardwareReadingsByMetricId = new(StringComparer.Ordinal);
-        Dictionary<string, MetricUnavailableReport> hardwareUnavailableReportsByMetricId = new(StringComparer.Ordinal);
         List<string> hardwareWarnings = [];
 
         if (updateError is not null)
@@ -143,8 +151,6 @@ internal sealed class LibreHardwareSnapshotReader
                 AddSensorReadings(
                     hardware,
                     sensor,
-                    hardwareReadingsByMetricId,
-                    hardwareUnavailableReportsByMetricId,
                     readingsByMetricId,
                     unavailableReportsByMetricId,
                     cpuTemperatureCandidates,
@@ -154,16 +160,11 @@ internal sealed class LibreHardwareSnapshotReader
             }
         }
 
-        // RAM total must exist in both the per-hardware RAM polling group and
-        // the full traversal result, so memory derivation runs at both levels.
-        AddMemoryDerivedReadings(hardwareReadingsByMetricId);
-        pollingGroupSnapshots.Add(new MetricPollingGroupSnapshotUpdate
+        touchedPollingGroups.Add(new TouchedPollingGroup
         {
             PollingGroupId = LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(hardware),
-            ReadingsByMetricId = hardwareReadingsByMetricId,
             Warnings = hardwareWarnings,
             CapturedAt = capturedAt,
-            UnavailableReports = hardwareUnavailableReportsByMetricId.Values.ToList(),
         });
 
         if (updateError is not null)
@@ -182,7 +183,7 @@ internal sealed class LibreHardwareSnapshotReader
                 capturedAt,
                 sourceTick,
                 hardwareUpdates,
-                pollingGroupSnapshots,
+                touchedPollingGroups,
                 warnings,
                 cancellationToken);
         }
@@ -191,8 +192,6 @@ internal sealed class LibreHardwareSnapshotReader
     private void AddSensorReadings(
         IHardware hardware,
         ISensor sensor,
-        Dictionary<string, MetricReading> hardwareReadingsByMetricId,
-        Dictionary<string, MetricUnavailableReport> hardwareUnavailableReportsByMetricId,
         Dictionary<string, MetricReading> readingsByMetricId,
         Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId,
         List<RankedMetricReading> cpuTemperatureCandidates,
@@ -206,7 +205,6 @@ internal sealed class LibreHardwareSnapshotReader
         {
             hadFreshReading = true;
             RecordFreshReading(reading, sourceTick, capturedAt);
-            AddReading(hardwareReadingsByMetricId, reading);
             AddReading(readingsByMetricId, reading);
         }
 
@@ -241,7 +239,6 @@ internal sealed class LibreHardwareSnapshotReader
             out MetricReading retainedCatalogReading,
             out bool sourceSensorExpired))
         {
-            AddReading(hardwareReadingsByMetricId, retainedCatalogReading);
             AddReading(readingsByMetricId, retainedCatalogReading);
         }
         else if (LibreHardwareMetricCatalog.HasCanonicalMetricUnit(sensor.SensorType))
@@ -252,7 +249,6 @@ internal sealed class LibreHardwareSnapshotReader
                 sourceSensorExpired
                     ? BuildRawSensorIdentity(retainedCatalogReading)
                     : BuildRawSensorIdentity(hardware, sensor));
-            hardwareUnavailableReportsByMetricId[sourceSensorMetricId] = unavailableReport;
             unavailableReportsByMetricId[sourceSensorMetricId] = unavailableReport;
         }
 
@@ -265,9 +261,7 @@ internal sealed class LibreHardwareSnapshotReader
                 out MetricReading retainedStableReading,
                 out bool stableAliasExpired))
             {
-                AddReading(hardwareReadingsByMetricId, retainedStableReading);
                 AddReading(readingsByMetricId, retainedStableReading);
-                hardwareUnavailableReportsByMetricId.Remove(stableMetricId);
                 unavailableReportsByMetricId.Remove(stableMetricId);
                 return;
             }
@@ -278,7 +272,6 @@ internal sealed class LibreHardwareSnapshotReader
                 stableAliasExpired
                     ? BuildRawSensorIdentity(retainedStableReading)
                     : BuildRawSensorIdentity(hardware, sensor));
-            hardwareUnavailableReportsByMetricId[stableMetricId] = unavailableReport;
             unavailableReportsByMetricId[stableMetricId] = unavailableReport;
         }
     }
@@ -417,6 +410,40 @@ internal sealed class LibreHardwareSnapshotReader
             ';',
             new[] { firstSourceSensorId, secondSourceSensorId }.Where(id => !string.IsNullOrWhiteSpace(id)));
     }
+
+    private static bool HardwareTargetsContainCpu(IReadOnlyList<IHardware> hardwareTargets)
+    {
+        return hardwareTargets.Any(HardwareTreeContainsCpu);
+    }
+
+    private static bool HardwareTreeContainsCpu(IHardware hardware)
+    {
+        return hardware.HardwareType is HardwareType.Cpu
+            || hardware.SubHardware.Any(HardwareTreeContainsCpu);
+    }
+
+    private static IReadOnlyList<MetricPollingGroupSnapshotPublication> BuildPollingGroupSnapshotPublications(
+        IReadOnlyList<TouchedPollingGroup> touchedPollingGroups,
+        Dictionary<string, MetricReading> readingsByMetricId,
+        Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId)
+    {
+        List<MetricPollingGroupSnapshotPublication> publications = [];
+        List<MetricUnavailableReport> unavailableReports = unavailableReportsByMetricId.Values.ToList();
+
+        foreach (TouchedPollingGroup touchedPollingGroup in touchedPollingGroups)
+        {
+            publications.Add(new MetricPollingGroupSnapshotPublication
+            {
+                PollingGroupId = touchedPollingGroup.PollingGroupId,
+                TraversalReadingsByMetricId = readingsByMetricId,
+                Warnings = touchedPollingGroup.Warnings,
+                CapturedAt = touchedPollingGroup.CapturedAt,
+                TraversalUnavailableReports = unavailableReports,
+            });
+        }
+
+        return publications;
+    }
 }
 
 /// <summary>
@@ -432,23 +459,44 @@ internal sealed record LibreHardwareSnapshotReadResult
 
     public required IReadOnlyList<HardwareRefreshDiagnostic> HardwareUpdates { get; init; }
 
-    public required IReadOnlyList<MetricPollingGroupSnapshotUpdate> PollingGroupSnapshots { get; init; }
+    public required IReadOnlyList<MetricPollingGroupSnapshotPublication> PollingGroupSnapshotPublications { get; init; }
 
     public required IReadOnlyList<string> Warnings { get; init; }
 }
 
 /// <summary>
-/// Per-polling-group cache update produced by the reader and published by the session.
+/// Per-polling-group cache publication produced by the reader and published by the session.
 /// </summary>
-internal sealed record MetricPollingGroupSnapshotUpdate
+/// <remarks>
+/// Readings and unavailable reports are traversal-wide candidates. The cache
+/// owns the final metricId-to-polling-group filter before replacing a group
+/// snapshot, which keeps publish ownership in one place. Replacing is destructive:
+/// only produce publications for groups touched by this traversal. Consumers must
+/// publish these updates immediately instead of retaining them across later
+/// mutations to the traversal dictionaries.
+/// </remarks>
+internal sealed record MetricPollingGroupSnapshotPublication
 {
     public required string PollingGroupId { get; init; }
 
-    public required Dictionary<string, MetricReading> ReadingsByMetricId { get; init; }
+    public required Dictionary<string, MetricReading> TraversalReadingsByMetricId { get; init; }
 
     public required IReadOnlyList<string> Warnings { get; init; }
 
     public required DateTimeOffset CapturedAt { get; init; }
 
-    public required IReadOnlyList<MetricUnavailableReport> UnavailableReports { get; init; }
+    public required IReadOnlyList<MetricUnavailableReport> TraversalUnavailableReports { get; init; }
+}
+
+/// <summary>
+/// A polling group touched by this traversal. Final publication waits until
+/// derived metrics are complete.
+/// </summary>
+internal sealed record TouchedPollingGroup
+{
+    public required string PollingGroupId { get; init; }
+
+    public required IReadOnlyList<string> Warnings { get; init; }
+
+    public required DateTimeOffset CapturedAt { get; init; }
 }

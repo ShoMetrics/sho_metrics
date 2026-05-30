@@ -60,25 +60,30 @@ internal sealed class MetricSnapshotCache
         // Aggregate groups are computed from the full traversal, but their
         // snapshots must not inherit unrelated hardware warnings. A GPU update
         // failure should not appear on a network throughput read.
-        PublishPollingGroupSnapshot(
+        ReplaceFilteredPollingGroupSnapshot(
             LibreHardwareMetricCatalog.NetworkAggregatePollingGroupId,
             readingsByMetricId,
             [],
             capturedAt);
-        PublishPollingGroupSnapshot(
+        ReplaceFilteredPollingGroupSnapshot(
             WindowsSystemTotalDiskThroughputProvider.PollingGroupId,
             readingsByMetricId,
             [],
             capturedAt);
     }
 
-    public void PublishPollingGroupSnapshot(
+    public void ReplaceFilteredPollingGroupSnapshot(
         string pollingGroupId,
         Dictionary<string, MetricReading> readingsByMetricId,
         IReadOnlyList<string> warnings,
         DateTimeOffset capturedAt,
         IReadOnlyList<MetricUnavailableReport>? unavailableReports = null)
     {
+        // This is replace-not-merge. Call it only for a polling group fully
+        // owned by the current refresh; publishing a partial group snapshot will
+        // erase any previously cached metrics omitted from the candidate set.
+        // Traversal-wide candidates are accepted, but only metrics declared in
+        // this polling group can enter the replaced snapshot.
         List<MetricReading> readings = readingsByMetricId.Values
             .Where(reading => !LibreHardwareMetricCatalog.IsInternalMetricId(reading.MetricId)
                 && IsMetricInPollingGroup(reading.MetricId, pollingGroupId))
@@ -99,25 +104,6 @@ internal sealed class MetricSnapshotCache
             UnavailableMetrics = filteredUnavailableMetrics,
             Warnings = warnings.ToList(),
         };
-    }
-
-    public void PublishStableAliasPollingGroupSnapshot(
-        string metricId,
-        Dictionary<string, MetricReading> readingsByMetricId,
-        Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId,
-        DateTimeOffset capturedAt)
-    {
-        if (!_pollingGroupIdsByMetricId.TryGetValue(metricId, out string? pollingGroupId))
-        {
-            return;
-        }
-
-        PublishPollingGroupSnapshot(
-            pollingGroupId,
-            readingsByMetricId,
-            [],
-            capturedAt,
-            unavailableReportsByMetricId.Values.ToList());
     }
 
     public static List<MetricReading> FilterReadings(
