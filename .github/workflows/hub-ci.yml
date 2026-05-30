@@ -44,8 +44,16 @@ jobs:
       - name: Run lint
         run: npm run lint
 
-      - name: Run unit tests
-        run: npm run test:unit
+      - name: Run unit tests with coverage
+        run: npm run test:unit:coverage
+
+      - name: Upload unit coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hub-unit-coverage
+          path: packages/hub/coverage/unit
+          if-no-files-found: ignore
 
       - name: Build plugin
         run: npm run build
