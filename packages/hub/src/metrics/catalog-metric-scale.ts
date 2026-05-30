@@ -14,6 +14,8 @@ const GIBIBYTE = KIBIBYTE ** 3;
 const MEBIBYTE = KIBIBYTE ** 2;
 const DECIMAL_MEGABYTE = KILOBYTE ** 2;
 const DECIMAL_GIGAHERTZ = KILOBYTE ** 3;
+const GPU_DATA_DEFAULT_MAXIMUM_BYTES = 32 * GIBIBYTE;
+const TIMING_DEFAULT_MAXIMUM_SECONDS = 1e-7;
 const FALLBACK_DEFAULT_MAXIMUM_VALUE = 100;
 const MAXIMUM_CUSTOM_MAXIMUM_VALUE = 1_000_000_000_000_000;
 const RAW_INPUT_MULTIPLIER = 1;
@@ -53,6 +55,10 @@ export function resolveCatalogMetricDefaultMaximumValue(
         case MetricUnit.REVOLUTIONS_PER_MINUTE:
             return resolveFanDefaultMaximumValue(category);
         case MetricUnit.SECONDS:
+            if (readingKind === "timing") {
+                return TIMING_DEFAULT_MAXIMUM_SECONDS;
+            }
+
             return 60;
         case MetricUnit.MILLISECONDS:
             return 1_000;
@@ -166,6 +172,8 @@ function resolveClockDefaultMaximumValue(category: CatalogMetricCategory): numbe
 
 function resolveBytesDefaultMaximumValue(category: CatalogMetricCategory): number {
     switch (category) {
+        case "gpu":
+            return GPU_DATA_DEFAULT_MAXIMUM_BYTES;
         case "memory":
             return 64 * GIBIBYTE;
         case "disk":

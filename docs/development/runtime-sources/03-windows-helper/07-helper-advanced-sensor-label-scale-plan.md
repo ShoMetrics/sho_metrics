@@ -565,9 +565,11 @@ Initial defaults:
 | network throughput B/s | 125 * 1000 * 1000 |
 | other throughput B/s | 100 * 1024 * 1024 |
 | bytes/data memory | 64 * 1024 * 1024 * 1024 |
+| bytes/data GPU | 32 * 1024 * 1024 * 1024 |
 | bytes/data disk | 2 * 1024 * 1024 * 1024 * 1024 |
 | bytes/data other | 1024 * 1024 * 1024 |
 | milliseconds | 1_000 |
+| timing seconds | 100e-9 |
 | seconds | 60 |
 | fallback | 100 |
 
