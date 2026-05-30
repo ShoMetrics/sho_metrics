@@ -512,6 +512,36 @@ test("catalog metric settings show catalog load state without descriptor inferen
     assert.match(failedMarkup, /Metrics unavailable/);
 });
 
+test("catalog metric settings explain helper setup failures", () => {
+    const missingHelperMarkup = renderWidgetSettings({
+        actionKind: "catalog",
+        runtimeCache: {
+            catalogMetricDescriptorSourceStatus: {
+                state: "unavailable",
+                reason: "helperNotInstalled",
+            },
+        },
+        runtimeCacheStatus: {
+            catalogMetricDescriptorStatus: "failed",
+        },
+    });
+    const stoppedHelperMarkup = renderWidgetSettings({
+        actionKind: "catalog",
+        runtimeCache: {
+            catalogMetricDescriptorSourceStatus: {
+                state: "unavailable",
+                reason: "helperStopped",
+            },
+        },
+        runtimeCacheStatus: {
+            catalogMetricDescriptorStatus: "failed",
+        },
+    });
+
+    assert.match(missingHelperMarkup, /Install ShoMetrics Helper to use advanced sensors/);
+    assert.match(stoppedHelperMarkup, /Start ShoMetrics Helper from ShoMetrics Control Panel/);
+});
+
 test("catalog metric settings render the initial guided picker without writing a default", () => {
     const markup = renderWidgetSettings({
         actionKind: "catalog",

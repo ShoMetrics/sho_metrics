@@ -17,7 +17,7 @@ import {
     resolveCatalogMetricMaximumInputStep,
     writeCatalogMetricMaximumInputValue,
 } from "../../metrics/catalog-metric-scale";
-import type { MetricDescriptor } from "../../runtime/sources/source-client";
+import type { MetricDescriptor, SourceClientStatus } from "../../runtime/sources/source-client";
 import type { ResolvedCatalogMetricTarget, ScaleMode } from "../../settings/resolved-settings";
 import type { StoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
 import { StandardColorSettings } from "./ColorSettings";
@@ -61,7 +61,10 @@ function CatalogMetricPicker({
     return (
         <SettingsSection title="Metric">
             {descriptors.length === 0 ? (
-                <CatalogMetricDescriptorStatusNote status={context.runtimeCacheStatus.catalogMetricDescriptorStatus} />
+                <CatalogMetricDescriptorStatusNote
+                    status={context.runtimeCacheStatus.catalogMetricDescriptorStatus}
+                    sourceStatus={context.runtimeCache.catalogMetricDescriptorSourceStatus}
+                />
             ) : (
                 <>
                     {shouldShowTypeSetting(options) && (
@@ -121,21 +124,40 @@ function CatalogMetricPicker({
 }
 
 function CatalogMetricDescriptorStatusNote({
+    sourceStatus,
     status,
 }: {
+    sourceStatus: SourceClientStatus | undefined;
     status: "pending" | "ready" | "failed";
 }): React.JSX.Element {
-    const text = status === "failed"
-        ? "Metrics unavailable"
-        : status === "ready"
-            ? "No helper metrics"
-            : "Loading metrics...";
+    const text = resolveCatalogMetricDescriptorStatusText(status, sourceStatus);
 
     return (
         <InspectorItem className="note-item note-item-caption">
             <p className="section-note">{text}</p>
         </InspectorItem>
     );
+}
+
+function resolveCatalogMetricDescriptorStatusText(
+    status: "pending" | "ready" | "failed",
+    sourceStatus: SourceClientStatus | undefined,
+): string {
+    if (sourceStatus?.state === "unavailable") {
+        if (sourceStatus.reason === "helperNotInstalled") {
+            return "Install ShoMetrics Helper to use advanced sensors.";
+        }
+
+        if (sourceStatus.reason === "helperStopped") {
+            return "Start ShoMetrics Helper from ShoMetrics Control Panel.";
+        }
+    }
+
+    return status === "failed"
+        ? "Metrics unavailable"
+        : status === "ready"
+            ? "No helper metrics"
+            : "Loading metrics...";
 }
 
 function CatalogMetricLabelScaleSettings({

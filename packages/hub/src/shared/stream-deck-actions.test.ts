@@ -16,6 +16,7 @@ interface StreamDeckManifest {
 
 interface StreamDeckManifestAction {
     UUID?: string;
+    OS?: readonly string[];
 }
 
 test("Stream Deck action UUID constants match the manifest", () => {
@@ -41,6 +42,16 @@ test("Stream Deck action kind resolution requires an exact manifest UUID", () =>
         "network",
     );
     assert.equal(resolveStreamDeckActionKind("com.example.network"), "unknown");
+});
+
+test("Advanced Sensor action is Windows-only in the action list", () => {
+    const manifest = JSON.parse(
+        readFileSync("com.ez.sho-metrics.sdPlugin/manifest.json", "utf8"),
+    ) as StreamDeckManifest;
+    const advancedSensorAction = (manifest.Actions ?? [])
+        .find(action => action.UUID === STREAM_DECK_ACTION_UUID_BY_KIND.catalog);
+
+    assert.deepEqual(advancedSensorAction?.OS, ["windows"]);
 });
 
 test("old reading-level action names do not remain in source or manifest files", () => {

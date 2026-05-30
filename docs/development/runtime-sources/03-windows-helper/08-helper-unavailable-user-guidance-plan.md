@@ -88,7 +88,7 @@ system status and repair actions in ShoMetrics Control Panel.
 
 | State key | Deck copy | PI guidance | ShoMetrics Control Panel guidance |
 | --- | --- | --- | --- |
-| `setupRequired` | `Setup required` | `Install ShoMetrics Helper to use this sensor.` | Show service not installed. Offer install/repair once installer UX exists. |
+| `setupRequired` | `Setup required` | `Install ShoMetrics Helper to use advanced sensors.` | Show service not installed. Offer install/repair once installer UX exists. |
 | `helperStopped` | `Helper stopped` | `Start ShoMetrics Helper from ShoMetrics Control Panel.` | Show service installed but not running. Offer Start with UAC if needed. |
 | `helperStarting` | `Waiting...` | `Waiting for ShoMetrics Helper to start.` | Show service start-pending or pipe missing inside a short startup window. |
 | `versionMismatch` | `Check ShoMetrics` | `Update ShoMetrics Helper and Hub to matching versions.` | Show Hub version, helper version, and protocol version. |
@@ -169,7 +169,7 @@ layer is added later, use these as initial keys.
 | `expiredSensorValue` | `No data` | `データなし` | `无数据` |
 | `unsupportedPlatform` | `Windows only` | `Windows のみ` | `仅限 Windows` |
 | `openControlPanel` | `Open ShoMetrics Control Panel` | `ShoMetrics コントロールパネルを開く` | `打开 ShoMetrics 控制面板` |
-| `installHelper` | `Install ShoMetrics Helper to use this sensor.` | `このセンサーを使うには ShoMetrics Helper をインストールしてください。` | `安装 ShoMetrics Helper 后才能使用此传感器。` |
+| `installHelper` | `Install ShoMetrics Helper to use advanced sensors.` | `高度なセンサーを使うには ShoMetrics Helper をインストールしてください。` | `安装 ShoMetrics Helper 后才能使用高级传感器。` |
 | `startHelper` | `Start ShoMetrics Helper from ShoMetrics Control Panel.` | `ShoMetrics コントロールパネルから ShoMetrics Helper を起動してください。` | `请从 ShoMetrics 控制面板启动 ShoMetrics Helper。` |
 | `checkDriver` | `Open ShoMetrics Control Panel to check sensor driver status.` | `ShoMetrics コントロールパネルでセンサードライバーの状態を確認してください。` | `打开 ShoMetrics 控制面板检查传感器驱动状态。` |
 | `updateShoMetrics` | `Update ShoMetrics Helper and Hub to matching versions.` | `ShoMetrics Helper と Hub を対応するバージョンに更新してください。` | `请将 ShoMetrics Helper 和 Hub 更新到匹配版本。` |
