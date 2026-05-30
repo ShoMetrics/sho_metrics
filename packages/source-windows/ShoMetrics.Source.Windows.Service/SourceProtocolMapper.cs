@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Google.Protobuf.WellKnownTypes;
 using ShoMetrics.Contracts.V1;
+using ShoMetrics.Source.Windows.Contracts;
 using ShoMetrics.Source.Windows.Core;
 using CoreDescriptor = ShoMetrics.Source.Windows.Core.HardwareMetricDescriptor;
 using CoreDescriptorSnapshot = ShoMetrics.Source.Windows.Core.HardwareMetricDescriptorSnapshot;
@@ -28,12 +29,23 @@ using SourceWarningList = Google.Protobuf.Collections.RepeatedField<ShoMetrics.C
 
 namespace ShoMetrics.Source.Windows.Service;
 
+// Converts Core hardware/source models into protobuf responses at the service
+// boundary. Keep Core transport-independent; generated protobuf types should
+// not leak back into the hardware reader.
 internal sealed class SourceProtocolMapper
 {
+    private const string PawnIoWarningCode = "pawnio_warning";
     private const string HardwareWarningCode = "lhm_warning";
     private const string MetricUnavailableWarningCode = "metric_unavailable";
 
-    public GetSourceHealthResponse BuildHealthResponse(IReadOnlyList<HardwareSourceWarning> warnings)
+    /// <summary>
+    /// Builds source health from generic hardware warnings plus optional
+    /// component diagnostics. Component status is coarse Panel state; detailed
+    /// human-readable diagnostic text still belongs in SourceWarning.
+    /// </summary>
+    public GetSourceHealthResponse BuildHealthResponse(
+        IReadOnlyList<HardwareSourceWarning> warnings,
+        PawnIoDiagnostic? pawnIoDiagnostic)
     {
         GetSourceHealthResponse response = new()
         {
@@ -50,6 +62,8 @@ internal sealed class SourceProtocolMapper
                 Message = warning.Message,
             });
         }
+
+        AddPawnIoComponentStatus(response, pawnIoDiagnostic);
 
         return response;
     }
@@ -368,6 +382,60 @@ internal sealed class SourceProtocolMapper
                 MetricId = requestedMetricId,
             });
         }
+    }
+
+    private static void AddPawnIoComponentStatus(
+        GetSourceHealthResponse response,
+        PawnIoDiagnostic? diagnostic)
+    {
+        SourceComponentStatus componentStatus = new()
+        {
+            Component = WindowsSourceServiceConstants.PawnIoDriverComponentId,
+            State = MapPawnIoComponentState(diagnostic),
+        };
+
+        if (!string.IsNullOrWhiteSpace(diagnostic?.Version))
+        {
+            componentStatus.Version = diagnostic.Version;
+        }
+
+        response.ComponentStatuses.Add(componentStatus);
+
+        if (diagnostic is null)
+        {
+            return;
+        }
+
+        foreach (string warning in diagnostic.Warnings)
+        {
+            response.Warnings.Add(new SourceWarning
+            {
+                Code = PawnIoWarningCode,
+                Message = warning,
+            });
+        }
+    }
+
+    private static SourceComponentState MapPawnIoComponentState(PawnIoDiagnostic? diagnostic)
+    {
+        if (diagnostic is null)
+        {
+            return SourceComponentState.Unknown;
+        }
+
+        if (!diagnostic.IsInstalled)
+        {
+            return SourceComponentState.NotInstalled;
+        }
+
+        if (!diagnostic.IsAdministrator)
+        {
+            return SourceComponentState.NotElevated;
+        }
+
+        return diagnostic.Warnings.Count == 0
+            ? SourceComponentState.Ok
+            : SourceComponentState.Unusable;
     }
 
     private static uint ToUInt32(double value)

@@ -19,6 +19,11 @@ internal sealed class MetricRefreshDemandChangeGate
         _minimumChangeInterval = minimumChangeInterval;
     }
 
+    /// <summary>
+    /// Runs the refresh-demand mutation only when the full demand fingerprint is
+    /// accepted. Rapidly changing demand is rejected, while identical demand is
+    /// allowed through so the caller can keep receiving current status.
+    /// </summary>
     public T RunIfAccepted<T>(
         IReadOnlyList<MetricRefreshDemand> demands,
         Func<MetricRefreshDemandChangeStatus, T> action)

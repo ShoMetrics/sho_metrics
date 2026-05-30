@@ -22,6 +22,7 @@ internal sealed partial class SourceRequestHandler(
     private static readonly TimeSpan SlowOperationDebugThreshold = TimeSpan.FromMilliseconds(100);
     private static readonly TimeSpan OperationLogThrottleInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan MinimumDemandApplyInterval = TimeSpan.FromMilliseconds(250);
+    private const string PawnIoDiagnosticFailureWarningCode = "pawnio_diagnostic_failed";
 
     private readonly MetricRefreshDemandChangeGate _demandChangeGate =
         new(timeProvider, MinimumDemandApplyInterval);
@@ -33,7 +34,7 @@ internal sealed partial class SourceRequestHandler(
         return HandleOperationAsync(
             nameof(GetSourceHealthAsync),
             HealthTimeout,
-            _ => Task.FromResult(protocolMapper.BuildHealthResponse(monitorSession.InitializationWarnings)),
+            _ => Task.FromResult(GetSourceHealthCore()),
             cancellationToken);
     }
 
@@ -68,6 +69,45 @@ internal sealed partial class SourceRequestHandler(
             SetRefreshDemandTimeout,
             _ => Task.FromResult(SetMetricRefreshDemandCore(request)),
             cancellationToken);
+    }
+
+    private GetSourceHealthResponse GetSourceHealthCore()
+    {
+        PawnIoDiagnostic? pawnIoDiagnostic = TryReadPawnIoDiagnostic(out HardwareSourceWarning? diagnosticWarning);
+
+        if (diagnosticWarning is null)
+        {
+            return protocolMapper.BuildHealthResponse(monitorSession.InitializationWarnings, pawnIoDiagnostic);
+        }
+
+        List<HardwareSourceWarning> warnings = [.. monitorSession.InitializationWarnings, diagnosticWarning];
+        return protocolMapper.BuildHealthResponse(warnings, pawnIoDiagnostic);
+    }
+
+    private PawnIoDiagnostic? TryReadPawnIoDiagnostic(out HardwareSourceWarning? warning)
+    {
+        try
+        {
+            warning = null;
+            return PawnIoDiagnostics.Read();
+        }
+        catch (Exception exception)
+        {
+            logger.AtWarning()
+                .EveryBucket("source-health-pawnio-diagnostic-failed", OperationLogThrottleInterval)
+                .Log(context => ThrottledLogEntry.Create(
+                    exception,
+                    "PawnIO diagnostic failed while building source health. suppressedLogCount={SuppressedLogCount}",
+                    context.SuppressedCount));
+
+            warning = new HardwareSourceWarning
+            {
+                Code = PawnIoDiagnosticFailureWarningCode,
+                Message = $"PawnIO diagnostic failed: {exception.GetType().Name}: {exception.Message}",
+            };
+
+            return null;
+        }
     }
 
     private async Task<ReadMetricSnapshotResponse> ReadMetricSnapshotCoreAsync(
