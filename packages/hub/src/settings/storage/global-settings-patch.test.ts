@@ -4,6 +4,8 @@ import {
     ColorMode as StoredColorMode,
     MetricView as StoredMetricView,
     MetricTheme as StoredMetricTheme,
+    NetworkDisplaySettings_UnitBase as StoredNetworkUnitBase,
+    ScaleMode as StoredScaleMode,
     TerminalPalettePreset as StoredTerminalPalettePreset,
     TerminalThemeVariant as StoredTerminalThemeVariant,
     TextViewVariant as StoredTextViewVariant,
@@ -73,4 +75,67 @@ test("global settings patch writes pixel window theme", () => {
     const settings = readStoredGlobalSettings(nextSettings).settings;
     assert.equal(settings.overrides?.theme?.enabled, true);
     assert.equal(settings.overrides?.theme?.theme?.selectedTheme, StoredMetricTheme.PIXEL_WINDOW);
+});
+
+test("global settings patch writes network and disk throughput defaults", () => {
+    const nextSettings = writeStoredGlobalSettingsPatch(undefined, {
+        network: {
+            scaleMode: "custom",
+            maximumDownloadSpeedMegabitsPerSecond: 250,
+            maximumUploadSpeedMegabitsPerSecond: 100,
+            unitBase: "bit",
+        },
+        diskThroughput: {
+            scaleMode: "custom",
+            maximumReadThroughputMebibytesPerSecond: 500,
+            maximumWriteThroughputMebibytesPerSecond: 300,
+        },
+    });
+
+    const defaults = readStoredGlobalSettings(nextSettings).settings.defaults;
+
+    assert.equal(defaults?.network?.scaleMode, StoredScaleMode.CUSTOM);
+    assert.equal(defaults?.network?.maximumDownloadSpeedMegabitsPerSecond, 250);
+    assert.equal(defaults?.network?.maximumUploadSpeedMegabitsPerSecond, 100);
+    assert.equal(defaults?.network?.unitBase, StoredNetworkUnitBase.BIT);
+    assert.equal(defaults?.diskThroughput?.scaleMode, StoredScaleMode.CUSTOM);
+    assert.equal(defaults?.diskThroughput?.maximumReadThroughputMebibytesPerSecond, 500);
+    assert.equal(defaults?.diskThroughput?.maximumWriteThroughputMebibytesPerSecond, 300);
+});
+
+test("global settings patch clears optional default maxima without clearing mode choices", () => {
+    const initialSettings = writeStoredGlobalSettingsPatch(undefined, {
+        network: {
+            scaleMode: "custom",
+            maximumDownloadSpeedMegabitsPerSecond: 250,
+            maximumUploadSpeedMegabitsPerSecond: 100,
+            unitBase: "bit",
+        },
+        diskThroughput: {
+            scaleMode: "custom",
+            maximumReadThroughputMebibytesPerSecond: 500,
+            maximumWriteThroughputMebibytesPerSecond: 300,
+        },
+    });
+
+    const nextSettings = writeStoredGlobalSettingsPatch(initialSettings, {
+        network: {
+            maximumDownloadSpeedMegabitsPerSecond: undefined,
+            maximumUploadSpeedMegabitsPerSecond: undefined,
+        },
+        diskThroughput: {
+            maximumReadThroughputMebibytesPerSecond: undefined,
+            maximumWriteThroughputMebibytesPerSecond: undefined,
+        },
+    });
+
+    const defaults = readStoredGlobalSettings(nextSettings).settings.defaults;
+
+    assert.equal(defaults?.network?.scaleMode, StoredScaleMode.CUSTOM);
+    assert.equal(defaults?.network?.maximumDownloadSpeedMegabitsPerSecond, undefined);
+    assert.equal(defaults?.network?.maximumUploadSpeedMegabitsPerSecond, undefined);
+    assert.equal(defaults?.network?.unitBase, StoredNetworkUnitBase.BIT);
+    assert.equal(defaults?.diskThroughput?.scaleMode, StoredScaleMode.CUSTOM);
+    assert.equal(defaults?.diskThroughput?.maximumReadThroughputMebibytesPerSecond, undefined);
+    assert.equal(defaults?.diskThroughput?.maximumWriteThroughputMebibytesPerSecond, undefined);
 });
