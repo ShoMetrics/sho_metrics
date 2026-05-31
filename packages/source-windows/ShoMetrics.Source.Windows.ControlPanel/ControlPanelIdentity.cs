@@ -1,20 +1,17 @@
 using System.Reflection;
 
-namespace ShoMetrics.Source.Windows.Service;
+namespace ShoMetrics.Source.Windows.ControlPanel;
 
-internal static class WindowsSourceServiceIdentity
+internal static class ControlPanelIdentity
 {
-    public const string SourceId = "windows-helper";
-    public const string ProtocolVersion = "1";
-
-    public static readonly string HelperVersion = ResolveHelperVersion();
+    public static readonly string Version = ResolveVersion();
 
     // TODO: If another shipped Source Windows binary needs this same assembly
     // version resolver, move the helper into a shared project instead of
     // copying a third copy.
-    private static string ResolveHelperVersion()
+    private static string ResolveVersion()
     {
-        Assembly assembly = typeof(WindowsSourceServiceIdentity).Assembly;
+        Assembly assembly = typeof(ControlPanelIdentity).Assembly;
         AssemblyInformationalVersionAttribute? informationalVersion =
             assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
 

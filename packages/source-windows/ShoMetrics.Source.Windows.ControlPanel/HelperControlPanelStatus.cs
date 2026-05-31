@@ -26,6 +26,7 @@ internal sealed record HelperControlPanelStatus
             [
                 "ShoMetrics Helper diagnostics",
                 $"Checked: {CheckedAt:O}",
+                $"Control Panel version: {ControlPanelIdentity.Version}",
                 $"Service: {Service.StatusText}",
                 $"Service installed: {Service.InstallText}",
                 $"Service runtime: {Service.RuntimeText}",
@@ -33,7 +34,7 @@ internal sealed record HelperControlPanelStatus
                 $"Connection: {Service.ConnectionText}",
                 $"PawnIO driver: {PawnIoDriver.StatusText}",
                 $"PawnIO driver detail: {PawnIoDriver.DetailText}",
-                $"Version: {Diagnostics.HelperVersionText}",
+                $"Helper version: {Diagnostics.HelperVersionText}",
                 $"Protocol: {Diagnostics.ProtocolVersionText}",
                 $"Last sample: {Diagnostics.LastSampleText}",
                 $"Descriptors: {Diagnostics.DescriptorCountText}",
