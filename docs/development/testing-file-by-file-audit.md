@@ -1,8 +1,21 @@
-﻿# File-by-File Production Readiness Testing Audit
+﻿# Production Readiness Testing Audit
 
 Date: 2026-05-30
 
-This matrix is generated from the current working tree inventory. It is a testing audit, not a test implementation. It excludes generated output, build output, test files, snapshots, vendor assets, binary assets, diagnostic benchmark scripts, and package lock files unless the file is a release-bearing source/config entry.
+This is the active combined production-readiness testing audit. It supersedes the original high-level plan now archived at `docs/development/archive/testing-production-readiness-audit.md`.
+
+This audit covers the full repository working tree and records the completed meaningful-test plan for prod readiness. It excludes generated output, build output, test files, snapshots, vendor assets, binary assets, diagnostic benchmark scripts, and package lock files unless the file is a release-bearing source/config entry.
+
+## Scope Decisions
+
+- Add a small Property Inspector DOM test stack.
+- Add Windows helper named-pipe/gRPC integration smoke in CI.
+- Keep true Stream Deck device automation out of CI gates.
+- Treat coverage as a guardrail, with measured baselines and modest floors rather than 100% coverage.
+- Add a tracked manual release checklist for hardware, driver, helper install, Control Panel, and real Stream Deck scenarios.
+- Keep site/docs checks to build, link, and content smoke.
+- Do not target `.mjs` diagnostic or benchmark scripts for direct test coverage unless they become release pipeline entry points.
+- Keep PI DOM tests split into `test:pi`; merge into `test:unit` only after setup cost and isolation are proven stable.
 
 ## Inventory Summary
 
@@ -363,23 +376,23 @@ Excluded from the production matrix as test infrastructure found under source fo
 | `site/layouts/index.html` | User site/docs | Hugo build only | P2 G10 site smoke: Hugo build, link check, and required-page content smoke; no app-level DOM tests. |
 | `site/static/css/site.css` | User site/docs | Hugo build only | P2 G10 site smoke: Hugo build, link check, and required-page content smoke; no app-level DOM tests. |
 
-## Logical Commit Groups
+## Completed Implementation Groups
 
-These groups are the implementation order after this audit. They are intentionally not interchangeable. Combining two groups is rejected unless they share owner, runner, CI gate, and failure mode.
-- **G1 Coverage infrastructure baseline**: Hub Node coverage spike; Windows collector is already installed, so remaining Windows work is exclusions, CI/reporting, and baseline capture. Do not mix with behavior tests because failures are tooling/reporting failures.
-- **G2 PI DOM test infrastructure**: Testing Library, user-event, jsdom, test:pi, cleanup/isolation, tsconfig include changes. Do not mix with PI behavior coverage because setup failures must be isolated.
-- **G3 PI interaction coverage**: PI app load, settings writes, custom select, optional number inputs, helper guidance, runtime cache, color compensation. Do not mix with runtime/source tests because runner and failure mode are DOM-specific.
-- **G4 Settings and persisted contract coverage**: Storage codec/resolver, sparse patches, unknown field warnings, global overrides, helper-backed defaults, catalog display hints. Do not mix with PI DOM even when UI triggers settings writes; persisted data is the owner.
-- **G5 Source API and helper contract coverage**: Proto adapters, mapper, version skew, pending refresh, attribution/unavailable conflicts, demand validation. Do not mix with transport smoke; this is contract behavior, not cross-process proof.
-- **G6 Runtime collection, fallback, and action coverage**: Metadata invalidation, descriptor preload, retained values, demand renewal/clear/recovery, subscriptions, disposal, built-in fallback. Do not mix with source API mapper tests because runtime owns state mutation.
-- **G7 Windows helper integration smoke**: Independent integration project, named-pipe/gRPC startup, one RPC, timeout/retry, diagnostics artifact. Do not mix with Service unit tests because cross-process flake and artifacts need separate ownership.
-- **G8 Windows Core, Diagnostics, and Control Panel coverage**: LHM catalog/session, retention, demand state, diagnostics logging, service status, Control Panel support text. Do not mix with Hub runtime because Windows owns hardware/supportability behavior.
-- **G9 Rendering, widget, visual, and no-data coverage**: Render models, primitives, existing Playwright visual matrix, no-data/pending/unavailable notices. Do not mix with runtime/source because visual snapshots have a separate review flow.
-- **G10 Site/docs/release checklist smoke**: Hugo/link/content smoke, CI workflow changes, Stream Deck manifest checks, manual verification checklist. Do not mix with product logic because these are release-process gates.
+These groups were implemented as separate commits because each group has a distinct owner, runner, CI gate, or failure mode.
+- **G1 Coverage infrastructure baseline**: `134c86f Add coverage reporting baseline`.
+- **G2 PI DOM test infrastructure**: `0a6880d Add Property Inspector DOM test runner`.
+- **G3 PI interaction coverage**: `27e9209 Add Property Inspector interaction tests`.
+- **G4 Settings and persisted contract coverage**: `934ebe1 Add settings contract tests`.
+- **G5 Source API and helper contract coverage**: `6bdc5d2 Fix helper malformed response status`.
+- **G6 Runtime collection, fallback, and action coverage**: `f258253 Add runtime collection contract tests`.
+- **G7 Windows helper integration smoke**: `f9ba42d Add Windows helper integration smoke`.
+- **G8 Windows Core, Diagnostics, and Control Panel coverage**: `34e7991 Add Windows behavior contract tests`.
+- **G9 Rendering, widget, visual, and no-data coverage**: `ef97de6 Add rendering widget contract tests`.
+- **G10 Site/docs/release checklist smoke**: `e97feaf Add release smoke checks`.
 
 ## Remaining User Decisions
 
-None. Current decisions are locked in `docs/development/testing-production-readiness-audit.md`.
+None. Current decisions are captured in this document.
 
 ## Verification
 
