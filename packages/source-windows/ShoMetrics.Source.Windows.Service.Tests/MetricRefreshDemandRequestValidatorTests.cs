@@ -77,6 +77,48 @@ public sealed class MetricRefreshDemandRequestValidatorTests
     }
 
     [Fact]
+    public void ValidateAndMapRejectsBlankPollingGroupId()
+    {
+        SetMetricRefreshDemandRequest request = new();
+        request.Groups.Add(new MetricRefreshDemandGroup
+        {
+            PollingGroupId = " ",
+            RequestedIntervalMilliseconds = 1000,
+            MetricIds = { "metric.id" },
+        });
+
+        AssertInvalidArgument(request);
+    }
+
+    [Fact]
+    public void ValidateAndMapRejectsBlankMetricId()
+    {
+        SetMetricRefreshDemandRequest request = new();
+        request.Groups.Add(new MetricRefreshDemandGroup
+        {
+            PollingGroupId = "lhm:hardware:cpu",
+            RequestedIntervalMilliseconds = 1000,
+            MetricIds = { "" },
+        });
+
+        AssertInvalidArgument(request);
+    }
+
+    [Fact]
+    public void ValidateAndMapRejectsControlCharactersInPollingGroupId()
+    {
+        SetMetricRefreshDemandRequest request = new();
+        request.Groups.Add(new MetricRefreshDemandGroup
+        {
+            PollingGroupId = "lhm:hardware:\u0001cpu",
+            RequestedIntervalMilliseconds = 1000,
+            MetricIds = { "metric.id" },
+        });
+
+        AssertInvalidArgument(request);
+    }
+
+    [Fact]
     public void ValidateAndMapRejectsOversizedPollingGroupId()
     {
         SetMetricRefreshDemandRequest request = new();
