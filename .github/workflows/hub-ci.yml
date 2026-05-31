@@ -47,6 +47,9 @@ jobs:
       - name: Run unit tests with coverage
         run: npm run test:unit:coverage
 
+      - name: Run Property Inspector DOM tests
+        run: npm run test:pi
+
       - name: Upload unit coverage report
         if: always()
         uses: actions/upload-artifact@v4
