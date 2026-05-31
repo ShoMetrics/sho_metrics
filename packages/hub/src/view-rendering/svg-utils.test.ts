@@ -4,11 +4,19 @@ import {
     adjustHexColorBrightness,
     clamp,
     escapeSvgText,
+    formatSvgShapeOutlineStrokeAttributes,
+    formatSvgTextOutlineAttributes,
+    isSvgOutlineEnabled,
     renderConstrainedSvgText,
     renderStyledSvgText,
+    resolveSvgFilledShapeOutlinePadding,
+    resolveSvgShapeOutlineExtraWidth,
+    resolveSvgShapeOutlineStrokeWidth,
+    resolveSvgTextOutlineStrokeWidth,
     resolveSvgTextFit,
     sanitizeSvgId,
 } from "./svg-utils";
+import type { RenderOutlineTokens } from "./render-appearance";
 import { DEFAULT_RENDER_TEXT_STYLES } from "./render-text-style";
 
 test("SVG text escaping covers XML-sensitive characters", () => {
@@ -201,6 +209,63 @@ test("styled SVG text lets layout fit options override the style minimum font sc
     });
 
     assert.match(styledText, /font-size="10"/);
+});
+
+test("SVG text outline helpers emit no attributes when disabled", () => {
+    assert.equal(formatSvgTextOutlineAttributes({ outline: undefined, strokeWidth: 2 }), "");
+    assert.equal(formatSvgTextOutlineAttributes({
+        outline: { color: "#000000", strength: 0 },
+        strokeWidth: 2,
+    }), "");
+});
+
+test("constrained SVG text emits shared outline attributes when enabled", () => {
+    const svgFragment = renderConstrainedSvgText({
+        id: "outlined-title",
+        text: "CPU",
+        xCoordinate: 42,
+        yCoordinate: 30,
+        maxWidth: 120,
+        fontSize: 20,
+        fill: "#fff",
+        fontFamily: "Inter",
+        fontWeight: 850,
+        outline: { color: "#000000", strength: 0.5 },
+    });
+
+    assert.match(svgFragment, /stroke="#000000"/);
+    assert.match(svgFragment, /stroke-opacity="0\.50"/);
+    assert.match(svgFragment, /stroke-width="1\.90"/);
+    assert.match(svgFragment, /stroke-linejoin="round"/);
+    assert.match(svgFragment, /paint-order="stroke fill"/);
+});
+
+test("SVG outline geometry helpers resolve strength-based widths", () => {
+    const outline: RenderOutlineTokens = { color: "#000000", strength: 0.5 };
+
+    assert.equal(isSvgOutlineEnabled(undefined), false);
+    assert.equal(isSvgOutlineEnabled({ color: "#000000", strength: 0 }), false);
+    assert.equal(isSvgOutlineEnabled(outline), true);
+    assert.equal(resolveSvgTextOutlineStrokeWidth(20, outline), 1.9);
+    assert.equal(resolveSvgShapeOutlineExtraWidth(10, outline), 4.4);
+    assert.equal(resolveSvgShapeOutlineStrokeWidth(10, outline), 14.4);
+    assert.equal(resolveSvgFilledShapeOutlinePadding(10, outline), 2.2);
+    assert.equal(resolveSvgShapeOutlineExtraWidth(10, undefined), 0);
+});
+
+test("SVG shape outline attribute helper emits stroke backing attributes", () => {
+    const attributes = formatSvgShapeOutlineStrokeAttributes({
+        outline: { color: "#000000", strength: 0.5 },
+        strokeWidth: 14.4,
+        lineCap: "round",
+        lineJoin: "round",
+    });
+
+    assert.equal(
+        attributes,
+        " stroke=\"#000000\" stroke-opacity=\"0.50\" stroke-width=\"14.40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"",
+    );
+    assert.equal(formatSvgShapeOutlineStrokeAttributes({ outline: undefined, strokeWidth: 10 }), "");
 });
 
 test("SVG text fitting applies width scale before the guard ratio", () => {

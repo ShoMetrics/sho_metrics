@@ -69,6 +69,17 @@ test("text metric renders a pure text layout without a ring", () => {
     assert.doesNotMatch(svgFragment, /Arc Gauge: track/);
 });
 
+test("text metric forwards outline tokens to text helpers", () => {
+    const svgFragment = renderCenteredTextMetric(buildWidgetData(), {
+        ...DEFAULT_TEXT_METRIC_CONFIG,
+        textOutline: { color: "#000000", strength: 0.85 },
+    }, keySize);
+
+    assert.match(svgFragment, /stroke="#000000"/);
+    assert.match(svgFragment, /stroke-opacity="0\.85"/);
+    assert.match(svgFragment, /paint-order="stroke fill"/);
+});
+
 test("text metric uses a horizontal touch strip layout for wide keys", () => {
     const svgFragment = renderCenteredTextMetric({
         ...buildWidgetData(),
@@ -734,6 +745,34 @@ test("metric text row escapes values and clamps non-finite coordinates", () => {
     assert.match(svgFragment, /x="0" y="0"/);
     assert.match(svgFragment, /&lt;N\/A&gt;/);
     assert.match(svgFragment, /MB\/s &amp;/);
+});
+
+test("metric text row emits shared outline attributes when enabled", () => {
+    const svgFragment = renderMetricTextRow({
+        id: "metric-outlined-value",
+        layout: {
+            xCoordinate: 16,
+            yCoordinate: 61,
+            width: 120,
+        },
+        value: {
+            text: "42",
+            baseFontSize: 24,
+            textStyle: DEFAULT_RENDER_TEXT_STYLES.value,
+            fill: "white",
+        },
+        unit: {
+            text: "%",
+            baseFontSize: 14,
+            textStyle: DEFAULT_RENDER_TEXT_STYLES.unit,
+            fill: "#aaa",
+        },
+        outline: { color: "#000000", strength: 0.85 },
+    });
+
+    assert.match(svgFragment, /stroke="#000000"/);
+    assert.match(svgFragment, /stroke-opacity="0\.85"/);
+    assert.match(svgFragment, /paint-order="stroke fill"/);
 });
 
 test("metric text row shrinks long values and units into the row width", () => {

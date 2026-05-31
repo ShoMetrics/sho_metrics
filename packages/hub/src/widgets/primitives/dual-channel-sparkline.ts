@@ -1,5 +1,9 @@
 import type { DualChannelWidgetData, KeySize, SparklineScale } from "../../view-rendering/widget-data";
 import {
+    DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS,
+    type RenderOutlineTokens,
+} from "../../view-rendering/render-appearance";
+import {
     buildSvgFilterAttributes,
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     type RenderThemeEffectTokens,
@@ -42,6 +46,7 @@ export interface DualChannelSparklineConfig extends WidgetBaseConfig {
     paints: DualChannelSparklinePaints;
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
+    textOutline?: RenderOutlineTokens;
 }
 
 // Dual-channel sparklines draw directly on the theme background, so they intentionally omit surface/divider paints.
@@ -80,6 +85,7 @@ export const DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG: DualChannelSparklineConfig =
     },
     textStyles: DEFAULT_RENDER_TEXT_STYLES,
     themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
+    textOutline: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS.textOutline,
 };
 
 const CHART_PLOT_TOP_INSET = 2;
@@ -192,6 +198,7 @@ export function renderDualChannelSparkline(
             iconColor: config.paints.icon,
             textStyles: config.textStyles,
             themeEffects: config.themeEffects,
+            textOutline: config.textOutline,
         })}
         ${renderChannelRow({
             layout: resolveRowLayout(layoutPlan, chartLayout, config.chartMode, "positive"),
@@ -205,6 +212,7 @@ export function renderDualChannelSparkline(
             unitTextColor: config.paints.supportingText,
             textStyles: config.textStyles,
             themeEffects: config.themeEffects,
+            textOutline: config.textOutline,
         })}
         ${renderChannelRow({
             layout: resolveRowLayout(layoutPlan, chartLayout, config.chartMode, "negative"),
@@ -218,6 +226,7 @@ export function renderDualChannelSparkline(
             unitTextColor: config.paints.supportingText,
             textStyles: config.textStyles,
             themeEffects: config.themeEffects,
+            textOutline: config.textOutline,
         })}
         ${config.chartMode === "mirrored" ? renderMirroredBaseline(plotLayout, config.paints.baseline, config.themeEffects.subtleFilter) : ""}
         ${renderChannelAreaPath({
@@ -454,6 +463,7 @@ function renderTitle(options: {
     iconColor: string;
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
+    textOutline: RenderOutlineTokens | undefined;
 }): string {
     const titleTextStyle = options.textStyles.title;
     const titleXCoordinate = options.iconFragment
@@ -475,6 +485,7 @@ function renderTitle(options: {
             baseFontSize: options.layout.fontSize,
             textStyle: titleTextStyle,
             fill: options.textColor,
+            outline: options.textOutline,
             extraAttributes: buildSvgFilterAttributes(titleTextStyle.filter),
         })}
     `;
@@ -524,6 +535,7 @@ function renderChannelRow(options: {
     unitTextColor: string;
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
+    textOutline: RenderOutlineTokens | undefined;
 }): string {
     const valueTextStyle = options.textStyles.value;
     const unitTextStyle = options.textStyles.unit;
@@ -560,6 +572,7 @@ function renderChannelRow(options: {
                 baselineOffset: 2,
                 extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
             },
+            outline: options.textOutline,
         })}
     `;
 }

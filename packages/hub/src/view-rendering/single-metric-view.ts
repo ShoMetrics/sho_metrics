@@ -1,4 +1,8 @@
-import type { RenderPaintTokens, TextMetricVariant } from "./render-appearance";
+import type {
+    RenderPaintTokens,
+    RenderTransparentSurfaceTokens,
+    TextMetricVariant,
+} from "./render-appearance";
 import type { RenderTextStyles } from "./render-text-style";
 import type { RenderThemeEffectTokens } from "./render-svg-effects";
 import type { KeySize, WidgetData } from "./widget-data";
@@ -32,6 +36,7 @@ export interface SingleMetricBodyViewProps {
     visual: {
         renderPrimitive: SingleMetricRenderPrimitive;
         paints: RenderPaintTokens;
+        transparentSurface: RenderTransparentSurfaceTokens;
         textStyles: RenderTextStyles;
         themeEffects: RenderThemeEffectTokens;
         textVariant: TextMetricVariant;
@@ -71,6 +76,7 @@ function renderSingleCircularMetric(options: SingleMetricBodyViewProps): string 
         iconColor: options.visual.paints.icon,
         textStyles: options.visual.textStyles,
         themeEffects: options.visual.themeEffects,
+        textOutline: options.visual.transparentSurface.textOutline,
         circleVariant: options.circleVariant,
         centerIconFragment: options.centerIcon,
         footerIconFragment: options.footerIcon,
@@ -88,6 +94,7 @@ function renderSingleTextMetric(options: SingleMetricBodyViewProps): string {
         secondaryTextColor: options.visual.paints.mutedText,
         textStyles: options.visual.textStyles,
         themeEffects: options.visual.themeEffects,
+        textOutline: options.visual.transparentSurface.textOutline,
     };
 
     if (options.visual.textVariant === "title-card") {
@@ -116,6 +123,7 @@ function renderSingleBarMetric(options: SingleMetricBodyViewProps): string {
         },
         textStyles: options.visual.textStyles,
         themeEffects: options.visual.themeEffects,
+        textOutline: options.visual.transparentSurface.textOutline,
         topIconFragment: options.topIcon ?? options.centerIcon,
     }, options.renderSize);
 }
@@ -140,6 +148,7 @@ function renderSingleSparklineMetric(options: SingleMetricBodyViewProps): string
         },
         textStyles: options.visual.textStyles,
         themeEffects: options.visual.themeEffects,
+        textOutline: options.visual.transparentSurface.textOutline,
         topIconFragment: options.topIcon ?? options.centerIcon,
     }, options.renderSize);
 }

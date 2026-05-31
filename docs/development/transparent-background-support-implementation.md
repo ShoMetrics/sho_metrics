@@ -48,8 +48,8 @@ Respect these boundaries:
 - Render appearance resolves those settings into numeric drawing tokens.
 - Low-level SVG primitives must not know product intent such as "transparent background support is enabled." They receive concrete drawing instructions:
   - background opacity as `0..1`
-  - text outline opacity and width as concrete values
-  - shape outline opacity and width as concrete values
+  - text outline color and strength as renderer tokens; SVG helpers derive width locally
+  - shape outline color and strength as renderer tokens; SVG helpers derive backing width locally
 - Theme styles keep owning theme-specific background/chrome drawing.
 - Do not add a separate background rendering module between existing theme rendering and `setImage`. Integrate opacity into the existing frame/theme rendering path.
 
@@ -924,7 +924,7 @@ Add or update these tests:
   - Sparse overrides merge transparent surface values without replacing paint.
 
 - Render appearance tests:
-  - Disabled feature resolves `backgroundOpacity: 1` and outline opacity/strength `0`.
+  - Disabled feature resolves `backgroundOpacity: 1` and outline strength `0`.
   - Enabled Flat with defaults resolves `backgroundOpacity: 0`, text outline `0.85`, shape outline `0.85`.
   - Enabled non-Flat defaults resolve `backgroundOpacity: 0.5`.
 
@@ -961,7 +961,8 @@ After implementation:
 1. Render current Flat / Default with transparent support disabled on pure black. It must match today's output.
 2. Enable Flat / Default transparent support with defaults on pure black. The visual result should be close enough that black outlines/backing are not perceptible against black.
 3. Enable Flat / Default transparent support over `SummitEverest.jpg`. Text and metric shapes must remain readable for circle, progress bar, and sparkline views.
-4. Enable each non-Flat theme with defaults over `SummitEverest.jpg`. Confirm background opacity affects only theme-owned surface/chrome layers and does not fade foreground metrics.
-5. Enable Pixel Window and lower background opacity. Confirm window chrome fades while metric body opacity remains unchanged. Confirm Pixel Window title/chrome text is not outlined.
+4. With text outline enabled, check clipped text edges in title-card, long value/unit rows, gauge labels, and end-anchored wide layouts. Black outline must not look visibly flattened at the clip boundary.
+5. Enable each non-Flat theme with defaults over `SummitEverest.jpg`. Confirm background opacity affects only theme-owned surface/chrome layers and does not fade foreground metrics.
+6. Enable Pixel Window and lower background opacity. Confirm window chrome fades while metric body opacity remains unchanged. Confirm Pixel Window title/chrome text is not outlined.
 
 Do not change default-on behavior based on these checks in the same implementation. Record the result separately for a later product decision.
