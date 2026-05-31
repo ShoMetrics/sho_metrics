@@ -11,6 +11,7 @@ import type {
     ResolvedMetricMultiColorPaintSettings,
     ResolvedMultiColorSet,
     ResolvedTerminalPaintSettings,
+    ResolvedTransparentSurfaceSettings,
 } from "./resolved-settings";
 
 export type MetricColorChannel = keyof ResolvedMetricMultiColorChannelColors;
@@ -33,23 +34,41 @@ export interface ResolvedAppearanceThemeSettingsOverride {
     readonly cupertinoGlass?: ResolvedCupertinoGlassThemeSettingsOverride | undefined;
     readonly colorFilled?: ResolvedColorFilledThemeSettingsOverride | undefined;
     readonly terminal?: ResolvedTerminalThemeSettingsOverride | undefined;
+    readonly pixelWindow?: ResolvedPixelWindowThemeSettingsOverride | undefined;
 }
 
 export interface ResolvedFlatThemeSettingsOverride {
     readonly paint?: ResolvedMetricPaintSettingsOverride | undefined;
+    // TODO(Step 4): Review after widget Transparent Surface PI lands. Keep only if widget previews patch
+    // per-theme transparent surface through appearance overrides; otherwise remove these override fields.
+    readonly transparentSurface?: ResolvedTransparentSurfaceSettingsOverride | undefined;
 }
 
 export interface ResolvedCupertinoGlassThemeSettingsOverride {
     readonly paint?: ResolvedMetricPaintSettingsOverride | undefined;
+    readonly transparentSurface?: ResolvedTransparentSurfaceSettingsOverride | undefined;
 }
 
 export interface ResolvedColorFilledThemeSettingsOverride {
     readonly paint?: ResolvedColorFilledPaintSettingsOverride | undefined;
+    readonly transparentSurface?: ResolvedTransparentSurfaceSettingsOverride | undefined;
 }
 
 export interface ResolvedTerminalThemeSettingsOverride {
     readonly variant?: TerminalThemeVariant | undefined;
     readonly paint?: ResolvedTerminalPaintSettingsOverride | undefined;
+    readonly transparentSurface?: ResolvedTransparentSurfaceSettingsOverride | undefined;
+}
+
+export interface ResolvedPixelWindowThemeSettingsOverride {
+    readonly transparentSurface?: ResolvedTransparentSurfaceSettingsOverride | undefined;
+}
+
+export interface ResolvedTransparentSurfaceSettingsOverride {
+    readonly enabled?: boolean | undefined;
+    readonly backgroundOpacityPercent?: ResolvedTransparentSurfaceSettings["backgroundOpacityPercent"] | undefined;
+    readonly textOutlinePercent?: ResolvedTransparentSurfaceSettings["textOutlinePercent"] | undefined;
+    readonly shapeOutlinePercent?: ResolvedTransparentSurfaceSettings["shapeOutlinePercent"] | undefined;
 }
 
 export interface ResolvedTerminalPaintSettingsOverride {
@@ -144,6 +163,10 @@ export function mergeResolvedAppearanceSettings(
                 ...settings.theme.flat,
                 ...override.theme?.flat,
                 paint: mergeMetricPaintSettings(settings.theme.flat.paint, override.theme?.flat?.paint),
+                transparentSurface: {
+                    ...settings.theme.flat.transparentSurface,
+                    ...override.theme?.flat?.transparentSurface,
+                },
             },
             cupertinoGlass: {
                 ...settings.theme.cupertinoGlass,
@@ -152,6 +175,10 @@ export function mergeResolvedAppearanceSettings(
                     settings.theme.cupertinoGlass.paint,
                     override.theme?.cupertinoGlass?.paint,
                 ),
+                transparentSurface: {
+                    ...settings.theme.cupertinoGlass.transparentSurface,
+                    ...override.theme?.cupertinoGlass?.transparentSurface,
+                },
             },
             colorFilled: {
                 ...settings.theme.colorFilled,
@@ -160,6 +187,10 @@ export function mergeResolvedAppearanceSettings(
                     settings.theme.colorFilled.paint,
                     override.theme?.colorFilled?.paint,
                 ),
+                transparentSurface: {
+                    ...settings.theme.colorFilled.transparentSurface,
+                    ...override.theme?.colorFilled?.transparentSurface,
+                },
             },
             terminal: {
                 ...settings.theme.terminal,
@@ -167,6 +198,18 @@ export function mergeResolvedAppearanceSettings(
                 paint: {
                     ...settings.theme.terminal.paint,
                     ...override.theme?.terminal?.paint,
+                },
+                transparentSurface: {
+                    ...settings.theme.terminal.transparentSurface,
+                    ...override.theme?.terminal?.transparentSurface,
+                },
+            },
+            pixelWindow: {
+                ...settings.theme.pixelWindow,
+                ...override.theme?.pixelWindow,
+                transparentSurface: {
+                    ...settings.theme.pixelWindow.transparentSurface,
+                    ...override.theme?.pixelWindow?.transparentSurface,
                 },
             },
         },

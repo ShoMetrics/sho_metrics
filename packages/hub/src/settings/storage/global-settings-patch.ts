@@ -13,11 +13,13 @@ import {
     GlobalMetricPaintSettingsSchema,
     GlobalSolidPaintSettingsSchema,
     GlobalThemeOverrideSchema,
+    GlobalTransparentSurfaceOverrideSchema,
     GlobalViewOverrideSchema,
     MultiColorSetSchema,
     NetworkDisplaySettingsSchema,
     TerminalPaintSettingsSchema,
     TerminalThemeSettingsSchema,
+    TransparentSurfaceSettingsSchema,
     type AppearanceThemeSettings as StoredAppearanceThemeSettings,
     type ColorFilledPaintSettings as StoredColorFilledPaintSettings,
     type GlobalDefaults as StoredGlobalDefaults,
@@ -33,11 +35,12 @@ import type {
     ResolvedGlobalMultiColorPaintSettings,
     ResolvedGlobalSolidPaintSettings,
     ScaleMode,
+    TerminalThemeVariant,
 } from "../resolved-settings";
 import type {
     ResolvedColorFilledPaintSettingsOverride,
     ResolvedTerminalPaintSettingsOverride,
-    ResolvedTerminalThemeSettingsOverride,
+    ResolvedTransparentSurfaceSettingsOverride,
     ResolvedMultiColorSetOverride,
 } from "../appearance-overrides";
 import {
@@ -56,14 +59,17 @@ import {
     storedMetricViewByResolved,
     storedThemeByResolved,
 } from "./enum-maps";
+import { applyStoredTransparentSurfacePatch } from "./transparent-surface-patch";
 
 export interface StoredGlobalSettingsPatch {
     readonly globalOverrideEnabled?: boolean | undefined;
     readonly viewOverrideEnabled?: boolean | undefined;
     readonly themeOverrideEnabled?: boolean | undefined;
+    readonly transparentSurfaceOverrideEnabled?: boolean | undefined;
     readonly paintOverrideEnabled?: boolean | undefined;
     readonly view?: Partial<ResolvedAppearanceViewSettings> | undefined;
     readonly theme?: GlobalThemeSettingsPatch | undefined;
+    readonly transparentSurface?: ResolvedTransparentSurfaceSettingsOverride | undefined;
     readonly paint?: GlobalPaintSettingsPatch | undefined;
     readonly network?: Partial<{
         readonly scaleMode: ScaleMode;
@@ -80,7 +86,11 @@ export interface StoredGlobalSettingsPatch {
 
 interface GlobalThemeSettingsPatch {
     readonly selectedTheme?: MetricTheme | undefined;
-    readonly terminal?: ResolvedTerminalThemeSettingsOverride | undefined;
+    readonly terminal?: GlobalTerminalThemeSettingsPatch | undefined;
+}
+
+interface GlobalTerminalThemeSettingsPatch {
+    readonly variant?: TerminalThemeVariant | undefined;
 }
 
 interface GlobalPaintSettingsPatch {
@@ -122,6 +132,7 @@ export function writeStoredGlobalSettingsPatch(
 
     applyViewOverridePatch(settings.overrides, patch);
     applyThemeOverridePatch(settings.overrides, patch);
+    applyTransparentSurfaceOverridePatch(settings.overrides, patch);
     applyPaintOverridePatch(settings.overrides, patch);
     applyNetworkDefaultsPatch(settings.defaults, patch.network);
     applyDiskThroughputDefaultsPatch(settings.defaults, patch.diskThroughput);
@@ -190,6 +201,28 @@ function applyThemeSettingsPatch(
     if (patch.terminal?.variant !== undefined) {
         theme.terminal ??= create(TerminalThemeSettingsSchema);
         theme.terminal.variant = storedTerminalThemeVariantByResolved[patch.terminal.variant];
+    }
+}
+
+function applyTransparentSurfaceOverridePatch(
+    overrides: StoredGlobalOverrides,
+    patch: StoredGlobalSettingsPatch,
+): void {
+    if (patch.transparentSurfaceOverrideEnabled === undefined && patch.transparentSurface === undefined) {
+        return;
+    }
+
+    const transparentSurfaceOverride = overrides.transparentSurface ??= create(GlobalTransparentSurfaceOverrideSchema);
+
+    if (patch.transparentSurfaceOverrideEnabled !== undefined) {
+        transparentSurfaceOverride.enabled = patch.transparentSurfaceOverrideEnabled;
+    }
+
+    if (patch.transparentSurface !== undefined) {
+        applyStoredTransparentSurfacePatch(
+            transparentSurfaceOverride.transparentSurface ??= create(TransparentSurfaceSettingsSchema),
+            patch.transparentSurface,
+        );
     }
 }
 

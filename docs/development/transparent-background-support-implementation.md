@@ -4,7 +4,7 @@ This document is the implementation contract for transparent background support.
 
 ## Goal
 
-Add per-theme transparent surface controls:
+Add transparent surface controls:
 
 - Enable transparent surface support.
 - Control theme-owned background opacity.
@@ -26,8 +26,8 @@ Implement these exact decisions:
   - `backgroundOpacityPercent: 50`
   - `textOutlinePercent: 85`
   - `shapeOutlinePercent: 85`
-- Store settings per theme.
-- Global theme override supports overriding these settings.
+- Widget settings store transparent surface settings per theme.
+- Global override stores one transparent surface override independent of theme. This is intentionally different from widget settings: global transparent surface expresses cross-widget readability for the user's background, while widget settings remember theme-specific tuning.
 - Pixel Window supports the same setting group, defaults disabled, and uses background opacity for the window chrome/background layer. Pixel Window metric body text/shape outlines use the same renderer token path as other themes. Pixel Window chrome text and window-control glyphs are theme chrome and are not outlined.
 - The Property Inspector exposes one toggle and three sliders:
   - `Transparent background`
@@ -92,7 +92,8 @@ Work:
 - Add `pixelWindow` to resolved theme settings.
 - Add sparse override types and merge logic for every theme.
 - Add widget patch writing for every theme.
-- Add global theme override patch writing for every theme.
+- Add global transparent surface override patch writing as one global setting, independent of global theme override.
+- Ensure global theme override preserves widget-level per-theme `transparentSurface`; only the independent global transparent surface override may replace those values.
 - Use a local storage-specific `resolveStoredPercent` helper, not renderer/SVG helpers.
 
 Why this step stands alone:
@@ -464,7 +465,9 @@ Call it for every theme in `applyAppearanceThemePatch`.
 
 Edit [global-settings-patch.ts](../../packages/hub/src/settings/storage/global-settings-patch.ts).
 
-Extend `GlobalThemeSettingsPatch` with per-theme transparent surface patches. `applyThemeSettingsPatch` must call the same transparent patch helper for every theme. This makes global theme override capable of overriding transparent surface settings.
+Add `transparentSurfaceOverrideEnabled?: boolean` and `transparentSurface?: ResolvedTransparentSurfaceSettingsOverride` to `StoredGlobalSettingsPatch`.
+
+`applyTransparentSurfaceOverridePatch` must write one `GlobalTransparentSurfaceOverride.transparentSurface` value by calling the same storage transparent patch helper. Do not write global transparent surface values into `GlobalThemeOverride.theme.*`; global transparent surface is a single cross-widget override and must not force global theme override on.
 
 ## Render Tokens
 
@@ -842,7 +845,7 @@ Patch the active selected theme only:
 - selected `terminal` patches `appearance.theme.terminal.transparentSurface`
 - selected `pixel-window` patches `appearance.theme.pixelWindow.transparentSurface`
 
-Add the same controls to the global Theme Override section in [GlobalSettingsTab.tsx](../../packages/hub/src/property-inspector/panels/GlobalSettingsTab.tsx). They must patch the selected theme inside the global theme override.
+Add the same controls as a global Transparent Surface override section in [GlobalSettingsTab.tsx](../../packages/hub/src/property-inspector/panels/GlobalSettingsTab.tsx). They must patch `transparentSurfaceOverrideEnabled` and `transparentSurface`; they must not patch a selected theme inside the global theme override.
 
 When `Transparent background` is off, keep sliders visible and enabled. This lets the user stage values before enabling the feature.
 
@@ -860,10 +863,10 @@ These alternatives were considered and rejected:
   - Why considered: it appears to solve transparency with one value.
   - Rejected because it fades metric text and shapes, making the widget less readable.
 
-- One global transparent-background setting:
-  - Benefit: fewer stored fields and simpler UI.
-  - Why considered: all themes expose the same controls.
-  - Rejected because theme backgrounds have different roles. Flat background can disappear with little visual change; Pixel Window and Color Filled backgrounds are part of the theme identity.
+- Global per-theme transparent-background storage:
+  - Benefit: can preserve separate global values for each theme.
+  - Why considered: widget-level transparent surface is stored per theme.
+  - Rejected because global transparent surface expresses one cross-widget readability override for the user's external background. Storing one value also lets users apply global transparency without forcing global theme override.
 
 - New background module between frame rendering and `setImage`:
   - Benefit: isolates the new feature.
@@ -916,7 +919,8 @@ Add or update these tests:
   - Pixel Window patch creates `pixel_window.transparent_surface`.
 
 - Global settings patch tests:
-  - Global theme override can write transparent surface values for every theme.
+  - Global transparent surface override writes one `transparent_surface` value.
+  - Global transparent surface override applies without replacing widget theme.
 
 - Appearance merge tests:
   - Sparse overrides merge transparent surface values without replacing paint.
@@ -940,7 +944,7 @@ Add or update these tests:
 - PI tests:
   - Widget Appearance theme section renders toggle and three sliders.
   - Changing controls patches the active selected theme.
-  - Global Theme Override renders the same controls and patches the override theme.
+  - Global Transparent Surface override renders the same controls and patches the global transparent surface override.
 
 Run from `packages/hub`:
 

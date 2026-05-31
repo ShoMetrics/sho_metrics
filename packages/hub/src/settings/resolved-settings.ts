@@ -312,6 +312,7 @@ export interface ResolvedGlobalSettings {
     readonly globalOverrideEnabled: boolean;
     readonly viewOverride: ResolvedGlobalViewOverride | undefined;
     readonly themeOverride: ResolvedGlobalThemeOverride | undefined;
+    readonly transparentSurfaceOverride: ResolvedGlobalTransparentSurfaceOverride | undefined;
     readonly paintOverride: ResolvedGlobalPaintOverride | undefined;
     readonly sourceProfiles: readonly ResolvedMetricSourceProfile[];
     readonly defaultSourceProfileId: string | undefined;
@@ -331,6 +332,10 @@ export interface ResolvedGlobalViewOverride {
 
 export interface ResolvedGlobalThemeOverride {
     readonly theme: ResolvedAppearanceThemeSettings;
+}
+
+export interface ResolvedGlobalTransparentSurfaceOverride {
+    readonly transparentSurface: ResolvedTransparentSurfaceSettings;
 }
 
 export interface ResolvedGlobalPaintOverride {
