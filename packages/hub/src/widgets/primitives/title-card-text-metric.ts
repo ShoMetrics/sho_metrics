@@ -2,7 +2,12 @@ import type { DualChannelWidgetData, KeySize, WidgetData } from "../../view-rend
 import { resolveColorForThresholdValue } from "../../view-rendering/color-resolver";
 import { buildSvgFilterAttributes } from "../../view-rendering/render-svg-effects";
 import { JAPANESE_SERIF_RENDER_FONT_FAMILY } from "../../view-rendering/render-text-style";
-import { escapeSvgText, renderConstrainedSvgText, resolveSvgTextFit } from "../../view-rendering/svg-utils";
+import {
+    escapeSvgText,
+    isSvgOutlineEnabled,
+    renderConstrainedSvgText,
+    resolveSvgTextFit,
+} from "../../view-rendering/svg-utils";
 import type { TextMetricConfig } from "./text-metric";
 
 export interface TitleCardSingleMetricContent {
@@ -218,6 +223,7 @@ function renderSquareTitleCardTextMetric(
             fontWeight: 900,
             fill: config.valueTextColor,
             textAnchor: "start",
+            outline: config.textOutline,
             extraAttributes: [
                 titleCardScaleTransformAttribute(
                     layout.codeX,
@@ -225,7 +231,7 @@ function renderSquareTitleCardTextMetric(
                     1,
                     0.84,
                 ),
-                ...buildTitleCardStrokeAttributes(config.valueTextColor, 0.35),
+                ...buildTitleCardStrokeAttributes(config.valueTextColor, 0.35, config.textOutline),
                 ...buildSvgFilterAttributes(config.textStyles.title.filter),
             ],
         })}
@@ -235,6 +241,7 @@ function renderSquareTitleCardTextMetric(
             layout: layout.caption,
             fill: config.valueTextColor,
             filter: config.textStyles.title.filter,
+            outline: config.textOutline,
         })}
         ${renderConstrainedSvgText({
             id: "title-card-value",
@@ -247,9 +254,10 @@ function renderSquareTitleCardTextMetric(
             fontWeight: 900,
             fill: valueTextColor,
             textAnchor: "end",
+            outline: config.textOutline,
             extraAttributes: [
                 "font-variant-numeric=\"tabular-nums\"",
-                ...buildTitleCardStrokeAttributes(valueTextColor, 0.7),
+                ...buildTitleCardStrokeAttributes(valueTextColor, 0.7, config.textOutline),
                 ...buildSvgFilterAttributes(config.textStyles.value.filter),
             ],
             fitOptions: resolveTitleCardSingleValueTextFitOptions(valueText),
@@ -264,6 +272,7 @@ function renderSquareTitleCardTextMetric(
             fill: config.unitTextColor,
             filter: config.textStyles.unit.filter,
             textAnchor: "start",
+            outline: config.textOutline,
         })}
     `;
 }
@@ -302,6 +311,7 @@ function renderWideTitleCardTextMetric(
             layout: TITLE_CARD_WIDE_CAPTION_COLUMN_LAYOUT,
             fill: config.valueTextColor,
             filter: config.textStyles.title.filter,
+            outline: config.textOutline,
         })}
         ${renderTitleCardCodeLetters({
             idPrefix: "title-card-code",
@@ -312,6 +322,7 @@ function renderWideTitleCardTextMetric(
             fontSizes: TITLE_CARD_WIDE_LAYOUT.codeFontSizes,
             fill: config.valueTextColor,
             filter: config.textStyles.smallLabel.filter,
+            outline: config.textOutline,
         })}
         ${renderConstrainedSvgText({
             id: "title-card-value",
@@ -324,9 +335,10 @@ function renderWideTitleCardTextMetric(
             fontWeight: 900,
             fill: valueTextColor,
             textAnchor: "end",
+            outline: config.textOutline,
             extraAttributes: [
                 "font-variant-numeric=\"tabular-nums\"",
-                ...buildTitleCardStrokeAttributes(valueTextColor, 0.7),
+                ...buildTitleCardStrokeAttributes(valueTextColor, 0.7, config.textOutline),
                 ...buildSvgFilterAttributes(config.textStyles.value.filter),
             ],
             fitOptions: resolveTitleCardSingleValueTextFitOptions(valueText),
@@ -341,6 +353,7 @@ function renderWideTitleCardTextMetric(
             fill: config.unitTextColor,
             filter: config.textStyles.unit.filter,
             textAnchor: "start",
+            outline: config.textOutline,
         })}
     `;
 }
@@ -378,6 +391,7 @@ function renderSquareTitleCardDualTextMetric(
             fontWeight: 900,
             fill: config.valueTextColor,
             textAnchor: "start",
+            outline: config.textOutline,
             extraAttributes: buildSvgFilterAttributes(config.textStyles.title.filter),
         })}
         ${renderTitleCardCaptionColumn({
@@ -386,6 +400,7 @@ function renderSquareTitleCardDualTextMetric(
             layout: layout.caption,
             fill: config.valueTextColor,
             filter: config.textStyles.title.filter,
+            outline: config.textOutline,
         })}
         ${renderTitleCardDualRow({
             rowId: "title-card-positive",
@@ -442,6 +457,7 @@ function renderWideTitleCardDualTextMetric(
             layout: TITLE_CARD_WIDE_CAPTION_COLUMN_LAYOUT,
             fill: config.valueTextColor,
             filter: config.textStyles.title.filter,
+            outline: config.textOutline,
         })}
         ${renderTitleCardCodeLetters({
             idPrefix: "title-card-dual-code",
@@ -452,6 +468,7 @@ function renderWideTitleCardDualTextMetric(
             fontSizes: TITLE_CARD_DUAL_WIDE_LAYOUT.codeFontSizes,
             fill: config.valueTextColor,
             filter: config.textStyles.smallLabel.filter,
+            outline: config.textOutline,
         })}
         ${renderTitleCardDualRow({
             rowId: "title-card-positive",
@@ -556,6 +573,7 @@ function renderTitleCardCaptionColumn(options: {
     layout: TitleCardCaptionColumnLayout;
     fill: string;
     filter: string | undefined;
+    outline: TextMetricConfig["textOutline"];
 }): string {
     return options.characters.map((character, characterIndex) => {
         const fallbackYCoordinate = options.layout.yCoordinates[options.layout.yCoordinates.length - 1] ?? 0;
@@ -572,6 +590,7 @@ function renderTitleCardCaptionColumn(options: {
             fontWeight: 900,
             fill: options.fill,
             textAnchor: "start",
+            outline: options.outline,
             extraAttributes: [
                 titleCardScaleTransformAttribute(
                     options.layout.xCoordinate,
@@ -579,7 +598,7 @@ function renderTitleCardCaptionColumn(options: {
                     options.layout.xScale,
                     options.layout.yScale,
                 ),
-                ...buildTitleCardStrokeAttributes(options.fill, options.layout.strokeWidth),
+                ...buildTitleCardStrokeAttributes(options.fill, options.layout.strokeWidth, options.outline),
                 ...buildSvgFilterAttributes(options.filter),
             ],
             clipHeight: options.layout.fontSize * options.layout.yScale * 1.35,
@@ -603,6 +622,7 @@ function renderTitleCardCodeLetters(options: {
     fontSizes: readonly number[];
     fill: string;
     filter: string | undefined;
+    outline: TextMetricConfig["textOutline"];
 }): string {
     return Array.from(options.codeText).slice(0, 3).map((letter, letterIndex) => {
         return renderConstrainedSvgText({
@@ -616,8 +636,9 @@ function renderTitleCardCodeLetters(options: {
             fontWeight: 900,
             fill: options.fill,
             textAnchor: "start",
+            outline: options.outline,
             extraAttributes: [
-                ...buildTitleCardStrokeAttributes(options.fill, 0.25),
+                ...buildTitleCardStrokeAttributes(options.fill, 0.25, options.outline),
                 ...buildSvgFilterAttributes(options.filter),
             ],
             fitOptions: { minimumFontScale: 0.55, widthGuardRatio: 1 },
@@ -710,6 +731,7 @@ function renderTitleCardUnitText(options: {
     fill: string;
     filter: string | undefined;
     textAnchor: "start" | "end";
+    outline: TextMetricConfig["textOutline"];
 }): string {
     if (options.unitText.length === 0) {
         return "";
@@ -726,9 +748,10 @@ function renderTitleCardUnitText(options: {
         fontWeight: 900,
         fill: options.fill,
         textAnchor: options.textAnchor,
+        outline: options.outline,
         clipHeight: options.fontSize * 1.75,
         extraAttributes: [
-            ...buildTitleCardStrokeAttributes(options.fill, 0.35),
+            ...buildTitleCardStrokeAttributes(options.fill, 0.35, options.outline),
             ...buildSvgFilterAttributes(options.filter),
         ],
         fitOptions: TITLE_CARD_UNIT_TEXT_FIT_OPTIONS,
@@ -755,6 +778,7 @@ function renderTitleCardDualRow(options: {
             fontWeight: 900,
             fill: options.config.labelTextColor,
             textAnchor: "start",
+            outline: options.config.textOutline,
             extraAttributes: buildSvgFilterAttributes(options.config.textStyles.smallLabel.filter),
         })}
         ${renderConstrainedSvgText({
@@ -768,6 +792,7 @@ function renderTitleCardDualRow(options: {
             fontWeight: 900,
             fill: options.content.fill,
             textAnchor: "end",
+            outline: options.config.textOutline,
             extraAttributes: [
                 "font-variant-numeric=\"tabular-nums\"",
                 ...buildSvgFilterAttributes(options.config.textStyles.value.filter),
@@ -784,6 +809,7 @@ function renderTitleCardDualRow(options: {
             fill: options.config.unitTextColor,
             filter: options.config.textStyles.unit.filter,
             textAnchor: options.layout.unitTextAnchor ?? "start",
+            outline: options.config.textOutline,
         })}
     `;
 }
@@ -803,7 +829,17 @@ function isCompactTitleCardSingleValueText(valueText: string): boolean {
     return Array.from(valueText).length >= 3;
 }
 
-function buildTitleCardStrokeAttributes(fill: string, strokeWidth: number): readonly string[] {
+function buildTitleCardStrokeAttributes(
+    fill: string,
+    strokeWidth: number,
+    outline: TextMetricConfig["textOutline"],
+): readonly string[] {
+    // Title-card's legacy same-color stroke is a weight tweak; transparent
+    // outlines replace it so one text element never emits competing stroke attrs.
+    if (isSvgOutlineEnabled(outline)) {
+        return [];
+    }
+
     return [`stroke="${escapeSvgText(fill)}"`, `stroke-width="${formatSvgNumber(strokeWidth)}"`, "paint-order=\"stroke fill\""];
 }
 

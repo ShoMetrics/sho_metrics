@@ -1,4 +1,8 @@
 import type { WidgetData, KeySize } from "../../view-rendering/widget-data";
+import {
+    DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS,
+    type RenderOutlineTokens,
+} from "../../view-rendering/render-appearance";
 import { resolveColorForThresholdValue } from "../../view-rendering/color-resolver";
 import {
     buildSvgFilterAttributes,
@@ -52,6 +56,7 @@ export interface ProgressCircleConfig extends WidgetBaseConfig {
     iconColor: string;
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
+    textOutline?: RenderOutlineTokens;
     innerTextScale: number;
     circleVariant: CircleVariant;
     gaugeRangeBlendProgress: number;
@@ -74,6 +79,7 @@ export const DEFAULT_PROGRESS_CIRCLE_CONFIG: ProgressCircleConfig = {
     iconColor: "rgba(255,255,255,0.88)",
     textStyles: DEFAULT_RENDER_TEXT_STYLES,
     themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
+    textOutline: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS.textOutline,
     gradientHeadAdjustmentPercent: -42,
     innerTextScale: 1,
     circleVariant: "full-ring",
@@ -554,6 +560,7 @@ function renderGaugeValueRow(options: {
             textStyle: valueTextStyle,
             fill: options.config.valueTextColor,
             textAnchor: "middle",
+            outline: options.config.textOutline,
             extraAttributes: [
                 "font-variant-numeric=\"tabular-nums\"",
                 ...buildSvgFilterAttributes(valueTextStyle.filter),
@@ -586,6 +593,7 @@ function renderGaugeValueRow(options: {
             textStyle: valueTextStyle,
             fill: options.config.valueTextColor,
             textAnchor: valuePlacement.textAnchor,
+            outline: options.config.textOutline,
             extraAttributes: [
                 "font-variant-numeric=\"tabular-nums\"",
                 ...buildSvgFilterAttributes(valueTextStyle.filter),
@@ -601,6 +609,7 @@ function renderGaugeValueRow(options: {
             textStyle: unitTextStyle,
             fill: options.config.unitTextColor,
             textAnchor: "start",
+            outline: options.config.textOutline,
             extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
         })}
     `;
@@ -719,6 +728,7 @@ function renderGaugeBottomLabel(options: {
             textStyle: labelTextStyle,
             fill: options.config.labelTextColor,
             textAnchor: "middle",
+            outline: options.config.textOutline,
             extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
         ${renderGaugeInlineIcon({
@@ -763,6 +773,7 @@ function renderCenterValue(options: {
             textStyle: labelTextStyle,
             fill: options.config.labelTextColor,
             textAnchor: "middle",
+            outline: options.config.textOutline,
             extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
         ${renderMetricTextRow({
@@ -793,6 +804,7 @@ function renderCenterValue(options: {
             fitOptions: options.unitText.length > 1
                 ? { minimumFontScale: 0.42, widthGuardRatio: 1.45 }
                 : undefined,
+            outline: options.config.textOutline,
         })}
         ${renderCenterIcon(
             options.footerIconFragment,

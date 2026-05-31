@@ -1,4 +1,8 @@
 import type { WidgetData, KeySize } from "../../view-rendering/widget-data";
+import {
+    DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS,
+    type RenderOutlineTokens,
+} from "../../view-rendering/render-appearance";
 import { resolveColorForThresholdValue } from "../../view-rendering/color-resolver";
 import {
     buildSvgFilterAttributes,
@@ -23,6 +27,7 @@ export interface ProgressBarConfig extends WidgetBaseConfig {
     paints: ProgressBarPaints;
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
+    textOutline?: RenderOutlineTokens;
     topIconFragment?: string;
 }
 
@@ -53,6 +58,7 @@ export const DEFAULT_PROGRESS_BAR_CONFIG: ProgressBarConfig = {
     },
     textStyles: DEFAULT_RENDER_TEXT_STYLES,
     themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
+    textOutline: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS.textOutline,
     gradientHeadAdjustmentPercent: -15,
 };
 
@@ -232,6 +238,7 @@ function renderSingleBar(
             iconColor: config.paints.icon,
             textStyles: config.textStyles,
             themeEffects: config.themeEffects,
+            textOutline: config.textOutline,
         })}
         ${data.barValueIconFragment ? renderSingleValueIcon({
             iconFragment: data.barValueIconFragment,
@@ -249,6 +256,7 @@ function renderSingleBar(
             unitTextColor: config.paints.supportingText,
             textStyles: config.textStyles,
             themeEffects: config.themeEffects,
+            textOutline: config.textOutline,
         })}
         ${renderTrack(layoutPlan.singleBar, config.paints.track, config.themeEffects.subtleFilter)}
         ${renderFill(layoutPlan.singleBar, fillWidth, fillPaint, config.themeEffects.metricFilter)}
@@ -259,6 +267,7 @@ function renderSingleBar(
             textColor: config.paints.mutedText,
             textStyles: config.textStyles,
             themeEffects: config.themeEffects,
+            textOutline: config.textOutline,
         })}
     `;
 }
@@ -315,6 +324,7 @@ function renderChannelBars(
             iconColor: config.paints.icon,
             textStyles: config.textStyles,
             themeEffects: config.themeEffects,
+            textOutline: config.textOutline,
         })}
         ${channels.slice(0, 2).map((channel, channelIndex) => {
             const channelLayout = buildChannelLayout({
@@ -346,6 +356,7 @@ function renderChannelBars(
                     unitTextColor: config.paints.supportingText,
                     textStyles: config.textStyles,
                     themeEffects: config.themeEffects,
+                    textOutline: config.textOutline,
                 })}
                 ${renderTrack(channelLayout.bar, config.paints.track, config.themeEffects.subtleFilter)}
                 ${renderFill(channelLayout.bar, fillWidth, fillPaint, config.themeEffects.metricFilter)}
@@ -424,6 +435,7 @@ function renderTitle(options: {
     iconColor: string;
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
+    textOutline: RenderOutlineTokens | undefined;
 }): string {
     const titleTextStyle = options.textStyles.title;
     const titleXCoordinate = options.iconFragment
@@ -445,6 +457,7 @@ function renderTitle(options: {
             baseFontSize: options.layout.fontSize,
             textStyle: titleTextStyle,
             fill: options.textColor,
+            outline: options.textOutline,
             extraAttributes: buildSvgFilterAttributes(titleTextStyle.filter),
         })}
     `;
@@ -459,6 +472,7 @@ function renderValueWithUnit(options: {
     unitTextColor: string;
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
+    textOutline: RenderOutlineTokens | undefined;
 }): string {
     const valueTextStyle = options.textStyles.value;
     const unitTextStyle = options.textStyles.unit;
@@ -488,6 +502,7 @@ function renderValueWithUnit(options: {
             baselineOffset: 2,
             extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
         },
+        outline: options.textOutline,
     });
 }
 
@@ -498,6 +513,7 @@ function renderSecondaryText(options: {
     textColor: string;
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
+    textOutline: RenderOutlineTokens | undefined;
 }): string {
     if (!options.text) {
         return "";
@@ -513,6 +529,7 @@ function renderSecondaryText(options: {
         baseFontSize: options.layout.fontSize,
         textStyle,
         fill: options.textColor,
+        outline: options.textOutline,
         extraAttributes: buildSvgFilterAttributes(textStyle.filter),
     });
 }

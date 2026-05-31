@@ -1,7 +1,9 @@
 import {
     clamp,
     escapeSvgText,
+    formatSvgTextOutlineAttributes,
     formatSvgTextFitAttributes,
+    resolveSvgTextOutlineStrokeWidth,
     resolveSvgTextFit,
     sanitizeSvgId,
     type SvgTextAnchor,
@@ -11,12 +13,14 @@ import {
     resolveRenderTextStyleFontSize,
     type RenderTextStyle,
 } from "../../view-rendering/render-text-style";
+import type { RenderOutlineTokens } from "../../view-rendering/render-appearance";
 
 interface MetricTextRowOptions {
     readonly id: string;
     readonly layout: MetricTextRowLayout;
     readonly value: MetricTextSegment;
     readonly unit: MetricTextUnitSegment;
+    readonly outline?: RenderOutlineTokens;
     readonly fitOptions?: SvgTextFitOptions;
 }
 
@@ -114,8 +118,17 @@ export function renderMetricTextRow(options: MetricTextRowOptions): string {
                 fill="${escapeSvgText(options.unit.fill)}"${unitLetterSpacingAttribute}${unitAttributes}>${escapeSvgText(options.unit.text)}</tspan>`
         : "";
     const textFitAttributes = formatSvgTextFitAttributes(textFit);
+    const textOutlineStrokeWidth = options.outline === undefined
+        ? 0
+        : resolveSvgTextOutlineStrokeWidth(valueFontSize, options.outline);
+    const outlineAttributes = formatSvgTextOutlineAttributes({
+        outline: options.outline,
+        strokeWidth: textOutlineStrokeWidth,
+        lineJoin: "round",
+    });
+    // Keep outline inside the row clip; callers own extra edge room for enabled outlines.
     const textElement = `<text x="${formatSvgNumber(options.layout.xCoordinate)}" y="${formatSvgNumber(yCoordinate)}"
-                text-anchor="${textAnchor}" dominant-baseline="middle"${textFitAttributes}><tspan
+                text-anchor="${textAnchor}" dominant-baseline="middle"${textFitAttributes}${outlineAttributes}><tspan
                     font-family="${escapeSvgText(options.value.textStyle.fontFamily)}" font-size="${formatSvgNumber(valueFontSize)}"
                     font-weight="${escapeSvgText(String(options.value.textStyle.fontWeight))}"
                     fill="${escapeSvgText(options.value.fill)}"${valueLetterSpacingAttribute}${valueAttributes}>${escapeSvgText(options.value.text)}</tspan>${unitTspan}</text>`;

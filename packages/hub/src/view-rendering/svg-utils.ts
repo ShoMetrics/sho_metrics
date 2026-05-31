@@ -7,6 +7,7 @@ import {
     resolveRenderTextStyleFontSize,
     type RenderTextStyle,
 } from "./render-text-style";
+import type { RenderOutlineTokens } from "./render-appearance";
 
 export { adjustHexColorBrightness };
 
@@ -41,6 +42,8 @@ export interface ConstrainedSvgTextOptions {
     clipHeight?: number;
     clipHeightEm?: number;
     letterSpacingEm?: number;
+    /** Drawn inside the existing clip path; callers enabling outline must leave enough edge room. */
+    outline?: RenderOutlineTokens;
     extraAttributes?: readonly string[];
     fitOptions?: SvgTextFitOptions;
 }
@@ -56,6 +59,7 @@ export interface StyledSvgTextOptions {
     textStyle: RenderTextStyle;
     textAnchor?: SvgTextAnchor;
     dominantBaseline?: "middle" | "auto";
+    outline?: RenderOutlineTokens;
     extraAttributes?: readonly string[];
     fitOptions?: SvgTextFitOptions;
 }
@@ -80,6 +84,10 @@ export interface SvgTextFitResult {
 
 const MINIMUM_TEXT_WIDTH = 1;
 const DEFAULT_TEXT_WIDTH_GUARD_RATIO = 1.08;
+const TEXT_OUTLINE_STROKE_WIDTH_FLOOR_RATIO = 0.055;
+const TEXT_OUTLINE_STROKE_WIDTH_SCALE_RATIO = 0.08;
+const SHAPE_OUTLINE_EXTRA_WIDTH_FLOOR_RATIO = 0.18;
+const SHAPE_OUTLINE_EXTRA_WIDTH_SCALE_RATIO = 0.52;
 
 export function renderStyledSvgText(options: StyledSvgTextOptions): string {
     const fontSize = resolveRenderTextStyleFontSize(options.baseFontSize, options.textStyle);
@@ -99,6 +107,7 @@ export function renderStyledSvgText(options: StyledSvgTextOptions): string {
         dominantBaseline: options.dominantBaseline,
         clipHeightEm: options.textStyle.clipHeightEm,
         letterSpacingEm: options.textStyle.letterSpacingEm,
+        outline: options.outline,
         extraAttributes: options.extraAttributes,
         fitOptions: {
             ...options.fitOptions,
@@ -140,6 +149,14 @@ export function renderConstrainedSvgText(options: ConstrainedSvgTextOptions): st
         : "";
     const textFitAttributes = formatSvgTextFitAttributes(textFit);
     const letterSpacingAttribute = formatSvgLetterSpacingAttribute(letterSpacing);
+    const textOutlineStrokeWidth = options.outline === undefined
+        ? 0
+        : resolveSvgTextOutlineStrokeWidth(fontSize, options.outline);
+    const outlineAttributes = formatSvgTextOutlineAttributes({
+        outline: options.outline,
+        strokeWidth: textOutlineStrokeWidth,
+        lineJoin: "round",
+    });
 
     return `
         <defs>
@@ -153,9 +170,90 @@ export function renderConstrainedSvgText(options: ConstrainedSvgTextOptions): st
                 text-anchor="${textAnchor}" dominant-baseline="${dominantBaseline}"
                 font-family="${escapeSvgText(options.fontFamily)}"
                 font-size="${formatSvgNumber(fontSize)}" font-weight="${escapeSvgText(String(options.fontWeight))}"
-                fill="${escapeSvgText(options.fill)}"${letterSpacingAttribute}${textFitAttributes}${extraAttributes}>${escapeSvgText(options.text)}</text>
+                fill="${escapeSvgText(options.fill)}"${letterSpacingAttribute}${textFitAttributes}${outlineAttributes}${extraAttributes}>${escapeSvgText(options.text)}</text>
         </g>
     `;
+}
+
+export function resolveSvgTextOutlineStrokeWidth(fontSize: number, outline: RenderOutlineTokens): number {
+    return fontSize * (
+        TEXT_OUTLINE_STROKE_WIDTH_FLOOR_RATIO
+        + TEXT_OUTLINE_STROKE_WIDTH_SCALE_RATIO * outline.strength
+    );
+}
+
+export function formatSvgTextOutlineAttributes(options: {
+    outline: RenderOutlineTokens | undefined;
+    strokeWidth: number;
+    lineJoin?: "round";
+}): string {
+    const outline = options.outline;
+
+    if (!isSvgOutlineEnabled(outline)) {
+        return "";
+    }
+
+    const lineJoinAttribute = options.lineJoin ? ` stroke-linejoin="${options.lineJoin}"` : "";
+
+    return ` stroke="${escapeSvgText(outline.color)}"` +
+        ` stroke-opacity="${formatSvgNumber(outline.strength)}"` +
+        ` stroke-width="${formatSvgNumber(options.strokeWidth)}"` +
+        `${lineJoinAttribute} paint-order="stroke fill"`;
+}
+
+export function isSvgOutlineEnabled(outline: RenderOutlineTokens | undefined): outline is RenderOutlineTokens {
+    return outline !== undefined && outline.strength > 0;
+}
+
+// Shape primitives use these helpers to draw backing SVG elements before the
+// foreground shape. They do not encode product-level transparent-surface intent.
+export function resolveSvgShapeOutlineStrokeWidth(
+    foregroundStrokeWidth: number,
+    outline: RenderOutlineTokens | undefined,
+): number {
+    return foregroundStrokeWidth + resolveSvgShapeOutlineExtraWidth(foregroundStrokeWidth, outline);
+}
+
+export function resolveSvgShapeOutlineExtraWidth(
+    referenceSize: number,
+    outline: RenderOutlineTokens | undefined,
+): number {
+    if (!isSvgOutlineEnabled(outline)) {
+        return 0;
+    }
+
+    return referenceSize * (
+        SHAPE_OUTLINE_EXTRA_WIDTH_FLOOR_RATIO
+        + SHAPE_OUTLINE_EXTRA_WIDTH_SCALE_RATIO * outline.strength
+    );
+}
+
+export function resolveSvgFilledShapeOutlinePadding(
+    referenceSize: number,
+    outline: RenderOutlineTokens | undefined,
+): number {
+    return resolveSvgShapeOutlineExtraWidth(referenceSize, outline) / 2;
+}
+
+export function formatSvgShapeOutlineStrokeAttributes(options: {
+    outline: RenderOutlineTokens | undefined;
+    strokeWidth: number;
+    lineCap?: "butt" | "round" | "square";
+    lineJoin?: "round";
+}): string {
+    const outline = options.outline;
+
+    if (!isSvgOutlineEnabled(outline)) {
+        return "";
+    }
+
+    const lineCapAttribute = options.lineCap ? ` stroke-linecap="${options.lineCap}"` : "";
+    const lineJoinAttribute = options.lineJoin ? ` stroke-linejoin="${options.lineJoin}"` : "";
+
+    return ` stroke="${escapeSvgText(outline.color)}"` +
+        ` stroke-opacity="${formatSvgNumber(outline.strength)}"` +
+        ` stroke-width="${formatSvgNumber(options.strokeWidth)}"` +
+        ` fill="none"${lineCapAttribute}${lineJoinAttribute}`;
 }
 
 /**

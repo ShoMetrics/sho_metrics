@@ -1,4 +1,8 @@
 import type { WidgetData, KeySize, SparklineScale } from "../../view-rendering/widget-data";
+import {
+    DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS,
+    type RenderOutlineTokens,
+} from "../../view-rendering/render-appearance";
 import { resolveColorForThresholdValue } from "../../view-rendering/color-resolver";
 import {
     buildSvgFilterAttributes,
@@ -40,6 +44,7 @@ export interface SparklineConfig extends WidgetBaseConfig {
     paints: SparklinePaints;
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
+    textOutline?: RenderOutlineTokens;
     topIconFragment?: string;
 }
 
@@ -83,6 +88,7 @@ export const DEFAULT_SPARKLINE_CONFIG: SparklineConfig = {
     },
     textStyles: DEFAULT_RENDER_TEXT_STYLES,
     themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
+    textOutline: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS.textOutline,
     gradientHeadAdjustmentPercent: 28,
 };
 
@@ -172,6 +178,7 @@ export const sparkline: Widget<SparklineConfig> = {
             paints: config.paints,
             textStyles: config.textStyles,
             themeEffects: config.themeEffects,
+            textOutline: config.textOutline,
         });
         const latestPoint = points[points.length - 1];
         const latestPointGlowSvg = config.gridLineVisibility !== "none" && config.gridLineType === "vertical" && latestPoint
@@ -216,6 +223,7 @@ export const sparkline: Widget<SparklineConfig> = {
                 iconColor: config.paints.icon,
                 textStyles: config.textStyles,
                 themeEffects: config.themeEffects,
+                textOutline: config.textOutline,
             })}
             ${renderMetricTextRow({
                 id: "sparkline-current-value",
@@ -243,6 +251,7 @@ export const sparkline: Widget<SparklineConfig> = {
                     baselineOffset: 2,
                     extraAttributes: buildSvgFilterAttributes(config.textStyles.unit.filter),
                 },
+                outline: config.textOutline,
             })}
             <path d="${areaPath}" fill="${areaPaint}"${areaOpacity} ${buildSvgFilterAttributes(config.themeEffects.subtleFilter).join(" ")} />
             ${gridLineSvg}
@@ -327,6 +336,7 @@ function renderTitle(options: {
     iconColor: string;
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
+    textOutline: RenderOutlineTokens | undefined;
 }): string {
     const titleTextStyle = options.textStyles.title;
     const titleXCoordinate = options.iconFragment
@@ -348,6 +358,7 @@ function renderTitle(options: {
             baseFontSize: options.layout.fontSize,
             textStyle: titleTextStyle,
             fill: options.textColor,
+            outline: options.textOutline,
             extraAttributes: buildSvgFilterAttributes(titleTextStyle.filter),
         })}
     `;
@@ -465,6 +476,7 @@ function renderGridLines(options: {
     paints: SparklinePaints;
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
+    textOutline: RenderOutlineTokens | undefined;
 }): string {
     if (options.gridLineVisibility === "none") {
         return "";
@@ -491,6 +503,7 @@ function renderGridLines(options: {
             paints: options.paints,
             textStyles: options.textStyles,
             themeEffects: options.themeEffects,
+            textOutline: options.textOutline,
         });
     }
 
@@ -536,6 +549,7 @@ function renderVerticalGridLines(options: {
     paints: SparklinePaints;
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
+    textOutline: RenderOutlineTokens | undefined;
 }): string {
     const smallLabelTextStyle = options.textStyles.smallLabel;
     const safeTickCount = Math.max(2, Math.round(options.timeGuideTickCount));
@@ -564,6 +578,7 @@ function renderVerticalGridLines(options: {
                 textStyle: smallLabelTextStyle,
                 fill: options.paints.mutedText,
                 textAnchor: "middle",
+                outline: options.textOutline,
                 extraAttributes: buildSvgFilterAttributes(smallLabelTextStyle.filter),
             })}
         `;

@@ -1,4 +1,8 @@
 import type { DualChannelWidgetData, KeySize } from "../../view-rendering/widget-data";
+import {
+    DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS,
+    type RenderOutlineTokens,
+} from "../../view-rendering/render-appearance";
 import type { ColorConfig } from "../../view-rendering/color-resolver";
 import {
     buildSvgFilterAttributes,
@@ -29,6 +33,7 @@ export interface DualChannelProgressCircleConfig extends WidgetBaseConfig {
     iconColor: string;
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
+    textOutline?: RenderOutlineTokens;
     centerContent: DualChannelProgressCircleCenterContent;
     circleVariant: CircleVariant;
     titleText?: string;
@@ -53,6 +58,7 @@ export const DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG: DualChannelProgressCir
     iconColor: "rgba(255,255,255,0.88)",
     textStyles: DEFAULT_RENDER_TEXT_STYLES,
     themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
+    textOutline: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS.textOutline,
     centerContent: "value",
     circleVariant: "full-ring",
     titleText: "",
@@ -599,6 +605,7 @@ function renderGaugeBottomLabel(options: {
         textStyle: labelTextStyle,
         fill: options.config.unitTextColor,
         textAnchor: "middle",
+        outline: options.config.textOutline,
         extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
     });
 }
@@ -654,6 +661,7 @@ function renderGaugeChannelValueRow(options: {
                 textStyle: valueTextStyle,
                 fill: options.config.valueTextColor,
                 textAnchor: "start",
+                outline: options.config.textOutline,
                 extraAttributes: [
                     "font-variant-numeric=\"tabular-nums\"",
                     ...buildSvgFilterAttributes(valueTextStyle.filter),
@@ -682,6 +690,7 @@ function renderGaugeChannelValueRow(options: {
             textStyle: valueTextStyle,
             fill: options.config.valueTextColor,
             textAnchor: "end",
+            outline: options.config.textOutline,
             extraAttributes: [
                 "font-variant-numeric=\"tabular-nums\"",
                 ...buildSvgFilterAttributes(valueTextStyle.filter),
@@ -698,6 +707,7 @@ function renderGaugeChannelValueRow(options: {
             textStyle: unitTextStyle,
             fill: options.config.unitTextColor,
             textAnchor: "start",
+            outline: options.config.textOutline,
             extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
             fitOptions: { minimumFontScale: 0.62 },
         })}
@@ -820,6 +830,7 @@ function renderChannelValueBlock(options: {
             baseFontSize: ARC_LAYOUT.valueFontSize,
             textStyle: valueTextStyle,
             fill: options.config.valueTextColor,
+            outline: options.config.textOutline,
             extraAttributes: [
                 "font-variant-numeric=\"tabular-nums\"",
                 ...buildSvgFilterAttributes(valueTextStyle.filter),
@@ -838,6 +849,7 @@ function renderChannelValueBlock(options: {
             baseFontSize: ARC_LAYOUT.valueFontSize,
             textStyle: valueTextStyle,
             fill: options.config.valueTextColor,
+            outline: options.config.textOutline,
             extraAttributes: [
                 "font-variant-numeric=\"tabular-nums\"",
                 ...buildSvgFilterAttributes(valueTextStyle.filter),
@@ -853,6 +865,7 @@ function renderChannelValueBlock(options: {
             baseFontSize: ARC_LAYOUT.unitFontSize,
             textStyle: unitTextStyle,
             fill: options.config.unitTextColor,
+            outline: options.config.textOutline,
             extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
             fitOptions: { minimumFontScale: 0.70 },
         })}

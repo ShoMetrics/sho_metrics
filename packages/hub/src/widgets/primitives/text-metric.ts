@@ -1,4 +1,8 @@
 import type { DualChannelWidgetData, KeySize, WidgetData } from "../../view-rendering/widget-data";
+import {
+    DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS,
+    type RenderOutlineTokens,
+} from "../../view-rendering/render-appearance";
 import { resolveColorForThresholdValue } from "../../view-rendering/color-resolver";
 import {
     buildSvgFilterAttributes,
@@ -21,6 +25,7 @@ export interface TextMetricConfig extends WidgetBaseConfig {
     secondaryTextColor: string;
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
+    textOutline?: RenderOutlineTokens;
     positiveColor?: string;
     negativeColor?: string;
 }
@@ -44,6 +49,7 @@ export const DEFAULT_TEXT_METRIC_CONFIG: TextMetricConfig = {
     secondaryTextColor: "rgba(255,255,255,0.52)",
     textStyles: DEFAULT_RENDER_TEXT_STYLES,
     themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
+    textOutline: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS.textOutline,
 };
 
 const SINGLE_TEXT_SQUARE_LAYOUT = {
@@ -152,6 +158,7 @@ function renderSquareCenteredTextMetric(data: WidgetData, config: TextMetricConf
             textStyle: labelTextStyle,
             fill: config.labelTextColor,
             textAnchor: "middle",
+            outline: config.textOutline,
             extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
         ${renderStyledSvgText({
@@ -164,6 +171,7 @@ function renderSquareCenteredTextMetric(data: WidgetData, config: TextMetricConf
             textStyle: valueTextStyle,
             fill: valueTextColor,
             textAnchor: "middle",
+            outline: config.textOutline,
             extraAttributes: [
                 "font-variant-numeric=\"tabular-nums\"",
                 ...buildSvgFilterAttributes(valueTextStyle.filter),
@@ -207,6 +215,7 @@ function renderWideCenteredTextMetric(data: WidgetData, config: TextMetricConfig
             textStyle: labelTextStyle,
             fill: config.labelTextColor,
             textAnchor: "start",
+            outline: config.textOutline,
             extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
         ${renderStyledSvgText({
@@ -219,6 +228,7 @@ function renderWideCenteredTextMetric(data: WidgetData, config: TextMetricConfig
             textStyle: valueTextStyle,
             fill: valueTextColor,
             textAnchor: "middle",
+            outline: config.textOutline,
             extraAttributes: [
                 "font-variant-numeric=\"tabular-nums\"",
                 ...buildSvgFilterAttributes(valueTextStyle.filter),
@@ -258,6 +268,7 @@ function renderSquareCenteredDualTextMetric(
             textStyle: labelTextStyle,
             fill: config.labelTextColor,
             textAnchor: "middle",
+            outline: config.textOutline,
             extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
         ${renderDualTextRow({
@@ -320,6 +331,7 @@ function renderWideCenteredDualTextMetric(
             textStyle: labelTextStyle,
             fill: config.labelTextColor,
             textAnchor: "start",
+            outline: config.textOutline,
             extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
         ${renderDualTextRow({
@@ -398,6 +410,7 @@ function renderDualTextRow(options: {
             textStyle: labelTextStyle,
             fill: options.config.labelTextColor,
             textAnchor: "start",
+            outline: options.config.textOutline,
             extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
         ${renderStyledSvgText({
@@ -410,6 +423,7 @@ function renderDualTextRow(options: {
             textStyle: valueTextStyle,
             fill: options.valueFill,
             textAnchor: "end",
+            outline: options.config.textOutline,
             extraAttributes: [
                 "font-variant-numeric=\"tabular-nums\"",
                 ...buildSvgFilterAttributes(valueTextStyle.filter),
@@ -426,6 +440,7 @@ function renderDualTextRow(options: {
             textStyle: unitTextStyle,
             fill: options.config.unitTextColor,
             textAnchor: "end",
+            outline: options.config.textOutline,
             extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
             fitOptions: UNIT_TEXT_FIT_OPTIONS,
         })}
@@ -457,6 +472,7 @@ function renderUnitText(options: {
         textStyle: options.textStyle,
         fill: options.config.unitTextColor,
         textAnchor: options.textAnchor,
+        outline: options.config.textOutline,
         extraAttributes: buildSvgFilterAttributes(options.textStyle.filter),
         fitOptions: UNIT_TEXT_FIT_OPTIONS,
     });

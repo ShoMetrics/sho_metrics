@@ -1,5 +1,9 @@
 import type { ColorConfig } from "./color-resolver";
-import type { RenderPaintTokens, TextMetricVariant } from "./render-appearance";
+import type {
+    RenderPaintTokens,
+    RenderTransparentSurfaceTokens,
+    TextMetricVariant,
+} from "./render-appearance";
 import type { RenderTextStyles } from "./render-text-style";
 import type { RenderThemeEffectTokens } from "./render-svg-effects";
 import type { DualChannelWidgetData, KeySize } from "./widget-data";
@@ -42,6 +46,7 @@ export interface DualMetricBodyViewProps {
     data: DualChannelWidgetData;
     visual: {
         paints: RenderPaintTokens;
+        transparentSurface: RenderTransparentSurfaceTokens;
         textStyles: RenderTextStyles;
         themeEffects: RenderThemeEffectTokens;
         textVariant: TextMetricVariant;
@@ -81,6 +86,7 @@ function renderDualCircularMetric(options: DualMetricBodyViewProps): string {
         iconColor: options.visual.paints.icon,
         textStyles: options.visual.textStyles,
         themeEffects: options.visual.themeEffects,
+        textOutline: options.visual.transparentSurface.textOutline,
         positiveColor: options.positive.color,
         negativeColor: options.negative.color,
         positiveColorConfig: options.positive.colorConfig,
@@ -105,6 +111,7 @@ function renderDualTextMetricView(options: DualMetricBodyViewProps): string {
         secondaryTextColor: options.visual.paints.mutedText,
         textStyles: options.visual.textStyles,
         themeEffects: options.visual.themeEffects,
+        textOutline: options.visual.transparentSurface.textOutline,
         positiveColor: options.positive.color,
         negativeColor: options.negative.color,
     };
@@ -156,5 +163,6 @@ function renderDualSparklineMetric(options: DualMetricBodyViewProps): string {
         },
         textStyles: options.visual.textStyles,
         themeEffects: options.visual.themeEffects,
+        textOutline: options.visual.transparentSurface.textOutline,
     }, options.renderSize);
 }
