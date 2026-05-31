@@ -28,6 +28,8 @@ settings.local.json
 [Dd]ebugPublic/
 [Rr]elease/
 [Rr]eleases/
+!docs/release/
+!docs/release/**
 [Dd]ebug/x64/
 [Dd]ebugPublic/x64/
 [Rr]elease/x64/

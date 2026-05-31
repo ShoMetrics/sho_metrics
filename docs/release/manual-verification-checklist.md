@@ -1,0 +1,78 @@
+# Manual Release Verification Checklist
+
+Use this checklist before a production release. Record the release build details below and
+attach notes for every failed or skipped item.
+
+## Release Build
+
+- [ ] Version:
+- [ ] Commit:
+- [ ] Build artifact:
+- [ ] Tester:
+- [ ] Date:
+- [ ] Windows test machine:
+- [ ] Stream Deck device:
+
+## CI Gates
+
+- [ ] Hub CI passed: proto lint/build, lint, unit tests with coverage, PI DOM tests, build.
+- [ ] Hub visual snapshots passed without updating snapshots in the release PR.
+- [ ] Windows unit CI passed with coverage artifact uploaded.
+- [ ] Windows helper integration smoke passed with diagnostics artifact uploaded.
+- [ ] Site preview built and site smoke checks passed.
+
+## Install And Startup
+
+- [ ] Clean install succeeds on Windows 11.
+- [ ] Clean install succeeds on one additional supported Windows version, if available.
+- [ ] Stream Deck app starts with the Sho Metrics plugin loaded.
+- [ ] Property Inspector opens for every action.
+- [ ] First render appears on a physical key.
+- [ ] Settings save, close, reopen, and load the saved values.
+- [ ] Stream Deck restart keeps existing action settings.
+
+## Helper And Driver States
+
+- [ ] Helper not installed shows the expected install guidance.
+- [ ] Helper stopped shows recovery guidance without breaking rendering.
+- [ ] Helper running reports version, protocol, descriptor count, and status.
+- [ ] Helper protocol mismatch shows bounded recovery guidance.
+- [ ] Helper unavailable shows bounded recovery guidance.
+- [ ] Helper install, start, restart, and uninstall paths were exercised.
+- [ ] PawnIO not installed is reported correctly in Control Panel.
+- [ ] PawnIO not elevated or unusable is reported correctly in Control Panel.
+- [ ] PawnIO OK state is reported correctly in Control Panel.
+
+## Control Panel
+
+- [ ] Control Panel opens from the installed build.
+- [ ] Open logs action opens the expected log location.
+- [ ] Copy diagnostics includes bounded support text.
+- [ ] Diagnostics text includes helper version, protocol, descriptor count, service state, and driver state.
+- [ ] Diagnostics text does not include unbounded raw sensor dumps.
+
+## Metrics
+
+- [ ] CPU built-in widgets display meaningful values or correct unavailable notices.
+- [ ] GPU built-in widgets display meaningful values or correct unavailable notices.
+- [ ] RAM built-in widgets display meaningful values or correct unavailable notices.
+- [ ] Disk built-in widgets display meaningful values or correct unavailable notices.
+- [ ] Network built-in widgets display meaningful values or correct unavailable notices.
+- [ ] One Advanced Sensor selection survives a Stream Deck restart.
+- [ ] Pending refresh transitions to a value after helper warmup.
+- [ ] Retained values do not create misleading history spikes.
+- [ ] Built-in Node sources are used when helper-backed data is unavailable and fallback is allowed.
+- [ ] 16-32 visible keys run for several minutes without runaway CPU, memory growth, or log spam.
+
+## Non-Windows Behavior
+
+- [ ] Windows-only helper readings are hidden or blocked on macOS/non-Windows.
+- [ ] Built-in CPU, memory, disk, and network metrics still work on macOS/non-Windows where supported.
+
+## Site And Docs
+
+- [ ] Install page matches the current installer and plugin package behavior.
+- [ ] Download page points to the current approved artifacts or release location.
+- [ ] Troubleshooting page matches current logs, helper states, and recovery actions.
+- [ ] Helper FAQ accurately describes PawnIO, helper optionality, and Windows-only behavior.
+- [ ] Color Compensation tutorial matches the current Property Inspector flow.
