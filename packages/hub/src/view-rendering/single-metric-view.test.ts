@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { renderSingleMetricBodyView } from "./single-metric-view";
-import type { MetricRenderAppearance } from "./render-appearance";
+import { DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS, type MetricRenderAppearance } from "./render-appearance";
 import { DEFAULT_RENDER_THEME_EFFECT_TOKENS } from "./render-svg-effects";
 import { DEFAULT_RENDER_TEXT_STYLES } from "./render-text-style";
 import type { WidgetData } from "./widget-data";
@@ -154,6 +154,7 @@ function buildMetricRenderAppearance(): MetricRenderAppearance {
             },
         },
         themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
+        transparentSurface: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS,
         lineSmoothingPercent: 75,
         gridLineVisibility: "adaptive",
         gridLineType: "horizontal",

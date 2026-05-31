@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { MetricRenderAppearance } from "./render-appearance";
+import { DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS, type MetricRenderAppearance } from "./render-appearance";
 import { DEFAULT_RENDER_THEME_EFFECT_TOKENS } from "./render-svg-effects";
 import { DEFAULT_RENDER_TEXT_STYLES } from "./render-text-style";
 import { renderMetricNoticeBody } from "./metric-notice-body";
@@ -74,6 +74,7 @@ function buildMetricRenderAppearance(): MetricRenderAppearance {
         },
         textStyles: DEFAULT_RENDER_TEXT_STYLES,
         themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
+        transparentSurface: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS,
         lineSmoothingPercent: 75,
         gridLineVisibility: "adaptive",
         gridLineType: "horizontal",

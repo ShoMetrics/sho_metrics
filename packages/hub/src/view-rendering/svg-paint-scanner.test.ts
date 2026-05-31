@@ -3,7 +3,7 @@ import test from "node:test";
 import { resolveColorForThresholdValue } from "./color-resolver";
 import { renderDualMetricBodyView } from "./dual-metric-view";
 import { renderMetricFrame } from "./metric-frame";
-import type { MetricRenderAppearance } from "./render-appearance";
+import { DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS, type MetricRenderAppearance } from "./render-appearance";
 import { DEFAULT_RENDER_THEME_EFFECT_TOKENS } from "./render-svg-effects";
 import { DEFAULT_RENDER_TEXT_STYLES } from "./render-text-style";
 import { renderSingleMetricBodyView } from "./single-metric-view";
@@ -178,7 +178,8 @@ function renderSingleFinalSvg(options: {
     return renderMetricFrame({
         bodies: [{ svg: body, muted: false }],
         themePreset: visualSettings.themePreset,
-        paints: visualSettings.paints,
+        themePaints: visualSettings.paints,
+        themeChromeOpacity: visualSettings.transparentSurface.backgroundOpacity,
         size: WIDGET_LOGICAL_SIZE,
     });
 }
@@ -231,7 +232,8 @@ function renderDualFinalSvg(options: {
     return renderMetricFrame({
         bodies: [{ svg: body, muted: false }],
         themePreset: visualSettings.themePreset,
-        paints: visualSettings.paints,
+        themePaints: visualSettings.paints,
+        themeChromeOpacity: visualSettings.transparentSurface.backgroundOpacity,
         size: WIDGET_LOGICAL_SIZE,
     });
 }
@@ -281,6 +283,7 @@ function buildBlackWhiteRenderAppearance(options: {
         },
         textStyles: DEFAULT_RENDER_TEXT_STYLES,
         themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
+        transparentSurface: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS,
         lineSmoothingPercent: 75,
         gridLineVisibility: "adaptive",
         gridLineType: options.gridLineType ?? "horizontal",

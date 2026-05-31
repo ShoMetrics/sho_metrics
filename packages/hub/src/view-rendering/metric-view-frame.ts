@@ -136,7 +136,8 @@ export function composeMetricViewFrame(options: {
         svg: renderMetricFrame({
             bodies: body.bodies,
             themePreset: renderPlan.renderAppearance.themePreset,
-            paints: renderPlan.renderAppearance.paints,
+            themePaints: renderPlan.renderAppearance.paints,
+            themeChromeOpacity: renderPlan.renderAppearance.transparentSurface.backgroundOpacity,
             size: renderPlan.renderSize,
         }),
         renderedMetricData: body.renderedMetricData,
@@ -180,7 +181,7 @@ export function buildMetricViewRenderPlan(options: {
     const renderSize = touchStripMetricLayout?.renderSize ?? WIDGET_LOGICAL_SIZE;
     const themeBodyViewport = resolveThemeBodyViewport({
         themePreset: renderAppearance.themePreset,
-        paints: renderAppearance.paints,
+        themePaints: renderAppearance.paints,
         size: renderSize,
     });
     const bodyViewports = resolveMetricBodyViewports({

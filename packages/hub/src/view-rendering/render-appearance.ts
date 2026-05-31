@@ -27,6 +27,34 @@ export interface RenderPaintTokens {
     readonly divider: string;
 }
 
+export const DEFAULT_RENDER_OUTLINE_COLOR = "#000000";
+
+export interface RenderOutlineTokens {
+    /** V1 resolves outline color to black; do not add a PI color control without a product decision. */
+    readonly color: string;
+    /** Single 0..1 outline value from the text/shape outline slider. */
+    readonly strength: number;
+}
+
+export interface RenderTransparentSurfaceTokens {
+    /** Theme-owned background and chrome opacity. Metric body content remains opaque. */
+    readonly backgroundOpacity: number;
+    readonly textOutline: RenderOutlineTokens;
+    readonly shapeOutline: RenderOutlineTokens;
+}
+
+export const DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS: RenderTransparentSurfaceTokens = {
+    backgroundOpacity: 1,
+    textOutline: {
+        color: DEFAULT_RENDER_OUTLINE_COLOR,
+        strength: 0,
+    },
+    shapeOutline: {
+        color: DEFAULT_RENDER_OUTLINE_COLOR,
+        strength: 0,
+    },
+};
+
 export type RenderBackgroundFill =
     | {
         readonly fillKind: "solid";
@@ -50,6 +78,7 @@ export interface MetricRenderAppearance {
     readonly paints: RenderPaintTokens;
     readonly textStyles: RenderTextStyles;
     readonly themeEffects: RenderThemeEffectTokens;
+    readonly transparentSurface: RenderTransparentSurfaceTokens;
     readonly lineSmoothingPercent: number;
     readonly gridLineVisibility: SparklineGridLineVisibility;
     readonly gridLineType: SparklineGridLineType;

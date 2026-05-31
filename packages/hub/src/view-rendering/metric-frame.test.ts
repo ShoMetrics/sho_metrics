@@ -13,7 +13,8 @@ test("metric frame wraps body with the selected key size and style", () => {
     const svg = renderMetricFrame({
         bodies: [{ svg: "<g id=\"metric-body\"></g>", muted: false }],
         themePreset: "flat",
-        paints: framePaints,
+        themePaints: framePaints,
+        themeChromeOpacity: 1,
         size: { width: 144, height: 144 },
     });
 
@@ -28,7 +29,8 @@ test("metric frame applies the muted filter around the body", () => {
     const svg = renderMetricFrame({
         bodies: [{ svg: "<g id=\"metric-body\"></g>", muted: true }],
         themePreset: "flat",
-        paints: framePaints,
+        themePaints: framePaints,
+        themeChromeOpacity: 1,
         size: { width: 100, height: 100 },
     });
 
@@ -58,7 +60,8 @@ test("pixel window frame clips and scales the body viewport", () => {
             },
         ],
         themePreset: "pixel-window",
-        paints: framePaints,
+        themePaints: framePaints,
+        themeChromeOpacity: 1,
         size: { width: 144, height: 144 },
     });
 
@@ -89,7 +92,8 @@ test("muted pixel window frame keeps filtering inside the viewport placement", (
             },
         ],
         themePreset: "pixel-window",
-        paints: framePaints,
+        themePaints: framePaints,
+        themeChromeOpacity: 1,
         size: { width: 144, height: 144 },
     });
 
@@ -133,7 +137,8 @@ test("metric frame keeps viewport clip paths distinct for multiple bodies", () =
             },
         ],
         themePreset: "flat",
-        paints: framePaints,
+        themePaints: framePaints,
+        themeChromeOpacity: 1,
         size: { width: 200, height: 100 },
     });
 
@@ -156,7 +161,8 @@ test("metric frame namespaces local body ids when composing multiple bodies", ()
             },
         ],
         themePreset: "flat",
-        paints: framePaints,
+        themePaints: framePaints,
+        themeChromeOpacity: 1,
         size: { width: 200, height: 100 },
     });
 
@@ -170,4 +176,39 @@ test("metric frame namespaces local body ids when composing multiple bodies", ()
     assert.doesNotMatch(svg, /id="metric-gradient"/);
     assert.doesNotMatch(svg, /id="metric-path"/);
     assert.doesNotMatch(svg, /url\(#metric-gradient\)/);
+});
+
+test("metric frame applies background opacity to theme chrome without fading the body", () => {
+    const svg = renderMetricFrame({
+        bodies: [{ svg: "<g id=\"metric-body\"></g>", muted: false }],
+        themePreset: "cupertino-glass",
+        themePaints: framePaints,
+        themeChromeOpacity: 0.25,
+        size: { width: 144, height: 144 },
+    });
+    const opacityGroupMatches = svg.match(/<g opacity="0\.25">/gu) ?? [];
+    const backgroundGroupStart = svg.indexOf("<g opacity=\"0.25\">");
+    const backgroundGroupEnd = svg.indexOf("</g>", backgroundGroupStart);
+    const bodyIndex = svg.indexOf("id=\"metric-body\"");
+    const overlayGroupStart = svg.indexOf("<g opacity=\"0.25\">", bodyIndex);
+
+    assert.equal(opacityGroupMatches.length, 2);
+    assert.ok(backgroundGroupStart >= 0);
+    assert.ok(backgroundGroupEnd < bodyIndex);
+    assert.ok(overlayGroupStart > bodyIndex);
+});
+
+test("metric frame omits theme chrome at zero background opacity without removing the body", () => {
+    const svg = renderMetricFrame({
+        bodies: [{ svg: "<g id=\"metric-body\"></g>", muted: false }],
+        themePreset: "cupertino-glass",
+        themePaints: framePaints,
+        themeChromeOpacity: 0,
+        size: { width: 144, height: 144 },
+    });
+
+    assert.match(svg, /metric-body/);
+    assert.doesNotMatch(svg, /frosted background/);
+    assert.doesNotMatch(svg, /specular highlight overlay/);
+    assert.doesNotMatch(svg, /<g opacity=/);
 });

@@ -7,6 +7,7 @@ import type {
 } from "./resolved-settings";
 import { resolveRenderThemeEffects } from "./render-theme-effects-resolver";
 import { resolveRenderPaint } from "./render-paint-resolver";
+import { resolveRenderTransparentSurface } from "./render-transparent-surface-resolver";
 import { resolveRenderTextStyles } from "./render-text-style-resolver";
 
 /**
@@ -29,6 +30,7 @@ export function buildMetricRenderAppearance(
         paints: renderPaint.paintTokens,
         textStyles: resolveRenderTextStyles(settings),
         themeEffects: resolveRenderThemeEffects(settings),
+        transparentSurface: resolveRenderTransparentSurface(settings),
         lineSmoothingPercent: settings.line.lineSmoothingPercent,
         gridLineVisibility: settings.line.gridLineVisibility,
         gridLineType: settings.line.gridLineType,

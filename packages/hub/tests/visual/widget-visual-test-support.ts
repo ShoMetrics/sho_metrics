@@ -32,6 +32,7 @@ import type { DualChannelProgressCircleCenterContent } from "../../src/widgets/p
 import type { DualChannelSparklineMode } from "../../src/widgets/primitives/dual-channel-sparkline";
 import { getMetricStatusIcon } from "../../src/widgets/icons/metric-status-icons";
 
+// TODO(Step 7): Add enabled transparent-surface visual snapshots after text and shape outlines land.
 const VISUAL_TEST_INTER_FONT_FILE = path.resolve(process.cwd(), "assets", "fonts", "inter", "InterVariable.ttf");
 const VISUAL_TEST_SHARE_TECH_MONO_FONT_FILE = path.resolve(
     process.cwd(),
@@ -317,7 +318,8 @@ export function renderSingleMetricWidgetPngBuffer(testCase: SingleMetricVisualTe
             },
         ],
         themePreset: visualSettings.themePreset,
-        paints: visualSettings.paints,
+        themePaints: visualSettings.paints,
+        themeChromeOpacity: visualSettings.transparentSurface.backgroundOpacity,
         size: keySize,
     }), keySize);
 }
@@ -367,7 +369,8 @@ export function renderDualMetricWidgetPngBuffer(testCase: DualMetricVisualTestCa
             },
         ],
         themePreset: visualSettings.themePreset,
-        paints: visualSettings.paints,
+        themePaints: visualSettings.paints,
+        themeChromeOpacity: visualSettings.transparentSurface.backgroundOpacity,
         size: keySize,
     }), keySize);
 }
