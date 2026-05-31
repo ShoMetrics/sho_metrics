@@ -3,6 +3,7 @@ import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { SelectSetting } from "./SelectSetting";
+import { resolveSelectedOptionValue } from "./setting-control";
 import {
     findFirstEnabledOptionIndex,
     findLastEnabledOptionIndex,
@@ -51,6 +52,24 @@ test("custom select can render the selected option preview", () => {
     assert.match(markup, /--custom-select-preview-size:32px/);
     assert.match(markup, /--custom-select-option-height:40px/);
     assert.match(markup, /class="custom-select-preview" src="data:image\/svg\+xml,solid"/);
+});
+
+test("custom select can show a disabled current value while keeping enabled choices selectable", () => {
+    const optionList = [
+        { value: "usage", label: "Usage" },
+        { value: "temperature", label: "Temperature (not supported)", disabled: true },
+    ] as const satisfies readonly SelectOption[];
+    const markup = renderToStaticMarkup(createElement(SelectSetting, {
+        label: "Metric",
+        value: "temperature",
+        optionList,
+        onValueChange: () => undefined,
+    }));
+
+    assert.equal(resolveSelectedOptionValue({ optionList, value: "temperature" }), "temperature");
+    assert.match(markup, /role="combobox"/);
+    assert.match(markup, /Temperature \(not supported\)/);
+    assert.doesNotMatch(markup, /data-disabled="true"/);
 });
 
 test("custom select navigation skips disabled options without wrapping", () => {

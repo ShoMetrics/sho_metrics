@@ -62,6 +62,7 @@ import {
     pollWindowsNvidiaGpuTelemetry,
     reserveNodeSystemGpuPollDebugSequence,
 } from "./node-system-gpu";
+import { isNodeSystemMetricSupportedOnPlatform } from "../../source-capabilities/node-system-platform-capabilities";
 import {
     calculateNetworkRate,
     formatNetworkInterfaceOptionDebug,
@@ -227,18 +228,18 @@ export class NodeSystemSource implements MetricSource {
         const resolutions = new Map<string, SourceMetricPollingGroupResolution>();
 
         for (const metricKey of metricKeys) {
-            if (this.platform === "darwin"
-                && isGpuMetricKey(metricKey)
-                && metricKey !== GPU_USAGE_METRIC_KEY) {
+            const metricGroup = resolveNodeSystemMetricGroup(metricKey);
+            if (!metricGroup) {
+                resolutions.set(metricKey, { state: "unknown" });
+                continue;
+            }
+
+            if (!isNodeSystemMetricSupportedOnPlatform(metricKey, this.platform)) {
                 resolutions.set(metricKey, { state: "unsupported" });
                 continue;
             }
 
-            const metricGroup = resolveNodeSystemMetricGroup(metricKey);
-
-            resolutions.set(metricKey, metricGroup
-                ? { state: "owned", pollingGroupId: metricGroup }
-                : { state: "unknown" });
+            resolutions.set(metricKey, { state: "owned", pollingGroupId: metricGroup });
         }
 
         return resolutions;

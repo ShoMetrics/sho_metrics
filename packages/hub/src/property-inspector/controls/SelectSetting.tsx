@@ -68,7 +68,7 @@ export function SelectSetting<TValue extends SelectOptionValue>({
         optionList,
         value,
     });
-    const selectedOption = optionList.find((option) => option.value === selectedValue && !isOptionDisabled(option));
+    const selectedOption = optionList.find((option) => option.value === selectedValue);
     const hasEnabledOption = findFirstEnabledOptionIndex(optionList) >= 0;
     const isControlDisabled = disabled || !hasEnabledOption;
     const selectedOptionLabel = selectedOption?.label ?? "";

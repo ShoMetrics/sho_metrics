@@ -9,10 +9,12 @@ import type {
     StoredSettingsReadWarning,
 } from "../../settings/storage/codec";
 import type { ActionKind } from "../inspector/settings-types";
+import type { PropertyInspectorPlatform } from "../inspector/platform";
 import type { LoadStatus, PropertyInspectorRuntimeCacheStatus } from "../inspector/types";
 
 export interface SettingsSyncState {
     readonly actionKind: ActionKind;
+    readonly platform: PropertyInspectorPlatform;
     readonly isWindows: boolean;
     readonly rawSettings: unknown;
     readonly widgetSettingsStatus: LoadStatus;
@@ -45,6 +47,7 @@ export type SettingsSyncAction =
     | {
         readonly type: "connectionLoaded";
         readonly actionKind: ActionKind;
+        readonly platform: PropertyInspectorPlatform;
         readonly isWindows: boolean;
         readonly widgetSettingsRead: InspectorWidgetSettingsRead;
     }
@@ -88,6 +91,7 @@ export type SettingsSyncDispatch = (action: SettingsSyncAction) => void;
 
 export const initialSettingsSyncState: SettingsSyncState = {
     actionKind: "unknown",
+    platform: "other",
     isWindows: false,
     rawSettings: undefined,
     widgetSettingsStatus: "pending",
@@ -111,6 +115,7 @@ export function settingsSyncReducer(
             return {
                 ...state,
                 actionKind: action.actionKind,
+                platform: action.platform,
                 isWindows: action.isWindows,
                 rawSettings: action.widgetSettingsRead.rawSettings,
                 widgetSettingsStatus: "ready",

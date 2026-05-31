@@ -1,9 +1,23 @@
-import type { SelectOption } from "../inspector/types";
+import type { SelectOption, SelectOptionValue } from "../inspector/types";
 import type {
+    ResolvedCpuReading,
+    ResolvedGpuReading,
     ResolvedNetworkReading,
     TerminalPalettePreset,
     TerminalThemeVariant,
 } from "../../settings/resolved-settings";
+import {
+    CPU_POWER_METRIC_KEY,
+    CPU_TEMP_METRIC_KEY,
+    CPU_USAGE_METRIC_KEY,
+    GPU_POWER_METRIC_KEY,
+    GPU_TEMP_METRIC_KEY,
+    GPU_USAGE_METRIC_KEY,
+    GPU_VRAM_TOTAL_METRIC_KEY,
+    GPU_VRAM_USED_METRIC_KEY,
+} from "../../runtime/metric-keys";
+import { isBuiltInMetricSupportedOnPlatform } from "../../runtime/source-routing/metric-source-preferences";
+import type { MetricSupportPlatform } from "../../runtime/source-capabilities/metric-support-platform";
 
 export const pollingFrequencyOptionList = [
     { value: 1, label: "1s" },
@@ -109,20 +123,107 @@ export const cpuMetricKindOptionList = [
     { value: "usage", label: "Usage" },
     { value: "temperature", label: "Temperature" },
     { value: "power", label: "Power" },
-] as const satisfies readonly SelectOption[];
-
-export const nonWindowsCpuMetricKindOptionList = [
-    { value: "usage", label: "Usage" },
-] as const satisfies readonly SelectOption[];
+] as const satisfies readonly SelectOption<ResolvedCpuReading["kind"]>[];
 
 export const gpuMetricKindOptionList = [
     { value: "usage", label: "Usage" },
     { value: "temperature", label: "Temperature" },
     { value: "vram", label: "VRAM" },
     { value: "power", label: "Power" },
-] as const satisfies readonly SelectOption[];
+] as const satisfies readonly SelectOption<ResolvedGpuReading["kind"]>[];
 
 export const temperatureUnitOptionList = [
     { value: "celsius", label: "Celsius" },
     { value: "fahrenheit", label: "Fahrenheit" },
 ] as const satisfies readonly SelectOption[];
+
+/**
+ * Builds CPU metric choices that have at least one source on the target platform.
+ *
+ * When the current stored choice is unsupported, include it as a disabled
+ * option so users can see what is stored and switch away from it.
+ */
+export function buildCpuMetricKindOptionList(
+    platform: MetricSupportPlatform,
+    currentKind?: ResolvedCpuReading["kind"],
+): readonly SelectOption<ResolvedCpuReading["kind"]>[] {
+    const supportedOptions = cpuMetricKindOptionList.filter(option =>
+        isBuiltInMetricSupportedOnPlatform(resolveCpuMetricKindMetricKey(option.value), platform),
+    );
+
+    return appendUnsupportedCurrentOption(supportedOptions, cpuMetricKindOptionList, currentKind);
+}
+
+/**
+ * Builds GPU metric choices whose required metric keys are all source-supported on the target platform.
+ *
+ * When the current stored choice is unsupported, include it as a disabled
+ * option so users can see what is stored and switch away from it.
+ */
+export function buildGpuMetricKindOptionList(
+    platform: MetricSupportPlatform,
+    currentKind?: ResolvedGpuReading["kind"],
+): readonly SelectOption<ResolvedGpuReading["kind"]>[] {
+    const supportedOptions = gpuMetricKindOptionList.filter(option =>
+        resolveGpuMetricKindMetricKeys(option.value).every(metricKey =>
+            isBuiltInMetricSupportedOnPlatform(metricKey, platform),
+        ),
+    );
+
+    return appendUnsupportedCurrentOption(supportedOptions, gpuMetricKindOptionList, currentKind);
+}
+
+/** Maps a CPU PI reading choice to its stable runtime metric key. */
+export function resolveCpuMetricKindMetricKey(kind: ResolvedCpuReading["kind"]): string {
+    switch (kind) {
+        case "usage":
+            return CPU_USAGE_METRIC_KEY;
+        case "temperature":
+            return CPU_TEMP_METRIC_KEY;
+        case "power":
+            return CPU_POWER_METRIC_KEY;
+    }
+}
+
+/**
+ * Maps a GPU PI reading choice to the runtime metric keys it needs.
+ *
+ * VRAM needs both used and total values, so platform filtering must require
+ * both keys to be source-supported before showing the VRAM option.
+ */
+export function resolveGpuMetricKindMetricKeys(kind: ResolvedGpuReading["kind"]): readonly string[] {
+    switch (kind) {
+        case "usage":
+            return [GPU_USAGE_METRIC_KEY];
+        case "temperature":
+            return [GPU_TEMP_METRIC_KEY];
+        case "vram":
+            return [GPU_VRAM_USED_METRIC_KEY, GPU_VRAM_TOTAL_METRIC_KEY];
+        case "power":
+            return [GPU_POWER_METRIC_KEY];
+    }
+}
+
+function appendUnsupportedCurrentOption<TValue extends SelectOptionValue>(
+    supportedOptions: readonly SelectOption<TValue>[],
+    allOptions: readonly SelectOption<TValue>[],
+    currentValue: TValue | undefined,
+): readonly SelectOption<TValue>[] {
+    if (currentValue === undefined || supportedOptions.some(option => option.value === currentValue)) {
+        return supportedOptions;
+    }
+
+    const currentOption = allOptions.find(option => option.value === currentValue);
+    if (!currentOption) {
+        return supportedOptions;
+    }
+
+    return [
+        ...supportedOptions,
+        {
+            ...currentOption,
+            label: `${currentOption.label} (not supported)`,
+            disabled: true,
+        },
+    ];
+}

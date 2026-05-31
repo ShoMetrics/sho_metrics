@@ -4,6 +4,7 @@ import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/qu
 import { resolveStoredWidgetSettings } from "../../settings/storage/resolver";
 import type { ActionKind } from "../../shared/stream-deck-actions";
 import type { PropertyInspectorRuntimeCacheStatus, VisibilityContext } from "./types";
+import type { PropertyInspectorPlatform } from "./platform";
 
 export function buildPropertyInspectorContext(options: {
     rawSettings: unknown;
@@ -11,12 +12,14 @@ export function buildPropertyInspectorContext(options: {
     runtimeCache: WidgetRuntimeCache;
     runtimeCacheStatus: PropertyInspectorRuntimeCacheStatus;
     actionKind: ActionKind;
+    platform: PropertyInspectorPlatform;
     isWindows: boolean;
 }): VisibilityContext {
     const quickStartSettings = resolveQuickStartStoredWidgetSettings(options.rawSettings, options.actionKind);
 
     return {
         actionKind: options.actionKind,
+        platform: options.platform,
         isWindows: options.isWindows,
         runtimeCache: options.runtimeCache,
         runtimeCacheStatus: options.runtimeCacheStatus,

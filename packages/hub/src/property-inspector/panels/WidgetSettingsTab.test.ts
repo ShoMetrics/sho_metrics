@@ -26,6 +26,7 @@ import {
 import { WidgetSettingsTab } from "./WidgetSettingsTab";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
 import type { ResolvedCatalogMetricTarget } from "../../settings/resolved-settings";
+import type { PropertyInspectorPlatform } from "../inspector/platform";
 import {
     BUILT_IN_NODE_SYSTEM_SOURCE_PROFILE_ID,
     BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID,
@@ -521,6 +522,23 @@ test("non-windows CPU settings hide helper-owned metric options", () => {
     assert.doesNotMatch(markup, /Source: Helper only/);
 });
 
+test("non-windows CPU settings preserve unsupported current metric selection", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "cpu",
+        isWindows: false,
+        settings: buildWidgetSettings("cpu", {
+            cpu: { kind: "temperature" },
+        }),
+    });
+
+    assert.match(markup, /CPU Metric:/);
+    assert.match(markup, /Current CPU metric is not supported on this platform/);
+    assert.match(markup, /Temperature \(not supported\)/);
+    assert.doesNotMatch(markup, /Max Temp/);
+    assert.doesNotMatch(markup, /Source: Helper only/);
+    assert.doesNotMatch(markup, /Install ShoMetrics Helper/);
+});
+
 test("windows GPU settings panel renders source preference controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
@@ -599,8 +617,50 @@ test("non-windows GPU settings panel hides source preference controls", () => {
         isWindows: false,
     });
 
+    assert.match(markup, /GPU Metric:/);
+    assert.match(markup, /Usage/);
+    assert.doesNotMatch(markup, /Temperature/);
+    assert.doesNotMatch(markup, /VRAM/);
+    assert.doesNotMatch(markup, /Power/);
     assert.doesNotMatch(markup, /Source:/);
     assert.doesNotMatch(markup, /nvidia-smi/);
+});
+
+test("unknown non-windows platform keeps conservative metric options", () => {
+    const cpuMarkup = renderWidgetSettings({
+        actionKind: "cpu",
+        platform: "other",
+    });
+    const gpuMarkup = renderWidgetSettings({
+        actionKind: "gpu",
+        platform: "other",
+    });
+
+    assert.match(cpuMarkup, /CPU Metric:/);
+    assert.match(cpuMarkup, /Usage/);
+    assert.doesNotMatch(cpuMarkup, /Temperature/);
+    assert.doesNotMatch(cpuMarkup, /Power/);
+    assert.match(gpuMarkup, /GPU Metric:/);
+    assert.match(gpuMarkup, /Usage/);
+    assert.doesNotMatch(gpuMarkup, /Temperature/);
+    assert.doesNotMatch(gpuMarkup, /VRAM/);
+    assert.doesNotMatch(gpuMarkup, /Power/);
+});
+
+test("non-windows GPU settings preserve unsupported current metric selection", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "gpu",
+        isWindows: false,
+        settings: buildWidgetSettings("gpu", {
+            gpu: { kind: "temperature" },
+        }),
+    });
+
+    assert.match(markup, /GPU Metric:/);
+    assert.match(markup, /Current GPU metric is not supported on this platform/);
+    assert.match(markup, /Temperature \(not supported\)/);
+    assert.doesNotMatch(markup, /Max Temp/);
+    assert.doesNotMatch(markup, /Install ShoMetrics Helper/);
 });
 
 test("non-windows GPU settings panel does not show Windows helper guidance", () => {
@@ -655,6 +715,35 @@ test("catalog metric settings show catalog load state without descriptor inferen
 
     assert.match(pendingMarkup, /Loading metrics/);
     assert.match(failedMarkup, /Metrics unavailable/);
+});
+
+test("non-windows catalog metric settings show unsupported platform guidance", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "catalog",
+        isWindows: false,
+        runtimeCache: {
+            availableCatalogMetricDescriptors: [
+                buildMetricDescriptor({
+                    metricId: "lhm.sensor:/cpu/0/temperature/package",
+                    sourceSensorId: "cpu-package-temp",
+                    hardwareId: "cpu0",
+                    hardwareName: "CPU",
+                    hardwareType: "cpu",
+                    sensorName: "CPU Package",
+                    sourceSensorType: "temperature",
+                }),
+            ],
+        },
+        runtimeCacheStatus: {
+            catalogMetricDescriptorStatus: "ready",
+        },
+    });
+
+    assert.match(markup, /This sensor is not supported on this platform/);
+    assert.doesNotMatch(markup, /Type:/);
+    assert.doesNotMatch(markup, /View:/);
+    assert.doesNotMatch(markup, /Polling Frequency:/);
+    assert.doesNotMatch(markup, /Source: Helper only/);
 });
 
 test("catalog metric settings explain helper setup failures", () => {
@@ -1191,6 +1280,7 @@ test("widget text view renders text variant controls", () => {
 
 function renderWidgetSettings(options: {
     actionKind: ActionKind;
+    platform?: PropertyInspectorPlatform;
     isWindows?: boolean;
     isGlobalViewOverrideEnabled?: boolean;
     isGlobalThemeOverrideEnabled?: boolean;
@@ -1202,7 +1292,8 @@ function renderWidgetSettings(options: {
     return renderToStaticMarkup(createElement(WidgetSettingsTab, {
         context: buildVisibilityContext({
             actionKind: options.actionKind,
-            isWindows: options.isWindows,
+            platform: options.platform,
+            isWindows: options.isWindows ?? (options.platform === undefined || options.platform === "win32"),
             settings: options.settings,
             runtimeCache: options.runtimeCache,
             runtimeCacheStatus: options.runtimeCacheStatus,

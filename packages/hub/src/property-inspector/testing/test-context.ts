@@ -5,12 +5,14 @@ import {
     type WidgetRuntimeCachePatch,
 } from "../../runtime/widget-runtime-cache";
 import { buildPropertyInspectorContext } from "../inspector/context";
+import type { PropertyInspectorPlatform } from "../inspector/platform";
 import type { PropertyInspectorRuntimeCacheStatus, VisibilityContext } from "../inspector/types";
 
 export type InspectorTestSettings = unknown;
 
 export function buildVisibilityContext(options: {
     actionKind?: ActionKind;
+    platform?: PropertyInspectorPlatform;
     isWindows?: boolean;
     settings?: InspectorTestSettings;
     runtimeCache?: WidgetRuntimeCachePatch;
@@ -25,6 +27,7 @@ export function buildVisibilityContext(options: {
             catalogMetricDescriptorStatus: options.runtimeCacheStatus?.catalogMetricDescriptorStatus ?? "pending",
         },
         actionKind: options.actionKind ?? "cpu",
+        platform: options.platform ?? (options.isWindows === true ? "win32" : "darwin"),
         isWindows: options.isWindows ?? false,
     });
 }

@@ -488,7 +488,7 @@ function resolveMetricTarget(
 ): ResolvedMetricTarget {
     switch (storedMetricSelection?.target.case) {
         case "cpu":
-            return resolveCpuMetricTarget(storedMetricSelection.target.value, runtime);
+            return resolveCpuMetricTarget(storedMetricSelection.target.value);
         case "memory":
             return resolveMemoryMetricTarget(storedMetricSelection.target.value.kind);
         case "network":
@@ -500,22 +500,14 @@ function resolveMetricTarget(
         case "catalog":
             return resolveCatalogMetricTarget(storedMetricSelection.target.value);
         case undefined:
-            return resolveCpuMetricTarget(undefined, runtime);
+            return resolveCpuMetricTarget(undefined);
     }
 }
 
 function resolveCpuMetricTarget(
     storedTarget: StoredCpuMetricTarget | undefined,
-    runtime: ResolveStoredSettingsRuntimeContext | undefined,
 ): ResolvedMetricTarget {
-    const kind = runtime?.isWindows === false && (
-        storedTarget?.kind === StoredCpuMetricKind.TEMPERATURE
-        || storedTarget?.kind === StoredCpuMetricKind.POWER
-    )
-        ? StoredCpuMetricKind.USAGE
-        : storedTarget?.kind;
-
-    switch (kind) {
+    switch (storedTarget?.kind) {
         case StoredCpuMetricKind.TEMPERATURE:
             return {
                 domain: "cpu",

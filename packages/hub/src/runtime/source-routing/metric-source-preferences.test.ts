@@ -7,11 +7,19 @@ import {
 } from "../disk-metric-keys";
 import {
     CPU_BASE_FREQUENCY_METRIC_KEY,
+    CPU_METRIC_KEYS,
     CPU_MODEL_METRIC_KEY,
     CPU_POWER_METRIC_KEY,
     CPU_TEMP_METRIC_KEY,
     CPU_USAGE_METRIC_KEY,
     GPU_METRIC_KEYS,
+    GPU_MODEL_METRIC_KEY,
+    GPU_POWER_METRIC_KEY,
+    GPU_POWER_LIMIT_METRIC_KEY,
+    GPU_TEMP_METRIC_KEY,
+    GPU_USAGE_METRIC_KEY,
+    GPU_VRAM_TOTAL_METRIC_KEY,
+    GPU_VRAM_USED_METRIC_KEY,
     RAM_TOTAL_METRIC_KEY,
     RAM_USED_METRIC_KEY,
 } from "../metric-keys";
@@ -23,7 +31,9 @@ import {
 import {
     BUILT_IN_STABLE_METRIC_KEYS,
     hasExplicitLocalAutoMetricSourcePreference,
+    isBuiltInMetricSupportedOnPlatform,
     isBuiltInMetricHelperOnly,
+    localSourceSupportsMetricOnPlatform,
     resolveLocalAutoMetricSourceCandidates,
 } from "./metric-source-preferences";
 import {
@@ -94,9 +104,21 @@ test("local auto source preference uses only Windows helper for helper-owned sta
     }
 });
 
+test("local auto source preference hides helper-only metrics outside Windows", () => {
+    for (const metricKey of [CPU_TEMP_METRIC_KEY, CPU_POWER_METRIC_KEY]) {
+        assert.deepEqual(
+            resolveLocalAutoMetricSourceCandidates(metricKey, "darwin"),
+            [],
+            metricKey,
+        );
+        assert.equal(isBuiltInMetricSupportedOnPlatform(metricKey, "darwin"), false, metricKey);
+    }
+});
+
 test("helper-only metric classification is a static built-in routing fact", () => {
     assert.equal(isBuiltInMetricHelperOnly(CPU_TEMP_METRIC_KEY), true);
     assert.equal(isBuiltInMetricHelperOnly(CPU_POWER_METRIC_KEY), true);
+    assert.equal(isBuiltInMetricHelperOnly(getDiskThroughputMetricKey("read")), false);
     assert.equal(isBuiltInMetricHelperOnly(GPU_METRIC_KEYS[0]), false);
     assert.equal(isBuiltInMetricHelperOnly(CPU_USAGE_METRIC_KEY), false);
 });
@@ -121,15 +143,48 @@ test("local auto source preference uses Windows helper before node-system for st
     }
 });
 
-test("local auto source preference uses node-system outside Windows", () => {
+test("local auto source preference keeps only node-supported GPU metrics outside Windows", () => {
     assert.deepEqual(
-        resolveLocalAutoMetricSourceCandidates(GPU_METRIC_KEYS[0], "darwin"),
+        resolveLocalAutoMetricSourceCandidates(GPU_USAGE_METRIC_KEY, "darwin"),
         NODE_SYSTEM_CANDIDATES,
     );
+
+    for (const metricKey of [
+        GPU_MODEL_METRIC_KEY,
+        GPU_TEMP_METRIC_KEY,
+        GPU_VRAM_USED_METRIC_KEY,
+        GPU_VRAM_TOTAL_METRIC_KEY,
+        GPU_POWER_METRIC_KEY,
+        GPU_POWER_LIMIT_METRIC_KEY,
+    ]) {
+        assert.deepEqual(
+            resolveLocalAutoMetricSourceCandidates(metricKey, "darwin"),
+            [],
+            metricKey,
+        );
+        assert.equal(isBuiltInMetricSupportedOnPlatform(metricKey, "darwin"), false, metricKey);
+    }
+});
+
+test("local auto source preference uses node-system for supported non-Windows disk throughput", () => {
     assert.deepEqual(
         resolveLocalAutoMetricSourceCandidates(getDiskThroughputMetricKey("read"), "darwin"),
         NODE_SYSTEM_CANDIDATES,
     );
+});
+
+test("local auto source candidates always satisfy source platform support", () => {
+    for (const metricKey of BUILT_IN_STABLE_METRIC_KEYS) {
+        for (const platform of ["win32", "darwin"] as const) {
+            for (const sourceCandidate of resolveLocalAutoMetricSourceCandidates(metricKey, platform)) {
+                assert.equal(
+                    localSourceSupportsMetricOnPlatform(sourceCandidate.sourceId, metricKey, platform),
+                    true,
+                    `${metricKey} routed to ${sourceCandidate.sourceId} on ${platform}`,
+                );
+            }
+        }
+    }
 });
 
 test("local auto source preference defaults unknown metric keys to node-system", () => {
@@ -147,6 +202,33 @@ test("local auto source preference covers every known stable built-in metric key
             hasExplicitLocalAutoMetricSourcePreference(metricKey),
             true,
             metricKey,
+        );
+    }
+});
+
+test("local auto source preference covers stable metric key inventories", () => {
+    const builtInStableMetricKeySet = new Set<string>(BUILT_IN_STABLE_METRIC_KEYS);
+
+    for (const metricKey of [
+        ...CPU_METRIC_KEYS,
+        ...GPU_METRIC_KEYS,
+        RAM_USED_METRIC_KEY,
+        RAM_TOTAL_METRIC_KEY,
+    ]) {
+        assert.equal(
+            builtInStableMetricKeySet.has(metricKey),
+            true,
+            `${metricKey} must be classified in local:auto source routing`,
+        );
+    }
+});
+
+test("local auto source preference gives every stable built-in metric a Windows source", () => {
+    for (const metricKey of BUILT_IN_STABLE_METRIC_KEYS) {
+        assert.notEqual(
+            resolveLocalAutoMetricSourceCandidates(metricKey, "win32").length,
+            0,
+            `${metricKey} must not disappear from Windows local:auto routing`,
         );
     }
 });

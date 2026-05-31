@@ -1,5 +1,8 @@
 import type { ResolvedMetricSourcePolicy } from "../../settings/resolved-settings";
-import { resolveLocalAutoMetricSourceCandidates } from "./metric-source-preferences";
+import {
+    localSourceSupportsMetricOnPlatform,
+    resolveLocalAutoMetricSourceCandidates,
+} from "./metric-source-preferences";
 import {
     LOCAL_SOURCE_SCOPE_ID,
     normalizeMetricReadPlan,
@@ -139,19 +142,37 @@ function resolveBuiltInLocalSourceProfile(
             };
         case BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID:
             return {
-                kind: "static",
+                kind: "metricRouted",
                 sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
-                sourceCandidates: [{ sourceId: WINDOWS_HELPER_SOURCE_ID }],
+                resolveMetricSourceCandidates: metricKey => resolveBuiltInSourceCandidateForMetric(
+                    WINDOWS_HELPER_SOURCE_ID,
+                    metricKey,
+                    platform,
+                ),
             };
         case BUILT_IN_NODE_SYSTEM_SOURCE_PROFILE_ID:
             return {
-                kind: "static",
+                kind: "metricRouted",
                 sourceScopeId: LOCAL_SOURCE_SCOPE_ID,
-                sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
+                resolveMetricSourceCandidates: metricKey => resolveBuiltInSourceCandidateForMetric(
+                    NODE_SYSTEM_SOURCE_ID,
+                    metricKey,
+                    platform,
+                ),
             };
         default:
             return undefined;
     }
+}
+
+function resolveBuiltInSourceCandidateForMetric(
+    sourceId: string,
+    metricKey: string,
+    platform: NodeJS.Platform,
+): readonly SourceCandidate[] {
+    return localSourceSupportsMetricOnPlatform(sourceId, metricKey, platform)
+        ? [{ sourceId }]
+        : [];
 }
 
 function normalizeSourceProfileId(sourceProfileId: string | undefined): string | undefined {
