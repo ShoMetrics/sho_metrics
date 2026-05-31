@@ -15,8 +15,8 @@ defaults:
     working-directory: packages/source-windows
 
 jobs:
-  tests:
-    name: C# tests
+  unit-tests:
+    name: C# unit tests
     runs-on: windows-latest
     steps:
       - name: Check out repository
@@ -31,12 +31,42 @@ jobs:
         run: ./scripts/Test-SourceWindowsLint.ps1
 
       - name: Run tests with coverage
-        run: dotnet test ShoMetrics.Source.Windows.slnx --configuration Release --no-restore --settings SourceWindows.coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults
+        # Keep cross-process smoke out of the coverage run so unit failures and
+        # process-startup failures produce separate CI signals.
+        run: dotnet test ShoMetrics.Source.Windows.UnitTests.slnx --configuration Release --no-restore --settings SourceWindows.coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults
 
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: source-windows-coverage
+          name: source-windows-unit-coverage
           path: packages/source-windows/TestResults
+          if-no-files-found: ignore
+
+  integration-smoke:
+    name: Windows helper integration smoke
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore integration smoke
+        run: dotnet restore ShoMetrics.Source.Windows.IntegrationTests/ShoMetrics.Source.Windows.IntegrationTests.csproj
+
+      - name: Run integration smoke
+        run: dotnet test ShoMetrics.Source.Windows.IntegrationTests/ShoMetrics.Source.Windows.IntegrationTests.csproj --configuration Release --no-restore --results-directory IntegrationTestResults
+        env:
+          SHOMETRICS_SOURCE_WINDOWS_TEST_ARTIFACT_DIR: ${{ github.workspace }}/packages/source-windows/IntegrationTestResults/integration-diagnostics
+
+      - name: Upload integration diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-windows-integration-diagnostics
+          path: packages/source-windows/IntegrationTestResults
           if-no-files-found: ignore
