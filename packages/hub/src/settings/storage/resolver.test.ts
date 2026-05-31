@@ -28,6 +28,109 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.slot.appearance.theme.colorFilled.paint.solid.color, "#3b82f6");
         assert.equal(settings.widget.slot.appearance.theme.terminal.variant, "clean");
         assert.equal(settings.widget.slot.appearance.theme.terminal.paint.preset, "green");
+        assert.deepEqual(settings.widget.slot.appearance.theme.flat.transparentSurface, {
+            enabled: false,
+            backgroundOpacityPercent: 0,
+            textOutlinePercent: 85,
+            shapeOutlinePercent: 85,
+        });
+        assert.deepEqual(settings.widget.slot.appearance.theme.pixelWindow.transparentSurface, {
+            enabled: false,
+            backgroundOpacityPercent: 50,
+            textOutlinePercent: 85,
+            shapeOutlinePercent: 85,
+        });
+    });
+
+    it("resolves transparent surface settings for every theme", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    overrides: {
+                        appearance: {
+                            theme: {
+                                flat: {
+                                    transparentSurface: {
+                                        enabled: true,
+                                        backgroundOpacityPercent: 10,
+                                        textOutlinePercent: 20,
+                                        shapeOutlinePercent: 30,
+                                    },
+                                },
+                                cupertinoGlass: {
+                                    transparentSurface: {
+                                        enabled: true,
+                                        backgroundOpacityPercent: 40,
+                                        textOutlinePercent: 50,
+                                        shapeOutlinePercent: 60,
+                                    },
+                                },
+                                colorFilled: {
+                                    transparentSurface: {
+                                        enabled: true,
+                                        backgroundOpacityPercent: 70,
+                                        textOutlinePercent: 80,
+                                        shapeOutlinePercent: 90,
+                                    },
+                                },
+                                terminal: {
+                                    transparentSurface: {
+                                        enabled: true,
+                                        backgroundOpacityPercent: 15,
+                                        textOutlinePercent: 25,
+                                        shapeOutlinePercent: 35,
+                                    },
+                                },
+                                pixelWindow: {
+                                    transparentSurface: {
+                                        enabled: true,
+                                        backgroundOpacityPercent: 45,
+                                        textOutlinePercent: 55,
+                                        shapeOutlinePercent: 65,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+        });
+        const theme = settings.widget.slot.appearance.theme;
+
+        assert.deepEqual(theme.flat.transparentSurface, {
+            enabled: true,
+            backgroundOpacityPercent: 10,
+            textOutlinePercent: 20,
+            shapeOutlinePercent: 30,
+        });
+        assert.deepEqual(theme.cupertinoGlass.transparentSurface, {
+            enabled: true,
+            backgroundOpacityPercent: 40,
+            textOutlinePercent: 50,
+            shapeOutlinePercent: 60,
+        });
+        assert.deepEqual(theme.colorFilled.transparentSurface, {
+            enabled: true,
+            backgroundOpacityPercent: 70,
+            textOutlinePercent: 80,
+            shapeOutlinePercent: 90,
+        });
+        assert.deepEqual(theme.terminal.transparentSurface, {
+            enabled: true,
+            backgroundOpacityPercent: 15,
+            textOutlinePercent: 25,
+            shapeOutlinePercent: 35,
+        });
+        assert.deepEqual(theme.pixelWindow.transparentSurface, {
+            enabled: true,
+            backgroundOpacityPercent: 45,
+            textOutlinePercent: 55,
+            shapeOutlinePercent: 65,
+        });
     });
 
     it("resolves title-card as a text view-owned variant", () => {
@@ -809,6 +912,116 @@ describe("stored settings proto resolver", () => {
 
         assert.equal(settings.widget.slot.appearance.theme.selectedTheme, "pixel-window");
         assert.equal(settings.widget.slot.appearance.theme.flat.paint.colorMode, "multi-color");
+    });
+
+    it("preserves widget transparent surface when only global theme override applies", () => {
+        const storedGlobalSettings = readStoredGlobalSettings({
+            overrides: {
+                enabled: true,
+                view: {
+                    enabled: false,
+                },
+                theme: {
+                    theme: {
+                        selectedTheme: "METRIC_THEME_CUPERTINO_GLASS",
+                    },
+                },
+                paint: {
+                    enabled: false,
+                },
+                transparentSurface: {
+                    enabled: false,
+                },
+            },
+        }).settings;
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    overrides: {
+                        appearance: {
+                            theme: {
+                                selectedTheme: "METRIC_THEME_FLAT",
+                                cupertinoGlass: {
+                                    transparentSurface: {
+                                        enabled: true,
+                                        backgroundOpacityPercent: 20,
+                                        textOutlinePercent: 30,
+                                        shapeOutlinePercent: 40,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+            storedGlobalSettings,
+        });
+        const theme = settings.widget.slot.appearance.theme;
+
+        assert.equal(theme.selectedTheme, "cupertino-glass");
+        assert.deepEqual(theme.cupertinoGlass.transparentSurface, {
+            enabled: true,
+            backgroundOpacityPercent: 20,
+            textOutlinePercent: 30,
+            shapeOutlinePercent: 40,
+        });
+    });
+
+    it("applies global transparent surface override without replacing widget theme", () => {
+        const storedGlobalSettings = readStoredGlobalSettings({
+            overrides: {
+                enabled: true,
+                view: {
+                    enabled: false,
+                },
+                theme: {
+                    enabled: false,
+                },
+                paint: {
+                    enabled: false,
+                },
+                transparentSurface: {
+                    transparentSurface: {
+                        enabled: true,
+                        backgroundOpacityPercent: 35,
+                        textOutlinePercent: 45,
+                        shapeOutlinePercent: 55,
+                    },
+                },
+            },
+        }).settings;
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    overrides: {
+                        appearance: {
+                            theme: {
+                                selectedTheme: "METRIC_THEME_PIXEL_WINDOW",
+                            },
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+            storedGlobalSettings,
+        });
+        const theme = settings.widget.slot.appearance.theme;
+
+        assert.equal(theme.selectedTheme, "pixel-window");
+        assert.deepEqual(theme.pixelWindow.transparentSurface, {
+            enabled: true,
+            backgroundOpacityPercent: 35,
+            textOutlinePercent: 45,
+            shapeOutlinePercent: 55,
+        });
+        assert.deepEqual(theme.flat.transparentSurface, theme.pixelWindow.transparentSurface);
     });
 
     it("uses kind switches for disk metric branches", () => {

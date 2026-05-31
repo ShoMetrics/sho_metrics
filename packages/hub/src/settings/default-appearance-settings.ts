@@ -90,6 +90,13 @@ const DEFAULT_FLAT_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSetti
     shapeOutlinePercent: 85,
 };
 
+export const DEFAULT_GLOBAL_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
+    enabled: false,
+    backgroundOpacityPercent: 50,
+    textOutlinePercent: 85,
+    shapeOutlinePercent: 85,
+};
+
 const DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
     enabled: false,
     backgroundOpacityPercent: 50,

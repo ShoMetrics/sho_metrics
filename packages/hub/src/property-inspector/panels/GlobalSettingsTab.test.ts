@@ -129,6 +129,7 @@ function buildGlobalSettings(selectedTheme: MetricTheme = "flat", selectedView: 
                 selectedTheme,
             },
         },
+        transparentSurfaceOverride: undefined,
         paintOverride: {
             metric: {
                 colorMode: "multi-color",

@@ -439,12 +439,13 @@ message GlobalDefaults {
 
 message GlobalOverrides {
   // Main switch for global override. When enabled, omitted subsection enabled
-  // fields resolve to enabled so one click applies view, theme, and paint
-  // overrides.
+  // fields resolve to enabled so one click applies view, theme, paint, and
+  // transparent surface overrides.
   optional bool enabled = 1;
   GlobalViewOverride view = 2;
   GlobalThemeOverride theme = 3;
   GlobalPaintOverride paint = 4;
+  GlobalTransparentSurfaceOverride transparent_surface = 5;
 }
 
 // AppearanceSettings describes the visual presentation of one metric. It is
@@ -684,6 +685,18 @@ message GlobalThemeOverride {
   // subsection as enabled.
   optional bool enabled = 1;
   AppearanceThemeSettings theme = 2;
+}
+
+message GlobalTransparentSurfaceOverride {
+  // When unset and global override is enabled, the resolver treats this
+  // subsection as enabled.
+  optional bool enabled = 1;
+
+  // Unlike widget theme settings, global override stores one transparent
+  // surface setting because it expresses cross-widget readability for the
+  // user's background. Widget settings remain per theme so a widget can
+  // remember theme-specific tuning.
+  TransparentSurfaceSettings transparent_surface = 2;
 }
 
 message GlobalPaintOverride {

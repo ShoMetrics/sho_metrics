@@ -77,6 +77,27 @@ test("global settings patch writes pixel window theme", () => {
     assert.equal(settings.overrides?.theme?.theme?.selectedTheme, StoredMetricTheme.PIXEL_WINDOW);
 });
 
+test("global settings patch writes transparent surface override", () => {
+    const nextSettings = writeStoredGlobalSettingsPatch(undefined, {
+        transparentSurfaceOverrideEnabled: true,
+        transparentSurface: {
+            enabled: true,
+            backgroundOpacityPercent: 45,
+            textOutlinePercent: 55,
+            shapeOutlinePercent: 65,
+        },
+    });
+
+    const transparentSurface = readStoredGlobalSettings(nextSettings).settings.overrides
+        ?.transparentSurface?.transparentSurface;
+
+    assert.equal(readStoredGlobalSettings(nextSettings).settings.overrides?.transparentSurface?.enabled, true);
+    assert.equal(transparentSurface?.enabled, true);
+    assert.equal(transparentSurface?.backgroundOpacityPercent, 45);
+    assert.equal(transparentSurface?.textOutlinePercent, 55);
+    assert.equal(transparentSurface?.shapeOutlinePercent, 65);
+});
+
 test("global settings patch writes network and disk throughput defaults", () => {
     const nextSettings = writeStoredGlobalSettingsPatch(undefined, {
         network: {

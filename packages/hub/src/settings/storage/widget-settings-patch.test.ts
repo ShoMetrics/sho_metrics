@@ -490,3 +490,77 @@ test("widget patch writes terminal palette", () => {
     const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
     assert.equal(appearance?.theme?.terminal?.paint?.preset, StoredTerminalPalettePreset.AMBER);
 });
+
+test("widget patch writes transparent surface settings for every theme", () => {
+    const cpuSettings = resolveQuickStartStoredWidgetSettings(undefined, "cpu").rawSettings;
+
+    const nextSettings = writeStoredWidgetSettingsPatch(cpuSettings, {
+        appearance: {
+            theme: {
+                flat: {
+                    transparentSurface: {
+                        enabled: true,
+                        backgroundOpacityPercent: 10,
+                        textOutlinePercent: 20,
+                        shapeOutlinePercent: 30,
+                    },
+                },
+                cupertinoGlass: {
+                    transparentSurface: {
+                        enabled: true,
+                        backgroundOpacityPercent: 40,
+                        textOutlinePercent: 50,
+                        shapeOutlinePercent: 60,
+                    },
+                },
+                colorFilled: {
+                    transparentSurface: {
+                        enabled: true,
+                        backgroundOpacityPercent: 70,
+                        textOutlinePercent: 80,
+                        shapeOutlinePercent: 90,
+                    },
+                },
+                terminal: {
+                    transparentSurface: {
+                        enabled: true,
+                        backgroundOpacityPercent: 15,
+                        textOutlinePercent: 25,
+                        shapeOutlinePercent: 35,
+                    },
+                },
+                pixelWindow: {
+                    transparentSurface: {
+                        enabled: true,
+                        backgroundOpacityPercent: 45,
+                        textOutlinePercent: 55,
+                        shapeOutlinePercent: 65,
+                    },
+                },
+            },
+        },
+    });
+
+    const theme = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance?.theme;
+
+    assert.equal(theme?.flat?.transparentSurface?.enabled, true);
+    assert.equal(theme?.flat?.transparentSurface?.backgroundOpacityPercent, 10);
+    assert.equal(theme?.flat?.transparentSurface?.textOutlinePercent, 20);
+    assert.equal(theme?.flat?.transparentSurface?.shapeOutlinePercent, 30);
+    assert.equal(theme?.cupertinoGlass?.transparentSurface?.enabled, true);
+    assert.equal(theme?.cupertinoGlass?.transparentSurface?.backgroundOpacityPercent, 40);
+    assert.equal(theme?.cupertinoGlass?.transparentSurface?.textOutlinePercent, 50);
+    assert.equal(theme?.cupertinoGlass?.transparentSurface?.shapeOutlinePercent, 60);
+    assert.equal(theme?.colorFilled?.transparentSurface?.enabled, true);
+    assert.equal(theme?.colorFilled?.transparentSurface?.backgroundOpacityPercent, 70);
+    assert.equal(theme?.colorFilled?.transparentSurface?.textOutlinePercent, 80);
+    assert.equal(theme?.colorFilled?.transparentSurface?.shapeOutlinePercent, 90);
+    assert.equal(theme?.terminal?.transparentSurface?.enabled, true);
+    assert.equal(theme?.terminal?.transparentSurface?.backgroundOpacityPercent, 15);
+    assert.equal(theme?.terminal?.transparentSurface?.textOutlinePercent, 25);
+    assert.equal(theme?.terminal?.transparentSurface?.shapeOutlinePercent, 35);
+    assert.equal(theme?.pixelWindow?.transparentSurface?.enabled, true);
+    assert.equal(theme?.pixelWindow?.transparentSurface?.backgroundOpacityPercent, 45);
+    assert.equal(theme?.pixelWindow?.transparentSurface?.textOutlinePercent, 55);
+    assert.equal(theme?.pixelWindow?.transparentSurface?.shapeOutlinePercent, 65);
+});

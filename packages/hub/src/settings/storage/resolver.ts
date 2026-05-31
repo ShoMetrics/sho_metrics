@@ -41,6 +41,7 @@ import {
     type GlobalPaintOverride as StoredGlobalPaintOverride,
     type GlobalSolidPaintSettings as StoredGlobalSolidPaintSettings,
     type GlobalThemeOverride as StoredGlobalThemeOverride,
+    type GlobalTransparentSurfaceOverride as StoredGlobalTransparentSurfaceOverride,
     type GlobalViewOverride as StoredGlobalViewOverride,
     type GpuMetricTarget as StoredGpuMetricTarget,
     type MetricPaintSettings as StoredMetricPaintSettings,
@@ -53,8 +54,10 @@ import {
     type MetricSourceProfile as StoredMetricSourceProfile,
     type NetworkDisplaySettings as StoredNetworkDisplaySettings,
     type NetworkMetricTarget as StoredNetworkMetricTarget,
+    type PixelWindowThemeSettings as StoredPixelWindowThemeSettings,
     type TerminalPaintSettings as StoredTerminalPaintSettings,
     type TerminalThemeSettings as StoredTerminalThemeSettings,
+    type TransparentSurfaceSettings as StoredTransparentSurfaceSettings,
     type StoredGlobalSettings,
     type StoredWidgetSettings,
 } from "../../generated/shometrics/v1/settings_pb.js";
@@ -88,6 +91,7 @@ import type {
     ResolvedGlobalDefaults,
     ResolvedGlobalSettings,
     ResolvedGlobalThemeOverride,
+    ResolvedGlobalTransparentSurfaceOverride,
     ResolvedGlobalViewOverride,
     ResolvedGlobalMetricPaintSettings,
     ResolvedGlobalMultiColorPaintSettings,
@@ -110,8 +114,10 @@ import type {
     ResolvedNetworkDisplaySettings,
     ResolvedNetworkReading,
     ResolvedCupertinoGlassThemeSettings,
+    ResolvedPixelWindowThemeSettings,
     ResolvedTerminalThemeSettings,
     ResolvedTerminalPaintSettings,
+    ResolvedTransparentSurfaceSettings,
     ResolvedLineAppearanceSettings,
     ResolvedWidgetPreferences,
     ResolvedWidgetSettings,
@@ -123,6 +129,7 @@ import type {
 import {
     buildDefaultAppearanceSettings,
     DEFAULT_APPEARANCE_SETTINGS,
+    DEFAULT_GLOBAL_TRANSPARENT_SURFACE_SETTINGS,
 } from "../default-appearance-settings";
 import {
     DEFAULT_NETWORK_PING_TARGET_HOST,
@@ -382,6 +389,8 @@ export function resolveStoredGlobalSettings(
         && (storedOverrides?.view?.enabled ?? true);
     const themeOverrideEnabled = globalOverrideEnabled
         && (storedOverrides?.theme?.enabled ?? true);
+    const transparentSurfaceOverrideEnabled = globalOverrideEnabled
+        && (storedOverrides?.transparentSurface?.enabled ?? true);
     const paintOverrideEnabled = globalOverrideEnabled
         && (storedOverrides?.paint?.enabled ?? true);
 
@@ -393,6 +402,9 @@ export function resolveStoredGlobalSettings(
             : undefined,
         themeOverride: themeOverrideEnabled
             ? resolveGlobalThemeOverride(storedOverrides?.theme)
+            : undefined,
+        transparentSurfaceOverride: transparentSurfaceOverrideEnabled
+            ? resolveGlobalTransparentSurfaceOverride(storedOverrides?.transparentSurface)
             : undefined,
         paintOverride: paintOverrideEnabled
             ? resolveGlobalPaintOverride(storedOverrides?.paint)
@@ -442,9 +454,12 @@ function resolveMetricSlot(
     const appearanceWithThemeOverride = globalSettings.themeOverride
         ? applyGlobalThemeOverride(appearanceWithViewOverride, globalSettings.themeOverride)
         : appearanceWithViewOverride;
-    const appearance = globalSettings.paintOverride
+    const appearanceWithPaintOverride = globalSettings.paintOverride
         ? applyGlobalPaintOverride(appearanceWithThemeOverride, globalSettings.paintOverride)
         : appearanceWithThemeOverride;
+    const appearance = globalSettings.transparentSurfaceOverride
+        ? applyGlobalTransparentSurfaceOverride(appearanceWithPaintOverride, globalSettings.transparentSurfaceOverride)
+        : appearanceWithPaintOverride;
 
     return {
         metric,
@@ -750,6 +765,17 @@ function resolveGlobalThemeOverride(
     };
 }
 
+function resolveGlobalTransparentSurfaceOverride(
+    storedOverride: StoredGlobalTransparentSurfaceOverride | undefined,
+): ResolvedGlobalTransparentSurfaceOverride {
+    return {
+        transparentSurface: resolveTransparentSurfaceSettings(
+            DEFAULT_GLOBAL_TRANSPARENT_SURFACE_SETTINGS,
+            storedOverride?.transparentSurface,
+        ),
+    };
+}
+
 function resolveGlobalPaintOverride(
     storedOverride: StoredGlobalPaintOverride | undefined,
 ): ResolvedGlobalPaintOverride {
@@ -876,6 +902,7 @@ function resolveAppearanceThemeSettings(
         cupertinoGlass: resolveCupertinoGlassThemeSettings(defaults.cupertinoGlass, storedTheme?.cupertinoGlass),
         colorFilled: resolveColorFilledThemeSettings(defaults.colorFilled, storedTheme?.colorFilled),
         terminal: resolveTerminalThemeSettings(defaults.terminal, storedTheme?.terminal),
+        pixelWindow: resolvePixelWindowThemeSettings(defaults.pixelWindow, storedTheme?.pixelWindow),
     };
 }
 
@@ -885,6 +912,7 @@ function resolveFlatThemeSettings(
 ): ResolvedFlatThemeSettings {
     return {
         paint: resolveMetricPaintSettings(defaults.paint, storedTheme?.paint),
+        transparentSurface: resolveTransparentSurfaceSettings(defaults.transparentSurface, storedTheme?.transparentSurface),
     };
 }
 
@@ -894,6 +922,7 @@ function resolveCupertinoGlassThemeSettings(
 ): ResolvedCupertinoGlassThemeSettings {
     return {
         paint: resolveMetricPaintSettings(defaults.paint, storedTheme?.paint),
+        transparentSurface: resolveTransparentSurfaceSettings(defaults.transparentSurface, storedTheme?.transparentSurface),
     };
 }
 
@@ -903,6 +932,7 @@ function resolveColorFilledThemeSettings(
 ): ResolvedColorFilledThemeSettings {
     return {
         paint: resolveColorFilledPaintSettings(defaults.paint, storedTheme?.paint),
+        transparentSurface: resolveTransparentSurfaceSettings(defaults.transparentSurface, storedTheme?.transparentSurface),
     };
 }
 
@@ -913,6 +943,19 @@ function resolveTerminalThemeSettings(
     return {
         variant: resolveStoredEnum(storedTerminal?.variant, terminalThemeVariantByProto, defaults.variant),
         paint: resolveTerminalPaintSettings(defaults.paint, storedTerminal?.paint),
+        transparentSurface: resolveTransparentSurfaceSettings(
+            defaults.transparentSurface,
+            storedTerminal?.transparentSurface,
+        ),
+    };
+}
+
+function resolvePixelWindowThemeSettings(
+    defaults: ResolvedPixelWindowThemeSettings,
+    storedTheme: StoredPixelWindowThemeSettings | undefined,
+): ResolvedPixelWindowThemeSettings {
+    return {
+        transparentSurface: resolveTransparentSurfaceSettings(defaults.transparentSurface, storedTheme?.transparentSurface),
     };
 }
 
@@ -922,6 +965,21 @@ function resolveTerminalPaintSettings(
 ): ResolvedTerminalPaintSettings {
     return {
         preset: resolveStoredEnum(storedPaint?.preset, terminalPalettePresetByProto, defaults.preset),
+    };
+}
+
+function resolveTransparentSurfaceSettings(
+    defaults: ResolvedTransparentSurfaceSettings,
+    storedSurface: StoredTransparentSurfaceSettings | undefined,
+): ResolvedTransparentSurfaceSettings {
+    return {
+        enabled: storedSurface?.enabled ?? defaults.enabled,
+        backgroundOpacityPercent: resolveStoredPercent(
+            storedSurface?.backgroundOpacityPercent,
+            defaults.backgroundOpacityPercent,
+        ),
+        textOutlinePercent: resolveStoredPercent(storedSurface?.textOutlinePercent, defaults.textOutlinePercent),
+        shapeOutlinePercent: resolveStoredPercent(storedSurface?.shapeOutlinePercent, defaults.shapeOutlinePercent),
     };
 }
 
@@ -1108,7 +1166,63 @@ function applyGlobalThemeOverride(
 ): ResolvedAppearanceSettings {
     return {
         ...appearance,
-        theme: themeOverride.theme,
+        theme: {
+            ...themeOverride.theme,
+            flat: {
+                ...themeOverride.theme.flat,
+                transparentSurface: appearance.theme.flat.transparentSurface,
+            },
+            cupertinoGlass: {
+                ...themeOverride.theme.cupertinoGlass,
+                transparentSurface: appearance.theme.cupertinoGlass.transparentSurface,
+            },
+            colorFilled: {
+                ...themeOverride.theme.colorFilled,
+                transparentSurface: appearance.theme.colorFilled.transparentSurface,
+            },
+            terminal: {
+                ...themeOverride.theme.terminal,
+                transparentSurface: appearance.theme.terminal.transparentSurface,
+            },
+            pixelWindow: {
+                ...themeOverride.theme.pixelWindow,
+                transparentSurface: appearance.theme.pixelWindow.transparentSurface,
+            },
+        },
+    };
+}
+
+function applyGlobalTransparentSurfaceOverride(
+    appearance: ResolvedAppearanceSettings,
+    transparentSurfaceOverride: ResolvedGlobalTransparentSurfaceOverride,
+): ResolvedAppearanceSettings {
+    const transparentSurface = transparentSurfaceOverride.transparentSurface;
+
+    return {
+        ...appearance,
+        theme: {
+            ...appearance.theme,
+            flat: {
+                ...appearance.theme.flat,
+                transparentSurface,
+            },
+            cupertinoGlass: {
+                ...appearance.theme.cupertinoGlass,
+                transparentSurface,
+            },
+            colorFilled: {
+                ...appearance.theme.colorFilled,
+                transparentSurface,
+            },
+            terminal: {
+                ...appearance.theme.terminal,
+                transparentSurface,
+            },
+            pixelWindow: {
+                ...appearance.theme.pixelWindow,
+                transparentSurface,
+            },
+        },
     };
 }
 
@@ -1288,6 +1402,14 @@ function readPositiveRuntimeMaximum(value: number | undefined): number | undefin
     return value !== undefined && Number.isFinite(value) && value > 0
         ? value
         : undefined;
+}
+
+function resolveStoredPercent(value: number | undefined, fallback: number): number {
+    if (value === undefined || !Number.isFinite(value)) {
+        return fallback;
+    }
+
+    return Math.min(Math.max(value, 0), 100);
 }
 
 function throwUnexpectedStoredSettingsState(message: string): never {
