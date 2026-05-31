@@ -37,10 +37,11 @@ export interface ResolvedAppearanceThemeSettingsOverride {
     readonly pixelWindow?: ResolvedPixelWindowThemeSettingsOverride | undefined;
 }
 
+// TODO(Step 4): Review the per-theme transparentSurface override fields after widget
+// Transparent Surface PI lands. Keep them only if widget previews patch per-theme
+// transparent surface through appearance overrides; otherwise remove them from theme overrides.
 export interface ResolvedFlatThemeSettingsOverride {
     readonly paint?: ResolvedMetricPaintSettingsOverride | undefined;
-    // TODO(Step 4): Review after widget Transparent Surface PI lands. Keep only if widget previews patch
-    // per-theme transparent surface through appearance overrides; otherwise remove these override fields.
     readonly transparentSurface?: ResolvedTransparentSurfaceSettingsOverride | undefined;
 }
 

@@ -24,10 +24,12 @@ export interface MetricFrameBody {
 export function renderMetricFrame(options: {
     bodies: readonly MetricFrameBody[];
     themePreset: ThemePresetName;
-    paints: ThemeStylePaints;
+    themePaints: ThemeStylePaints;
+    themeChromeOpacity: number;
     size: KeySize;
 }): string {
     const style = resolveThemePreset(options.themePreset);
+    const themeChromeOpacity = options.themeChromeOpacity;
     const filterId = `muted-widget-${options.size.width}-${options.size.height}`;
     // The filter definition is shared, but each body chooses independently
     // whether its own SVG is wrapped with the muted filter.
@@ -58,32 +60,43 @@ export function renderMetricFrame(options: {
             themePreset: options.themePreset,
         }))
         .join("");
-    const panelAttributes = style.renderPanelAttributes?.(options.size, options.paints) ?? [];
+    const panelAttributes = style.renderPanelAttributes?.(options.size, options.themePaints) ?? [];
     const panelStart = panelAttributes.length === 0
         ? ""
         : `<g ${panelAttributes.join(" ")}>`;
     const panelEnd = panelAttributes.length === 0 ? "" : "</g>";
-    const panelOverlay = style.renderPanelOverlay?.(options.size, options.paints) ?? "";
+    const background = renderThemeSvgFragmentOpacityGroup(
+        style.renderBackground(options.size, options.themePaints),
+        themeChromeOpacity,
+    );
+    const panelOverlay = renderThemeSvgFragmentOpacityGroup(
+        style.renderPanelOverlay?.(options.size, options.themePaints) ?? "",
+        themeChromeOpacity,
+    );
+    const overlay = renderThemeSvgFragmentOpacityGroup(
+        style.renderOverlay(options.size, options.themePaints),
+        themeChromeOpacity,
+    );
 
     return `<svg xmlns="http://www.w3.org/2000/svg"
         width="${options.size.width}" height="${options.size.height}"
         viewBox="0 0 ${options.size.width} ${options.size.height}">
-        <defs>${style.renderDefs(options.size, options.paints)}${viewportDefs}${mutedDefs}</defs>
+        <defs>${style.renderDefs(options.size, options.themePaints)}${viewportDefs}${mutedDefs}</defs>
         ${panelStart}
-        ${style.renderBackground(options.size, options.paints)}
+        ${background}
         ${placedBodies}
         ${panelOverlay}
         ${panelEnd}
-        ${style.renderOverlay(options.size, options.paints)}
+        ${overlay}
     </svg>`;
 }
 
 export function resolveThemeBodyViewport(options: {
     themePreset: ThemePresetName;
-    paints: ThemeStylePaints;
+    themePaints: ThemeStylePaints;
     size: KeySize;
 }): ThemeBodyViewport | undefined {
-    return resolveThemePreset(options.themePreset).resolveBodyViewport?.(options.size, options.paints);
+    return resolveThemePreset(options.themePreset).resolveBodyViewport?.(options.size, options.themePaints);
 }
 
 function resolveThemePreset(themePreset: ThemePresetName): ThemeStyle {
@@ -174,6 +187,24 @@ function namespaceSvgFragmentIds(svg: string, namespace: string): string {
         .replace(/url\(#([^)]+)\)/gu, (_match, id: string) => `url(#${resolveNamespacedId(id)})`)
         .replace(/\b(xlink:href|href)="#([^"]+)"/gu, (_match, attributeName: string, id: string) =>
             `${attributeName}="#${resolveNamespacedId(id)}"`);
+}
+
+function renderThemeSvgFragmentOpacityGroup(themeSvgFragment: string, opacity: number): string {
+    if (themeSvgFragment.trim().length === 0) {
+        return "";
+    }
+
+    if (opacity >= 1) {
+        return themeSvgFragment;
+    }
+
+    if (opacity <= 0) {
+        return "";
+    }
+
+    // Theme style renderers return SVG fragments, not full <svg> documents.
+    // This opacity group must stay around theme chrome, not metric bodies.
+    return `<g opacity="${formatSvgNumber(opacity)}">${themeSvgFragment}</g>`;
 }
 
 function formatSvgNumber(value: number): string {

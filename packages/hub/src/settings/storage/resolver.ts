@@ -1164,6 +1164,8 @@ function applyGlobalThemeOverride(
     appearance: ResolvedAppearanceSettings,
     themeOverride: ResolvedGlobalThemeOverride,
 ): ResolvedAppearanceSettings {
+    // Transparent surface is a separate global override path; replacing the theme
+    // must preserve widget-level per-theme transparent tuning.
     return {
         ...appearance,
         theme: {

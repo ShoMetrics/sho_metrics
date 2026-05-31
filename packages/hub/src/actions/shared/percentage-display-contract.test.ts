@@ -83,7 +83,8 @@ test("percentage action display values are honored by line view rendering", () =
     const svg = renderMetricFrame({
         bodies: [{ svg: body, muted: false }],
         themePreset: "flat",
-        paints: visualSettings.paints,
+        themePaints: visualSettings.paints,
+        themeChromeOpacity: visualSettings.transparentSurface.backgroundOpacity,
         size: { width: 144, height: 144 },
     });
 

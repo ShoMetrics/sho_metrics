@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS } from "../view-rendering/render-appearance";
 import {
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     TERMINAL_CLEAN_RENDER_THEME_EFFECT_TOKENS,
@@ -109,6 +110,61 @@ test("theme effects map resolved appearance settings to renderer effect tokens",
     assert.deepEqual(terminalCleanSettings.themeEffects, TERMINAL_CLEAN_RENDER_THEME_EFFECT_TOKENS);
     assert.deepEqual(terminalVintageSettings.themeEffects, TERMINAL_VINTAGE_RENDER_THEME_EFFECT_TOKENS);
     assert.deepEqual(pixelWindowSettings.themeEffects, DEFAULT_RENDER_THEME_EFFECT_TOKENS);
+});
+
+test("disabled transparent surface resolves to opaque background and disabled outlines", () => {
+    const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings());
+
+    assert.deepEqual(visualSettings.transparentSurface, DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS);
+});
+
+test("enabled flat transparent surface resolves flat defaults to render tokens", () => {
+    const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: {
+            flat: {
+                transparentSurface: {
+                    enabled: true,
+                },
+            },
+        },
+    }));
+
+    assert.deepEqual(visualSettings.transparentSurface, {
+        backgroundOpacity: 0,
+        textOutline: {
+            color: "#000000",
+            strength: 0.85,
+        },
+        shapeOutline: {
+            color: "#000000",
+            strength: 0.85,
+        },
+    });
+});
+
+test("enabled non-flat transparent surface resolves non-flat defaults to render tokens", () => {
+    const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        theme: {
+            selectedTheme: "cupertino-glass",
+            cupertinoGlass: {
+                transparentSurface: {
+                    enabled: true,
+                },
+            },
+        },
+    }));
+
+    assert.deepEqual(visualSettings.transparentSurface, {
+        backgroundOpacity: 0.5,
+        textOutline: {
+            color: "#000000",
+            strength: 0.85,
+        },
+        shapeOutline: {
+            color: "#000000",
+            strength: 0.85,
+        },
+    });
 });
 
 test("solid color mode uses resolved appearance color", () => {

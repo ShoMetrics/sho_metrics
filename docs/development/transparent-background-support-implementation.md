@@ -105,16 +105,16 @@ Why this step stands alone:
 Locations:
 
 - [render-appearance.ts](../../packages/hub/src/view-rendering/render-appearance.ts)
-- `packages/hub/src/settings/render-surface-treatment-resolver.ts`
+- `packages/hub/src/settings/render-transparent-surface-resolver.ts`
 - [render-appearance-builder.ts](../../packages/hub/src/settings/render-appearance-builder.ts)
 - [metric-frame.ts](../../packages/hub/src/view-rendering/metric-frame.ts)
 - [metric-view-frame.ts](../../packages/hub/src/view-rendering/metric-view-frame.ts)
 
 Work:
 
-- Add `RenderOutlineTokens` and `RenderSurfaceTreatmentTokens`.
+- Add `RenderOutlineTokens` and `RenderTransparentSurfaceTokens`.
 - Resolve active per-theme settings into concrete renderer tokens.
-- Pass `surfaceTreatment` through `MetricRenderAppearance`.
+- Pass `transparentSurface` through `MetricRenderAppearance`.
 - Apply `backgroundOpacity` only to theme-owned background/chrome fragments in `metric-frame.ts`.
 - Do not wrap metric body SVG or any content passed through `placedBodies`.
 
@@ -163,7 +163,7 @@ Locations:
 
 Work:
 
-- Pass `surfaceTreatment.shapeOutline` into primitive configs.
+- Pass `transparentSurface.shapeOutline` into primitive configs.
 - Add backing shapes only when `isSvgOutlineEnabled(outline)` is true.
 - Use stroke-style backing for stroked rings, lines, arcs, and dots.
 - Use larger filled rounded rectangle backing for progress bar track/fill.
@@ -483,26 +483,20 @@ export interface RenderOutlineTokens {
      * Do not expose a PI color setting in V1.
      */
     readonly color: string;
-    /**
-     * Controls backing opacity. In V1 this comes from the same percentage as
-     * strength. Keep the fields separate because opacity and width are different
-     * renderer concepts; do not add another slider to make them diverge.
-     */
-    readonly opacity: number;
-    /** Controls backing width. In V1 this equals opacity numerically. */
+    /** Single 0..1 outline value from the text/shape outline slider. */
     readonly strength: number;
 }
 
-export interface RenderSurfaceTreatmentTokens {
+export interface RenderTransparentSurfaceTokens {
     readonly backgroundOpacity: number;
     readonly textOutline: RenderOutlineTokens;
     readonly shapeOutline: RenderOutlineTokens;
 }
 ```
 
-Add `surfaceTreatment: RenderSurfaceTreatmentTokens` to `MetricRenderAppearance`.
+Add `transparentSurface: RenderTransparentSurfaceTokens` to `MetricRenderAppearance`.
 
-Create [render-surface-treatment-resolver.ts](../../packages/hub/src/settings/render-surface-treatment-resolver.ts).
+Create [render-transparent-surface-resolver.ts](../../packages/hub/src/settings/render-transparent-surface-resolver.ts).
 
 Implementation rules:
 
@@ -512,8 +506,8 @@ Implementation rules:
 ```ts
 {
     backgroundOpacity: 1,
-    textOutline: { color: "#000000", opacity: 0, strength: 0 },
-    shapeOutline: { color: "#000000", opacity: 0, strength: 0 },
+    textOutline: { color: "#000000", strength: 0 },
+    shapeOutline: { color: "#000000", strength: 0 },
 }
 ```
 
@@ -524,12 +518,10 @@ Implementation rules:
     backgroundOpacity: backgroundOpacityPercent / 100,
     textOutline: {
         color: "#000000",
-        opacity: textOutlinePercent / 100,
         strength: textOutlinePercent / 100,
     },
     shapeOutline: {
         color: "#000000",
-        opacity: shapeOutlinePercent / 100,
         strength: shapeOutlinePercent / 100,
     },
 }
@@ -537,13 +529,17 @@ Implementation rules:
 
 Clamp percentages to `0..100` before division.
 
-Edit [render-appearance-builder.ts](../../packages/hub/src/settings/render-appearance-builder.ts) to include `surfaceTreatment: resolveRenderSurfaceTreatment(settings)`.
+Edit [render-appearance-builder.ts](../../packages/hub/src/settings/render-appearance-builder.ts) to include `transparentSurface: resolveRenderTransparentSurface(settings)`.
 
 ## Theme Background Opacity
 
 Edit [metric-frame.ts](../../packages/hub/src/view-rendering/metric-frame.ts).
 
-Add `surfaceTreatment: RenderSurfaceTreatmentTokens` to `renderMetricFrame` options.
+Update `renderMetricFrame` options to keep the frame boundary narrow:
+
+- Rename `paints: ThemeStylePaints` to `themePaints: ThemeStylePaints`.
+- Add `themeChromeOpacity: number`.
+- Do not pass the full `RenderTransparentSurfaceTokens` into `renderMetricFrame`; text and shape outline tokens belong to body/primitive renderers, not the frame renderer.
 
 Wrap theme-owned background/chrome fragments in the existing frame renderer:
 
@@ -554,20 +550,22 @@ Wrap theme-owned background/chrome fragments in the existing frame renderer:
 Use a local helper in `metric-frame.ts`:
 
 ```ts
-function renderOpacityGroup(svg: string, opacity: number): string {
-    if (svg.trim().length === 0) {
+function renderThemeSvgFragmentOpacityGroup(themeSvgFragment: string, opacity: number): string {
+    if (themeSvgFragment.trim().length === 0) {
         return "";
     }
 
     if (opacity >= 1) {
-        return svg;
+        return themeSvgFragment;
     }
 
     if (opacity <= 0) {
         return "";
     }
 
-    return `<g opacity="${formatSvgNumber(opacity)}">${svg}</g>`;
+    // Theme style renderers return SVG fragments, not full <svg> documents.
+    // This opacity group must stay around theme chrome, not metric bodies.
+    return `<g opacity="${formatSvgNumber(opacity)}">${themeSvgFragment}</g>`;
 }
 ```
 
@@ -575,7 +573,7 @@ Do not wrap `placedBodies`; metric content must keep its own opacity.
 
 This deliberately fades theme decoration together with the background. That includes glass highlights, Color Filled washes, Terminal scanlines/vignette, and Pixel Window chrome. The PI control group must include short helper copy near the sliders: `Affects theme background and chrome only. Metrics stay opaque.`
 
-Update every caller of `renderMetricFrame` to pass `renderAppearance.surfaceTreatment`. The existing call path in [metric-view-frame.ts](../../packages/hub/src/view-rendering/metric-view-frame.ts) is the primary place.
+Update every caller of `renderMetricFrame` to pass `themePaints: renderAppearance.paints` and `themeChromeOpacity: renderAppearance.transparentSurface.backgroundOpacity`. The existing call path in [metric-view-frame.ts](../../packages/hub/src/view-rendering/metric-view-frame.ts) is the primary place.
 
 Do not modify theme style files just to apply opacity. Their job remains drawing theme-specific background/chrome SVG.
 
@@ -615,20 +613,20 @@ export function formatSvgTextOutlineAttributes(options: {
 }): string {
     const outline = options.outline;
 
-    if (!outline || outline.opacity <= 0 || outline.strength <= 0) {
+    if (!outline || outline.strength <= 0) {
         return "";
     }
 
     const lineJoinAttribute = options.lineJoin ? ` stroke-linejoin="${options.lineJoin}"` : "";
 
     return ` stroke="${escapeSvgText(outline.color)}"` +
-        ` stroke-opacity="${formatSvgNumber(outline.opacity)}"` +
+        ` stroke-opacity="${formatSvgNumber(outline.strength)}"` +
         ` stroke-width="${formatSvgNumber(options.strokeWidth)}"` +
         `${lineJoinAttribute} paint-order="stroke fill"`;
 }
 ```
 
-- If `outline.opacity > 0` and `outline.strength > 0`, compute text stroke width with:
+- If `outline.strength > 0`, compute text stroke width with:
 
 ```ts
 const textOutlineStrokeWidth = resolveSvgTextOutlineStrokeWidth(fontSize, outline);
@@ -638,7 +636,7 @@ const textOutlineStrokeWidth = resolveSvgTextOutlineStrokeWidth(fontSize, outlin
 
 ```ts
 stroke="${escapeSvgText(outline.color)}"
-stroke-opacity="${formatSvgNumber(outline.opacity)}"
+stroke-opacity="${formatSvgNumber(outline.strength)}"
 stroke-width="${formatSvgNumber(textOutlineStrokeWidth)}"
 stroke-linejoin="round"
 paint-order="stroke fill"
@@ -669,7 +667,7 @@ const SHAPE_OUTLINE_EXTRA_WIDTH_FLOOR_RATIO = 0.18;
 const SHAPE_OUTLINE_EXTRA_WIDTH_SCALE_RATIO = 0.52;
 
 export function isSvgOutlineEnabled(outline: RenderOutlineTokens | undefined): outline is RenderOutlineTokens {
-    return outline !== undefined && outline.opacity > 0 && outline.strength > 0;
+    return outline !== undefined && outline.strength > 0;
 }
 
 export function resolveSvgShapeOutlineStrokeWidth(
@@ -716,7 +714,7 @@ export function formatSvgShapeOutlineStrokeAttributes(options: {
     const lineJoinAttribute = options.lineJoin ? ` stroke-linejoin="${options.lineJoin}"` : "";
 
     return ` stroke="${escapeSvgText(outline.color)}"` +
-        ` stroke-opacity="${formatSvgNumber(outline.opacity)}"` +
+        ` stroke-opacity="${formatSvgNumber(outline.strength)}"` +
         ` stroke-width="${formatSvgNumber(options.strokeWidth)}"` +
         ` fill="none"${lineCapAttribute}${lineJoinAttribute}`;
 }
@@ -734,7 +732,7 @@ Backing attributes:
 
 ```svg
 stroke="#000000"
-stroke-opacity="{outline.opacity}"
+stroke-opacity="{outline.strength}"
 stroke-width="{backingStrokeWidth}"
 fill="none"
 stroke-linecap="{same as foreground}"
@@ -765,7 +763,7 @@ const backingRect = {
 };
 ```
 
-Render the backing with `fill="${outline.color}"` and `opacity="${outline.opacity}"`. Use `rect.height` as the reference size so thin bars receive a proportional halo. Only render this backing when `isSvgOutlineEnabled(outline)` is true.
+Render the backing with `fill="${outline.color}"` and `opacity="${outline.strength}"`. Use `rect.height` as the reference size so thin bars receive a proportional halo. Only render this backing when `isSvgOutlineEnabled(outline)` is true.
 
 Only render a filled rectangle backing when the foreground filled rectangle will be rendered and its width and height are both greater than `0`. A zero-progress bar must not produce a standalone black cap.
 
@@ -812,12 +810,12 @@ Only emit backing shapes when `isSvgOutlineEnabled(outline)` is true. Disabled o
 
 Edit [single-metric-view.ts](../../packages/hub/src/view-rendering/single-metric-view.ts) and [dual-metric-view.ts](../../packages/hub/src/view-rendering/dual-metric-view.ts).
 
-Add `surfaceTreatment: RenderSurfaceTreatmentTokens` to the `visual` object.
+Add `transparentSurface: RenderTransparentSurfaceTokens` to the `visual` object.
 
 Pass:
 
-- `surfaceTreatment.textOutline` to text helper configs.
-- `surfaceTreatment.shapeOutline` to shape primitive configs.
+- `transparentSurface.textOutline` to text helper configs.
+- `transparentSurface.shapeOutline` to shape primitive configs.
 
 Update every default primitive config with disabled outline tokens so direct tests that instantiate defaults keep current behavior.
 

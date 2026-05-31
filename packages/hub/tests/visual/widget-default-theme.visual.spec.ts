@@ -125,7 +125,8 @@ function renderSingleMetricWidgetSvg(options: {
     return renderMetricFrame({
         bodies: [{ svg: body, muted: false }],
         themePreset: visualSettings.themePreset,
-        paints: visualSettings.paints,
+        themePaints: visualSettings.paints,
+        themeChromeOpacity: visualSettings.transparentSurface.backgroundOpacity,
         size: options.keySize,
     });
 }
