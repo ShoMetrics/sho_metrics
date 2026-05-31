@@ -335,6 +335,10 @@ export abstract class MetricAction extends SingletonAction {
         return backgroundMetricCollection.readCachedSourceStatus(sourceId);
     }
 
+    protected currentPlatform(): NodeJS.Platform {
+        return process.platform;
+    }
+
     protected refreshActiveMetricView(event: WillAppearEvent | PropertyInspectorDidAppearEvent): void {
         const activeActionState = this.activeActionStates.get(event.action.id);
 
@@ -424,6 +428,7 @@ export abstract class MetricAction extends SingletonAction {
             metricKeys,
             sourcePolicy: settings.widget.slot.metric.source,
             defaultSourceProfileId: pluginGlobalSettingsStore.getResolved().defaultSourceProfileId,
+            platform: this.currentPlatform(),
         });
     }
 }

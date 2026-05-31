@@ -170,6 +170,7 @@ test("catalog metric no-selection view renders choose-metric copy when helper is
         event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-empty-action"), rawSettings),
         settings,
         helperStatus: { state: "available" },
+        platform: "win32",
     });
 
     assert.equal(viewOptions.metricKey, "catalog.unselected");
@@ -186,6 +187,7 @@ test("catalog metric no-selection view renders install-helper copy only for neve
         event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-install-helper-action"), rawSettings),
         settings,
         helperStatus: { state: "unavailable", reason: "helperNotInstalled" },
+        platform: "win32",
     });
 
     assert.equal(viewOptions.noticeText, CATALOG_INSTALL_HELPER_NOTICE_TEXT);
@@ -200,6 +202,7 @@ test("catalog metric no-selection view keeps generic copy when helper is install
         event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-stopped-helper-action"), rawSettings),
         settings,
         helperStatus: { state: "unavailable", reason: "helperStopped" },
+        platform: "win32",
     });
 
     assert.equal(viewOptions.noticeText, undefined);
@@ -506,6 +509,10 @@ class TestCatalogMetric extends CatalogMetric {
     protected override readCachedSourceStatus(sourceId: string): SourceClientStatus | undefined {
         assert.equal(sourceId, WINDOWS_HELPER_SOURCE_ID);
         return this.sourceStatus;
+    }
+
+    protected override currentPlatform(): NodeJS.Platform {
+        return "win32";
     }
 
     protected override sendRuntimeCachePatchToPropertyInspector(
