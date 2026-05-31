@@ -17,10 +17,11 @@ import {
 } from "../../runtime/widget-runtime-cache";
 import { buildPropertyInspectorContext } from "../inspector/context";
 import {
+    readPropertyInspectorPlatformValue,
     readActionUuid,
-    resolveIsWindowsPropertyInspector,
     type StreamDeckPropertyInspectorClient,
 } from "../stream-deck/stream-deck-client";
+import { normalizePropertyInspectorHostPlatform } from "../inspector/platform";
 import { resolveStreamDeckActionKind } from "../../shared/stream-deck-actions";
 import type { ActionKind } from "../inspector/settings-types";
 import {
@@ -88,6 +89,7 @@ export function usePropertyInspectorSettings(
         runtimeCache: state.runtimeCache,
         runtimeCacheStatus: state.runtimeCacheStatus,
         actionKind: state.actionKind,
+        platform: state.platform,
         isWindows: state.isWindows,
     }), [
         state.rawSettings,
@@ -95,6 +97,7 @@ export function usePropertyInspectorSettings(
         state.runtimeCache,
         state.runtimeCacheStatus,
         state.actionKind,
+        state.platform,
         state.isWindows,
     ]);
 
@@ -243,7 +246,8 @@ async function loadPropertyInspectorSettings(
 ): Promise<void> {
     const connectionInfo = await client.getConnectionInfo();
     const actionKind = resolveStreamDeckActionKind(readActionUuid(connectionInfo));
-    const isWindows = resolveIsWindowsPropertyInspector(connectionInfo);
+    const platform = normalizePropertyInspectorHostPlatform(readPropertyInspectorPlatformValue(connectionInfo));
+    const isWindows = platform === "win32";
     if (isDisposed()) {
         return;
     }
@@ -260,6 +264,7 @@ async function loadPropertyInspectorSettings(
     dispatchSettingsAction({
         type: "connectionLoaded",
         actionKind,
+        platform,
         isWindows,
         widgetSettingsRead,
     });

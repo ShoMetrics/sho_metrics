@@ -34,6 +34,16 @@ type CatalogMetricWidgetSettingsProps = WidgetSettingsPanelProps & {
 };
 
 export function CatalogMetricWidgetSettings(props: CatalogMetricWidgetSettingsProps): React.JSX.Element {
+    if (!props.context.isWindows) {
+        return (
+            <SettingsSection title="Metric">
+                <InspectorItem className="note-item note-item-caption">
+                    <p className="section-note">This sensor is not supported on this platform.</p>
+                </InspectorItem>
+            </SettingsSection>
+        );
+    }
+
     return (
         <>
             <CatalogMetricPicker {...props} />

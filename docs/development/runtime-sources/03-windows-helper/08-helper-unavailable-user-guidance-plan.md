@@ -164,7 +164,7 @@ ordinary PI messages before DEBUG details:
 | Selected metric invalid/expired | `No current value is available for this metric.` | DEBUG/Panel can show invalid/expired and raw sensor identity when available. |
 | GPU widget has no fresh value from the current source | `No GPU value is available from the current source. Intel and AMD GPU metrics usually require ShoMetrics Helper. If Helper is installed, restart it or open ShoMetrics Control Panel for diagnostics.` | Do not classify NVIDIA-SMI failure, Intel/AMD hardware, or fallback warmup in the PI unless the source later reports a structured reason. |
 | Driver/sensor-path warning exists | `Open ShoMetrics Control Panel to check sensor driver status.` | The Panel owns driver/component details. The key remains `N/A`. |
-| Unsupported platform or unsupported current selection | `This metric is not supported on this platform.` | Future platform-filtering slice; do not show install-helper guidance on macOS. |
+| Unsupported platform or unsupported current selection | `This metric is not supported on this platform.` | Do not show install-helper guidance on macOS. Preserve the stored selection until the user chooses a supported metric. |
 
 The GPU note is intentionally generic. Node-system currently reports GPU
 telemetry failure as "no value" to the rest of Hub; logs may mention
@@ -223,6 +223,45 @@ Transient states must not wait forever.
 
 Slice 1 may implement only `sensorPending` for known single-group reads, but it
 must define how the state exits.
+
+### Platform Metric Support Contract
+
+Platform support is an app-owned routing concern for stable built-in metrics.
+Do not add `supported_platforms` to dynamic source descriptors: catalog
+descriptors already come from a source that is available or unavailable on the
+current platform.
+
+Rules:
+
+- Source routing is the single source of truth for stable built-in metric
+  platform support.
+- The Property Inspector normalizes Stream Deck host-platform strings into the
+  same platform vocabulary used by source routing. Known target platforms such
+  as `win32` and `darwin` stay explicit; unknown host strings fall back to
+  `other`.
+- A stable built-in metric is supported on platform `P` only when at least one
+  candidate source for that metric is supported on `P`.
+- ShoMetrics Windows Helper candidates are Windows-only.
+- Node-system candidates must declare static metric support per platform. This
+  is source capability, not a per-machine hardware probe.
+- macOS node-system GPU support is `gpu.usage_percent` only. GPU temperature,
+  VRAM, and power are not listed on macOS until node-system can actually
+  produce them there.
+- PI dropdowns hide unsupported built-in metrics and unsupported built-in source
+  choices on the current platform.
+- Already-stored unsupported selections from synced/imported profiles are
+  preserved. The PI shows them as unsupported and offers supported choices; the
+  stored setting is not cleared automatically.
+- The key keeps ordinary unsupported/no-value copy as `N/A`. Platform-specific
+  details belong in PI.
+
+Strong constraints:
+
+- Every stable built-in metric key must be covered by the routing support table.
+- Tests must assert that every local auto candidate is supported by its source
+  on the target platform.
+- Tests must cover macOS CPU helper-only filtering and macOS GPU usage-only
+  filtering so adding a new metric cannot silently bypass the platform model.
 
 ## Localized Copy Table
 
@@ -921,9 +960,16 @@ no fresher metric value exists.
     eligibility from the static source-routing classification in
     `metric-source-preferences.ts`. Do not hard-code per-action booleans and do
     not infer helper requirement from sample freshness.
-13. On non-Windows platforms, filter PI metric/source dropdowns so
-    Windows-helper-only metrics are not offered as selectable options. Already
-    stored unsupported selections should be preserved but shown as unavailable.
+13. On non-Windows platforms, filter PI metric/source dropdowns from source
+    routing support so unsupported built-in metrics are not offered as
+    selectable options. Already stored unsupported selections should be
+    preserved but shown as unavailable.
+    - macOS CPU exposes usage only; CPU temperature/power are Windows-helper
+      metrics.
+    - macOS GPU exposes usage only until node-system supports more GPU
+      telemetry there.
+    - Explicit built-in source preferences from synced profiles are filtered by
+      the same source/platform support rules as local auto routing.
 14. Add GPU no-value PI guidance without classifying hardware vendor,
     `nvidia-smi` availability, or fallback warmup. The key remains `N/A`.
 15. Do not consume `SourceComponentStatus` in action key rendering. It is for
@@ -1113,7 +1159,7 @@ for source errors that have no more specific remediation.
 | Proto/runtime mapping | `PENDING_REFRESH`, unknown unavailable enum values, old-helper/new-Hub fallback, protocol mismatch status, optional `SourceComponentStatus` compatibility. |
 | Hub state resolver | State priority table, stale value versus source status, `versionMismatch`, warning-assisted PI guidance. |
 | Property Inspector | Helper missing/stopped, protocol mismatch, descriptor catalog pending/unavailable, picker disabled/install guidance, GPU no-value guidance without install-helper key copy. |
-| Manifest/platform | Advanced Sensor OS gate, PI dropdown filtering for unsupported metrics/source choices, and already-placed unsupported-platform fallback. |
+| Manifest/platform | Advanced Sensor OS gate, source-routing platform support coverage for every stable built-in metric, PI dropdown filtering for unsupported metrics/source choices, macOS GPU usage-only filtering, and already-placed unsupported-platform fallback. |
 | Rendering | Ordinary no-data states render `N/A` in selected views; static helper-required missing-helper states render `Install helper` through action-owned notice bodies; helper-preferred fallback metrics do not infer `Install helper` from momentary no-sample states; no-selected Advanced Sensor renders `Choose metric` through the action-owned notice body; `sensorPending` renders `...` outside minimal circle; no full dedicated error SVG/body by default. |
 | ShoMetrics Control Panel | Normal-user service status, gRPC health read, `driver:pawnio` component status, sanitized diagnostics copy, no privileged mutation in data-plane service. |
 | Recovery | Helper install/start, protocol repair, driver repair, Windows resume/topology change, shared source-client retry/backoff reset. |
@@ -1125,6 +1171,10 @@ for source errors that have no more specific remediation.
   Windows-only guidance in PI instead of helper install copy.
 - Non-Windows PI dropdowns do not offer Windows-helper-only metrics or source
   choices; existing unsupported selections are preserved as unavailable.
+- macOS GPU dropdowns offer usage only until node-system supports additional
+  GPU metrics on macOS.
+- Stable built-in routing tests fail if a new metric key is added without
+  source/platform support coverage.
 - A never-installed helper produces key-level `Install helper` for Advanced
   Sensor onboarding/selection and static helper-only built-ins such as CPU
   temperature/power.

@@ -33,18 +33,21 @@ export const GPU_METRIC_KEYS = [
 export const RAM_USED_METRIC_KEY = "ram.used";
 export const RAM_TOTAL_METRIC_KEY = "ram.total";
 
-const CPU_METRIC_PREFIX = "cpu.";
-const GPU_METRIC_PREFIX = "gpu.";
-const RAM_METRIC_PREFIX = "ram.";
+const CPU_METRIC_KEY_SET = new Set<string>(CPU_METRIC_KEYS);
+const GPU_METRIC_KEY_SET = new Set<string>(GPU_METRIC_KEYS);
+const RAM_METRIC_KEY_SET = new Set<string>([
+    RAM_USED_METRIC_KEY,
+    RAM_TOTAL_METRIC_KEY,
+]);
 
 export function isCpuMetricKey(metricKey: string): boolean {
-    return metricKey.startsWith(CPU_METRIC_PREFIX);
+    return CPU_METRIC_KEY_SET.has(metricKey);
 }
 
 export function isGpuMetricKey(metricKey: string): boolean {
-    return metricKey.startsWith(GPU_METRIC_PREFIX);
+    return GPU_METRIC_KEY_SET.has(metricKey);
 }
 
 export function isRamMetricKey(metricKey: string): boolean {
-    return metricKey.startsWith(RAM_METRIC_PREFIX);
+    return RAM_METRIC_KEY_SET.has(metricKey);
 }

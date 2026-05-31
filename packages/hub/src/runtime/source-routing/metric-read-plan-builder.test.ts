@@ -103,9 +103,9 @@ test("metric read plan builder appends fallback profile ids to each local auto m
     });
 });
 
-test("metric read plan builder uses only node for unset local non-Windows settings", () => {
+test("metric read plan builder uses only node for supported unset local non-Windows settings", () => {
     const readPlan = buildMetricReadPlanFromSourcePolicy({
-        metricKeys: ["cpu.usage_percent"],
+        metricKeys: ["cpu.usage_percent", "gpu.usage_percent"],
         sourcePolicy: createSourcePolicy(),
         defaultSourceProfileId: undefined,
         platform: "darwin",
@@ -118,6 +118,68 @@ test("metric read plan builder uses only node for unset local non-Windows settin
                 metricKey: "cpu.usage_percent",
                 sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
                 failureMode: "empty",
+            },
+            {
+                sourceScopeId: "local",
+                metricKey: "gpu.usage_percent",
+                sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
+                failureMode: "empty",
+            },
+        ],
+    });
+});
+
+test("metric read plan builder has no local candidates for unsupported non-Windows metrics", () => {
+    const readPlan = buildMetricReadPlanFromSourcePolicy({
+        metricKeys: ["cpu.temp", "gpu.temp"],
+        sourcePolicy: createSourcePolicy(),
+        defaultSourceProfileId: undefined,
+        platform: "darwin",
+    });
+
+    assert.deepEqual(readPlan, {
+        metrics: [
+            {
+                sourceScopeId: "local",
+                metricKey: "cpu.temp",
+                sourceCandidates: [],
+                failureMode: "empty",
+            },
+            {
+                sourceScopeId: "local",
+                metricKey: "gpu.temp",
+                sourceCandidates: [],
+                failureMode: "empty",
+            },
+        ],
+    });
+});
+
+test("metric read plan builder filters explicit built-in sources by platform support", () => {
+    const readPlan = buildMetricReadPlanFromSourcePolicy({
+        metricKeys: ["gpu.usage_percent", "gpu.temp"],
+        sourcePolicy: createSourcePolicy({
+            primarySourceProfileId: BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID,
+            fallbackSourceProfileIds: [BUILT_IN_NODE_SYSTEM_SOURCE_PROFILE_ID],
+            failureMode: "useFallback",
+        }),
+        defaultSourceProfileId: undefined,
+        platform: "darwin",
+    });
+
+    assert.deepEqual(readPlan, {
+        metrics: [
+            {
+                sourceScopeId: "local",
+                metricKey: "gpu.temp",
+                sourceCandidates: [],
+                failureMode: "empty",
+            },
+            {
+                sourceScopeId: "local",
+                metricKey: "gpu.usage_percent",
+                sourceCandidates: [{ sourceId: NODE_SYSTEM_SOURCE_ID }],
+                failureMode: "fallback",
             },
         ],
     });

@@ -1,3 +1,5 @@
+import { normalizePropertyInspectorHostPlatform } from "../inspector/platform";
+
 export type SettingsRecord = Record<string, unknown>;
 
 export interface StreamDeckPropertyInspectorClient {
@@ -387,14 +389,21 @@ export function readActionUuid(connectionInfo: ConnectionInfo): string {
         ?? "";
 }
 
+/** Reports whether the PI host is running on Windows. */
 export function resolveIsWindowsPropertyInspector(connectionInfo: ConnectionInfo): boolean {
-    const platformValue = String(
-        connectionInfo.application?.platform
-            ?? connectionInfo.info?.application?.platform
-            ?? (typeof navigator === "undefined" ? "" : navigator.platform),
-    ).toLowerCase();
+    return normalizePropertyInspectorHostPlatform(readPropertyInspectorPlatformValue(connectionInfo)) === "win32";
+}
 
-    return platformValue.includes("win");
+/**
+ * Reads the raw platform string from Stream Deck PI registration metadata.
+ *
+ * Keep this raw boundary separate from platform normalization: Stream Deck and
+ * browser fallback values are not guaranteed to use Node's platform names.
+ */
+export function readPropertyInspectorPlatformValue(connectionInfo: ConnectionInfo): unknown {
+    return connectionInfo.application?.platform
+        ?? connectionInfo.info?.application?.platform
+        ?? (typeof navigator === "undefined" ? "" : navigator.platform);
 }
 
 function createInitialSettingsEvent(actionInfo: ActionInfo): DidReceiveSettingsEvent | null {

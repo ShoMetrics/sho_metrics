@@ -13,11 +13,13 @@ test("connectionLoaded sets action metadata and marks widget settings ready", ()
     const nextState = settingsSyncReducer(initialSettingsSyncState, {
         type: "connectionLoaded",
         actionKind: "network",
+        platform: "win32",
         isWindows: true,
         widgetSettingsRead: buildWidgetSettingsRead({ rawSettings }),
     });
 
     assert.equal(nextState.actionKind, "network");
+    assert.equal(nextState.platform, "win32");
     assert.equal(nextState.isWindows, true);
     assert.equal(nextState.rawSettings, rawSettings);
     assert.equal(nextState.widgetSettingsStatus, "ready");

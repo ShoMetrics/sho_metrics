@@ -12,7 +12,7 @@ export function resolveSelectedOptionValue<TValue extends SelectOptionValue>(opt
     optionList: readonly SelectOption<TValue>[];
     value: TValue;
 }): TValue | "" {
-    if (options.optionList.some((option) => option.value === options.value && isSelectableOption(option))) {
+    if (options.optionList.some((option) => option.value === options.value)) {
         return options.value;
     }
 

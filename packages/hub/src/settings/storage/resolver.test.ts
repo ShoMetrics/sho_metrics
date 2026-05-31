@@ -169,7 +169,7 @@ describe("stored settings proto resolver", () => {
         }
     });
 
-    it("resolves unsupported non-Windows CPU helper readings to usage", () => {
+    it("preserves unsupported non-Windows CPU helper readings", () => {
         const temperatureSettings = resolveStoredWidgetSettings({
             storedWidgetSettings: readStoredWidgetSettings({
                 singleMetric: {
@@ -208,8 +208,15 @@ describe("stored settings proto resolver", () => {
         assert.equal(temperatureTarget.domain, "cpu");
         assert.equal(powerTarget.domain, "cpu");
         if (temperatureTarget.domain === "cpu" && powerTarget.domain === "cpu") {
-            assert.deepEqual(temperatureTarget.reading, { kind: "usage" });
-            assert.deepEqual(powerTarget.reading, { kind: "usage" });
+            assert.deepEqual(temperatureTarget.reading, {
+                kind: "temperature",
+                maximumCelsius: 100,
+                unit: "celsius",
+            });
+            assert.deepEqual(powerTarget.reading, {
+                kind: "power",
+                maximumWatts: 150,
+            });
         }
     });
 

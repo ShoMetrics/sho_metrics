@@ -62,6 +62,18 @@ export class CatalogMetric extends MetricAction {
     }
 
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
+        if (process.platform !== "win32") {
+            // Catalog metrics are currently backed only by the Windows helper.
+            // Non-Windows profiles can still contain this action after sync or
+            // import, so keep the PI responsive without probing a source that
+            // cannot exist on this platform.
+            void this.updateRuntimeCache(event, {
+                availableCatalogMetricDescriptors: [],
+                catalogMetricDescriptorLoadState: "failed",
+            });
+            return;
+        }
+
         this.refreshCatalogMetricDescriptorsForPropertyInspector(event)
             .catch(error => {
                 log.warn(() => `Failed to refresh catalog metric runtime cache: ${String(error)}`);
@@ -214,6 +226,10 @@ function buildNoSelectionWidgetData(): WidgetData {
 function resolveNoSelectionNoticeText(
     helperStatus: SourceClientStatus | undefined,
 ): string | undefined {
+    if (process.platform !== "win32") {
+        return undefined;
+    }
+
     if (helperStatus?.state === "unavailable" && helperStatus.reason === "helperNotInstalled") {
         return CATALOG_INSTALL_HELPER_NOTICE_TEXT;
     }

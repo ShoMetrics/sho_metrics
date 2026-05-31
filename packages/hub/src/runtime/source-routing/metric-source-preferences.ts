@@ -22,6 +22,8 @@ import {
     NODE_SYSTEM_SOURCE_ID,
     WINDOWS_HELPER_SOURCE_ID,
 } from "../sources/source-ids";
+import { isNodeSystemMetricSupportedOnPlatform } from "../source-capabilities/node-system-platform-capabilities";
+import type { MetricSupportPlatform } from "../source-capabilities/metric-support-platform";
 
 const NODE_SYSTEM_ONLY_METRIC_KEYS = [
     CPU_USAGE_METRIC_KEY,
@@ -40,6 +42,9 @@ const NODE_SYSTEM_ONLY_METRIC_KEYS = [
 const WINDOWS_HELPER_ONLY_METRIC_KEYS = [
     CPU_TEMP_METRIC_KEY,
     CPU_POWER_METRIC_KEY,
+] as const;
+
+const WINDOWS_HELPER_ON_WINDOWS_NODE_ON_OTHER_PLATFORM_METRIC_KEYS = [
     getDiskThroughputMetricKey("read"),
     getDiskThroughputMetricKey("write"),
 ] as const;
@@ -59,11 +64,15 @@ const WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEYS = [...GPU_METRIC_KEYS] as co
 export const BUILT_IN_STABLE_METRIC_KEYS = [
     ...NODE_SYSTEM_ONLY_METRIC_KEYS,
     ...WINDOWS_HELPER_ONLY_METRIC_KEYS,
+    ...WINDOWS_HELPER_ON_WINDOWS_NODE_ON_OTHER_PLATFORM_METRIC_KEYS,
     ...WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEYS,
 ] as const;
 
 const NODE_SYSTEM_ONLY_METRIC_KEY_SET = new Set<string>(NODE_SYSTEM_ONLY_METRIC_KEYS);
 const WINDOWS_HELPER_ONLY_METRIC_KEY_SET = new Set<string>(WINDOWS_HELPER_ONLY_METRIC_KEYS);
+const WINDOWS_HELPER_ON_WINDOWS_NODE_ON_OTHER_PLATFORM_METRIC_KEY_SET = new Set<string>(
+    WINDOWS_HELPER_ON_WINDOWS_NODE_ON_OTHER_PLATFORM_METRIC_KEYS,
+);
 const WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEY_SET = new Set<string>(
     WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEYS,
 );
@@ -84,22 +93,26 @@ const WINDOWS_HELPER_THEN_NODE_CANDIDATES = [
  */
 export function resolveLocalAutoMetricSourceCandidates(
     metricKey: string,
-    platform: NodeJS.Platform,
+    platform: MetricSupportPlatform,
 ): readonly SourceCandidate[] {
-    if (platform !== "win32") {
-        return NODE_SYSTEM_CANDIDATES;
+    if (WINDOWS_HELPER_ONLY_METRIC_KEY_SET.has(metricKey)) {
+        return filterSourceCandidatesForMetricPlatform(WINDOWS_HELPER_CANDIDATES, metricKey, platform);
     }
 
-    if (WINDOWS_HELPER_ONLY_METRIC_KEY_SET.has(metricKey)) {
-        return WINDOWS_HELPER_CANDIDATES;
+    if (WINDOWS_HELPER_ON_WINDOWS_NODE_ON_OTHER_PLATFORM_METRIC_KEY_SET.has(metricKey)) {
+        return filterSourceCandidatesForMetricPlatform(
+            platform === "win32" ? WINDOWS_HELPER_CANDIDATES : NODE_SYSTEM_CANDIDATES,
+            metricKey,
+            platform,
+        );
     }
 
     if (WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEY_SET.has(metricKey)) {
-        return WINDOWS_HELPER_THEN_NODE_CANDIDATES;
+        return filterSourceCandidatesForMetricPlatform(WINDOWS_HELPER_THEN_NODE_CANDIDATES, metricKey, platform);
     }
 
     if (hasExplicitLocalAutoMetricSourcePreference(metricKey)) {
-        return NODE_SYSTEM_CANDIDATES;
+        return filterSourceCandidatesForMetricPlatform(NODE_SYSTEM_CANDIDATES, metricKey, platform);
     }
 
     return NODE_SYSTEM_CANDIDATES;
@@ -124,7 +137,47 @@ export function isBuiltInMetricHelperOnly(metricKey: string): boolean {
 export function hasExplicitLocalAutoMetricSourcePreference(metricKey: string): boolean {
     return NODE_SYSTEM_ONLY_METRIC_KEY_SET.has(metricKey)
         || WINDOWS_HELPER_ONLY_METRIC_KEY_SET.has(metricKey)
+        || WINDOWS_HELPER_ON_WINDOWS_NODE_ON_OTHER_PLATFORM_METRIC_KEY_SET.has(metricKey)
         || WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEY_SET.has(metricKey)
         || isNetworkMetricKey(metricKey)
         || isDiskUsageMetricKey(metricKey);
+}
+
+/** Reports whether a stable built-in metric has any local source on a platform. */
+export function isBuiltInMetricSupportedOnPlatform(
+    metricKey: string,
+    platform: MetricSupportPlatform,
+): boolean {
+    return hasExplicitLocalAutoMetricSourcePreference(metricKey)
+        && resolveLocalAutoMetricSourceCandidates(metricKey, platform).length > 0;
+}
+
+/**
+ * Reports whether a built-in local source can produce a metric on a platform.
+ *
+ * This is static source capability, not a hardware or helper availability probe.
+ */
+export function localSourceSupportsMetricOnPlatform(
+    sourceId: string,
+    metricKey: string,
+    platform: MetricSupportPlatform,
+): boolean {
+    switch (sourceId) {
+        case WINDOWS_HELPER_SOURCE_ID:
+            return platform === "win32";
+        case NODE_SYSTEM_SOURCE_ID:
+            return isNodeSystemMetricSupportedOnPlatform(metricKey, platform);
+        default:
+            return true;
+    }
+}
+
+function filterSourceCandidatesForMetricPlatform(
+    sourceCandidates: readonly SourceCandidate[],
+    metricKey: string,
+    platform: MetricSupportPlatform,
+): readonly SourceCandidate[] {
+    return sourceCandidates.filter(sourceCandidate =>
+        localSourceSupportsMetricOnPlatform(sourceCandidate.sourceId, metricKey, platform),
+    );
 }

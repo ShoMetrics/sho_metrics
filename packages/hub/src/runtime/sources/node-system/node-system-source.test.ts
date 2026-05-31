@@ -88,16 +88,29 @@ test("node system source declares polling groups for owned metric keys", () => {
     });
 });
 
-test("node system source declares only GPU usage as supported on macOS", () => {
+test("node system source declares unsupported helper-only and macOS GPU metrics", () => {
     const source = new NodeSystemSource({ platform: "darwin" });
 
     const resolutions = source.resolveMetricPollingGroups([
+        "cpu.usage_percent",
+        "cpu.temp",
+        "cpu.power",
         "gpu.usage_percent",
         "gpu.temp",
         "gpu.vram_used",
         "gpu.power",
     ]);
 
+    assert.deepEqual(resolutions.get("cpu.usage_percent"), {
+        state: "owned",
+        pollingGroupId: "cpu",
+    });
+    assert.deepEqual(resolutions.get("cpu.temp"), {
+        state: "unsupported",
+    });
+    assert.deepEqual(resolutions.get("cpu.power"), {
+        state: "unsupported",
+    });
     assert.deepEqual(resolutions.get("gpu.usage_percent"), {
         state: "owned",
         pollingGroupId: "gpu",
