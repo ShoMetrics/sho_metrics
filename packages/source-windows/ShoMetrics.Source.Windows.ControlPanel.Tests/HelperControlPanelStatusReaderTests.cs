@@ -89,6 +89,62 @@ public sealed class HelperControlPanelStatusReaderTests
         Assert.NotEqual("No sample", status.Diagnostics.LastSampleText);
     }
 
+    [Fact]
+    public async Task ReadAsyncAggregatesWarningsFromHealthDescriptorsAndSnapshot()
+    {
+        var sourceClient = new FakeHelperControlPanelSourceClient
+        {
+            Health = new GetSourceHealthResponse
+            {
+                Warnings =
+                {
+                    new SourceWarning
+                    {
+                        Code = "health",
+                        Message = "Health warning.",
+                    },
+                },
+            },
+            Descriptors = new ListMetricDescriptorsResponse
+            {
+                Warnings =
+                {
+                    new SourceWarning
+                    {
+                        Code = "catalog",
+                        Message = "Descriptor warning.",
+                    },
+                },
+            },
+            Snapshot = new ReadMetricSnapshotResponse
+            {
+                Warnings =
+                {
+                    new SourceWarning
+                    {
+                        Code = "snapshot",
+                        Message = "Snapshot warning.",
+                    },
+                },
+            },
+        };
+        var reader = new HelperControlPanelStatusReader(
+            new FakeWindowsServiceStatusReader(WindowsServiceStatusKind.Running),
+            sourceClient);
+
+        HelperControlPanelStatus status = await reader.ReadAsync(CancellationToken.None);
+
+        Assert.Equal("Connected", status.Service.ConnectionText);
+        Assert.Equal("3 warnings", status.Diagnostics.WarningCountText);
+        Assert.Equal("Copy diagnostics or open logs for support details.", status.Diagnostics.DetailText);
+        Assert.Equal(ControlPanelStatusTone.Caution, status.Diagnostics.Tone);
+        Assert.True(status.Diagnostics.HasDetails);
+        Assert.Contains("health: Health warning.", status.Diagnostics.WarningDetailsText, StringComparison.Ordinal);
+        Assert.Contains("catalog: Descriptor warning.", status.Diagnostics.WarningDetailsText, StringComparison.Ordinal);
+        Assert.Contains("snapshot: Snapshot warning.", status.Diagnostics.WarningDetailsText, StringComparison.Ordinal);
+        Assert.Equal("", status.ErrorText);
+    }
+
     [Theory]
     [InlineData(SourceComponentState.Ok, "Installed")]
     [InlineData(SourceComponentState.NotInstalled, "Not installed")]
