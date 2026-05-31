@@ -1,0 +1,16 @@
+{
+    "extends": "./tsconfig.test.json",
+    "compilerOptions": {
+        "types": [
+            "node",
+            "jsdom"
+        ]
+    },
+    "include": [
+        "src/property-inspector/**/*.pi.test.tsx",
+        "src/property-inspector/testing/dom-test-setup.ts"
+    ],
+    "exclude": [
+        "node_modules"
+    ]
+}
