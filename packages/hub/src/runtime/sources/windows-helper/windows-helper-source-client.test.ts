@@ -5,6 +5,7 @@ import test from "node:test";
 import {
     GetSourceHealthResponseSchema,
     ListMetricDescriptorsResponseSchema,
+    MetricDescriptorSchema,
     MetricIdKind as ProtoMetricIdKind,
     MetricUnavailableReason as ProtoMetricUnavailableReason,
     MetricUnavailableReportSchema,
@@ -17,6 +18,7 @@ import {
     type GetSourceHealthResponse,
     type ListMetricDescriptorsRequest,
     type ListMetricDescriptorsResponse,
+    type MetricDescriptor as ProtoMetricDescriptor,
     type MetricUnavailableReport as ProtoMetricUnavailableReport,
     type MetricValueAttribution as ProtoMetricValueAttribution,
     type ReadMetricSnapshotRequest,
@@ -581,6 +583,38 @@ test("windows helper source client sends requested metric ids and returns a runt
     );
 });
 
+test("windows helper source client records missing snapshot responses as source errors", async () => {
+    const nowMilliseconds = 1000;
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
+            case "getSourceHealth":
+                return buildHealthResponse();
+            case "readMetricSnapshot":
+                return create(ReadMetricSnapshotResponseSchema);
+            default:
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport, {}, {
+        monotonicNow: () => nowMilliseconds,
+        wallClockNow: () => nowMilliseconds,
+    });
+
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /without a snapshot/u,
+    );
+
+    assert.deepEqual(client.getCachedStatus(), {
+        state: "unavailable",
+        reason: "sourceError",
+        retryAfterTimestampMilliseconds: nowMilliseconds + INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+        lastErrorCode: "missing_snapshot",
+        lastErrorMessage: "Windows source returned a snapshot response without a snapshot.",
+        lastFailureAtTimestampMilliseconds: nowMilliseconds,
+    });
+});
+
 test("windows helper source client maps value attribution and unavailable metric reports", async () => {
     const transport = new FakeWindowsHelperGrpcTransport(request => {
         switch (request.method) {
@@ -809,6 +843,65 @@ test("windows helper source client returns descriptors with the catalog fingerpr
     }]);
 });
 
+test("windows helper source client records missing descriptor snapshots as source errors", async () => {
+    const nowMilliseconds = 1000;
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
+            case "getSourceHealth":
+                return buildHealthResponse();
+            case "listMetricDescriptors":
+                return create(ListMetricDescriptorsResponseSchema);
+            default:
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport, {}, {
+        monotonicNow: () => nowMilliseconds,
+        wallClockNow: () => nowMilliseconds,
+    });
+
+    await assert.rejects(
+        async () => await client.listMetricDescriptors(["cpu.usage_percent"]),
+        /without a descriptor snapshot/u,
+    );
+
+    assert.deepEqual(client.getCachedStatus(), {
+        state: "unavailable",
+        reason: "sourceError",
+        retryAfterTimestampMilliseconds: nowMilliseconds + INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+        lastErrorCode: "missing_descriptor_snapshot",
+        lastErrorMessage: "Windows source returned a descriptor response without a descriptor snapshot.",
+        lastFailureAtTimestampMilliseconds: nowMilliseconds,
+    });
+});
+
+test("windows helper source client drops descriptors without raw sensor identity", async () => {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
+            case "getSourceHealth":
+                return buildHealthResponse();
+            case "listMetricDescriptors":
+                return buildDescriptorResponse({
+                    descriptors: [create(MetricDescriptorSchema, {
+                        metricId: "cpu.usage_percent",
+                        pollingGroupId: CPU_HELPER_POLLING_GROUP_ID,
+                        valueKind: ProtoMetricValueKind.SCALAR,
+                        unit: MetricUnit.PERCENT,
+                        metricIdKind: ProtoMetricIdKind.STABLE_ALIAS,
+                    })],
+                });
+            default:
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport);
+
+    const descriptorSnapshot = await client.listMetricDescriptors(["cpu.usage_percent"]);
+
+    assert.equal(descriptorSnapshot.descriptorFingerprint, "catalog-sha256-test");
+    assert.deepEqual(descriptorSnapshot.descriptors, []);
+});
+
 test("windows helper source client drops descriptors without polling group ids", async () => {
     const transport = new FakeWindowsHelperGrpcTransport(request => {
         switch (request.method) {
@@ -880,6 +973,54 @@ test("windows helper source client cools down unsupported protocol retries", asy
         /Unsupported Windows source protocol/u,
     );
     assert.equal(transport.requests.length, 2);
+});
+
+test("windows helper source client recovers after protocol mismatch cooldown", async () => {
+    let nowMilliseconds = 1000;
+    let healthRequestCount = 0;
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
+            case "getSourceHealth":
+                healthRequestCount += 1;
+                return healthRequestCount === 1
+                    ? buildHealthResponse("2")
+                    : buildHealthResponse();
+            case "readMetricSnapshot":
+                return buildSnapshotResponse();
+            default:
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
+        }
+    });
+    const client = new WindowsHelperSourceClient({
+        transport,
+        monotonicNow: () => nowMilliseconds,
+        wallClockNow: () => nowMilliseconds,
+        serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
+        timeouts: {
+            healthMilliseconds: 10,
+            readSnapshotMilliseconds: 10,
+        },
+    });
+
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /Unsupported Windows source protocol/u,
+    );
+
+    nowMilliseconds += UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS;
+
+    const readResult = await client.readSnapshot(["cpu.usage_percent"]);
+
+    assert.equal(readResult.snapshot.metrics["cpu.usage_percent"]?.value.value, 42);
+    assert.deepEqual(client.getCachedStatus(), {
+        state: "available",
+        protocolVersion: SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION,
+        lastSuccessAtTimestampMilliseconds: nowMilliseconds,
+    });
+    assert.deepEqual(
+        transport.requests.map(request => request.method),
+        ["getSourceHealth", "getSourceHealth", "readMetricSnapshot"],
+    );
 });
 
 test("windows helper source client cools down unavailable helper retries", async () => {
@@ -1359,7 +1500,7 @@ function buildSnapshotResponse(
 function buildDescriptorResponse(
     options: {
         readonly descriptorFingerprint?: string;
-        readonly descriptors?: readonly ReturnType<typeof buildDescriptor>[];
+        readonly descriptors?: readonly ProtoMetricDescriptor[];
     } = {},
 ): ListMetricDescriptorsResponse {
     return create(ListMetricDescriptorsResponseSchema, {
@@ -1373,22 +1514,8 @@ function buildDescriptorResponse(
 function buildDescriptor(options: {
     readonly metricId: string;
     readonly pollingGroupId?: string;
-}): {
-    readonly metricId: string;
-    readonly rawSensorIdentity: {
-        readonly sourceSensorId: string;
-        readonly hardwareId: string;
-        readonly hardwareName: string;
-        readonly hardwareType: string;
-        readonly sensorName: string;
-        readonly sourceSensorType: string;
-    };
-    readonly pollingGroupId: string;
-    readonly valueKind: ProtoMetricValueKind;
-    readonly unit: MetricUnit;
-    readonly metricIdKind: ProtoMetricIdKind;
-} {
-    return {
+}): ProtoMetricDescriptor {
+    return create(MetricDescriptorSchema, {
         metricId: options.metricId,
         rawSensorIdentity: {
             sourceSensorId: `lhm:/${options.metricId}`,
@@ -1402,7 +1529,7 @@ function buildDescriptor(options: {
         valueKind: ProtoMetricValueKind.SCALAR,
         unit: MetricUnit.PERCENT,
         metricIdKind: ProtoMetricIdKind.STABLE_ALIAS,
-    };
+    });
 }
 
 function defaultHelperPollingGroupId(metricId: string): string {

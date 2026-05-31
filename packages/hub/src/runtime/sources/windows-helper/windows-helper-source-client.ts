@@ -239,7 +239,13 @@ export class WindowsHelperSourceClient implements SourceClient {
 
         const snapshot = readResponse.snapshot;
         if (!snapshot) {
-            throw new Error("Windows source returned a snapshot response without a snapshot.");
+            const error = new WindowsHelperSourceClientError(
+                "Windows source returned a snapshot response without a snapshot.",
+                "missing_snapshot",
+                "sourceError",
+            );
+            this.recordHelperRequestFailure(error);
+            throw error;
         }
 
         const timestampMilliseconds = readMetricSnapshotTimestampMilliseconds(snapshot);
@@ -368,7 +374,13 @@ export class WindowsHelperSourceClient implements SourceClient {
 
         const descriptorSnapshot = listResponse.descriptorSnapshot;
         if (!descriptorSnapshot) {
-            throw new Error("Windows source returned a descriptor response without a descriptor snapshot.");
+            const error = new WindowsHelperSourceClientError(
+                "Windows source returned a descriptor response without a descriptor snapshot.",
+                "missing_descriptor_snapshot",
+                "sourceError",
+            );
+            this.recordHelperRequestFailure(error);
+            throw error;
         }
 
         this.recordHelperRequestSuccess();
