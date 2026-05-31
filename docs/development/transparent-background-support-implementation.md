@@ -939,6 +939,10 @@ Add or update these tests:
   - Progress bar track and fill use larger filled rounded rectangle backings, not stroke-only backings.
   - Grid lines, dividers, chart panel borders, Pixel Window chrome text, and icons are not outlined.
 
+- Visual tests:
+  - Keep the main visual matrix disabled/default for baseline stability.
+  - Add dedicated enabled transparent surface snapshots for Flat circle, non-Flat bar, Pixel Window sparkline, and dual sparkline.
+
 - PI tests:
   - Widget Appearance theme section renders toggle and three sliders.
   - Changing controls patches the active selected theme.

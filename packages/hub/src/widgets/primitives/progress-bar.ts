@@ -16,7 +16,10 @@ import {
 import {
     adjustHexColorBrightness,
     clamp,
+    escapeSvgText,
+    isSvgOutlineEnabled,
     renderStyledSvgText,
+    resolveSvgFilledShapeOutlinePadding,
 } from "../../view-rendering/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget-contract";
 import { renderMetricTextRow } from "./metric-text-row";
@@ -28,6 +31,7 @@ export interface ProgressBarConfig extends WidgetBaseConfig {
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
     textOutline?: RenderOutlineTokens;
+    shapeOutline?: RenderOutlineTokens;
     topIconFragment?: string;
 }
 
@@ -59,6 +63,7 @@ export const DEFAULT_PROGRESS_BAR_CONFIG: ProgressBarConfig = {
     textStyles: DEFAULT_RENDER_TEXT_STYLES,
     themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     textOutline: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS.textOutline,
+    shapeOutline: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS.shapeOutline,
     gradientHeadAdjustmentPercent: -15,
 };
 
@@ -258,8 +263,8 @@ function renderSingleBar(
             themeEffects: config.themeEffects,
             textOutline: config.textOutline,
         })}
-        ${renderTrack(layoutPlan.singleBar, config.paints.track, config.themeEffects.subtleFilter)}
-        ${renderFill(layoutPlan.singleBar, fillWidth, fillPaint, config.themeEffects.metricFilter)}
+        ${renderTrack(layoutPlan.singleBar, config.paints.track, config.themeEffects.subtleFilter, config.shapeOutline)}
+        ${renderFill(layoutPlan.singleBar, fillWidth, fillPaint, config.themeEffects.metricFilter, config.shapeOutline)}
         ${renderSecondaryText({
             text: data.secondaryDisplayValue,
             layout: layoutPlan.singleSecondaryText,
@@ -358,8 +363,8 @@ function renderChannelBars(
                     themeEffects: config.themeEffects,
                     textOutline: config.textOutline,
                 })}
-                ${renderTrack(channelLayout.bar, config.paints.track, config.themeEffects.subtleFilter)}
-                ${renderFill(channelLayout.bar, fillWidth, fillPaint, config.themeEffects.metricFilter)}
+                ${renderTrack(channelLayout.bar, config.paints.track, config.themeEffects.subtleFilter, config.shapeOutline)}
+                ${renderFill(channelLayout.bar, fillWidth, fillPaint, config.themeEffects.metricFilter, config.shapeOutline)}
             `;
         }).join("")}
     `;
@@ -534,16 +539,68 @@ function renderSecondaryText(options: {
     });
 }
 
-function renderTrack(layout: BarLayout, color: string, filter: string | undefined): string {
+function renderTrack(
+    layout: BarLayout,
+    color: string,
+    filter: string | undefined,
+    outline: RenderOutlineTokens | undefined,
+): string {
     return `
+        ${renderFilledRectOutline({
+            className: "progress-bar-track-outline",
+            layout,
+            width: layout.width,
+            outline,
+        })}
         <rect x="${layout.xCoordinate}" y="${layout.yCoordinate}" width="${layout.width}" height="${layout.height}"
             rx="${layout.radius}" fill="${color}" ${buildSvgFilterAttributes(filter).join(" ")} />
     `;
 }
 
-function renderFill(layout: BarLayout, fillWidth: number, fillPaint: string, filter: string | undefined): string {
+function renderFill(
+    layout: BarLayout,
+    fillWidth: number,
+    fillPaint: string,
+    filter: string | undefined,
+    outline: RenderOutlineTokens | undefined,
+): string {
     return `
+        ${renderFilledRectOutline({
+            className: "progress-bar-fill-outline",
+            layout,
+            width: fillWidth,
+            outline,
+        })}
         <rect x="${layout.xCoordinate}" y="${layout.yCoordinate}" width="${fillWidth}" height="${layout.height}"
             rx="${layout.radius}" fill="${fillPaint}" ${buildSvgFilterAttributes(filter).join(" ")} />
     `;
+}
+
+function renderFilledRectOutline(options: {
+    className: string;
+    layout: BarLayout;
+    width: number;
+    outline: RenderOutlineTokens | undefined;
+}): string {
+    if (!isSvgOutlineEnabled(options.outline) || options.width <= 0 || options.layout.height <= 0) {
+        return "";
+    }
+
+    // Bars are filled rectangles, not stroked shapes. Draw a larger black
+    // rounded rect behind the foreground so the visible interior stays crisp.
+    const padding = resolveSvgFilledShapeOutlinePadding(options.layout.height, options.outline);
+
+    return `<rect class="${options.className}"
+        x="${formatSvgNumber(options.layout.xCoordinate - padding)}"
+        y="${formatSvgNumber(options.layout.yCoordinate - padding)}"
+        width="${formatSvgNumber(options.width + padding * 2)}"
+        height="${formatSvgNumber(options.layout.height + padding * 2)}"
+        rx="${formatSvgNumber(options.layout.radius + padding)}"
+        fill="${escapeSvgText(options.outline.color)}" opacity="${formatSvgNumber(options.outline.strength)}" />`;
+}
+
+function formatSvgNumber(value: number): string {
+    const safeValue = Number.isFinite(value) ? value : 0;
+
+    return Number.isInteger(safeValue) ? String(safeValue) : safeValue.toFixed(2);
 }

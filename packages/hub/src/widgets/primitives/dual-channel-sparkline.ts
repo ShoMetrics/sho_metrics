@@ -8,7 +8,14 @@ import {
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     type RenderThemeEffectTokens,
 } from "../../view-rendering/render-svg-effects";
-import { adjustHexColorBrightness, clamp, renderStyledSvgText } from "../../view-rendering/svg-utils";
+import {
+    adjustHexColorBrightness,
+    clamp,
+    formatSvgShapeOutlineStrokeAttributes,
+    isSvgOutlineEnabled,
+    renderStyledSvgText,
+    resolveSvgShapeOutlineStrokeWidth,
+} from "../../view-rendering/svg-utils";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
     type RenderTextStyles,
@@ -18,6 +25,7 @@ import { renderMetricTextRow } from "./metric-text-row";
 import {
     buildDualSparklineChannelModels,
     type DualSparklineChannelInput,
+    type DualSparklineChannelModel,
     type DualSparklineChartLayout,
     type DualSparklinePoint,
 } from "./dual-channel-sparkline-chart";
@@ -47,6 +55,7 @@ export interface DualChannelSparklineConfig extends WidgetBaseConfig {
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
     textOutline?: RenderOutlineTokens;
+    shapeOutline?: RenderOutlineTokens;
 }
 
 // Dual-channel sparklines draw directly on the theme background, so they intentionally omit surface/divider paints.
@@ -86,6 +95,7 @@ export const DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG: DualChannelSparklineConfig =
     textStyles: DEFAULT_RENDER_TEXT_STYLES,
     themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     textOutline: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS.textOutline,
+    shapeOutline: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS.shapeOutline,
 };
 
 const CHART_PLOT_TOP_INSET = 2;
@@ -248,6 +258,7 @@ export function renderDualChannelSparkline(
             lineWidth: config.lineWidth,
             glowFilterId,
             themeEffects: config.themeEffects,
+            outline: config.shapeOutline,
         })}
         ${renderChannelLinePaths({
             model: negativeModel,
@@ -255,6 +266,7 @@ export function renderDualChannelSparkline(
             lineWidth: config.lineWidth,
             glowFilterId,
             themeEffects: config.themeEffects,
+            outline: config.shapeOutline,
         })}
     `;
 }
@@ -597,11 +609,12 @@ function renderChannelAreaPath(options: {
 }
 
 function renderChannelLinePaths(options: {
-    model: { linePath: string; areaPath: string } | undefined;
+    model: DualSparklineChannelModel | undefined;
     linePaint: string;
     lineWidth: number;
     glowFilterId: string;
     themeEffects: RenderThemeEffectTokens;
+    outline: RenderOutlineTokens | undefined;
 }): string {
     if (!options.model) {
         return "";
@@ -611,9 +624,37 @@ function renderChannelLinePaths(options: {
         <path d="${options.model.linePath}" fill="none" stroke="${options.linePaint}"
             stroke-width="${Math.max(1, options.lineWidth + 1.2)}" stroke-linejoin="round"
             stroke-linecap="round" filter="url(#${options.glowFilterId})" opacity="0.46" />
+        ${renderChannelLineOutline({
+            model: options.model,
+            lineWidth: options.lineWidth,
+            outline: options.outline,
+        })}
         <path d="${options.model.linePath}" fill="none" stroke="${options.linePaint}"
             stroke-width="${options.lineWidth}" stroke-linejoin="round" stroke-linecap="round" ${buildSvgFilterAttributes(options.themeEffects.metricFilter).join(" ")} />
     `;
+}
+
+function renderChannelLineOutline(options: {
+    model: DualSparklineChannelModel;
+    lineWidth: number;
+    outline: RenderOutlineTokens | undefined;
+}): string {
+    if (!isSvgOutlineEnabled(options.outline)) {
+        return "";
+    }
+
+    // Draw backing only for channel data lines. Mirrored baselines and grid
+    // guides are chart chrome and should stay outside shape outline handling.
+    const strokeWidth = resolveSvgShapeOutlineStrokeWidth(options.lineWidth, options.outline);
+
+    return `<path class="dual-sparkline-${options.model.channelId}-line-outline"
+        d="${options.model.linePath}"
+        ${formatSvgShapeOutlineStrokeAttributes({
+            outline: options.outline,
+            strokeWidth,
+            lineCap: "round",
+            lineJoin: "round",
+        })} />`;
 }
 
 function renderGridLines(options: {

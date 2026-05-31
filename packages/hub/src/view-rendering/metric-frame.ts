@@ -21,10 +21,15 @@ export interface MetricFrameBody {
     readonly muted: boolean;
 }
 
+/**
+ * Composes one or more metric body SVG fragments inside the selected theme frame.
+ */
 export function renderMetricFrame(options: {
     bodies: readonly MetricFrameBody[];
     themePreset: ThemePresetName;
+    /** Theme-owned background/chrome paints. Metric body paints are already baked into each body SVG. */
     themePaints: ThemeStylePaints;
+    /** Applies only to theme background/chrome fragments; metric bodies remain fully opaque. */
     themeChromeOpacity: number;
     size: KeySize;
 }): string {

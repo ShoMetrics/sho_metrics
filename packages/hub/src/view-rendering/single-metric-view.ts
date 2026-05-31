@@ -52,6 +52,11 @@ export interface SingleMetricBodyViewProps {
     circleVariant: CircleVariant;
 }
 
+/**
+ * Renders only the metric body for the selected single-metric view.
+ *
+ * Theme frame/background composition happens later in renderMetricFrame.
+ */
 export function renderSingleMetricBodyView(options: SingleMetricBodyViewProps): string {
     switch (options.visual.renderPrimitive) {
         case "circle":
@@ -77,6 +82,7 @@ function renderSingleCircularMetric(options: SingleMetricBodyViewProps): string 
         textStyles: options.visual.textStyles,
         themeEffects: options.visual.themeEffects,
         textOutline: options.visual.transparentSurface.textOutline,
+        shapeOutline: options.visual.transparentSurface.shapeOutline,
         circleVariant: options.circleVariant,
         centerIconFragment: options.centerIcon,
         footerIconFragment: options.footerIcon,
@@ -124,6 +130,7 @@ function renderSingleBarMetric(options: SingleMetricBodyViewProps): string {
         textStyles: options.visual.textStyles,
         themeEffects: options.visual.themeEffects,
         textOutline: options.visual.transparentSurface.textOutline,
+        shapeOutline: options.visual.transparentSurface.shapeOutline,
         topIconFragment: options.topIcon ?? options.centerIcon,
     }, options.renderSize);
 }
@@ -149,6 +156,7 @@ function renderSingleSparklineMetric(options: SingleMetricBodyViewProps): string
         textStyles: options.visual.textStyles,
         themeEffects: options.visual.themeEffects,
         textOutline: options.visual.transparentSurface.textOutline,
+        shapeOutline: options.visual.transparentSurface.shapeOutline,
         topIconFragment: options.topIcon ?? options.centerIcon,
     }, options.renderSize);
 }

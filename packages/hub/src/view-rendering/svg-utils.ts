@@ -175,6 +175,9 @@ export function renderConstrainedSvgText(options: ConstrainedSvgTextOptions): st
     `;
 }
 
+/**
+ * Converts a text outline strength token into a concrete SVG stroke width.
+ */
 export function resolveSvgTextOutlineStrokeWidth(fontSize: number, outline: RenderOutlineTokens): number {
     return fontSize * (
         TEXT_OUTLINE_STROKE_WIDTH_FLOOR_RATIO
@@ -182,6 +185,12 @@ export function resolveSvgTextOutlineStrokeWidth(fontSize: number, outline: Rend
     );
 }
 
+/**
+ * Formats text-outline attributes as a leading-space SVG attribute fragment.
+ *
+ * Callers append this directly inside a <text> start tag; disabled outlines
+ * return an empty string so default SVG output stays unchanged.
+ */
 export function formatSvgTextOutlineAttributes(options: {
     outline: RenderOutlineTokens | undefined;
     strokeWidth: number;
@@ -201,12 +210,21 @@ export function formatSvgTextOutlineAttributes(options: {
         `${lineJoinAttribute} paint-order="stroke fill"`;
 }
 
+/**
+ * Shared outline gate; disabled outlines must emit no hidden SVG elements.
+ */
 export function isSvgOutlineEnabled(outline: RenderOutlineTokens | undefined): outline is RenderOutlineTokens {
     return outline !== undefined && outline.strength > 0;
 }
 
 // Shape primitives use these helpers to draw backing SVG elements before the
 // foreground shape. They do not encode product-level transparent-surface intent.
+/**
+ * Returns the full stroke width for a stroked-shape backing.
+ *
+ * Use this when the foreground itself is a stroked line/circle/path and the
+ * backing should be a wider stroke behind it.
+ */
 export function resolveSvgShapeOutlineStrokeWidth(
     foregroundStrokeWidth: number,
     outline: RenderOutlineTokens | undefined,
@@ -214,6 +232,12 @@ export function resolveSvgShapeOutlineStrokeWidth(
     return foregroundStrokeWidth + resolveSvgShapeOutlineExtraWidth(foregroundStrokeWidth, outline);
 }
 
+/**
+ * Returns only the extra width added beyond the foreground geometry.
+ *
+ * Use this for filled annular paths where the backing stroke is drawn behind
+ * the filled path instead of replacing the foreground stroke width.
+ */
 export function resolveSvgShapeOutlineExtraWidth(
     referenceSize: number,
     outline: RenderOutlineTokens | undefined,
@@ -228,6 +252,9 @@ export function resolveSvgShapeOutlineExtraWidth(
     );
 }
 
+/**
+ * Returns per-side padding for filled backing shapes such as bars and dots.
+ */
 export function resolveSvgFilledShapeOutlinePadding(
     referenceSize: number,
     outline: RenderOutlineTokens | undefined,
@@ -235,6 +262,12 @@ export function resolveSvgFilledShapeOutlinePadding(
     return resolveSvgShapeOutlineExtraWidth(referenceSize, outline) / 2;
 }
 
+/**
+ * Formats stroked-shape backing attributes as a leading-space SVG fragment.
+ *
+ * The helper intentionally sets fill="none"; filled rectangles/circles should
+ * draw larger filled backing shapes instead of using this stroke helper.
+ */
 export function formatSvgShapeOutlineStrokeAttributes(options: {
     outline: RenderOutlineTokens | undefined;
     strokeWidth: number;

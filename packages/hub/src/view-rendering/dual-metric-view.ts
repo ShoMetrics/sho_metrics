@@ -65,6 +65,11 @@ export interface DualMetricBodyViewProps {
     negative: DualMetricChannelViewProps;
 }
 
+/**
+ * Renders only the metric body for the selected dual-channel view.
+ *
+ * Theme frame/background composition happens later in renderMetricFrame.
+ */
 export function renderDualMetricBodyView(options: DualMetricBodyViewProps): string {
     switch (options.renderPrimitive) {
         case "circle":
@@ -87,6 +92,7 @@ function renderDualCircularMetric(options: DualMetricBodyViewProps): string {
         textStyles: options.visual.textStyles,
         themeEffects: options.visual.themeEffects,
         textOutline: options.visual.transparentSurface.textOutline,
+        shapeOutline: options.visual.transparentSurface.shapeOutline,
         positiveColor: options.positive.color,
         negativeColor: options.negative.color,
         positiveColorConfig: options.positive.colorConfig,
@@ -164,5 +170,6 @@ function renderDualSparklineMetric(options: DualMetricBodyViewProps): string {
         textStyles: options.visual.textStyles,
         themeEffects: options.visual.themeEffects,
         textOutline: options.visual.transparentSurface.textOutline,
+        shapeOutline: options.visual.transparentSurface.shapeOutline,
     }, options.renderSize);
 }

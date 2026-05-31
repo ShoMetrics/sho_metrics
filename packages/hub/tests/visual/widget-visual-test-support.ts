@@ -32,7 +32,6 @@ import type { DualChannelProgressCircleCenterContent } from "../../src/widgets/p
 import type { DualChannelSparklineMode } from "../../src/widgets/primitives/dual-channel-sparkline";
 import { getMetricStatusIcon } from "../../src/widgets/icons/metric-status-icons";
 
-// TODO(Step 7): Add enabled transparent-surface visual snapshots after text and shape outlines land.
 const VISUAL_TEST_INTER_FONT_FILE = path.resolve(process.cwd(), "assets", "fonts", "inter", "InterVariable.ttf");
 const VISUAL_TEST_SHARE_TECH_MONO_FONT_FILE = path.resolve(
     process.cwd(),
