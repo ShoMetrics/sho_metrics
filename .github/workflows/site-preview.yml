@@ -36,7 +36,11 @@ jobs:
       - name: Build site
         shell: bash
         working-directory: site
-        run: ../hugo --destination public --minify
+        run: ../hugo --destination public --minify --printPathWarnings
+
+      - name: Run site smoke checks
+        shell: pwsh
+        run: ./.github/scripts/Test-SitePreview.ps1 -PublicRoot site/public
 
       - name: Upload preview artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

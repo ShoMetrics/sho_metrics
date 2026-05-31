@@ -9,20 +9,37 @@ import {
     STREAM_DECK_PLUGIN_UUID,
 } from "./stream-deck-actions";
 
+const SD_PLUGIN_ROOT = "com.ez.sho-metrics.sdPlugin";
+
 interface StreamDeckManifest {
     UUID?: string;
+    CategoryIcon?: string;
+    CodePath?: string;
+    Icon?: string;
+    Nodejs?: {
+        Version?: string;
+    };
     Actions?: readonly StreamDeckManifestAction[];
 }
 
 interface StreamDeckManifestAction {
+    Name?: string;
     UUID?: string;
+    Icon?: string;
+    PropertyInspectorPath?: string;
+    Controllers?: readonly string[];
+    Encoder?: {
+        Icon?: string;
+        layout?: string;
+    };
     OS?: readonly string[];
+    States?: readonly {
+        Image?: string;
+    }[];
 }
 
 test("Stream Deck action UUID constants match the manifest", () => {
-    const manifest = JSON.parse(
-        readFileSync("com.ez.sho-metrics.sdPlugin/manifest.json", "utf8"),
-    ) as StreamDeckManifest;
+    const manifest = readManifest();
     const manifestActionUuids = new Set(
         (manifest.Actions ?? [])
             .map((action) => action.UUID)
@@ -44,10 +61,38 @@ test("Stream Deck action kind resolution requires an exact manifest UUID", () =>
     assert.equal(resolveStreamDeckActionKind("com.example.network"), "unknown");
 });
 
+test("Stream Deck manifest references bundled plugin entry points and assets", () => {
+    const manifest = readManifest();
+
+    assert.equal(manifest.CodePath, "bin/plugin.js");
+    assert.equal(manifest.Nodejs?.Version, "24");
+    assertAssetReferenceExists(manifest.CategoryIcon, "manifest CategoryIcon");
+    assertAssetReferenceExists(manifest.Icon, "manifest Icon");
+
+    for (const action of manifest.Actions ?? []) {
+        const actionLabel = action.Name ?? action.UUID ?? "unknown action";
+
+        assert.equal(
+            action.PropertyInspectorPath,
+            "ui/property-inspector.html",
+            `${actionLabel} PropertyInspectorPath`,
+        );
+        assertPluginFileExists(action.PropertyInspectorPath, `${actionLabel} PropertyInspectorPath`);
+        assertAssetReferenceExists(action.Icon, `${actionLabel} Icon`);
+
+        for (const state of action.States ?? []) {
+            assertAssetReferenceExists(state.Image, `${actionLabel} state image`);
+        }
+
+        if (action.Controllers?.includes("Encoder")) {
+            assertAssetReferenceExists(action.Encoder?.Icon, `${actionLabel} encoder icon`);
+            assertLayoutReferenceExists(action.Encoder?.layout, `${actionLabel} encoder layout`);
+        }
+    }
+});
+
 test("Advanced Sensor action is Windows-only in the action list", () => {
-    const manifest = JSON.parse(
-        readFileSync("com.ez.sho-metrics.sdPlugin/manifest.json", "utf8"),
-    ) as StreamDeckManifest;
+    const manifest = readManifest();
     const advancedSensorAction = (manifest.Actions ?? [])
         .find(action => action.UUID === STREAM_DECK_ACTION_UUID_BY_KIND.catalog);
 
@@ -97,6 +142,51 @@ test("Advanced Sensor display copy does not leak into source identifiers", () =>
 
     assert.deepEqual(matches, []);
 });
+
+function readManifest(): StreamDeckManifest {
+    return JSON.parse(
+        readFileSync(`${SD_PLUGIN_ROOT}/manifest.json`, "utf8"),
+    ) as StreamDeckManifest;
+}
+
+function assertPluginFileExists(relativePath: string | undefined, label: string): void {
+    assert.ok(relativePath, `${label} is missing`);
+    assert.ok(statSync(path.join(SD_PLUGIN_ROOT, relativePath)).isFile(), `${label} missing file: ${relativePath}`);
+}
+
+function assertAssetReferenceExists(relativePath: string | undefined, label: string): void {
+    assert.ok(relativePath, `${label} is missing`);
+    const assetPath = path.join(SD_PLUGIN_ROOT, relativePath);
+    const assetCandidates = [
+        assetPath,
+        `${assetPath}.png`,
+        `${assetPath}@2x.png`,
+        `${assetPath}.svg`,
+    ];
+
+    assert.ok(
+        assetCandidates.some(candidatePath => fileExists(candidatePath)),
+        `${label} missing asset: ${relativePath}`,
+    );
+}
+
+function assertLayoutReferenceExists(layoutReference: string | undefined, label: string): void {
+    assert.ok(layoutReference, `${label} is missing`);
+
+    if (layoutReference.startsWith("$")) {
+        return;
+    }
+
+    assertPluginFileExists(`layouts/${layoutReference}.json`, label);
+}
+
+function fileExists(filePath: string): boolean {
+    try {
+        return statSync(filePath).isFile();
+    } catch {
+        return false;
+    }
+}
 
 function findTextFiles(rootPath: string): string[] {
     const filePaths: string[] = [];
