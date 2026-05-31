@@ -156,7 +156,8 @@ public partial class MainWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
         ApplyStatusIcon(PawnIoDriverStatusIcon, status.PawnIoDriver.Tone);
-        VersionText.Text = status.Diagnostics.HelperVersionText;
+        PanelVersionText.Text = ControlPanelIdentity.Version;
+        HelperVersionText.Text = status.Diagnostics.HelperVersionText;
         ProtocolText.Text = status.Diagnostics.ProtocolVersionText;
         SensorDiagnosticsText.Text = status.Diagnostics.SensorDiagnosticsText;
         WarningCountText.Text = status.Diagnostics.WarningCountText;

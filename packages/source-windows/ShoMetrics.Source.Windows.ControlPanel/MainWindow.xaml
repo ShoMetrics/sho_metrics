@@ -261,19 +261,23 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
 
-                                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource DetailLabelTextStyle}" Text="Helper version" />
-                                <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DetailValueTextStyle}" x:Name="VersionText" />
+                                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource DetailLabelTextStyle}" Text="Control Panel version" />
+                                <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DetailValueTextStyle}" x:Name="PanelVersionText" />
 
-                                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource DetailLabelTextStyle}" Text="Protocol" />
-                                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DetailValueTextStyle}" x:Name="ProtocolText" />
+                                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource DetailLabelTextStyle}" Text="Helper version" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DetailValueTextStyle}" x:Name="HelperVersionText" />
 
-                                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource DetailLabelTextStyle}" Text="Service status" />
-                                <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DetailValueTextStyle}" x:Name="ServiceStatusText" />
+                                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource DetailLabelTextStyle}" Text="Protocol" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DetailValueTextStyle}" x:Name="ProtocolText" />
 
-                                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource DetailLabelTextStyle}" Text="Log folder" />
-                                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DetailValueTextStyle}" x:Name="LogFolderText" TextWrapping="Wrap" />
+                                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource DetailLabelTextStyle}" Text="Service status" />
+                                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DetailValueTextStyle}" x:Name="ServiceStatusText" />
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource DetailLabelTextStyle}" Text="Log folder" />
+                                <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource DetailValueTextStyle}" x:Name="LogFolderText" TextWrapping="Wrap" />
                             </Grid>
                         </Border>
                     </StackPanel>

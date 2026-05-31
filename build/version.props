@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <!-- Source Windows owns this version for the helper, Control Panel, and
+         future installer metadata. The Stream Deck plugin version remains
+         manifest-owned; release verification must keep the release train
+         aligned. Release builds may override ShoMetricsVersionPrefix from CI. -->
+    <ShoMetricsVersionPrefix Condition="'$(ShoMetricsVersionPrefix)' == ''">0.1.0</ShoMetricsVersionPrefix>
+    <ShoMetricsVersionSuffix Condition="'$(ShoMetricsVersionSuffix)' == ''"></ShoMetricsVersionSuffix>
+    <ShoMetricsVersion Condition="'$(ShoMetricsVersion)' == '' and '$(ShoMetricsVersionSuffix)' != ''">$(ShoMetricsVersionPrefix)-$(ShoMetricsVersionSuffix)</ShoMetricsVersion>
+    <ShoMetricsVersion Condition="'$(ShoMetricsVersion)' == ''">$(ShoMetricsVersionPrefix)</ShoMetricsVersion>
+    <ShoMetricsAssemblyVersion Condition="'$(ShoMetricsAssemblyVersion)' == ''">$(ShoMetricsVersionPrefix).0</ShoMetricsAssemblyVersion>
+  </PropertyGroup>
+</Project>
