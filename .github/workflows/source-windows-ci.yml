@@ -76,3 +76,30 @@ jobs:
           name: source-windows-integration-diagnostics
           path: packages/source-windows/IntegrationTestResults
           if-no-files-found: ignore
+
+  installer-smoke:
+    name: Windows helper installer smoke
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            packages/source-windows/**/packages.lock.json
+            packages/installer/windows/packages.lock.json
+
+      - name: Build MSI
+        working-directory: .
+        run: ./packages/installer/windows/Build-WindowsInstaller.ps1 -Configuration Release -RuntimeIdentifier win-x64
+
+      - name: Upload MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: shometrics-helper-windows-msi
+          path: artifacts/installer/windows/msi/*.msi
+          if-no-files-found: error
