@@ -193,23 +193,39 @@ export interface ResolvedAppearanceThemeSettings {
     readonly cupertinoGlass: ResolvedCupertinoGlassThemeSettings;
     readonly colorFilled: ResolvedColorFilledThemeSettings;
     readonly terminal: ResolvedTerminalThemeSettings;
+    readonly pixelWindow: ResolvedPixelWindowThemeSettings;
 }
 
 export interface ResolvedFlatThemeSettings {
     readonly paint: ResolvedMetricPaintSettings;
+    readonly transparentSurface: ResolvedTransparentSurfaceSettings;
 }
 
 export interface ResolvedCupertinoGlassThemeSettings {
     readonly paint: ResolvedMetricPaintSettings;
+    readonly transparentSurface: ResolvedTransparentSurfaceSettings;
 }
 
 export interface ResolvedColorFilledThemeSettings {
     readonly paint: ResolvedColorFilledPaintSettings;
+    readonly transparentSurface: ResolvedTransparentSurfaceSettings;
 }
 
 export interface ResolvedTerminalThemeSettings {
     readonly variant: TerminalThemeVariant;
     readonly paint: ResolvedTerminalPaintSettings;
+    readonly transparentSurface: ResolvedTransparentSurfaceSettings;
+}
+
+export interface ResolvedPixelWindowThemeSettings {
+    readonly transparentSurface: ResolvedTransparentSurfaceSettings;
+}
+
+export interface ResolvedTransparentSurfaceSettings {
+    readonly enabled: boolean;
+    readonly backgroundOpacityPercent: number;
+    readonly textOutlinePercent: number;
+    readonly shapeOutlinePercent: number;
 }
 
 export interface ResolvedTerminalPaintSettings {
