@@ -8,6 +8,7 @@ import type {
     ResolvedMetricPaintSettings,
     ResolvedMultiColorSet,
     ResolvedTerminalPaintSettings,
+    ResolvedTransparentSurfaceSettings,
 } from "./resolved-settings";
 
 export const DEFAULT_USAGE_MULTI_COLOR_SET: ResolvedMultiColorSet = {
@@ -82,6 +83,20 @@ const DEFAULT_TERMINAL_PAINT_SETTINGS: ResolvedTerminalPaintSettings = {
     preset: "green",
 };
 
+const DEFAULT_FLAT_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
+    enabled: false,
+    backgroundOpacityPercent: 0,
+    textOutlinePercent: 85,
+    shapeOutlinePercent: 85,
+};
+
+const DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
+    enabled: false,
+    backgroundOpacityPercent: 50,
+    textOutlinePercent: 85,
+    shapeOutlinePercent: 85,
+};
+
 export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
     view: {
         selectedView: "circle",
@@ -92,16 +107,23 @@ export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
         selectedTheme: "flat",
         flat: {
             paint: DEFAULT_METRIC_ACCENT_PAINT_SETTINGS,
+            transparentSurface: DEFAULT_FLAT_TRANSPARENT_SURFACE_SETTINGS,
         },
         cupertinoGlass: {
             paint: DEFAULT_METRIC_ACCENT_PAINT_SETTINGS,
+            transparentSurface: DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS,
         },
         colorFilled: {
             paint: DEFAULT_COLOR_FILLED_PAINT_SETTINGS,
+            transparentSurface: DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS,
         },
         terminal: {
             variant: "clean",
             paint: DEFAULT_TERMINAL_PAINT_SETTINGS,
+            transparentSurface: DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS,
+        },
+        pixelWindow: {
+            transparentSurface: DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS,
         },
     },
     line: {

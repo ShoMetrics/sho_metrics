@@ -497,23 +497,35 @@ message AppearanceThemeSettings {
   // clean terminal look and the more opinionated vintage screen treatment
   // without splitting them into separate themes.
   TerminalThemeSettings terminal = 5;
+
+  PixelWindowThemeSettings pixel_window = 6;
+}
+
+message TransparentSurfaceSettings {
+  optional bool enabled = 1;
+  optional uint32 background_opacity_percent = 2 [(buf.validate.field).uint32.lte = 100];
+  optional uint32 text_outline_percent = 3 [(buf.validate.field).uint32.lte = 100];
+  optional uint32 shape_outline_percent = 4 [(buf.validate.field).uint32.lte = 100];
 }
 
 message FlatThemeSettings {
   // Metric accent paint controls ring, large text, bar fill, and line stroke.
   MetricPaintSettings paint = 1;
+  TransparentSurfaceSettings transparent_surface = 2;
 }
 
 message CupertinoGlassThemeSettings {
   // Metric accent paint controls foreground metric emphasis for now. Future
   // glass tint or glass material settings belong in this message, not in Flat.
   MetricPaintSettings paint = 1;
+  TransparentSurfaceSettings transparent_surface = 2;
 }
 
 message ColorFilledThemeSettings {
   // Color Filled paint controls the widget background fill. Foreground paint is
   // derived by the renderer for legibility.
   ColorFilledPaintSettings paint = 1;
+  TransparentSurfaceSettings transparent_surface = 2;
 }
 
 message TerminalThemeSettings {
@@ -525,6 +537,11 @@ message TerminalThemeSettings {
   // Terminal paint is theme-owned because terminal palettes control the whole
   // foreground treatment, including text, dim text, and glow.
   TerminalPaintSettings paint = 2;
+  TransparentSurfaceSettings transparent_surface = 3;
+}
+
+message PixelWindowThemeSettings {
+  TransparentSurfaceSettings transparent_surface = 1;
 }
 
 message TerminalPaintSettings {
