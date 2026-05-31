@@ -19,6 +19,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="Assets\sho-metrics-icon-titlebar-light.svg"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\hub\com.ez.sho-metrics.sdPlugin\imgs\actions\sho-metrics\icon.svg"
+             Link="Assets\sho-metrics-icon.svg"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Grpc.Net.Client" Version="[2.71.0]" />
     <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" Version="[8.2.251219]" />
     <!-- Override Grpc.Net.Client's old minimum dependency, which fails the repo's NuGet signature trust policy. -->

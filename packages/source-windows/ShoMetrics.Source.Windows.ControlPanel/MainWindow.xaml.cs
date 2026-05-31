@@ -31,7 +31,9 @@ public partial class MainWindow : Window
         InitializeComponent();
         SystemBackdrop = new MicaBackdrop();
         SetWindowSizeInDips(width: 1100, height: 720);
+        ConfigureCustomTitleBar();
         ApplyStatus(HelperControlPanelStatus.Initial());
+        RootGrid.ActualThemeChanged += OnRootGridActualThemeChanged;
         Closed += OnClosed;
         _checkedAtTimer.Interval = TimeSpan.FromSeconds(1);
         _checkedAtTimer.Tick += OnCheckedAtTimerTick;
@@ -200,24 +202,61 @@ public partial class MainWindow : Window
 
         icon.Foreground = tone switch
         {
-            ControlPanelStatusTone.Success => GetThemeBrush("SystemFillColorSuccessBrush", Colors.Green),
-            ControlPanelStatusTone.Caution => GetThemeBrush("SystemFillColorCautionBrush", Colors.Goldenrod),
-            ControlPanelStatusTone.Critical => GetThemeBrush("SystemFillColorCriticalBrush", Colors.Firebrick),
-            ControlPanelStatusTone.Unknown => GetThemeBrush("TextFillColorSecondaryBrush", Colors.Gray),
-            _ => GetThemeBrush("TextFillColorSecondaryBrush", Colors.Gray),
+            ControlPanelStatusTone.Success => CreateStatusIconBrush(Colors.ForestGreen),
+            ControlPanelStatusTone.Caution => CreateStatusIconBrush(Colors.Goldenrod),
+            ControlPanelStatusTone.Critical => CreateStatusIconBrush(Colors.Firebrick),
+            ControlPanelStatusTone.Unknown => CreateStatusIconBrush(ResolveSecondaryIconColor()),
+            _ => CreateStatusIconBrush(ResolveSecondaryIconColor()),
         };
     }
 
-    private Brush GetThemeBrush(string resourceKey, global::Windows.UI.Color fallbackColor)
+    private static SolidColorBrush CreateStatusIconBrush(global::Windows.UI.Color color)
     {
-        return Application.Current.Resources.TryGetValue(resourceKey, out object? resource) && resource is Brush brush
-            ? brush
-            : new SolidColorBrush(fallbackColor);
+        return new SolidColorBrush(color);
+    }
+
+    private global::Windows.UI.Color ResolvePrimaryTextColor()
+    {
+        return RootGrid.ActualTheme == ElementTheme.Dark ? Colors.White : Colors.Black;
+    }
+
+    private global::Windows.UI.Color ResolveSecondaryIconColor()
+    {
+        return RootGrid.ActualTheme == ElementTheme.Dark ? Colors.LightGray : Colors.DimGray;
+    }
+
+    private void ConfigureCustomTitleBar()
+    {
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(AppTitleBar);
+
+        ApplyTitleBarTheme();
+    }
+
+    private void ApplyTitleBarTheme()
+    {
+        AppWindowTitleBar titleBar = ResolveAppWindow().TitleBar;
+
+        titleBar.ButtonBackgroundColor = Colors.Transparent;
+        titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
+        titleBar.ButtonForegroundColor = ResolvePrimaryTextColor();
+        titleBar.ButtonInactiveForegroundColor = ResolveSecondaryIconColor();
+    }
+
+    private void OnRootGridActualThemeChanged(FrameworkElement sender, object args)
+    {
+        ApplyTitleBarTheme();
+
+        if (_currentStatus is not null)
+        {
+            ApplyStatus(_currentStatus);
+        }
     }
 
     private void OnClosed(object sender, WindowEventArgs args)
     {
         _checkedAtTimer.Stop();
+        RootGrid.ActualThemeChanged -= OnRootGridActualThemeChanged;
         _statusReader.Dispose();
     }
 
@@ -236,11 +275,17 @@ public partial class MainWindow : Window
     {
         nint windowHandle = WindowNative.GetWindowHandle(this);
         double scale = GetDpiForWindow(windowHandle) / 96.0;
-        WindowId windowId = Win32Interop.GetWindowIdFromWindow(windowHandle);
-        AppWindow appWindow = AppWindow.GetFromWindowId(windowId);
+        AppWindow appWindow = ResolveAppWindow();
         appWindow.Resize(new SizeInt32(
             ConvertDipToPhysicalPixel(width, scale),
             ConvertDipToPhysicalPixel(height, scale)));
+    }
+
+    private AppWindow ResolveAppWindow()
+    {
+        nint windowHandle = WindowNative.GetWindowHandle(this);
+        WindowId windowId = Win32Interop.GetWindowIdFromWindow(windowHandle);
+        return AppWindow.GetFromWindowId(windowId);
     }
 
     private static int ConvertDipToPhysicalPixel(int value, double scale)
