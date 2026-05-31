@@ -283,6 +283,28 @@ test("widget patch updates CPU reading within the CPU action domain", () => {
     }
 });
 
+test("widget patch writes sparse CPU target changes without resolved defaults", () => {
+    const cpuSettings = resolveQuickStartStoredWidgetSettings(undefined, "cpu").rawSettings;
+
+    const nextSettings = writeStoredWidgetSettingsPatch(cpuSettings, {
+        cpu: {
+            kind: "temperature",
+        },
+    });
+
+    assert.deepEqual(nextSettings, {
+        singleMetric: {
+            slot: {
+                metric: {
+                    cpu: {
+                        kind: "KIND_TEMPERATURE",
+                    },
+                },
+            },
+        },
+    });
+});
+
 test("widget patch preserves disk volume id when switching to throughput", () => {
     const diskSettings = writeStoredWidgetSettingsPatch(
         resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings,
