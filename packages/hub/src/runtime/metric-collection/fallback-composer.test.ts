@@ -173,6 +173,34 @@ test("fallback reader uses fallback when the primary scalar value is stale", () 
     assert.equal(reader.getWidgetData("ram.used", "RAM", "B").current, 50);
 });
 
+test("fallback reader ignores helper unavailable metadata when fallback has a fresh value", () => {
+    const metricStore = new MetricStore();
+    const readPlan = buildReadPlan({ metricKey: "gpu.temp" });
+
+    metricStore.ingest("windows-helper", buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {},
+    }), {
+        unavailableMetrics: [{
+            metricId: "gpu.temp",
+            reason: "pendingRefresh",
+        }],
+    });
+    metricStore.ingest("node-system", buildMetricSnapshot({
+        timestampMilliseconds: 2000,
+        metrics: {
+            "gpu.temp": buildScalarMetricValue(60),
+        },
+    }));
+
+    const reader = createTestFallbackReader(metricStore, readPlan);
+    const readResult = reader.getWidgetDataWithAttribution("gpu.temp", "GPU", "C");
+
+    assert.equal(readResult.selectedSourceId, "node-system");
+    assert.equal(readResult.widgetData.current, 60);
+    assert.equal(readResult.unavailableMetric, undefined);
+});
+
 test("fallback reader attributes fallback values to the selected fallback source", () => {
     const metricStore = new MetricStore();
     const readPlan = buildReadPlan();

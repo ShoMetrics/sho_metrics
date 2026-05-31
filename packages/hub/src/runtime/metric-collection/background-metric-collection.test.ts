@@ -1,16 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { MetricDescriptorSnapshot, SourceClient, SourceSnapshotReadResult } from "../sources/source-client";
+import type {
+    MetricDescriptorSnapshot,
+    SourceClient,
+    SourceRefreshDemandGroup,
+    SourceSnapshotReadResult,
+} from "../sources/source-client";
 import type { SourceRegistry } from "../sources/source-registry";
 import type { SourceMetricPollingGroupResolution } from "../sources/source-polling-groups";
 import type { SourceMetadataInvalidation, SourceMetadataInvalidationListener } from "../sources/source-planning-metadata";
 import { buildMetricSnapshot } from "../sources/metric-source";
+import { WINDOWS_HELPER_SOURCE_ID } from "../sources/source-ids";
 import { BackoffPolicy } from "../sources/backoff-policy";
 import { BackgroundMetricCollection } from "./background-metric-collection";
 import { CollectorGroupPlanner } from "./collector-group-planner";
 import { CollectorGroupSupervisor } from "./collector-group-supervisor";
 import { MetricSubscriptionRegistry } from "./metric-subscription-registry";
 import { SourcePlanningMetadataRegistry } from "./source-planning-metadata-registry";
+
+// register/unregister fire-and-forget refresh-demand sends; ten turns matches
+// the deeper supervisor tests and leaves margin for the promise/finally chain.
+const ASYNC_TIMER_DRAIN_MICROTASK_TICKS = 10;
 
 type BuildBackgroundMetricCollectionOptions =
     (
@@ -228,6 +238,46 @@ test("changed source profile planning fingerprint restarts changed collector gro
     assert.deepEqual(timer.recordedDelaysMilliseconds, [0, 0]);
 });
 
+test("unregistering helper subscriptions clears refresh demand and cancels renewal", async () => {
+    const subscriptionRegistry = new MetricSubscriptionRegistry();
+    const timer = new FakeTimer();
+    const windowsHelperSourceClient = new FakeSourceClient(WINDOWS_HELPER_SOURCE_ID, () => ({
+        state: "owned",
+        pollingGroupId: "lhm:hardware:cpu",
+    }), { servesSnapshots: true });
+    const collection = buildBackgroundMetricCollection(subscriptionRegistry, {
+        sourceClients: [windowsHelperSourceClient],
+        timer,
+    });
+
+    const unregister = collection.registerSubscriptions({
+        subscriberId: "action-1",
+        subscriptions: [{
+            subscriberId: "action-1",
+            metricKey: "cpu.temperature",
+            sourceScopeId: "local",
+            sourceCandidates: [{ sourceId: WINDOWS_HELPER_SOURCE_ID }],
+            failureMode: "fallback",
+            intervalMilliseconds: 1000,
+        }],
+    });
+    await timer.drainMicrotasks();
+
+    assert.deepEqual(windowsHelperSourceClient.refreshDemandGroups, [[{
+        pollingGroupId: "lhm:hardware:cpu",
+        metricKeys: ["cpu.temperature"],
+        intervalMilliseconds: 1000,
+    }]]);
+    // One runner poll timer plus one helper demand renewal timer should be live.
+    assert.equal(timer.activeHandleCount(), 2);
+
+    unregister();
+    await timer.drainMicrotasks();
+
+    assert.deepEqual(windowsHelperSourceClient.refreshDemandGroups.at(-1), []);
+    assert.equal(timer.activeHandleCount(), 0);
+});
+
 test("refreshReadPlanOnce requests only each source candidate's routed metric keys", async () => {
     const subscriptionRegistry = new MetricSubscriptionRegistry();
     const windowsHelperSourceClient = new FakeSourceClient("windows-helper", () => ({
@@ -370,6 +420,7 @@ class FakeSourceClient implements SourceClient {
     latestReadMetricKeys: readonly string[] = [];
     listMetricDescriptorsCallCount = 0;
     latestDescriptorMetricKeys: readonly string[] = [];
+    readonly refreshDemandGroups: SourceRefreshDemandGroup[][] = [];
 
     constructor(
         readonly sourceId: string,
@@ -417,22 +468,42 @@ class FakeSourceClient implements SourceClient {
 
         return this.options.descriptorSnapshot;
     }
+
+    async setMetricRefreshDemand(groups: readonly SourceRefreshDemandGroup[]): Promise<void> {
+        this.refreshDemandGroups.push(groups.map(group => ({
+            pollingGroupId: group.pollingGroupId,
+            metricKeys: [...group.metricKeys],
+            intervalMilliseconds: group.intervalMilliseconds,
+        })));
+    }
 }
 
 class FakeTimer {
     readonly recordedDelaysMilliseconds: number[] = [];
+    private readonly handles: FakeTimerHandle[] = [];
 
     set(callback: () => void, delayMilliseconds: number): unknown {
         const handle = {
             active: true,
             callback,
         };
+        this.handles.push(handle);
         this.recordedDelaysMilliseconds.push(delayMilliseconds);
         return handle;
     }
 
     clear(handle: unknown): void {
         (handle as FakeTimerHandle).active = false;
+    }
+
+    activeHandleCount(): number {
+        return this.handles.filter(handle => handle.active).length;
+    }
+
+    async drainMicrotasks(): Promise<void> {
+        for (let tick = 0; tick < ASYNC_TIMER_DRAIN_MICROTASK_TICKS; tick += 1) {
+            await Promise.resolve();
+        }
     }
 }
 
