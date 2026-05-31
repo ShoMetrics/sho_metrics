@@ -22,7 +22,7 @@ $repoRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..\..")
 $artifactRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot "artifacts"))
 
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
-    $OutputDirectory = Join-Path $artifactRoot "source-windows\service\$RuntimeIdentifier"
+    $OutputDirectory = Join-Path $artifactRoot "source-windows\control-panel\$RuntimeIdentifier"
 }
 
 $outputFullPath = [System.IO.Path]::GetFullPath($OutputDirectory)
@@ -32,7 +32,7 @@ if (-not $outputFullPath.StartsWith($artifactRootWithSeparator, [System.StringCo
     throw "OutputDirectory must be under '$artifactRoot' so publish cleanup cannot remove arbitrary files."
 }
 
-$projectPath = Join-Path $sourceRoot "ShoMetrics.Source.Windows.Service\ShoMetrics.Source.Windows.Service.csproj"
+$projectPath = Join-Path $sourceRoot "ShoMetrics.Source.Windows.ControlPanel\ShoMetrics.Source.Windows.ControlPanel.csproj"
 
 if (Test-Path -LiteralPath $outputFullPath) {
     Remove-Item -LiteralPath $outputFullPath -Recurse -Force
@@ -90,7 +90,7 @@ function Format-ByteSize {
     return "{0:N0} B" -f $ByteCount
 }
 
-Write-Host "Published ShoMetrics Windows service."
+Write-Host "Published ShoMetrics Control Panel."
 Write-Host "Project: $projectPath"
 Write-Host "Output: $outputFullPath"
 Write-Host "Configuration: $Configuration"
