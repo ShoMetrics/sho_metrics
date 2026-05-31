@@ -20,6 +20,16 @@ internal sealed class FakeHardware : IHardware
         return new FakeHardware(HardwareType.GpuNvidia, "gpu/0");
     }
 
+    public static FakeHardware Memory()
+    {
+        return new FakeHardware(HardwareType.Memory, "ram");
+    }
+
+    public static FakeHardware Network()
+    {
+        return new FakeHardware(HardwareType.Network, "nic/0");
+    }
+
     public static FakeHardware Storage()
     {
         return new FakeHardware(HardwareType.Storage, "storage/0");
@@ -104,6 +114,16 @@ internal sealed class FakeSensor : ISensor
     public static FakeSensor Throughput(string name, float? value)
     {
         return new FakeSensor(SensorType.Throughput, name, value);
+    }
+
+    public static FakeSensor Data(string name, float? value)
+    {
+        return new FakeSensor(SensorType.Data, name, value);
+    }
+
+    public static FakeSensor SmallData(string name, float? value)
+    {
+        return new FakeSensor(SensorType.SmallData, name, value);
     }
 
     public static FakeSensor Load(string name, float? value)

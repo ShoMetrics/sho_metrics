@@ -35,6 +35,37 @@ public sealed class MetricRefreshDemandStateTests
     }
 
     [Fact]
+    public void ApplyUsesLatestDuplicateDemandAndClampsMaximumInterval()
+    {
+        var timeProvider = new ManualTimeProvider();
+        var state = new MetricRefreshDemandState(["known"], timeProvider);
+
+        MetricRefreshDemandApplyResult result = state.Apply(
+            [
+                new MetricRefreshDemand
+                {
+                    PollingGroupId = "known",
+                    MetricIds = ["first.metric"],
+                    RequestedInterval = TimeSpan.FromSeconds(1),
+                },
+                new MetricRefreshDemand
+                {
+                    PollingGroupId = "known",
+                    MetricIds = ["second.metric"],
+                    RequestedInterval = TimeSpan.FromHours(1),
+                },
+            ]);
+        IReadOnlyList<EffectiveMetricRefreshDemand> activeDemands = state.Snapshot();
+
+        Assert.Equal(1, result.AcceptedGroupCount);
+        Assert.Equal(0, result.IgnoredGroupCount);
+        Assert.Empty(result.Warnings);
+        EffectiveMetricRefreshDemand demand = Assert.Single(activeDemands);
+        Assert.Equal(["second.metric"], demand.MetricIds);
+        Assert.Equal(MetricRefreshDemandConstants.MaximumRefreshInterval, demand.RefreshInterval);
+    }
+
+    [Fact]
     public void ApplyReplacesExistingDemand()
     {
         var timeProvider = new ManualTimeProvider();

@@ -55,6 +55,81 @@ public sealed class LibreHardwareMetricCatalogTests
             "SoC",
         };
 
+    public static TheoryData<string, Func<IHardware>, Func<ISensor>, MetricUnit, double> BuiltInStableAliasReadings =>
+        new()
+        {
+            {
+                "cpu.usage_percent",
+                FakeHardware.Cpu,
+                () => FakeSensor.Load("CPU Total", value: 37),
+                MetricUnit.Percent,
+                37
+            },
+            {
+                "gpu.usage_percent",
+                FakeHardware.Gpu,
+                () => FakeSensor.Load("GPU Core", value: 42),
+                MetricUnit.Percent,
+                42
+            },
+            {
+                "gpu.temp",
+                FakeHardware.Gpu,
+                () => FakeSensor.Temperature("GPU Core", value: 55),
+                MetricUnit.Celsius,
+                55
+            },
+            {
+                "gpu.power",
+                FakeHardware.Gpu,
+                () => FakeSensor.Power("GPU Package", value: 75),
+                MetricUnit.Watts,
+                75
+            },
+            {
+                "gpu.vram_used",
+                FakeHardware.Gpu,
+                () => FakeSensor.SmallData("GPU Memory Used", value: 512),
+                MetricUnit.Bytes,
+                512d * 1024d * 1024d
+            },
+            {
+                "gpu.vram_total",
+                FakeHardware.Gpu,
+                () => FakeSensor.SmallData("GPU Memory Total", value: 8192),
+                MetricUnit.Bytes,
+                8192d * 1024d * 1024d
+            },
+            {
+                "ram.used",
+                FakeHardware.Memory,
+                () => FakeSensor.Data("Memory Used", value: 8),
+                MetricUnit.Bytes,
+                8d * 1024d * 1024d * 1024d
+            },
+            {
+                LibreHardwareMetricCatalog.RamAvailableMetricId,
+                FakeHardware.Memory,
+                () => FakeSensor.Data("Memory Available", value: 24),
+                MetricUnit.Bytes,
+                24d * 1024d * 1024d * 1024d
+            },
+            {
+                "net.down",
+                FakeHardware.Network,
+                () => FakeSensor.Throughput("Download Speed", value: 1024),
+                MetricUnit.BytesPerSecond,
+                1024
+            },
+            {
+                "net.up",
+                FakeHardware.Network,
+                () => FakeSensor.Throughput("Upload Speed", value: 256),
+                MetricUnit.BytesPerSecond,
+                256
+            },
+        };
+
     [Theory]
     [MemberData(nameof(CpuTemperatureRanks))]
     public void CpuTemperatureStableAliasRanksKnownCpuSensorNames(string sensorName, int expectedRank)
@@ -113,6 +188,23 @@ public sealed class LibreHardwareMetricCatalogTests
         Assert.False(classified);
         Assert.Null(metricId);
         Assert.Equal(0, rank);
+    }
+
+    [Theory]
+    [MemberData(nameof(BuiltInStableAliasReadings))]
+    public void CreateReadingsEmitsStableAliasForBuiltInMetricFamily(
+        string expectedMetricId,
+        Func<IHardware> createHardware,
+        Func<ISensor> createSensor,
+        MetricUnit expectedUnit,
+        double expectedValue)
+    {
+        AssertStableAliasReading(
+            createHardware(),
+            createSensor(),
+            expectedMetricId,
+            expectedUnit,
+            expectedValue);
     }
 
     [Fact]
@@ -184,5 +276,20 @@ public sealed class LibreHardwareMetricCatalogTests
             descriptor => descriptor.MetricId == WindowsSystemTotalDiskThroughputProvider.ReadThroughputMetricId);
         Assert.Contains(readings, reading => LibreHardwareMetricCatalog.IsSourceSensorMetricId(reading.MetricId));
         Assert.Contains(descriptors, descriptor => LibreHardwareMetricCatalog.IsSourceSensorMetricId(descriptor.MetricId));
+    }
+
+    private static void AssertStableAliasReading(
+        IHardware hardware,
+        ISensor sensor,
+        string expectedMetricId,
+        MetricUnit expectedUnit,
+        double expectedValue)
+    {
+        IReadOnlyList<MetricReading> readings = LibreHardwareMetricCatalog.CreateReadings(hardware, sensor);
+        MetricReading stableAlias = readings.Single(reading =>
+            reading.MetricId.Equals(expectedMetricId, StringComparison.Ordinal));
+
+        Assert.Equal(expectedUnit, stableAlias.Unit);
+        Assert.Equal(expectedValue, stableAlias.Value);
     }
 }
