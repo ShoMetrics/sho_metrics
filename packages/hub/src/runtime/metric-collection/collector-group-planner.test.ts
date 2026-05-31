@@ -194,6 +194,27 @@ test("skips source candidates waiting for descriptor metadata", () => {
     }]);
 });
 
+test("does not isolate pending descriptor metrics as unknown helper runners", () => {
+    const planner = new CollectorGroupPlanner(new FakeSourceRegistry([
+        new FakeSourceClient("windows-helper", () => ({ state: "pendingMetadata" })),
+    ]));
+
+    const groups = planner.plan([
+        buildSubscription({
+            metricKey: "lhm.sensor:/intelcpu/0/temperature/26",
+            sourceIds: ["windows-helper"],
+            failureMode: "empty",
+        }),
+        buildSubscription({
+            metricKey: "lhm.sensor:/intelcpu/0/load/0",
+            sourceIds: ["windows-helper"],
+            failureMode: "empty",
+        }),
+    ]);
+
+    assert.deepEqual(groups, []);
+});
+
 test("skips unsupported source candidates", () => {
     const planner = new CollectorGroupPlanner(new FakeSourceRegistry([
         new FakeSourceClient("windows-helper", () => ({ state: "unsupported" })),
