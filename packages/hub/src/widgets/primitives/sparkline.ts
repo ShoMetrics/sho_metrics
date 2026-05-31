@@ -16,7 +16,12 @@ import {
 import {
     adjustHexColorBrightness,
     clamp,
+    escapeSvgText,
+    formatSvgShapeOutlineStrokeAttributes,
+    isSvgOutlineEnabled,
     renderStyledSvgText,
+    resolveSvgFilledShapeOutlinePadding,
+    resolveSvgShapeOutlineStrokeWidth,
     type SvgTextAnchor,
 } from "../../view-rendering/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget-contract";
@@ -45,6 +50,7 @@ export interface SparklineConfig extends WidgetBaseConfig {
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
     textOutline?: RenderOutlineTokens;
+    shapeOutline?: RenderOutlineTokens;
     topIconFragment?: string;
 }
 
@@ -89,6 +95,7 @@ export const DEFAULT_SPARKLINE_CONFIG: SparklineConfig = {
     textStyles: DEFAULT_RENDER_TEXT_STYLES,
     themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     textOutline: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS.textOutline,
+    shapeOutline: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS.shapeOutline,
     gradientHeadAdjustmentPercent: 28,
 };
 
@@ -186,7 +193,11 @@ export const sparkline: Widget<SparklineConfig> = {
             : "";
         const valueText = data.displayValue ?? data.current.toFixed(1);
         const dotSvg = config.showDots && latestPoint
-            ? `<circle cx="${formatSvgNumber(latestPoint.xCoordinate)}" cy="${formatSvgNumber(latestPoint.yCoordinate)}" r="2.8" fill="${lineHeadColor}" />`
+            ? renderLatestPointDot({
+                point: latestPoint,
+                color: lineHeadColor,
+                outline: config.shapeOutline,
+            })
             : "";
         const linePaint = config.colorConfig.isGradientEnabled ? `url(#${lineGradientId})` : currentColor;
         const areaPaint = config.colorConfig.isGradientEnabled ? `url(#${areaGradientId})` : currentColor;
@@ -259,6 +270,12 @@ export const sparkline: Widget<SparklineConfig> = {
             <path d="${linePath}" fill="none" stroke="${linePaint}"
                 stroke-width="${Math.max(1, config.lineWidth + 1.4)}" stroke-linejoin="round"
                 stroke-linecap="round" filter="url(#${glowFilterId})" opacity="0.55" />
+            ${renderLineOutline({
+                linePath,
+                lineWidth: config.lineWidth,
+                dashPattern: config.dashPattern,
+                outline: config.shapeOutline,
+            })}
             <path d="${linePath}" fill="none" stroke="${linePaint}"
                 stroke-width="${config.lineWidth}" stroke-linejoin="round" stroke-linecap="round"
                 stroke-dasharray="${config.dashPattern}" ${buildSvgFilterAttributes(config.themeEffects.metricFilter).join(" ")} />
@@ -603,6 +620,47 @@ function renderLatestPointGlow(point: SparklinePoint, color: string, filterId: s
         <circle cx="${formatSvgNumber(point.xCoordinate)}" cy="${formatSvgNumber(point.yCoordinate)}"
             r="5.5" fill="${color}" opacity="0.34" filter="url(#${filterId})" />
     `;
+}
+
+function renderLineOutline(options: {
+    linePath: string;
+    lineWidth: number;
+    dashPattern: string;
+    outline: RenderOutlineTokens | undefined;
+}): string {
+    if (!isSvgOutlineEnabled(options.outline)) {
+        return "";
+    }
+
+    // The sparkline outline is a backing path for the data line only; grid,
+    // baseline, and panel chrome stay unoutlined.
+    const strokeWidth = resolveSvgShapeOutlineStrokeWidth(options.lineWidth, options.outline);
+
+    return `<path class="sparkline-line-outline" d="${options.linePath}"
+        stroke-dasharray="${options.dashPattern}"
+        ${formatSvgShapeOutlineStrokeAttributes({
+            outline: options.outline,
+            strokeWidth,
+            lineCap: "round",
+            lineJoin: "round",
+        })} />`;
+}
+
+function renderLatestPointDot(options: {
+    point: SparklinePoint;
+    color: string;
+    outline: RenderOutlineTokens | undefined;
+}): string {
+    const radius = 2.8;
+    const outlineDot = isSvgOutlineEnabled(options.outline)
+        ? `<circle class="sparkline-latest-dot-outline"
+            cx="${formatSvgNumber(options.point.xCoordinate)}"
+            cy="${formatSvgNumber(options.point.yCoordinate)}"
+            r="${formatSvgNumber(radius + resolveSvgFilledShapeOutlinePadding(radius * 2, options.outline))}"
+            fill="${escapeSvgText(options.outline.color)}" opacity="${formatSvgNumber(options.outline.strength)}" />`
+        : "";
+
+    return `${outlineDot}<circle cx="${formatSvgNumber(options.point.xCoordinate)}" cy="${formatSvgNumber(options.point.yCoordinate)}" r="${formatSvgNumber(radius)}" fill="${options.color}" />`;
 }
 
 function formatSvgNumber(value: number): string {

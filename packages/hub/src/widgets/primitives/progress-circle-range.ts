@@ -2,7 +2,13 @@ import type { ColorConfig } from "../../view-rendering/color-resolver";
 import {
     adjustHexColorBrightness,
     clamp,
+    escapeSvgText,
+    formatSvgShapeOutlineStrokeAttributes,
+    isSvgOutlineEnabled,
+    resolveSvgFilledShapeOutlinePadding,
+    resolveSvgShapeOutlineExtraWidth,
 } from "../../view-rendering/svg-utils";
+import type { RenderOutlineTokens } from "../../view-rendering/render-appearance";
 import { interpolateHexColor } from "../../shared/color-utils";
 import type { CircleVariant } from "./progress-circle";
 
@@ -71,9 +77,17 @@ interface GaugeMarkerTravelDomain {
 
 const GAUGE_RANGE_SEGMENT_OVERLAP_PROGRESS = 0.002;
 const MAX_GAUGE_RANGE_BLEND_PROGRESS = 0.24;
+// Keep marker dots away from the open gauge ends so the dot remains visible
+// without changing true 0% and 100% endpoint semantics.
 const GAUGE_MARKER_VISUAL_MIN_PROGRESS = 0.08;
 const GAUGE_MARKER_VISUAL_MAX_PROGRESS = 0.90;
 
+/**
+ * Builds the color model shared by single and dual gauge lanes.
+ *
+ * `paintSegments` are used for filled annular arcs; `stops` remain for callers
+ * that still need gradient-stop output.
+ */
 export function buildGaugeRangeColorPlan(options: {
     circleVariant: CircleVariant;
     colorConfig: ColorConfig;
@@ -138,10 +152,16 @@ export function buildGaugeRangeColorPlan(options: {
     };
 }
 
+/**
+ * Formats one normalized gauge gradient stop for callers that render SVG defs.
+ */
 export function renderGradientStop(stop: GaugeRangeGradientStop): string {
     return `<stop offset="${formatSvgNumber(stop.offset * 100)}%" stop-color="${stop.color}" />`;
 }
 
+/**
+ * Places a gauge marker dot on the visible ring while respecting marker travel guards.
+ */
 export function resolveGaugeMarkerDot(options: {
     geometry: ProgressCircleGeometry;
     notchGeometry: RingNotchGeometry;
@@ -173,12 +193,19 @@ export function resolveGaugeMarkerDot(options: {
     };
 }
 
+/**
+ * Renders the single-gauge range lane around a notched progress circle.
+ *
+ * This adapts the older notch geometry into the lane renderer used by both
+ * single and dual gauge variants.
+ */
 export function renderGaugeRangeArcSegments(options: {
     geometry: ProgressCircleGeometry;
     notchGeometry: RingNotchGeometry;
     markerDot: GaugeMarkerDot | null;
     rangeColorPlan: GaugeRangeColorPlan;
     strokeWidth: number;
+    outline?: RenderOutlineTokens;
 }): string {
     return renderGaugeRangeLaneSegments({
         geometry: options.geometry,
@@ -190,18 +217,26 @@ export function renderGaugeRangeArcSegments(options: {
         markerDot: options.markerDot,
         rangeColorPlan: options.rangeColorPlan,
         strokeWidth: options.strokeWidth,
+        outline: options.outline,
         segmentClassName: "progress-circle-range-segment",
         capClassName: "progress-circle-range-cap",
         gradientIdentifierPrefix: "progress-circle-range",
     });
 }
 
+/**
+ * Renders filled annular range segments plus round caps for one gauge lane.
+ *
+ * A marker gap removes a small section from the always-filled lane so the
+ * marker dot reads as a separate indicator instead of sitting on top of the arc.
+ */
 export function renderGaugeRangeLaneSegments(options: {
     geometry: ProgressCircleGeometry;
     laneGeometry: GaugeRangeLaneGeometry;
     markerDot: GaugeMarkerDot | null;
     rangeColorPlan: GaugeRangeColorPlan;
     strokeWidth: number;
+    outline?: RenderOutlineTokens;
     segmentClassName: string;
     capClassName: string;
     gradientIdentifierPrefix: string;
@@ -223,6 +258,7 @@ export function renderGaugeRangeLaneSegments(options: {
         gradientIdentifier: `${options.gradientIdentifierPrefix}-${segmentIndex}`,
         className: options.segmentClassName,
         strokeWidth: options.strokeWidth,
+        outline: options.outline,
     }));
     const caps = buildGaugeRangeCaps({
         paintSegments: options.rangeColorPlan.paintSegments,
@@ -234,17 +270,41 @@ export function renderGaugeRangeLaneSegments(options: {
         color: cap.color,
         radius: options.strokeWidth / 2,
         className: options.capClassName,
+        outline: options.outline,
     }));
 
     return [...arcSegments, ...caps].join("");
 }
 
+/**
+ * Renders the foreground gauge marker dot.
+ */
 export function renderGaugeMarkerDot(markerDot: GaugeMarkerDot): string {
     return `<circle class="progress-circle-marker" cx="${formatSvgNumber(markerDot.xCoordinate)}"
         cy="${formatSvgNumber(markerDot.yCoordinate)}" r="${formatSvgNumber(markerDot.radius)}"
         fill="${markerDot.fill}" />`;
 }
 
+/**
+ * Renders the black backing circle for gauge marker dots when shape outline is enabled.
+ */
+export function renderGaugeMarkerDotOutline(
+    markerDot: GaugeMarkerDot,
+    outline: RenderOutlineTokens | undefined,
+    className: string,
+): string {
+    return renderFilledCircleOutline({
+        className,
+        xCoordinate: markerDot.xCoordinate,
+        yCoordinate: markerDot.yCoordinate,
+        radius: markerDot.radius,
+        outline,
+    });
+}
+
+/**
+ * Formats numbers consistently for progress-circle range SVG fragments.
+ */
 export function formatSvgNumber(value: number): string {
     const safeValue = Number.isFinite(value) ? value : 0;
 
@@ -514,6 +574,12 @@ function splitGaugeRangeSegmentByMarkerGap(
     return segments;
 }
 
+/**
+ * Maps semantic progress to the visible marker travel domain.
+ *
+ * Interior values are pulled away from gauge ends to reserve room for the
+ * marker gap; exact 0 and 1 remain exact endpoint values.
+ */
 export function resolveGaugeMarkerRenderProgress(options: {
     progress: number;
     gapLength: number;
@@ -534,6 +600,9 @@ export function resolveGaugeMarkerRenderProgress(options: {
         + clampedProgress * (markerTravelDomain.maximumProgress - markerTravelDomain.minimumProgress);
 }
 
+/**
+ * Resolves the progress interval cut out of an always-filled gauge lane.
+ */
 export function resolveGaugeMarkerGap(options: {
     progress: number;
     gapLength: number;
@@ -595,6 +664,7 @@ function renderGaugeRangeArcSegment(options: {
     gradientIdentifier: string;
     className: string;
     strokeWidth: number;
+    outline?: RenderOutlineTokens;
 }): string {
     if (options.segment.endProgress - options.segment.startProgress <= 0.001) {
         return "";
@@ -629,15 +699,26 @@ function renderGaugeRangeArcSegment(options: {
             <stop offset="0%" stop-color="${options.segment.startColor}" />
             <stop offset="100%" stop-color="${options.segment.endColor}" />
         </linearGradient>`;
+    const path = renderAnnularArcPath({
+        geometry: options.geometry,
+        startAngleDegrees,
+        endAngleDegrees,
+        largeArcFlag,
+        strokeWidth: options.strokeWidth,
+    });
+    // Filled annular arcs use the same path as a black backing stroke. Use only
+    // the extra width here; the foreground fill already owns the visible band.
+    const outlineStrokeWidth = resolveSvgShapeOutlineExtraWidth(options.strokeWidth, options.outline);
+    const outlinePath = isSvgOutlineEnabled(options.outline)
+        ? `<path class="${options.className}-outline" d="${path}"${formatSvgShapeOutlineStrokeAttributes({
+            outline: options.outline,
+            strokeWidth: outlineStrokeWidth,
+            lineJoin: "round",
+        })} />`
+        : "";
 
-    return `${gradient}<path class="${options.className}"
-        d="${renderAnnularArcPath({
-            geometry: options.geometry,
-            startAngleDegrees,
-            endAngleDegrees,
-            largeArcFlag,
-            strokeWidth: options.strokeWidth,
-        })}"
+    return `${gradient}${outlinePath}<path class="${options.className}"
+        d="${path}"
         fill="${fill}" />`;
 }
 
@@ -693,16 +774,44 @@ function renderGaugeRangeCap(options: {
     color: string;
     radius: number;
     className: string;
+    outline?: RenderOutlineTokens;
 }): string {
     const point = resolvePointOnCircle({
         geometry: options.geometry,
         angleDegrees: resolveGaugeRangeAngleDegrees(options.laneGeometry, options.progress),
         radialOffset: 0,
     });
+    const outlineCircle = renderFilledCircleOutline({
+        className: `${options.className}-outline`,
+        xCoordinate: point.xCoordinate,
+        yCoordinate: point.yCoordinate,
+        radius: options.radius,
+        outline: options.outline,
+    });
 
-    return `<circle class="${options.className}" cx="${formatSvgNumber(point.xCoordinate)}"
+    return `${outlineCircle}<circle class="${options.className}" cx="${formatSvgNumber(point.xCoordinate)}"
         cy="${formatSvgNumber(point.yCoordinate)}" r="${formatSvgNumber(options.radius)}"
         fill="${options.color}" />`;
+}
+
+function renderFilledCircleOutline(options: {
+    className: string;
+    xCoordinate: number;
+    yCoordinate: number;
+    radius: number;
+    outline: RenderOutlineTokens | undefined;
+}): string {
+    if (!isSvgOutlineEnabled(options.outline)) {
+        return "";
+    }
+
+    // Filled dots/caps use a larger black fill instead of a stroked circle so
+    // the foreground dot can fully cover the center of the backing.
+    const radius = options.radius + resolveSvgFilledShapeOutlinePadding(options.radius * 2, options.outline);
+
+    return `<circle class="${options.className}" cx="${formatSvgNumber(options.xCoordinate)}"
+        cy="${formatSvgNumber(options.yCoordinate)}" r="${formatSvgNumber(radius)}"
+        fill="${escapeSvgText(options.outline.color)}" opacity="${formatSvgNumber(options.outline.strength)}" />`;
 }
 
 function resolveGaugeRangePaintColor(progress: number, segments: readonly GaugeRangePaintSegment[]): string {

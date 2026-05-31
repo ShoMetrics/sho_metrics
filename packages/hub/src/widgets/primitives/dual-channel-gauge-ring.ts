@@ -1,10 +1,12 @@
 import {
     clamp,
 } from "../../view-rendering/svg-utils";
+import type { RenderOutlineTokens } from "../../view-rendering/render-appearance";
 import type { ColorConfig } from "../../view-rendering/color-resolver";
 import {
     buildGaugeRangeColorPlan,
     formatSvgNumber,
+    renderGaugeMarkerDotOutline,
     resolveGaugeMarkerRenderProgress,
     renderGaugeRangeLaneSegments,
     type ProgressCircleGeometry,
@@ -55,6 +57,8 @@ interface GaugeLaneModel {
 const GAUGE_RING_LAYOUT = {
     markerRadiusRatio: 0.78,
     markerGapPaddingRatio: 0.22,
+    // Dual gauge lanes are always filled, so the marker needs a slightly
+    // oversized cutout to stay visually separate from the colored arc.
     markerGapScale: 1.5,
 } as const;
 
@@ -66,6 +70,7 @@ export function renderDualGaugeRing(options: {
     geometry: DualGaugeRingGeometry;
     channelModels: readonly DualGaugeChannelModel[];
     strokeWidth: number;
+    shapeOutline?: RenderOutlineTokens;
 }): string {
     const gaugeLaneModels = options.channelModels.map(channel => buildGaugeLaneModel({
         channel,
@@ -78,11 +83,16 @@ export function renderDualGaugeRing(options: {
             gaugeLane,
             geometry: options.geometry,
             strokeWidth: options.strokeWidth,
+            shapeOutline: options.shapeOutline,
         })).join("")}
-        ${gaugeLaneModels.map(gaugeLane => renderGaugeMarkerDot(
-            gaugeLane.channel.channelId,
-            gaugeLane.markerDot,
-        )).join("")}
+        ${gaugeLaneModels.map(gaugeLane => `
+            ${renderGaugeMarkerDotOutline(
+                gaugeLane.markerDot,
+                options.shapeOutline,
+                `dual-progress-circle-${gaugeLane.channel.channelId}-marker-outline`,
+            )}
+            ${renderGaugeMarkerDot(gaugeLane.channel.channelId, gaugeLane.markerDot)}
+        `).join("")}
     `;
 }
 
@@ -177,6 +187,7 @@ function renderGaugeLaneArc(options: {
     gaugeLane: GaugeLaneModel;
     geometry: DualGaugeRingGeometry;
     strokeWidth: number;
+    shapeOutline: RenderOutlineTokens | undefined;
 }): string {
     return renderGaugeRangeLaneSegments({
         geometry: toProgressCircleGeometry(options.geometry),
@@ -184,6 +195,7 @@ function renderGaugeLaneArc(options: {
         markerDot: options.gaugeLane.markerDot,
         rangeColorPlan: options.gaugeLane.colorPlan,
         strokeWidth: options.strokeWidth,
+        outline: options.shapeOutline,
         segmentClassName: `dual-progress-circle-${options.gaugeLane.channel.channelId}-segment`,
         capClassName: `dual-progress-circle-${options.gaugeLane.channel.channelId}-cap`,
         gradientIdentifierPrefix: `dual-arc-${options.gaugeLane.channel.channelId}-range`,

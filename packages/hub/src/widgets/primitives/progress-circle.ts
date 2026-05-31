@@ -15,7 +15,10 @@ import {
 } from "../../view-rendering/render-text-style";
 import {
     clamp,
+    formatSvgShapeOutlineStrokeAttributes,
+    isSvgOutlineEnabled,
     renderStyledSvgText,
+    resolveSvgShapeOutlineStrokeWidth,
     type SvgTextAnchor,
 } from "../../view-rendering/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget-contract";
@@ -24,6 +27,7 @@ import {
     buildGaugeRangeColorPlan,
     formatSvgNumber,
     renderGaugeMarkerDot,
+    renderGaugeMarkerDotOutline,
     renderGaugeRangeArcSegments,
     renderGradientStop,
     resolveGaugeMarkerDot,
@@ -57,6 +61,7 @@ export interface ProgressCircleConfig extends WidgetBaseConfig {
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
     textOutline?: RenderOutlineTokens;
+    shapeOutline?: RenderOutlineTokens;
     innerTextScale: number;
     circleVariant: CircleVariant;
     gaugeRangeBlendProgress: number;
@@ -80,6 +85,7 @@ export const DEFAULT_PROGRESS_CIRCLE_CONFIG: ProgressCircleConfig = {
     textStyles: DEFAULT_RENDER_TEXT_STYLES,
     themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     textOutline: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS.textOutline,
+    shapeOutline: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS.shapeOutline,
     gradientHeadAdjustmentPercent: -42,
     innerTextScale: 1,
     circleVariant: "full-ring",
@@ -260,6 +266,7 @@ export const progressCircle: Widget<ProgressCircleConfig> = {
                 shouldRenderMarker: circleVariant === "gauge" && valueText !== "N/A",
                 metricFilter: config.themeEffects.metricFilter,
                 subtleFilter: config.themeEffects.subtleFilter,
+                shapeOutline: config.shapeOutline,
             })}
             ${centerContentFragment}
         `;
@@ -386,6 +393,7 @@ function renderRing(options: {
     shouldRenderMarker: boolean;
     metricFilter: string | undefined;
     subtleFilter: string | undefined;
+    shapeOutline: RenderOutlineTokens | undefined;
 }): string {
     const progress = clamp(options.progress, 0, 1);
     const trackDashArray = options.notchGeometry
@@ -418,6 +426,7 @@ function renderRing(options: {
             markerDot,
             rangeColorPlan: options.rangeColorPlan,
             strokeWidth: options.strokeWidth,
+            outline: options.shapeOutline,
         })
         : shouldRenderProgressRing
         ? renderRingCircle({
@@ -430,10 +439,13 @@ function renderRing(options: {
             dashOffset: options.notchGeometry ? 0 : options.geometry.circumference * (1 - progress),
             rotationDegrees,
             filter: options.metricFilter,
+            outline: options.shapeOutline,
+            outlineClassName: "progress-circle-ring-outline",
         })
         : "";
     const markerDotFragment = markerDot
-        ? `<g ${buildSvgFilterAttributes(options.metricFilter).join(" ")}>${renderGaugeMarkerDot(markerDot)}</g>`
+        ? `${renderGaugeMarkerDotOutline(markerDot, options.shapeOutline, "progress-circle-marker-outline")}
+            <g ${buildSvgFilterAttributes(options.metricFilter).join(" ")}>${renderGaugeMarkerDot(markerDot)}</g>`
         : "";
     const trackRing = options.shouldRenderFullRangeArc
         ? ""
@@ -445,6 +457,8 @@ function renderRing(options: {
             dashOffset: 0,
             rotationDegrees,
             filter: options.subtleFilter,
+            outline: options.shapeOutline,
+            outlineClassName: "progress-circle-track-outline",
         });
 
     return `
@@ -464,10 +478,25 @@ function renderRingCircle(options: {
     dashOffset: number;
     rotationDegrees: number;
     filter: string | undefined;
+    outline: RenderOutlineTokens | undefined;
+    outlineClassName: string;
 }): string {
     const filterAttributes = buildSvgFilterAttributes(options.filter);
+    const outlineStrokeWidth = resolveSvgShapeOutlineStrokeWidth(options.strokeWidth, options.outline);
+    const outlineCircle = isSvgOutlineEnabled(options.outline)
+        ? `<circle class="${options.outlineClassName}"
+            cx="${options.geometry.centerXCoordinate}" cy="${options.geometry.centerYCoordinate}" r="${options.geometry.radius}"
+            stroke-dasharray="${options.dashArray}" stroke-dashoffset="${options.dashOffset}"
+            transform="rotate(${options.rotationDegrees} ${options.geometry.centerXCoordinate} ${options.geometry.centerYCoordinate})"
+            ${formatSvgShapeOutlineStrokeAttributes({
+                outline: options.outline,
+                strokeWidth: outlineStrokeWidth,
+                lineCap: "round",
+            })} />`
+        : "";
 
     return `
+        ${outlineCircle}
         <circle cx="${options.geometry.centerXCoordinate}" cy="${options.geometry.centerYCoordinate}" r="${options.geometry.radius}"
             fill="none" stroke="${options.stroke}" stroke-width="${options.strokeWidth}"
             stroke-dasharray="${options.dashArray}" stroke-dashoffset="${options.dashOffset}"

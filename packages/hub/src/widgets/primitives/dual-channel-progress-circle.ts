@@ -15,7 +15,10 @@ import {
 } from "../../view-rendering/render-text-style";
 import {
     clamp,
+    formatSvgShapeOutlineStrokeAttributes,
+    isSvgOutlineEnabled,
     renderStyledSvgText,
+    resolveSvgShapeOutlineStrokeWidth,
 } from "../../view-rendering/svg-utils";
 import type { WidgetBaseConfig } from "../widget-contract";
 import type { ProgressCircleStatusIcon, CircleVariant } from "./progress-circle";
@@ -34,6 +37,7 @@ export interface DualChannelProgressCircleConfig extends WidgetBaseConfig {
     textStyles: RenderTextStyles;
     themeEffects: RenderThemeEffectTokens;
     textOutline?: RenderOutlineTokens;
+    shapeOutline?: RenderOutlineTokens;
     centerContent: DualChannelProgressCircleCenterContent;
     circleVariant: CircleVariant;
     titleText?: string;
@@ -59,6 +63,7 @@ export const DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG: DualChannelProgressCir
     textStyles: DEFAULT_RENDER_TEXT_STYLES,
     themeEffects: DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     textOutline: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS.textOutline,
+    shapeOutline: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS.shapeOutline,
     centerContent: "value",
     circleVariant: "full-ring",
     titleText: "",
@@ -229,6 +234,7 @@ export function renderDualChannelProgressCircle(
             metricFilter: config.themeEffects.metricFilter,
             subtleFilter: config.themeEffects.subtleFilter,
             iconFilter: config.themeEffects.iconFilter,
+            shapeOutline: config.shapeOutline,
         })}
         ${renderCenterContent({ data, config, geometry })}
         ${isGaugeVariant ? renderGaugeBottomLabel({ config, geometry }) : ""}
@@ -245,12 +251,14 @@ function renderRing(options: {
     metricFilter: string | undefined;
     subtleFilter: string | undefined;
     iconFilter: string | undefined;
+    shapeOutline: RenderOutlineTokens | undefined;
 }): string {
     if (options.mode === "gauge") {
         return renderDualGaugeRing({
             geometry: options.geometry,
             channelModels: options.channelArcModels,
             strokeWidth: options.strokeWidth,
+            shapeOutline: options.shapeOutline,
         });
     }
 
@@ -285,6 +293,8 @@ function renderRing(options: {
             // need rounded ends around the icon gaps.
             strokeLineCap: options.hasNotches ? "round" : "butt",
             filter: options.subtleFilter,
+            outline: options.shapeOutline,
+            outlineClassName: "dual-progress-circle-track-outline",
         })).join("")}
         ${options.channelArcModels.map(channel => {
             const progress = clamp(channel.progress, 0, 1);
@@ -317,6 +327,8 @@ function renderRing(options: {
                 }),
                 clipPathId: isFullRing ? resolveFullRingProgressClipPathId(channel.channelId) : undefined,
                 filter: options.metricFilter,
+                outline: options.shapeOutline,
+                outlineClassName: `dual-progress-circle-${channel.channelId}-arc-outline`,
             });
         }).join("")}
         ${options.hasNotches ? options.channelArcModels.map(channel => renderNotchIcon({
@@ -347,14 +359,32 @@ function renderArcSegment(options: {
     strokeLineCap?: "butt" | "round";
     clipPathId?: string;
     filter: string | undefined;
+    outline: RenderOutlineTokens | undefined;
+    outlineClassName: string;
 }): string {
+    const strokeLineCap = options.strokeLineCap ?? "round";
+    const outlineStrokeWidth = resolveSvgShapeOutlineStrokeWidth(options.strokeWidth, options.outline);
+    const outlineCircle = isSvgOutlineEnabled(options.outline)
+        ? `<circle class="${options.outlineClassName}"
+            cx="${formatSvgNumber(options.geometry.centerXCoordinate)}"
+            cy="${formatSvgNumber(options.geometry.centerYCoordinate)}"
+            r="${formatSvgNumber(options.geometry.radius)}"
+            stroke-dasharray="${options.dashArray}" stroke-dashoffset="${formatSvgNumber(options.dashOffset)}"
+            transform="rotate(${formatSvgNumber(options.rotationDegrees)} ${formatSvgNumber(options.geometry.centerXCoordinate)} ${formatSvgNumber(options.geometry.centerYCoordinate)})"
+            ${formatSvgShapeOutlineStrokeAttributes({
+                outline: options.outline,
+                strokeWidth: outlineStrokeWidth,
+                lineCap: strokeLineCap,
+            })} />`
+        : "";
     const circleFragment = `
+        ${outlineCircle}
         <circle cx="${formatSvgNumber(options.geometry.centerXCoordinate)}"
             cy="${formatSvgNumber(options.geometry.centerYCoordinate)}"
             r="${formatSvgNumber(options.geometry.radius)}"
             fill="none" stroke="${options.stroke}" stroke-width="${formatSvgNumber(options.strokeWidth)}"
             stroke-dasharray="${options.dashArray}" stroke-dashoffset="${formatSvgNumber(options.dashOffset)}"
-            stroke-linecap="${options.strokeLineCap ?? "round"}"
+            stroke-linecap="${strokeLineCap}"
             transform="rotate(${formatSvgNumber(options.rotationDegrees)} ${formatSvgNumber(options.geometry.centerXCoordinate)} ${formatSvgNumber(options.geometry.centerYCoordinate)})"
             ${buildSvgFilterAttributes(options.filter).join(" ")} />
     `;

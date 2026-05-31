@@ -7,6 +7,8 @@ import { progressCircle, DEFAULT_PROGRESS_CIRCLE_CONFIG } from "./progress-circl
 import { buildGaugeRangeColorPlan, resolveGaugeMarkerGap, resolveGaugeMarkerRenderProgress } from "./progress-circle-range";
 import { DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG, renderDualChannelProgressCircle } from "./dual-channel-progress-circle";
 import { progressBar, DEFAULT_PROGRESS_BAR_CONFIG } from "./progress-bar";
+import { DEFAULT_SPARKLINE_CONFIG, sparkline } from "./sparkline";
+import { DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG, renderDualChannelSparkline } from "./dual-channel-sparkline";
 import { renderMetricTextRow } from "./metric-text-row";
 import { DEFAULT_MIRRORED_TRAFFIC_CONFIG, renderMirroredTraffic } from "./mirrored-traffic";
 import {
@@ -17,6 +19,7 @@ import {
 import { renderTitleCardDualTextMetric, renderTitleCardTextMetric } from "./title-card-text-metric";
 
 const keySize = { width: 144, height: 144 };
+const enabledShapeOutline = { color: "#000000", strength: 0.85 };
 
 test("progress circle clamps progress and escapes center text", () => {
     const svgFragment = progressCircle.render({
@@ -328,6 +331,26 @@ test("gauge circle variant keeps the range track uncolored while data is unavail
     assert.match(svgFragment, /stroke-dasharray="/);
 });
 
+test("progress circle emits shape backings for ring and gauge shapes", () => {
+    const ringFragment = progressCircle.render(buildWidgetData(), {
+        ...DEFAULT_PROGRESS_CIRCLE_CONFIG,
+        shapeOutline: enabledShapeOutline,
+    }, keySize);
+    const gaugeFragment = progressCircle.render(buildWidgetData(), {
+        ...DEFAULT_PROGRESS_CIRCLE_CONFIG,
+        circleVariant: "gauge",
+        shapeOutline: enabledShapeOutline,
+    }, keySize);
+
+    assert.match(ringFragment, /class="progress-circle-track-outline"/);
+    assert.match(ringFragment, /class="progress-circle-ring-outline"/);
+    assert.match(ringFragment, /stroke="#000000"/);
+    assert.match(ringFragment, /stroke-opacity="0\.85"/);
+    assert.match(gaugeFragment, /class="progress-circle-range-segment-outline"/);
+    assert.match(gaugeFragment, /class="progress-circle-range-cap-outline"/);
+    assert.match(gaugeFragment, /class="progress-circle-marker-outline"/);
+});
+
 test("gauge marker uses a conservative visual range without changing true endpoints", () => {
     const startProgress = roundMarkerProgress(resolveGaugeMarkerRenderProgress({
         progress: 0,
@@ -479,6 +502,27 @@ test("dual-channel full-ring variant keeps tiny nonzero progress visible", () =>
     assert.ok(downloadLength >= 15 && downloadLength <= 18);
     assert.ok(downloadArc.rotationDegrees > 65);
     assert.ok(downloadArc.rotationDegrees < 75);
+});
+
+test("dual-channel progress circle emits shape backings for ring and gauge shapes", () => {
+    const ringFragment = renderDualChannelProgressCircle(buildDualChannelData(), {
+        ...DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG,
+        circleVariant: "full-ring",
+        shapeOutline: enabledShapeOutline,
+    }, keySize);
+    const gaugeFragment = renderDualChannelProgressCircle(buildDualChannelData(), {
+        ...DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG,
+        circleVariant: "gauge",
+        shapeOutline: enabledShapeOutline,
+    }, keySize);
+
+    assert.match(ringFragment, /class="dual-progress-circle-track-outline"/);
+    assert.match(ringFragment, /class="dual-progress-circle-positive-arc-outline"/);
+    assert.match(ringFragment, /class="dual-progress-circle-negative-arc-outline"/);
+    assert.match(gaugeFragment, /class="dual-progress-circle-positive-segment-outline"/);
+    assert.match(gaugeFragment, /class="dual-progress-circle-negative-segment-outline"/);
+    assert.match(gaugeFragment, /class="dual-progress-circle-positive-marker-outline"/);
+    assert.match(gaugeFragment, /class="dual-progress-circle-negative-marker-outline"/);
 });
 
 test("dual-channel gauge variant renders two full-color gauge lanes with marker dots", () => {
@@ -708,6 +752,46 @@ test("progress bar renders single value icon", () => {
     assert.match(svgFragment, /direction-icon/);
     assert.match(svgFragment, /color="#38bdf8"/);
     assert.match(svgFragment, /progress-bar-single-value/);
+});
+
+test("progress bar emits filled shape backings without drawing a zero-fill cap", () => {
+    const filledFragment = progressBar.render(buildWidgetData(), {
+        ...DEFAULT_PROGRESS_BAR_CONFIG,
+        shapeOutline: enabledShapeOutline,
+    }, keySize);
+    const zeroProgressFragment = progressBar.render({
+        ...buildWidgetData(),
+        progress: 0,
+    }, {
+        ...DEFAULT_PROGRESS_BAR_CONFIG,
+        shapeOutline: enabledShapeOutline,
+    }, keySize);
+
+    assert.match(filledFragment, /class="progress-bar-track-outline"/);
+    assert.match(filledFragment, /class="progress-bar-fill-outline"/);
+    assert.match(filledFragment, /fill="#000000" opacity="0\.85"/);
+    assert.match(zeroProgressFragment, /class="progress-bar-track-outline"/);
+    assert.doesNotMatch(zeroProgressFragment, /class="progress-bar-fill-outline"/);
+});
+
+test("sparkline primitives emit line backings without outlining chart chrome", () => {
+    const singleFragment = sparkline.render(buildWidgetData(), {
+        ...DEFAULT_SPARKLINE_CONFIG,
+        showDots: true,
+        gridLineVisibility: "always",
+        gridLineType: "vertical",
+        shapeOutline: enabledShapeOutline,
+    }, keySize);
+    const dualFragment = renderDualChannelSparkline(buildDualChannelData(), {
+        ...DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG,
+        shapeOutline: enabledShapeOutline,
+    }, keySize);
+
+    assert.match(singleFragment, /class="sparkline-line-outline"/);
+    assert.match(singleFragment, /class="sparkline-latest-dot-outline"/);
+    assert.doesNotMatch(singleFragment, /grid-outline|baseline-outline|divider-outline/);
+    assert.match(dualFragment, /class="dual-sparkline-positive-line-outline"/);
+    assert.match(dualFragment, /class="dual-sparkline-negative-line-outline"/);
 });
 
 test("metric text row escapes values and clamps non-finite coordinates", () => {
