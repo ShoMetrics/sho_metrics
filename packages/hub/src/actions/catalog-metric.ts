@@ -45,10 +45,11 @@ export class CatalogMetric extends MetricAction {
         const catalogTarget = readResolvedMetricTarget(settings, "catalog");
 
         const helperStatus = this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID);
+        const platform = this.currentPlatform();
 
         if (catalogTarget.metricId.length === 0) {
-            logCatalogMetricNoSelectionRender(helperStatus);
-            setMetricView(buildCatalogMetricNoSelectionViewOptions({ event, settings, helperStatus }));
+            logCatalogMetricNoSelectionRender(helperStatus, platform);
+            setMetricView(buildCatalogMetricNoSelectionViewOptions({ event, settings, helperStatus, platform }));
             return;
         }
 
@@ -62,7 +63,7 @@ export class CatalogMetric extends MetricAction {
     }
 
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
-        if (process.platform !== "win32") {
+        if (this.currentPlatform() !== "win32") {
             // Catalog metrics are currently backed only by the Windows helper.
             // Non-Windows profiles can still contain this action after sync or
             // import, so keep the PI responsive without probing a source that
@@ -144,8 +145,9 @@ export function buildCatalogMetricNoSelectionViewOptions(options: {
     readonly event: WillAppearEvent;
     readonly settings: ResolvedWidgetSettings;
     readonly helperStatus: SourceClientStatus | undefined;
+    readonly platform?: NodeJS.Platform;
 }): SingleMetricViewOptions {
-    const noticeText = resolveNoSelectionNoticeText(options.helperStatus);
+    const noticeText = resolveNoSelectionNoticeText(options.helperStatus, options.platform ?? process.platform);
 
     return {
         event: options.event,
@@ -225,8 +227,9 @@ function buildNoSelectionWidgetData(): WidgetData {
 
 function resolveNoSelectionNoticeText(
     helperStatus: SourceClientStatus | undefined,
+    platform: NodeJS.Platform,
 ): string | undefined {
-    if (process.platform !== "win32") {
+    if (platform !== "win32") {
         return undefined;
     }
 
@@ -241,13 +244,16 @@ function resolveNoSelectionNoticeText(
     return undefined;
 }
 
-function logCatalogMetricNoSelectionRender(helperStatus: SourceClientStatus | undefined): void {
+function logCatalogMetricNoSelectionRender(
+    helperStatus: SourceClientStatus | undefined,
+    platform: NodeJS.Platform,
+): void {
     log.atDebug()
         .everyMs("catalog-no-selection-helper-status", CATALOG_NO_SELECTION_DEBUG_INTERVAL_MILLISECONDS)
         .log(() => [
             "catalogNoSelectionRender",
             `helperStatus=${formatSourceStatusForDebug(helperStatus)}`,
-            `keyCopy=${resolveNoSelectionNoticeText(helperStatus) ?? "N/A"}`,
+            `keyCopy=${resolveNoSelectionNoticeText(helperStatus, platform) ?? "N/A"}`,
         ].join(" "));
 }
 
