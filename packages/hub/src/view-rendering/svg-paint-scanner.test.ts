@@ -9,7 +9,7 @@ import { DEFAULT_RENDER_TEXT_STYLES } from "./render-text-style";
 import { renderSingleMetricBodyView } from "./single-metric-view";
 import {
     scanChromaticSvgPaintValues,
-} from "../../tests/support/svg-paint-scanner";
+} from "../../tests/testing/svg-paint-scanner";
 import type { DualChannelWidgetData, WidgetData } from "./widget-data";
 import { WIDGET_LOGICAL_SIZE } from "./widget-data";
 import type { ProgressCircleStatusIcon } from "../widgets/primitives/progress-circle";
