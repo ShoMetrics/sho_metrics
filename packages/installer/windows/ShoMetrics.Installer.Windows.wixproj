@@ -3,10 +3,12 @@
 
   <PropertyGroup>
     <OutputName>ShoMetrics-Helper-$(ShoMetricsVersionPrefix)-win-x64</OutputName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <InstallerPayloadDir Condition="'$(InstallerPayloadDir)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\installer\windows\payload</InstallerPayloadDir>
     <ProductVersion>$(ShoMetricsVersionPrefix)</ProductVersion>
     <InstallerPlatform>x64</InstallerPlatform>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <NuGetLockFilePath>$(MSBuildProjectDirectory)\ShoMetrics.Installer.Windows.packages.lock.json</NuGetLockFilePath>
     <RestoreLockedMode Condition="'$(UpdatePackageLocks)' != 'true'">true</RestoreLockedMode>
     <DefineConstants>ProductVersion=$(ProductVersion);InstallerPayloadDir=$(InstallerPayloadDir)</DefineConstants>
     <!-- Self-contained .NET/WinUI payloads include runtime/resource files with
@@ -14,4 +16,8 @@
          same-version smoke builds intentionally upgrade each other. -->
     <SuppressIces>ICE03;ICE61</SuppressIces>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Package.wxs" />
+  </ItemGroup>
 </Project>
