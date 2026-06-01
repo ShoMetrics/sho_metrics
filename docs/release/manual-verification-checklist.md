@@ -23,12 +23,8 @@ attach notes for every failed or skipped item.
 
 ## Install And Startup
 
-- [ ] Windows MSI artifact downloads from GitHub Releases and starts normally.
 - [ ] Clean install succeeds on Windows 11.
 - [ ] Clean install succeeds on one additional supported Windows version, if available.
-- [ ] MSI installs ShoMetrics Helper under Program Files.
-- [ ] MSI installs ShoMetrics Helper service as automatic start.
-- [ ] MSI creates the ShoMetrics Helper Start Menu shortcut.
 - [ ] Stream Deck app starts with the Sho Metrics plugin loaded.
 - [ ] Property Inspector opens for every action.
 - [ ] First render appears on a physical key.
@@ -43,9 +39,6 @@ attach notes for every failed or skipped item.
 - [ ] Helper protocol mismatch shows bounded recovery guidance.
 - [ ] Helper unavailable shows bounded recovery guidance.
 - [ ] Helper install, start, restart, and uninstall paths were exercised.
-- [ ] MSI uninstall stops and removes ShoMetrics Helper service.
-- [ ] MSI reinstall or repair does not create duplicate service registrations.
-- [ ] MSI same-version rebuild installs as an upgrade, not as a side-by-side product.
 - [ ] PawnIO not installed is reported correctly in Control Panel.
 - [ ] PawnIO not elevated or unusable is reported correctly in Control Panel.
 - [ ] PawnIO OK state is reported correctly in Control Panel.
