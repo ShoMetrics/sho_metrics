@@ -91,7 +91,7 @@ jobs:
           cache: true
           cache-dependency-path: |
             packages/source-windows/**/packages.lock.json
-            packages/installer/windows/packages.lock.json
+            packages/installer/windows/**/*.packages.lock.json
 
       - name: Build MSI
         working-directory: .
