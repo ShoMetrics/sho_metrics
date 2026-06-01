@@ -4,7 +4,10 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { MetricTheme, MetricView, ResolvedGlobalSettings } from "../../settings/resolved-settings";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
-import { DEFAULT_APPEARANCE_SETTINGS } from "../../settings/default-appearance-settings";
+import {
+    DEFAULT_APPEARANCE_SETTINGS,
+    DEFAULT_GLOBAL_TRANSPARENT_SURFACE_SETTINGS,
+} from "../../settings/default-appearance-settings";
 import { GlobalSettingsTab } from "./GlobalSettingsTab";
 
 test("global override groups view theme and color controls under the master switch", () => {
@@ -22,6 +25,8 @@ test("global override groups view theme and color controls under the master swit
     assert.match(markup, /Override theme/);
     assert.match(markup, /Color Override/);
     assert.match(markup, /Override color/);
+    assert.match(markup, /Transparent Surface Override/);
+    assert.match(markup, /Override transparent surface/);
     assert.doesNotMatch(markup, /Global Color Mode:/);
     assert.match(markup, /Color Mode:/);
     assert.match(markup, /Range Colors/);
@@ -33,6 +38,26 @@ test("global override groups view theme and color controls under the master swit
     assert.doesNotMatch(markup, /Tint/);
     assert.match(markup, /Advanced/);
     assert.match(markup, /Color Compensation/);
+});
+
+test("global override renders transparent surface controls when its subsection is enabled", () => {
+    const markup = renderToStaticMarkup(createElement(GlobalSettingsTab, {
+        resolvedSettings: {
+            ...buildGlobalSettings(),
+            transparentSurfaceOverride: {
+                transparentSurface: DEFAULT_GLOBAL_TRANSPARENT_SURFACE_SETTINGS,
+            },
+        },
+        colorCompensationProfile: DEFAULT_COLOR_COMPENSATION_PROFILE,
+        onSettingsPatch: () => undefined,
+        onOpenColorCompensation: () => undefined,
+    }));
+
+    assert.match(markup, /Transparent Surface Override/);
+    assert.match(markup, /Transparent background/);
+    assert.match(markup, /Background Opacity:/);
+    assert.match(markup, /Text Outline:/);
+    assert.match(markup, /Shape Outline:/);
 });
 
 test("global override renders terminal palette controls for terminal theme", () => {

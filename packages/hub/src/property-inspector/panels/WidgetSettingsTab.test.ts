@@ -1284,6 +1284,7 @@ function renderWidgetSettings(options: {
     isWindows?: boolean;
     isGlobalViewOverrideEnabled?: boolean;
     isGlobalThemeOverrideEnabled?: boolean;
+    isGlobalTransparentSurfaceOverrideEnabled?: boolean;
     isGlobalPaintOverrideEnabled?: boolean;
     settings?: InspectorTestSettings;
     runtimeCache?: WidgetRuntimeCachePatch;
@@ -1300,6 +1301,7 @@ function renderWidgetSettings(options: {
         }),
         isGlobalViewOverrideEnabled: options.isGlobalViewOverrideEnabled ?? false,
         isGlobalThemeOverrideEnabled: options.isGlobalThemeOverrideEnabled ?? false,
+        isGlobalTransparentSurfaceOverrideEnabled: options.isGlobalTransparentSurfaceOverrideEnabled ?? false,
         isGlobalPaintOverrideEnabled: options.isGlobalPaintOverrideEnabled ?? false,
         colorCompensationProfile: DEFAULT_COLOR_COMPENSATION_PROFILE,
         onSettingsPatch: () => undefined,

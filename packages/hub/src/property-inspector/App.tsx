@@ -39,6 +39,8 @@ export function App({ client }: AppProps): React.JSX.Element {
         isGlobalSettingsReady && resolvedGlobalSettings.viewOverride !== undefined;
     const isGlobalThemeOverrideEnabled =
         isGlobalSettingsReady && resolvedGlobalSettings.themeOverride !== undefined;
+    const isGlobalTransparentSurfaceOverrideEnabled =
+        isGlobalSettingsReady && resolvedGlobalSettings.transparentSurfaceOverride !== undefined;
     const isGlobalPaintOverrideEnabled =
         isGlobalSettingsReady && resolvedGlobalSettings.paintOverride !== undefined;
     if (isColorCompensationWizardOpen) {
@@ -80,6 +82,7 @@ export function App({ client }: AppProps): React.JSX.Element {
                     context={visibilityContext}
                     isGlobalViewOverrideEnabled={isGlobalViewOverrideEnabled}
                     isGlobalThemeOverrideEnabled={isGlobalThemeOverrideEnabled}
+                    isGlobalTransparentSurfaceOverrideEnabled={isGlobalTransparentSurfaceOverrideEnabled}
                     isGlobalPaintOverrideEnabled={isGlobalPaintOverrideEnabled}
                     colorCompensationProfile={colorCompensation.profile}
                     onSettingsPatch={updateWidgetSettings}

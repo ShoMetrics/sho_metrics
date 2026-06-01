@@ -276,6 +276,48 @@ export function buildTerminalPaintAppearanceOverride(
     };
 }
 
+/** Resolves the active theme's transparent surface settings. */
+export function resolveActiveTransparentSurface(
+    appearance: ResolvedAppearanceSettings,
+): ResolvedTransparentSurfaceSettings {
+    switch (appearance.theme.selectedTheme) {
+        case "flat":
+            return appearance.theme.flat.transparentSurface;
+        case "cupertino-glass":
+            return appearance.theme.cupertinoGlass.transparentSurface;
+        case "color-filled":
+            return appearance.theme.colorFilled.transparentSurface;
+        case "terminal":
+            return appearance.theme.terminal.transparentSurface;
+        case "pixel-window":
+            return appearance.theme.pixelWindow.transparentSurface;
+    }
+}
+
+/**
+ * Builds the active theme branch for a transparent surface patch.
+ *
+ * Widget-level transparent surface is stored per theme, so UI patches must
+ * update only the currently selected theme branch.
+ */
+export function buildTransparentSurfaceAppearanceThemeOverride(
+    selectedTheme: MetricTheme,
+    transparentSurface: ResolvedTransparentSurfaceSettingsOverride,
+): ResolvedAppearanceThemeSettingsOverride {
+    switch (selectedTheme) {
+        case "flat":
+            return { flat: { transparentSurface } };
+        case "cupertino-glass":
+            return { cupertinoGlass: { transparentSurface } };
+        case "color-filled":
+            return { colorFilled: { transparentSurface } };
+        case "terminal":
+            return { terminal: { transparentSurface } };
+        case "pixel-window":
+            return { pixelWindow: { transparentSurface } };
+    }
+}
+
 function mergeMetricPaintSettings(
     paint: ResolvedMetricPaintSettings,
     override: ResolvedMetricPaintSettingsOverride | undefined,

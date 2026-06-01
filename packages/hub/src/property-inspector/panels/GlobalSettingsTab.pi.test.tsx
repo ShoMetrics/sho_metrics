@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
 import type { ResolvedGlobalSettings } from "../../settings/resolved-settings";
@@ -32,6 +32,34 @@ test("global settings tab writes subsection override toggles independently", asy
     await user.click(screen.getByRole("checkbox", { name: /^override view$/i }));
 
     assert.deepEqual(settingsPatches, [{ viewOverrideEnabled: false }]);
+});
+
+test("global settings tab writes transparent surface override patches", async () => {
+    const settingsPatches: StoredGlobalSettingsPatch[] = [];
+    const user = userEvent.setup();
+
+    renderGlobalSettingsTab(resolveGlobalSettings({ globalOverrideEnabled: true }), settingsPatches);
+
+    await user.click(screen.getByRole("checkbox", { name: /^transparent background$/i }));
+    fireEvent.change(screen.getByRole("slider", { name: /^shape outline:$/i }), {
+        target: { value: "60" },
+    });
+
+    assert.deepEqual(settingsPatches, [
+        { transparentSurface: { enabled: true } },
+        { transparentSurface: { shapeOutlinePercent: 60 } },
+    ]);
+});
+
+test("global settings tab writes transparent surface subsection toggle independently", async () => {
+    const settingsPatches: StoredGlobalSettingsPatch[] = [];
+    const user = userEvent.setup();
+
+    renderGlobalSettingsTab(resolveGlobalSettings({ globalOverrideEnabled: true }), settingsPatches);
+
+    await user.click(screen.getByRole("checkbox", { name: /^override transparent surface$/i }));
+
+    assert.deepEqual(settingsPatches, [{ transparentSurfaceOverrideEnabled: false }]);
 });
 
 test("global settings tab writes undefined when an optional network maximum is cleared", async () => {

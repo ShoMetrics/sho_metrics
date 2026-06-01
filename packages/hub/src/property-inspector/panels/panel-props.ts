@@ -6,5 +6,6 @@ export interface WidgetSettingsPanelProps {
     onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
     viewDisabled?: boolean | undefined;
     themeDisabled?: boolean | undefined;
+    transparentSurfaceDisabled?: boolean | undefined;
     colorDisabled?: boolean | undefined;
 }
