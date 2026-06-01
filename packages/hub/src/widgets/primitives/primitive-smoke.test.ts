@@ -347,8 +347,8 @@ test("progress circle emits shape backings for ring and gauge shapes", () => {
     assert.match(ringFragment, /stroke="#000000"/);
     assert.match(ringFragment, /stroke-opacity="0\.85"/);
     assert.match(gaugeFragment, /class="progress-circle-range-segment-outline"/);
-    assert.match(gaugeFragment, /class="progress-circle-range-cap-outline"/);
     assert.match(gaugeFragment, /class="progress-circle-marker-outline"/);
+    assert.doesNotMatch(gaugeFragment, /class="progress-circle-range-cap-outline"/);
 });
 
 test("gauge marker uses a conservative visual range without changing true endpoints", () => {
@@ -523,6 +523,8 @@ test("dual-channel progress circle emits shape backings for ring and gauge shape
     assert.match(gaugeFragment, /class="dual-progress-circle-negative-segment-outline"/);
     assert.match(gaugeFragment, /class="dual-progress-circle-positive-marker-outline"/);
     assert.match(gaugeFragment, /class="dual-progress-circle-negative-marker-outline"/);
+    assert.doesNotMatch(gaugeFragment, /class="dual-progress-circle-positive-cap-outline"/);
+    assert.doesNotMatch(gaugeFragment, /class="dual-progress-circle-negative-cap-outline"/);
 });
 
 test("dual-channel gauge variant renders two full-color gauge lanes with marker dots", () => {

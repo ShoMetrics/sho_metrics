@@ -77,6 +77,17 @@ const DUAL_TRANSPARENT_SURFACE_CASES: readonly DualMetricVisualTestCase[] = [
         selectedView: "line",
         chartMode: "overlay",
     },
+    {
+        snapshotName: "transparent-surface-flat-dual-circle-gauge",
+        appearance: enableFlatTransparentSurface(buildDefaultAppearanceOverride({
+            selectedView: "circle",
+            circleVariant: "gauge",
+            colorMode: "multi-color",
+        })),
+        data: NETWORK_DUAL_CHANNEL_WIDGET_DATA,
+        selectedView: "circle",
+        circleVariant: "gauge",
+    },
 ];
 
 for (const testCase of SINGLE_TRANSPARENT_SURFACE_CASES) {
