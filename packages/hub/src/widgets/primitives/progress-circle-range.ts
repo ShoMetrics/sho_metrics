@@ -260,20 +260,19 @@ export function renderGaugeRangeLaneSegments(options: {
         strokeWidth: options.strokeWidth,
         outline: options.outline,
     }));
-    const caps = buildGaugeRangeCaps({
+    const roundEndCaps = buildGaugeRangeRoundEndCaps({
         paintSegments: options.rangeColorPlan.paintSegments,
         markerGap,
-    }).map((cap) => renderGaugeRangeCap({
+    }).map((cap) => renderGaugeRangeRoundEndCap({
         geometry: options.geometry,
         laneGeometry: options.laneGeometry,
         progress: cap.progress,
         color: cap.color,
         radius: options.strokeWidth / 2,
         className: options.capClassName,
-        outline: options.outline,
     }));
 
-    return [...arcSegments, ...caps].join("");
+    return [...arcSegments, ...roundEndCaps].join("");
 }
 
 /**
@@ -510,7 +509,7 @@ function normalizeGradientStops(stops: readonly GaugeRangeGradientStop[]): reado
     });
 }
 
-function buildGaugeRangeCaps(options: {
+function buildGaugeRangeRoundEndCaps(options: {
     paintSegments: readonly GaugeRangePaintSegment[];
     markerGap: GaugeMarkerGap | null;
 }): Array<{ progress: number; color: string }> {
@@ -767,29 +766,24 @@ function renderAnnularArcPath(options: {
     ].join(" ");
 }
 
-function renderGaugeRangeCap(options: {
+function renderGaugeRangeRoundEndCap(options: {
     geometry: ProgressCircleGeometry;
     laneGeometry: GaugeRangeLaneGeometry;
     progress: number;
     color: string;
     radius: number;
     className: string;
-    outline?: RenderOutlineTokens;
 }): string {
     const point = resolvePointOnCircle({
         geometry: options.geometry,
         angleDegrees: resolveGaugeRangeAngleDegrees(options.laneGeometry, options.progress),
         radialOffset: 0,
     });
-    const outlineCircle = renderFilledCircleOutline({
-        className: `${options.className}-outline`,
-        xCoordinate: point.xCoordinate,
-        yCoordinate: point.yCoordinate,
-        radius: options.radius,
-        outline: options.outline,
-    });
 
-    return `${outlineCircle}<circle class="${options.className}" cx="${formatSvgNumber(point.xCoordinate)}"
+    // Round end caps are construction patches for the filled annular arc.
+    // They are not independent metric shapes; outlining them separately creates
+    // visible dots at every lane end and marker-gap edge.
+    return `<circle class="${options.className}" cx="${formatSvgNumber(point.xCoordinate)}"
         cy="${formatSvgNumber(point.yCoordinate)}" r="${formatSvgNumber(options.radius)}"
         fill="${options.color}" />`;
 }
