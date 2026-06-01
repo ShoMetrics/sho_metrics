@@ -4,11 +4,8 @@ import {
     type RenderOutlineTokens,
     type RenderTransparentSurfaceTokens,
 } from "../view-rendering/render-appearance";
-import type {
-    ResolvedAppearanceSettings,
-    ResolvedAppearanceThemeSettings,
-    ResolvedTransparentSurfaceSettings,
-} from "./resolved-settings";
+import { resolveActiveTransparentSurface } from "./appearance-overrides";
+import type { ResolvedAppearanceSettings } from "./resolved-settings";
 
 /**
  * Resolves transparent-surface settings into renderer drawing tokens.
@@ -17,7 +14,7 @@ import type {
  * background opacity and outline strength tokens.
  */
 export function resolveRenderTransparentSurface(settings: ResolvedAppearanceSettings): RenderTransparentSurfaceTokens {
-    const transparentSurface = resolveActiveTransparentSurface(settings.theme);
+    const transparentSurface = resolveActiveTransparentSurface(settings);
 
     if (!transparentSurface.enabled) {
         return DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS;
@@ -28,23 +25,6 @@ export function resolveRenderTransparentSurface(settings: ResolvedAppearanceSett
         textOutline: resolveOutlineTokens(transparentSurface.textOutlinePercent),
         shapeOutline: resolveOutlineTokens(transparentSurface.shapeOutlinePercent),
     };
-}
-
-function resolveActiveTransparentSurface(
-    theme: ResolvedAppearanceThemeSettings,
-): ResolvedTransparentSurfaceSettings {
-    switch (theme.selectedTheme) {
-        case "flat":
-            return theme.flat.transparentSurface;
-        case "cupertino-glass":
-            return theme.cupertinoGlass.transparentSurface;
-        case "color-filled":
-            return theme.colorFilled.transparentSurface;
-        case "terminal":
-            return theme.terminal.transparentSurface;
-        case "pixel-window":
-            return theme.pixelWindow.transparentSurface;
-    }
 }
 
 function resolveOutlineTokens(percent: number): RenderOutlineTokens {

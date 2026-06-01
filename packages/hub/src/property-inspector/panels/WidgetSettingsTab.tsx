@@ -17,6 +17,7 @@ interface WidgetSettingsTabProps {
     context: VisibilityContext;
     isGlobalViewOverrideEnabled: boolean;
     isGlobalThemeOverrideEnabled: boolean;
+    isGlobalTransparentSurfaceOverrideEnabled: boolean;
     isGlobalPaintOverrideEnabled: boolean;
     colorCompensationProfile: ColorCompensationProfile;
     onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
@@ -30,6 +31,7 @@ export function WidgetSettingsTab({
     context,
     isGlobalViewOverrideEnabled,
     isGlobalThemeOverrideEnabled,
+    isGlobalTransparentSurfaceOverrideEnabled,
     isGlobalPaintOverrideEnabled,
     colorCompensationProfile,
     onSettingsPatch,
@@ -69,10 +71,12 @@ export function WidgetSettingsTab({
         onSettingsPatch,
         viewDisabled: isGlobalViewOverrideEnabled,
         themeDisabled: isGlobalThemeOverrideEnabled,
+        transparentSurfaceDisabled: isGlobalTransparentSurfaceOverrideEnabled,
         colorDisabled: isGlobalPaintOverrideEnabled,
     };
     const hasGlobalOverride = isGlobalViewOverrideEnabled
         || isGlobalThemeOverrideEnabled
+        || isGlobalTransparentSurfaceOverrideEnabled
         || isGlobalPaintOverrideEnabled;
 
     return (

@@ -4,6 +4,7 @@ import { NumberSetting } from "../controls/NumberSetting";
 import { TerminalVariantSetting } from "../controls/TerminalVariantSetting";
 import { TextVariantSetting } from "../controls/TextVariantSetting";
 import { ThemeSetting } from "../controls/ThemeSetting";
+import { TransparentSurfaceSetting } from "../controls/TransparentSurfaceSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { InspectorItem } from "../components/InspectorItem";
 import {
@@ -23,6 +24,7 @@ import type {
     ResolvedGlobalPaintOverride,
     ResolvedGlobalSettings,
     ResolvedGlobalThemeOverride,
+    ResolvedGlobalTransparentSurfaceOverride,
     ResolvedGlobalViewOverride,
     ResolvedMetricTarget,
     ResolvedNetworkDisplaySettings,
@@ -81,6 +83,13 @@ export function GlobalSettingsTab({
                             paintOverrideEnabled,
                         })}
                         onPaintPatch={(paint) => onSettingsPatch({ paint })}
+                    />
+                    <TransparentSurfaceOverrideSection
+                        transparentSurfaceOverride={resolvedSettings.transparentSurfaceOverride}
+                        onOverrideChange={(transparentSurfaceOverrideEnabled) => onSettingsPatch({
+                            transparentSurfaceOverrideEnabled,
+                        })}
+                        onTransparentSurfacePatch={(transparentSurface) => onSettingsPatch({ transparentSurface })}
                     />
                 </>
             )}
@@ -253,6 +262,32 @@ function PaintOverrideSection({
                     selectedTheme={selectedTheme}
                     paintOverride={paintOverride}
                     onPaintPatch={onPaintPatch}
+                />
+            ) : null}
+        </SettingsSection>
+    );
+}
+
+function TransparentSurfaceOverrideSection({
+    transparentSurfaceOverride,
+    onOverrideChange,
+    onTransparentSurfacePatch,
+}: {
+    transparentSurfaceOverride: ResolvedGlobalTransparentSurfaceOverride | undefined;
+    onOverrideChange: (isEnabled: boolean) => void;
+    onTransparentSurfacePatch: (patch: NonNullable<StoredGlobalSettingsPatch["transparentSurface"]>) => void;
+}): React.JSX.Element {
+    return (
+        <SettingsSection title="Transparent Surface Override">
+            <OverrideSubsectionToggle
+                label="Override transparent surface"
+                isEnabled={transparentSurfaceOverride !== undefined}
+                onValueChange={onOverrideChange}
+            />
+            {transparentSurfaceOverride ? (
+                <TransparentSurfaceSetting
+                    value={transparentSurfaceOverride.transparentSurface}
+                    onPatch={onTransparentSurfacePatch}
                 />
             ) : null}
         </SettingsSection>

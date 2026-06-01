@@ -3,7 +3,12 @@ import { MetricViewSetting } from "../controls/MetricViewSetting";
 import { TerminalVariantSetting } from "../controls/TerminalVariantSetting";
 import { TextVariantSetting } from "../controls/TextVariantSetting";
 import { ThemeSetting } from "../controls/ThemeSetting";
+import { TransparentSurfaceSetting } from "../controls/TransparentSurfaceSetting";
 import { SettingsSection } from "./SettingsSection";
+import {
+    buildTransparentSurfaceAppearanceThemeOverride,
+    resolveActiveTransparentSurface,
+} from "../../settings/appearance-overrides";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 
 export function AppearanceSettings({
@@ -11,6 +16,7 @@ export function AppearanceSettings({
     onSettingsPatch,
     viewDisabled = false,
     themeDisabled = false,
+    transparentSurfaceDisabled = false,
 }: WidgetSettingsPanelProps): React.JSX.Element {
     const appearance = context.resolved.widget.slot.appearance;
     const preview = {
@@ -69,6 +75,18 @@ export function AppearanceSettings({
                         disabled={themeDisabled}
                     />
                 )}
+                <TransparentSurfaceSetting
+                    value={resolveActiveTransparentSurface(appearance)}
+                    onPatch={(transparentSurface) => onSettingsPatch({
+                        appearance: {
+                            theme: buildTransparentSurfaceAppearanceThemeOverride(
+                                appearance.theme.selectedTheme,
+                                transparentSurface,
+                            ),
+                        },
+                    })}
+                    disabled={transparentSurfaceDisabled}
+                />
             </SettingsSection>
         </>
     );
