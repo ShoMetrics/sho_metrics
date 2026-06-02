@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <NuGetLockFilePath>$(MSBuildProjectDirectory)\ShoMetrics.Installer.Windows.Inno.packages.lock.json</NuGetLockFilePath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Tools.InnoSetup is an unofficial NuGet package. Keep the exact version
+         and lock file pinned so installer builds do not float across packages. -->
+    <PackageReference Include="Tools.InnoSetup" Version="[6.7.3]" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

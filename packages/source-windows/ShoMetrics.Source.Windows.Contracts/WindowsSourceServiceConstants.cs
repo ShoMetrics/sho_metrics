@@ -9,6 +9,6 @@ public static class WindowsSourceServiceConstants
     // prefix or substring.
     public const string PawnIoDriverComponentId = "driver:pawnio";
 
-    public const string ServiceName = "ShoMetrics Source Windows";
+    public const string ServiceName = "ShoMetrics Helper";
     public const int MaximumGrpcMessageBytes = 1024 * 1024;
 }

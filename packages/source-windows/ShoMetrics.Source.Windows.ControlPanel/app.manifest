@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3">
-  <assemblyIdentity version="1.0.0.0" name="ShoMetrics.Source.Windows.ControlPanel" />
+  <assemblyIdentity version="1.0.0.0" name="ShoMetrics.Helper.ControlPanel" />
   <asmv3:application>
     <asmv3:windowsSettings>
       <!-- Keep the WinUI control panel crisp on high-DPI displays instead of letting Windows bitmap-scale the window. -->

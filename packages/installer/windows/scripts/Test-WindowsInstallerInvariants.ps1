@@ -1,0 +1,133 @@
+[CmdletBinding()]
+param()
+
+$ErrorActionPreference = "Stop"
+
+$installerRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")
+$innoRoot = Join-Path $installerRoot "inno"
+$mainScriptPath = Join-Path $innoRoot "ShoMetricsHelperSetup.iss"
+$buildScriptPath = Join-Path $installerRoot "Build-WindowsInstaller.ps1"
+$innoProjectPath = Join-Path $innoRoot "ShoMetrics.Installer.Windows.Inno.csproj"
+$repoRoot = Resolve-Path -LiteralPath (Join-Path $installerRoot "..\..\..")
+$serviceConstantsPath = Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.Contracts\WindowsSourceServiceConstants.cs"
+
+$scriptFiles = @(
+    $mainScriptPath
+    Get-ChildItem -LiteralPath (Join-Path $innoRoot "code") -Filter "*.iss" -File |
+        Sort-Object Name |
+        Select-Object -ExpandProperty FullName
+)
+
+$scriptText = ($scriptFiles | ForEach-Object {
+    Get-Content -Encoding UTF8 -LiteralPath $_ -Raw
+}) -join "`n"
+$mainScriptText = Get-Content -Encoding UTF8 -LiteralPath $mainScriptPath -Raw
+$buildScriptText = Get-Content -Encoding UTF8 -LiteralPath $buildScriptPath -Raw
+$innoProjectText = Get-Content -Encoding UTF8 -LiteralPath $innoProjectPath -Raw
+$serviceConstantsText = Get-Content -Encoding UTF8 -LiteralPath $serviceConstantsPath -Raw
+$ciWorkflowText = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $repoRoot ".github\workflows\source-windows-ci.yml") -Raw
+
+$failures = [System.Collections.Generic.List[string]]::new()
+
+function Assert-Contains {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name,
+
+        [Parameter(Mandatory)]
+        [string] $Text,
+
+        [Parameter(Mandatory)]
+        [string] $Pattern
+    )
+
+    if ($Text -notmatch $Pattern) {
+        $failures.Add($Name)
+    }
+}
+
+function Assert-NotContains {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name,
+
+        [Parameter(Mandatory)]
+        [string] $Text,
+
+        [Parameter(Mandatory)]
+        [string] $Pattern
+    )
+
+    if ($Text -match $Pattern) {
+        $failures.Add($Name)
+    }
+}
+
+Assert-Contains `
+    -Name "Inno setup version is pinned in build script" `
+    -Text $buildScriptText `
+    -Pattern '\$innoSetupVersion\s*=\s*"6\.7\.3"'
+Assert-Contains `
+    -Name "Tools.InnoSetup package is exact-pinned" `
+    -Text $innoProjectText `
+    -Pattern '<PackageReference\s+Include="Tools\.InnoSetup"\s+Version="\[6\.7\.3\]"'
+Assert-Contains `
+    -Name "Inno package lock file is used" `
+    -Text $innoProjectText `
+    -Pattern '<NuGetLockFilePath>'
+
+Assert-Contains -Name "Ready page stays disabled" -Text $mainScriptText -Pattern '(?m)^DisableReadyPage=yes$'
+Assert-Contains -Name "Welcome page stays disabled" -Text $mainScriptText -Pattern '(?m)^DisableWelcomePage=yes$'
+Assert-Contains -Name "Install cancellation is disabled once install starts" -Text $mainScriptText -Pattern '(?m)^AllowCancelDuringInstall=no$'
+Assert-Contains -Name "Inno must not restart apps" -Text $mainScriptText -Pattern '(?m)^RestartApplications=no$'
+Assert-Contains -Name "Inno must not restart Windows because of Run entries" -Text $mainScriptText -Pattern '(?m)^RestartIfNeededByRun=no$'
+Assert-Contains -Name "RedirectionGuard remains enabled" -Text $mainScriptText -Pattern '(?m)^RedirectionGuard=yes$'
+Assert-Contains -Name "Finish page launches Control Panel as original user" -Text $mainScriptText -Pattern 'Flags:\s*postinstall\s+nowait\s+skipifsilent\s+runasoriginaluser'
+
+Assert-Contains `
+    -Name "NeedRestart always returns false" `
+    -Text $scriptText `
+    -Pattern '(?s)function\s+NeedRestart:\s*Boolean;\s*begin\s*//.*?Result\s*:=\s*False;\s*end;'
+Assert-Contains `
+    -Name "PrepareToInstall explicitly keeps NeedsRestart false" `
+    -Text $scriptText `
+    -Pattern '(?s)function\s+PrepareToInstall\(var\s+NeedsRestart:\s*Boolean\):\s*String;.*?NeedsRestart\s*:=\s*False;'
+Assert-NotContains `
+    -Name "PrepareToInstall must not set NeedsRestart true" `
+    -Text $scriptText `
+    -Pattern 'NeedsRestart\s*:=\s*True'
+Assert-NotContains `
+    -Name "Script must not call msiexec" `
+    -Text $scriptText `
+    -Pattern '(?i)\bmsiexec\b'
+Assert-NotContains `
+    -Name "Script must not call PowerShell" `
+    -Text $scriptText `
+    -Pattern '(?i)\bpowershell\b'
+Assert-NotContains `
+    -Name "Script must not expose internal Source.Windows executable names" `
+    -Text $scriptText `
+    -Pattern 'ShoMetrics\.Source\.Windows'
+
+Assert-Contains -Name "Inno service name is ShoMetrics Helper" -Text $scriptText -Pattern "ServiceName\s*=\s*'ShoMetrics Helper'"
+Assert-Contains -Name "C# service name is ShoMetrics Helper" -Text $serviceConstantsText -Pattern 'public\s+const\s+string\s+ServiceName\s*=\s*"ShoMetrics Helper"'
+Assert-Contains -Name "Service executable uses shipped friendly name" -Text $scriptText -Pattern 'ShoMetricsHelperService\.exe'
+Assert-Contains -Name "Control Panel executable uses shipped friendly name" -Text $scriptText -Pattern 'ShoMetricsHelper\.exe'
+Assert-Contains -Name "Service start waits for RUNNING state" -Text $scriptText -Pattern '(?s)function\s+StartService:\s*Boolean;.*?RunSc\(''start.*?WaitForServiceRunning'
+Assert-Contains -Name "PawnIO is staged only through a Check predicate" -Text $mainScriptText -Pattern 'Check:\s*ShouldStagePawnIoSetup'
+Assert-Contains -Name "PawnIO setup URL is pinned" -Text $buildScriptText -Pattern 'https://github\.com/namazso/PawnIO\.Setup/releases/download/\$pawnIoVersion/PawnIO_setup\.exe'
+Assert-Contains -Name "PawnIO setup version is pinned" -Text $buildScriptText -Pattern '\$pawnIoVersion\s*=\s*"2\.2\.0"'
+Assert-Contains -Name "PawnIO setup SHA256 is pinned" -Text $buildScriptText -Pattern '\$pawnIoSetupSha256\s*=\s*"1f519a22e47187f70a1379a48ca604981c4fcf694f4e65b734aaa74a9fba3032"'
+Assert-Contains -Name "PawnIO setup hash is verified" -Text $buildScriptText -Pattern 'Assert-FileSha256\s+-Path\s+\$pawnIoSetupFullPath\s+-ExpectedSha256\s+\$pawnIoSetupSha256'
+Assert-NotContains -Name "CI must not package a fake PawnIO placeholder" -Text $ciWorkflowText -Pattern 'CI placeholder for installer packaging smoke|Create CI-only PawnIO placeholder'
+Assert-Contains -Name "PawnIO setup is silent install" -Text $scriptText -Pattern "PawnIO_setup\.exe'\), '-install -silent'"
+Assert-Contains -Name "PawnIO install is intentionally non-rollback procedure" -Text $scriptText -Pattern '(?s)procedure\s+InstallPawnIo;'
+Assert-Contains -Name "PawnIO already-exists exit code is treated as known" -Text $scriptText -Pattern 'ErrorAlreadyExists\s*=\s*183'
+Assert-Contains -Name "PawnIO reboot-required exit code is treated as known" -Text $scriptText -Pattern 'ErrorSuccessRebootRequired\s*=\s*3010'
+Assert-Contains -Name "Control Panel process detection uses shipped friendly name" -Text $scriptText -Pattern "ControlPanelProcessName\s*=\s*'ShoMetricsHelper\.exe'"
+
+if ($failures.Count -gt 0) {
+    Write-Error ("Windows installer invariant test failed:`n- " + ($failures -join "`n- "))
+}
+
+Write-Host "Windows installer invariants passed."

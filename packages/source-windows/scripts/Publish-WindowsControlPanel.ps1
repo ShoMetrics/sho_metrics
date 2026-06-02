@@ -66,6 +66,52 @@ if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE."
 }
 
+$projectDirectory = Split-Path -Path $projectPath -Parent
+$projectName = [System.IO.Path]::GetFileNameWithoutExtension($projectPath)
+$projectXml = [xml](Get-Content -Encoding UTF8 -LiteralPath $projectPath -Raw)
+$assemblyName = $projectXml.Project.PropertyGroup |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_.AssemblyName) } |
+    Select-Object -First 1 -ExpandProperty AssemblyName
+
+if ([string]::IsNullOrWhiteSpace($assemblyName)) {
+    $assemblyName = $projectName
+}
+
+$targetFramework = $projectXml.Project.PropertyGroup |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_.TargetFramework) } |
+    Select-Object -First 1 -ExpandProperty TargetFramework
+
+if ([string]::IsNullOrWhiteSpace($targetFramework)) {
+    throw "TargetFramework was not found in '$projectPath'."
+}
+
+$buildOutputDirectory = Join-Path $projectDirectory "bin\$Configuration\$targetFramework\$RuntimeIdentifier"
+$resourceIndexCandidates = @(
+    (Join-Path $buildOutputDirectory "$assemblyName.pri"),
+    (Join-Path $buildOutputDirectory "$projectName.pri")
+) | Select-Object -Unique
+
+$projectResourceIndexPath = $resourceIndexCandidates |
+    Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+    Select-Object -First 1
+
+if ([string]::IsNullOrWhiteSpace($projectResourceIndexPath)) {
+    throw "Required WinUI resource index was not found. Checked: $($resourceIndexCandidates -join ', ')"
+}
+
+Copy-Item -LiteralPath $projectResourceIndexPath -Destination (Join-Path $outputFullPath ([System.IO.Path]::GetFileName($projectResourceIndexPath))) -Force
+
+# WinUI generates one .xbf per XAML file. Copy all compiled XAML resources so
+# adding a future page cannot silently ship an installer that crashes at startup.
+$xamlResourceFiles = @(Get-ChildItem -LiteralPath $buildOutputDirectory -Filter "*.xbf" -File)
+if ($xamlResourceFiles.Count -eq 0) {
+    throw "No compiled WinUI XAML resources were found under '$buildOutputDirectory'."
+}
+
+foreach ($xamlResourceFile in $xamlResourceFiles) {
+    Copy-Item -LiteralPath $xamlResourceFile.FullName -Destination (Join-Path $outputFullPath $xamlResourceFile.Name) -Force
+}
+
 $publishedFiles = @(Get-ChildItem -LiteralPath $outputFullPath -Recurse -File)
 $directoryBytes = ($publishedFiles | Measure-Object -Property Length -Sum).Sum
 if ($null -eq $directoryBytes) {

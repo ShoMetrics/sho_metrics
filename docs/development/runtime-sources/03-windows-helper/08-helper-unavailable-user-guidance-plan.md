@@ -1043,7 +1043,7 @@ tile, with technical details available below it.
 | PawnIO Driver | `Installed` | `Required for temperature and power sensors.` |
 | PawnIO Driver | `Not installed` | `Install PawnIO to enable temperature and power sensors.` |
 | PawnIO Driver | `Not elevated` | `Restart or reinstall ShoMetrics Helper to restore the privileges required for PawnIO.` |
-| PawnIO Driver | `Needs attention` | `Restart ShoMetrics Helper. If it keeps failing, reinstall PawnIO or open logs.` |
+| PawnIO Driver | `Needs attention` | `If you just installed PawnIO, restart your PC. If it keeps failing, reinstall PawnIO or open logs.` |
 | PawnIO Driver | `Unknown` | `ShoMetrics Helper could not determine PawnIO status.` |
 | PawnIO Driver | `Unknown` from missing `driver:pawnio` status | `Update ShoMetrics Helper to the latest version if driver diagnostics are unavailable.` |
 | Diagnostics | `No warnings` | `No warnings were reported at the last refresh.` |

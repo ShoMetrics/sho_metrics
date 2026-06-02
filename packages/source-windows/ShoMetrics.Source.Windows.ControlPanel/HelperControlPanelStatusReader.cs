@@ -360,7 +360,7 @@ internal sealed class HelperControlPanelStatusReader : IDisposable
                 CanInstallPawnIoDriver: false),
             SourceComponentState.Unusable => new PawnIoDriverTileText(
                 StatusText: "Needs attention",
-                DetailText: "Restart ShoMetrics Helper. If it keeps failing, reinstall PawnIO or open logs.",
+                DetailText: "If you just installed PawnIO, restart your PC. If it keeps failing, reinstall PawnIO or open logs.",
                 Tone: ControlPanelStatusTone.Caution,
                 CanInstallPawnIoDriver: false),
             SourceComponentState.Unknown => new PawnIoDriverTileText(
