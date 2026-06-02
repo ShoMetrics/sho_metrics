@@ -76,12 +76,12 @@ Assert-Contains `
     -Text $innoProjectText `
     -Pattern '<NuGetLockFilePath>'
 
-Assert-Contains -Name "Ready page stays disabled" -Text $mainScriptText -Pattern '(?m)^DisableReadyPage=yes$'
-Assert-Contains -Name "Welcome page stays disabled" -Text $mainScriptText -Pattern '(?m)^DisableWelcomePage=yes$'
-Assert-Contains -Name "Install cancellation is disabled once install starts" -Text $mainScriptText -Pattern '(?m)^AllowCancelDuringInstall=no$'
-Assert-Contains -Name "Inno must not restart apps" -Text $mainScriptText -Pattern '(?m)^RestartApplications=no$'
-Assert-Contains -Name "Inno must not restart Windows because of Run entries" -Text $mainScriptText -Pattern '(?m)^RestartIfNeededByRun=no$'
-Assert-Contains -Name "RedirectionGuard remains enabled" -Text $mainScriptText -Pattern '(?m)^RedirectionGuard=yes$'
+Assert-Contains -Name "Ready page stays disabled" -Text $mainScriptText -Pattern '(?m)^DisableReadyPage=yes\r?$'
+Assert-Contains -Name "Welcome page stays disabled" -Text $mainScriptText -Pattern '(?m)^DisableWelcomePage=yes\r?$'
+Assert-Contains -Name "Install cancellation is disabled once install starts" -Text $mainScriptText -Pattern '(?m)^AllowCancelDuringInstall=no\r?$'
+Assert-Contains -Name "Inno must not restart apps" -Text $mainScriptText -Pattern '(?m)^RestartApplications=no\r?$'
+Assert-Contains -Name "Inno must not restart Windows because of Run entries" -Text $mainScriptText -Pattern '(?m)^RestartIfNeededByRun=no\r?$'
+Assert-Contains -Name "RedirectionGuard remains enabled" -Text $mainScriptText -Pattern '(?m)^RedirectionGuard=yes\r?$'
 Assert-Contains -Name "Finish page launches Control Panel as original user" -Text $mainScriptText -Pattern 'Flags:\s*postinstall\s+nowait\s+skipifsilent\s+runasoriginaluser'
 
 Assert-Contains `
