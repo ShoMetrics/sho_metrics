@@ -82,10 +82,9 @@ internal static class WindowsSourceServiceHost
     private static void LogStarting(WindowsSourceServiceHostOptions options)
     {
         Log.Information(
-            "Starting ShoMetrics Windows source gRPC service for source {SourceId}, protocol {ProtocolVersion}, and pipe {PipeName}.",
+            "Starting ShoMetrics Helper service. source={SourceId} protocol={ProtocolVersion}.",
             WindowsSourceServiceIdentity.SourceId,
-            WindowsSourceServiceIdentity.ProtocolVersion,
-            options.PipeName);
+            WindowsSourceServiceIdentity.ProtocolVersion);
     }
 
     private static void ConfigureGrpcNamedPipeHost(
@@ -118,7 +117,7 @@ internal static class WindowsSourceServiceHost
 
         webBuilder.Configure(app =>
         {
-            app.Use((context, next) => VerifyNamedPipeClientAsync(context, next, options.PipeName));
+            app.Use(VerifyNamedPipeClientAsync);
             app.UseRouting();
             app.UseEndpoints(endpoints =>
             {
@@ -127,7 +126,7 @@ internal static class WindowsSourceServiceHost
         });
     }
 
-    private static async Task VerifyNamedPipeClientAsync(HttpContext context, Func<Task> next, string pipeName)
+    private static async Task VerifyNamedPipeClientAsync(HttpContext context, Func<Task> next)
     {
         IConnectionNamedPipeFeature? namedPipeFeature = context.Features.Get<IConnectionNamedPipeFeature>();
         if (namedPipeFeature is not null)
@@ -138,8 +137,7 @@ internal static class WindowsSourceServiceHost
             if (!pipeClientVerifier.IsLocalClient(namedPipeFeature.NamedPipe))
             {
                 Log.Warning(
-                    "Rejected remote gRPC named pipe client for {PipeName}.",
-                    pipeName);
+                    "Rejected remote gRPC named pipe client.");
 
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
 

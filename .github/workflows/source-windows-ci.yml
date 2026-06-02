@@ -76,3 +76,34 @@ jobs:
           name: source-windows-integration-diagnostics
           path: packages/source-windows/IntegrationTestResults
           if-no-files-found: ignore
+
+  installer-smoke:
+    name: Windows installer smoke
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            packages/source-windows/**/packages.lock.json
+            packages/installer/windows/inno/*.lock.json
+
+      - name: Run installer invariant checks
+        working-directory: ${{ github.workspace }}
+        run: ./packages/installer/windows/scripts/Test-WindowsInstallerInvariants.ps1
+
+      - name: Build installer
+        working-directory: ${{ github.workspace }}
+        run: ./packages/installer/windows/Build-WindowsInstaller.ps1 -Configuration Release -RuntimeIdentifier win-x64 -ShoMetricsVersionPrefix 0.1.0
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shometrics-helper-installer-win-x64
+          path: artifacts/installer/windows/setup/*.exe
+          if-no-files-found: error

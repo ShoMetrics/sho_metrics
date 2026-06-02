@@ -28,10 +28,13 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        ControlPanelStartupLog.Write("MainWindow ctor enter");
+        ControlPanelStartupLog.Write("InitializeComponent enter");
         InitializeComponent();
-        SystemBackdrop = new MicaBackdrop();
-        SetWindowSizeInDips(width: 1100, height: 720);
-        ConfigureCustomTitleBar();
+        ControlPanelStartupLog.Write("InitializeComponent exit");
+        TryApplyMicaBackdrop();
+        TrySetWindowSizeInDips(width: 1100, height: 720);
+        TryConfigureCustomTitleBar();
         ApplyStatus(HelperControlPanelStatus.Initial());
         RootGrid.ActualThemeChanged += OnRootGridActualThemeChanged;
         Closed += OnClosed;
@@ -39,6 +42,7 @@ public partial class MainWindow : Window
         _checkedAtTimer.Tick += OnCheckedAtTimerTick;
         _checkedAtTimer.Start();
         _ = RefreshStatusAsync();
+        ControlPanelStartupLog.Write("MainWindow ctor exit");
     }
 
     private async void OnRefreshClicked(object sender, RoutedEventArgs args)
@@ -226,12 +230,60 @@ public partial class MainWindow : Window
         return RootGrid.ActualTheme == ElementTheme.Dark ? Colors.LightGray : Colors.DimGray;
     }
 
+    private void TryApplyMicaBackdrop()
+    {
+        try
+        {
+            SystemBackdrop = new MicaBackdrop();
+        }
+        catch (Exception exception)
+        {
+            ControlPanelStartupLog.WriteException("MicaBackdrop failed", exception);
+        }
+    }
+
+    private void TrySetWindowSizeInDips(int width, int height)
+    {
+        try
+        {
+            SetWindowSizeInDips(width, height);
+        }
+        catch (Exception exception)
+        {
+            ControlPanelStartupLog.WriteException("SetWindowSizeInDips failed", exception);
+        }
+    }
+
+    private void TryConfigureCustomTitleBar()
+    {
+        try
+        {
+            ConfigureCustomTitleBar();
+        }
+        catch (Exception exception)
+        {
+            ControlPanelStartupLog.WriteException("ConfigureCustomTitleBar failed", exception);
+        }
+    }
+
+    private void TryApplyTitleBarTheme()
+    {
+        try
+        {
+            ApplyTitleBarTheme();
+        }
+        catch (Exception exception)
+        {
+            ControlPanelStartupLog.WriteException("ApplyTitleBarTheme failed", exception);
+        }
+    }
+
     private void ConfigureCustomTitleBar()
     {
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
 
-        ApplyTitleBarTheme();
+        TryApplyTitleBarTheme();
     }
 
     private void ApplyTitleBarTheme()
@@ -246,7 +298,7 @@ public partial class MainWindow : Window
 
     private void OnRootGridActualThemeChanged(FrameworkElement sender, object args)
     {
-        ApplyTitleBarTheme();
+        TryApplyTitleBarTheme();
 
         if (_currentStatus is not null)
         {

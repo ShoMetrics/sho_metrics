@@ -56,13 +56,13 @@ internal static class Program
             ShoMetrics Windows Source Service
 
             Usage:
-              ShoMetrics.Source.Windows.Service.exe
+              ShoMetricsHelperService.exe
                                                                Run as a Windows Service.
-              ShoMetrics.Source.Windows.Service.exe --dev-pipe Run the service host in console dev mode.
-              ShoMetrics.Source.Windows.Service.exe --metric-source-probe [--duration-ms N] [--interval-ms N] [--probe-sources native,lhm-dll]
+              ShoMetricsHelperService.exe --dev-pipe Run the service host in console dev mode.
+              ShoMetricsHelperService.exe --metric-source-probe [--duration-ms N] [--interval-ms N] [--probe-sources native,lhm-dll]
                                                                Run a metric source comparison probe.
-              ShoMetrics.Source.Windows.Service.exe --help     Print this help.
-              ShoMetrics.Source.Windows.Service.exe --version  Print the helper version.
+              ShoMetricsHelperService.exe --help               Print this help.
+              ShoMetricsHelperService.exe --version            Print the helper version.
             """);
 
         return 0;

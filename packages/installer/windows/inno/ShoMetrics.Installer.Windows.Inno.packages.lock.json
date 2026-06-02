@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "Tools.InnoSetup": {
+        "type": "Direct",
+        "requested": "[6.7.3, 6.7.3]",
+        "resolved": "6.7.3",
+        "contentHash": "4i38ZZrwJsa9KwdwcNXPgnH5uIX3KFrmUJmh+bfoMWPCpByvXJu/E06Zyu7XWZIp8qtHH7rnXenQyE2bJCQQtw=="
+      }
+    }
+  }
+}
