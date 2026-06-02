@@ -55,6 +55,18 @@ function Assert-FileSha256 {
     }
 }
 
+function Assert-AuthenticodeSignatureValid {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Path
+    )
+
+    $signature = Get-AuthenticodeSignature -LiteralPath $Path
+    if ($signature.Status -ne "Valid") {
+        throw "Invalid Authenticode signature for '$Path'. Status: $($signature.Status)."
+    }
+}
+
 function Save-PinnedPawnIoSetup {
     param(
         [Parameter(Mandatory)]
@@ -96,6 +108,7 @@ if (-not (Test-Path -LiteralPath $pawnIoSetupFullPath -PathType Leaf)) {
     throw "PawnIO setup was not found: $pawnIoSetupFullPath"
 }
 Assert-FileSha256 -Path $pawnIoSetupFullPath -ExpectedSha256 $pawnIoSetupSha256
+Assert-AuthenticodeSignatureValid -Path $pawnIoSetupFullPath
 
 $outputFullPath = Resolve-UnderArtifactRoot -Path $OutputDirectory
 $payloadRoot = Resolve-UnderArtifactRoot -Path (Join-Path $artifactRoot "installer\windows\payload")

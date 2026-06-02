@@ -119,6 +119,7 @@ Assert-Contains -Name "PawnIO setup URL is pinned" -Text $buildScriptText -Patte
 Assert-Contains -Name "PawnIO setup version is pinned" -Text $buildScriptText -Pattern '\$pawnIoVersion\s*=\s*"2\.2\.0"'
 Assert-Contains -Name "PawnIO setup SHA256 is pinned" -Text $buildScriptText -Pattern '\$pawnIoSetupSha256\s*=\s*"1f519a22e47187f70a1379a48ca604981c4fcf694f4e65b734aaa74a9fba3032"'
 Assert-Contains -Name "PawnIO setup hash is verified" -Text $buildScriptText -Pattern 'Assert-FileSha256\s+-Path\s+\$pawnIoSetupFullPath\s+-ExpectedSha256\s+\$pawnIoSetupSha256'
+Assert-Contains -Name "PawnIO setup Authenticode signature is verified" -Text $buildScriptText -Pattern 'Assert-AuthenticodeSignatureValid\s+-Path\s+\$pawnIoSetupFullPath'
 Assert-NotContains -Name "CI must not package a fake PawnIO placeholder" -Text $ciWorkflowText -Pattern 'CI placeholder for installer packaging smoke|Create CI-only PawnIO placeholder'
 Assert-Contains -Name "PawnIO setup is silent install" -Text $scriptText -Pattern "PawnIO_setup\.exe'\), '-install -silent'"
 Assert-Contains -Name "PawnIO install is intentionally non-rollback procedure" -Text $scriptText -Pattern '(?s)procedure\s+InstallPawnIo;'
