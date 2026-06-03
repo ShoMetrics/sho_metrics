@@ -9,6 +9,9 @@ param(
     [ValidateNotNullOrEmpty()]
     [string] $ShoMetricsVersionPrefix = "0.1.0",
 
+    [ValidateSet("Standalone", "FrameworkDependent")]
+    [string] $Distribution = "Standalone",
+
     [ValidateNotNullOrEmpty()]
     [string] $PawnIoSetupPath = "",
 
@@ -21,6 +24,14 @@ $ErrorActionPreference = "Stop"
 $pawnIoVersion = "2.2.0"
 $pawnIoSetupUri = "https://github.com/namazso/PawnIO.Setup/releases/download/$pawnIoVersion/PawnIO_setup.exe"
 $pawnIoSetupSha256 = "1f519a22e47187f70a1379a48ca604981c4fcf694f4e65b734aaa74a9fba3032"
+$aspNetCoreRuntimeVersion = "10.0.8"
+$aspNetCoreRuntimeSetupUri = "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/$aspNetCoreRuntimeVersion/aspnetcore-runtime-$aspNetCoreRuntimeVersion-win-x64.exe"
+$aspNetCoreRuntimeSetupSha256 = "1c152d4a9138a92e2c04bea8ecc00e79ca8febfb7a9d5b6141f1546a076d11fd"
+$isFrameworkDependentDistribution = $Distribution -eq "FrameworkDependent"
+$distributionDirectoryName = switch ($Distribution) {
+    "Standalone" { "standalone" }
+    "FrameworkDependent" { "framework-dependent" }
+}
 
 $repoRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..\..")
 $artifactRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot "artifacts"))
@@ -67,17 +78,26 @@ function Assert-AuthenticodeSignatureValid {
     }
 }
 
-function Save-PinnedPawnIoSetup {
+function Save-PinnedDownload {
     param(
         [Parameter(Mandatory)]
-        [string] $DestinationPath
+        [string] $Name,
+
+        [Parameter(Mandatory)]
+        [string] $Uri,
+
+        [Parameter(Mandatory)]
+        [string] $DestinationPath,
+
+        [Parameter(Mandatory)]
+        [string] $ExpectedSha256
     )
 
     $destinationDirectory = Split-Path -Parent $DestinationPath
     New-Item -ItemType Directory -Path $destinationDirectory -Force | Out-Null
 
     if (Test-Path -LiteralPath $DestinationPath -PathType Leaf) {
-        Assert-FileSha256 -Path $DestinationPath -ExpectedSha256 $pawnIoSetupSha256
+        Assert-FileSha256 -Path $DestinationPath -ExpectedSha256 $ExpectedSha256
         return
     }
 
@@ -86,21 +106,71 @@ function Save-PinnedPawnIoSetup {
         Remove-Item -LiteralPath $temporaryPath -Force
     }
 
-    Write-Host "Downloading PawnIO setup $pawnIoVersion..."
-    Write-Host "Source: $pawnIoSetupUri"
-    Invoke-WebRequest -Uri $pawnIoSetupUri -OutFile $temporaryPath
-    Assert-FileSha256 -Path $temporaryPath -ExpectedSha256 $pawnIoSetupSha256
+    Write-Host "Downloading $Name..."
+    Write-Host "Source: $Uri"
+    Invoke-WebRequest -Uri $Uri -OutFile $temporaryPath
+    Assert-FileSha256 -Path $temporaryPath -ExpectedSha256 $ExpectedSha256
     Move-Item -LiteralPath $temporaryPath -Destination $DestinationPath -Force
+}
+
+function Format-RuntimeVersionPrefix {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Version
+    )
+
+    $runtimeVersion = [System.Version]::Parse($Version)
+    return "$($runtimeVersion.Major).$($runtimeVersion.Minor)."
+}
+
+function Read-ServiceRuntimeFrameworkRequirement {
+    param(
+        [Parameter(Mandatory)]
+        [string] $ServicePayloadDirectory,
+
+        [Parameter(Mandatory)]
+        [string] $FrameworkName
+    )
+
+    $runtimeConfigPath = Join-Path $ServicePayloadDirectory "ShoMetricsHelperService.runtimeconfig.json"
+    if (-not (Test-Path -LiteralPath $runtimeConfigPath -PathType Leaf)) {
+        throw "Service runtime config was not found: $runtimeConfigPath"
+    }
+
+    $runtimeConfig = Get-Content -Encoding UTF8 -LiteralPath $runtimeConfigPath -Raw | ConvertFrom-Json
+    $frameworks = @()
+
+    if ($null -ne $runtimeConfig.runtimeOptions.framework) {
+        $frameworks += $runtimeConfig.runtimeOptions.framework
+    }
+
+    if ($null -ne $runtimeConfig.runtimeOptions.frameworks) {
+        $frameworks += @($runtimeConfig.runtimeOptions.frameworks)
+    }
+
+    $framework = $frameworks |
+        Where-Object { $_.name -eq $FrameworkName -and -not [string]::IsNullOrWhiteSpace($_.version) } |
+        Select-Object -First 1
+
+    if ($null -eq $framework) {
+        throw "Runtime requirement '$FrameworkName' was not found in '$runtimeConfigPath'."
+    }
+
+    return "$FrameworkName=$(Format-RuntimeVersionPrefix -Version $framework.version)"
 }
 
 if ([string]::IsNullOrWhiteSpace($PawnIoSetupPath)) {
     $PawnIoSetupPath = Join-Path $artifactRoot "installer\windows\cache\pawnio\$pawnIoVersion\PawnIO_setup.exe"
     $PawnIoSetupPath = Resolve-UnderArtifactRoot -Path $PawnIoSetupPath
-    Save-PinnedPawnIoSetup -DestinationPath $PawnIoSetupPath
+    Save-PinnedDownload `
+        -Name "PawnIO setup $pawnIoVersion" `
+        -Uri $pawnIoSetupUri `
+        -DestinationPath $PawnIoSetupPath `
+        -ExpectedSha256 $pawnIoSetupSha256
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
-    $OutputDirectory = Join-Path $artifactRoot "installer\windows\setup"
+    $OutputDirectory = Join-Path $artifactRoot "installer\windows\setup\$distributionDirectoryName"
 }
 
 $pawnIoSetupFullPath = [System.IO.Path]::GetFullPath($PawnIoSetupPath)
@@ -111,20 +181,25 @@ Assert-FileSha256 -Path $pawnIoSetupFullPath -ExpectedSha256 $pawnIoSetupSha256
 Assert-AuthenticodeSignatureValid -Path $pawnIoSetupFullPath
 
 $outputFullPath = Resolve-UnderArtifactRoot -Path $OutputDirectory
-$payloadRoot = Resolve-UnderArtifactRoot -Path (Join-Path $artifactRoot "installer\windows\payload")
+$distributionBuildRoot = Resolve-UnderArtifactRoot -Path (Join-Path $artifactRoot "installer\windows\build\$distributionDirectoryName")
+$payloadRoot = Join-Path $distributionBuildRoot "payload"
 $servicePayloadDirectory = Join-Path $payloadRoot "service"
 $controlPanelPayloadDirectory = Join-Path $payloadRoot "control-panel"
+$aspNetCoreRuntimeSetupFullPath = ""
+$distributionSuffix = if ($isFrameworkDependentDistribution) { "-framework-dependent" } else { "" }
+$outputBaseFilename = "ShoMetrics-Helper-Setup-$ShoMetricsVersionPrefix-$RuntimeIdentifier$distributionSuffix"
+$setupPath = Join-Path $outputFullPath "$outputBaseFilename.exe"
 
 if (Test-Path -LiteralPath $payloadRoot) {
     Remove-Item -LiteralPath $payloadRoot -Recurse -Force
 }
 
-if (Test-Path -LiteralPath $outputFullPath) {
-    Remove-Item -LiteralPath $outputFullPath -Recurse -Force
-}
-
 New-Item -ItemType Directory -Path $payloadRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $outputFullPath -Force | Out-Null
+
+if (Test-Path -LiteralPath $setupPath) {
+    Remove-Item -LiteralPath $setupPath -Force
+}
 
 $publishServiceScript = Join-Path $repoRoot "packages\source-windows\scripts\Publish-WindowsService.ps1"
 $publishControlPanelScript = Join-Path $repoRoot "packages\source-windows\scripts\Publish-WindowsControlPanel.ps1"
@@ -133,13 +208,32 @@ $publishControlPanelScript = Join-Path $repoRoot "packages\source-windows\script
     -Configuration $Configuration `
     -RuntimeIdentifier $RuntimeIdentifier `
     -OutputDirectory $servicePayloadDirectory `
-    -ShoMetricsVersionPrefix $ShoMetricsVersionPrefix
+    -ShoMetricsVersionPrefix $ShoMetricsVersionPrefix `
+    -SelfContained:(-not $isFrameworkDependentDistribution)
 
 & $publishControlPanelScript `
     -Configuration $Configuration `
     -RuntimeIdentifier $RuntimeIdentifier `
     -OutputDirectory $controlPanelPayloadDirectory `
-    -ShoMetricsVersionPrefix $ShoMetricsVersionPrefix
+    -ShoMetricsVersionPrefix $ShoMetricsVersionPrefix `
+    -SelfContained:(-not $isFrameworkDependentDistribution) `
+    -WindowsAppSDKSelfContained:(-not $isFrameworkDependentDistribution)
+
+$serviceBaseRuntimeRequirement = ""
+if ($isFrameworkDependentDistribution) {
+    $serviceBaseRuntimeRequirement = Read-ServiceRuntimeFrameworkRequirement `
+        -ServicePayloadDirectory $servicePayloadDirectory `
+        -FrameworkName "Microsoft.NETCore.App"
+
+    $aspNetCoreRuntimeSetupFullPath = Resolve-UnderArtifactRoot -Path (
+        Join-Path $artifactRoot "installer\windows\cache\aspnetcore-runtime\$aspNetCoreRuntimeVersion\aspnetcore-runtime-$aspNetCoreRuntimeVersion-win-x64.exe")
+    Save-PinnedDownload `
+        -Name "ASP.NET Core Runtime $aspNetCoreRuntimeVersion" `
+        -Uri $aspNetCoreRuntimeSetupUri `
+        -DestinationPath $aspNetCoreRuntimeSetupFullPath `
+        -ExpectedSha256 $aspNetCoreRuntimeSetupSha256
+    Assert-AuthenticodeSignatureValid -Path $aspNetCoreRuntimeSetupFullPath
+}
 
 $innoProjectPath = Join-Path $PSScriptRoot "inno\ShoMetrics.Installer.Windows.Inno.csproj"
 $innoScriptPath = Join-Path $PSScriptRoot "inno\ShoMetricsHelperSetup.iss"
@@ -163,7 +257,6 @@ if ($null -eq $innoCompiler) {
     throw "ISCC.exe was not found under '$innoPackageDirectory'."
 }
 
-$outputBaseFilename = "ShoMetrics-Helper-Setup-$ShoMetricsVersionPrefix-$RuntimeIdentifier"
 $innoArguments = @(
     "/Qp",
     "/O$outputFullPath",
@@ -172,15 +265,25 @@ $innoArguments = @(
     "/DServicePayloadDir=$servicePayloadDirectory",
     "/DControlPanelPayloadDir=$controlPanelPayloadDirectory",
     "/DPawnIoSetupPath=$pawnIoSetupFullPath",
+    "/DAspNetCoreRuntimeVersion=$aspNetCoreRuntimeVersion",
     $innoScriptPath
 )
+
+if ($isFrameworkDependentDistribution) {
+    $innoArguments = @(
+        $innoArguments[0..($innoArguments.Count - 2)] +
+        "/DShoMetricsFrameworkDependentDistribution=1" +
+        "/DServiceBaseRuntimeRequirement=$serviceBaseRuntimeRequirement" +
+        "/DAspNetCoreRuntimeSetupPath=$aspNetCoreRuntimeSetupFullPath" +
+        $innoArguments[-1]
+    )
+}
 
 & $innoCompiler.FullName @innoArguments
 if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup compile failed with exit code $LASTEXITCODE."
 }
 
-$setupPath = Join-Path $outputFullPath "$outputBaseFilename.exe"
 if (-not (Test-Path -LiteralPath $setupPath -PathType Leaf)) {
     throw "Expected installer was not produced: $setupPath"
 }
@@ -189,3 +292,8 @@ Write-Host "Built ShoMetrics Helper installer."
 Write-Host "Output: $setupPath"
 Write-Host "Version: $ShoMetricsVersionPrefix"
 Write-Host "RuntimeIdentifier: $RuntimeIdentifier"
+Write-Host "Distribution: $Distribution"
+if ($isFrameworkDependentDistribution) {
+    Write-Host "ServiceBaseRuntimeRequirement: $serviceBaseRuntimeRequirement"
+    Write-Host "AspNetCoreRuntimeSetupPath: $aspNetCoreRuntimeSetupFullPath"
+}

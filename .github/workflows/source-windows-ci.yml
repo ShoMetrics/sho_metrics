@@ -97,13 +97,17 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: ./packages/installer/windows/scripts/Test-WindowsInstallerInvariants.ps1
 
-      - name: Build installer
+      - name: Build standalone installer
         working-directory: ${{ github.workspace }}
         run: ./packages/installer/windows/Build-WindowsInstaller.ps1 -Configuration Release -RuntimeIdentifier win-x64 -ShoMetricsVersionPrefix 0.1.0
+
+      - name: Build framework-dependent installer
+        working-directory: ${{ github.workspace }}
+        run: ./packages/installer/windows/Build-WindowsInstaller.ps1 -Configuration Release -RuntimeIdentifier win-x64 -ShoMetricsVersionPrefix 0.1.0 -Distribution FrameworkDependent
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: shometrics-helper-installer-win-x64
-          path: artifacts/installer/windows/setup/*.exe
+          path: artifacts/installer/windows/setup/**/*.exe
           if-no-files-found: error
