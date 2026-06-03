@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private const string UnknownStatusGlyph = "\uE946"; // Segoe MDL2 Assets: Info.
     private const string ShoMetricsReleasesUrl = "https://github.com/edwardez/sho_metrics/releases";
     private const string PawnIoInstallUrl = "https://pawnio.eu/";
+    private const double DiagnosticValueColumnWidthRatio = 0.62;
 
     private readonly HelperControlPanelStatusReader _statusReader = new();
     private readonly DispatcherTimer _checkedAtTimer = new();
@@ -36,6 +37,7 @@ public partial class MainWindow : Window
         TrySetWindowSizeInDips(width: 1100, height: 720);
         TryConfigureCustomTitleBar();
         ApplyStatus(HelperControlPanelStatus.Initial());
+        WarningDiagnosticsCard.SizeChanged += OnDiagnosticValueCardSizeChanged;
         RootGrid.ActualThemeChanged += OnRootGridActualThemeChanged;
         Closed += OnClosed;
         _checkedAtTimer.Interval = TimeSpan.FromSeconds(1);
@@ -176,6 +178,27 @@ public partial class MainWindow : Window
         ErrorText.Text = status.ErrorText;
         LogFolderText.Text = WindowsSourceServicePaths.ResolveLogDirectoryPath();
         UpdateCheckedAtText(DateTimeOffset.Now);
+        UpdateDiagnosticValueTextWidth();
+    }
+
+    private void OnDiagnosticValueCardSizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        UpdateDiagnosticValueTextWidth();
+    }
+
+    private void UpdateDiagnosticValueTextWidth()
+    {
+        if (WarningDiagnosticsCard.ActualWidth <= 0)
+        {
+            return;
+        }
+
+        // SettingsCard lays each row out independently. Diagnostics rows stretch
+        // to the same card width, so use one measured row to give both values a
+        // shared right column while capped descriptions leave a visible filler.
+        double valueTextWidth = Math.Max(0, WarningDiagnosticsCard.ActualWidth * DiagnosticValueColumnWidthRatio);
+        SensorDiagnosticsText.Width = valueTextWidth;
+        WarningDetailsText.Width = valueTextWidth;
     }
 
     private void OnCheckedAtTimerTick(object? sender, object args)
@@ -309,6 +332,7 @@ public partial class MainWindow : Window
     private void OnClosed(object sender, WindowEventArgs args)
     {
         _checkedAtTimer.Stop();
+        WarningDiagnosticsCard.SizeChanged -= OnDiagnosticValueCardSizeChanged;
         RootGrid.ActualThemeChanged -= OnRootGridActualThemeChanged;
         _statusReader.Dispose();
     }

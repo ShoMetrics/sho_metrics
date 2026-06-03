@@ -211,21 +211,26 @@
                                     <toolkit:SettingsCard Header="Sensor Reads">
                                         <toolkit:SettingsCard.Description>
                                             <TextBlock Text="Last sample age and discovered metric count from the last check."
+                                                       MaxWidth="320"
                                                        TextWrapping="Wrap" />
                                         </toolkit:SettingsCard.Description>
                                         <TextBlock x:Name="SensorDiagnosticsText"
                                                    Style="{ThemeResource BodyTextBlockStyle}"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   TextAlignment="Right"
                                                    TextWrapping="Wrap" />
                                     </toolkit:SettingsCard>
-                                    <toolkit:SettingsCard Header="Warnings">
+                                    <toolkit:SettingsCard x:Name="WarningDiagnosticsCard"
+                                                          Header="Warnings">
                                         <toolkit:SettingsCard.Description>
                                             <TextBlock Text="Helper warnings collected from health, descriptor, and snapshot reads."
+                                                       MaxWidth="320"
                                                        TextWrapping="Wrap" />
                                         </toolkit:SettingsCard.Description>
                                         <TextBlock x:Name="WarningDetailsText"
                                                    Style="{ThemeResource BodyTextBlockStyle}"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   TextAlignment="Right"
                                                    TextWrapping="Wrap" />
                                     </toolkit:SettingsCard>
                                 </toolkit:SettingsExpander.Items>
