@@ -45,6 +45,24 @@ public partial class SettingsExpander
         new PropertyMetadata(defaultValue: null));
 
     /// <summary>
+    /// The backing <see cref="DependencyProperty"/> for the <see cref="HeaderContentAlignment"/> property.
+    /// </summary>
+    public static readonly DependencyProperty HeaderContentAlignmentProperty = DependencyProperty.Register(
+        nameof(HeaderContentAlignment),
+        typeof(ContentAlignment),
+        typeof(SettingsExpander),
+        new PropertyMetadata(ContentAlignment.Right));
+
+    /// <summary>
+    /// The backing <see cref="DependencyProperty"/> for the <see cref="HeaderHorizontalContentAlignment"/> property.
+    /// </summary>
+    public static readonly DependencyProperty HeaderHorizontalContentAlignmentProperty = DependencyProperty.Register(
+        nameof(HeaderHorizontalContentAlignment),
+        typeof(HorizontalAlignment),
+        typeof(SettingsExpander),
+        new PropertyMetadata(HorizontalAlignment.Right));
+
+    /// <summary>
     /// The backing <see cref="DependencyProperty"/> for the <see cref="ItemsHeader"/> property.
     /// </summary>
     public static readonly DependencyProperty ItemsHeaderProperty = DependencyProperty.Register(
@@ -107,6 +125,24 @@ public partial class SettingsExpander
     {
         get => (object)GetValue(ContentProperty);
         set => SetValue(ContentProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets how the header SettingsCard arranges its right-side content.
+    /// </summary>
+    public ContentAlignment HeaderContentAlignment
+    {
+        get => (ContentAlignment)GetValue(HeaderContentAlignmentProperty);
+        set => SetValue(HeaderContentAlignmentProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the horizontal alignment for the header SettingsCard content.
+    /// </summary>
+    public HorizontalAlignment HeaderHorizontalContentAlignment
+    {
+        get => (HorizontalAlignment)GetValue(HeaderHorizontalContentAlignmentProperty);
+        set => SetValue(HeaderHorizontalContentAlignmentProperty, value);
     }
 
     /// <summary>

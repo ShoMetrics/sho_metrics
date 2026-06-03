@@ -6,6 +6,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using ShoMetrics.Source.Windows.ControlPanel.Controls;
 using ShoMetrics.Source.Windows.Contracts;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Graphics;
@@ -21,11 +22,14 @@ public partial class MainWindow : Window
     private const string UnknownStatusGlyph = "\uE946"; // Segoe MDL2 Assets: Info.
     private const string ShoMetricsReleasesUrl = "https://github.com/edwardez/sho_metrics/releases";
     private const string PawnIoInstallUrl = "https://pawnio.eu/";
-    private const double DiagnosticValueColumnWidthRatio = 0.62;
+    private const int MinimumWindowWidthDips = 560;
+    private const int MinimumWindowHeightDips = 480;
+    private const double NarrowLayoutWidthDips = 760;
 
     private readonly HelperControlPanelStatusReader _statusReader = new();
     private readonly DispatcherTimer _checkedAtTimer = new();
     private HelperControlPanelStatus? _currentStatus;
+    private bool? _isNarrowLayout;
 
     public MainWindow()
     {
@@ -35,9 +39,11 @@ public partial class MainWindow : Window
         ControlPanelStartupLog.Write("InitializeComponent exit");
         TryApplyMicaBackdrop();
         TrySetWindowSizeInDips(width: 1100, height: 720);
+        TrySetMinimumWindowSizeInDips(width: MinimumWindowWidthDips, height: MinimumWindowHeightDips);
         TryConfigureCustomTitleBar();
         ApplyStatus(HelperControlPanelStatus.Initial());
-        WarningDiagnosticsCard.SizeChanged += OnDiagnosticValueCardSizeChanged;
+        RootGrid.Loaded += OnRootGridLoaded;
+        RootGrid.SizeChanged += OnRootGridSizeChanged;
         RootGrid.ActualThemeChanged += OnRootGridActualThemeChanged;
         Closed += OnClosed;
         _checkedAtTimer.Interval = TimeSpan.FromSeconds(1);
@@ -146,15 +152,15 @@ public partial class MainWindow : Window
 
         ServiceTileStatusText.Text = status.Service.StatusText;
         ServiceTileDetailText.Text = status.Service.DetailText;
-        ServiceInstallDetailText.Text = status.Service.InstallText;
-        ServiceRuntimeDetailText.Text = status.Service.RuntimeText;
-        ConnectionDetailText.Text = status.Service.ConnectionText;
+        ServiceInstalledRow.Value = status.Service.InstallText;
+        ServiceRunningRow.Value = status.Service.RuntimeText;
+        ServiceConnectionRow.Value = status.Service.ConnectionText;
         ApplyStatusIcon(ServiceTileStatusIcon, status.Service.Tone);
         Visibility serviceInstallVisibility = status.Service.CanInstallShoMetricsHelper
             ? Visibility.Visible
             : Visibility.Collapsed;
         ServiceInstallButton.Visibility = serviceInstallVisibility;
-        ServiceInstallDetailButton.Visibility = serviceInstallVisibility;
+        ServiceInstalledRow.ActionVisibility = serviceInstallVisibility;
         ServiceStatusText.Text = status.Service.StatusText;
         PawnIoDriverText.Text = status.PawnIoDriver.StatusText;
         PawnIoDriverDetailText.Text = status.PawnIoDriver.DetailText;
@@ -165,12 +171,12 @@ public partial class MainWindow : Window
         PanelVersionText.Text = ControlPanelIdentity.Version;
         HelperVersionText.Text = status.Diagnostics.HelperVersionText;
         ProtocolText.Text = status.Diagnostics.ProtocolVersionText;
-        SensorDiagnosticsText.Text = status.Diagnostics.SensorDiagnosticsText;
+        SensorDiagnosticsRow.Value = status.Diagnostics.SensorDiagnosticsText;
         WarningCountText.Text = status.Diagnostics.WarningCountText;
         WarningCountSummaryText.Text = status.Diagnostics.WarningCountText;
         DiagnosticsDetailText.Text = status.Diagnostics.DetailText;
         DiagnosticsSummaryDetailText.Text = status.Diagnostics.DetailText;
-        WarningDetailsText.Text = status.Diagnostics.WarningDetailsText;
+        WarningDiagnosticsRow.Value = status.Diagnostics.WarningDetailsText;
         ApplyStatusIcon(DiagnosticsStatusIcon, status.Diagnostics.Tone);
         ApplyStatusIcon(DiagnosticsSummaryStatusIcon, status.Diagnostics.Tone);
         DiagnosticsSummaryCard.Visibility = status.Diagnostics.HasDetails ? Visibility.Collapsed : Visibility.Visible;
@@ -178,27 +184,141 @@ public partial class MainWindow : Window
         ErrorText.Text = status.ErrorText;
         LogFolderText.Text = WindowsSourceServicePaths.ResolveLogDirectoryPath();
         UpdateCheckedAtText(DateTimeOffset.Now);
-        UpdateDiagnosticValueTextWidth();
     }
 
-    private void OnDiagnosticValueCardSizeChanged(object sender, SizeChangedEventArgs args)
+    private void OnRootGridLoaded(object sender, RoutedEventArgs args)
     {
-        UpdateDiagnosticValueTextWidth();
+        ApplyResponsiveLayout(RootGrid.ActualWidth);
     }
 
-    private void UpdateDiagnosticValueTextWidth()
+    private void OnRootGridSizeChanged(object sender, SizeChangedEventArgs args)
     {
-        if (WarningDiagnosticsCard.ActualWidth <= 0)
+        ApplyResponsiveLayout(args.NewSize.Width);
+    }
+
+    private void ApplyResponsiveLayout(double windowWidth)
+    {
+        if (windowWidth <= 0)
         {
             return;
         }
 
-        // SettingsCard lays each row out independently. Diagnostics rows stretch
-        // to the same card width, so use one measured row to give both values a
-        // shared right column while capped descriptions leave a visible filler.
-        double valueTextWidth = Math.Max(0, WarningDiagnosticsCard.ActualWidth * DiagnosticValueColumnWidthRatio);
-        SensorDiagnosticsText.Width = valueTextWidth;
-        WarningDetailsText.Width = valueTextWidth;
+        bool isNarrowLayout = windowWidth < NarrowLayoutWidthDips;
+        if (_isNarrowLayout == isNarrowLayout)
+        {
+            return;
+        }
+
+        _isNarrowLayout = isNarrowLayout;
+
+        if (isNarrowLayout)
+        {
+            ApplyNarrowLayout();
+        }
+        else
+        {
+            ApplyWideLayout();
+        }
+
+    }
+
+    private void ApplyWideLayout()
+    {
+        StatusPage.Padding = new Thickness(40, 32, 40, 32);
+        AboutPage.Padding = new Thickness(40, 32, 40, 32);
+        Navigation.PaneDisplayMode = NavigationViewPaneDisplayMode.Left;
+        Navigation.IsPaneOpen = true;
+        Navigation.IsPaneToggleButtonVisible = false;
+        ServiceDetailsExpander.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+        DiagnosticsDetailsExpander.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+        ServiceDetailsExpander.HeaderContentAlignment = ContentAlignment.Right;
+        ServiceDetailsExpander.HeaderHorizontalContentAlignment = HorizontalAlignment.Right;
+        DiagnosticsDetailsExpander.HeaderContentAlignment = ContentAlignment.Right;
+        DiagnosticsDetailsExpander.HeaderHorizontalContentAlignment = HorizontalAlignment.Right;
+
+        Grid.SetColumnSpan(StatusHeaderText, 1);
+        StatusHeaderGrid.ColumnSpacing = 24;
+        Grid.SetRow(StatusHeaderActions, 0);
+        Grid.SetColumn(StatusHeaderActions, 1);
+        Grid.SetColumnSpan(StatusHeaderActions, 1);
+        StatusHeaderActions.Margin = new Thickness(24, 0, 0, 0);
+        StatusHeaderActions.HorizontalAlignment = HorizontalAlignment.Right;
+        ActionButtonsPanel.Orientation = Orientation.Horizontal;
+        ActionButtonsPanel.HorizontalAlignment = HorizontalAlignment.Left;
+        RefreshButton.HorizontalAlignment = HorizontalAlignment.Left;
+        CopyDiagnosticsButton.HorizontalAlignment = HorizontalAlignment.Left;
+        OpenLogsButton.HorizontalAlignment = HorizontalAlignment.Left;
+
+        SetStandaloneCardContentAlignment(ContentAlignment.Right, HorizontalAlignment.Right);
+        SetNarrowDetailsLabelsVisibility(Visibility.Collapsed);
+        SetDetailRowsIsNarrow(false);
+    }
+
+    private void ApplyNarrowLayout()
+    {
+        StatusPage.Padding = new Thickness(56, 24, 56, 24);
+        AboutPage.Padding = new Thickness(56, 24, 56, 24);
+        Navigation.PaneDisplayMode = NavigationViewPaneDisplayMode.LeftMinimal;
+        Navigation.IsPaneOpen = false;
+        Navigation.IsPaneToggleButtonVisible = true;
+        ServiceDetailsExpander.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+        DiagnosticsDetailsExpander.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+        ServiceDetailsExpander.HeaderContentAlignment = ContentAlignment.Vertical;
+        ServiceDetailsExpander.HeaderHorizontalContentAlignment = HorizontalAlignment.Left;
+        DiagnosticsDetailsExpander.HeaderContentAlignment = ContentAlignment.Vertical;
+        DiagnosticsDetailsExpander.HeaderHorizontalContentAlignment = HorizontalAlignment.Left;
+
+        Grid.SetColumnSpan(StatusHeaderText, 2);
+        StatusHeaderGrid.ColumnSpacing = 0;
+        Grid.SetRow(StatusHeaderActions, 1);
+        Grid.SetColumn(StatusHeaderActions, 0);
+        Grid.SetColumnSpan(StatusHeaderActions, 2);
+        StatusHeaderActions.Margin = new Thickness(0, 16, 0, 0);
+        StatusHeaderActions.HorizontalAlignment = HorizontalAlignment.Stretch;
+        ActionButtonsPanel.Orientation = Orientation.Vertical;
+        ActionButtonsPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
+        RefreshButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+        CopyDiagnosticsButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+        OpenLogsButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+
+        SetStandaloneCardContentAlignment(ContentAlignment.Vertical, HorizontalAlignment.Left);
+        SetNarrowDetailsLabelsVisibility(Visibility.Visible);
+        SetDetailRowsIsNarrow(true);
+    }
+
+    private void SetStandaloneCardContentAlignment(ContentAlignment contentAlignment, HorizontalAlignment horizontalAlignment)
+    {
+        PawnIoDriverCard.ContentAlignment = contentAlignment;
+        PawnIoDriverCard.HorizontalContentAlignment = horizontalAlignment;
+        DiagnosticsSummaryCard.ContentAlignment = contentAlignment;
+        DiagnosticsSummaryCard.HorizontalContentAlignment = horizontalAlignment;
+        AboutPanelVersionCard.ContentAlignment = contentAlignment;
+        AboutPanelVersionCard.HorizontalContentAlignment = horizontalAlignment;
+        AboutHelperVersionCard.ContentAlignment = contentAlignment;
+        AboutHelperVersionCard.HorizontalContentAlignment = horizontalAlignment;
+        AboutProtocolCard.ContentAlignment = contentAlignment;
+        AboutProtocolCard.HorizontalContentAlignment = horizontalAlignment;
+        AboutServiceStatusCard.ContentAlignment = contentAlignment;
+        AboutServiceStatusCard.HorizontalContentAlignment = horizontalAlignment;
+        AboutLogFolderCard.ContentAlignment = contentAlignment;
+        AboutLogFolderCard.HorizontalContentAlignment = horizontalAlignment;
+    }
+
+    private void SetDetailRowsIsNarrow(bool isNarrow)
+    {
+        ServiceInstalledRow.IsNarrow = isNarrow;
+        ServiceRunningRow.IsNarrow = isNarrow;
+        ServiceConnectionRow.IsNarrow = isNarrow;
+        SensorDiagnosticsRow.IsNarrow = isNarrow;
+        WarningDiagnosticsRow.IsNarrow = isNarrow;
+    }
+
+    private void SetNarrowDetailsLabelsVisibility(Visibility visibility)
+    {
+        ServiceTileStatusLabel.Visibility = visibility;
+        PawnIoDriverLabel.Visibility = visibility;
+        DiagnosticsSummaryLabel.Visibility = visibility;
+        WarningCountLabel.Visibility = visibility;
     }
 
     private void OnCheckedAtTimerTick(object? sender, object args)
@@ -277,6 +397,18 @@ public partial class MainWindow : Window
         }
     }
 
+    private void TrySetMinimumWindowSizeInDips(int width, int height)
+    {
+        try
+        {
+            SetMinimumWindowSizeInDips(width, height);
+        }
+        catch (Exception exception)
+        {
+            ControlPanelStartupLog.WriteException("SetMinimumWindowSizeInDips failed", exception);
+        }
+    }
+
     private void TryConfigureCustomTitleBar()
     {
         try
@@ -332,7 +464,8 @@ public partial class MainWindow : Window
     private void OnClosed(object sender, WindowEventArgs args)
     {
         _checkedAtTimer.Stop();
-        WarningDiagnosticsCard.SizeChanged -= OnDiagnosticValueCardSizeChanged;
+        RootGrid.Loaded -= OnRootGridLoaded;
+        RootGrid.SizeChanged -= OnRootGridSizeChanged;
         RootGrid.ActualThemeChanged -= OnRootGridActualThemeChanged;
         _statusReader.Dispose();
     }
@@ -356,6 +489,18 @@ public partial class MainWindow : Window
         appWindow.Resize(new SizeInt32(
             ConvertDipToPhysicalPixel(width, scale),
             ConvertDipToPhysicalPixel(height, scale)));
+    }
+
+    private void SetMinimumWindowSizeInDips(int width, int height)
+    {
+        nint windowHandle = WindowNative.GetWindowHandle(this);
+        double scale = GetDpiForWindow(windowHandle) / 96.0;
+
+        if (ResolveAppWindow().Presenter is OverlappedPresenter presenter)
+        {
+            presenter.PreferredMinimumWidth = ConvertDipToPhysicalPixel(width, scale);
+            presenter.PreferredMinimumHeight = ConvertDipToPhysicalPixel(height, scale);
+        }
     }
 
     private AppWindow ResolveAppWindow()
