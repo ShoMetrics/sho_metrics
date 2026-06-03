@@ -121,6 +121,18 @@ foreach ($xamlResourceFile in $xamlResourceFiles) {
 }
 
 $publishedFiles = @(Get-ChildItem -LiteralPath $outputFullPath -Recurse -File)
+
+# The Control Panel uses WinUI only. These ML payloads are pulled in by the
+# Windows App SDK umbrella package and should not return to standalone output.
+$forbiddenPublishPayloadNames = @(
+    "DirectML.dll",
+    "onnxruntime.dll"
+)
+$forbiddenPublishPayloadFiles = @($publishedFiles | Where-Object { $_.Name -in $forbiddenPublishPayloadNames })
+if ($forbiddenPublishPayloadFiles.Count -gt 0) {
+    throw "Control Panel publish output includes unused ML payload files: $($forbiddenPublishPayloadFiles.Name -join ', '). Use Windows App SDK component packages instead of the umbrella package."
+}
+
 $directoryBytes = ($publishedFiles | Measure-Object -Property Length -Sum).Sum
 if ($null -eq $directoryBytes) {
     $directoryBytes = 0

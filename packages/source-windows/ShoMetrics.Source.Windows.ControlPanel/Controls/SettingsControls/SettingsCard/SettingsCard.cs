@@ -1,8 +1,8 @@
-// Licensed to the .NET Foundation under one or more agreements.
+﻿// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-namespace CommunityToolkit.WinUI.Controls;
+namespace ShoMetrics.Source.Windows.ControlPanel.Controls;
 
 /// <summary>
 /// This is the base control to create consistent settings experiences, inline with the Windows 11 design language.
@@ -137,7 +137,7 @@ public partial class SettingsCard : ButtonBase
 
     private void Control_PreviewKeyUp(object sender, KeyRoutedEventArgs e)
     {
-        if (e.Key == Windows.System.VirtualKey.Enter || e.Key == Windows.System.VirtualKey.Space || e.Key == Windows.System.VirtualKey.GamepadA)
+        if (e.Key == global::Windows.System.VirtualKey.Enter || e.Key == global::Windows.System.VirtualKey.Space || e.Key == global::Windows.System.VirtualKey.GamepadA)
         {
             VisualStateManager.GoToState(this, NormalState, true);
         }
@@ -145,7 +145,7 @@ public partial class SettingsCard : ButtonBase
 
     private void Control_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (e.Key == Windows.System.VirtualKey.Enter || e.Key == Windows.System.VirtualKey.Space || e.Key == Windows.System.VirtualKey.GamepadA)
+        if (e.Key == global::Windows.System.VirtualKey.Enter || e.Key == global::Windows.System.VirtualKey.Space || e.Key == global::Windows.System.VirtualKey.GamepadA)
         {
             // Check if the active focus is on the card itself - only then we show the pressed state.
             if (GetFocusedElement() is SettingsCard)

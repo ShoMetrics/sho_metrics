@@ -1,12 +1,10 @@
-// Licensed to the .NET Foundation under one or more agreements.
+﻿// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
 using System.Collections;
-using System.Collections.Specialized;
-using CommunityToolkit.WinUI.Helpers;
 
-namespace CommunityToolkit.WinUI;
+namespace ShoMetrics.Source.Windows.ControlPanel.Controls;
 
 /// <summary>
 /// Enables a state if an Object is <c>null</c> or a String/IEnumerable is empty
@@ -47,49 +45,9 @@ public class IsNullOrEmptyStateTrigger : StateTriggerBase
             return;
         }
 
-        // Try to listen for various notification events
-        // Starting with INorifyCollectionChanged
-        var valNotifyCollection = val as INotifyCollectionChanged;
-        if (valNotifyCollection != null)
-        {
-#pragma warning disable CS8622 // Nullability of reference types in type of parameter doesn't match the target delegate (possibly because of nullability attributes).
-            var weakEvent = new WeakEventListener<IsNullOrEmptyStateTrigger, object, NotifyCollectionChangedEventArgs>(this)
-            {
-                OnEventAction = static (instance, source, args) => instance.SetActive(IsNullOrEmpty(source)),
-                OnDetachAction = (weakEventListener) => valNotifyCollection.CollectionChanged -= weakEventListener.OnEvent
-            };
-
-            valNotifyCollection.CollectionChanged += weakEvent.OnEvent;
-#pragma warning restore CS8622 // Nullability of reference types in type of parameter doesn't match the target delegate (possibly because of nullability attributes).
-            return;
-        }
-
-        // Not INotifyCollectionChanged, try IObservableVector
-        var valObservableVector = val as IObservableVector<object>;
-        if (valObservableVector != null)
-        {
-            var weakEvent = new WeakEventListener<IsNullOrEmptyStateTrigger, object, IVectorChangedEventArgs>(this)
-            {
-                OnEventAction = static (instance, source, args) => instance.SetActive(IsNullOrEmpty(source)),
-                OnDetachAction = (weakEventListener) => valObservableVector.VectorChanged -= weakEventListener.OnEvent
-            };
-
-            valObservableVector.VectorChanged += weakEvent.OnEvent;
-            return;
-        }
-
-        // Not INotifyCollectionChanged, try IObservableMap
-        var valObservableMap = val as IObservableMap<object, object>;
-        if (valObservableMap != null)
-        {
-            var weakEvent = new WeakEventListener<IsNullOrEmptyStateTrigger, object, IMapChangedEventArgs<object>>(this)
-            {
-                OnEventAction = static (instance, source, args) => instance.SetActive(IsNullOrEmpty(source)),
-                OnDetachAction = (weakEventListener) => valObservableMap.MapChanged -= weakEventListener.OnEvent
-            };
-
-            valObservableMap.MapChanged += weakEvent.OnEvent;
-        }
+        // ShoMetrics only uses this trigger for template-bound values that are
+        // replaced wholesale. We intentionally omit CommunityToolkit's weak
+        // collection listeners to avoid vendoring unrelated helper code.
     }
 
     private static void OnValuePropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)

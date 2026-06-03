@@ -23,6 +23,7 @@ $scriptText = ($scriptFiles | ForEach-Object {
 }) -join "`n"
 $mainScriptText = Get-Content -Encoding UTF8 -LiteralPath $mainScriptPath -Raw
 $buildScriptText = Get-Content -Encoding UTF8 -LiteralPath $buildScriptPath -Raw
+$publishControlPanelScriptText = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $repoRoot "packages\source-windows\scripts\Publish-WindowsControlPanel.ps1") -Raw
 $innoProjectText = Get-Content -Encoding UTF8 -LiteralPath $innoProjectPath -Raw
 $serviceConstantsText = Get-Content -Encoding UTF8 -LiteralPath $serviceConstantsPath -Raw
 $ciWorkflowText = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $repoRoot ".github\workflows\source-windows-ci.yml") -Raw
@@ -143,6 +144,8 @@ Assert-Contains -Name "Distribution builds use separate artifact directory names
 Assert-Contains -Name "Default installer output is separated by distribution" -Text $buildScriptText -Pattern 'installer\\windows\\setup\\\$distributionDirectoryName'
 Assert-Contains -Name "Installer payload output is separated by distribution" -Text $buildScriptText -Pattern 'installer\\windows\\build\\\$distributionDirectoryName'
 Assert-Contains -Name "CI uploads installers from distribution subdirectories" -Text $ciWorkflowText -Pattern 'artifacts/installer/windows/setup/\*\*/\*\.exe'
+Assert-Contains -Name "Control Panel publish output blocks unused ONNX Runtime payload" -Text $publishControlPanelScriptText -Pattern 'onnxruntime\.dll'
+Assert-Contains -Name "Control Panel publish output blocks unused DirectML payload" -Text $publishControlPanelScriptText -Pattern 'DirectML\.dll'
 $forbiddenDistributionName = 'sl' + 'im'
 Assert-NotContains -Name "Installer distribution naming must not use deprecated compact-size name" -Text ($scriptText + $buildScriptText + $mainScriptText) -Pattern "(?i)\b$forbiddenDistributionName\b"
 
