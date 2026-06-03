@@ -12,6 +12,8 @@ param(
     [ValidateNotNullOrEmpty()]
     [string] $ShoMetricsVersionPrefix,
 
+    [bool] $SelfContained = $true,
+
     [switch] $CreateZip
 )
 
@@ -40,6 +42,8 @@ if (Test-Path -LiteralPath $outputFullPath) {
 
 New-Item -ItemType Directory -Path $outputFullPath -Force | Out-Null
 
+$selfContainedValue = $SelfContained.ToString().ToLowerInvariant()
+
 $publishArguments = @(
     "publish",
     $projectPath,
@@ -48,7 +52,7 @@ $publishArguments = @(
     "-r",
     $RuntimeIdentifier,
     "--self-contained",
-    "true",
+    $selfContainedValue,
     "-o",
     $outputFullPath,
     "/p:SourceWindowsPackageLockFlavor=$RuntimeIdentifier",
@@ -95,7 +99,7 @@ Write-Host "Project: $projectPath"
 Write-Host "Output: $outputFullPath"
 Write-Host "Configuration: $Configuration"
 Write-Host "RuntimeIdentifier: $RuntimeIdentifier"
-Write-Host "Self-contained: true"
+Write-Host "Self-contained: $selfContainedValue"
 Write-Host "PublishTrimmed: false"
 Write-Host "Directory size: $(Format-ByteSize $directoryBytes)"
 

@@ -14,6 +14,20 @@
   #error PawnIoSetupPath must be passed by the build script.
 #endif
 
+#ifndef ServiceBaseRuntimeRequirement
+  #define ServiceBaseRuntimeRequirement ""
+#endif
+
+#ifdef ShoMetricsFrameworkDependentDistribution
+  #ifndef AspNetCoreRuntimeVersion
+    #error AspNetCoreRuntimeVersion must be passed by the build script for FrameworkDependent distribution.
+  #endif
+
+  #ifndef AspNetCoreRuntimeSetupPath
+    #error AspNetCoreRuntimeSetupPath must be passed by the build script for FrameworkDependent distribution.
+  #endif
+#endif
+
 #define PawnIoPostUninstallSharedComponentNotice "PawnIO was not uninstalled.%n%nThis is intentional since it can be a shared component.%n%nIf you want to remove PawnIO, uninstall it separately from Windows Installed Apps."
 
 [Setup]
@@ -58,6 +72,9 @@ Name: "{commonappdata}\ShoMetrics\logs"; Flags: uninsneveruninstall
 
 [Files]
 Source: "ShoMetricsDisclaimer.txt"; Flags: dontcopy
+#ifdef ShoMetricsFrameworkDependentDistribution
+Source: "{#AspNetCoreRuntimeSetupPath}"; DestDir: "{tmp}"; DestName: "aspnetcore-runtime-{#AspNetCoreRuntimeVersion}-win-x64.exe"; Flags: deleteafterinstall
+#endif
 Source: "{#ServicePayloadDir}\*"; DestDir: "{app}\Service"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#ControlPanelPayloadDir}\*"; DestDir: "{app}\ControlPanel"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#PawnIoSetupPath}"; DestDir: "{tmp}"; DestName: "PawnIO_setup.exe"; Flags: deleteafterinstall; Check: ShouldStagePawnIoSetup
@@ -84,6 +101,7 @@ UninstalledAndNeedsRestart=To complete the uninstallation of %1, your computer m
 [Code]
 #include "code\Declarations.iss"
 #include "code\CommandOutput.iss"
+#include "code\RuntimePreflight.iss"
 #include "code\ServiceLifecycle.iss"
 #include "code\PawnIoFlow.iss"
 #include "code\InstallFlow.iss"

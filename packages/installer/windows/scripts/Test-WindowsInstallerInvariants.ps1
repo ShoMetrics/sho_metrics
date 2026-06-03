@@ -83,6 +83,7 @@ Assert-Contains -Name "Inno must not restart apps" -Text $mainScriptText -Patter
 Assert-Contains -Name "Inno must not restart Windows because of Run entries" -Text $mainScriptText -Pattern '(?m)^RestartIfNeededByRun=no\r?$'
 Assert-Contains -Name "RedirectionGuard remains enabled" -Text $mainScriptText -Pattern '(?m)^RedirectionGuard=yes\r?$'
 Assert-Contains -Name "Finish page launches Control Panel as original user" -Text $mainScriptText -Pattern 'Flags:\s*postinstall\s+nowait\s+skipifsilent\s+runasoriginaluser'
+Assert-Contains -Name "Framework-dependent installer bundles ASP.NET Core Runtime only for framework-dependent distribution" -Text $mainScriptText -Pattern '(?s)#ifdef\s+ShoMetricsFrameworkDependentDistribution.*?aspnetcore-runtime-\{#AspNetCoreRuntimeVersion\}-win-x64\.exe.*?#endif'
 
 Assert-Contains `
     -Name "NeedRestart always returns false" `
@@ -114,6 +115,14 @@ Assert-Contains -Name "C# service name is ShoMetrics Helper" -Text $serviceConst
 Assert-Contains -Name "Service executable uses shipped friendly name" -Text $scriptText -Pattern 'ShoMetricsHelperService\.exe'
 Assert-Contains -Name "Control Panel executable uses shipped friendly name" -Text $scriptText -Pattern 'ShoMetricsHelper\.exe'
 Assert-Contains -Name "Service start waits for RUNNING state" -Text $scriptText -Pattern '(?s)function\s+StartService:\s*Boolean;.*?RunSc\(''start.*?WaitForServiceRunning'
+Assert-Contains -Name "Framework-dependent preflight checks only the service base runtime before wizard/install starts" -Text $scriptText -Pattern '(?s)function\s+InitializeSetup:\s*Boolean;.*?ServiceBaseRuntimeInstalled.*?ShowMissingDotNetRuntimePrompt.*?Result\s*:=\s*False'
+Assert-Contains -Name "Framework-dependent missing base runtime prompt opens official Microsoft .NET Runtime page" -Text $scriptText -Pattern 'https://dotnet\.microsoft\.com/download/dotnet/thank-you/runtime-10\.0\.8-windows-x64-installer'
+Assert-Contains -Name "Framework-dependent installs bundled ASP.NET Core Runtime before service registration" -Text $scriptText -Pattern '(?s)procedure\s+InstallServiceAfterFiles;.*?InstallBundledAspNetCoreRuntime.*?InstallService'
+Assert-Contains -Name "Framework-dependent ASP.NET Core Runtime setup is silent and non-restarting" -Text $scriptText -Pattern "aspnetcore-runtime-\{#AspNetCoreRuntimeVersion\}-win-x64\.exe'\),\s*'/install /quiet /norestart'"
+Assert-Contains -Name "Framework-dependent runtime detection checks shared framework directories before sharedfx registry" -Text $scriptText -Pattern '(?s)function\s+RuntimeVersionPrefixExists\(.*?RuntimeVersionPrefixExistsInDefaultRoot.*?RuntimeVersionPrefixExistsFromRegistryRoot.*?RuntimeVersionPrefixExistsFromSharedHostPath.*?RuntimeVersionPrefixExistsFromEnvironment.*?RuntimeVersionPrefixExistsInSharedFxRegistry'
+Assert-Contains -Name "Framework-dependent runtime detection treats sharedhost only as dotnet root hint" -Text $scriptText -Pattern '(?s)function\s+RuntimeVersionPrefixExistsFromSharedHostPath.*?sharedhost is not proof.*?DotNetRootContainsRuntime'
+Assert-NotContains -Name "Framework-dependent runtime preflight must not use apphost prompt shims" -Text $scriptText -Pattern 'TriggerControlPanelRuntimePrompt|TriggerServiceRuntimePrompt|--runtime-check|ShoMetricsHelper\.exe.*?dontcopy|RuntimePromptDirectory'
+Assert-NotContains -Name "Framework-dependent installer must not skip service start after install" -Text $scriptText -Pattern 'ShoMetricsFrameworkDependentDistribution.*?StartService|StartService.*?ShoMetricsFrameworkDependentDistribution'
 Assert-Contains -Name "PawnIO is staged only through a Check predicate" -Text $mainScriptText -Pattern 'Check:\s*ShouldStagePawnIoSetup'
 Assert-Contains -Name "PawnIO setup URL is pinned" -Text $buildScriptText -Pattern 'https://github\.com/namazso/PawnIO\.Setup/releases/download/\$pawnIoVersion/PawnIO_setup\.exe'
 Assert-Contains -Name "PawnIO setup version is pinned" -Text $buildScriptText -Pattern '\$pawnIoVersion\s*=\s*"2\.2\.0"'
@@ -126,6 +135,16 @@ Assert-Contains -Name "PawnIO install is intentionally non-rollback procedure" -
 Assert-Contains -Name "PawnIO already-exists exit code is treated as known" -Text $scriptText -Pattern 'ErrorAlreadyExists\s*=\s*183'
 Assert-Contains -Name "PawnIO reboot-required exit code is treated as known" -Text $scriptText -Pattern 'ErrorSuccessRebootRequired\s*=\s*3010'
 Assert-Contains -Name "Control Panel process detection uses shipped friendly name" -Text $scriptText -Pattern "ControlPanelProcessName\s*=\s*'ShoMetricsHelper\.exe'"
+Assert-Contains -Name "Framework-dependent service base runtime requirement comes from service runtimeconfig" -Text $buildScriptText -Pattern 'Read-ServiceRuntimeFrameworkRequirement'
+Assert-Contains -Name "ASP.NET Core Runtime version is always passed into Inno" -Text $buildScriptText -Pattern '(?s)\$innoArguments\s*=\s*@\(.*?/DAspNetCoreRuntimeVersion=\$aspNetCoreRuntimeVersion'
+Assert-Contains -Name "Framework-dependent ASP.NET Core Runtime version is pinned" -Text $buildScriptText -Pattern '\$aspNetCoreRuntimeVersion\s*=\s*"10\.0\.8"'
+Assert-Contains -Name "Framework-dependent ASP.NET Core Runtime SHA256 is pinned" -Text $buildScriptText -Pattern '\$aspNetCoreRuntimeSetupSha256\s*=\s*"1c152d4a9138a92e2c04bea8ecc00e79ca8febfb7a9d5b6141f1546a076d11fd"'
+Assert-Contains -Name "Distribution builds use separate artifact directory names" -Text $buildScriptText -Pattern '(?s)\$distributionDirectoryName\s*=\s*switch\s*\(\$Distribution\).*?"Standalone"\s*\{\s*"standalone"\s*\}.*?"FrameworkDependent"\s*\{\s*"framework-dependent"\s*\}'
+Assert-Contains -Name "Default installer output is separated by distribution" -Text $buildScriptText -Pattern 'installer\\windows\\setup\\\$distributionDirectoryName'
+Assert-Contains -Name "Installer payload output is separated by distribution" -Text $buildScriptText -Pattern 'installer\\windows\\build\\\$distributionDirectoryName'
+Assert-Contains -Name "CI uploads installers from distribution subdirectories" -Text $ciWorkflowText -Pattern 'artifacts/installer/windows/setup/\*\*/\*\.exe'
+$forbiddenDistributionName = 'sl' + 'im'
+Assert-NotContains -Name "Installer distribution naming must not use deprecated compact-size name" -Text ($scriptText + $buildScriptText + $mainScriptText) -Pattern "(?i)\b$forbiddenDistributionName\b"
 
 if ($failures.Count -gt 0) {
     Write-Error ("Windows installer invariant test failed:`n- " + ($failures -join "`n- "))

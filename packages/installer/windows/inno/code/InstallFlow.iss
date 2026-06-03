@@ -1,5 +1,8 @@
 procedure InstallServiceAfterFiles;
 begin
+  if not InstallBundledAspNetCoreRuntime then
+    RaiseException('ASP.NET Core Runtime could not be installed. ShoMetrics Helper service was not registered.');
+
   WizardForm.StatusLabel.Caption := 'Installing ShoMetrics Helper service...';
   WizardForm.FilenameLabel.Caption := ServiceExePath;
   WizardForm.ProgressGauge.Max := 100;
