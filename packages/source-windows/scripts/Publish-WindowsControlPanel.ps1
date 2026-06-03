@@ -107,6 +107,9 @@ if ([string]::IsNullOrWhiteSpace($projectResourceIndexPath)) {
     throw "Required WinUI resource index was not found. Checked: $($resourceIndexCandidates -join ', ')"
 }
 
+# Work around Windows App SDK publish output missing app .pri/.xbf resources for
+# unpackaged WinUI apps in this scenario:
+# https://github.com/microsoft/WindowsAppSDK/issues/6394
 Copy-Item -LiteralPath $projectResourceIndexPath -Destination (Join-Path $outputFullPath ([System.IO.Path]::GetFileName($projectResourceIndexPath))) -Force
 
 # WinUI generates one .xbf per XAML file. Copy all compiled XAML resources so
