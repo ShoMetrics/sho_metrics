@@ -9,6 +9,9 @@ const
   ServiceStartTimeoutSeconds = 30;
   ServiceStopTimeoutSeconds = 30;
   ServiceDeleteTimeoutSeconds = 10;
+  // Must match [Setup] AppId. Inno stores installed app metadata under this
+  // key, which we use only to show a reinstall/update intro page.
+  ShoMetricsUninstallRegistryKey = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{36A3A687-9B6A-4F81-9343-6683FF2CC3C2}_is1';
   PawnIoUrl = 'https://pawnio.eu/';
   ErrorServiceDoesNotExist = 1060;
   ErrorServiceNotActive = 1062;
@@ -17,6 +20,9 @@ const
   ErrorSuccessRebootRequired = 3010;
 
 var
+  ExistingInstallPage: TWizardPage;
+  ExistingShoMetricsInstalledBeforeSetup: Boolean;
+  ExistingShoMetricsInstalledVersion: String;
   ShoMetricsLicensePage: TWizardPage;
   ShoMetricsLicenseViewer: TRichEditViewer;
   ShoMetricsAcceptRadioButton: TNewRadioButton;
@@ -68,6 +74,32 @@ begin
   // usability remains the Control Panel's responsibility.
   Result := RegKeyExists(HKEY_LOCAL_MACHINE_64, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PawnIO') or
     RegKeyExists(HKEY_LOCAL_MACHINE_32, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PawnIO');
+end;
+
+function ExistingShoMetricsInstallRecordExists(var InstalledVersion: String): Boolean;
+var
+  DisplayVersionFound: Boolean;
+begin
+  Result := RegKeyExists(HKEY_LOCAL_MACHINE_64, ShoMetricsUninstallRegistryKey) or
+    RegKeyExists(HKEY_LOCAL_MACHINE_32, ShoMetricsUninstallRegistryKey);
+
+  if not Result then
+    Exit;
+
+  DisplayVersionFound := RegQueryStringValue(
+    HKEY_LOCAL_MACHINE_64,
+    ShoMetricsUninstallRegistryKey,
+    'DisplayVersion',
+    InstalledVersion);
+  if not DisplayVersionFound then
+    DisplayVersionFound := RegQueryStringValue(
+      HKEY_LOCAL_MACHINE_32,
+      ShoMetricsUninstallRegistryKey,
+      'DisplayVersion',
+      InstalledVersion);
+
+  if (not DisplayVersionFound) or (Trim(InstalledVersion) = '') then
+    InstalledVersion := 'unknown';
 end;
 
 procedure OpenUrl(const Url: String);
