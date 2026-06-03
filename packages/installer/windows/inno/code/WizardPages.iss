@@ -61,14 +61,14 @@ begin
   Result.Visible := IsVisible;
 end;
 
-procedure CreateShoMetricsLicensePage;
+procedure CreateShoMetricsLicensePage(const AfterPageID: Integer);
 var
   DescriptionLabel: TNewLinkLabel;
   MemoTop: Integer;
   RadioTop: Integer;
 begin
   ShoMetricsLicensePage := CreateCustomPage(
-    wpWelcome,
+    AfterPageID,
     'License Agreement',
     'Please read this agreement before continuing.');
   ShoMetricsLicensePage.OnNextButtonClick := @ShoMetricsLicensePageNextButtonClick;
@@ -104,6 +104,22 @@ begin
     True,
     True);
   ShoMetricsDeclineRadioButton.OnClick := @ShoMetricsLicenseChanged;
+end;
+
+procedure CreateExistingInstallPage;
+begin
+  ExistingInstallPage := CreateCustomPage(
+    wpWelcome,
+    'ShoMetrics Helper is already installed',
+    'Setup will install this version over the existing installation.');
+
+  CreateBodyLinkLabel(
+    ExistingInstallPage,
+    'Installed version: ' + ExistingShoMetricsInstalledVersion + #13#10 +
+      'This installer version: {#ShoMetricsVersion}'#13#10#13#10 +
+      'Click Next to stop ShoMetrics Helper, clean old application files, and install this version.'#13#10 +
+      'Your logs will be kept. PawnIO will not be uninstalled or changed by this step.',
+    True);
 end;
 
 procedure CreatePawnIoOptionPage;
@@ -180,10 +196,21 @@ begin
 end;
 
 procedure InitializeWizard;
+var
+  LicensePagePreviousPageID: Integer;
 begin
+  ExistingShoMetricsInstalledBeforeSetup := ExistingShoMetricsInstallRecordExists(ExistingShoMetricsInstalledVersion);
   PawnIoInstalledBeforeSetup := PawnIoInstallRecordExists;
 
-  CreateShoMetricsLicensePage;
+  if ExistingShoMetricsInstalledBeforeSetup then
+  begin
+    CreateExistingInstallPage;
+    LicensePagePreviousPageID := ExistingInstallPage.ID;
+  end
+  else
+    LicensePagePreviousPageID := wpWelcome;
+
+  CreateShoMetricsLicensePage(LicensePagePreviousPageID);
   CreatePawnIoOptionPage;
 
   CaptureDefaultWizardButtonLayout;

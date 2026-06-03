@@ -27,6 +27,8 @@ $publishControlPanelScriptText = Get-Content -Encoding UTF8 -LiteralPath (Join-P
 $innoProjectText = Get-Content -Encoding UTF8 -LiteralPath $innoProjectPath -Raw
 $serviceConstantsText = Get-Content -Encoding UTF8 -LiteralPath $serviceConstantsPath -Raw
 $ciWorkflowText = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $repoRoot ".github\workflows\source-windows-ci.yml") -Raw
+$setupAppIdGuid = [regex]::Match($mainScriptText, '(?m)^AppId=\{\{(?<guid>[0-9A-Fa-f-]+)\}\r?$').Groups["guid"].Value
+$uninstallRegistryGuid = [regex]::Match($scriptText, "ShoMetricsUninstallRegistryKey\s*=\s*'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\\{(?<guid>[0-9A-Fa-f-]+)\}_is1'").Groups["guid"].Value
 
 $failures = [System.Collections.Generic.List[string]]::new()
 
@@ -80,11 +82,20 @@ Assert-Contains `
 Assert-Contains -Name "Ready page stays disabled" -Text $mainScriptText -Pattern '(?m)^DisableReadyPage=yes\r?$'
 Assert-Contains -Name "Welcome page stays disabled" -Text $mainScriptText -Pattern '(?m)^DisableWelcomePage=yes\r?$'
 Assert-Contains -Name "Install cancellation is disabled once install starts" -Text $mainScriptText -Pattern '(?m)^AllowCancelDuringInstall=no\r?$'
+Assert-Contains -Name "Setup can force-close read-only Control Panel during updates" -Text $mainScriptText -Pattern '(?m)^CloseApplications=force\r?$'
 Assert-Contains -Name "Inno must not restart apps" -Text $mainScriptText -Pattern '(?m)^RestartApplications=no\r?$'
 Assert-Contains -Name "Inno must not restart Windows because of Run entries" -Text $mainScriptText -Pattern '(?m)^RestartIfNeededByRun=no\r?$'
 Assert-Contains -Name "RedirectionGuard remains enabled" -Text $mainScriptText -Pattern '(?m)^RedirectionGuard=yes\r?$'
 Assert-Contains -Name "Finish page launches Control Panel as original user" -Text $mainScriptText -Pattern 'Flags:\s*postinstall\s+nowait\s+skipifsilent\s+runasoriginaluser'
 Assert-Contains -Name "Framework-dependent installer bundles ASP.NET Core Runtime only for framework-dependent distribution" -Text $mainScriptText -Pattern '(?s)#ifdef\s+ShoMetricsFrameworkDependentDistribution.*?aspnetcore-runtime-\{#AspNetCoreRuntimeVersion\}-win-x64\.exe.*?#endif'
+Assert-Contains -Name "Installer deletes stale service payload before copying files" -Text $mainScriptText -Pattern '(?m)^Type:\s*filesandordirs;\s*Name:\s*"\{app\}\\Service"\r?$'
+Assert-Contains -Name "Installer deletes stale Control Panel payload before copying files" -Text $mainScriptText -Pattern '(?m)^Type:\s*filesandordirs;\s*Name:\s*"\{app\}\\ControlPanel"\r?$'
+Assert-Contains -Name "Existing install page uses Next to continue the normal flow" -Text $scriptText -Pattern '(?s)procedure\s+CreateExistingInstallPage;.*?ShoMetrics Helper is already installed.*?Click Next to stop ShoMetrics Helper'
+Assert-Contains -Name "Existing install page appears before the license page" -Text $scriptText -Pattern '(?s)if\s+ExistingShoMetricsInstalledBeforeSetup\s+then.*?CreateExistingInstallPage;.*?LicensePagePreviousPageID\s*:=\s*ExistingInstallPage\.ID.*?CreateShoMetricsLicensePage\(LicensePagePreviousPageID\)'
+Assert-NotContains -Name "Existing install page must not bypass license or PawnIO pages" -Text $scriptText -Pattern 'ExistingInstallPage.*?(InstallServiceAfterFiles|wpInstalling|PrepareToInstall|UpdateInstallButtonCaption)'
+if (($setupAppIdGuid -eq '') -or ($uninstallRegistryGuid -eq '') -or ($setupAppIdGuid.ToUpperInvariant() -ne $uninstallRegistryGuid.ToUpperInvariant())) {
+    $failures.Add("Existing install detection uses the same AppId as setup")
+}
 
 Assert-Contains `
     -Name "NeedRestart always returns false" `

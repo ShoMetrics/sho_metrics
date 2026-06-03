@@ -54,6 +54,9 @@ WizardSizePercent=120
 ; Setup runs service and driver installers that are not safely cancellable
 ; mid-operation. Only allow cancellation between pages, before install starts.
 AllowCancelDuringInstall=no
+; Control Panel is a read-only diagnostics window. Let Inno close it so updates
+; can replace the app payload without asking users to manually hunt it down.
+CloseApplications=force
 ; ShoMetrics owns restart messaging. Inno must not restart apps or Windows on
 ; our behalf, because Preparing-page failures can otherwise become restart UI.
 RestartApplications=no
@@ -69,6 +72,13 @@ VersionInfoVersion={#ShoMetricsVersion}
 
 [Dirs]
 Name: "{commonappdata}\ShoMetrics\logs"; Flags: uninsneveruninstall
+
+[InstallDelete]
+; Switching between Standalone and FrameworkDependent changes the payload shape.
+; Remove old app-local runtime files first so stale hostfxr/coreclr copies do
+; not hijack framework-dependent launches away from the global .NET install.
+Type: filesandordirs; Name: "{app}\Service"
+Type: filesandordirs; Name: "{app}\ControlPanel"
 
 [Files]
 Source: "ShoMetricsDisclaimer.txt"; Flags: dontcopy
