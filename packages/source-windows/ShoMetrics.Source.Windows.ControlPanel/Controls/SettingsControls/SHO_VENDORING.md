@@ -12,3 +12,8 @@ without pulling the full Microsoft.WindowsAppSDK umbrella package into our
 standalone Control Panel publish output. We vendor the source for now because
 the NuGet package currently brings Windows App SDK ML dependencies that the
 Control Panel does not use, including ONNX Runtime and DirectML payload files.
+
+The upstream project and props files are intentionally removed in the ShoMetrics
+adaptation layer. The control styles are loaded from App.xaml because these
+controls are compiled into the Control Panel app; there is no separate control
+library assembly for WinUI to probe via Themes/Generic.xaml.

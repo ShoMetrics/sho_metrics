@@ -5,6 +5,10 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <!-- Vendored SettingsControls are compiled into this app, not a separate control library.
+                     Load their implicit styles here instead of relying on library Generic.xaml auto-discovery. -->
+                <ResourceDictionary Source="Controls/SettingsControls/SettingsCard/SettingsCard.xaml" />
+                <ResourceDictionary Source="Controls/SettingsControls/SettingsExpander/SettingsExpander.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Light">
