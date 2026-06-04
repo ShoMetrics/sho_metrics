@@ -11,10 +11,19 @@ namespace ShoMetrics.Source.Windows.ControlPanel;
 
 internal interface IHelperControlPanelSourceClient : IDisposable
 {
+    /// <summary>
+    /// Reads helper health and component status, including PawnIO diagnostics.
+    /// </summary>
     Task<GetSourceHealthResponse> GetSourceHealthAsync(TimeSpan requestTimeout, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Reads the current metric descriptor catalog for support diagnostics.
+    /// </summary>
     Task<ListMetricDescriptorsResponse> ListMetricDescriptorsAsync(TimeSpan requestTimeout, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Reads one metric snapshot so the panel can report sample freshness.
+    /// </summary>
     Task<ReadMetricSnapshotResponse> ReadMetricSnapshotAsync(TimeSpan requestTimeout, CancellationToken cancellationToken);
 }
 
@@ -23,6 +32,9 @@ internal sealed class HelperControlPanelSourceClient : IHelperControlPanelSource
     private readonly GrpcChannel _channel;
     private readonly MetricSourceService.MetricSourceServiceClient _client;
 
+    /// <summary>
+    /// Creates the read-only gRPC client used by the panel status surface.
+    /// </summary>
     public HelperControlPanelSourceClient(TimeSpan connectTimeout)
     {
         var connectionFactory = new NamedPipeGrpcConnectionFactory(WindowsSourceServiceConstants.GrpcPipeName);
@@ -41,6 +53,7 @@ internal sealed class HelperControlPanelSourceClient : IHelperControlPanelSource
         _client = new MetricSourceService.MetricSourceServiceClient(_channel);
     }
 
+    /// <inheritdoc />
     public async Task<GetSourceHealthResponse> GetSourceHealthAsync(
         TimeSpan requestTimeout,
         CancellationToken cancellationToken)
@@ -51,6 +64,7 @@ internal sealed class HelperControlPanelSourceClient : IHelperControlPanelSource
             .ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
     public async Task<ListMetricDescriptorsResponse> ListMetricDescriptorsAsync(
         TimeSpan requestTimeout,
         CancellationToken cancellationToken)
@@ -61,6 +75,7 @@ internal sealed class HelperControlPanelSourceClient : IHelperControlPanelSource
             .ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
     public async Task<ReadMetricSnapshotResponse> ReadMetricSnapshotAsync(
         TimeSpan requestTimeout,
         CancellationToken cancellationToken)
@@ -71,6 +86,9 @@ internal sealed class HelperControlPanelSourceClient : IHelperControlPanelSource
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Closes the gRPC channel owned by this status client.
+    /// </summary>
     public void Dispose()
     {
         _channel.Dispose();
@@ -85,6 +103,9 @@ internal sealed class HelperControlPanelSourceClient : IHelperControlPanelSource
 
     private sealed class NamedPipeGrpcConnectionFactory(string pipeName)
     {
+        /// <summary>
+        /// Connects gRPC to the helper through a Windows named pipe instead of TCP.
+        /// </summary>
         public async ValueTask<Stream> ConnectAsync(
             SocketsHttpConnectionContext _,
             CancellationToken cancellationToken)

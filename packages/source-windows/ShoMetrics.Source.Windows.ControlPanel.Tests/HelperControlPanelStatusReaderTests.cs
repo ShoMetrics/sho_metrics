@@ -244,8 +244,9 @@ public sealed class HelperControlPanelStatusReaderTests
 
         HelperControlPanelStatus status = await reader.ReadAsync(CancellationToken.None);
 
-        Assert.Equal("Stopped", status.Service.StatusText);
-        Assert.Equal("Start ShoMetrics Helper to check sensors and drivers.", status.Service.DetailText);
+        Assert.Equal("Not started", status.Service.StatusText);
+        Assert.Equal("The background service is not running.", status.Service.DetailText);
+        Assert.True(status.Service.CanStartBackgroundService);
         Assert.Equal("Not running", status.Service.RuntimeText);
         Assert.Equal("Failed", status.Service.ConnectionText);
         Assert.Equal("Not checked", status.PawnIoDriver.StatusText);

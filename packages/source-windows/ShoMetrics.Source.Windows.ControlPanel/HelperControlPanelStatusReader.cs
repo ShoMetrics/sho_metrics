@@ -12,6 +12,9 @@ internal sealed class HelperControlPanelStatusReader : IDisposable
     private readonly IWindowsServiceStatusReader _serviceStatusReader;
     private readonly IHelperControlPanelSourceClient _sourceClient;
 
+    /// <summary>
+    /// Creates the default status reader for the local ShoMetrics Helper service.
+    /// </summary>
     public HelperControlPanelStatusReader()
         : this(
             new WindowsServiceStatusReader(),
@@ -224,6 +227,7 @@ internal sealed class HelperControlPanelStatusReader : IDisposable
             DetailText = tileText.DetailText,
             Tone = tileText.Tone,
             CanInstallShoMetricsHelper = tileText.CanInstallShoMetricsHelper,
+            CanStartBackgroundService = tileText.CanStartBackgroundService,
             InstallText = FormatServiceInstallStatus(serviceStatus),
             RuntimeText = FormatServiceRuntimeStatus(serviceStatus),
             ConnectionText = connectionText,
@@ -251,7 +255,8 @@ internal sealed class HelperControlPanelStatusReader : IDisposable
                 StatusText: "Update required",
                 DetailText: "Update ShoMetrics Helper and Hub to the latest version.",
                 Tone: ControlPanelStatusTone.Critical,
-                CanInstallShoMetricsHelper: false);
+                CanInstallShoMetricsHelper: false,
+                CanStartBackgroundService: false);
         }
 
         return serviceStatus switch
@@ -260,52 +265,62 @@ internal sealed class HelperControlPanelStatusReader : IDisposable
                 StatusText: "Not installed",
                 DetailText: "Installation did not complete. Restart your PC or reinstall ShoMetrics Helper.",
                 Tone: ControlPanelStatusTone.Critical,
-                CanInstallShoMetricsHelper: true),
+                CanInstallShoMetricsHelper: true,
+                CanStartBackgroundService: false),
             WindowsServiceStatusKind.Stopped => new ServiceTileText(
-                StatusText: "Stopped",
-                DetailText: "Start ShoMetrics Helper to check sensors and drivers.",
+                StatusText: "Not started",
+                DetailText: "The background service is not running.",
                 Tone: ControlPanelStatusTone.Critical,
-                CanInstallShoMetricsHelper: false),
+                CanInstallShoMetricsHelper: false,
+                CanStartBackgroundService: true),
             WindowsServiceStatusKind.StartPending => new ServiceTileText(
                 StatusText: "Starting",
                 DetailText: "Waiting for ShoMetrics Helper to become available.",
                 Tone: ControlPanelStatusTone.Caution,
-                CanInstallShoMetricsHelper: false),
+                CanInstallShoMetricsHelper: false,
+                CanStartBackgroundService: false),
             WindowsServiceStatusKind.StopPending => new ServiceTileText(
                 StatusText: "Stopping",
                 DetailText: "Waiting for ShoMetrics Helper to stop.",
                 Tone: ControlPanelStatusTone.Caution,
-                CanInstallShoMetricsHelper: false),
+                CanInstallShoMetricsHelper: false,
+                CanStartBackgroundService: false),
             WindowsServiceStatusKind.Running when helperRequestException is null => new ServiceTileText(
                 StatusText: "Connected",
                 DetailText: "ShoMetrics Helper is running.",
                 Tone: ControlPanelStatusTone.Success,
-                CanInstallShoMetricsHelper: false),
+                CanInstallShoMetricsHelper: false,
+                CanStartBackgroundService: false),
             WindowsServiceStatusKind.Running => new ServiceTileText(
                 StatusText: "Connection error",
                 DetailText: "Could not connect to ShoMetrics Helper. Restart ShoMetrics Helper, then open logs if it keeps failing.",
                 Tone: ControlPanelStatusTone.Critical,
-                CanInstallShoMetricsHelper: false),
+                CanInstallShoMetricsHelper: false,
+                CanStartBackgroundService: false),
             WindowsServiceStatusKind.Paused => new ServiceTileText(
                 StatusText: "Paused",
                 DetailText: "Resume ShoMetrics Helper to check sensors and drivers.",
                 Tone: ControlPanelStatusTone.Unknown,
-                CanInstallShoMetricsHelper: false),
+                CanInstallShoMetricsHelper: false,
+                CanStartBackgroundService: false),
             WindowsServiceStatusKind.ContinuePending => new ServiceTileText(
                 StatusText: "Starting",
                 DetailText: "Waiting for ShoMetrics Helper to become available.",
                 Tone: ControlPanelStatusTone.Caution,
-                CanInstallShoMetricsHelper: false),
+                CanInstallShoMetricsHelper: false,
+                CanStartBackgroundService: false),
             WindowsServiceStatusKind.PausePending => new ServiceTileText(
                 StatusText: "Pausing",
                 DetailText: "Waiting for ShoMetrics Helper to pause.",
                 Tone: ControlPanelStatusTone.Caution,
-                CanInstallShoMetricsHelper: false),
+                CanInstallShoMetricsHelper: false,
+                CanStartBackgroundService: false),
             _ => new ServiceTileText(
                 StatusText: "Unknown",
                 DetailText: "Could not read ShoMetrics Helper status.",
                 Tone: ControlPanelStatusTone.Unknown,
-                CanInstallShoMetricsHelper: false),
+                CanInstallShoMetricsHelper: false,
+                CanStartBackgroundService: false),
         };
     }
 
@@ -443,6 +458,9 @@ internal sealed class HelperControlPanelStatusReader : IDisposable
         return warningCount > 0 || errorCount > 0;
     }
 
+    /// <summary>
+    /// Releases the gRPC client and any disposable service status reader owned by this reader.
+    /// </summary>
     public void Dispose()
     {
         _sourceClient.Dispose();
@@ -485,7 +503,8 @@ internal sealed class HelperControlPanelStatusReader : IDisposable
         string StatusText,
         string DetailText,
         ControlPanelStatusTone Tone,
-        bool CanInstallShoMetricsHelper);
+        bool CanInstallShoMetricsHelper,
+        bool CanStartBackgroundService);
 
     private readonly record struct PawnIoDriverTileText(
         string StatusText,

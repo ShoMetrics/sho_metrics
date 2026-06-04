@@ -67,7 +67,7 @@
                 <CornerRadius x:Key="NavigationViewContentGridCornerRadius">0</CornerRadius>
             </muxc:NavigationView.Resources>
             <muxc:NavigationView.MenuItems>
-                <muxc:NavigationViewItem Content="Status"
+                <muxc:NavigationViewItem Content="Home"
                                          IsSelected="True"
                                          Icon="Home"
                                          Tag="status" />
@@ -89,70 +89,90 @@
                                        TextWrapping="Wrap" />
                         </StackPanel>
 
-                        <StackPanel Spacing="4">
-                            <toolkit:SettingsExpander x:Name="ServiceDetailsExpander"
-                                                      Header="ShoMetrics Helper"
-                                                      IsExpanded="False">
-                                <toolkit:SettingsExpander.HeaderIcon>
-                                    <FontIcon x:Name="ServiceTileStatusIcon"
-                                              AutomationProperties.AccessibilityView="Raw"
-                                              FontSize="18" />
-                                </toolkit:SettingsExpander.HeaderIcon>
-                                <toolkit:SettingsExpander.Description>
-                                    <TextBlock x:Name="ServiceTileDetailText"
-                                               TextWrapping="Wrap" />
-                                </toolkit:SettingsExpander.Description>
-                                <StackPanel Orientation="Horizontal"
-                                            Spacing="12"
-                                            VerticalAlignment="Center">
-                                    <TextBlock x:Name="ServiceTileStatusText"
-                                               Style="{ThemeResource BodyTextBlockStyle}"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                               VerticalAlignment="Center" />
-                                    <Button x:Name="ServiceInstallButton"
-                                            Content="Install"
-                                            Visibility="Collapsed"
-                                            Click="OnInstallShoMetricsClicked" />
-                                </StackPanel>
-                                <toolkit:SettingsExpander.Items>
-                                    <toolkit:SettingsCard Header="Installed">
-                                        <toolkit:SettingsCard.Description>
-                                            <TextBlock Text="Whether the ShoMetrics Helper Windows service is installed on this PC."
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="App status"
+                                       Style="{ThemeResource SubtitleTextBlockStyle}" />
+                            <StackPanel Spacing="4">
+                                <toolkit:SettingsExpander x:Name="ServiceDetailsExpander"
+                                                          Header="ShoMetrics Helper"
+                                                          IsExpanded="False">
+                                    <toolkit:SettingsExpander.HeaderIcon>
+                                        <FontIcon x:Name="ServiceTileStatusIcon"
+                                                  AutomationProperties.AccessibilityView="Raw"
+                                                  FontSize="18" />
+                                    </toolkit:SettingsExpander.HeaderIcon>
+                                    <toolkit:SettingsExpander.Description>
+                                        <StackPanel Spacing="4">
+                                            <TextBlock x:Name="ServiceTileDetailText"
                                                        TextWrapping="Wrap" />
-                                        </toolkit:SettingsCard.Description>
-                                        <StackPanel Orientation="Horizontal"
-                                                    Spacing="12"
-                                                    VerticalAlignment="Center">
-                                            <TextBlock x:Name="ServiceInstallDetailText"
-                                                       Style="{ThemeResource BodyTextBlockStyle}"
-                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                       VerticalAlignment="Center" />
-                                            <Button x:Name="ServiceInstallDetailButton"
-                                                    Content="Install"
-                                                    Visibility="Collapsed"
-                                                    Click="OnInstallShoMetricsClicked" />
+                                            <TextBlock x:Name="ServiceTileRecoveryText"
+                                                       Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                                       TextWrapping="Wrap"
+                                                       Visibility="Collapsed" />
                                         </StackPanel>
-                                    </toolkit:SettingsCard>
-                                    <toolkit:SettingsCard Header="Running Status">
-                                        <toolkit:SettingsCard.Description>
-                                            <TextBlock Text="Whether the helper service is currently running."
-                                                       TextWrapping="Wrap" />
-                                        </toolkit:SettingsCard.Description>
-                                        <TextBlock x:Name="ServiceRuntimeDetailText"
+                                    </toolkit:SettingsExpander.Description>
+                                    <StackPanel Orientation="Horizontal"
+                                                Spacing="12"
+                                                VerticalAlignment="Center">
+                                        <TextBlock x:Name="ServiceTileStatusText"
                                                    Style="{ThemeResource BodyTextBlockStyle}"
-                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                    </toolkit:SettingsCard>
-                                    <toolkit:SettingsCard Header="Connection">
-                                        <toolkit:SettingsCard.Description>
-                                            <TextBlock Text="Whether the panel can talk to the running helper service."
-                                                       TextWrapping="Wrap" />
-                                        </toolkit:SettingsCard.Description>
-                                        <TextBlock x:Name="ConnectionDetailText"
-                                                   Style="{ThemeResource BodyTextBlockStyle}"
-                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                    </toolkit:SettingsCard>
-                                </toolkit:SettingsExpander.Items>
-                            </toolkit:SettingsExpander>
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   VerticalAlignment="Center" />
+                                        <Button x:Name="ServicePrimaryActionButton"
+                                                AutomationProperties.AutomationId="ServicePrimaryActionButton"
+                                                Visibility="Collapsed"
+                                                Click="OnServicePrimaryActionClicked">
+                                            <StackPanel Orientation="Horizontal"
+                                                        Spacing="8"
+                                                        VerticalAlignment="Center">
+                                                <FontIcon x:Name="ServicePrimaryActionAdminIcon"
+                                                          Glyph="&#xE7EF;"
+                                                          FontSize="16"
+                                                          Visibility="Collapsed" />
+                                                <TextBlock x:Name="ServicePrimaryActionText"
+                                                           Text="Install" />
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                    <toolkit:SettingsExpander.Items>
+                                        <toolkit:SettingsCard Header="Installed">
+                                            <toolkit:SettingsCard.Description>
+                                                <TextBlock Text="Whether the background service is installed on this PC."
+                                                           TextWrapping="Wrap" />
+                                            </toolkit:SettingsCard.Description>
+                                            <StackPanel Orientation="Horizontal"
+                                                        Spacing="12"
+                                                        VerticalAlignment="Center">
+                                                <TextBlock x:Name="ServiceInstallDetailText"
+                                                           Style="{ThemeResource BodyTextBlockStyle}"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                           VerticalAlignment="Center" />
+                                                <Button x:Name="ServiceInstallDetailButton"
+                                                        Content="Install"
+                                                        Visibility="Collapsed"
+                                                        Click="OnInstallShoMetricsClicked" />
+                                            </StackPanel>
+                                        </toolkit:SettingsCard>
+                                        <toolkit:SettingsCard Header="Running Status">
+                                            <toolkit:SettingsCard.Description>
+                                                <TextBlock Text="Whether the background service is currently running."
+                                                           TextWrapping="Wrap" />
+                                            </toolkit:SettingsCard.Description>
+                                            <TextBlock x:Name="ServiceRuntimeDetailText"
+                                                       Style="{ThemeResource BodyTextBlockStyle}"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </toolkit:SettingsCard>
+                                        <toolkit:SettingsCard Header="Connection">
+                                            <toolkit:SettingsCard.Description>
+                                                <TextBlock Text="Whether the panel can talk to the running background service."
+                                                           TextWrapping="Wrap" />
+                                            </toolkit:SettingsCard.Description>
+                                            <TextBlock x:Name="ConnectionDetailText"
+                                                       Style="{ThemeResource BodyTextBlockStyle}"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </toolkit:SettingsCard>
+                                    </toolkit:SettingsExpander.Items>
+                                </toolkit:SettingsExpander>
 
                             <toolkit:SettingsCard Header="PawnIO Driver">
                                 <toolkit:SettingsCard.HeaderIcon>
@@ -239,6 +259,7 @@
                                     </toolkit:SettingsCard>
                                 </toolkit:SettingsExpander.Items>
                             </toolkit:SettingsExpander>
+                            </StackPanel>
                         </StackPanel>
 
                         <TextBlock x:Name="ErrorText"
