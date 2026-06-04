@@ -1,6 +1,8 @@
 ﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="-12.57 -26.40 500 500" width="500" height="500">
 <!-- ShoMetrics filled logo source of truth.
      Do not edit generated copies in hub or Windows asset folders.
+     sync-brand-assets.ts uses the stable ids below to derive variants; keep
+     those ids if the artwork is re-exported.
      Glow = centre radial bloom (light from the circle's centre) + wide stroke
      glow + tight core. Ground #0a0e18, ink #e9f1ff, accent #9ec5ff.
      Values tuned in the glow-match comparison tool. -->
@@ -25,9 +27,9 @@
 		</feMerge>
 	</filter>
 </defs>
-<rect x="-12.57" y="-26.40" width="500" height="500" fill="#0a0e18"/>
-<circle cx="237.43" cy="223.6" r="241" fill="url(#shometrics-logo-bloom)"/>
-<g filter="url(#shometrics-logo-stroke-glow)">
+<rect id="shometrics-logo-background" x="-12.57" y="-26.40" width="500" height="500" fill="#0a0e18"/>
+<circle id="shometrics-logo-bloom-surface" cx="237.43" cy="223.6" r="241" fill="url(#shometrics-logo-bloom)"/>
+<g id="shometrics-logo-mark" filter="url(#shometrics-logo-stroke-glow)">
 	<path fill="#e9f1ff" stroke="none" d="
 M351.628967,363.661530
 	C324.194733,386.574677 292.620575,399.404785 257.778168,403.018005

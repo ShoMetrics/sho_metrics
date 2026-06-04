@@ -11,6 +11,7 @@
         "verify": "node sync-brand-assets.ts --verify-only"
     },
     "dependencies": {
-        "@resvg/resvg-js": "2.6.2"
+        "@resvg/resvg-js": "2.6.2",
+        "@xmldom/xmldom": "0.9.10"
     }
 }
