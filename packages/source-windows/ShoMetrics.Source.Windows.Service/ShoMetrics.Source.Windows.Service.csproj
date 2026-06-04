@@ -8,6 +8,7 @@
     <FileDescription>ShoMetrics Helper Service</FileDescription>
     <Product>ShoMetrics Helper</Product>
     <Company>ShoMetrics</Company>
+    <ApplicationIcon>..\Assets\ShoMetrics.ico</ApplicationIcon>
     <TargetFramework>net10.0-windows</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ImplicitUsings>enable</ImplicitUsings>

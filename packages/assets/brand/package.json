@@ -1,0 +1,16 @@
+{
+    "name": "@shometrics/brand-assets",
+    "private": true,
+    "type": "module",
+    "engines": {
+        "node": ">=24.0.0 <25.0.0"
+    },
+    "scripts": {
+        "sync": "node sync-brand-assets.ts",
+        "test": "node sync-brand-assets.ts --test",
+        "verify": "node sync-brand-assets.ts --verify-only"
+    },
+    "dependencies": {
+        "@resvg/resvg-js": "2.6.2"
+    }
+}

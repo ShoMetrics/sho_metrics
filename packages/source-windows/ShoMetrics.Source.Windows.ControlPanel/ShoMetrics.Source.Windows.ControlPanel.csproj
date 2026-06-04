@@ -8,6 +8,7 @@
     <FileDescription>ShoMetrics Helper</FileDescription>
     <Product>ShoMetrics Helper</Product>
     <Company>ShoMetrics</Company>
+    <ApplicationIcon>..\Assets\ShoMetrics.ico</ApplicationIcon>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -25,10 +26,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Assets\sho-metrics-icon-titlebar-light.svg"
+    <Content Include="Assets\sho-metrics-icon-titlebar-light.png"
              CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="..\..\hub\com.ez.sho-metrics.sdPlugin\imgs\actions\sho-metrics\icon.svg"
-             Link="Assets\sho-metrics-icon.svg"
+    <Content Include="Assets\sho-metrics-icon-titlebar-dark.png"
              CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

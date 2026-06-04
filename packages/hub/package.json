@@ -1,5 +1,7 @@
 {
     "scripts": {
+        "brand:sync": "npm --prefix ../assets/brand run sync",
+        "brand:verify": "npm --prefix ../assets/brand run verify",
         "prebuild": "npm run generate:proto",
         "build": "rollup -c",
         "test": "npm run test:unit",

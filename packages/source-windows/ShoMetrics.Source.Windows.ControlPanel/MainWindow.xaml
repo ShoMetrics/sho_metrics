@@ -11,16 +11,16 @@
             <ResourceDictionary>
                 <ResourceDictionary.ThemeDictionaries>
                     <ResourceDictionary x:Key="Light">
-                        <media:SvgImageSource x:Key="TitleBarLogoSource"
-                                              UriSource="ms-appx:///Assets/sho-metrics-icon-titlebar-light.svg" />
+                        <media:BitmapImage x:Key="TitleBarLogoSource"
+                                           UriSource="ms-appx:///Assets/sho-metrics-icon-titlebar-light.png" />
                     </ResourceDictionary>
                     <ResourceDictionary x:Key="Dark">
-                        <media:SvgImageSource x:Key="TitleBarLogoSource"
-                                              UriSource="ms-appx:///Assets/sho-metrics-icon.svg" />
+                        <media:BitmapImage x:Key="TitleBarLogoSource"
+                                           UriSource="ms-appx:///Assets/sho-metrics-icon-titlebar-dark.png" />
                     </ResourceDictionary>
                     <ResourceDictionary x:Key="HighContrast">
-                        <media:SvgImageSource x:Key="TitleBarLogoSource"
-                                              UriSource="ms-appx:///Assets/sho-metrics-icon.svg" />
+                        <media:BitmapImage x:Key="TitleBarLogoSource"
+                                           UriSource="ms-appx:///Assets/sho-metrics-icon-titlebar-dark.png" />
                     </ResourceDictionary>
                 </ResourceDictionary.ThemeDictionaries>
             </ResourceDictionary>
