@@ -80,50 +80,14 @@
                 <ScrollViewer x:Name="StatusPage"
                               Padding="40,32,40,32"
                               VerticalScrollBarVisibility="Auto">
-                    <StackPanel x:Name="StatusContentPanel"
-                                Spacing="24">
-                        <Grid x:Name="StatusHeaderGrid"
-                              ColumnSpacing="24">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <StackPanel x:Name="StatusHeaderText"
-                                        Spacing="6">
-                                <TextBlock Text="ShoMetrics status"
-                                           Style="{ThemeResource TitleTextBlockStyle}"
-                                           TextWrapping="Wrap" />
-                                <TextBlock Text="Check ShoMetrics Helper, driver access, and sensor diagnostics."
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                           TextWrapping="Wrap" />
-                            </StackPanel>
-                            <Grid x:Name="StatusHeaderActions"
-                                  Grid.Column="1"
-                                  Margin="24,0,0,0"
-                                  HorizontalAlignment="Right"
-                                  VerticalAlignment="Top">
-                                <StackPanel x:Name="ActionButtonsPanel"
-                                            Orientation="Horizontal"
-                                            Spacing="8">
-                                    <Button x:Name="RefreshButton"
-                                            Content="Refresh"
-                                            MinWidth="86"
-                                            Click="OnRefreshClicked" />
-                                    <Button x:Name="CopyDiagnosticsButton"
-                                            Content="Copy diagnostics"
-                                            MinWidth="132"
-                                            Click="OnCopyDiagnosticsClicked" />
-                                    <Button x:Name="OpenLogsButton"
-                                            Content="Open logs"
-                                            MinWidth="92"
-                                            Click="OnOpenLogsClicked" />
-                                </StackPanel>
-                            </Grid>
-                        </Grid>
+                    <StackPanel Spacing="24">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="ShoMetrics status"
+                                       Style="{ThemeResource TitleTextBlockStyle}" />
+                            <TextBlock Text="Check ShoMetrics Helper, driver access, and sensor diagnostics."
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
 
                         <StackPanel Spacing="4">
                             <toolkit:SettingsExpander x:Name="ServiceDetailsExpander"
@@ -141,11 +105,6 @@
                                 <StackPanel Orientation="Horizontal"
                                             Spacing="12"
                                             VerticalAlignment="Center">
-                                    <TextBlock x:Name="ServiceTileStatusLabel"
-                                               Text="Status:"
-                                               Visibility="Collapsed"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                               VerticalAlignment="Center" />
                                     <TextBlock x:Name="ServiceTileStatusText"
                                                Style="{ThemeResource BodyTextBlockStyle}"
                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -156,22 +115,46 @@
                                             Click="OnInstallShoMetricsClicked" />
                                 </StackPanel>
                                 <toolkit:SettingsExpander.Items>
-                                    <toolkit:ResponsiveDetailRow x:Name="ServiceInstalledRow"
-                                                                 Header="Installed"
-                                                                 Description="Whether the ShoMetrics Helper Windows service is installed on this PC."
-                                                                 ActionText="Install"
-                                                                 ActionClick="OnInstallShoMetricsClicked" />
-                                    <toolkit:ResponsiveDetailRow x:Name="ServiceRunningRow"
-                                                                 Header="Running Status"
-                                                                 Description="Whether the helper service is currently running." />
-                                    <toolkit:ResponsiveDetailRow x:Name="ServiceConnectionRow"
-                                                                 Header="Connection"
-                                                                 Description="Whether the panel can talk to the running helper service." />
+                                    <toolkit:SettingsCard Header="Installed">
+                                        <toolkit:SettingsCard.Description>
+                                            <TextBlock Text="Whether the ShoMetrics Helper Windows service is installed on this PC."
+                                                       TextWrapping="Wrap" />
+                                        </toolkit:SettingsCard.Description>
+                                        <StackPanel Orientation="Horizontal"
+                                                    Spacing="12"
+                                                    VerticalAlignment="Center">
+                                            <TextBlock x:Name="ServiceInstallDetailText"
+                                                       Style="{ThemeResource BodyTextBlockStyle}"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                       VerticalAlignment="Center" />
+                                            <Button x:Name="ServiceInstallDetailButton"
+                                                    Content="Install"
+                                                    Visibility="Collapsed"
+                                                    Click="OnInstallShoMetricsClicked" />
+                                        </StackPanel>
+                                    </toolkit:SettingsCard>
+                                    <toolkit:SettingsCard Header="Running Status">
+                                        <toolkit:SettingsCard.Description>
+                                            <TextBlock Text="Whether the helper service is currently running."
+                                                       TextWrapping="Wrap" />
+                                        </toolkit:SettingsCard.Description>
+                                        <TextBlock x:Name="ServiceRuntimeDetailText"
+                                                   Style="{ThemeResource BodyTextBlockStyle}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </toolkit:SettingsCard>
+                                    <toolkit:SettingsCard Header="Connection">
+                                        <toolkit:SettingsCard.Description>
+                                            <TextBlock Text="Whether the panel can talk to the running helper service."
+                                                       TextWrapping="Wrap" />
+                                        </toolkit:SettingsCard.Description>
+                                        <TextBlock x:Name="ConnectionDetailText"
+                                                   Style="{ThemeResource BodyTextBlockStyle}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </toolkit:SettingsCard>
                                 </toolkit:SettingsExpander.Items>
                             </toolkit:SettingsExpander>
 
-                            <toolkit:SettingsCard x:Name="PawnIoDriverCard"
-                                                  Header="PawnIO Driver">
+                            <toolkit:SettingsCard Header="PawnIO Driver">
                                 <toolkit:SettingsCard.HeaderIcon>
                                     <FontIcon x:Name="PawnIoDriverStatusIcon"
                                               AutomationProperties.AccessibilityView="Raw"
@@ -184,11 +167,6 @@
                                 <StackPanel Orientation="Horizontal"
                                             Spacing="12"
                                             VerticalAlignment="Center">
-                                    <TextBlock x:Name="PawnIoDriverLabel"
-                                               Text="Status:"
-                                               Visibility="Collapsed"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                               VerticalAlignment="Center" />
                                     <TextBlock x:Name="PawnIoDriverText"
                                                Style="{ThemeResource BodyTextBlockStyle}"
                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -211,17 +189,10 @@
                                     <TextBlock x:Name="DiagnosticsSummaryDetailText"
                                                TextWrapping="Wrap" />
                                 </toolkit:SettingsCard.Description>
-                                <StackPanel Orientation="Horizontal"
-                                            Spacing="4">
-                                    <TextBlock x:Name="DiagnosticsSummaryLabel"
-                                               Text="Status:"
-                                               Visibility="Collapsed"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                    <TextBlock x:Name="WarningCountSummaryText"
-                                               Style="{ThemeResource BodyTextBlockStyle}"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                               VerticalAlignment="Center" />
-                                </StackPanel>
+                                <TextBlock x:Name="WarningCountSummaryText"
+                                           Style="{ThemeResource BodyTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                           VerticalAlignment="Center" />
                             </toolkit:SettingsCard>
 
                             <toolkit:SettingsExpander x:Name="DiagnosticsDetailsExpander"
@@ -236,26 +207,36 @@
                                     <TextBlock x:Name="DiagnosticsDetailText"
                                                TextWrapping="Wrap" />
                                 </toolkit:SettingsExpander.Description>
-                                <StackPanel Orientation="Horizontal"
-                                            Spacing="4">
-                                    <TextBlock x:Name="WarningCountLabel"
-                                               Text="Status:"
-                                               Visibility="Collapsed"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                    <TextBlock x:Name="WarningCountText"
-                                               Style="{ThemeResource BodyTextBlockStyle}"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                               VerticalAlignment="Center" />
-                                </StackPanel>
+                                <TextBlock x:Name="WarningCountText"
+                                           Style="{ThemeResource BodyTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                           VerticalAlignment="Center" />
                                 <toolkit:SettingsExpander.Items>
-                                    <toolkit:ResponsiveDetailRow x:Name="SensorDiagnosticsRow"
-                                                                 Header="Sensor Reads"
-                                                                 Description="Last sample age and discovered metric count from the last check."
-                                                                 ValueLabel="Details:" />
-                                    <toolkit:ResponsiveDetailRow x:Name="WarningDiagnosticsRow"
-                                                                 Header="Warnings"
-                                                                 Description="Helper warnings collected from health, descriptor, and snapshot reads."
-                                                                 ValueLabel="Details:" />
+                                    <toolkit:SettingsCard Header="Sensor Reads">
+                                        <toolkit:SettingsCard.Description>
+                                            <TextBlock Text="Last sample age and discovered metric count from the last check."
+                                                       MaxWidth="320"
+                                                       TextWrapping="Wrap" />
+                                        </toolkit:SettingsCard.Description>
+                                        <TextBlock x:Name="SensorDiagnosticsText"
+                                                   Style="{ThemeResource BodyTextBlockStyle}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   TextAlignment="Right"
+                                                   TextWrapping="Wrap" />
+                                    </toolkit:SettingsCard>
+                                    <toolkit:SettingsCard x:Name="WarningDiagnosticsCard"
+                                                          Header="Warnings">
+                                        <toolkit:SettingsCard.Description>
+                                            <TextBlock Text="Helper warnings collected from health, descriptor, and snapshot reads."
+                                                       MaxWidth="320"
+                                                       TextWrapping="Wrap" />
+                                        </toolkit:SettingsCard.Description>
+                                        <TextBlock x:Name="WarningDetailsText"
+                                                   Style="{ThemeResource BodyTextBlockStyle}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   TextAlignment="Right"
+                                                   TextWrapping="Wrap" />
+                                    </toolkit:SettingsCard>
                                 </toolkit:SettingsExpander.Items>
                             </toolkit:SettingsExpander>
                         </StackPanel>
@@ -278,39 +259,36 @@
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
 
-                        <StackPanel Spacing="4">
-                            <toolkit:SettingsCard x:Name="AboutPanelVersionCard"
-                                                  Header="Control Panel version">
-                                <TextBlock x:Name="PanelVersionText"
-                                           Style="{StaticResource DetailValueTextStyle}"
-                                           TextAlignment="Right" />
-                            </toolkit:SettingsCard>
-                            <toolkit:SettingsCard x:Name="AboutHelperVersionCard"
-                                                  Header="Helper version">
-                                <TextBlock x:Name="HelperVersionText"
-                                           Style="{StaticResource DetailValueTextStyle}"
-                                           TextAlignment="Right" />
-                            </toolkit:SettingsCard>
-                            <toolkit:SettingsCard x:Name="AboutProtocolCard"
-                                                  Header="Protocol">
-                                <TextBlock x:Name="ProtocolText"
-                                           Style="{StaticResource DetailValueTextStyle}"
-                                           TextAlignment="Right" />
-                            </toolkit:SettingsCard>
-                            <toolkit:SettingsCard x:Name="AboutServiceStatusCard"
-                                                  Header="Service status">
-                                <TextBlock x:Name="ServiceStatusText"
-                                           Style="{StaticResource DetailValueTextStyle}"
-                                           TextAlignment="Right" />
-                            </toolkit:SettingsCard>
-                            <toolkit:SettingsCard x:Name="AboutLogFolderCard"
-                                                  Header="Log folder">
-                                <TextBlock x:Name="LogFolderText"
-                                           Style="{StaticResource DetailValueTextStyle}"
-                                           TextAlignment="Right"
-                                           TextWrapping="Wrap" />
-                            </toolkit:SettingsCard>
-                        </StackPanel>
+                        <Border Style="{StaticResource StatusCardStyle}">
+                            <Grid ColumnSpacing="24" RowSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource DetailLabelTextStyle}" Text="Control Panel version" />
+                                <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DetailValueTextStyle}" x:Name="PanelVersionText" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource DetailLabelTextStyle}" Text="Helper version" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DetailValueTextStyle}" x:Name="HelperVersionText" />
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource DetailLabelTextStyle}" Text="Protocol" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DetailValueTextStyle}" x:Name="ProtocolText" />
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource DetailLabelTextStyle}" Text="Service status" />
+                                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DetailValueTextStyle}" x:Name="ServiceStatusText" />
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource DetailLabelTextStyle}" Text="Log folder" />
+                                <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource DetailValueTextStyle}" x:Name="LogFolderText" TextWrapping="Wrap" />
+                            </Grid>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
             </Grid>
@@ -321,5 +299,22 @@
             </muxc:NavigationView.FooterMenuItems>
         </muxc:NavigationView>
 
+        <StackPanel HorizontalAlignment="Right"
+                    Grid.Row="1"
+                    VerticalAlignment="Top"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    Margin="0,18,40,0">
+            <Button x:Name="RefreshButton"
+                    Content="Refresh"
+                    MinWidth="86"
+                    Click="OnRefreshClicked" />
+            <Button Content="Copy diagnostics"
+                    MinWidth="132"
+                    Click="OnCopyDiagnosticsClicked" />
+            <Button Content="Open logs"
+                    MinWidth="92"
+                    Click="OnOpenLogsClicked" />
+        </StackPanel>
     </Grid>
 </Window>
