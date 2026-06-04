@@ -12,6 +12,9 @@ public partial class App : Application
 
     private Window? _window;
 
+    /// <summary>
+    /// Initializes the WinUI app and installs startup diagnostics before loading the main window.
+    /// </summary>
     public App()
     {
         ControlPanelStartupLog.Write("App ctor enter");

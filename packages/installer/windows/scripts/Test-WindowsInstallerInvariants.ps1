@@ -10,6 +10,10 @@ $buildScriptPath = Join-Path $installerRoot "Build-WindowsInstaller.ps1"
 $innoProjectPath = Join-Path $innoRoot "ShoMetrics.Installer.Windows.Inno.csproj"
 $repoRoot = Resolve-Path -LiteralPath (Join-Path $installerRoot "..\..\..")
 $serviceConstantsPath = Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.Contracts\WindowsSourceServiceConstants.cs"
+$serviceProgramPath = Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.Service\Program.cs"
+$serviceStartCommandPath = Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.Service\WindowsServiceStartCommand.cs"
+$controlPanelMainWindowXamlPath = Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.ControlPanel\MainWindow.xaml"
+$controlPanelMainWindowCodePath = Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.ControlPanel\MainWindow.xaml.cs"
 
 $scriptFiles = @(
     $mainScriptPath
@@ -26,6 +30,9 @@ $buildScriptText = Get-Content -Encoding UTF8 -LiteralPath $buildScriptPath -Raw
 $publishControlPanelScriptText = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $repoRoot "packages\source-windows\scripts\Publish-WindowsControlPanel.ps1") -Raw
 $innoProjectText = Get-Content -Encoding UTF8 -LiteralPath $innoProjectPath -Raw
 $serviceConstantsText = Get-Content -Encoding UTF8 -LiteralPath $serviceConstantsPath -Raw
+$serviceProgramText = Get-Content -Encoding UTF8 -LiteralPath $serviceProgramPath -Raw
+$serviceStartCommandText = Get-Content -Encoding UTF8 -LiteralPath $serviceStartCommandPath -Raw
+$controlPanelMainWindowText = (Get-Content -Encoding UTF8 -LiteralPath $controlPanelMainWindowXamlPath -Raw) + "`n" + (Get-Content -Encoding UTF8 -LiteralPath $controlPanelMainWindowCodePath -Raw)
 $ciWorkflowText = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $repoRoot ".github\workflows\source-windows-ci.yml") -Raw
 $setupAppIdGuid = [regex]::Match($mainScriptText, '(?m)^AppId=\{\{(?<guid>[0-9A-Fa-f-]+)\}\r?$').Groups["guid"].Value
 $uninstallRegistryGuid = [regex]::Match($scriptText, "ShoMetricsUninstallRegistryKey\s*=\s*'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\\{(?<guid>[0-9A-Fa-f-]+)\}_is1'").Groups["guid"].Value
@@ -62,6 +69,27 @@ function Assert-NotContains {
     )
 
     if ($Text -match $Pattern) {
+        $failures.Add($Name)
+    }
+}
+
+function Assert-MatchCount {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name,
+
+        [Parameter(Mandatory)]
+        [string] $Text,
+
+        [Parameter(Mandatory)]
+        [string] $Pattern,
+
+        [Parameter(Mandatory)]
+        [int] $ExpectedCount
+    )
+
+    $actualCount = [regex]::Matches($Text, $Pattern).Count
+    if ($actualCount -ne $ExpectedCount) {
         $failures.Add($Name)
     }
 }
@@ -124,6 +152,7 @@ Assert-NotContains `
 
 Assert-Contains -Name "Inno service name is ShoMetrics Helper" -Text $scriptText -Pattern "ServiceName\s*=\s*'ShoMetrics Helper'"
 Assert-Contains -Name "C# service name is ShoMetrics Helper" -Text $serviceConstantsText -Pattern 'public\s+const\s+string\s+ServiceName\s*=\s*"ShoMetrics Helper"'
+Assert-Contains -Name "Service start command uses the service contract name" -Text $serviceStartCommandText -Pattern 'WindowsSourceServiceConstants\.ServiceName'
 Assert-Contains -Name "Service executable uses shipped friendly name" -Text $scriptText -Pattern 'ShoMetricsHelperService\.exe'
 Assert-Contains -Name "Control Panel executable uses shipped friendly name" -Text $scriptText -Pattern 'ShoMetricsHelper\.exe'
 Assert-Contains -Name "Service start waits for RUNNING state" -Text $scriptText -Pattern '(?s)function\s+StartService:\s*Boolean;.*?RunSc\(''start.*?WaitForServiceRunning'
@@ -157,6 +186,19 @@ Assert-Contains -Name "Installer payload output is separated by distribution" -T
 Assert-Contains -Name "CI uploads installers from distribution subdirectories" -Text $ciWorkflowText -Pattern 'artifacts/installer/windows/setup/\*\*/\*\.exe'
 Assert-Contains -Name "Control Panel publish output blocks unused ONNX Runtime payload" -Text $publishControlPanelScriptText -Pattern 'onnxruntime\.dll'
 Assert-Contains -Name "Control Panel publish output blocks unused DirectML payload" -Text $publishControlPanelScriptText -Pattern 'DirectML\.dll'
+Assert-Contains -Name "Control Panel starts the service executable only through the fixed command" -Text $controlPanelMainWindowText -Pattern 'ServiceStartCommand\s*=\s*"--start-service"'
+Assert-Contains -Name "Control Panel elevates only the service executable" -Text $controlPanelMainWindowText -Pattern 'ServiceExecutableName\s*=\s*"ShoMetricsHelperService\.exe"'
+# "runas" is the UAC boundary. Keep exactly one call site because extra
+# privileged executables are more likely to trigger AV/reputation false
+# positives. Whole-app elevation also makes ordinary actions such as opening
+# URLs, Explorer, or logs inherit an admin token. The only P0 privileged action
+# is starting the installed background service.
+Assert-MatchCount -Name "Control Panel has exactly one elevation call site" -Text $controlPanelMainWindowText -Pattern 'Verb\s*=\s*"runas"' -ExpectedCount 1
+Assert-Contains -Name "Control Panel elevation call site uses the fixed service start command" -Text $controlPanelMainWindowText -Pattern '(?s)Process\.Start\(new ProcessStartInfo\s*\{.*?FileName\s*=\s*serviceExecutablePath,.*?Arguments\s*=\s*ServiceStartCommand,.*?Verb\s*=\s*"runas"'
+Assert-Contains -Name "Control Panel uses the admin shield glyph on the service start action" -Text $controlPanelMainWindowText -Pattern 'Glyph="&#xE7EF;"'
+Assert-NotContains -Name "Control Panel must not restart the whole app as administrator" -Text $controlPanelMainWindowText -Pattern 'RestartAsAdministrator|AdminModeCard|AdminRestartButton|Environment\.ProcessPath|IsRunningAsAdministrator'
+Assert-Contains -Name "Service executable accepts start-service only as an exact maintenance mode" -Text $serviceProgramText -Pattern '"--start-service"\s+when\s+args\.Length\s+==\s+1'
+Assert-NotContains -Name "Service start command must not start arbitrary processes" -Text $serviceStartCommandText -Pattern 'Process\.Start|UseShellExecute|Verb\s*='
 $forbiddenDistributionName = 'sl' + 'im'
 Assert-NotContains -Name "Installer distribution naming must not use deprecated compact-size name" -Text ($scriptText + $buildScriptText + $mainScriptText) -Pattern "(?i)\b$forbiddenDistributionName\b"
 

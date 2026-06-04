@@ -60,6 +60,7 @@ internal sealed record HelperControlPanelStatus
                 DetailText = "Refresh to check ShoMetrics Helper.",
                 Tone = ControlPanelStatusTone.Unknown,
                 CanInstallShoMetricsHelper = false,
+                CanStartBackgroundService = false,
                 InstallText = "Not checked",
                 RuntimeText = "Not checked",
                 ConnectionText = "Not checked",
@@ -103,6 +104,7 @@ internal sealed record HelperControlPanelStatus
                 DetailText = "Could not read ShoMetrics Helper status.",
                 Tone = ControlPanelStatusTone.Unknown,
                 CanInstallShoMetricsHelper = false,
+                CanStartBackgroundService = false,
                 InstallText = "Unknown",
                 RuntimeText = "Unknown",
                 ConnectionText = "Failed",
@@ -185,6 +187,8 @@ internal sealed record HelperServicePanelStatus
     public required ControlPanelStatusTone Tone { get; init; }
 
     public required bool CanInstallShoMetricsHelper { get; init; }
+
+    public required bool CanStartBackgroundService { get; init; }
 
     public required string InstallText { get; init; }
 

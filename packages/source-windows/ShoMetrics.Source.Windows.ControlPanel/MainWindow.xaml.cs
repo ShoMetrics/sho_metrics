@@ -1,9 +1,11 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using ShoMetrics.Source.Windows.Contracts;
@@ -25,12 +27,17 @@ public partial class MainWindow : Window
     private const int MinimumWindowHeightDips = 480;
     private const double NavigationMinimalWidthDips = 1008;
     private const double DiagnosticValueColumnWidthRatio = 0.62;
+    private const string ServiceExecutableName = "ShoMetricsHelperService.exe";
+    private const string ServiceStartCommand = "--start-service";
 
     private readonly HelperControlPanelStatusReader _statusReader = new();
     private readonly DispatcherTimer _checkedAtTimer = new();
     private HelperControlPanelStatus? _currentStatus;
     private bool? _isNavigationMinimal;
 
+    /// <summary>
+    /// Creates the normal-user status surface and wires lightweight service recovery actions.
+    /// </summary>
     public MainWindow()
     {
         ControlPanelStartupLog.Write("MainWindow ctor enter");
@@ -107,6 +114,27 @@ public partial class MainWindow : Window
         OpenUrl(ShoMetricsReleasesUrl);
     }
 
+    private async void OnServicePrimaryActionClicked(object sender, RoutedEventArgs args)
+    {
+        if (_currentStatus is null)
+        {
+            return;
+        }
+
+        if (_currentStatus.Service.CanInstallShoMetricsHelper)
+        {
+            OpenUrl(ShoMetricsReleasesUrl);
+            return;
+        }
+
+        if (!_currentStatus.Service.CanStartBackgroundService)
+        {
+            return;
+        }
+
+        await StartBackgroundServiceAsync().ConfigureAwait(true);
+    }
+
     private void OpenUrl(string url)
     {
         try
@@ -160,8 +188,12 @@ public partial class MainWindow : Window
         Visibility serviceInstallVisibility = status.Service.CanInstallShoMetricsHelper
             ? Visibility.Visible
             : Visibility.Collapsed;
-        ServiceInstallButton.Visibility = serviceInstallVisibility;
+        ApplyServicePrimaryAction(status.Service);
         ServiceInstallDetailButton.Visibility = serviceInstallVisibility;
+        ServiceTileRecoveryText.Text = ResolveServiceRecoveryText(status.Service);
+        ServiceTileRecoveryText.Visibility = status.Service.CanStartBackgroundService
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         ServiceStatusText.Text = status.Service.StatusText;
         PawnIoDriverText.Text = status.PawnIoDriver.StatusText;
         PawnIoDriverDetailText.Text = status.PawnIoDriver.DetailText;
@@ -186,6 +218,115 @@ public partial class MainWindow : Window
         LogFolderText.Text = WindowsSourceServicePaths.ResolveLogDirectoryPath();
         UpdateCheckedAtText(DateTimeOffset.Now);
         UpdateDiagnosticValueTextWidth();
+    }
+
+    private Visibility ResolveServicePrimaryActionVisibility(HelperServicePanelStatus serviceStatus)
+    {
+        return serviceStatus.CanInstallShoMetricsHelper || serviceStatus.CanStartBackgroundService
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private string ResolveServicePrimaryActionText(HelperServicePanelStatus serviceStatus)
+    {
+        if (serviceStatus.CanInstallShoMetricsHelper)
+        {
+            return "Install";
+        }
+
+        if (!serviceStatus.CanStartBackgroundService)
+        {
+            return "";
+        }
+
+        return "Start";
+    }
+
+    private void ApplyServicePrimaryAction(HelperServicePanelStatus serviceStatus)
+    {
+        string actionText = ResolveServicePrimaryActionText(serviceStatus);
+        ServicePrimaryActionButton.Visibility = ResolveServicePrimaryActionVisibility(serviceStatus);
+        ServicePrimaryActionText.Text = actionText;
+        ServicePrimaryActionAdminIcon.Visibility = serviceStatus.CanStartBackgroundService
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        AutomationProperties.SetName(ServicePrimaryActionButton, actionText);
+    }
+
+    private string ResolveServiceRecoveryText(HelperServicePanelStatus serviceStatus)
+    {
+        if (!serviceStatus.CanStartBackgroundService)
+        {
+            return "";
+        }
+
+        return "Start the background service to restore sensor checks.";
+    }
+
+    private async Task StartBackgroundServiceAsync()
+    {
+        ServicePrimaryActionButton.IsEnabled = false;
+        ErrorText.Text = "";
+
+        try
+        {
+            await RunServiceStartCommandAsync().ConfigureAwait(true);
+            await RefreshStatusAsync().ConfigureAwait(true);
+        }
+        catch (Win32Exception exception) when (exception.NativeErrorCode == 1223)
+        {
+            ErrorText.Text = "Service start was canceled.";
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            ErrorText.Text = HelperControlPanelStatus.FormatException(exception);
+        }
+        catch (OperationCanceledException)
+        {
+            ErrorText.Text = "Service start did not finish in time. Open logs for details.";
+        }
+        finally
+        {
+            ServicePrimaryActionButton.IsEnabled = true;
+        }
+    }
+
+    private async Task RunServiceStartCommandAsync()
+    {
+        string serviceExecutablePath = ResolveServiceExecutablePath();
+        if (!File.Exists(serviceExecutablePath))
+        {
+            throw new FileNotFoundException("ShoMetrics Helper service executable was not found. Reinstall ShoMetrics Helper.", serviceExecutablePath);
+        }
+
+        // Keep the elevated boundary narrow: the service executable only accepts
+        // this fixed maintenance command and does not parse arbitrary forwarded
+        // Control Panel arguments.
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = serviceExecutablePath,
+            Arguments = ServiceStartCommand,
+            WorkingDirectory = Path.GetDirectoryName(serviceExecutablePath),
+            UseShellExecute = true,
+            Verb = "runas",
+        }) ?? throw new InvalidOperationException("ShoMetrics Helper service start command did not run.");
+
+        using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+        await process.WaitForExitAsync(cancellationTokenSource.Token).ConfigureAwait(true);
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(WindowsServiceStartCommandExitCodeFormatter.Format(process.ExitCode));
+        }
+    }
+
+    private static string ResolveServiceExecutablePath()
+    {
+        return Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "Service",
+            ServiceExecutableName));
     }
 
     private void OnRootGridLoaded(object sender, RoutedEventArgs args)
@@ -277,17 +418,23 @@ public partial class MainWindow : Window
 
         icon.Foreground = tone switch
         {
-            ControlPanelStatusTone.Success => CreateStatusIconBrush(Colors.ForestGreen),
-            ControlPanelStatusTone.Caution => CreateStatusIconBrush(Colors.Goldenrod),
-            ControlPanelStatusTone.Critical => CreateStatusIconBrush(Colors.Firebrick),
-            ControlPanelStatusTone.Unknown => CreateStatusIconBrush(ResolveSecondaryIconColor()),
-            _ => CreateStatusIconBrush(ResolveSecondaryIconColor()),
+            ControlPanelStatusTone.Success => ResolveThemeBrush("SystemFillColorSuccessBrush"),
+            ControlPanelStatusTone.Caution => ResolveThemeBrush("SystemFillColorCautionBrush"),
+            ControlPanelStatusTone.Critical => ResolveThemeBrush("SystemFillColorCriticalBrush"),
+            ControlPanelStatusTone.Unknown => ResolveThemeBrush("TextFillColorSecondaryBrush"),
+            _ => ResolveThemeBrush("TextFillColorSecondaryBrush"),
         };
     }
 
-    private static SolidColorBrush CreateStatusIconBrush(global::Windows.UI.Color color)
+    private Brush ResolveThemeBrush(string resourceKey)
     {
-        return new SolidColorBrush(color);
+        if (Application.Current.Resources.TryGetValue(resourceKey, out object resource) &&
+            resource is Brush brush)
+        {
+            return brush;
+        }
+
+        return new SolidColorBrush(ResolveSecondaryIconColor());
     }
 
     private global::Windows.UI.Color ResolvePrimaryTextColor()

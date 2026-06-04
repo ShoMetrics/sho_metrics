@@ -10,6 +10,9 @@ internal static class ControlPanelStartupLog
 
     public static string LogFilePath => Path.Combine(ResolveLogDirectoryPath(), LogFileName);
 
+    /// <summary>
+    /// Writes a startup diagnostic line without risking a panel crash if logging fails.
+    /// </summary>
     public static void Write(string message)
     {
         try
@@ -22,6 +25,9 @@ internal static class ControlPanelStartupLog
         }
     }
 
+    /// <summary>
+    /// Writes startup exception details for failures that can happen before XAML UI is available.
+    /// </summary>
     public static void WriteException(string message, Exception exception)
     {
         try

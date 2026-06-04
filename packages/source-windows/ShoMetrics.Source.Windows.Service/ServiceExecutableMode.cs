@@ -6,6 +6,8 @@ internal enum ServiceExecutableMode
     WindowsService,
     DevPipe,
     MetricSourceProbe,
+    StartWindowsService,
+    InvalidStartWindowsServiceCommand,
     Help,
     Version,
 }

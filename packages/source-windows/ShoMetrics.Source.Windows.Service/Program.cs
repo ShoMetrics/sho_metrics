@@ -1,10 +1,14 @@
 using Microsoft.Extensions.Hosting;
+using ShoMetrics.Source.Windows.Contracts;
 using ShoMetrics.Source.Windows.Core;
 
 namespace ShoMetrics.Source.Windows.Service;
 
 internal static class Program
 {
+    /// <summary>
+    /// Dispatches either the Windows Service host or a fixed maintenance command.
+    /// </summary>
     public static async Task<int> Main(string[] args)
     {
         ServiceExecutableMode mode = ParseMode(args);
@@ -14,6 +18,8 @@ internal static class Program
             ServiceExecutableMode.Help => WriteHelp(),
             ServiceExecutableMode.Version => WriteVersion(),
             ServiceExecutableMode.MetricSourceProbe => await MetricSourceComparisonProbe.RunAsync(args[1..]).ConfigureAwait(false),
+            ServiceExecutableMode.StartWindowsService => (int)new WindowsServiceStartCommand().Start(),
+            ServiceExecutableMode.InvalidStartWindowsServiceCommand => (int)WindowsServiceStartExitCode.InvalidCommand,
             ServiceExecutableMode.DevPipe => await RunHostAsync(args, mode).ConfigureAwait(false),
             ServiceExecutableMode.WindowsService => await RunHostAsync(args, mode).ConfigureAwait(false),
             ServiceExecutableMode.Invalid => WriteInvalidArguments(args),
@@ -32,6 +38,8 @@ internal static class Program
         {
             "--dev-pipe" when args.Length == 1 => ServiceExecutableMode.DevPipe,
             "--metric-source-probe" => ServiceExecutableMode.MetricSourceProbe,
+            "--start-service" when args.Length == 1 => ServiceExecutableMode.StartWindowsService,
+            "--start-service" => ServiceExecutableMode.InvalidStartWindowsServiceCommand,
             "--help" or "-h" when args.Length == 1 => ServiceExecutableMode.Help,
             "--version" when args.Length == 1 => ServiceExecutableMode.Version,
             _ => ServiceExecutableMode.Invalid,
@@ -61,6 +69,8 @@ internal static class Program
               ShoMetricsHelperService.exe --dev-pipe Run the service host in console dev mode.
               ShoMetricsHelperService.exe --metric-source-probe [--duration-ms N] [--interval-ms N] [--probe-sources native,lhm-dll]
                                                                Run a metric source comparison probe.
+              ShoMetricsHelperService.exe --start-service
+                                                               Start the installed Windows Service, then exit.
               ShoMetricsHelperService.exe --help               Print this help.
               ShoMetricsHelperService.exe --version            Print the helper version.
             """);

@@ -5,6 +5,9 @@ namespace ShoMetrics.Source.Windows.ControlPanel;
 
 internal interface IWindowsServiceStatusReader
 {
+    /// <summary>
+    /// Reads the ShoMetrics service state from Windows Service Control Manager.
+    /// </summary>
     WindowsServiceStatusKind ReadStatus();
 }
 
@@ -15,6 +18,7 @@ internal sealed partial class WindowsServiceStatusReader : IWindowsServiceStatus
     private const int ErrorServiceDoesNotExist = 1060;
     private const int ScStatusProcessInfo = 0;
 
+    /// <inheritdoc />
     public WindowsServiceStatusKind ReadStatus()
     {
         nint serviceControlManagerHandle = OpenSCManager(
