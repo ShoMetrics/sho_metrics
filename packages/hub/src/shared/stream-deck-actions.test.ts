@@ -66,6 +66,8 @@ test("Stream Deck manifest references bundled plugin entry points and assets", (
 
     assert.equal(manifest.CodePath, "bin/plugin.js");
     assert.equal(manifest.Nodejs?.Version, "24");
+    // Manifest asset paths are extensionless. Check every root, action, state,
+    // and encoder icon resolves to a real bundled SVG or PNG asset.
     assertAssetReferenceExists(manifest.CategoryIcon, "manifest CategoryIcon");
     assertAssetReferenceExists(manifest.Icon, "manifest Icon");
 
@@ -97,6 +99,18 @@ test("Advanced Sensor action is Windows-only in the action list", () => {
         .find(action => action.UUID === STREAM_DECK_ACTION_UUID_BY_KIND.catalog);
 
     assert.deepEqual(advancedSensorAction?.OS, ["windows"]);
+});
+
+test("Advanced Sensor action uses a dedicated hardware icon", () => {
+    const manifest = readManifest();
+    const advancedSensorAction = (manifest.Actions ?? [])
+        .find(action => action.UUID === STREAM_DECK_ACTION_UUID_BY_KIND.catalog);
+
+    assert.equal(advancedSensorAction?.Icon, "imgs/actions/catalog-metric/icon");
+    assertAssetReferenceExists(advancedSensorAction?.Icon, "Advanced Sensor Icon");
+
+    const iconSvg = readFileSync(`${SD_PLUGIN_ROOT}/imgs/actions/catalog-metric/icon.svg`, "utf8");
+    assert.match(iconSvg, /Lucide Computer, ISC License/u);
 });
 
 test("old reading-level action names do not remain in source or manifest files", () => {

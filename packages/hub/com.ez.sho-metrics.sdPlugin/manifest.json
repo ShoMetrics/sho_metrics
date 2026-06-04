@@ -121,7 +121,7 @@
 		{
 			"Name": "Advanced Sensor",
 			"UUID": "com.ez.sho-metrics.catalog-metric",
-			"Icon": "imgs/actions/sho-metrics/icon",
+			"Icon": "imgs/actions/catalog-metric/icon",
 			"Tooltip": "Displays one selected metric.",
 			"OS": [
 				"windows"

@@ -14,6 +14,7 @@ $serviceProgramPath = Join-Path $repoRoot "packages\source-windows\ShoMetrics.So
 $serviceStartCommandPath = Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.Service\WindowsServiceStartCommand.cs"
 $controlPanelMainWindowXamlPath = Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.ControlPanel\MainWindow.xaml"
 $controlPanelMainWindowCodePath = Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.ControlPanel\MainWindow.xaml.cs"
+$brandAssetsScriptPath = Join-Path $repoRoot "packages\assets\brand\sync-brand-assets.ts"
 
 $scriptFiles = @(
     $mainScriptPath
@@ -28,6 +29,8 @@ $scriptText = ($scriptFiles | ForEach-Object {
 $mainScriptText = Get-Content -Encoding UTF8 -LiteralPath $mainScriptPath -Raw
 $buildScriptText = Get-Content -Encoding UTF8 -LiteralPath $buildScriptPath -Raw
 $publishControlPanelScriptText = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $repoRoot "packages\source-windows\scripts\Publish-WindowsControlPanel.ps1") -Raw
+$controlPanelProjectText = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.ControlPanel\ShoMetrics.Source.Windows.ControlPanel.csproj") -Raw
+$serviceProjectText = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.Service\ShoMetrics.Source.Windows.Service.csproj") -Raw
 $innoProjectText = Get-Content -Encoding UTF8 -LiteralPath $innoProjectPath -Raw
 $serviceConstantsText = Get-Content -Encoding UTF8 -LiteralPath $serviceConstantsPath -Raw
 $serviceProgramText = Get-Content -Encoding UTF8 -LiteralPath $serviceProgramPath -Raw
@@ -94,6 +97,9 @@ function Assert-MatchCount {
     }
 }
 
+& node $brandAssetsScriptPath --test
+& node $brandAssetsScriptPath --verify-only
+
 Assert-Contains `
     -Name "Inno setup version is pinned in build script" `
     -Text $buildScriptText `
@@ -115,6 +121,9 @@ Assert-Contains -Name "Inno must not restart apps" -Text $mainScriptText -Patter
 Assert-Contains -Name "Inno must not restart Windows because of Run entries" -Text $mainScriptText -Pattern '(?m)^RestartIfNeededByRun=no\r?$'
 Assert-Contains -Name "RedirectionGuard remains enabled" -Text $mainScriptText -Pattern '(?m)^RedirectionGuard=yes\r?$'
 Assert-Contains -Name "Finish page launches Control Panel as original user" -Text $mainScriptText -Pattern 'Flags:\s*postinstall\s+nowait\s+skipifsilent\s+runasoriginaluser'
+Assert-Contains -Name "Setup executable uses the shared Windows application icon" -Text $mainScriptText -Pattern '(?m)^SetupIconFile=\.\.\\\.\.\\\.\.\\source-windows\\Assets\\ShoMetrics\.ico\r?$'
+Assert-Contains -Name "Setup wizard uses the shared large brand image" -Text $mainScriptText -Pattern '(?m)^WizardImageFile=\.\.\\\.\.\\\.\.\\source-windows\\Assets\\ShoMetricsWizardImage\.png\r?$'
+Assert-Contains -Name "Setup wizard uses the shared small brand image" -Text $mainScriptText -Pattern '(?m)^WizardSmallImageFile=\.\.\\\.\.\\\.\.\\source-windows\\Assets\\ShoMetricsWizardSmallImage\.png\r?$'
 Assert-Contains -Name "Framework-dependent installer bundles ASP.NET Core Runtime only for framework-dependent distribution" -Text $mainScriptText -Pattern '(?s)#ifdef\s+ShoMetricsFrameworkDependentDistribution.*?aspnetcore-runtime-\{#AspNetCoreRuntimeVersion\}-win-x64\.exe.*?#endif'
 Assert-Contains -Name "Installer deletes stale service payload before copying files" -Text $mainScriptText -Pattern '(?m)^Type:\s*filesandordirs;\s*Name:\s*"\{app\}\\Service"\r?$'
 Assert-Contains -Name "Installer deletes stale Control Panel payload before copying files" -Text $mainScriptText -Pattern '(?m)^Type:\s*filesandordirs;\s*Name:\s*"\{app\}\\ControlPanel"\r?$'
@@ -155,6 +164,8 @@ Assert-Contains -Name "C# service name is ShoMetrics Helper" -Text $serviceConst
 Assert-Contains -Name "Service start command uses the service contract name" -Text $serviceStartCommandText -Pattern 'WindowsSourceServiceConstants\.ServiceName'
 Assert-Contains -Name "Service executable uses shipped friendly name" -Text $scriptText -Pattern 'ShoMetricsHelperService\.exe'
 Assert-Contains -Name "Control Panel executable uses shipped friendly name" -Text $scriptText -Pattern 'ShoMetricsHelper\.exe'
+Assert-Contains -Name "Control Panel embeds the shared Windows application icon" -Text $controlPanelProjectText -Pattern '<ApplicationIcon>\.\.\\Assets\\ShoMetrics\.ico</ApplicationIcon>'
+Assert-Contains -Name "Service executable embeds the shared Windows application icon" -Text $serviceProjectText -Pattern '<ApplicationIcon>\.\.\\Assets\\ShoMetrics\.ico</ApplicationIcon>'
 Assert-Contains -Name "Service start waits for RUNNING state" -Text $scriptText -Pattern '(?s)function\s+StartService:\s*Boolean;.*?RunSc\(''start.*?WaitForServiceRunning'
 Assert-Contains -Name "Framework-dependent preflight checks only the service base runtime before wizard/install starts" -Text $scriptText -Pattern '(?s)function\s+InitializeSetup:\s*Boolean;.*?ServiceBaseRuntimeInstalled.*?ShowMissingDotNetRuntimePrompt.*?Result\s*:=\s*False'
 Assert-Contains -Name "Framework-dependent missing base runtime prompt opens official Microsoft .NET Runtime page" -Text $scriptText -Pattern 'https://dotnet\.microsoft\.com/download/dotnet/thank-you/runtime-10\.0\.8-windows-x64-installer'
