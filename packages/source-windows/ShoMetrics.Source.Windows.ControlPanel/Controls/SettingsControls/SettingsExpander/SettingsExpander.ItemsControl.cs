@@ -87,10 +87,9 @@ public partial class SettingsExpander
     private void ItemsRepeater_ElementPrepared(MUXC.ItemsRepeater sender, MUXC.ItemsRepeaterElementPreparedEventArgs args)
     {
         if (ItemContainerStyleSelector != null &&
-            args.Element is SettingsCard element &&
+            args.Element is FrameworkElement element &&
             element.ReadLocalValue(FrameworkElement.StyleProperty) == DependencyProperty.UnsetValue)
         {
-            // The vendored expander can host custom row controls. Only SettingsCard items can safely receive the toolkit SettingsCard style.
             // TODO: Get item from args.Index?
             element.Style = ItemContainerStyleSelector.SelectStyle(null, element);
         }

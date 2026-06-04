@@ -89,12 +89,10 @@
                                                     Background="Transparent"
                                                     BorderThickness="0"
                                                     Content="{TemplateBinding Content}"
-                                                    ContentAlignment="{Binding HeaderContentAlignment, RelativeSource={RelativeSource TemplatedParent}}"
                                                     Description="{TemplateBinding Description}"
                                                     FontFamily="{TemplateBinding FontFamily}"
                                                     Header="{TemplateBinding Header}"
                                                     HeaderIcon="{TemplateBinding HeaderIcon}"
-                                                    HorizontalContentAlignment="{Binding HeaderHorizontalContentAlignment, RelativeSource={RelativeSource TemplatedParent}}"
                                                     IsClickEnabled="False" />
                             </muxc:Expander.Header>
                             <muxc:Expander.Content>
