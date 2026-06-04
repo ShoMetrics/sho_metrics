@@ -5,6 +5,15 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Resvg } from "@resvg/resvg-js";
+import {
+    DOMParser,
+    MIME_TYPE,
+    NAMESPACE,
+    XMLSerializer,
+    type Document,
+    type Element,
+    type Node,
+} from "@xmldom/xmldom";
 
 interface CliOptions {
     verifyOnly: boolean;
@@ -81,6 +90,11 @@ const minimumIconSizes = [16, 24, 32, 48, 256];
 const extraIconSizes = [20, 40, 64, 128];
 const iconSizes = [...minimumIconSizes, ...extraIconSizes].sort((left, right) => right - left);
 const filledLogoGroundColor = "#0a0e18";
+const logoBackgroundElementId = "shometrics-logo-background";
+const logoBloomSurfaceElementId = "shometrics-logo-bloom-surface";
+const logoMarkElementId = "shometrics-logo-mark";
+const logoStrokeGlowFilterId = "shometrics-logo-stroke-glow";
+const roundedLogoClipPathId = "shometrics-logo-rounded-clip";
 const appIconCornerRadius = 125.0;
 const appIconCornerSmoothing = 0.8;
 const appIconBoundsX = -12.57;
@@ -217,26 +231,29 @@ function saveOrVerifyText(options: CliOptions, filePath: string, expectedText: s
 function buildTransparentLogoSvg(filledLogoSvg: string): string {
     // Dark-surface shell/titlebar usage keeps the logo glow/filter treatment,
     // but removes only the solid ground so the mark can sit on the host surface.
-    return filledLogoSvg.replace(
-        /^<rect\s+x="-12\.57"\s+y="-26\.40"\s+width="500"\s+height="500"\s+fill="#0a0e18"\s*\/>\r?\n?/m,
-        "",
-    );
+    const logoDocument = parseSvgDocument(filledLogoSvg);
+    removeRequiredElement(logoDocument, logoBackgroundElementId);
+    return serializeSvgDocument(logoDocument);
 }
 
 function buildStreamDeckActionListLogoSvg(filledLogoSvg: string): string {
     // Stream Deck category/action-list icons are not app icons. Marketplace
     // guidance requires monochrome #FFFFFF foreground on a transparent ground,
     // so this strips the brand glow/accent treatment and keeps only the mark.
-    return filledLogoSvg
-        .replace(/<defs>[\s\S]*?<\/defs>\r?\n?/m, "")
-        .replace(/^<rect\s+x="-12\.57"\s+y="-26\.40"\s+width="500"\s+height="500"\s+fill="#0a0e18"\s*\/>\r?\n?/m, "")
-        .replace(/^<circle\s+cx="237\.43"\s+cy="223\.6"\s+r="241"\s+fill="url\(#shometrics-logo-bloom\)"\s*\/>\r?\n?/m, "")
-        .replace("<g filter=\"url(#shometrics-logo-stroke-glow)\">", "<g>")
-        .replaceAll("fill=\"#e9f1ff\"", "fill=\"#FFFFFF\"")
-        .replaceAll("fill=\"#9ec5ff\"", "fill=\"#FFFFFF\"");
+    const logoDocument = parseSvgDocument(filledLogoSvg);
+    removeRequiredElement(logoDocument, logoBackgroundElementId);
+    removeRequiredElement(logoDocument, logoBloomSurfaceElementId);
+    removeFirstElementByTagName(logoDocument, "defs");
+
+    const markElement = findRequiredElement(logoDocument.documentElement, logoMarkElementId);
+    removeExpectedAttributeValue(markElement, "filter", `url(#${logoStrokeGlowFilterId})`);
+    setFilledDescendantsToWhite(markElement);
+
+    return serializeSvgDocument(logoDocument);
 }
 
 function buildRoundedLogoSvg(filledLogoSvg: string): string {
+    const logoDocument = parseSvgDocument(filledLogoSvg);
     const clipPathData = buildFigmaSquircleSvgPath({
         width: appIconBoundsSize,
         height: appIconBoundsSize,
@@ -244,17 +261,160 @@ function buildRoundedLogoSvg(filledLogoSvg: string): string {
         cornerSmoothing: appIconCornerSmoothing,
     });
 
-    const clipPath = [
-        "\t<clipPath id=\"shometrics-logo-rounded-clip\">",
-        `\t\t<path transform="translate(${formatSvgNumber(appIconBoundsX)} ${formatSvgNumber(appIconBoundsY)})" d="${clipPathData}"/>`,
-        "\t</clipPath>",
-    ].join("\n");
+    const definitionsElement = findFirstElementByTagName(logoDocument, "defs");
+    if (!definitionsElement) {
+        throw new Error("Filled logo SVG must have a <defs> element for the rounded clip path.");
+    }
 
-    const withClipPath = filledLogoSvg.replace(
-        "</defs>",
-        `${clipPath}\n</defs>\n<g clip-path="url(#shometrics-logo-rounded-clip)">`,
-    );
-    return withClipPath.replace(/<\/svg>\s*$/, "</g>\n</svg>");
+    const clipPathElement = logoDocument.createElementNS(NAMESPACE.SVG, "clipPath");
+    clipPathElement.setAttribute("id", roundedLogoClipPathId);
+
+    const clipGeometryElement = logoDocument.createElementNS(NAMESPACE.SVG, "path");
+    clipGeometryElement.setAttribute("transform", `translate(${formatSvgNumber(appIconBoundsX)} ${formatSvgNumber(appIconBoundsY)})`);
+    clipGeometryElement.setAttribute("d", clipPathData);
+
+    clipPathElement.appendChild(clipGeometryElement);
+    definitionsElement.appendChild(clipPathElement);
+
+    wrapElementsAfterDefinitions(logoDocument, definitionsElement, `url(#${roundedLogoClipPathId})`);
+    return serializeSvgDocument(logoDocument);
+}
+
+function parseSvgDocument(svg: string): Document {
+    const parseErrors: string[] = [];
+    const parser = new DOMParser({
+        locator: false,
+        onError: (level, message) => {
+            if (level !== "warning") {
+                parseErrors.push(message);
+            }
+        },
+    });
+    const logoDocument = parser.parseFromString(svg, MIME_TYPE.XML_SVG_IMAGE);
+
+    if (parseErrors.length > 0) {
+        throw new Error(`Could not parse brand SVG: ${parseErrors.join("; ")}`);
+    }
+
+    if (logoDocument.documentElement.tagName !== "svg") {
+        throw new Error("Brand source must be an SVG document.");
+    }
+
+    return logoDocument;
+}
+
+function serializeSvgDocument(logoDocument: Document): string {
+    return new XMLSerializer().serializeToString(logoDocument);
+}
+
+function findRequiredElement(rootElement: Element, elementId: string): Element {
+    const element = findElementById(rootElement, elementId);
+    if (!element) {
+        throw new Error(`Brand source SVG is missing required element id '${elementId}'.`);
+    }
+
+    return element;
+}
+
+function findElementById(rootElement: Element, elementId: string): Element | undefined {
+    if (rootElement.getAttribute("id") === elementId) {
+        return rootElement;
+    }
+
+    for (const childNode of getChildNodes(rootElement)) {
+        if (isElementNode(childNode)) {
+            const element = findElementById(childNode, elementId);
+            if (element) {
+                return element;
+            }
+        }
+    }
+
+    return undefined;
+}
+
+function removeRequiredElement(logoDocument: Document, elementId: string): void {
+    const element = findRequiredElement(logoDocument.documentElement, elementId);
+    if (!element.parentNode) {
+        throw new Error(`Brand source SVG element '${elementId}' cannot be removed because it has no parent.`);
+    }
+
+    element.parentNode.removeChild(element);
+}
+
+function findFirstElementByTagName(logoDocument: Document, tagName: string): Element | undefined {
+    const elements = logoDocument.getElementsByTagName(tagName);
+    const firstElement = elements.item(0);
+    return firstElement ?? undefined;
+}
+
+function removeFirstElementByTagName(logoDocument: Document, tagName: string): void {
+    const element = findFirstElementByTagName(logoDocument, tagName);
+    if (!element) {
+        return;
+    }
+
+    if (!element.parentNode) {
+        throw new Error(`Brand source SVG <${tagName}> element cannot be removed because it has no parent.`);
+    }
+
+    element.parentNode.removeChild(element);
+}
+
+function removeExpectedAttributeValue(element: Element, attributeName: string, expectedValue: string): void {
+    const actualValue = element.getAttribute(attributeName);
+    if (actualValue !== expectedValue) {
+        throw new Error(`Expected '${element.getAttribute("id") ?? element.tagName}' to have ${attributeName}='${expectedValue}', got '${actualValue ?? ""}'.`);
+    }
+
+    element.removeAttribute(attributeName);
+}
+
+function setFilledDescendantsToWhite(rootElement: Element): void {
+    if (rootElement.hasAttribute("fill") && rootElement.getAttribute("fill") !== "none") {
+        rootElement.setAttribute("fill", "#FFFFFF");
+    }
+
+    for (const childNode of getChildNodes(rootElement)) {
+        if (isElementNode(childNode)) {
+            setFilledDescendantsToWhite(childNode);
+        }
+    }
+}
+
+function wrapElementsAfterDefinitions(logoDocument: Document, definitionsElement: Element, clipPathValue: string): void {
+    const clipGroupElement = logoDocument.createElementNS(NAMESPACE.SVG, "g");
+    clipGroupElement.setAttribute("clip-path", clipPathValue);
+
+    let shouldWrap = false;
+    for (const childNode of getChildNodes(logoDocument.documentElement)) {
+        if (childNode === definitionsElement) {
+            shouldWrap = true;
+            continue;
+        }
+
+        if (shouldWrap) {
+            clipGroupElement.appendChild(childNode);
+        }
+    }
+
+    logoDocument.documentElement.appendChild(clipGroupElement);
+}
+
+function getChildNodes(node: Node): Node[] {
+    const nodes: Node[] = [];
+    for (let index = 0; index < node.childNodes.length; index += 1) {
+        const childNode = node.childNodes.item(index);
+        if (childNode) {
+            nodes.push(childNode);
+        }
+    }
+
+    return nodes;
+}
+
+function isElementNode(node: Node): node is Element {
+    return node.nodeType === 1;
 }
 
 function buildFigmaSquircleSvgPath(input: {
@@ -322,23 +482,103 @@ function buildFigmaSquircleCornerPath(input: {
 }
 
 function buildFigmaSquircleTopRightPath(cornerPath: FigmaSquircleCornerPath): string {
-    return `c ${formatSvgNumber(cornerPath.leadingControlLength)} 0 ${formatSvgNumber(cornerPath.leadingControlLength + cornerPath.trailingControlLength)} 0 ${formatSvgNumber(cornerPath.leadingControlLength + cornerPath.trailingControlLength + cornerPath.arcApproachLength)} ${formatSvgNumber(cornerPath.arcApproachOffset)} a ${formatSvgNumber(cornerPath.radius)} ${formatSvgNumber(cornerPath.radius)} 0 0 1 ${formatSvgNumber(cornerPath.arcSectionLength)} ${formatSvgNumber(cornerPath.arcSectionLength)} c ${formatSvgNumber(cornerPath.arcApproachOffset)} ${formatSvgNumber(cornerPath.arcApproachLength)} ${formatSvgNumber(cornerPath.arcApproachOffset)} ${formatSvgNumber(cornerPath.trailingControlLength + cornerPath.arcApproachLength)} ${formatSvgNumber(cornerPath.arcApproachOffset)} ${formatSvgNumber(cornerPath.leadingControlLength + cornerPath.trailingControlLength + cornerPath.arcApproachLength)}`;
+    const {
+        leadingControlLength,
+        trailingControlLength,
+        arcApproachLength,
+        arcApproachOffset,
+        radius,
+        arcSectionLength,
+    } = cornerPath;
+
+    const firstCurveControlX = leadingControlLength;
+    const secondCurveControlX = leadingControlLength + trailingControlLength;
+    const firstCurveEndX = leadingControlLength + trailingControlLength + arcApproachLength;
+    const finalCurveControlY = trailingControlLength + arcApproachLength;
+    const finalCurveEndY = leadingControlLength + trailingControlLength + arcApproachLength;
+
+    const firstBezier = `c ${formatSvgCoordinatePair(firstCurveControlX, 0)}, ${formatSvgCoordinatePair(secondCurveControlX, 0)}, ${formatSvgCoordinatePair(firstCurveEndX, arcApproachOffset)}`;
+    const arc = `a ${formatSvgCoordinatePair(radius, radius)} 0 0 1, ${formatSvgCoordinatePair(arcSectionLength, arcSectionLength)}`;
+    const secondBezier = `c ${formatSvgCoordinatePair(arcApproachOffset, arcApproachLength)}, ${formatSvgCoordinatePair(arcApproachOffset, finalCurveControlY)}, ${formatSvgCoordinatePair(arcApproachOffset, finalCurveEndY)}`;
+
+    return `${firstBezier} ${arc} ${secondBezier}`;
 }
 
 function buildFigmaSquircleBottomRightPath(cornerPath: FigmaSquircleCornerPath): string {
-    return `c 0 ${formatSvgNumber(cornerPath.leadingControlLength)} 0 ${formatSvgNumber(cornerPath.leadingControlLength + cornerPath.trailingControlLength)} ${formatSvgNumber(-cornerPath.arcApproachOffset)} ${formatSvgNumber(cornerPath.leadingControlLength + cornerPath.trailingControlLength + cornerPath.arcApproachLength)} a ${formatSvgNumber(cornerPath.radius)} ${formatSvgNumber(cornerPath.radius)} 0 0 1 ${formatSvgNumber(-cornerPath.arcSectionLength)} ${formatSvgNumber(cornerPath.arcSectionLength)} c ${formatSvgNumber(-cornerPath.arcApproachLength)} ${formatSvgNumber(cornerPath.arcApproachOffset)} ${formatSvgNumber(-(cornerPath.trailingControlLength + cornerPath.arcApproachLength))} ${formatSvgNumber(cornerPath.arcApproachOffset)} ${formatSvgNumber(-(cornerPath.leadingControlLength + cornerPath.trailingControlLength + cornerPath.arcApproachLength))} ${formatSvgNumber(cornerPath.arcApproachOffset)}`;
+    const {
+        leadingControlLength,
+        trailingControlLength,
+        arcApproachLength,
+        arcApproachOffset,
+        radius,
+        arcSectionLength,
+    } = cornerPath;
+
+    const firstCurveControlY = leadingControlLength;
+    const secondCurveControlY = leadingControlLength + trailingControlLength;
+    const firstCurveEndY = leadingControlLength + trailingControlLength + arcApproachLength;
+    const finalCurveControlX = -(trailingControlLength + arcApproachLength);
+    const finalCurveEndX = -(leadingControlLength + trailingControlLength + arcApproachLength);
+
+    const firstBezier = `c ${formatSvgCoordinatePair(0, firstCurveControlY)}, ${formatSvgCoordinatePair(0, secondCurveControlY)}, ${formatSvgCoordinatePair(-arcApproachOffset, firstCurveEndY)}`;
+    const arc = `a ${formatSvgCoordinatePair(radius, radius)} 0 0 1, ${formatSvgCoordinatePair(-arcSectionLength, arcSectionLength)}`;
+    const secondBezier = `c ${formatSvgCoordinatePair(-arcApproachLength, arcApproachOffset)}, ${formatSvgCoordinatePair(finalCurveControlX, arcApproachOffset)}, ${formatSvgCoordinatePair(finalCurveEndX, arcApproachOffset)}`;
+
+    return `${firstBezier} ${arc} ${secondBezier}`;
 }
 
 function buildFigmaSquircleBottomLeftPath(cornerPath: FigmaSquircleCornerPath): string {
-    return `c ${formatSvgNumber(-cornerPath.leadingControlLength)} 0 ${formatSvgNumber(-(cornerPath.leadingControlLength + cornerPath.trailingControlLength))} 0 ${formatSvgNumber(-(cornerPath.leadingControlLength + cornerPath.trailingControlLength + cornerPath.arcApproachLength))} ${formatSvgNumber(-cornerPath.arcApproachOffset)} a ${formatSvgNumber(cornerPath.radius)} ${formatSvgNumber(cornerPath.radius)} 0 0 1 ${formatSvgNumber(-cornerPath.arcSectionLength)} ${formatSvgNumber(-cornerPath.arcSectionLength)} c ${formatSvgNumber(-cornerPath.arcApproachOffset)} ${formatSvgNumber(-cornerPath.arcApproachLength)} ${formatSvgNumber(-cornerPath.arcApproachOffset)} ${formatSvgNumber(-(cornerPath.trailingControlLength + cornerPath.arcApproachLength))} ${formatSvgNumber(-cornerPath.arcApproachOffset)} ${formatSvgNumber(-(cornerPath.leadingControlLength + cornerPath.trailingControlLength + cornerPath.arcApproachLength))}`;
+    const {
+        leadingControlLength,
+        trailingControlLength,
+        arcApproachLength,
+        arcApproachOffset,
+        radius,
+        arcSectionLength,
+    } = cornerPath;
+
+    const firstCurveControlX = -leadingControlLength;
+    const secondCurveControlX = -(leadingControlLength + trailingControlLength);
+    const firstCurveEndX = -(leadingControlLength + trailingControlLength + arcApproachLength);
+    const finalCurveControlY = -(trailingControlLength + arcApproachLength);
+    const finalCurveEndY = -(leadingControlLength + trailingControlLength + arcApproachLength);
+
+    const firstBezier = `c ${formatSvgCoordinatePair(firstCurveControlX, 0)}, ${formatSvgCoordinatePair(secondCurveControlX, 0)}, ${formatSvgCoordinatePair(firstCurveEndX, -arcApproachOffset)}`;
+    const arc = `a ${formatSvgCoordinatePair(radius, radius)} 0 0 1, ${formatSvgCoordinatePair(-arcSectionLength, -arcSectionLength)}`;
+    const secondBezier = `c ${formatSvgCoordinatePair(-arcApproachOffset, -arcApproachLength)}, ${formatSvgCoordinatePair(-arcApproachOffset, finalCurveControlY)}, ${formatSvgCoordinatePair(-arcApproachOffset, finalCurveEndY)}`;
+
+    return `${firstBezier} ${arc} ${secondBezier}`;
 }
 
 function buildFigmaSquircleTopLeftPath(cornerPath: FigmaSquircleCornerPath): string {
-    return `c 0 ${formatSvgNumber(-cornerPath.leadingControlLength)} 0 ${formatSvgNumber(-(cornerPath.leadingControlLength + cornerPath.trailingControlLength))} ${formatSvgNumber(cornerPath.arcApproachOffset)} ${formatSvgNumber(-(cornerPath.leadingControlLength + cornerPath.trailingControlLength + cornerPath.arcApproachLength))} a ${formatSvgNumber(cornerPath.radius)} ${formatSvgNumber(cornerPath.radius)} 0 0 1 ${formatSvgNumber(cornerPath.arcSectionLength)} ${formatSvgNumber(-cornerPath.arcSectionLength)} c ${formatSvgNumber(cornerPath.arcApproachLength)} ${formatSvgNumber(-cornerPath.arcApproachOffset)} ${formatSvgNumber(cornerPath.trailingControlLength + cornerPath.arcApproachLength)} ${formatSvgNumber(-cornerPath.arcApproachOffset)} ${formatSvgNumber(cornerPath.leadingControlLength + cornerPath.trailingControlLength + cornerPath.arcApproachLength)} ${formatSvgNumber(-cornerPath.arcApproachOffset)}`;
+    const {
+        leadingControlLength,
+        trailingControlLength,
+        arcApproachLength,
+        arcApproachOffset,
+        radius,
+        arcSectionLength,
+    } = cornerPath;
+
+    const firstCurveControlY = -leadingControlLength;
+    const secondCurveControlY = -(leadingControlLength + trailingControlLength);
+    const firstCurveEndY = -(leadingControlLength + trailingControlLength + arcApproachLength);
+    const finalCurveControlX = trailingControlLength + arcApproachLength;
+    const finalCurveEndX = leadingControlLength + trailingControlLength + arcApproachLength;
+
+    const firstBezier = `c ${formatSvgCoordinatePair(0, firstCurveControlY)}, ${formatSvgCoordinatePair(0, secondCurveControlY)}, ${formatSvgCoordinatePair(arcApproachOffset, firstCurveEndY)}`;
+    const arc = `a ${formatSvgCoordinatePair(radius, radius)} 0 0 1, ${formatSvgCoordinatePair(arcSectionLength, -arcSectionLength)}`;
+    const secondBezier = `c ${formatSvgCoordinatePair(arcApproachLength, -arcApproachOffset)}, ${formatSvgCoordinatePair(finalCurveControlX, -arcApproachOffset)}, ${formatSvgCoordinatePair(finalCurveEndX, -arcApproachOffset)}`;
+
+    return `${firstBezier} ${arc} ${secondBezier}`;
 }
 
 function toRadians(degrees: number): number {
     return (degrees * Math.PI) / 180.0;
+}
+
+function formatSvgCoordinatePair(x: number, y: number): string {
+    return `${formatSvgNumber(x)} ${formatSvgNumber(y)}`;
 }
 
 function formatSvgNumber(value: number): string {
@@ -346,7 +586,7 @@ function formatSvgNumber(value: number): string {
 }
 
 function readImageSignature(filePath: string): string {
-    if (!magickExists()) {
+    if (!isMagickAvailable()) {
         throw new Error("ImageMagick 'magick' is required to verify generated ICO and installer bitmap assets.");
     }
 
@@ -366,7 +606,7 @@ function assertRasterPixelsEqual(expectedPath: string, actualPath: string): void
     }
 }
 
-function magickExists(): boolean {
+function isMagickAvailable(): boolean {
     try {
         execFileSync("magick", ["-version"], { stdio: "ignore" });
         return true;
@@ -377,7 +617,7 @@ function magickExists(): boolean {
 }
 
 function invokeMagick(args: string[]): void {
-    if (!magickExists()) {
+    if (!isMagickAvailable()) {
         throw new Error("ImageMagick 'magick' was not found on PATH. Install it or add it to PATH before syncing brand assets.");
     }
 
@@ -474,7 +714,7 @@ function runTests(): void {
 
     const solidGroundSvg = [
         "<svg>",
-        `<rect x="-12.57" y="-26.40" width="500" height="500" fill="${filledLogoGroundColor}"/>`,
+        `<rect id="${logoBackgroundElementId}" x="-12.57" y="-26.40" width="500" height="500" fill="${filledLogoGroundColor}"/>`,
         "<path d=\"M0 0\"/>",
         "</svg>",
     ].join("\n");
@@ -482,17 +722,23 @@ function runTests(): void {
     assert(!transparentGroundSvg.includes("<rect"), "transparent variant should remove only the solid logo ground rect");
     assert(transparentGroundSvg.includes("<path d=\"M0 0\"/>"), "transparent variant should keep the logo geometry");
 
-    const streamDeckActionListSvg = buildStreamDeckActionListLogoSvg(readTextFile(sourceFilledLogoPath));
-    assert(!streamDeckActionListSvg.includes("<defs>"), "Stream Deck action-list icon should not keep glow/filter definitions");
-    assert(!/<rect\b/u.test(streamDeckActionListSvg), "Stream Deck action-list icon should have transparent ground");
+    const sourceFilledLogoSvg = readTextFile(sourceFilledLogoPath);
+    assert(sourceFilledLogoSvg.includes(`id="${logoBackgroundElementId}"`), "source logo should keep the stable background id");
+    assert(sourceFilledLogoSvg.includes(`id="${logoBloomSurfaceElementId}"`), "source logo should keep the stable bloom-surface id");
+    assert(sourceFilledLogoSvg.includes(`id="${logoMarkElementId}"`), "source logo should keep the stable mark id");
+
+    const streamDeckActionListSvg = buildStreamDeckActionListLogoSvg(sourceFilledLogoSvg);
+    assert(!streamDeckActionListSvg.includes("<defs"), "Stream Deck action-list icon should not keep glow/filter definitions");
+    assert(!streamDeckActionListSvg.includes(logoBackgroundElementId), "Stream Deck action-list icon should have transparent ground");
+    assert(!streamDeckActionListSvg.includes(logoBloomSurfaceElementId), "Stream Deck action-list icon should remove the filled-logo bloom surface");
     assert(!/fill="#9ec5ff"/u.test(streamDeckActionListSvg), "Stream Deck action-list icon should not keep accent color");
     assert(!/filter="/u.test(streamDeckActionListSvg), "Stream Deck action-list icon should not keep glow filters");
     assert(streamDeckActionListSvg.includes("fill=\"#FFFFFF\""), "Stream Deck action-list icon should use white foreground");
 
     const roundedSvg = buildRoundedLogoSvg("<svg><defs></defs><path d=\"M0 0\"/></svg>");
-    assert(roundedSvg.includes("<clipPath id=\"shometrics-logo-rounded-clip\">"));
-    assert(roundedSvg.includes("<g clip-path=\"url(#shometrics-logo-rounded-clip)\">"));
-    assert(roundedSvg.endsWith("</g>\n</svg>"));
+    assert(roundedSvg.includes(`<clipPath id="${roundedLogoClipPathId}">`));
+    assert(roundedSvg.includes(`<g clip-path="url(#${roundedLogoClipPathId})">`));
+    assert(roundedSvg.endsWith("</g></svg>"));
 
     const cornerPath = buildFigmaSquircleCornerPath({
         cornerRadius: appIconCornerRadius,
