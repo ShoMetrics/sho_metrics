@@ -206,10 +206,23 @@ function assertTextEquals(filePath: string, expectedText: string): void {
         throw new Error(`Brand asset is missing: ${filePath}`);
     }
 
-    const actualText = readTextFile(filePath);
-    if (actualText !== expectedText) {
+    const actualText = normalizeTextForComparison(filePath, readTextFile(filePath));
+    const normalizedExpectedText = normalizeTextForComparison(filePath, expectedText);
+    if (actualText !== normalizedExpectedText) {
         throw new Error(`Brand asset is out of sync with '${sourceFilledLogoPath}': ${filePath}`);
     }
+}
+
+function normalizeTextForComparison(filePath: string, text: string): string {
+    const textWithoutByteOrderMark = text.replace(/^\uFEFF/, "");
+    if (path.extname(filePath).toLowerCase() !== ".svg") {
+        return textWithoutByteOrderMark.replace(/\r\n/g, "\n");
+    }
+
+    // SVG assets are generated through an XML serializer whose harmless
+    // formatting details can differ by platform. Compare the parsed XML shape
+    // instead of raw text so verify mode still catches real asset drift.
+    return serializeSvgDocument(parseSvgDocument(textWithoutByteOrderMark));
 }
 
 function assertBinaryFileEquals(filePath: string, expectedContent: Buffer): void {
