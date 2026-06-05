@@ -1,0 +1,84 @@
+name: Publish Site
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "site/**"
+      - ".github/workflows/site-publish.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-site
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish Hugo site
+    runs-on: ubuntu-latest
+    env:
+      HUGO_VERSION: "0.161.1"
+      HUGO_TARBALL: "hugo_0.161.1_linux-amd64.tar.gz"
+      HUGO_SHA256: "fae28bf7909c1a42d1365b89d2e9e3d4194fbe5968ae0dd5504f562381018a1d"
+      PAGES_REPOSITORY: "ShoMetrics/ShoMetrics.github.io"
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Download Hugo
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --remote-name "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/${HUGO_TARBALL}"
+          echo "${HUGO_SHA256}  ${HUGO_TARBALL}" | sha256sum --check -
+          tar -xzf "${HUGO_TARBALL}" hugo
+          ./hugo version
+
+      - name: Build site
+        shell: bash
+        working-directory: site
+        run: ../hugo --destination public --minify --printPathWarnings
+
+      - name: Run site smoke checks
+        shell: pwsh
+        run: ./.github/scripts/Test-SitePreview.ps1 -PublicRoot site/public
+
+      - name: Push generated site
+        # This workflow owns the Hugo build and pushes static output into the
+        # org Pages repository. Configure ShoMetrics.github.io Pages as
+        # "Deploy from a branch" using main / root; using "GitHub Actions" in
+        # that repository would require a second deploy workflow there.
+        shell: bash
+        env:
+          PAGES_DEPLOY_TOKEN: ${{ secrets.PAGES_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${PAGES_DEPLOY_TOKEN}" ]; then
+            echo "PAGES_DEPLOY_TOKEN is required to publish ShoMetrics.github.io." >&2
+            exit 1
+          fi
+
+          git clone --depth 1 "https://x-access-token:${PAGES_DEPLOY_TOKEN}@github.com/${PAGES_REPOSITORY}.git" published-site
+          git -C published-site checkout -B main
+
+          rsync --archive --delete --exclude .git site/public/ published-site/
+          touch published-site/.nojekyll
+
+          git -C published-site config user.name "github-actions[bot]"
+          git -C published-site config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C published-site add --all
+
+          if git -C published-site diff --cached --quiet; then
+            echo "Generated site is unchanged."
+            exit 0
+          fi
+
+          git -C published-site commit -m "Publish ShoMetrics site"
+          git -C published-site push origin main

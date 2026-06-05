@@ -6,7 +6,7 @@ namespace ShoMetrics.Source.Windows.ControlPanel.Tests;
 
 public sealed class UpdateAppcastParserTests
 {
-    private static readonly Uri AppcastUri = new("https://edwardez.github.io/sho_metrics/update/windows-appcast.xml");
+    private static readonly Uri AppcastUri = new("https://shometrics.github.io/update/windows-appcast.xml");
 
     [Fact]
     public void ParseReadsSparkleAppcastItemFields()
@@ -17,8 +17,8 @@ public sealed class UpdateAppcastParserTests
         Assert.Equal("0.2.0", item.Version);
         Assert.Equal("0.2.0", item.DisplayVersion);
         Assert.Equal("staging", item.Channel);
-        Assert.Equal(new Uri("https://github.com/edwardez/sho_metrics/releases/tag/v0.2.0"), item.ReleaseNotesUri);
-        Assert.Equal(new Uri("https://github.com/edwardez/sho_metrics/releases/download/v0.2.0/ShoMetrics-Helper-Setup.exe"), item.DownloadUri);
+        Assert.Equal(new Uri("https://github.com/ShoMetrics/sho_metrics/releases/tag/v0.2.0"), item.ReleaseNotesUri);
+        Assert.Equal(new Uri("https://github.com/ShoMetrics/sho_metrics/releases/download/v0.2.0/ShoMetrics-Helper-Setup.exe"), item.DownloadUri);
         Assert.Equal(TimeSpan.FromDays(1), item.PhasedRolloutInterval);
         Assert.True(item.IsCritical);
         Assert.NotNull(item.PublishedAt);
@@ -33,7 +33,7 @@ public sealed class UpdateAppcastParserTests
               <channel>
                 <item>
                   <title>Version 0.2.0</title>
-                  <enclosure url="https://github.com/edwardez/sho_metrics/releases/download/v0.2.0/setup.exe"
+                  <enclosure url="https://github.com/ShoMetrics/sho_metrics/releases/download/v0.2.0/setup.exe"
                              sparkle:version="0.2.0"
                              sparkle:shortVersionString="0.2.0"
                              type="application/octet-stream" />
@@ -58,7 +58,7 @@ public sealed class UpdateAppcastParserTests
               <channel>
                 <item>
                   <title>No version</title>
-                  <enclosure url="https://github.com/edwardez/sho_metrics/releases/download/v0.2.0/setup.exe"
+                  <enclosure url="https://github.com/ShoMetrics/sho_metrics/releases/download/v0.2.0/setup.exe"
                              type="application/octet-stream" />
                 </item>
                 <item>
@@ -83,18 +83,18 @@ public sealed class UpdateAppcastParserTests
                 <item>
                   <sparkle:version>0.2.0</sparkle:version>
                   <pubDate>not a date</pubDate>
-                  <enclosure url="https://github.com/edwardez/sho_metrics/releases/download/v0.2.0/setup.exe"
+                  <enclosure url="https://github.com/ShoMetrics/sho_metrics/releases/download/v0.2.0/setup.exe"
                              type="application/octet-stream" />
                 </item>
                 <item>
                   <sparkle:version>0.3.0</sparkle:version>
                   <sparkle:phasedRolloutInterval>never</sparkle:phasedRolloutInterval>
-                  <enclosure url="https://github.com/edwardez/sho_metrics/releases/download/v0.3.0/setup.exe"
+                  <enclosure url="https://github.com/ShoMetrics/sho_metrics/releases/download/v0.3.0/setup.exe"
                              type="application/octet-stream" />
                 </item>
                 <item>
                   <sparkle:version>0.4.0</sparkle:version>
-                  <enclosure url="https://github.com/edwardez/sho_metrics/releases/download/v0.4.0/setup.exe"
+                  <enclosure url="https://github.com/ShoMetrics/sho_metrics/releases/download/v0.4.0/setup.exe"
                              type="application/octet-stream" />
                 </item>
               </channel>
@@ -154,19 +154,19 @@ public sealed class UpdateAppcastParserTests
         <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
           <channel>
             <title>ShoMetrics Helper Updates</title>
-            <link>https://edwardez.github.io/sho_metrics/update/windows-appcast.xml</link>
+            <link>https://shometrics.github.io/update/windows-appcast.xml</link>
             <description>ShoMetrics Helper update feed.</description>
             <item>
               <title>Version 0.2.0</title>
               <sparkle:version>0.2.0</sparkle:version>
               <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
               <sparkle:channel>staging</sparkle:channel>
-              <sparkle:releaseNotesLink>https://github.com/edwardez/sho_metrics/releases/tag/v0.2.0</sparkle:releaseNotesLink>
+              <sparkle:releaseNotesLink>https://github.com/ShoMetrics/sho_metrics/releases/tag/v0.2.0</sparkle:releaseNotesLink>
               <pubDate>Mon, 28 Jan 2030 14:30:00 +0000</pubDate>
-              <link>https://github.com/edwardez/sho_metrics/releases/tag/v0.2.0</link>
+              <link>https://github.com/ShoMetrics/sho_metrics/releases/tag/v0.2.0</link>
               <sparkle:phasedRolloutInterval>86400</sparkle:phasedRolloutInterval>
               <sparkle:criticalUpdate />
-              <enclosure url="https://github.com/edwardez/sho_metrics/releases/download/v0.2.0/ShoMetrics-Helper-Setup.exe"
+              <enclosure url="https://github.com/ShoMetrics/sho_metrics/releases/download/v0.2.0/ShoMetrics-Helper-Setup.exe"
                          length="123"
                          type="application/octet-stream" />
             </item>
