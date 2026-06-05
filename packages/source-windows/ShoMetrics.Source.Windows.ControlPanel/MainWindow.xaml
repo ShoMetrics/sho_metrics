@@ -90,6 +90,52 @@
                         </StackPanel>
 
                         <StackPanel Spacing="8">
+                            <TextBlock Text="Version &amp; updates"
+                                       Style="{ThemeResource SubtitleTextBlockStyle}" />
+                            <toolkit:SettingsCard x:Name="UpdateCard">
+                                <toolkit:SettingsCard.Header>
+                                    <TextBlock x:Name="UpdateVersionText" />
+                                </toolkit:SettingsCard.Header>
+                                <toolkit:SettingsCard.HeaderIcon>
+                                    <FontIcon Glyph="&#xE72C;"
+                                              FontSize="20" />
+                                </toolkit:SettingsCard.HeaderIcon>
+                                <toolkit:SettingsCard.Description>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock x:Name="UpdateLastCheckedText"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock x:Name="UpdateDetailText"
+                                                   TextWrapping="Wrap" />
+                                        <StackPanel Orientation="Horizontal"
+                                                    Spacing="12">
+                                            <HyperlinkButton x:Name="UpdateReleaseNotesButton"
+                                                             Content="Release notes"
+                                                             Padding="0"
+                                                             Visibility="Collapsed"
+                                                             Click="OnOpenUpdateReleaseNotesClicked" />
+                                            <HyperlinkButton x:Name="UpdateDownloadButton"
+                                                             Content="Download update"
+                                                             Padding="0"
+                                                             Visibility="Collapsed"
+                                                             Click="OnOpenUpdateDownloadClicked" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </toolkit:SettingsCard.Description>
+                                <StackPanel Orientation="Horizontal"
+                                            Spacing="12"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="UpdateStatusText"
+                                               Style="{ThemeResource BodyTextBlockStyle}"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               VerticalAlignment="Center" />
+                                    <Button x:Name="UpdateCheckButton"
+                                            Content="Check for updates"
+                                            Click="OnCheckForUpdatesClicked" />
+                                </StackPanel>
+                            </toolkit:SettingsCard>
+                        </StackPanel>
+
+                        <StackPanel Spacing="8">
                             <TextBlock Text="App status"
                                        Style="{ThemeResource SubtitleTextBlockStyle}" />
                             <StackPanel Spacing="4">

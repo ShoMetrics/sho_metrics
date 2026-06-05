@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ShoMetrics update appcast constraint schema.
+
+  This is intentionally a constrained Sparkle-compatible RSS subset, not a
+  complete Sparkle schema. It documents the fields this Control Panel accepts
+  while leaving Sparkle namespace extension points available for future clients.
+  Keep published appcasts inside this schema; parser-only compatibility exists
+  for reading common Sparkle feeds, not for expanding ShoMetrics' feed format.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+           elementFormDefault="unqualified"
+           attributeFormDefault="unqualified">
+  <xs:import namespace="http://www.andymatuschak.org/xml-namespaces/sparkle"
+             schemaLocation="UpdateAppcastSparkle.xsd" />
+
+  <xs:element name="rss">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="channel" type="ChannelType" />
+      </xs:sequence>
+      <xs:attribute name="version" type="xs:string" use="required" fixed="2.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="ChannelType">
+    <xs:sequence>
+      <xs:element name="title" type="xs:string" minOccurs="0" />
+      <xs:element name="link" type="xs:anyURI" minOccurs="0" />
+      <xs:element name="description" type="xs:string" minOccurs="0" />
+      <xs:element name="item" type="ItemType" minOccurs="0" maxOccurs="unbounded" />
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ItemType">
+    <xs:sequence>
+      <xs:element name="title" type="xs:string" minOccurs="0" />
+      <xs:element ref="sparkle:version" />
+      <xs:element ref="sparkle:shortVersionString" minOccurs="0" />
+      <xs:element ref="sparkle:channel" minOccurs="0" />
+      <xs:element ref="sparkle:releaseNotesLink" minOccurs="0" />
+      <xs:element name="pubDate" type="xs:string" minOccurs="0" />
+      <xs:element name="link" type="xs:anyURI" minOccurs="0" />
+      <xs:element ref="sparkle:phasedRolloutInterval" minOccurs="0" />
+      <xs:element ref="sparkle:criticalUpdate" minOccurs="0" />
+      <xs:element name="enclosure" type="EnclosureType" minOccurs="0" />
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="EnclosureType">
+    <xs:attribute name="url" type="xs:anyURI" use="required" />
+    <xs:attribute name="type" type="xs:string" use="required" />
+    <xs:attribute name="length" type="xs:nonNegativeInteger" use="optional" />
+  </xs:complexType>
+</xs:schema>
