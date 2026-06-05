@@ -6,6 +6,12 @@ export interface ThemeStylePaints {
     readonly surface: string;
 }
 
+/** Renders the theme-owned base layer behind any rounded or inset surface. */
+export function renderFullBleedThemeBackground(keySize: KeySize, paints: ThemeStylePaints): string {
+    return `<rect x="0" y="0" width="${keySize.width}" height="${keySize.height}"
+        fill="${paints.background}" />`;
+}
+
 export interface ThemeBodyPlacement {
     /** Offset inside the viewport after the body render size is scaled to fit. */
     readonly xOffset: number;
