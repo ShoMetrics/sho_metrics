@@ -76,7 +76,7 @@ begin
   DescriptionLabel := CreateBodyLinkLabel(
     ShoMetricsLicensePage,
     'ShoMetrics Helper provides Windows sensor data to the ShoMetrics Stream Deck plugin. It is not useful without the parent Stream Deck plugin.'#13#10 +
-      'ShoMetrics Helper is open source: <a href="https://github.com/edwardez/sho_metrics">edwardez/sho_metrics</a>.',
+      'ShoMetrics Helper is open source: <a href="https://github.com/ShoMetrics/sho_metrics">ShoMetrics/sho_metrics</a>.',
     True);
 
   RadioTop := ShoMetricsLicensePage.SurfaceHeight - AgreementRadioGroupHeight;

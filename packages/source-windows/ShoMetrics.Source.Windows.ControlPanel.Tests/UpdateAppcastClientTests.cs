@@ -2,7 +2,7 @@ namespace ShoMetrics.Source.Windows.ControlPanel.Tests;
 
 public sealed class UpdateAppcastClientTests
 {
-    private static readonly Uri AppcastUri = new("https://edwardez.github.io/sho_metrics/update/windows-appcast.xml");
+    private static readonly Uri AppcastUri = new("https://shometrics.github.io/update/windows-appcast.xml");
 
     [Fact]
     public async Task CheckAsyncReturnsAvailableUpdateFromAllowedFeed()
@@ -20,7 +20,7 @@ public sealed class UpdateAppcastClientTests
 
         Assert.Equal(UpdateAppcastStatusKind.UpdateAvailable, status.Kind);
         Assert.Equal("Update available: v0.2.0", status.StatusText);
-        Assert.Equal(new Uri("https://github.com/edwardez/sho_metrics/releases/download/v0.2.0/setup.exe"), status.DownloadUri);
+        Assert.Equal(new Uri("https://github.com/ShoMetrics/sho_metrics/releases/download/v0.2.0/setup.exe"), status.DownloadUri);
     }
 
     [Fact]
@@ -178,7 +178,7 @@ public sealed class UpdateAppcastClientTests
                   <sparkle:version>0.2.0</sparkle:version>
                   <pubDate>{DateTimeOffset.Now.AddDays(1):r}</pubDate>
                   <sparkle:phasedRolloutInterval>86400</sparkle:phasedRolloutInterval>
-                  <enclosure url="https://github.com/edwardez/sho_metrics/releases/download/v0.2.0/setup.exe"
+                  <enclosure url="https://github.com/ShoMetrics/sho_metrics/releases/download/v0.2.0/setup.exe"
                              type="application/octet-stream" />
                 </item>
               </channel>
@@ -210,7 +210,7 @@ public sealed class UpdateAppcastClientTests
                   <pubDate>{DateTimeOffset.Now.AddDays(1):r}</pubDate>
                   <sparkle:phasedRolloutInterval>86400</sparkle:phasedRolloutInterval>
                   <sparkle:criticalUpdate />
-                  <enclosure url="https://github.com/edwardez/sho_metrics/releases/download/v0.2.0/setup.exe"
+                  <enclosure url="https://github.com/ShoMetrics/sho_metrics/releases/download/v0.2.0/setup.exe"
                              type="application/octet-stream" />
                 </item>
               </channel>
@@ -254,8 +254,8 @@ public sealed class UpdateAppcastClientTests
               <sparkle:version>{version}</sparkle:version>
               <sparkle:shortVersionString>{version}</sparkle:shortVersionString>
               {channelElement}
-              <sparkle:releaseNotesLink>https://github.com/edwardez/sho_metrics/releases/tag/v{version}</sparkle:releaseNotesLink>
-              <enclosure url="https://github.com/edwardez/sho_metrics/releases/download/v{version}/setup.exe"
+              <sparkle:releaseNotesLink>https://github.com/ShoMetrics/sho_metrics/releases/tag/v{version}</sparkle:releaseNotesLink>
+              <enclosure url="https://github.com/ShoMetrics/sho_metrics/releases/download/v{version}/setup.exe"
                          type="application/octet-stream" />
             </item>
             """;

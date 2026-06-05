@@ -21,7 +21,7 @@ public partial class MainWindow : Window
     private const string CautionStatusGlyph = "\uE7BA"; // Segoe MDL2 Assets: Important.
     private const string CriticalStatusGlyph = "\uEB90"; // Segoe MDL2 Assets: StatusErrorFull.
     private const string UnknownStatusGlyph = "\uE946"; // Segoe MDL2 Assets: Info.
-    private const string ShoMetricsReleasesUrl = "https://github.com/edwardez/sho_metrics/releases";
+    private const string ShoMetricsReleasesUrl = "https://github.com/ShoMetrics/sho_metrics/releases";
     private const string PawnIoInstallUrl = "https://pawnio.eu/";
     private const int MinimumWindowWidthDips = 900;
     private const int MinimumWindowHeightDips = 480;

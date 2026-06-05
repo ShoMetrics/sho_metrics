@@ -2,7 +2,7 @@
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
   <channel>
     <title>ShoMetrics Helper Windows Staging Updates</title>
-    <link>https://edwardez.github.io/sho_metrics/update/windows-appcast-staging.xml</link>
+    <link>https://shometrics.github.io/update/windows-appcast-staging.xml</link>
     <description>Staging update feed for ShoMetrics Helper on Windows.</description>
   </channel>
 </rss>

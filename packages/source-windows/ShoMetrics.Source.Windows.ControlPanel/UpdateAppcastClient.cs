@@ -7,8 +7,8 @@ namespace ShoMetrics.Source.Windows.ControlPanel;
 
 internal sealed class UpdateAppcastClient : IDisposable
 {
-    private const string ProdAppcastUrl = "https://edwardez.github.io/sho_metrics/update/windows-appcast.xml";
-    private const string StagingAppcastUrl = "https://edwardez.github.io/sho_metrics/update/windows-appcast-staging.xml";
+    private const string ProdAppcastUrl = "https://shometrics.github.io/update/windows-appcast.xml";
+    private const string StagingAppcastUrl = "https://shometrics.github.io/update/windows-appcast-staging.xml";
     private const string AppcastUrlOverrideEnvironmentVariable = "SHOMETRICS_UPDATE_APPCAST_URL";
     private const string AppcastChannelEnvironmentVariable = "SHOMETRICS_UPDATE_CHANNEL";
     private const int SparklePhasedRolloutGroupCount = 7;
@@ -146,8 +146,10 @@ internal sealed class UpdateAppcastClient : IDisposable
             return false;
         }
 
+        const string releasesPath = "/ShoMetrics/sho_metrics/releases";
         return string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase) &&
-            uri.AbsolutePath.StartsWith("/edwardez/sho_metrics/releases", StringComparison.Ordinal);
+            (string.Equals(uri.AbsolutePath, releasesPath, StringComparison.OrdinalIgnoreCase) ||
+                uri.AbsolutePath.StartsWith(releasesPath + "/", StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool IsReadyForPhasedRollout(
@@ -236,8 +238,8 @@ internal sealed class UpdateAppcastClient : IDisposable
 
         private static bool IsAllowedAppcastUri(Uri uri)
         {
-            return string.Equals(uri.Host, "edwardez.github.io", StringComparison.OrdinalIgnoreCase) &&
-                uri.AbsolutePath.StartsWith("/sho_metrics/update/", StringComparison.Ordinal);
+            return string.Equals(uri.Host, "shometrics.github.io", StringComparison.OrdinalIgnoreCase) &&
+                uri.AbsolutePath.StartsWith("/update/", StringComparison.Ordinal);
         }
 
         private static int? ResolvePhasedRolloutGroup()

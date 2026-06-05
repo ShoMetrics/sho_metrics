@@ -55,7 +55,61 @@ function Get-RelativePathText {
     return [Uri]::UnescapeDataString($rootUri.MakeRelativeUri($targetUri).ToString()).Replace("\", "/")
 }
 
+function Test-AppcastXml {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$AppcastPath,
+        [Parameter(Mandatory = $true)]
+        [string]$AppcastSchemaPath,
+        [Parameter(Mandatory = $true)]
+        [string]$SparkleSchemaPath,
+        [System.Collections.Generic.List[string]]$Failures
+    )
+
+    if (-not (Test-Path -LiteralPath $AppcastPath -PathType Leaf)) {
+        $Failures.Add("missing appcast $AppcastPath")
+        return
+    }
+
+    $validationErrors = [System.Collections.Generic.List[string]]::new()
+    $schemaSet = [System.Xml.Schema.XmlSchemaSet]::new()
+    [void]$schemaSet.Add("http://www.andymatuschak.org/xml-namespaces/sparkle", $SparkleSchemaPath)
+    [void]$schemaSet.Add($null, $AppcastSchemaPath)
+
+    $readerSettings = [System.Xml.XmlReaderSettings]::new()
+    $readerSettings.DtdProcessing = [System.Xml.DtdProcessing]::Prohibit
+    $readerSettings.ValidationType = [System.Xml.ValidationType]::Schema
+    $readerSettings.Schemas = $schemaSet
+    $readerSettings.add_ValidationEventHandler({
+        param($sender, $eventArgs)
+        $validationErrors.Add($eventArgs.Message)
+    })
+
+    try {
+        $reader = [System.Xml.XmlReader]::Create($AppcastPath, $readerSettings)
+        try {
+            while ($reader.Read()) {
+            }
+        }
+        finally {
+            if ($null -ne $reader) {
+                $reader.Dispose()
+            }
+        }
+    }
+    catch {
+        $validationErrors.Add($_.Exception.Message)
+    }
+
+    foreach ($validationError in $validationErrors) {
+        $Failures.Add("$AppcastPath is not a valid ShoMetrics appcast: $validationError")
+    }
+}
+
 $resolvedPublicRoot = (Resolve-Path -LiteralPath $PublicRoot).Path
+$repoRoot = [IO.Path]::GetFullPath((Join-Path -Path $PSScriptRoot -ChildPath "..\.."))
+$appcastSchemaPath = Join-Path -Path $repoRoot -ChildPath "packages\source-windows\ShoMetrics.Source.Windows.ControlPanel\UpdateAppcast.xsd"
+$sparkleSchemaPath = Join-Path -Path $repoRoot -ChildPath "packages\source-windows\ShoMetrics.Source.Windows.ControlPanel\UpdateAppcastSparkle.xsd"
 $requiredPages = @(
     @{ Path = "index.html"; Terms = @("Sho Metrics") },
     @{ Path = "install/index.html"; Terms = @("Install The Plugin", "Install The Helper", "Add A Metric") },
@@ -104,6 +158,15 @@ foreach ($htmlFile in $htmlFiles) {
     }
 }
 
+$requiredAppcasts = @(
+    "update/windows-appcast.xml",
+    "update/windows-appcast-staging.xml"
+)
+foreach ($requiredAppcast in $requiredAppcasts) {
+    $appcastPath = Join-Path -Path $resolvedPublicRoot -ChildPath $requiredAppcast
+    Test-AppcastXml -AppcastPath $appcastPath -AppcastSchemaPath $appcastSchemaPath -SparkleSchemaPath $sparkleSchemaPath -Failures $failures
+}
+
 if ($failures.Count -gt 0) {
     Write-Host "Site smoke failed:"
     foreach ($failure in $failures) {
@@ -112,4 +175,4 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 
-Write-Host "Site smoke passed: $($requiredPages.Count) required pages and internal links checked."
+Write-Host "Site smoke passed: $($requiredPages.Count) required pages, internal links, and $($requiredAppcasts.Count) appcasts checked."
