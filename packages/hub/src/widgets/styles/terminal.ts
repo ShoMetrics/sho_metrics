@@ -5,7 +5,7 @@ import {
     TERMINAL_SUBTLE_GLOW_FILTER_ID,
     TERMINAL_VALUE_GLOW_FILTER_ID,
 } from "../../view-rendering/render-svg-effects";
-import type { ThemeStyle, ThemeStylePaints } from "./theme-style";
+import { renderFullBleedThemeBackground, type ThemeStyle, type ThemeStylePaints } from "./theme-style";
 
 const TERMINAL_RADIUS = 12;
 const TERMINAL_REFERENCE_SIZE = 144;
@@ -192,6 +192,7 @@ function renderTerminalBackground(keySize: KeySize, paints: ThemeStylePaints): s
     const idPrefix = terminalIdPrefix(keySize);
 
     return `
+        ${renderFullBleedThemeBackground(keySize, paints)}
         <rect x="0" y="0" width="${keySize.width}" height="${keySize.height}"
             rx="${TERMINAL_RADIUS}" fill="#000000" />
         <rect x="0" y="0" width="${keySize.width}" height="${keySize.height}"

@@ -1,5 +1,5 @@
 import type { KeySize } from "../../view-rendering/widget-data";
-import type { ThemeStyle, ThemeStylePaints } from "./theme-style";
+import { renderFullBleedThemeBackground, type ThemeStyle, type ThemeStylePaints } from "./theme-style";
 
 /**
  * Cupertino Glass style: frosted translucent background with specular highlight
@@ -38,7 +38,7 @@ export const cupertinoGlassStyle: ThemeStyle = {
         const inset = 2;
         const radius = 18;
         return `
-            <rect width="${keySize.width}" height="${keySize.height}" fill="${paints.background}" />
+            ${renderFullBleedThemeBackground(keySize, paints)}
             <!-- Glass: frosted background -->
             <rect x="${inset}" y="${inset}"
                 width="${keySize.width - inset * 2}" height="${keySize.height - inset * 2}"

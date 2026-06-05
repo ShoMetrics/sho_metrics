@@ -1,5 +1,5 @@
 import type { KeySize } from "../../view-rendering/widget-data";
-import type { ThemeStyle, ThemeStylePaints } from "./theme-style";
+import { renderFullBleedThemeBackground, type ThemeStyle, type ThemeStylePaints } from "./theme-style";
 
 /**
  * Flat style: solid dark background, clean minimalist look, no effects.
@@ -12,8 +12,7 @@ export const flatStyle: ThemeStyle = {
     },
 
     renderBackground(keySize: KeySize, paints: ThemeStylePaints): string {
-        return `<rect x="0" y="0" width="${keySize.width}" height="${keySize.height}"
-            rx="12" fill="${paints.background}" />`;
+        return renderFullBleedThemeBackground(keySize, paints);
     },
 
     renderOverlay(): string {

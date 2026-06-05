@@ -1,6 +1,11 @@
 import { adjustHexColorBrightness } from "../../view-rendering/svg-utils";
 import type { KeySize } from "../../view-rendering/widget-data";
-import type { ThemeBackgroundFill, ThemeStyle, ThemeStylePaints } from "./theme-style";
+import {
+    renderFullBleedThemeBackground,
+    type ThemeBackgroundFill,
+    type ThemeStyle,
+    type ThemeStylePaints,
+} from "./theme-style";
 
 type SoftTriangleBackgroundFill = Extract<ThemeBackgroundFill, {
     readonly fillKind: "soft-triangle";
@@ -72,11 +77,14 @@ function renderColorFilledBackground(keySize: KeySize, paints: ThemeStylePaints)
             ? `url(#${colorFilledIdPrefix(keySize)}-solid)`
             : backgroundFill.color;
 
-        return `<rect x="0" y="0" width="${keySize.width}" height="${keySize.height}"
+        return `
+            ${renderFullBleedThemeBackground(keySize, paints)}
+            <rect x="0" y="0" width="${keySize.width}" height="${keySize.height}"
             rx="${COLOR_FILLED_RADIUS}" fill="${fill}" />`;
     }
 
-    return renderSoftTriangleBackground(keySize, backgroundFill);
+    return `${renderFullBleedThemeBackground(keySize, paints)}
+        ${renderSoftTriangleBackground(keySize, backgroundFill)}`;
 }
 
 function renderSoftTriangleBackground(keySize: KeySize, backgroundFill: SoftTriangleBackgroundFill): string {
