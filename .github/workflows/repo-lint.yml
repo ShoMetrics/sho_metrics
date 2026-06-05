@@ -1,0 +1,51 @@
+name: Repository Lint
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/scripts/test-command-playbook.ts"
+      - ".github/scripts/.npmrc"
+      - ".github/scripts/package.json"
+      - ".github/workflows/repo-lint.yml"
+      - "docs/development/command-playbook.md"
+      - "docs/release/manual-verification-checklist.md"
+      - "packages/assets/brand/package.json"
+      - "packages/hub/package.json"
+      - "packages/installer/windows/Build-WindowsInstaller.ps1"
+      - "packages/installer/windows/scripts/Test-WindowsInstallerInvariants.ps1"
+      - "packages/source-windows/scripts/Test-SourceWindowsLint.ps1"
+  pull_request:
+    paths:
+      - ".github/scripts/test-command-playbook.ts"
+      - ".github/scripts/.npmrc"
+      - ".github/scripts/package.json"
+      - ".github/workflows/repo-lint.yml"
+      - "docs/development/command-playbook.md"
+      - "docs/release/manual-verification-checklist.md"
+      - "packages/assets/brand/package.json"
+      - "packages/hub/package.json"
+      - "packages/installer/windows/Build-WindowsInstaller.ps1"
+      - "packages/installer/windows/scripts/Test-WindowsInstallerInvariants.ps1"
+      - "packages/source-windows/scripts/Test-SourceWindowsLint.ps1"
+
+permissions:
+  contents: read
+
+jobs:
+  command-playbook:
+    name: Command playbook
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+
+      - name: Check command playbook
+        working-directory: .github/scripts
+        run: npm run check-command-playbook

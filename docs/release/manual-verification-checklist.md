@@ -20,6 +20,7 @@ attach notes for every failed or skipped item.
 - [ ] Windows unit CI passed with coverage artifact uploaded.
 - [ ] Windows helper integration smoke passed with diagnostics artifact uploaded.
 - [ ] Site preview built and site smoke checks passed.
+- [ ] Command playbook was reviewed if build, release, generated-asset, or verification commands changed.
 
 ## Install And Startup
 
