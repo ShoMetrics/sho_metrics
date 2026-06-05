@@ -87,7 +87,11 @@ const installerWizardImagePath = path.join(repoRoot, "packages/source-windows/As
 const installerWizardSmallImagePath = path.join(repoRoot, "packages/source-windows/Assets/ShoMetricsWizardSmallImage.png");
 
 const minimumIconSizes = [16, 24, 32, 48, 256];
-const extraIconSizes = [20, 40, 64, 128];
+// Match the modern Windows scale table for titlebar, tray, taskbar, search,
+// Start all-apps, and Start pins. Windows prefers an exact frame before it
+// scales another size, so include the intermediate sizes called out by:
+// https://learn.microsoft.com/windows/apps/design/iconography/app-icon-construction
+const extraIconSizes = [20, 30, 36, 40, 60, 64, 72, 80, 96, 128];
 const iconSizes = [...minimumIconSizes, ...extraIconSizes].sort((left, right) => right - left);
 const filledLogoGroundColor = "#0a0e18";
 const logoBackgroundElementId = "shometrics-logo-background";
