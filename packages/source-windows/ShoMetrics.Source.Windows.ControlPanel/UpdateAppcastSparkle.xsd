@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://www.andymatuschak.org/xml-namespaces/sparkle"
+           xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+  <xs:element name="version" type="xs:string" />
+  <xs:element name="shortVersionString" type="xs:string" />
+  <xs:element name="releaseNotesLink" type="xs:anyURI" />
+  <xs:element name="phasedRolloutInterval" type="xs:positiveInteger" />
+
+  <xs:element name="channel">
+    <xs:simpleType>
+      <xs:restriction base="xs:string">
+        <xs:pattern value="[A-Za-z0-9._-]+" />
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:element>
+
+  <xs:element name="criticalUpdate">
+    <xs:complexType>
+      <xs:sequence />
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

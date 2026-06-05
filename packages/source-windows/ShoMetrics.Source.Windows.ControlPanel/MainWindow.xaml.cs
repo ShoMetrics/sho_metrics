@@ -31,9 +31,13 @@ public partial class MainWindow : Window
     private const string ServiceStartCommand = "--start-service";
 
     private readonly HelperControlPanelStatusReader _statusReader = new();
+    private readonly UpdateAppcastClient _updateAppcastClient = new();
     private readonly DispatcherTimer _checkedAtTimer = new();
     private HelperControlPanelStatus? _currentStatus;
+    private UpdateAppcastStatus _currentUpdateStatus = UpdateAppcastStatus.Initial(ControlPanelIdentity.Version);
     private bool? _isNavigationMinimal;
+    private bool _hasStartedAutomaticUpdateCheck;
+    private bool _isCheckingForUpdates;
 
     /// <summary>
     /// Creates the normal-user status surface and wires lightweight service recovery actions.
@@ -49,6 +53,7 @@ public partial class MainWindow : Window
         TrySetMinimumWindowSizeInDips(width: MinimumWindowWidthDips, height: MinimumWindowHeightDips);
         TryConfigureCustomTitleBar();
         ApplyStatus(HelperControlPanelStatus.Initial());
+        ApplyUpdateAppcastStatus(_currentUpdateStatus);
         WarningDiagnosticsCard.SizeChanged += OnDiagnosticValueCardSizeChanged;
         RootGrid.Loaded += OnRootGridLoaded;
         RootGrid.SizeChanged += OnRootGridSizeChanged;
@@ -114,6 +119,27 @@ public partial class MainWindow : Window
         OpenUrl(ShoMetricsReleasesUrl);
     }
 
+    private async void OnCheckForUpdatesClicked(object sender, RoutedEventArgs args)
+    {
+        await CheckForUpdatesAsync().ConfigureAwait(true);
+    }
+
+    private void OnOpenUpdateReleaseNotesClicked(object sender, RoutedEventArgs args)
+    {
+        if (_currentUpdateStatus.ReleaseNotesUri is not null)
+        {
+            OpenUrl(_currentUpdateStatus.ReleaseNotesUri.AbsoluteUri);
+        }
+    }
+
+    private void OnOpenUpdateDownloadClicked(object sender, RoutedEventArgs args)
+    {
+        if (_currentUpdateStatus.DownloadUri is not null)
+        {
+            OpenUrl(_currentUpdateStatus.DownloadUri.AbsoluteUri);
+        }
+    }
+
     private async void OnServicePrimaryActionClicked(object sender, RoutedEventArgs args)
     {
         if (_currentStatus is null)
@@ -175,6 +201,36 @@ public partial class MainWindow : Window
         }
     }
 
+    private async Task CheckForUpdatesAsync()
+    {
+        if (_isCheckingForUpdates)
+        {
+            return;
+        }
+
+        _isCheckingForUpdates = true;
+        UpdateCheckButton.IsEnabled = false;
+        ApplyUpdateAppcastStatus(UpdateAppcastStatus.Checking(ControlPanelIdentity.Version));
+
+        try
+        {
+            using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            UpdateAppcastStatus updateStatus = await _updateAppcastClient
+                .CheckAsync(ControlPanelIdentity.Version, cancellationTokenSource.Token)
+                .ConfigureAwait(true);
+            ApplyUpdateAppcastStatus(updateStatus);
+        }
+        catch (OperationCanceledException)
+        {
+            ApplyUpdateAppcastStatus(UpdateAppcastStatus.Failed(ControlPanelIdentity.Version, DateTimeOffset.Now));
+        }
+        finally
+        {
+            _isCheckingForUpdates = false;
+            UpdateCheckButton.IsEnabled = true;
+        }
+    }
+
     private void ApplyStatus(HelperControlPanelStatus status)
     {
         _currentStatus = status;
@@ -218,6 +274,23 @@ public partial class MainWindow : Window
         LogFolderText.Text = WindowsSourceServicePaths.ResolveLogDirectoryPath();
         UpdateCheckedAtText(DateTimeOffset.Now);
         UpdateDiagnosticValueTextWidth();
+    }
+
+    private void ApplyUpdateAppcastStatus(UpdateAppcastStatus status)
+    {
+        _currentUpdateStatus = status;
+
+        UpdateVersionText.Text = status.CurrentVersionText;
+        UpdateStatusText.Text = status.StatusText;
+        UpdateDetailText.Text = status.DetailText;
+        UpdateLastCheckedText.Text = status.CheckedAt is null
+            ? "Last checked: Never"
+            : $"Last checked: {status.CheckedAt.Value:g}";
+        UpdateReleaseNotesButton.Visibility = status.HasReleaseNotes ? Visibility.Visible : Visibility.Collapsed;
+        UpdateDownloadButton.Visibility = status.HasDownload ? Visibility.Visible : Visibility.Collapsed;
+        UpdateStatusText.Foreground = status.Kind == UpdateAppcastStatusKind.CriticalUpdateAvailable
+            ? ResolveThemeBrush("SystemFillColorCriticalBrush")
+            : ResolveThemeBrush("TextFillColorSecondaryBrush");
     }
 
     private Visibility ResolveServicePrimaryActionVisibility(HelperServicePanelStatus serviceStatus)
@@ -329,9 +402,24 @@ public partial class MainWindow : Window
             ServiceExecutableName));
     }
 
-    private void OnRootGridLoaded(object sender, RoutedEventArgs args)
+    private async void OnRootGridLoaded(object sender, RoutedEventArgs args)
     {
         ApplyNavigationLayout(RootGrid.ActualWidth);
+        await CheckForUpdatesAutomaticallyAsync().ConfigureAwait(true);
+    }
+
+    private async Task CheckForUpdatesAutomaticallyAsync()
+    {
+        if (_hasStartedAutomaticUpdateCheck)
+        {
+            return;
+        }
+
+        // This is intentionally process-local. It avoids background/tray startup
+        // network traffic without introducing a persisted Control Panel state file
+        // before the update reminder policy is fully defined.
+        _hasStartedAutomaticUpdateCheck = true;
+        await CheckForUpdatesAsync().ConfigureAwait(true);
     }
 
     private void OnRootGridSizeChanged(object sender, SizeChangedEventArgs args)
@@ -543,6 +631,7 @@ public partial class MainWindow : Window
         RootGrid.SizeChanged -= OnRootGridSizeChanged;
         RootGrid.ActualThemeChanged -= OnRootGridActualThemeChanged;
         _statusReader.Dispose();
+        _updateAppcastClient.Dispose();
     }
 
     private void OnNavigationSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)

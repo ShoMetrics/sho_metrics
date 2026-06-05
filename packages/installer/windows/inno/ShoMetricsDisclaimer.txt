@@ -4,4 +4,6 @@ ShoMetrics Helper is provided "as is", without warranty of any kind, express or 
 
 In no event shall the authors or copyright holders be liable for any claim, damages, or other liability arising from the software or its use.
 
+When you open ShoMetrics Control Panel, it may make necessary connections to check for updates. This check does not upload your hardware details.
+
 ShoMetrics is licensed under the GNU General Public License. Third-party components are provided under their own licenses.
