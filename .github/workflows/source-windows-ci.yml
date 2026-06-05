@@ -93,6 +93,17 @@ jobs:
             packages/source-windows/**/packages.lock.json
             packages/installer/windows/inno/*.lock.json
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: npm
+          cache-dependency-path: packages/assets/brand/package-lock.json
+
+      - name: Restore brand asset tooling
+        working-directory: ${{ github.workspace }}/packages/assets/brand
+        run: npm.cmd ci
+
       - name: Run installer invariant checks
         working-directory: ${{ github.workspace }}
         run: ./packages/installer/windows/scripts/Test-WindowsInstallerInvariants.ps1
