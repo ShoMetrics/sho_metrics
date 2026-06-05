@@ -81,13 +81,51 @@
                               Padding="40,32,40,32"
                               VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="24">
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="ShoMetrics status"
+                        <Grid ColumnSpacing="24"
+                              RowSpacing="6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Grid.Column="0"
+                                       Text="ShoMetrics status"
                                        Style="{ThemeResource TitleTextBlockStyle}" />
-                            <TextBlock Text="Check ShoMetrics Helper, driver access, and sensor diagnostics."
+                            <TextBlock Grid.Row="1"
+                                       Grid.Column="0"
+                                       Text="Check ShoMetrics Helper, driver access, and sensor diagnostics."
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        TextWrapping="Wrap" />
-                        </StackPanel>
+                            <TextBlock Grid.Row="2"
+                                       Grid.Column="0"
+                                       Text="Closing this panel does not stop the background service."
+                                       FontWeight="SemiBold"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap" />
+
+                            <StackPanel Grid.Row="0"
+                                        Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Orientation="Horizontal"
+                                        Spacing="8">
+                                <Button x:Name="RefreshButton"
+                                        Content="Refresh"
+                                        MinWidth="86"
+                                        Click="OnRefreshClicked" />
+                                <Button Content="Copy diagnostics"
+                                        MinWidth="132"
+                                        Click="OnCopyDiagnosticsClicked" />
+                                <Button Content="Open logs"
+                                        MinWidth="92"
+                                        Click="OnOpenLogsClicked" />
+                            </StackPanel>
+                        </Grid>
 
                         <StackPanel Spacing="8">
                             <TextBlock Text="Version &amp; updates"
@@ -366,22 +404,5 @@
             </muxc:NavigationView.FooterMenuItems>
         </muxc:NavigationView>
 
-        <StackPanel HorizontalAlignment="Right"
-                    Grid.Row="1"
-                    VerticalAlignment="Top"
-                    Orientation="Horizontal"
-                    Spacing="8"
-                    Margin="0,18,40,0">
-            <Button x:Name="RefreshButton"
-                    Content="Refresh"
-                    MinWidth="86"
-                    Click="OnRefreshClicked" />
-            <Button Content="Copy diagnostics"
-                    MinWidth="132"
-                    Click="OnCopyDiagnosticsClicked" />
-            <Button Content="Open logs"
-                    MinWidth="92"
-                    Click="OnOpenLogsClicked" />
-        </StackPanel>
     </Grid>
 </Window>
