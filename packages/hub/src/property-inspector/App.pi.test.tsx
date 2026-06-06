@@ -24,6 +24,7 @@ import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick
 import { resolveStoredWidgetSettings } from "../settings/storage/resolver";
 import { STREAM_DECK_ACTION_UUID_BY_KIND, type ActionKind } from "../shared/stream-deck-actions";
 import { App } from "./App";
+import { I18nProvider } from "../i18n/react";
 import {
     readTestSettingsRecord,
     TestPropertyInspectorClient,
@@ -36,7 +37,7 @@ test("app loads widget settings and writes a sparse CPU metric patch through Str
         settings: buildQuickStartSettingsRecord("cpu"),
     });
 
-    render(<App client={client} />);
+    renderApp(client);
 
     const cpuMetricSelect = await screen.findByRole("combobox", { name: /cpu metric/i });
     await user.click(cpuMetricSelect);
@@ -55,7 +56,7 @@ test("app updates catalog helper guidance and picker options from runtime cache 
         settings: buildQuickStartSettingsRecord("catalog"),
     });
 
-    render(<App client={client} />);
+    renderApp(client);
 
     await screen.findByText("Loading metrics...");
 
@@ -117,7 +118,7 @@ test("app color compensation wizard saves the profile through global settings", 
         settings: buildQuickStartSettingsRecord("cpu"),
     });
 
-    render(<App client={client} />);
+    renderApp(client);
 
     await user.click(await screen.findByRole("button", { name: "Color Compensation" }));
     await user.click(screen.getByRole("button", { name: "Start" }));
@@ -163,7 +164,7 @@ test("app color compensation wizard resets a saved profile through global settin
         globalSettings: readTestSettingsRecord(writeStoredColorCompensationProfile(undefined, savedProfile)),
     });
 
-    render(<App client={client} />);
+    renderApp(client);
 
     // The checkmark is part of the accessible name when a saved profile exists.
     await user.click(await screen.findByRole("button", { name: "Color Compensation \u2713" }));
@@ -180,6 +181,14 @@ test("app color compensation wizard resets a saved profile through global settin
 function buildQuickStartSettingsRecord(actionKind: ActionKind) {
     return readTestSettingsRecord(
         resolveQuickStartStoredWidgetSettings(undefined, actionKind).rawSettings,
+    );
+}
+
+function renderApp(client: TestPropertyInspectorClient): void {
+    render(
+        <I18nProvider locale="en">
+            <App client={client} />
+        </I18nProvider>,
     );
 }
 

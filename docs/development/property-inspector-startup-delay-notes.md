@@ -152,6 +152,63 @@ UI decision:
   runtime seed bridge unless measured evidence shows the localized global
   readiness delay is still unacceptable.
 
+## I18n Step 1 React Visibility Baseline
+
+Updated on June 6, 2026, before adding the Hub i18n runtime.
+
+Temporary PI console diagnostics were added locally, the PI panel was opened for
+GPU and Memory actions, and the diagnostics were removed after recording these
+numbers.
+
+Observed GPU action open:
+
+```txt
+0.1ms    script evaluated
+1.1ms    React render requested
+57.3ms   connectElgatoStreamDeckSocket called
+57.5ms   connection info resolved, initial widget settings present
+61.9ms   first React commit, actionKind still unknown
+64.2ms   connectionLoaded dispatched, actionKind=gpu
+368.9ms  PI WebSocket open
+371.1ms  first runtime cache patch
+377.5ms  global settings ready
+378.7ms  widget settings refresh ready
+```
+
+Observed Memory action open:
+
+```txt
+0.1ms    script evaluated
+1.2ms    React render requested
+60.6ms   connectElgatoStreamDeckSocket called
+60.8ms   connection info resolved, initial widget settings present
+77.5ms   first React commit, actionKind still unknown
+79.3ms   connectionLoaded dispatched, actionKind=memory
+379.5ms  PI WebSocket open
+385.5ms  global settings ready
+386.0ms  widget settings refresh ready
+442.4ms  first runtime cache patch
+```
+
+Interpretation:
+
+- React first commit happened around 62-78ms from script evaluation.
+- The current App first commits before `connectionLoaded`, so the first commit
+  still has `actionKind=unknown`. Action-specific controls become available
+  immediately after connection info, around 64-79ms in these runs.
+- The slow path is the PI WebSocket opening around 369-380ms, not React render.
+- `getSettings()` and `getGlobalSettings()` are gated by that WebSocket and
+  completed around 378-386ms in these runs.
+- Locale selection for i18n must use connection info and must not wait for
+  `getSettings()` or `getGlobalSettings()`.
+
+The historical observations above remain useful context because they show the
+same shape: initial widget data can be available immediately while settings
+refresh and runtime-cache updates arrive later.
+
+The Step 1 message inventory lives in
+`docs/development/i18n-hub-implementation-plan.md`.
+
 ## Follow-up Observation: Runtime Option Lists
 
 Runtime option lists, such as disk volumes and network interfaces, are

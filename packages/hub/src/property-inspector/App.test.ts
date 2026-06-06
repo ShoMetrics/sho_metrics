@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { I18nProvider } from "../i18n/react";
 import { App } from "./App";
 import type {
     ConnectionInfo,
@@ -15,7 +16,13 @@ import type {
 } from "./stream-deck/stream-deck-client";
 
 test("app renders the widget tab as the default active tab", () => {
-    const markup = renderToStaticMarkup(createElement(App, { client: fakePropertyInspectorClient }));
+    const markup = renderToStaticMarkup(createElement(
+        I18nProvider,
+        {
+            children: createElement(App, { client: fakePropertyInspectorClient }),
+            locale: "en",
+        },
+    ));
 
     assert.match(markup, /role="tab" aria-selected="true" data-selected="true">Widget/);
     assert.match(markup, /role="tab" aria-selected="false" data-selected="false">Global/);
