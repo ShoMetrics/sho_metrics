@@ -79,6 +79,11 @@ export const commonMessages = {
         zh_CN: "主题",
         ja: "テーマ",
     },
+    colorLabel: {
+        en: "Color",
+        zh_CN: "颜色",
+        ja: "色",
+    },
     viewVariantLabel: {
         en: "View Variant",
         zh_CN: "视图样式",
