@@ -158,51 +158,61 @@ settings arrive later than connection info in observed PI startup runs.
 
 ### Catalog Style
 
-Use module-local typed message objects.
+Use domain-group typed message objects.
 
 Do not create a global `messages.propertyInspector...` object. That shape
 encourages broad global imports and turns the catalog into a second application
-tree. Each UI module or panel should import only the message object it needs.
+tree. Each UI module or panel should import only the message group objects it
+needs.
 
 Recommended shape:
 
 ```ts
-// packages/hub/src/i18n/messages.ts
-import type { LocalizedMessages } from "./types";
+// packages/hub/src/i18n/message-groups/widgets.ts
+import type { LocalizedMessages } from "../types";
 
-export const appMessages = {
-    widgetTab: {
-        en: "Widget",
-        zh_CN: "Widget",
-        ja: "ウィジェット",
-    },
-    globalTab: {
-        en: "Global",
-        zh_CN: "全局",
-        ja: "グローバル",
-    },
-    settingsTabListLabel: {
-        en: "Settings",
-        zh_CN: "设置",
-        ja: "設定",
+export const cpuMessages = {
+    cpuMetricLabel: {
+        en: "CPU Metric",
+        zh_CN: "CPU 指标",
+        ja: "CPU メトリクス",
     },
 } as const satisfies LocalizedMessages;
+```
+
+`packages/hub/src/i18n/messages.ts` is only a barrel and registry:
+
+```ts
+import { shellMessages, commonMessages } from "./message-groups/shell";
+import { optionMessages } from "./message-groups/options";
+import { cpuMessages } from "./message-groups/widgets";
+
+export * from "./message-groups/shell";
+export * from "./message-groups/options";
+export * from "./message-groups/widgets";
+
+export const messageGroups = {
+    shellMessages,
+    commonMessages,
+    optionMessages,
+    cpuMessages,
+} as const;
 ```
 
 Usage:
 
 ```tsx
-import { appMessages } from "../i18n/messages";
+import { commonMessages } from "../../i18n/message-groups/shell";
+import { cpuMessages } from "../../i18n/message-groups/widgets";
 import { useI18n } from "../i18n/react";
 
-export function AppTabs(): React.JSX.Element {
-    const i18n = useI18n();
+export function CpuMetricSetting(): React.JSX.Element {
+    const { t } = useI18n();
 
     return (
-        <div role="tablist" aria-label={i18n.t(appMessages.settingsTabListLabel)}>
-            <button>{i18n.t(appMessages.widgetTab)}</button>
-            <button>{i18n.t(appMessages.globalTab)}</button>
-        </div>
+        <SettingsSection title={t(commonMessages.metricSection)}>
+            <SelectSetting label={t(cpuMessages.cpuMetricLabel)} />
+        </SettingsSection>
     );
 }
 ```
@@ -214,6 +224,16 @@ Rules:
 - Do not add `surface`, `maxLength`, or required `description` metadata.
 - Add ordinary code comments only for ambiguous short strings such as `Open`,
   `Reset`, `Auto`, or `Scale`.
+- Do not create a hidden flat catalog plus remap layer. Each exported
+  `*Messages` object is its own source of truth and directly owns its
+  `{ en, zh_CN, ja }` literals.
+- `messages.ts` owns the application-side `messageGroups` registry and must
+  list every PI message group exactly once.
+- `i18n-check.mjs` should explicitly import the six leaf `message-groups/*.ts`
+  files instead of importing `messages.ts`: Node can type-strip explicit leaf
+  `.ts` imports, but it does not resolve the extensionless imports inside
+  `messages.ts` the way Rollup does. Keep this check-side list in sync with
+  `messageGroups`; do not replace it with source-text scraping.
 - Use `satisfies`/helper types to make missing locale values a TypeScript
   error.
 - `LocalizedMessage` must require every supported locale:
@@ -409,7 +429,7 @@ not become a CI gate without a separate design.
 | `intl-messageformat` by default | It is the right choice once plural/select ICU messages are real requirements. It is not justified for v1 if the message inventory has zero plural/select messages. |
 | Custom plural/select handling | This is fragile and should not be implemented. If plural/select is needed, add a mature messageformat library instead. |
 | Stable generated ids for all PI messages | PI code can use direct typed message objects. Stable ids are useful for translation platforms and large cross-file catalogs, but v1 intentionally does not integrate a translation platform. |
-| Global `messages.propertyInspector...` tree | It encourages broad global imports and makes the message catalog look like a second app tree. Prefer module-local exports such as `appMessages`. |
+| Global `messages.propertyInspector...` tree | It encourages broad global imports and makes the message catalog look like a second app tree. Prefer domain-group exports such as `cpuMessages`. |
 | JSON as PI source of truth | JSON is translation-platform friendly, but weaker for direct code references and agentic maintenance. The repo is not using a translation platform in v1. |
 | Global language setting in v1 | It reintroduces the PI startup race: global settings arrive later than connection info. Follow Stream Deck language first and avoid proto changes. |
 | Localizing Deck key SVG text in v1 | This would turn i18n into a rendering/font/layout project. It is out of scope. |
@@ -432,9 +452,24 @@ packages/hub/src/i18n/
   manifest-localization.ts
 ```
 
-`messages.ts` should export local named objects such as `appMessages`,
-`cpuMessages`, and `helperGuidanceMessages`. It must not export one global
-`messages.propertyInspector...` tree.
+PI message files are grouped by edit domain:
+
+```txt
+packages/hub/src/i18n/
+  message-groups/
+    shell.ts                 # shellMessages, commonMessages
+    options.ts               # optionMessages
+    widgets.ts               # widgetMessages, cpu/gpu/disk/network/catalog/helper
+    color.ts                 # colorMessages
+    settings.ts              # settingsNoticeMessages, globalSettingsMessages
+    color-compensation.ts    # colorCompensationMessages
+  messages.ts                # barrel plus messageGroups registry only
+```
+
+Do not split one file per panel or action. Do not merge unrelated groups into a
+catch-all file. `colorMessages` and `colorCompensationMessages` stay separate:
+ordinary color controls and the compensation wizard are different editing
+domains.
 
 Do not split v1 into `en.ts`, `zh_CN.ts`, and `ja.ts`. Per-locale files are a
 good fit for translation-platform workflows, but this project wants direct code
@@ -559,8 +594,8 @@ Work:
    `client.getConnectionInfo()`, normalizes locale, then renders
    `<I18nProvider locale={locale}><App ... /></I18nProvider>`.
 8. Before locale is known, render no user-visible text.
-9. Add `packages/hub/src/i18n/messages.ts` with `appMessages` and migrate only
-   the App shell:
+9. Add `packages/hub/src/i18n/message-groups/shell.ts` and
+   `packages/hub/src/i18n/messages.ts`, then migrate only the App shell:
    - Widget tab.
    - Global tab.
    - Tablist ARIA label.
@@ -583,8 +618,9 @@ Acceptance:
 - Existing widget/global settings load behavior remains unchanged.
 - No `intl-messageformat` dependency is added unless Step 1 proved plural/select
   is needed and this plan was updated.
-- Components call `i18n.t(appMessages.widgetTab)`, not string ids.
+- Components call `t(shellMessages.widgetTab)`, not string ids.
 - There is no global `messages.propertyInspector...` export.
+- There is no hidden flat catalog or `key: messageCatalog.key` remap layer.
 - `LocalizedMessage` has a test-backed invariant that `en`, `zh_CN`, and `ja`
   are all required.
 - The production missing-placeholder path is test-backed and never displays raw
@@ -619,6 +655,8 @@ Work:
    - Placeholder-name mismatch between `en`, `zh_CN`, and `ja`.
    - Generated locale JSON drift.
    - Manifest English drift.
+   - The PI message groups by importing the leaf `message-groups/*.ts` files
+     directly. Do not parse `messages.ts` source text with regular expressions.
 6. Add package scripts:
    - `i18n:generate`
    - `i18n:check`

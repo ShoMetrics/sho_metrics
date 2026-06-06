@@ -3,28 +3,37 @@ import {
     resolveDefaultDiskVolumeOption,
     type DiskVolumeOption,
 } from "../../runtime/disk-volumes";
+import { optionMessages } from "../../i18n/message-groups/options";
+import { formatMessage } from "../../i18n/format";
+import type { I18n } from "../../i18n/react";
+import type { LocalizedMessage, PlaceholderValues } from "../../i18n/types";
 import type { NetworkInterfaceOption } from "../../runtime/network-interfaces";
 import type { SelectOption, VisibilityContext } from "../inspector/types";
 
-export function resolveNetworkInterfaceOptions(context: VisibilityContext): SelectOption[] {
-    return buildNetworkInterfaceOptions(context.runtimeCache.availableNetworkInterfaces);
+/** Builds localized network interface picker options while preserving dynamic interface labels. */
+export function resolveNetworkInterfaceOptions(context: VisibilityContext, i18n?: I18n): SelectOption[] {
+    return buildNetworkInterfaceOptions(context.runtimeCache.availableNetworkInterfaces, i18n);
 }
 
+/** Builds localized disk volume picker options while preserving dynamic volume labels. */
 export function resolveDiskVolumeOptions(
     context: VisibilityContext,
     selectedDiskVolumeId = "",
+    i18n?: I18n,
 ): SelectOption[] {
-    return buildDiskVolumeOptions(context, selectedDiskVolumeId);
+    return buildDiskVolumeOptions(context, i18n, selectedDiskVolumeId);
 }
 
-function buildNetworkInterfaceOptions(networkInterfaces: readonly NetworkInterfaceOption[]): SelectOption[] {
+function buildNetworkInterfaceOptions(networkInterfaces: readonly NetworkInterfaceOption[], i18n: I18n | undefined): SelectOption[] {
     return [
-        { value: "", label: "Automatic" },
+        { value: "", label: translate(i18n, optionMessages.automaticOption) },
         ...networkInterfaces.map((networkInterface) => {
             const speedLabel = networkInterface.speedMegabitsPerSecond
                 ? `, ${networkInterface.speedMegabitsPerSecond} Mbps`
                 : "";
-            const defaultLabel = networkInterface.isDefault ? "default, " : "";
+            const defaultLabel = networkInterface.isDefault
+                ? `${translate(i18n, optionMessages.defaultLowercaseLabel)}, `
+                : "";
             const typeLabel = networkInterface.type === "unknown" ? "" : `${networkInterface.type}, `;
 
             return {
@@ -35,7 +44,7 @@ function buildNetworkInterfaceOptions(networkInterfaces: readonly NetworkInterfa
     ];
 }
 
-function buildDiskVolumeOptions(context: VisibilityContext, selectedDiskVolumeId: string): SelectOption[] {
+function buildDiskVolumeOptions(context: VisibilityContext, i18n: I18n | undefined, selectedDiskVolumeId: string): SelectOption[] {
     const diskVolumes = context.runtimeCache.availableDiskVolumes;
     const diskVolumeOptions = diskVolumes.map((diskVolume) => ({
         value: diskVolume.id,
@@ -47,7 +56,9 @@ function buildDiskVolumeOptions(context: VisibilityContext, selectedDiskVolumeId
     if (selectedDiskVolumeId.length > 0 && !hasSelectedDiskVolume) {
         diskVolumeOptions.unshift({
             value: selectedDiskVolumeId,
-            label: `${formatDiskVolumeSelectionText(selectedDiskVolumeId)} (Unavailable)`,
+            label: translate(i18n, optionMessages.unavailableOptionLabel, {
+                label: formatDiskVolumeSelectionText(selectedDiskVolumeId),
+            }),
         });
     }
 
@@ -58,13 +69,13 @@ function buildDiskVolumeOptions(context: VisibilityContext, selectedDiskVolumeId
     let volumeOptionLabel: string;
     switch (context.runtimeCacheStatus.diskVolumeOptionsStatus) {
         case "pending":
-            volumeOptionLabel = "Loading volumes...";
+            volumeOptionLabel = translate(i18n, optionMessages.loadingVolumesOption);
             break;
         case "failed":
-            volumeOptionLabel = "Volumes unavailable";
+            volumeOptionLabel = translate(i18n, optionMessages.volumesUnavailableOption);
             break;
         case "ready":
-            volumeOptionLabel = "No detected volumes";
+            volumeOptionLabel = translate(i18n, optionMessages.noDetectedVolumesOption);
             break;
     }
 
@@ -82,14 +93,15 @@ export function resolveSelectedDiskVolumeLabel(context: VisibilityContext): stri
     return volumeLabel && volumeLabel.length > 0 ? volumeLabel : "-";
 }
 
-export function resolveDiskBarLabelPlaceholder(context: VisibilityContext): string {
+/** Builds the localized disk bar label placeholder from the current runtime disk selection. */
+export function resolveDiskBarLabelPlaceholder(context: VisibilityContext, i18n?: I18n): string {
     const diskVolume = resolveSelectedDiskVolume(context);
 
     if (!diskVolume) {
-        return "Auto";
+        return translate(i18n, optionMessages.autoLabelPrefix);
     }
 
-    return `Auto: ${resolveCompactDiskStorageLabel(diskVolume)} (${formatDiskVolumeDisplayLabel(diskVolume)})`;
+    return `${translate(i18n, optionMessages.autoLabelPrefix)}: ${resolveCompactDiskStorageLabel(diskVolume)} (${formatDiskVolumeDisplayLabel(diskVolume)})`;
 }
 
 export function resolveSelectedDiskVolume(context: VisibilityContext): DiskVolumeOption | null {
@@ -187,4 +199,12 @@ function formatByteCount(bytes: number): string {
     }
 
     return `${displayValue >= 10 ? displayValue.toFixed(0) : displayValue.toFixed(1)} ${units[unitIndex]}`;
+}
+
+function translate(
+    i18n: I18n | undefined,
+    message: LocalizedMessage,
+    values?: PlaceholderValues,
+): string {
+    return i18n ? i18n.t(message, values) : formatMessage("en", message, values);
 }

@@ -7,6 +7,7 @@ import {
     type InspectorGlobalSettingsRead,
     type InspectorWidgetSettingsRead,
 } from "./settings-sync-state";
+import { settingsNoticeMessages } from "../../i18n/message-groups/settings";
 
 test("connectionLoaded sets action metadata and marks widget settings ready", () => {
     const rawSettings = { preferences: { pollingFrequencySeconds: 5 } };
@@ -94,7 +95,8 @@ test("save failure keeps optimistic widget settings and reports warning", () => 
     assert.equal(failedState.widgetSettingsStatus, "ready");
     assert.deepEqual(failedState.widgetSettingsNotice, {
         kind: "warning",
-        text: "Failed to save widget settings: disk full",
+        message: settingsNoticeMessages.widgetSettingsSaveFailed,
+        values: { errorMessage: "disk full" },
     });
 });
 
@@ -107,15 +109,9 @@ test("load failures mark the matching settings scope failed", () => {
     });
 
     assert.equal(widgetFailedState.widgetSettingsStatus, "failed");
-    assert.match(
-        widgetFailedState.widgetSettingsNotice?.text ?? "",
-        /couldn't load this widget's saved settings/,
-    );
+    assert.equal(widgetFailedState.widgetSettingsNotice?.message, settingsNoticeMessages.widgetSettingsLoadDefaults);
     assert.equal(globalFailedState.globalSettingsStatus, "failed");
-    assert.match(
-        globalFailedState.globalSettingsNotice?.text ?? "",
-        /couldn't load global settings/,
-    );
+    assert.equal(globalFailedState.globalSettingsNotice?.message, settingsNoticeMessages.globalSettingsLoadDefaults);
 });
 
 function buildWidgetSettingsRead(

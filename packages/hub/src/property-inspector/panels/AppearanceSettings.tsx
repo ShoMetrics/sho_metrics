@@ -5,6 +5,8 @@ import { TextVariantSetting } from "../controls/TextVariantSetting";
 import { ThemeSetting } from "../controls/ThemeSetting";
 import { TransparentSurfaceSetting } from "../controls/TransparentSurfaceSetting";
 import { SettingsSection } from "./SettingsSection";
+import { commonMessages } from "../../i18n/message-groups/shell";
+import { useI18n } from "../../i18n/react";
 import {
     buildTransparentSurfaceAppearanceThemeOverride,
     resolveActiveTransparentSurface,
@@ -18,6 +20,7 @@ export function AppearanceSettings({
     themeDisabled = false,
     transparentSurfaceDisabled = false,
 }: WidgetSettingsPanelProps): React.JSX.Element {
+    const { t } = useI18n();
     const appearance = context.resolved.widget.slot.appearance;
     const preview = {
         appearance,
@@ -26,7 +29,7 @@ export function AppearanceSettings({
 
     return (
         <>
-            <SettingsSection title="View">
+            <SettingsSection title={t(commonMessages.appearanceViewSection)}>
                 <MetricViewSetting
                     value={appearance.view.selectedView}
                     preview={preview}
@@ -56,7 +59,7 @@ export function AppearanceSettings({
                     />
                 )}
             </SettingsSection>
-            <SettingsSection title="Theme">
+            <SettingsSection title={t(commonMessages.appearanceThemeSection)}>
                 <ThemeSetting
                     value={appearance.theme.selectedTheme}
                     preview={preview}

@@ -145,7 +145,10 @@ test("Advanced Sensor display copy does not leak into source identifiers", () =>
         "advanced-sensor",
     ];
     const scannedFiles = findTextFiles("src")
-        .filter(filePath => !filePath.endsWith("stream-deck-actions.test.ts"));
+        .filter(filePath =>
+            !filePath.endsWith("stream-deck-actions.test.ts")
+            && !filePath.startsWith("src\\i18n\\")
+            && !filePath.startsWith("src/i18n/"));
     const matches = scannedFiles.flatMap((filePath) => {
         const fileText = readFileSync(filePath, "utf8");
 

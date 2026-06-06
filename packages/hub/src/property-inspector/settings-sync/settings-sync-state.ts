@@ -11,6 +11,8 @@ import type {
 import type { ActionKind } from "../inspector/settings-types";
 import type { PropertyInspectorPlatform } from "../inspector/platform";
 import type { LoadStatus, PropertyInspectorRuntimeCacheStatus } from "../inspector/types";
+import { settingsNoticeMessages } from "../../i18n/message-groups/settings";
+import type { LocalizedMessage, PlaceholderValues } from "../../i18n/types";
 
 export interface SettingsSyncState {
     readonly actionKind: ActionKind;
@@ -40,7 +42,8 @@ export interface InspectorGlobalSettingsRead {
 
 export interface SettingsNotice {
     readonly kind: "loading" | "warning";
-    readonly text: string;
+    readonly message: LocalizedMessage;
+    readonly values?: PlaceholderValues | undefined;
 }
 
 export type SettingsSyncAction =
@@ -174,7 +177,8 @@ export function settingsSyncReducer(
                 ...state,
                 widgetSettingsNotice: {
                     kind: "warning",
-                    text: `Failed to save widget settings: ${action.errorMessage}`,
+                    message: settingsNoticeMessages.widgetSettingsSaveFailed,
+                    values: { errorMessage: action.errorMessage },
                 },
             };
         case "globalSaveFailed":
@@ -182,7 +186,8 @@ export function settingsSyncReducer(
                 ...state,
                 globalSettingsNotice: {
                     kind: "warning",
-                    text: `Failed to save global settings: ${action.errorMessage}`,
+                    message: settingsNoticeMessages.globalSettingsSaveFailed,
+                    values: { errorMessage: action.errorMessage },
                 },
             };
         default:
@@ -207,20 +212,21 @@ function settingsLoadFailureNotice(settingsScope: "widget" | "global"): Settings
     if (settingsScope === "widget") {
         return {
             kind: "warning",
-            text: "We couldn't load this widget's saved settings, so defaults are shown.",
+            message: settingsNoticeMessages.widgetSettingsLoadDefaults,
         };
     }
 
     return {
         kind: "warning",
-        text: "We couldn't load global settings, so defaults are shown.",
+        message: settingsNoticeMessages.globalSettingsLoadDefaults,
     };
 }
 
 function settingsLoadFailureNoticeWithError(errorMessage: string): SettingsNotice {
     return {
         kind: "warning",
-        text: `Failed to load settings: ${errorMessage}`,
+        message: settingsNoticeMessages.settingsLoadFailedWithError,
+        values: { errorMessage },
     };
 }
 

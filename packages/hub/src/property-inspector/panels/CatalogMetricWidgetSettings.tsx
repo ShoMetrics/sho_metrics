@@ -1,4 +1,9 @@
 import { InspectorItem } from "../components/InspectorItem";
+import { catalogMessages, helperMessages } from "../../i18n/message-groups/widgets";
+import { commonMessages } from "../../i18n/message-groups/shell";
+import { optionMessages } from "../../i18n/message-groups/options";
+import { localizeOptionList } from "../../i18n/options";
+import { useI18n, type I18n } from "../../i18n/react";
 import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { TextSetting } from "../controls/TextSetting";
@@ -34,11 +39,14 @@ type CatalogMetricWidgetSettingsProps = WidgetSettingsPanelProps & {
 };
 
 export function CatalogMetricWidgetSettings(props: CatalogMetricWidgetSettingsProps): React.JSX.Element {
+    const i18n = useI18n();
+    const { t } = i18n;
+
     if (!props.context.isWindows) {
         return (
-            <SettingsSection title="Metric">
+            <SettingsSection title={t(commonMessages.metricSection)}>
                 <InspectorItem className="note-item note-item-caption">
-                    <p className="section-note">This sensor is not supported on this platform.</p>
+                    <p className="section-note">{t(catalogMessages.catalogUnsupportedPlatformNotice)}</p>
                 </InspectorItem>
             </SettingsSection>
         );
@@ -61,16 +69,18 @@ function CatalogMetricPicker({
     target,
     onSettingsPatch,
 }: CatalogMetricWidgetSettingsProps): React.JSX.Element {
+    const i18n = useI18n();
+    const { t } = i18n;
     // Keep showing cached descriptors during a transient pending refresh so the
     // picker does not blank out every time the Property Inspector reopens.
     const descriptors = context.runtimeCache.availableCatalogMetricDescriptors;
     const options = buildCatalogMetricOptions(descriptors, {
         metricId: target.metricId,
-    });
+    }, i18n);
     const selection = options.resolvedSelection;
 
     return (
-        <SettingsSection title="Metric">
+        <SettingsSection title={t(commonMessages.metricSection)}>
             {descriptors.length === 0 ? (
                 <CatalogMetricDescriptorStatusNote
                     status={context.runtimeCacheStatus.catalogMetricDescriptorStatus}
@@ -80,7 +90,7 @@ function CatalogMetricPicker({
                 <>
                     {shouldShowTypeSetting(options) && (
                         <SelectSetting
-                            label="Type"
+                            label={t(catalogMessages.typeLabel)}
                             value={selection.typeId}
                             optionList={options.typeOptions}
                             onValueChange={(typeId) => {
@@ -90,7 +100,7 @@ function CatalogMetricPicker({
                     )}
                     {selection.typeId.length > 0 && countEnabledOptions(options.hardwareOptions) > 1 && (
                         <SelectSetting
-                            label="Hardware"
+                            label={t(catalogMessages.hardwareLabel)}
                             value={selection.hardwareId}
                             optionList={options.hardwareOptions}
                             onValueChange={(hardwareId) => {
@@ -103,7 +113,7 @@ function CatalogMetricPicker({
                     )}
                     {selection.hardwareId.length > 0 && countEnabledOptions(options.readingOptions) > 1 && (
                         <SelectSetting
-                            label="Reading"
+                            label={t(catalogMessages.readingLabel)}
                             value={selection.readingId}
                             optionList={options.readingOptions}
                             onValueChange={(readingId) => {
@@ -117,7 +127,7 @@ function CatalogMetricPicker({
                     )}
                     {selection.readingId.length > 0 && countEnabledOptions(options.metricOptions) > 1 && (
                         <SelectSetting
-                            label="Metric"
+                            label={t(catalogMessages.metricLabel)}
                             value={selection.metricId}
                             optionList={options.metricOptions}
                             onValueChange={(metricId) => {
@@ -126,7 +136,7 @@ function CatalogMetricPicker({
                         />
                     )}
                     <InspectorItem className="note-item note-item-caption">
-                        <p className="section-note">Source: Helper only</p>
+                        <p className="section-note">{t(helperMessages.sourceHelperOnly)}</p>
                     </InspectorItem>
                 </>
             )}
@@ -141,7 +151,8 @@ function CatalogMetricDescriptorStatusNote({
     sourceStatus: SourceClientStatus | undefined;
     status: "pending" | "ready" | "failed";
 }): React.JSX.Element {
-    const text = resolveCatalogMetricDescriptorStatusText(status, sourceStatus);
+    const i18n = useI18n();
+    const text = resolveCatalogMetricDescriptorStatusText(i18n, status, sourceStatus);
 
     return (
         <InspectorItem className="note-item note-item-caption">
@@ -151,27 +162,32 @@ function CatalogMetricDescriptorStatusNote({
 }
 
 function resolveCatalogMetricDescriptorStatusText(
+    i18n: I18n,
     status: "pending" | "ready" | "failed",
     sourceStatus: SourceClientStatus | undefined,
 ): string {
+    const { t } = i18n;
     const helperGuidance = resolveHelperStatusGuidanceText(sourceStatus, {
-        installSubject: "advanced sensors",
+        i18n,
+        installSubject: "catalogMetrics",
     });
     if (helperGuidance !== undefined) {
         return helperGuidance;
     }
 
     return status === "failed"
-        ? "Metrics unavailable"
+        ? t(catalogMessages.metricsUnavailable)
         : status === "ready"
-            ? "No helper metrics"
-            : "Loading metrics...";
+            ? t(catalogMessages.noHelperMetrics)
+            : t(catalogMessages.loadingMetrics);
 }
 
 function CatalogMetricLabelScaleSettings({
     target,
     onSettingsPatch,
 }: CatalogMetricWidgetSettingsProps): React.JSX.Element {
+    const i18n = useI18n();
+    const { t } = i18n;
     const scaleMode: ScaleMode = target.customMaximumValue === undefined ? "auto" : "custom";
     const customMaximumInputValue = readCatalogMetricMaximumInputValue(
         target.customMaximumValue,
@@ -180,11 +196,11 @@ function CatalogMetricLabelScaleSettings({
     );
 
     return (
-        <SettingsSection title="Label & Scale">
+        <SettingsSection title={t(catalogMessages.labelScaleSection)}>
             <TextSetting
-                label="Label"
+                label={t(catalogMessages.labelLabel)}
                 value={target.customLabel ?? ""}
-                placeholder={target.detectedLabel ?? "Detected label"}
+                placeholder={target.detectedLabel ?? t(catalogMessages.detectedLabelPlaceholder)}
                 onValueChange={(customLabel) => onSettingsPatch(buildCatalogMetricCustomLabelPatch(customLabel))}
                 actionButton={(
                     <button
@@ -193,14 +209,14 @@ function CatalogMetricLabelScaleSettings({
                         disabled={target.customLabel === undefined}
                         onClick={() => onSettingsPatch(buildCatalogMetricUseDetectedLabelPatch())}
                     >
-                        Use Detected
+                        {t(catalogMessages.useDetectedButton)}
                     </button>
                 )}
             />
             <SelectSetting<ScaleMode>
-                label="Scale"
+                label={t(commonMessages.scaleLabel)}
                 value={scaleMode}
-                optionList={scaleModeOptionList}
+                optionList={localizeOptionList(t, scaleModeOptionList, scaleModeMessageByValue)}
                 onValueChange={(nextScaleMode) => onSettingsPatch(buildCatalogMetricScaleModePatch(
                     target,
                     nextScaleMode,
@@ -226,7 +242,7 @@ function CatalogMetricLabelScaleSettings({
                 />
             )}
             <InspectorItem className="note-item note-item-caption">
-                <p className="section-note">Custom label and scale reset when you choose a different metric.</p>
+                <p className="section-note">{t(catalogMessages.catalogLabelScaleResetNote)}</p>
             </InspectorItem>
         </SettingsSection>
     );
@@ -338,3 +354,8 @@ function countTypeOptions(options: readonly SelectOption<CatalogMetricTypeId | "
 function countEnabledOptions(options: readonly SelectOption[]): number {
     return options.filter(option => option.disabled !== true).length;
 }
+
+const scaleModeMessageByValue = {
+    auto: optionMessages.autoOption,
+    custom: optionMessages.customOption,
+} as const;

@@ -1,4 +1,8 @@
 import type { MetricView } from "../inspector/settings-types";
+import { commonMessages } from "../../i18n/message-groups/shell";
+import { optionMessages } from "../../i18n/message-groups/options";
+import { localizeOptionList } from "../../i18n/options";
+import { useI18n } from "../../i18n/react";
 import { buildMetricViewPreviewUri, type MetricPreviewInput } from "../previews/metric-option-preview";
 import { PreviewOptionSetting } from "./PreviewOptionSetting";
 import type { SettingControlProps } from "./setting-control";
@@ -17,12 +21,21 @@ interface MetricViewSettingProps extends SettingControlProps {
 }
 
 export function MetricViewSetting(props: MetricViewSettingProps): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
         <PreviewOptionSetting
             {...props}
-            label="View"
-            optionList={metricViewOptionList}
+            label={t(commonMessages.viewLabel)}
+            optionList={localizeOptionList(t, metricViewOptionList, metricViewMessageByValue)}
             buildPreviewUri={(metricView) => buildMetricViewPreviewUri(metricView, props.preview)}
         />
     );
 }
+
+const metricViewMessageByValue = {
+    circle: optionMessages.circleOption,
+    text: optionMessages.textOption,
+    bar: optionMessages.barOption,
+    line: optionMessages.lineOption,
+} as const;

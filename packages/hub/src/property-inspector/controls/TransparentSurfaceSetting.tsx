@@ -1,4 +1,6 @@
 import { InspectorItem } from "../components/InspectorItem";
+import { colorMessages } from "../../i18n/message-groups/color";
+import { useI18n } from "../../i18n/react";
 import { RangeSetting } from "./RangeSetting";
 import type { ResolvedTransparentSurfaceSettings } from "../../settings/resolved-settings";
 import type { ResolvedTransparentSurfaceSettingsOverride } from "../../settings/appearance-overrides";
@@ -14,9 +16,11 @@ export function TransparentSurfaceSetting({
     onPatch,
     disabled = false,
 }: TransparentSurfaceSettingProps): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
         <>
-            <InspectorItem label="Transparency">
+            <InspectorItem label={t(colorMessages.transparencyLabel)}>
                 <div className="override-toggle-control">
                     <label className="native-checkbox-row">
                         <input
@@ -25,27 +29,27 @@ export function TransparentSurfaceSetting({
                             disabled={disabled}
                             onChange={(event) => onPatch({ enabled: event.currentTarget.checked })}
                         />
-                        <span>Transparent background</span>
+                        <span>{t(colorMessages.transparentBackgroundLabel)}</span>
                     </label>
                     <p className="section-note">
-                        Affects theme background and chrome only. Metrics stay opaque.
+                        {t(colorMessages.transparencyNote)}
                     </p>
                 </div>
             </InspectorItem>
             <RangeSetting
-                label="Background Opacity"
+                label={t(colorMessages.backgroundOpacityLabel)}
                 value={value.backgroundOpacityPercent}
                 onValueChange={(backgroundOpacityPercent) => onPatch({ backgroundOpacityPercent })}
                 disabled={disabled}
             />
             <RangeSetting
-                label="Text Outline"
+                label={t(colorMessages.textOutlineLabel)}
                 value={value.textOutlinePercent}
                 onValueChange={(textOutlinePercent) => onPatch({ textOutlinePercent })}
                 disabled={disabled}
             />
             <RangeSetting
-                label="Shape Outline"
+                label={t(colorMessages.shapeOutlineLabel)}
                 value={value.shapeOutlinePercent}
                 onValueChange={(shapeOutlinePercent) => onPatch({ shapeOutlinePercent })}
                 disabled={disabled}

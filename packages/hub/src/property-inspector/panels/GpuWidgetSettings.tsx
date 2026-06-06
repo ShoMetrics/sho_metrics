@@ -1,4 +1,9 @@
 import { InspectorItem } from "../components/InspectorItem";
+import { commonMessages } from "../../i18n/message-groups/shell";
+import { gpuMessages } from "../../i18n/message-groups/widgets";
+import { optionMessages } from "../../i18n/message-groups/options";
+import { localizeOptionList } from "../../i18n/options";
+import { useI18n } from "../../i18n/react";
 import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import type { DisplayedMetricReadAttribution } from "../../runtime/widget-runtime-cache";
@@ -51,19 +56,20 @@ function GpuMetricSettings({
     target,
     onSettingsPatch,
 }: GpuWidgetSettingsProps): React.JSX.Element {
+    const { t } = useI18n();
     const optionList = buildGpuMetricKindOptionList(context.platform, target.reading.kind);
     const isSelectedReadingSupported = isGpuReadingSupportedOnCurrentPlatform(context.platform, target);
-    const noValueGuidance = resolveGpuNoValueGuidanceText(
+    const shouldShowNoValueGuidance = shouldShowGpuNoValueGuidance(
         context.isWindows,
         context.runtimeCache.displayedMetricReadAttribution,
     );
 
     return (
-        <SettingsSection title="Metric">
+        <SettingsSection title={t(commonMessages.metricSection)}>
             <SelectSetting
-                label="GPU Metric"
+                label={t(gpuMessages.gpuMetricLabel)}
                 value={target.reading.kind}
-                optionList={optionList}
+                optionList={localizeOptionList(t, optionList, gpuMetricKindMessageByValue)}
                 onValueChange={(kind) => onSettingsPatch({
                     gpu: { kind },
                 })}
@@ -71,7 +77,7 @@ function GpuMetricSettings({
             {!isSelectedReadingSupported && (
                 <InspectorItem className="note-item note-item-caption">
                     <p className="section-note">
-                        Current GPU metric is not supported on this platform. Choose a supported metric to continue.
+                        {t(gpuMessages.unsupportedGpuMetricNotice)}
                     </p>
                 </InspectorItem>
             )}
@@ -81,28 +87,28 @@ function GpuMetricSettings({
                     onSettingsPatch={onSettingsPatch}
                 />
             )}
-            {noValueGuidance !== undefined && (
+            {shouldShowNoValueGuidance && (
                 <InspectorItem className="note-item note-item-caption">
-                    <p className="section-note">{noValueGuidance}</p>
+                    <p className="section-note">{t(gpuMessages.gpuNoValueGuidance)}</p>
                 </InspectorItem>
             )}
         </SettingsSection>
     );
 }
 
-function resolveGpuNoValueGuidanceText(
+function shouldShowGpuNoValueGuidance(
     isWindows: boolean,
     attribution: DisplayedMetricReadAttribution | undefined,
-): string | undefined {
+): boolean {
     if (!isWindows || attribution?.metricKey.startsWith("gpu.") !== true) {
-        return undefined;
+        return false;
     }
 
     if (attribution.outcome?.kind === "value") {
-        return undefined;
+        return false;
     }
 
-    return "No GPU value is available from the current source. Intel and AMD GPU metrics usually require ShoMetrics Helper. If Helper is installed, restart it or open ShoMetrics Control Panel for diagnostics.";
+    return true;
 }
 
 function GpuTemperatureScaleSettings({
@@ -111,18 +117,20 @@ function GpuTemperatureScaleSettings({
 }: GpuWidgetSettingsProps & {
     reading: GpuTemperatureReading;
 }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
-        <SettingsSection title="Scale & Units">
+        <SettingsSection title={t(commonMessages.scaleUnitsSection)}>
             <SelectSetting
-                label="Unit"
+                label={t(commonMessages.unitLabel)}
                 value={reading.unit}
-                optionList={temperatureUnitOptionList}
+                optionList={localizeOptionList(t, temperatureUnitOptionList, temperatureUnitMessageByValue)}
                 onValueChange={(temperatureUnit) => onSettingsPatch({
                     gpu: { temperatureUnit },
                 })}
             />
             <NumberSetting
-                label="Max Temp (C)"
+                label={t(commonMessages.maxTempCLabel)}
                 value={reading.maximumCelsius}
                 onValueChange={(maximumTemperatureCelsius) => onSettingsPatch({
                     gpu: { maximumTemperatureCelsius },
@@ -140,10 +148,12 @@ function GpuPowerScaleSettings({
 }: GpuWidgetSettingsProps & {
     reading: GpuPowerReading;
 }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
-        <SettingsSection title="Scale & Units">
+        <SettingsSection title={t(commonMessages.scaleUnitsSection)}>
             <NumberSetting
-                label="Max Power (W)"
+                label={t(commonMessages.maxPowerWLabel)}
                 value={reading.maximumWatts}
                 onValueChange={(maximumGpuPowerWatts) => onSettingsPatch({
                     gpu: { maximumPowerWatts: maximumGpuPowerWatts },
@@ -155,6 +165,18 @@ function GpuPowerScaleSettings({
         </SettingsSection>
     );
 }
+
+const gpuMetricKindMessageByValue = {
+    usage: optionMessages.usageOption,
+    temperature: optionMessages.temperatureOption,
+    vram: optionMessages.vramOption,
+    power: optionMessages.powerOption,
+} as const;
+
+const temperatureUnitMessageByValue = {
+    celsius: optionMessages.celsiusOption,
+    fahrenheit: optionMessages.fahrenheitOption,
+} as const;
 
 function isGpuReadingSupportedOnCurrentPlatform(
     platform: PropertyInspectorPlatform,

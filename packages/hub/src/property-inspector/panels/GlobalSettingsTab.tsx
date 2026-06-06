@@ -1,4 +1,9 @@
 import { CircleVariantSetting } from "../controls/CircleVariantSetting";
+import { commonMessages } from "../../i18n/message-groups/shell";
+import { globalSettingsMessages } from "../../i18n/message-groups/settings";
+import { optionMessages } from "../../i18n/message-groups/options";
+import { localizeOptionList } from "../../i18n/options";
+import { useI18n } from "../../i18n/react";
 import { MetricViewSetting } from "../controls/MetricViewSetting";
 import { NumberSetting } from "../controls/NumberSetting";
 import { TerminalVariantSetting } from "../controls/TerminalVariantSetting";
@@ -52,6 +57,8 @@ export function GlobalSettingsTab({
     onSettingsPatch,
     onOpenColorCompensation,
 }: GlobalSettingsTabProps): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
         <div>
             <GlobalOverrideSection
@@ -101,7 +108,7 @@ export function GlobalSettingsTab({
                 diskThroughput={resolvedSettings.defaults.diskThroughput}
                 onDiskThroughputPatch={(diskThroughput) => onSettingsPatch({ diskThroughput })}
             />
-            <SettingsSection title="Advanced">
+            <SettingsSection title={t(commonMessages.advancedSection)}>
                 <ColorCompensationControls
                     profile={colorCompensationProfile}
                     onOpenColorCompensation={onOpenColorCompensation}
@@ -118,9 +125,11 @@ function GlobalOverrideSection({
     isGlobalOverrideEnabled: boolean;
     onOverrideChange: (isGlobalOverrideEnabled: boolean) => void;
 }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
-        <SettingsSection title="Override">
-            <InspectorItem label="Widgets">
+        <SettingsSection title={t(globalSettingsMessages.overrideSection)}>
+            <InspectorItem label={t(globalSettingsMessages.widgetsLabel)}>
                 <div className="override-toggle-control">
                     <label className="native-checkbox-row">
                         <input
@@ -128,10 +137,10 @@ function GlobalOverrideSection({
                             checked={isGlobalOverrideEnabled}
                             onChange={(event) => onOverrideChange(event.currentTarget.checked)}
                         />
-                        <span>Global override</span>
+                        <span>{t(globalSettingsMessages.globalOverrideLabel)}</span>
                     </label>
                     <p className="section-note">
-                        Temporarily override every widget without changing individual settings.
+                        {t(globalSettingsMessages.globalOverrideNote)}
                     </p>
                 </div>
             </InspectorItem>
@@ -150,12 +159,13 @@ function ViewOverrideSection({
     onOverrideChange: (isEnabled: boolean) => void;
     onViewPatch: (patch: NonNullable<StoredGlobalSettingsPatch["view"]>) => void;
 }): React.JSX.Element {
+    const { t } = useI18n();
     const preview = buildGlobalOverridePreview(viewOverride, themeOverride);
 
     return (
-        <SettingsSection title="View Override">
+        <SettingsSection title={t(globalSettingsMessages.viewOverrideSection)}>
             <OverrideSubsectionToggle
-                label="Override view"
+                label={t(globalSettingsMessages.overrideViewLabel)}
                 isEnabled={viewOverride !== undefined}
                 onValueChange={onOverrideChange}
             />
@@ -197,12 +207,13 @@ function ThemeOverrideSection({
     onOverrideChange: (isEnabled: boolean) => void;
     onThemePatch: (patch: NonNullable<StoredGlobalSettingsPatch["theme"]>) => void;
 }): React.JSX.Element {
+    const { t } = useI18n();
     const preview = buildGlobalOverridePreview(viewOverride, themeOverride);
 
     return (
-        <SettingsSection title="Theme Override">
+        <SettingsSection title={t(globalSettingsMessages.themeOverrideSection)}>
             <OverrideSubsectionToggle
-                label="Override theme"
+                label={t(globalSettingsMessages.overrideThemeLabel)}
                 isEnabled={themeOverride !== undefined}
                 onValueChange={onOverrideChange}
             />
@@ -250,10 +261,12 @@ function PaintOverrideSection({
     onOverrideChange: (isEnabled: boolean) => void;
     onPaintPatch: (patch: NonNullable<StoredGlobalSettingsPatch["paint"]>) => void;
 }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
-        <SettingsSection title="Color Override">
+        <SettingsSection title={t(globalSettingsMessages.colorOverrideSection)}>
             <OverrideSubsectionToggle
-                label="Override color"
+                label={t(globalSettingsMessages.overrideColorLabel)}
                 isEnabled={paintOverride !== undefined}
                 onValueChange={onOverrideChange}
             />
@@ -277,10 +290,12 @@ function TransparentSurfaceOverrideSection({
     onOverrideChange: (isEnabled: boolean) => void;
     onTransparentSurfacePatch: (patch: NonNullable<StoredGlobalSettingsPatch["transparentSurface"]>) => void;
 }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
-        <SettingsSection title="Transparent Surface Override">
+        <SettingsSection title={t(globalSettingsMessages.transparentSurfaceOverrideSection)}>
             <OverrideSubsectionToggle
-                label="Override transparent surface"
+                label={t(globalSettingsMessages.overrideTransparentSurfaceLabel)}
                 isEnabled={transparentSurfaceOverride !== undefined}
                 onValueChange={onOverrideChange}
             />
@@ -359,8 +374,10 @@ function OverrideSubsectionToggle({
     isEnabled: boolean;
     onValueChange: (isEnabled: boolean) => void;
 }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
-        <InspectorItem label="Enabled">
+        <InspectorItem label={t(commonMessages.enabledLabel)}>
             <label className="native-checkbox-row">
                 <input
                     type="checkbox"
@@ -380,20 +397,21 @@ function NetworkDefaultsSection({
     network: ResolvedNetworkDisplaySettings;
     onNetworkPatch: (patch: NonNullable<StoredGlobalSettingsPatch["network"]>) => void;
 }): React.JSX.Element {
+    const { t } = useI18n();
     const isAutoScale = network.scaleMode === "auto";
 
     return (
-        <SettingsSection title="Network Defaults">
+        <SettingsSection title={t(globalSettingsMessages.networkDefaultsSection)}>
             <SelectSetting
-                label="Unit"
+                label={t(commonMessages.unitLabel)}
                 value={network.unitBase}
                 optionList={networkUnitBaseOptionList}
                 onValueChange={(unitBase) => onNetworkPatch({ unitBase })}
             />
             <SelectSetting
-                label="Scale"
+                label={t(commonMessages.scaleLabel)}
                 value={network.scaleMode}
-                optionList={scaleModeOptionList}
+                optionList={localizeOptionList(t, scaleModeOptionList, scaleModeMessageByValue)}
                 onValueChange={(scaleMode) => onNetworkPatch({ scaleMode })}
             />
             <NumberSetting
@@ -427,14 +445,15 @@ function DiskThroughputDefaultsSection({
     diskThroughput: ResolvedDiskThroughputDisplaySettings;
     onDiskThroughputPatch: (patch: NonNullable<StoredGlobalSettingsPatch["diskThroughput"]>) => void;
 }): React.JSX.Element {
+    const { t } = useI18n();
     const isAutoScale = diskThroughput.scaleMode === "auto";
 
     return (
-        <SettingsSection title="Disk Throughput Defaults">
+        <SettingsSection title={t(globalSettingsMessages.diskThroughputDefaultsSection)}>
             <SelectSetting
-                label="Scale"
+                label={t(commonMessages.scaleLabel)}
                 value={diskThroughput.scaleMode}
-                optionList={scaleModeOptionList}
+                optionList={localizeOptionList(t, scaleModeOptionList, scaleModeMessageByValue)}
                 onValueChange={(scaleMode) => onDiskThroughputPatch({ scaleMode })}
             />
             <NumberSetting
@@ -460,3 +479,8 @@ function DiskThroughputDefaultsSection({
         </SettingsSection>
     );
 }
+
+const scaleModeMessageByValue = {
+    auto: optionMessages.autoOption,
+    custom: optionMessages.customOption,
+} as const;

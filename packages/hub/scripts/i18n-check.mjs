@@ -1,7 +1,22 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { validateLocalizedMessagePlaceholders } from "../src/i18n/format.ts";
-import { appMessages } from "../src/i18n/messages.ts";
+// Node can type-strip explicit leaf .ts imports, but it does not resolve the
+// extensionless imports inside src/i18n/messages.ts the way Rollup does.
+import { colorCompensationMessages } from "../src/i18n/message-groups/color-compensation.ts";
+import { colorMessages } from "../src/i18n/message-groups/color.ts";
+import { optionMessages } from "../src/i18n/message-groups/options.ts";
+import { settingsNoticeMessages, globalSettingsMessages } from "../src/i18n/message-groups/settings.ts";
+import { shellMessages, commonMessages } from "../src/i18n/message-groups/shell.ts";
+import {
+    catalogMessages,
+    cpuMessages,
+    diskMessages,
+    gpuMessages,
+    helperMessages,
+    networkMessages,
+    widgetMessages,
+} from "../src/i18n/message-groups/widgets.ts";
 import {
     buildStreamDeckLocaleJson,
     validateManifestLocalizationCatalog,
@@ -12,10 +27,26 @@ const pluginDirectory = "com.ez.sho-metrics.sdPlugin";
 const manifestPath = join(pluginDirectory, "manifest.json");
 const locales = ["en", "zh_CN", "ja"];
 
+const messageGroups = {
+    shellMessages,
+    commonMessages,
+    optionMessages,
+    widgetMessages,
+    cpuMessages,
+    gpuMessages,
+    diskMessages,
+    networkMessages,
+    colorMessages,
+    helperMessages,
+    catalogMessages,
+    settingsNoticeMessages,
+    globalSettingsMessages,
+    colorCompensationMessages,
+};
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 const errorList = [
     ...validateManifestLocalizationCatalog(manifest, manifestMessages),
-    ...validateCatalogPlaceholders("appMessages", appMessages),
+    ...validateCatalogPlaceholders("messageGroups", messageGroups),
     ...validateCatalogPlaceholders("manifestMessages.root", manifestMessages.root),
     ...Object.entries(manifestMessages.actions).flatMap(([actionUuid, actionMessages]) => [
         ...validateCatalogPlaceholders(`manifestMessages.actions.${actionUuid}`, actionMessages),
