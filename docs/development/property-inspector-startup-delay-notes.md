@@ -207,7 +207,52 @@ same shape: initial widget data can be available immediately while settings
 refresh and runtime-cache updates arrive later.
 
 The Step 1 message inventory lives in
-`docs/development/i18n-hub-implementation-plan.md`.
+`docs/development/archive/i18n-hub-implementation-plan.md`.
+
+## I18n Step 5 Post-Migration Validation
+
+Updated on June 6, 2026, after migrating Property Inspector copy to the Hub
+i18n runtime.
+
+Automated validation completed:
+
+```txt
+npm.cmd run i18n:check
+npm.cmd run build
+npm.cmd run test:unit
+npm.cmd run test:pi
+npx.cmd streamdeck validate com.ez.sho-metrics.sdPlugin
+```
+
+Observed results:
+
+- `i18n:check` passed.
+- `build` passed. Rollup reported only existing third-party Buf/CEL circular
+  dependency and `this` rewrite warnings.
+- `test:unit` passed: 901 tests.
+- `test:pi` passed: 16 tests.
+- Stream Deck CLI validation passed.
+- Generated locale files are present in the plugin directory:
+  - `packages/hub/com.ez.sho-metrics.sdPlugin/en.json`
+  - `packages/hub/com.ez.sho-metrics.sdPlugin/zh_CN.json`
+  - `packages/hub/com.ez.sho-metrics.sdPlugin/ja.json`
+
+No-flicker coverage:
+
+- The PI suite includes a deterministic test that renders the Property
+  Inspector root with Stream Deck language metadata and verifies the first
+  visible tab is already localized.
+- The i18n bootstrap still chooses locale from connection info before rendering
+  `App`; it does not wait for `getSettings()` or `getGlobalSettings()`.
+
+Manual runtime observation still required:
+
+- A real Stream Deck PI open must be repeated for `en`, `zh_CN`, `ja`, and
+  `zh_TW` to confirm the visible no-flicker behavior in the host webview.
+- The Step 1 timing numbers should be compared against a post-i18n PI open from
+  the same machine and Stream Deck version.
+- Do not add a permanent timing harness for this. Use temporary local
+  diagnostics only if the visible PI open suggests a regression.
 
 ## Follow-up Observation: Runtime Option Lists
 

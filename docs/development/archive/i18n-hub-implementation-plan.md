@@ -1,5 +1,7 @@
 # Hub I18n Implementation Plan
 
+Status: completed on June 6, 2026, and archived for historical context.
+
 ## Purpose
 
 Implement internationalization for Sho Metrics Hub and the Property Inspector
@@ -29,16 +31,17 @@ All other Stream Deck languages fall back to `en`. `zh_TW` also falls back to
 `en`; do not auto-convert `zh_CN` to `zh_TW` because regional wording and
 idioms differ and simplified-to-traditional conversion is not localization.
 
-## Current Facts
+## Pre-Implementation Facts
 
-These facts are from the current repository and official SDK docs:
+These facts were recorded before implementation from the repository and
+official SDK docs:
 
-- `packages/hub/com.ez.sho-metrics.sdPlugin/manifest.json` contains English
+- `packages/hub/com.ez.sho-metrics.sdPlugin/manifest.json` contained English
   root and action strings directly.
-- The plugin directory does not currently contain generated `en.json`,
-  `zh_CN.json`, or `ja.json` locale files.
+- The plugin directory did not contain generated `en.json`, `zh_CN.json`, or
+  `ja.json` locale files.
 - `packages/hub/src/property-inspector/stream-deck/stream-deck-client.ts`
-  models `RegistrationInfo.application.platform`, but does not yet model
+  modeled `RegistrationInfo.application.platform`, but did not model
   `RegistrationInfo.application.language`.
 - `docs/development/property-inspector-startup-delay-notes.md` records that PI
   connection info can resolve before widget/global settings. It also records
@@ -48,7 +51,7 @@ These facts are from the current repository and official SDK docs:
 - Elgato's localization files live in the `*.sdPlugin` directory and can
   override manifest root `Name`/`Description`, action `Name`/`Tooltip`, encoder
   trigger descriptions, state names, and custom `Localization` strings.
-- The repo currently has many hard-coded user-visible strings in
+- The repo had many hard-coded user-visible strings in
   `packages/hub/src/property-inspector/**`.
 
 ## Step 1 Inventory Result
@@ -402,6 +405,19 @@ Rules:
   `i18n:check` and tests.
 - If a runtime mode check is needed, it belongs in one i18n-owned module only.
 - Components and panels must only call `i18n.t(message, values?)`.
+
+Development-only locale override:
+
+- The PI locale resolver may honor a manual override only when
+  `__BUILD_MODE__ === "development"`.
+- Supported override values are `en`, `zh_CN`, and `ja`. Unsupported values are
+  ignored and the Stream Deck language remains the source.
+- The override is for checking translations only. It must not change stored
+  settings, proto, global settings, or production/staging builds.
+- Current dev flag: build with `SHO_METRICS_DEV_LOCALE_OVERRIDE=ja`.
+- The flag is injected by Rollup as `__DEV_LOCALE_OVERRIDE__`. It is a
+  build-time development flag, not a PI `localStorage` value and not a runtime
+  plugin-to-PI message.
 
 ### Hard-Coded Text Detection
 
