@@ -7,6 +7,8 @@ namespace ShoMetrics.Source.Windows.ControlPanel;
 internal static class ControlPanelStartupLog
 {
     private const string LogFileName = "shometrics-control-panel-startup.log";
+    private const long LogFileSizeLimitBytes = 1 * 1024 * 1024;
+    private const int RetainedLogFileCountLimit = 2;
 
     public static string LogFilePath => Path.Combine(ResolveLogDirectoryPath(), LogFileName);
 
@@ -44,7 +46,46 @@ internal static class ControlPanelStartupLog
     {
         string logDirectoryPath = ResolveLogDirectoryPath();
         Directory.CreateDirectory(logDirectoryPath);
+        RotateIfNeeded();
         File.AppendAllText(LogFilePath, line + Environment.NewLine);
+    }
+
+    private static void RotateIfNeeded()
+    {
+        // Startup logging is best-effort and intentionally lock-free. If two
+        // panel instances rotate at the same time, the caller catches any I/O
+        // failure so diagnostics cannot block startup.
+        var logFile = new FileInfo(LogFilePath);
+        if (!logFile.Exists || logFile.Length < LogFileSizeLimitBytes)
+        {
+            return;
+        }
+
+        for (int index = RetainedLogFileCountLimit; index >= 1; index--)
+        {
+            string sourcePath = BuildRotatedLogFilePath(index);
+
+            if (!File.Exists(sourcePath))
+            {
+                continue;
+            }
+
+            if (index == RetainedLogFileCountLimit)
+            {
+                File.Delete(sourcePath);
+                continue;
+            }
+
+            string targetPath = BuildRotatedLogFilePath(index + 1);
+            File.Move(sourcePath, targetPath, overwrite: true);
+        }
+
+        File.Move(LogFilePath, BuildRotatedLogFilePath(1), overwrite: true);
+    }
+
+    private static string BuildRotatedLogFilePath(int index)
+    {
+        return Path.Combine(ResolveLogDirectoryPath(), $"{LogFileName}.{index}");
     }
 
     private static string ResolveLogDirectoryPath()
