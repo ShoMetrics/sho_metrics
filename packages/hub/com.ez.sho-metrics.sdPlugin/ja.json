@@ -1,0 +1,28 @@
+{
+	"Name": "Sho Metrics",
+	"Description": "システム監視プラグイン",
+	"com.ez.sho-metrics.catalog-metric": {
+		"Name": "高度なセンサー",
+		"Tooltip": "LibreHardwareMonitor データなど、選択したメトリクスを 1 つ表示します。"
+	},
+	"com.ez.sho-metrics.cpu": {
+		"Name": "CPU",
+		"Tooltip": "CPU メトリクスを表示します。"
+	},
+	"com.ez.sho-metrics.disk": {
+		"Name": "ディスク",
+		"Tooltip": "ディスクメトリクスを表示します。"
+	},
+	"com.ez.sho-metrics.gpu": {
+		"Name": "GPU",
+		"Tooltip": "GPU メトリクスを表示します。"
+	},
+	"com.ez.sho-metrics.memory": {
+		"Name": "メモリ",
+		"Tooltip": "メモリメトリクスを表示します。"
+	},
+	"com.ez.sho-metrics.network": {
+		"Name": "ネットワーク",
+		"Tooltip": "ネットワークメトリクスを表示します。"
+	}
+}

@@ -1,0 +1,28 @@
+{
+	"Name": "Sho Metrics",
+	"Description": "系统监控插件",
+	"com.ez.sho-metrics.catalog-metric": {
+		"Name": "高级传感器",
+		"Tooltip": "显示一个选定指标（如：LibreHardwareMonitor 数据）。"
+	},
+	"com.ez.sho-metrics.cpu": {
+		"Name": "CPU",
+		"Tooltip": "显示 CPU 指标。"
+	},
+	"com.ez.sho-metrics.disk": {
+		"Name": "磁盘",
+		"Tooltip": "显示磁盘指标。"
+	},
+	"com.ez.sho-metrics.gpu": {
+		"Name": "GPU",
+		"Tooltip": "显示 GPU 指标。"
+	},
+	"com.ez.sho-metrics.memory": {
+		"Name": "内存",
+		"Tooltip": "显示内存指标。"
+	},
+	"com.ez.sho-metrics.network": {
+		"Name": "网络",
+		"Tooltip": "显示网络指标。"
+	}
+}

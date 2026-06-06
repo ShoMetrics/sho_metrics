@@ -122,7 +122,7 @@
 			"Name": "Advanced Sensor",
 			"UUID": "com.ez.sho-metrics.catalog-metric",
 			"Icon": "imgs/actions/catalog-metric/icon",
-			"Tooltip": "Displays one selected metric.",
+			"Tooltip": "Displays one selected metric, such as LibreHardwareMonitor data.",
 			"OS": [
 				"windows"
 			],
