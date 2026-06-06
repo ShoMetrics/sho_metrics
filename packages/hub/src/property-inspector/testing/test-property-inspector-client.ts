@@ -15,6 +15,7 @@ interface TestPropertyInspectorClientOptions {
     readonly actionUuid: string;
     readonly settings?: SettingsRecord;
     readonly globalSettings?: SettingsRecord;
+    readonly language?: string;
     readonly platform?: string;
 }
 
@@ -69,6 +70,7 @@ export class TestPropertyInspectorClient implements StreamDeckPropertyInspectorC
             },
             info: {
                 application: {
+                    language: options.language ?? "en",
                     platform: options.platform ?? "win32",
                 },
             },

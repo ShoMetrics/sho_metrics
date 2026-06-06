@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { appMessages } from "../i18n/messages";
+import { useI18n } from "../i18n/react";
 import { InspectorItem } from "./components/InspectorItem";
 import { ColorCompensationWizard } from "./color-compensation/ColorCompensationWizard";
 import { GlobalSettingsTab } from "./panels/GlobalSettingsTab";
@@ -14,13 +16,14 @@ interface AppProps {
 }
 
 const settingsTabs = [
-    { id: "widget", label: "Widget" },
-    { id: "global", label: "Global" },
+    { id: "widget", label: appMessages.widgetTab },
+    { id: "global", label: appMessages.globalTab },
 ] as const;
 
 type SettingsTabId = typeof settingsTabs[number]["id"];
 
 export function App({ client }: AppProps): React.JSX.Element {
+    const i18n = useI18n();
     const [activeTab, setActiveTab] = useState<SettingsTabId>("widget");
     const [isColorCompensationWizardOpen, setIsColorCompensationWizardOpen] = useState(false);
     const {
@@ -57,7 +60,7 @@ export function App({ client }: AppProps): React.JSX.Element {
 
     return (
         <div>
-            <div className="settings-tab-list" role="tablist" aria-label="Settings">
+            <div className="settings-tab-list" role="tablist" aria-label={i18n.t(appMessages.settingsTabListLabel)}>
                 {settingsTabs.map((tab) => (
                     <button
                         key={tab.id}
@@ -68,7 +71,7 @@ export function App({ client }: AppProps): React.JSX.Element {
                         data-selected={activeTab === tab.id ? "true" : "false"}
                         onClick={() => setActiveTab(tab.id)}
                     >
-                        {tab.label}
+                        {i18n.t(tab.label)}
                     </button>
                 ))}
             </div>

@@ -61,6 +61,7 @@ export interface ActionInfo {
 
 export interface RegistrationInfo {
     application?: {
+        language?: string;
         platform?: string;
         [key: string]: unknown;
     };
@@ -87,7 +88,9 @@ export interface ConnectionInfo {
     action?: string;
     actionInfo?: ActionInfo;
     application?: {
+        language?: string;
         platform?: string;
+        [key: string]: unknown;
     };
     info?: RegistrationInfo;
     propertyInspectorUUID?: string;
@@ -404,6 +407,17 @@ export function readPropertyInspectorPlatformValue(connectionInfo: ConnectionInf
     return connectionInfo.application?.platform
         ?? connectionInfo.info?.application?.platform
         ?? (typeof navigator === "undefined" ? "" : navigator.platform);
+}
+
+/**
+ * Reads the raw Stream Deck language value from PI registration metadata.
+ */
+export function readPropertyInspectorLanguageValue(connectionInfo: ConnectionInfo): unknown {
+    // The SDK registration payload is stored under info.application today.
+    // Keep the top-level application fallback with platform handling because
+    // tests and future callers may pass an already-flattened connection shape.
+    return connectionInfo.application?.language
+        ?? connectionInfo.info?.application?.language;
 }
 
 function createInitialSettingsEvent(actionInfo: ActionInfo): DidReceiveSettingsEvent | null {
