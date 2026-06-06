@@ -125,17 +125,15 @@ Use the GitHub Actions workflows as the release-grade source of truth.
 
 | Task | Command | Source of truth |
 | --- | --- | --- |
+| Local live preview (edit + auto-reload) | `hugo server --source site --disableFastRender` | `site/AGENTS.md` |
 | Site preview in CI | `Site Preview` workflow | `.github/workflows/site-preview.yml` |
 | Publish site/appcast | `Publish ShoMetrics site` workflow | `.github/workflows/site-publish.yml` |
-| Local site smoke after Hugo build | `./.github/scripts/Test-SitePreview.ps1 -PublicRoot site/public` | `.github/scripts/Test-SitePreview.ps1` |
+| Local build + smoke | `hugo --source site --destination public --minify` then `./.github/scripts/Test-SitePreview.ps1 -PublicRoot site/public` | `.github/scripts/Test-SitePreview.ps1` |
 
-For local preview, run Hugo from `site` if Hugo is installed:
-
-```powershell
-hugo --destination public --minify --printPathWarnings
-```
-
-Then run the site smoke command from the repository root.
+Run all commands from the repository root (`--source site` points Hugo at the
+site subtree). Live preview serves from memory at `http://localhost:1313/` and
+reloads on save; it does not write `site/public/`. Use the build + smoke row to
+verify the final generated output.
 
 ## Docs
 
