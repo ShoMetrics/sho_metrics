@@ -144,7 +144,7 @@ export const optionMessages = {
     circleOption: {
         en: "Circle",
         zh_CN: "圆环",
-        ja: "円",
+        ja: "リング",
     },
     textOption: {
         en: "Text",
