@@ -20,10 +20,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
           cache: true
@@ -41,7 +41,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: source-windows-unit-coverage
           path: packages/source-windows/TestResults
@@ -52,10 +52,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
           cache: true
@@ -71,7 +71,7 @@ jobs:
 
       - name: Upload integration diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: source-windows-integration-diagnostics
           path: packages/source-windows/IntegrationTestResults
@@ -82,10 +82,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
           cache: true
@@ -94,7 +94,7 @@ jobs:
             packages/installer/windows/inno/*.lock.json
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 24.x
           cache: npm
@@ -117,7 +117,7 @@ jobs:
         run: ./packages/installer/windows/Build-WindowsInstaller.ps1 -Configuration Release -RuntimeIdentifier win-x64 -ShoMetricsVersionPrefix 0.1.0 -Distribution FrameworkDependent
 
       - name: Upload installer artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: shometrics-helper-installer-win-x64
           path: artifacts/installer/windows/setup/**/*.exe
