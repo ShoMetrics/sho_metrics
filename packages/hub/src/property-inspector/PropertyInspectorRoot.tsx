@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { I18nProvider } from "../i18n/react";
-import { normalizeHubLocale } from "../i18n/locale";
+import { resolveHubLocale } from "../i18n/locale";
 import type { HubLocale } from "../i18n/types";
 import { App } from "./App";
 import {
@@ -21,7 +21,7 @@ export function PropertyInspectorRoot({ client }: PropertyInspectorRootProps): R
         void client.getConnectionInfo()
             .then((connectionInfo) => {
                 if (isMounted) {
-                    setLocale(normalizeHubLocale(readPropertyInspectorLanguageValue(connectionInfo)));
+                    setLocale(resolveHubLocale(readPropertyInspectorLanguageValue(connectionInfo)));
                 }
             })
             .catch(() => {

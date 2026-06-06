@@ -16,9 +16,6 @@ interface MetricSourceDiagnosticProps {
     readonly attribution: DisplayedMetricReadAttribution | undefined;
 }
 
-/** Build mode constant replaced by Rollup and globally declared in `src/env.d.ts`. */
-declare const __BUILD_MODE__: "development" | "staging" | "production" | undefined;
-
 const RELATIVE_TIME_REFRESH_MILLISECONDS = 500;
 
 const metricUnavailableTextByReason = {
