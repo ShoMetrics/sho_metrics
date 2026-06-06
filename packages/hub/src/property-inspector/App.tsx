@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { appMessages } from "../i18n/messages";
+import { shellMessages } from "../i18n/message-groups/shell";
 import { useI18n } from "../i18n/react";
 import { InspectorItem } from "./components/InspectorItem";
 import { ColorCompensationWizard } from "./color-compensation/ColorCompensationWizard";
@@ -16,14 +16,14 @@ interface AppProps {
 }
 
 const settingsTabs = [
-    { id: "widget", label: appMessages.widgetTab },
-    { id: "global", label: appMessages.globalTab },
+    { id: "widget", label: shellMessages.widgetTab },
+    { id: "global", label: shellMessages.globalTab },
 ] as const;
 
 type SettingsTabId = typeof settingsTabs[number]["id"];
 
 export function App({ client }: AppProps): React.JSX.Element {
-    const i18n = useI18n();
+    const { t } = useI18n();
     const [activeTab, setActiveTab] = useState<SettingsTabId>("widget");
     const [isColorCompensationWizardOpen, setIsColorCompensationWizardOpen] = useState(false);
     const {
@@ -60,7 +60,7 @@ export function App({ client }: AppProps): React.JSX.Element {
 
     return (
         <div>
-            <div className="settings-tab-list" role="tablist" aria-label={i18n.t(appMessages.settingsTabListLabel)}>
+            <div className="settings-tab-list" role="tablist" aria-label={t(shellMessages.settingsTabListLabel)}>
                 {settingsTabs.map((tab) => (
                     <button
                         key={tab.id}
@@ -71,7 +71,7 @@ export function App({ client }: AppProps): React.JSX.Element {
                         data-selected={activeTab === tab.id ? "true" : "false"}
                         onClick={() => setActiveTab(tab.id)}
                     >
-                        {i18n.t(tab.label)}
+                        {t(tab.label)}
                     </button>
                 ))}
             </div>
@@ -115,9 +115,11 @@ function SettingsNoticeSlot(options: {
 }
 
 function SettingsNoticeView({ notice }: { notice: SettingsNotice }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
         <InspectorItem className={`settings-notice settings-notice-${notice.kind}`}>
-            <p className="section-note">{notice.text}</p>
+            <p className="section-note">{t(notice.message, notice.values)}</p>
         </InspectorItem>
     );
 }

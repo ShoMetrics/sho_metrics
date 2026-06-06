@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
 import { InspectorItem } from "../components/InspectorItem";
+import { commonMessages } from "../../i18n/message-groups/shell";
+import { networkMessages } from "../../i18n/message-groups/widgets";
+import { optionMessages } from "../../i18n/message-groups/options";
+import { localizeOptionList } from "../../i18n/options";
+import { useI18n, type I18n } from "../../i18n/react";
 import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { TextSetting } from "../controls/TextSetting";
@@ -31,8 +36,6 @@ import {
 type NetworkWidgetSettingsProps = WidgetSettingsPanelProps & {
     target: ResolvedNetworkMetricTarget;
 };
-
-const PING_TARGET_VALIDATION_MESSAGE = "Enter an IP address, hostname, or URL.";
 
 type ResolvedNetworkTrafficMetricTarget = ResolvedNetworkMetricTarget & {
     readonly reading: Extract<ResolvedNetworkReading, { readonly kind: "traffic" }>;
@@ -68,17 +71,19 @@ function NetworkMetricSettings({
     target,
     onSettingsPatch,
 }: NetworkWidgetSettingsProps): React.JSX.Element {
+    const i18n = useI18n();
+    const { t } = i18n;
     const trafficTarget = readNetworkTrafficMetricTarget(target);
     const pingTargetHost = target.reading.kind === "ping"
         ? target.reading.targetHost
         : DEFAULT_NETWORK_PING_TARGET_HOST;
 
     return (
-        <SettingsSection title="Metric">
+        <SettingsSection title={t(commonMessages.metricSection)}>
             <SelectSetting
-                label="Network Metric"
+                label={t(networkMessages.networkMetricLabel)}
                 value={target.reading.kind}
-                optionList={networkMetricKindOptionList}
+                optionList={localizeOptionList(t, networkMetricKindOptionList, networkMetricKindMessageByValue)}
                 onValueChange={(kind) => onSettingsPatch({
                     network: { kind },
                 })}
@@ -105,6 +110,8 @@ function NetworkPingTargetSetting({
 }: Pick<NetworkWidgetSettingsProps, "onSettingsPatch"> & {
     readonly targetHost: string;
 }): React.JSX.Element {
+    const i18n = useI18n();
+    const { t } = i18n;
     const [draftTargetHost, setDraftTargetHost] = useState(targetHost);
     const [isEditing, setIsEditing] = useState(false);
     const [validationMessage, setValidationMessage] = useState("");
@@ -120,14 +127,14 @@ function NetworkPingTargetSetting({
 
     return (
         <TextSetting
-            label="Ping Target"
+            label={t(networkMessages.pingTargetLabel)}
             value={textValue}
             placeholder={DEFAULT_NETWORK_PING_TARGET_HOST}
             validationMessage={validationMessage}
             onFocus={() => setIsEditing(true)}
             onValueChange={(value) => {
                 setDraftTargetHost(value);
-                setValidationMessage(readPingTargetValidationMessage(value));
+                setValidationMessage(readPingTargetValidationMessage(i18n, value));
             }}
             onBlur={() => {
                 const normalizedTarget = normalizeNetworkPingTargetInput(draftTargetHost);
@@ -144,20 +151,22 @@ function NetworkPingTargetSetting({
                     return;
                 }
 
-                setValidationMessage(PING_TARGET_VALIDATION_MESSAGE);
+                setValidationMessage(t(networkMessages.pingTargetValidation));
             }}
         />
     );
 }
 
-function readPingTargetValidationMessage(value: string): string {
+function readPingTargetValidationMessage(i18n: I18n, value: string): string {
+    const { t } = i18n;
+
     if (value.trim().length === 0) {
         return "";
     }
 
     return normalizeNetworkPingTargetInput(value).status === "normalized"
         ? ""
-        : PING_TARGET_VALIDATION_MESSAGE;
+        : t(networkMessages.pingTargetValidation);
 }
 
 function NetworkTrafficMetricSettings({
@@ -165,27 +174,29 @@ function NetworkTrafficMetricSettings({
     target,
     onSettingsPatch,
 }: NetworkTrafficWidgetSettingsProps): React.JSX.Element {
+    const i18n = useI18n();
+    const { t } = i18n;
     const reading = target.reading;
 
     return (
         <>
             <SelectSetting
-                label="Direction"
+                label={t(commonMessages.directionLabel)}
                 value={reading.direction}
-                optionList={networkDirectionOptionList}
+                optionList={localizeOptionList(t, networkDirectionOptionList, networkDirectionMessageByValue)}
                 onValueChange={(direction) => onSettingsPatch({
                     network: { direction },
                 })}
             />
             {context.resolved.widget.slot.appearance.view.selectedView === "circle" && (
                 <InspectorItem className="note-item note-item-default">
-                    <p className="section-note">Upload and download split the circle into two halves.</p>
+                    <p className="section-note">{t(networkMessages.networkCircleSplitNote)}</p>
                 </InspectorItem>
             )}
             <SelectSetting
-                label="Network Interface"
+                label={t(networkMessages.networkInterfaceLabel)}
                 value={reading.interfaceId ?? ""}
-                optionList={resolveNetworkInterfaceOptions(context)}
+                optionList={resolveNetworkInterfaceOptions(context, i18n)}
                 onValueChange={(interfaceId) => onSettingsPatch({
                     network: { interfaceId },
                 })}
@@ -198,21 +209,23 @@ function NetworkScaleSettings({
     target,
     onSettingsPatch,
 }: NetworkTrafficWidgetSettingsProps): React.JSX.Element {
+    const i18n = useI18n();
+    const { t } = i18n;
     const display = target.reading.display;
     const isAutoScale = display.scaleMode === "auto";
 
     return (
-        <SettingsSection title="Scale & Units">
+        <SettingsSection title={t(commonMessages.scaleUnitsSection)}>
             <SelectSetting
-                label="Scale"
+                label={t(commonMessages.scaleLabel)}
                 value={display.scaleMode}
-                optionList={scaleModeOptionList}
+                optionList={localizeOptionList(t, scaleModeOptionList, scaleModeMessageByValue)}
                 onValueChange={(scaleMode) => onSettingsPatch({
                     network: { scaleMode },
                 })}
             />
             <NumberSetting
-                label="Upload Max (Mbps)"
+                label={t(networkMessages.uploadMaxMbpsLabel)}
                 value={display.maximumUploadSpeedMegabitsPerSecond}
                 onValueChange={(maximumUploadSpeedMegabitsPerSecond) => onSettingsPatch({
                     network: {
@@ -226,7 +239,7 @@ function NetworkScaleSettings({
                 disabled={isAutoScale}
             />
             <NumberSetting
-                label="Download Max (Mbps)"
+                label={t(networkMessages.downloadMaxMbpsLabel)}
                 value={display.maximumDownloadSpeedMegabitsPerSecond}
                 onValueChange={(maximumDownloadSpeedMegabitsPerSecond) => onSettingsPatch({
                     network: {
@@ -240,9 +253,9 @@ function NetworkScaleSettings({
                 disabled={isAutoScale}
             />
             <SelectSetting
-                label="Unit"
+                label={t(commonMessages.unitLabel)}
                 value={display.unitBase}
-                optionList={networkUnitBaseOptionList}
+                optionList={localizeOptionList(t, networkUnitBaseOptionList, networkUnitBaseMessageByValue)}
                 onValueChange={(unitBase) => onSettingsPatch({
                     network: { unitBase },
                 })}
@@ -260,3 +273,24 @@ function readNetworkTrafficMetricTarget(
 function isNetworkTrafficMetricTarget(target: ResolvedNetworkMetricTarget): target is ResolvedNetworkTrafficMetricTarget {
     return target.reading.kind === "traffic";
 }
+
+const networkMetricKindMessageByValue = {
+    traffic: optionMessages.trafficOption,
+    ping: optionMessages.pingOption,
+} as const;
+
+const networkDirectionMessageByValue = {
+    both: optionMessages.uploadDownloadOption,
+    upload: optionMessages.uploadOption,
+    download: optionMessages.downloadOption,
+} as const;
+
+const scaleModeMessageByValue = {
+    auto: optionMessages.autoOption,
+    custom: optionMessages.customOption,
+} as const;
+
+const networkUnitBaseMessageByValue = {
+    byte: optionMessages.bytePerSecondOption,
+    bit: optionMessages.bitPerSecondOption,
+} as const;

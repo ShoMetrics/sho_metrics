@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { InspectorItem } from "../components/InspectorItem";
+import { commonMessages } from "../../i18n/message-groups/shell";
+import { widgetMessages } from "../../i18n/message-groups/widgets";
+import { useI18n } from "../../i18n/react";
 import type { StoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
 import type { VisibilityContext } from "../inspector/types";
 import type { ColorCompensationProfile } from "../../color-compensation/types";
@@ -38,6 +41,7 @@ export function WidgetSettingsTab({
     onResetWidgetSettings,
     onOpenColorCompensation,
 }: WidgetSettingsTabProps): React.JSX.Element {
+    const { t } = useI18n();
     const [canShowPendingNotice, setCanShowPendingNotice] = useState(false);
     const isSettingsPending = context.actionKind === "unknown";
 
@@ -60,7 +64,7 @@ export function WidgetSettingsTab({
         return canShowPendingNotice
             ? (
                 <InspectorItem className="note-item note-item-caption">
-                    <p className="section-note">Loading widget settings...</p>
+                    <p className="section-note">{t(widgetMessages.loadingWidgetSettings)}</p>
                 </InspectorItem>
             )
             : <></>;
@@ -83,23 +87,23 @@ export function WidgetSettingsTab({
         <>
             {hasGlobalOverride && (
                 <InspectorItem className="note-item note-item-caption">
-                    <p className="section-note">Some settings are disabled since global override is enabled.</p>
+                    <p className="section-note">{t(widgetMessages.globalOverrideDisabledNote)}</p>
                 </InspectorItem>
             )}
             {renderMetricPanel(panelProps)}
-            <SettingsSection title="Advanced">
+            <SettingsSection title={t(commonMessages.advancedSection)}>
                 <ColorCompensationControls
                     profile={colorCompensationProfile}
                     onOpenColorCompensation={onOpenColorCompensation}
                 />
-                <InspectorItem className="widget-reset-item" label="Reset">
+                <InspectorItem className="widget-reset-item" label={t(commonMessages.resetLabel)}>
                     <div className="advanced-action-stack">
                         <button
                             className="inline-action-button"
                             type="button"
                             onClick={onResetWidgetSettings}
                         >
-                            Reset Widget Settings
+                            {t(widgetMessages.resetWidgetSettingsButton)}
                         </button>
                     </div>
                 </InspectorItem>
@@ -144,10 +148,12 @@ function renderMetricPanel(
 }
 
 function DomainMismatchNotice(): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
         <InspectorItem className="note-item note-item-caption">
             <p className="section-note">
-                Stored metric settings do not match this action. Reset widget settings to continue.
+                {t(widgetMessages.domainMismatchNotice)}
             </p>
         </InspectorItem>
     );

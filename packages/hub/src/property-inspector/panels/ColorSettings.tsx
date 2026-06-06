@@ -19,6 +19,12 @@ import {
     buildMetricAccentPaintAppearanceOverride,
     buildTerminalPaintAppearanceOverride,
 } from "../../settings/appearance-overrides";
+import { colorMessages } from "../../i18n/message-groups/color";
+import { commonMessages } from "../../i18n/message-groups/shell";
+import { optionMessages } from "../../i18n/message-groups/options";
+import { localizeOptionList } from "../../i18n/options";
+import { useI18n } from "../../i18n/react";
+import type { LocalizedMessage } from "../../i18n/types";
 import {
     resolveActiveColorFilledPaint,
     resolveActiveMetricAccentPaint,
@@ -57,18 +63,18 @@ const solidColorKeyByChannel = {
 } satisfies Record<MetricChannelKey, SolidColorKey>;
 
 const networkColorChannels = [
-    { channel: "upload", heading: "Color - Upload" },
-    { channel: "download", heading: "Color - Download" },
+    { channel: "upload", heading: colorMessages.colorUploadHeading },
+    { channel: "download", heading: colorMessages.colorDownloadHeading },
 ] as const satisfies readonly ChannelColorSectionSettings[];
 
 const diskThroughputColorChannels = [
-    { channel: "diskRead", heading: "Read" },
-    { channel: "diskWrite", heading: "Write" },
+    { channel: "diskRead", heading: optionMessages.readOption },
+    { channel: "diskWrite", heading: optionMessages.writeOption },
 ] as const satisfies readonly ChannelColorSectionSettings[];
 
 interface ChannelColorSectionSettings {
     readonly channel: MetricColorChannelKey;
-    readonly heading: string;
+    readonly heading: LocalizedMessage;
 }
 
 function patchMetricPaintSettings(
@@ -97,6 +103,7 @@ function patchTerminalPaintSettings(
 }
 
 export function StandardColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
+    const { t } = useI18n();
     const { context } = props;
     const appearance = context.resolved.widget.slot.appearance;
     const selectedTheme = appearance.theme.selectedTheme;
@@ -115,8 +122,8 @@ export function StandardColorSettings(props: WidgetSettingsPanelProps): React.JS
     }
 
     return (
-        <SettingsSection title="Colors">
-            <SectionHeading text="Color Settings" />
+        <SettingsSection title={t(commonMessages.colorsSection)}>
+            <SectionHeading text={t(colorMessages.colorSettingsHeading)} />
             <MetricColorControls
                 colorMode={metricPaint.colorMode}
                 solidColor={metricPaint.solid.colors.usageColor}
@@ -184,13 +191,14 @@ export function MetricColorControls({
     onMultiColorGradientChange,
     disabled = false,
 }: MetricColorControlsProps): React.JSX.Element {
+    const { t } = useI18n();
     let colorFields: React.JSX.Element | null = null;
 
     if (colorMode === "solid") {
         colorFields = (
             <>
                 <ColorSetting
-                    label="Solid Color"
+                    label={t(colorMessages.solidColorLabel)}
                     value={solidColor}
                     onValueChange={onSolidColorChange}
                     disabled={disabled}
@@ -227,9 +235,9 @@ export function MetricColorControls({
     return (
         <>
             <SelectSetting
-                label="Color Mode"
+                label={t(colorMessages.colorModeLabel)}
                 value={colorMode}
-                optionList={metricPaintColorModeOptionList}
+                optionList={localizeOptionList(t, metricPaintColorModeOptionList, metricPaintColorModeMessageByValue)}
                 onValueChange={onColorModeChange}
                 disabled={disabled}
             />
@@ -239,6 +247,7 @@ export function MetricColorControls({
 }
 
 export function NetworkChannelColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
+    const { t } = useI18n();
     if (props.context.resolved.widget.slot.appearance.theme.selectedTheme === "color-filled") {
         return <ColorFilledSettingsSection {...props} />;
     }
@@ -255,8 +264,8 @@ export function NetworkChannelColorSettings(props: WidgetSettingsPanelProps): Re
     const shouldShowChannelColors = metricPaint.colorMode !== "black-white";
 
     return (
-        <SettingsSection title="Colors">
-            <SectionHeading text="Color Settings" />
+        <SettingsSection title={t(commonMessages.colorsSection)}>
+            <SectionHeading text={t(colorMessages.colorSettingsHeading)} />
             <ColorModeSetting {...props} />
             <MetricGradientSetting {...props} />
             <ChannelThresholdControls {...props} />
@@ -277,6 +286,7 @@ export function NetworkChannelColorSettings(props: WidgetSettingsPanelProps): Re
 }
 
 export function DiskThroughputChannelColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
+    const { t } = useI18n();
     if (props.context.resolved.widget.slot.appearance.theme.selectedTheme === "color-filled") {
         return <ColorFilledSettingsSection {...props} />;
     }
@@ -293,8 +303,8 @@ export function DiskThroughputChannelColorSettings(props: WidgetSettingsPanelPro
     const shouldShowChannelColors = metricPaint.colorMode !== "black-white";
 
     return (
-        <SettingsSection title="Colors">
-            <SectionHeading text="Color Settings" />
+        <SettingsSection title={t(commonMessages.colorsSection)}>
+            <SectionHeading text={t(colorMessages.colorSettingsHeading)} />
             <ColorModeSetting {...props} />
             <MetricGradientSetting {...props} />
             <ChannelThresholdControls {...props} />
@@ -319,6 +329,7 @@ function ColorModeSetting({
     onSettingsPatch,
     colorDisabled = false,
 }: WidgetSettingsPanelProps): React.JSX.Element {
+    const { t } = useI18n();
     const appearance = context.resolved.widget.slot.appearance;
     const metricPaint = resolveActiveMetricAccentPaint(appearance);
     if (metricPaint === undefined) {
@@ -327,9 +338,9 @@ function ColorModeSetting({
 
     return (
         <SelectSetting
-            label="Color Mode"
+            label={t(colorMessages.colorModeLabel)}
             value={metricPaint.colorMode}
-            optionList={metricPaintColorModeOptionList}
+            optionList={localizeOptionList(t, metricPaintColorModeOptionList, metricPaintColorModeMessageByValue)}
             onValueChange={(colorMode) => patchMetricPaintSettings(
                 onSettingsPatch,
                 appearance.theme.selectedTheme,
@@ -355,11 +366,13 @@ function MultiColorSettings({
     readonly onThresholdPatch: (patch: ThresholdPercentPatch) => void;
     readonly disabled?: boolean | undefined;
 }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
         <>
-            <SectionHeading text="Range Colors" />
+            <SectionHeading text={t(colorMessages.rangeColorsHeading)} />
             <InspectorItem className="note-item note-item-default">
-                <p className="section-note">Set the percentage ranges that choose low, medium, or high color.</p>
+                <p className="section-note">{t(colorMessages.rangeColorsNote)}</p>
             </InspectorItem>
             <ThresholdRangeSettings
                 lowThresholdPercent={lowThresholdPercent}
@@ -368,21 +381,21 @@ function MultiColorSettings({
                 disabled={disabled}
             />
             <ColorBandSetting
-                label="Low Color"
+                label={t(colorMessages.lowColorLabel)}
                 value={colors.lowColor}
                 onValueChange={(lowColor) => onMultiColorPatch({ lowColor })}
                 bandText={`0-${lowThresholdPercent}%`}
                 disabled={disabled}
             />
             <ColorBandSetting
-                label="Medium Color"
+                label={t(colorMessages.mediumColorLabel)}
                 value={colors.mediumColor}
                 onValueChange={(mediumColor) => onMultiColorPatch({ mediumColor })}
                 bandText={`${lowThresholdPercent}-${highThresholdPercent}%`}
                 disabled={disabled}
             />
             <ColorBandSetting
-                label="High Color"
+                label={t(colorMessages.highColorLabel)}
                 value={colors.highColor}
                 onValueChange={(highColor) => onMultiColorPatch({ highColor })}
                 bandText={`${highThresholdPercent}-100%`}
@@ -393,6 +406,7 @@ function MultiColorSettings({
 }
 
 function ColorFilledSettingsSection(props: WidgetSettingsPanelProps): React.JSX.Element {
+    const { t } = useI18n();
     const appearance = props.context.resolved.widget.slot.appearance;
     const colorFilledPaint = resolveActiveColorFilledPaint(appearance);
     if (colorFilledPaint === undefined) {
@@ -400,8 +414,8 @@ function ColorFilledSettingsSection(props: WidgetSettingsPanelProps): React.JSX.
     }
 
     return (
-        <SettingsSection title="Colors">
-            <SectionHeading text="Color Filled" />
+        <SettingsSection title={t(commonMessages.colorsSection)}>
+            <SectionHeading text={t(optionMessages.colorFilledOption)} />
             <ColorFilledPaintControls
                 colorFilled={colorFilledPaint}
                 onColorModeChange={(colorMode) => patchColorFilledPaintSettings(props.onSettingsPatch, { colorMode })}
@@ -414,6 +428,7 @@ function ColorFilledSettingsSection(props: WidgetSettingsPanelProps): React.JSX.
 }
 
 function TerminalPaintSettingsSection(props: WidgetSettingsPanelProps): React.JSX.Element {
+    const { t } = useI18n();
     const appearance = props.context.resolved.widget.slot.appearance;
     const terminalPaint = resolveActiveTerminalPaint(appearance);
     if (terminalPaint === undefined) {
@@ -421,8 +436,8 @@ function TerminalPaintSettingsSection(props: WidgetSettingsPanelProps): React.JS
     }
 
     return (
-        <SettingsSection title="Colors">
-            <SectionHeading text="Terminal" />
+        <SettingsSection title={t(commonMessages.colorsSection)}>
+            <SectionHeading text={t(optionMessages.terminalOption)} />
             <TerminalPaintControls
                 terminalPaint={terminalPaint}
                 onPaintPatch={(paint) => patchTerminalPaintSettings(props.onSettingsPatch, paint)}
@@ -441,11 +456,13 @@ export function TerminalPaintControls({
     readonly onPaintPatch: (patch: ResolvedTerminalPaintSettingsOverride) => void;
     readonly disabled?: boolean | undefined;
 }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
         <SelectSetting
-            label="Phosphor"
+            label={t(colorMessages.phosphorLabel)}
             value={terminalPaint.preset}
-            optionList={terminalPaletteOptionList}
+            optionList={localizeOptionList(t, terminalPaletteOptionList, terminalPaletteMessageByValue)}
             onValueChange={(preset) => onPaintPatch({ preset })}
             disabled={disabled}
         />
@@ -463,6 +480,8 @@ function ColorFilledActiveColorControls({
     readonly onMultiColorPatch: (patch: ResolvedColorFilledMultiColorPaintSettingsOverride) => void;
     readonly disabled?: boolean | undefined;
 }): React.JSX.Element | null {
+    const { t } = useI18n();
+
     if (colorFilled.colorMode === "black-white") {
         return null;
     }
@@ -471,7 +490,7 @@ function ColorFilledActiveColorControls({
         return (
             <>
                 <ColorSetting
-                    label="Background Color"
+                    label={t(colorMessages.backgroundColorLabel)}
                     value={colorFilled.solid.color}
                     onValueChange={(color) => onSolidPatch({ color })}
                     disabled={disabled}
@@ -487,7 +506,7 @@ function ColorFilledActiveColorControls({
 
     return (
         <>
-            <SectionHeading text="Color Mix" />
+            <SectionHeading text={t(optionMessages.colorMixOption)} />
             <SoftTriangleColorSettings
                 colors={colorFilled.multiColor.colors}
                 onColorPatch={(colors) => onMultiColorPatch({ colors })}
@@ -515,12 +534,14 @@ export function ColorFilledPaintControls({
     readonly onMultiColorPatch: (patch: ResolvedColorFilledMultiColorPaintSettingsOverride) => void;
     readonly disabled?: boolean | undefined;
 }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
         <>
             <SelectSetting
-                label="Color Mode"
+                label={t(colorMessages.colorModeLabel)}
                 value={colorFilled.colorMode}
-                optionList={colorFilledColorModeOptionList}
+                optionList={localizeOptionList(t, colorFilledColorModeOptionList, colorFilledColorModeMessageByValue)}
                 onValueChange={onColorModeChange}
                 disabled={disabled}
             />
@@ -543,27 +564,29 @@ function SoftTriangleColorSettings({
     readonly onColorPatch: (patch: ResolvedMultiColorSetOverride) => void;
     readonly disabled: boolean;
 }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
         <>
             <ColorBandSetting
-                label="Left Color"
+                label={t(colorMessages.leftColorLabel)}
                 value={colors.lowColor}
                 onValueChange={(lowColor) => onColorPatch({ lowColor })}
-                bandText="Left"
+                bandText={t(colorMessages.leftLabel)}
                 disabled={disabled}
             />
             <ColorBandSetting
-                label="Right Color"
+                label={t(colorMessages.rightColorLabel)}
                 value={colors.mediumColor}
                 onValueChange={(mediumColor) => onColorPatch({ mediumColor })}
-                bandText="Right"
+                bandText={t(colorMessages.rightLabel)}
                 disabled={disabled}
             />
             <ColorBandSetting
-                label="Bottom Color"
+                label={t(colorMessages.bottomColorLabel)}
                 value={colors.highColor}
                 onValueChange={(highColor) => onColorPatch({ highColor })}
-                bandText="Bottom"
+                bandText={t(colorMessages.bottomLabel)}
                 disabled={disabled}
             />
         </>
@@ -579,8 +602,10 @@ function GradientSetting({
     readonly onValueChange: (isEnabled: boolean) => void;
     readonly disabled: boolean;
 }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
-        <InspectorItem label="Gradient">
+        <InspectorItem label={t(colorMessages.gradientLabel)}>
             <label className="native-checkbox-row">
                 <input
                     type="checkbox"
@@ -588,13 +613,14 @@ function GradientSetting({
                     disabled={disabled}
                     onChange={(event) => onValueChange(event.currentTarget.checked)}
                 />
-                <span>Smooth gradient</span>
+                <span>{t(colorMessages.smoothGradientLabel)}</span>
             </label>
         </InspectorItem>
     );
 }
 
 function ChannelThresholdControls(props: WidgetSettingsPanelProps): React.JSX.Element | null {
+    const { t } = useI18n();
     const appearance = props.context.resolved.widget.slot.appearance;
     const metricPaint = resolveActiveMetricAccentPaint(appearance);
 
@@ -604,7 +630,7 @@ function ChannelThresholdControls(props: WidgetSettingsPanelProps): React.JSX.El
 
     return (
         <>
-            <SectionHeading text="Range Colors" />
+            <SectionHeading text={t(colorMessages.rangeColorsHeading)} />
             <ThresholdRangeSettings
                 lowThresholdPercent={metricPaint.multiColor.lowThresholdPercent}
                 highThresholdPercent={metricPaint.multiColor.highThresholdPercent}
@@ -665,10 +691,12 @@ function ThresholdRangeSettings({
     readonly onThresholdPatch: (patch: ThresholdPercentPatch) => void;
     readonly disabled?: boolean | undefined;
 }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
         <>
             <RangeSetting
-                label="Low Ends At"
+                label={t(colorMessages.lowEndsAtLabel)}
                 value={lowThresholdPercent}
                 minimum={0}
                 maximum={100}
@@ -686,7 +714,7 @@ function ThresholdRangeSettings({
                 disabled={disabled}
             />
             <RangeSetting
-                label="High Starts At"
+                label={t(colorMessages.highStartsAtLabel)}
                 value={highThresholdPercent}
                 minimum={0}
                 maximum={100}
@@ -712,9 +740,11 @@ function ChannelColorSection({
     heading,
     ...props
 }: WidgetSettingsPanelProps & ChannelColorSectionSettings): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
         <>
-            <SectionHeading text={heading} />
+            <SectionHeading text={t(heading)} />
             <ChannelColorFields {...props} channel={channel} />
         </>
     );
@@ -728,6 +758,7 @@ function ChannelColorFields({
 }: WidgetSettingsPanelProps & {
     channel: MetricColorChannelKey;
 }): React.JSX.Element {
+    const { t } = useI18n();
     const appearance = context.resolved.widget.slot.appearance;
     const selectedTheme = appearance.theme.selectedTheme;
     const metricPaint = resolveActiveMetricAccentPaint(appearance);
@@ -762,7 +793,7 @@ function ChannelColorFields({
     if (metricPaint.colorMode !== "multi-color") {
         return (
             <ColorSetting
-                label="Solid Color"
+                label={t(colorMessages.solidColorLabel)}
                 value={metricPaint.solid.colors[solidColorKey]}
                 onValueChange={patchSolidChannelColor}
                 disabled={colorDisabled}
@@ -773,19 +804,19 @@ function ChannelColorFields({
     return (
         <>
             <ColorSetting
-                label="Low Color"
+                label={t(colorMessages.lowColorLabel)}
                 value={metricPaint.multiColor.colors[channel].lowColor}
                 onValueChange={(lowColor) => patchMultiColorChannel("lowColor", lowColor)}
                 disabled={colorDisabled}
             />
             <ColorSetting
-                label="Medium Color"
+                label={t(colorMessages.mediumColorLabel)}
                 value={metricPaint.multiColor.colors[channel].mediumColor}
                 onValueChange={(mediumColor) => patchMultiColorChannel("mediumColor", mediumColor)}
                 disabled={colorDisabled}
             />
             <ColorSetting
-                label="High Color"
+                label={t(colorMessages.highColorLabel)}
                 value={metricPaint.multiColor.colors[channel].highColor}
                 onValueChange={(highColor) => patchMultiColorChannel("highColor", highColor)}
                 disabled={colorDisabled}
@@ -793,3 +824,22 @@ function ChannelColorFields({
         </>
     );
 }
+
+const metricPaintColorModeMessageByValue = {
+    "multi-color": optionMessages.rangeColorsOption,
+    solid: optionMessages.solidColorOption,
+    "black-white": optionMessages.blackWhiteOption,
+} as const;
+
+const colorFilledColorModeMessageByValue = {
+    "multi-color": optionMessages.colorMixOption,
+    solid: optionMessages.solidColorOption,
+    "black-white": optionMessages.blackWhiteOption,
+} as const;
+
+const terminalPaletteMessageByValue = {
+    green: optionMessages.greenOption,
+    amber: optionMessages.amberOption,
+    cyan: optionMessages.cyanOption,
+    white: optionMessages.whiteOption,
+} as const;

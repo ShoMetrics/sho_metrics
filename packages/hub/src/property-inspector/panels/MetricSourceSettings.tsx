@@ -1,3 +1,7 @@
+import { commonMessages } from "../../i18n/message-groups/shell";
+import { optionMessages } from "../../i18n/message-groups/options";
+import { localizeOptionList } from "../../i18n/options";
+import { useI18n } from "../../i18n/react";
 import { SelectSetting } from "../controls/SelectSetting";
 import type { SelectOption } from "../inspector/types";
 import {
@@ -29,6 +33,7 @@ export function MetricSourceSettings({
     sourcePolicy,
     onSettingsPatch,
 }: MetricSourceSettingsProps): React.JSX.Element {
+    const { t } = useI18n();
     const sourcePreference = resolveLocalMetricSourcePreference(sourcePolicy);
     const optionList = sourcePreference === "custom"
         ? [...sourcePreferenceOptionList, customSourcePreferenceOption]
@@ -36,9 +41,9 @@ export function MetricSourceSettings({
 
     return (
         <SelectSetting
-            label="Source"
+            label={t(commonMessages.sourceLabel)}
             value={sourcePreference}
-            optionList={optionList}
+            optionList={localizeOptionList(t, optionList, sourcePreferenceMessageByValue)}
             onValueChange={(nextSourcePreference) => {
                 if (nextSourcePreference === "custom") {
                     return;
@@ -51,6 +56,13 @@ export function MetricSourceSettings({
         />
     );
 }
+
+const sourcePreferenceMessageByValue = {
+    auto: optionMessages.autoRecommendedOption,
+    "windows-helper": optionMessages.preferHelperOption,
+    "node-system": optionMessages.preferBuiltInOption,
+    custom: optionMessages.customSourceOption,
+} as const;
 
 function resolveLocalMetricSourcePreference(
     sourcePolicy: ResolvedMetricSourcePolicy,

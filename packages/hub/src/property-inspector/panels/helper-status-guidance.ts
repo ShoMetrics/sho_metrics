@@ -1,7 +1,10 @@
+import { helperMessages } from "../../i18n/message-groups/widgets";
+import type { I18n } from "../../i18n/react";
 import type { SourceClientStatus } from "../../runtime/sources/source-client";
 
 interface HelperStatusGuidanceOptions {
-    readonly installSubject: "advanced sensors" | "this metric";
+    readonly i18n: I18n;
+    readonly installSubject: "catalogMetrics" | "thisMetric";
 }
 
 /**
@@ -20,12 +23,16 @@ export function resolveHelperStatusGuidanceText(
 
     switch (sourceStatus.reason) {
         case "helperNotInstalled":
-            return `Install ShoMetrics Helper to use ${options.installSubject}.`;
+            return options.i18n.t(helperMessages.helperNotInstalledGuidance, {
+                subject: options.i18n.t(options.installSubject === "catalogMetrics"
+                    ? helperMessages.helperInstallCatalogMetrics
+                    : helperMessages.helperInstallThisMetric),
+            });
         case "helperStopped":
-            return "Start ShoMetrics Helper from ShoMetrics Control Panel.";
+            return options.i18n.t(helperMessages.helperStoppedGuidance);
         case "protocolMismatch":
-            return "Update ShoMetrics Helper and Hub to the latest version.";
+            return options.i18n.t(helperMessages.helperProtocolMismatchGuidance);
         default:
-            return "Open ShoMetrics Control Panel for helper diagnostics.";
+            return options.i18n.t(helperMessages.helperDiagnosticsGuidance);
     }
 }

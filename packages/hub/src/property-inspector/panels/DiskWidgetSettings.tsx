@@ -1,5 +1,10 @@
 import { InspectorItem } from "../components/InspectorItem";
 import { SectionHeading } from "../components/SectionHeading";
+import { catalogMessages, diskMessages } from "../../i18n/message-groups/widgets";
+import { commonMessages } from "../../i18n/message-groups/shell";
+import { optionMessages } from "../../i18n/message-groups/options";
+import { localizeOptionList } from "../../i18n/options";
+import { useI18n } from "../../i18n/react";
 import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { TextSetting } from "../controls/TextSetting";
@@ -36,8 +41,6 @@ type DiskWidgetSettingsProps = WidgetSettingsPanelProps & {
 const aggregateDiskVolumeOptionList = [
     { value: "", label: "All disks" },
 ] as const;
-const DISK_THROUGHPUT_AGGREGATE_NOTE =
-    "Showing aggregate disk read/write. Per-disk monitoring is not available in this version.";
 
 export function DiskWidgetSettings(props: DiskWidgetSettingsProps): React.JSX.Element {
     const reading = props.target.reading;
@@ -71,17 +74,19 @@ export function DiskWidgetSettings(props: DiskWidgetSettingsProps): React.JSX.El
 function DiskUsageMetricSettings(props: DiskWidgetSettingsProps & {
     reading: DiskUsageReading;
 }): React.JSX.Element {
+    const i18n = useI18n();
+    const { t } = i18n;
     const selectedDiskVolumeId = props.target.volumeId
         ?? resolveSelectedDiskVolume(props.context)?.id
         ?? "";
 
     return (
-        <SettingsSection title="Metric">
+        <SettingsSection title={t(commonMessages.metricSection)}>
             <DiskMetricKindSetting {...props} currentKind={props.reading.kind} />
             <SelectSetting
-                label="Volume"
+                label={t(commonMessages.volumeLabel)}
                 value={selectedDiskVolumeId}
-                optionList={resolveDiskVolumeOptions(props.context, selectedDiskVolumeId)}
+                optionList={resolveDiskVolumeOptions(props.context, selectedDiskVolumeId, i18n)}
                 onValueChange={(volumeId) => props.onSettingsPatch({
                     disk: { volumeId },
                 })}
@@ -93,16 +98,18 @@ function DiskUsageMetricSettings(props: DiskWidgetSettingsProps & {
 function DiskUsageExtraSettings(props: DiskWidgetSettingsProps & {
     reading: DiskUsageReading;
 }): React.JSX.Element {
+    const i18n = useI18n();
+    const { t } = i18n;
     const selectedView = props.context.resolved.widget.slot.appearance.view.selectedView;
 
     return (
         <>
             {(selectedView === "circle" || selectedView === "text") && (
-                <SettingsSection title="Scale & Units">
-                    <SelectSetting
-                        label="Usage Display"
+                <SettingsSection title={t(commonMessages.scaleUnitsSection)}>
+                <SelectSetting
+                        label={t(diskMessages.usageDisplayLabel)}
                         value={props.reading.displayMode}
-                        optionList={diskUsageDisplayModeOptionList}
+                        optionList={localizeOptionList(t, diskUsageDisplayModeOptionList, diskUsageDisplayModeMessageByValue)}
                         onValueChange={(usageDisplayMode) => props.onSettingsPatch({
                             disk: { usageDisplayMode },
                         })}
@@ -117,27 +124,30 @@ function DiskUsageExtraSettings(props: DiskWidgetSettingsProps & {
 function DiskThroughputMetricSettings(props: DiskWidgetSettingsProps & {
     reading: DiskThroughputReading;
 }): React.JSX.Element {
+    const i18n = useI18n();
+    const { t } = i18n;
+
     return (
-        <SettingsSection title="Metric">
+        <SettingsSection title={t(commonMessages.metricSection)}>
             <DiskMetricKindSetting {...props} currentKind={props.reading.kind} />
             <SelectSetting
-                label="Direction"
+                label={t(commonMessages.directionLabel)}
                 value={props.reading.direction}
-                optionList={diskThroughputDirectionOptionList}
+                optionList={localizeOptionList(t, diskThroughputDirectionOptionList, diskThroughputDirectionMessageByValue)}
                 onValueChange={(throughputDirection) => props.onSettingsPatch({
                     disk: { throughputDirection },
                 })}
             />
             <SelectSetting
-                label="Volume"
+                label={t(commonMessages.volumeLabel)}
                 value=""
-                optionList={aggregateDiskVolumeOptionList}
+                optionList={localizeOptionList(t, aggregateDiskVolumeOptionList, aggregateDiskVolumeMessageByValue)}
                 onValueChange={() => undefined}
                 disabled
             />
             <InspectorItem>
                 <div className="readonly-inline">
-                    <span className="readonly-text">{DISK_THROUGHPUT_AGGREGATE_NOTE}</span>
+                    <span className="readonly-text">{t(diskMessages.diskAggregateNote)}</span>
                 </div>
             </InspectorItem>
         </SettingsSection>
@@ -147,21 +157,23 @@ function DiskThroughputMetricSettings(props: DiskWidgetSettingsProps & {
 function DiskThroughputScaleSettings(props: DiskWidgetSettingsProps & {
     reading: DiskThroughputReading;
 }): React.JSX.Element {
+    const i18n = useI18n();
+    const { t } = i18n;
     const display = props.reading.display;
     const isAutoScale = display.scaleMode === "auto";
 
     return (
-        <SettingsSection title="Scale & Units">
+        <SettingsSection title={t(commonMessages.scaleUnitsSection)}>
             <SelectSetting
-                label="Scale"
+                label={t(commonMessages.scaleLabel)}
                 value={display.scaleMode}
-                optionList={scaleModeOptionList}
+                optionList={localizeOptionList(t, scaleModeOptionList, scaleModeMessageByValue)}
                 onValueChange={(scaleMode) => props.onSettingsPatch({
                     disk: { scaleMode },
                 })}
             />
             <NumberSetting
-                label="Read Max (MiB/s)"
+                label={t(diskMessages.readMaxMibLabel)}
                 value={display.maximumReadThroughputMebibytesPerSecond}
                 onValueChange={(maximumReadThroughputMebibytesPerSecond) => props.onSettingsPatch({
                     disk: {
@@ -175,7 +187,7 @@ function DiskThroughputScaleSettings(props: DiskWidgetSettingsProps & {
                 disabled={isAutoScale}
             />
             <NumberSetting
-                label="Write Max (MiB/s)"
+                label={t(diskMessages.writeMaxMibLabel)}
                 value={display.maximumWriteThroughputMebibytesPerSecond}
                 onValueChange={(maximumWriteThroughputMebibytesPerSecond) => props.onSettingsPatch({
                     disk: {
@@ -198,11 +210,14 @@ function DiskMetricKindSetting({
 }: WidgetSettingsPanelProps & {
     currentKind: ResolvedDiskMetricTarget["reading"]["kind"];
 }): React.JSX.Element {
+    const i18n = useI18n();
+    const { t } = i18n;
+
     return (
         <SelectSetting
-            label="Disk Metric"
+            label={t(diskMessages.diskMetricLabel)}
             value={currentKind}
-            optionList={diskMetricKindOptionList}
+            optionList={localizeOptionList(t, diskMetricKindOptionList, diskMetricKindMessageByValue)}
             onValueChange={(kind) => onSettingsPatch({
                 disk: { kind },
             })}
@@ -217,6 +232,8 @@ function DiskUsageBarLabelSettings({
 }: WidgetSettingsPanelProps & {
     reading: DiskUsageReading;
 }): React.JSX.Element {
+    const i18n = useI18n();
+    const { t } = i18n;
     const detectedLabel = resolveSelectedDiskVolumeLabel(context);
     const currentLabel = reading.barLabel;
     const canUseDetectedLabel = detectedLabel.length > 0
@@ -224,15 +241,15 @@ function DiskUsageBarLabelSettings({
         && currentLabel.trim() !== detectedLabel;
 
     return (
-        <SettingsSection title="Labels">
-            <SectionHeading text="Display Label" />
+        <SettingsSection title={t(commonMessages.labelsSection)}>
+            <SectionHeading text={t(diskMessages.displayLabelHeading)} />
             <TextSetting
-                label="Custom Label"
+                label={t(diskMessages.customLabelLabel)}
                 value={currentLabel}
                 onValueChange={(barLabel) => onSettingsPatch({
                     disk: { barLabel },
                 })}
-                placeholder={resolveDiskBarLabelPlaceholder(context)}
+                placeholder={resolveDiskBarLabelPlaceholder(context, i18n)}
                 actionButton={(
                     <button
                         className="inline-action-button"
@@ -245,13 +262,13 @@ function DiskUsageBarLabelSettings({
                                 });
                             }
                         }}
-                        aria-label="Use detected label as custom label"
+                        aria-label={t(diskMessages.useDetectedLabelAria)}
                     >
-                        Use Detected
+                        {t(catalogMessages.useDetectedButton)}
                     </button>
                 )}
             />
-            <InspectorItem label="Detected Label">
+            <InspectorItem label={t(diskMessages.detectedLabelLabel)}>
                 <div className="readonly-inline">
                     <span className="readonly-text">{detectedLabel}</span>
                 </div>
@@ -259,3 +276,28 @@ function DiskUsageBarLabelSettings({
         </SettingsSection>
     );
 }
+
+const diskMetricKindMessageByValue = {
+    usage: optionMessages.usageOption,
+    throughput: optionMessages.throughputOption,
+} as const;
+
+const diskThroughputDirectionMessageByValue = {
+    both: optionMessages.readWriteOption,
+    read: optionMessages.readOption,
+    write: optionMessages.writeOption,
+} as const;
+
+const scaleModeMessageByValue = {
+    auto: optionMessages.autoOption,
+    custom: optionMessages.customOption,
+} as const;
+
+const diskUsageDisplayModeMessageByValue = {
+    percentage: optionMessages.percentageOption,
+    space: optionMessages.freeSpaceOption,
+} as const;
+
+const aggregateDiskVolumeMessageByValue = {
+    "": optionMessages.allDisksOption,
+} as const;

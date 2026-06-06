@@ -1,4 +1,7 @@
 import { normalizeKnownMetricUnit } from "../../metrics/metric-unit-format";
+import { cpuMessages, gpuMessages } from "../../i18n/message-groups/widgets";
+import { optionMessages } from "../../i18n/message-groups/options";
+import type { I18n } from "../../i18n/react";
 import type { CatalogMetricCategory, CatalogMetricReadingKind } from "../../settings/resolved-settings";
 import type { MetricUnit } from "../../runtime/sources/metric-source";
 import {
@@ -146,6 +149,7 @@ const NATURAL_TEXT_COLLATOR = new Intl.Collator("en", {
 export function buildCatalogMetricOptions(
     descriptors: readonly MetricDescriptor[],
     selection: Partial<CatalogMetricSelection> = {},
+    i18n?: I18n,
 ): CatalogMetricOptions {
     const entries = buildCatalogMetricEntries(descriptors);
     const storedMetricEntry = selection.metricId
@@ -155,14 +159,15 @@ export function buildCatalogMetricOptions(
     const selectedEntry = entries.find(entry => entry.descriptor.metricId === resolvedSelection.metricId);
 
     return {
-        typeOptions: buildTypeOptions(entries),
-        hardwareOptions: buildHardwareOptions(entries, resolvedSelection.typeId),
-        readingOptions: buildReadingOptions(entries, resolvedSelection.typeId, resolvedSelection.hardwareId),
+        typeOptions: buildTypeOptions(entries, i18n),
+        hardwareOptions: buildHardwareOptions(entries, resolvedSelection.typeId, i18n),
+        readingOptions: buildReadingOptions(entries, resolvedSelection.typeId, resolvedSelection.hardwareId, i18n),
         metricOptions: buildMetricOptions(
             entries,
             resolvedSelection.typeId,
             resolvedSelection.hardwareId,
             resolvedSelection.readingId,
+            i18n,
         ),
         resolvedSelection,
         selectedMetric: selectedEntry
@@ -458,16 +463,17 @@ function disambiguateMetricLabels(entries: readonly CatalogMetricEntry[]): reado
 
 function buildTypeOptions(
     entries: readonly CatalogMetricEntry[],
+    i18n: I18n | undefined,
 ): readonly SelectOption<CatalogMetricTypeId | "">[] {
     const presentTypeIds = new Set(entries.map(entry => entry.typeId));
 
     return [
-        TOP_LEVEL_PLACEHOLDER_OPTION,
+        i18n ? { value: "", label: i18n.t(optionMessages.chooseTypeOption) } : TOP_LEVEL_PLACEHOLDER_OPTION,
         ...[...presentTypeIds]
             .sort(compareTypeId)
             .map(typeId => ({
                 value: typeId,
-                label: TYPE_LABEL_BY_ID[typeId],
+                label: readTypeLabel(typeId, i18n),
             })),
     ];
 }
@@ -475,9 +481,10 @@ function buildTypeOptions(
 function buildHardwareOptions(
     entries: readonly CatalogMetricEntry[],
     typeId: CatalogMetricTypeId | "",
+    i18n: I18n | undefined,
 ): readonly SelectOption[] {
     if (typeId.length === 0) {
-        return [EMPTY_HARDWARE_OPTION];
+        return [buildEmptyHardwareOption(i18n)];
     }
 
     const hardwareDisplays = uniqueBy(
@@ -486,7 +493,7 @@ function buildHardwareOptions(
     ).sort(compareHardwareEntries);
 
     return hardwareDisplays.length === 0
-        ? [EMPTY_HARDWARE_OPTION]
+        ? [buildEmptyHardwareOption(i18n)]
         : hardwareDisplays.map(entry => ({
             value: entry.hardwareId,
             label: entry.hardwareLabel,
@@ -497,9 +504,10 @@ function buildReadingOptions(
     entries: readonly CatalogMetricEntry[],
     typeId: CatalogMetricTypeId | "",
     hardwareId: string,
+    i18n: I18n | undefined,
 ): readonly SelectOption<ReadingId | "">[] {
     if (typeId.length === 0 || hardwareId.length === 0) {
-        return [EMPTY_READING_OPTION];
+        return [buildEmptyReadingOption(i18n)];
     }
 
     const readingEntries = uniqueBy(
@@ -508,11 +516,81 @@ function buildReadingOptions(
     ).sort(compareReadingEntries);
 
     return readingEntries.length === 0
-        ? [EMPTY_READING_OPTION]
+        ? [buildEmptyReadingOption(i18n)]
         : readingEntries.map(entry => ({
             value: entry.readingId,
-            label: entry.readingLabel,
+            label: readReadingLabel(entry.readingId, i18n),
         }));
+}
+
+function readReadingLabel(readingId: ReadingId, i18n: I18n | undefined): string {
+    if (!i18n) {
+        return READING_LABEL_BY_ID[readingId];
+    }
+
+    switch (readingId) {
+        case "temperature":
+            return i18n.t(optionMessages.temperatureOption);
+        case "usage":
+            return i18n.t(optionMessages.usageOption);
+        case "clock":
+            return i18n.t(optionMessages.clockOption);
+        case "voltage":
+            return i18n.t(optionMessages.voltageOption);
+        case "power":
+            return i18n.t(optionMessages.powerOption);
+        case "fan":
+            return i18n.t(optionMessages.fanOption);
+        case "control":
+            return i18n.t(optionMessages.controlOption);
+        case "data":
+            return i18n.t(optionMessages.dataOption);
+        case "throughput":
+            return i18n.t(optionMessages.throughputOption);
+        case "timing":
+            return i18n.t(optionMessages.timingOption);
+        case "other":
+            return i18n.t(optionMessages.otherOption);
+    }
+}
+
+function readTypeLabel(typeId: CatalogMetricTypeId, i18n: I18n | undefined): string {
+    if (!i18n) {
+        return TYPE_LABEL_BY_ID[typeId];
+    }
+
+    switch (typeId) {
+        case "cpu":
+            return i18n.t(cpuMessages.cpuMetricLabel);
+        case "gpu":
+            return i18n.t(gpuMessages.gpuMetricLabel);
+        case "memory":
+            return i18n.t(optionMessages.memoryOption);
+        case "disk":
+            return i18n.t(optionMessages.diskOption);
+        case "network":
+            return i18n.t(optionMessages.networkOption);
+        case "other":
+            return i18n.t(optionMessages.otherOption);
+    }
+}
+
+function buildEmptyHardwareOption(i18n: I18n | undefined): SelectOption {
+    return i18n
+        ? { value: "", label: i18n.t(optionMessages.noHardwareMetricsOption), disabled: true }
+        : EMPTY_HARDWARE_OPTION;
+}
+
+function buildEmptyReadingOption(i18n: I18n | undefined): SelectOption<ReadingId | ""> {
+    return i18n
+        ? { value: "", label: i18n.t(optionMessages.noReadingsOption), disabled: true }
+        : EMPTY_READING_OPTION;
+}
+
+function buildEmptyMetricOption(i18n: I18n | undefined): SelectOption {
+    return i18n
+        ? { value: "", label: i18n.t(optionMessages.noMetricsOption), disabled: true }
+        : EMPTY_METRIC_OPTION;
 }
 
 function buildMetricOptions(
@@ -520,9 +598,10 @@ function buildMetricOptions(
     typeId: CatalogMetricTypeId | "",
     hardwareId: string,
     readingId: string,
+    i18n: I18n | undefined,
 ): readonly SelectOption[] {
     if (typeId.length === 0 || hardwareId.length === 0 || readingId.length === 0) {
-        return [EMPTY_METRIC_OPTION];
+        return [buildEmptyMetricOption(i18n)];
     }
 
     const metricEntries = entries
@@ -533,7 +612,7 @@ function buildMetricOptions(
         .sort(compareMetricEntries);
 
     return metricEntries.length === 0
-        ? [EMPTY_METRIC_OPTION]
+        ? [buildEmptyMetricOption(i18n)]
         : metricEntries.map(entry => ({
             value: entry.descriptor.metricId,
             label: entry.metricLabel,

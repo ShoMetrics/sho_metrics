@@ -17,6 +17,9 @@ import {
 } from "../../color-compensation/messages";
 import { renderColorCompensationSampleSvg } from "../../view-rendering/color-compensation-patterns";
 import { SteppedSlider } from "../components/SteppedSlider";
+import { colorCompensationMessages } from "../../i18n/message-groups/color-compensation";
+import { commonMessages } from "../../i18n/message-groups/shell";
+import { useI18n } from "../../i18n/react";
 import type { StreamDeckPropertyInspectorClient } from "../stream-deck/stream-deck-client";
 import {
     COLOR_COMPENSATION_GUIDED_ADJUSTMENT_IDS,
@@ -36,41 +39,41 @@ interface ColorCompensationWizardProps {
 }
 
 interface ManualAdjustmentCopy {
-    readonly title: string;
-    readonly lowerLabel: string;
-    readonly upperLabel: string;
+    readonly title: keyof typeof colorCompensationMessages;
+    readonly lowerLabel: keyof typeof colorCompensationMessages;
+    readonly upperLabel: keyof typeof colorCompensationMessages;
 }
 
 interface GuidedAdjustmentCopy extends ManualAdjustmentCopy {
-    readonly instruction: string;
+    readonly instruction: keyof typeof colorCompensationMessages;
 }
 
-const guidedInstructionByAdjustmentId: Record<ColorCompensationGuidedAdjustmentId, string> = {
-    saturation: "Adjust until the colored blocks on your Stream Deck key look closest to the monitor sample.",
-    gamma: "Adjust until the gray gradient on your Stream Deck key looks closest to the monitor sample.",
-    shadow: "Adjust until the dark blocks on your Stream Deck key look closest to the dark blocks on your monitor.",
+const guidedInstructionByAdjustmentId: Record<ColorCompensationGuidedAdjustmentId, keyof typeof colorCompensationMessages> = {
+    saturation: "colorCompensationSaturationInstruction",
+    gamma: "colorCompensationGammaInstruction",
+    shadow: "colorCompensationShadowInstruction",
 };
 
 const manualAdjustmentCopyById: Record<ColorCompensationAdjustmentId, ManualAdjustmentCopy> = {
     saturation: {
-        title: "Color Strength",
-        lowerLabel: "Muted",
-        upperLabel: "Vivid",
+        title: "colorStrengthTitle",
+        lowerLabel: "mutedLabel",
+        upperLabel: "vividLabel",
     },
     brightness: {
-        title: "Overall Brightness",
-        lowerLabel: "Dimmer",
-        upperLabel: "Brighter",
+        title: "overallBrightnessTitle",
+        lowerLabel: "dimmerLabel",
+        upperLabel: "brighterLabel",
     },
     gamma: {
-        title: "Midtones",
-        lowerLabel: "Darker",
-        upperLabel: "Lighter",
+        title: "midtonesTitle",
+        lowerLabel: "darkerLabel",
+        upperLabel: "lighterLabel",
     },
     shadow: {
-        title: "Dark Detail",
-        lowerLabel: "Flat",
-        upperLabel: "Deep",
+        title: "darkDetailTitle",
+        lowerLabel: "flatLabel",
+        upperLabel: "deepLabel",
     },
 };
 
@@ -88,6 +91,7 @@ export function ColorCompensationWizard({
     onProfileReset,
     onClose,
 }: ColorCompensationWizardProps): React.JSX.Element {
+    const { t } = useI18n();
     const [state, dispatch] = useReducer(
         colorCompensationWizardReducer,
         initialProfile,
@@ -101,9 +105,9 @@ export function ColorCompensationWizard({
     const sessionId = sessionIdRef.current;
     const sendMessage = useCallback((message: unknown): void => {
         client.send("sendToPlugin", message).catch((error: Error) => {
-            setNoticeText(`Preview update failed: ${error.message}`);
+            setNoticeText(t(colorCompensationMessages.colorCompensationPreviewFailed, { errorMessage: error.message }));
         });
-    }, [client]);
+    }, [client, t]);
 
     useEffect(() => {
         sendMessage(buildColorCompensationStartMessage(sessionId));
@@ -168,9 +172,11 @@ export function ColorCompensationWizard({
                 onClose();
             })
             .catch((error: unknown) => {
-                setNoticeText(`Failed to save color compensation: ${readErrorMessage(error)}`);
+                setNoticeText(t(colorCompensationMessages.colorCompensationSaveFailed, {
+                    errorMessage: readErrorMessage(error),
+                }));
             });
-    }, [onClose, onProfileSave, sendMessage, sessionId, state.profile]);
+    }, [t, onClose, onProfileSave, sendMessage, sessionId, state.profile]);
 
     const resetSavedProfile = useCallback((): void => {
         onProfileReset()
@@ -179,9 +185,11 @@ export function ColorCompensationWizard({
                 dispatch({ type: "profileReset" });
             })
             .catch((error: unknown) => {
-                setNoticeText(`Failed to reset color compensation: ${readErrorMessage(error)}`);
+                setNoticeText(t(colorCompensationMessages.colorCompensationResetFailed, {
+                    errorMessage: readErrorMessage(error),
+                }));
             });
-    }, [onProfileReset, sendMessage, sessionId]);
+    }, [t, onProfileReset, sendMessage, sessionId]);
 
     const resetDraft = useCallback((): void => {
         dispatch({ type: "draftReset" });
@@ -192,8 +200,10 @@ export function ColorCompensationWizard({
             return null;
         }
 
-        return `${state.skippedAdjustmentIds.length} step${state.skippedAdjustmentIds.length === 1 ? "" : "s"} skipped.`;
-    }, [state.skippedAdjustmentIds.length]);
+        return t(colorCompensationMessages.colorCompensationSkippedSteps, {
+            count: state.skippedAdjustmentIds.length,
+        });
+    }, [state.skippedAdjustmentIds.length, t]);
 
     return (
         <div className="color-compensation-shell">
@@ -272,18 +282,20 @@ function ExistingProfilePage({
     readonly onReset: () => void;
     readonly onDone: () => void;
 }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
         <section className="color-compensation-page">
-            <h1>Color Compensation</h1>
-            <p>You already have a saved compensation profile.</p>
+            <h1>{t(colorCompensationMessages.colorCompensationTitle)}</h1>
+            <p>{t(colorCompensationMessages.colorCompensationExistingProfile)}</p>
             <HoldBeforeButton
                 reviewMode={reviewMode}
                 onReviewModeChange={onReviewModeChange}
             />
             <div className="color-compensation-actions">
-                <button className="inline-action-button" type="button" onClick={onSetupAgain}>Set Up Again</button>
-                <button className="inline-action-button" type="button" onClick={onReset}>Reset</button>
-                <button className="inline-action-button" type="button" onClick={onDone}>Done</button>
+                <button className="inline-action-button" type="button" onClick={onSetupAgain}>{t(colorCompensationMessages.setUpAgainButton)}</button>
+                <button className="inline-action-button" type="button" onClick={onReset}>{t(commonMessages.resetLabel)}</button>
+                <button className="inline-action-button" type="button" onClick={onDone}>{t(colorCompensationMessages.doneButton)}</button>
             </div>
         </section>
     );
@@ -296,26 +308,25 @@ function IntroPage({
     readonly onStart: () => void;
     readonly onCancel: () => void;
 }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
         <section className="color-compensation-page">
-            <h1>Color Compensation</h1>
+            <h1>{t(colorCompensationMessages.colorCompensationTitle)}</h1>
             <p>
-                Stream Deck hardware colors may look different from your monitor. This wizard adjusts the{" "}
-                display result on <strong>Stream Deck</strong> so it looks closer to what you see on your monitor.
+                {t(colorCompensationMessages.colorCompensationIntro1)}
             </p>
             <p>
-                Each step shows the same sample on both screens.{" "}
-                <strong>The sample you see on your monitor stays the same. The Stream Deck sample updates as you move the slider.</strong>{" "}
-                Adjust until they look as close as possible.
+                {t(colorCompensationMessages.colorCompensationIntro2)}
             </p>
             <ul className="color-compensation-bullet-list">
-                <li>Set Stream Deck global brightness to a comfortable level before starting</li>
-                <li>This wizard takes about 1 minute</li>
-                <li>Affects all Stream Deck keys controlled by Sho Metrics</li>
+                <li>{t(colorCompensationMessages.colorCompensationBulletBrightness)}</li>
+                <li>{t(colorCompensationMessages.colorCompensationBulletDuration)}</li>
+                <li>{t(colorCompensationMessages.colorCompensationBulletScope)}</li>
             </ul>
             <div className="color-compensation-actions">
-                <button className="inline-action-button" type="button" onClick={onStart}>Start</button>
-                <button className="inline-action-button" type="button" onClick={onCancel}>Cancel</button>
+                <button className="inline-action-button" type="button" onClick={onStart}>{t(colorCompensationMessages.startButton)}</button>
+                <button className="inline-action-button" type="button" onClick={onCancel}>{t(colorCompensationMessages.cancelButton)}</button>
             </div>
         </section>
     );
@@ -330,27 +341,29 @@ function PreflightPage({
     readonly onConfirm: () => void;
     readonly onCancel: () => void;
 }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
         <section className="color-compensation-page">
-            <h1>Check Your Key</h1>
+            <h1>{t(colorCompensationMessages.checkYourKeyTitle)}</h1>
             <div className="color-compensation-preflight-summary">
                 <SampleWidgetPreview focus="preflight" />
                 <div className="color-compensation-preflight-copy">
                     <p className="color-compensation-instruction">
-                        Find the Stream Deck key showing this image.
+                        {t(colorCompensationMessages.findStreamDeckKeyInstruction)}
                     </p>
                     <p className="color-compensation-instruction">
-                        In the next steps, compare that key with the reference sample on your monitor.
+                        {t(colorCompensationMessages.compareKeyInstruction)}
                     </p>
                 </div>
             </div>
             <p className="section-note">
-                If you set a custom icon for this key, live preview is blocked for this key and setup will not work.
+                {t(colorCompensationMessages.customIconPreviewBlockedNote)}
             </p>
             <div className="color-compensation-actions color-compensation-actions-wide">
-                <button className="inline-action-button" type="button" onClick={onBack}>Back</button>
-                <button className="inline-action-button" type="button" onClick={onConfirm}>I See It</button>
-                <button className="inline-action-button" type="button" onClick={onCancel}>Cancel</button>
+                <button className="inline-action-button" type="button" onClick={onBack}>{t(colorCompensationMessages.backButton)}</button>
+                <button className="inline-action-button" type="button" onClick={onConfirm}>{t(colorCompensationMessages.iSeeItButton)}</button>
+                <button className="inline-action-button" type="button" onClick={onCancel}>{t(colorCompensationMessages.cancelButton)}</button>
             </div>
         </section>
     );
@@ -377,27 +390,34 @@ function StepPage({
     readonly onNext: () => void;
     readonly onCancel: () => void;
 }): React.JSX.Element {
+    const { t } = useI18n();
     const stepCopy = buildGuidedAdjustmentCopy(adjustmentId);
 
     return (
         <section className="color-compensation-page">
-            <p className="color-compensation-progress">Step {stepNumber} of {stepCount}: {stepCopy.title}</p>
+            <p className="color-compensation-progress">
+                {t(colorCompensationMessages.colorCompensationStepProgress, {
+                    stepNumber,
+                    stepCount,
+                    title: t(colorCompensationMessages[stepCopy.title]),
+                })}
+            </p>
             <SampleWidgetPreview focus={adjustmentId} />
-            <p className="color-compensation-instruction">{stepCopy.instruction}</p>
+            <p className="color-compensation-instruction">{t(colorCompensationMessages[stepCopy.instruction])}</p>
             <SteppedSlider
                 value={value}
                 minimum={COLOR_COMPENSATION_ADJUSTMENT_MINIMUM}
                 maximum={COLOR_COMPENSATION_ADJUSTMENT_MAXIMUM}
-                lowerLabel={stepCopy.lowerLabel}
-                upperLabel={stepCopy.upperLabel}
-                ariaLabel={stepCopy.title}
+                lowerLabel={t(colorCompensationMessages[stepCopy.lowerLabel])}
+                upperLabel={t(colorCompensationMessages[stepCopy.upperLabel])}
+                ariaLabel={t(colorCompensationMessages[stepCopy.title])}
                 onValueChange={onValueChange}
             />
             <div className="color-compensation-actions color-compensation-actions-wide">
-                <button className="inline-action-button" type="button" onClick={onBack}>Back</button>
-                <button className="inline-action-button" type="button" onClick={onSkip}>Skip</button>
-                <button className="inline-action-button" type="button" onClick={onNext}>Next</button>
-                <button className="inline-action-button" type="button" onClick={onCancel}>Cancel</button>
+                <button className="inline-action-button" type="button" onClick={onBack}>{t(colorCompensationMessages.backButton)}</button>
+                <button className="inline-action-button" type="button" onClick={onSkip}>{t(colorCompensationMessages.skipButton)}</button>
+                <button className="inline-action-button" type="button" onClick={onNext}>{t(colorCompensationMessages.nextButton)}</button>
+                <button className="inline-action-button" type="button" onClick={onCancel}>{t(colorCompensationMessages.cancelButton)}</button>
             </div>
         </section>
     );
@@ -426,42 +446,44 @@ function ReviewPage({
     readonly onDone: () => void;
     readonly onCancel: () => void;
 }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
         <section className="color-compensation-page">
-            <h1>Compensation Ready</h1>
+            <h1>{t(colorCompensationMessages.compensationReadyTitle)}</h1>
             <SampleWidgetPreview focus="review" />
-            <p className="color-compensation-instruction">Hold the button below to preview Stream Deck without compensation.</p>
+            <p className="color-compensation-instruction">{t(colorCompensationMessages.holdBeforeInstruction)}</p>
             {skippedStepText ? <p className="color-compensation-notice">{skippedStepText}</p> : null}
             <HoldBeforeButton
                 reviewMode={reviewMode}
                 onReviewModeChange={onReviewModeChange}
             />
             <details className="color-compensation-details">
-                <summary>Fine-tune manually</summary>
+                <summary>{t(colorCompensationMessages.fineTuneManuallySummary)}</summary>
                 <ManualProfileSliders
                     profile={profile}
                     onProfileAdjustmentChange={onProfileAdjustmentChange}
                 />
                 <div className="color-compensation-manual-actions">
                     <button className="inline-action-button" type="button" onClick={onResetDraft}>
-                        Reset Compensation
+                        {t(colorCompensationMessages.resetCompensationButton)}
                     </button>
                 </div>
             </details>
             <p className="section-note">
-                Re-run this if you change Stream Deck global brightness, switch monitors, or enable HDR.
+                {t(colorCompensationMessages.rerunColorCompensationNote)}
             </p>
             <div className="color-compensation-actions color-compensation-actions-wide">
-                <button className="inline-action-button" type="button" onClick={onBack}>Back</button>
-                <button className="inline-action-button" type="button" onClick={onRedo}>Redo</button>
+                <button className="inline-action-button" type="button" onClick={onBack}>{t(colorCompensationMessages.backButton)}</button>
+                <button className="inline-action-button" type="button" onClick={onRedo}>{t(colorCompensationMessages.redoButton)}</button>
                 <button
                     className="inline-action-button"
                     type="button"
                     onClick={onDone}
                 >
-                    Done
+                    {t(colorCompensationMessages.doneButton)}
                 </button>
-                <button className="inline-action-button" type="button" onClick={onCancel}>Cancel</button>
+                <button className="inline-action-button" type="button" onClick={onCancel}>{t(colorCompensationMessages.cancelButton)}</button>
             </div>
         </section>
     );
@@ -474,6 +496,7 @@ function HoldBeforeButton({
     readonly reviewMode: ColorCompensationReviewMode;
     readonly onReviewModeChange: (reviewMode: ColorCompensationReviewMode) => void;
 }): React.JSX.Element {
+    const { t } = useI18n();
     const showBefore = useCallback((): void => {
         onReviewModeChange("before");
     }, [onReviewModeChange]);
@@ -482,7 +505,7 @@ function HoldBeforeButton({
     }, [onReviewModeChange]);
 
     return (
-        <div className="color-compensation-hold-preview" role="group" aria-label="Before and after preview">
+        <div className="color-compensation-hold-preview" role="group" aria-label={t(colorCompensationMessages.beforeAfterPreviewLabel)}>
             <button
                 className="inline-action-button"
                 type="button"
@@ -504,7 +527,7 @@ function HoldBeforeButton({
                     }
                 }}
             >
-                Hold for Before
+                {t(colorCompensationMessages.holdForBeforeButton)}
             </button>
         </div>
     );
@@ -517,6 +540,8 @@ function ManualProfileSliders({
     readonly profile: ColorCompensationProfile;
     readonly onProfileAdjustmentChange: (adjustmentId: ColorCompensationAdjustmentId, value: number) => void;
 }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
         <div className="color-compensation-manual-sliders">
             {COLOR_COMPENSATION_ADJUSTMENT_IDS.map((adjustmentId) => {
@@ -524,14 +549,14 @@ function ManualProfileSliders({
 
                 return (
                     <div key={adjustmentId} className="color-compensation-manual-slider">
-                        <p>{adjustmentCopy.title}</p>
+                        <p>{t(colorCompensationMessages[adjustmentCopy.title])}</p>
                         <SteppedSlider
                             value={readAdjustmentValue(profile, adjustmentId)}
                             minimum={COLOR_COMPENSATION_ADJUSTMENT_MINIMUM}
                             maximum={COLOR_COMPENSATION_ADJUSTMENT_MAXIMUM}
-                            lowerLabel={adjustmentCopy.lowerLabel}
-                            upperLabel={adjustmentCopy.upperLabel}
-                            ariaLabel={adjustmentCopy.title}
+                            lowerLabel={t(colorCompensationMessages[adjustmentCopy.lowerLabel])}
+                            upperLabel={t(colorCompensationMessages[adjustmentCopy.upperLabel])}
+                            ariaLabel={t(colorCompensationMessages[adjustmentCopy.title])}
                             onValueChange={(value) => onProfileAdjustmentChange(adjustmentId, value)}
                         />
                     </div>
@@ -546,13 +571,14 @@ function SampleWidgetPreview({
 }: {
     readonly focus: ColorCompensationSampleFocus;
 }): React.JSX.Element {
+    const { t } = useI18n();
     const previewUri = `data:image/svg+xml,${encodeURIComponent(renderColorCompensationSampleSvg(focus))}`;
 
     return (
         <img
             className="color-compensation-sample-widget"
             src={previewUri}
-            alt="Color compensation sample widget"
+            alt={t(colorCompensationMessages.colorCompensationSampleAlt)}
         />
     );
 }

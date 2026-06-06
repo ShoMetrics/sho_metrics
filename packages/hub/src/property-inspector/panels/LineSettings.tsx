@@ -1,5 +1,11 @@
 import { InspectorItem } from "../components/InspectorItem";
 import { SectionHeading } from "../components/SectionHeading";
+import { colorMessages } from "../../i18n/message-groups/color";
+import { commonMessages } from "../../i18n/message-groups/shell";
+import { networkMessages } from "../../i18n/message-groups/widgets";
+import { optionMessages } from "../../i18n/message-groups/options";
+import { localizeOptionList } from "../../i18n/options";
+import { useI18n } from "../../i18n/react";
 import { RangeSetting } from "../controls/RangeSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { SettingsSection } from "./SettingsSection";
@@ -15,6 +21,7 @@ export function LineSettings({
     context,
     onSettingsPatch,
 }: WidgetSettingsPanelProps): React.JSX.Element | null {
+    const { t } = useI18n();
     const appearance = context.resolved.widget.slot.appearance;
     const target = context.resolved.widget.slot.metric.target;
 
@@ -29,20 +36,20 @@ export function LineSettings({
         && target.reading.trafficDisplayMode === "mirrored";
 
     return (
-        <SettingsSection title="Trend">
+        <SettingsSection title={t(commonMessages.trendSection)}>
             {isNetworkBoth && (
                 <SelectSetting
-                    label="Traffic Mode"
+                    label={t(networkMessages.trafficModeLabel)}
                     value={target.reading.trafficDisplayMode}
-                    optionList={networkTrafficDisplayModeOptionList}
+                    optionList={localizeOptionList(t, networkTrafficDisplayModeOptionList, networkTrafficDisplayModeMessageByValue)}
                     onValueChange={(trafficDisplayMode) => onSettingsPatch({
                         network: { trafficDisplayMode },
                     })}
                 />
             )}
-            <SectionHeading text="Visual Guides" />
+            <SectionHeading text={t(colorMessages.visualGuidesHeading)} />
             <RangeSetting
-                label="Trend Line Smoothing"
+                label={t(networkMessages.trendLineSmoothingLabel)}
                 value={appearance.line.lineSmoothingPercent}
                 minimum={0}
                 maximum={100}
@@ -54,21 +61,21 @@ export function LineSettings({
             {isMirroredNetworkTraffic ? (
                 <>
                     <SelectSetting
-                        label="Grid Line Visibility"
+                        label={t(networkMessages.gridLineVisibilityLabel)}
                         value="none"
-                        optionList={disabledGridLineVisibilityOptionList}
+                        optionList={localizeOptionList(t, disabledGridLineVisibilityOptionList, gridLineVisibilityMessageByValue)}
                         onValueChange={(gridLineVisibility) => onSettingsPatch({
                             appearance: { line: { gridLineVisibility } },
                         })}
                         disabled
                     />
                     <InspectorItem className="note-item note-item-caption">
-                        <p className="section-note">Grid line settings are not supported in mirrored traffic mode.</p>
+                        <p className="section-note">{t(networkMessages.mirroredTrafficGridUnsupportedNote)}</p>
                     </InspectorItem>
                     <SelectSetting
-                        label="Grid Line Type"
+                        label={t(networkMessages.gridLineTypeLabel)}
                         value={appearance.line.gridLineType}
-                        optionList={gridLineTypeOptionList}
+                        optionList={localizeOptionList(t, gridLineTypeOptionList, gridLineTypeMessageByValue)}
                         onValueChange={(gridLineType) => onSettingsPatch({
                             appearance: { line: { gridLineType } },
                         })}
@@ -78,17 +85,17 @@ export function LineSettings({
             ) : (
                 <>
                     <SelectSetting
-                        label="Grid Line Visibility"
+                        label={t(networkMessages.gridLineVisibilityLabel)}
                         value={appearance.line.gridLineVisibility}
-                        optionList={gridLineVisibilityOptionList}
+                        optionList={localizeOptionList(t, gridLineVisibilityOptionList, gridLineVisibilityMessageByValue)}
                         onValueChange={(gridLineVisibility) => onSettingsPatch({
                             appearance: { line: { gridLineVisibility } },
                         })}
                     />
                     <SelectSetting
-                        label="Grid Line Type"
+                        label={t(networkMessages.gridLineTypeLabel)}
                         value={appearance.line.gridLineType}
-                        optionList={gridLineTypeOptionList}
+                        optionList={localizeOptionList(t, gridLineTypeOptionList, gridLineTypeMessageByValue)}
                         onValueChange={(gridLineType) => onSettingsPatch({
                             appearance: { line: { gridLineType } },
                         })}
@@ -99,3 +106,19 @@ export function LineSettings({
         </SettingsSection>
     );
 }
+
+const networkTrafficDisplayModeMessageByValue = {
+    overlay: optionMessages.overlayOption,
+    mirrored: optionMessages.mirroredOption,
+} as const;
+
+const gridLineVisibilityMessageByValue = {
+    adaptive: optionMessages.adaptiveToActivityOption,
+    always: optionMessages.alwaysOption,
+    none: optionMessages.noneOption,
+} as const;
+
+const gridLineTypeMessageByValue = {
+    horizontal: optionMessages.horizontalOption,
+    vertical: optionMessages.verticalOption,
+} as const;

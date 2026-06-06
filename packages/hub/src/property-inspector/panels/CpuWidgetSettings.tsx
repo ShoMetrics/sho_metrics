@@ -1,4 +1,9 @@
 import { InspectorItem } from "../components/InspectorItem";
+import { commonMessages } from "../../i18n/message-groups/shell";
+import { cpuMessages, helperMessages } from "../../i18n/message-groups/widgets";
+import { optionMessages } from "../../i18n/message-groups/options";
+import { localizeOptionList } from "../../i18n/options";
+import { useI18n } from "../../i18n/react";
 import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import type { ResolvedCpuMetricTarget, ResolvedCpuReading } from "../../settings/resolved-settings";
@@ -49,6 +54,8 @@ function CpuMetricSettings({
     target,
     onSettingsPatch,
 }: CpuWidgetSettingsProps): React.JSX.Element {
+    const i18n = useI18n();
+    const { t } = i18n;
     const reading = target.reading;
     const optionList = buildCpuMetricKindOptionList(context.platform, reading.kind);
     const isSelectedReadingSupported = isBuiltInMetricSupportedOnPlatform(
@@ -59,15 +66,15 @@ function CpuMetricSettings({
         ? undefined
         : resolveHelperStatusGuidanceText(
             context.runtimeCache.displayedMetricReadAttribution?.preferredSourceStatus,
-            { installSubject: "this metric" },
+            { i18n, installSubject: "thisMetric" },
         );
 
     return (
-        <SettingsSection title="Metric">
+        <SettingsSection title={t(commonMessages.metricSection)}>
             <SelectSetting
-                label="CPU Metric"
+                label={t(cpuMessages.cpuMetricLabel)}
                 value={reading.kind}
-                optionList={optionList}
+                optionList={localizeOptionList(t, optionList, cpuMetricKindMessageByValue)}
                 onValueChange={(kind) => onSettingsPatch({
                     cpu: { kind },
                 })}
@@ -75,13 +82,13 @@ function CpuMetricSettings({
             {!isSelectedReadingSupported && (
                 <InspectorItem className="note-item note-item-caption">
                     <p className="section-note">
-                        Current CPU metric is not supported on this platform. Choose a supported metric to continue.
+                        {t(cpuMessages.unsupportedCpuMetricNotice)}
                     </p>
                 </InspectorItem>
             )}
             {isSelectedReadingSupported && reading.kind !== "usage" && (
                 <InspectorItem className="note-item note-item-caption">
-                    <p className="section-note">Source: Helper only</p>
+                    <p className="section-note">{t(helperMessages.sourceHelperOnly)}</p>
                 </InspectorItem>
             )}
             {helperOnlyGuidance !== undefined && (
@@ -99,18 +106,21 @@ function CpuTemperatureScaleSettings({
 }: CpuWidgetSettingsProps & {
     reading: CpuTemperatureReading;
 }): React.JSX.Element {
+    const i18n = useI18n();
+    const { t } = i18n;
+
     return (
-        <SettingsSection title="Scale & Units">
+        <SettingsSection title={t(commonMessages.scaleUnitsSection)}>
             <SelectSetting
-                label="Unit"
+                label={t(commonMessages.unitLabel)}
                 value={reading.unit}
-                optionList={temperatureUnitOptionList}
+                optionList={localizeOptionList(t, temperatureUnitOptionList, temperatureUnitMessageByValue)}
                 onValueChange={(temperatureUnit) => onSettingsPatch({
                     cpu: { temperatureUnit },
                 })}
             />
             <NumberSetting
-                label="Max Temp (C)"
+                label={t(commonMessages.maxTempCLabel)}
                 value={reading.maximumCelsius}
                 onValueChange={(maximumTemperatureCelsius) => onSettingsPatch({
                     cpu: { maximumTemperatureCelsius },
@@ -128,10 +138,13 @@ function CpuPowerScaleSettings({
 }: CpuWidgetSettingsProps & {
     reading: CpuPowerReading;
 }): React.JSX.Element {
+    const i18n = useI18n();
+    const { t } = i18n;
+
     return (
-        <SettingsSection title="Scale & Units">
+        <SettingsSection title={t(commonMessages.scaleUnitsSection)}>
             <NumberSetting
-                label="Max Power (W)"
+                label={t(commonMessages.maxPowerWLabel)}
                 value={reading.maximumWatts}
                 onValueChange={(maximumPowerWatts) => onSettingsPatch({
                     cpu: { maximumPowerWatts },
@@ -143,6 +156,17 @@ function CpuPowerScaleSettings({
         </SettingsSection>
     );
 }
+
+const cpuMetricKindMessageByValue = {
+    usage: optionMessages.usageOption,
+    temperature: optionMessages.temperatureOption,
+    power: optionMessages.powerOption,
+} as const;
+
+const temperatureUnitMessageByValue = {
+    celsius: optionMessages.celsiusOption,
+    fahrenheit: optionMessages.fahrenheitOption,
+} as const;
 
 function isCpuReadingSupportedOnCurrentPlatform({
     context,

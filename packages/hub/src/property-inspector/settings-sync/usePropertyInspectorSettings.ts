@@ -33,6 +33,7 @@ import {
     readStoredColorCompensationProfile,
     writeStoredColorCompensationProfile,
 } from "../../settings/storage/color-compensation-settings";
+import { settingsNoticeMessages } from "../../i18n/message-groups/settings";
 import type { ColorCompensationProfile } from "../../color-compensation/types";
 import {
     initialSettingsSyncState,
@@ -454,22 +455,20 @@ function readWarningNotice(
         return null;
     }
 
-    const label = settingsScope === "widget" ? "Widget" : "Global";
-
     if (warning.reason === "unknownFieldsDiscarded") {
         return {
             kind: "warning",
-            text:
-                `${label} settings contain fields this version does not understand. ` +
-                `They will be removed the next time ${settingsScope} settings are saved.`,
+            message: settingsScope === "widget"
+                ? settingsNoticeMessages.widgetSettingsUnknownFields
+                : settingsNoticeMessages.globalSettingsUnknownFields,
         };
     }
 
     return {
         kind: "warning",
-        text:
-            `${label} settings could not be read. Defaults are shown; ` +
-            `saving ${settingsScope} settings will replace the unreadable settings.`,
+        message: settingsScope === "widget"
+            ? settingsNoticeMessages.widgetSettingsUnreadable
+            : settingsNoticeMessages.globalSettingsUnreadable,
     };
 }
 

@@ -1,4 +1,8 @@
 import type { CircleViewVariant } from "../inspector/settings-types";
+import { commonMessages } from "../../i18n/message-groups/shell";
+import { optionMessages } from "../../i18n/message-groups/options";
+import { localizeOptionList } from "../../i18n/options";
+import { useI18n } from "../../i18n/react";
 import { buildCircleVariantPreviewUri, type MetricPreviewInput } from "../previews/metric-option-preview";
 import { SelectSetting } from "./SelectSetting";
 import type { SettingControlProps } from "./setting-control";
@@ -18,13 +22,21 @@ interface CircleVariantSettingProps extends SettingControlProps {
 }
 
 export function CircleVariantSetting(props: CircleVariantSettingProps): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
         <SelectSetting
             {...props}
-            label="View Variant"
-            optionList={circleVariantOptionList}
+            label={t(commonMessages.viewVariantLabel)}
+            optionList={localizeOptionList(t, circleVariantOptionList, circleVariantMessageByValue)}
             buildOptionPreviewUri={(circleVariant) => buildCircleVariantPreviewUri(circleVariant, props.preview)}
             optionPreviewSizePixels={VARIANT_PREVIEW_SIZE_PIXELS}
         />
     );
 }
+
+const circleVariantMessageByValue = {
+    "full-ring": optionMessages.fullRingOption,
+    minimal: optionMessages.minimalOption,
+    gauge: optionMessages.gaugeOption,
+} as const;
