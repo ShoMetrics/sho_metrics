@@ -1,0 +1,28 @@
+{
+	"Name": "Sho Metrics",
+	"Description": "system monitor plugin",
+	"com.ez.sho-metrics.catalog-metric": {
+		"Name": "Advanced Sensor",
+		"Tooltip": "Displays one selected metric, such as LibreHardwareMonitor data."
+	},
+	"com.ez.sho-metrics.cpu": {
+		"Name": "CPU",
+		"Tooltip": "Displays CPU metrics."
+	},
+	"com.ez.sho-metrics.disk": {
+		"Name": "Disk",
+		"Tooltip": "Displays disk metrics."
+	},
+	"com.ez.sho-metrics.gpu": {
+		"Name": "GPU",
+		"Tooltip": "Displays GPU metrics."
+	},
+	"com.ez.sho-metrics.memory": {
+		"Name": "Memory",
+		"Tooltip": "Displays memory metrics."
+	},
+	"com.ez.sho-metrics.network": {
+		"Name": "Network",
+		"Tooltip": "Displays network metrics."
+	}
+}

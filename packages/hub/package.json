@@ -19,6 +19,8 @@
         "diagnostics:windows-helper-lhm-parity": "node scripts/diagnostics/windows-helper-lhm-parity.mjs",
         "benchmark:protobuf": "node scripts/run-buf.mjs generate --template scripts/benchmark/protobuf/buf.gen.yaml && node scripts/benchmark/protobuf/protobuf-performance-benchmark.mjs",
         "benchmark:resvg": "node scripts/benchmark/resvg-minimal.mjs",
+        "i18n:generate": "node scripts/i18n-generate.mjs",
+        "i18n:check": "node scripts/i18n-check.mjs",
         "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart com.ez.sho-metrics\"",
         "prelint": "npm run generate:proto",
         "lint": "eslint .",
