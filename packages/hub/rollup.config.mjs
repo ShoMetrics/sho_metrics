@@ -10,6 +10,8 @@ import url from "node:url";
 const isWatching = !!process.env.ROLLUP_WATCH;
 const sdPlugin = "com.ez.sho-metrics.sdPlugin";
 const buildMode = normalizeBuildMode(process.env.SHO_METRICS_BUILD_MODE ?? (isWatching ? "development" : "production"));
+const devLocaleOverride = normalizeDevLocaleOverride(process.env.SHO_METRICS_DEV_LOCALE_OVERRIDE);
+const devLocaleOverrideLiteral = devLocaleOverride === undefined ? "undefined" : JSON.stringify(devLocaleOverride);
 const logLevel = normalizeLogLevel(process.env.SHO_METRICS_LOG_LEVEL ?? (buildMode === "production" ? "info" : "debug"));
 
 const typescriptOptions = {
@@ -45,6 +47,7 @@ function replaceCompileTimeConstants() {
                 code: code
                     .replaceAll("process.env.NODE_ENV", JSON.stringify("production"))
                     .replaceAll("__BUILD_MODE__", JSON.stringify(buildMode))
+                    .replaceAll("__DEV_LOCALE_OVERRIDE__", devLocaleOverrideLiteral)
                     .replaceAll("__LOG_LEVEL__", JSON.stringify(logLevel)),
                 map: null,
             };
@@ -92,6 +95,18 @@ function normalizeBuildMode(value) {
     }
 
     throw new Error(`Unsupported SHO_METRICS_BUILD_MODE: ${value}`);
+}
+
+function normalizeDevLocaleOverride(value) {
+    if (value === undefined || value === "") {
+        return undefined;
+    }
+
+    if (value === "en" || value === "zh_CN" || value === "ja") {
+        return value;
+    }
+
+    throw new Error(`Unsupported SHO_METRICS_DEV_LOCALE_OVERRIDE: ${value}`);
 }
 
 function normalizeLogLevel(value) {

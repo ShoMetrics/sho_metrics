@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeHubLocale } from "./locale";
+import { normalizeHubLocale, resolveHubLocale } from "./locale";
 
 test("normalizes Stream Deck languages to the Hub v1 locale set", () => {
     assert.equal(normalizeHubLocale("en"), "en");
@@ -11,3 +11,9 @@ test("normalizes Stream Deck languages to the Hub v1 locale set", () => {
     assert.equal(normalizeHubLocale(undefined), "en");
 });
 
+test("resolves to Stream Deck language normalization when no build-time override is active", () => {
+    assert.equal(resolveHubLocale("en"), normalizeHubLocale("en"));
+    assert.equal(resolveHubLocale("zh_CN"), normalizeHubLocale("zh_CN"));
+    assert.equal(resolveHubLocale("ja"), normalizeHubLocale("ja"));
+    assert.equal(resolveHubLocale("zh_TW"), normalizeHubLocale("zh_TW"));
+});

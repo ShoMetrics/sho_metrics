@@ -39,9 +39,24 @@ Use these from `packages/hub`.
 | Lint | `npm.cmd run lint` | `packages/hub/package.json` |
 | Stream Deck dev watch | `npm.cmd run watch` | `packages/hub/package.json` |
 | Restart linked plugin | `npx.cmd streamdeck restart com.ez.sho-metrics` | Elgato Stream Deck CLI |
+| Regenerate i18n locale JSON | `npm.cmd run i18n:generate` | `packages/hub/package.json` |
+| Check i18n catalogs and generated locale JSON | `npm.cmd run i18n:check` | `packages/hub/package.json` |
 
 Do not run visual tests as a default gate. Use `npm.cmd run test:visual` only
 when changing widget visuals, SVG/raster output, or Property Inspector UI.
+
+To inspect Property Inspector translations without changing Stream Deck's app
+language, run a development build with a build-time locale override:
+
+```powershell
+$env:SHO_METRICS_BUILD_MODE = "development"
+$env:SHO_METRICS_DEV_LOCALE_OVERRIDE = "ja" # en, zh_CN, or ja
+npm.cmd run watch
+```
+
+Clear `SHO_METRICS_DEV_LOCALE_OVERRIDE` and rebuild before returning to normal
+Stream Deck-language behavior. The override is injected at build time and is
+ignored outside development builds.
 
 ## Proto
 
