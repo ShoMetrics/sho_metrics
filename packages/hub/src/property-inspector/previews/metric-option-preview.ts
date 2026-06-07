@@ -115,6 +115,7 @@ function buildMetricPreviewUri(
     const frame = composeMetricViewFrame({
         renderTarget: "key",
         viewOptions: {
+            metricRenderKind: "singleMetric",
             resolvedSettings: appearance,
             widgetData: sample.widgetData,
             centerIconFragment: sample.centerIconFragment,

@@ -36,6 +36,7 @@ export class Memory extends MetricAction {
 
         setMetricView({
             event,
+            metricRenderKind: "singleMetric",
             resolvedSettings: widget.slot.appearance,
             metricKey: RAM_USED_METRIC_KEY,
             widgetData: buildMemoryUsageWidgetData({

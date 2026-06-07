@@ -112,6 +112,7 @@ export function buildGpuViewOptions(options: {
     const widget = requireResolvedSingleMetricWidget(options.settings);
     const baseOptions = {
         event: options.event,
+        metricRenderKind: "singleMetric" as const,
         resolvedSettings: widget.slot.appearance,
     };
 

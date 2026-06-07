@@ -156,6 +156,7 @@ export function buildCatalogMetricNoSelectionViewOptions(options: {
 
     return {
         event: options.event,
+        metricRenderKind: "singleMetric",
         resolvedSettings: widget.slot.appearance,
         metricKey: CATALOG_NO_SELECTION_RENDER_KEY,
         widgetData: buildNoSelectionWidgetData(),
@@ -213,6 +214,7 @@ export function buildCatalogMetricSelectedViewOptions(options: {
 
     return {
         event: options.event,
+        metricRenderKind: "singleMetric",
         resolvedSettings: widget.slot.appearance,
         metricKey: options.target.metricId,
         widgetData,

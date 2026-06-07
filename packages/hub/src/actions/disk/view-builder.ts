@@ -24,7 +24,7 @@ import {
     resolveAvailableDiskVolume,
     type DiskVolumeSelection,
 } from "./volume-selection";
-import type { MetricViewOptions } from "../../view-updates/runner";
+import type { DualMetricViewOptions, SingleMetricViewOptions } from "../../view-updates/runner";
 import {
     buildColorConfigFromAppearance,
     resolveActiveMetricAccentColorMode,
@@ -46,7 +46,9 @@ type DiskThroughputReading = Extract<ResolvedDiskMetricTarget["reading"], { read
 
 const SYSTEM_TOTAL_DISK_THROUGHPUT_LABEL = "DISK";
 
-export function buildDiskViewOptions(options: BuildDiskViewOptions): MetricViewOptions {
+type DiskMetricViewOptions = SingleMetricViewOptions | DualMetricViewOptions;
+
+export function buildDiskViewOptions(options: BuildDiskViewOptions): DiskMetricViewOptions {
     if (options.target.reading.kind === "throughput") {
         return buildDiskThroughputViewOptions({
             ...options,
@@ -78,7 +80,7 @@ export function resolveDiskMaximumThroughputMebibytesPerSecond(
 
 function buildDiskUsageViewOptions(
     options: BuildDiskViewOptions & { reading: DiskUsageReading },
-): MetricViewOptions {
+): DiskMetricViewOptions {
     const selectedVolume = resolveAvailableDiskVolume(options.volumeSelection);
     const usedMetricKey = resolveDiskUsageMetricKey("used", options.target.volumeId);
     const totalMetricKey = resolveDiskUsageMetricKey("total", options.target.volumeId);
@@ -104,6 +106,7 @@ function buildDiskUsageViewOptions(
 
     return {
         event: options.event,
+        metricRenderKind: "singleMetric",
         resolvedSettings: appearance,
         metricKey: usedMetricKey,
         widgetData: buildDiskUsageWidgetData({
@@ -137,7 +140,7 @@ function buildUnavailableDiskBytesWidgetData(label: string): WidgetData {
 
 function buildDiskThroughputViewOptions(
     options: BuildDiskViewOptions & { reading: DiskThroughputReading },
-): MetricViewOptions {
+): DiskMetricViewOptions {
     const throughputDirection = options.reading.direction;
     const appearance = readSingleMetricAppearance(options.settings);
     const selectedView = appearance.view.selectedView;
@@ -177,6 +180,7 @@ function buildDiskThroughputViewOptions(
 
     return {
         event: options.event,
+        metricRenderKind: "singleMetric",
         resolvedSettings: appearance,
         metricKey: throughputMetricKey,
         widgetData: buildDiskThroughputWidgetData({
@@ -210,7 +214,7 @@ function buildDiskThroughputViewOptions(
 
 function buildDualThroughputViewOptions(
     options: BuildDiskViewOptions & { reading: DiskThroughputReading },
-): MetricViewOptions {
+): DiskMetricViewOptions {
     const readMetricKey = getDiskThroughputMetricKey("read");
     const writeMetricKey = getDiskThroughputMetricKey("write");
     const appearance = readSingleMetricAppearance(options.settings);
@@ -247,6 +251,7 @@ function buildDualThroughputViewOptions(
 
     return {
         event: options.event,
+        metricRenderKind: "dualMetric",
         resolvedSettings: appearance,
         metricKey: `${readMetricKey},${writeMetricKey}`,
         dualRenderPrimitive,
@@ -288,7 +293,7 @@ function buildDualThroughputViewOptions(
 
 function buildDiskThroughputBarViewOptions(
     options: BuildDiskViewOptions & { reading: DiskThroughputReading },
-): MetricViewOptions {
+): DiskMetricViewOptions {
     const readMetricKey = getDiskThroughputMetricKey("read");
     const writeMetricKey = getDiskThroughputMetricKey("write");
     const readWidgetData = buildDiskThroughputWidgetData({
@@ -315,6 +320,7 @@ function buildDiskThroughputBarViewOptions(
 
     return {
         event: options.event,
+        metricRenderKind: "singleMetric",
         resolvedSettings: appearance,
         metricKey: `${readMetricKey},${writeMetricKey}`,
         widgetData: {
@@ -373,7 +379,7 @@ function buildDiskThroughputSingleBarViewOptions(
         reading: DiskThroughputReading;
         direction: DiskThroughputMetricDirection;
     },
-): MetricViewOptions {
+): DiskMetricViewOptions {
     const throughputMetricKey = getDiskThroughputMetricKey(options.direction);
     const widgetData = buildDiskThroughputWidgetData({
         bytesPerSecondWidgetData: options.metrics.getWidgetData(
@@ -393,6 +399,7 @@ function buildDiskThroughputSingleBarViewOptions(
 
     return {
         event: options.event,
+        metricRenderKind: "singleMetric",
         resolvedSettings: appearance,
         metricKey: throughputMetricKey,
         widgetData: {
