@@ -41,6 +41,8 @@ const temporaryRoot = path.join(repoRoot, "artifacts/brand-assets", randomUUID()
 
 const roundedSvgTargets = [
     path.join(brandRoot, "shometrics-logo-rounded.svg"),
+    // The website serves the rounded squircle directly as a scalable SVG favicon.
+    path.join(repoRoot, "site/static/favicon.svg"),
 ];
 
 // Stream Deck category/action-list icons are UI chrome, not key artwork.
@@ -68,6 +70,20 @@ const streamDeckMarketplacePngTargets = [
     { path: path.join(repoRoot, "packages/hub/com.ez.sho-metrics.sdPlugin/imgs/plugin/marketplace.png"), size: 256 },
     { path: path.join(repoRoot, "packages/hub/com.ez.sho-metrics.sdPlugin/imgs/plugin/marketplace@2x.png"), size: 512 },
 ];
+
+// Website favicons reuse the rounded squircle app icon so the browser tab,
+// bookmarks, and iOS home screen match the plugin and Windows app marks. The
+// SVG (emitted via roundedSvgTargets) covers modern browsers, the ICO is the
+// legacy and default `/favicon.ico` fallback, and the Apple touch icon serves
+// iOS home-screen bookmarks. All files stay local so the site loads no remote
+// assets.
+const siteFaviconIcoPath = path.join(repoRoot, "site/static/favicon.ico");
+const siteFaviconIcoSizes = [16, 32, 48];
+const siteAppleTouchIconPngTarget = { path: path.join(repoRoot, "site/static/apple-touch-icon.png"), size: 180 };
+// The website header and primary button use a theme-aware brand mark: the
+// rounded squircle (favicon.svg above) on light surfaces and this transparent
+// glow mark on dark surfaces, matching the Windows titlebar light/dark split.
+const siteDarkSurfaceMarkPath = path.join(repoRoot, "site/static/logo-mark-dark.svg");
 
 // WinUI titlebar images are loaded through ThemeDictionaries. Light surfaces use
 // the rounded filled app icon for contrast; dark surfaces use the transparent
@@ -134,6 +150,7 @@ function main(): void {
         }
 
         saveOrVerifyText(options, windowsIconSourcePath, transparentLogoSvg);
+        saveOrVerifyText(options, siteDarkSurfaceMarkPath, transparentLogoSvg);
         const roundedIconSourcePath = path.join(temporaryRoot, "ShoMetricsIconRounded.svg");
         writeTextFile(roundedIconSourcePath, roundedLogoSvg);
 
@@ -144,6 +161,10 @@ function main(): void {
         for (const target of streamDeckMarketplacePngTargets) {
             saveOrVerifyPng(options, roundedIconSourcePath, target.path, target.size);
         }
+
+        // Website favicons share the rounded squircle source with the marketplace icon.
+        saveOrVerifyPng(options, roundedIconSourcePath, siteAppleTouchIconPngTarget.path, siteAppleTouchIconPngTarget.size);
+        saveOrVerifyIcon(options, roundedIconSourcePath, siteFaviconIcoPath, siteFaviconIcoSizes);
 
         const streamDeckActionListLogoPath = path.join(temporaryRoot, "ShoMetricsStreamDeckActionListIcon.svg");
         writeTextFile(streamDeckActionListLogoPath, streamDeckActionListLogoSvg);
@@ -652,15 +673,16 @@ function saveOrVerifyPng(options: CliOptions, sourceSvgPath: string, targetPath:
     writeBinaryFile(targetPath, expectedPng);
 }
 
-function saveOrVerifyIcon(options: CliOptions, sourceSvgPath: string, targetPath: string): void {
-    const iconPngPaths = iconSizes.map(iconSize => {
-        const iconPngPath = path.join(temporaryRoot, `ShoMetrics-${iconSize}.png`);
+function saveOrVerifyIcon(options: CliOptions, sourceSvgPath: string, targetPath: string, sizesForIcon: number[] = iconSizes): void {
+    const iconBaseName = path.basename(targetPath, path.extname(targetPath));
+    const iconPngPaths = sizesForIcon.map(iconSize => {
+        const iconPngPath = path.join(temporaryRoot, `${iconBaseName}-${iconSize}.png`);
         writeBinaryFile(iconPngPath, renderSvgToPng(sourceSvgPath, iconSize));
         return iconPngPath;
     });
 
     if (options.verifyOnly) {
-        const expectedPath = path.join(temporaryRoot, "ShoMetrics.ico");
+        const expectedPath = path.join(temporaryRoot, `expected-${path.basename(targetPath)}`);
         invokeMagick([...iconPngPaths, expectedPath]);
 
         assertRasterPixelsEqual(expectedPath, targetPath);

@@ -5,16 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ site.Params.description }}{{ end }}">
   <title>{{ if .IsHome }}{{ site.Title }}{{ else }}{{ .Title }} | {{ site.Title }}{{ end }}</title>
+  <link rel="icon" href="{{ "favicon.ico" | relURL }}" sizes="32x32">
+  <link rel="icon" href="{{ "favicon.svg" | relURL }}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{{ "apple-touch-icon.png" | relURL }}">
   <link rel="stylesheet" href="{{ "css/site.css" | relURL }}">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
     <nav class="site-nav" aria-label="Main navigation">
-      <a class="brand" href="{{ "/" | relURL }}" aria-label="ShoMetrics home">ShoMetrics</a>
+      <a class="brand" href="{{ "/" | relURL }}" aria-label="ShoMetrics home">
+        <img class="brand-mark mark-on-light" src="{{ "favicon.svg" | relURL }}" alt="" width="30" height="30">
+        <img class="brand-mark mark-on-dark" src="{{ "logo-mark-dark.svg" | relURL }}" alt="" width="30" height="30">
+        ShoMetrics
+      </a>
+      <input class="nav-toggle" type="checkbox" id="nav-toggle">
+      <label class="nav-burger" for="nav-toggle" aria-label="Toggle navigation menu">
+        <!-- Hamburger / close icons from Lucide (ISC). See site/THIRD_PARTY_NOTICES.md -->
+        <svg class="icon-menu" xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+        <svg class="icon-close" xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </label>
       <div class="nav-links">
         <a href="{{ "/#start" | relURL }}">Get started</a>
-        <a href="{{ "install/" | relURL }}">Install guide</a>
+        <a href="https://github.com/ShoMetrics/sho_metrics" target="_blank" rel="noopener noreferrer">GitHub</a>
         <a href="{{ "faq/" | relURL }}">FAQ</a>
       </div>
     </nav>

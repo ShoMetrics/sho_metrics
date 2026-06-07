@@ -15,6 +15,7 @@ Generated consumers:
 | Stream Deck plugin icon | Rounded filled PNG marketplace/preferences icons at Elgato's required plugin sizes. |
 | Windows executables and installer | Multi-size ICO plus Inno wizard bitmap images. |
 | WinUI titlebar | Light and dark titlebar PNG variants selected through theme resources. |
+| ShoMetrics website | Favicon set under `site/static/`: scalable `favicon.svg`, legacy `favicon.ico`, `apple-touch-icon.png`, plus the transparent `logo-mark-dark.svg` for dark surfaces. |
 
 Do not edit generated assets directly. Update `shometrics-logo-filled.svg`, then run:
 
