@@ -1,14 +1,15 @@
-baseURL = "/"
+baseURL = "https://shometrics.github.io/"
 title = "Sho Metrics"
 locale = "en-US"
 defaultContentLanguage = "en"
 relativeURLs = true
 canonifyURLs = false
 disableKinds = ["taxonomy", "term", "RSS"]
-enableRobotsTXT = false
+enableRobotsTXT = true
 
 [params]
 description = "A Stream Deck plugin for clear, glanceable system metrics."
+ogImage = "og-image.png"
 
 [markup]
   [markup.goldmark]
