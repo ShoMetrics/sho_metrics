@@ -5,12 +5,15 @@ export type ActionKind =
     | "disk"
     | "catalog"
     | "denseMultiMetric"
+    | "stackedMetric"
     | "network"
     | "unknown";
 
 export const STREAM_DECK_PLUGIN_UUID = "com.ez.sho-metrics";
 
-type StreamDeckActionKind = Exclude<ActionKind, "unknown">;
+// TODO(StackedMetric Step 2): include stackedMetric when the Stream Deck
+// action class and manifest entry are added.
+type StreamDeckActionKind = Exclude<ActionKind, "unknown" | "stackedMetric">;
 
 export const STREAM_DECK_ACTION_UUID_BY_KIND = {
     cpu: `${STREAM_DECK_PLUGIN_UUID}.cpu`,

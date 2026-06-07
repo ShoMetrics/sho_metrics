@@ -536,5 +536,7 @@ function formatResolvedWidgetForLog(settings: ResolvedWidgetSettings): string {
             return `singleMetric:${settings.widget.slot.appearance.view.selectedView}`;
         case "denseMultiMetric":
             return `denseMultiMetric:${settings.widget.slots.length}`;
+        case "stackedMetric":
+            return `stackedMetric:${settings.widget.slots.length}`;
     }
 }

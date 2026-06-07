@@ -1,8 +1,10 @@
-
 import {
     type DenseMetricSlot as StoredDenseMetricSlot,
     type DenseMultiMetricWidget as StoredDenseMultiMetricWidget,
     type MetricSlot as StoredMetricSlot,
+    type SingleMetricWidget as StoredSingleMetricWidget,
+    type StackedMetricSlot as StoredStackedMetricSlot,
+    type StackedMetricWidget as StoredStackedMetricWidget,
     type StoredWidgetSettings,
 } from "../../../generated/shometrics/v1/settings_pb.js";
 import type {
@@ -11,6 +13,10 @@ import type {
     ResolvedGlobalSettings,
     ResolvedMetricSlot,
     ResolvedMetricTarget,
+    ResolvedSingleMetricWidget,
+    ResolvedStackedMetricSlot,
+    ResolvedStackedMetricWidget,
+    ResolvedStackedMetricRotationSettings,
     ResolvedWidgetPreferences,
     ResolvedWidgetSettings,
 } from "../../resolved-settings";
@@ -18,6 +24,14 @@ import {
     DENSE_MULTI_METRIC_MAX_SLOT_COUNT,
     DENSE_MULTI_METRIC_MIN_SLOT_COUNT,
 } from "../dense-multi-metric-constraints";
+import {
+    STACKED_METRIC_DEFAULT_AUTO_ROTATE_ENABLED,
+    STACKED_METRIC_DEFAULT_INTERVAL_SECONDS,
+    STACKED_METRIC_MAX_INTERVAL_SECONDS,
+    STACKED_METRIC_MAX_SLOT_COUNT,
+    STACKED_METRIC_MIN_INTERVAL_SECONDS,
+    STACKED_METRIC_MIN_SLOT_COUNT,
+} from "../stacked-metric-constraints";
 import {
     resolveDiskThroughputDisplaySettings,
     resolveNetworkDisplaySettings,
@@ -60,20 +74,26 @@ export function resolveStoredWidgetSettings(
                 ),
                 preferences: resolveWidgetPreferences(options.storedWidgetSettings),
             };
+        case "stackedMetric":
+            return {
+                widget: resolveStackedMetricWidget(
+                    options.storedWidgetSettings.widget.value,
+                    globalSettings,
+                    options.runtime,
+                ),
+                preferences: resolveWidgetPreferences(options.storedWidgetSettings),
+            };
         case "singleMetric":
         case undefined: {
-            const slot = resolveMetricSlot(
-                resolveStoredSingleMetricSlot(options.storedWidgetSettings),
+            const widget = resolveSingleMetricWidget(
+                readStoredSingleMetricWidget(options.storedWidgetSettings),
                 globalSettings,
                 options.runtime,
             );
 
             return {
-                widget: {
-                    widgetKind: "singleMetric",
-                    slot,
-                },
-                preferences: resolveWidgetPreferences(options.storedWidgetSettings, slot.metric.target),
+                widget,
+                preferences: resolveWidgetPreferences(options.storedWidgetSettings, widget.slot.metric.target),
             };
         }
     }
@@ -81,10 +101,10 @@ export function resolveStoredWidgetSettings(
 
 /** Resolves stored global defaults, overrides, and source profiles. */
 
-function resolveStoredSingleMetricSlot(storedWidgetSettings: StoredWidgetSettings): StoredMetricSlot | undefined {
+function readStoredSingleMetricWidget(storedWidgetSettings: StoredWidgetSettings): StoredSingleMetricWidget | undefined {
     switch (storedWidgetSettings.widget.case) {
         case "singleMetric":
-            return storedWidgetSettings.widget.value.slot;
+            return storedWidgetSettings.widget.value;
         case undefined:
             return undefined;
     }
@@ -131,6 +151,17 @@ function resolveMetricSlot(
     return {
         metric,
         appearance,
+    };
+}
+
+function resolveSingleMetricWidget(
+    storedWidget: StoredSingleMetricWidget | undefined,
+    globalSettings: ResolvedGlobalSettings,
+    runtime: ResolveStoredSettingsRuntimeContext | undefined,
+): ResolvedSingleMetricWidget {
+    return {
+        widgetKind: "singleMetric",
+        slot: resolveMetricSlot(storedWidget?.slot, globalSettings, runtime),
     };
 }
 
@@ -185,6 +216,88 @@ function resolveDenseMetricSlot(
         slot: resolveMetricSlot(storedSlot.slot, globalSettings, runtime),
         customLabel: normalizeOptionalText(storedSlot.customLabel),
         customMaximumValue: storedSlot.customMaximumValue,
+    };
+}
+
+function resolveStackedMetricWidget(
+    storedWidget: StoredStackedMetricWidget,
+    globalSettings: ResolvedGlobalSettings,
+    runtime: ResolveStoredSettingsRuntimeContext | undefined,
+): ResolvedStackedMetricWidget {
+    const storedSlots = readStackedMetricSlots(storedWidget);
+
+    return {
+        widgetKind: "stackedMetric",
+        slots: storedSlots.map((storedSlot) => resolveStackedMetricSlot(storedSlot, globalSettings, runtime)),
+        rotation: resolveStackedMetricRotationSettings(storedWidget),
+    };
+}
+
+function readStackedMetricSlots(storedWidget: StoredStackedMetricWidget): readonly StoredStackedMetricSlot[] {
+    // Resolved stacked widgets promise stable slot bounds and identity even when
+    // callers construct stored proto objects without going through the codec.
+    if (
+        storedWidget.slots.length < STACKED_METRIC_MIN_SLOT_COUNT
+        || storedWidget.slots.length > STACKED_METRIC_MAX_SLOT_COUNT
+    ) {
+        return throwUnexpectedStoredSettingsState(
+            `Stacked metric widgets must have ${STACKED_METRIC_MIN_SLOT_COUNT}`
+            + ` to ${STACKED_METRIC_MAX_SLOT_COUNT} metric slots.`,
+        );
+    }
+
+    const slotIds = new Set<string>();
+    for (const storedSlot of storedWidget.slots) {
+        if (storedSlot.slotId === "") {
+            return throwUnexpectedStoredSettingsState("Stacked metric slot is missing its stable slot id.");
+        }
+        if (slotIds.has(storedSlot.slotId)) {
+            return throwUnexpectedStoredSettingsState("Stacked metric slot ids must be unique.");
+        }
+        if (storedSlot.item.case !== "singleMetric") {
+            return throwUnexpectedStoredSettingsState("Stacked metric slots must contain a single metric widget.");
+        }
+        slotIds.add(storedSlot.slotId);
+    }
+
+    return storedWidget.slots;
+}
+
+function resolveStackedMetricSlot(
+    storedSlot: StoredStackedMetricSlot,
+    globalSettings: ResolvedGlobalSettings,
+    runtime: ResolveStoredSettingsRuntimeContext | undefined,
+): ResolvedStackedMetricSlot {
+    if (storedSlot.item.case !== "singleMetric") {
+        return throwUnexpectedStoredSettingsState("Stacked metric slots must contain a single metric widget.");
+    }
+
+    return {
+        slotId: storedSlot.slotId,
+        widget: resolveSingleMetricWidget(storedSlot.item.value, globalSettings, runtime),
+    };
+}
+
+function resolveStackedMetricRotationSettings(
+    storedWidget: StoredStackedMetricWidget,
+): ResolvedStackedMetricRotationSettings {
+    const intervalSeconds = storedWidget.rotation?.intervalSeconds
+        ?? STACKED_METRIC_DEFAULT_INTERVAL_SECONDS;
+
+    if (
+        intervalSeconds < STACKED_METRIC_MIN_INTERVAL_SECONDS
+        || intervalSeconds > STACKED_METRIC_MAX_INTERVAL_SECONDS
+    ) {
+        return throwUnexpectedStoredSettingsState(
+            `Stacked metric interval must be ${STACKED_METRIC_MIN_INTERVAL_SECONDS}`
+            + ` to ${STACKED_METRIC_MAX_INTERVAL_SECONDS} seconds.`,
+        );
+    }
+
+    return {
+        autoRotateEnabled: storedWidget.rotation?.autoRotateEnabled
+            ?? STACKED_METRIC_DEFAULT_AUTO_ROTATE_ENABLED,
+        intervalSeconds,
     };
 }
 

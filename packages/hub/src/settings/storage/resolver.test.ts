@@ -13,6 +13,9 @@ import {
 import { MetricUnit } from "../../runtime/sources/metric-source";
 import {
     DenseMultiMetricWidgetSchema,
+    SingleMetricWidgetSchema,
+    StackedMetricSlotSchema,
+    StackedMetricWidgetSchema,
     StoredWidgetSettingsSchema,
 } from "../../generated/shometrics/v1/settings_pb.js";
 import type {
@@ -1317,6 +1320,162 @@ describe("stored settings proto resolver", () => {
         });
 
         assert.throws(() => resolveStoredWidgetSettings({ storedWidgetSettings }), /slot ids must be unique/);
+    });
+
+    it("resolves stacked metric slots and rotation settings", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            stackedMetric: {
+                slots: [
+                    {
+                        slotId: "cpu-stack",
+                        singleMetric: {
+                            slot: {
+                                metric: {
+                                    cpu: {
+                                        kind: "KIND_USAGE",
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    {
+                        slotId: "memory-stack",
+                        singleMetric: {
+                            slot: {
+                                metric: {
+                                    memory: {
+                                        kind: "KIND_USAGE",
+                                    },
+                                },
+                            },
+                        },
+                    },
+                ],
+                rotation: {
+                    autoRotateEnabled: false,
+                    intervalSeconds: 5,
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({ storedWidgetSettings });
+
+        assert.equal(settings.widget.widgetKind, "stackedMetric");
+        assert.equal(settings.widget.slots.length, 2);
+        assert.equal(settings.widget.slots[0]?.slotId, "cpu-stack");
+        assert.equal(settings.widget.slots[0]?.widget.slot.metric.target.domain, "cpu");
+        assert.equal(settings.widget.slots[1]?.slotId, "memory-stack");
+        assert.equal(settings.widget.slots[1]?.widget.slot.metric.target.domain, "memory");
+        assert.equal(settings.widget.rotation.autoRotateEnabled, false);
+        assert.equal(settings.widget.rotation.intervalSeconds, 5);
+        assert.equal(settings.preferences.pollingFrequencySeconds, 1);
+    });
+
+    it("resolves stacked metric rotation defaults", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            stackedMetric: {
+                slots: [
+                    { slotId: "slot-1", singleMetric: { slot: { metric: { cpu: {} } } } },
+                    { slotId: "slot-2", singleMetric: { slot: { metric: { memory: {} } } } },
+                ],
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({ storedWidgetSettings });
+
+        assert.equal(settings.widget.widgetKind, "stackedMetric");
+        assert.equal(settings.widget.rotation.autoRotateEnabled, true);
+        assert.equal(settings.widget.rotation.intervalSeconds, 3);
+    });
+
+    it("rejects stacked metric widgets below the minimum resolved slot count", () => {
+        const storedWidgetSettings = create(StoredWidgetSettingsSchema, {
+            widget: {
+                case: "stackedMetric",
+                value: create(StackedMetricWidgetSchema, {
+                    slots: [
+                        { slotId: "slot-1" },
+                    ],
+                }),
+            },
+        });
+
+        assert.throws(() => resolveStoredWidgetSettings({ storedWidgetSettings }), /2 to 3 metric slots/);
+    });
+
+    it("rejects stacked metric widgets with duplicate resolved slot ids", () => {
+        const storedWidgetSettings = create(StoredWidgetSettingsSchema, {
+            widget: {
+                case: "stackedMetric",
+                value: create(StackedMetricWidgetSchema, {
+                    slots: [
+                        create(StackedMetricSlotSchema, {
+                            slotId: "slot-1",
+                            item: {
+                                case: "singleMetric",
+                                value: create(SingleMetricWidgetSchema),
+                            },
+                        }),
+                        create(StackedMetricSlotSchema, {
+                            slotId: "slot-1",
+                            item: {
+                                case: "singleMetric",
+                                value: create(SingleMetricWidgetSchema),
+                            },
+                        }),
+                    ],
+                }),
+            },
+        });
+
+        assert.throws(() => resolveStoredWidgetSettings({ storedWidgetSettings }), /slot ids must be unique/);
+    });
+
+    it("rejects stacked metric slots without a single metric item", () => {
+        const storedWidgetSettings = create(StoredWidgetSettingsSchema, {
+            widget: {
+                case: "stackedMetric",
+                value: create(StackedMetricWidgetSchema, {
+                    slots: [
+                        { slotId: "slot-1" },
+                        { slotId: "slot-2" },
+                    ],
+                }),
+            },
+        });
+
+        assert.throws(() => resolveStoredWidgetSettings({ storedWidgetSettings }), /single metric widget/);
+    });
+
+    it("rejects stacked metric rotation intervals outside the supported range", () => {
+        const storedWidgetSettings = create(StoredWidgetSettingsSchema, {
+            widget: {
+                case: "stackedMetric",
+                value: create(StackedMetricWidgetSchema, {
+                    slots: [
+                        create(StackedMetricSlotSchema, {
+                            slotId: "slot-1",
+                            item: {
+                                case: "singleMetric",
+                                value: create(SingleMetricWidgetSchema),
+                            },
+                        }),
+                        create(StackedMetricSlotSchema, {
+                            slotId: "slot-2",
+                            item: {
+                                case: "singleMetric",
+                                value: create(SingleMetricWidgetSchema),
+                            },
+                        }),
+                    ],
+                    rotation: {
+                        intervalSeconds: 6,
+                    },
+                }),
+            },
+        });
+
+        assert.throws(() => resolveStoredWidgetSettings({ storedWidgetSettings }), /1 to 5 seconds/);
     });
 });
 

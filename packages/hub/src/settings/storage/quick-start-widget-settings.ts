@@ -21,6 +21,8 @@ import {
     NetworkMetricTarget_TrafficSchema,
     NetworkMetricTargetSchema,
     SingleMetricWidgetSchema,
+    StackedMetricSlotSchema,
+    StackedMetricWidgetSchema,
     type MetricSelection,
     type MetricSourcePolicy,
     type StoredWidgetSettings,
@@ -115,6 +117,10 @@ type QuickStartWidget =
     | {
         readonly widgetKind: "denseMultiMetric";
         readonly metrics: readonly QuickStartMetric[];
+    }
+    | {
+        readonly widgetKind: "stackedMetric";
+        readonly metrics: readonly QuickStartMetric[];
     };
 
 function buildQuickStartWidget(actionKind: ActionKind): QuickStartWidget | null {
@@ -150,6 +156,14 @@ function buildQuickStartWidget(actionKind: ActionKind): QuickStartWidget | null 
                 metrics: [
                     buildCpuUsageQuickStartMetric(),
                     buildGpuUsageQuickStartMetric(),
+                ],
+            };
+        case "stackedMetric":
+            return {
+                widgetKind: "stackedMetric",
+                metrics: [
+                    buildCpuUsageQuickStartMetric(),
+                    buildMemoryUsageQuickStartMetric(),
                 ],
             };
         case "gpu":
@@ -280,6 +294,25 @@ function writeQuickStartStoredWidgetSettings(
                 slots: quickStartWidget.metrics.map((metric) => create(DenseMetricSlotSchema, {
                     slotId: createSlotId(),
                     slot: createMetricSlot(metric),
+                })),
+            }),
+        };
+
+        return writeStoredWidgetSettings(settings);
+    }
+
+    if (quickStartWidget.widgetKind === "stackedMetric") {
+        settings.widget = {
+            case: "stackedMetric",
+            value: create(StackedMetricWidgetSchema, {
+                slots: quickStartWidget.metrics.map((metric) => create(StackedMetricSlotSchema, {
+                    slotId: createSlotId(),
+                    item: {
+                        case: "singleMetric",
+                        value: create(SingleMetricWidgetSchema, {
+                            slot: createMetricSlot(metric),
+                        }),
+                    },
                 })),
             }),
         };
