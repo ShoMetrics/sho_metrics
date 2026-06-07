@@ -195,6 +195,25 @@ test("styled SVG text applies font-relative letter spacing", () => {
     assert.match(styledText, /letter-spacing="1\.60"/);
 });
 
+test("styled SVG text lets layout override style letter spacing", () => {
+    const styledText = renderStyledSvgText({
+        id: "letter-spacing-override",
+        text: "NET",
+        xCoordinate: 42,
+        yCoordinate: 30,
+        maxWidth: 120,
+        baseFontSize: 20,
+        fill: "#fff",
+        textStyle: {
+            ...DEFAULT_RENDER_TEXT_STYLES.label,
+            letterSpacingEm: 0.08,
+        },
+        letterSpacingEm: 0,
+    });
+
+    assert.doesNotMatch(styledText, /letter-spacing=/);
+});
+
 test("styled SVG text lets layout fit options override the style minimum font scale", () => {
     const styledText = renderStyledSvgText({
         id: "layout-fit",
@@ -209,6 +228,34 @@ test("styled SVG text lets layout fit options override the style minimum font sc
     });
 
     assert.match(styledText, /font-size="10"/);
+});
+
+test("styled SVG text lets layout fit options override the style width scale", () => {
+    const roomyText = renderStyledSvgText({
+        id: "roomy-fit",
+        text: "CPU",
+        xCoordinate: 42,
+        yCoordinate: 30,
+        maxWidth: 34,
+        baseFontSize: 16,
+        fill: "#fff",
+        textStyle: DEFAULT_RENDER_TEXT_STYLES.label,
+        fitOptions: { widthScale: 1 },
+    });
+    const strictText = renderStyledSvgText({
+        id: "strict-fit",
+        text: "CPU",
+        xCoordinate: 42,
+        yCoordinate: 30,
+        maxWidth: 34,
+        baseFontSize: 16,
+        fill: "#fff",
+        textStyle: DEFAULT_RENDER_TEXT_STYLES.label,
+        fitOptions: { widthScale: 2 },
+    });
+
+    assert.doesNotMatch(roomyText, /textLength=/);
+    assert.match(strictText, /textLength="34" lengthAdjust="spacingAndGlyphs"/);
 });
 
 test("SVG text outline helpers emit no attributes when disabled", () => {

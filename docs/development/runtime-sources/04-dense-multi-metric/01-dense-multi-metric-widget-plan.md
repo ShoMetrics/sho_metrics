@@ -52,12 +52,17 @@ entry named **Stacked Metric** and should not be implemented in this batch.
 - Touch strip logical size: 200 x 100.
 - Square layout: one vertical column, 2 to 6 rows.
 - Touch strip layout:
-  - 2 or 3 metrics: one vertical column, each metric uses a full-width row.
-  - 4 to 6 metrics: two columns, row-major order.
-  - 4 metrics render as 2 columns x 2 rows.
-  - 5 metrics render as 2 columns x 3 rows with the last cell empty.
+  - 2 to 5 metrics: one vertical column, each metric uses a full-width row.
   - 6 metrics render as 2 columns x 3 rows.
+- Touch strip 4 and 5 metric layouts intentionally remain single-column. The
+  dense row shape is horizontally expensive (`label | bar | value + unit`), and
+  a 200 x 100 touch strip has more useful width than height for 4 or 5 rows.
+  Only 6 rows become too vertically thin in one column, so 6 rows use two
+  columns.
 - Row shape: left label, center progress bar, right value plus unit.
+- Bar shape: rounded rectangles with modest corner radius, not full pill bars.
+  Dense rows are too small for pill ends; low values should read as a filled
+  rectangular bar, not as a dot.
 - The left label target is roughly 4 short Latin characters on square keys.
   The renderer's pixel fitting is authoritative because CJK, kana, and wide
   glyphs do not map cleanly to a character count.
@@ -474,9 +479,11 @@ Implementation owner:
 Rendering rules:
 
 - Square key: one column, `rowCount` rows.
-- Touch strip 2..3 rows: one column.
-- Touch strip 4..6 rows: two columns, row-major.
+- Touch strip 2..5 rows: one column.
+- Touch strip 6 rows: two columns, row-major.
 - Each row draws label, bar track, bar fill, value, and unit.
+- Bar track and fill use rounded-rectangle geometry. Do not use a full pill
+  radius unless a later product review explicitly chooses the softer pill look.
 - Value text uses `WidgetData.displayValue ?? current`.
 - Unit text uses `WidgetData.unit` after the existing render unit formatting
   path.
@@ -682,12 +689,15 @@ Work:
 3. Add dense frame/body composition in `metric-view-frame.ts` without weakening
    single/dual behavior.
 4. Add `dense-metric-view.ts` and `dense-progress-list.ts`.
-5. Implement square and touch-strip layouts exactly as documented above.
+5. Implement square and touch-strip layouts exactly as documented above:
+   square 2..6 rows in one column; touch strip 2..5 rows in one column; touch
+   strip 6 rows in two columns.
 6. Reuse existing theme frame, transparent surface, paint tokens, and
    multi-color thresholds.
 7. Add text fitting/truncation so labels, values, and units do not overlap.
 8. Add renderer unit tests for 2, 3, 4, 5, and 6 rows on square and touch-strip
-   logical sizes.
+   logical sizes, including the touch-strip 5-row single-column and 6-row
+   two-column boundary.
 9. Add or update visual snapshots only after inspecting the rendered output.
 
 Verification:
@@ -774,7 +784,8 @@ Manual host smoke:
 5. Edit one row label and one row maximum.
 6. Switch theme/color modes and verify every row updates together.
 7. Drag Dense Multi Metric to a Stream Deck+ encoder slot and verify the
-   200 x 100 touch-strip layout.
+   200 x 100 touch-strip layout: 2 to 5 rows stay single-column and 6 rows use
+   two columns.
 8. Rotate/press/touch the encoder/key and verify no custom behavior fires.
 
 ## Acceptance Checklist
@@ -795,7 +806,7 @@ Manual host smoke:
   `catalog-metric-widget-data.ts`.
 - One row with no data does not blank the whole widget.
 - Square layout is one column for 2 to 6 rows.
-- Touch-strip layout is one column for 2 to 3 rows and two columns for 4 to 6
+- Touch-strip layout is one column for 2 to 5 rows and two columns only for 6
   rows.
 - Labels are pixel-fitted by the dense renderer. PI short-label guidance is not
   the only enforcement.

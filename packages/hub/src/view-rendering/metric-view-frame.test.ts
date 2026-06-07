@@ -692,6 +692,41 @@ test("dense metric frame renders a progress list body", () => {
     assert.equal(countMatches(frame.svg, /class="dense-progress-list-row"/gu), 3);
 });
 
+test("dense pixel window frame uses the full client viewport", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildDenseMetricRenderOptions({
+            widgetData: {
+                rows: ["CPU", "GPU", "RAM", "RAM", "RAM", "RAM"].map((label, index) => buildDenseMetricRow({
+                    slotId: `dense-slot-${index}`,
+                    label,
+                })),
+            },
+            resolvedSettings: {
+                theme: { selectedTheme: "pixel-window" },
+            },
+        }),
+        renderTarget: "key",
+    });
+
+    assert.deepEqual(frame.renderPlan.bodyRenderSize, { width: 134, height: 120 });
+    assert.deepEqual(frame.renderPlan.bodyViewport, {
+        xCoordinate: 5,
+        yCoordinate: 19,
+        width: 134,
+        height: 120,
+        body: {
+            xOffset: 0,
+            yOffset: 0,
+            renderSize: { width: 134, height: 120 },
+        },
+        clipRadius: 0,
+    });
+    assert.match(frame.svg, /<g transform="translate\(5 19\)">/);
+    assert.doesNotMatch(frame.svg, /scale\(0\.8333\)/);
+    assert.ok(readDenseLabelTextElements(frame.svg).every(element => !/letter-spacing=/u.test(element)));
+    assert.ok(readDenseLabelTextElements(frame.svg).every(element => !/textLength=/u.test(element)));
+});
+
 test("dense metric frame uses the wide touch strip layout", () => {
     const frame = composeMetricViewFrame({
         viewOptions: buildDenseMetricRenderOptions({
@@ -703,6 +738,35 @@ test("dense metric frame uses the wide touch strip layout", () => {
     assert.equal(frame.renderPlan.touchStripMetricLayout?.kind, "wide");
     assert.deepEqual(frame.renderPlan.renderSize, TOUCH_STRIP_LOGICAL_SIZE);
     assert.equal(countMatches(frame.svg, /class="dense-progress-list-row"/gu), 5);
+});
+
+test("dense pixel window touch strip frame uses the full client viewport", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildDenseMetricRenderOptions({
+            widgetData: buildDenseMetricWidgetData(6),
+            resolvedSettings: {
+                theme: { selectedTheme: "pixel-window" },
+            },
+        }),
+        renderTarget: "touch-strip",
+    });
+
+    assert.equal(frame.renderPlan.touchStripMetricLayout?.kind, "wide");
+    assert.deepEqual(frame.renderPlan.bodyRenderSize, { width: 190, height: 78 });
+    assert.deepEqual(frame.renderPlan.bodyViewport, {
+        xCoordinate: 5,
+        yCoordinate: 17,
+        width: 190,
+        height: 78,
+        body: {
+            xOffset: 0,
+            yOffset: 0,
+            renderSize: { width: 190, height: 78 },
+        },
+        clipRadius: 0,
+    });
+    assert.match(frame.svg, /<g transform="translate\(5 17\)">/);
+    assert.doesNotMatch(frame.svg, /scale\(0\.78\)/);
 });
 
 test("dense metric frame keeps missing samples isolated to their rows", () => {
@@ -860,6 +924,11 @@ function buildDenseMetricRow(options: {
 
 function countMatches(text: string, pattern: RegExp): number {
     return [...text.matchAll(pattern)].length;
+}
+
+function readDenseLabelTextElements(svg: string): readonly string[] {
+    return [...svg.matchAll(/<clipPath id="dense-progress-list-label-\d+">[\s\S]*?<\/clipPath>\s*<\/defs>\s*<g clip-path="url\(#dense-progress-list-label-\d+\)">\s*(<text[\s\S]*?<\/text>)/gu)]
+        .map(match => match[1] ?? "");
 }
 
 function buildStatusIcon(): ProgressCircleStatusIcon {

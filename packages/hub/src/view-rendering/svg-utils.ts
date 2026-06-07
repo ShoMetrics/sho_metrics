@@ -61,6 +61,8 @@ export interface StyledSvgTextOptions {
     dominantBaseline?: "middle" | "auto";
     /** Overrides the style baseline shift for tightly controlled primitive text. */
     baselineShiftEm?: number;
+    /** Overrides the style letter spacing for tightly controlled primitive text. */
+    letterSpacingEm?: number;
     outline?: RenderOutlineTokens;
     extraAttributes?: readonly string[];
     fitOptions?: SvgTextFitOptions;
@@ -108,13 +110,13 @@ export function renderStyledSvgText(options: StyledSvgTextOptions): string {
         textAnchor: options.textAnchor,
         dominantBaseline: options.dominantBaseline,
         clipHeightEm: options.textStyle.clipHeightEm,
-        letterSpacingEm: options.textStyle.letterSpacingEm,
+        letterSpacingEm: options.letterSpacingEm ?? options.textStyle.letterSpacingEm,
         outline: options.outline,
         extraAttributes: options.extraAttributes,
         fitOptions: {
             ...options.fitOptions,
             minimumFontScale: options.fitOptions?.minimumFontScale ?? options.textStyle.minimumFontScale,
-            widthScale: options.textStyle.widthScale,
+            widthScale: options.fitOptions?.widthScale ?? options.textStyle.widthScale,
         },
     });
 }

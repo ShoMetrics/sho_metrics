@@ -195,7 +195,9 @@ export function buildMetricViewRenderPlan(options: {
         size: renderSize,
     });
     const bodyViewports = resolveMetricBodyViewports({
+        metricRenderKind: options.viewOptions.metricRenderKind,
         renderSize,
+        themePreset: renderAppearance.themePreset,
         themeBodyViewport,
         touchStripMetricLayout,
     });
@@ -359,10 +361,20 @@ export function resolveTouchStripMetricLayout(options: {
 }
 
 function resolveMetricBodyViewports(options: {
+    metricRenderKind: MetricRenderOptions["metricRenderKind"];
     renderSize: KeySize;
+    themePreset: MetricRenderAppearance["themePreset"];
     themeBodyViewport: ThemeBodyViewport | undefined;
     touchStripMetricLayout: TouchStripMetricLayout | null;
 }): readonly ThemeBodyViewport[] {
+    if (
+        options.metricRenderKind === "denseMetric"
+        && options.themePreset === "pixel-window"
+        && options.themeBodyViewport !== undefined
+    ) {
+        return [resolveFullViewportBodyPlacement(options.themeBodyViewport)];
+    }
+
     if (options.touchStripMetricLayout?.kind === "wide-frame-square-body") {
         return [
             resolveWideFrameSquareBodyViewport({
@@ -380,6 +392,20 @@ function resolveMetricBodyViewports(options: {
     }
 
     return options.themeBodyViewport === undefined ? [] : [options.themeBodyViewport];
+}
+
+function resolveFullViewportBodyPlacement(viewport: ThemeBodyViewport): ThemeBodyViewport {
+    return {
+        ...viewport,
+        body: {
+            xOffset: 0,
+            yOffset: 0,
+            renderSize: {
+                width: viewport.width,
+                height: viewport.height,
+            },
+        },
+    };
 }
 
 function resolveWideFrameSquareBodyViewport(options: {

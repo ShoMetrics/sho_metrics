@@ -119,6 +119,21 @@ test("dense progress list keeps bar text on a shared visual-center baseline", ()
     assert.ok(firstValueTextYCoordinate <= firstTrack.yCoordinate + firstTrack.height / 2 + 3);
 });
 
+test("dense progress list offsets labels onto the same visual-center side as bar text", () => {
+    const svg = renderDenseProgressList(
+        buildDenseMetricWidgetData(4),
+        DEFAULT_DENSE_PROGRESS_LIST_CONFIG,
+        WIDGET_LOGICAL_SIZE,
+    );
+    const firstTrack = readTrackRects(svg)[0];
+    const firstLabelTextYCoordinate = readLabelTextYCoordinates(svg)[0];
+
+    assert.notEqual(firstTrack, undefined);
+    assert.notEqual(firstLabelTextYCoordinate, undefined);
+    assert.ok(firstLabelTextYCoordinate > firstTrack.yCoordinate + firstTrack.height / 2);
+    assert.ok(firstLabelTextYCoordinate <= firstTrack.yCoordinate + firstTrack.height / 2 + 3);
+});
+
 test("dense progress list picks readable value text over filled bar color", () => {
     const svg = renderDenseProgressList(
         {
@@ -173,8 +188,42 @@ test("dense progress list shrinks bar height as row count increases", () => {
     assert.ok(twoRowTrackHeight > sixRowTrackHeight);
 });
 
-test("dense progress list keeps touch strip rows full width for 2 or 3 rows", () => {
-    for (const rowCount of [2, 3]) {
+test("dense progress list keeps sparse square rows visually looser than dense rows", () => {
+    const threeRowSvg = renderDenseProgressList(
+        buildDenseMetricWidgetData(3),
+        DEFAULT_DENSE_PROGRESS_LIST_CONFIG,
+        WIDGET_LOGICAL_SIZE,
+    );
+    const fourRowSvg = renderDenseProgressList(
+        buildDenseMetricWidgetData(4),
+        DEFAULT_DENSE_PROGRESS_LIST_CONFIG,
+        WIDGET_LOGICAL_SIZE,
+    );
+
+    assert.ok(readMinimumTrackGap(threeRowSvg) > readMinimumTrackGap(fourRowSvg));
+});
+
+test("dense progress list keeps square outer padding compact", () => {
+    const svg = renderDenseProgressList(
+        buildDenseMetricWidgetData(6),
+        DEFAULT_DENSE_PROGRESS_LIST_CONFIG,
+        WIDGET_LOGICAL_SIZE,
+    );
+    const trackRects = readTrackRects(svg);
+    const firstTrack = trackRects[0];
+    const lastTrack = trackRects.at(-1);
+
+    if (firstTrack === undefined || lastTrack === undefined) {
+        assert.fail("expected dense track rectangles");
+    }
+
+    assert.ok(firstTrack.xCoordinate < 50);
+    assert.ok(firstTrack.yCoordinate < 15);
+    assert.ok(lastTrack.yCoordinate + lastTrack.height > WIDGET_LOGICAL_SIZE.height - 15);
+});
+
+test("dense progress list keeps touch strip rows full width for 2 to 5 rows", () => {
+    for (const rowCount of [2, 3, 4, 5]) {
         const svg = renderDenseProgressList(
             buildDenseMetricWidgetData(rowCount),
             DEFAULT_DENSE_PROGRESS_LIST_CONFIG,
@@ -196,20 +245,110 @@ test("dense progress list keeps touch strip labels above the fuzzy small-text fl
     assert.ok(readLabelFontSizes(svg).every(fontSize => fontSize >= 10));
 });
 
-test("dense progress list uses two touch strip columns for 4 to 6 rows", () => {
-    for (const rowCount of [4, 5, 6]) {
-        const svg = renderDenseProgressList(
-            buildDenseMetricWidgetData(rowCount),
-            DEFAULT_DENSE_PROGRESS_LIST_CONFIG,
-            TOUCH_STRIP_LOGICAL_SIZE,
-        );
-        const trackXCoordinates = readTrackXCoordinates(svg);
+test("dense progress list lets callers disable label letter spacing", () => {
+    const svg = renderDenseProgressList(
+        {
+            rows: ["CPU", "GPU", "RAM", "RAM", "RAM", "RAM"].map((label, index) => buildDenseMetricRow({
+                slotId: `slot-${index}`,
+                label,
+            })),
+        },
+        {
+            ...DEFAULT_DENSE_PROGRESS_LIST_CONFIG,
+            textStyles: {
+                ...DEFAULT_DENSE_PROGRESS_LIST_CONFIG.textStyles,
+                label: {
+                    ...DEFAULT_DENSE_PROGRESS_LIST_CONFIG.textStyles.label,
+                    letterSpacingEm: 0.2,
+                },
+            },
+            labelLetterSpacingEm: 0,
+        },
+        { width: 134, height: 120 },
+    );
+    const labelClipRects = readLabelClipRects(svg);
+    const labelTextElements = readLabelTextElements(svg);
+    const trackRects = readTrackRects(svg);
 
-        assert.equal(countMatches(svg, /class="dense-progress-list-row"/gu), rowCount);
-        assert.equal(new Set(trackXCoordinates).size, 2);
-        assert.equal(trackXCoordinates[0], trackXCoordinates[2]);
-        assert.equal(trackXCoordinates[1], trackXCoordinates[3]);
-    }
+    assert.equal(labelClipRects.length, 6);
+    assert.equal(labelTextElements.length, 6);
+    assert.equal(trackRects.length, 6);
+    assert.ok(labelClipRects.every(rect => rect.width === 32));
+    assert.ok(labelTextElements.every(element => !/textLength=/u.test(element)));
+    assert.ok(labelTextElements.every(element => !/letter-spacing=/u.test(element)));
+    assert.ok(labelClipRects.every((rect, index) => {
+        const trackRect = trackRects[index];
+        return trackRect !== undefined && rect.xCoordinate + rect.width <= trackRect.xCoordinate - 4;
+    }));
+});
+
+test("dense progress list preserves label letter spacing without an override", () => {
+    const svg = renderDenseProgressList(
+        {
+            rows: ["CPU", "GPU"].map((label, index) => buildDenseMetricRow({
+                slotId: `slot-${index}`,
+                label,
+            })),
+        },
+        {
+            ...DEFAULT_DENSE_PROGRESS_LIST_CONFIG,
+            textStyles: {
+                ...DEFAULT_DENSE_PROGRESS_LIST_CONFIG.textStyles,
+                label: {
+                    ...DEFAULT_DENSE_PROGRESS_LIST_CONFIG.textStyles.label,
+                    letterSpacingEm: 0.08,
+                },
+            },
+        },
+        WIDGET_LOGICAL_SIZE,
+    );
+
+    assert.ok(readLabelTextElements(svg).every(element => /letter-spacing=/u.test(element)));
+});
+
+test("dense progress list gives two-column touch strip labels enough width before fitting", () => {
+    const svg = renderDenseProgressList(
+        {
+            rows: ["CPU", "GPU", "VRAM", "RAM", "RAM", "RAM"].map((label, index) => buildDenseMetricRow({
+                slotId: `slot-${index}`,
+                label,
+            })),
+        },
+        DEFAULT_DENSE_PROGRESS_LIST_CONFIG,
+        TOUCH_STRIP_LOGICAL_SIZE,
+    );
+
+    assert.ok(Math.min(...readLabelFontSizes(svg)) >= 11);
+});
+
+test("dense progress list scales square labels up for dense row counts", () => {
+    const fourRowSvg = renderDenseProgressList(
+        buildDenseMetricWidgetData(4),
+        DEFAULT_DENSE_PROGRESS_LIST_CONFIG,
+        WIDGET_LOGICAL_SIZE,
+    );
+    const sixRowSvg = renderDenseProgressList(
+        buildDenseMetricWidgetData(6),
+        DEFAULT_DENSE_PROGRESS_LIST_CONFIG,
+        WIDGET_LOGICAL_SIZE,
+    );
+
+    assert.ok(readLabelFontSizes(fourRowSvg).every(fontSize => fontSize >= 13));
+    assert.ok(readLabelFontSizes(sixRowSvg).every(fontSize => fontSize >= 11));
+});
+
+test("dense progress list uses two touch strip columns only for 6 rows", () => {
+    const svg = renderDenseProgressList(
+        buildDenseMetricWidgetData(6),
+        DEFAULT_DENSE_PROGRESS_LIST_CONFIG,
+        TOUCH_STRIP_LOGICAL_SIZE,
+    );
+    const trackXCoordinates = readTrackXCoordinates(svg);
+
+    assert.equal(countMatches(svg, /class="dense-progress-list-row"/gu), 6);
+    assert.equal(new Set(trackXCoordinates).size, 2);
+    assert.equal(trackXCoordinates[0], trackXCoordinates[2]);
+    assert.equal(trackXCoordinates[1], trackXCoordinates[3]);
 });
 
 test("dense progress list escapes labels and slot ids", () => {
@@ -286,9 +425,41 @@ function readTrackRects(svg: string): ReadonlyArray<{ xCoordinate: number; yCoor
         }));
 }
 
+function readMinimumTrackGap(svg: string): number {
+    const rects = readTrackRects(svg);
+    const gaps = rects
+        .slice(1)
+        .map((rect, index) => {
+            const previousRect = rects[index];
+            return previousRect === undefined
+                ? Number.POSITIVE_INFINITY
+                : rect.yCoordinate - (previousRect.yCoordinate + previousRect.height);
+        });
+
+    return Math.min(...gaps);
+}
+
 function readLabelFontSizes(svg: string): readonly number[] {
     return [...svg.matchAll(/<clipPath id="dense-progress-list-label-\d+">[\s\S]*?<\/clipPath>\s*<\/defs>\s*<g clip-path="url\(#dense-progress-list-label-\d+\)">\s*<text[\s\S]*?font-size="([^"]+)"/gu)]
         .map(match => Number(match[1] ?? 0));
+}
+
+function readLabelClipRects(svg: string): ReadonlyArray<{ xCoordinate: number; width: number }> {
+    return [...svg.matchAll(/<clipPath id="dense-progress-list-label-\d+">\s*<rect x="([^"]+)" y="[^"]+"\s+width="([^"]+)"/gu)]
+        .map(match => ({
+            xCoordinate: Number(match[1] ?? 0),
+            width: Number(match[2] ?? 0),
+        }));
+}
+
+function readLabelTextYCoordinates(svg: string): readonly number[] {
+    return [...svg.matchAll(/<clipPath id="dense-progress-list-label-\d+">[\s\S]*?<\/clipPath>\s*<\/defs>\s*<g clip-path="url\(#dense-progress-list-label-\d+\)">\s*<text x="[^"]+" y="([^"]+)"/gu)]
+        .map(match => Number(match[1] ?? 0));
+}
+
+function readLabelTextElements(svg: string): readonly string[] {
+    return [...svg.matchAll(/<clipPath id="dense-progress-list-label-\d+">[\s\S]*?<\/clipPath>\s*<\/defs>\s*<g clip-path="url\(#dense-progress-list-label-\d+\)">\s*(<text[\s\S]*?<\/text>)/gu)]
+        .map(match => match[1] ?? "");
 }
 
 function readValueTextXCoordinates(svg: string): readonly number[] {

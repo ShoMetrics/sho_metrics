@@ -24,6 +24,7 @@ export function renderDenseMetricBodyView(options: DenseMetricBodyViewProps): st
             track: options.visual.paints.track,
         },
         textStyles: options.visual.textStyles,
+        labelLetterSpacingEm: options.visual.themePreset === "pixel-window" ? 0 : undefined,
         themeEffects: options.visual.themeEffects,
         textOutline: options.visual.transparentSurface.textOutline,
         shapeOutline: options.visual.transparentSurface.shapeOutline,

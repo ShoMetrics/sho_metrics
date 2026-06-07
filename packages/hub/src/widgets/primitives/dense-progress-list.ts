@@ -25,6 +25,7 @@ import type { WidgetBaseConfig } from "../widget-contract";
 interface DenseProgressListConfig extends WidgetBaseConfig {
     readonly paints: DenseProgressListPaints;
     readonly textStyles: RenderTextStyles;
+    readonly labelLetterSpacingEm?: number;
     readonly themeEffects: RenderThemeEffectTokens;
     readonly textOutline?: RenderOutlineTokens;
     readonly shapeOutline?: RenderOutlineTokens;
@@ -74,6 +75,10 @@ interface DenseProgressListBar {
 
 const BAR_TEXT_BASELINE_SHIFT_EM = 0.08;
 const BAR_TEXT_MINIMUM_BASELINE_SHIFT_PX = 1;
+const LABEL_BAR_GAP = 8;
+const LABEL_TEXT_BASELINE_SHIFT_EM = 0.08;
+const LABEL_TEXT_TRAILING_BLEED = 4;
+const BAR_CORNER_RADIUS_RATIO = 0.25;
 
 // Production dense rendering overrides these theme-owned tokens; the defaults keep the primitive standalone-testable.
 export const DEFAULT_DENSE_PROGRESS_LIST_CONFIG: DenseProgressListConfig = {
@@ -118,22 +123,25 @@ export function renderDenseProgressList(
 
 function buildDenseProgressListLayout(rowCount: number, keySize: KeySize): DenseProgressListLayout {
     const isWide = keySize.width / keySize.height >= 1.45;
-    const columnCount = isWide && rowCount > 3 ? 2 : 1;
+    const columnCount = isWide && rowCount >= 6 ? 2 : 1;
     const columnGap = isWide && columnCount === 2 ? 12 : 0;
-    const paddingX = Math.round(keySize.width * (isWide ? 0.08 : 0.105));
-    const paddingY = Math.round(keySize.height * (isWide ? 0.12 : 0.12));
+    const paddingX = Math.round(keySize.width * (isWide ? 0.08 : 0.06));
+    const paddingY = Math.round(keySize.height * 0.05);
     const effectiveRowCount = columnCount === 2 ? Math.ceil(rowCount / 2) : Math.max(1, rowCount);
     const rowGap = isWide ? 4 : clamp(Math.round(10 - rowCount), 4, 8);
     const columnWidth = (keySize.width - paddingX * 2 - columnGap * (columnCount - 1)) / columnCount;
     const rowHeight = (keySize.height - paddingY * 2 - rowGap * (effectiveRowCount - 1)) / effectiveRowCount;
-    const compactColumn = columnWidth < 100;
-    const labelWidth = Math.round(columnWidth * (compactColumn ? 0.25 : 0.24));
-    const valueWidth = Math.round(columnWidth * (compactColumn ? 0.38 : 0.31));
-    const unitWidth = Math.round(columnWidth * (compactColumn ? 0.13 : 0.10));
-    const valueUnitGap = compactColumn ? 2 : 3;
-    const valuePaddingX = compactColumn ? 3 : 5;
-    const barHeight = clamp(Math.round(rowHeight * (isWide ? 0.62 : 0.66)), 8, 30);
-    const fontSize = clamp(Math.round(rowHeight * (isWide ? 0.42 : 0.36)), 10, 18);
+    const isCompactColumn = columnWidth < 100;
+    const labelWidthRatio = (columnWidth < 100 && isWide && columnCount === 2) ? 0.35 : 0.24;
+    const labelWidth = Math.round(columnWidth * labelWidthRatio);
+    const valueWidth = Math.round(columnWidth * (isCompactColumn ? 0.38 : 0.31));
+    const unitWidth = Math.round(columnWidth * (isCompactColumn ? 0.13 : 0.10));
+    const valueUnitGap = isCompactColumn ? 2 : 3;
+    const valuePaddingX = isCompactColumn ? 3 : 5;
+    const barHeightRatio = resolveDenseProgressListBarHeightRatio(rowCount, isWide);
+    const barHeight = clamp(Math.round(rowHeight * barHeightRatio), 8, 30);
+    const fontSizeRatio = resolveDenseProgressListLabelFontSizeRatio(rowCount, isWide);
+    const fontSize = clamp(Math.round(rowHeight * fontSizeRatio), 10, 18);
     const valueFontSize = clamp(Math.round(rowHeight * (isWide ? 0.50 : 0.52)), 12, 24);
 
     return {
@@ -155,6 +163,49 @@ function buildDenseProgressListLayout(rowCount: number, keySize: KeySize): Dense
         valueFontSize,
         unitFontSize: clamp(Math.round(valueFontSize * 0.56), 8, 14),
     };
+}
+
+function resolveDenseProgressListBarHeightRatio(rowCount: number, isWide: boolean): number {
+    if (isWide) {
+        return rowCount > 3 ? 0.68 : 0.62;
+    }
+
+    if (rowCount >= 6) {
+        return 0.92;
+    }
+    if (rowCount === 5) {
+        return 0.88;
+    }
+    if (rowCount === 4) {
+        return 0.82;
+    }
+
+    return 0.66;
+}
+
+function resolveDenseProgressListLabelFontSizeRatio(rowCount: number, isWide: boolean): number {
+    if (isWide) {
+        if (rowCount >= 6) {
+            return 0.95;
+        }
+        if (rowCount === 5) {
+            return 0.9;
+        }
+        if (rowCount === 4) {
+            return 0.8;
+        }
+
+        return 0.5;
+    }
+
+    if (rowCount >= 4) {
+        // Dense labels are horizontally fitted after this base size is chosen.
+        // Keep the base generous so tiny row height is the limit, not an
+        // overly defensive ratio from the earlier thinner-bar layout.
+        return 0.95;
+    }
+
+    return 0.36;
 }
 
 function resolveDenseProgressListCell(index: number, layout: DenseProgressListLayout): DenseProgressListCell {
@@ -215,9 +266,11 @@ function renderDenseProgressListRow(options: {
                 text: label,
                 xCoordinate: options.cell.xCoordinate,
                 yCoordinate: rowCenterY,
-                maxWidth: options.layout.labelWidth,
+                maxWidth: resolveDenseLabelTextMaxWidth(options.layout),
                 baseFontSize: options.layout.fontSize,
                 textStyle: options.config.textStyles.label,
+                baselineShiftEm: LABEL_TEXT_BASELINE_SHIFT_EM,
+                letterSpacingEm: options.config.labelLetterSpacingEm,
                 fill: options.config.paints.labelText,
                 outline: options.config.textOutline,
                 extraAttributes: buildSvgFilterAttributes(options.config.textStyles.label.filter),
@@ -277,6 +330,10 @@ function renderDenseProgressListRow(options: {
     `;
 }
 
+function resolveDenseLabelTextMaxWidth(layout: DenseProgressListLayout): number {
+    return layout.labelWidth + Math.min(LABEL_TEXT_TRAILING_BLEED, LABEL_BAR_GAP / 2);
+}
+
 function resolveDenseBarTextYCoordinate(centerYCoordinate: number, valueFontSize: number): number {
     // The global SVG text baseline presets are tuned for larger metric text.
     // Bar-internal text is much smaller, so use a local visual-center offset
@@ -290,7 +347,7 @@ function resolveDenseProgressListBar(options: {
     readonly cell: DenseProgressListCell;
     readonly layout: DenseProgressListLayout;
 }): DenseProgressListBar {
-    const xCoordinate = options.cell.xCoordinate + options.layout.labelWidth + 8;
+    const xCoordinate = options.cell.xCoordinate + options.layout.labelWidth + LABEL_BAR_GAP;
     const width = Math.max(1, options.cell.xCoordinate + options.cell.width - xCoordinate);
 
     return {
@@ -298,7 +355,7 @@ function resolveDenseProgressListBar(options: {
         yCoordinate: options.cell.yCoordinate + (options.cell.height - options.layout.barHeight) / 2,
         width,
         height: options.layout.barHeight,
-        radius: options.layout.barHeight / 2,
+        radius: clamp(Math.round(options.layout.barHeight * BAR_CORNER_RADIUS_RATIO), 2, 6),
     };
 }
 
