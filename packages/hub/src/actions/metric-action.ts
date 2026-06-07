@@ -20,7 +20,10 @@ import {
     resolveActionSettings,
     resolveInitialActionSettings,
 } from "./settings/action-settings-resolver";
-import type { ResolvedWidgetSettings } from "../settings/resolved-settings";
+import {
+    requireResolvedSingleMetricWidget,
+    type ResolvedWidgetSettings,
+} from "../settings/resolved-settings";
 import type { ActionKind } from "../shared/stream-deck-actions";
 import {
     emptyWidgetRuntimeCache,
@@ -121,8 +124,8 @@ export abstract class MetricAction extends SingletonAction {
             log.info(() => [
                 "settingsReceived",
                 `actionId=${event.action.id}`,
-                `previousSelectedView=${formatSettingValue(previousSettings.widget.slot.appearance.view.selectedView)}`,
-                `nextSelectedView=${formatSettingValue(nextSettings.widget.slot.appearance.view.selectedView)}`,
+                `previousWidget=${formatResolvedWidgetForLog(previousSettings)}`,
+                `nextWidget=${formatResolvedWidgetForLog(nextSettings)}`,
                 `previousPollingFrequencySeconds=${formatSettingValue(previousSettings.preferences.pollingFrequencySeconds)}`,
                 `nextPollingFrequencySeconds=${formatSettingValue(nextSettings.preferences.pollingFrequencySeconds)}`,
             ].join(" "));
@@ -423,10 +426,11 @@ export abstract class MetricAction extends SingletonAction {
         }
 
         const settings = this.resolveSettings(event);
+        const widget = requireResolvedSingleMetricWidget(settings);
 
         return buildMetricReadPlanFromSourcePolicy({
             metricKeys,
-            sourcePolicy: settings.widget.slot.metric.source,
+            sourcePolicy: widget.slot.metric.source,
             defaultSourceProfileId: pluginGlobalSettingsStore.getResolved().defaultSourceProfileId,
             platform: this.currentPlatform(),
         });
@@ -524,4 +528,13 @@ function formatSettingValue(value: unknown): string {
     }
 
     return "unset";
+}
+
+function formatResolvedWidgetForLog(settings: ResolvedWidgetSettings): string {
+    switch (settings.widget.widgetKind) {
+        case "singleMetric":
+            return `singleMetric:${settings.widget.slot.appearance.view.selectedView}`;
+        case "denseMultiMetric":
+            return `denseMultiMetric:${settings.widget.slots.length}`;
+    }
 }

@@ -14,7 +14,10 @@ import {
     type MetricDescriptor,
 } from "../runtime/sources/source-client";
 import { WIDGET_RUNTIME_CACHE_MESSAGE_TYPE } from "../runtime/widget-runtime-cache";
-import type { ResolvedMetricTarget } from "../settings/resolved-settings";
+import {
+    requireResolvedSingleMetricWidget,
+    type ResolvedMetricTarget,
+} from "../settings/resolved-settings";
 import { readStoredGlobalSettings, readStoredWidgetSettings } from "../settings/storage/codec";
 import {
     readStoredColorCompensationProfile,
@@ -193,9 +196,11 @@ function renderApp(client: TestPropertyInspectorClient): void {
 }
 
 function resolveWidgetTarget(rawSettings: unknown): ResolvedMetricTarget {
-    return resolveStoredWidgetSettings({
+    const settings = resolveStoredWidgetSettings({
         storedWidgetSettings: readStoredWidgetSettings(rawSettings).settings,
-    }).widget.slot.metric.target;
+    });
+
+    return requireResolvedSingleMetricWidget(settings).slot.metric.target;
 }
 
 function readSavedColorCompensationProfile(rawGlobalSettings: unknown): ColorCompensationProfile {

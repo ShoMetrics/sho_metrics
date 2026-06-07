@@ -8,9 +8,11 @@ import {
 } from "../../runtime/disk-metric-keys";
 import { buildDiskThroughputWidgetData, buildDiskUsageWidgetData } from "../../metrics/storage-widget-data";
 import type {
+    ResolvedAppearanceSettings,
     ResolvedDiskMetricTarget,
     ResolvedWidgetSettings,
 } from "../../settings/resolved-settings";
+import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
 import { resolveColorForThresholdValue, type ColorConfig } from "../../view-rendering/color-resolver";
 import { getDiskIcon, getDiskIconFragment, renderCenteredHardwareIconFragment } from "../../widgets/icons/hardware-icons";
 import { renderDiskThroughputDirectionIconFragment } from "../../widgets/icons/catalog/disk";
@@ -95,7 +97,7 @@ function buildDiskUsageViewOptions(
         label,
         "B",
     );
-    const appearance = options.settings.widget.slot.appearance;
+    const appearance = readSingleMetricAppearance(options.settings);
     const selectedView = appearance.view.selectedView;
     const circleVariant = appearance.view.circleVariant;
     const shouldRenderGauge = selectedView === "circle" && circleVariant === "gauge";
@@ -137,7 +139,7 @@ function buildDiskThroughputViewOptions(
     options: BuildDiskViewOptions & { reading: DiskThroughputReading },
 ): MetricViewOptions {
     const throughputDirection = options.reading.direction;
-    const appearance = options.settings.widget.slot.appearance;
+    const appearance = readSingleMetricAppearance(options.settings);
     const selectedView = appearance.view.selectedView;
 
     switch (selectedView) {
@@ -211,7 +213,7 @@ function buildDualThroughputViewOptions(
 ): MetricViewOptions {
     const readMetricKey = getDiskThroughputMetricKey("read");
     const writeMetricKey = getDiskThroughputMetricKey("write");
-    const appearance = options.settings.widget.slot.appearance;
+    const appearance = readSingleMetricAppearance(options.settings);
     const selectedView = appearance.view.selectedView;
     let dualRenderPrimitive: "circle" | "text" | undefined;
     if (selectedView === "circle") {
@@ -309,7 +311,7 @@ function buildDiskThroughputBarViewOptions(
     });
     const readColor = resolveDiskWidgetChannelColor("read", options.settings, readWidgetData);
     const writeColor = resolveDiskWidgetChannelColor("write", options.settings, writeWidgetData);
-    const appearance = options.settings.widget.slot.appearance;
+    const appearance = readSingleMetricAppearance(options.settings);
 
     return {
         event: options.event,
@@ -387,7 +389,7 @@ function buildDiskThroughputSingleBarViewOptions(
         label: SYSTEM_TOTAL_DISK_THROUGHPUT_LABEL,
     });
     const color = resolveDiskWidgetChannelColor(options.direction, options.settings, widgetData);
-    const appearance = options.settings.widget.slot.appearance;
+    const appearance = readSingleMetricAppearance(options.settings);
 
     return {
         event: options.event,
@@ -542,14 +544,18 @@ function buildDiskChannelColorConfig(
     settings: ResolvedWidgetSettings,
 ): ColorConfig {
     if (direction === "read") {
-        return buildColorConfigFromAppearance(settings.widget.slot.appearance, "diskRead");
+        return buildColorConfigFromAppearance(readSingleMetricAppearance(settings), "diskRead");
     }
 
-    return buildColorConfigFromAppearance(settings.widget.slot.appearance, "diskWrite");
+    return buildColorConfigFromAppearance(readSingleMetricAppearance(settings), "diskWrite");
 }
 
 function assertNever(value: never): never {
     throw new Error(`Unexpected disk throughput view: ${String(value)}`);
+}
+
+function readSingleMetricAppearance(settings: ResolvedWidgetSettings): ResolvedAppearanceSettings {
+    return requireResolvedSingleMetricWidget(settings).slot.appearance;
 }
 
 const DEFAULT_HDD_READ_THROUGHPUT_MEBIBYTES_PER_SECOND = 220;

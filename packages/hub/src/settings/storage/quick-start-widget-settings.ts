@@ -4,6 +4,8 @@ import {
     CpuMetricTarget_Kind as StoredCpuMetricKind,
     CatalogMetricTargetSchema,
     CpuMetricTargetSchema,
+    DenseMetricSlotSchema,
+    DenseMultiMetricWidgetSchema,
     DiskMetricTarget_Kind as StoredDiskMetricKind,
     DiskMetricTargetSchema,
     GpuMetricTarget_Kind as StoredGpuMetricKind,
@@ -30,6 +32,10 @@ import {
     writeStoredWidgetSettings,
     type StoredSettingsJsonObject,
 } from "./codec";
+import {
+    createDefaultSlotId,
+    type SlotIdGenerator,
+} from "./slot-id";
 
 export interface QuickStartStoredWidgetSettings {
     readonly rawSettings: unknown;
@@ -38,15 +44,21 @@ export interface QuickStartStoredWidgetSettings {
     readonly storedSettings: StoredWidgetSettings;
 }
 
+export interface QuickStartStoredWidgetSettingsOptions {
+    readonly createSlotId?: SlotIdGenerator;
+}
+
+/** Resolves existing settings or creates the action's first stored widget settings. */
 export function resolveQuickStartStoredWidgetSettings(
     rawSettings: unknown,
     actionKind: ActionKind,
+    options: QuickStartStoredWidgetSettingsOptions = {},
 ): QuickStartStoredWidgetSettings {
-    const quickStartMetric = buildQuickStartMetric(actionKind);
+    const quickStartWidget = buildQuickStartWidget(actionKind);
     const readResult = readStoredWidgetSettings(rawSettings);
     const storedSettings = readResult.settings;
 
-    if (!quickStartMetric) {
+    if (!quickStartWidget) {
         return {
             rawSettings,
             settingsJsonToPersist: null,
@@ -58,8 +70,9 @@ export function resolveQuickStartStoredWidgetSettings(
     const readableSettingsJson = writeStoredWidgetSettings(storedSettings);
 
     if (hasStoredMetricTarget(storedSettings)) {
-        if (shouldBackfillQuickStartSourcePolicy(storedSettings, quickStartMetric)) {
-            const settingsJson = writeQuickStartSourcePolicy(storedSettings, quickStartMetric.sourcePolicy);
+        if (quickStartWidget.widgetKind === "singleMetric"
+            && shouldBackfillQuickStartSourcePolicy(storedSettings, quickStartWidget.metric)) {
+            const settingsJson = writeQuickStartSourcePolicy(storedSettings, quickStartWidget.metric.sourcePolicy);
             return {
                 rawSettings: settingsJson,
                 settingsJsonToPersist: settingsJson,
@@ -76,7 +89,11 @@ export function resolveQuickStartStoredWidgetSettings(
         };
     }
 
-    const settingsJson = writeQuickStartStoredWidgetSettings(storedSettings, quickStartMetric);
+    const settingsJson = writeQuickStartStoredWidgetSettings(
+        storedSettings,
+        quickStartWidget,
+        options.createSlotId ?? createDefaultSlotId,
+    );
     return {
         rawSettings: settingsJson,
         settingsJsonToPersist: settingsJson,
@@ -90,62 +107,122 @@ interface QuickStartMetric {
     readonly sourcePolicy?: MetricSourcePolicy | undefined;
 }
 
-function buildQuickStartMetric(actionKind: ActionKind): QuickStartMetric | null {
+type QuickStartWidget =
+    | {
+        readonly widgetKind: "singleMetric";
+        readonly metric: QuickStartMetric;
+    }
+    | {
+        readonly widgetKind: "denseMultiMetric";
+        readonly metrics: readonly QuickStartMetric[];
+    };
+
+function buildQuickStartWidget(actionKind: ActionKind): QuickStartWidget | null {
     switch (actionKind) {
         case "cpu":
             return {
-                target: {
-                    case: "cpu",
-                    value: create(CpuMetricTargetSchema, { kind: StoredCpuMetricKind.USAGE }),
-                },
+                widgetKind: "singleMetric",
+                metric: buildCpuUsageQuickStartMetric(),
             };
         case "memory":
             return {
-                target: {
-                    case: "memory",
-                    value: create(MemoryMetricTargetSchema, { kind: StoredMemoryMetricKind.USAGE }),
-                },
+                widgetKind: "singleMetric",
+                metric: buildMemoryUsageQuickStartMetric(),
             };
         case "network":
             return {
-                target: {
-                    case: "network",
-                    value: create(NetworkMetricTargetSchema, {
-                        kind: StoredNetworkMetricKind.TRAFFIC,
-                        traffic: create(NetworkMetricTarget_TrafficSchema, {
-                            direction: StoredNetworkDirection.BOTH,
-                        }),
-                    }),
-                },
+                widgetKind: "singleMetric",
+                metric: buildNetworkTrafficQuickStartMetric(),
             };
         case "disk":
             return {
-                target: {
-                    case: "disk",
-                    value: create(DiskMetricTargetSchema, { kind: StoredDiskMetricKind.USAGE }),
-                },
+                widgetKind: "singleMetric",
+                metric: buildDiskUsageQuickStartMetric(),
             };
         case "catalog":
             return {
-                target: {
-                    case: "catalog",
-                    value: create(CatalogMetricTargetSchema),
-                },
-                sourcePolicy: create(MetricSourcePolicySchema, {
-                    primarySourceProfileId: BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID,
-                    failureMode: StoredSourceFailureMode.SHOW_UNAVAILABLE,
-                }),
+                widgetKind: "singleMetric",
+                metric: buildCatalogQuickStartMetric(),
+            };
+        case "denseMultiMetric":
+            return {
+                widgetKind: "denseMultiMetric",
+                metrics: [
+                    buildCpuUsageQuickStartMetric(),
+                    buildGpuUsageQuickStartMetric(),
+                ],
             };
         case "gpu":
             return {
-                target: {
-                    case: "gpu",
-                    value: create(GpuMetricTargetSchema, { kind: StoredGpuMetricKind.USAGE }),
-                },
+                widgetKind: "singleMetric",
+                metric: buildGpuUsageQuickStartMetric(),
             };
         case "unknown":
             return null;
     }
+}
+
+function buildCpuUsageQuickStartMetric(): QuickStartMetric {
+    return {
+        target: {
+            case: "cpu",
+            value: create(CpuMetricTargetSchema, { kind: StoredCpuMetricKind.USAGE }),
+        },
+    };
+}
+
+function buildGpuUsageQuickStartMetric(): QuickStartMetric {
+    return {
+        target: {
+            case: "gpu",
+            value: create(GpuMetricTargetSchema, { kind: StoredGpuMetricKind.USAGE }),
+        },
+    };
+}
+
+function buildMemoryUsageQuickStartMetric(): QuickStartMetric {
+    return {
+        target: {
+            case: "memory",
+            value: create(MemoryMetricTargetSchema, { kind: StoredMemoryMetricKind.USAGE }),
+        },
+    };
+}
+
+function buildDiskUsageQuickStartMetric(): QuickStartMetric {
+    return {
+        target: {
+            case: "disk",
+            value: create(DiskMetricTargetSchema, { kind: StoredDiskMetricKind.USAGE }),
+        },
+    };
+}
+
+function buildNetworkTrafficQuickStartMetric(): QuickStartMetric {
+    return {
+        target: {
+            case: "network",
+            value: create(NetworkMetricTargetSchema, {
+                kind: StoredNetworkMetricKind.TRAFFIC,
+                traffic: create(NetworkMetricTarget_TrafficSchema, {
+                    direction: StoredNetworkDirection.BOTH,
+                }),
+            }),
+        },
+    };
+}
+
+function buildCatalogQuickStartMetric(): QuickStartMetric {
+    return {
+        target: {
+            case: "catalog",
+            value: create(CatalogMetricTargetSchema),
+        },
+        sourcePolicy: create(MetricSourcePolicySchema, {
+            primarySourceProfileId: BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID,
+            failureMode: StoredSourceFailureMode.SHOW_UNAVAILABLE,
+        }),
+    };
 }
 
 function hasStoredMetricTarget(settings: StoredWidgetSettings): boolean {
@@ -193,8 +270,23 @@ function writeQuickStartSourcePolicy(
 
 function writeQuickStartStoredWidgetSettings(
     settings: StoredWidgetSettings,
-    quickStartMetric: QuickStartMetric,
+    quickStartWidget: QuickStartWidget,
+    createSlotId: () => string,
 ): StoredSettingsJsonObject {
+    if (quickStartWidget.widgetKind === "denseMultiMetric") {
+        settings.widget = {
+            case: "denseMultiMetric",
+            value: create(DenseMultiMetricWidgetSchema, {
+                slots: quickStartWidget.metrics.map((metric) => create(DenseMetricSlotSchema, {
+                    slotId: createSlotId(),
+                    slot: createMetricSlot(metric),
+                })),
+            }),
+        };
+
+        return writeStoredWidgetSettings(settings);
+    }
+
     if (settings.widget.case !== "singleMetric") {
         settings.widget = {
             case: "singleMetric",
@@ -204,10 +296,20 @@ function writeQuickStartStoredWidgetSettings(
 
     const slot = settings.widget.value.slot ??= create(MetricSlotSchema);
     const metric = slot.metric ??= create(MetricSelectionSchema);
+    metric.target = quickStartWidget.metric.target;
+    if (quickStartWidget.metric.sourcePolicy !== undefined) {
+        metric.sourcePolicy = quickStartWidget.metric.sourcePolicy;
+    }
+
+    return writeStoredWidgetSettings(settings);
+}
+
+function createMetricSlot(quickStartMetric: QuickStartMetric) {
+    const metric = create(MetricSelectionSchema);
     metric.target = quickStartMetric.target;
     if (quickStartMetric.sourcePolicy !== undefined) {
         metric.sourcePolicy = quickStartMetric.sourcePolicy;
     }
 
-    return writeStoredWidgetSettings(settings);
+    return create(MetricSlotSchema, { metric });
 }

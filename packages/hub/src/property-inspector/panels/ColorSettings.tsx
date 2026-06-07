@@ -1,11 +1,14 @@
 import type {
     ColorMode,
     MetricTheme,
+    ResolvedAppearanceSettings,
     ResolvedColorFilledPaintSettings,
     ResolvedMetricSolidChannelColors,
     ResolvedMultiColorSet,
     ResolvedTerminalPaintSettings,
+    ResolvedWidgetSettings,
 } from "../../settings/resolved-settings";
+import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
 import type {
     ResolvedColorFilledPaintSettingsOverride,
     ResolvedColorFilledMultiColorPaintSettingsOverride,
@@ -105,7 +108,7 @@ function patchTerminalPaintSettings(
 export function StandardColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
     const { t } = useI18n();
     const { context } = props;
-    const appearance = context.resolved.widget.slot.appearance;
+    const appearance = readSingleMetricAppearance(context.resolved);
     const selectedTheme = appearance.theme.selectedTheme;
 
     if (selectedTheme === "color-filled") {
@@ -248,15 +251,15 @@ export function MetricColorControls({
 
 export function NetworkChannelColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
     const { t } = useI18n();
-    if (props.context.resolved.widget.slot.appearance.theme.selectedTheme === "color-filled") {
+    if (readSingleMetricAppearance(props.context.resolved).theme.selectedTheme === "color-filled") {
         return <ColorFilledSettingsSection {...props} />;
     }
 
-    if (props.context.resolved.widget.slot.appearance.theme.selectedTheme === "terminal") {
+    if (readSingleMetricAppearance(props.context.resolved).theme.selectedTheme === "terminal") {
         return <TerminalPaintSettingsSection {...props} />;
     }
 
-    const metricPaint = resolveActiveMetricAccentPaint(props.context.resolved.widget.slot.appearance);
+    const metricPaint = resolveActiveMetricAccentPaint(readSingleMetricAppearance(props.context.resolved));
     if (metricPaint === undefined) {
         return <></>;
     }
@@ -287,15 +290,15 @@ export function NetworkChannelColorSettings(props: WidgetSettingsPanelProps): Re
 
 export function DiskThroughputChannelColorSettings(props: WidgetSettingsPanelProps): React.JSX.Element {
     const { t } = useI18n();
-    if (props.context.resolved.widget.slot.appearance.theme.selectedTheme === "color-filled") {
+    if (readSingleMetricAppearance(props.context.resolved).theme.selectedTheme === "color-filled") {
         return <ColorFilledSettingsSection {...props} />;
     }
 
-    if (props.context.resolved.widget.slot.appearance.theme.selectedTheme === "terminal") {
+    if (readSingleMetricAppearance(props.context.resolved).theme.selectedTheme === "terminal") {
         return <TerminalPaintSettingsSection {...props} />;
     }
 
-    const metricPaint = resolveActiveMetricAccentPaint(props.context.resolved.widget.slot.appearance);
+    const metricPaint = resolveActiveMetricAccentPaint(readSingleMetricAppearance(props.context.resolved));
     if (metricPaint === undefined) {
         return <></>;
     }
@@ -330,7 +333,7 @@ function ColorModeSetting({
     colorDisabled = false,
 }: WidgetSettingsPanelProps): React.JSX.Element {
     const { t } = useI18n();
-    const appearance = context.resolved.widget.slot.appearance;
+    const appearance = readSingleMetricAppearance(context.resolved);
     const metricPaint = resolveActiveMetricAccentPaint(appearance);
     if (metricPaint === undefined) {
         return <></>;
@@ -407,7 +410,7 @@ function MultiColorSettings({
 
 function ColorFilledSettingsSection(props: WidgetSettingsPanelProps): React.JSX.Element {
     const { t } = useI18n();
-    const appearance = props.context.resolved.widget.slot.appearance;
+    const appearance = readSingleMetricAppearance(props.context.resolved);
     const colorFilledPaint = resolveActiveColorFilledPaint(appearance);
     if (colorFilledPaint === undefined) {
         return <></>;
@@ -429,7 +432,7 @@ function ColorFilledSettingsSection(props: WidgetSettingsPanelProps): React.JSX.
 
 function TerminalPaintSettingsSection(props: WidgetSettingsPanelProps): React.JSX.Element {
     const { t } = useI18n();
-    const appearance = props.context.resolved.widget.slot.appearance;
+    const appearance = readSingleMetricAppearance(props.context.resolved);
     const terminalPaint = resolveActiveTerminalPaint(appearance);
     if (terminalPaint === undefined) {
         return <></>;
@@ -621,7 +624,7 @@ function GradientSetting({
 
 function ChannelThresholdControls(props: WidgetSettingsPanelProps): React.JSX.Element | null {
     const { t } = useI18n();
-    const appearance = props.context.resolved.widget.slot.appearance;
+    const appearance = readSingleMetricAppearance(props.context.resolved);
     const metricPaint = resolveActiveMetricAccentPaint(appearance);
 
     if (metricPaint === undefined || metricPaint.colorMode !== "multi-color") {
@@ -646,7 +649,7 @@ function ChannelThresholdControls(props: WidgetSettingsPanelProps): React.JSX.El
 }
 
 function MetricGradientSetting(props: WidgetSettingsPanelProps): React.JSX.Element | null {
-    const appearance = props.context.resolved.widget.slot.appearance;
+    const appearance = readSingleMetricAppearance(props.context.resolved);
     const metricPaint = resolveActiveMetricAccentPaint(appearance);
 
     if (metricPaint === undefined || metricPaint.colorMode === "black-white") {
@@ -759,7 +762,7 @@ function ChannelColorFields({
     channel: MetricColorChannelKey;
 }): React.JSX.Element {
     const { t } = useI18n();
-    const appearance = context.resolved.widget.slot.appearance;
+    const appearance = readSingleMetricAppearance(context.resolved);
     const selectedTheme = appearance.theme.selectedTheme;
     const metricPaint = resolveActiveMetricAccentPaint(appearance);
     const solidColorKey = solidColorKeyByChannel[channel];
@@ -843,3 +846,7 @@ const terminalPaletteMessageByValue = {
     cyan: optionMessages.cyanOption,
     white: optionMessages.whiteOption,
 } as const;
+
+function readSingleMetricAppearance(settings: ResolvedWidgetSettings): ResolvedAppearanceSettings {
+    return requireResolvedSingleMetricWidget(settings).slot.appearance;
+}

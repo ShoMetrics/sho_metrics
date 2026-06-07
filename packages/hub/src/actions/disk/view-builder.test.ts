@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import test from "node:test";
 import type { WillAppearEvent } from "@elgato/streamdeck";
 import { MetricStore } from "../../runtime/metric-store";
@@ -11,6 +11,7 @@ import type { DiskVolumeOption } from "../../runtime/disk-volumes";
 import { LOCAL_SOURCE_SCOPE_ID } from "../../runtime/source-routing/metric-read-plan";
 import { buildMetricSnapshot, buildScalarMetricValue, MetricUnit } from "../../runtime/sources/metric-source";
 import { buildMetricViewRenderPlan, buildRenderWidgetData } from "../../view-rendering/metric-view-frame";
+import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
 import { resolveInitialActionSettings } from "../settings/action-settings-resolver";
@@ -29,7 +30,7 @@ test("disk usage automatic volume reads default usage keys after registry select
         },
     );
     const settings = resolveInitialActionSettings(rawSettings, "disk").resolvedSettings;
-    const target = settings.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
 
     assert.equal(target.domain, "disk");
     if (target.domain !== "disk") {
@@ -76,7 +77,7 @@ test("disk usage display keeps explicit unavailable volume instead of falling ba
         },
     );
     const settings = resolveInitialActionSettings(rawSettings, "disk").resolvedSettings;
-    const target = settings.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
 
     assert.equal(target.domain, "disk");
     if (target.domain !== "disk") {
@@ -141,7 +142,7 @@ test("disk compact center icon label uses theme label font family", () => {
         },
     );
     const settings = resolveInitialActionSettings(rawSettings, "disk").resolvedSettings;
-    const target = settings.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
 
     assert.equal(target.domain, "disk");
     if (target.domain !== "disk") {
@@ -172,7 +173,7 @@ test("disk throughput view ignores selected volume identity", () => {
         },
     );
     const settings = resolveInitialActionSettings(rawSettings, "disk").resolvedSettings;
-    const target = settings.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
 
     assert.equal(target.domain, "disk");
     if (target.domain !== "disk") {
@@ -218,7 +219,7 @@ test("disk throughput bar both mode renders read and write channels", () => {
         },
     );
     const settings = resolveInitialActionSettings(rawSettings, "disk").resolvedSettings;
-    const target = settings.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
 
     assert.equal(target.domain, "disk");
     if (target.domain !== "disk") {
@@ -272,7 +273,7 @@ test("disk throughput bar single direction renders direction icon value row", ()
         },
     );
     const settings = resolveInitialActionSettings(rawSettings, "disk").resolvedSettings;
-    const target = settings.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
 
     assert.equal(target.domain, "disk");
     if (target.domain !== "disk") {
@@ -321,3 +322,4 @@ function buildDiskVolumeOption(id: string): DiskVolumeOption {
         volumeLabel: "Test",
     };
 }
+

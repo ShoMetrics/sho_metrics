@@ -125,6 +125,10 @@ function renderMetricPanel(
     },
 ): React.JSX.Element {
     const actionKind = panelProps.context.actionKind;
+    if (panelProps.context.resolved.widget.widgetKind !== "singleMetric") {
+        return <DomainMismatchNotice />;
+    }
+
     const target = panelProps.context.resolved.widget.slot.metric.target;
 
     if (actionKind !== target.domain) {

@@ -2,6 +2,7 @@ import type {
     ResolvedMetricTarget,
     ResolvedWidgetSettings,
 } from "../../settings/resolved-settings";
+import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
 
 export type ActionMetricTargetDomain = ResolvedMetricTarget["domain"];
 export type ActionMetricTarget<TDomain extends ActionMetricTargetDomain> = Extract<
@@ -13,7 +14,7 @@ export function readResolvedMetricTarget<TDomain extends ActionMetricTargetDomai
     settings: ResolvedWidgetSettings,
     domain: TDomain,
 ): ActionMetricTarget<TDomain> {
-    const target = settings.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
 
     assertResolvedMetricTargetDomain(target, domain);
 

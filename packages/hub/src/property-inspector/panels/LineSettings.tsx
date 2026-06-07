@@ -9,6 +9,7 @@ import { useI18n } from "../../i18n/react";
 import { RangeSetting } from "../controls/RangeSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { SettingsSection } from "./SettingsSection";
+import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import {
     disabledGridLineVisibilityOptionList,
@@ -22,8 +23,9 @@ export function LineSettings({
     onSettingsPatch,
 }: WidgetSettingsPanelProps): React.JSX.Element | null {
     const { t } = useI18n();
-    const appearance = context.resolved.widget.slot.appearance;
-    const target = context.resolved.widget.slot.metric.target;
+    const slot = requireResolvedSingleMetricWidget(context.resolved).slot;
+    const appearance = slot.appearance;
+    const target = slot.metric.target;
 
     if (appearance.view.selectedView !== "line") {
         return null;

@@ -1,5 +1,6 @@
-import { describe, it } from "node:test";
+﻿import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { create } from "@bufbuild/protobuf";
 
 import {
     readStoredGlobalSettings,
@@ -10,10 +11,18 @@ import {
     resolveStoredWidgetSettings,
 } from "./resolver";
 import { MetricUnit } from "../../runtime/sources/metric-source";
+import {
+    DenseMultiMetricWidgetSchema,
+    StoredWidgetSettingsSchema,
+} from "../../generated/shometrics/v1/settings_pb.js";
+import type {
+    ResolvedSingleMetricWidget,
+    ResolvedWidgetSettings,
+} from "../resolved-settings";
 
 describe("stored settings proto resolver", () => {
     it("resolves empty stored settings to a complete single CPU widget", () => {
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings: readStoredWidgetSettings(undefined).settings,
         });
 
@@ -96,7 +105,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
         });
         const theme = settings.widget.slot.appearance.theme;
@@ -149,7 +158,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
         });
 
@@ -172,7 +181,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
             runtime: {
                 isWindows: true,
@@ -204,7 +213,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
             runtime: {
                 isWindows: true,
@@ -222,7 +231,7 @@ describe("stored settings proto resolver", () => {
     });
 
     it("uses CPU temperature and power defaults", () => {
-        const temperatureSettings = resolveStoredWidgetSettings({
+        const temperatureSettings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings: readStoredWidgetSettings({
                 singleMetric: {
                     slot: {
@@ -238,7 +247,7 @@ describe("stored settings proto resolver", () => {
                 isWindows: true,
             },
         });
-        const powerSettings = resolveStoredWidgetSettings({
+        const powerSettings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings: readStoredWidgetSettings({
                 singleMetric: {
                     slot: {
@@ -273,7 +282,7 @@ describe("stored settings proto resolver", () => {
     });
 
     it("preserves unsupported non-Windows CPU helper readings", () => {
-        const temperatureSettings = resolveStoredWidgetSettings({
+        const temperatureSettings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings: readStoredWidgetSettings({
                 singleMetric: {
                     slot: {
@@ -289,7 +298,7 @@ describe("stored settings proto resolver", () => {
                 isWindows: false,
             },
         });
-        const powerSettings = resolveStoredWidgetSettings({
+        const powerSettings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings: readStoredWidgetSettings({
                 singleMetric: {
                     slot: {
@@ -334,7 +343,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
         });
 
@@ -371,7 +380,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
         });
 
@@ -394,7 +403,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
         });
 
@@ -420,7 +429,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
         });
 
@@ -451,7 +460,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
         });
 
@@ -502,7 +511,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
             storedGlobalSettings,
             runtime: {
@@ -542,7 +551,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
         });
         const target = settings.widget.slot.metric.target;
@@ -570,7 +579,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
         });
         const target = settings.widget.slot.metric.target;
@@ -635,7 +644,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
             storedGlobalSettings,
         });
@@ -667,7 +676,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
         });
 
@@ -689,7 +698,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
         });
 
@@ -716,7 +725,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
         });
 
@@ -744,7 +753,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
         });
 
@@ -767,7 +776,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
         });
 
@@ -818,7 +827,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
             storedGlobalSettings,
         });
@@ -865,7 +874,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
             storedGlobalSettings,
         });
@@ -905,7 +914,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
             storedGlobalSettings,
         });
@@ -956,7 +965,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
             storedGlobalSettings,
         });
@@ -1008,7 +1017,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
             storedGlobalSettings,
         });
@@ -1043,7 +1052,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
         });
         const target = settings.widget.slot.metric.target;
@@ -1067,7 +1076,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
             runtime: {
                 runtimeMaximumGpuPowerWatts: 450,
@@ -1093,7 +1102,7 @@ describe("stored settings proto resolver", () => {
             },
         }).settings;
 
-        const settings = resolveStoredWidgetSettings({
+        const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings,
             runtime: {
                 isWindows: true,
@@ -1120,7 +1129,7 @@ describe("stored settings proto resolver", () => {
                 },
             ],
         }).settings);
-        const widgetSettings = resolveStoredWidgetSettings({
+        const widgetSettings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings: readStoredWidgetSettings({
                 singleMetric: {
                     slot: {
@@ -1163,7 +1172,7 @@ describe("stored settings proto resolver", () => {
     });
 
     it("resolves catalog target initial state with text view defaults", () => {
-        const widgetSettings = resolveStoredWidgetSettings({
+        const widgetSettings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings: readStoredWidgetSettings({
                 singleMetric: {
                     slot: {
@@ -1189,4 +1198,139 @@ describe("stored settings proto resolver", () => {
         assert.equal(widgetSettings.widget.slot.appearance.view.selectedView, "text");
         assert.equal(widgetSettings.widget.slot.appearance.theme.flat.paint.colorMode, "black-white");
     });
+
+    it("resolves dense multi metric rows and shared appearance", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            denseMultiMetric: {
+                slots: [
+                    {
+                        slotId: "cpu-row",
+                        slot: {
+                            metric: {
+                                cpu: {
+                                    kind: "KIND_USAGE",
+                                },
+                            },
+                        },
+                        customLabel: " CPU ",
+                        customMaximumValue: 100,
+                    },
+                    {
+                        slotId: "gpu-row",
+                        slot: {
+                            metric: {
+                                gpu: {
+                                    kind: "KIND_TEMPERATURE",
+                                    maximumTemperatureCelsius: 90,
+                                },
+                            },
+                        },
+                    },
+                ],
+                appearance: {
+                    view: {
+                        selectedView: "METRIC_VIEW_LINE",
+                    },
+                    theme: {
+                        selectedTheme: "METRIC_THEME_CUPERTINO_GLASS",
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({ storedWidgetSettings });
+
+        assert.equal(settings.widget.widgetKind, "denseMultiMetric");
+        assert.equal(settings.widget.slots.length, 2);
+        assert.equal(settings.widget.slots[0]?.slotId, "cpu-row");
+        assert.equal(settings.widget.slots[0]?.slot.metric.target.domain, "cpu");
+        assert.equal(settings.widget.slots[0]?.customLabel, "CPU");
+        assert.equal(settings.widget.slots[0]?.customMaximumValue, 100);
+        assert.equal(settings.widget.slots[1]?.slotId, "gpu-row");
+        assert.equal(settings.widget.slots[1]?.slot.metric.target.domain, "gpu");
+        assert.equal(settings.widget.appearance.view.selectedView, "circle");
+        assert.equal(settings.widget.appearance.theme.selectedTheme, "cupertino-glass");
+        assert.equal(settings.preferences.pollingFrequencySeconds, 1);
+    });
+
+    it("does not apply global view overrides to dense multi metric appearance", () => {
+        const storedGlobalSettings = readStoredGlobalSettings({
+            overrides: {
+                enabled: true,
+                view: {
+                    view: {
+                        selectedView: "METRIC_VIEW_TEXT",
+                    },
+                },
+                theme: {
+                    theme: {
+                        selectedTheme: "METRIC_THEME_TERMINAL",
+                    },
+                },
+            },
+        }).settings;
+        const storedWidgetSettings = readStoredWidgetSettings({
+            denseMultiMetric: {
+                slots: [
+                    { slotId: "slot-1", slot: { metric: { cpu: {} } } },
+                    { slotId: "slot-2", slot: { metric: { gpu: {} } } },
+                ],
+            },
+        }).settings;
+
+        const settings = resolveStoredWidgetSettings({
+            storedWidgetSettings,
+            storedGlobalSettings,
+        });
+
+        assert.equal(settings.widget.widgetKind, "denseMultiMetric");
+        assert.equal(settings.widget.appearance.view.selectedView, "circle");
+        assert.equal(settings.widget.appearance.theme.selectedTheme, "terminal");
+    });
+
+    it("rejects dense multi metric widgets below the minimum resolved slot count", () => {
+        const storedWidgetSettings = create(StoredWidgetSettingsSchema, {
+            widget: {
+                case: "denseMultiMetric",
+                value: create(DenseMultiMetricWidgetSchema, {
+                    slots: [
+                        { slotId: "slot-1" },
+                    ],
+                }),
+            },
+        });
+
+        assert.throws(() => resolveStoredWidgetSettings({ storedWidgetSettings }), /2 to 6 metric slots/);
+    });
+
+    it("rejects dense multi metric widgets with duplicate resolved slot ids", () => {
+        const storedWidgetSettings = create(StoredWidgetSettingsSchema, {
+            widget: {
+                case: "denseMultiMetric",
+                value: create(DenseMultiMetricWidgetSchema, {
+                    slots: [
+                        { slotId: "slot-1" },
+                        { slotId: "slot-1" },
+                    ],
+                }),
+            },
+        });
+
+        assert.throws(() => resolveStoredWidgetSettings({ storedWidgetSettings }), /slot ids must be unique/);
+    });
 });
+
+function resolveSingleMetricWidgetSettings(
+    options: Parameters<typeof resolveStoredWidgetSettings>[0],
+): ResolvedWidgetSettings & { readonly widget: ResolvedSingleMetricWidget } {
+    const settings = resolveStoredWidgetSettings(options);
+    if (settings.widget.widgetKind !== "singleMetric") {
+        assert.fail(`Expected singleMetric widget, received ${settings.widget.widgetKind}`);
+    }
+
+    return {
+        ...settings,
+        widget: settings.widget,
+    };
+}
+

@@ -9,10 +9,12 @@ import {
 import type { WidgetData } from "../../view-rendering/widget-data";
 import { resolveColorForThresholdValue, type ColorConfig } from "../../view-rendering/color-resolver";
 import type {
+    ResolvedAppearanceSettings,
     ResolvedNetworkMetricTarget,
     ResolvedNetworkReading,
     ResolvedWidgetSettings,
 } from "../../settings/resolved-settings";
+import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
 import { buildNetworkPingWidgetData } from "../../metrics/network-ping-widget-data";
 import {
     buildNetworkSpeedWidgetData,
@@ -112,7 +114,7 @@ export function buildNetworkViewUpdate(options: BuildNetworkViewOptions): Networ
 }
 
 function buildTrafficNetworkViewUpdate(options: BuildTrafficNetworkViewOptions): NetworkViewUpdate {
-    const appearance = options.settings.widget.slot.appearance;
+    const appearance = readSingleMetricAppearance(options.settings);
     const networkReading = options.target.reading;
     const selectedView = appearance.view.selectedView;
     const networkDirection = networkReading.direction;
@@ -211,7 +213,7 @@ function buildTrafficNetworkViewUpdate(options: BuildTrafficNetworkViewOptions):
 }
 
 function buildPingNetworkViewUpdate(options: BuildPingNetworkViewOptions): NetworkViewUpdate {
-    const appearance = options.settings.widget.slot.appearance;
+    const appearance = readSingleMetricAppearance(options.settings);
     const targetHost = options.target.reading.targetHost;
     const networkMetricKey = getNetworkPingLatencyMetricKey(targetHost);
     const sourceWidgetData = options.metrics.getWidgetData(
@@ -318,13 +320,13 @@ function buildDualNetworkCircleOrTextViewOptions(
     const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
     const uploadColorConfig = buildNetworkChannelColorConfig("upload", options.settings);
     const downloadColorConfig = buildNetworkChannelColorConfig("download", options.settings);
-    const appearance = options.settings.widget.slot.appearance;
+    const appearance = readSingleMetricAppearance(options.settings);
     const circleVariant = appearance.view.circleVariant;
     const solidMetricColorMode = resolveSolidMetricColorMode(resolveActiveMetricAccentColorMode(appearance));
 
     return {
         event: options.event,
-        resolvedSettings: options.settings.widget.slot.appearance,
+        resolvedSettings: appearance,
         metricKey: `${uploadMetricKey},${downloadMetricKey}`,
         dualRenderPrimitive: options.dualRenderPrimitive,
         widgetData: {
@@ -400,12 +402,12 @@ function buildDualNetworkLineViewOptions(options: BuildTrafficNetworkViewOptions
     const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData);
     const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
     const trafficDisplayMode = options.target.reading.trafficDisplayMode;
-    const appearance = options.settings.widget.slot.appearance;
+    const appearance = readSingleMetricAppearance(options.settings);
     const solidMetricColorMode = resolveSolidMetricColorMode(resolveActiveMetricAccentColorMode(appearance));
 
     return {
         event: options.event,
-        resolvedSettings: options.settings.widget.slot.appearance,
+        resolvedSettings: appearance,
         metricKey: `${uploadMetricKey},${downloadMetricKey}`,
         widgetData: {
             positive: uploadWidgetData,
@@ -467,10 +469,11 @@ function buildDualBarNetworkViewOptions(options: BuildTrafficNetworkViewOptions)
     });
     const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
     const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData);
+    const appearance = readSingleMetricAppearance(options.settings);
 
     return {
         event: options.event,
-        resolvedSettings: options.settings.widget.slot.appearance,
+        resolvedSettings: appearance,
         metricKey: `${uploadMetricKey},${downloadMetricKey}`,
         widgetData: {
             current: uploadWidgetData.current,
@@ -519,11 +522,9 @@ function buildDualBarNetworkViewOptions(options: BuildTrafficNetworkViewOptions)
             direction: "upload",
         }),
         appearanceOverride: buildMetricAccentPaintAppearanceOverride(
-            options.settings.widget.slot.appearance.theme.selectedTheme,
+            appearance.theme.selectedTheme,
             {
-                colorMode: resolveSolidMetricColorMode(resolveActiveMetricAccentColorMode(
-                    options.settings.widget.slot.appearance,
-                )),
+                colorMode: resolveSolidMetricColorMode(resolveActiveMetricAccentColorMode(appearance)),
                 solid: {
                     colors: {
                         usageColor: uploadColor,
@@ -552,10 +553,11 @@ function buildSingleBarNetworkViewOptions(
         currentTimestampMilliseconds: options.currentTimestampMilliseconds,
     });
     const color = resolveNetworkWidgetChannelColor(networkDirection, options.settings, widgetData);
+    const appearance = readSingleMetricAppearance(options.settings);
 
     return {
         event: options.event,
-        resolvedSettings: options.settings.widget.slot.appearance,
+        resolvedSettings: appearance,
         metricKey: networkMetricKey,
         widgetData: {
             ...widgetData,
@@ -579,11 +581,9 @@ function buildSingleBarNetworkViewOptions(
             direction: networkDirection,
         }),
         appearanceOverride: buildMetricAccentPaintAppearanceOverride(
-            options.settings.widget.slot.appearance.theme.selectedTheme,
+            appearance.theme.selectedTheme,
             {
-                colorMode: resolveSolidMetricColorMode(resolveActiveMetricAccentColorMode(
-                    options.settings.widget.slot.appearance,
-                )),
+                colorMode: resolveSolidMetricColorMode(resolveActiveMetricAccentColorMode(appearance)),
                 solid: {
                     colors: {
                         usageColor: color,
@@ -670,14 +670,18 @@ function buildNetworkChannelColorConfig(
     settings: ResolvedWidgetSettings,
 ): ColorConfig {
     if (direction === "download") {
-        return buildColorConfigFromAppearance(settings.widget.slot.appearance, "download");
+        return buildColorConfigFromAppearance(readSingleMetricAppearance(settings), "download");
     }
 
-    return buildColorConfigFromAppearance(settings.widget.slot.appearance, "upload");
+    return buildColorConfigFromAppearance(readSingleMetricAppearance(settings), "upload");
 }
 
 function assertNever(value: never): never {
     throw new Error(`Unexpected network traffic view: ${String(value)}`);
+}
+
+function readSingleMetricAppearance(settings: ResolvedWidgetSettings): ResolvedAppearanceSettings {
+    return requireResolvedSingleMetricWidget(settings).slot.appearance;
 }
 
 const DEFAULT_DOWNLOAD_MAXIMUM_SPEED_MEGABITS_PER_SECOND = 100;

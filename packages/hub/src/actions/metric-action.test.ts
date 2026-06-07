@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import test from "node:test";
 import type {
     DidReceiveSettingsEvent,
@@ -17,6 +17,7 @@ import {
     WINDOWS_HELPER_SOURCE_ID,
 } from "../runtime/sources/source-ids";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
+import { requireResolvedSingleMetricWidget } from "../settings/resolved-settings";
 import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
 import { writeStoredGlobalSettingsPatch } from "../settings/storage/global-settings-patch";
 import { writeStoredWidgetSettingsPatch } from "../settings/storage/widget-settings-patch";
@@ -657,7 +658,7 @@ class TestMetricAction extends MetricAction {
     protected getMetricKeys(event: WillAppearEvent): readonly string[] {
         const settings = this.resolveSettings(event);
 
-        return settings.widget.slot.appearance.view.selectedView === "line"
+        return requireResolvedSingleMetricWidget(settings).slot.appearance.view.selectedView === "line"
             ? ["net.up"]
             : ["net.down"];
     }
@@ -666,7 +667,7 @@ class TestMetricAction extends MetricAction {
         const settings = this.resolveSettings(event);
 
         this.metricsUpdateSnapshots.push({
-            selectedView: settings.widget.slot.appearance.view.selectedView,
+            selectedView: requireResolvedSingleMetricWidget(settings).slot.appearance.view.selectedView,
             pollingFrequencySeconds: settings.preferences.pollingFrequencySeconds,
         });
     }
@@ -863,3 +864,4 @@ function createQueuedBindingFactory(
         return binding;
     };
 }
+

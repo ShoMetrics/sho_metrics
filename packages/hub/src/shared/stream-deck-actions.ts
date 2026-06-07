@@ -4,12 +4,13 @@ export type ActionKind =
     | "memory"
     | "disk"
     | "catalog"
+    | "denseMultiMetric"
     | "network"
     | "unknown";
 
 export const STREAM_DECK_PLUGIN_UUID = "com.ez.sho-metrics";
 
-type StreamDeckActionKind = Exclude<ActionKind, "unknown">;
+type StreamDeckActionKind = Exclude<ActionKind, "denseMultiMetric" | "unknown">;
 
 export const STREAM_DECK_ACTION_UUID_BY_KIND = {
     cpu: `${STREAM_DECK_PLUGIN_UUID}.cpu`,

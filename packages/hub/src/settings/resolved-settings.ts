@@ -57,20 +57,48 @@ export interface ResolvedWidgetSettings {
 }
 
 export type ResolvedWidget =
-    | ResolvedSingleMetricWidget;
+    | ResolvedSingleMetricWidget
+    | ResolvedDenseMultiMetricWidget;
 
 export interface ResolvedSingleMetricWidget {
     readonly widgetKind: "singleMetric";
     readonly slot: ResolvedMetricSlot;
 }
 
-// Future multi-slot widgets should reuse ResolvedMetricSlot after the stored
-// contract adds widget oneof arms for rotation, text dashboards, or touch-strip
-// layouts. Do not pre-create those resolved widget types before proto can store
-// them.
+export interface ResolvedDenseMultiMetricWidget {
+    readonly widgetKind: "denseMultiMetric";
+    readonly slots: readonly ResolvedDenseMetricSlot[];
+    readonly appearance: ResolvedAppearanceSettings;
+}
+
+export interface ResolvedDenseMetricSlot {
+    readonly slotId: string;
+    readonly slot: ResolvedMetricSlot;
+    readonly customLabel: string | undefined;
+    readonly customMaximumValue: number | undefined;
+}
+
 export interface ResolvedMetricSlot {
     readonly metric: ResolvedMetric;
     readonly appearance: ResolvedAppearanceSettings;
+}
+
+/**
+ * Narrows resolved settings for legacy single-metric callers.
+ *
+ * TODO(DenseMultiMetric): Replace this transitional assertion with single-metric
+ * function parameters at action/view-builder boundaries.
+ * TODO(DenseMultiMetric): Add a lint or architecture test that limits this
+ * helper to approved boundary files after dense action wiring is complete.
+ */
+export function requireResolvedSingleMetricWidget(
+    settings: ResolvedWidgetSettings,
+): ResolvedSingleMetricWidget {
+    if (settings.widget.widgetKind !== "singleMetric") {
+        throw new Error(`Expected single metric widget, received ${settings.widget.widgetKind}.`);
+    }
+
+    return settings.widget;
 }
 
 export interface ResolvedWidgetPreferences {

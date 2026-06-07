@@ -8,6 +8,7 @@ import {
     ColorFilledThemeSettingsSchema,
     ColorFilledSolidPaintSettingsSchema,
     CupertinoGlassThemeSettingsSchema,
+    DenseMetricSlotSchema,
     DiskThroughputDisplaySettingsSchema,
     FlatThemeSettingsSchema,
     MetricMultiColorChannelColorsSchema,
@@ -30,6 +31,8 @@ import {
     WidgetPreferencesSchema,
     type AppearanceSettings as StoredAppearanceSettings,
     type CatalogMetricTarget as StoredCatalogMetricTarget,
+    type DenseMetricSlot as StoredDenseMetricSlot,
+    type DenseMultiMetricWidget as StoredDenseMultiMetricWidget,
     type ColorFilledPaintSettings as StoredColorFilledPaintSettings,
     type CpuMetricTarget as StoredCpuMetricTarget,
     type DiskMetricTarget as StoredDiskMetricTarget,
@@ -72,6 +75,15 @@ import {
     writeStoredWidgetSettings,
     type StoredSettingsJsonObject,
 } from "./codec";
+import {
+    createDefaultSlotId,
+    createUniqueSlotId,
+    type SlotIdGenerator,
+} from "./slot-id";
+import {
+    DENSE_MULTI_METRIC_MAX_SLOT_COUNT,
+    DENSE_MULTI_METRIC_MIN_SLOT_COUNT,
+} from "./dense-multi-metric-constraints";
 import {
     storedCatalogMetricCategoryByResolved,
     storedCatalogMetricReadingKindByResolved,
@@ -152,22 +164,51 @@ export interface StoredWidgetSettingsPatch {
         readonly customLabel: string | undefined;
         readonly customMaximumValue: number | undefined;
     }>;
+    readonly dense?: DenseWidgetSettingsPatch | undefined;
 }
 
+export interface DenseWidgetSettingsPatch {
+    readonly appearance?: ResolvedAppearanceSettingsOverride | undefined;
+    readonly addSlot?: DenseMetricSlotPatch | undefined;
+    readonly updateSlot?: DenseMetricSlotPatch & {
+        readonly slotId: string;
+    } | undefined;
+    readonly removeSlotId?: string | undefined;
+}
+
+export interface DenseMetricSlotPatch {
+    readonly customLabel?: string | undefined;
+    readonly customMaximumValue?: number | undefined;
+}
+
+export interface WriteStoredWidgetSettingsPatchOptions {
+    readonly createSlotId?: SlotIdGenerator;
+}
+
+/** Writes a sparse stored-settings patch without persisting resolved defaults. */
 export function writeStoredWidgetSettingsPatch(
     rawSettings: unknown,
     patch: StoredWidgetSettingsPatch,
+    options: WriteStoredWidgetSettingsPatchOptions = {},
 ): StoredSettingsJsonObject {
     const nextSettings = readStoredWidgetSettings(rawSettings).settings;
 
-    applyPatch(nextSettings, patch);
+    applyPatch(nextSettings, patch, options.createSlotId ?? createDefaultSlotId);
 
     return writeStoredWidgetSettings(nextSettings);
 }
 
-function applyPatch(settings: StoredWidgetSettings, patch: StoredWidgetSettingsPatch): void {
+function applyPatch(
+    settings: StoredWidgetSettings,
+    patch: StoredWidgetSettingsPatch,
+    createSlotId: SlotIdGenerator,
+): void {
     if (patch.preferences) {
         applyPreferencesPatch(settings, patch.preferences);
+    }
+
+    if (patch.dense) {
+        applyDensePatch(requireDenseMultiMetricWidget(settings), patch.dense, createSlotId);
     }
 
     if (patch.appearance) {
@@ -199,6 +240,62 @@ function applyPatch(settings: StoredWidgetSettings, patch: StoredWidgetSettingsP
 
     if (patch.catalog) {
         applyCatalogPatch(requireCatalogTarget(requireMetricSelection(requireSingleMetricSlot(settings))), patch.catalog);
+    }
+}
+
+function applyDensePatch(
+    widget: StoredDenseMultiMetricWidget,
+    patch: DenseWidgetSettingsPatch,
+    createSlotId: SlotIdGenerator,
+): void {
+    if (patch.appearance) {
+        applyAppearancePatch(widget.appearance ??= create(AppearanceSettingsSchema), patch.appearance);
+    }
+
+    if (patch.addSlot !== undefined) {
+        if (widget.slots.length >= DENSE_MULTI_METRIC_MAX_SLOT_COUNT) {
+            return throwPatchTargetMismatch(
+                `Cannot add more than ${DENSE_MULTI_METRIC_MAX_SLOT_COUNT} dense metric slots.`,
+            );
+        }
+
+        const existingSlotIds = new Set(widget.slots.map((slot) => slot.slotId));
+        const slot = create(DenseMetricSlotSchema, {
+            slotId: createUniqueSlotId(existingSlotIds, createSlotId),
+        });
+        applyDenseMetricSlotPatch(slot, patch.addSlot);
+        widget.slots.push(slot);
+    }
+
+    if (patch.updateSlot !== undefined) {
+        applyDenseMetricSlotPatch(requireDenseMetricSlot(widget, patch.updateSlot.slotId), patch.updateSlot);
+    }
+
+    if (patch.removeSlotId !== undefined) {
+        if (widget.slots.length <= DENSE_MULTI_METRIC_MIN_SLOT_COUNT) {
+            return throwPatchTargetMismatch(
+                `Cannot remove dense metric slots below the minimum of ${DENSE_MULTI_METRIC_MIN_SLOT_COUNT}.`,
+            );
+        }
+
+        const slotIndex = widget.slots.findIndex((slot) => slot.slotId === patch.removeSlotId);
+        if (slotIndex < 0) {
+            return throwPatchTargetMismatch("Cannot remove an unknown dense metric slot.");
+        }
+
+        widget.slots.splice(slotIndex, 1);
+    }
+}
+
+function applyDenseMetricSlotPatch(
+    slot: StoredDenseMetricSlot,
+    patch: DenseMetricSlotPatch,
+): void {
+    if ("customLabel" in patch) {
+        slot.customLabel = patch.customLabel;
+    }
+    if ("customMaximumValue" in patch) {
+        slot.customMaximumValue = patch.customMaximumValue;
     }
 }
 
@@ -602,6 +699,26 @@ function requireSingleMetricSlot(settings: StoredWidgetSettings): StoredMetricSl
     }
 
     return settings.widget.value.slot;
+}
+
+function requireDenseMultiMetricWidget(settings: StoredWidgetSettings): StoredDenseMultiMetricWidget {
+    if (settings.widget.case !== "denseMultiMetric") {
+        return throwPatchTargetMismatch("Cannot apply a dense widget patch to a non-dense widget.");
+    }
+
+    return settings.widget.value;
+}
+
+function requireDenseMetricSlot(
+    widget: StoredDenseMultiMetricWidget,
+    slotId: string,
+): StoredDenseMetricSlot {
+    const slot = widget.slots.find((candidateSlot) => candidateSlot.slotId === slotId);
+    if (slot === undefined) {
+        return throwPatchTargetMismatch("Cannot update an unknown dense metric slot.");
+    }
+
+    return slot;
 }
 
 function ensureSlotOverrides(slot: StoredMetricSlot): StoredSlotOverrides {

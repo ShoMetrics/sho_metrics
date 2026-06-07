@@ -13,6 +13,7 @@ import type {
     MetricTheme,
     TerminalThemeVariant,
 } from "../../settings/resolved-settings";
+import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
 import { buildVisibilityContext } from "../testing/test-context";
 
 test("metric view preview URIs render every Property Inspector view option without throwing", () => {
@@ -86,9 +87,10 @@ test("terminal variant preview URIs render every terminal variant without throwi
 
 function buildGpuPreviewInput(): MetricPreviewInput {
     const context = buildVisibilityContext({ actionKind: "gpu" });
+    const slot = requireResolvedSingleMetricWidget(context.resolved).slot;
 
     return {
-        appearance: context.resolved.widget.slot.appearance,
-        target: context.resolved.widget.slot.metric.target,
+        appearance: slot.appearance,
+        target: slot.metric.target,
     };
 }
