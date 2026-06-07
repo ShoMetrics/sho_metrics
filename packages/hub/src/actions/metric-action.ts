@@ -227,9 +227,13 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     protected resolveSettings(event: WillAppearEvent | PropertyInspectorDidAppearEvent): ResolvedWidgetSettings {
-        const activeActionState = this.activeActionStates.get(event.action.id);
+        return this.resolveSettingsForAction(event.action.id);
+    }
+
+    protected resolveSettingsForAction(actionId: string): ResolvedWidgetSettings {
+        const activeActionState = this.activeActionStates.get(actionId);
         if (!activeActionState) {
-            throw new Error(`Action ${event.action.id} is not active; cannot resolve settings.`);
+            throw new Error(`Action ${actionId} is not active; cannot resolve settings.`);
         }
 
         return activeActionState.resolvedSettings;
@@ -343,7 +347,11 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     protected refreshActiveMetricView(event: WillAppearEvent | PropertyInspectorDidAppearEvent): void {
-        const activeActionState = this.activeActionStates.get(event.action.id);
+        this.refreshMetricViewForAction(event.action.id);
+    }
+
+    protected refreshMetricViewForAction(actionId: string): void {
+        const activeActionState = this.activeActionStates.get(actionId);
 
         if (activeActionState) {
             this.refreshMetricView(activeActionState.event);
