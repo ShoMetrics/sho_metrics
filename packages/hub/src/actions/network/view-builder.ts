@@ -1,4 +1,4 @@
-﻿import type { WillAppearEvent } from "@elgato/streamdeck";
+import type { WillAppearEvent } from "@elgato/streamdeck";
 import type { MetricStoreReader } from "../../runtime/metric-store";
 import type { NetworkInterfaceOption } from "../../runtime/network-interfaces";
 import {
@@ -28,7 +28,7 @@ import {
     renderNetworkInterfaceIconFragment,
     renderNetworkPingIconFragment,
 } from "../../widgets/icons/catalog/network";
-import type { MetricViewOptions } from "../../view-updates/runner";
+import type { DualMetricViewOptions, SingleMetricViewOptions } from "../../view-updates/runner";
 import {
     buildColorConfigFromAppearance,
     resolveActiveMetricAccentColorMode,
@@ -37,7 +37,7 @@ import {
 import { buildMetricAccentPaintAppearanceOverride } from "../../settings/appearance-overrides";
 
 export interface NetworkViewUpdate {
-    viewOptions: MetricViewOptions;
+    viewOptions: NetworkMetricViewOptions;
     debugInfo?: NetworkViewDebugInfo;
 }
 
@@ -78,6 +78,8 @@ export type ResolvedNetworkTrafficMetricTarget = ResolvedNetworkMetricTarget & {
 type ResolvedNetworkPingMetricTarget = ResolvedNetworkMetricTarget & {
     readonly reading: ResolvedNetworkPingReading;
 };
+
+type NetworkMetricViewOptions = SingleMetricViewOptions | DualMetricViewOptions;
 
 type BuildTrafficNetworkViewOptions = Omit<BuildNetworkViewOptions, "target"> & {
     readonly target: ResolvedNetworkTrafficMetricTarget;
@@ -172,6 +174,7 @@ function buildTrafficNetworkViewUpdate(options: BuildTrafficNetworkViewOptions):
     return {
         viewOptions: {
             event: options.event,
+            metricRenderKind: "singleMetric",
             resolvedSettings: appearance,
             metricKey: networkMetricKey,
             widgetData: renderedWidgetData,
@@ -246,6 +249,7 @@ function buildPingNetworkViewUpdate(options: BuildPingNetworkViewOptions): Netwo
     return {
         viewOptions: {
             event: options.event,
+            metricRenderKind: "singleMetric",
             resolvedSettings: appearance,
             metricKey: networkMetricKey,
             widgetData: renderedWidgetData,
@@ -293,7 +297,7 @@ export function resolveNetworkMaximumMegabitsPerSecond(
 
 function buildDualNetworkCircleOrTextViewOptions(
     options: BuildTrafficNetworkViewOptions & { dualRenderPrimitive: "circle" | "text" },
-): MetricViewOptions {
+): NetworkMetricViewOptions {
     const uploadMetricKey = resolveNetworkMetricKey("upload", options.target.reading.interfaceId);
     const downloadMetricKey = resolveNetworkMetricKey("download", options.target.reading.interfaceId);
     const uploadWidgetData = buildNetworkWidgetData({
@@ -326,6 +330,7 @@ function buildDualNetworkCircleOrTextViewOptions(
 
     return {
         event: options.event,
+        metricRenderKind: "dualMetric",
         resolvedSettings: appearance,
         metricKey: `${uploadMetricKey},${downloadMetricKey}`,
         dualRenderPrimitive: options.dualRenderPrimitive,
@@ -376,7 +381,7 @@ function buildDualNetworkCircleOrTextViewOptions(
     };
 }
 
-function buildDualNetworkLineViewOptions(options: BuildTrafficNetworkViewOptions): MetricViewOptions {
+function buildDualNetworkLineViewOptions(options: BuildTrafficNetworkViewOptions): NetworkMetricViewOptions {
     const uploadMetricKey = resolveNetworkMetricKey("upload", options.target.reading.interfaceId);
     const downloadMetricKey = resolveNetworkMetricKey("download", options.target.reading.interfaceId);
     const uploadWidgetData = buildNetworkWidgetData({
@@ -407,6 +412,7 @@ function buildDualNetworkLineViewOptions(options: BuildTrafficNetworkViewOptions
 
     return {
         event: options.event,
+        metricRenderKind: "dualMetric",
         resolvedSettings: appearance,
         metricKey: `${uploadMetricKey},${downloadMetricKey}`,
         widgetData: {
@@ -444,7 +450,7 @@ function buildDualNetworkLineViewOptions(options: BuildTrafficNetworkViewOptions
     };
 }
 
-function buildDualBarNetworkViewOptions(options: BuildTrafficNetworkViewOptions): MetricViewOptions {
+function buildDualBarNetworkViewOptions(options: BuildTrafficNetworkViewOptions): NetworkMetricViewOptions {
     const uploadMetricKey = resolveNetworkMetricKey("upload", options.target.reading.interfaceId);
     const downloadMetricKey = resolveNetworkMetricKey("download", options.target.reading.interfaceId);
     const uploadWidgetData = buildNetworkWidgetData({
@@ -473,6 +479,7 @@ function buildDualBarNetworkViewOptions(options: BuildTrafficNetworkViewOptions)
 
     return {
         event: options.event,
+        metricRenderKind: "singleMetric",
         resolvedSettings: appearance,
         metricKey: `${uploadMetricKey},${downloadMetricKey}`,
         widgetData: {
@@ -539,7 +546,7 @@ function buildSingleBarNetworkViewOptions(
     options: BuildTrafficNetworkViewOptions & {
         networkDirection: Exclude<NetworkMetricDirection, "both">;
     },
-): MetricViewOptions {
+): NetworkMetricViewOptions {
     const networkDirection = options.networkDirection;
     const networkMetricKey = resolveNetworkMetricKey(networkDirection, options.target.reading.interfaceId);
     const widgetData = buildNetworkWidgetData({
@@ -557,6 +564,7 @@ function buildSingleBarNetworkViewOptions(
 
     return {
         event: options.event,
+        metricRenderKind: "singleMetric",
         resolvedSettings: appearance,
         metricKey: networkMetricKey,
         widgetData: {

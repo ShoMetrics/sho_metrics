@@ -3,7 +3,6 @@ import { rasterizeSvgToPngDataUrl } from "../view-rendering/rasterizer";
 import type { MetricRenderAppearance } from "../view-rendering/render-appearance";
 import {
     composeMetricViewFrame,
-    isDualMetricRenderOptions,
     resolveMetricViewLogValue,
     resolveMetricViewSampleTimestampMilliseconds,
     type DualMetricRenderOptions,
@@ -390,7 +389,7 @@ export class MetricViewUpdateRunner {
             `actionId=${options.event.action.id}`,
             `metricKey=${options.metricKey}`,
             `renderPrimitive=${settingsSignature.renderPrimitive}`,
-            `viewKind=${isDualMetricRenderOptions(options) ? "dual" : "single"}`,
+            `viewKind=${options.metricRenderKind}`,
             `isRenderInFlight=${metricViewActionState.isRenderInFlight}`,
             `isQueued=${metricViewActionState.isQueued}`,
             `activeUpdates=${this.activeMetricViewUpdateCount}`,

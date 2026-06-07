@@ -399,6 +399,7 @@ function renderSingleMetricFramePngBuffer(testCase: SingleMetricVisualTestCase):
     const frame = composeMetricViewFrame({
         renderTarget: testCase.renderTarget ?? "key",
         viewOptions: {
+            metricRenderKind: "singleMetric",
             resolvedSettings,
             widgetData: testCase.data,
             centerIconFragment: testCase.centerIcon ?? "",
@@ -421,6 +422,7 @@ function renderDualMetricFramePngBuffer(testCase: DualMetricVisualTestCase): Buf
     const frame = composeMetricViewFrame({
         renderTarget: testCase.renderTarget ?? "key",
         viewOptions: {
+            metricRenderKind: "dualMetric",
             resolvedSettings,
             widgetData: testCase.data,
             titleText: testCase.selectedView === "text" ? "NET" : "NETWORK",

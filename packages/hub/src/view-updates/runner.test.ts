@@ -223,6 +223,7 @@ function buildMetricViewOptions(action: FakeKeyAction, options: {
     return {
         event: buildEvent(action),
         metricKey: "cpu.usage_percent",
+        metricRenderKind: "singleMetric",
         centerIconFragment: "<path />",
         statusIcon: buildStatusIcon(),
         widgetData: options.widgetData ?? buildWidgetData(),

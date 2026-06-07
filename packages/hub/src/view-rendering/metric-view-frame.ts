@@ -1,4 +1,5 @@
 import type { ColorConfig } from "./color-resolver";
+import { renderDenseMetricBodyView } from "./dense-metric-view";
 import { renderDualMetricBodyView } from "./dual-metric-view";
 import { renderMetricFrame, resolveThemeBodyViewport, type MetricFrameBody } from "./metric-frame";
 import { renderMetricNoticeBody } from "./metric-notice-body";
@@ -21,6 +22,7 @@ import {
 } from "../settings/appearance-overrides";
 import { buildMetricRenderAppearance } from "../settings/render-appearance-builder";
 import type { ResolvedAppearanceSettings } from "../settings/resolved-settings";
+import type { DenseMetricWidgetData } from "../actions/dense-multi-metric/row-data";
 import type { ProgressCircleStatusIcon } from "../widgets/primitives/progress-circle";
 import type { ThemeBodyViewport } from "../widgets/styles/theme-style";
 
@@ -35,12 +37,14 @@ interface BaseMetricRenderOptions {
 }
 
 export interface SingleMetricRenderOptions extends BaseMetricRenderOptions {
+    readonly metricRenderKind: "singleMetric";
     widgetData: WidgetData;
     /** Static action-owned notice rendered instead of the selected metric primitive. */
     noticeText?: string;
 }
 
 export interface DualMetricRenderOptions extends BaseMetricRenderOptions {
+    readonly metricRenderKind: "dualMetric";
     widgetData: DualChannelWidgetData;
     titleText: string;
     dualRenderPrimitive?: "circle" | "text" | "sparkline";
@@ -57,7 +61,12 @@ export interface DualMetricRenderOptions extends BaseMetricRenderOptions {
     negativeStatusIcon?: ProgressCircleStatusIcon;
 }
 
-export type MetricRenderOptions = SingleMetricRenderOptions | DualMetricRenderOptions;
+export interface DenseMetricRenderOptions extends BaseMetricRenderOptions {
+    readonly metricRenderKind: "denseMetric";
+    widgetData: DenseMetricWidgetData;
+}
+
+export type MetricRenderOptions = SingleMetricRenderOptions | DualMetricRenderOptions | DenseMetricRenderOptions;
 export type MetricRenderTarget = "key" | "touch-strip";
 
 export type TouchStripMetricLayoutKind = "wide" | "wide-frame-square-body" | "wide-frame-two-square-bodies";
@@ -85,14 +94,16 @@ export interface MetricViewRenderPlan {
 
 export interface MetricViewFrame {
     readonly svg: string;
-    readonly renderedMetricData: WidgetData | DualChannelWidgetData;
+    readonly renderedMetricData: MetricRenderedData;
     readonly renderPlan: MetricViewRenderPlan;
 }
 
 interface RenderedMetricBodies {
     readonly bodies: readonly MetricFrameBody[];
-    readonly renderedMetricData: WidgetData | DualChannelWidgetData;
+    readonly renderedMetricData: MetricRenderedData;
 }
+
+export type MetricRenderedData = WidgetData | DualChannelWidgetData | DenseMetricWidgetData;
 
 interface BodyArea {
     readonly xCoordinate: number;
@@ -128,9 +139,7 @@ export function composeMetricViewFrame(options: {
     renderTarget: MetricRenderTarget;
 }): MetricViewFrame {
     const renderPlan = buildMetricViewRenderPlan(options);
-    const body = isDualMetricRenderOptions(options.viewOptions)
-        ? composeDualMetricBody(options.viewOptions, renderPlan)
-        : composeSingleMetricBody(options.viewOptions, renderPlan);
+    const body = composeMetricBody(options.viewOptions, renderPlan);
 
     return {
         svg: renderMetricFrame({
@@ -161,10 +170,10 @@ export function buildMetricViewRenderPlan(options: {
     });
     const centerContent = circleVariant === "minimal" ? "icon" : "value";
     const viewHasData = hasMetricViewData(options.viewOptions);
-    const singleMetricOptions = isDualMetricRenderOptions(options.viewOptions)
-        ? undefined
-        : options.viewOptions;
-    const dualRenderPrimitive = isDualMetricRenderOptions(options.viewOptions)
+    const singleMetricOptions = options.viewOptions.metricRenderKind === "singleMetric"
+        ? options.viewOptions
+        : undefined;
+    const dualRenderPrimitive = options.viewOptions.metricRenderKind === "dualMetric"
         ? options.viewOptions.dualRenderPrimitive
         : undefined;
     const shouldRenderMutedIconPlaceholder = singleMetricOptions?.noticeText === undefined
@@ -174,6 +183,7 @@ export function buildMetricViewRenderPlan(options: {
         && circleVariant === "minimal";
     const touchStripMetricLayout = options.renderTarget === "touch-strip"
         ? resolveTouchStripMetricLayout({
+            metricRenderKind: options.viewOptions.metricRenderKind,
             renderPrimitive: renderAppearance.renderPrimitive,
             dualRenderPrimitive,
         })
@@ -206,6 +216,20 @@ export function buildMetricViewRenderPlan(options: {
         bodyViewports,
         pngSize: touchStripMetricLayout?.pngSize ?? KEYPAD_PNG_SIZE,
     };
+}
+
+function composeMetricBody(
+    viewOptions: MetricRenderOptions,
+    renderPlan: MetricViewRenderPlan,
+): RenderedMetricBodies {
+    switch (viewOptions.metricRenderKind) {
+        case "singleMetric":
+            return composeSingleMetricBody(viewOptions, renderPlan);
+        case "dualMetric":
+            return composeDualMetricBody(viewOptions, renderPlan);
+        case "denseMetric":
+            return composeDenseMetricBody(viewOptions, renderPlan);
+    }
 }
 
 export function resolveEffectiveCircleVariant(options: {
@@ -271,40 +295,54 @@ export function buildRenderDualChannelWidgetData(options: {
     };
 }
 
-export function isDualMetricRenderOptions(options: MetricRenderOptions): options is DualMetricRenderOptions {
-    return "positiveColor" in options;
-}
-
 export function hasMetricViewData(options: MetricRenderOptions): boolean {
-    if (isDualMetricRenderOptions(options)) {
-        return options.widgetData.positive.sampleTimestampMilliseconds != null
-            || options.widgetData.negative.sampleTimestampMilliseconds != null;
+    switch (options.metricRenderKind) {
+        case "singleMetric":
+            return options.widgetData.sampleTimestampMilliseconds != null;
+        case "dualMetric":
+            return options.widgetData.positive.sampleTimestampMilliseconds != null
+                || options.widgetData.negative.sampleTimestampMilliseconds != null;
+        case "denseMetric":
+            return options.widgetData.rows.some(row => row.widgetData.sampleTimestampMilliseconds != null);
     }
-
-    return options.widgetData.sampleTimestampMilliseconds != null;
 }
 
-export function resolveMetricViewLogValue(widgetData: WidgetData | DualChannelWidgetData): number {
+export function resolveMetricViewLogValue(widgetData: MetricRenderedData): number {
     if (isDualChannelWidgetData(widgetData)) {
         return widgetData.positive.current + widgetData.negative.current;
+    }
+
+    if (isDenseMetricWidgetData(widgetData)) {
+        const firstConfiguredRow = widgetData.rows.find(row => row.rowKind === "configured");
+        return firstConfiguredRow?.widgetData.current ?? 0;
     }
 
     return widgetData.current;
 }
 
-export function resolveMetricViewSampleTimestampMilliseconds(widgetData: WidgetData | DualChannelWidgetData): number | undefined {
+export function resolveMetricViewSampleTimestampMilliseconds(widgetData: MetricRenderedData): number | undefined {
     if (isDualChannelWidgetData(widgetData)) {
         return widgetData.positive.sampleTimestampMilliseconds
             ?? widgetData.negative.sampleTimestampMilliseconds;
+    }
+
+    if (isDenseMetricWidgetData(widgetData)) {
+        return widgetData.rows.find(row => row.widgetData.sampleTimestampMilliseconds != null)
+            ?.widgetData.sampleTimestampMilliseconds;
     }
 
     return widgetData.sampleTimestampMilliseconds;
 }
 
 export function resolveTouchStripMetricLayout(options: {
+    metricRenderKind?: MetricRenderOptions["metricRenderKind"];
     renderPrimitive: MetricRenderAppearance["renderPrimitive"];
     dualRenderPrimitive?: DualMetricRenderOptions["dualRenderPrimitive"];
 }): TouchStripMetricLayout {
+    if (options.metricRenderKind === "denseMetric") {
+        return TOUCH_STRIP_METRIC_LAYOUTS.wide;
+    }
+
     if (options.dualRenderPrimitive === "circle") {
         return TOUCH_STRIP_METRIC_LAYOUTS["wide-frame-two-square-bodies"];
     }
@@ -523,6 +561,28 @@ function composeDualMetricBody(
     };
 }
 
+function composeDenseMetricBody(
+    options: DenseMetricRenderOptions,
+    renderPlan: MetricViewRenderPlan,
+): RenderedMetricBodies {
+    const renderedMetricData = buildRenderDenseMetricWidgetData(options.widgetData);
+
+    return {
+        bodies: [
+            {
+                svg: renderDenseMetricBodyView({
+                    data: renderedMetricData,
+                    visual: renderPlan.renderAppearance,
+                    renderSize: renderPlan.bodyRenderSize,
+                }),
+                bodyViewport: renderPlan.bodyViewport,
+                muted: false,
+            },
+        ],
+        renderedMetricData,
+    };
+}
+
 function composeDualTouchStripCircleBodies(options: {
     viewOptions: DualMetricRenderOptions;
     renderedMetricData: DualChannelWidgetData;
@@ -658,6 +718,17 @@ function buildPlaceholderChannelWidgetData(widgetData: WidgetData, displayValue:
     };
 }
 
+function buildRenderDenseMetricWidgetData(widgetData: DenseMetricWidgetData): DenseMetricWidgetData {
+    return {
+        rows: widgetData.rows.map(row => ({
+            ...row,
+            widgetData: row.widgetData.sampleTimestampMilliseconds == null
+                ? formatRenderWidgetDataUnit(buildPlaceholderChannelWidgetData(row.widgetData, resolveUnavailableRenderDisplayValue(row.widgetData)))
+                : formatRenderWidgetDataUnit(row.widgetData),
+        })),
+    };
+}
+
 function buildZeroChannelWidgetData(widgetData: WidgetData, referenceHistoryLength: number): WidgetData {
     return {
         ...widgetData,
@@ -668,6 +739,10 @@ function buildZeroChannelWidgetData(widgetData: WidgetData, referenceHistoryLeng
     };
 }
 
-function isDualChannelWidgetData(widgetData: WidgetData | DualChannelWidgetData): widgetData is DualChannelWidgetData {
+function isDualChannelWidgetData(widgetData: MetricRenderedData): widgetData is DualChannelWidgetData {
     return "positive" in widgetData && "negative" in widgetData;
+}
+
+function isDenseMetricWidgetData(widgetData: MetricRenderedData): widgetData is DenseMetricWidgetData {
+    return "rows" in widgetData;
 }

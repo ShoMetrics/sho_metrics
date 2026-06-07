@@ -80,6 +80,7 @@ export function buildCpuViewOptions(options: {
     const widget = requireResolvedSingleMetricWidget(options.settings);
     const baseOptions = {
         event: options.event,
+        metricRenderKind: "singleMetric" as const,
         resolvedSettings: widget.slot.appearance,
     };
 

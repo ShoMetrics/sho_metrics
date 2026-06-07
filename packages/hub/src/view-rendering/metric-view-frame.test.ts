@@ -5,6 +5,7 @@ import {
 } from "../settings/default-appearance-settings";
 import type { ResolvedAppearanceSettingsOverride } from "../settings/appearance-overrides";
 import { buildMetricRenderAppearance } from "../settings/render-appearance-builder";
+import type { DenseMetricWidgetData } from "../actions/dense-multi-metric/row-data";
 import {
     KEYPAD_PNG_SIZE,
     PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE,
@@ -26,6 +27,7 @@ import {
     resolveMetricViewSampleTimestampMilliseconds,
     resolveTouchStripMetricLayout,
     type DualMetricRenderOptions,
+    type MetricRenderedData,
     type SingleMetricRenderOptions,
 } from "./metric-view-frame";
 
@@ -94,11 +96,7 @@ test("single metric notice renders a dedicated notice body", () => {
         renderTarget: "key",
     });
 
-    if ("positive" in frame.renderedMetricData) {
-        throw new Error("Expected single metric render data.");
-    }
-
-    assert.equal(frame.renderedMetricData.displayValue, "N/A");
+    assert.equal(readSingleRenderedMetricData(frame.renderedMetricData).displayValue, "N/A");
     assert.match(frame.svg, /metric-notice-line-0/);
     assert.match(frame.svg, />Install<\/text>/);
     assert.match(frame.svg, />helper<\/text>/);
@@ -118,11 +116,7 @@ test("ordinary unavailable copy keeps the selected primitive and generic N/A dis
         renderTarget: "key",
     });
 
-    if ("positive" in frame.renderedMetricData) {
-        throw new Error("Expected single metric render data.");
-    }
-
-    assert.equal(frame.renderedMetricData.displayValue, "N/A");
+    assert.equal(readSingleRenderedMetricData(frame.renderedMetricData).displayValue, "N/A");
     assert.doesNotMatch(frame.svg, /data-metric-unavailable-body=/);
     assert.match(frame.svg, />N\/A<\/text>/);
 });
@@ -140,11 +134,7 @@ test("pending refresh copy keeps the selected primitive and loading display", ()
         renderTarget: "key",
     });
 
-    if ("positive" in frame.renderedMetricData) {
-        throw new Error("Expected single metric render data.");
-    }
-
-    assert.equal(frame.renderedMetricData.displayValue, PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE);
+    assert.equal(readSingleRenderedMetricData(frame.renderedMetricData).displayValue, PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE);
     assert.doesNotMatch(frame.svg, /data-metric-unavailable-body=/);
     assert.match(frame.svg, />\.\.\.<\/text>/);
 });
@@ -339,13 +329,9 @@ test("metric data helpers treat either dual-channel timestamp as available data"
         positive: buildWidgetData({ current: 3 }),
         negative: buildWidgetData({ current: 7, sampleTimestampMilliseconds: 2000 }),
     });
-    const hasViewData = hasMetricViewData({
-        ...buildSingleMetricRenderOptions({ widgetData: buildWidgetData() }),
+    const hasViewData = hasMetricViewData(buildDualMetricRenderOptions({
         widgetData: dualWidgetData,
-        titleText: "Traffic",
-        positiveColor: "#00ff00",
-        negativeColor: "#ff0000",
-    });
+    }));
     const displayLogValue = resolveMetricViewLogValue(dualWidgetData);
     const sampleTimestampMilliseconds = resolveMetricViewSampleTimestampMilliseconds(dualWidgetData);
 
@@ -693,12 +679,68 @@ test("dual circle gauge touch strip renders two complete gauge bodies", () => {
     assert.doesNotMatch(frame.svg, /dual-arc-negative-range-/);
 });
 
+test("dense metric frame renders a progress list body", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildDenseMetricRenderOptions({
+            widgetData: buildDenseMetricWidgetData(3),
+        }),
+        renderTarget: "key",
+    });
+
+    assert.equal(frame.renderPlan.touchStripMetricLayout, null);
+    assert.match(frame.svg, /dense-progress-list-row/);
+    assert.equal(countMatches(frame.svg, /class="dense-progress-list-row"/gu), 3);
+});
+
+test("dense metric frame uses the wide touch strip layout", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildDenseMetricRenderOptions({
+            widgetData: buildDenseMetricWidgetData(5),
+        }),
+        renderTarget: "touch-strip",
+    });
+
+    assert.equal(frame.renderPlan.touchStripMetricLayout?.kind, "wide");
+    assert.deepEqual(frame.renderPlan.renderSize, TOUCH_STRIP_LOGICAL_SIZE);
+    assert.equal(countMatches(frame.svg, /class="dense-progress-list-row"/gu), 5);
+});
+
+test("dense metric frame keeps missing samples isolated to their rows", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildDenseMetricRenderOptions({
+            widgetData: {
+                rows: [
+                    buildDenseMetricRow({
+                        slotId: "fresh",
+                        label: "CPU",
+                        current: 26,
+                        progress: 0.26,
+                        sampleTimestampMilliseconds: 1000,
+                    }),
+                    buildDenseMetricRow({
+                        slotId: "missing",
+                        label: "GPU",
+                        sampleTimestampMilliseconds: undefined,
+                    }),
+                ],
+            },
+        }),
+        renderTarget: "key",
+    });
+
+    const renderedMetricData = readDenseRenderedMetricData(frame.renderedMetricData);
+
+    assert.equal(renderedMetricData.rows[0]?.widgetData.displayValue, "26");
+    assert.equal(renderedMetricData.rows[1]?.widgetData.displayValue, "N/A");
+});
+
 function buildSingleMetricRenderOptions(options: {
     widgetData: WidgetData;
     noticeText?: string;
     resolvedSettings?: ResolvedAppearanceSettingsOverride;
 }): SingleMetricRenderOptions {
     return {
+        metricRenderKind: "singleMetric",
         centerIconFragment: "<path />",
         statusIcon: buildStatusIcon(),
         widgetData: options.widgetData,
@@ -714,6 +756,7 @@ function buildDualMetricRenderOptions(options: {
     dualRenderPrimitive?: "circle" | "text" | "sparkline";
 }): DualMetricRenderOptions {
     return {
+        metricRenderKind: "dualMetric",
         centerIconFragment: "",
         statusIcon: buildStatusIcon(),
         widgetData: options.widgetData,
@@ -728,6 +771,35 @@ function buildDualMetricRenderOptions(options: {
             ...options.resolvedSettings,
         }),
     };
+}
+
+function buildDenseMetricRenderOptions(options: {
+    widgetData: DenseMetricWidgetData;
+    resolvedSettings?: ResolvedAppearanceSettingsOverride;
+}) {
+    return {
+        metricRenderKind: "denseMetric" as const,
+        centerIconFragment: "",
+        statusIcon: buildStatusIcon(),
+        widgetData: options.widgetData,
+        resolvedSettings: buildDefaultAppearanceSettings(options.resolvedSettings),
+    };
+}
+
+function readSingleRenderedMetricData(metricData: MetricRenderedData): WidgetData {
+    if ("rows" in metricData || "positive" in metricData) {
+        throw new Error("Expected single metric render data.");
+    }
+
+    return metricData;
+}
+
+function readDenseRenderedMetricData(metricData: MetricRenderedData): DenseMetricWidgetData {
+    if (!("rows" in metricData)) {
+        throw new Error("Expected dense metric render data.");
+    }
+
+    return metricData;
 }
 
 function buildDualChannelWidgetData(options: Partial<DualChannelWidgetData> = {}): DualChannelWidgetData {
@@ -749,6 +821,45 @@ function buildWidgetData(options: Partial<WidgetData> = {}): WidgetData {
         unavailableDisplayValue: options.unavailableDisplayValue,
         sampleTimestampMilliseconds: options.sampleTimestampMilliseconds,
     };
+}
+
+function buildDenseMetricWidgetData(rowCount: number): DenseMetricWidgetData {
+    return {
+        rows: Array.from({ length: rowCount }, (_, index) => buildDenseMetricRow({
+            slotId: `dense-slot-${index}`,
+            label: `R${index}`,
+            current: index + 1,
+            progress: (index + 1) / rowCount,
+        })),
+    };
+}
+
+function buildDenseMetricRow(options: {
+    readonly slotId: string;
+    readonly label: string;
+    readonly current?: number;
+    readonly progress?: number;
+    readonly sampleTimestampMilliseconds?: number | undefined;
+}) {
+    const widgetData = buildWidgetData({
+        label: options.label,
+        current: options.current,
+        progress: options.progress,
+        displayValue: options.current?.toFixed(0),
+    });
+
+    return {
+        rowKind: "configured" as const,
+        slotId: options.slotId,
+        metricKey: `metric.${options.slotId}`,
+        widgetData: "sampleTimestampMilliseconds" in options
+            ? { ...widgetData, sampleTimestampMilliseconds: options.sampleTimestampMilliseconds }
+            : widgetData,
+    };
+}
+
+function countMatches(text: string, pattern: RegExp): number {
+    return [...text.matchAll(pattern)].length;
 }
 
 function buildStatusIcon(): ProgressCircleStatusIcon {
