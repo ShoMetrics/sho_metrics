@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Resvg } from "@resvg/resvg-js";
@@ -84,6 +84,9 @@ const siteAppleTouchIconPngTarget = { path: path.join(repoRoot, "site/static/app
 // rounded squircle (favicon.svg above) on light surfaces and this transparent
 // glow mark on dark surfaces, matching the Windows titlebar light/dark split.
 const siteDarkSurfaceMarkPath = path.join(repoRoot, "site/static/logo-mark-dark.svg");
+// Social-share card (Open Graph / Twitter): the filled logo centered on the
+// brand ground at the 1200x630 ratio that link previews expect.
+const siteOgImagePath = path.join(repoRoot, "site/static/og-image.png");
 
 // WinUI titlebar images are loaded through ThemeDictionaries. Light surfaces use
 // the rounded filled app icon for contrast; dark surfaces use the transparent
@@ -182,6 +185,7 @@ function main(): void {
         saveOrVerifyIcon(options, roundedIconSourcePath, windowsIconPath);
         saveOrVerifyWizardPanelImage(options, sourceFilledLogoPath, installerWizardImagePath);
         saveOrVerifyWizardSmallImage(options, roundedIconSourcePath, installerWizardSmallImagePath);
+        saveOrVerifyOgImage(options, sourceFilledLogoPath, siteOgImagePath);
     }
     finally {
         rmSync(temporaryRoot, { recursive: true, force: true });
@@ -662,6 +666,28 @@ function invokeMagick(args: string[]): void {
     execFileSync("magick", args, { stdio: "inherit" });
 }
 
+// ImageMagick output (ICO packing, installer compositing) is not byte-stable
+// across versions, so rewriting an unchanged asset produces noisy diffs even
+// though the pixels are identical. Build into a temp file, then compare pixels:
+// verify mode asserts equality, write mode only overwrites the committed asset
+// when the pixels actually changed.
+function commitMagickRasterOutput(options: CliOptions, targetPath: string, buildOutput: (outputPath: string) => void): void {
+    const stagedPath = path.join(temporaryRoot, `staged-${path.basename(targetPath)}`);
+    buildOutput(stagedPath);
+
+    if (options.verifyOnly) {
+        assertRasterPixelsEqual(stagedPath, targetPath);
+        return;
+    }
+
+    if (existsSync(targetPath) && readImageSignature(stagedPath) === readImageSignature(targetPath)) {
+        return;
+    }
+
+    mkdirSync(path.dirname(targetPath), { recursive: true });
+    copyFileSync(stagedPath, targetPath);
+}
+
 function saveOrVerifyPng(options: CliOptions, sourceSvgPath: string, targetPath: string, outputSize: number): void {
     const expectedPng = renderSvgToPng(sourceSvgPath, outputSize);
 
@@ -681,48 +707,34 @@ function saveOrVerifyIcon(options: CliOptions, sourceSvgPath: string, targetPath
         return iconPngPath;
     });
 
-    if (options.verifyOnly) {
-        const expectedPath = path.join(temporaryRoot, `expected-${path.basename(targetPath)}`);
-        invokeMagick([...iconPngPaths, expectedPath]);
-
-        assertRasterPixelsEqual(expectedPath, targetPath);
-        return;
-    }
-
-    mkdirSync(path.dirname(targetPath), { recursive: true });
-    invokeMagick([...iconPngPaths, targetPath]);
+    commitMagickRasterOutput(options, targetPath, outputPath => invokeMagick([...iconPngPaths, outputPath]));
 }
 
 function saveOrVerifyWizardPanelImage(options: CliOptions, sourceSvgPath: string, targetPath: string): void {
     const logoPath = path.join(temporaryRoot, "wizard-panel-logo.png");
     writeBinaryFile(logoPath, renderSvgToPng(sourceSvgPath, 380));
 
-    if (options.verifyOnly) {
-        const expectedPath = path.join(temporaryRoot, path.basename(targetPath));
-        invokeMagick(["-size", "534x1022", `xc:${filledLogoGroundColor}`, logoPath, "-gravity", "center", "-composite", `PNG32:${expectedPath}`]);
-
-        assertRasterPixelsEqual(expectedPath, targetPath);
-        return;
-    }
-
-    mkdirSync(path.dirname(targetPath), { recursive: true });
-    invokeMagick(["-size", "534x1022", `xc:${filledLogoGroundColor}`, logoPath, "-gravity", "center", "-composite", `PNG32:${targetPath}`]);
+    commitMagickRasterOutput(options, targetPath, outputPath =>
+        invokeMagick(["-size", "534x1022", `xc:${filledLogoGroundColor}`, logoPath, "-gravity", "center", "-composite", `PNG32:${outputPath}`]));
 }
 
 function saveOrVerifyWizardSmallImage(options: CliOptions, sourceSvgPath: string, targetPath: string): void {
     const iconPath = path.join(temporaryRoot, "wizard-small-icon.png");
     writeBinaryFile(iconPath, renderSvgToPng(sourceSvgPath, 96));
 
-    if (options.verifyOnly) {
-        const expectedPath = path.join(temporaryRoot, path.basename(targetPath));
-        invokeMagick(["-size", "159x159", "xc:none", iconPath, "-gravity", "center", "-composite", `PNG32:${expectedPath}`]);
+    commitMagickRasterOutput(options, targetPath, outputPath =>
+        invokeMagick(["-size", "159x159", "xc:none", iconPath, "-gravity", "center", "-composite", `PNG32:${outputPath}`]));
+}
 
-        assertRasterPixelsEqual(expectedPath, targetPath);
-        return;
-    }
+// "OG" is Open Graph (https://ogp.me): the meta-tag protocol that Slack, Discord,
+// X, iMessage, and others read to render a link-preview card. Open Graph expects a
+// 1200x630 image, so this centers the filled logo on the brand ground at that ratio.
+function saveOrVerifyOgImage(options: CliOptions, sourceSvgPath: string, targetPath: string): void {
+    const logoPath = path.join(temporaryRoot, "og-logo.png");
+    writeBinaryFile(logoPath, renderSvgToPng(sourceSvgPath, 360));
 
-    mkdirSync(path.dirname(targetPath), { recursive: true });
-    invokeMagick(["-size", "159x159", "xc:none", iconPath, "-gravity", "center", "-composite", `PNG32:${targetPath}`]);
+    commitMagickRasterOutput(options, targetPath, outputPath =>
+        invokeMagick(["-size", "1200x630", `xc:${filledLogoGroundColor}`, logoPath, "-gravity", "center", "-composite", `PNG32:${outputPath}`]));
 }
 
 function renderSvgToPng(sourceSvgPath: string, outputSize: number): Buffer {
