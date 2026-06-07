@@ -89,7 +89,7 @@ type BuildPingNetworkViewOptions = Omit<BuildNetworkViewOptions, "target"> & {
 
 // Network throughput is a 1 Hz hot reading. Keep a last-good value through a few
 // missed ticks, then let the renderer show N/A instead of a misleading old rate.
-const NETWORK_SAMPLE_STALE_MS = 5000;
+export const NETWORK_SAMPLE_STALE_MS = 5000;
 
 export function buildNetworkViewUpdate(options: BuildNetworkViewOptions): NetworkViewUpdate {
     const networkReading = options.target.reading;

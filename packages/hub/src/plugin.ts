@@ -6,6 +6,7 @@ import { Gpu } from "./actions/gpu";
 import { Memory } from "./actions/memory";
 import { Disk } from "./actions/disk";
 import { CatalogMetric } from "./actions/catalog-metric";
+import { DenseMultiMetric } from "./actions/dense-multi-metric";
 import { logger } from "./logging/logger";
 import { pluginGlobalSettingsStore } from "./settings/global-settings-store";
 import { backgroundMetricCollection } from "./runtime/metric-collection/background-metric-collection";
@@ -26,6 +27,7 @@ streamDeck.actions.registerAction(new Memory());
 streamDeck.actions.registerAction(new Disk());
 streamDeck.actions.registerAction(new Gpu());
 streamDeck.actions.registerAction(new CatalogMetric());
+streamDeck.actions.registerAction(new DenseMultiMetric());
 
 process.once("exit", () => {
     backgroundMetricCollection.dispose();

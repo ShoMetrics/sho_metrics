@@ -113,6 +113,18 @@ test("Advanced Sensor action uses a dedicated hardware icon", () => {
     assert.match(iconSvg, /Lucide Computer, ISC License/u);
 });
 
+test("Dense Multi Metric action uses a dedicated list icon", () => {
+    const manifest = readManifest();
+    const denseMultiMetricAction = (manifest.Actions ?? [])
+        .find(action => action.UUID === STREAM_DECK_ACTION_UUID_BY_KIND.denseMultiMetric);
+
+    assert.equal(denseMultiMetricAction?.Icon, "imgs/actions/dense-multi-metric/icon");
+    assertAssetReferenceExists(denseMultiMetricAction?.Icon, "Dense Multi Metric Icon");
+
+    const iconSvg = readFileSync(`${SD_PLUGIN_ROOT}/imgs/actions/dense-multi-metric/icon.svg`, "utf8");
+    assert.match(iconSvg, /Lucide List, ISC License/u);
+});
+
 test("old reading-level action names do not remain in source or manifest files", () => {
     const forbiddenActionUuids = [
         `${STREAM_DECK_PLUGIN_UUID}.cpu-usage`,

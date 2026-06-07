@@ -10,7 +10,7 @@ export type ActionKind =
 
 export const STREAM_DECK_PLUGIN_UUID = "com.ez.sho-metrics";
 
-type StreamDeckActionKind = Exclude<ActionKind, "denseMultiMetric" | "unknown">;
+type StreamDeckActionKind = Exclude<ActionKind, "unknown">;
 
 export const STREAM_DECK_ACTION_UUID_BY_KIND = {
     cpu: `${STREAM_DECK_PLUGIN_UUID}.cpu`,
@@ -18,6 +18,7 @@ export const STREAM_DECK_ACTION_UUID_BY_KIND = {
     memory: `${STREAM_DECK_PLUGIN_UUID}.memory`,
     disk: `${STREAM_DECK_PLUGIN_UUID}.disk`,
     catalog: `${STREAM_DECK_PLUGIN_UUID}.catalog-metric`,
+    denseMultiMetric: `${STREAM_DECK_PLUGIN_UUID}.dense-multi-metric`,
     network: `${STREAM_DECK_PLUGIN_UUID}.network`,
 } as const satisfies Record<StreamDeckActionKind, string>;
 

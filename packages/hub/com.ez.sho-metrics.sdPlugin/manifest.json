@@ -143,6 +143,29 @@
 					"TitleAlignment": "middle"
 				}
 			]
+		},
+		{
+			"Name": "Dense Multi Metric",
+			"UUID": "com.ez.sho-metrics.dense-multi-metric",
+			"Icon": "imgs/actions/dense-multi-metric/icon",
+			"Tooltip": "Displays multiple metrics in one compact view.",
+			"PropertyInspectorPath": "ui/property-inspector.html",
+			"Controllers": [
+				"Keypad",
+				"Encoder"
+			],
+			"Encoder": {
+				"Icon": "imgs/actions/sho-metrics/icon",
+				"layout": "$B1"
+			},
+			"UserTitleEnabled": false,
+			"States": [
+				{
+					"Image": "imgs/actions/sho-metrics/key",
+					"ShowTitle": false,
+					"TitleAlignment": "middle"
+				}
+			]
 		}
 	],
 	"Category": "Sho Metrics",
