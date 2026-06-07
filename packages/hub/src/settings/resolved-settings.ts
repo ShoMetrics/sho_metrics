@@ -101,6 +101,17 @@ export function requireResolvedSingleMetricWidget(
     return settings.widget;
 }
 
+/** Narrows resolved settings for dense multi-metric action callers. */
+export function requireResolvedDenseMultiMetricWidget(
+    settings: ResolvedWidgetSettings,
+): ResolvedDenseMultiMetricWidget {
+    if (settings.widget.widgetKind !== "denseMultiMetric") {
+        throw new Error(`Expected dense multi metric widget, received ${settings.widget.widgetKind}.`);
+    }
+
+    return settings.widget;
+}
+
 export interface ResolvedWidgetPreferences {
     readonly pollingFrequencySeconds: number;
 }
