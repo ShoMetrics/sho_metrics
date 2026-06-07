@@ -3,22 +3,17 @@
   <h1>See your system<br><span>on every key.</span></h1>
   <p class="hero-lede">{{ .Description }}</p>
   <div class="hero-actions" id="start" aria-label="Primary actions">
-    <a class="action-button action-button-primary" href="{{ "install/" | relURL }}">
-      <span class="button-icon">S</span>
+    <a class="action-button action-button-primary" href="https://marketplace.elgato.com/" target="_blank" rel="noopener noreferrer">
+      <img class="button-mark mark-on-light" src="{{ "logo-mark-dark.svg" | relURL }}" alt="" width="28" height="28">
+      <img class="button-mark mark-on-dark" src="{{ "favicon.svg" | relURL }}" alt="" width="28" height="28">
       <span class="button-text">
-        <small>Step 1 - plugin</small>
         <strong>Install ShoMetrics</strong>
-      </span>
-    </a>
-    <a class="action-button action-button-secondary" href="{{ "download/" | relURL }}">
-      <span class="button-icon">W</span>
-      <span class="button-text">
-        <small>Step 2 - optional, Windows</small>
-        <strong>Download the helper (.msi)</strong>
+        <small>Free on the Elgato Marketplace</small>
       </span>
     </a>
   </div>
-  <p class="hero-note">The helper unlocks deeper Windows hardware sensors when you need them.</p>
+  <p class="hero-note">On Windows, an optional <a href="{{ "download/" | relURL }}">helper</a> adds deeper hardware sensors. Most metrics work without it.</p>
+  <p class="hero-note">ShoMetrics is a free, <a href="https://github.com/ShoMetrics/sho_metrics">open source</a> project.</p>
 </section>
 
 <section class="deck-stage" aria-label="Example Stream Deck metric keys">
@@ -44,8 +39,7 @@
 
 <section class="sellpoint-section" aria-label="ShoMetrics highlights">
   <header>
-    <h2>What makes it good.</h2>
-    <p>A short, honest list.</p>
+    <h2>Everything worth monitoring, at a glance</h2>
   </header>
   <div class="feature-row">
     <article>
@@ -56,12 +50,12 @@
     <article>
       <span>PLATFORMS</span>
       <h3>Windows &amp; macOS</h3>
-      <p>Use the plugin on both supported Stream Deck desktop platforms.</p>
+      <p>Runs wherever the Stream Deck app does, on both Windows and macOS.</p>
     </article>
     <article>
       <span>SETUP</span>
       <h3>Out of the box</h3>
-      <p>Install from Marketplace in one click. The plugin does not need administrator permission by default; the deeper-sensor helper does.</p>
+      <p>Install from the Marketplace and start dropping metrics on keys. The plugin runs without admin rights; only the optional deep-sensor helper (Windows only) needs them.</p>
     </article>
     <article>
       <span>PROJECT</span>
@@ -101,7 +95,7 @@
   <article class="step-card">
     <span class="step-number">02</span>
     <h2>Drop a metric onto a key</h2>
-    <p>Pick the metric you want visible and let the key update while your system changes.</p>
+    <p>Pick the metric you want to watch. The key updates live as your system changes.</p>
   </article>
   <article class="step-card">
     <span class="step-number">03</span>
@@ -120,16 +114,32 @@
 
 <section class="faq-panel" aria-label="Common questions">
   <details open>
-    <summary>Which metrics are available?</summary>
-    <p>The plugin currently exposes CPU, GPU, Memory, Disk, and Network actions.</p>
+    <summary>Is ShoMetrics free?</summary>
+    <p>Yes. ShoMetrics is free and <a href="https://github.com/ShoMetrics/sho_metrics">open source</a>.</p>
   </details>
   <details>
-    <summary>Which systems does the plugin target?</summary>
-    <p>The Stream Deck manifest targets Windows 10 or later and macOS 12 or later.</p>
+    <summary>Do I need a Stream Deck to run it?</summary>
+    <p>As of today, yes — ShoMetrics runs inside the Stream Deck. You don't need the physical hardware, though: Elgato's <a href="https://www.elgato.com/us/en/s/virtual-stream-deck">Virtual Stream Deck</a> works too, and it's free if you already own a Stream Deck device.</p>
+  </details>
+  <details>
+    <summary>Which metrics are available?</summary>
+    <p>CPU, GPU, memory, disk, and network out of the box, with more sources on the way. GPU metrics work natively on NVIDIA cards and on macOS; Intel and AMD GPUs need the helper installed for deeper readings.</p>
+  </details>
+  <details>
+    <summary>Which systems does it support?</summary>
+    <p>Windows 10 or later, and macOS 12 or later on Apple Silicon. ShoMetrics <em>may</em> run on other systems, but those are neither tested nor recommended.</p>
   </details>
   <details>
     <summary>What is the helper for?</summary>
-    <p>The Windows helper is used when richer hardware data is needed. Download and setup details live on the download page.</p>
+    <p>The helper is a small Windows-native companion app that unlocks deeper hardware sensors, such as fan speeds, voltages, and per-component temperatures. It builds on the well-known <a href="https://github.com/LibreHardwareMonitor/LibreHardwareMonitor">LibreHardwareMonitor</a> project. See the <a href="{{ "faq/helper/" | relURL }}">helper guide</a> for setup.</p>
+  </details>
+  <details>
+    <summary>Is it safe to monitor my system?</summary>
+    <p>It's designed to be, with <a href="https://github.com/ShoMetrics/sho_metrics">open source</a> at its core, so you don't have to take that on trust. Being able to see all the way through a system monitor is a big part of why ShoMetrics exists: the code is public, and every release is built and published through GitHub Actions with no manual steps. If you have extra concerns, you can compare a download's hash against the release or build ShoMetrics yourself from source. Please note, the optional Windows helper installs a system driver to reach deeper sensors (see the <a href="{{ "faq/helper/" | relURL }}">helper guide</a>). No software can claim to be completely free of bugs, but the project stays transparent so you can judge it on the code, not on a promise.</p>
+  </details>
+  <details>
+    <summary>Will it slow my system down?</summary>
+    <p>We build ShoMetrics on the principle that a monitor should stay out of your way, and put real effort into keeping overhead low. Monitoring always costs a little, but the aim is to keep it small enough that you don't notice it.</p>
   </details>
 </section>
 {{ end }}
