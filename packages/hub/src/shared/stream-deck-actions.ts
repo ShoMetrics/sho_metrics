@@ -10,8 +10,9 @@ export type ActionKind =
     | "unknown";
 
 export const STREAM_DECK_PLUGIN_UUID = "com.ez.sho-metrics";
+export const STREAM_DECK_STACKED_METRIC_ACTION_UUID = `${STREAM_DECK_PLUGIN_UUID}.stacked-metric`;
 
-// TODO(StackedMetric Step 2): include stackedMetric when the Stream Deck
+// TODO(StackedMetric Step 5): include stackedMetric when the Stream Deck
 // action class and manifest entry are added.
 type StreamDeckActionKind = Exclude<ActionKind, "unknown" | "stackedMetric">;
 
