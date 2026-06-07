@@ -32,7 +32,6 @@
   --key-ring-track-color: rgba(255, 255, 255, 0.12);
   --key-warm-start-color: #102936;
   --key-cool-start-color: #0d2f33;
-  --key-filled-end-color: #063244;
   --key-paper-color: #e8eef1;
   --key-paper-text-color: #101418;
   --key-paper-label-color: #617078;
@@ -189,26 +188,14 @@ a {
   display: none;
 }
 
-.home-hero,
-.studio-hero {
+.home-hero {
   width: min(1120px, calc(100% - 2rem));
   margin: 0 auto;
   padding: 2rem 0 0.5rem;
   text-align: center;
 }
 
-.hero-tag,
-.section-kicker {
-  margin: 0 0 1rem;
-  color: var(--muted-color);
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.home-hero h1,
-.studio-hero h1 {
+.home-hero h1 {
   max-width: 760px;
   margin: 0 auto;
   font-size: clamp(2.375rem, 6vw, 4rem);
@@ -220,8 +207,7 @@ a {
   color: var(--accent-color);
 }
 
-.hero-lede,
-.studio-lede {
+.hero-lede {
   max-width: 620px;
   margin: 0.9rem auto 0;
   color: var(--muted-color);
@@ -252,19 +238,6 @@ a {
   box-shadow: 0 1rem 2.5rem var(--shadow-color);
 }
 
-.button-icon {
-  display: grid;
-  width: 1.75rem;
-  height: 1.75rem;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 0.5rem;
-  background: var(--accent-color);
-  color: var(--on-accent-color);
-  font-size: 1rem;
-  font-weight: 900;
-}
-
 .button-text {
   display: grid;
   gap: 0.2rem;
@@ -291,25 +264,14 @@ a {
   color: var(--background-color);
 }
 
-.action-button-secondary {
-  background: var(--surface-color);
-  color: var(--text-color);
-}
-
-.action-button-secondary .button-icon {
-  background: var(--text-color);
-  color: var(--background-color);
-}
-
-.deck-stage,
-.studio-deck {
+.deck-stage {
   width: min(880px, calc(100% - 2rem));
   margin: 3.5rem auto 4rem;
   perspective: 1400px;
 }
 
-.stream-deck,
-.studio-device {
+.stream-deck {
+  margin-bottom: 0;
   padding: 1.375rem;
   border-radius: 1.75rem;
   background: linear-gradient(180deg, var(--deck-color), var(--deck-dark-color));
@@ -317,16 +279,7 @@ a {
     0 1.875rem 3.75rem var(--deck-shadow-color),
     0 0.5rem 1.125rem var(--deck-shadow-soft-color),
     inset 0 1px 0 var(--key-highlight-color);
-}
-
-.stream-deck {
-  margin-bottom: 0;
   transform: rotateX(8deg);
-  transform-origin: center bottom;
-}
-
-.studio-device {
-  transform: rotateX(18deg) rotateZ(-1deg);
   transform-origin: center bottom;
 }
 
@@ -385,20 +338,14 @@ a {
   stroke: var(--key-accent-color);
 }
 
-.key-cool,
-.key-glass {
+.key-cool {
   background: linear-gradient(160deg, var(--key-cool-start-color), var(--key-color));
 }
 
 .key-cool strong,
-.key-cool svg polyline,
-.key-glass strong {
+.key-cool svg polyline {
   color: var(--cyan-color);
   stroke: var(--cyan-color);
-}
-
-.key-filled {
-  background: linear-gradient(160deg, var(--accent-deep-color), var(--key-filled-end-color));
 }
 
 .key-paper {
@@ -431,8 +378,7 @@ a {
   mask: radial-gradient(circle, transparent 42%, black 44%);
 }
 
-.key-cool.key-ring i,
-.key-glass.key-ring i {
+.key-cool.key-ring i {
   color: var(--cyan-color);
 }
 
@@ -455,11 +401,9 @@ a {
 }
 
 .step-grid,
-.home-panel,
 .faq-panel,
 .feature-row,
 .sellpoint-section,
-.variant-gallery,
 .page-shell {
   width: min(1160px, calc(100% - 2rem));
   margin: 0 auto;
@@ -513,29 +457,11 @@ a {
 
 .step-card p,
 .feature-row p,
-.home-panel p,
 .faq-panel p,
 .page-content p,
 .page-content li,
 .content-panel p {
   color: var(--muted-color);
-}
-
-.home-panel {
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  gap: 2rem;
-  align-items: start;
-  padding: 3rem 0;
-  border-top: 1px solid var(--border-color);
-}
-
-.home-panel h2,
-.variant-gallery h2 {
-  margin: 0;
-  max-width: 620px;
-  font-size: clamp(2rem, 5vw, 3.5rem);
-  line-height: 1;
 }
 
 .faq-panel {
@@ -574,31 +500,6 @@ summary::after {
 
 details[open] summary::after {
   content: "-";
-}
-
-.studio-hero {
-  width: min(1320px, calc(100% - 2rem));
-  padding: 7rem 0 0;
-  padding-bottom: 0;
-}
-
-.studio-hero h1 {
-  max-width: 1240px;
-  font-size: clamp(4.2rem, 7.2vw, 7.2rem);
-  line-height: 1.02;
-}
-
-.studio-lede {
-  max-width: 860px;
-  margin-top: 1.2rem;
-  font-size: clamp(1.15rem, 2.2vw, 1.55rem);
-}
-
-.studio-deck {
-  width: min(1120px, calc(100% - 2rem));
-  margin-top: 3rem;
-  margin-bottom: 9rem;
-  perspective: 1500px;
 }
 
 .feature-row {
@@ -640,24 +541,6 @@ details[open] summary::after {
   box-shadow:
     0 0.9rem 1.8rem var(--shadow-color),
     inset 0 1px 0 var(--key-highlight-color);
-}
-
-.variant-gallery {
-  padding: 4.5rem 0 5rem;
-}
-
-.variant-gallery header {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 2rem;
-  margin-bottom: 2rem;
-}
-
-.variant-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
 }
 
 .mini-key {
@@ -812,18 +695,13 @@ details[open] summary::after {
 
 @media (max-width: 900px) {
   .feature-row,
-  .step-grid,
-  .home-panel {
+  .step-grid {
     grid-template-columns: 1fr;
   }
 
   .feature-row article + article {
     border-left: 0;
     border-top: 1px solid var(--border-color);
-  }
-
-  .variant-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .variant-preview {
@@ -908,19 +786,16 @@ details[open] summary::after {
     border-top: 0;
   }
 
-  .home-hero,
-  .studio-hero {
+  .home-hero {
     padding-top: 3rem;
     text-align: left;
   }
 
-  .home-hero h1,
-  .studio-hero h1 {
+  .home-hero h1 {
     font-size: clamp(3.2rem, 15vw, 4.8rem);
   }
 
-  .hero-lede,
-  .studio-lede {
+  .hero-lede {
     margin-left: 0;
     margin-right: 0;
   }
@@ -935,8 +810,7 @@ details[open] summary::after {
     width: 100%;
   }
 
-  .stream-deck,
-  .studio-device {
+  .stream-deck {
     margin-bottom: 0;
     transform: none;
     border-radius: 0.85rem;
@@ -949,19 +823,11 @@ details[open] summary::after {
   .metric-key {
     border-radius: 0.55rem;
   }
-
-  .studio-deck {
-    margin-bottom: 4rem;
-  }
 }
 
 @media (max-width: 520px) {
   .deck-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .variant-grid {
-    grid-template-columns: 1fr;
   }
 
   .variant-preview {
