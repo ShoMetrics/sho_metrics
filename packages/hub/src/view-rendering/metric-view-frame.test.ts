@@ -402,7 +402,7 @@ test("key render plan uses keypad PNG dimensions and no touch strip layout", () 
     assert.deepEqual(renderPlan.pngSize, KEYPAD_PNG_SIZE);
 });
 
-test("pixel window renders square widget body inside the client viewport", () => {
+test("pixel window keeps square text body inside the client viewport", () => {
     const frame = composeMetricViewFrame({
         viewOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData({
@@ -436,7 +436,7 @@ test("pixel window renders square widget body inside the client viewport", () =>
     assert.match(frame.svg, /<g transform="translate\(12 19\) scale\(0\.8333\)">/);
 });
 
-test("pixel window wide touch strip scales the original body into the client viewport", () => {
+test("pixel window wide touch strip renders non-circle body across the full client viewport", () => {
     const renderPlan = buildMetricViewRenderPlan({
         viewOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
@@ -450,7 +450,7 @@ test("pixel window wide touch strip scales the original body into the client vie
 
     assert.equal(renderPlan.touchStripMetricLayout?.kind, "wide");
     assert.deepEqual(renderPlan.renderSize, TOUCH_STRIP_LOGICAL_SIZE);
-    assert.deepEqual(renderPlan.bodyRenderSize, TOUCH_STRIP_LOGICAL_SIZE);
+    assert.deepEqual(renderPlan.bodyRenderSize, { width: 190, height: 78 });
     assert.ok(renderPlan.bodyViewport);
     assert.deepEqual(renderPlan.bodyViewport, {
         xCoordinate: 5,
@@ -458,9 +458,9 @@ test("pixel window wide touch strip scales the original body into the client vie
         width: 190,
         height: 78,
         body: {
-            xOffset: 17,
+            xOffset: 0,
             yOffset: 0,
-            renderSize: TOUCH_STRIP_LOGICAL_SIZE,
+            renderSize: { width: 190, height: 78 },
         },
         clipRadius: 0,
     });
