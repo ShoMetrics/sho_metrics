@@ -197,6 +197,8 @@ export function buildMetricViewRenderPlan(options: {
     const bodyViewports = resolveMetricBodyViewports({
         metricRenderKind: options.viewOptions.metricRenderKind,
         renderSize,
+        renderPrimitive: renderAppearance.renderPrimitive,
+        dualRenderPrimitive,
         themePreset: renderAppearance.themePreset,
         themeBodyViewport,
         touchStripMetricLayout,
@@ -363,18 +365,12 @@ export function resolveTouchStripMetricLayout(options: {
 function resolveMetricBodyViewports(options: {
     metricRenderKind: MetricRenderOptions["metricRenderKind"];
     renderSize: KeySize;
+    renderPrimitive: MetricRenderAppearance["renderPrimitive"];
+    dualRenderPrimitive: DualMetricRenderOptions["dualRenderPrimitive"] | undefined;
     themePreset: MetricRenderAppearance["themePreset"];
     themeBodyViewport: ThemeBodyViewport | undefined;
     touchStripMetricLayout: TouchStripMetricLayout | null;
 }): readonly ThemeBodyViewport[] {
-    if (
-        options.metricRenderKind === "denseMetric"
-        && options.themePreset === "pixel-window"
-        && options.themeBodyViewport !== undefined
-    ) {
-        return [resolveFullViewportBodyPlacement(options.themeBodyViewport)];
-    }
-
     if (options.touchStripMetricLayout?.kind === "wide-frame-square-body") {
         return [
             resolveWideFrameSquareBodyViewport({
@@ -391,7 +387,45 @@ function resolveMetricBodyViewports(options: {
         });
     }
 
+    if (shouldUsePixelWindowFullBodyViewport(options)) {
+        return [resolveFullViewportBodyPlacement(options.themeBodyViewport)];
+    }
+
     return options.themeBodyViewport === undefined ? [] : [options.themeBodyViewport];
+}
+
+function shouldUsePixelWindowFullBodyViewport(options: {
+    metricRenderKind: MetricRenderOptions["metricRenderKind"];
+    renderPrimitive: MetricRenderAppearance["renderPrimitive"];
+    dualRenderPrimitive: DualMetricRenderOptions["dualRenderPrimitive"] | undefined;
+    themePreset: MetricRenderAppearance["themePreset"];
+    themeBodyViewport: ThemeBodyViewport | undefined;
+}): options is typeof options & { readonly themeBodyViewport: ThemeBodyViewport } {
+    if (options.themePreset !== "pixel-window" || options.themeBodyViewport === undefined) {
+        return false;
+    }
+
+    if (options.metricRenderKind === "denseMetric") {
+        return true;
+    }
+
+    if (options.metricRenderKind === "singleMetric" && options.renderPrimitive === "text") {
+        return false;
+    }
+
+    if (options.metricRenderKind === "singleMetric" && options.renderPrimitive === "circle") {
+        return false;
+    }
+
+    if (options.metricRenderKind === "dualMetric" && options.dualRenderPrimitive === "text") {
+        return false;
+    }
+
+    if (options.metricRenderKind === "dualMetric" && options.dualRenderPrimitive === "circle") {
+        return false;
+    }
+
+    return true;
 }
 
 function resolveFullViewportBodyPlacement(viewport: ThemeBodyViewport): ThemeBodyViewport {
