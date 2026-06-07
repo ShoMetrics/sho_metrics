@@ -22,6 +22,7 @@ import type { ResolvedAppearanceSettingsOverride } from "../../src/settings/appe
 import { buildDefaultAppearanceSettings } from "../../src/settings/default-appearance-settings";
 import { buildMetricRenderAppearance } from "../../src/settings/render-appearance-builder";
 import { buildColorConfigFromAppearance } from "../../src/settings/render-paint-resolver";
+import type { DenseMetricWidgetData } from "../../src/actions/dense-multi-metric/row-data";
 import { getDiskIconFragment, getHardwareIconFragment } from "../../src/widgets/icons/hardware-icons";
 import {
     getNetworkDirectionStatusIcon,
@@ -202,6 +203,13 @@ export interface DualMetricVisualTestCase {
     readonly muted?: boolean;
 }
 
+export interface DenseMetricVisualTestCase {
+    readonly snapshotName: string;
+    readonly appearance: ResolvedAppearanceSettingsOverride;
+    readonly data: DenseMetricWidgetData;
+    readonly renderTarget?: MetricRenderTarget;
+}
+
 export function buildDefaultAppearanceOverride(options: {
     selectedView: VisualMetricView;
     circleVariant?: CircleVariant;
@@ -372,6 +380,23 @@ export function renderDualMetricWidgetPngBuffer(testCase: DualMetricVisualTestCa
         themeChromeOpacity: visualSettings.transparentSurface.backgroundOpacity,
         size: keySize,
     }), keySize);
+}
+
+export function renderDenseMetricWidgetPngBuffer(testCase: DenseMetricVisualTestCase): Buffer {
+    const resolvedSettings = buildDefaultAppearanceSettings(testCase.appearance);
+    const frame = composeMetricViewFrame({
+        renderTarget: testCase.renderTarget ?? "key",
+        viewOptions: {
+            metricRenderKind: "denseMetric",
+            resolvedSettings,
+            widgetData: testCase.data,
+            centerIconFragment: "",
+            statusIcon: getMetricStatusIcon("percentage"),
+            circleVariantOverride: resolvedSettings.view.circleVariant,
+        },
+    });
+
+    return renderSvgToPngBuffer(frame.svg, frame.renderPlan.pngSize);
 }
 
 export function renderSvgToPngBuffer(svg: string, keySize: KeySize): Buffer {
