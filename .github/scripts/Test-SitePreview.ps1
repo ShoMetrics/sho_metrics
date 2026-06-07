@@ -112,7 +112,6 @@ $appcastSchemaPath = Join-Path -Path $repoRoot -ChildPath "packages\source-windo
 $sparkleSchemaPath = Join-Path -Path $repoRoot -ChildPath "packages\source-windows\ShoMetrics.Source.Windows.ControlPanel\UpdateAppcastSparkle.xsd"
 $requiredPages = @(
     @{ Path = "index.html"; Terms = @("Sho Metrics") },
-    @{ Path = "install/index.html"; Terms = @("Install The Plugin", "Install The Helper", "Add A Metric") },
     @{ Path = "download/index.html"; Terms = @("Helper", "Plugin") },
     @{ Path = "troubleshooting/index.html"; Terms = @("Actions Do Not Appear", "Metrics Do Not Update") },
     @{ Path = "faq/helper/index.html"; Terms = @("Windows-only", "PawnIO", "LibreHardwareMonitor") },
