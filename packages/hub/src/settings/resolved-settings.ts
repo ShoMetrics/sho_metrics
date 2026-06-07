@@ -58,7 +58,8 @@ export interface ResolvedWidgetSettings {
 
 export type ResolvedWidget =
     | ResolvedSingleMetricWidget
-    | ResolvedDenseMultiMetricWidget;
+    | ResolvedDenseMultiMetricWidget
+    | ResolvedStackedMetricWidget;
 
 export interface ResolvedSingleMetricWidget {
     readonly widgetKind: "singleMetric";
@@ -76,6 +77,22 @@ export interface ResolvedDenseMetricSlot {
     readonly slot: ResolvedMetricSlot;
     readonly customLabel: string | undefined;
     readonly customMaximumValue: number | undefined;
+}
+
+export interface ResolvedStackedMetricWidget {
+    readonly widgetKind: "stackedMetric";
+    readonly slots: readonly ResolvedStackedMetricSlot[];
+    readonly rotation: ResolvedStackedMetricRotationSettings;
+}
+
+export interface ResolvedStackedMetricSlot {
+    readonly slotId: string;
+    readonly widget: ResolvedSingleMetricWidget;
+}
+
+export interface ResolvedStackedMetricRotationSettings {
+    readonly autoRotateEnabled: boolean;
+    readonly intervalSeconds: number;
 }
 
 export interface ResolvedMetricSlot {
@@ -107,6 +124,17 @@ export function requireResolvedDenseMultiMetricWidget(
 ): ResolvedDenseMultiMetricWidget {
     if (settings.widget.widgetKind !== "denseMultiMetric") {
         throw new Error(`Expected dense multi metric widget, received ${settings.widget.widgetKind}.`);
+    }
+
+    return settings.widget;
+}
+
+/** Narrows resolved settings for stacked metric action callers. */
+export function requireResolvedStackedMetricWidget(
+    settings: ResolvedWidgetSettings,
+): ResolvedStackedMetricWidget {
+    if (settings.widget.widgetKind !== "stackedMetric") {
+        throw new Error(`Expected stacked metric widget, received ${settings.widget.widgetKind}.`);
     }
 
     return settings.widget;

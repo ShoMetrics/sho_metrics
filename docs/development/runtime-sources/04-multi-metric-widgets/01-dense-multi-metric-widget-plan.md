@@ -43,7 +43,7 @@ entry named **Stacked Metric** and should not be implemented in this batch.
 - Product/action label: **Dense Multi Metric**.
 - Internal widget type: `DenseMultiMetricWidget`.
 - Future rotation action label: **Stacked Metric**.
-- Future rotation widget type: `RotatingMetricWidget`.
+- Future rotation widget type: `StackedMetricWidget`.
 - Supported controllers in v1: `Keypad` and `Encoder`.
 - Encoder support means touch-strip/dial layout rendering only. Do not add dial
   rotate, dial press, touch tap, or key press behavior in this batch.
@@ -110,7 +110,7 @@ Boundary names:
 | Resolved widget kind | `"denseMultiMetric"` |
 | Action class | `DenseMultiMetric` |
 | Renderer branch | `denseProgressList` |
-| Future rotating widget | `RotatingMetricWidget` |
+| Future rotating widget | `StackedMetricWidget` |
 
 ## Current Code Facts
 
