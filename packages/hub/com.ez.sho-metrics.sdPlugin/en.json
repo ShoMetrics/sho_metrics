@@ -9,6 +9,10 @@
 		"Name": "CPU",
 		"Tooltip": "Displays CPU metrics."
 	},
+	"com.ez.sho-metrics.dense-multi-metric": {
+		"Name": "Dense Multi Metric",
+		"Tooltip": "Displays multiple metrics in one compact view."
+	},
 	"com.ez.sho-metrics.disk": {
 		"Name": "Disk",
 		"Tooltip": "Displays disk metrics."

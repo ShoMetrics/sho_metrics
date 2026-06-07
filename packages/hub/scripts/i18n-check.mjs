@@ -11,6 +11,7 @@ import { shellMessages, commonMessages } from "../src/i18n/message-groups/shell.
 import {
     catalogMessages,
     cpuMessages,
+    denseMessages,
     diskMessages,
     gpuMessages,
     helperMessages,
@@ -33,6 +34,7 @@ const messageGroups = {
     optionMessages,
     widgetMessages,
     cpuMessages,
+    denseMessages,
     gpuMessages,
     diskMessages,
     networkMessages,

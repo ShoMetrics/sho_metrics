@@ -9,6 +9,10 @@
 		"Name": "CPU",
 		"Tooltip": "CPU メトリクスを表示します。"
 	},
+	"com.ez.sho-metrics.dense-multi-metric": {
+		"Name": "高密度マルチメトリクス",
+		"Tooltip": "複数のメトリクスを 1 つのコンパクトな表示にまとめます。"
+	},
 	"com.ez.sho-metrics.disk": {
 		"Name": "ディスク",
 		"Tooltip": "ディスクメトリクスを表示します。"

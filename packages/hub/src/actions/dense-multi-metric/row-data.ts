@@ -12,8 +12,8 @@ import {
     RAM_USED_METRIC_KEY,
 } from "../../runtime/metric-keys";
 import {
-    getDefaultDiskUsageMetricKey,
     getDiskThroughputMetricKey,
+    resolveDiskUsageMetricKey,
 } from "../../runtime/disk-metric-keys";
 import {
     getNetworkPingLatencyMetricKey,
@@ -148,6 +148,9 @@ export function buildDenseMetricReadPlan(options: DenseMetricReadPlanOptions): D
             platform: options.platform,
         });
         const rowRoutes = rowReadPlan.metrics;
+        // normalizeMetricReadPlan rejects conflicting routes for the same key.
+        // Dense treats that as a row-level configuration problem so one bad row
+        // cannot blank the entire widget.
         if (rowRoutes.some(route => hasConflictingAcceptedRoute(acceptedRouteByMetricKey, route))) {
             resolvedRows.push({
                 rowKind: "unconfigured",
@@ -270,17 +273,19 @@ function resolveGpuDenseMetricKeys(target: ResolvedGpuMetricTarget): DenseMetric
 
 function resolveDiskDenseMetricKeys(target: ResolvedDiskMetricTarget): DenseMetricKeys | undefined {
     if (target.reading.kind === "usage") {
-        const usedMetricKey = getDefaultDiskUsageMetricKey("used");
+        const usedMetricKey = resolveDiskUsageMetricKey("used", target.volumeId);
         return {
             displayMetricKey: usedMetricKey,
             subscriptionMetricKeys: [
                 usedMetricKey,
-                getDefaultDiskUsageMetricKey("total"),
-                getDefaultDiskUsageMetricKey("available"),
+                resolveDiskUsageMetricKey("total", target.volumeId),
+                resolveDiskUsageMetricKey("available", target.volumeId),
             ],
         };
     }
 
+    // Single disk throughput can show read and write as two channels. Dense
+    // rows have one progress value, so the PI offers read/write only.
     if (target.reading.direction === "both") {
         return undefined;
     }
@@ -293,6 +298,8 @@ function resolveNetworkDenseMetricKeys(target: ResolvedNetworkMetricTarget): Den
         return buildSingleKey(getNetworkPingLatencyMetricKey(target.reading.targetHost));
     }
 
+    // Single network traffic can render upload and download together. Dense
+    // rows intentionally keep one direction per row for predictable spacing.
     if (target.reading.direction === "both") {
         return undefined;
     }
@@ -431,9 +438,9 @@ function buildDiskRowWidgetData(row: DenseMetricConfiguredRow, metrics: MetricSt
     const label = resolveDenseRowLabel(row);
     if (row.target.reading.kind === "usage") {
         return buildDiskUsageWidgetData({
-            usedBytesWidgetData: metrics.getWidgetData(getDefaultDiskUsageMetricKey("used"), label, "B"),
-            totalBytes: metrics.getWidgetData(getDefaultDiskUsageMetricKey("total"), label, "B").current,
-            availableBytes: metrics.getWidgetData(getDefaultDiskUsageMetricKey("available"), label, "B").current,
+            usedBytesWidgetData: metrics.getWidgetData(resolveDiskUsageMetricKey("used", row.target.volumeId), label, "B"),
+            totalBytes: metrics.getWidgetData(resolveDiskUsageMetricKey("total", row.target.volumeId), label, "B").current,
+            availableBytes: metrics.getWidgetData(resolveDiskUsageMetricKey("available", row.target.volumeId), label, "B").current,
             displayMode: row.target.reading.displayMode,
             label,
         });

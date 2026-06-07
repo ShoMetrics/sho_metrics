@@ -13,6 +13,7 @@ import type {
     ResolvedMetricTarget,
 } from "../../settings/resolved-settings";
 import { CPU_USAGE_METRIC_KEY, GPU_USAGE_METRIC_KEY } from "../../runtime/metric-keys";
+import { resolveDiskUsageMetricKey } from "../../runtime/disk-metric-keys";
 import { MetricUnit } from "../../runtime/sources/metric-source";
 import type { WidgetData } from "../../view-rendering/widget-data";
 import {
@@ -60,6 +61,22 @@ test("dense read plan keeps duplicate rows when their source route is identical"
 
     assert.deepEqual(readPlanResolution.rows.map(row => row.rowKind), ["configured", "configured"]);
     assert.deepEqual(listMetricReadPlanKeys(readPlanResolution.readPlan), [CPU_USAGE_METRIC_KEY]);
+});
+
+test("dense disk usage rows subscribe the selected disk volume", () => {
+    const widget = buildDenseWidget([
+        buildSlot("slot-1", buildDiskUsageTarget("E:\\")),
+        buildSlot("slot-2", buildCpuUsageTarget()),
+    ]);
+
+    const readPlanResolution = buildDenseMetricReadPlan({ widget, platform: "win32" });
+
+    assert.deepEqual(listMetricReadPlanKeys(readPlanResolution.readPlan), [
+        CPU_USAGE_METRIC_KEY,
+        resolveDiskUsageMetricKey("available", "E:\\"),
+        resolveDiskUsageMetricKey("total", "E:\\"),
+        resolveDiskUsageMetricKey("used", "E:\\"),
+    ]);
 });
 
 test("dense read plan downgrades later duplicate rows with conflicting source routes", () => {
@@ -239,6 +256,18 @@ function buildMemoryUsageTarget(): ResolvedMetricTarget {
     return {
         domain: "memory",
         reading: { kind: "usage" },
+    };
+}
+
+function buildDiskUsageTarget(volumeId: string | undefined): ResolvedMetricTarget {
+    return {
+        domain: "disk",
+        volumeId,
+        reading: {
+            kind: "usage",
+            displayMode: "percentage",
+            barLabel: "",
+        },
     };
 }
 

@@ -72,7 +72,36 @@ test("dense progress list keeps padding between value and unit text", () => {
     assert.ok(firstValueTextXCoordinate + 2 <= firstUnitTextXCoordinate);
 });
 
-test("dense progress list vertically centers value and unit text on the bar", () => {
+test("dense progress list gives value text enough left-side room before fitting", () => {
+    const svg = renderDenseProgressList(
+        {
+            rows: [
+                buildDenseMetricRow({
+                    slotId: "slot-ninety",
+                    label: "DSK",
+                    current: 90,
+                    progress: 0.9,
+                }),
+                buildDenseMetricRow({
+                    slotId: "slot-hundred",
+                    label: "CPU",
+                    current: 100,
+                    progress: 1,
+                }),
+            ],
+        },
+        DEFAULT_DENSE_PROGRESS_LIST_CONFIG,
+        WIDGET_LOGICAL_SIZE,
+    );
+    const valueTextElements = readValueTextElements(svg);
+
+    assert.match(valueTextElements[0] ?? "", />90<\/text>/u);
+    assert.match(valueTextElements[1] ?? "", />100<\/text>/u);
+    assert.doesNotMatch(valueTextElements[0] ?? "", /textLength=/u);
+    assert.doesNotMatch(valueTextElements[1] ?? "", /textLength=/u);
+});
+
+test("dense progress list keeps bar text on a shared visual-center baseline", () => {
     const svg = renderDenseProgressList(
         buildDenseMetricWidgetData(2),
         DEFAULT_DENSE_PROGRESS_LIST_CONFIG,
@@ -85,8 +114,9 @@ test("dense progress list vertically centers value and unit text on the bar", ()
     assert.notEqual(firstTrack, undefined);
     assert.notEqual(firstValueTextYCoordinate, undefined);
     assert.notEqual(firstUnitTextYCoordinate, undefined);
-    assert.equal(firstValueTextYCoordinate, firstTrack.yCoordinate + firstTrack.height / 2);
-    assert.equal(firstUnitTextYCoordinate, firstTrack.yCoordinate + firstTrack.height / 2);
+    assert.equal(firstValueTextYCoordinate, firstUnitTextYCoordinate);
+    assert.ok(firstValueTextYCoordinate > firstTrack.yCoordinate + firstTrack.height / 2);
+    assert.ok(firstValueTextYCoordinate <= firstTrack.yCoordinate + firstTrack.height / 2 + 3);
 });
 
 test("dense progress list picks readable value text over filled bar color", () => {
@@ -154,6 +184,16 @@ test("dense progress list keeps touch strip rows full width for 2 or 3 rows", ()
         assert.equal(countMatches(svg, /class="dense-progress-list-row"/gu), rowCount);
         assert.equal(new Set(readTrackXCoordinates(svg)).size, 1);
     }
+});
+
+test("dense progress list keeps touch strip labels above the fuzzy small-text floor", () => {
+    const svg = renderDenseProgressList(
+        buildDenseMetricWidgetData(3),
+        DEFAULT_DENSE_PROGRESS_LIST_CONFIG,
+        TOUCH_STRIP_LOGICAL_SIZE,
+    );
+
+    assert.ok(readLabelFontSizes(svg).every(fontSize => fontSize >= 10));
 });
 
 test("dense progress list uses two touch strip columns for 4 to 6 rows", () => {
@@ -246,6 +286,11 @@ function readTrackRects(svg: string): ReadonlyArray<{ xCoordinate: number; yCoor
         }));
 }
 
+function readLabelFontSizes(svg: string): readonly number[] {
+    return [...svg.matchAll(/<clipPath id="dense-progress-list-label-\d+">[\s\S]*?<\/clipPath>\s*<\/defs>\s*<g clip-path="url\(#dense-progress-list-label-\d+\)">\s*<text[\s\S]*?font-size="([^"]+)"/gu)]
+        .map(match => Number(match[1] ?? 0));
+}
+
 function readValueTextXCoordinates(svg: string): readonly number[] {
     return [...svg.matchAll(/<clipPath id="dense-progress-list-value-\d+">[\s\S]*?<\/clipPath>\s*<\/defs>\s*<g clip-path="url\(#dense-progress-list-value-\d+\)">\s*<text x="([^"]+)"/gu)]
         .map(match => Number(match[1] ?? 0));
@@ -254,6 +299,11 @@ function readValueTextXCoordinates(svg: string): readonly number[] {
 function readValueTextYCoordinates(svg: string): readonly number[] {
     return [...svg.matchAll(/<clipPath id="dense-progress-list-value-\d+">[\s\S]*?<\/clipPath>\s*<\/defs>\s*<g clip-path="url\(#dense-progress-list-value-\d+\)">\s*<text x="[^"]+" y="([^"]+)"/gu)]
         .map(match => Number(match[1] ?? 0));
+}
+
+function readValueTextElements(svg: string): readonly string[] {
+    return [...svg.matchAll(/<clipPath id="dense-progress-list-value-\d+">[\s\S]*?<\/clipPath>\s*<\/defs>\s*<g clip-path="url\(#dense-progress-list-value-\d+\)">\s*(<text[\s\S]*?<\/text>)/gu)]
+        .map(match => match[1] ?? "");
 }
 
 function readUnitTextXCoordinates(svg: string): readonly number[] {

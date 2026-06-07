@@ -8,19 +8,29 @@ import {
     ColorFilledThemeSettingsSchema,
     ColorFilledSolidPaintSettingsSchema,
     CupertinoGlassThemeSettingsSchema,
+    CatalogMetricTargetSchema,
+    CpuMetricTargetSchema,
     DenseMetricSlotSchema,
+    DiskMetricTargetSchema,
     DiskThroughputDisplaySettingsSchema,
     FlatThemeSettingsSchema,
+    GpuMetricTargetSchema,
+    MemoryMetricTarget_Kind as StoredMemoryMetricKind,
+    MemoryMetricTargetSchema,
     MetricMultiColorChannelColorsSchema,
     MetricMultiColorPaintSettingsSchema,
     MetricPaintSettingsSchema,
+    MetricSelectionSchema,
     MetricSourcePolicySchema,
+    MetricSourcePolicy_FailureMode as StoredSourceFailureMode,
+    MetricSlotSchema,
     MetricSolidChannelColorsSchema,
     MetricSolidPaintSettingsSchema,
     MultiColorSetSchema,
     NetworkDisplaySettingsSchema,
     NetworkMetricTarget_Kind as StoredNetworkMetricKind,
     NetworkMetricTarget_PingSchema,
+    NetworkMetricTargetSchema,
     NetworkMetricTarget_TrafficSchema,
     PixelWindowThemeSettingsSchema,
     TerminalPaintSettingsSchema,
@@ -70,6 +80,7 @@ import type {
     ResolvedMultiColorSetOverride,
 } from "../appearance-overrides";
 import { normalizeNetworkPingTargetInput } from "../network-ping-target";
+import { BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID } from "../../runtime/sources/source-ids";
 import {
     readStoredWidgetSettings,
     writeStoredWidgetSettings,
@@ -173,13 +184,38 @@ export interface DenseWidgetSettingsPatch {
     readonly updateSlot?: DenseMetricSlotPatch & {
         readonly slotId: string;
     } | undefined;
+    readonly moveSlot?: {
+        readonly slotId: string;
+        readonly direction: "up" | "down";
+    } | undefined;
     readonly removeSlotId?: string | undefined;
 }
 
 export interface DenseMetricSlotPatch {
+    readonly target?: DenseMetricTargetPatch | undefined;
     readonly customLabel?: string | undefined;
     readonly customMaximumValue?: number | undefined;
 }
+
+export type DenseMetricTargetPatch =
+    | { readonly domain: "cpu"; readonly kind: ResolvedCpuReading["kind"] }
+    | { readonly domain: "gpu"; readonly kind: ResolvedGpuReading["kind"] }
+    | { readonly domain: "memory" }
+    | {
+        readonly domain: "disk";
+        readonly kind: "usage" | "throughput";
+        readonly volumeId?: string | undefined;
+        readonly throughputDirection?: "read" | "write";
+    }
+    | { readonly domain: "network"; readonly kind: "traffic"; readonly direction: "upload" | "download" }
+    | {
+        readonly domain: "catalog";
+        readonly metricId: string;
+        readonly detectedLabel: string | undefined;
+        readonly detectedUnit: MetricUnit | undefined;
+        readonly detectedCategory: CatalogMetricCategory | undefined;
+        readonly detectedReadingKind: CatalogMetricReadingKind | undefined;
+    };
 
 export interface WriteStoredWidgetSettingsPatchOptions {
     readonly createSlotId?: SlotIdGenerator;
@@ -271,6 +307,10 @@ function applyDensePatch(
         applyDenseMetricSlotPatch(requireDenseMetricSlot(widget, patch.updateSlot.slotId), patch.updateSlot);
     }
 
+    if (patch.moveSlot !== undefined) {
+        moveDenseMetricSlot(widget, patch.moveSlot.slotId, patch.moveSlot.direction);
+    }
+
     if (patch.removeSlotId !== undefined) {
         if (widget.slots.length <= DENSE_MULTI_METRIC_MIN_SLOT_COUNT) {
             return throwPatchTargetMismatch(
@@ -291,11 +331,109 @@ function applyDenseMetricSlotPatch(
     slot: StoredDenseMetricSlot,
     patch: DenseMetricSlotPatch,
 ): void {
+    if (patch.target !== undefined) {
+        const metricSlot = slot.slot ??= create(MetricSlotSchema);
+        const metric = metricSlot.metric ??= create(MetricSelectionSchema);
+        metric.target = buildDenseMetricTarget(patch.target);
+        metric.sourcePolicy = buildDenseMetricSourcePolicy(patch.target);
+    }
     if ("customLabel" in patch) {
         slot.customLabel = patch.customLabel;
     }
     if ("customMaximumValue" in patch) {
         slot.customMaximumValue = patch.customMaximumValue;
+    }
+}
+
+function buildDenseMetricSourcePolicy(target: DenseMetricTargetPatch): StoredMetricSelection["sourcePolicy"] {
+    if (target.domain !== "catalog") {
+        return undefined;
+    }
+
+    return create(MetricSourcePolicySchema, {
+        primarySourceProfileId: BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID,
+        failureMode: StoredSourceFailureMode.SHOW_UNAVAILABLE,
+    });
+}
+
+function moveDenseMetricSlot(
+    widget: StoredDenseMultiMetricWidget,
+    slotId: string,
+    direction: "up" | "down",
+): void {
+    const slotIndex = widget.slots.findIndex((slot) => slot.slotId === slotId);
+    if (slotIndex < 0) {
+        return throwPatchTargetMismatch("Cannot move an unknown dense metric slot.");
+    }
+
+    const nextSlotIndex = direction === "up" ? slotIndex - 1 : slotIndex + 1;
+    if (nextSlotIndex < 0 || nextSlotIndex >= widget.slots.length) {
+        return;
+    }
+
+    const [slot] = widget.slots.splice(slotIndex, 1);
+    widget.slots.splice(nextSlotIndex, 0, slot);
+}
+
+function buildDenseMetricTarget(patch: DenseMetricTargetPatch): StoredMetricSelection["target"] {
+    switch (patch.domain) {
+        case "cpu":
+            return {
+                case: "cpu",
+                value: create(CpuMetricTargetSchema, {
+                    kind: storedCpuMetricKindByResolved[patch.kind],
+                }),
+            };
+        case "gpu":
+            return {
+                case: "gpu",
+                value: create(GpuMetricTargetSchema, {
+                    kind: storedGpuMetricKindByResolved[patch.kind],
+                }),
+            };
+        case "memory":
+            return {
+                case: "memory",
+                value: create(MemoryMetricTargetSchema, {
+                    kind: StoredMemoryMetricKind.USAGE,
+                }),
+            };
+        case "disk":
+            return {
+                case: "disk",
+                value: create(DiskMetricTargetSchema, {
+                    kind: storedDiskMetricKindByResolved[patch.kind],
+                    volumeId: patch.volumeId,
+                    throughputDirection: patch.kind === "throughput"
+                        ? storedDiskThroughputDirectionByResolved[patch.throughputDirection ?? "read"]
+                        : undefined,
+                }),
+            };
+        case "network":
+            return {
+                case: "network",
+                value: create(NetworkMetricTargetSchema, {
+                    kind: StoredNetworkMetricKind.TRAFFIC,
+                    traffic: create(NetworkMetricTarget_TrafficSchema, {
+                        direction: storedNetworkDirectionByResolved[patch.direction],
+                    }),
+                }),
+            };
+        case "catalog":
+            return {
+                case: "catalog",
+                value: create(CatalogMetricTargetSchema, {
+                    metricId: patch.metricId,
+                    detectedLabel: patch.detectedLabel,
+                    detectedUnit: patch.detectedUnit,
+                    detectedCategory: patch.detectedCategory === undefined
+                        ? undefined
+                        : storedCatalogMetricCategoryByResolved[patch.detectedCategory],
+                    detectedReadingKind: patch.detectedReadingKind === undefined
+                        ? undefined
+                        : storedCatalogMetricReadingKindByResolved[patch.detectedReadingKind],
+                }),
+            };
     }
 }
 

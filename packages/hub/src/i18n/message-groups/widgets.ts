@@ -270,3 +270,76 @@ export const catalogMessages = {
         ja: "別のメトリクスを選択すると、カスタムラベルとスケールはリセットされます。",
     },
 } as const satisfies LocalizedMessages;
+
+export const denseMessages = {
+    rowsSection: {
+        en: "Metrics",
+        zh_CN: "指标",
+        ja: "メトリクス",
+    },
+    rowMetricLabel: {
+        en: "Metric",
+        zh_CN: "指标",
+        ja: "メトリクス",
+    },
+    rowMetricSubtypeLabel: {
+        en: "Metric Detail",
+        zh_CN: "指标细项",
+        ja: "メトリクス詳細",
+    },
+    rowDirectionLabel: {
+        en: "Direction",
+        zh_CN: "方向",
+        ja: "方向",
+    },
+    rowLabelLabel: {
+        en: "Label",
+        zh_CN: "标签",
+        ja: "ラベル",
+    },
+    rowMaximumLabel: {
+        en: "Max",
+        zh_CN: "最大值",
+        ja: "最大値",
+    },
+    shortLabelNote: {
+        en: "Use short labels. The widget will fit text by pixels.",
+        zh_CN: "请使用短标签。组件会按像素自动适配文本。",
+        ja: "短いラベルを使用してください。ウィジェットはピクセル単位で文字を調整します。",
+    },
+    reorderLabel: {
+        en: "Reorder",
+        zh_CN: "重新排序",
+        ja: "並べ替え",
+    },
+    reorderMoveButtonsLabel: {
+        en: "Show move buttons",
+        zh_CN: "显示移动按钮",
+        ja: "移動ボタンを表示",
+    },
+    addMetricButton: {
+        en: "Add Metric",
+        zh_CN: "添加指标",
+        ja: "メトリクスを追加",
+    },
+    removeMetricButton: {
+        en: "Remove",
+        zh_CN: "移除",
+        ja: "削除",
+    },
+    moveUpButton: {
+        en: "Move Up",
+        zh_CN: "上移",
+        ja: "上へ移動",
+    },
+    moveDownButton: {
+        en: "Move Down",
+        zh_CN: "下移",
+        ja: "下へ移動",
+    },
+    catalogMetricChoice: {
+        en: "Advanced Sensor",
+        zh_CN: "高级传感器",
+        ja: "高度なセンサー",
+    },
+} as const satisfies LocalizedMessages;

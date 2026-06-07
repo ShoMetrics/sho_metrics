@@ -86,5 +86,17 @@ export const manifestMessages = {
                 ja: "LibreHardwareMonitor データなど、選択したメトリクスを 1 つ表示します。",
             },
         },
+        "com.ez.sho-metrics.dense-multi-metric": {
+            name: {
+                en: "Dense Multi Metric",
+                zh_CN: "密集多指标",
+                ja: "高密度マルチメトリクス",
+            },
+            tooltip: {
+                en: "Displays multiple metrics in one compact view.",
+                zh_CN: "在一个紧凑视图中显示多个指标。",
+                ja: "複数のメトリクスを 1 つのコンパクトな表示にまとめます。",
+            },
+        },
     },
 } as const satisfies ManifestMessagesCatalog;

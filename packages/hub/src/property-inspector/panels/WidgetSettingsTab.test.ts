@@ -1026,6 +1026,136 @@ test("catalog metric label and scale patches keep independent overrides", () => 
     assert.equal(Object.hasOwn(buildCatalogMetricScaleModePatch(target, "custom").catalog ?? {}, "customLabel"), false);
 });
 
+test("dense multi metric settings render rows and hide single metric view controls", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "denseMultiMetric",
+        settings: buildDenseWidgetSettings([
+            { slotId: "slot-1", slot: { metric: { cpu: {} } }, customLabel: "CPU" },
+            { slotId: "slot-2", slot: { metric: { gpu: {} } }, customLabel: "GPU" },
+        ]),
+    });
+
+    assert.match(markup, /Metric 1:/);
+    assert.match(markup, /Metric 2:/);
+    assert.match(markup, /CPU Metric:/);
+    assert.match(markup, /GPU Metric:/);
+    assert.match(markup, /value="CPU"/);
+    assert.match(markup, /value="GPU"/);
+    assert.match(markup, /Add Metric/);
+    assert.match(markup, /Reorder:/);
+    assert.match(markup, /Show move buttons/);
+    assert.match(markup, /Theme:/);
+    assert.match(markup, /Color Mode:/);
+    assert.match(markup, /Polling Frequency:/);
+    assert.doesNotMatch(markup, /Move Up/);
+    assert.doesNotMatch(markup, /Move Down/);
+    assert.doesNotMatch(markup, /View:/);
+    assert.doesNotMatch(markup, /Trend Line Smoothing/);
+});
+
+test("dense multi metric settings enforce row count controls", () => {
+    const minMarkup = renderWidgetSettings({
+        actionKind: "denseMultiMetric",
+        settings: buildDenseWidgetSettings([
+            { slotId: "slot-1", slot: { metric: { cpu: {} } } },
+            { slotId: "slot-2", slot: { metric: { gpu: {} } } },
+        ]),
+    });
+    const maxMarkup = renderWidgetSettings({
+        actionKind: "denseMultiMetric",
+        settings: buildDenseWidgetSettings([
+            { slotId: "slot-1", slot: { metric: { cpu: {} } } },
+            { slotId: "slot-2", slot: { metric: { gpu: {} } } },
+            { slotId: "slot-3", slot: { metric: { memory: {} } } },
+            { slotId: "slot-4", slot: { metric: { disk: {} } } },
+            { slotId: "slot-5", slot: { metric: { network: { traffic: { direction: "download" } } } } },
+            { slotId: "slot-6", slot: { metric: { network: { traffic: { direction: "upload" } } } } },
+        ]),
+    });
+
+    assert.match(minMarkup, /disabled=""[\s\S]*Remove/);
+    assert.match(maxMarkup, /disabled=""[\s\S]*Add Metric/);
+});
+
+test("dense multi metric disk usage row renders disk volume picker", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "denseMultiMetric",
+        settings: buildDenseWidgetSettings([
+            { slotId: "slot-1", slot: { metric: { disk: { volumeId: "E:\\" } } } },
+            { slotId: "slot-2", slot: { metric: { gpu: {} } } },
+        ]),
+        runtimeCache: {
+            availableDiskVolumes: [
+                {
+                    id: "E:\\",
+                    fs: "NTFS",
+                    mount: "E:\\",
+                    sizeBytes: 500 * 1024 * 1024 * 1024,
+                    usedBytes: 250 * 1024 * 1024 * 1024,
+                    availableBytes: 250 * 1024 * 1024 * 1024,
+                    storageKind: "ssd",
+                    diskName: "Game Disk",
+                    volumeLabel: "Games",
+                },
+            ],
+        },
+        runtimeCacheStatus: {
+            diskVolumeOptionsStatus: "ready",
+        },
+    });
+
+    assert.match(markup, /Metric Detail:/);
+    assert.match(markup, /Volume:/);
+    assert.match(markup, /E: \(500 GB, Games\)/);
+});
+
+test("dense multi metric catalog row renders descriptor label and readable maximum unit", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "denseMultiMetric",
+        settings: buildDenseWidgetSettings([
+            {
+                slotId: "slot-1",
+                slot: {
+                    metric: {
+                        catalog: {
+                            metricId: "lhm.sensor:/gpu/0/power/board",
+                            detectedLabel: "GPU Board Power",
+                            detectedUnit: MetricUnit.WATTS,
+                            detectedCategory: "gpu",
+                            detectedReadingKind: "power",
+                        },
+                    },
+                },
+                customMaximumValue: 450,
+            },
+            { slotId: "slot-2", slot: { metric: { memory: {} } } },
+        ]),
+        runtimeCache: {
+            availableCatalogMetricDescriptors: [
+                buildMetricDescriptor({
+                    metricId: "lhm.sensor:/gpu/0/power/board",
+                    sourceSensorId: "gpu-board-power",
+                    hardwareId: "gpu0",
+                    hardwareName: "NVIDIA GPU",
+                    hardwareType: "GpuNvidia",
+                    sensorName: "GPU Board Power",
+                    sourceSensorType: "Power",
+                    unit: MetricUnit.WATTS,
+                }),
+            ],
+            catalogMetricDescriptorLoadState: "ready",
+        },
+        runtimeCacheStatus: {
+            catalogMetricDescriptorStatus: "ready",
+        },
+    });
+
+    assert.match(markup, new RegExp(["Advanced", "Sensor"].join(" ")));
+    assert.match(markup, /placeholder="GPU Board Power"/);
+    assert.match(markup, /Max \(W\):/);
+    assert.match(markup, /value="450"/);
+});
+
 test("widget advanced controls render current metric source attribution", () => {
     const markup = renderWidgetSettings({
         actionKind: "cpu",
@@ -1383,4 +1513,12 @@ function buildWidgetSettings(
         resolveQuickStartStoredWidgetSettings(undefined, actionKind).rawSettings,
         patch,
     );
+}
+
+function buildDenseWidgetSettings(slots: readonly unknown[]): InspectorTestSettings {
+    return {
+        denseMultiMetric: {
+            slots,
+        },
+    };
 }
