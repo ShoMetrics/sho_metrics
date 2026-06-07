@@ -638,6 +638,91 @@ test("widget patch updates dense metric slot label and maximum by slot id", () =
     assert.equal(widget.value.slots[1]?.customMaximumValue, 90);
 });
 
+test("widget patch updates dense metric slot target by slot id", () => {
+    const nextSettings = writeStoredWidgetSettingsPatch({
+        denseMultiMetric: {
+            slots: [
+                { slotId: "slot-1", slot: { metric: { cpu: {} } } },
+                { slotId: "slot-2", slot: { metric: { gpu: {} } } },
+            ],
+        },
+    }, {
+        dense: {
+            updateSlot: {
+                slotId: "slot-2",
+                target: {
+                    domain: "network",
+                    kind: "traffic",
+                    direction: "download",
+                },
+                customLabel: undefined,
+                customMaximumValue: undefined,
+            },
+        },
+    });
+    const widget = readStoredWidgetSettings(nextSettings).settings.widget;
+
+    assert.equal(widget.case, "denseMultiMetric");
+    assert.equal(widget.value.slots[0]?.slot?.metric?.target.case, "cpu");
+    assert.equal(widget.value.slots[1]?.slot?.metric?.target.case, "network");
+    assert.equal(widget.value.slots[1]?.customLabel, undefined);
+    assert.equal(widget.value.slots[1]?.customMaximumValue, undefined);
+});
+
+test("widget patch writes dense disk usage volume by slot id", () => {
+    const nextSettings = writeStoredWidgetSettingsPatch({
+        denseMultiMetric: {
+            slots: [
+                { slotId: "slot-1", slot: { metric: { cpu: {} } } },
+                { slotId: "slot-2", slot: { metric: { gpu: {} } } },
+            ],
+        },
+    }, {
+        dense: {
+            updateSlot: {
+                slotId: "slot-2",
+                target: {
+                    domain: "disk",
+                    kind: "usage",
+                    volumeId: "E:\\",
+                },
+            },
+        },
+    });
+    const widget = readStoredWidgetSettings(nextSettings).settings.widget;
+
+    assert.equal(widget.case, "denseMultiMetric");
+    const target = widget.value.slots[1]?.slot?.metric?.target;
+    assert.equal(target?.case, "disk");
+    if (target?.case === "disk") {
+        assert.equal(target.value.kind, StoredDiskMetricKind.USAGE);
+        assert.equal(target.value.volumeId, "E:\\");
+    }
+});
+
+test("widget patch moves dense metric slots by stable slot id", () => {
+    const nextSettings = writeStoredWidgetSettingsPatch({
+        denseMultiMetric: {
+            slots: [
+                { slotId: "slot-1", slot: { metric: { cpu: {} } } },
+                { slotId: "slot-2", slot: { metric: { gpu: {} } } },
+                { slotId: "slot-3", slot: { metric: { memory: {} } } },
+            ],
+        },
+    }, {
+        dense: {
+            moveSlot: {
+                slotId: "slot-3",
+                direction: "up",
+            },
+        },
+    });
+    const widget = readStoredWidgetSettings(nextSettings).settings.widget;
+
+    assert.equal(widget.case, "denseMultiMetric");
+    assert.deepEqual(widget.value.slots.map((slot) => slot.slotId), ["slot-1", "slot-3", "slot-2"]);
+});
+
 test("widget patch rejects removing dense metric slots below the minimum", () => {
     assert.throws(() => writeStoredWidgetSettingsPatch({
         denseMultiMetric: {

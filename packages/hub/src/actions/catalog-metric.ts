@@ -11,9 +11,10 @@ import {
     resolveHelperRequiredInstallNoticeText,
 } from "./shared/helper-backed-widget-data";
 import { logger } from "../logging/logger";
-import { backgroundMetricCollection } from "../runtime/metric-collection/background-metric-collection";
 import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
 import type { MetricDescriptorSnapshot, SourceClientStatus } from "../runtime/sources/source-client";
+import { backgroundMetricCollection } from "../runtime/metric-collection/background-metric-collection";
+import { refreshCatalogMetricDescriptorRuntimeCache } from "./shared/catalog-metric-descriptor-runtime-cache";
 import {
     requireResolvedSingleMetricWidget,
     type ResolvedCatalogMetricTarget,
@@ -26,7 +27,6 @@ import { resolveCatalogMetricDefaultMaximumValue } from "../metrics/catalog-metr
 import { formatCatalogMetricFreshWidgetData } from "../metrics/catalog-metric-widget-data";
 
 const log = logger.for("Action:CatalogMetric");
-const CATALOG_DESCRIPTOR_LOAD_WARNING_INTERVAL_MILLISECONDS = 30_000;
 const CATALOG_NO_SELECTION_DEBUG_INTERVAL_MILLISECONDS = 5_000;
 const CATALOG_NO_SELECTION_RENDER_KEY = "catalog.unselected";
 const CATALOG_NO_SELECTION_LABEL = "METRIC";
@@ -67,18 +67,6 @@ export class CatalogMetric extends MetricAction {
     }
 
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
-        if (this.currentPlatform() !== "win32") {
-            // Catalog metrics are currently backed only by the Windows helper.
-            // Non-Windows profiles can still contain this action after sync or
-            // import, so keep the PI responsive without probing a source that
-            // cannot exist on this platform.
-            void this.updateRuntimeCache(event, {
-                availableCatalogMetricDescriptors: [],
-                catalogMetricDescriptorLoadState: "failed",
-            });
-            return;
-        }
-
         this.refreshCatalogMetricDescriptorsForPropertyInspector(event)
             .catch(error => {
                 log.warn(() => `Failed to refresh catalog metric runtime cache: ${String(error)}`);
@@ -93,39 +81,13 @@ export class CatalogMetric extends MetricAction {
                 this.refreshActiveMetricView(event);
             }
         };
-
-        const pendingSourceStatus = this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID);
-        await this.updateRuntimeCache(event, {
-            catalogMetricDescriptorLoadState: "pending",
-            ...(pendingSourceStatus ? { catalogMetricDescriptorSourceStatus: pendingSourceStatus } : {}),
+        await refreshCatalogMetricDescriptorRuntimeCache({
+            platform: this.currentPlatform(),
+            readCachedSourceStatus: sourceId => this.readCachedSourceStatus(sourceId),
+            updateRuntimeCache: patch => this.updateRuntimeCache(event, patch),
+            readMetricDescriptorSnapshot: () => this.readCatalogMetricDescriptorSnapshot(),
         });
-
-        try {
-            const descriptorSnapshot = await this.readCatalogMetricDescriptorSnapshot();
-            const sourceStatus = this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID);
-
-            await this.updateRuntimeCache(event, {
-                availableCatalogMetricDescriptors: descriptorSnapshot.descriptors,
-                catalogMetricDescriptorLoadState: "ready",
-                ...(sourceStatus ? { catalogMetricDescriptorSourceStatus: sourceStatus } : {}),
-            });
-            refreshNoSelectionKey();
-        } catch (error) {
-            log.atWarn()
-                .everyMs(
-                    "catalog-metric-descriptors-load-failed",
-                    CATALOG_DESCRIPTOR_LOAD_WARNING_INTERVAL_MILLISECONDS,
-                )
-                .log(() => `Failed to load catalog metric descriptors. error=${String(error)}`);
-            const sourceStatus = this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID);
-
-            await this.updateRuntimeCache(event, {
-                availableCatalogMetricDescriptors: [],
-                catalogMetricDescriptorLoadState: "failed",
-                ...(sourceStatus ? { catalogMetricDescriptorSourceStatus: sourceStatus } : {}),
-            });
-            refreshNoSelectionKey();
-        }
+        refreshNoSelectionKey();
     }
 
     protected readCatalogMetricDescriptorSnapshot(): Promise<MetricDescriptorSnapshot> {

@@ -59,6 +59,8 @@ export interface StyledSvgTextOptions {
     textStyle: RenderTextStyle;
     textAnchor?: SvgTextAnchor;
     dominantBaseline?: "middle" | "auto";
+    /** Overrides the style baseline shift for tightly controlled primitive text. */
+    baselineShiftEm?: number;
     outline?: RenderOutlineTokens;
     extraAttributes?: readonly string[];
     fitOptions?: SvgTextFitOptions;
@@ -91,7 +93,7 @@ const SHAPE_OUTLINE_EXTRA_WIDTH_SCALE_RATIO = 0.52;
 
 export function renderStyledSvgText(options: StyledSvgTextOptions): string {
     const fontSize = resolveRenderTextStyleFontSize(options.baseFontSize, options.textStyle);
-    const yCoordinate = options.yCoordinate + fontSize * options.textStyle.baselineShiftEm;
+    const yCoordinate = options.yCoordinate + fontSize * (options.baselineShiftEm ?? options.textStyle.baselineShiftEm);
 
     return renderConstrainedSvgText({
         id: options.id,

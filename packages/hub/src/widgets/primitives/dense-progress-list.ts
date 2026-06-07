@@ -4,6 +4,7 @@ import { resolveColorForThresholdValue } from "../../view-rendering/color-resolv
 import type { RenderOutlineTokens } from "../../view-rendering/render-appearance";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
+    resolveRenderTextStyleFontSize,
     type RenderTextStyles,
 } from "../../view-rendering/render-text-style";
 import {
@@ -71,6 +72,9 @@ interface DenseProgressListBar {
     readonly radius: number;
 }
 
+const BAR_TEXT_BASELINE_SHIFT_EM = 0.08;
+const BAR_TEXT_MINIMUM_BASELINE_SHIFT_PX = 1;
+
 // Production dense rendering overrides these theme-owned tokens; the defaults keep the primitive standalone-testable.
 export const DEFAULT_DENSE_PROGRESS_LIST_CONFIG: DenseProgressListConfig = {
     colorConfig: {
@@ -129,7 +133,7 @@ function buildDenseProgressListLayout(rowCount: number, keySize: KeySize): Dense
     const valueUnitGap = compactColumn ? 2 : 3;
     const valuePaddingX = compactColumn ? 3 : 5;
     const barHeight = clamp(Math.round(rowHeight * (isWide ? 0.62 : 0.66)), 8, 30);
-    const fontSize = clamp(Math.round(rowHeight * (isWide ? 0.36 : 0.34)), 9, 18);
+    const fontSize = clamp(Math.round(rowHeight * (isWide ? 0.42 : 0.36)), 10, 18);
     const valueFontSize = clamp(Math.round(rowHeight * (isWide ? 0.50 : 0.52)), 12, 24);
 
     return {
@@ -184,7 +188,7 @@ function renderDenseProgressListRow(options: {
         - options.layout.unitWidth
         - options.layout.valueUnitGap
         - options.layout.valuePaddingX;
-    const valueBoxWidth = Math.max(1, options.layout.valueWidth - options.layout.unitWidth);
+    const valueBoxWidth = Math.max(1, valueBoxRightCoordinate - bar.xCoordinate);
     const unitXCoordinate = bar.xCoordinate + bar.width - options.layout.unitWidth - options.layout.valuePaddingX;
     const fillWidth = Math.max(0, bar.width * clamp(options.row.widgetData.progress, 0, 1));
     const barColor = resolveColorForThresholdValue(
@@ -192,6 +196,11 @@ function renderDenseProgressListRow(options: {
         options.config.colorConfig,
     );
     const barCenterY = bar.yCoordinate + bar.height / 2;
+    const valueTextFontSize = resolveRenderTextStyleFontSize(
+        options.layout.valueFontSize,
+        options.config.textStyles.value,
+    );
+    const barTextYCoordinate = resolveDenseBarTextYCoordinate(barCenterY, valueTextFontSize);
     const valueTextColor = fillWidth >= valueBoxRightCoordinate - bar.xCoordinate
         ? resolveReadableTextColor(barColor)
         : options.config.paints.valueText;
@@ -229,11 +238,12 @@ function renderDenseProgressListRow(options: {
                 id: `dense-progress-list-value-${options.rowIndex}`,
                 text: valueText,
                 xCoordinate: valueBoxRightCoordinate,
-                yCoordinate: barCenterY,
+                yCoordinate: barTextYCoordinate,
                 maxWidth: valueBoxWidth,
                 baseFontSize: options.layout.valueFontSize,
                 textStyle: options.config.textStyles.value,
                 textAnchor: "end",
+                baselineShiftEm: 0,
                 fill: valueTextColor,
                 outline: options.config.textOutline,
                 extraAttributes: [
@@ -249,11 +259,12 @@ function renderDenseProgressListRow(options: {
                 id: `dense-progress-list-unit-${options.rowIndex}`,
                 text: unitText,
                 xCoordinate: unitXCoordinate,
-                yCoordinate: barCenterY,
+                yCoordinate: barTextYCoordinate,
                 maxWidth: options.layout.unitWidth,
                 baseFontSize: options.layout.unitFontSize,
                 textStyle: options.config.textStyles.unit,
                 textAnchor: "start",
+                baselineShiftEm: 0,
                 fill: unitTextColor,
                 outline: options.config.textOutline,
                 extraAttributes: buildSvgFilterAttributes(options.config.textStyles.unit.filter),
@@ -264,6 +275,15 @@ function renderDenseProgressListRow(options: {
             })}
         </g>
     `;
+}
+
+function resolveDenseBarTextYCoordinate(centerYCoordinate: number, valueFontSize: number): number {
+    // The global SVG text baseline presets are tuned for larger metric text.
+    // Bar-internal text is much smaller, so use a local visual-center offset
+    // that stays visible even after the font size is clamped down. Value and
+    // unit share this coordinate so their baselines do not drift apart.
+    return centerYCoordinate
+        + Math.max(BAR_TEXT_MINIMUM_BASELINE_SHIFT_PX, valueFontSize * BAR_TEXT_BASELINE_SHIFT_EM);
 }
 
 function resolveDenseProgressListBar(options: {

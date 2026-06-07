@@ -10,6 +10,7 @@ import { ColorCompensationControls } from "./ColorCompensationControls";
 import { CpuWidgetSettings } from "./CpuWidgetSettings";
 import { CatalogMetricWidgetSettings } from "./CatalogMetricWidgetSettings";
 import { DefaultWidgetSettings } from "./DefaultWidgetSettings";
+import { DenseMultiMetricWidgetSettings } from "./DenseMultiMetricWidgetSettings";
 import { DiskWidgetSettings } from "./DiskWidgetSettings";
 import { GpuWidgetSettings } from "./GpuWidgetSettings";
 import { MetricSourceDiagnostic } from "./MetricSourceDiagnostic";
@@ -125,6 +126,12 @@ function renderMetricPanel(
     },
 ): React.JSX.Element {
     const actionKind = panelProps.context.actionKind;
+    if (panelProps.context.resolved.widget.widgetKind === "denseMultiMetric") {
+        return actionKind === "denseMultiMetric"
+            ? <DenseMultiMetricWidgetSettings {...panelProps} widget={panelProps.context.resolved.widget} />
+            : <DomainMismatchNotice />;
+    }
+
     if (panelProps.context.resolved.widget.widgetKind !== "singleMetric") {
         return <DomainMismatchNotice />;
     }

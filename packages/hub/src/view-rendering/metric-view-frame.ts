@@ -340,6 +340,8 @@ export function resolveTouchStripMetricLayout(options: {
     dualRenderPrimitive?: DualMetricRenderOptions["dualRenderPrimitive"];
 }): TouchStripMetricLayout {
     if (options.metricRenderKind === "denseMetric") {
+        // Dense owns its row layout inside the body renderer, including the
+        // two-column touch-strip case. The frame only needs the full wide body.
         return TOUCH_STRIP_METRIC_LAYOUTS.wide;
     }
 

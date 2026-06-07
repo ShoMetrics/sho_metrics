@@ -9,6 +9,10 @@
 		"Name": "CPU",
 		"Tooltip": "显示 CPU 指标。"
 	},
+	"com.ez.sho-metrics.dense-multi-metric": {
+		"Name": "密集多指标",
+		"Tooltip": "在一个紧凑视图中显示多个指标。"
+	},
 	"com.ez.sho-metrics.disk": {
 		"Name": "磁盘",
 		"Tooltip": "显示磁盘指标。"
