@@ -24,6 +24,8 @@ The baseline suite is grouped by rendering surface:
   generated from the first visual snapshot renderer baseline.
 - `widget-dual-baseline.visual.spec.ts`: dual-channel widget coverage generated
   from the first visual snapshot renderer baseline.
+- `widget-dense-multi-metric.visual.spec.ts`: dense multi-metric square,
+  touch-strip, and Pixel Window coverage.
 - `widget-default-theme.visual.spec.ts`: representative default-theme coverage
   added after the baseline suite.
 - `widget-terminal.visual.spec.ts`: Terminal theme coverage.
