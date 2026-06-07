@@ -10,6 +10,7 @@ import {
 import type { NetworkInterfaceOption } from "../../runtime/network-interfaces";
 import { LOCAL_SOURCE_SCOPE_ID } from "../../runtime/source-routing/metric-read-plan";
 import { buildMetricSnapshot, buildScalarMetricValue, MetricUnit } from "../../runtime/sources/metric-source";
+import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
 import { resolveInitialActionSettings } from "../settings/action-settings-resolver";
@@ -28,7 +29,7 @@ test("network automatic interface reads aggregate keys after registry selection"
         },
     );
     const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
-    const target = settings.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
 
     assert.equal(target.domain, "network");
     if (target.domain !== "network") {
@@ -77,7 +78,7 @@ test("network explicit interface reads interface keys without registry selection
         },
     );
     const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
-    const target = settings.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
 
     assert.equal(target.domain, "network");
     if (target.domain !== "network") {
@@ -125,7 +126,7 @@ test("network view treats expired throughput samples as no data", () => {
         },
     );
     const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
-    const target = settings.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
 
     assert.equal(target.domain, "network");
     if (target.domain !== "network") {
@@ -175,7 +176,7 @@ test("network overlay line keeps upload as the first channel", () => {
         },
     );
     const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
-    const target = settings.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
 
     assert.equal(target.domain, "network");
     if (target.domain !== "network") {
@@ -219,7 +220,7 @@ test("network bar keeps upload as the first channel", () => {
         },
     );
     const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
-    const target = settings.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
 
     assert.equal(target.domain, "network");
     if (target.domain !== "network") {
@@ -258,7 +259,7 @@ test("network bar single direction renders one direction icon value row", () => 
         },
     );
     const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
-    const target = settings.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
 
     assert.equal(target.domain, "network");
     if (target.domain !== "network") {
@@ -296,7 +297,7 @@ test("network ping view reads a single ping metric key", () => {
         },
     );
     const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
-    const target = settings.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
 
     assert.equal(target.domain, "network");
     if (target.domain !== "network") {
@@ -346,7 +347,7 @@ test("network ping view treats expired latency samples as no data", () => {
         },
     );
     const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
-    const target = settings.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
 
     assert.equal(target.domain, "network");
     if (target.domain !== "network") {
@@ -396,7 +397,7 @@ test("network ping bar view shows target host as secondary text", () => {
         },
     );
     const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
-    const target = settings.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
 
     assert.equal(target.domain, "network");
     if (target.domain !== "network") {
@@ -444,4 +445,5 @@ function buildNetworkMetricStore(): MetricStore {
     }));
     return metricStore;
 }
+
 

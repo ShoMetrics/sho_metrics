@@ -14,7 +14,11 @@ import { logger } from "../logging/logger";
 import { backgroundMetricCollection } from "../runtime/metric-collection/background-metric-collection";
 import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
 import type { MetricDescriptorSnapshot, SourceClientStatus } from "../runtime/sources/source-client";
-import type { ResolvedCatalogMetricTarget, ResolvedWidgetSettings } from "../settings/resolved-settings";
+import {
+    requireResolvedSingleMetricWidget,
+    type ResolvedCatalogMetricTarget,
+    type ResolvedWidgetSettings,
+} from "../settings/resolved-settings";
 import type { WidgetData } from "../view-rendering/widget-data";
 import type { SingleMetricViewOptions } from "../view-updates/runner";
 import { formatMetricUnit } from "../metrics/metric-unit-format";
@@ -147,11 +151,12 @@ export function buildCatalogMetricNoSelectionViewOptions(options: {
     readonly helperStatus: SourceClientStatus | undefined;
     readonly platform?: NodeJS.Platform;
 }): SingleMetricViewOptions {
+    const widget = requireResolvedSingleMetricWidget(options.settings);
     const noticeText = resolveNoSelectionNoticeText(options.helperStatus, options.platform ?? process.platform);
 
     return {
         event: options.event,
-        resolvedSettings: options.settings.widget.slot.appearance,
+        resolvedSettings: widget.slot.appearance,
         metricKey: CATALOG_NO_SELECTION_RENDER_KEY,
         widgetData: buildNoSelectionWidgetData(),
         ...(noticeText === undefined ? {} : { noticeText }),
@@ -172,6 +177,7 @@ export function buildCatalogMetricSelectedViewOptions(options: {
     readonly metrics: MetricStoreReader;
     readonly helperStatus: SourceClientStatus | undefined;
 }): SingleMetricViewOptions {
+    const widget = requireResolvedSingleMetricWidget(options.settings);
     // Rendering must be self-contained after selection. The descriptor catalog
     // may be unavailable later, so use stored detected hints plus user overrides.
     const unit = formatMetricUnit(options.target.detectedUnit);
@@ -207,7 +213,7 @@ export function buildCatalogMetricSelectedViewOptions(options: {
 
     return {
         event: options.event,
-        resolvedSettings: options.settings.widget.slot.appearance,
+        resolvedSettings: widget.slot.appearance,
         metricKey: options.target.metricId,
         widgetData,
         ...(noticeText === undefined ? {} : { noticeText }),

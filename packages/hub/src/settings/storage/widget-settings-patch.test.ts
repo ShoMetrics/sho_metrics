@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import test from "node:test";
 import {
     CatalogMetricCategory as StoredCatalogMetricCategory,
@@ -16,6 +16,7 @@ import {
     TerminalThemeVariant as StoredTerminalThemeVariant,
     TemperatureUnit as StoredTemperatureUnit,
     TextViewVariant as StoredTextViewVariant,
+    type MetricSlot as StoredMetricSlot,
 } from "../../generated/shometrics/v1/settings_pb";
 import { MetricUnit } from "../../runtime/sources/metric-source";
 import { readStoredWidgetSettings } from "./codec";
@@ -78,7 +79,7 @@ test("widget patch updates catalog metric target", () => {
         },
     });
 
-    const target = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.metric?.target;
+    const target = readSingleMetricSlot(nextSettings)?.metric?.target;
     assert.equal(target?.case, "catalog");
     if (target?.case === "catalog") {
         assert.equal(target.value.metricId, "source.sensor:/gpu/temperature");
@@ -118,7 +119,7 @@ test("widget patch can clear catalog display hints and overrides", () => {
         },
     });
 
-    const target = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.metric?.target;
+    const target = readSingleMetricSlot(nextSettings)?.metric?.target;
     assert.equal(target?.case, "catalog");
     if (target?.case === "catalog") {
         assert.equal(target.value.metricId, "source.sensor:/gpu/temperature");
@@ -140,7 +141,7 @@ test("widget patch updates GPU reading within the GPU action domain", () => {
         },
     });
 
-    const target = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.metric?.target;
+    const target = readSingleMetricSlot(nextSettings)?.metric?.target;
     assert.equal(target?.case, "gpu");
     if (target?.case === "gpu") {
         assert.equal(target.value.kind, StoredGpuMetricKind.POWER);
@@ -162,7 +163,7 @@ test("widget patch writes black-white color mode", () => {
         },
     });
 
-    const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
+    const appearance = readSingleMetricSlot(nextSettings)?.overrides?.appearance;
     assert.equal(appearance?.theme?.flat?.paint?.colorMode, StoredColorMode.BLACK_WHITE);
 });
 
@@ -176,7 +177,7 @@ test("widget patch switches network traffic to ping and writes target host", () 
         },
     });
 
-    const target = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.metric?.target;
+    const target = readSingleMetricSlot(nextSettings)?.metric?.target;
     assert.equal(target?.case, "network");
     if (target?.case === "network") {
         assert.equal(target.value.kind, StoredNetworkMetricKind.PING);
@@ -204,7 +205,7 @@ test("widget patch switches network ping to traffic and writes traffic settings"
         },
     });
 
-    const target = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.metric?.target;
+    const target = readSingleMetricSlot(nextSettings)?.metric?.target;
     assert.equal(target?.case, "network");
     if (target?.case === "network") {
         assert.equal(target.value.kind, StoredNetworkMetricKind.TRAFFIC);
@@ -229,8 +230,8 @@ test("widget patch keeps network display overrides traffic-only", () => {
         },
     });
 
-    const pingOverrides = readStoredWidgetSettings(pingSettings).settings.widget.value?.slot?.overrides;
-    const trafficOverrides = readStoredWidgetSettings(trafficSettings).settings.widget.value?.slot?.overrides;
+    const pingOverrides = readSingleMetricSlot(pingSettings)?.overrides;
+    const trafficOverrides = readSingleMetricSlot(trafficSettings)?.overrides;
 
     assert.equal(pingOverrides?.network, undefined);
     assert.equal(trafficOverrides?.network?.unitBase, StoredNetworkUnitBase.BIT);
@@ -253,14 +254,13 @@ test("widget patch does not write traffic display overrides while stored network
         },
     });
 
-    const storedSettings = readStoredWidgetSettings(nextSettings).settings;
-    const target = storedSettings.widget.value?.slot?.metric?.target;
+    const target = readSingleMetricSlot(nextSettings)?.metric?.target;
     assert.equal(target?.case, "network");
     if (target?.case === "network") {
         assert.equal(target.value.kind, StoredNetworkMetricKind.PING);
         assert.equal(target.value.ping?.targetHost, "example.com");
     }
-    assert.equal(storedSettings.widget.value?.slot?.overrides?.network, undefined);
+    assert.equal(readSingleMetricSlot(nextSettings)?.overrides?.network, undefined);
 });
 
 test("widget patch updates CPU reading within the CPU action domain", () => {
@@ -274,7 +274,7 @@ test("widget patch updates CPU reading within the CPU action domain", () => {
         },
     });
 
-    const target = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.metric?.target;
+    const target = readSingleMetricSlot(nextSettings)?.metric?.target;
     assert.equal(target?.case, "cpu");
     if (target?.case === "cpu") {
         assert.equal(target.value.kind, StoredCpuMetricKind.TEMPERATURE);
@@ -321,7 +321,7 @@ test("widget patch preserves disk volume id when switching to throughput", () =>
         },
     });
 
-    const target = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.metric?.target;
+    const target = readSingleMetricSlot(nextSettings)?.metric?.target;
     assert.equal(target?.case, "disk");
     if (target?.case === "disk") {
         assert.equal(target.value.kind, StoredDiskMetricKind.THROUGHPUT);
@@ -339,7 +339,7 @@ test("widget patch writes optional CPU power maximum", () => {
         },
     });
 
-    const target = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.metric?.target;
+    const target = readSingleMetricSlot(nextSettings)?.metric?.target;
     assert.equal(target?.case, "cpu");
     if (target?.case === "cpu") {
         assert.equal(target.value.kind, StoredCpuMetricKind.POWER);
@@ -358,7 +358,7 @@ test("widget patch replaces metric source policy with helper preference and fall
         },
     });
 
-    const sourcePolicy = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.metric?.sourcePolicy;
+    const sourcePolicy = readSingleMetricSlot(nextSettings)?.metric?.sourcePolicy;
     assert.equal(sourcePolicy?.primarySourceProfileId, BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID);
     assert.deepEqual(sourcePolicy?.fallbackSourceProfileIds, [BUILT_IN_NODE_SYSTEM_SOURCE_PROFILE_ID]);
     assert.equal(sourcePolicy?.failureMode, StoredSourceFailureMode.USE_FALLBACK);
@@ -375,7 +375,7 @@ test("widget patch replaces metric source policy with node preference and fallba
         },
     });
 
-    const sourcePolicy = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.metric?.sourcePolicy;
+    const sourcePolicy = readSingleMetricSlot(nextSettings)?.metric?.sourcePolicy;
     assert.equal(sourcePolicy?.primarySourceProfileId, BUILT_IN_NODE_SYSTEM_SOURCE_PROFILE_ID);
     assert.deepEqual(sourcePolicy?.fallbackSourceProfileIds, [BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID]);
     assert.equal(sourcePolicy?.failureMode, StoredSourceFailureMode.USE_FALLBACK);
@@ -401,7 +401,7 @@ test("widget patch clears source policy fallback state when returning to auto", 
         },
     });
 
-    const sourcePolicy = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.metric?.sourcePolicy;
+    const sourcePolicy = readSingleMetricSlot(nextSettings)?.metric?.sourcePolicy;
     assert.equal(sourcePolicy?.primarySourceProfileId, undefined);
     assert.deepEqual(sourcePolicy?.fallbackSourceProfileIds, []);
     assert.equal(sourcePolicy?.failureMode, StoredSourceFailureMode.SHOW_UNAVAILABLE);
@@ -418,7 +418,7 @@ test("widget patch writes terminal theme", () => {
         },
     });
 
-    const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
+    const appearance = readSingleMetricSlot(nextSettings)?.overrides?.appearance;
     assert.equal(appearance?.theme?.selectedTheme, StoredMetricTheme.TERMINAL);
 });
 
@@ -433,7 +433,7 @@ test("widget patch writes pixel window theme", () => {
         },
     });
 
-    const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
+    const appearance = readSingleMetricSlot(nextSettings)?.overrides?.appearance;
     assert.equal(appearance?.theme?.selectedTheme, StoredMetricTheme.PIXEL_WINDOW);
 });
 
@@ -449,7 +449,7 @@ test("widget patch writes text view variant", () => {
         },
     });
 
-    const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
+    const appearance = readSingleMetricSlot(nextSettings)?.overrides?.appearance;
     assert.equal(appearance?.view?.textVariant, StoredTextViewVariant.TITLE_CARD);
 });
 
@@ -467,7 +467,7 @@ test("widget patch writes terminal variant", () => {
         },
     });
 
-    const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
+    const appearance = readSingleMetricSlot(nextSettings)?.overrides?.appearance;
     assert.equal(appearance?.theme?.terminal?.variant, StoredTerminalThemeVariant.VINTAGE);
 });
 
@@ -487,7 +487,7 @@ test("widget patch writes terminal palette", () => {
         },
     });
 
-    const appearance = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance;
+    const appearance = readSingleMetricSlot(nextSettings)?.overrides?.appearance;
     assert.equal(appearance?.theme?.terminal?.paint?.preset, StoredTerminalPalettePreset.AMBER);
 });
 
@@ -541,7 +541,7 @@ test("widget patch writes transparent surface settings for every theme", () => {
         },
     });
 
-    const theme = readStoredWidgetSettings(nextSettings).settings.widget.value?.slot?.overrides?.appearance?.theme;
+    const theme = readSingleMetricSlot(nextSettings)?.overrides?.appearance?.theme;
 
     assert.equal(theme?.flat?.transparentSurface?.enabled, true);
     assert.equal(theme?.flat?.transparentSurface?.backgroundOpacityPercent, 10);
@@ -564,3 +564,101 @@ test("widget patch writes transparent surface settings for every theme", () => {
     assert.equal(theme?.pixelWindow?.transparentSurface?.textOutlinePercent, 55);
     assert.equal(theme?.pixelWindow?.transparentSurface?.shapeOutlinePercent, 65);
 });
+
+test("widget patch adds dense metric slots with storage-owned ids", () => {
+    const nextSettings = writeStoredWidgetSettingsPatch({
+        denseMultiMetric: {
+            slots: [
+                { slotId: "slot-1", slot: { metric: { cpu: {} } } },
+                { slotId: "slot-2", slot: { metric: { gpu: {} } } },
+            ],
+        },
+    }, {
+        dense: {
+            addSlot: {
+                customLabel: "RAM",
+                customMaximumValue: 100,
+            },
+        },
+    }, {
+        createSlotId: () => "slot-3",
+    });
+    const widget = readStoredWidgetSettings(nextSettings).settings.widget;
+
+    assert.equal(widget.case, "denseMultiMetric");
+    assert.equal(widget.value.slots.length, 3);
+    assert.equal(widget.value.slots[2]?.slotId, "slot-3");
+    assert.equal(widget.value.slots[2]?.customLabel, "RAM");
+    assert.equal(widget.value.slots[2]?.customMaximumValue, 100);
+});
+
+test("widget patch generates a unique dense metric slot id after a collision", () => {
+    const generatedSlotIds = ["slot-1", "slot-2", "slot-3"];
+    const nextSettings = writeStoredWidgetSettingsPatch({
+        denseMultiMetric: {
+            slots: [
+                { slotId: "slot-1", slot: { metric: { cpu: {} } } },
+                { slotId: "slot-2", slot: { metric: { gpu: {} } } },
+            ],
+        },
+    }, {
+        dense: {
+            addSlot: {},
+        },
+    }, {
+        createSlotId: () => generatedSlotIds.shift() ?? "unexpected-slot",
+    });
+    const widget = readStoredWidgetSettings(nextSettings).settings.widget;
+
+    assert.equal(widget.case, "denseMultiMetric");
+    assert.equal(widget.value.slots[2]?.slotId, "slot-3");
+});
+
+test("widget patch updates dense metric slot label and maximum by slot id", () => {
+    const nextSettings = writeStoredWidgetSettingsPatch({
+        denseMultiMetric: {
+            slots: [
+                { slotId: "slot-1", slot: { metric: { cpu: {} } } },
+                { slotId: "slot-2", slot: { metric: { gpu: {} } } },
+            ],
+        },
+    }, {
+        dense: {
+            updateSlot: {
+                slotId: "slot-2",
+                customLabel: "GPU",
+                customMaximumValue: 90,
+            },
+        },
+    });
+    const widget = readStoredWidgetSettings(nextSettings).settings.widget;
+
+    assert.equal(widget.case, "denseMultiMetric");
+    assert.equal(widget.value.slots[1]?.customLabel, "GPU");
+    assert.equal(widget.value.slots[1]?.customMaximumValue, 90);
+});
+
+test("widget patch rejects removing dense metric slots below the minimum", () => {
+    assert.throws(() => writeStoredWidgetSettingsPatch({
+        denseMultiMetric: {
+            slots: [
+                { slotId: "slot-1", slot: { metric: { cpu: {} } } },
+                { slotId: "slot-2", slot: { metric: { gpu: {} } } },
+            ],
+        },
+    }, {
+        dense: {
+            removeSlotId: "slot-2",
+        },
+    }), /minimum of 2/);
+});
+
+function readSingleMetricSlot(rawSettings: unknown): StoredMetricSlot | undefined {
+    const widget = readStoredWidgetSettings(rawSettings).settings.widget;
+    if (widget.case !== "singleMetric") {
+        assert.fail(`Expected singleMetric widget, received ${String(widget.case)}`);
+    }
+
+    return widget.value.slot;
+}
+

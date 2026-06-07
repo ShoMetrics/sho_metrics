@@ -35,6 +35,8 @@ import {
     type CpuMetricTarget as StoredCpuMetricTarget,
     type DiskMetricTarget as StoredDiskMetricTarget,
     type DiskThroughputDisplaySettings as StoredDiskThroughputDisplaySettings,
+    type DenseMetricSlot as StoredDenseMetricSlot,
+    type DenseMultiMetricWidget as StoredDenseMultiMetricWidget,
     type FlatThemeSettings as StoredFlatThemeSettings,
     type GlobalMetricPaintSettings as StoredGlobalMetricPaintSettings,
     type GlobalMultiColorPaintSettings as StoredGlobalMultiColorPaintSettings,
@@ -80,6 +82,7 @@ import type {
     TextViewVariant,
     ResolvedAppearanceSettings,
     ResolvedCatalogMetricTarget,
+    ResolvedDenseMetricSlot,
     ResolvedAppearanceThemeSettings,
     ResolvedAppearanceViewSettings,
     ResolvedColorFilledThemeSettings,
@@ -87,6 +90,7 @@ import type {
     ResolvedColorFilledPaintSettings,
     ResolvedColorFilledSolidPaintSettings,
     ResolvedDiskReading,
+    ResolvedDenseMultiMetricWidget,
     ResolvedDiskThroughputDisplaySettings,
     ResolvedGlobalDefaults,
     ResolvedGlobalSettings,
@@ -135,13 +139,19 @@ import {
     DEFAULT_NETWORK_PING_TARGET_HOST,
     normalizeNetworkPingTargetInput,
 } from "../network-ping-target";
+import {
+    DENSE_MULTI_METRIC_MAX_SLOT_COUNT,
+    DENSE_MULTI_METRIC_MIN_SLOT_COUNT,
+} from "./dense-multi-metric-constraints";
 
+/** Inputs used to resolve stored widget settings into app-owned settings. */
 export interface ResolveStoredWidgetSettingsOptions {
     readonly storedWidgetSettings: StoredWidgetSettings;
     readonly storedGlobalSettings?: StoredGlobalSettings | undefined;
     readonly runtime?: ResolveStoredSettingsRuntimeContext | undefined;
 }
 
+/** Runtime facts that can affect resolved defaults without being persisted. */
 export interface ResolveStoredSettingsRuntimeContext {
     readonly isWindows?: boolean;
     readonly runtimeMaximumDownloadSpeedMegabitsPerSecond?: number | undefined;
@@ -196,7 +206,6 @@ const DEFAULT_CPU_POWER_WATTS = 150;
 const DEFAULT_GPU_TEMPERATURE_CELSIUS = 100;
 const DEFAULT_GPU_POWER_WATTS = 300;
 const DEFAULT_DISK_USAGE_POLLING_FREQUENCY_SECONDS = 60;
-
 const sourceFailureModeByProto = {
     [StoredSourceFailureMode.UNSPECIFIED]: undefined,
     [StoredSourceFailureMode.SHOW_UNAVAILABLE]: "showUnavailable",
@@ -361,25 +370,42 @@ function resolveStoredEnum<StoredValue extends number, ResolvedValue>(
     return resolvedValue;
 }
 
+/** Resolves stored widget settings into the complete app-owned widget contract. */
 export function resolveStoredWidgetSettings(
     options: ResolveStoredWidgetSettingsOptions,
 ): ResolvedWidgetSettings {
     const globalSettings = resolveStoredGlobalSettings(options.storedGlobalSettings);
-    const slot = resolveMetricSlot(
-        resolveStoredSingleMetricSlot(options.storedWidgetSettings),
-        globalSettings,
-        options.runtime,
-    );
 
-    return {
-        widget: {
-            widgetKind: "singleMetric",
-            slot,
-        },
-        preferences: resolveWidgetPreferences(options.storedWidgetSettings, slot.metric.target),
-    };
+    switch (options.storedWidgetSettings.widget.case) {
+        case "denseMultiMetric":
+            return {
+                widget: resolveDenseMultiMetricWidget(
+                    options.storedWidgetSettings.widget.value,
+                    globalSettings,
+                    options.runtime,
+                ),
+                preferences: resolveWidgetPreferences(options.storedWidgetSettings),
+            };
+        case "singleMetric":
+        case undefined: {
+            const slot = resolveMetricSlot(
+                resolveStoredSingleMetricSlot(options.storedWidgetSettings),
+                globalSettings,
+                options.runtime,
+            );
+
+            return {
+                widget: {
+                    widgetKind: "singleMetric",
+                    slot,
+                },
+                preferences: resolveWidgetPreferences(options.storedWidgetSettings, slot.metric.target),
+            };
+        }
+    }
 }
 
+/** Resolves stored global defaults, overrides, and source profiles. */
 export function resolveStoredGlobalSettings(
     storedGlobalSettings: StoredGlobalSettings | undefined,
 ): ResolvedGlobalSettings {
@@ -465,6 +491,81 @@ function resolveMetricSlot(
         metric,
         appearance,
     };
+}
+
+function resolveDenseMultiMetricWidget(
+    storedWidget: StoredDenseMultiMetricWidget,
+    globalSettings: ResolvedGlobalSettings,
+    runtime: ResolveStoredSettingsRuntimeContext | undefined,
+): ResolvedDenseMultiMetricWidget {
+    const storedSlots = readDenseMetricSlots(storedWidget);
+
+    return {
+        widgetKind: "denseMultiMetric",
+        slots: storedSlots.map((storedSlot) => resolveDenseMetricSlot(storedSlot, globalSettings, runtime)),
+        appearance: resolveDenseAppearanceSettings(storedWidget.appearance, globalSettings),
+    };
+}
+
+function readDenseMetricSlots(storedWidget: StoredDenseMultiMetricWidget): readonly StoredDenseMetricSlot[] {
+    // Resolved dense widgets promise stable row bounds and identity even when
+    // callers construct stored proto objects without going through the codec.
+    if (
+        storedWidget.slots.length < DENSE_MULTI_METRIC_MIN_SLOT_COUNT
+        || storedWidget.slots.length > DENSE_MULTI_METRIC_MAX_SLOT_COUNT
+    ) {
+        return throwUnexpectedStoredSettingsState(
+            `Dense multi metric widgets must have ${DENSE_MULTI_METRIC_MIN_SLOT_COUNT}`
+            + ` to ${DENSE_MULTI_METRIC_MAX_SLOT_COUNT} metric slots.`,
+        );
+    }
+
+    const slotIds = new Set<string>();
+    for (const storedSlot of storedWidget.slots) {
+        if (storedSlot.slotId === "") {
+            return throwUnexpectedStoredSettingsState("Dense metric slot is missing its stable slot id.");
+        }
+        if (slotIds.has(storedSlot.slotId)) {
+            return throwUnexpectedStoredSettingsState("Dense metric slot ids must be unique.");
+        }
+        slotIds.add(storedSlot.slotId);
+    }
+
+    return storedWidget.slots;
+}
+
+function resolveDenseMetricSlot(
+    storedSlot: StoredDenseMetricSlot,
+    globalSettings: ResolvedGlobalSettings,
+    runtime: ResolveStoredSettingsRuntimeContext | undefined,
+): ResolvedDenseMetricSlot {
+    return {
+        slotId: storedSlot.slotId,
+        slot: resolveMetricSlot(storedSlot.slot, globalSettings, runtime),
+        customLabel: normalizeOptionalText(storedSlot.customLabel),
+        customMaximumValue: storedSlot.customMaximumValue,
+    };
+}
+
+function resolveDenseAppearanceSettings(
+    storedAppearance: StoredAppearanceSettings | undefined,
+    globalSettings: ResolvedGlobalSettings,
+): ResolvedAppearanceSettings {
+    const appearance = {
+        view: DEFAULT_APPEARANCE_SETTINGS.view,
+        theme: resolveAppearanceThemeSettings(DEFAULT_APPEARANCE_SETTINGS.theme, storedAppearance?.theme),
+        line: DEFAULT_APPEARANCE_SETTINGS.line,
+    } satisfies ResolvedAppearanceSettings;
+    const appearanceWithThemeOverride = globalSettings.themeOverride
+        ? applyGlobalThemeOverride(appearance, globalSettings.themeOverride)
+        : appearance;
+    const appearanceWithPaintOverride = globalSettings.paintOverride
+        ? applyGlobalPaintOverride(appearanceWithThemeOverride, globalSettings.paintOverride)
+        : appearanceWithThemeOverride;
+
+    return globalSettings.transparentSurfaceOverride
+        ? applyGlobalTransparentSurfaceOverride(appearanceWithPaintOverride, globalSettings.transparentSurfaceOverride)
+        : appearanceWithPaintOverride;
 }
 
 function resolveDefaultAppearanceSettings(target: ResolvedMetricTarget): ResolvedAppearanceSettings {
@@ -724,11 +825,13 @@ function resolveMetricSourcePolicy(
 
 function resolveWidgetPreferences(
     storedWidgetSettings: StoredWidgetSettings,
-    resolvedTarget: ResolvedMetricTarget,
+    resolvedTarget?: ResolvedMetricTarget,
 ): ResolvedWidgetPreferences {
     return {
         pollingFrequencySeconds: storedWidgetSettings.preferences?.pollingFrequencySeconds
-            ?? defaultPollingFrequencySeconds(resolvedTarget),
+            ?? (resolvedTarget === undefined
+                ? DEFAULT_WIDGET_PREFERENCES.pollingFrequencySeconds
+                : defaultPollingFrequencySeconds(resolvedTarget)),
     };
 }
 
@@ -1404,6 +1507,14 @@ function readPositiveRuntimeMaximum(value: number | undefined): number | undefin
     return value !== undefined && Number.isFinite(value) && value > 0
         ? value
         : undefined;
+}
+
+function normalizeOptionalText(value: string | undefined): string | undefined {
+    const trimmedValue = value?.trim();
+
+    return trimmedValue === ""
+        ? undefined
+        : trimmedValue;
 }
 
 function resolveStoredPercent(value: number | undefined, fallback: number): number {

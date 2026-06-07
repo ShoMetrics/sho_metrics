@@ -10,7 +10,10 @@ import {
     type NetworkMetricDirection,
 } from "../runtime/network-metric-keys";
 import { resolveNetworkMetricSubscriptionKeys } from "./network/metric-subscriptions";
-import type { ResolvedNetworkMetricTarget } from "../settings/resolved-settings";
+import {
+    requireResolvedSingleMetricWidget,
+    type ResolvedNetworkMetricTarget,
+} from "../settings/resolved-settings";
 import {
     buildNetworkViewUpdate,
     resolveNetworkMaximumBytesPerSecond,
@@ -36,9 +39,10 @@ export class Network extends MetricAction {
 
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
         const settings = this.resolveSettings(event);
+        const widget = requireResolvedSingleMetricWidget(settings);
         const networkTarget = readResolvedMetricTarget(settings, "network");
         return resolveNetworkMetricSubscriptionKeys({
-            selectedView: settings.widget.slot.appearance.view.selectedView,
+            selectedView: widget.slot.appearance.view.selectedView,
             reading: networkTarget.reading,
         });
     }

@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import test from "node:test";
 import type { PropertyInspectorDidAppearEvent, WillAppearEvent, WillDisappearEvent } from "@elgato/streamdeck";
 import {
@@ -25,7 +25,11 @@ import {
     type WidgetData,
 } from "../view-rendering/widget-data";
 import { wallClockNowMilliseconds } from "../shared/clock";
-import type { CatalogMetricCategory, CatalogMetricReadingKind } from "../settings/resolved-settings";
+import {
+    requireResolvedSingleMetricWidget,
+    type CatalogMetricCategory,
+    type CatalogMetricReadingKind,
+} from "../settings/resolved-settings";
 import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../settings/storage/widget-settings-patch";
 import { resolveInitialActionSettings } from "./settings/action-settings-resolver";
@@ -625,7 +629,7 @@ function buildCatalogWidgetSettings(
 }
 
 function readCatalogTarget(settings: ReturnType<typeof resolveInitialActionSettings>["resolvedSettings"]) {
-    const target = settings.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
 
     if (target.domain !== "catalog") {
         assert.fail(`Expected catalog target, received ${target.domain}.`);
@@ -666,3 +670,4 @@ function buildPropertyInspectorDidAppearEvent(action: FakeStreamDeckAction): Pro
 function buildWillDisappearEvent(action: FakeStreamDeckAction): WillDisappearEvent {
     return { action } as unknown as WillDisappearEvent;
 }
+

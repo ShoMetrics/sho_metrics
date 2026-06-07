@@ -23,7 +23,10 @@ import { PollingSettings } from "./PollingSettings";
 import { LineSettings } from "./LineSettings";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
-import type { ResolvedDiskMetricTarget } from "../../settings/resolved-settings";
+import {
+    requireResolvedSingleMetricWidget,
+    type ResolvedDiskMetricTarget,
+} from "../../settings/resolved-settings";
 import {
     diskMetricKindOptionList,
     diskThroughputDirectionOptionList,
@@ -100,7 +103,7 @@ function DiskUsageExtraSettings(props: DiskWidgetSettingsProps & {
 }): React.JSX.Element {
     const i18n = useI18n();
     const { t } = i18n;
-    const selectedView = props.context.resolved.widget.slot.appearance.view.selectedView;
+    const selectedView = requireResolvedSingleMetricWidget(props.context.resolved).slot.appearance.view.selectedView;
 
     return (
         <>

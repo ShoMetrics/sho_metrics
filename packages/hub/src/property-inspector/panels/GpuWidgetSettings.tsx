@@ -7,7 +7,11 @@ import { useI18n } from "../../i18n/react";
 import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import type { DisplayedMetricReadAttribution } from "../../runtime/widget-runtime-cache";
-import type { ResolvedGpuMetricTarget, ResolvedGpuReading } from "../../settings/resolved-settings";
+import {
+    requireResolvedSingleMetricWidget,
+    type ResolvedGpuMetricTarget,
+    type ResolvedGpuReading,
+} from "../../settings/resolved-settings";
 import { isBuiltInMetricSupportedOnPlatform } from "../../runtime/source-routing/metric-source-preferences";
 import type { PropertyInspectorPlatform } from "../inspector/platform";
 import { StandardColorSettings } from "./ColorSettings";
@@ -83,7 +87,7 @@ function GpuMetricSettings({
             )}
             {context.isWindows && (
                 <MetricSourceSettings
-                    sourcePolicy={context.resolved.widget.slot.metric.source}
+                    sourcePolicy={requireResolvedSingleMetricWidget(context.resolved).slot.metric.source}
                     onSettingsPatch={onSettingsPatch}
                 />
             )}

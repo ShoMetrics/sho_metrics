@@ -6,6 +6,7 @@ import { buildMetricViewIcons } from "../widgets/icons/metric-view-icons";
 import { PROGRESS_CIRCLE_LABELS } from "../widgets/primitives/progress-circle-label";
 import { RAM_TOTAL_METRIC_KEY, RAM_USED_METRIC_KEY } from "../runtime/metric-keys";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
+import { requireResolvedSingleMetricWidget } from "../settings/resolved-settings";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 
 @action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.memory })
@@ -18,6 +19,7 @@ export class Memory extends MetricAction {
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event);
+        const widget = requireResolvedSingleMetricWidget(settings);
         const metrics = this.getMetricReader(event);
         readResolvedMetricTarget(settings, "memory");
 
@@ -34,7 +36,7 @@ export class Memory extends MetricAction {
 
         setMetricView({
             event,
-            resolvedSettings: settings.widget.slot.appearance,
+            resolvedSettings: widget.slot.appearance,
             metricKey: RAM_USED_METRIC_KEY,
             widgetData: buildMemoryUsageWidgetData({
                 usedBytesWidgetData,

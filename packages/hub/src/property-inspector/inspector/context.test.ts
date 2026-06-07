@@ -3,6 +3,7 @@ import test from "node:test";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { readStoredWidgetSettings } from "../../settings/storage/codec";
 import { writeStoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
+import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
 import { buildVisibilityContext } from "../testing/test-context";
 
 test("Property Inspector context reads resolved disk polling defaults without persisting them", () => {
@@ -35,7 +36,7 @@ test("Property Inspector context preserves stored disk throughput kind on Window
         settings: diskSettings,
     });
 
-    const target = context.resolved.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(context.resolved).slot.metric.target;
     assert.equal(target.domain, "disk");
 
     if (target.domain === "disk") {

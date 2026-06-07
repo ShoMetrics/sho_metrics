@@ -119,6 +119,22 @@ describe("quick-start stored widget settings", () => {
         }
     });
 
+    it("creates dense multi metric quick-start rows with stable generated ids", () => {
+        const slotIds = ["slot-1", "slot-2"];
+        const quickStartSettings = resolveQuickStartStoredWidgetSettings(undefined, "denseMultiMetric", {
+            createSlotId: () => slotIds.shift() ?? "unexpected-slot",
+        });
+        const widget = quickStartSettings.storedSettings.widget;
+
+        assert.equal(quickStartSettings.settingsJsonToPersist != null, true);
+        assert.equal(widget.case, "denseMultiMetric");
+        assert.equal(widget.value.slots.length, 2);
+        assert.equal(widget.value.slots[0]?.slotId, "slot-1");
+        assert.equal(widget.value.slots[0]?.slot?.metric?.target.case, "cpu");
+        assert.equal(widget.value.slots[1]?.slotId, "slot-2");
+        assert.equal(widget.value.slots[1]?.slot?.metric?.target.case, "gpu");
+    });
+
     it("keeps existing metric targets without requesting persistence", () => {
         const initialSettings = resolveQuickStartStoredWidgetSettings(undefined, "disk");
         const quickStartSettings = resolveQuickStartStoredWidgetSettings(initialSettings.rawSettings, "network");

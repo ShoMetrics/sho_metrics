@@ -8,6 +8,7 @@ import { formatMessage } from "../../i18n/format";
 import type { I18n } from "../../i18n/react";
 import type { LocalizedMessage, PlaceholderValues } from "../../i18n/types";
 import type { NetworkInterfaceOption } from "../../runtime/network-interfaces";
+import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
 import type { SelectOption, VisibilityContext } from "../inspector/types";
 
 /** Builds localized network interface picker options while preserving dynamic interface labels. */
@@ -106,7 +107,7 @@ export function resolveDiskBarLabelPlaceholder(context: VisibilityContext, i18n?
 
 export function resolveSelectedDiskVolume(context: VisibilityContext): DiskVolumeOption | null {
     const diskVolumes = context.runtimeCache.availableDiskVolumes;
-    const target = context.resolved.widget.slot.metric.target;
+    const target = requireResolvedSingleMetricWidget(context.resolved).slot.metric.target;
     const selectedDiskVolumeId = target.domain === "disk"
         ? target.volumeId ?? ""
         : "";

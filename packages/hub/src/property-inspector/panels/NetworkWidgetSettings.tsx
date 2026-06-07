@@ -18,9 +18,10 @@ import { PollingSettings } from "./PollingSettings";
 import { LineSettings } from "./LineSettings";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
-import type {
-    ResolvedNetworkMetricTarget,
-    ResolvedNetworkReading,
+import {
+    requireResolvedSingleMetricWidget,
+    type ResolvedNetworkMetricTarget,
+    type ResolvedNetworkReading,
 } from "../../settings/resolved-settings";
 import {
     DEFAULT_NETWORK_PING_TARGET_HOST,
@@ -188,7 +189,7 @@ function NetworkTrafficMetricSettings({
                     network: { direction },
                 })}
             />
-            {context.resolved.widget.slot.appearance.view.selectedView === "circle" && (
+            {requireResolvedSingleMetricWidget(context.resolved).slot.appearance.view.selectedView === "circle" && (
                 <InspectorItem className="note-item note-item-default">
                     <p className="section-note">{t(networkMessages.networkCircleSplitNote)}</p>
                 </InspectorItem>

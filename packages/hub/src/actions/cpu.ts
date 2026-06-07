@@ -17,7 +17,11 @@ import {
 import type { SourceClientStatus } from "../runtime/sources/source-client";
 import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
-import type { ResolvedCpuMetricTarget, ResolvedWidgetSettings } from "../settings/resolved-settings";
+import {
+    requireResolvedSingleMetricWidget,
+    type ResolvedCpuMetricTarget,
+    type ResolvedWidgetSettings,
+} from "../settings/resolved-settings";
 import {
     readHelperBackedWidgetData,
     resolveBuiltInHelperInstallNoticeText,
@@ -73,9 +77,10 @@ export function buildCpuViewOptions(options: {
     metrics: MetricStoreReader;
     helperStatus: SourceClientStatus | undefined;
 }): SingleMetricViewOptions {
+    const widget = requireResolvedSingleMetricWidget(options.settings);
     const baseOptions = {
         event: options.event,
-        resolvedSettings: options.settings.widget.slot.appearance,
+        resolvedSettings: widget.slot.appearance,
     };
 
     switch (options.target.reading.kind) {

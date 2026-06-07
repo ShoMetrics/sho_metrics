@@ -20,7 +20,11 @@ import {
     GPU_VRAM_USED_METRIC_KEY,
 } from "../runtime/metric-keys";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
-import type { ResolvedGpuMetricTarget, ResolvedWidgetSettings } from "../settings/resolved-settings";
+import {
+    requireResolvedSingleMetricWidget,
+    type ResolvedGpuMetricTarget,
+    type ResolvedWidgetSettings,
+} from "../settings/resolved-settings";
 import type { SourceClientStatus } from "../runtime/sources/source-client";
 import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
 import {
@@ -105,9 +109,10 @@ export function buildGpuViewOptions(options: {
     metrics: MetricStoreReader;
     helperStatus: SourceClientStatus | undefined;
 }): SingleMetricViewOptions {
+    const widget = requireResolvedSingleMetricWidget(options.settings);
     const baseOptions = {
         event: options.event,
-        resolvedSettings: options.settings.widget.slot.appearance,
+        resolvedSettings: widget.slot.appearance,
     };
 
     switch (options.target.reading.kind) {

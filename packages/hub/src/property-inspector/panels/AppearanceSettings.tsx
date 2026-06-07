@@ -11,6 +11,7 @@ import {
     buildTransparentSurfaceAppearanceThemeOverride,
     resolveActiveTransparentSurface,
 } from "../../settings/appearance-overrides";
+import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 
 export function AppearanceSettings({
@@ -21,10 +22,11 @@ export function AppearanceSettings({
     transparentSurfaceDisabled = false,
 }: WidgetSettingsPanelProps): React.JSX.Element {
     const { t } = useI18n();
-    const appearance = context.resolved.widget.slot.appearance;
+    const slot = requireResolvedSingleMetricWidget(context.resolved).slot;
+    const appearance = slot.appearance;
     const preview = {
         appearance,
-        target: context.resolved.widget.slot.metric.target,
+        target: slot.metric.target,
     };
 
     return (
