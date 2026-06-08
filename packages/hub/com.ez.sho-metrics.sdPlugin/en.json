@@ -28,5 +28,14 @@
 	"com.ez.sho-metrics.network": {
 		"Name": "Network",
 		"Tooltip": "Displays network metrics."
+	},
+	"com.ez.sho-metrics.stacked-metric": {
+		"Name": "Stacked Metric",
+		"Tooltip": "Rotates between multiple metric widgets on one key.",
+		"Encoder": {
+			"TriggerDescription": {
+				"Rotate": "Switch metric"
+			}
+		}
 	}
 }

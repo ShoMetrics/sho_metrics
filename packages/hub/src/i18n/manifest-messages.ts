@@ -98,5 +98,26 @@ export const manifestMessages = {
                 ja: "複数のメトリクスを 1 つのコンパクトな表示にまとめます。",
             },
         },
+        "com.ez.sho-metrics.stacked-metric": {
+            name: {
+                en: "Stacked Metric",
+                zh_CN: "堆叠指标",
+                ja: "スタックメトリクス",
+            },
+            tooltip: {
+                en: "Rotates between multiple metric widgets on one key.",
+                zh_CN: "在一个按键上轮播多个指标小组件。",
+                ja: "1 つのキーで複数のメトリクスウィジェットを切り替えます。",
+            },
+            encoder: {
+                triggerDescription: {
+                    Rotate: {
+                        en: "Switch metric",
+                        zh_CN: "切换指标",
+                        ja: "メトリクスを切り替え",
+                    },
+                },
+            },
+        },
     },
 } as const satisfies ManifestMessagesCatalog;
