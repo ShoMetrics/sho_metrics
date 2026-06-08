@@ -5,7 +5,6 @@ import { networkMessages } from "../../i18n/message-groups/widgets";
 import { optionMessages } from "../../i18n/message-groups/options";
 import { localizeOptionList } from "../../i18n/options";
 import { useI18n, type I18n } from "../../i18n/react";
-import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { TextSetting } from "../controls/TextSetting";
 import { resolveNetworkInterfaceOptions } from "../select-options/runtime-select-options";
@@ -16,6 +15,7 @@ import {
 import { AppearanceSettings } from "./AppearanceSettings";
 import { PollingSettings } from "./PollingSettings";
 import { LineSettings } from "./LineSettings";
+import { NetworkTrafficMaximumSetting } from "./MetricMaximumSettings";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import {
@@ -225,8 +225,8 @@ function NetworkScaleSettings({
                     network: { scaleMode },
                 })}
             />
-            <NumberSetting
-                label={t(networkMessages.uploadMaxMbpsLabel)}
+            <NetworkTrafficMaximumSetting
+                direction="upload"
                 value={display.maximumUploadSpeedMegabitsPerSecond}
                 onValueChange={(maximumUploadSpeedMegabitsPerSecond) => onSettingsPatch({
                     network: {
@@ -234,13 +234,10 @@ function NetworkScaleSettings({
                         maximumUploadSpeedMegabitsPerSecond,
                     },
                 })}
-                minimum={1}
-                step={1}
-                optional
                 disabled={isAutoScale}
             />
-            <NumberSetting
-                label={t(networkMessages.downloadMaxMbpsLabel)}
+            <NetworkTrafficMaximumSetting
+                direction="download"
                 value={display.maximumDownloadSpeedMegabitsPerSecond}
                 onValueChange={(maximumDownloadSpeedMegabitsPerSecond) => onSettingsPatch({
                     network: {
@@ -248,9 +245,6 @@ function NetworkScaleSettings({
                         maximumDownloadSpeedMegabitsPerSecond,
                     },
                 })}
-                minimum={1}
-                step={1}
-                optional
                 disabled={isAutoScale}
             />
             <SelectSetting

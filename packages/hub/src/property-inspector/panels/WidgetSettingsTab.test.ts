@@ -1035,8 +1035,9 @@ test("dense multi metric settings render rows and hide single metric view contro
         ]),
     });
 
-    assert.match(markup, /Metric 1:/);
-    assert.match(markup, /Metric 2:/);
+    assert.match(markup, sectionHeadingPattern("Metric 1"));
+    assert.match(markup, sectionHeadingPattern("Metric 2"));
+    assert.match(markup, /Metric:/);
     assert.match(markup, /CPU Metric:/);
     assert.match(markup, /GPU Metric:/);
     assert.match(markup, /value="CPU"/);
@@ -1110,6 +1111,53 @@ test("dense multi metric disk usage row renders disk volume picker", () => {
     assert.match(markup, /Metric Detail:/);
     assert.match(markup, /Volume:/);
     assert.match(markup, /E: \(500 GB, Games\)/);
+});
+
+test("dense multi metric built-in max inputs use readable units", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "denseMultiMetric",
+        settings: buildDenseWidgetSettings([
+            { slotId: "slot-1", slot: { metric: { cpu: {} } }, customMaximumValue: 90 },
+            { slotId: "slot-2", slot: { metric: { gpu: { kind: "KIND_TEMPERATURE" } } }, customMaximumValue: 95 },
+            { slotId: "slot-3", slot: { metric: { memory: {} } } },
+        ]),
+    });
+
+    assert.match(markup, /Max \(%\):/);
+    assert.match(markup, /value="90"/);
+    assert.match(markup, /Max Temp \(C\):/);
+    assert.match(markup, /value="95"/);
+    assert.equal(countTextOccurrences(markup, "Max:"), 0);
+});
+
+test("dense multi metric throughput max inputs convert raw byte rates to readable units", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "denseMultiMetric",
+        settings: buildDenseWidgetSettings([
+            {
+                slotId: "slot-1",
+                slot: {
+                    metric: {
+                        disk: {
+                            kind: "KIND_THROUGHPUT",
+                            throughputDirection: "THROUGHPUT_DIRECTION_READ",
+                        },
+                    },
+                },
+                customMaximumValue: 100 * 1024 * 1024,
+            },
+            {
+                slotId: "slot-2",
+                slot: { metric: { network: { traffic: { direction: "download" } } } },
+                customMaximumValue: 125_000_000,
+            },
+        ]),
+    });
+
+    assert.match(markup, /Read Max \(MiB\/s\):/);
+    assert.match(markup, /value="100"/);
+    assert.match(markup, /Download Max \(Mbps\):/);
+    assert.match(markup, /value="1000"/);
 });
 
 test("dense multi metric catalog row renders descriptor label and readable maximum unit", () => {

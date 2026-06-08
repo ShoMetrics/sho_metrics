@@ -5,7 +5,6 @@ import { commonMessages } from "../../i18n/message-groups/shell";
 import { optionMessages } from "../../i18n/message-groups/options";
 import { localizeOptionList } from "../../i18n/options";
 import { useI18n } from "../../i18n/react";
-import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { TextSetting } from "../controls/TextSetting";
 import {
@@ -21,6 +20,7 @@ import {
 import { AppearanceSettings } from "./AppearanceSettings";
 import { PollingSettings } from "./PollingSettings";
 import { LineSettings } from "./LineSettings";
+import { DiskThroughputMaximumSetting } from "./MetricMaximumSettings";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import {
@@ -175,8 +175,8 @@ function DiskThroughputScaleSettings(props: DiskWidgetSettingsProps & {
                     disk: { scaleMode },
                 })}
             />
-            <NumberSetting
-                label={t(diskMessages.readMaxMibLabel)}
+            <DiskThroughputMaximumSetting
+                direction="read"
                 value={display.maximumReadThroughputMebibytesPerSecond}
                 onValueChange={(maximumReadThroughputMebibytesPerSecond) => props.onSettingsPatch({
                     disk: {
@@ -184,13 +184,10 @@ function DiskThroughputScaleSettings(props: DiskWidgetSettingsProps & {
                         maximumReadThroughputMebibytesPerSecond,
                     },
                 })}
-                minimum={1}
-                step={1}
-                optional
                 disabled={isAutoScale}
             />
-            <NumberSetting
-                label={t(diskMessages.writeMaxMibLabel)}
+            <DiskThroughputMaximumSetting
+                direction="write"
                 value={display.maximumWriteThroughputMebibytesPerSecond}
                 onValueChange={(maximumWriteThroughputMebibytesPerSecond) => props.onSettingsPatch({
                     disk: {
@@ -198,9 +195,6 @@ function DiskThroughputScaleSettings(props: DiskWidgetSettingsProps & {
                         maximumWriteThroughputMebibytesPerSecond,
                     },
                 })}
-                minimum={1}
-                step={1}
-                optional
                 disabled={isAutoScale}
             />
         </SettingsSection>

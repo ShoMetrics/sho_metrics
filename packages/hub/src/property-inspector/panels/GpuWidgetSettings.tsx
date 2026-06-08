@@ -4,7 +4,6 @@ import { gpuMessages } from "../../i18n/message-groups/widgets";
 import { optionMessages } from "../../i18n/message-groups/options";
 import { localizeOptionList } from "../../i18n/options";
 import { useI18n } from "../../i18n/react";
-import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import type { DisplayedMetricReadAttribution } from "../../runtime/widget-runtime-cache";
 import {
@@ -20,6 +19,7 @@ import { PollingSettings } from "./PollingSettings";
 import { LineSettings } from "./LineSettings";
 import { MetricSourceSettings } from "./MetricSourceSettings";
 import { SettingsSection } from "./SettingsSection";
+import { PowerMaximumSetting, TemperatureMaximumSetting } from "./MetricMaximumSettings";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import {
     buildGpuMetricKindOptionList,
@@ -133,14 +133,11 @@ function GpuTemperatureScaleSettings({
                     gpu: { temperatureUnit },
                 })}
             />
-            <NumberSetting
-                label={t(commonMessages.maxTempCLabel)}
+            <TemperatureMaximumSetting
                 value={reading.maximumCelsius}
                 onValueChange={(maximumTemperatureCelsius) => onSettingsPatch({
                     gpu: { maximumTemperatureCelsius },
                 })}
-                minimum={1}
-                step={1}
             />
         </SettingsSection>
     );
@@ -156,15 +153,11 @@ function GpuPowerScaleSettings({
 
     return (
         <SettingsSection title={t(commonMessages.scaleUnitsSection)}>
-            <NumberSetting
-                label={t(commonMessages.maxPowerWLabel)}
+            <PowerMaximumSetting
                 value={reading.maximumWatts}
                 onValueChange={(maximumGpuPowerWatts) => onSettingsPatch({
                     gpu: { maximumPowerWatts: maximumGpuPowerWatts },
                 })}
-                minimum={1}
-                step={1}
-                optional
             />
         </SettingsSection>
     );

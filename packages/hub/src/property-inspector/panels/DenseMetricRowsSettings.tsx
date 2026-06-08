@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { InspectorItem } from "../components/InspectorItem";
+import { SectionHeading } from "../components/SectionHeading";
 import { commonMessages } from "../../i18n/message-groups/shell";
 import { catalogMessages, cpuMessages, denseMessages, gpuMessages, helperMessages, multiMetricMessages } from "../../i18n/message-groups/widgets";
 import { optionMessages } from "../../i18n/message-groups/options";
@@ -12,13 +13,26 @@ import type { MetricDescriptor, SourceClientStatus } from "../../runtime/sources
 import type { ResolvedCpuReading, ResolvedDenseMetricSlot, ResolvedDenseMultiMetricWidget, ResolvedDiskMetricTarget, ResolvedGpuReading, ResolvedMetricTarget, ResolvedNetworkReading } from "../../settings/resolved-settings";
 import { DENSE_MULTI_METRIC_MAX_SLOT_COUNT, DENSE_MULTI_METRIC_MIN_SLOT_COUNT } from "../../settings/storage/dense-multi-metric-constraints";
 import type { DenseMetricTargetPatch, StoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
-import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { TextSetting } from "../controls/TextSetting";
 import type { SelectOption } from "../inspector/types";
 import { buildCatalogMetricOptions, type CatalogMetricOptions, type CatalogMetricSelection, type CatalogMetricTypeId, type SelectedCatalogMetric } from "../select-options/catalog-metric-options";
 import { resolveDiskVolumeOptions } from "../select-options/runtime-select-options";
 import { resolveHelperStatusGuidanceText } from "./helper-status-guidance";
+import {
+    buildDiskThroughputMaximumInputSpec,
+    buildMillisecondsMaximumInputSpec,
+    buildNetworkTrafficMaximumInputSpec,
+    buildPercentMaximumInputSpec,
+    buildPowerMaximumInputSpec,
+    buildTemperatureMaximumInputSpec,
+    MetricMaximumNumberSetting,
+    readByteRateAsMegabitsPerSecond,
+    readByteRateAsMebibytesPerSecond,
+    type MetricMaximumInputSpec,
+    writeMegabitsPerSecondAsByteRate,
+    writeMebibytesPerSecondAsByteRate,
+} from "./MetricMaximumSettings";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import { SettingsSection } from "./SettingsSection";
 import { buildCpuMetricKindOptionList, buildGpuMetricKindOptionList, diskMetricKindOptionList } from "./setting-options";
@@ -119,13 +133,13 @@ function DenseMetricRowSettings({
     const { t } = i18n;
     const target = slot.slot.metric.target;
     const categoryId = resolveDenseMetricCategoryId(target);
-    const maximumInput = readDenseMaximumInputValue(slot);
+    const maximumInput = resolveDenseMaximumInputSpec(slot, t);
 
     return (
         <>
+            <SectionHeading text={`${t(denseMessages.rowMetricLabel)} ${rowIndex + 1}`} />
             <DenseMetricCategorySetting
                 categoryId={categoryId}
-                rowIndex={rowIndex}
                 descriptors={context.runtimeCache.availableCatalogMetricDescriptors}
                 i18n={i18n}
                 slotId={slot.slotId}
@@ -150,22 +164,19 @@ function DenseMetricRowSettings({
                     },
                 })}
             />
-            <NumberSetting
-                label={resolveDenseMaximumInputLabel(target, t)}
-                value={maximumInput}
-                onValueChange={(inputValue) => onSettingsPatch({
-                    dense: {
-                        updateSlot: {
-                            slotId: slot.slotId,
-                            customMaximumValue: writeDenseMaximumInputValue(target, inputValue),
+            {maximumInput !== undefined && (
+                <MetricMaximumNumberSetting
+                    input={maximumInput}
+                    onValueChange={(inputValue) => onSettingsPatch({
+                        dense: {
+                            updateSlot: {
+                                slotId: slot.slotId,
+                                customMaximumValue: writeDenseMaximumInputValue(target, inputValue),
+                            },
                         },
-                    },
-                })}
-                minimum={0.001}
-                maximum={resolveDenseMaximumInputMaximum(target)}
-                step={resolveDenseMaximumInputStep(target)}
-                optional
-            />
+                    })}
+                />
+            )}
             <InspectorItem>
                 <div className="advanced-action-stack">
                     {isReorderEnabled && (
@@ -210,14 +221,12 @@ function DenseMetricRowSettings({
 
 function DenseMetricCategorySetting({
     categoryId,
-    rowIndex,
     descriptors,
     i18n,
     slotId,
     onSettingsPatch,
 }: {
     readonly categoryId: DenseMetricCategoryId;
-    readonly rowIndex: number;
     readonly descriptors: readonly MetricDescriptor[];
     readonly i18n: I18n;
     readonly slotId: string;
@@ -227,7 +236,7 @@ function DenseMetricCategorySetting({
 
     return (
         <SelectSetting
-            label={`${t(denseMessages.rowMetricLabel)} ${rowIndex + 1}`}
+            label={t(denseMessages.rowMetricLabel)}
             value={categoryId}
             optionList={localizeOptionList(t, denseMetricCategoryOptionList, denseMetricCategoryMessageByValue)}
             onValueChange={(nextCategoryId) => {
@@ -622,42 +631,109 @@ function resolveCatalogMetricDescriptorStatusText(
             : t(catalogMessages.loadingMetrics);
 }
 
-function readDenseMaximumInputValue(slot: ResolvedDenseMetricSlot): number | undefined {
+function resolveDenseMaximumInputSpec(
+    slot: ResolvedDenseMetricSlot,
+    t: I18n["t"],
+): MetricMaximumInputSpec | undefined {
     const target = slot.slot.metric.target;
-    if (target.domain !== "catalog") {
-        return slot.customMaximumValue;
-    }
+    const maximumLabel = t(denseMessages.rowMaximumLabel);
 
-    return readCatalogMetricMaximumInputValue(slot.customMaximumValue, target.detectedUnit, target.detectedCategory);
+    switch (target.domain) {
+        case "cpu":
+            return resolveCpuDenseMaximumInputSpec(target, slot.customMaximumValue, t, maximumLabel);
+        case "gpu":
+            return resolveGpuDenseMaximumInputSpec(target, slot.customMaximumValue, t, maximumLabel);
+        case "memory":
+            return undefined;
+        case "disk":
+            return target.reading.kind === "throughput"
+                ? buildDiskThroughputMaximumInputSpec(
+                    t,
+                    target.reading.direction === "write" ? "write" : "read",
+                    readByteRateAsMebibytesPerSecond(slot.customMaximumValue),
+                )
+                : undefined;
+        case "network":
+            if (target.reading.kind === "ping") {
+                return buildMillisecondsMaximumInputSpec(maximumLabel, slot.customMaximumValue);
+            }
+
+            return buildNetworkTrafficMaximumInputSpec(
+                t,
+                target.reading.direction === "upload" ? "upload" : "download",
+                readByteRateAsMegabitsPerSecond(slot.customMaximumValue),
+            );
+        case "catalog":
+            return {
+                label: resolveCatalogMetricMaximumInputLabel(target.detectedUnit, target.detectedCategory),
+                value: readCatalogMetricMaximumInputValue(
+                    slot.customMaximumValue,
+                    target.detectedUnit,
+                    target.detectedCategory,
+                ),
+                minimum: 0.001,
+                maximum: resolveCatalogMetricMaximumInputMaximum(target.detectedUnit, target.detectedCategory),
+                step: resolveCatalogMetricMaximumInputStep(target.detectedUnit, target.detectedCategory),
+                optional: true,
+            };
+    }
 }
 
 function writeDenseMaximumInputValue(
     target: ResolvedMetricTarget,
     inputValue: number | undefined,
 ): number | undefined {
-    if (inputValue === undefined || target.domain !== "catalog") {
+    if (inputValue === undefined) {
         return inputValue;
     }
 
-    return writeCatalogMetricMaximumInputValue(inputValue, target.detectedUnit, target.detectedCategory);
+    if (target.domain === "catalog") {
+        return writeCatalogMetricMaximumInputValue(inputValue, target.detectedUnit, target.detectedCategory);
+    }
+
+    if (target.domain === "disk" && target.reading.kind === "throughput") {
+        return writeMebibytesPerSecondAsByteRate(inputValue);
+    }
+
+    if (target.domain === "network" && target.reading.kind === "traffic") {
+        return writeMegabitsPerSecondAsByteRate(inputValue);
+    }
+
+    return inputValue;
 }
 
-function resolveDenseMaximumInputLabel(target: ResolvedMetricTarget, t: I18n["t"]): string {
-    return target.domain === "catalog"
-        ? resolveCatalogMetricMaximumInputLabel(target.detectedUnit, target.detectedCategory)
-        : t(denseMessages.rowMaximumLabel);
+function resolveCpuDenseMaximumInputSpec(
+    target: Extract<ResolvedMetricTarget, { readonly domain: "cpu" }>,
+    customMaximumValue: number | undefined,
+    t: I18n["t"],
+    maximumLabel: string,
+): MetricMaximumInputSpec | undefined {
+    switch (target.reading.kind) {
+        case "usage":
+            return buildPercentMaximumInputSpec(maximumLabel, customMaximumValue);
+        case "temperature":
+            return buildTemperatureMaximumInputSpec(t, customMaximumValue ?? target.reading.maximumCelsius);
+        case "power":
+            return buildPowerMaximumInputSpec(t, customMaximumValue ?? target.reading.maximumWatts);
+    }
 }
 
-function resolveDenseMaximumInputMaximum(target: ResolvedMetricTarget): number | undefined {
-    return target.domain === "catalog"
-        ? resolveCatalogMetricMaximumInputMaximum(target.detectedUnit, target.detectedCategory)
-        : 1_000_000_000;
-}
-
-function resolveDenseMaximumInputStep(target: ResolvedMetricTarget): number {
-    return target.domain === "catalog"
-        ? resolveCatalogMetricMaximumInputStep(target.detectedUnit, target.detectedCategory)
-        : 1;
+function resolveGpuDenseMaximumInputSpec(
+    target: Extract<ResolvedMetricTarget, { readonly domain: "gpu" }>,
+    customMaximumValue: number | undefined,
+    t: I18n["t"],
+    maximumLabel: string,
+): MetricMaximumInputSpec | undefined {
+    switch (target.reading.kind) {
+        case "usage":
+            return buildPercentMaximumInputSpec(maximumLabel, customMaximumValue);
+        case "temperature":
+            return buildTemperatureMaximumInputSpec(t, customMaximumValue ?? target.reading.maximumCelsius);
+        case "power":
+            return buildPowerMaximumInputSpec(t, customMaximumValue ?? target.reading.maximumWatts);
+        case "vram":
+            return undefined;
+    }
 }
 
 function resolveDenseMetricPlaceholderLabel(target: ResolvedMetricTarget): string {
