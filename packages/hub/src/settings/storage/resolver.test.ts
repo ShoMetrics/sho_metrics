@@ -42,15 +42,15 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.slot.appearance.theme.terminal.paint.preset, "green");
         assert.deepEqual(settings.widget.slot.appearance.theme.flat.transparentSurface, {
             enabled: false,
-            backgroundOpacityPercent: 0,
-            textOutlinePercent: 85,
-            shapeOutlinePercent: 85,
+            backgroundOpacityPercent: 50,
+            textOutlinePercent: 70,
+            shapeOutlinePercent: 30,
         });
         assert.deepEqual(settings.widget.slot.appearance.theme.pixelWindow.transparentSurface, {
             enabled: false,
             backgroundOpacityPercent: 50,
-            textOutlinePercent: 85,
-            shapeOutlinePercent: 85,
+            textOutlinePercent: 70,
+            shapeOutlinePercent: 30,
         });
     });
 
@@ -1254,6 +1254,53 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.appearance.view.selectedView, "circle");
         assert.equal(settings.widget.appearance.theme.selectedTheme, "cupertino-glass");
         assert.equal(settings.preferences.pollingFrequencySeconds, 1);
+    });
+
+    it("uses dense transparent surface outline defaults without blocking stored overrides", () => {
+        const defaultSettings = resolveStoredWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                denseMultiMetric: {
+                    slots: [
+                        { slotId: "slot-1", slot: { metric: { cpu: {} } } },
+                        { slotId: "slot-2", slot: { metric: { gpu: {} } } },
+                    ],
+                },
+            }).settings,
+        });
+        const customSettings = resolveStoredWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                denseMultiMetric: {
+                    slots: [
+                        { slotId: "slot-1", slot: { metric: { cpu: {} } } },
+                        { slotId: "slot-2", slot: { metric: { gpu: {} } } },
+                    ],
+                    appearance: {
+                        theme: {
+                            flat: {
+                                transparentSurface: {
+                                    textOutlinePercent: 40,
+                                    shapeOutlinePercent: 50,
+                                },
+                            },
+                        },
+                    },
+                },
+            }).settings,
+        });
+
+        if (defaultSettings.widget.widgetKind !== "denseMultiMetric") {
+            throw new Error("Expected dense multi metric settings.");
+        }
+        if (customSettings.widget.widgetKind !== "denseMultiMetric") {
+            throw new Error("Expected dense multi metric settings.");
+        }
+
+        assert.equal(defaultSettings.widget.appearance.theme.flat.transparentSurface.textOutlinePercent, 0);
+        assert.equal(defaultSettings.widget.appearance.theme.flat.transparentSurface.shapeOutlinePercent, 0);
+        assert.equal(defaultSettings.widget.appearance.theme.pixelWindow.transparentSurface.textOutlinePercent, 0);
+        assert.equal(defaultSettings.widget.appearance.theme.pixelWindow.transparentSurface.shapeOutlinePercent, 0);
+        assert.equal(customSettings.widget.appearance.theme.flat.transparentSurface.textOutlinePercent, 40);
+        assert.equal(customSettings.widget.appearance.theme.flat.transparentSurface.shapeOutlinePercent, 50);
     });
 
     it("does not apply global view overrides to dense multi metric appearance", () => {

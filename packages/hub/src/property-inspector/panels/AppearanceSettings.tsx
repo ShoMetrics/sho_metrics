@@ -91,6 +91,7 @@ export function AppearanceSettings({
                         },
                     })}
                     disabled={transparentSurfaceDisabled}
+                    showPerThemeNote
                 />
             </SettingsSection>
         </>

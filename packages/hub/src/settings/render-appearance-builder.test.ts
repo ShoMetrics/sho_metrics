@@ -130,14 +130,14 @@ test("enabled flat transparent surface resolves flat defaults to render tokens",
     }));
 
     assert.deepEqual(visualSettings.transparentSurface, {
-        backgroundOpacity: 0,
+        backgroundOpacity: 0.5,
         textOutline: {
             color: "#000000",
-            strength: 0.85,
+            strength: 0.7,
         },
         shapeOutline: {
             color: "#000000",
-            strength: 0.85,
+            strength: 0.3,
         },
     });
 });
@@ -158,11 +158,11 @@ test("enabled non-flat transparent surface resolves non-flat defaults to render 
         backgroundOpacity: 0.5,
         textOutline: {
             color: "#000000",
-            strength: 0.85,
+            strength: 0.7,
         },
         shapeOutline: {
             color: "#000000",
-            strength: 0.85,
+            strength: 0.3,
         },
     });
 });

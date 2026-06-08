@@ -85,23 +85,36 @@ const DEFAULT_TERMINAL_PAINT_SETTINGS: ResolvedTerminalPaintSettings = {
 
 const DEFAULT_FLAT_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
     enabled: false,
-    backgroundOpacityPercent: 0,
-    textOutlinePercent: 85,
-    shapeOutlinePercent: 85,
+    backgroundOpacityPercent: 50,
+    textOutlinePercent: 70,
+    shapeOutlinePercent: 30,
 };
 
 export const DEFAULT_GLOBAL_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
     enabled: false,
     backgroundOpacityPercent: 50,
-    textOutlinePercent: 85,
-    shapeOutlinePercent: 85,
+    textOutlinePercent: 70,
+    shapeOutlinePercent: 30,
 };
 
 const DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
     enabled: false,
     backgroundOpacityPercent: 50,
-    textOutlinePercent: 85,
-    shapeOutlinePercent: 85,
+    textOutlinePercent: 70,
+    shapeOutlinePercent: 30,
+};
+
+const DEFAULT_DENSE_FLAT_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
+    ...DEFAULT_FLAT_TRANSPARENT_SURFACE_SETTINGS,
+    backgroundOpacityPercent: 0,
+    textOutlinePercent: 0,
+    shapeOutlinePercent: 0,
+};
+
+const DEFAULT_DENSE_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
+    ...DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS,
+    textOutlinePercent: 0,
+    shapeOutlinePercent: 0,
 };
 
 export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
@@ -137,6 +150,33 @@ export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
         lineSmoothingPercent: 75,
         gridLineVisibility: "none",
         gridLineType: "horizontal",
+    },
+};
+
+export const DEFAULT_DENSE_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
+    ...DEFAULT_APPEARANCE_SETTINGS,
+    theme: {
+        ...DEFAULT_APPEARANCE_SETTINGS.theme,
+        flat: {
+            ...DEFAULT_APPEARANCE_SETTINGS.theme.flat,
+            transparentSurface: DEFAULT_DENSE_FLAT_TRANSPARENT_SURFACE_SETTINGS,
+        },
+        cupertinoGlass: {
+            ...DEFAULT_APPEARANCE_SETTINGS.theme.cupertinoGlass,
+            transparentSurface: DEFAULT_DENSE_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS,
+        },
+        colorFilled: {
+            ...DEFAULT_APPEARANCE_SETTINGS.theme.colorFilled,
+            transparentSurface: DEFAULT_DENSE_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS,
+        },
+        terminal: {
+            ...DEFAULT_APPEARANCE_SETTINGS.theme.terminal,
+            transparentSurface: DEFAULT_DENSE_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS,
+        },
+        pixelWindow: {
+            ...DEFAULT_APPEARANCE_SETTINGS.theme.pixelWindow,
+            transparentSurface: DEFAULT_DENSE_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS,
+        },
     },
 };
 

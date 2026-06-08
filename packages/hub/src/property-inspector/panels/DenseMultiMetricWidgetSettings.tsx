@@ -87,6 +87,7 @@ function DenseThemeSettings({
                     },
                 })}
                 disabled={transparentSurfaceDisabled}
+                showPerThemeNote
             />
         </SettingsSection>
     );
