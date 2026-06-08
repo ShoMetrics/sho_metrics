@@ -693,6 +693,30 @@ test("dense metric frame renders a progress list body", () => {
     assert.equal(countMatches(frame.svg, /class="dense-progress-list-row"/gu), 3);
 });
 
+test("dense metric body uses configured transparent surface outlines", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildDenseMetricRenderOptions({
+            widgetData: buildDenseMetricWidgetData(3),
+            resolvedSettings: {
+                theme: {
+                    flat: {
+                        transparentSurface: {
+                            enabled: true,
+                            textOutlinePercent: 40,
+                            shapeOutlinePercent: 40,
+                        },
+                    },
+                },
+            },
+        }),
+        renderTarget: "key",
+    });
+
+    assert.match(frame.svg, /dense-progress-list-row/);
+    assert.match(frame.svg, /dense-progress-list-track-outline/);
+    assert.match(frame.svg, /stroke-opacity="0\.40"/);
+});
+
 test("dense pixel window frame uses the full client viewport", () => {
     const frame = composeMetricViewFrame({
         viewOptions: buildDenseMetricRenderOptions({

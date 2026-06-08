@@ -58,6 +58,7 @@ test("global override renders transparent surface controls when its subsection i
     assert.match(markup, /Background Opacity:/);
     assert.match(markup, /Text Outline:/);
     assert.match(markup, /Shape Outline:/);
+    assert.doesNotMatch(markup, /saved per theme/);
 });
 
 test("global override renders terminal palette controls for terminal theme", () => {

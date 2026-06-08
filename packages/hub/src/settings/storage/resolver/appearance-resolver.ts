@@ -1,4 +1,3 @@
-
 import {
     CircleViewVariant as StoredCircleViewVariant,
     ColorMode as StoredColorMode,
@@ -70,6 +69,7 @@ import type {
 import {
     buildDefaultAppearanceSettings,
     DEFAULT_APPEARANCE_SETTINGS,
+    DEFAULT_DENSE_APPEARANCE_SETTINGS,
 } from "../../default-appearance-settings";
 import {
     resolveStoredEnum,
@@ -168,9 +168,9 @@ export function resolveDenseAppearanceSettings(
     globalSettings: ResolvedGlobalSettings,
 ): ResolvedAppearanceSettings {
     const appearance = {
-        view: DEFAULT_APPEARANCE_SETTINGS.view,
-        theme: resolveAppearanceThemeSettings(DEFAULT_APPEARANCE_SETTINGS.theme, storedAppearance?.theme),
-        line: DEFAULT_APPEARANCE_SETTINGS.line,
+        view: DEFAULT_DENSE_APPEARANCE_SETTINGS.view,
+        theme: resolveAppearanceThemeSettings(DEFAULT_DENSE_APPEARANCE_SETTINGS.theme, storedAppearance?.theme),
+        line: DEFAULT_DENSE_APPEARANCE_SETTINGS.line,
     } satisfies ResolvedAppearanceSettings;
     const appearanceWithThemeOverride = globalSettings.themeOverride
         ? applyGlobalThemeOverride(appearance, globalSettings.themeOverride)

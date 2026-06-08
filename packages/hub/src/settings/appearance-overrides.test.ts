@@ -19,7 +19,7 @@ test("appearance override merges pixel window transparent surface fields", () =>
     assert.deepEqual(appearance.theme.pixelWindow.transparentSurface, {
         enabled: true,
         backgroundOpacityPercent: 25,
-        textOutlinePercent: 85,
-        shapeOutlinePercent: 85,
+        textOutlinePercent: 70,
+        shapeOutlinePercent: 30,
     });
 });

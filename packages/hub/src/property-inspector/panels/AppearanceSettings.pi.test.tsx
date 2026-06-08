@@ -47,6 +47,26 @@ test("appearance settings patches transparent surface for the active theme", asy
     ]);
 });
 
+test("appearance settings disables transparent surface sliders until enabled", async () => {
+    const user = userEvent.setup();
+
+    renderAppearanceSettings([]);
+
+    const backgroundOpacity = screen.getByRole("slider", { name: /^background opacity:$/i });
+    const textOutline = screen.getByRole("slider", { name: /^text outline:$/i });
+    const shapeOutline = screen.getByRole("slider", { name: /^shape outline:$/i });
+
+    assert.equal(backgroundOpacity.hasAttribute("disabled"), true);
+    assert.equal(textOutline.hasAttribute("disabled"), true);
+    assert.equal(shapeOutline.hasAttribute("disabled"), true);
+
+    await user.click(screen.getByRole("checkbox", { name: /^transparent background$/i }));
+
+    assert.equal(backgroundOpacity.hasAttribute("disabled"), false);
+    assert.equal(textOutline.hasAttribute("disabled"), false);
+    assert.equal(shapeOutline.hasAttribute("disabled"), false);
+});
+
 test("appearance settings patches pixel window transparent surface when it is active", () => {
     const settingsPatches: StoredWidgetSettingsPatch[] = [];
 
@@ -58,21 +78,35 @@ test("appearance settings patches pixel window transparent surface when it is ac
         },
     });
 
+    fireEvent.click(screen.getByRole("checkbox", { name: /^transparent background$/i }));
     fireEvent.change(screen.getByRole("slider", { name: /^text outline:$/i }), {
         target: { value: "70" },
     });
 
-    assert.deepEqual(settingsPatches, [{
-        appearance: {
-            theme: {
-                pixelWindow: {
-                    transparentSurface: {
-                        textOutlinePercent: 70,
+    assert.deepEqual(settingsPatches, [
+        {
+            appearance: {
+                theme: {
+                    pixelWindow: {
+                        transparentSurface: {
+                            enabled: true,
+                        },
                     },
                 },
             },
         },
-    }]);
+        {
+            appearance: {
+                theme: {
+                    pixelWindow: {
+                        transparentSurface: {
+                            textOutlinePercent: 70,
+                        },
+                    },
+                },
+            },
+        },
+    ]);
 });
 
 function renderAppearanceSettings(
