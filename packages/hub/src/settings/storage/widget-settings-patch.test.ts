@@ -862,6 +862,39 @@ test("widget patch updates a stacked single metric item by slot id", () => {
     assert.equal(firstSlot.item.value.slot?.metric?.sourcePolicy?.failureMode, StoredSourceFailureMode.USE_FALLBACK);
 });
 
+test("widget patch replaces a stacked slot metric domain before applying single metric patches", () => {
+    const nextSettings = writeStoredWidgetSettingsPatch({
+        stackedMetric: {
+            slots: [
+                { slotId: "slot-1", singleMetric: { slot: { metric: { cpu: {} } } } },
+                { slotId: "slot-2", singleMetric: { slot: { metric: { memory: {} } } } },
+            ],
+        },
+    }, {
+        stacked: {
+            updateSlot: {
+                slotId: "slot-1",
+                metricDomain: "catalog",
+                singleMetric: {
+                    catalog: {
+                        metricId: "source.sensor:/gpu/0/power",
+                        detectedLabel: "GPU Power",
+                        detectedUnit: MetricUnit.WATTS,
+                        detectedCategory: "gpu",
+                        detectedReadingKind: "power",
+                    },
+                },
+            },
+        },
+    });
+    const widget = readStackedMetricWidget(nextSettings);
+    const firstSlot = widget.slots[0];
+
+    assert.equal(firstSlot?.item.case, "singleMetric");
+    assert.equal(firstSlot.item.value.slot?.metric?.target.case, "catalog");
+    assert.equal(firstSlot.item.value.slot?.metric?.target.value.metricId, "source.sensor:/gpu/0/power");
+});
+
 test("widget patch rejects removing stacked metric slots below the minimum", () => {
     assert.throws(() => writeStoredWidgetSettingsPatch({
         stackedMetric: {

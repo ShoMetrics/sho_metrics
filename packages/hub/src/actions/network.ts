@@ -5,7 +5,6 @@ import { setMetricView } from "../view-updates/runner";
 import { logger } from "../logging/logger";
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../runtime/network-interfaces";
 import {
-    getNetworkAggregateMetricKey,
     resolveNetworkMetricKey,
     type NetworkMetricDirection,
 } from "../runtime/network-metric-keys";
@@ -24,9 +23,12 @@ import {
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 import { wallClockNowMilliseconds } from "../shared/clock";
+import {
+    NETWORK_INTERFACE_LIST_REFRESH_METRIC_KEYS,
+    publishNetworkInterfaceRuntimeCache,
+} from "./shared/network-interface-runtime-cache";
 
 const log = logger.for("Action:Network");
-const NETWORK_INTERFACE_LIST_REFRESH_METRIC_KEYS = [getNetworkAggregateMetricKey("download")] as const;
 
 /**
  * Network action.
@@ -95,10 +97,8 @@ export class Network extends MetricAction {
     }
 
     private publishNetworkInterfaceOptions(event: WillAppearEvent | PropertyInspectorDidAppearEvent): void {
-        const availableNetworkInterfaces = [...networkInterfaceRegistry.getOptions()];
-
-        this.updateRuntimeCache(event, {
-            availableNetworkInterfaces,
+        publishNetworkInterfaceRuntimeCache({
+            updateRuntimeCache: patch => this.updateRuntimeCache(event, patch),
         }).catch(error => {
             log.error(() => `Failed to publish network interfaces: ${String(error)}`);
         });

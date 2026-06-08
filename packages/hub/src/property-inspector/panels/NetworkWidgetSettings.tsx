@@ -62,7 +62,7 @@ export function NetworkWidgetSettings(props: NetworkWidgetSettingsProps): React.
             ) : (
                 <StandardColorSettings {...props} />
             )}
-            <PollingSettings {...props} />
+            {props.showPolling !== false && <PollingSettings {...props} />}
         </>
     );
 }
