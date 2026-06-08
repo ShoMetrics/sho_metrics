@@ -2,7 +2,7 @@ import { useState } from "react";
 import { InspectorItem } from "../components/InspectorItem";
 import { SectionHeading } from "../components/SectionHeading";
 import { commonMessages } from "../../i18n/message-groups/shell";
-import { catalogMessages, cpuMessages, denseMessages, gpuMessages, helperMessages, multiMetricMessages } from "../../i18n/message-groups/widgets";
+import { catalogMessages, cpuMessages, denseMessages, gpuMessages, helperMessages, multiMetricMessages, networkMessages } from "../../i18n/message-groups/widgets";
 import { optionMessages } from "../../i18n/message-groups/options";
 import { localizeOptionList } from "../../i18n/options";
 import { useI18n, type I18n } from "../../i18n/react";
@@ -17,7 +17,7 @@ import { SelectSetting } from "../controls/SelectSetting";
 import { TextSetting } from "../controls/TextSetting";
 import type { SelectOption } from "../inspector/types";
 import { buildCatalogMetricOptions, type CatalogMetricOptions, type CatalogMetricSelection, type CatalogMetricTypeId, type SelectedCatalogMetric } from "../select-options/catalog-metric-options";
-import { resolveDiskVolumeOptions } from "../select-options/runtime-select-options";
+import { resolveDiskVolumeOptions, resolveNetworkInterfaceOptions } from "../select-options/runtime-select-options";
 import { resolveHelperStatusGuidanceText } from "./helper-status-guidance";
 import {
     buildDiskThroughputMaximumInputSpec,
@@ -276,7 +276,7 @@ function DenseMetricTargetSettings({
         case "disk":
             return <DenseDiskMetricSettings context={context} target={target} slotId={slotId} onSettingsPatch={onSettingsPatch} />;
         case "network":
-            return <DenseNetworkMetricSettings reading={target.reading} slotId={slotId} onSettingsPatch={onSettingsPatch} />;
+            return <DenseNetworkMetricSettings context={context} reading={target.reading} slotId={slotId} onSettingsPatch={onSettingsPatch} />;
         case "catalog":
             return (
                 <DenseCatalogMetricSettings
@@ -397,26 +397,50 @@ function DenseDiskMetricSettings({
 }
 
 function DenseNetworkMetricSettings({
+    context,
     reading,
     slotId,
     onSettingsPatch,
 }: {
+    readonly context: WidgetSettingsPanelProps["context"];
     readonly reading: ResolvedNetworkReading;
     readonly slotId: string;
     readonly onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
 }): React.JSX.Element {
-    const { t } = useI18n();
+    const i18n = useI18n();
+    const { t } = i18n;
     const direction = reading.kind === "traffic" && reading.direction === "upload" ? "upload" : "download";
+    const interfaceId = reading.kind === "traffic" ? reading.interfaceId ?? "" : "";
 
     return (
-        <SelectSetting
-            label={t(denseMessages.rowDirectionLabel)}
-            value={direction}
-            optionList={localizeOptionList(t, singleDirectionNetworkOptionList, networkDirectionMessageByValue)}
-            onValueChange={(nextDirection) => {
-                writeDenseSlotTarget(onSettingsPatch, slotId, { domain: "network", kind: "traffic", direction: nextDirection });
-            }}
-        />
+        <>
+            <SelectSetting
+                label={t(denseMessages.rowDirectionLabel)}
+                value={direction}
+                optionList={localizeOptionList(t, singleDirectionNetworkOptionList, networkDirectionMessageByValue)}
+                onValueChange={(nextDirection) => {
+                    writeDenseSlotTargetPreservingCustomDisplay(onSettingsPatch, slotId, {
+                        domain: "network",
+                        kind: "traffic",
+                        direction: nextDirection,
+                        interfaceId,
+                    });
+                }}
+            />
+            <SelectSetting
+                label={t(networkMessages.networkInterfaceLabel)}
+                value={interfaceId}
+                optionList={resolveNetworkInterfaceOptions(context, i18n)}
+                onValueChange={(nextInterfaceId) => {
+                    writeDenseSlotTargetPreservingCustomDisplay(onSettingsPatch, slotId, {
+                        domain: "network",
+                        kind: "traffic",
+                        direction,
+                        interfaceId: nextInterfaceId,
+                    });
+                }}
+            />
+        </>
     );
 }
 
@@ -550,6 +574,23 @@ function writeDenseSlotTarget(
                 target,
                 customLabel: undefined,
                 customMaximumValue: undefined,
+            },
+        },
+    });
+}
+
+function writeDenseSlotTargetPreservingCustomDisplay(
+    onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void,
+    slotId: string,
+    target: DenseMetricTargetPatch,
+): void {
+    // Network direction/interface changes keep the metric in the same traffic unit family,
+    // so custom label and maximum remain valid and must not be reset.
+    onSettingsPatch({
+        dense: {
+            updateSlot: {
+                slotId,
+                target,
             },
         },
     });

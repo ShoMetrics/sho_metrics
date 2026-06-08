@@ -1113,6 +1113,31 @@ test("dense multi metric disk usage row renders disk volume picker", () => {
     assert.match(markup, /E: \(500 GB, Games\)/);
 });
 
+test("dense multi metric network row renders interface picker", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "denseMultiMetric",
+        settings: buildDenseWidgetSettings([
+            { slotId: "slot-1", slot: { metric: { network: { traffic: { direction: "download", interfaceId: "eth0" } } } } },
+            { slotId: "slot-2", slot: { metric: { gpu: {} } } },
+        ]),
+        runtimeCache: {
+            availableNetworkInterfaces: [
+                {
+                    id: "eth0",
+                    name: "Ethernet",
+                    type: "wired",
+                    isDefault: true,
+                    speedMegabitsPerSecond: null,
+                },
+            ],
+        },
+    });
+
+    assert.match(markup, /Direction:/);
+    assert.match(markup, /Network Interface:/);
+    assert.match(markup, /Ethernet \(default, wired, eth0\)/);
+});
+
 test("dense multi metric built-in max inputs use readable units", () => {
     const markup = renderWidgetSettings({
         actionKind: "denseMultiMetric",

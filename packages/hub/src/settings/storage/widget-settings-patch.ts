@@ -228,7 +228,12 @@ export type DenseMetricTargetPatch =
         readonly volumeId?: string | undefined;
         readonly throughputDirection?: "read" | "write";
     }
-    | { readonly domain: "network"; readonly kind: "traffic"; readonly direction: "upload" | "download" }
+    | {
+        readonly domain: "network";
+        readonly kind: "traffic";
+        readonly direction: "upload" | "download";
+        readonly interfaceId?: string | undefined;
+    }
     | {
         readonly domain: "catalog";
         readonly metricId: string;
@@ -648,6 +653,7 @@ function buildDenseMetricTarget(patch: DenseMetricTargetPatch): StoredMetricSele
                     kind: StoredNetworkMetricKind.TRAFFIC,
                     traffic: create(NetworkMetricTarget_TrafficSchema, {
                         direction: storedNetworkDirectionByResolved[patch.direction],
+                        interfaceId: patch.interfaceId,
                     }),
                 }),
             };

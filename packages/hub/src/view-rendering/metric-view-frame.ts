@@ -8,7 +8,7 @@ import {
     renderStackedMetricIndicator,
     type StackedMetricIndicator,
 } from "./stacked-metric-indicator";
-import { formatRenderUnitText } from "./text-content/render-unit-text";
+import { formatCompactDataRateUnitText, formatRenderUnitText } from "./text-content/render-unit-text";
 import { renderSingleMetricBodyView } from "./single-metric-view";
 import {
     KEYPAD_PNG_SIZE,
@@ -805,10 +805,19 @@ function buildRenderDenseMetricWidgetData(widgetData: DenseMetricWidgetData): De
         rows: widgetData.rows.map(row => ({
             ...row,
             widgetData: row.widgetData.sampleTimestampMilliseconds == null
-                ? formatRenderWidgetDataUnit(buildPlaceholderChannelWidgetData(row.widgetData, resolveUnavailableRenderDisplayValue(row.widgetData)))
-                : formatRenderWidgetDataUnit(row.widgetData),
+                ? formatDenseRenderWidgetDataUnit(buildPlaceholderChannelWidgetData(row.widgetData, resolveUnavailableRenderDisplayValue(row.widgetData)))
+                : formatDenseRenderWidgetDataUnit(row.widgetData),
         })),
     };
+}
+
+function formatDenseRenderWidgetDataUnit(widgetData: WidgetData): WidgetData {
+    const formattedWidgetData = formatRenderWidgetDataUnit(widgetData);
+    const compactUnit = formatCompactDataRateUnitText(formattedWidgetData.unit);
+
+    return compactUnit === formattedWidgetData.unit
+        ? formattedWidgetData
+        : { ...formattedWidgetData, unit: compactUnit };
 }
 
 function buildZeroChannelWidgetData(widgetData: WidgetData, referenceHistoryLength: number): WidgetData {
