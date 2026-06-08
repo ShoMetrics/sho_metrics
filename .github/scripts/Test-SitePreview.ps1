@@ -115,7 +115,7 @@ $requiredPages = @(
     @{ Path = "download/index.html"; Terms = @("Helper", "Plugin") },
     @{ Path = "troubleshooting/index.html"; Terms = @("Actions Do Not Appear", "Metrics Do Not Update") },
     @{ Path = "faq/helper/index.html"; Terms = @("Windows-only", "PawnIO", "LibreHardwareMonitor") },
-    @{ Path = "tutorials/color-compensation/index.html"; Terms = @("Color Compensation", "Stream Deck key", "Overall Brightness") }
+    @{ Path = "faq/color-compensation/index.html"; Terms = @("Color Compensation", "Stream Deck key", "Overall Brightness") }
 )
 $skippedSchemes = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 @("data", "http", "https", "javascript", "mailto", "tel") | ForEach-Object { [void]$skippedSchemes.Add($_) }
