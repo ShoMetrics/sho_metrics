@@ -30,6 +30,7 @@ import {
     type MetricRenderedData,
     type SingleMetricRenderOptions,
 } from "./metric-view-frame";
+import type { StackedMetricIndicator } from "./stacked-metric-indicator";
 
 test("single value-capable widget without data renders an N/A placeholder copy", () => {
     const widgetData = buildWidgetData({
@@ -798,10 +799,78 @@ test("dense metric frame keeps missing samples isolated to their rows", () => {
     assert.equal(renderedMetricData.rows[1]?.widgetData.displayValue, "N/A");
 });
 
+test("stacked metric indicator renders as a bottom-right overlay", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
+            stackedIndicator: {
+                currentIndex: 2,
+                totalCount: 3,
+            },
+        }),
+        renderTarget: "key",
+    });
+
+    assert.match(frame.svg, /class="stacked-metric-indicator"/);
+    assert.match(frame.svg, /<rect x="102\.80" y="124\.60"[\s\S]*width="36\.20" height="14\.40"/);
+    assert.match(frame.svg, /<circle cx="120\.90" cy="131\.80" r="3\.2"[\s\S]*opacity="1"/);
+    assert.doesNotMatch(frame.svg, />2\/3<\/text>/);
+});
+
+test("stacked metric indicator does not change the active body viewport", () => {
+    const withoutIndicator = composeMetricViewFrame({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
+            resolvedSettings: {
+                theme: { selectedTheme: "pixel-window" },
+                view: { selectedView: "text" },
+            },
+        }),
+        renderTarget: "key",
+    });
+    const withIndicator = composeMetricViewFrame({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
+            resolvedSettings: {
+                theme: { selectedTheme: "pixel-window" },
+                view: { selectedView: "text" },
+            },
+            stackedIndicator: {
+                currentIndex: 1,
+                totalCount: 2,
+            },
+        }),
+        renderTarget: "key",
+    });
+
+    assert.deepEqual(withIndicator.renderPlan.bodyViewport, withoutIndicator.renderPlan.bodyViewport);
+    assert.deepEqual(withIndicator.renderPlan.bodyRenderSize, withoutIndicator.renderPlan.bodyRenderSize);
+    assert.match(withIndicator.svg, /class="stacked-metric-indicator"/);
+});
+
+test("stacked metric indicator uses touch strip coordinates", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
+            stackedIndicator: {
+                currentIndex: 3,
+                totalCount: 3,
+            },
+        }),
+        renderTarget: "touch-strip",
+    });
+
+    assert.deepEqual(frame.renderPlan.renderSize, TOUCH_STRIP_LOGICAL_SIZE);
+    assert.match(frame.svg, /<rect x="158\.80" y="80\.60"[\s\S]*width="36\.20" height="14\.40"/);
+    assert.match(frame.svg, /<circle cx="187\.30" cy="87\.80" r="3\.2"[\s\S]*opacity="1"/);
+    assert.doesNotMatch(frame.svg, />3\/3<\/text>/);
+});
+
 function buildSingleMetricRenderOptions(options: {
     widgetData: WidgetData;
     noticeText?: string;
     resolvedSettings?: ResolvedAppearanceSettingsOverride;
+    stackedIndicator?: StackedMetricIndicator;
 }): SingleMetricRenderOptions {
     return {
         metricRenderKind: "singleMetric",
@@ -809,6 +878,7 @@ function buildSingleMetricRenderOptions(options: {
         statusIcon: buildStatusIcon(),
         widgetData: options.widgetData,
         ...(options.noticeText === undefined ? {} : { noticeText: options.noticeText }),
+        ...(options.stackedIndicator === undefined ? {} : { stackedIndicator: options.stackedIndicator }),
         resolvedSettings: buildDefaultAppearanceSettings(options.resolvedSettings),
     };
 }
