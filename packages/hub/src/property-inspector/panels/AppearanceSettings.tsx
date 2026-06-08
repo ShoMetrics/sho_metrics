@@ -7,10 +7,7 @@ import { TransparentSurfaceSetting } from "../controls/TransparentSurfaceSetting
 import { SettingsSection } from "./SettingsSection";
 import { commonMessages } from "../../i18n/message-groups/shell";
 import { useI18n } from "../../i18n/react";
-import {
-    buildTransparentSurfaceAppearanceThemeOverride,
-    resolveActiveTransparentSurface,
-} from "../../settings/appearance-overrides";
+import { buildTransparentSurfaceAppearanceOverride } from "../../settings/appearance-overrides";
 import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 
@@ -81,17 +78,11 @@ export function AppearanceSettings({
                     />
                 )}
                 <TransparentSurfaceSetting
-                    value={resolveActiveTransparentSurface(appearance)}
+                    value={appearance.transparentSurface}
                     onPatch={(transparentSurface) => onSettingsPatch({
-                        appearance: {
-                            theme: buildTransparentSurfaceAppearanceThemeOverride(
-                                appearance.theme.selectedTheme,
-                                transparentSurface,
-                            ),
-                        },
+                        appearance: buildTransparentSurfaceAppearanceOverride(transparentSurface),
                     })}
                     disabled={transparentSurfaceDisabled}
-                    showPerThemeNote
                 />
             </SettingsSection>
         </>

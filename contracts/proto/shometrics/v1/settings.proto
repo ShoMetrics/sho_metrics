@@ -50,7 +50,7 @@ message DenseMultiMetricWidget {
   }];
 
   // Shared appearance for the dense list. Dense consumes theme, paint, and
-  // theme-owned transparent surface settings. It ignores view and line
+  // widget-owned transparent surface settings. It ignores view and line
   // settings in v1.
   AppearanceSettings appearance = 2;
 }
@@ -533,6 +533,11 @@ message AppearanceSettings {
   AppearanceViewSettings view = 1;
   AppearanceThemeSettings theme = 2;
   LineAppearanceSettings line = 3;
+
+  // Transparent surface tuning is widget-owned instead of theme-owned. Users
+  // tune it for readability over their background, and changing theme should
+  // not reset that widget-level choice.
+  TransparentSurfaceSettings transparent_surface = 4;
 }
 
 message AppearanceViewSettings {
@@ -576,8 +581,6 @@ message AppearanceThemeSettings {
   // clean terminal look and the more opinionated vintage screen treatment
   // without splitting them into separate themes.
   TerminalThemeSettings terminal = 5;
-
-  PixelWindowThemeSettings pixel_window = 6;
 }
 
 message TransparentSurfaceSettings {
@@ -590,21 +593,18 @@ message TransparentSurfaceSettings {
 message FlatThemeSettings {
   // Metric accent paint controls ring, large text, bar fill, and line stroke.
   MetricPaintSettings paint = 1;
-  TransparentSurfaceSettings transparent_surface = 2;
 }
 
 message CupertinoGlassThemeSettings {
   // Metric accent paint controls foreground metric emphasis for now. Future
   // glass tint or glass material settings belong in this message, not in Flat.
   MetricPaintSettings paint = 1;
-  TransparentSurfaceSettings transparent_surface = 2;
 }
 
 message ColorFilledThemeSettings {
   // Color Filled paint controls the widget background fill. Foreground paint is
   // derived by the renderer for legibility.
   ColorFilledPaintSettings paint = 1;
-  TransparentSurfaceSettings transparent_surface = 2;
 }
 
 message TerminalThemeSettings {
@@ -616,11 +616,6 @@ message TerminalThemeSettings {
   // Terminal paint is theme-owned because terminal palettes control the whole
   // foreground treatment, including text, dim text, and glow.
   TerminalPaintSettings paint = 2;
-  TransparentSurfaceSettings transparent_surface = 3;
-}
-
-message PixelWindowThemeSettings {
-  TransparentSurfaceSettings transparent_surface = 1;
 }
 
 message TerminalPaintSettings {
@@ -770,10 +765,8 @@ message GlobalTransparentSurfaceOverride {
   // subsection as enabled.
   optional bool enabled = 1;
 
-  // Unlike widget theme settings, global override stores one transparent
-  // surface setting because it expresses cross-widget readability for the
-  // user's background. Widget settings remain per theme so a widget can
-  // remember theme-specific tuning.
+  // Global override also stores one transparent surface setting because this
+  // axis expresses readability over the user's background, not theme identity.
   TransparentSurfaceSettings transparent_surface = 2;
 }
 

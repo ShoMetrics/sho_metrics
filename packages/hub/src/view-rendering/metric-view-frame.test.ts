@@ -698,14 +698,10 @@ test("dense metric body uses configured transparent surface outlines", () => {
         viewOptions: buildDenseMetricRenderOptions({
             widgetData: buildDenseMetricWidgetData(3),
             resolvedSettings: {
-                theme: {
-                    flat: {
-                        transparentSurface: {
-                            enabled: true,
-                            textOutlinePercent: 40,
-                            shapeOutlinePercent: 40,
-                        },
-                    },
+                transparentSurface: {
+                    enabled: true,
+                    textOutlinePercent: 40,
+                    shapeOutlinePercent: 40,
                 },
             },
         }),

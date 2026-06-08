@@ -337,7 +337,8 @@ Resolver rules:
 - If stored widget is `dense_multi_metric`, resolve every stored slot using the
   existing `resolveMetricSlot` path.
 - Dense widget appearance uses `DenseMultiMetricWidget.appearance`, then global
-  theme/paint/transparent-surface overrides.
+  theme/paint/transparent-surface overrides. Transparent surface is one
+  widget-owned setting on `AppearanceSettings`, not a per-theme setting.
 - Dense widget appearance must not apply global view overrides. Dense has no
   product-level view selector, and global `MetricView` values such as `circle`
   or `line` do not describe the dense progress list.

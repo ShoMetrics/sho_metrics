@@ -18,17 +18,18 @@ The feature exists for users who place their own background behind the plugin im
 Implement these exact decisions:
 
 - All themes default to transparent surface support disabled.
-- Flat / Default stores these default values for when the user enables the feature:
-  - `backgroundOpacityPercent: 0`
-  - `textOutlinePercent: 85`
-  - `shapeOutlinePercent: 85`
-- Every other theme stores these default values for when the user enables the feature:
+- Widget settings store one transparent surface setting at `AppearanceSettings.transparent_surface`.
+- Widget defaults are theme-aware only while resolving missing stored values:
+  - Flat / Default: `backgroundOpacityPercent: 20`, `textOutlinePercent: 70`, `shapeOutlinePercent: 30`
+  - Non-Flat themes: `backgroundOpacityPercent: 50`, `textOutlinePercent: 70`, `shapeOutlinePercent: 30`
+- Flat uses `20` instead of `0` because it mostly reveals the user's background while keeping a small amount of theme presence; `0` made the Flat surface disappear completely.
+- Dense Multi Metric defaults use `backgroundOpacityPercent: 0`, `textOutlinePercent: 0`, `shapeOutlinePercent: 0`.
+- Global override stores one transparent surface override independent of theme:
   - `backgroundOpacityPercent: 50`
-  - `textOutlinePercent: 85`
-  - `shapeOutlinePercent: 85`
-- Widget settings store transparent surface settings per theme.
-- Global override stores one transparent surface override independent of theme. This is intentionally different from widget settings: global transparent surface expresses cross-widget readability for the user's background, while widget settings remember theme-specific tuning.
-- Pixel Window supports the same setting group, defaults disabled, and uses background opacity for the window chrome/background layer. Pixel Window metric body text/shape outlines use the same renderer token path as other themes. Pixel Window chrome text and window-control glyphs are theme chrome and are not outlined.
+  - `textOutlinePercent: 70`
+  - `shapeOutlinePercent: 30`
+- Global override does not use theme-aware defaults because it has no widget selected theme. It expresses one cross-widget readability override for the user's background.
+- Pixel Window supports the same appearance-level setting group and uses background opacity for the window chrome/background layer. Pixel Window metric body text/shape outlines use the same renderer token path as other themes. Pixel Window chrome text and window-control glyphs are theme chrome and are not outlined.
 - The Property Inspector exposes one toggle and three sliders:
   - `Transparent background`
   - `Background opacity`
@@ -44,7 +45,7 @@ Implement these exact decisions:
 Respect these boundaries:
 
 - Stored settings express user intent: whether transparent support is enabled and what percentages the user selected.
-- Resolved settings hold complete per-theme values.
+- Resolved settings hold one complete appearance-level transparent surface value. Resolver/default helpers own theme-aware fallback values when stored percentages are absent.
 - Render appearance resolves those settings into numeric drawing tokens.
 - Low-level SVG primitives must not know product intent such as "transparent background support is enabled." They receive concrete drawing instructions:
   - background opacity as `0..1`
@@ -68,10 +69,10 @@ Locations:
 Work:
 
 - Add `TransparentSurfaceSettings` to proto.
-- Add per-theme transparent surface fields, including the new `PixelWindowThemeSettings`.
-- Regenerate proto outputs from `packages/hub` with `npm run generate:proto`.
+- Add one appearance-level transparent surface field.
+- Regenerate proto outputs from `packages/hub` with `npm.cmd run generate:proto`.
 - Add resolved interfaces and defaults.
-- Preserve the product defaults exactly: Flat `0/85/85`, all non-Flat themes `50/85/85`, all disabled.
+- Preserve the product defaults exactly: Flat `20/70/30`, non-Flat `50/70/30`, Dense `0/0/0`, Global `50/70/30`, all disabled.
 
 Why this step stands alone:
 
@@ -88,12 +89,11 @@ Locations:
 
 Work:
 
-- Resolve `transparentSurface` for every theme.
-- Add `pixelWindow` to resolved theme settings.
-- Add sparse override types and merge logic for every theme.
-- Add widget patch writing for every theme.
+- Resolve one appearance-level `transparentSurface`.
+- Add sparse override types and merge logic for the appearance-level transparent surface.
+- Add widget patch writing for the appearance-level transparent surface.
 - Add global transparent surface override patch writing as one global setting, independent of global theme override.
-- Ensure global theme override preserves widget-level per-theme `transparentSurface`; only the independent global transparent surface override may replace those values.
+- Ensure global theme override preserves widget-level `transparentSurface`; only the independent global transparent surface override may replace that value.
 - Use a local storage-specific `resolveStoredPercent` helper, not renderer/SVG helpers.
 
 Why this step stands alone:
@@ -113,7 +113,7 @@ Locations:
 Work:
 
 - Add `RenderOutlineTokens` and `RenderTransparentSurfaceTokens`.
-- Resolve active per-theme settings into concrete renderer tokens.
+- Resolve appearance-level settings into concrete renderer tokens.
 - Pass `transparentSurface` through `MetricRenderAppearance`.
 - Apply `backgroundOpacity` only to theme-owned background/chrome fragments in `metric-frame.ts`.
 - Do not wrap metric body SVG or any content passed through `placedBodies`.
@@ -188,13 +188,13 @@ Work:
 - Create `TransparentSurfaceSetting.tsx`.
 - Render the toggle and three sliders.
 - Render helper copy: `Affects theme background and chrome only. Metrics stay opaque.`
-- Patch only the active selected theme.
+- Patch `appearance.transparentSurface` for widget settings.
 - Add the same controls to global Theme Override.
-- Keep sliders visible and enabled when the toggle is off.
+- Keep sliders visible but disabled when the toggle is off.
 
 Why this step stands alone:
 
-- It is the user-facing settings surface. It must patch the same per-theme contract implemented in storage and render.
+- It is the user-facing settings surface. It must patch the same appearance-level contract implemented in storage and render.
 
 ### Step 7: Add Tests And Run Verification
 
@@ -219,9 +219,14 @@ Work:
 - Run from `packages/hub`:
 
 ```powershell
-npm run test:unit
-npm run test:pi
-npm run build
+npm.cmd run proto:format
+npm.cmd run proto:lint
+npm.cmd run proto:build
+npm.cmd run generate:proto
+npm.cmd run build
+npm.cmd run test:unit
+npm.cmd run test:pi
+npm.cmd run test:visual
 ```
 
 - Perform the Manual Verification section.
@@ -245,9 +250,16 @@ message TransparentSurfaceSettings {
 }
 ```
 
-Extend theme messages:
+Add the field to `AppearanceSettings`, not to individual theme messages:
 
 ```proto
+message AppearanceSettings {
+  AppearanceViewSettings view = 1;
+  AppearanceThemeSettings theme = 2;
+  LineAppearanceSettings line = 3;
+  TransparentSurfaceSettings transparent_surface = 4;
+}
+
 message AppearanceThemeSettings {
   optional MetricTheme selected_theme = 1 [(buf.validate.field).enum = {
     defined_only: true
@@ -258,22 +270,18 @@ message AppearanceThemeSettings {
   CupertinoGlassThemeSettings cupertino_glass = 3;
   ColorFilledThemeSettings color_filled = 4;
   TerminalThemeSettings terminal = 5;
-  PixelWindowThemeSettings pixel_window = 6;
 }
 
 message FlatThemeSettings {
   MetricPaintSettings paint = 1;
-  TransparentSurfaceSettings transparent_surface = 2;
 }
 
 message CupertinoGlassThemeSettings {
   MetricPaintSettings paint = 1;
-  TransparentSurfaceSettings transparent_surface = 2;
 }
 
 message ColorFilledThemeSettings {
   ColorFilledPaintSettings paint = 1;
-  TransparentSurfaceSettings transparent_surface = 2;
 }
 
 message TerminalThemeSettings {
@@ -283,18 +291,13 @@ message TerminalThemeSettings {
   }];
 
   TerminalPaintSettings paint = 2;
-  TransparentSurfaceSettings transparent_surface = 3;
-}
-
-message PixelWindowThemeSettings {
-  TransparentSurfaceSettings transparent_surface = 1;
 }
 ```
 
 Run proto generation from `packages/hub`:
 
 ```powershell
-npm run generate:proto
+npm.cmd run generate:proto
 ```
 
 Do not hand-edit generated files.
@@ -314,56 +317,65 @@ export interface ResolvedTransparentSurfaceSettings {
 }
 ```
 
-Add `transparentSurface: ResolvedTransparentSurfaceSettings` to:
+Add `transparentSurface: ResolvedTransparentSurfaceSettings` to `ResolvedAppearanceSettings`.
 
-- `ResolvedFlatThemeSettings`
-- `ResolvedCupertinoGlassThemeSettings`
-- `ResolvedColorFilledThemeSettings`
-- `ResolvedTerminalThemeSettings`
-
-Add:
-
-```ts
-export interface ResolvedPixelWindowThemeSettings {
-    readonly transparentSurface: ResolvedTransparentSurfaceSettings;
-}
-```
-
-Add `pixelWindow: ResolvedPixelWindowThemeSettings` to `ResolvedAppearanceThemeSettings`.
+Do not add a `ResolvedPixelWindowThemeSettings` empty shell. Pixel Window is a theme preset with no theme-owned settings after transparent surface moved to `AppearanceSettings`.
 
 Edit [default-appearance-settings.ts](../../packages/hub/src/settings/default-appearance-settings.ts).
 
 Add constants:
 
 ```ts
-const DEFAULT_FLAT_TRANSPARENT_SURFACE_SETTINGS = {
+const DEFAULT_FLAT_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
     enabled: false,
-    backgroundOpacityPercent: 0,
-    textOutlinePercent: 85,
-    shapeOutlinePercent: 85,
-} satisfies ResolvedTransparentSurfaceSettings;
+    backgroundOpacityPercent: 20,
+    textOutlinePercent: 70,
+    shapeOutlinePercent: 30,
+};
 
-const DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS = {
+const DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
     enabled: false,
     backgroundOpacityPercent: 50,
-    textOutlinePercent: 85,
-    shapeOutlinePercent: 85,
-} satisfies ResolvedTransparentSurfaceSettings;
+    textOutlinePercent: 70,
+    shapeOutlinePercent: 30,
+};
+
+const DEFAULT_DENSE_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
+    enabled: false,
+    backgroundOpacityPercent: 0,
+    textOutlinePercent: 0,
+    shapeOutlinePercent: 0,
+};
+
+export const DEFAULT_GLOBAL_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
+    enabled: false,
+    backgroundOpacityPercent: 50,
+    textOutlinePercent: 70,
+    shapeOutlinePercent: 30,
+};
 ```
 
-Assign them to each theme default:
+Assign `DEFAULT_APPEARANCE_SETTINGS.transparentSurface` to `DEFAULT_FLAT_TRANSPARENT_SURFACE_SETTINGS` because Flat is the default selected theme.
 
-- `flat.transparentSurface = DEFAULT_FLAT_TRANSPARENT_SURFACE_SETTINGS`
-- `cupertinoGlass.transparentSurface = DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS`
-- `colorFilled.transparentSurface = DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS`
-- `terminal.transparentSurface = DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS`
-- `pixelWindow.transparentSurface = DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS`
+Add a shared default selector:
+
+```ts
+export function resolveDefaultTransparentSurfaceSettings(
+    selectedTheme: MetricTheme,
+): ResolvedTransparentSurfaceSettings {
+    return selectedTheme === "flat"
+        ? DEFAULT_FLAT_TRANSPARENT_SURFACE_SETTINGS
+        : DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS;
+}
+```
+
+Use it from both `buildDefaultAppearanceSettings(...)` and the storage resolver so tests/previews and stored settings resolve the same theme-aware fallback. Dense settings use `DEFAULT_DENSE_TRANSPARENT_SURFACE_SETTINGS` directly.
 
 ## Storage Resolver
 
 Edit [resolver.ts](../../packages/hub/src/settings/storage/resolver.ts).
 
-Add imports for the generated transparent surface and pixel window schema/types.
+Add imports for the generated transparent surface schema/type.
 
 Add a resolver:
 
@@ -398,14 +410,13 @@ function resolveStoredPercent(value: number | undefined, fallback: number): numb
 
 Use `resolveStoredPercent` for all transparent surface percentage fields.
 
-Update theme resolvers:
+Resolve `transparentSurface` at the `AppearanceSettings` level:
 
-- `resolveFlatThemeSettings` resolves `transparentSurface`.
-- `resolveCupertinoGlassThemeSettings` resolves `transparentSurface`.
-- `resolveColorFilledThemeSettings` resolves `transparentSurface`.
-- `resolveTerminalThemeSettings` resolves `transparentSurface`.
-- Add `resolvePixelWindowThemeSettings`.
-- `resolveAppearanceThemeSettings` returns `pixelWindow`.
+- Resolve `selectedTheme` first.
+- Use `resolveDefaultTransparentSurfaceSettings(selectedTheme)` for the ordinary widget fallback.
+- Use `DEFAULT_DENSE_TRANSPARENT_SURFACE_SETTINGS` for Dense.
+- Apply `storedAppearance?.transparentSurface` over that fallback.
+- Keep theme resolvers focused on theme-owned paint/variant settings only.
 
 ## Appearance Overrides and Patches
 
@@ -422,20 +433,16 @@ export interface ResolvedTransparentSurfaceSettingsOverride {
 }
 ```
 
-Add `transparentSurface?: ResolvedTransparentSurfaceSettingsOverride` to each theme override, including a new `ResolvedPixelWindowThemeSettingsOverride`.
+Add `transparentSurface?: ResolvedTransparentSurfaceSettingsOverride` to `ResolvedAppearanceSettingsOverride`.
 
-Update `ResolvedAppearanceThemeSettingsOverride` with `pixelWindow`.
-
-Update `mergeResolvedAppearanceSettings` so every theme merges `transparentSurface` shallowly:
+Update `mergeResolvedAppearanceSettings` so the appearance-level transparent surface merges shallowly:
 
 ```ts
 transparentSurface: {
-    ...settings.theme.flat.transparentSurface,
-    ...override.theme?.flat?.transparentSurface,
+    ...settings.transparentSurface,
+    ...override.transparentSurface,
 }
 ```
-
-Do the same for `cupertinoGlass`, `colorFilled`, `terminal`, and `pixelWindow`.
 
 Edit [widget-settings-patch.ts](../../packages/hub/src/settings/storage/widget-settings-patch.ts).
 
@@ -461,7 +468,7 @@ function applyTransparentSurfacePatch(
 }
 ```
 
-Call it for every theme in `applyAppearanceThemePatch`.
+Call it once from `applyAppearancePatch` for `appearance.transparentSurface`.
 
 Edit [global-settings-patch.ts](../../packages/hub/src/settings/storage/global-settings-patch.ts).
 
@@ -500,7 +507,7 @@ Create [render-transparent-surface-resolver.ts](../../packages/hub/src/settings/
 
 Implementation rules:
 
-- Resolve the active theme's `transparentSurface`.
+- Resolve `settings.transparentSurface`.
 - If `enabled` is false, return:
 
 ```ts
@@ -835,17 +842,11 @@ The control group must show concise helper copy: `Affects theme background and c
 
 Place the controls inside the existing Theme section in [AppearanceSettings.tsx](../../packages/hub/src/property-inspector/panels/AppearanceSettings.tsx), below `ThemeSetting` and `TerminalVariantSetting`.
 
-Patch the active selected theme only:
-
-- selected `flat` patches `appearance.theme.flat.transparentSurface`
-- selected `cupertino-glass` patches `appearance.theme.cupertinoGlass.transparentSurface`
-- selected `color-filled` patches `appearance.theme.colorFilled.transparentSurface`
-- selected `terminal` patches `appearance.theme.terminal.transparentSurface`
-- selected `pixel-window` patches `appearance.theme.pixelWindow.transparentSurface`
+Patch `appearance.transparentSurface` directly. Do not patch a theme branch.
 
 Add the same controls as a global Transparent Surface override section in [GlobalSettingsTab.tsx](../../packages/hub/src/property-inspector/panels/GlobalSettingsTab.tsx). They must patch `transparentSurfaceOverrideEnabled` and `transparentSurface`; they must not patch a selected theme inside the global theme override.
 
-When `Transparent background` is off, keep sliders visible and enabled. This lets the user stage values before enabling the feature.
+When `Transparent background` is off, keep sliders visible but disabled.
 
 ## Rejected Options
 
@@ -861,10 +862,10 @@ These alternatives were considered and rejected:
   - Why considered: it appears to solve transparency with one value.
   - Rejected because it fades metric text and shapes, making the widget less readable.
 
-- Global per-theme transparent-background storage:
-  - Benefit: can preserve separate global values for each theme.
-  - Why considered: widget-level transparent surface is stored per theme.
-  - Rejected because global transparent surface expresses one cross-widget readability override for the user's external background. Storing one value also lets users apply global transparency without forcing global theme override.
+- Per-theme transparent-background storage:
+  - Benefit: can preserve separate values for each theme.
+  - Why considered: early design assumed each theme would need very different transparent tuning.
+  - Rejected because using it felt confusing in practice: switching themes appeared to lose the current transparent setting. The final model stores one widget-level setting and lets the resolver choose theme-aware fallback values only when the user has not stored a value.
 
 - New background module between frame rendering and `setImage`:
   - Benefit: isolates the new feature.
@@ -906,15 +907,14 @@ These alternatives were considered and rejected:
 Add or update these tests:
 
 - Storage resolver tests:
-  - Defaults resolve disabled for every theme.
-  - Flat defaults store `0/85/85`.
-  - Non-Flat defaults store `50/85/85`.
+  - Defaults resolve disabled.
+  - Flat missing stored percentages resolve to `20/70/30`.
+  - Non-Flat missing stored percentages resolve to `50/70/30`.
+  - Dense missing stored percentages resolve to `0/0/0`.
   - Stored values clamp to `0..100`.
-  - Pixel Window resolves `transparentSurface`.
 
 - Widget settings patch tests:
-  - Patching each theme writes `transparent_surface`.
-  - Pixel Window patch creates `pixel_window.transparent_surface`.
+  - Patching widget transparent surface writes `appearance.transparent_surface`.
 
 - Global settings patch tests:
   - Global transparent surface override writes one `transparent_surface` value.
@@ -925,7 +925,7 @@ Add or update these tests:
 
 - Render appearance tests:
   - Disabled feature resolves `backgroundOpacity: 1` and outline strength `0`.
-  - Enabled Flat with defaults resolves `backgroundOpacity: 0`, text outline `0.85`, shape outline `0.85`.
+  - Enabled Flat with defaults resolves `backgroundOpacity: 0.2`, text outline `0.7`, shape outline `0.3`.
   - Enabled non-Flat defaults resolve `backgroundOpacity: 0.5`.
 
 - Frame tests:
@@ -945,15 +945,20 @@ Add or update these tests:
 
 - PI tests:
   - Widget Appearance theme section renders toggle and three sliders.
-  - Changing controls patches the active selected theme.
+  - Changing controls patches `appearance.transparentSurface`.
   - Global Transparent Surface override renders the same controls and patches the global transparent surface override.
 
 Run from `packages/hub`:
 
 ```powershell
-npm run test:unit
-npm run test:pi
-npm run build
+npm.cmd run proto:format
+npm.cmd run proto:lint
+npm.cmd run proto:build
+npm.cmd run generate:proto
+npm.cmd run build
+npm.cmd run test:unit
+npm.cmd run test:pi
+npm.cmd run test:visual
 ```
 
 ## Manual Verification

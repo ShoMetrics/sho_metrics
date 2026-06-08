@@ -131,11 +131,6 @@ export const colorMessages = {
         zh_CN: "仅影响主题背景和边框。指标保持不透明。",
         ja: "テーマ背景と装飾のみに影響します。メトリクスは不透明のままです。",
     },
-    transparencyPerThemeNote: {
-        en: "Transparent surface settings are saved per theme.",
-        zh_CN: "透明表面设置会按主题分别保存。",
-        ja: "透明サーフェス設定はテーマごとに保存されます。",
-    },
     backgroundOpacityLabel: {
         en: "Background Opacity",
         zh_CN: "背景不透明度",

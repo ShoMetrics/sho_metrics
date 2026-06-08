@@ -118,19 +118,15 @@ test("disabled transparent surface resolves to opaque background and disabled ou
     assert.deepEqual(visualSettings.transparentSurface, DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS);
 });
 
-test("enabled flat transparent surface resolves flat defaults to render tokens", () => {
+test("enabled transparent surface resolves widget defaults to render tokens", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
-        theme: {
-            flat: {
-                transparentSurface: {
-                    enabled: true,
-                },
-            },
+        transparentSurface: {
+            enabled: true,
         },
     }));
 
     assert.deepEqual(visualSettings.transparentSurface, {
-        backgroundOpacity: 0.5,
+        backgroundOpacity: 0.2,
         textOutline: {
             color: "#000000",
             strength: 0.7,
@@ -142,15 +138,13 @@ test("enabled flat transparent surface resolves flat defaults to render tokens",
     });
 });
 
-test("enabled non-flat transparent surface resolves non-flat defaults to render tokens", () => {
+test("enabled transparent surface uses non-flat background opacity defaults", () => {
     const visualSettings = buildMetricRenderAppearance(buildAppearanceSettings({
         theme: {
             selectedTheme: "cupertino-glass",
-            cupertinoGlass: {
-                transparentSurface: {
-                    enabled: true,
-                },
-            },
+        },
+        transparentSurface: {
+            enabled: true,
         },
     }));
 
