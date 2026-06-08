@@ -653,6 +653,16 @@ details[open] summary::after {
   padding: 2rem 0 4rem;
 }
 
+/* Keep in-content images (tutorial screenshots) within the column on every
+   screen size instead of overflowing and forcing horizontal scroll. */
+.page-content img,
+.content-panel img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}
+
 .page-content code {
   padding: 0.1rem 0.3rem;
   background: var(--surface-muted-color);
