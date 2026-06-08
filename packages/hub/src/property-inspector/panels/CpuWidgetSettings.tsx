@@ -4,7 +4,6 @@ import { cpuMessages, helperMessages } from "../../i18n/message-groups/widgets";
 import { optionMessages } from "../../i18n/message-groups/options";
 import { localizeOptionList } from "../../i18n/options";
 import { useI18n } from "../../i18n/react";
-import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import type { ResolvedCpuMetricTarget, ResolvedCpuReading } from "../../settings/resolved-settings";
 import { StandardColorSettings } from "./ColorSettings";
@@ -12,6 +11,7 @@ import { AppearanceSettings } from "./AppearanceSettings";
 import { PollingSettings } from "./PollingSettings";
 import { LineSettings } from "./LineSettings";
 import { SettingsSection } from "./SettingsSection";
+import { PowerMaximumSetting, TemperatureMaximumSetting } from "./MetricMaximumSettings";
 import { resolveHelperStatusGuidanceText } from "./helper-status-guidance";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import {
@@ -119,14 +119,11 @@ function CpuTemperatureScaleSettings({
                     cpu: { temperatureUnit },
                 })}
             />
-            <NumberSetting
-                label={t(commonMessages.maxTempCLabel)}
+            <TemperatureMaximumSetting
                 value={reading.maximumCelsius}
                 onValueChange={(maximumTemperatureCelsius) => onSettingsPatch({
                     cpu: { maximumTemperatureCelsius },
                 })}
-                minimum={1}
-                step={1}
             />
         </SettingsSection>
     );
@@ -143,15 +140,11 @@ function CpuPowerScaleSettings({
 
     return (
         <SettingsSection title={t(commonMessages.scaleUnitsSection)}>
-            <NumberSetting
-                label={t(commonMessages.maxPowerWLabel)}
+            <PowerMaximumSetting
                 value={reading.maximumWatts}
                 onValueChange={(maximumPowerWatts) => onSettingsPatch({
                     cpu: { maximumPowerWatts },
                 })}
-                minimum={1}
-                step={1}
-                optional
             />
         </SettingsSection>
     );
