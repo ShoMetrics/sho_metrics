@@ -68,10 +68,10 @@ source/target. Stacked Metric arranges existing metric selections.
 - Each slot has independent single-metric metric selection and appearance.
 - Polling interval is widget-level through existing `WidgetPreferences`.
   Individual slots do not have independent polling intervals in v1.
-- The active slot indicator is a transient small circled number such as `2/3`.
-  It appears in the bottom-right corner for 1 second after every slot switch
-  and then disappears. It does not reserve layout space or move the underlying
-  metric view.
+- The active slot indicator is a transient horizontal dot stack such as
+  `○ ● ○`. It appears in the bottom-right corner for 1 second after every slot
+  switch and then disappears. It does not reserve layout space or move the
+  underlying metric view.
 - No indicator is shown on initial render because no switch has completed yet.
 - The action icon should use a stack/file-stack visual. Prefer a dedicated
   action icon under `imgs/actions/stacked-metric/icon` over reusing the generic
@@ -483,17 +483,17 @@ Recommended placement:
   affecting layout.
 - Position it in the bottom-right corner for square keys and touch-strip
   layouts.
-- Draw a small circle with the text `${currentIndex}/${totalCount}` centered
-  inside it.
-- The circle and text must use theme-aware contrast. Do not hard-code a color
+- Draw a small rounded pill with one horizontal dot per slot. The active slot's
+  dot is opaque and inactive dots are dimmed.
+- The pill and dots must use theme-aware contrast. Do not hard-code a color
   that disappears in `pixel-window`, `terminal`, or `color-filled`.
 - Do not show the indicator when no switch happened in the last 1000ms.
 - Do not reserve layout space for the indicator.
 - Do not add a user setting for indicator position or style in v1.
 
-If fitting `1/3` inside one small circle is unreadable in visual review, stop
-and report the issue. Do not silently change to permanent text, dots, or an
-arrow; that is a product decision.
+The indicator originally used a small `current/total` number. Visual review
+showed that text was unreadable at key size, so the accepted v1 product decision
+is the horizontal dot stack.
 
 ## Property Inspector
 
@@ -529,10 +529,11 @@ Stack section:
 Rotation section:
 
 - Toggle auto rotate.
-- Integer interval control from 1 to 5 seconds.
+- Dropdown interval control from 1 to 5 seconds.
 - Default shown value is 3 seconds.
-- Explain through concise UI copy that manual switching still works when auto
-  rotate is disabled.
+- Explain through concise UI copy that Keypad actions switch on key press,
+  Encoder actions switch on dial rotation, and manual switching still works
+  when auto rotate is disabled.
 
 Selected Slot Editor:
 
@@ -709,8 +710,8 @@ Work:
 1. Add a small render-owned `StackedMetricIndicator` contract.
 2. Thread optional indicator data through the render options path used by
    `setMetricView(...)` and `metric-view-frame.ts`.
-3. Render a bottom-right circled `current/total` indicator after every active
-   slot switch.
+3. Render a bottom-right horizontal dot-stack indicator after every active slot
+   switch.
 4. Ensure indicator rendering does not alter body viewport, frame layout, or
    active slot metric layout.
 5. Make indicator colors theme-aware and readable on flat, cupertino-glass,
@@ -819,6 +820,112 @@ Manual host smoke:
 13. Verify the encoder rotate trigger description is visible in the Stream Deck
     app.
 
+### Step 6: Property Inspector Drill-In Slot Editor
+
+Estimated changed LOC: 250 to 500, including tests and locale files.
+
+This step is a PI UX refinement only. It must not change proto, resolved
+settings, Stacked action runtime, render contracts, or slot patch ownership.
+
+Step 4 renders the stack list, rotation settings, selected slot editor, and
+polling settings in one inline page. That is functional but too dense. The
+desired UX is a two-page local PI flow:
+
+```text
+Stacked Settings Page
+  -> Edit slot
+Metric #N Settings Page
+  -> Back
+Stacked Settings Page
+```
+
+Do not implement a page transition animation in this step. A clean instant
+switch is preferred over a fragile custom animation inside the Stream Deck
+Property Inspector iframe.
+
+Stacked Settings Page:
+
+- Show the slot list, add/remove, and reorder controls.
+- Show each slot's short summary and an `Edit` button.
+- Show a max-reached note below Add when the slot count reaches the Stacked
+  maximum.
+- Show rotation controls.
+- Show widget-level polling once, with copy explaining that one polling
+  frequency is shared by every metric inside this key. Dense Multi Metric has
+  the same shared polling behavior.
+- Do not show any slot's full single-metric settings inline.
+- Dense Multi Metric should show the same max-reached note when it reaches its
+  own maximum row count.
+- Dense Multi Metric theme previews should render a Dense progress-list sample,
+  not the single-metric circle fallback.
+
+Metric #N Settings Page:
+
+- Show a top header with a Back button.
+- Show copy equivalent to: `Editing metric #N settings`.
+- Show concise copy explaining that edits auto-save and Back returns to Stacked
+  settings.
+- Show the selected slot's metric type dropdown.
+- Reuse `SingleMetricWidgetSettings` for the selected slot.
+- Continue wrapping child single-metric patches in
+  `StackedMetricSlot.single_metric`.
+- Keep per-slot polling hidden with `showPolling={false}`.
+- Keep catalog descriptor, disk volume, and network interface runtime caches
+  available for the child single-metric editor.
+
+WidgetSettingsTab boundary:
+
+- The Stacked child page should hide the outer WidgetSettingsTab advanced reset
+  section and metric source diagnostic. Otherwise the user is not really inside
+  a metric-editing page.
+- The Stacked settings page should not show the outer metric source diagnostic.
+  That diagnostic describes the currently displayed active slot attribution,
+  not the Stacked container and not necessarily the slot being edited. Showing
+  it at the Stacked level is misleading.
+- Dense Multi Metric has the same attribution ownership issue: the outer debug
+  diagnostic cannot unambiguously describe all rows. Hide the outer DEBUG
+  diagnostic for both Stacked and Dense. Do not add per-row or per-slot DEBUG
+  in this step; that would require a separate diagnostic owner under the
+  multi-metric row/slot editor.
+- Add a narrow, generic PI chrome suppression signal that lets
+  `WidgetSettingsTab` know whether the panel is in any drill-in child page.
+  Do not expose Stacked-specific state, `editingSlotId`, or Stacked-specific
+  branching in `WidgetSettingsTab`; future Dense or other panels should be able
+  to reuse the same concept.
+- Do not move Stacked-specific page state into global settings or persisted
+  widget settings. `editingSlotId` is local PI state only.
+- `editingSlotId` must survive settings updates caused by auto-save. A field
+  edit on the child page must not bounce the user back to the Stacked settings
+  page.
+- If the selected slot is removed while editing, return to the Stacked settings
+  page.
+- If slots are reordered while editing, keep editing the same `slot_id` and
+  update the displayed metric number from the current slot order.
+
+Tests:
+
+- Opening Stacked settings initially shows Stacked controls and does not
+  render a full single-metric editor.
+- Clicking a slot's Edit button switches to the Metric #N settings page.
+- Back returns to the Stacked settings page.
+- Editing metric type and child single-metric fields still emits patches for
+  the selected `slot_id`.
+- Editing a child field triggers auto-save and the PI remains on the same
+  Metric #N settings page after the resolved settings update.
+- The child page hides per-slot polling, outer advanced reset, and metric source
+  diagnostic.
+- Removing the edited slot returns to the Stacked settings page.
+- Reordering while editing preserves `editingSlotId` and updates the displayed
+  metric number.
+
+Verification:
+
+```powershell
+npm.cmd run test:pi
+npm.cmd run test:unit
+npm.cmd run build
+```
+
 ## Acceptance Checklist
 
 - `StackedMetricWidget` is a new stored widget oneof arm.
@@ -827,7 +934,7 @@ Manual host smoke:
 - Quick-start creates CPU usage and Memory usage.
 - Auto rotate defaults to enabled.
 - Rotation interval defaults to 3 seconds and is configurable from 1 to 5
-  seconds.
+  seconds through a dropdown.
 - Manual switching works when auto rotate is enabled and disabled.
 - Manual switching resets the auto rotate deadline.
 - Keypad `keyDown` switches to the next slot.
@@ -835,6 +942,10 @@ Manual host smoke:
 - `dialDown`, `dialUp`, `touchTap`, double press, hold, and long touch are not
   Stacked v1 interactions.
 - Source polling interval remains widget-level and is not duplicated per slot.
+- Stacked and Dense PI explain that source polling is shared by every metric in
+  the key.
+- Stacked and Dense PI hide the outer metric source diagnostic because it is
+  not row/slot scoped.
 - Auto rotate interval is not blocked by polling interval.
 - Active slot is tracked by `slot_id`.
 - Reorder preserves active slot when the slot still exists.
@@ -845,12 +956,18 @@ Manual host smoke:
 - Stacked reuses canonical single metric render builders.
 - No Stacked-specific copy of CPU/GPU/Memory/Disk/Network/Catalog rendering
   exists.
-- Transient indicator renders as a bottom-right circled `current/total` value.
+- Transient indicator renders as a bottom-right horizontal dot stack.
 - Indicator appears for 1 second after switches and does not show on initial
   render.
 - Indicator does not change the active slot layout.
 - Slot editor shows only one selected slot's full single-metric settings.
 - Slot editor does not show per-slot polling.
+- Follow-up PI drill-in shows Stacked settings and Metric #N settings as
+  separate local PI pages without changing stored settings.
+- Dense and Stacked PI show a max-reached note when Add is disabled at the
+  widget's slot limit.
+- Dense theme previews render Dense progress-list content instead of the
+  single-metric default preview.
 - Encoder `TriggerDescription.Rotate` is localized.
 - Key Logic / Multi Action context detection is not used as a behavior gate.
 - Renderer contracts receive app-owned data, not stored settings proto.
