@@ -10,7 +10,7 @@ export function DefaultWidgetSettings(props: PanelProps): React.JSX.Element {
             <AppearanceSettings {...props} />
             <LineSettings {...props} />
             <StandardColorSettings {...props} />
-            <PollingSettings {...props} />
+            {props.showPolling !== false && <PollingSettings {...props} />}
         </>
     );
 }

@@ -3,11 +3,24 @@ import test from "node:test";
 import type {
     DialRotateEvent,
     KeyDownEvent,
+    PropertyInspectorDidAppearEvent,
     WillAppearEvent,
     WillDisappearEvent,
 } from "@elgato/streamdeck";
 import { StackedMetric, type StackedMetricTimerScheduler } from "./stacked-metric";
 import type { MetricCollectionBinding } from "./metric-action";
+import { MetricUnit } from "../runtime/sources/metric-source";
+import {
+    MetricIdKind,
+    MetricValueKind,
+    type MetricDescriptor,
+    type MetricDescriptorSnapshot,
+} from "../runtime/sources/source-client";
+import { diskVolumeRegistry, type DiskVolumeOption } from "../runtime/disk-volumes";
+import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../runtime/network-interfaces";
+import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
+import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
+import { writeStoredWidgetSettingsPatch } from "../settings/storage/widget-settings-patch";
 import {
     CPU_MODEL_METRIC_KEY,
     CPU_USAGE_METRIC_KEY,
@@ -135,10 +148,53 @@ test("stacked metric dispose clears auto and indicator timers", () => {
     }
 });
 
+test("stacked metric publishes selected-slot picker caches to the Property Inspector", async () => {
+    const timers = new FakeTimerScheduler();
+    const descriptor = buildMetricDescriptor("source.sensor:/gpu/0/temperature");
+    const diskVolume = buildDiskVolumeOption("E:\\");
+    const networkInterface = buildNetworkInterfaceOption("ethernet-0");
+    const action = new TestStackedMetric(timers, {
+        descriptors: [descriptor],
+        descriptorFingerprint: "stacked-catalog-fingerprint",
+    });
+    const streamDeckAction = new FakeStreamDeckAction("stacked-pi-cache-action");
+    diskVolumeRegistry.update([diskVolume]);
+    networkInterfaceRegistry.update([networkInterface]);
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildStackedWidgetSettings()));
+        action.refreshRuntimeCacheForTest(buildPropertyInspectorDidAppearEvent(streamDeckAction));
+        await flushAsyncOperations();
+
+        assert.deepEqual(action.runtimeCachePatchList.find(patch => patch.catalogMetricDescriptorLoadState === "ready"), {
+            availableCatalogMetricDescriptors: [descriptor],
+            catalogMetricDescriptorLoadState: "ready",
+            catalogMetricDescriptorSourceStatus: { state: "unknown" },
+        });
+        assert.deepEqual(action.runtimeCachePatchList.find(patch => patch.availableDiskVolumes !== undefined), {
+            availableDiskVolumes: [diskVolume],
+        });
+        assert.deepEqual(action.runtimeCachePatchList.find(patch => patch.availableNetworkInterfaces !== undefined), {
+            availableNetworkInterfaces: [networkInterface],
+        });
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+        diskVolumeRegistry.update([]);
+        networkInterfaceRegistry.update([]);
+    }
+});
+
 class TestStackedMetric extends StackedMetric {
     readonly bindings: FakeMetricCollectionBinding[] = [];
+    readonly runtimeCachePatchList: WidgetRuntimeCachePatch[] = [];
 
-    constructor(timerScheduler: StackedMetricTimerScheduler) {
+    constructor(
+        timerScheduler: StackedMetricTimerScheduler,
+        private readonly descriptorReadResult: MetricDescriptorSnapshot = {
+            descriptors: [],
+            descriptorFingerprint: "empty",
+        },
+    ) {
         super(timerScheduler);
     }
 
@@ -150,6 +206,10 @@ class TestStackedMetric extends StackedMetric {
         return this.isIndicatorVisibleForTest(actionId);
     }
 
+    refreshRuntimeCacheForTest(event: PropertyInspectorDidAppearEvent): void {
+        this.refreshRuntimeCacheForPropertyInspector(event);
+    }
+
     protected override onMetricsUpdate(event: WillAppearEvent): void {
         void event;
     }
@@ -158,6 +218,39 @@ class TestStackedMetric extends StackedMetric {
         const binding = new FakeMetricCollectionBinding();
         this.bindings.push(binding);
         return binding;
+    }
+
+    protected override readCatalogMetricDescriptorSnapshot(): Promise<MetricDescriptorSnapshot> {
+        return Promise.resolve(this.descriptorReadResult);
+    }
+
+    protected override refreshDiskVolumesForPropertyInspector(event: PropertyInspectorDidAppearEvent): Promise<void> {
+        void event;
+        this.runtimeCachePatchList.push({
+            availableDiskVolumes: [...diskVolumeRegistry.getOptions()],
+        });
+        return Promise.resolve();
+    }
+
+    protected override refreshNetworkInterfacesForPropertyInspector(event: PropertyInspectorDidAppearEvent): Promise<void> {
+        void event;
+        this.runtimeCachePatchList.push({
+            availableNetworkInterfaces: [...networkInterfaceRegistry.getOptions()],
+        });
+        return Promise.resolve();
+    }
+
+    protected override currentPlatform(): NodeJS.Platform {
+        return "win32";
+    }
+
+    protected override sendRuntimeCachePatchToPropertyInspector(
+        event: WillAppearEvent | PropertyInspectorDidAppearEvent,
+        patch: WidgetRuntimeCachePatch,
+    ): Promise<void> {
+        void event;
+        this.runtimeCachePatchList.push(patch);
+        return Promise.resolve();
     }
 }
 
@@ -221,20 +314,31 @@ function buildStackedWidgetSettings(options: {
     readonly autoRotateEnabled?: boolean | undefined;
     readonly thirdSlot?: boolean | undefined;
 } = {}): unknown {
-    return {
-        stackedMetric: {
-            slots: [
-                { slotId: "slot-1", singleMetric: { slot: { metric: { cpu: {} } } } },
-                { slotId: "slot-2", singleMetric: { slot: { metric: { memory: {} } } } },
-                ...(options.thirdSlot
-                    ? [{ slotId: "slot-3", singleMetric: { slot: { metric: { gpu: {} } } } }]
-                    : []),
-            ],
-            ...(options.autoRotateEnabled === undefined
-                ? {}
-                : { rotation: { autoRotateEnabled: options.autoRotateEnabled } }),
-        },
-    };
+    const slotIds = ["slot-1", "slot-2", "slot-3"];
+    const createSlotId = (): string => slotIds.shift() ?? "unexpected-slot";
+    let rawSettings = resolveQuickStartStoredWidgetSettings(undefined, "stackedMetric", {
+        createSlotId,
+    }).rawSettings;
+
+    if (options.thirdSlot === true) {
+        rawSettings = writeStoredWidgetSettingsPatch(rawSettings, {
+            stacked: {
+                addSlot: {},
+            },
+        }, { createSlotId });
+    }
+
+    if (options.autoRotateEnabled !== undefined) {
+        rawSettings = writeStoredWidgetSettingsPatch(rawSettings, {
+            stacked: {
+                rotation: {
+                    autoRotateEnabled: options.autoRotateEnabled,
+                },
+            },
+        });
+    }
+
+    return rawSettings;
 }
 
 function buildWillAppearEvent(action: FakeStreamDeckAction, settings: unknown): WillAppearEvent {
@@ -242,6 +346,10 @@ function buildWillAppearEvent(action: FakeStreamDeckAction, settings: unknown): 
         action,
         payload: { settings },
     } as unknown as WillAppearEvent;
+}
+
+function buildPropertyInspectorDidAppearEvent(action: FakeStreamDeckAction): PropertyInspectorDidAppearEvent {
+    return { action } as unknown as PropertyInspectorDidAppearEvent;
 }
 
 function buildKeyDownEvent(action: FakeStreamDeckAction): KeyDownEvent {
@@ -257,4 +365,51 @@ function buildDialRotateEvent(action: FakeStreamDeckAction, ticks: number): Dial
 
 function buildWillDisappearEvent(action: FakeStreamDeckAction): WillDisappearEvent {
     return { action } as unknown as WillDisappearEvent;
+}
+
+async function flushAsyncOperations(): Promise<void> {
+    await Promise.resolve();
+    await Promise.resolve();
+}
+
+function buildMetricDescriptor(metricId: string): MetricDescriptor {
+    return {
+        metricId,
+        rawSensorIdentity: {
+            sourceSensorId: metricId,
+            hardwareId: "gpu-0",
+            hardwareName: "NVIDIA GPU",
+            hardwareType: "GpuNvidia",
+            sensorName: "GPU Hot Spot",
+            sourceSensorType: "Temperature",
+        },
+        pollingGroupId: "lhm:hardware:gpu-0",
+        valueKind: MetricValueKind.SCALAR,
+        unit: MetricUnit.CELSIUS,
+        metricIdKind: MetricIdKind.SOURCE_SENSOR,
+    };
+}
+
+function buildDiskVolumeOption(id: string): DiskVolumeOption {
+    return {
+        id,
+        fs: "NTFS",
+        mount: id,
+        sizeBytes: 512 * 1024 * 1024 * 1024,
+        usedBytes: 256 * 1024 * 1024 * 1024,
+        availableBytes: 256 * 1024 * 1024 * 1024,
+        storageKind: "ssd",
+        diskName: "Test Disk",
+        volumeLabel: "Data",
+    };
+}
+
+function buildNetworkInterfaceOption(id: string): NetworkInterfaceOption {
+    return {
+        id,
+        name: "Ethernet",
+        type: "wired",
+        isDefault: true,
+        speedMegabitsPerSecond: 1000,
+    };
 }

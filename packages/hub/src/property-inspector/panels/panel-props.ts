@@ -8,4 +8,5 @@ export interface WidgetSettingsPanelProps {
     themeDisabled?: boolean | undefined;
     transparentSurfaceDisabled?: boolean | undefined;
     colorDisabled?: boolean | undefined;
+    showPolling?: boolean | undefined;
 }

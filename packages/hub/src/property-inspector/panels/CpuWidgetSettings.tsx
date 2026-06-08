@@ -44,7 +44,7 @@ export function CpuWidgetSettings(props: CpuWidgetSettingsProps): React.JSX.Elem
                 && reading.kind === "power"
                 && <CpuPowerScaleSettings {...props} reading={reading} />}
             <StandardColorSettings {...props} />
-            <PollingSettings {...props} />
+            {props.showPolling !== false && <PollingSettings {...props} />}
         </>
     );
 }

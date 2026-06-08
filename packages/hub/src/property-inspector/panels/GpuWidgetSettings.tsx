@@ -50,7 +50,7 @@ export function GpuWidgetSettings(props: GpuWidgetSettingsProps): React.JSX.Elem
                 && reading.kind === "power"
                 && <GpuPowerScaleSettings {...props} reading={reading} />}
             <StandardColorSettings {...props} />
-            <PollingSettings {...props} />
+            {props.showPolling !== false && <PollingSettings {...props} />}
         </>
     );
 }

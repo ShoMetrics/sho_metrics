@@ -1,9 +1,8 @@
 import { action, type PropertyInspectorDidAppearEvent, type WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
-import { requireResolvedDenseMultiMetricWidget, type ResolvedMetricSourcePolicy } from "../settings/resolved-settings";
+import { requireResolvedDenseMultiMetricWidget } from "../settings/resolved-settings";
 import { listMetricReadPlanKeys, type MetricReadPlan } from "../runtime/source-routing/metric-read-plan";
-import { buildMetricReadPlanFromSourcePolicy } from "../runtime/source-routing/metric-read-plan-builder";
 import { wallClockNowMilliseconds } from "../shared/clock";
 import { setMetricView } from "../view-updates/runner";
 import {
@@ -17,17 +16,10 @@ import { logger } from "../logging/logger";
 import type { MetricDescriptorSnapshot } from "../runtime/sources/source-client";
 import { backgroundMetricCollection } from "../runtime/metric-collection/background-metric-collection";
 import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
-import { diskVolumeRegistry } from "../runtime/disk-volumes";
-import { resolveDiskUsageMetricSubscriptionKeys } from "./disk/metric-subscriptions";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
+import { refreshDiskVolumeRuntimeCache } from "./shared/disk-volume-runtime-cache";
 
 const log = logger.for("Action:DenseMultiMetric");
-const autoMetricSourcePolicy: ResolvedMetricSourcePolicy = {
-    primarySourceProfileId: undefined,
-    fallbackSourceProfileIds: [],
-    failureMode: "useFallback",
-};
-
 /** Dense Multi Metric action that collects several metric rows for one key. */
 @action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.denseMultiMetric })
 export class DenseMultiMetric extends MetricAction {
@@ -73,28 +65,16 @@ export class DenseMultiMetric extends MetricAction {
     protected refreshDiskVolumesForPropertyInspector(event: PropertyInspectorDidAppearEvent): Promise<void> {
         log.debug(() => `diskVolumeRefreshStart actionId=${event.action.id}`);
 
-        return this.refreshDiskVolumeRegistryForPropertyInspector()
-            .then(() => this.publishDiskVolumeOptions(event));
+        return this.refreshDiskVolumeRuntimeCacheForPropertyInspector(event);
     }
 
-    protected refreshDiskVolumeRegistryForPropertyInspector(): Promise<void> {
-        // Disk volume options are discovered as a side effect of reading disk
-        // usage keys. Dense cannot use MetricAction.refreshMetricKeys here:
-        // that helper intentionally assumes widget.slot exists.
-        return backgroundMetricCollection.refreshReadPlanOnce(buildMetricReadPlanFromSourcePolicy({
-            metricKeys: resolveDiskUsageMetricSubscriptionKeys(undefined),
-            sourcePolicy: autoMetricSourcePolicy,
+    protected refreshDiskVolumeRuntimeCacheForPropertyInspector(
+        event: PropertyInspectorDidAppearEvent,
+    ): Promise<void> {
+        return refreshDiskVolumeRuntimeCache({
             defaultSourceProfileId: pluginGlobalSettingsStore.getResolved().defaultSourceProfileId,
             platform: this.currentPlatform(),
-        })).then(() => undefined);
-    }
-
-    protected publishDiskVolumeOptions(event: PropertyInspectorDidAppearEvent): Promise<void> {
-        const availableDiskVolumes = [...diskVolumeRegistry.getOptions()];
-        log.debug(() => `diskVolumeOptionsPublish actionId=${event.action.id} volumeCount=${availableDiskVolumes.length} volumes=${formatDiskVolumeSummary(availableDiskVolumes)}`);
-
-        return this.updateRuntimeCache(event, {
-            availableDiskVolumes,
+            updateRuntimeCache: patch => this.updateRuntimeCache(event, patch),
         });
     }
 
@@ -140,14 +120,4 @@ export class DenseMultiMetric extends MetricAction {
     protected readCatalogMetricDescriptorSnapshot(): Promise<MetricDescriptorSnapshot> {
         return backgroundMetricCollection.readSourceMetricDescriptors(WINDOWS_HELPER_SOURCE_ID);
     }
-}
-
-function formatDiskVolumeSummary(volumes: ReturnType<typeof diskVolumeRegistry.getOptions>): string {
-    return JSON.stringify(volumes.map(volume => ({
-        id: volume.id,
-        mount: volume.mount,
-        fs: volume.fs,
-        sizeBytes: volume.sizeBytes,
-        storageKind: volume.storageKind,
-    })));
 }

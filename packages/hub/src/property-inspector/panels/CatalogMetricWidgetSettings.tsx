@@ -59,7 +59,7 @@ export function CatalogMetricWidgetSettings(props: CatalogMetricWidgetSettingsPr
             {props.target.metricId.length > 0 && <CatalogMetricLabelScaleSettings {...props} />}
             <LineSettings {...props} />
             <StandardColorSettings {...props} />
-            <PollingSettings {...props} />
+            {props.showPolling !== false && <PollingSettings {...props} />}
         </>
     );
 }

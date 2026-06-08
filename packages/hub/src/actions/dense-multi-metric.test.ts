@@ -100,8 +100,14 @@ class TestDenseMultiMetric extends DenseMultiMetric {
         return undefined;
     }
 
-    protected override refreshDiskVolumeRegistryForPropertyInspector(): Promise<void> {
+    protected override refreshDiskVolumeRuntimeCacheForPropertyInspector(
+        event: PropertyInspectorDidAppearEvent,
+    ): Promise<void> {
+        void event;
         this.refreshedMetricKeysList.push([...resolveDiskUsageMetricSubscriptionKeys(undefined)]);
+        this.runtimeCachePatchList.push({
+            availableDiskVolumes: [...diskVolumeRegistry.getOptions()],
+        });
         return Promise.resolve();
     }
 

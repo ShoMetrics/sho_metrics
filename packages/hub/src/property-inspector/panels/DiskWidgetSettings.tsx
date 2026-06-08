@@ -69,7 +69,7 @@ export function DiskWidgetSettings(props: DiskWidgetSettingsProps): React.JSX.El
             ) : (
                 <StandardColorSettings {...props} />
             )}
-            <PollingSettings {...props} />
+            {props.showPolling !== false && <PollingSettings {...props} />}
         </>
     );
 }

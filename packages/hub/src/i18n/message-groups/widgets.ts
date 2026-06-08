@@ -343,3 +343,96 @@ export const denseMessages = {
         ja: "高度なセンサー",
     },
 } as const satisfies LocalizedMessages;
+
+export const stackedMessages = {
+    stackSection: {
+        en: "Stack",
+        zh_CN: "叠放",
+        ja: "スタック",
+    },
+    rotationSection: {
+        en: "Rotation",
+        zh_CN: "轮播",
+        ja: "ローテーション",
+    },
+    selectedSlotSection: {
+        en: "Selected Slot",
+        zh_CN: "当前槽位",
+        ja: "選択中のスロット",
+    },
+    metricTypeLabel: {
+        en: "Metric Type",
+        zh_CN: "指标类型",
+        ja: "メトリクスタイプ",
+    },
+    slotLabel: {
+        en: "Slot",
+        zh_CN: "槽位",
+        ja: "スロット",
+    },
+    editSlotButton: {
+        en: "Edit",
+        zh_CN: "编辑",
+        ja: "編集",
+    },
+    selectedSlotButton: {
+        en: "Editing",
+        zh_CN: "正在编辑",
+        ja: "編集中",
+    },
+    addSlotButton: {
+        en: "Add Slot",
+        zh_CN: "添加槽位",
+        ja: "スロットを追加",
+    },
+    removeSlotButton: {
+        en: "Remove",
+        zh_CN: "移除",
+        ja: "削除",
+    },
+    reorderLabel: {
+        en: "Reorder",
+        zh_CN: "重新排序",
+        ja: "並べ替え",
+    },
+    reorderMoveButtonsLabel: {
+        en: "Show move buttons",
+        zh_CN: "显示移动按钮",
+        ja: "移動ボタンを表示",
+    },
+    moveUpButton: {
+        en: "Move Up",
+        zh_CN: "上移",
+        ja: "上へ移動",
+    },
+    moveDownButton: {
+        en: "Move Down",
+        zh_CN: "下移",
+        ja: "下へ移動",
+    },
+    autoRotateLabel: {
+        en: "Auto Rotate",
+        zh_CN: "自动轮播",
+        ja: "自動ローテーション",
+    },
+    intervalSecondsLabel: {
+        en: "Interval (s)",
+        zh_CN: "间隔（秒）",
+        ja: "間隔（秒）",
+    },
+    manualSwitchNote: {
+        en: "Press the key or rotate the dial to switch manually. Manual switching still works when auto rotate is off.",
+        zh_CN: "按下按键或转动旋钮可手动切换。关闭自动轮播后仍可手动切换。",
+        ja: "キーを押すかダイヤルを回すと手動で切り替えます。自動ローテーションがオフでも手動切り替えは使えます。",
+    },
+    selectedSlotNote: {
+        en: "Only this slot's metric and appearance are being edited.",
+        zh_CN: "当前只编辑此槽位的指标和外观。",
+        ja: "このスロットのメトリクスと外観だけを編集中です。",
+    },
+    catalogMetricChoice: {
+        en: "Advanced Sensor",
+        zh_CN: "高级传感器",
+        ja: "高度なセンサー",
+    },
+} as const satisfies LocalizedMessages;

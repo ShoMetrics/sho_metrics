@@ -1156,6 +1156,90 @@ test("dense multi metric catalog row renders descriptor label and readable maxim
     assert.match(markup, /value="450"/);
 });
 
+test("stacked metric settings render stack, rotation, selected slot editor, and one polling control", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "stackedMetric",
+        settings: buildStackedWidgetSettings(),
+    });
+
+    assert.match(markup, sectionTitlePattern("Stack"));
+    assert.match(markup, sectionTitlePattern("Rotation"));
+    assert.match(markup, sectionTitlePattern("Selected Slot"));
+    assert.match(markup, /Slot 1:/);
+    assert.match(markup, /Slot 2:/);
+    assert.match(markup, /CPU Metric:/);
+    assert.match(markup, /Auto Rotate:/);
+    assert.match(markup, /Interval \(s\):/);
+    assert.match(markup, /Add Slot/);
+    assert.match(markup, /Reorder:/);
+    assert.match(markup, /Show move buttons/);
+    assert.doesNotMatch(markup, /Move Up/);
+    assert.doesNotMatch(markup, /Move Down/);
+    assert.equal(countTextOccurrences(markup, "Polling Frequency:"), 1);
+});
+
+test("stacked metric settings enforce slot count controls", () => {
+    const minMarkup = renderWidgetSettings({
+        actionKind: "stackedMetric",
+        settings: buildStackedWidgetSettings(),
+    });
+    const maxMarkup = renderWidgetSettings({
+        actionKind: "stackedMetric",
+        settings: buildStackedWidgetSettings({
+            stacked: { addSlot: {} },
+        }),
+    });
+
+    assert.match(minMarkup, /disabled=""[\s\S]*Remove/);
+    assert.match(maxMarkup, /disabled=""[\s\S]*Add Slot/);
+});
+
+test("stacked metric selected slot editor reuses catalog picker runtime cache", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "stackedMetric",
+        settings: buildStackedWidgetSettings({
+            stacked: {
+                updateSlot: {
+                    slotId: "slot-1",
+                    metricDomain: "catalog",
+                    singleMetric: {
+                        catalog: {
+                            metricId: "lhm.sensor:/gpu/0/power/board",
+                            detectedLabel: "GPU Board Power",
+                            detectedUnit: MetricUnit.WATTS,
+                            detectedCategory: "gpu",
+                            detectedReadingKind: "power",
+                        },
+                    },
+                },
+            },
+        }),
+        runtimeCache: {
+            availableCatalogMetricDescriptors: [
+                buildMetricDescriptor({
+                    metricId: "lhm.sensor:/gpu/0/power/board",
+                    sourceSensorId: "gpu-board-power",
+                    hardwareId: "gpu0",
+                    hardwareName: "NVIDIA GPU",
+                    hardwareType: "GpuNvidia",
+                    sensorName: "GPU Board Power",
+                    sourceSensorType: "Power",
+                    unit: MetricUnit.WATTS,
+                }),
+            ],
+            catalogMetricDescriptorLoadState: "ready",
+        },
+        runtimeCacheStatus: {
+            catalogMetricDescriptorStatus: "ready",
+        },
+    });
+
+    assert.match(markup, new RegExp(["Advanced", "Sensor"].join(" ")));
+    assert.match(markup, /GPU Board Power/);
+    assert.match(markup, /Label &amp; Scale/);
+    assert.equal(countTextOccurrences(markup, "Polling Frequency:"), 1);
+});
+
 test("widget advanced controls render current metric source attribution", () => {
     const markup = renderWidgetSettings({
         actionKind: "cpu",
@@ -1505,6 +1589,10 @@ function sectionTitlePattern(text: string): RegExp {
     return new RegExp(`class="section-title"[^>]*>${text}<`);
 }
 
+function countTextOccurrences(value: string, text: string): number {
+    return value.split(text).length - 1;
+}
+
 function buildWidgetSettings(
     actionKind: ActionKind,
     patch: StoredWidgetSettingsPatch,
@@ -1521,4 +1609,16 @@ function buildDenseWidgetSettings(slots: readonly unknown[]): InspectorTestSetti
             slots,
         },
     };
+}
+
+function buildStackedWidgetSettings(patch?: StoredWidgetSettingsPatch): InspectorTestSettings {
+    const slotIds = ["slot-1", "slot-2", "slot-3"];
+    const createSlotId = (): string => slotIds.shift() ?? "unexpected-slot";
+    const quickStartSettings = resolveQuickStartStoredWidgetSettings(undefined, "stackedMetric", {
+        createSlotId,
+    }).rawSettings;
+
+    return patch === undefined
+        ? quickStartSettings
+        : writeStoredWidgetSettingsPatch(quickStartSettings, patch, { createSlotId });
 }

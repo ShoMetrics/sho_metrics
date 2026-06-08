@@ -76,6 +76,7 @@ import type {
     ResolvedNetworkReading,
     ResolvedCpuReading,
     ResolvedGpuReading,
+    ResolvedMetricTarget,
     ScaleMode,
     SourceFailureMode,
     TemperatureUnit,
@@ -254,6 +255,8 @@ export interface StackedWidgetSettingsPatch {
 }
 
 export interface StackedMetricSlotPatch {
+    /** Replaces the selected stacked slot with a default single-metric widget for this domain. */
+    readonly metricDomain?: ResolvedMetricTarget["domain"] | undefined;
     readonly singleMetric?: SingleMetricWidgetSettingsPatch | undefined;
 }
 
@@ -415,8 +418,63 @@ function applyStackedMetricSlotPatch(
     slot: StoredStackedMetricSlot,
     patch: StackedMetricSlotPatch,
 ): void {
+    if (patch.metricDomain !== undefined) {
+        slot.item = {
+            case: "singleMetric",
+            value: buildDefaultSingleMetricWidget(patch.metricDomain),
+        };
+    }
+
     if (patch.singleMetric !== undefined) {
         applySingleMetricWidgetPatch(requireStackedSingleMetricWidget(slot), patch.singleMetric);
+    }
+}
+
+function buildDefaultSingleMetricWidget(domain: ResolvedMetricTarget["domain"]): StoredSingleMetricWidget {
+    return create(SingleMetricWidgetSchema, {
+        slot: create(MetricSlotSchema, {
+            metric: create(MetricSelectionSchema, {
+                target: buildDefaultSingleMetricTarget(domain),
+            }),
+        }),
+    });
+}
+
+function buildDefaultSingleMetricTarget(domain: ResolvedMetricTarget["domain"]): StoredMetricSelection["target"] {
+    switch (domain) {
+        case "cpu":
+            return {
+                case: "cpu",
+                value: create(CpuMetricTargetSchema, { kind: StoredCpuMetricKind.USAGE }),
+            };
+        case "gpu":
+            return {
+                case: "gpu",
+                value: create(GpuMetricTargetSchema),
+            };
+        case "memory":
+            return {
+                case: "memory",
+                value: create(MemoryMetricTargetSchema, { kind: StoredMemoryMetricKind.USAGE }),
+            };
+        case "disk":
+            return {
+                case: "disk",
+                value: create(DiskMetricTargetSchema),
+            };
+        case "network":
+            return {
+                case: "network",
+                value: create(NetworkMetricTargetSchema, {
+                    kind: StoredNetworkMetricKind.TRAFFIC,
+                    traffic: create(NetworkMetricTarget_TrafficSchema),
+                }),
+            };
+        case "catalog":
+            return {
+                case: "catalog",
+                value: create(CatalogMetricTargetSchema),
+            };
     }
 }
 

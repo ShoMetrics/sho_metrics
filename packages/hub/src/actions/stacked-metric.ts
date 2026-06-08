@@ -3,6 +3,7 @@ import {
     type DialRotateEvent,
     type DidReceiveSettingsEvent,
     type KeyDownEvent,
+    type PropertyInspectorDidAppearEvent,
     type WillAppearEvent,
     type WillDisappearEvent,
 } from "@elgato/streamdeck";
@@ -24,8 +25,17 @@ import {
 } from "./stacked-metric/read-plan";
 import { buildStackedSingleMetricViewOptions } from "./stacked-metric/single-metric-view-builder";
 import type { StackedMetricIndicator } from "../view-rendering/stacked-metric-indicator";
+import { refreshCatalogMetricDescriptorRuntimeCache } from "./shared/catalog-metric-descriptor-runtime-cache";
+import { refreshDiskVolumeRuntimeCache } from "./shared/disk-volume-runtime-cache";
+import { refreshNetworkInterfaceRuntimeCache } from "./shared/network-interface-runtime-cache";
+import { logger } from "../logging/logger";
+import type { MetricDescriptorSnapshot } from "../runtime/sources/source-client";
+import { backgroundMetricCollection } from "../runtime/metric-collection/background-metric-collection";
+import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
+import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 
 const INDICATOR_VISIBLE_MILLISECONDS = 1000;
+const log = logger.for("Action:StackedMetric");
 
 interface StackedMetricActionState {
     activeSlotId: string | undefined;
@@ -100,6 +110,45 @@ export class StackedMetric extends MetricAction {
         return this.buildStackedReadPlan(event).readPlan;
     }
 
+    protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
+        // Stacked selected-slot editors reuse single metric pickers, but the
+        // action itself does not own one stable single-metric target. Warm every
+        // runtime picker cache those editors can need.
+        refreshCatalogMetricDescriptorRuntimeCache({
+            platform: this.currentPlatform(),
+            readCachedSourceStatus: sourceId => this.readCachedSourceStatus(sourceId),
+            updateRuntimeCache: patch => this.updateRuntimeCache(event, patch),
+            readMetricDescriptorSnapshot: () => this.readCatalogMetricDescriptorSnapshot(),
+        })
+            .catch(error => {
+                log.warn(() => `Failed to refresh stacked metric catalog runtime cache: ${String(error)}`);
+            });
+        this.refreshDiskVolumesForPropertyInspector(event)
+            .catch(error => {
+                log.warn(() => `Failed to refresh stacked metric disk volume runtime cache: ${String(error)}`);
+            });
+        this.refreshNetworkInterfacesForPropertyInspector(event)
+            .catch(error => {
+                log.warn(() => `Failed to refresh stacked metric network interface runtime cache: ${String(error)}`);
+            });
+    }
+
+    protected refreshDiskVolumesForPropertyInspector(event: PropertyInspectorDidAppearEvent): Promise<void> {
+        return refreshDiskVolumeRuntimeCache({
+            defaultSourceProfileId: pluginGlobalSettingsStore.getResolved().defaultSourceProfileId,
+            platform: this.currentPlatform(),
+            updateRuntimeCache: patch => this.updateRuntimeCache(event, patch),
+        });
+    }
+
+    protected refreshNetworkInterfacesForPropertyInspector(event: PropertyInspectorDidAppearEvent): Promise<void> {
+        return refreshNetworkInterfaceRuntimeCache({
+            defaultSourceProfileId: pluginGlobalSettingsStore.getResolved().defaultSourceProfileId,
+            platform: this.currentPlatform(),
+            updateRuntimeCache: patch => this.updateRuntimeCache(event, patch),
+        });
+    }
+
     protected override onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event);
         const widget = requireResolvedStackedMetricWidget(settings);
@@ -137,6 +186,10 @@ export class StackedMetric extends MetricAction {
 
     protected readActiveSlotIdForTest(actionId: string): string | undefined {
         return this.states.get(actionId)?.activeSlotId;
+    }
+
+    protected readCatalogMetricDescriptorSnapshot(): Promise<MetricDescriptorSnapshot> {
+        return backgroundMetricCollection.readSourceMetricDescriptors(WINDOWS_HELPER_SOURCE_ID);
     }
 
     private buildStackedReadPlan(event: WillAppearEvent) {

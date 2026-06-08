@@ -7,15 +7,11 @@ import type { StoredWidgetSettingsPatch } from "../../settings/storage/widget-se
 import type { VisibilityContext } from "../inspector/types";
 import type { ColorCompensationProfile } from "../../color-compensation/types";
 import { ColorCompensationControls } from "./ColorCompensationControls";
-import { CpuWidgetSettings } from "./CpuWidgetSettings";
-import { CatalogMetricWidgetSettings } from "./CatalogMetricWidgetSettings";
-import { DefaultWidgetSettings } from "./DefaultWidgetSettings";
 import { DenseMultiMetricWidgetSettings } from "./DenseMultiMetricWidgetSettings";
-import { DiskWidgetSettings } from "./DiskWidgetSettings";
-import { GpuWidgetSettings } from "./GpuWidgetSettings";
 import { MetricSourceDiagnostic } from "./MetricSourceDiagnostic";
-import { NetworkWidgetSettings } from "./NetworkWidgetSettings";
 import { SettingsSection } from "./SettingsSection";
+import { SingleMetricWidgetSettings } from "./SingleMetricWidgetSettings";
+import { StackedMetricWidgetSettings } from "./StackedMetricWidgetSettings";
 
 interface WidgetSettingsTabProps {
     context: VisibilityContext;
@@ -132,6 +128,12 @@ function renderMetricPanel(
             : <DomainMismatchNotice />;
     }
 
+    if (panelProps.context.resolved.widget.widgetKind === "stackedMetric") {
+        return actionKind === "stackedMetric"
+            ? <StackedMetricWidgetSettings {...panelProps} widget={panelProps.context.resolved.widget} />
+            : <DomainMismatchNotice />;
+    }
+
     if (panelProps.context.resolved.widget.widgetKind !== "singleMetric") {
         return <DomainMismatchNotice />;
     }
@@ -142,20 +144,7 @@ function renderMetricPanel(
         return <DomainMismatchNotice />;
     }
 
-    switch (target.domain) {
-        case "network":
-            return <NetworkWidgetSettings {...panelProps} target={target} />;
-        case "disk":
-            return <DiskWidgetSettings {...panelProps} target={target} />;
-        case "gpu":
-            return <GpuWidgetSettings {...panelProps} target={target} />;
-        case "cpu":
-            return <CpuWidgetSettings {...panelProps} target={target} />;
-        case "catalog":
-            return <CatalogMetricWidgetSettings {...panelProps} target={target} />;
-        case "memory":
-            return <DefaultWidgetSettings {...panelProps} />;
-    }
+    return <SingleMetricWidgetSettings {...panelProps} target={target} />;
 }
 
 function DomainMismatchNotice(): React.JSX.Element {
