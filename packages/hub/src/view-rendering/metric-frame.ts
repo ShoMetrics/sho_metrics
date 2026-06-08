@@ -26,6 +26,12 @@ export interface MetricFrameBody {
  */
 export function renderMetricFrame(options: {
     bodies: readonly MetricFrameBody[];
+    /**
+     * Frame-level SVG fragments that do not participate in body viewport
+     * placement. Use this only for chrome-like overlays that must not move or
+     * resize metric bodies.
+     */
+    overlays?: readonly string[];
     themePreset: ThemePresetName;
     /** Theme-owned background/chrome paints. Metric body paints are already baked into each body SVG. */
     themePaints: ThemeStylePaints;
@@ -78,6 +84,10 @@ export function renderMetricFrame(options: {
         style.renderPanelOverlay?.(options.size, options.themePaints) ?? "",
         themeChromeOpacity,
     );
+    // Frame overlays intentionally sit above metric bodies and panel chrome but
+    // below the theme's final overlay. This keeps transient badges under
+    // glass/window effects without changing metric layout.
+    const frameOverlays = options.overlays?.join("") ?? "";
     const overlay = renderThemeSvgFragmentOpacityGroup(
         style.renderOverlay(options.size, options.themePaints),
         themeChromeOpacity,
@@ -92,6 +102,7 @@ export function renderMetricFrame(options: {
         ${placedBodies}
         ${panelOverlay}
         ${panelEnd}
+        ${frameOverlays}
         ${overlay}
     </svg>`;
 }

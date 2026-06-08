@@ -23,6 +23,7 @@ import {
     readStackedDisplayedMetricKey,
 } from "./stacked-metric/read-plan";
 import { buildStackedSingleMetricViewOptions } from "./stacked-metric/single-metric-view-builder";
+import type { StackedMetricIndicator } from "../view-rendering/stacked-metric-indicator";
 
 const INDICATOR_VISIBLE_MILLISECONDS = 1000;
 
@@ -106,8 +107,9 @@ export class StackedMetric extends MetricAction {
         if (activeSlot === undefined) {
             return;
         }
+        const actionState = this.states.get(event.action.id);
 
-        setMetricView(buildStackedSingleMetricViewOptions({
+        const viewOptions = buildStackedSingleMetricViewOptions({
             event,
             widget: activeSlot.widget,
             preferences: settings.preferences,
@@ -116,7 +118,17 @@ export class StackedMetric extends MetricAction {
             platform: this.currentPlatform(),
             currentTimestampMilliseconds: this.currentTimestampMilliseconds(),
             readCachedSourceStatus: sourceId => this.readCachedSourceStatus(sourceId),
-        }));
+        });
+
+        setMetricView({
+            ...viewOptions,
+            // The active slot renders exactly like a single metric. Stacked
+            // adds indicator data only after a completed switch, so the
+            // renderer can overlay it without changing slot layout.
+            ...(actionState?.indicatorVisible === true
+                ? { stackedIndicator: buildStackedMetricIndicator(widget, activeSlot) }
+                : {}),
+        });
     }
 
     protected isIndicatorVisibleForTest(actionId: string): boolean {
@@ -254,4 +266,16 @@ function createStackedMetricActionState(): StackedMetricActionState {
 
 function modulo(value: number, divisor: number): number {
     return ((value % divisor) + divisor) % divisor;
+}
+
+function buildStackedMetricIndicator(
+    widget: ResolvedStackedMetricWidget,
+    activeSlot: ResolvedStackedMetricSlot,
+): StackedMetricIndicator {
+    // The slot should always be present after reconciliation. Keep the fallback
+    // user-safe in case a settings update races with a render.
+    return {
+        currentIndex: Math.max(1, widget.slots.findIndex(slot => slot.slotId === activeSlot.slotId) + 1),
+        totalCount: widget.slots.length,
+    };
 }

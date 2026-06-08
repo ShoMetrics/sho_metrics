@@ -23,6 +23,7 @@ import { buildDefaultAppearanceSettings } from "../../src/settings/default-appea
 import { buildMetricRenderAppearance } from "../../src/settings/render-appearance-builder";
 import { buildColorConfigFromAppearance } from "../../src/settings/render-paint-resolver";
 import type { DenseMetricWidgetData } from "../../src/actions/dense-multi-metric/row-data";
+import type { StackedMetricIndicator } from "../../src/view-rendering/stacked-metric-indicator";
 import { getDiskIconFragment, getHardwareIconFragment } from "../../src/widgets/icons/hardware-icons";
 import {
     getNetworkDirectionStatusIcon,
@@ -210,6 +211,14 @@ export interface DenseMetricVisualTestCase {
     readonly renderTarget?: MetricRenderTarget;
 }
 
+export interface StackedMetricVisualTestCase {
+    readonly snapshotName: string;
+    readonly appearance: ResolvedAppearanceSettingsOverride;
+    readonly data: WidgetData;
+    readonly indicator?: StackedMetricIndicator;
+    readonly renderTarget?: MetricRenderTarget;
+}
+
 export function buildDefaultAppearanceOverride(options: {
     selectedView: VisualMetricView;
     circleVariant?: CircleVariant;
@@ -393,6 +402,24 @@ export function renderDenseMetricWidgetPngBuffer(testCase: DenseMetricVisualTest
             centerIconFragment: "",
             statusIcon: getMetricStatusIcon("percentage"),
             circleVariantOverride: resolvedSettings.view.circleVariant,
+        },
+    });
+
+    return renderSvgToPngBuffer(frame.svg, frame.renderPlan.pngSize);
+}
+
+export function renderStackedMetricWidgetPngBuffer(testCase: StackedMetricVisualTestCase): Buffer {
+    const resolvedSettings = buildDefaultAppearanceSettings(testCase.appearance);
+    const frame = composeMetricViewFrame({
+        renderTarget: testCase.renderTarget ?? "key",
+        viewOptions: {
+            metricRenderKind: "singleMetric",
+            resolvedSettings,
+            widgetData: testCase.data,
+            centerIconFragment: CPU_CENTER_ICON_FRAGMENT,
+            statusIcon: getMetricStatusIcon("percentage"),
+            circleVariantOverride: resolvedSettings.view.circleVariant,
+            ...(testCase.indicator === undefined ? {} : { stackedIndicator: testCase.indicator }),
         },
     });
 
