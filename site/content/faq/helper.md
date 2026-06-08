@@ -49,31 +49,40 @@ The helper sensor stack has two pieces:
 ShoMetrics does not require you to install LibreHardwareMonitor separately —
 the helper uses the library directly.
 
-**PawnIO is installed by you, not by the helper.** You download and install
-PawnIO yourself from [pawnio.eu](https://pawnio.eu/); the helper does not
-install or bundle it. This is by design of PawnIO's authors — PawnIO is meant
-to be installed explicitly by the user, not silently by other apps.
+**If you do not already have PawnIO installed, the helper installer installs it
+for you** — you will be asked to accept PawnIO's own agreement during that step.
 
-If you do not install PawnIO, the helper still runs, but sensors that need
-driver access will be unavailable.
+If PawnIO is already installed, the helper installer leaves it as is and does not
+reinstall it. To reinstall or update PawnIO, you can do that yourself from
+[pawnio.eu](https://pawnio.eu/).
+
+You can also choose not to install PawnIO. The helper still runs, but most of the
+sensors it can provide will be unavailable without the driver.
+
+This step is install-only: removing ShoMetrics later does not remove PawnIO —
+you need to uninstall PawnIO yourself (see [What PawnIO is](#what-pawnio-is) below).
 
 ## What PawnIO is
 
-[PawnIO](https://pawnio.eu/) is a signed Windows kernel driver used by
-hardware tooling to reach sensors that standard user-mode APIs cannot. Rather
-than exposing raw I/O to user-mode callers, it runs small signed bytecode
-modules that each perform one task — read this sensor, query that chip — which
-keeps the attack surface narrower than older "give-me-MSR-access" drivers.
+[PawnIO](https://pawnio.eu/) is a small, signed Windows driver that hardware
+tools use to read sensors Windows otherwise keeps locked away. The part that
+matters for trust: it only lets a fixed set of **signed modules it trusts** reach
+your hardware — never arbitrary apps or arbitrary code.
 
-PawnIO is third-party software. If you later remove ShoMetrics and no other
-app on your PC uses PawnIO, you can uninstall it from Windows Settings →
-Installed apps.
+PawnIO is third-party software, and removing ShoMetrics does not remove it —
+**if you would like PawnIO gone, you will need to uninstall it yourself** from
+Windows Settings → Installed apps. ShoMetrics deliberately leaves it in place
+because other popular tools use PawnIO too (for example OpenRGB and some Lian Li
+case-lighting sync apps), and silently pulling a shared driver could break them
+in surprising ways. If you are not sure whether anything else relies on it, a
+safe check is to uninstall PawnIO and watch for anything breaking — if nothing
+does, you are all set.
 
 Some strict anti-cheat systems, such as FACEIT, have previously misreported
 PawnIO. According to the PawnIO author, the
 [PawnIO.Setup issue](https://github.com/namazso/PawnIO.Setup/issues/1#issuecomment-3893913885)
-should be fixed as of 2.1.0. Install PawnIO only from the official site, and
-use PawnIO 2.1.0 or newer.
+should be fixed as of 2.1.0. We recommend installing PawnIO only from the
+official site, and using version 2.1.0 or newer.
 
 ### If you have read complaints about LHM's old WinRing0 driver
 
@@ -84,9 +93,9 @@ WinRing0 — the helper has been built on PawnIO from the first release.
 
 ## If you do not want the driver
 
-Do not install PawnIO. The Stream Deck plugin still works without the helper,
-and the helper still works without PawnIO — you just will not see sensors
-that need driver access.
+You can simply skip PawnIO. The Stream Deck plugin still works without the
+helper, and the helper still runs without PawnIO — but most of the sensors the
+helper can provide need driver access, so those will be unavailable.
 
 ## Before installing
 
