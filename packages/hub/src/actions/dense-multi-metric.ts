@@ -18,6 +18,7 @@ import { backgroundMetricCollection } from "../runtime/metric-collection/backgro
 import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import { refreshDiskVolumeRuntimeCache } from "./shared/disk-volume-runtime-cache";
+import { refreshNetworkInterfaceRuntimeCache } from "./shared/network-interface-runtime-cache";
 
 const log = logger.for("Action:DenseMultiMetric");
 /** Dense Multi Metric action that collects several metric rows for one key. */
@@ -60,6 +61,10 @@ export class DenseMultiMetric extends MetricAction {
             .catch(error => {
                 log.warn(() => `Failed to refresh dense metric disk volume runtime cache: ${String(error)}`);
             });
+        this.refreshNetworkInterfacesForPropertyInspector(event)
+            .catch(error => {
+                log.warn(() => `Failed to refresh dense metric network interface runtime cache: ${String(error)}`);
+            });
     }
 
     protected refreshDiskVolumesForPropertyInspector(event: PropertyInspectorDidAppearEvent): Promise<void> {
@@ -72,6 +77,14 @@ export class DenseMultiMetric extends MetricAction {
         event: PropertyInspectorDidAppearEvent,
     ): Promise<void> {
         return refreshDiskVolumeRuntimeCache({
+            defaultSourceProfileId: pluginGlobalSettingsStore.getResolved().defaultSourceProfileId,
+            platform: this.currentPlatform(),
+            updateRuntimeCache: patch => this.updateRuntimeCache(event, patch),
+        });
+    }
+
+    protected refreshNetworkInterfacesForPropertyInspector(event: PropertyInspectorDidAppearEvent): Promise<void> {
+        return refreshNetworkInterfaceRuntimeCache({
             defaultSourceProfileId: pluginGlobalSettingsStore.getResolved().defaultSourceProfileId,
             platform: this.currentPlatform(),
             updateRuntimeCache: patch => this.updateRuntimeCache(event, patch),

@@ -656,6 +656,7 @@ test("widget patch updates dense metric slot target by slot id", () => {
                     domain: "network",
                     kind: "traffic",
                     direction: "download",
+                    interfaceId: "Ethernet",
                 },
                 customLabel: undefined,
                 customMaximumValue: undefined,
@@ -667,8 +668,50 @@ test("widget patch updates dense metric slot target by slot id", () => {
     assert.equal(widget.case, "denseMultiMetric");
     assert.equal(widget.value.slots[0]?.slot?.metric?.target.case, "cpu");
     assert.equal(widget.value.slots[1]?.slot?.metric?.target.case, "network");
+    const networkTarget = widget.value.slots[1]?.slot?.metric?.target;
+    if (networkTarget?.case === "network") {
+        assert.equal(networkTarget.value.traffic?.interfaceId, "Ethernet");
+    }
     assert.equal(widget.value.slots[1]?.customLabel, undefined);
     assert.equal(widget.value.slots[1]?.customMaximumValue, undefined);
+});
+
+test("widget patch preserves dense custom label and maximum when target patch omits them", () => {
+    const nextSettings = writeStoredWidgetSettingsPatch({
+        denseMultiMetric: {
+            slots: [
+                { slotId: "slot-1", slot: { metric: { cpu: {} } } },
+                {
+                    slotId: "slot-2",
+                    slot: { metric: { network: { traffic: { direction: "download" } } } },
+                    customLabel: "DL",
+                    customMaximumValue: 62_500_000,
+                },
+            ],
+        },
+    }, {
+        dense: {
+            updateSlot: {
+                slotId: "slot-2",
+                target: {
+                    domain: "network",
+                    kind: "traffic",
+                    direction: "download",
+                    interfaceId: "Ethernet",
+                },
+            },
+        },
+    });
+    const widget = readStoredWidgetSettings(nextSettings).settings.widget;
+
+    assert.equal(widget.case, "denseMultiMetric");
+    assert.equal(widget.value.slots[1]?.customLabel, "DL");
+    assert.equal(widget.value.slots[1]?.customMaximumValue, 62_500_000);
+    const target = widget.value.slots[1]?.slot?.metric?.target;
+    assert.equal(target?.case, "network");
+    if (target?.case === "network") {
+        assert.equal(target.value.traffic?.interfaceId, "Ethernet");
+    }
 });
 
 test("widget patch writes dense disk usage volume by slot id", () => {

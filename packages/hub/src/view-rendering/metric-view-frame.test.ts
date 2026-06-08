@@ -799,6 +799,34 @@ test("dense metric frame keeps missing samples isolated to their rows", () => {
     assert.equal(renderedMetricData.rows[1]?.widgetData.displayValue, "N/A");
 });
 
+test("dense metric frame compacts data-rate units", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildDenseMetricRenderOptions({
+            widgetData: {
+                rows: [
+                    buildDenseMetricRow({
+                        slotId: "megabytes",
+                        label: "DOWN",
+                        unit: "MB/s",
+                        sampleTimestampMilliseconds: 1000,
+                    }),
+                    buildDenseMetricRow({
+                        slotId: "kilobytes",
+                        label: "UP",
+                        unit: "KB/s",
+                        sampleTimestampMilliseconds: 1000,
+                    }),
+                ],
+            },
+        }),
+        renderTarget: "key",
+    });
+    const renderedMetricData = readDenseRenderedMetricData(frame.renderedMetricData);
+
+    assert.equal(renderedMetricData.rows[0]?.widgetData.unit, "M");
+    assert.equal(renderedMetricData.rows[1]?.widgetData.unit, "K");
+});
+
 test("stacked metric indicator renders as a bottom-right overlay", () => {
     const frame = composeMetricViewFrame({
         viewOptions: buildSingleMetricRenderOptions({
@@ -973,12 +1001,14 @@ function buildDenseMetricRow(options: {
     readonly label: string;
     readonly current?: number;
     readonly progress?: number;
+    readonly unit?: string;
     readonly sampleTimestampMilliseconds?: number | undefined;
 }) {
     const widgetData = buildWidgetData({
         label: options.label,
         current: options.current,
         progress: options.progress,
+        unit: options.unit,
         displayValue: options.current?.toFixed(0),
     });
 

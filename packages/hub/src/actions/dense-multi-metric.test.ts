@@ -13,6 +13,7 @@ import {
 } from "../runtime/sources/source-client";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
 import { diskVolumeRegistry, type DiskVolumeOption } from "../runtime/disk-volumes";
+import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../runtime/network-interfaces";
 import { resolveDiskUsageMetricSubscriptionKeys } from "./disk/metric-subscriptions";
 
 test("dense multi metric publishes catalog descriptors to the Property Inspector runtime cache", async () => {
@@ -60,6 +61,28 @@ test("dense multi metric publishes disk volume options to the Property Inspector
     }
 });
 
+test("dense multi metric publishes network interface options to the Property Inspector runtime cache", async () => {
+    const networkInterface = buildNetworkInterfaceOption("ethernet-0");
+    const action = new TestDenseMultiMetric({
+        descriptors: [],
+        descriptorFingerprint: "empty",
+    });
+    const streamDeckAction = new FakeStreamDeckAction("dense-network-interface-action");
+    networkInterfaceRegistry.update([networkInterface]);
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildDenseWidgetSettings()));
+        await action.refreshNetworkInterfacesForTest(buildPropertyInspectorDidAppearEvent(streamDeckAction));
+
+        assert.deepEqual(action.runtimeCachePatchList.at(-1), {
+            availableNetworkInterfaces: [networkInterface],
+        });
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+        networkInterfaceRegistry.update([]);
+    }
+});
+
 class TestDenseMultiMetric extends DenseMultiMetric {
     readonly bindings: FakeMetricCollectionBinding[] = [];
     readonly runtimeCachePatchList: WidgetRuntimeCachePatch[] = [];
@@ -75,6 +98,10 @@ class TestDenseMultiMetric extends DenseMultiMetric {
 
     refreshDiskVolumesForTest(event: PropertyInspectorDidAppearEvent): Promise<void> {
         return this.refreshDiskVolumesForPropertyInspector(event);
+    }
+
+    refreshNetworkInterfacesForTest(event: PropertyInspectorDidAppearEvent): Promise<void> {
+        return this.refreshNetworkInterfacesForPropertyInspector(event);
     }
 
     protected override onMetricsUpdate(event: WillAppearEvent): void {
@@ -107,6 +134,14 @@ class TestDenseMultiMetric extends DenseMultiMetric {
         this.refreshedMetricKeysList.push([...resolveDiskUsageMetricSubscriptionKeys(undefined)]);
         this.runtimeCachePatchList.push({
             availableDiskVolumes: [...diskVolumeRegistry.getOptions()],
+        });
+        return Promise.resolve();
+    }
+
+    protected override refreshNetworkInterfacesForPropertyInspector(event: PropertyInspectorDidAppearEvent): Promise<void> {
+        void event;
+        this.runtimeCachePatchList.push({
+            availableNetworkInterfaces: [...networkInterfaceRegistry.getOptions()],
         });
         return Promise.resolve();
     }
@@ -176,6 +211,16 @@ function buildMetricDescriptor(metricId: string): MetricDescriptor {
         valueKind: MetricValueKind.SCALAR,
         unit: MetricUnit.CELSIUS,
         metricIdKind: MetricIdKind.SOURCE_SENSOR,
+    };
+}
+
+function buildNetworkInterfaceOption(id: string): NetworkInterfaceOption {
+    return {
+        id,
+        name: "Ethernet",
+        type: "wired",
+        isDefault: true,
+        speedMegabitsPerSecond: null,
     };
 }
 
