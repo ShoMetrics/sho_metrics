@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
     buildCircleVariantPreviewUri,
+    buildDenseMetricThemePreviewUri,
     buildMetricViewPreviewUri,
     buildMetricThemePreviewUri,
     buildTerminalVariantPreviewUri,
@@ -14,6 +15,7 @@ import type {
     TerminalThemeVariant,
 } from "../../settings/resolved-settings";
 import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
+import { buildDefaultAppearanceSettings } from "../../settings/default-appearance-settings";
 import { buildVisibilityContext } from "../testing/test-context";
 
 test("metric view preview URIs render every Property Inspector view option without throwing", () => {
@@ -74,6 +76,24 @@ test("metric theme preview URIs render every Property Inspector theme without th
     }
 });
 
+test("dense metric theme preview renders dense rows instead of the single metric default", () => {
+    const previewUri = buildDenseMetricThemePreviewUri("flat", {
+        appearance: buildDefaultAppearanceSettings(),
+        data: {
+            rows: [
+                buildDensePreviewRow("preview-cpu", "CPU", 45),
+                buildDensePreviewRow("preview-gpu", "GPU", 68),
+                buildDensePreviewRow("preview-ram", "RAM", 72),
+            ],
+        },
+    });
+    const svg = decodeURIComponent(previewUri);
+
+    assert.match(svg, />GPU</);
+    assert.match(svg, />RAM</);
+    assert.doesNotMatch(svg, /<circle[\s\S]*>CPU</);
+});
+
 test("terminal variant preview URIs render every terminal variant without throwing", () => {
     const terminalVariants: readonly TerminalThemeVariant[] = ["clean", "vintage"];
 
@@ -92,5 +112,22 @@ function buildGpuPreviewInput(): MetricPreviewInput {
     return {
         appearance: slot.appearance,
         target: slot.metric.target,
+    };
+}
+
+function buildDensePreviewRow(slotId: string, label: string, current: number) {
+    return {
+        rowKind: "configured" as const,
+        slotId,
+        metricKey: slotId,
+        widgetData: {
+            current,
+            progress: current / 100,
+            history: [],
+            unit: "%",
+            label,
+            displayValue: current.toFixed(0),
+            sampleTimestampMilliseconds: 1,
+        },
     };
 }

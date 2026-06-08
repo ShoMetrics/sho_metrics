@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { InspectorItem } from "../components/InspectorItem";
 import { commonMessages } from "../../i18n/message-groups/shell";
-import { catalogMessages, cpuMessages, denseMessages, gpuMessages, helperMessages } from "../../i18n/message-groups/widgets";
+import { catalogMessages, cpuMessages, denseMessages, gpuMessages, helperMessages, multiMetricMessages } from "../../i18n/message-groups/widgets";
 import { optionMessages } from "../../i18n/message-groups/options";
 import { localizeOptionList } from "../../i18n/options";
 import { useI18n, type I18n } from "../../i18n/react";
@@ -91,6 +91,11 @@ export function DenseMetricRowsSettings({
                     {t(denseMessages.addMetricButton)}
                 </button>
             </InspectorItem>
+            {widget.slots.length >= DENSE_MULTI_METRIC_MAX_SLOT_COUNT && (
+                <InspectorItem className="note-item note-item-caption">
+                    <p className="section-note">{t(multiMetricMessages.maxSlotCountReachedNote)}</p>
+                </InspectorItem>
+            )}
         </SettingsSection>
     );
 }

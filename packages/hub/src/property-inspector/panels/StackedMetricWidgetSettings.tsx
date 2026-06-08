@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { InspectorItem } from "../components/InspectorItem";
-import { stackedMessages } from "../../i18n/message-groups/widgets";
+import { multiMetricMessages, stackedMessages } from "../../i18n/message-groups/widgets";
 import { useI18n } from "../../i18n/react";
 import type {
     ResolvedMetricTarget,
@@ -8,16 +8,13 @@ import type {
     ResolvedStackedMetricWidget,
 } from "../../settings/resolved-settings";
 import {
-    STACKED_METRIC_MAX_INTERVAL_SECONDS,
     STACKED_METRIC_MAX_SLOT_COUNT,
-    STACKED_METRIC_MIN_INTERVAL_SECONDS,
     STACKED_METRIC_MIN_SLOT_COUNT,
 } from "../../settings/storage/stacked-metric-constraints";
 import type {
     SingleMetricWidgetSettingsPatch,
     StoredWidgetSettingsPatch,
 } from "../../settings/storage/widget-settings-patch";
-import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import type { SelectOption } from "../inspector/types";
 import type { VisibilityContext } from "../inspector/types";
@@ -37,61 +34,85 @@ const stackedSlotMetricDomainOptionList = [
     { value: "catalog", label: "Catalog" },
 ] as const satisfies readonly SelectOption<StackedSlotMetricDomain>[];
 
+const stackedRotationIntervalOptionList = [
+    { value: 1, label: "1s" },
+    { value: 2, label: "2s" },
+    { value: 3, label: "3s" },
+    { value: 4, label: "4s" },
+    { value: 5, label: "5s" },
+] as const satisfies readonly SelectOption<number>[];
+
 export function StackedMetricWidgetSettings(props: WidgetSettingsPanelProps & {
     widget: ResolvedStackedMetricWidget;
 }): React.JSX.Element {
     const { widget } = props;
-    const [selectedSlotId, setSelectedSlotId] = useState(widget.slots[0]?.slotId);
+    const { t } = useI18n();
+    const [editingSlotId, setEditingSlotId] = useState<string | undefined>(undefined);
     const [isReorderEnabled, setIsReorderEnabled] = useState(false);
-    const selectedSlot = widget.slots.find(slot => slot.slotId === selectedSlotId)
-        ?? widget.slots[0];
+    const editingSlot = widget.slots.find(slot => slot.slotId === editingSlotId);
+    const editingSlotIndex = editingSlot === undefined
+        ? -1
+        : widget.slots.findIndex(slot => slot.slotId === editingSlot.slotId);
+    const isEditingSlot = editingSlot !== undefined;
 
     useEffect(() => {
-        if (widget.slots.some(slot => slot.slotId === selectedSlotId)) {
+        // Auto-save settings updates re-render this component frequently; keep
+        // the drill-in page open unless the edited slot was actually removed.
+        if (editingSlotId === undefined || widget.slots.some(slot => slot.slotId === editingSlotId)) {
             return;
         }
 
-        setSelectedSlotId(widget.slots[0]?.slotId);
-    }, [selectedSlotId, widget.slots]);
+        setEditingSlotId(undefined);
+    }, [editingSlotId, widget.slots]);
+
+    useEffect(() => {
+        props.onWidgetChromeSuppressionChange?.(isEditingSlot);
+
+        return () => {
+            props.onWidgetChromeSuppressionChange?.(false);
+        };
+    }, [isEditingSlot, props.onWidgetChromeSuppressionChange]);
+
+    if (editingSlot !== undefined && editingSlotIndex >= 0) {
+        return (
+            <StackedSelectedSlotSettings
+                {...props}
+                slot={editingSlot}
+                slotNumber={editingSlotIndex + 1}
+                onBack={() => setEditingSlotId(undefined)}
+            />
+        );
+    }
 
     return (
         <>
             <StackedSlotListSettings
                 widget={widget}
-                selectedSlotId={selectedSlot?.slotId}
                 isReorderEnabled={isReorderEnabled}
                 onReorderEnabledChange={setIsReorderEnabled}
-                onSelectedSlotIdChange={setSelectedSlotId}
+                onEditSlot={setEditingSlotId}
                 onSettingsPatch={props.onSettingsPatch}
             />
             <StackedRotationSettings
                 widget={widget}
                 onSettingsPatch={props.onSettingsPatch}
             />
-            {selectedSlot !== undefined && (
-                <StackedSelectedSlotSettings
-                    {...props}
-                    slot={selectedSlot}
-                />
-            )}
-            <PollingSettings {...props} />
+            <PollingSettings {...props} note={t(multiMetricMessages.sharedPollingNote)} />
         </>
     );
 }
 
 function StackedSlotListSettings({
     widget,
-    selectedSlotId,
     isReorderEnabled,
     onReorderEnabledChange,
-    onSelectedSlotIdChange,
+    onEditSlot,
     onSettingsPatch,
 }: {
     readonly widget: ResolvedStackedMetricWidget;
-    readonly selectedSlotId: string | undefined;
     readonly isReorderEnabled: boolean;
     readonly onReorderEnabledChange: (isEnabled: boolean) => void;
-    readonly onSelectedSlotIdChange: (slotId: string) => void;
+    readonly onEditSlot: (slotId: string) => void;
     readonly onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
 }): React.JSX.Element {
     const { t } = useI18n();
@@ -105,12 +126,9 @@ function StackedSlotListSettings({
                         <button
                             className="inline-action-button"
                             type="button"
-                            disabled={slot.slotId === selectedSlotId}
-                            onClick={() => onSelectedSlotIdChange(slot.slotId)}
+                            onClick={() => onEditSlot(slot.slotId)}
                         >
-                            {slot.slotId === selectedSlotId
-                                ? t(stackedMessages.selectedSlotButton)
-                                : t(stackedMessages.editSlotButton)}
+                            {t(stackedMessages.editSlotButton)}
                         </button>
                         {isReorderEnabled && (
                             <>
@@ -169,6 +187,11 @@ function StackedSlotListSettings({
                     {t(stackedMessages.addSlotButton)}
                 </button>
             </InspectorItem>
+            {widget.slots.length >= STACKED_METRIC_MAX_SLOT_COUNT && (
+                <InspectorItem className="note-item note-item-caption">
+                    <p className="section-note">{t(multiMetricMessages.maxSlotCountReachedNote)}</p>
+                </InspectorItem>
+            )}
         </SettingsSection>
     );
 }
@@ -196,18 +219,22 @@ function StackedRotationSettings({
                     <span>{t(stackedMessages.autoRotateLabel)}</span>
                 </label>
             </InspectorItem>
-            <NumberSetting
+            <SelectSetting
                 label={t(stackedMessages.intervalSecondsLabel)}
                 value={widget.rotation.intervalSeconds}
+                optionList={stackedRotationIntervalOptionList}
                 onValueChange={(intervalSeconds) => onSettingsPatch({
                     stacked: { rotation: { intervalSeconds } },
                 })}
-                minimum={STACKED_METRIC_MIN_INTERVAL_SECONDS}
-                maximum={STACKED_METRIC_MAX_INTERVAL_SECONDS}
-                step={1}
             />
             <InspectorItem className="note-item note-item-caption">
-                <p className="section-note">{t(stackedMessages.manualSwitchNote)}</p>
+                <p className="section-note">
+                    <span>{t(stackedMessages.manualSwitchKeyNote)}</span>
+                    <br />
+                    <span>{t(stackedMessages.manualSwitchDialNote)}</span>
+                    <br />
+                    <span>{t(stackedMessages.manualSwitchAutoRotateNote)}</span>
+                </p>
             </InspectorItem>
         </SettingsSection>
     );
@@ -216,6 +243,8 @@ function StackedRotationSettings({
 function StackedSelectedSlotSettings({
     context,
     slot,
+    slotNumber,
+    onBack,
     onSettingsPatch,
     viewDisabled,
     themeDisabled,
@@ -223,13 +252,29 @@ function StackedSelectedSlotSettings({
     colorDisabled,
 }: WidgetSettingsPanelProps & {
     readonly slot: ResolvedStackedMetricSlot;
+    readonly slotNumber: number;
+    readonly onBack: () => void;
 }): React.JSX.Element {
     const { t } = useI18n();
     const childContext = buildStackedSlotVisibilityContext(context, slot);
 
     return (
         <>
-            <SettingsSection title={t(stackedMessages.selectedSlotSection)}>
+            <SettingsSection title={t(stackedMessages.selectedSlotSection, { slotNumber })}>
+                <InspectorItem>
+                    <div className="advanced-action-stack">
+                        <button
+                            className="inline-action-button"
+                            type="button"
+                            onClick={onBack}
+                        >
+                            {t(stackedMessages.backToStackButton)}
+                        </button>
+                    </div>
+                </InspectorItem>
+                <InspectorItem className="note-item note-item-caption">
+                    <p className="section-note">{t(stackedMessages.selectedSlotNote)}</p>
+                </InspectorItem>
                 <SelectSetting
                     label={t(stackedMessages.metricTypeLabel)}
                     value={slot.widget.slot.metric.target.domain}
@@ -243,9 +288,6 @@ function StackedSelectedSlotSettings({
                         },
                     })}
                 />
-                <InspectorItem className="note-item note-item-caption">
-                    <p className="section-note">{t(stackedMessages.selectedSlotNote)}</p>
-                </InspectorItem>
             </SettingsSection>
             <SingleMetricWidgetSettings
                 context={childContext}
