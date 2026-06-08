@@ -40,6 +40,7 @@ export function WidgetSettingsTab({
 }: WidgetSettingsTabProps): React.JSX.Element {
     const { t } = useI18n();
     const [canShowPendingNotice, setCanShowPendingNotice] = useState(false);
+    const [isWidgetChromeSuppressed, setIsWidgetChromeSuppressed] = useState(false);
     const isSettingsPending = context.actionKind === "unknown";
 
     useEffect(() => {
@@ -57,6 +58,10 @@ export function WidgetSettingsTab({
         };
     }, [isSettingsPending]);
 
+    useEffect(() => {
+        setIsWidgetChromeSuppressed(false);
+    }, [context.actionKind]);
+
     if (isSettingsPending) {
         return canShowPendingNotice
             ? (
@@ -70,6 +75,7 @@ export function WidgetSettingsTab({
     const panelProps = {
         context,
         onSettingsPatch,
+        onWidgetChromeSuppressionChange: setIsWidgetChromeSuppressed,
         viewDisabled: isGlobalViewOverrideEnabled,
         themeDisabled: isGlobalThemeOverrideEnabled,
         transparentSurfaceDisabled: isGlobalTransparentSurfaceOverrideEnabled,
@@ -79,6 +85,7 @@ export function WidgetSettingsTab({
         || isGlobalThemeOverrideEnabled
         || isGlobalTransparentSurfaceOverrideEnabled
         || isGlobalPaintOverrideEnabled;
+    const canShowMetricSourceDiagnostic = context.resolved.widget.widgetKind === "singleMetric";
 
     return (
         <>
@@ -88,26 +95,32 @@ export function WidgetSettingsTab({
                 </InspectorItem>
             )}
             {renderMetricPanel(panelProps)}
-            <SettingsSection title={t(commonMessages.advancedSection)}>
-                <ColorCompensationControls
-                    profile={colorCompensationProfile}
-                    onOpenColorCompensation={onOpenColorCompensation}
-                />
-                <InspectorItem className="widget-reset-item" label={t(commonMessages.resetLabel)}>
-                    <div className="advanced-action-stack">
-                        <button
-                            className="inline-action-button"
-                            type="button"
-                            onClick={onResetWidgetSettings}
-                        >
-                            {t(widgetMessages.resetWidgetSettingsButton)}
-                        </button>
-                    </div>
-                </InspectorItem>
-            </SettingsSection>
-            <MetricSourceDiagnostic
-                attribution={context.runtimeCache.displayedMetricReadAttribution}
-            />
+            {!isWidgetChromeSuppressed && (
+                <>
+                    <SettingsSection title={t(commonMessages.advancedSection)}>
+                        <ColorCompensationControls
+                            profile={colorCompensationProfile}
+                            onOpenColorCompensation={onOpenColorCompensation}
+                        />
+                        <InspectorItem className="widget-reset-item" label={t(commonMessages.resetLabel)}>
+                            <div className="advanced-action-stack">
+                                <button
+                                    className="inline-action-button"
+                                    type="button"
+                                    onClick={onResetWidgetSettings}
+                                >
+                                    {t(widgetMessages.resetWidgetSettingsButton)}
+                                </button>
+                            </div>
+                        </InspectorItem>
+                    </SettingsSection>
+                    {canShowMetricSourceDiagnostic && (
+                        <MetricSourceDiagnostic
+                            attribution={context.runtimeCache.displayedMetricReadAttribution}
+                        />
+                    )}
+                </>
+            )}
         </>
     );
 }
@@ -116,8 +129,10 @@ function renderMetricPanel(
     panelProps: {
         context: VisibilityContext;
         onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
+        onWidgetChromeSuppressionChange?: ((isSuppressed: boolean) => void) | undefined;
         viewDisabled: boolean;
         themeDisabled: boolean;
+        transparentSurfaceDisabled: boolean;
         colorDisabled: boolean;
     },
 ): React.JSX.Element {

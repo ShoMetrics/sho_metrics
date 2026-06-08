@@ -1047,6 +1047,8 @@ test("dense multi metric settings render rows and hide single metric view contro
     assert.match(markup, /Theme:/);
     assert.match(markup, /Color Mode:/);
     assert.match(markup, /Polling Frequency:/);
+    assert.match(markup, /This polling frequency is shared by every metric in this key\./);
+    assert.doesNotMatch(markup, sectionTitlePattern("DEBUG"));
     assert.doesNotMatch(markup, /Move Up/);
     assert.doesNotMatch(markup, /Move Down/);
     assert.doesNotMatch(markup, /View:/);
@@ -1075,6 +1077,7 @@ test("dense multi metric settings enforce row count controls", () => {
 
     assert.match(minMarkup, /disabled=""[\s\S]*Remove/);
     assert.match(maxMarkup, /disabled=""[\s\S]*Add Metric/);
+    assert.match(maxMarkup, /You have reached the maximum number of metrics for this key\./);
 });
 
 test("dense multi metric disk usage row renders disk volume picker", () => {
@@ -1156,7 +1159,7 @@ test("dense multi metric catalog row renders descriptor label and readable maxim
     assert.match(markup, /value="450"/);
 });
 
-test("stacked metric settings render stack, rotation, selected slot editor, and one polling control", () => {
+test("stacked metric settings render stack, rotation, and one polling control", () => {
     const markup = renderWidgetSettings({
         actionKind: "stackedMetric",
         settings: buildStackedWidgetSettings(),
@@ -1164,18 +1167,20 @@ test("stacked metric settings render stack, rotation, selected slot editor, and 
 
     assert.match(markup, sectionTitlePattern("Stack"));
     assert.match(markup, sectionTitlePattern("Rotation"));
-    assert.match(markup, sectionTitlePattern("Selected Slot"));
     assert.match(markup, /Slot 1:/);
     assert.match(markup, /Slot 2:/);
-    assert.match(markup, /CPU Metric:/);
+    assert.doesNotMatch(markup, /CPU Metric:/);
     assert.match(markup, /Auto Rotate:/);
     assert.match(markup, /Interval \(s\):/);
     assert.match(markup, /Add Slot/);
     assert.match(markup, /Reorder:/);
     assert.match(markup, /Show move buttons/);
+    assert.doesNotMatch(markup, sectionTitlePattern("DEBUG"));
     assert.doesNotMatch(markup, /Move Up/);
     assert.doesNotMatch(markup, /Move Down/);
     assert.equal(countTextOccurrences(markup, "Polling Frequency:"), 1);
+    assert.match(markup, /This polling frequency is shared by every metric in this key\./);
+    assert.match(markup, /Key action: press the key to switch\.[\s\S]*Dial action: rotate the dial to switch\./);
 });
 
 test("stacked metric settings enforce slot count controls", () => {
@@ -1192,9 +1197,10 @@ test("stacked metric settings enforce slot count controls", () => {
 
     assert.match(minMarkup, /disabled=""[\s\S]*Remove/);
     assert.match(maxMarkup, /disabled=""[\s\S]*Add Slot/);
+    assert.match(maxMarkup, /You have reached the maximum number of metrics for this key\./);
 });
 
-test("stacked metric selected slot editor reuses catalog picker runtime cache", () => {
+test("stacked metric settings page summarizes catalog slots without expanding the picker", () => {
     const markup = renderWidgetSettings({
         actionKind: "stackedMetric",
         settings: buildStackedWidgetSettings({
@@ -1235,9 +1241,10 @@ test("stacked metric selected slot editor reuses catalog picker runtime cache", 
     });
 
     assert.match(markup, new RegExp(["Advanced", "Sensor"].join(" ")));
-    assert.match(markup, /GPU Board Power/);
-    assert.match(markup, /Label &amp; Scale/);
+    assert.doesNotMatch(markup, /GPU Board Power/);
+    assert.doesNotMatch(markup, /Label &amp; Scale/);
     assert.equal(countTextOccurrences(markup, "Polling Frequency:"), 1);
+    assert.match(markup, /This polling frequency is shared by every metric in this key\./);
 });
 
 test("widget advanced controls render current metric source attribution", () => {

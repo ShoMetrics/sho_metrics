@@ -4,13 +4,31 @@ import { optionMessages } from "../../i18n/message-groups/options";
 import { localizeOptionList } from "../../i18n/options";
 import { useI18n } from "../../i18n/react";
 import { themeOptionList } from "../panels/setting-options";
-import { buildMetricThemePreviewUri, type MetricPreviewInput } from "../previews/metric-option-preview";
+import {
+    buildDenseMetricThemePreviewUri,
+    buildMetricThemePreviewUri,
+    type DenseMetricPreviewInput,
+    type MetricPreviewInput,
+} from "../previews/metric-option-preview";
 import { PreviewOptionSetting } from "./PreviewOptionSetting";
 import type { SettingControlProps } from "./setting-control";
 
+type ThemePreviewInput =
+    | {
+        readonly kind: "singleMetric";
+        readonly input: MetricPreviewInput;
+    }
+    | {
+        readonly kind: "denseMetric";
+        readonly input: DenseMetricPreviewInput;
+    };
+
 interface ThemeSettingProps extends SettingControlProps {
     readonly value: MetricTheme;
-    readonly preview?: MetricPreviewInput | undefined;
+    // Existing single-metric callers pass MetricPreviewInput directly. Keep
+    // that untagged path to avoid touching every caller for symmetry; if more
+    // preview shapes appear, migrate all callers to the tagged union.
+    readonly preview?: ThemePreviewInput | MetricPreviewInput | undefined;
     readonly onValueChange: (value: MetricTheme) => void;
 }
 
@@ -22,9 +40,22 @@ export function ThemeSetting(props: ThemeSettingProps): React.JSX.Element {
             {...props}
             label={t(commonMessages.themeLabel)}
             optionList={localizeOptionList(t, themeOptionList, themeMessageByValue)}
-            buildPreviewUri={(selectedTheme) => buildMetricThemePreviewUri(selectedTheme, props.preview)}
+            buildPreviewUri={(selectedTheme) => buildThemePreviewUri(selectedTheme, props.preview)}
         />
     );
+}
+
+function buildThemePreviewUri(
+    selectedTheme: MetricTheme,
+    preview: ThemeSettingProps["preview"],
+): string {
+    if (preview !== undefined && "kind" in preview) {
+        return preview.kind === "denseMetric"
+            ? buildDenseMetricThemePreviewUri(selectedTheme, preview.input)
+            : buildMetricThemePreviewUri(selectedTheme, preview.input);
+    }
+
+    return buildMetricThemePreviewUri(selectedTheme, preview);
 }
 
 const themeMessageByValue = {

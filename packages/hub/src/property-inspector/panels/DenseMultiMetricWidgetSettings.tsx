@@ -1,4 +1,5 @@
 import { commonMessages } from "../../i18n/message-groups/shell";
+import { multiMetricMessages } from "../../i18n/message-groups/widgets";
 import { useI18n } from "../../i18n/react";
 import type { ResolvedAppearanceSettings, ResolvedDenseMultiMetricWidget } from "../../settings/resolved-settings";
 import {
@@ -17,6 +18,7 @@ import type { StoredWidgetSettingsPatch } from "../../settings/storage/widget-se
 import { TerminalVariantSetting } from "../controls/TerminalVariantSetting";
 import { ThemeSetting } from "../controls/ThemeSetting";
 import { TransparentSurfaceSetting } from "../controls/TransparentSurfaceSetting";
+import type { DenseMetricPreviewInput } from "../previews/metric-option-preview";
 import {
     ColorFilledPaintControls,
     MetricColorControls,
@@ -30,12 +32,14 @@ import type { WidgetSettingsPanelProps } from "./panel-props";
 export function DenseMultiMetricWidgetSettings(props: WidgetSettingsPanelProps & {
     widget: ResolvedDenseMultiMetricWidget;
 }): React.JSX.Element {
+    const { t } = useI18n();
+
     return (
         <>
             <DenseMetricRowsSettings {...props} />
             <DenseThemeSettings {...props} />
             <DenseColorSettings {...props} />
-            <PollingSettings {...props} />
+            <PollingSettings {...props} note={t(multiMetricMessages.sharedPollingNote)} />
         </>
     );
 }
@@ -55,6 +59,7 @@ function DenseThemeSettings({
         <SettingsSection title={t(commonMessages.appearanceThemeSection)}>
             <ThemeSetting
                 value={appearance.theme.selectedTheme}
+                preview={buildDenseThemePreviewInput(appearance)}
                 onValueChange={(selectedTheme) => onSettingsPatch({
                     dense: { appearance: { theme: { selectedTheme } } },
                 })}
@@ -85,6 +90,48 @@ function DenseThemeSettings({
             />
         </SettingsSection>
     );
+}
+
+function buildDenseThemePreviewInput(appearance: ResolvedAppearanceSettings): {
+    readonly kind: "denseMetric";
+    readonly input: DenseMetricPreviewInput;
+} {
+    return {
+        kind: "denseMetric",
+        input: {
+            appearance,
+            data: {
+                rows: [
+                    buildDenseThemePreviewRow("preview-cpu", "CPU", 45, "%", 0.45),
+                    buildDenseThemePreviewRow("preview-gpu", "GPU", 68, "%", 0.68),
+                    buildDenseThemePreviewRow("preview-ram", "RAM", 72, "%", 0.72),
+                ],
+            },
+        },
+    };
+}
+
+function buildDenseThemePreviewRow(
+    slotId: string,
+    label: string,
+    current: number,
+    unit: string,
+    progress: number,
+): DenseMetricPreviewInput["data"]["rows"][number] {
+    return {
+        rowKind: "configured",
+        slotId,
+        metricKey: slotId,
+        widgetData: {
+            current,
+            progress,
+            history: [],
+            unit,
+            label,
+            displayValue: current.toFixed(0),
+            sampleTimestampMilliseconds: 1,
+        },
+    };
 }
 
 function DenseColorSettings({

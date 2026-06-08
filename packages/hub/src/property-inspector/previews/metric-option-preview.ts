@@ -15,10 +15,16 @@ import { buildMetricViewIcons } from "../../widgets/icons/metric-view-icons";
 import type { HardwareIconKind } from "../../widgets/icons/hardware-icons";
 import { getNetworkDirectionStatusIcon, renderNetworkDirectionIconFragment } from "../../widgets/icons/catalog/network";
 import { formatMetricUnit } from "../../metrics/metric-unit-format";
+import type { DenseMetricWidgetData } from "../../actions/dense-multi-metric/row-data";
 
 export interface MetricPreviewInput {
     readonly appearance: ResolvedAppearanceSettings;
     readonly target: ResolvedMetricTarget;
+}
+
+export interface DenseMetricPreviewInput {
+    readonly appearance: ResolvedAppearanceSettings;
+    readonly data: DenseMetricWidgetData;
 }
 
 interface MetricPreviewSample {
@@ -88,6 +94,32 @@ export function buildMetricThemePreviewUri(
     return buildMetricPreviewUri(input, {
         theme: { selectedTheme },
     });
+}
+
+export function buildDenseMetricThemePreviewUri(
+    selectedTheme: MetricTheme,
+    input: DenseMetricPreviewInput,
+): string {
+    const appearance = mergeResolvedAppearanceSettings(input.appearance, {
+        theme: { selectedTheme },
+    });
+    const icons = buildMetricViewIcons({
+        hardware: "unknown",
+        status: "percentage",
+    });
+    const frame = composeMetricViewFrame({
+        renderTarget: "key",
+        viewOptions: {
+            metricRenderKind: "denseMetric",
+            resolvedSettings: appearance,
+            widgetData: input.data,
+            centerIconFragment: "",
+            topIconFragment: "",
+            statusIcon: icons.statusIcon,
+        },
+    });
+
+    return `data:image/svg+xml,${encodeURIComponent(frame.svg)}`;
 }
 
 export function buildTerminalVariantPreviewUri(

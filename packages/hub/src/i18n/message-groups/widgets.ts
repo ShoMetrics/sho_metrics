@@ -23,6 +23,19 @@ export const widgetMessages = {
     },
 } as const satisfies LocalizedMessages;
 
+export const multiMetricMessages = {
+    sharedPollingNote: {
+        en: "This polling frequency is shared by every metric in this key.",
+        zh_CN: "这个轮询频率由此按键里的所有指标共享。",
+        ja: "このポーリング頻度は、このキー内のすべてのメトリックで共有されます。",
+    },
+    maxSlotCountReachedNote: {
+        en: "You have reached the maximum number of metrics for this key.",
+        zh_CN: "此按键已达到可添加的指标数量上限。",
+        ja: "このキーで追加できるメトリック数の上限に達しました。",
+    },
+} as const satisfies LocalizedMessages;
+
 export const cpuMessages = {
     cpuMetricLabel: {
         en: "CPU Metric",
@@ -356,9 +369,9 @@ export const stackedMessages = {
         ja: "ローテーション",
     },
     selectedSlotSection: {
-        en: "Selected Slot",
-        zh_CN: "当前槽位",
-        ja: "選択中のスロット",
+        en: "Editing Metric #{slotNumber}",
+        zh_CN: "正在编辑指标 #{slotNumber}",
+        ja: "メトリック #{slotNumber} を編集中",
     },
     metricTypeLabel: {
         en: "Metric Type",
@@ -375,10 +388,10 @@ export const stackedMessages = {
         zh_CN: "编辑",
         ja: "編集",
     },
-    selectedSlotButton: {
-        en: "Editing",
-        zh_CN: "正在编辑",
-        ja: "編集中",
+    backToStackButton: {
+        en: "Back",
+        zh_CN: "返回",
+        ja: "戻る",
     },
     addSlotButton: {
         en: "Add Slot",
@@ -420,15 +433,25 @@ export const stackedMessages = {
         zh_CN: "间隔（秒）",
         ja: "間隔（秒）",
     },
-    manualSwitchNote: {
-        en: "Press the key or rotate the dial to switch manually. Manual switching still works when auto rotate is off.",
-        zh_CN: "按下按键或转动旋钮可手动切换。关闭自动轮播后仍可手动切换。",
-        ja: "キーを押すかダイヤルを回すと手動で切り替えます。自動ローテーションがオフでも手動切り替えは使えます。",
+    manualSwitchKeyNote: {
+        en: "Key action: press the key to switch.",
+        zh_CN: "按键动作：按下按键切换。",
+        ja: "キーアクション: キーを押すと切り替えます。",
+    },
+    manualSwitchDialNote: {
+        en: "Dial action: rotate the dial to switch.",
+        zh_CN: "旋钮动作：转动旋钮切换。",
+        ja: "ダイヤルアクション: ダイヤルを回すと切り替えます。",
+    },
+    manualSwitchAutoRotateNote: {
+        en: "Manual switching still works when auto rotate is off.",
+        zh_CN: "关闭自动轮播后仍可手动切换。",
+        ja: "自動ローテーションがオフでも手動切り替えは使えます。",
     },
     selectedSlotNote: {
-        en: "Only this slot's metric and appearance are being edited.",
-        zh_CN: "当前只编辑此槽位的指标和外观。",
-        ja: "このスロットのメトリクスと外観だけを編集中です。",
+        en: "Edits save automatically. Go back to edit stacked settings.",
+        zh_CN: "编辑会自动保存。返回后可编辑叠放设置。",
+        ja: "編集は自動保存されます。戻るとスタック設定を編集できます。",
     },
     catalogMetricChoice: {
         en: "Advanced Sensor",
