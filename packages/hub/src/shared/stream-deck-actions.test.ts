@@ -125,6 +125,18 @@ test("Dense Multi Metric action uses a dedicated list icon", () => {
     assert.match(iconSvg, /Lucide List, ISC License/u);
 });
 
+test("Stacked Metric action uses a dedicated file stack icon", () => {
+    const manifest = readManifest();
+    const stackedMetricAction = (manifest.Actions ?? [])
+        .find(action => action.UUID === STREAM_DECK_ACTION_UUID_BY_KIND.stackedMetric);
+
+    assert.equal(stackedMetricAction?.Icon, "imgs/actions/stacked-metric/icon");
+    assertAssetReferenceExists(stackedMetricAction?.Icon, "Stacked Metric Icon");
+
+    const iconSvg = readFileSync(`${SD_PLUGIN_ROOT}/imgs/actions/stacked-metric/icon.svg`, "utf8");
+    assert.match(iconSvg, /Lucide Files, ISC License/u);
+});
+
 test("old reading-level action names do not remain in source or manifest files", () => {
     const forbiddenActionUuids = [
         `${STREAM_DECK_PLUGIN_UUID}.cpu-usage`,

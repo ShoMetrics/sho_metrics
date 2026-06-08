@@ -28,5 +28,14 @@
 	"com.ez.sho-metrics.network": {
 		"Name": "网络",
 		"Tooltip": "显示网络指标。"
+	},
+	"com.ez.sho-metrics.stacked-metric": {
+		"Name": "堆叠指标",
+		"Tooltip": "在一个按键上轮播多个指标小组件。",
+		"Encoder": {
+			"TriggerDescription": {
+				"Rotate": "切换指标"
+			}
+		}
 	}
 }

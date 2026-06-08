@@ -166,6 +166,32 @@
 					"TitleAlignment": "middle"
 				}
 			]
+		},
+		{
+			"Name": "Stacked Metric",
+			"UUID": "com.ez.sho-metrics.stacked-metric",
+			"Icon": "imgs/actions/stacked-metric/icon",
+			"Tooltip": "Rotates between multiple metric widgets on one key.",
+			"PropertyInspectorPath": "ui/property-inspector.html",
+			"Controllers": [
+				"Keypad",
+				"Encoder"
+			],
+			"Encoder": {
+				"Icon": "imgs/actions/sho-metrics/icon",
+				"layout": "$B1",
+				"TriggerDescription": {
+					"Rotate": "Switch metric"
+				}
+			},
+			"UserTitleEnabled": false,
+			"States": [
+				{
+					"Image": "imgs/actions/sho-metrics/key",
+					"ShowTitle": false,
+					"TitleAlignment": "middle"
+				}
+			]
 		}
 	],
 	"Category": "Sho Metrics",
