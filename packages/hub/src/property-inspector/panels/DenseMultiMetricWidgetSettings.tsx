@@ -6,8 +6,7 @@ import {
     buildColorFilledPaintAppearanceOverride,
     buildMetricAccentPaintAppearanceOverride,
     buildTerminalPaintAppearanceOverride,
-    buildTransparentSurfaceAppearanceThemeOverride,
-    resolveActiveTransparentSurface,
+    buildTransparentSurfaceAppearanceOverride,
 } from "../../settings/appearance-overrides";
 import {
     resolveActiveColorFilledPaint,
@@ -75,19 +74,13 @@ function DenseThemeSettings({
                 />
             )}
             <TransparentSurfaceSetting
-                value={resolveActiveTransparentSurface(appearance)}
+                value={appearance.transparentSurface}
                 onPatch={(transparentSurface) => onSettingsPatch({
                     dense: {
-                        appearance: {
-                            theme: buildTransparentSurfaceAppearanceThemeOverride(
-                                appearance.theme.selectedTheme,
-                                transparentSurface,
-                            ),
-                        },
+                        appearance: buildTransparentSurfaceAppearanceOverride(transparentSurface),
                     },
                 })}
                 disabled={transparentSurfaceDisabled}
-                showPerThemeNote
             />
         </SettingsSection>
     );

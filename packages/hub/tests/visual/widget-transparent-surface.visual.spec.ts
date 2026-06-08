@@ -15,16 +15,16 @@ import {
 
 const FLAT_TRANSPARENT_SURFACE = {
     enabled: true,
-    backgroundOpacityPercent: 0,
-    textOutlinePercent: 85,
-    shapeOutlinePercent: 85,
+    backgroundOpacityPercent: 20,
+    textOutlinePercent: 70,
+    shapeOutlinePercent: 30,
 } as const;
 
 const NON_FLAT_TRANSPARENT_SURFACE = {
     enabled: true,
     backgroundOpacityPercent: 50,
-    textOutlinePercent: 85,
-    shapeOutlinePercent: 85,
+    textOutlinePercent: 70,
+    shapeOutlinePercent: 30,
 } as const;
 
 const SINGLE_TRANSPARENT_SURFACE_CASES: readonly SingleMetricVisualTestCase[] = [
@@ -111,13 +111,10 @@ function enableFlatTransparentSurface(
 ): ResolvedAppearanceSettingsOverride {
     return {
         ...appearance,
+        transparentSurface: FLAT_TRANSPARENT_SURFACE,
         theme: {
             ...appearance.theme,
             selectedTheme: "flat",
-            flat: {
-                ...appearance.theme?.flat,
-                transparentSurface: FLAT_TRANSPARENT_SURFACE,
-            },
         },
     };
 }
@@ -127,13 +124,10 @@ function enableColorFilledTransparentSurface(
 ): ResolvedAppearanceSettingsOverride {
     return {
         ...appearance,
+        transparentSurface: NON_FLAT_TRANSPARENT_SURFACE,
         theme: {
             ...appearance.theme,
             selectedTheme: "color-filled",
-            colorFilled: {
-                ...appearance.theme?.colorFilled,
-                transparentSurface: NON_FLAT_TRANSPARENT_SURFACE,
-            },
         },
     };
 }
@@ -143,13 +137,10 @@ function enablePixelWindowTransparentSurface(
 ): ResolvedAppearanceSettingsOverride {
     return {
         ...appearance,
+        transparentSurface: NON_FLAT_TRANSPARENT_SURFACE,
         theme: {
             ...appearance.theme,
             selectedTheme: "pixel-window",
-            pixelWindow: {
-                ...appearance.theme?.pixelWindow,
-                transparentSurface: NON_FLAT_TRANSPARENT_SURFACE,
-            },
         },
     };
 }

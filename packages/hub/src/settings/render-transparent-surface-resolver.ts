@@ -4,7 +4,6 @@ import {
     type RenderOutlineTokens,
     type RenderTransparentSurfaceTokens,
 } from "../view-rendering/render-appearance";
-import { resolveActiveTransparentSurface } from "./appearance-overrides";
 import type { ResolvedAppearanceSettings } from "./resolved-settings";
 
 /**
@@ -14,7 +13,7 @@ import type { ResolvedAppearanceSettings } from "./resolved-settings";
  * background opacity and outline strength tokens.
  */
 export function resolveRenderTransparentSurface(settings: ResolvedAppearanceSettings): RenderTransparentSurfaceTokens {
-    const transparentSurface = resolveActiveTransparentSurface(settings);
+    const transparentSurface = settings.transparentSurface;
 
     if (!transparentSurface.enabled) {
         return DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS;

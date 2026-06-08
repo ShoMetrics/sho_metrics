@@ -33,7 +33,6 @@ import {
     NetworkMetricTarget_PingSchema,
     NetworkMetricTargetSchema,
     NetworkMetricTarget_TrafficSchema,
-    PixelWindowThemeSettingsSchema,
     TerminalPaintSettingsSchema,
     TerminalThemeSettingsSchema,
     TransparentSurfaceSettingsSchema,
@@ -725,6 +724,13 @@ function applyAppearancePatch(appearance: StoredAppearanceSettings, patch: Resol
             line.gridLineType = storedGridLineTypeByResolved[patch.line.gridLineType];
         }
     }
+
+    if (patch.transparentSurface !== undefined) {
+        applyStoredTransparentSurfacePatch(
+            appearance.transparentSurface ??= create(TransparentSurfaceSettingsSchema),
+            patch.transparentSurface,
+        );
+    }
 }
 
 function applyAppearanceThemePatch(
@@ -745,54 +751,19 @@ function applyAppearanceThemePatch(
             paint.preset = storedTerminalPalettePresetByResolved[patch.terminal.paint.preset];
         }
     }
-    if (patch.terminal?.transparentSurface !== undefined) {
-        const terminal = theme.terminal ??= create(TerminalThemeSettingsSchema);
-        applyStoredTransparentSurfacePatch(
-            terminal.transparentSurface ??= create(TransparentSurfaceSettingsSchema),
-            patch.terminal.transparentSurface,
-        );
-    }
     if (patch.flat?.paint !== undefined) {
         const flat = theme.flat ??= create(FlatThemeSettingsSchema);
         applyMetricPaintPatch(flat.paint ??= create(MetricPaintSettingsSchema), patch.flat.paint);
     }
-    if (patch.flat?.transparentSurface !== undefined) {
-        const flat = theme.flat ??= create(FlatThemeSettingsSchema);
-        applyStoredTransparentSurfacePatch(
-            flat.transparentSurface ??= create(TransparentSurfaceSettingsSchema),
-            patch.flat.transparentSurface,
-        );
-    }
     if (patch.cupertinoGlass?.paint !== undefined) {
         const cupertinoGlass = theme.cupertinoGlass ??= create(CupertinoGlassThemeSettingsSchema);
         applyMetricPaintPatch(cupertinoGlass.paint ??= create(MetricPaintSettingsSchema), patch.cupertinoGlass.paint);
-    }
-    if (patch.cupertinoGlass?.transparentSurface !== undefined) {
-        const cupertinoGlass = theme.cupertinoGlass ??= create(CupertinoGlassThemeSettingsSchema);
-        applyStoredTransparentSurfacePatch(
-            cupertinoGlass.transparentSurface ??= create(TransparentSurfaceSettingsSchema),
-            patch.cupertinoGlass.transparentSurface,
-        );
     }
     if (patch.colorFilled?.paint !== undefined) {
         const colorFilled = theme.colorFilled ??= create(ColorFilledThemeSettingsSchema);
         applyColorFilledPaintPatch(
             colorFilled.paint ??= create(ColorFilledPaintSettingsSchema),
             patch.colorFilled.paint,
-        );
-    }
-    if (patch.colorFilled?.transparentSurface !== undefined) {
-        const colorFilled = theme.colorFilled ??= create(ColorFilledThemeSettingsSchema);
-        applyStoredTransparentSurfacePatch(
-            colorFilled.transparentSurface ??= create(TransparentSurfaceSettingsSchema),
-            patch.colorFilled.transparentSurface,
-        );
-    }
-    if (patch.pixelWindow?.transparentSurface !== undefined) {
-        const pixelWindow = theme.pixelWindow ??= create(PixelWindowThemeSettingsSchema);
-        applyStoredTransparentSurfacePatch(
-            pixelWindow.transparentSurface ??= create(TransparentSurfaceSettingsSchema),
-            patch.pixelWindow.transparentSurface,
         );
     }
 }

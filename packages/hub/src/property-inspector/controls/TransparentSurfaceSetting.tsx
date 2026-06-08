@@ -9,14 +9,12 @@ interface TransparentSurfaceSettingProps {
     readonly value: ResolvedTransparentSurfaceSettings;
     readonly onPatch: (patch: ResolvedTransparentSurfaceSettingsOverride) => void;
     readonly disabled?: boolean;
-    readonly showPerThemeNote?: boolean;
 }
 
 export function TransparentSurfaceSetting({
     value,
     onPatch,
     disabled = false,
-    showPerThemeNote = false,
 }: TransparentSurfaceSettingProps): React.JSX.Element {
     const { t } = useI18n();
     const settingsDisabled = disabled || !value.enabled;
@@ -37,11 +35,6 @@ export function TransparentSurfaceSetting({
                     <p className="section-note">
                         {t(colorMessages.transparencyNote)}
                     </p>
-                    {showPerThemeNote && (
-                        <p className="section-note">
-                            {t(colorMessages.transparencyPerThemeNote)}
-                        </p>
-                    )}
                 </div>
             </InspectorItem>
             <RangeSetting

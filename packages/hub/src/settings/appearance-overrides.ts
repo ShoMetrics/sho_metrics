@@ -20,6 +20,7 @@ export interface ResolvedAppearanceSettingsOverride {
     readonly view?: ResolvedAppearanceViewSettingsOverride | undefined;
     readonly theme?: ResolvedAppearanceThemeSettingsOverride | undefined;
     readonly line?: ResolvedLineAppearanceSettingsOverride | undefined;
+    readonly transparentSurface?: ResolvedTransparentSurfaceSettingsOverride | undefined;
 }
 
 export interface ResolvedAppearanceViewSettingsOverride {
@@ -34,35 +35,23 @@ export interface ResolvedAppearanceThemeSettingsOverride {
     readonly cupertinoGlass?: ResolvedCupertinoGlassThemeSettingsOverride | undefined;
     readonly colorFilled?: ResolvedColorFilledThemeSettingsOverride | undefined;
     readonly terminal?: ResolvedTerminalThemeSettingsOverride | undefined;
-    readonly pixelWindow?: ResolvedPixelWindowThemeSettingsOverride | undefined;
 }
 
-// TODO(transparent-surface-pi): Review these per-theme transparentSurface override
-// fields after widget PI lands. Keep them only if widget previews patch per-theme
-// transparent surface through appearance overrides; otherwise remove them.
 export interface ResolvedFlatThemeSettingsOverride {
     readonly paint?: ResolvedMetricPaintSettingsOverride | undefined;
-    readonly transparentSurface?: ResolvedTransparentSurfaceSettingsOverride | undefined;
 }
 
 export interface ResolvedCupertinoGlassThemeSettingsOverride {
     readonly paint?: ResolvedMetricPaintSettingsOverride | undefined;
-    readonly transparentSurface?: ResolvedTransparentSurfaceSettingsOverride | undefined;
 }
 
 export interface ResolvedColorFilledThemeSettingsOverride {
     readonly paint?: ResolvedColorFilledPaintSettingsOverride | undefined;
-    readonly transparentSurface?: ResolvedTransparentSurfaceSettingsOverride | undefined;
 }
 
 export interface ResolvedTerminalThemeSettingsOverride {
     readonly variant?: TerminalThemeVariant | undefined;
     readonly paint?: ResolvedTerminalPaintSettingsOverride | undefined;
-    readonly transparentSurface?: ResolvedTransparentSurfaceSettingsOverride | undefined;
-}
-
-export interface ResolvedPixelWindowThemeSettingsOverride {
-    readonly transparentSurface?: ResolvedTransparentSurfaceSettingsOverride | undefined;
 }
 
 export interface ResolvedTransparentSurfaceSettingsOverride {
@@ -164,10 +153,6 @@ export function mergeResolvedAppearanceSettings(
                 ...settings.theme.flat,
                 ...override.theme?.flat,
                 paint: mergeMetricPaintSettings(settings.theme.flat.paint, override.theme?.flat?.paint),
-                transparentSurface: {
-                    ...settings.theme.flat.transparentSurface,
-                    ...override.theme?.flat?.transparentSurface,
-                },
             },
             cupertinoGlass: {
                 ...settings.theme.cupertinoGlass,
@@ -176,10 +161,6 @@ export function mergeResolvedAppearanceSettings(
                     settings.theme.cupertinoGlass.paint,
                     override.theme?.cupertinoGlass?.paint,
                 ),
-                transparentSurface: {
-                    ...settings.theme.cupertinoGlass.transparentSurface,
-                    ...override.theme?.cupertinoGlass?.transparentSurface,
-                },
             },
             colorFilled: {
                 ...settings.theme.colorFilled,
@@ -188,10 +169,6 @@ export function mergeResolvedAppearanceSettings(
                     settings.theme.colorFilled.paint,
                     override.theme?.colorFilled?.paint,
                 ),
-                transparentSurface: {
-                    ...settings.theme.colorFilled.transparentSurface,
-                    ...override.theme?.colorFilled?.transparentSurface,
-                },
             },
             terminal: {
                 ...settings.theme.terminal,
@@ -200,23 +177,15 @@ export function mergeResolvedAppearanceSettings(
                     ...settings.theme.terminal.paint,
                     ...override.theme?.terminal?.paint,
                 },
-                transparentSurface: {
-                    ...settings.theme.terminal.transparentSurface,
-                    ...override.theme?.terminal?.transparentSurface,
-                },
-            },
-            pixelWindow: {
-                ...settings.theme.pixelWindow,
-                ...override.theme?.pixelWindow,
-                transparentSurface: {
-                    ...settings.theme.pixelWindow.transparentSurface,
-                    ...override.theme?.pixelWindow?.transparentSurface,
-                },
             },
         },
         line: {
             ...settings.line,
             ...override.line,
+        },
+        transparentSurface: {
+            ...settings.transparentSurface,
+            ...override.transparentSurface,
         },
     };
 }
@@ -276,46 +245,11 @@ export function buildTerminalPaintAppearanceOverride(
     };
 }
 
-/** Resolves the active theme's transparent surface settings. */
-export function resolveActiveTransparentSurface(
-    appearance: ResolvedAppearanceSettings,
-): ResolvedTransparentSurfaceSettings {
-    switch (appearance.theme.selectedTheme) {
-        case "flat":
-            return appearance.theme.flat.transparentSurface;
-        case "cupertino-glass":
-            return appearance.theme.cupertinoGlass.transparentSurface;
-        case "color-filled":
-            return appearance.theme.colorFilled.transparentSurface;
-        case "terminal":
-            return appearance.theme.terminal.transparentSurface;
-        case "pixel-window":
-            return appearance.theme.pixelWindow.transparentSurface;
-    }
-}
-
-/**
- * Builds the active theme branch for a transparent surface patch.
- *
- * Widget-level transparent surface is stored per theme, so UI patches must
- * update only the currently selected theme branch.
- */
-export function buildTransparentSurfaceAppearanceThemeOverride(
-    selectedTheme: MetricTheme,
+/** Builds a widget-level transparent surface override. */
+export function buildTransparentSurfaceAppearanceOverride(
     transparentSurface: ResolvedTransparentSurfaceSettingsOverride,
-): ResolvedAppearanceThemeSettingsOverride {
-    switch (selectedTheme) {
-        case "flat":
-            return { flat: { transparentSurface } };
-        case "cupertino-glass":
-            return { cupertinoGlass: { transparentSurface } };
-        case "color-filled":
-            return { colorFilled: { transparentSurface } };
-        case "terminal":
-            return { terminal: { transparentSurface } };
-        case "pixel-window":
-            return { pixelWindow: { transparentSurface } };
-    }
+): ResolvedAppearanceSettingsOverride {
+    return { transparentSurface };
 }
 
 function mergeMetricPaintSettings(

@@ -3,6 +3,7 @@ import {
     type ResolvedAppearanceSettingsOverride,
 } from "./appearance-overrides";
 import type {
+    MetricTheme,
     ResolvedAppearanceSettings,
     ResolvedColorFilledPaintSettings,
     ResolvedMetricPaintSettings,
@@ -83,13 +84,6 @@ const DEFAULT_TERMINAL_PAINT_SETTINGS: ResolvedTerminalPaintSettings = {
     preset: "green",
 };
 
-const DEFAULT_FLAT_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
-    enabled: false,
-    backgroundOpacityPercent: 50,
-    textOutlinePercent: 70,
-    shapeOutlinePercent: 30,
-};
-
 export const DEFAULT_GLOBAL_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
     enabled: false,
     backgroundOpacityPercent: 50,
@@ -97,22 +91,21 @@ export const DEFAULT_GLOBAL_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSur
     shapeOutlinePercent: 30,
 };
 
-const DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
+const DEFAULT_FLAT_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
     enabled: false,
-    backgroundOpacityPercent: 50,
+    backgroundOpacityPercent: 20,
     textOutlinePercent: 70,
     shapeOutlinePercent: 30,
 };
 
-const DEFAULT_DENSE_FLAT_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
+const DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
     ...DEFAULT_FLAT_TRANSPARENT_SURFACE_SETTINGS,
-    backgroundOpacityPercent: 0,
-    textOutlinePercent: 0,
-    shapeOutlinePercent: 0,
+    backgroundOpacityPercent: 50,
 };
 
-const DEFAULT_DENSE_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
-    ...DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS,
+const DEFAULT_DENSE_TRANSPARENT_SURFACE_SETTINGS: ResolvedTransparentSurfaceSettings = {
+    ...DEFAULT_FLAT_TRANSPARENT_SURFACE_SETTINGS,
+    backgroundOpacityPercent: 0,
     textOutlinePercent: 0,
     shapeOutlinePercent: 0,
 };
@@ -127,23 +120,16 @@ export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
         selectedTheme: "flat",
         flat: {
             paint: DEFAULT_METRIC_ACCENT_PAINT_SETTINGS,
-            transparentSurface: DEFAULT_FLAT_TRANSPARENT_SURFACE_SETTINGS,
         },
         cupertinoGlass: {
             paint: DEFAULT_METRIC_ACCENT_PAINT_SETTINGS,
-            transparentSurface: DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS,
         },
         colorFilled: {
             paint: DEFAULT_COLOR_FILLED_PAINT_SETTINGS,
-            transparentSurface: DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS,
         },
         terminal: {
             variant: "clean",
             paint: DEFAULT_TERMINAL_PAINT_SETTINGS,
-            transparentSurface: DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS,
-        },
-        pixelWindow: {
-            transparentSurface: DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS,
         },
     },
     line: {
@@ -151,33 +137,12 @@ export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
         gridLineVisibility: "none",
         gridLineType: "horizontal",
     },
+    transparentSurface: DEFAULT_FLAT_TRANSPARENT_SURFACE_SETTINGS,
 };
 
 export const DEFAULT_DENSE_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
     ...DEFAULT_APPEARANCE_SETTINGS,
-    theme: {
-        ...DEFAULT_APPEARANCE_SETTINGS.theme,
-        flat: {
-            ...DEFAULT_APPEARANCE_SETTINGS.theme.flat,
-            transparentSurface: DEFAULT_DENSE_FLAT_TRANSPARENT_SURFACE_SETTINGS,
-        },
-        cupertinoGlass: {
-            ...DEFAULT_APPEARANCE_SETTINGS.theme.cupertinoGlass,
-            transparentSurface: DEFAULT_DENSE_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS,
-        },
-        colorFilled: {
-            ...DEFAULT_APPEARANCE_SETTINGS.theme.colorFilled,
-            transparentSurface: DEFAULT_DENSE_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS,
-        },
-        terminal: {
-            ...DEFAULT_APPEARANCE_SETTINGS.theme.terminal,
-            transparentSurface: DEFAULT_DENSE_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS,
-        },
-        pixelWindow: {
-            ...DEFAULT_APPEARANCE_SETTINGS.theme.pixelWindow,
-            transparentSurface: DEFAULT_DENSE_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS,
-        },
-    },
+    transparentSurface: DEFAULT_DENSE_TRANSPARENT_SURFACE_SETTINGS,
 };
 
 /**
@@ -189,5 +154,19 @@ export const DEFAULT_DENSE_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
 export function buildDefaultAppearanceSettings(
     overrides: ResolvedAppearanceSettingsOverride = {},
 ): ResolvedAppearanceSettings {
-    return mergeResolvedAppearanceSettings(DEFAULT_APPEARANCE_SETTINGS, overrides);
+    const selectedTheme = overrides.theme?.selectedTheme ?? DEFAULT_APPEARANCE_SETTINGS.theme.selectedTheme;
+    const defaults = {
+        ...DEFAULT_APPEARANCE_SETTINGS,
+        transparentSurface: resolveDefaultTransparentSurfaceSettings(selectedTheme),
+    };
+
+    return mergeResolvedAppearanceSettings(defaults, overrides);
+}
+
+export function resolveDefaultTransparentSurfaceSettings(
+    selectedTheme: MetricTheme,
+): ResolvedTransparentSurfaceSettings {
+    return selectedTheme === "flat"
+        ? DEFAULT_FLAT_TRANSPARENT_SURFACE_SETTINGS
+        : DEFAULT_NON_FLAT_TRANSPARENT_SURFACE_SETTINGS;
 }

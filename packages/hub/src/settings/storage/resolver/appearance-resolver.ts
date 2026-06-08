@@ -23,7 +23,6 @@ import {
     type MetricPaintSettings as StoredMetricPaintSettings,
     type MetricSolidPaintSettings as StoredMetricSolidPaintSettings,
     type MultiColorSet as StoredMultiColorSet,
-    type PixelWindowThemeSettings as StoredPixelWindowThemeSettings,
     type TerminalPaintSettings as StoredTerminalPaintSettings,
     type TerminalThemeSettings as StoredTerminalThemeSettings,
     type TransparentSurfaceSettings as StoredTransparentSurfaceSettings,
@@ -58,7 +57,6 @@ import type {
     ResolvedMetricSolidPaintSettings,
     ResolvedMetricTarget,
     ResolvedMultiColorSet,
-    ResolvedPixelWindowThemeSettings,
     ResolvedTerminalPaintSettings,
     ResolvedTerminalThemeSettings,
     ResolvedTransparentSurfaceSettings,
@@ -70,6 +68,7 @@ import {
     buildDefaultAppearanceSettings,
     DEFAULT_APPEARANCE_SETTINGS,
     DEFAULT_DENSE_APPEARANCE_SETTINGS,
+    resolveDefaultTransparentSurfaceSettings,
 } from "../../default-appearance-settings";
 import {
     resolveStoredEnum,
@@ -171,6 +170,10 @@ export function resolveDenseAppearanceSettings(
         view: DEFAULT_DENSE_APPEARANCE_SETTINGS.view,
         theme: resolveAppearanceThemeSettings(DEFAULT_DENSE_APPEARANCE_SETTINGS.theme, storedAppearance?.theme),
         line: DEFAULT_DENSE_APPEARANCE_SETTINGS.line,
+        transparentSurface: resolveTransparentSurfaceSettings(
+            DEFAULT_DENSE_APPEARANCE_SETTINGS.transparentSurface,
+            storedAppearance?.transparentSurface,
+        ),
     } satisfies ResolvedAppearanceSettings;
     const appearanceWithThemeOverride = globalSettings.themeOverride
         ? applyGlobalThemeOverride(appearance, globalSettings.themeOverride)
@@ -211,6 +214,10 @@ export function mergeAppearanceSettings(
         view,
         theme: resolveAppearanceThemeSettings(appearanceDefaults.theme, storedAppearance?.theme, selectedTheme),
         line: resolveLineAppearanceSettings(appearanceDefaults.line, storedAppearance?.line),
+        transparentSurface: resolveTransparentSurfaceSettings(
+            appearanceDefaults.transparentSurface,
+            storedAppearance?.transparentSurface,
+        ),
     };
 }
 
@@ -219,20 +226,25 @@ export function resolveAppearanceDefaultsForViewAndTheme(
     resolvedView: ResolvedAppearanceViewSettings,
     selectedTheme: MetricTheme,
 ): ResolvedAppearanceSettings {
+    const themeDefaults = {
+        ...targetDefaults,
+        transparentSurface: resolveDefaultTransparentSurfaceSettings(selectedTheme),
+    };
+
     if (resolvedView.selectedView !== "text") {
-        return targetDefaults;
+        return themeDefaults;
     }
 
     switch (selectedTheme) {
         case "flat":
             return {
-                ...targetDefaults,
+                ...themeDefaults,
                 theme: {
-                    ...targetDefaults.theme,
+                    ...themeDefaults.theme,
                     flat: {
-                        ...targetDefaults.theme.flat,
+                        ...themeDefaults.theme.flat,
                         paint: {
-                            ...targetDefaults.theme.flat.paint,
+                            ...themeDefaults.theme.flat.paint,
                             colorMode: TEXT_VIEW_DEFAULT_METRIC_COLOR_MODE,
                         },
                     },
@@ -240,13 +252,13 @@ export function resolveAppearanceDefaultsForViewAndTheme(
             };
         case "cupertino-glass":
             return {
-                ...targetDefaults,
+                ...themeDefaults,
                 theme: {
-                    ...targetDefaults.theme,
+                    ...themeDefaults.theme,
                     cupertinoGlass: {
-                        ...targetDefaults.theme.cupertinoGlass,
+                        ...themeDefaults.theme.cupertinoGlass,
                         paint: {
-                            ...targetDefaults.theme.cupertinoGlass.paint,
+                            ...themeDefaults.theme.cupertinoGlass.paint,
                             colorMode: TEXT_VIEW_DEFAULT_METRIC_COLOR_MODE,
                         },
                     },
@@ -255,7 +267,7 @@ export function resolveAppearanceDefaultsForViewAndTheme(
         case "color-filled":
         case "terminal":
         case "pixel-window":
-            return targetDefaults;
+            return themeDefaults;
     }
 }
 
@@ -270,7 +282,6 @@ export function resolveAppearanceThemeSettings(
         cupertinoGlass: resolveCupertinoGlassThemeSettings(defaults.cupertinoGlass, storedTheme?.cupertinoGlass),
         colorFilled: resolveColorFilledThemeSettings(defaults.colorFilled, storedTheme?.colorFilled),
         terminal: resolveTerminalThemeSettings(defaults.terminal, storedTheme?.terminal),
-        pixelWindow: resolvePixelWindowThemeSettings(defaults.pixelWindow, storedTheme?.pixelWindow),
     };
 }
 
@@ -280,7 +291,6 @@ function resolveFlatThemeSettings(
 ): ResolvedFlatThemeSettings {
     return {
         paint: resolveMetricPaintSettings(defaults.paint, storedTheme?.paint),
-        transparentSurface: resolveTransparentSurfaceSettings(defaults.transparentSurface, storedTheme?.transparentSurface),
     };
 }
 
@@ -290,7 +300,6 @@ function resolveCupertinoGlassThemeSettings(
 ): ResolvedCupertinoGlassThemeSettings {
     return {
         paint: resolveMetricPaintSettings(defaults.paint, storedTheme?.paint),
-        transparentSurface: resolveTransparentSurfaceSettings(defaults.transparentSurface, storedTheme?.transparentSurface),
     };
 }
 
@@ -300,7 +309,6 @@ function resolveColorFilledThemeSettings(
 ): ResolvedColorFilledThemeSettings {
     return {
         paint: resolveColorFilledPaintSettings(defaults.paint, storedTheme?.paint),
-        transparentSurface: resolveTransparentSurfaceSettings(defaults.transparentSurface, storedTheme?.transparentSurface),
     };
 }
 
@@ -311,19 +319,6 @@ function resolveTerminalThemeSettings(
     return {
         variant: resolveStoredEnum(storedTerminal?.variant, terminalThemeVariantByProto, defaults.variant),
         paint: resolveTerminalPaintSettings(defaults.paint, storedTerminal?.paint),
-        transparentSurface: resolveTransparentSurfaceSettings(
-            defaults.transparentSurface,
-            storedTerminal?.transparentSurface,
-        ),
-    };
-}
-
-function resolvePixelWindowThemeSettings(
-    defaults: ResolvedPixelWindowThemeSettings,
-    storedTheme: StoredPixelWindowThemeSettings | undefined,
-): ResolvedPixelWindowThemeSettings {
-    return {
-        transparentSurface: resolveTransparentSurfaceSettings(defaults.transparentSurface, storedTheme?.transparentSurface),
     };
 }
 
@@ -532,33 +527,9 @@ export function applyGlobalThemeOverride(
     appearance: ResolvedAppearanceSettings,
     themeOverride: ResolvedGlobalThemeOverride,
 ): ResolvedAppearanceSettings {
-    // Transparent surface is a separate global override path; replacing the theme
-    // must preserve widget-level per-theme transparent tuning.
     return {
         ...appearance,
-        theme: {
-            ...themeOverride.theme,
-            flat: {
-                ...themeOverride.theme.flat,
-                transparentSurface: appearance.theme.flat.transparentSurface,
-            },
-            cupertinoGlass: {
-                ...themeOverride.theme.cupertinoGlass,
-                transparentSurface: appearance.theme.cupertinoGlass.transparentSurface,
-            },
-            colorFilled: {
-                ...themeOverride.theme.colorFilled,
-                transparentSurface: appearance.theme.colorFilled.transparentSurface,
-            },
-            terminal: {
-                ...themeOverride.theme.terminal,
-                transparentSurface: appearance.theme.terminal.transparentSurface,
-            },
-            pixelWindow: {
-                ...themeOverride.theme.pixelWindow,
-                transparentSurface: appearance.theme.pixelWindow.transparentSurface,
-            },
-        },
+        theme: themeOverride.theme,
     };
 }
 
@@ -566,33 +537,9 @@ export function applyGlobalTransparentSurfaceOverride(
     appearance: ResolvedAppearanceSettings,
     transparentSurfaceOverride: ResolvedGlobalTransparentSurfaceOverride,
 ): ResolvedAppearanceSettings {
-    const transparentSurface = transparentSurfaceOverride.transparentSurface;
-
     return {
         ...appearance,
-        theme: {
-            ...appearance.theme,
-            flat: {
-                ...appearance.theme.flat,
-                transparentSurface,
-            },
-            cupertinoGlass: {
-                ...appearance.theme.cupertinoGlass,
-                transparentSurface,
-            },
-            colorFilled: {
-                ...appearance.theme.colorFilled,
-                transparentSurface,
-            },
-            terminal: {
-                ...appearance.theme.terminal,
-                transparentSurface,
-            },
-            pixelWindow: {
-                ...appearance.theme.pixelWindow,
-                transparentSurface,
-            },
-        },
+        transparentSurface: transparentSurfaceOverride.transparentSurface,
     };
 }
 

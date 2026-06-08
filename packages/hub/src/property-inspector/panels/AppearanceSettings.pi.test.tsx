@@ -10,7 +10,7 @@ import {
 import { buildVisibilityContext } from "../testing/test-context";
 import { AppearanceSettings } from "./AppearanceSettings";
 
-test("appearance settings patches transparent surface for the active theme", async () => {
+test("appearance settings patches widget transparent surface", async () => {
     const settingsPatches: StoredWidgetSettingsPatch[] = [];
     const user = userEvent.setup();
 
@@ -24,23 +24,15 @@ test("appearance settings patches transparent surface for the active theme", asy
     assert.deepEqual(settingsPatches, [
         {
             appearance: {
-                theme: {
-                    flat: {
-                        transparentSurface: {
-                            enabled: true,
-                        },
-                    },
+                transparentSurface: {
+                    enabled: true,
                 },
             },
         },
         {
             appearance: {
-                theme: {
-                    flat: {
-                        transparentSurface: {
-                            backgroundOpacityPercent: 25,
-                        },
-                    },
+                transparentSurface: {
+                    backgroundOpacityPercent: 25,
                 },
             },
         },
@@ -48,8 +40,6 @@ test("appearance settings patches transparent surface for the active theme", asy
 });
 
 test("appearance settings disables transparent surface sliders until enabled", async () => {
-    const user = userEvent.setup();
-
     renderAppearanceSettings([]);
 
     const backgroundOpacity = screen.getByRole("slider", { name: /^background opacity:$/i });
@@ -59,15 +49,23 @@ test("appearance settings disables transparent surface sliders until enabled", a
     assert.equal(backgroundOpacity.hasAttribute("disabled"), true);
     assert.equal(textOutline.hasAttribute("disabled"), true);
     assert.equal(shapeOutline.hasAttribute("disabled"), true);
-
-    await user.click(screen.getByRole("checkbox", { name: /^transparent background$/i }));
-
-    assert.equal(backgroundOpacity.hasAttribute("disabled"), false);
-    assert.equal(textOutline.hasAttribute("disabled"), false);
-    assert.equal(shapeOutline.hasAttribute("disabled"), false);
 });
 
-test("appearance settings patches pixel window transparent surface when it is active", () => {
+test("appearance settings enables transparent surface sliders from resolved enabled state", () => {
+    renderAppearanceSettings([], {
+        appearance: {
+            transparentSurface: {
+                enabled: true,
+            },
+        },
+    });
+
+    assert.equal(screen.getByRole("slider", { name: /^background opacity:$/i }).hasAttribute("disabled"), false);
+    assert.equal(screen.getByRole("slider", { name: /^text outline:$/i }).hasAttribute("disabled"), false);
+    assert.equal(screen.getByRole("slider", { name: /^shape outline:$/i }).hasAttribute("disabled"), false);
+});
+
+test("appearance settings keeps transparent surface patch shape when pixel window is active", () => {
     const settingsPatches: StoredWidgetSettingsPatch[] = [];
 
     renderAppearanceSettings(settingsPatches, {
@@ -75,34 +73,21 @@ test("appearance settings patches pixel window transparent surface when it is ac
             theme: {
                 selectedTheme: "pixel-window",
             },
+            transparentSurface: {
+                enabled: true,
+            },
         },
     });
 
-    fireEvent.click(screen.getByRole("checkbox", { name: /^transparent background$/i }));
     fireEvent.change(screen.getByRole("slider", { name: /^text outline:$/i }), {
-        target: { value: "70" },
+        target: { value: "60" },
     });
 
     assert.deepEqual(settingsPatches, [
         {
             appearance: {
-                theme: {
-                    pixelWindow: {
-                        transparentSurface: {
-                            enabled: true,
-                        },
-                    },
-                },
-            },
-        },
-        {
-            appearance: {
-                theme: {
-                    pixelWindow: {
-                        transparentSurface: {
-                            textOutlinePercent: 70,
-                        },
-                    },
+                transparentSurface: {
+                    textOutlinePercent: 60,
                 },
             },
         },

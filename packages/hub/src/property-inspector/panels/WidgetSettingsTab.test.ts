@@ -1050,7 +1050,6 @@ test("dense multi metric settings render rows and hide single metric view contro
     assert.match(markup, /Background opacity:/i);
     assert.match(markup, /Text outline:/i);
     assert.match(markup, /Shape outline:/i);
-    assert.match(markup, /Transparent surface settings are saved per theme\./);
     assert.match(markup, /Color Mode:/);
     assert.match(markup, /Polling Frequency:/);
     assert.match(markup, /This polling frequency is shared by every metric in this key\./);

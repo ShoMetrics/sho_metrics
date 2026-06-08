@@ -4,19 +4,15 @@ import test from "node:test";
 import { DEFAULT_APPEARANCE_SETTINGS } from "./default-appearance-settings";
 import { mergeResolvedAppearanceSettings } from "./appearance-overrides";
 
-test("appearance override merges pixel window transparent surface fields", () => {
+test("appearance override merges widget transparent surface fields", () => {
     const appearance = mergeResolvedAppearanceSettings(DEFAULT_APPEARANCE_SETTINGS, {
-        theme: {
-            pixelWindow: {
-                transparentSurface: {
-                    enabled: true,
-                    backgroundOpacityPercent: 25,
-                },
-            },
+        transparentSurface: {
+            enabled: true,
+            backgroundOpacityPercent: 25,
         },
     });
 
-    assert.deepEqual(appearance.theme.pixelWindow.transparentSurface, {
+    assert.deepEqual(appearance.transparentSurface, {
         enabled: true,
         backgroundOpacityPercent: 25,
         textOutlinePercent: 70,
