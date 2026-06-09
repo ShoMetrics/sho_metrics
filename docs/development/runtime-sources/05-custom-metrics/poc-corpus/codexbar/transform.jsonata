@@ -1,0 +1,26 @@
+(
+  $metrics := [
+    usage.primary.usedPercent != null ? {
+      "metricId": "codex.primary.used_percent",
+      "label": "Codex",
+      "value": usage.primary.usedPercent,
+      "unit": "percent",
+      "maximum": 100
+    },
+    usage.secondary.usedPercent != null ? {
+      "metricId": "codex.secondary.used_percent",
+      "label": "Weekly",
+      "value": usage.secondary.usedPercent,
+      "unit": "percent",
+      "maximum": 100
+    },
+    credits.remaining != null ? {
+      "metricId": "codex.credits.remaining",
+      "label": "Credits",
+      "value": credits.remaining,
+      "unit": "unitless",
+      "maximum": 200
+    }
+  ];
+  {"metrics": $metrics}
+)

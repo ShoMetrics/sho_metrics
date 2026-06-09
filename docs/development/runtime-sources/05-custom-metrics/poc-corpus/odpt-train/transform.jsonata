@@ -1,0 +1,32 @@
+(
+  $targetDirection := "odpt.RailDirection:TokyoMetro.NishiFunabashi";
+  $targetRailway := "odpt.Railway:TokyoMetro.Tozai";
+  $targetStation := "odpt.Station:TokyoMetro.Tozai.Nihombashi";
+  {
+    "metrics": [
+      {
+        "metricId": "odpt.tozai.crowd",
+        "label": "Crowd",
+        "value": $max($map(
+          $filter(trains, function($train) {
+            $train.`odpt:railway` = $targetRailway and $train.`odpt:railDirection` = $targetDirection
+          }),
+          function($train) {
+            $lookup(occupancyStatusScale, $train.`odpt:occupancyStatus`)
+          }
+        )),
+        "unit": "unitless",
+        "maximum": 4
+      },
+      {
+        "metricId": "odpt.tozai.nihombashi_eta",
+        "label": "ETA",
+        "value": $filter(nextTrainMinutes, function($train) {
+          $train.station = $targetStation and $train.direction = $targetDirection
+        })[0].minutes,
+        "unit": "custom",
+        "customUnit": "min"
+      }
+    ]
+  }
+)

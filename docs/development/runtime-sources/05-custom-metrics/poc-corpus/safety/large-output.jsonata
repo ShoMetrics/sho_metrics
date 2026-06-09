@@ -1,0 +1,9 @@
+{
+  "metrics": [1..2000].{
+    "metricId": "metric." & $string($),
+    "label": "Metric",
+    "value": 1,
+    "unit": "unitless",
+    "maximum": 100
+  }
+}

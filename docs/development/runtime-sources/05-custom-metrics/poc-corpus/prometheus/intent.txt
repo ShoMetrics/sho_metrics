@@ -1,0 +1,1 @@
+Display the CPU idle percent for each CPU core in the Prometheus vector result.

@@ -1,0 +1,9 @@
+{
+  "metrics": data.result.{
+    "metricId": "prometheus." & $split(metric.instance, ":")[0] & ".cpu." & metric.cpu & "." & metric.mode,
+    "label": "CPU" & metric.cpu & " Idle",
+    "value": $number(value[1]),
+    "unit": "percent",
+    "maximum": 100
+  }
+}

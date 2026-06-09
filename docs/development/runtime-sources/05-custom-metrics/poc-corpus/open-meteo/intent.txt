@@ -1,0 +1,1 @@
+Display current temperature, current relative humidity, and current wind speed.

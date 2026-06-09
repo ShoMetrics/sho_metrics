@@ -1,0 +1,18 @@
+{
+  "metrics": [
+    {
+      "metricId": "odpt.tozai.crowd",
+      "label": "Crowd",
+      "value": 4,
+      "unit": "unitless",
+      "maximum": 4
+    },
+    {
+      "metricId": "odpt.tozai.nihombashi_eta",
+      "label": "ETA",
+      "value": 2,
+      "unit": "custom",
+      "customUnit": "min"
+    }
+  ]
+}

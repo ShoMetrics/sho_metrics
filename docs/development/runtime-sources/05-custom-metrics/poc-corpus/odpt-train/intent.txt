@@ -1,0 +1,1 @@
+Display Tokyo Metro Tozai line crowding toward Nishi-Funabashi as the maximum occupancy score, and display minutes until the next Nishi-Funabashi-bound train at Nihombashi.

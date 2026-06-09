@@ -1,0 +1,25 @@
+{
+  metrics: [
+    {
+      metricId: "github.repo.stars",
+      label: "Stars",
+      value: .stargazers_count,
+      unit: "unitless",
+      maximum: 20000
+    },
+    {
+      metricId: "github.repo.forks",
+      label: "Forks",
+      value: .forks_count,
+      unit: "unitless",
+      maximum: 5000
+    },
+    {
+      metricId: "github.repo.open_issues",
+      label: "Issues",
+      value: .open_issues_count,
+      unit: "unitless",
+      maximum: 500
+    }
+  ]
+}

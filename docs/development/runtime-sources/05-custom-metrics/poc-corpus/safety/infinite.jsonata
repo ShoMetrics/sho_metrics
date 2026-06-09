@@ -1,0 +1,1 @@
+($loop := function(){ $loop() }; $loop())

@@ -1,0 +1,26 @@
+{
+  "metrics": [
+    {
+      "metricId": "weather.temperature_2m",
+      "label": "Temp",
+      "value": 22.4,
+      "unit": "celsius",
+      "maximum": 50
+    },
+    {
+      "metricId": "weather.relative_humidity_2m",
+      "label": "Humidity",
+      "value": 80,
+      "unit": "percent",
+      "maximum": 100
+    },
+    {
+      "metricId": "weather.wind_speed_10m",
+      "label": "Wind",
+      "value": 2.3,
+      "unit": "custom",
+      "customUnit": "km/h",
+      "maximum": 100
+    }
+  ]
+}

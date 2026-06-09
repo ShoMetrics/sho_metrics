@@ -1,0 +1,39 @@
+{
+  "provider": "codex",
+  "version": "0.6.0",
+  "source": "openai-web",
+  "status": {
+    "indicator": "none",
+    "description": "Operational",
+    "updatedAt": "2025-12-04T17:55:00Z",
+    "url": "https://status.openai.com/"
+  },
+  "usage": {
+    "primary": {
+      "usedPercent": 28,
+      "windowMinutes": 300,
+      "resetsAt": "2025-12-04T19:15:00Z"
+    },
+    "secondary": {
+      "usedPercent": 59,
+      "windowMinutes": 10080,
+      "resetsAt": "2025-12-05T17:00:00Z"
+    },
+    "tertiary": null,
+    "updatedAt": "2025-12-04T18:10:22Z",
+    "identity": {
+      "providerID": "codex",
+      "accountEmail": "user@example.com",
+      "accountOrganization": null,
+      "loginMethod": "plus"
+    },
+    "accountEmail": "user@example.com",
+    "accountOrganization": null,
+    "loginMethod": "plus"
+  },
+  "credits": {
+    "remaining": 112.4,
+    "updatedAt": "2025-12-04T18:10:21Z"
+  },
+  "antigravityPlanInfo": null
+}

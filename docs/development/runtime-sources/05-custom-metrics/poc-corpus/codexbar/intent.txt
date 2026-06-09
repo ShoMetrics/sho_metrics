@@ -1,0 +1,1 @@
+Display the primary token usage percent, secondary token usage percent, and remaining credits.
