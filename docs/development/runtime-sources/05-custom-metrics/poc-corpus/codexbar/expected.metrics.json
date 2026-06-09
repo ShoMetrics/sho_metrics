@@ -1,0 +1,25 @@
+{
+  "metrics": [
+    {
+      "metricId": "codex.primary.used_percent",
+      "label": "Codex",
+      "value": 28,
+      "unit": "percent",
+      "maximum": 100
+    },
+    {
+      "metricId": "codex.secondary.used_percent",
+      "label": "Weekly",
+      "value": 59,
+      "unit": "percent",
+      "maximum": 100
+    },
+    {
+      "metricId": "codex.credits.remaining",
+      "label": "Credits",
+      "value": 112.4,
+      "unit": "unitless",
+      "maximum": 200
+    }
+  ]
+}

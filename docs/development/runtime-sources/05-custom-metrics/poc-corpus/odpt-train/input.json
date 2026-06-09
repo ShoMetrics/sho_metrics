@@ -1,0 +1,91 @@
+{
+  "trains": [
+    {
+      "@type": "odpt:Train",
+      "dc:date": "2026-06-08T08:05:00+09:00",
+      "dct:valid": "2026-06-08T08:05:30+09:00",
+      "odpt:frequency": 30,
+      "odpt:railway": "odpt.Railway:TokyoMetro.Tozai",
+      "owl:sameAs": "odpt.Train:TokyoMetro.Tozai.A0801S",
+      "odpt:trainNumber": "A0801S",
+      "odpt:trainType": "odpt.TrainType:TokyoMetro.Local",
+      "odpt:delay": 0,
+      "odpt:originStation": ["odpt.Station:TokyoMetro.Tozai.Nakano"],
+      "odpt:destinationStation": ["odpt.Station:TokyoMetro.Tozai.NishiFunabashi"],
+      "odpt:fromStation": "odpt.Station:TokyoMetro.Tozai.Kayabacho",
+      "odpt:toStation": "odpt.Station:TokyoMetro.Tozai.Nihombashi",
+      "odpt:railDirection": "odpt.RailDirection:TokyoMetro.NishiFunabashi",
+      "odpt:operator": "odpt.Operator:TokyoMetro",
+      "odpt:occupancyStatus": "odpt.OccupancyStatus:Toei.Crowded"
+    },
+    {
+      "@type": "odpt:Train",
+      "dc:date": "2026-06-08T08:05:00+09:00",
+      "dct:valid": "2026-06-08T08:05:30+09:00",
+      "odpt:frequency": 30,
+      "odpt:railway": "odpt.Railway:TokyoMetro.Tozai",
+      "owl:sameAs": "odpt.Train:TokyoMetro.Tozai.B0803S",
+      "odpt:trainNumber": "B0803S",
+      "odpt:trainType": "odpt.TrainType:TokyoMetro.Local",
+      "odpt:delay": 120,
+      "odpt:originStation": ["odpt.Station:TokyoMetro.Tozai.Nakano"],
+      "odpt:destinationStation": ["odpt.Station:TokyoMetro.Tozai.NishiFunabashi"],
+      "odpt:fromStation": "odpt.Station:TokyoMetro.Tozai.Nihombashi",
+      "odpt:toStation": "odpt.Station:TokyoMetro.Tozai.Otemachi",
+      "odpt:railDirection": "odpt.RailDirection:TokyoMetro.NishiFunabashi",
+      "odpt:operator": "odpt.Operator:TokyoMetro",
+      "odpt:occupancyStatus": "odpt.OccupancyStatus:Toei.Heavy"
+    },
+    {
+      "@type": "odpt:Train",
+      "dc:date": "2026-06-08T08:05:00+09:00",
+      "dct:valid": "2026-06-08T08:05:30+09:00",
+      "odpt:frequency": 30,
+      "odpt:railway": "odpt.Railway:TokyoMetro.Tozai",
+      "owl:sameAs": "odpt.Train:TokyoMetro.Tozai.C0805S",
+      "odpt:trainNumber": "C0805S",
+      "odpt:trainType": "odpt.TrainType:TokyoMetro.Local",
+      "odpt:delay": 60,
+      "odpt:originStation": ["odpt.Station:TokyoMetro.Tozai.Nakano"],
+      "odpt:destinationStation": ["odpt.Station:TokyoMetro.Tozai.NishiFunabashi"],
+      "odpt:fromStation": "odpt.Station:TokyoMetro.Tozai.Otemachi",
+      "odpt:toStation": "odpt.Station:TokyoMetro.Tozai.Takebashi",
+      "odpt:railDirection": "odpt.RailDirection:TokyoMetro.NishiFunabashi",
+      "odpt:operator": "odpt.Operator:TokyoMetro",
+      "odpt:occupancyStatus": "odpt.OccupancyStatus:Toei.Normal"
+    }
+  ],
+  "stations": [
+    {
+      "@type": "odpt:Station",
+      "owl:sameAs": "odpt.Station:TokyoMetro.Tozai.NishiFunabashi",
+      "dc:title": "西船橋",
+      "odpt:stationTitle": {
+        "ja": "西船橋",
+        "en": "Nishi-funabashi"
+      }
+    },
+    {
+      "@type": "odpt:Station",
+      "owl:sameAs": "odpt.Station:TokyoMetro.Tozai.Nihombashi",
+      "dc:title": "日本橋",
+      "odpt:stationTitle": {
+        "ja": "日本橋",
+        "en": "Nihombashi"
+      }
+    }
+  ],
+  "occupancyStatusScale": {
+    "odpt.OccupancyStatus:Toei.Vacant": 1,
+    "odpt.OccupancyStatus:Toei.Normal": 2,
+    "odpt.OccupancyStatus:Toei.Crowded": 3,
+    "odpt.OccupancyStatus:Toei.Heavy": 4
+  },
+  "nextTrainMinutes": [
+    {
+      "station": "odpt.Station:TokyoMetro.Tozai.Nihombashi",
+      "direction": "odpt.RailDirection:TokyoMetro.NishiFunabashi",
+      "minutes": 2
+    }
+  ]
+}

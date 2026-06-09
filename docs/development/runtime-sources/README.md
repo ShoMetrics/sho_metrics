@@ -10,6 +10,7 @@ Read the numbered folders in order when reconstructing the full reasoning:
 2. [Source Routing](02-source-routing/README.md)
 3. [Windows Helper](03-windows-helper/README.md)
 4. [Multi Metric Widgets](04-multi-metric-widgets/README.md)
+5. [Custom Metrics](05-custom-metrics/README.md)
 
 ## Folder Boundaries
 
@@ -19,3 +20,4 @@ Read the numbered folders in order when reconstructing the full reasoning:
 | `02-source-routing/` | Source choice evidence, metric-level routing, local auto preferences, fallback source order, and future source-routing work. | You are choosing default providers or changing `MetricReadPlan`, local auto source preference, action subscriptions, or source fallback order. |
 | `03-windows-helper/` | Windows helper behavior, LHM source-reading lessons, helper-produced stable aliases, helper reliability, version-skew handling, and LHM storage traversal policy. | You are changing helper-owned metrics, LHM traversal, source sample attribution, helper no-data copy, descriptor preload, or disk probing behavior. |
 | `04-multi-metric-widgets/` | Multi-metric widget storage, action collection, dense simultaneous rendering, stacked rotating rendering, and PI slot editing. | You are adding or changing Dense Multi Metric, Stacked Metric, multi-slot settings, multi-metric render contracts, or multi-slot PI editor behavior. |
+| `05-custom-metrics/` | Widget-local user-defined HTTP metrics, HTTP source polling, transform engine selection, and transform output schema. | You are adding or changing Custom Metric, HTTP target settings, transform rules, schema validation, custom source runtime, or Custom Metric Property Inspector UX. |

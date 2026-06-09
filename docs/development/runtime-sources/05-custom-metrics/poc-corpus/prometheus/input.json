@@ -1,0 +1,32 @@
+{
+  "status": "success",
+  "data": {
+    "resultType": "vector",
+    "result": [
+      {
+        "metric": {
+          "__name__": "node_cpu_seconds_total",
+          "cpu": "0",
+          "mode": "idle",
+          "instance": "workstation:9100"
+        },
+        "value": [
+          1435781451.781,
+          "71.25"
+        ]
+      },
+      {
+        "metric": {
+          "__name__": "node_cpu_seconds_total",
+          "cpu": "1",
+          "mode": "idle",
+          "instance": "workstation:9100"
+        },
+        "value": [
+          1435781451.781,
+          "64.5"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,1 @@
+Display the current kitchen temperature from sensor.kitchen_temperature.

@@ -1,0 +1,11 @@
+{
+  "metrics": [
+    {
+      "metricId": "expensive.metric",
+      "label": "Expensive",
+      "value": $sum([1..100000000]),
+      "unit": "unitless",
+      "maximum": 100
+    }
+  ]
+}

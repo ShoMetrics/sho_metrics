@@ -1,0 +1,11 @@
+{
+  "metrics": [
+    {
+      "metricId": "home_assistant.sensor.kitchen_temperature",
+      "label": "Kitchen",
+      "value": 25,
+      "unit": "celsius",
+      "maximum": 50
+    }
+  ]
+}
