@@ -15,6 +15,7 @@ import {
     MetricValueKind,
     type MetricDescriptor,
     type MetricDescriptorSnapshot,
+    type SourceClientStatus,
 } from "../runtime/sources/source-client";
 import { diskVolumeRegistry, type DiskVolumeOption } from "../runtime/disk-volumes";
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../runtime/network-interfaces";
@@ -169,7 +170,6 @@ test("stacked metric publishes selected-slot picker caches to the Property Inspe
         assert.deepEqual(action.runtimeCachePatchList.find(patch => patch.catalogMetricDescriptorLoadState === "ready"), {
             availableCatalogMetricDescriptors: [descriptor],
             catalogMetricDescriptorLoadState: "ready",
-            catalogMetricDescriptorSourceStatus: { state: "unknown" },
         });
         assert.deepEqual(action.runtimeCachePatchList.find(patch => patch.availableDiskVolumes !== undefined), {
             availableDiskVolumes: [diskVolume],
@@ -242,6 +242,11 @@ class TestStackedMetric extends StackedMetric {
 
     protected override currentPlatform(): NodeJS.Platform {
         return "win32";
+    }
+
+    protected override readCachedSourceStatus(sourceId: string): SourceClientStatus | undefined {
+        void sourceId;
+        return undefined;
     }
 
     protected override sendRuntimeCachePatchToPropertyInspector(
