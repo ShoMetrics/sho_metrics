@@ -13,7 +13,7 @@ import {
     resolveActiveMetricAccentPaint,
     resolveActiveTerminalPaint,
 } from "../../settings/render-paint-resolver";
-import type { StoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
+import type { StoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
 import { TerminalVariantSetting } from "../controls/TerminalVariantSetting";
 import { ThemeSetting } from "../controls/ThemeSetting";
 import { TransparentSurfaceSetting } from "../controls/TransparentSurfaceSetting";

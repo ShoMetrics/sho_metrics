@@ -7,7 +7,7 @@ import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/qu
 import {
     writeStoredWidgetSettingsPatch,
     type StoredWidgetSettingsPatch,
-} from "../../settings/storage/widget-settings-patch";
+} from "../../settings/storage/patch/widget-settings-patch";
 import type { WidgetRuntimeCachePatch } from "../../runtime/widget-runtime-cache";
 import { MetricUnit } from "../../runtime/sources/metric-source";
 import {

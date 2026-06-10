@@ -14,7 +14,7 @@ import {
 import type {
     SingleMetricWidgetSettingsPatch,
     StoredWidgetSettingsPatch,
-} from "../../settings/storage/widget-settings-patch";
+} from "../../settings/storage/patch/widget-settings-patch";
 import { SelectSetting } from "../controls/SelectSetting";
 import type { SelectOption } from "../inspector/types";
 import type { VisibilityContext } from "../inspector/types";

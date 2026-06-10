@@ -2,11 +2,11 @@ import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { StoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
+import type { StoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import {
     writeStoredWidgetSettingsPatch,
-} from "../../settings/storage/widget-settings-patch";
+} from "../../settings/storage/patch/widget-settings-patch";
 import { buildVisibilityContext } from "../testing/test-context";
 import { AppearanceSettings } from "./AppearanceSettings";
 

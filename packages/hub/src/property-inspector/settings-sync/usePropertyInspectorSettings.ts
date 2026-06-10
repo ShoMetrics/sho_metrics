@@ -9,7 +9,7 @@ import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/qu
 import {
     writeStoredWidgetSettingsPatch,
     type StoredWidgetSettingsPatch,
-} from "../../settings/storage/widget-settings-patch";
+} from "../../settings/storage/patch/widget-settings-patch";
 import {
     WIDGET_RUNTIME_CACHE_MESSAGE_TYPE,
     type WidgetRuntimeCacheMessage,

@@ -1,4 +1,4 @@
-﻿import assert from "node:assert/strict";
+import assert from "node:assert/strict";
 import test from "node:test";
 import type { WillAppearEvent } from "@elgato/streamdeck";
 import { MetricStore } from "../../runtime/metric-store";
@@ -13,7 +13,7 @@ import { buildMetricSnapshot, buildScalarMetricValue, MetricUnit } from "../../r
 import { buildMetricViewRenderPlan, buildRenderWidgetData } from "../../view-rendering/metric-view-frame";
 import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
-import { writeStoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
+import { writeStoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
 import { resolveInitialActionSettings } from "../settings/action-settings-resolver";
 import { buildDiskViewOptions } from "./view-builder";
 

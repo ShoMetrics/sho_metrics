@@ -23,7 +23,7 @@ import { MetricUnit } from "../../runtime/sources/metric-source";
 import { readStoredWidgetSettings } from "./codec";
 import { resolveQuickStartStoredWidgetSettings } from "./quick-start-widget-settings";
 import { resolveStoredWidgetSettings } from "./resolver";
-import { writeStoredWidgetSettingsPatch } from "./widget-settings-patch";
+import { writeStoredWidgetSettingsPatch } from "./patch/widget-settings-patch";
 import {
     BUILT_IN_NODE_SYSTEM_SOURCE_PROFILE_ID,
     BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID,

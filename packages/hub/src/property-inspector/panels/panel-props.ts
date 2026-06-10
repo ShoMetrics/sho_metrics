@@ -1,4 +1,4 @@
-import type { StoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
+import type { StoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
 import type { VisibilityContext } from "../inspector/types";
 
 export interface WidgetSettingsPanelProps {
