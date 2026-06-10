@@ -135,6 +135,21 @@ describe("quick-start stored widget settings", () => {
         assert.equal(widget.value.slots[1]?.slot?.metric?.target.case, "gpu");
     });
 
+    it("creates Custom Metric quick-start settings without persisted runtime identity", () => {
+        const quickStartSettings = resolveQuickStartStoredWidgetSettings(undefined, "customMetric");
+        const target = readStoredMetricTarget(quickStartSettings.storedSettings);
+
+        assert.equal(quickStartSettings.settingsJsonToPersist != null, true);
+        assert.equal(target?.case, "custom");
+        if (target?.case === "custom") {
+            assert.equal(target.value.source.case, undefined);
+            const storedJson = JSON.stringify(target.value);
+            assert.equal(storedJson.includes("actionId"), false);
+            assert.equal(storedJson.includes("metricKey"), false);
+            assert.equal(storedJson.includes("uuid"), false);
+        }
+    });
+
     it("creates stacked metric quick-start items with stable generated ids", () => {
         const slotIds = ["slot-1", "slot-2"];
         const quickStartSettings = resolveQuickStartStoredWidgetSettings(undefined, "stackedMetric", {

@@ -9,6 +9,8 @@ import {
     ColorFilledSolidPaintSettingsSchema,
     CupertinoGlassThemeSettingsSchema,
     CatalogMetricTargetSchema,
+    CustomHttpMetricSourceSchema,
+    CustomMetricTargetSchema,
     CpuMetricTarget_Kind as StoredCpuMetricKind,
     CpuMetricTargetSchema,
     DenseMetricSlotSchema,
@@ -38,6 +40,7 @@ import {
     TransparentSurfaceSettingsSchema,
     SlotOverridesSchema,
     SingleMetricWidgetSchema,
+    SingleCustomHttpRequestSchema,
     StackedMetricRotationSettingsSchema,
     StackedMetricSlotSchema,
     StoredWidgetSettingsSchema,
@@ -45,6 +48,7 @@ import {
     WidgetPreferencesSchema,
     type AppearanceSettings as StoredAppearanceSettings,
     type CatalogMetricTarget as StoredCatalogMetricTarget,
+    type CustomMetricTarget as StoredCustomMetricTarget,
     type DenseMetricSlot as StoredDenseMetricSlot,
     type DenseMultiMetricWidget as StoredDenseMultiMetricWidget,
     type ColorFilledPaintSettings as StoredColorFilledPaintSettings,
@@ -189,6 +193,11 @@ export interface StoredWidgetSettingsPatch {
         readonly customLabel: string | undefined;
         readonly customMaximumValue: number | undefined;
     }>;
+    readonly customMetric?: Partial<{
+        readonly url: string | undefined;
+        readonly userIntent: string | undefined;
+        readonly jqTransform: string | undefined;
+    }>;
     readonly dense?: DenseWidgetSettingsPatch | undefined;
     readonly stacked?: StackedWidgetSettingsPatch | undefined;
 }
@@ -327,6 +336,13 @@ function applyPatch(
 
     if (patch.catalog) {
         applyCatalogPatch(requireCatalogTarget(requireMetricSelection(requireSingleMetricSlot(settings))), patch.catalog);
+    }
+
+    if (patch.customMetric) {
+        applyCustomMetricPatch(
+            requireCustomMetricTarget(requireMetricSelection(requireSingleMetricSlot(settings))),
+            patch.customMetric,
+        );
     }
 }
 
@@ -478,6 +494,11 @@ function buildDefaultSingleMetricTarget(domain: ResolvedMetricTarget["domain"]):
             return {
                 case: "catalog",
                 value: create(CatalogMetricTargetSchema),
+            };
+        case "customMetric":
+            return {
+                case: "custom",
+                value: create(CustomMetricTargetSchema),
             };
     }
 }
@@ -692,6 +713,37 @@ function applySourcePatch(
     sourcePolicy.fallbackSourceProfileIds = [...patch.fallbackSourceProfileIds];
     sourcePolicy.failureMode = storedSourceFailureModeByResolved[patch.failureMode];
     metric.sourcePolicy = sourcePolicy;
+}
+
+function applyCustomMetricPatch(
+    target: StoredCustomMetricTarget,
+    patch: NonNullable<StoredWidgetSettingsPatch["customMetric"]>,
+): void {
+    if (target.source.case !== "http") {
+        target.source = {
+            case: "http",
+            value: create(CustomHttpMetricSourceSchema),
+        };
+    }
+
+    const httpSource = target.source.value;
+    if (httpSource.plan.case !== "singleRequest") {
+        httpSource.plan = {
+            case: "singleRequest",
+            value: create(SingleCustomHttpRequestSchema),
+        };
+    }
+    const request = httpSource.plan.value;
+
+    if ("url" in patch) {
+        request.url = patch.url;
+    }
+    if ("userIntent" in patch) {
+        request.userIntent = patch.userIntent;
+    }
+    if ("jqTransform" in patch) {
+        request.jqTransform = patch.jqTransform;
+    }
 }
 
 function applyAppearancePatch(appearance: StoredAppearanceSettings, patch: ResolvedAppearanceSettingsOverride): void {
@@ -1144,6 +1196,14 @@ function requireGpuTarget(metric: StoredMetricSelection): StoredGpuMetricTarget 
 function requireCatalogTarget(metric: StoredMetricSelection): StoredCatalogMetricTarget {
     if (metric.target.case !== "catalog") {
         return throwPatchTargetMismatch("Cannot apply a catalog settings patch to a non-catalog metric.");
+    }
+
+    return metric.target.value;
+}
+
+function requireCustomMetricTarget(metric: StoredMetricSelection): StoredCustomMetricTarget {
+    if (metric.target.case !== "custom") {
+        return throwPatchTargetMismatch("Cannot apply a Custom Metric settings patch to a non-Custom Metric.");
     }
 
     return metric.target.value;

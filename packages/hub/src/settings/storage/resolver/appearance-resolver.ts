@@ -191,7 +191,7 @@ export function resolveDefaultAppearanceSettings(target: ResolvedMetricTarget): 
     if (target.domain === "network") {
         return DEFAULT_NETWORK_APPEARANCE_SETTINGS;
     }
-    if (target.domain === "catalog") {
+    if (target.domain === "catalog" || target.domain === "customMetric") {
         return DEFAULT_CATALOG_APPEARANCE_SETTINGS;
     }
 

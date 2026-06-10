@@ -1,4 +1,4 @@
-﻿import assert from "node:assert/strict";
+import assert from "node:assert/strict";
 import test from "node:test";
 import {
     CatalogMetricCategory as StoredCatalogMetricCategory,
@@ -131,6 +131,83 @@ test("widget patch can clear catalog display hints and overrides", () => {
         assert.equal(target.value.detectedReadingKind, undefined);
         assert.equal(target.value.customLabel, undefined);
         assert.equal(target.value.customMaximumValue, undefined);
+    }
+});
+
+test("widget patch fails when a Custom Metric patch targets a non-Custom Metric", () => {
+    const cpuSettings = resolveQuickStartStoredWidgetSettings(undefined, "cpu").rawSettings;
+
+    assert.throws(
+        () => writeStoredWidgetSettingsPatch(cpuSettings, {
+            customMetric: {
+                url: "https://api.example.com/current",
+            },
+        }),
+        /non-Custom Metric/,
+    );
+});
+
+test("widget patch updates Custom Metric user intent", () => {
+    const customMetricSettings = resolveQuickStartStoredWidgetSettings(undefined, "customMetric").rawSettings;
+
+    const nextSettings = writeStoredWidgetSettingsPatch(customMetricSettings, {
+        customMetric: {
+            url: "https://api.example.com/current?city=tokyo",
+            userIntent: "Display current temperature",
+            jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+        },
+    });
+
+    const target = readSingleMetricSlot(nextSettings)?.metric?.target;
+    assert.equal(target?.case, "custom");
+    if (target?.case === "custom") {
+        assert.equal(target.value.source.case, "http");
+        if (target.value.source.case === "http") {
+            assert.equal(target.value.source.value.plan.case, "singleRequest");
+            if (target.value.source.value.plan.case === "singleRequest") {
+                assert.equal(target.value.source.value.plan.value.url, "https://api.example.com/current?city=tokyo");
+                assert.equal(target.value.source.value.plan.value.userIntent, "Display current temperature");
+                assert.equal(
+                    target.value.source.value.plan.value.jqTransform,
+                    "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+                );
+            }
+        }
+    }
+});
+
+test("widget patch can clear Custom Metric user intent", () => {
+    const customMetricSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "customMetric").rawSettings,
+        {
+            customMetric: {
+                url: "https://api.example.com/current?city=tokyo",
+                userIntent: "Display current temperature",
+                jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+            },
+        },
+    );
+
+    const nextSettings = writeStoredWidgetSettingsPatch(customMetricSettings, {
+        customMetric: {
+            url: undefined,
+            userIntent: undefined,
+            jqTransform: undefined,
+        },
+    });
+
+    const target = readSingleMetricSlot(nextSettings)?.metric?.target;
+    assert.equal(target?.case, "custom");
+    if (target?.case === "custom") {
+        assert.equal(target.value.source.case, "http");
+        if (target.value.source.case === "http") {
+            assert.equal(target.value.source.value.plan.case, "singleRequest");
+            if (target.value.source.value.plan.case === "singleRequest") {
+                assert.equal(target.value.source.value.plan.value.url, undefined);
+                assert.equal(target.value.source.value.plan.value.userIntent, undefined);
+                assert.equal(target.value.source.value.plan.value.jqTransform, undefined);
+            }
+        }
     }
 });
 

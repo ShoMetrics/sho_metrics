@@ -149,6 +149,7 @@ message MetricSelection {
     DiskMetricTarget disk = 13;
     GpuMetricTarget gpu = 14;
     CatalogMetricTarget catalog = 20;
+    CustomMetricTarget custom = 30;
   }
 }
 
@@ -359,6 +360,33 @@ message CatalogMetricTarget {
     gt: 0
     lte: 1000000000000000
   }];
+}
+
+message CustomMetricTarget {
+  oneof source {
+    CustomHttpMetricSource http = 1;
+  }
+}
+
+message CustomHttpMetricSource {
+  oneof plan {
+    SingleCustomHttpRequest single_request = 1;
+  }
+}
+
+message SingleCustomHttpRequest {
+  // HTTP GET URL returning JSON. Query strings may be stored because public
+  // no-auth APIs often need them, but logs and runtime metric ids must use only
+  // a sanitized hostname.
+  optional string url = 1 [(buf.validate.field).string.max_len = 2048];
+
+  // User-authored natural-language intent used to regenerate or explain the jq
+  // transform. The runtime does not execute this text and does not require it
+  // after a jq transform has been configured.
+  optional string user_intent = 2 [(buf.validate.field).string.max_len = 2048];
+
+  // jq filter that outputs the V1 Custom Metric single-object schema.
+  optional string jq_transform = 3 [(buf.validate.field).string.max_len = 32768];
 }
 
 enum CatalogMetricCategory {

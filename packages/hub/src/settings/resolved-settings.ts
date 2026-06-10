@@ -155,7 +155,8 @@ export type ResolvedMetricTarget =
     | ResolvedNetworkMetricTarget
     | ResolvedDiskMetricTarget
     | ResolvedGpuMetricTarget
-    | ResolvedCatalogMetricTarget;
+    | ResolvedCatalogMetricTarget
+    | ResolvedCustomMetricTarget;
 
 export interface ResolvedMetricSourcePolicy {
     readonly primarySourceProfileId: string | undefined;
@@ -240,6 +241,41 @@ export interface ResolvedCatalogMetricTarget {
     readonly detectedReadingKind: CatalogMetricReadingKind;
     readonly customLabel: string | undefined;
     readonly customMaximumValue: number | undefined;
+}
+
+export interface ResolvedCustomMetricTarget {
+    readonly domain: "customMetric";
+    readonly configuration: ResolvedCustomMetricConfiguration;
+}
+
+export type ResolvedCustomMetricConfiguration =
+    | { readonly state: "unconfigured" }
+    | { readonly state: "invalid"; readonly reason: CustomMetricInvalidReason }
+    | {
+        readonly state: "configured";
+        readonly source: ResolvedCustomMetricSource;
+    };
+
+export type CustomMetricInvalidReason =
+    | "missingUrl"
+    | "missingJqTransform";
+
+export type ResolvedCustomMetricSource =
+    | {
+        readonly kind: "http";
+        readonly plan: ResolvedCustomHttpMetricPlan;
+    };
+
+export type ResolvedCustomHttpMetricPlan =
+    | {
+        readonly kind: "singleRequest";
+        readonly request: ResolvedSingleCustomHttpRequest;
+    };
+
+export interface ResolvedSingleCustomHttpRequest {
+    readonly url: string;
+    readonly userIntent: string | undefined;
+    readonly jqTransform: string;
 }
 
 export interface ResolvedAppearanceSettings {
