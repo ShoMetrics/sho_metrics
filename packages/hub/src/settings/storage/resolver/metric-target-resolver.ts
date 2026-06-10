@@ -1,4 +1,3 @@
-
 import {
     CatalogMetricCategory as StoredCatalogMetricCategory,
     CatalogMetricReadingKind as StoredCatalogMetricReadingKind,
@@ -14,6 +13,8 @@ import {
     NetworkMetricTarget_Traffic_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
     TemperatureUnit as StoredTemperatureUnit,
     type CatalogMetricTarget as StoredCatalogMetricTarget,
+    type CustomHttpMetricSource as StoredCustomHttpMetricSource,
+    type CustomMetricTarget as StoredCustomMetricTarget,
     type CpuMetricTarget as StoredCpuMetricTarget,
     type DiskMetricTarget as StoredDiskMetricTarget,
     type GpuMetricTarget as StoredGpuMetricTarget,
@@ -29,11 +30,14 @@ import {
 import type {
     CatalogMetricCategory,
     CatalogMetricReadingKind,
+    CustomMetricInvalidReason,
     DiskThroughputDirection,
     DiskUsageDisplayMode,
     NetworkDirection,
     NetworkTrafficDisplayMode,
     ResolvedCatalogMetricTarget,
+    ResolvedCustomMetricTarget,
+    ResolvedSingleCustomHttpRequest,
     ResolvedDiskReading,
     ResolvedDiskThroughputDisplaySettings,
     ResolvedGpuReading,
@@ -165,6 +169,8 @@ function resolveMetricTarget(
             return resolveGpuMetricTarget(storedMetricSelection.target.value, runtime);
         case "catalog":
             return resolveCatalogMetricTarget(storedMetricSelection.target.value);
+        case "custom":
+            return resolveCustomMetricTarget(storedMetricSelection.target.value);
         case undefined:
             return resolveCpuMetricTarget(undefined);
     }
@@ -357,6 +363,99 @@ function resolveCatalogMetricTarget(storedTarget: StoredCatalogMetricTarget): Re
         customLabel: storedTarget.customLabel,
         customMaximumValue: storedTarget.customMaximumValue,
     };
+}
+
+function resolveCustomMetricTarget(storedTarget: StoredCustomMetricTarget): ResolvedCustomMetricTarget {
+    switch (storedTarget.source.case) {
+        case undefined:
+            return {
+                domain: "customMetric",
+                configuration: { state: "unconfigured" },
+            };
+        case "http":
+            return resolveCustomHttpMetricSource(storedTarget.source.value);
+    }
+
+    return assertNever(storedTarget.source);
+}
+
+function resolveCustomHttpMetricSource(storedHttpSource: StoredCustomHttpMetricSource): ResolvedCustomMetricTarget {
+    const request = readSingleCustomHttpRequest(storedHttpSource);
+    if (request === undefined) {
+        return {
+            domain: "customMetric",
+            configuration: { state: "unconfigured" },
+        };
+    }
+
+    const invalidReason = readCustomMetricInvalidReason(request);
+    if (invalidReason !== undefined) {
+        return {
+            domain: "customMetric",
+            configuration: {
+                state: "invalid",
+                reason: invalidReason,
+            },
+        };
+    }
+
+    return {
+        domain: "customMetric",
+        configuration: {
+            state: "configured",
+            source: {
+                kind: "http",
+                plan: {
+                    kind: "singleRequest",
+                    request,
+                },
+            },
+        },
+    };
+}
+
+function readSingleCustomHttpRequest(
+    storedHttpSource: StoredCustomHttpMetricSource,
+): ResolvedSingleCustomHttpRequest | undefined {
+    switch (storedHttpSource.plan.case) {
+        case undefined:
+            return undefined;
+        case "singleRequest": {
+            const storedRequest = storedHttpSource.plan.value;
+            const url = storedRequest.url?.trim() ?? "";
+            const userIntent = storedRequest.userIntent?.trim() || undefined;
+            const jqTransform = storedRequest.jqTransform?.trim() ?? "";
+
+            if (url.length === 0 && userIntent === undefined && jqTransform.length === 0) {
+                return undefined;
+            }
+
+            return {
+                url,
+                userIntent,
+                jqTransform,
+            };
+        }
+    }
+
+    return assertNever(storedHttpSource.plan);
+}
+
+function readCustomMetricInvalidReason(
+    request: ResolvedSingleCustomHttpRequest,
+): CustomMetricInvalidReason | undefined {
+    if (request.url.length === 0) {
+        return "missingUrl";
+    }
+    if (request.jqTransform.length === 0) {
+        return "missingJqTransform";
+    }
+
+    return undefined;
+}
+
+function assertNever(value: never): never {
+    throw new Error(`Unexpected Custom Metric stored settings branch: ${JSON.stringify(value)}`);
 }
 
 function resolveMetricSourcePolicy(

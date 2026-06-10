@@ -22,6 +22,7 @@ export function SingleMetricWidgetSettings(props: WidgetSettingsPanelProps & {
         case "catalog":
             return <CatalogMetricWidgetSettings {...props} target={props.target} />;
         case "memory":
+        case "customMetric":
             return <DefaultWidgetSettings {...props} />;
     }
 }

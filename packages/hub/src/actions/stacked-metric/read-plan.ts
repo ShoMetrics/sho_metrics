@@ -48,7 +48,7 @@ export interface StackedMetricConfiguredSlotReadState {
 export interface StackedMetricUnconfiguredSlotReadState {
     readonly stateKind: "unconfigured";
     readonly slotId: string;
-    readonly reason: "emptyCatalogMetric" | "conflictingSourcePolicy";
+    readonly reason: "emptyCatalogMetric" | "conflictingSourcePolicy" | "unsupportedCustomMetric";
 }
 
 export interface StackedMetricReadPlanResolution {
@@ -122,6 +122,13 @@ function resolveConfiguredStackedSlot(slot: ResolvedStackedMetricSlot): StackedM
             reason: "emptyCatalogMetric",
         };
     }
+    if (target.domain === "customMetric") {
+        return {
+            stateKind: "unconfigured",
+            slotId: slot.slotId,
+            reason: "unsupportedCustomMetric",
+        };
+    }
 
     const metricKeys = resolveStackedMetricKeys(target, slot.widget.slot.appearance.view.selectedView);
 
@@ -177,6 +184,8 @@ function resolveStackedMetricKeys(
             });
         case "catalog":
             return [target.metricId];
+        case "customMetric":
+            throw new Error("Stacked Custom Metric runtime routing is deferred to the Custom Metric integration step.");
     }
 }
 

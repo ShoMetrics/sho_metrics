@@ -99,6 +99,8 @@ export function buildStackedSingleMetricViewOptions(
                 metrics: context.metrics,
                 helperStatus: context.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID),
             });
+        case "customMetric":
+            throw new Error("Custom Metric stacked slots are not wired before Custom HTTP runtime support.");
     }
 }
 

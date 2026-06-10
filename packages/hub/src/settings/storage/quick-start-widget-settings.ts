@@ -3,6 +3,7 @@ import { create } from "@bufbuild/protobuf";
 import {
     CpuMetricTarget_Kind as StoredCpuMetricKind,
     CatalogMetricTargetSchema,
+    CustomMetricTargetSchema,
     CpuMetricTargetSchema,
     DenseMetricSlotSchema,
     DenseMultiMetricWidgetSchema,
@@ -50,10 +51,12 @@ export interface QuickStartStoredWidgetSettingsOptions {
     readonly createSlotId?: SlotIdGenerator;
 }
 
+export type QuickStartActionKind = ActionKind | "customMetric";
+
 /** Resolves existing settings or creates the action's first stored widget settings. */
 export function resolveQuickStartStoredWidgetSettings(
     rawSettings: unknown,
-    actionKind: ActionKind,
+    actionKind: QuickStartActionKind,
     options: QuickStartStoredWidgetSettingsOptions = {},
 ): QuickStartStoredWidgetSettings {
     const quickStartWidget = buildQuickStartWidget(actionKind);
@@ -123,7 +126,7 @@ type QuickStartWidget =
         readonly metrics: readonly QuickStartMetric[];
     };
 
-function buildQuickStartWidget(actionKind: ActionKind): QuickStartWidget | null {
+function buildQuickStartWidget(actionKind: QuickStartActionKind): QuickStartWidget | null {
     switch (actionKind) {
         case "cpu":
             return {
@@ -149,6 +152,11 @@ function buildQuickStartWidget(actionKind: ActionKind): QuickStartWidget | null 
             return {
                 widgetKind: "singleMetric",
                 metric: buildCatalogQuickStartMetric(),
+            };
+        case "customMetric":
+            return {
+                widgetKind: "singleMetric",
+                metric: buildCustomMetricQuickStartMetric(),
             };
         case "denseMultiMetric":
             return {
@@ -236,6 +244,15 @@ function buildCatalogQuickStartMetric(): QuickStartMetric {
             primarySourceProfileId: BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID,
             failureMode: StoredSourceFailureMode.SHOW_UNAVAILABLE,
         }),
+    };
+}
+
+function buildCustomMetricQuickStartMetric(): QuickStartMetric {
+    return {
+        target: {
+            case: "custom",
+            value: create(CustomMetricTargetSchema),
+        },
     };
 }
 

@@ -241,6 +241,8 @@ function resolveDenseMetricKeys(target: ResolvedMetricTarget): DenseMetricKeys |
             return resolveNetworkDenseMetricKeys(target);
         case "catalog":
             return buildSingleKey(target.metricId);
+        case "customMetric":
+            return undefined;
     }
 }
 
@@ -342,6 +344,8 @@ function buildTargetWidgetData(
             return buildNetworkRowWidgetData(row, metrics, currentTimestampMilliseconds);
         case "catalog":
             return buildCatalogRowWidgetData(row, metrics);
+        case "customMetric":
+            return buildEmptyRowWidgetData(resolveDenseRowLabel(row));
     }
 }
 
@@ -593,6 +597,8 @@ function resolveDefaultDenseRowLabel(target: ResolvedMetricTarget): string {
                 : resolveNetworkDirectionLabel(target.reading.direction);
         case "catalog":
             return target.customLabel ?? target.detectedLabel ?? "METRIC";
+        case "customMetric":
+            return "CUSTOM";
     }
 }
 

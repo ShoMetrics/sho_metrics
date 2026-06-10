@@ -202,6 +202,16 @@ function buildMetricPreviewSample(target: ResolvedMetricTarget): MetricPreviewSa
                 progress: 0.42,
                 secondaryDisplayValue: target.detectedLabel ?? "Metric",
             });
+        case "customMetric":
+            return buildHardwarePreviewSample({
+                hardware: "unknown",
+                label: "CUSTOM",
+                current: 42,
+                unit: "",
+                displayValue: "42",
+                progress: 0.42,
+                secondaryDisplayValue: "Metric",
+            });
     }
 }
 

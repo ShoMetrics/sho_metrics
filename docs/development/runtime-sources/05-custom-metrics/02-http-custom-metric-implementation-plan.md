@@ -29,6 +29,7 @@ Metric action and HTTP runtime source are stable.
 ## Product Decisions
 
 - Product/action label: **Custom Metric**.
+- Persisted target/domain name: **Custom Metric**.
 - V1 source type: HTTP GET JSON.
 - Internal source type id: `custom-http`.
 - Transform engine: jq through `jq-wasm`.
@@ -36,8 +37,10 @@ Metric action and HTTP runtime source are stable.
   output schema.
 - V1 does not implement a reusable source catalog or source picker.
 - V1 stores the HTTP definition inside the widget settings that use it.
-- V1 stores the user's display request text so the PI can rebuild the prompt and
-  explain what the transform is meant to extract.
+- V1 stores the user's `user_intent` text so the PI can rebuild the prompt and
+  explain what the transform is meant to extract. `user_intent` is persisted
+  editor context, not runtime input; a configured URL plus jq transform can run
+  even when `user_intent` is empty.
 - V1 does not implement sequence, parallel, request pipelines, request
   dependency graphs, auth, secrets, cookies, POST bodies, local command
   execution, or arbitrary text metrics.
@@ -233,6 +236,11 @@ validation, and source-owned unavailable reports. `MetricStore` owns samples.
 Actions own render-facing `WidgetData` assembly. The Property Inspector owns UI
 drafts and user-visible configuration errors.
 
+Do not put `WidgetData` builders, render labels, progress defaults, or
+view-facing formatting under `runtime/sources/custom-http/`. Runtime sources
+return metric snapshots and unavailable state only. Action/metric owners adapt
+those snapshots to render-facing data.
+
 Future exact-request coalescing must be an internal HTTP source-client
 optimization, not a settings or metric-key change. Coalescing keys must be based
 on request fingerprint and cadence, not on rendered metric identity.
@@ -311,7 +319,8 @@ LOC estimate: 700-1,200.
 
 Purpose:
 
-Add a stored and resolved Custom HTTP target without adding runtime HTTP I/O.
+Add a stored and resolved Custom Metric target with an HTTP single-request
+source plan, without adding runtime HTTP I/O.
 
 Locations:
 
@@ -327,11 +336,15 @@ Locations:
 
 Required work:
 
-1. Add a new `custom_http` target arm to `MetricSelection.oneof target`.
-2. Add a stored message for the widget-local HTTP definition.
-3. Store only persisted user intent:
+1. Add a new `custom` target arm to `MetricSelection.oneof target`.
+2. Add a stored `CustomMetricTarget` message whose V1 source oneof contains
+   `http`.
+3. Add `CustomHttpMetricSource` with a `plan` oneof containing
+   `single_request`.
+4. Add `SingleCustomHttpRequest` for the V1 widget-local HTTP definition.
+5. Store only persisted user intent:
    - URL;
-   - display request text;
+   - user intent text;
    - jq transform;
    - no runtime metric key;
    - no `actionId`;
@@ -339,11 +352,17 @@ Required work:
    - no fetched sample body;
    - no validated output preview;
    - no runtime status.
-4. Add resolved Custom HTTP target types.
-5. Add resolver validation and defaulting for absent/unconfigured HTTP target.
-6. Add sparse patch support for editing Custom HTTP fields.
-7. Add quick-start settings for the new Custom Metric action in an
+6. Add resolved Custom Metric target types with explicit `http` source and
+   `singleRequest` plan nesting.
+7. Add resolver validation and defaulting for absent/unconfigured Custom Metric
+   source and HTTP single-request plan.
+8. Add sparse patch support for editing Custom Metric HTTP fields.
+9. Add quick-start settings for the new Custom Metric action in an
    unconfigured state.
+10. Do not add `ActionKind.customMetric`, manifest entries, plugin
+    registration, or an action class in Step 1. If tests need to initialize
+    Custom Metric settings before Step 4, use a narrow test/local initializer
+    type instead of exposing a public action kind early.
 
 Acceptance:
 
@@ -376,7 +395,10 @@ Locations:
 - `packages/hub/src/runtime/sources/custom-http/custom-http-definition-registry.test.ts`
 - `packages/hub/src/runtime/source-routing/metric-read-plan.ts`
 - `packages/hub/src/actions/metric-action.ts`
-- `packages/hub/src/actions/custom-metric.ts`
+
+Do not create `packages/hub/src/actions/custom-metric.ts` in Step 2. The action
+class belongs to Step 4. Step 2 may add shared lifecycle hooks or protected
+extension points only when the existing action base needs them.
 
 Required work:
 
@@ -410,11 +432,13 @@ Required work:
    different runtime metric keys.
 8. Add a test or static grep-style guard that direct `custom-http:` key
    construction exists only in the shared helper and its tests.
-9. Add a runtime definition registry keyed by runtime metric key.
-10. Register the active action's resolved HTTP definition on `onWillAppear` and
-   settings updates.
-11. Unregister on `onWillDisappear`.
-12. Build a Custom HTTP read plan that routes the runtime metric key to
+9. Add a runtime definition registry keyed by runtime metric key, with explicit
+   register, replace, read, and unregister APIs.
+10. Add unit tests for registry replacement and unregister cleanup.
+11. If `MetricAction` needs a lifecycle extension point for future Custom Metric
+   registration, add the narrow protected hook here. Do not wire a Custom Metric
+   action lifecycle in Step 2.
+12. Add a pure Custom HTTP read-plan helper that routes the runtime metric key to
    `CUSTOM_HTTP_SOURCE_ID` and a Custom HTTP source scope.
 
 Acceptance:
@@ -451,7 +475,6 @@ Locations:
 - `packages/hub/src/runtime/sources/custom-http/custom-http-transform-worker.ts`
 - `packages/hub/src/runtime/sources/custom-http/custom-http-transform-worker-pool.ts`
 - `packages/hub/src/runtime/sources/custom-http/custom-http-output-schema.ts`
-- `packages/hub/src/runtime/sources/custom-http/custom-http-widget-data.ts`
 - `packages/hub/src/runtime/sources/custom-http/*.test.ts`
 - `packages/hub/package.json`
 - `packages/hub/package-lock.json`
@@ -477,7 +500,9 @@ Required work:
    `custom-metric-transform-check.mjs`.
 11. Prefer JSON Schema + Ajv for the final validator if package safety review
    passes. If Ajv is not used, document why and keep one shared validator.
-12. Convert output into `MetricSnapshot` and source attribution.
+12. Convert output into source-owned metric sample/snapshot data and source
+    attribution. Do not produce render-facing `WidgetData` in the source
+    client.
 13. Return unavailable reports for:
    - missing runtime definition;
    - invalid URL;
@@ -524,7 +549,8 @@ Locations:
 - `packages/hub/src/plugin.ts`
 - `packages/hub/src/shared/stream-deck-actions.ts`
 - `packages/hub/src/actions/settings/action-settings-resolver.ts`
-- `packages/hub/src/metrics/`
+- `packages/hub/src/metrics/` or an action-owned builder if no shared metric
+  helper is needed
 - `packages/hub/src/view-updates/runner.ts` only if required by existing
   render contract gaps
 - `packages/hub/com.ez.sho-metrics.sdPlugin/manifest.json`
@@ -541,14 +567,19 @@ Required work:
 4. Register Custom Metric in `plugin.ts`.
 5. Return the runtime metric key from the shared Custom HTTP identity helper
    using the active action id and fixed `single` consumer id.
-6. Build Custom HTTP widget data from the source output:
+6. Register the active action's resolved HTTP definition on `onWillAppear` and
+   settings updates.
+7. Unregister on `onWillDisappear`.
+8. Build Custom HTTP widget data from the source output:
    - label;
    - value;
    - unit/custom unit;
    - maximum when present;
    - progress when maximum or an existing semantic default is available.
-7. Preserve the existing single-metric appearance/view behavior.
-8. Render:
+   This adaptation belongs to the action/metric layer, not the Custom HTTP
+   source client.
+9. Preserve the existing single-metric appearance/view behavior.
+10. Render:
    - `Configure` for unconfigured;
    - `Error` for invalid configuration before a valid metric exists;
    - `...` while waiting for first configured sample;
@@ -594,7 +625,7 @@ Required work:
 2. User inputs:
    - HTTP URL;
    - sample fetch/test command;
-   - display request text;
+   - user intent text;
    - jq transform;
    - test transform command.
 3. Provide a copyable generic prompt using the final single-metric output
@@ -605,6 +636,9 @@ Required work:
    source owner.
 6. Store only settings needed for runtime. Do not store sample response bodies
    in action settings.
+   Sample JSON, extracted schema summaries, prompt drafts, and test output
+   previews are PI/runtime-cache state only and must disappear when the PI
+   closes or refreshes.
 7. Show detailed bounded errors in PI for URL, HTTP, JSON, jq, schema, and
    response-size failures.
 8. Show a preview of the validated output metric.
@@ -636,8 +670,8 @@ LOC estimate: 1,000-1,800.
 
 Purpose:
 
-Allow Dense Multi Metric and Stacked Metric to use Custom HTTP Metric targets
-without adding a reusable source catalog.
+Allow Dense Multi Metric and Stacked Metric to use Custom Metric targets with
+HTTP sources, without adding a reusable source catalog.
 
 Locations:
 
@@ -656,10 +690,10 @@ Required work:
 
 1. Dense row read-plan construction must register and route each Custom HTTP
    slot with its own runtime metric key.
-2. Dense row failure remains slot-level. One failed Custom HTTP row must not
-   blank the widget.
+2. Dense row failure remains slot-level. One failed Custom Metric HTTP row must
+   not blank the widget.
 3. Dense PI must not add per-row theme, polling, or appearance. Only the row's
-   Custom HTTP target definition belongs to that row.
+   Custom Metric HTTP source definition belongs to that row.
 4. Stacked slots already own complete single-metric settings. Custom HTTP
    targets should work through the existing child single-metric editor path.
 5. Reorder/remove must unregister stale runtime definitions and register the
@@ -668,11 +702,20 @@ Required work:
    remain separate runtime metric keys in V1.
 7. Use the Step 2 shared identity helper. Do not invent Dense-only or
    Stacked-only runtime key formatting.
+8. Remove the Step 1 placeholder behavior in all known Custom Metric deferral
+   sites:
+   - Dense read/data path currently treats Custom Metric rows as unconfigured
+     empty rows;
+   - Stacked read/view paths currently fail fast if a Custom Metric slot reaches
+     runtime routing before Step 6 support is wired;
+   - Dense PI category resolution currently maps Custom Metric to the catalog
+     bucket only as a temporary unreachable fallback.
 
 Acceptance:
 
-- Dense can display at least two Custom HTTP rows with independent definitions.
-- Dense degrades one failed Custom HTTP row without blanking the widget.
+- Dense can display at least two Custom Metric HTTP rows with independent
+  definitions.
+- Dense degrades one failed Custom Metric HTTP row without blanking the widget.
 - Stacked can rotate between Custom HTTP and built-in metric slots.
 - Copy/import of Dense or Stacked widgets does not copy runtime metric keys
   because runtime keys are not stored.

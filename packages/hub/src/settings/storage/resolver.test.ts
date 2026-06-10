@@ -1,4 +1,4 @@
-﻿import { describe, it } from "node:test";
+import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { create } from "@bufbuild/protobuf";
 
@@ -1158,6 +1158,138 @@ describe("stored settings proto resolver", () => {
         }
         assert.equal(widgetSettings.widget.slot.appearance.view.selectedView, "text");
         assert.equal(widgetSettings.widget.slot.appearance.theme.flat.paint.colorMode, "black-white");
+    });
+
+    it("resolves unconfigured Custom Metric target with text view defaults", () => {
+        const widgetSettings = resolveSingleMetricWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                singleMetric: {
+                    slot: {
+                        metric: {
+                            custom: {},
+                        },
+                    },
+                },
+            }).settings,
+        });
+        const target = widgetSettings.widget.slot.metric.target;
+
+        assert.equal(target.domain, "customMetric");
+        if (target.domain === "customMetric") {
+            assert.deepEqual(target.configuration, { state: "unconfigured" });
+        }
+        assert.equal(widgetSettings.widget.slot.appearance.view.selectedView, "text");
+        assert.equal(widgetSettings.widget.slot.appearance.theme.flat.paint.colorMode, "black-white");
+    });
+
+    it("marks partial Custom Metric definitions invalid without inventing runtime identity", () => {
+        const widgetSettings = resolveSingleMetricWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                singleMetric: {
+                    slot: {
+                        metric: {
+                            custom: {
+                                http: {
+                                    singleRequest: {
+                                        url: "https://api.example.com/current",
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            }).settings,
+        });
+        const target = widgetSettings.widget.slot.metric.target;
+
+        assert.equal(target.domain, "customMetric");
+        if (target.domain === "customMetric") {
+            assert.deepEqual(target.configuration, {
+                state: "invalid",
+                reason: "missingJqTransform",
+            });
+        }
+    });
+
+    it("resolves configured Custom Metric definitions as stored user intent", () => {
+        const widgetSettings = resolveSingleMetricWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                singleMetric: {
+                    slot: {
+                        metric: {
+                            custom: {
+                                http: {
+                                    singleRequest: {
+                                        url: " https://api.example.com/current?city=tokyo ",
+                                        userIntent: " Temperature ",
+                                        jqTransform: " { metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } } ",
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            }).settings,
+        });
+        const target = widgetSettings.widget.slot.metric.target;
+
+        assert.equal(target.domain, "customMetric");
+        if (target.domain === "customMetric") {
+            assert.deepEqual(target.configuration, {
+                state: "configured",
+                source: {
+                    kind: "http",
+                    plan: {
+                        kind: "singleRequest",
+                        request: {
+                            url: "https://api.example.com/current?city=tokyo",
+                            userIntent: "Temperature",
+                            jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+                        },
+                    },
+                },
+            });
+        }
+    });
+
+    it("does not require Custom Metric user intent at runtime", () => {
+        const widgetSettings = resolveSingleMetricWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                singleMetric: {
+                    slot: {
+                        metric: {
+                            custom: {
+                                http: {
+                                    singleRequest: {
+                                        url: "https://api.example.com/current",
+                                        jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            }).settings,
+        });
+        const target = widgetSettings.widget.slot.metric.target;
+
+        assert.equal(target.domain, "customMetric");
+        if (target.domain === "customMetric") {
+            assert.deepEqual(target.configuration, {
+                state: "configured",
+                source: {
+                    kind: "http",
+                    plan: {
+                        kind: "singleRequest",
+                        request: {
+                            url: "https://api.example.com/current",
+                            userIntent: undefined,
+                            jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+                        },
+                    },
+                },
+            });
+        }
     });
 
     it("resolves dense multi metric rows and shared appearance", () => {

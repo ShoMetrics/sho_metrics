@@ -288,6 +288,8 @@ function DenseMetricTargetSettings({
                     onSettingsPatch={onSettingsPatch}
                 />
             );
+        case "customMetric":
+            return <></>;
     }
 }
 
@@ -537,6 +539,10 @@ function resolveDenseMetricCategoryId(target: ResolvedMetricTarget): DenseMetric
         case "network":
             return target.domain;
         case "catalog":
+            return "catalog";
+        case "customMetric":
+            // Dense Custom Metric editing is intentionally deferred until the
+            // Custom HTTP single-widget runtime and PI are stable.
             return "catalog";
     }
 }
@@ -791,6 +797,8 @@ function resolveDenseMetricPlaceholderLabel(target: ResolvedMetricTarget): strin
             return target.reading.kind === "traffic" && target.reading.direction === "upload" ? "UP" : "DOWN";
         case "catalog":
             return target.detectedLabel ?? "METRIC";
+        case "customMetric":
+            return "CUSTOM";
     }
 }
 
