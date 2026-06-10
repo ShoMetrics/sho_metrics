@@ -1,0 +1,1079 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Liquid Glass Playground — static resvg approximation (verbatim Vue filter chain)</title>
+<style>
+  :root {
+    --bg: #14161c; --panel: #1d2029; --line: #2c3040; --text: #d7dce8;
+    --muted: #8b93a8; --accent: #9ec5ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 13px/1.5 "Segoe UI", system-ui, sans-serif;
+  }
+  header {
+    padding: 10px 16px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  #status { color: var(--accent); font-size: 12px; }
+  #status.err { color: #ff9a9a; }
+  main { display: flex; align-items: flex-start; gap: 16px; padding: 16px; }
+  aside {
+    width: 320px; flex: none; position: sticky; top: 12px;
+    max-height: calc(100vh - 40px); overflow-y: auto;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 14px 16px;
+  }
+  details { border-bottom: 1px solid var(--line); padding: 6px 0; }
+  details:last-child { border-bottom: none; }
+  summary { cursor: pointer; font-weight: 600; padding: 4px 0; color: var(--accent); }
+  .ctl { display: grid; grid-template-columns: 118px 1fr 44px; gap: 8px; align-items: center; margin: 5px 0; }
+  .ctl label { color: var(--text); font-size: 12px; }
+  .ctl input[type=range] { width: 100%; accent-color: var(--accent); }
+  .ctl .val { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; font-size: 11px; }
+  .ctl select, .ctl input[type=color] { grid-column: 2 / 4; background: #262a36; color: var(--text); border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; }
+  .ctl input[type=checkbox] { justify-self: start; accent-color: var(--accent); }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+  button, .toolbar select {
+    background: #262a36; color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 12px;
+  }
+  button:hover { border-color: var(--accent); }
+  section.previews { flex: 1; min-width: 0; }
+  .panes { display: flex; gap: 16px; flex-wrap: wrap; }
+  .pane { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .pane h2 { font-size: 12px; margin: 0 0 8px; color: var(--muted); font-weight: 600; }
+  .checkerboard { background: repeating-conic-gradient(#23262f 0% 25%, #1a1d24 0% 50%) 0 0 / 18px 18px; border-radius: 6px; padding: 8px; display: inline-block; }
+  #browserPreview svg { display: block; width: 432px; height: auto; }
+  #resvgImg { display: block; image-rendering: auto; }
+  #resvgImg.zoomed { image-rendering: pixelated; }
+  canvas.loupe { width: 216px; height: 216px; background: #000; border-radius: 6px; display: block; image-rendering: pixelated; }
+  .loupes { display: flex; gap: 12px; }
+  .loupes figure { margin: 0; }
+  .loupes figcaption { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  footer { padding: 8px 16px 24px; color: var(--muted); font-size: 12px; max-width: 980px; }
+  footer code { color: var(--accent); }
+  #uploadRow { margin-top: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Liquid Glass Playground</h1>
+  <span class="sub">static resvg approximation · filter chain = verbatim Vue library chain (byte-level numeric parity checked) · 144x144 widget</span>
+  <span id="status">Initializing...</span>
+</header>
+<main>
+  <aside id="controls"></aside>
+  <section class="previews">
+    <div class="toolbar">
+      <label>Preset:</label>
+      <select id="presetSelect"></select>
+      <label>resvg display:</label>
+      <select id="zoomSelect"><option value="1">1x (no resampling)</option><option value="2">2x nearest</option><option value="3">3x nearest</option></select>
+      <button id="btnCopySvg">Copy SVG</button>
+      <button id="btnDownloadSvg">Download SVG</button>
+      <button id="btnDownloadPng">Download resvg PNG</button>
+      <button id="btnCopyJson">Copy parameter JSON</button>
+      <span id="renderInfo" class="sub"></span>
+    </div>
+    <div class="panes" id="panesRoot">
+      <div class="pane">
+        <h2>resvg-wasm 2.6.2 (ground truth, same version as hub resvg-js, fitTo width)</h2>
+        <div class="checkerboard"><img id="resvgImg" alt="resvg render"></div>
+      </div>
+      <div class="pane">
+        <h2>Native browser SVG (approximate reference; resvg on the left is authoritative)</h2>
+        <div class="checkerboard"><div id="browserPreview"></div></div>
+      </div>
+      <div class="pane">
+        <h2>resvg output loupe (nearest-neighbor sampling for review)</h2>
+        <div class="loupes">
+          <figure><canvas id="loupeKey" class="loupe" width="216" height="216"></canvas>
+            <figcaption>Key/widget top-left corner</figcaption></figure>
+          <figure><canvas id="loupeBar" class="loupe" width="216" height="216"></canvas>
+            <figcaption>Music Bar top-left corner</figcaption></figure>
+        </div>
+        <div id="uploadRow">
+          <label class="sub">Custom background image:</label>
+          <input type="file" id="bgUpload" accept="image/*">
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<footer>
+  <b>Structure:</b> Glass = a second copy of the same background image (padded bleed, filter before clip, so blur never samples transparent black);
+  the filter chain matches Filter.vue node-for-node: blur → feImage(displacement) → feDisplacementMap → saturate →
+  feImage(specular) → feComposite(in) → feFuncA → two feBlend nodes. The default map engine is v2 (verbatim LUT refraction physics,
+  pixel generation changed to SDF + analytic AA + true maxDisplacement normalization, fixing corner artifacts and saturation clipping); it can switch back to
+  the verbatim engine for comparison (the verbatim port is continuously parity-checked by <code>validate-vue-parity.mjs</code>).
+  Browser comparison page: <code>liquid-glass-vue-parity.html</code> (real backdrop-filter).
+  After export, use <code>node scripts/playground/render-liquid-glass.mjs out.svg --width 288</code> to verify.
+</footer>
+
+<script type="module">
+"use strict";
+
+/* ============================= Constants ============================= */
+const KEY = 144; // WIDGET_LOGICAL_SIZE
+const RESVG_VERSION = "2.6.2";
+
+/* ==== VUE-LIB-PORT BEGIN ====
+   Ported line-by-line from vue-web-liquid-glass src/lib/{surfaceEquations,displacementMap,specular}.ts,
+   with types erased only. validate-vue-parity.mjs extracts this block and byte-checks it against the original .ts files. */
+const CONVEX_CIRCLE = { title: "Convex Circle", fn: (x) => Math.sqrt(1 - (1 - x) ** 2) };
+const CONVEX = { title: "Convex Squircle", fn: (x) => Math.pow(1 - Math.pow(1 - x, 4), 1 / 4) };
+const CONCAVE = { title: "Concave", fn: (x) => 1 - CONVEX_CIRCLE.fn(x) };
+const LIP = { title: "Lip", fn: (x) => {
+    const convex = CONVEX.fn(x * 2);
+    const concave = CONCAVE.fn(x) + 0.1;
+    const smootherstep = 6 * x ** 5 - 15 * x ** 4 + 10 * x ** 3;
+    return convex * (1 - smootherstep) + concave * smootherstep;
+} };
+
+function calculateDisplacementMap(
+    glassThickness = 200,
+    bezelWidth = 50,
+    bezelHeightFn = (x) => x,
+    refractiveIndex = 1.5,
+    samples = 128
+) {
+    const eta = 1 / refractiveIndex;
+    function refract(normalX, normalY) {
+        const dot = normalY;
+        const k = 1 - eta * eta * (1 - dot * dot);
+        if (k < 0) return null;
+        const kSqrt = Math.sqrt(k);
+        return [
+            -(eta * dot + kSqrt) * normalX,
+            eta - (eta * dot + kSqrt) * normalY,
+        ];
+    }
+    return Array.from({ length: samples }, (_, i) => {
+        const x = i / samples;
+        const y = bezelHeightFn(x);
+        const dx = x < 1 ? 0.0001 : -0.0001;
+        const y2 = bezelHeightFn(x + dx);
+        const derivative = (y2 - y) / dx;
+        const magnitude = Math.sqrt(derivative * derivative + 1);
+        const normal = [-derivative / magnitude, -1 / magnitude];
+        const refracted = refract(normal[0], normal[1]);
+        if (!refracted) {
+            return 0;
+        } else {
+            const remainingHeightOnBezel = y * bezelWidth;
+            const remainingHeight = remainingHeightOnBezel + glassThickness;
+            return refracted[0] * (remainingHeight / refracted[1]);
+        }
+    });
+}
+
+function calculateDisplacementMapWithShape(
+    canvasWidth, canvasHeight, objectWidth, objectHeight,
+    bezelWidth, maximumDisplacement, precomputedDisplacementMap = [],
+    shape = "circle", cornerRadius = 1.0, squircleExponent = 4, dpr
+) {
+    const devicePixelRatio = dpr ?? (typeof window !== "undefined" ? window.devicePixelRatio ?? 1 : 1);
+    const bufferWidth = Math.floor(canvasWidth * devicePixelRatio);
+    const bufferHeight = Math.floor(canvasHeight * devicePixelRatio);
+    const imageData = new ImageData(bufferWidth, bufferHeight);
+    const neutral = 0xff008080;
+    new Uint32Array(imageData.data.buffer).fill(neutral);
+
+    const objectWidth_ = objectWidth * devicePixelRatio;
+    const objectHeight_ = objectHeight * devicePixelRatio;
+    const bezel = bezelWidth * devicePixelRatio;
+    const objectX = (bufferWidth - objectWidth_) / 2;
+    const objectY = (bufferHeight - objectHeight_) / 2;
+
+    const maxCornerRadius = Math.min(objectWidth_, objectHeight_) / 2;
+    let actualRadius;
+    switch (shape) {
+        case "circle": actualRadius = maxCornerRadius; break;
+        case "pill": actualRadius = Math.min(objectWidth_, objectHeight_) / 2; break;
+        case "rectangle": actualRadius = cornerRadius * maxCornerRadius; break;
+        case "squircle":
+        default: actualRadius = cornerRadius * maxCornerRadius; break;
+    }
+
+    const radius_ = actualRadius;
+    const radiusSquared = radius_ ** 2;
+    const radiusPlusOneSquared = (radius_ + 1) ** 2;
+    const radiusMinusBezelSquared = Math.max(0, (radius_ - bezel) ** 2);
+    const widthBetweenRadiuses = Math.max(0, objectWidth_ - radius_ * 2);
+    const heightBetweenRadiuses = Math.max(0, objectHeight_ - radius_ * 2);
+
+    const squircleDistance = (x, y, r, n) => {
+        if (r === 0) return Math.sqrt(x * x + y * y);
+        const absX = Math.abs(x) / r;
+        const absY = Math.abs(y) / r;
+        return Math.pow(Math.pow(absX, n) + Math.pow(absY, n), 1 / n) * r;
+    };
+
+    for (let y1 = 0; y1 < objectHeight_; y1++) {
+        for (let x1 = 0; x1 < objectWidth_; x1++) {
+            const idx = ((objectY + y1) * bufferWidth + objectX + x1) * 4;
+            const isOnLeftSide = x1 < radius_;
+            const isOnRightSide = x1 >= objectWidth_ - radius_;
+            const isOnTopSide = y1 < radius_;
+            const isOnBottomSide = y1 >= objectHeight_ - radius_;
+
+            let x = 0, y = 0;
+            let distanceToEdge = 0;
+            let normalX = 0, normalY = 0;
+            let isInBezelRegion = false;
+
+            if ((isOnLeftSide || isOnRightSide) && (isOnTopSide || isOnBottomSide)) {
+                x = isOnLeftSide ? x1 - radius_ : x1 - (objectWidth_ - radius_);
+                y = isOnTopSide ? y1 - radius_ : y1 - (objectHeight_ - radius_);
+                let distanceFromCornerCenter;
+                if (shape === "squircle" && cornerRadius > 0) {
+                    distanceFromCornerCenter = squircleDistance(x, y, radius_, squircleExponent);
+                } else {
+                    distanceFromCornerCenter = Math.sqrt(x * x + y * y);
+                }
+                distanceToEdge = radius_ - distanceFromCornerCenter;
+                if (distanceToEdge >= -1 && distanceToEdge <= bezel) {
+                    isInBezelRegion = true;
+                    const magnitude = Math.sqrt(x * x + y * y) || 1;
+                    normalX = x / magnitude;
+                    normalY = y / magnitude;
+                }
+            } else if (isOnLeftSide || isOnRightSide) {
+                distanceToEdge = isOnLeftSide ? x1 : (objectWidth_ - 1 - x1);
+                if (distanceToEdge <= bezel) {
+                    isInBezelRegion = true;
+                    normalX = isOnLeftSide ? -1 : 1;
+                    normalY = 0;
+                }
+            } else if (isOnTopSide || isOnBottomSide) {
+                distanceToEdge = isOnTopSide ? y1 : (objectHeight_ - 1 - y1);
+                if (distanceToEdge <= bezel) {
+                    isInBezelRegion = true;
+                    normalX = 0;
+                    normalY = isOnTopSide ? -1 : 1;
+                }
+            }
+
+            if (isInBezelRegion && distanceToEdge >= 0) {
+                const opacity = distanceToEdge >= 0 ? 1 : Math.max(0, 1 + distanceToEdge);
+                const bezelIndex = Math.min(
+                    precomputedDisplacementMap.length - 1,
+                    Math.max(0, ((distanceToEdge / bezel) * precomputedDisplacementMap.length) | 0)
+                );
+                const distance = precomputedDisplacementMap[bezelIndex] ?? 0;
+                const dX = (-normalX * distance) / maximumDisplacement;
+                const dY = (-normalY * distance) / maximumDisplacement;
+                imageData.data[idx] = 128 + dX * 127 * opacity;
+                imageData.data[idx + 1] = 128 + dY * 127 * opacity;
+                imageData.data[idx + 2] = 0;
+                imageData.data[idx + 3] = 255;
+            }
+        }
+    }
+    return imageData;
+}
+
+function calculateRefractionSpecular(
+    objectWidth, objectHeight, radius, bezelWidth, specularAngle = Math.PI / 3, dpr
+) {
+    const devicePixelRatio = dpr ?? (typeof window !== "undefined" ? window.devicePixelRatio ?? 1 : 1);
+    const bufferWidth = Math.floor(objectWidth * devicePixelRatio);
+    const bufferHeight = Math.floor(objectHeight * devicePixelRatio);
+    const imageData = new ImageData(bufferWidth, bufferHeight);
+    const radius_ = radius * devicePixelRatio;
+    const bezel_ = bezelWidth * devicePixelRatio;
+    const specular_vector = [Math.cos(specularAngle), Math.sin(specularAngle)];
+    const neutral = 0x00000000;
+    new Uint32Array(imageData.data.buffer).fill(neutral);
+    const radiusSquared = radius_ ** 2;
+    const radiusPlusOneSquared = (radius_ + devicePixelRatio) ** 2;
+    const radiusMinusBezelSquared = (radius_ - bezel_) ** 2;
+    const widthBetweenRadiuses = bufferWidth - radius_ * 2;
+    const heightBetweenRadiuses = bufferHeight - radius_ * 2;
+
+    for (let y1 = 0; y1 < bufferHeight; y1++) {
+        for (let x1 = 0; x1 < bufferWidth; x1++) {
+            const idx = (y1 * bufferWidth + x1) * 4;
+            const isOnLeftSide = x1 < radius_;
+            const isOnRightSide = x1 >= bufferWidth - radius_;
+            const isOnTopSide = y1 < radius_;
+            const isOnBottomSide = y1 >= bufferHeight - radius_;
+            const x = isOnLeftSide ? x1 - radius_
+                : isOnRightSide ? x1 - radius_ - widthBetweenRadiuses : 0;
+            const y = isOnTopSide ? y1 - radius_
+                : isOnBottomSide ? y1 - radius_ - heightBetweenRadiuses : 0;
+            const distanceToCenterSquared = x * x + y * y;
+            const isInBezel =
+                distanceToCenterSquared <= radiusPlusOneSquared &&
+                distanceToCenterSquared >= radiusMinusBezelSquared;
+            if (isInBezel) {
+                const distanceFromCenter = Math.sqrt(distanceToCenterSquared);
+                const distanceFromSide = radius_ - distanceFromCenter;
+                const opacity =
+                    distanceToCenterSquared < radiusSquared
+                        ? 1
+                        : 1 -
+                        (distanceFromCenter - Math.sqrt(radiusSquared)) /
+                        (Math.sqrt(radiusPlusOneSquared) - Math.sqrt(radiusSquared));
+                const cos = x / distanceFromCenter;
+                const sin = -y / distanceFromCenter;
+                const dotProduct = Math.abs(
+                    cos * specular_vector[0] + sin * specular_vector[1]
+                );
+                const coefficient =
+                    dotProduct *
+                    Math.sqrt(1 - (1 - distanceFromSide / (1 * devicePixelRatio)) ** 2);
+                const color = 255 * coefficient;
+                const finalOpacity = color * coefficient * opacity;
+                imageData.data[idx] = color;
+                imageData.data[idx + 1] = color;
+                imageData.data[idx + 2] = color;
+                imageData.data[idx + 3] = finalOpacity;
+            }
+        }
+    }
+    return imageData;
+}
+/* ==== VUE-LIB-PORT END ==== */
+
+const SURFACE_BY_NAME = {
+    convex_squircle: CONVEX.fn,
+    convex_circle: CONVEX_CIRCLE.fn,
+    concave: CONCAVE.fn,
+    lip: LIP.fn,
+};
+
+/* ============================= Parameters ============================= */
+// Optics defaults: bar aligns with the Kube Music Player demo (specular 0.4/6),
+// the whole-key glass is slightly stronger; the "Vue Navbar bg" preset directly restores the navbar background-filter feel.
+// Optics parameters are scaled by element size (Vue absolute values were tuned
+// for 480x80 / 116x72 elements; using them directly in a 144 widget makes
+// displacement exceed 30% of element width and triggers map /100 normalization clipping).
+// Anchor = Vue thumb ratio: bezel ~= 0.21h, thickness ~= 2.2h, scale ~= 0.15w.
+const DEFAULTS = {
+    background: "swirl", outputScale: 2, mapSmooth: 2, mapEngine: "v2",
+    tintColor: "#ffffff",
+    keyGlass: true, keyRadius: 16, keyBezel: 14, keyThickness: 120, keyN: 1.5,
+    keyProfile: "convex_squircle", keyBlur: 2, keyScaleRatio: 0.12,
+    keySpecOpacity: 0.4, keySpecSaturation: 6, keyTintOpacity: 0.30,
+    bar: true, barWidth: 124, barHeight: 36, barY: 96, barRadius: 18,
+    barBezel: 8, barThickness: 80, barN: 1.5,
+    barProfile: "convex_squircle", barBlur: 1.2, barScaleRatio: 0.12,
+    barSpecOpacity: 0.4, barSpecSaturation: 6, barTintOpacity: 0.45,
+    barContent: true,
+    shadowOpacity: 0.10, shadowBlur: 10, shadowOffsetY: 4,
+};
+
+const PRESETS = {
+    "kube-music": { label: "Kube Music Player (default)", overrides: {} },
+    // navbar bg scaled proportionally to bar h36 (original h80): bezel 30->13, thickness 190->86, blur 2->1
+    "vue-navbar": { label: "Vue Navbar bg (strong flowing refraction)", overrides: {
+        barBezel: 13, barThickness: 86, barN: 1.3, barBlur: 1, barScaleRatio: 0.4,
+        barSpecOpacity: 1, barSpecSaturation: 19, barTintOpacity: 0.6,
+    } },
+    "pure-blur": { label: "Pure blur (no refraction/no specular)", overrides: {
+        keyScaleRatio: 0, barScaleRatio: 0, keySpecOpacity: 0, barSpecOpacity: 0,
+        keyBlur: 4, barBlur: 4.5, barTintOpacity: 0.5,
+    } },
+    "clear": { label: "Clear (thin tint)", overrides: {
+        keyTintOpacity: 0.06, barTintOpacity: 0.12, keyBlur: 1.5, barBlur: 1,
+    } },
+};
+
+const PROFILE_OPTIONS = [
+    ["convex_squircle", "Convex Squircle"], ["convex_circle", "Convex Circle"],
+    ["lip", "Lip"], ["concave", "Concave"],
+];
+
+const CONTROL_GROUPS = [
+    { title: "Output / Background", controls: [
+        { key: "background", label: "Background", type: "select", options: [
+            ["swirl", "Dark marble (parity background)"], ["album", "Album gradient"],
+            ["stripes", "High-contrast diagonal stripes"], ["checker", "Checkerboard + color dots"],
+            ["photo", "Photo-like + noise"], ["custom", "Custom upload"]] },
+        { key: "outputScale", label: "Output scale (= map DPR)", type: "range", min: 1, max: 4, step: 1 },
+        { key: "mapEngine", label: "Map engine", type: "select", options: [
+            ["v2", "v2 improved (analytic AA + no clipping)"], ["verbatim", "Vue verbatim (comparison)"]] },
+        { key: "mapSmooth", label: "Map supersampling (corner AA)", type: "range", min: 1, max: 5, step: 1 },
+        { key: "tintColor", label: "glass color", type: "color" },
+    ]},
+    { title: "Whole-key glass", controls: [
+        { key: "keyGlass", label: "Enabled", type: "check" },
+        { key: "keyRadius", label: "Corner radius", type: "range", min: 0, max: 40, step: 1 },
+        { key: "keyBezel", label: "bezel", type: "range", min: 2, max: 40, step: 1 },
+        { key: "keyThickness", label: "thickness", type: "range", min: 0, max: 300, step: 1 },
+        { key: "keyN", label: "n", type: "range", min: 1, max: 2, step: 0.01 },
+        { key: "keyProfile", label: "Profile", type: "select", options: PROFILE_OPTIONS },
+        { key: "keyBlur", label: "blur", type: "range", min: 0, max: 8, step: 0.1 },
+        { key: "keyScaleRatio", label: "scaleRatio", type: "range", min: -1, max: 1, step: 0.01 },
+        { key: "keySpecOpacity", label: "specularOpacity", type: "range", min: 0, max: 1, step: 0.01 },
+        { key: "keySpecSaturation", label: "specularSat", type: "range", min: 0, max: 30, step: 0.5 },
+        { key: "keyTintOpacity", label: "tint opacity", type: "range", min: 0, max: 1, step: 0.01 },
+    ]},
+    { title: "Music Bar glass", controls: [
+        { key: "bar", label: "Enabled", type: "check" },
+        { key: "barWidth", label: "Width", type: "range", min: 60, max: 140, step: 1 },
+        { key: "barHeight", label: "Height", type: "range", min: 20, max: 60, step: 1 },
+        { key: "barY", label: "Y position", type: "range", min: 56, max: 120, step: 1 },
+        { key: "barRadius", label: "Corner radius", type: "range", min: 4, max: 30, step: 1 },
+        { key: "barBezel", label: "bezel", type: "range", min: 2, max: 24, step: 1 },
+        { key: "barThickness", label: "thickness", type: "range", min: 0, max: 300, step: 1 },
+        { key: "barN", label: "n", type: "range", min: 1, max: 2, step: 0.01 },
+        { key: "barProfile", label: "Profile", type: "select", options: PROFILE_OPTIONS },
+        { key: "barBlur", label: "blur", type: "range", min: 0, max: 8, step: 0.1 },
+        { key: "barScaleRatio", label: "scaleRatio", type: "range", min: -1, max: 1, step: 0.01 },
+        { key: "barSpecOpacity", label: "specularOpacity", type: "range", min: 0, max: 1, step: 0.01 },
+        { key: "barSpecSaturation", label: "specularSat", type: "range", min: 0, max: 30, step: 0.5 },
+        { key: "barTintOpacity", label: "tint opacity", type: "range", min: 0, max: 1, step: 0.01 },
+        { key: "barContent", label: "Show content", type: "check" },
+        { key: "shadowOpacity", label: "Shadow opacity", type: "range", min: 0, max: 0.5, step: 0.01 },
+        { key: "shadowBlur", label: "Shadow blur sigma", type: "range", min: 0, max: 20, step: 0.5 },
+        { key: "shadowOffsetY", label: "Shadow offset Y", type: "range", min: 0, max: 12, step: 0.5 },
+    ]},
+];
+
+const params = { ...DEFAULTS };
+
+/* ============================= Background generation (with bleed) ============================= */
+const BG_PAINTERS = {
+    // Same formula as the liquid-glass-vue-parity.html swirl fallback (normalized coordinates, scale-free)
+    swirl(ctx, pad) {
+        const px = ctx.canvas.width;
+        const tmp = document.createElement("canvas");
+        tmp.width = px; tmp.height = px;
+        const tmpCtx = tmp.getContext("2d");
+        const img = tmpCtx.createImageData(px, px);
+        for (let y = 0; y < px; y++) {
+            for (let x = 0; x < px; x++) {
+                const u = x / px - 0.5, v = y / px - 0.5;
+                const warp = Math.sin(u * 5 + Math.sin(v * 7) * 1.8) + Math.sin((u + v) * 9 + Math.sin(u * 13) * 1.2);
+                const band = Math.sin(warp * 2.4 + u * 8 - v * 5);
+                const t = Math.pow(Math.abs(band), 2.2);
+                const i = (y * px + x) * 4;
+                img.data[i] = 26 + t * 204; img.data[i + 1] = 19 + t * 168;
+                img.data[i + 2] = 15 + t * 140; img.data[i + 3] = 255;
+            }
+        }
+        tmpCtx.putImageData(img, 0, 0);
+        ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(tmp, 0, 0); ctx.restore();
+    },
+    album(ctx, pad) {
+        const g = ctx.createLinearGradient(-pad, -pad, KEY + pad, KEY + pad * 2);
+        g.addColorStop(0, "#16204a"); g.addColorStop(0.35, "#5b3b8c");
+        g.addColorStop(0.7, "#c75b8d"); g.addColorStop(1, "#f2a65e");
+        ctx.fillStyle = g; ctx.fillRect(-pad, -pad, KEY + pad * 2, KEY + pad * 2);
+        const circle = (x, y, r, color) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); };
+        circle(30, 40, 38, "rgba(255,255,255,0.12)");
+        circle(120, 26, 30, "rgba(110,231,255,0.18)");
+        circle(104, 120, 46, "rgba(255,154,213,0.15)");
+        ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.lineWidth = 0.6;
+        for (let i = 0; i < 5; i++) {
+            ctx.beginPath(); ctx.moveTo(-pad, 18 + i * 26); ctx.lineTo(KEY + pad, 38 + i * 26); ctx.stroke();
+        }
+    },
+    stripes(ctx, pad) {
+        ctx.fillStyle = "#dddddd"; ctx.fillRect(-pad, -pad, KEY + pad * 2, KEY + pad * 2);
+        ctx.save(); ctx.translate(KEY / 2, KEY / 2); ctx.rotate(-Math.PI / 6);
+        for (let i = -20; i <= 20; i++) {
+            ctx.fillStyle = i === 0 ? "#c92a2a" : i === 4 ? "#1864ab" : "#161616";
+            ctx.fillRect(i * 14 - 3.5, -200, 7, 400);
+        }
+        ctx.restore();
+    },
+    checker(ctx, pad) {
+        const cell = 8;
+        for (let y = -pad; y < KEY + pad; y += cell) {
+            for (let x = -pad; x < KEY + pad; x += cell) {
+                ctx.fillStyle = ((Math.floor(x / cell) + Math.floor(y / cell)) % 2 === 0) ? "#1c1c1c" : "#e6e6e6";
+                ctx.fillRect(x, y, cell, cell);
+            }
+        }
+        const dots = [["#e03131", 24, 30], ["#2f9e44", 70, 60], ["#1971c2", 116, 40], ["#f08c00", 50, 110], ["#9c36b5", 100, 100]];
+        for (const [color, x, y] of dots) { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, 3.5, 0, 7); ctx.fill(); }
+    },
+    photo(ctx, pad) {
+        const g = ctx.createLinearGradient(0, -pad, 0, KEY + pad);
+        g.addColorStop(0, "#2b3a67"); g.addColorStop(0.55, "#e98074"); g.addColorStop(1, "#f7d488");
+        ctx.fillStyle = g; ctx.fillRect(-pad, -pad, KEY + pad * 2, KEY + pad * 2);
+        ctx.fillStyle = "rgba(255,244,214,0.85)"; ctx.beginPath(); ctx.arc(100, 52, 17, 0, 7); ctx.fill();
+        let seed = 12345;
+        const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+        ctx.fillStyle = "rgba(0,0,0,0.07)";
+        for (let i = 0; i < 1400; i++) ctx.fillRect(-pad + rand() * (KEY + pad * 2), -pad + rand() * (KEY + pad * 2), 0.9, 0.9);
+        ctx.fillStyle = "rgba(255,255,255,0.07)";
+        for (let i = 0; i < 1400; i++) ctx.fillRect(-pad + rand() * (KEY + pad * 2), -pad + rand() * (KEY + pad * 2), 0.9, 0.9);
+    },
+    custom(ctx, pad) {
+        if (!customImage) { BG_PAINTERS.album(ctx, pad); return; }
+        const targetSize = KEY + pad * 2;
+        const scale = Math.max(targetSize / customImage.width, targetSize / customImage.height);
+        const w = customImage.width * scale, h = customImage.height * scale;
+        ctx.drawImage(customImage, -pad + (targetSize - w) / 2, -pad + (targetSize - h) / 2, w, h);
+    },
+};
+
+let customImage = null;
+const bgCache = new Map();
+let bgCacheCustomVersion = 0;
+
+function getBackgroundDataUrl(name, pad, density) {
+    const sizeUser = KEY + pad * 2;
+    const sizePx = Math.round(sizeUser * density);
+    const cacheKey = `${name}@${sizePx}@${pad}@${name === "custom" ? bgCacheCustomVersion : 0}`;
+    if (bgCache.has(cacheKey)) return bgCache.get(cacheKey);
+    const canvas = document.createElement("canvas");
+    canvas.width = sizePx; canvas.height = sizePx;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(sizePx / sizeUser, sizePx / sizeUser);
+    ctx.translate(pad, pad);
+    (BG_PAINTERS[name] || BG_PAINTERS.album)(ctx, pad);
+    const url = canvas.toDataURL("image/png");
+    bgCache.set(cacheKey, url);
+    return url;
+}
+
+/* =============== Element map generation =============== */
+const mapCache = new Map();
+
+/* v2 engine: LUT refraction physics remains verbatim, but map pixel generation uses rounded-rect SDF
+   directly on the padded canvas, fixing two measured verbatim defects:
+   1. hard clipping outside the band (feImage resampling interpolates neutral <-> extreme values -> corner artifacts)
+      → analytic 1px feathering (written into RG values; alpha stays 255);
+   2. hard-coded /100 normalization causes broad saturation clipping when maxDisplacement > 100
+      → normalize by true maxDisplacement (scale formula unchanged -> peak displacement matches verbatim
+      clipped peak, while in-band gradients become smooth again).
+   specular uses the same formula (rim 2 user px, coef=dot*sqrt(1-(1-d)^2), alpha=255*coef^2),
+   only switching to SDF distance + AA. */
+function buildV2Maps(el, lut, maxDisplacement, pad, density, ss) {
+    const sizeUser = KEY + pad * 2;
+    const finalPx = Math.round(sizeUser * density);
+    const hiPx = finalPx * ss;
+    const s = hiPx / sizeUser;
+    const disp = new ImageData(hiPx, hiPx);
+    new Uint32Array(disp.data.buffer).fill(0xff008080);
+    const spec = new ImageData(hiPx, hiPx);
+
+    const cx = el.x + el.w / 2, cy = el.y + el.h / 2;
+    const hw = el.w / 2, hh = el.h / 2;
+    const r = Math.min(el.r, hw, hh);
+    const bezel = Math.max(0.5, el.bezel);
+    const ringWidth = Math.max(bezel, 2) + 1;
+    const lightX = Math.cos(Math.PI / 3), lightY = Math.sin(Math.PI / 3);
+    const clamp01 = (v) => Math.min(1, Math.max(0, v));
+    const sampleLut = (t) => {
+        const idx = clamp01(t) * (lut.length - 1);
+        const i0 = Math.floor(idx), frac = idx - i0;
+        return lut[i0] * (1 - frac) + lut[Math.min(lut.length - 1, i0 + 1)] * frac;
+    };
+
+    const px0 = Math.max(0, Math.floor((pad + el.x - 1) * s));
+    const px1 = Math.min(hiPx, Math.ceil((pad + el.x + el.w + 1) * s));
+    const py0 = Math.max(0, Math.floor((pad + el.y - 1) * s));
+    const py1 = Math.min(hiPx, Math.ceil((pad + el.y + el.h + 1) * s));
+
+    for (let py = py0; py < py1; py++) {
+        const uy = (py + 0.5) / s - pad;
+        for (let px = px0; px < px1; px++) {
+            const ux = (px + 0.5) / s - pad;
+            // Interior fast skip (rounded corners only make distEdge smaller, so this check is conservative and safe)
+            const minAxis = Math.min(ux - el.x, el.x + el.w - ux, uy - el.y, el.y + el.h - uy);
+            if (minAxis > ringWidth) continue;
+            // rounded-rect SDF
+            const qx = Math.abs(ux - cx) - (hw - r);
+            const qy = Math.abs(uy - cy) - (hh - r);
+            const ax = Math.max(qx, 0), ay = Math.max(qy, 0);
+            const distEdge = -(Math.hypot(ax, ay) + Math.min(Math.max(qx, qy), 0) - r);
+            if (distEdge < -1 || distEdge > ringWidth) continue;
+            const coverage = clamp01(distEdge * s + 0.5);
+            if (coverage <= 0) continue;
+            // Outer normal (SDF gradient)
+            let nx, ny;
+            if (qx > 0 && qy > 0) {
+                const len = Math.hypot(ax, ay) || 1;
+                nx = (ax / len) * Math.sign(ux - cx);
+                ny = (ay / len) * Math.sign(uy - cy);
+            } else if (qx > qy) { nx = Math.sign(ux - cx); ny = 0; }
+            else { nx = 0; ny = Math.sign(uy - cy); }
+            const i = (py * hiPx + px) * 4;
+
+            if (distEdge <= bezel) {
+                const lutValue = sampleLut(Math.max(0, distEdge) / bezel);
+                // Feather the inner boundary too (convex profiles naturally go to 0; lip/concave need it)
+                const feather = Math.min(coverage, clamp01((bezel - distEdge) * s + 0.5));
+                const dX = (-nx * lutValue) / maxDisplacement;
+                const dY = (-ny * lutValue) / maxDisplacement;
+                disp.data[i] = Math.round(128 + dX * 127 * feather);
+                disp.data[i + 1] = Math.round(128 + dY * 127 * feather);
+                disp.data[i + 2] = 0;
+            }
+            if (distEdge < 2) {
+                const dot = Math.abs(nx * lightX - ny * lightY);
+                const coefficient = dot * Math.sqrt(Math.max(0, 1 - (1 - Math.max(0, distEdge)) ** 2));
+                const color = 255 * coefficient;
+                spec.data[i] = color; spec.data[i + 1] = color; spec.data[i + 2] = color;
+                spec.data[i + 3] = color * coefficient * coverage;
+            }
+        }
+    }
+
+    const toUrl = (imageData) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = hiPx; canvas.height = hiPx;
+        canvas.getContext("2d").putImageData(imageData, 0, 0);
+        if (ss === 1) return canvas.toDataURL("image/png");
+        const outCanvas = document.createElement("canvas");
+        outCanvas.width = finalPx; outCanvas.height = finalPx;
+        const outCtx = outCanvas.getContext("2d");
+        outCtx.imageSmoothingEnabled = true;
+        outCtx.imageSmoothingQuality = "high";
+        outCtx.drawImage(canvas, 0, 0, finalPx, finalPx);
+        return outCanvas.toDataURL("image/png");
+    };
+    return { dispUrl: toUrl(disp), specUrl: toUrl(spec) };
+}
+
+// el: {x,y,w,h,r} + optics parameters. Returns {dispUrl, specUrl, scale}; scale is in user units.
+function makeElementAssets(el, optics, pad, density, smooth, engine) {
+    const cacheKey = JSON.stringify([el, optics, pad, density, smooth, engine]);
+    if (mapCache.has(cacheKey)) return mapCache.get(cacheKey);
+
+    const dpr = density * smooth;
+    const lut = calculateDisplacementMap(
+        optics.thickness, el.bezel, SURFACE_BY_NAME[optics.profile], optics.n);
+    const maxDisplacement = Math.max(...lut.map((v) => Math.abs(v))) || 1;
+
+    if (engine === "v2") {
+        const v2 = buildV2Maps(el, lut, maxDisplacement, pad, density, smooth);
+        const result = {
+            dispUrl: v2.dispUrl, specUrl: v2.specUrl,
+            scale: maxDisplacement * optics.scaleRatio, maxDisplacement,
+        };
+        if (mapCache.size > 16) mapCache.clear();
+        mapCache.set(cacheKey, result);
+        return result;
+    }
+
+    const isPill = el.r >= Math.min(el.w, el.h) / 2 - 0.01;
+    const shape = isPill ? "pill" : "rectangle";
+    const cornerRadius = isPill ? 1.0 : el.r / (Math.min(el.w, el.h) / 2);
+
+    const dispObject = calculateDisplacementMapWithShape(
+        el.w, el.h, el.w, el.h, el.bezel, 100, lut, shape, cornerRadius, 2, dpr);
+    const specObject = calculateRefractionSpecular(el.w, el.h, el.r, el.bezel, undefined, dpr);
+
+    const sizeUser = KEY + pad * 2;
+    const finalPx = Math.round(sizeUser * density);
+    const makePadded = (objectData, neutralCss) => {
+        const hiPx = Math.round(sizeUser * dpr);
+        const canvas = document.createElement("canvas");
+        canvas.width = hiPx; canvas.height = hiPx;
+        const ctx = canvas.getContext("2d");
+        if (neutralCss) { ctx.fillStyle = neutralCss; ctx.fillRect(0, 0, hiPx, hiPx); }
+        const objectCanvas = document.createElement("canvas");
+        objectCanvas.width = objectData.width; objectCanvas.height = objectData.height;
+        objectCanvas.getContext("2d").putImageData(objectData, 0, 0);
+        ctx.drawImage(objectCanvas, Math.round((pad + el.x) * dpr), Math.round((pad + el.y) * dpr));
+        if (smooth > 1) {
+            const outCanvas = document.createElement("canvas");
+            outCanvas.width = finalPx; outCanvas.height = finalPx;
+            const outCtx = outCanvas.getContext("2d");
+            outCtx.imageSmoothingEnabled = true;
+            outCtx.imageSmoothingQuality = "high";
+            outCtx.drawImage(canvas, 0, 0, finalPx, finalPx);
+            return outCanvas.toDataURL("image/png");
+        }
+        return canvas.toDataURL("image/png");
+    };
+
+    const result = {
+        // Neutral color = 0xff008080 (RGBA 128,128,0,255), matching the library neutral value
+        dispUrl: makePadded(dispObject, "rgb(128,128,0)"),
+        specUrl: makePadded(specObject, null),
+        scale: maxDisplacement * optics.scaleRatio,
+        maxDisplacement,
+    };
+    if (mapCache.size > 16) mapCache.clear();
+    mapCache.set(cacheKey, result);
+    return result;
+}
+
+/* ============================= SVG assembly ============================= */
+const fmt = (v) => (Number.isInteger(v) ? String(v) : v.toFixed(2));
+
+// Filter.vue filter chain verbatim (feImage changed to explicit padded regions for safe resvg use)
+function glassFilter(id, assets, optics, pad) {
+    const sizeUser = KEY + pad * 2;
+    const region = `x="${-pad}" y="${-pad}" width="${sizeUser}" height="${sizeUser}"`;
+    return `<filter id="${id}" filterUnits="userSpaceOnUse" ${region} color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="${fmt(optics.blur)}" result="blurred_source"/>
+      <feImage href="${assets.dispUrl}" ${region} result="displacement_map"/>
+      <feDisplacementMap in="blurred_source" in2="displacement_map" scale="${fmt(assets.scale)}"
+          xChannelSelector="R" yChannelSelector="G" result="displaced"/>
+      <feColorMatrix in="displaced" type="saturate" values="${fmt(optics.specSaturation)}" result="displaced_saturated"/>
+      <feImage href="${assets.specUrl}" ${region} result="specular_layer"/>
+      <feComposite in="displaced_saturated" in2="specular_layer" operator="in" result="specular_saturated"/>
+      <feComponentTransfer in="specular_layer" result="specular_faded">
+        <feFuncA type="linear" slope="${fmt(optics.specOpacity)}"/>
+      </feComponentTransfer>
+      <feBlend in="specular_saturated" in2="displaced" mode="normal" result="withSaturation"/>
+      <feBlend in="specular_faded" in2="withSaturation" mode="normal"/>
+    </filter>`;
+}
+
+function buildScene(p) {
+    const keyEl = { x: 0, y: 0, w: KEY, h: KEY, r: p.keyRadius, bezel: p.keyBezel };
+    const barEl = {
+        x: (KEY - p.barWidth) / 2, y: Math.min(p.barY, KEY - p.barHeight - 2),
+        w: p.barWidth, h: p.barHeight,
+        r: Math.min(p.barRadius, p.barHeight / 2, p.barWidth / 2), bezel: p.barBezel,
+    };
+    const keyOptics = {
+        thickness: p.keyThickness, n: p.keyN, profile: p.keyProfile, blur: p.keyBlur,
+        scaleRatio: p.keyScaleRatio, specOpacity: p.keySpecOpacity, specSaturation: p.keySpecSaturation,
+    };
+    // Glass overlay compositing: in Vue, when the thumb sits on the bar, the thumb backdrop samples
+    // the already-filtered bar image. In the static version the bar samples the original background, so key blur
+    // is composed into the bar (Gaussian convolution is additive: sigma_eff = sqrt(sigma_k^2 + sigma_b^2)); key tint is
+    // laid again inside the bar region by buildSvg. Displacement is not composed (the key displacement band is only at the key edge, while the bar is inside).
+    const barEffectiveBlur = p.keyGlass ? Math.hypot(p.keyBlur, p.barBlur) : p.barBlur;
+    const barOptics = {
+        thickness: p.barThickness, n: p.barN, profile: p.barProfile, blur: barEffectiveBlur,
+        scaleRatio: p.barScaleRatio, specOpacity: p.barSpecOpacity, specSaturation: p.barSpecSaturation,
+    };
+    const probe = (el, optics) => {
+        const lut = calculateDisplacementMap(optics.thickness, el.bezel, SURFACE_BY_NAME[optics.profile], optics.n);
+        return (Math.max(...lut.map((v) => Math.abs(v))) || 1) * Math.abs(optics.scaleRatio);
+    };
+    const maxScaleAbs = Math.max(
+        p.keyGlass ? probe(keyEl, keyOptics) : 0,
+        p.bar ? probe(barEl, barOptics) : 0);
+    const maxBlur = Math.max(p.keyGlass ? p.keyBlur : 0, p.bar ? barEffectiveBlur : 0);
+    const pad = Math.min(48, Math.max(8, Math.ceil(3 * maxBlur + 0.5 * maxScaleAbs + 4)));
+    return { keyEl, barEl, keyOptics, barOptics, pad };
+}
+
+function buildSvg(p) {
+    const { keyEl, barEl, keyOptics, barOptics, pad } = buildScene(p);
+    const density = p.outputScale;
+    const sizeUser = KEY + pad * 2;
+    const bgUrl = getBackgroundDataUrl(p.background, pad, density);
+    const keyAssets = p.keyGlass ? makeElementAssets(keyEl, keyOptics, pad, density, p.mapSmooth, p.mapEngine) : null;
+    const barAssets = p.bar ? makeElementAssets(barEl, barOptics, pad, density, p.mapSmooth, p.mapEngine) : null;
+
+    const bgImageAttrs = `href="${bgUrl}" x="${-pad}" y="${-pad}" width="${sizeUser}" height="${sizeUser}"`;
+    const defs = [];
+    const body = [];
+
+    defs.push(`<clipPath id="keyClip"><rect x="0" y="0" width="${KEY}" height="${KEY}" rx="${fmt(keyEl.r)}"/></clipPath>`);
+    body.push(`<image ${bgImageAttrs}/>`);
+
+    if (keyAssets) {
+        defs.push(glassFilter("glassKey", keyAssets, keyOptics, pad));
+        body.push(`<image ${bgImageAttrs} filter="url(#glassKey)"/>`);
+    }
+    if (p.keyTintOpacity > 0) {
+        body.push(`<rect x="0" y="0" width="${KEY}" height="${KEY}" rx="${fmt(keyEl.r)}" fill="${p.tintColor}" fill-opacity="${fmt(p.keyTintOpacity)}"/>`);
+    }
+
+    if (p.bar) {
+        const b = barEl;
+        defs.push(`<clipPath id="barClip"><rect x="${fmt(b.x)}" y="${fmt(b.y)}" width="${fmt(b.w)}" height="${fmt(b.h)}" rx="${fmt(b.r)}"/></clipPath>`);
+        if (p.shadowOpacity > 0) {
+            defs.push(`<filter id="shadowBlur" filterUnits="userSpaceOnUse"
+                x="${fmt(b.x - 3 * p.shadowBlur - 6)}" y="${fmt(b.y - 3 * p.shadowBlur - 6)}"
+                width="${fmt(b.w + 6 * p.shadowBlur + 12)}" height="${fmt(b.h + 6 * p.shadowBlur + 12 + p.shadowOffsetY)}"
+                color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="${fmt(p.shadowBlur)}"/></filter>`);
+            body.push(`<rect x="${fmt(b.x)}" y="${fmt(b.y + p.shadowOffsetY)}" width="${fmt(b.w)}" height="${fmt(b.h)}" rx="${fmt(b.r)}"
+                fill="#000000" fill-opacity="${fmt(p.shadowOpacity)}" filter="url(#shadowBlur)"/>`);
+        }
+        defs.push(glassFilter("glassBar", barAssets, barOptics, pad));
+        const barRectAttrs = `x="${fmt(b.x)}" y="${fmt(b.y)}" width="${fmt(b.w)}" height="${fmt(b.h)}" rx="${fmt(b.r)}"`;
+        // Draw key tint first (simulate the tinted image seen through key glass by the bar), then draw bar tint
+        body.push(`<g clip-path="url(#barClip)">
+          <image ${bgImageAttrs} filter="url(#glassBar)"/>
+          ${p.keyGlass && p.keyTintOpacity > 0 ? `<rect ${barRectAttrs} fill="${p.tintColor}" fill-opacity="${fmt(p.keyTintOpacity)}"/>` : ""}
+          ${p.barTintOpacity > 0 ? `<rect ${barRectAttrs} fill="${p.tintColor}" fill-opacity="${fmt(p.barTintOpacity)}"/>` : ""}
+        </g>`);
+        if (p.barContent) {
+            const art = b.h - 12;
+            defs.push(`<linearGradient id="albumArt" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#7ee0e6"/><stop offset="1" stop-color="#e87aa4"/></linearGradient>`);
+            body.push(`<g>
+              <rect x="${fmt(b.x + 7)}" y="${fmt(b.y + 6)}" width="${fmt(art)}" height="${fmt(art)}" rx="5" fill="url(#albumArt)"/>
+              <rect x="${fmt(b.x + art + 14)}" y="${fmt(b.y + b.h * 0.32)}" width="${fmt(b.w * 0.34)}" height="3.4" rx="1.7" fill="#ffffff" fill-opacity="0.92"/>
+              <rect x="${fmt(b.x + art + 14)}" y="${fmt(b.y + b.h * 0.56)}" width="${fmt(b.w * 0.24)}" height="3" rx="1.5" fill="#ffffff" fill-opacity="0.55"/>
+              <path d="M ${fmt(b.x + b.w - 19)} ${fmt(b.y + b.h / 2 - 5.5)} l 9.5 5.5 l -9.5 5.5 z" fill="#ffffff" fill-opacity="0.92"/>
+            </g>`);
+        }
+    }
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${KEY}" height="${KEY}" viewBox="0 0 ${KEY} ${KEY}">
+<defs>
+${defs.join("\n")}
+</defs>
+<g clip-path="url(#keyClip)">
+${body.join("\n")}
+</g>
+</svg>`;
+    return {
+        svg, keyEl, barEl, pad,
+        scaleKey: keyAssets?.scale ?? 0, scaleBar: barAssets?.scale ?? 0,
+    };
+}
+
+/* ============================= resvg-wasm loading ============================= */
+let resvgWasm = null;
+async function loadResvgWasm() {
+    const attempts = [
+        [`https://cdn.jsdelivr.net/npm/@resvg/resvg-wasm@${RESVG_VERSION}/+esm`,
+         `https://cdn.jsdelivr.net/npm/@resvg/resvg-wasm@${RESVG_VERSION}/index_bg.wasm`],
+        [`https://esm.sh/@resvg/resvg-wasm@${RESVG_VERSION}`,
+         `https://unpkg.com/@resvg/resvg-wasm@${RESVG_VERSION}/index_bg.wasm`],
+    ];
+    for (const [moduleUrl, wasmUrl] of attempts) {
+        try {
+            const mod = await import(moduleUrl);
+            await mod.initWasm(fetch(wasmUrl));
+            return mod;
+        } catch (err) {
+            console.warn("resvg-wasm load failed:", moduleUrl, err);
+        }
+    }
+    return null;
+}
+
+/* ============================= UI and render scheduling ============================= */
+const statusEl = document.getElementById("status");
+const renderInfoEl = document.getElementById("renderInfo");
+const browserPreviewEl = document.getElementById("browserPreview");
+const resvgImgEl = document.getElementById("resvgImg");
+const loupeKeyCtx = document.getElementById("loupeKey").getContext("2d");
+const loupeBarCtx = document.getElementById("loupeBar").getContext("2d");
+const valueLabels = new Map();
+let displayZoom = 1;
+
+function buildControls() {
+    const root = document.getElementById("controls");
+    for (const group of CONTROL_GROUPS) {
+        const details = document.createElement("details");
+        details.open = true;
+        details.innerHTML = `<summary>${group.title}</summary>`;
+        for (const ctl of group.controls) {
+            const row = document.createElement("div");
+            row.className = "ctl";
+            const label = document.createElement("label");
+            label.textContent = ctl.label;
+            label.title = ctl.key;
+            row.appendChild(label);
+            if (ctl.type === "check") {
+                const input = document.createElement("input");
+                input.type = "checkbox"; input.checked = params[ctl.key];
+                valueLabels.set(ctl.key, { input });
+                input.addEventListener("change", () => { params[ctl.key] = input.checked; scheduleRender(); });
+                row.append(input, document.createElement("span"));
+            } else if (ctl.type === "select") {
+                const select = document.createElement("select");
+                for (const [value, text] of ctl.options) {
+                    const option = document.createElement("option");
+                    option.value = value; option.textContent = text;
+                    select.appendChild(option);
+                }
+                select.value = params[ctl.key];
+                valueLabels.set(ctl.key, { input: select });
+                select.addEventListener("change", () => { params[ctl.key] = select.value; scheduleRender(); });
+                row.append(select);
+            } else if (ctl.type === "color") {
+                const input = document.createElement("input");
+                input.type = "color"; input.value = params[ctl.key];
+                valueLabels.set(ctl.key, { input });
+                input.addEventListener("input", () => { params[ctl.key] = input.value; scheduleRender(); });
+                row.append(input);
+            } else {
+                const input = document.createElement("input");
+                input.type = "range"; input.min = ctl.min; input.max = ctl.max; input.step = ctl.step;
+                input.value = params[ctl.key];
+                const val = document.createElement("span");
+                val.className = "val"; val.textContent = params[ctl.key];
+                valueLabels.set(ctl.key, { input, val });
+                input.addEventListener("input", () => {
+                    params[ctl.key] = Number(input.value);
+                    val.textContent = input.value;
+                    scheduleRender();
+                });
+                row.append(input, val);
+            }
+            details.appendChild(row);
+        }
+        root.appendChild(details);
+    }
+}
+
+function syncControlsFromParams() {
+    for (const [key, { input, val }] of valueLabels) {
+        if (input.type === "checkbox") input.checked = params[key];
+        else input.value = params[key];
+        if (val) val.textContent = params[key];
+    }
+}
+
+let renderTimer = 0;
+let renderToken = 0;
+let lastSvg = "";
+let lastPngBlob = null;
+
+function scheduleRender() {
+    clearTimeout(renderTimer);
+    renderTimer = setTimeout(renderAll, 100);
+}
+
+async function renderAll() {
+    const token = ++renderToken;
+    const t0 = performance.now();
+    let built;
+    try {
+        built = buildSvg(params);
+    } catch (err) {
+        statusEl.textContent = `SVG build failed: ${err.message}`;
+        statusEl.className = "err";
+        return;
+    }
+    lastSvg = built.svg;
+    window.__lastSvg = built.svg; // for external tools (Playwright verification) to read
+    browserPreviewEl.innerHTML = built.svg;
+    const buildMs = performance.now() - t0;
+
+    let info = `pad ${built.pad} · scale key ${built.scaleKey.toFixed(1)} / bar ${built.scaleBar.toFixed(1)} · build ${buildMs.toFixed(0)}ms`;
+    if (!resvgWasm) { renderInfoEl.textContent = info; window.__renderDone = true; return; }
+
+    try {
+        const t1 = performance.now();
+        const outputWidth = KEY * params.outputScale;
+        const renderer = new resvgWasm.Resvg(built.svg, { fitTo: { mode: "width", value: outputWidth } });
+        const rendered = renderer.render();
+        const pngBytes = rendered.asPng();
+        const wasmMs = performance.now() - t1;
+        if (token !== renderToken) return;
+        lastPngBlob = new Blob([pngBytes], { type: "image/png" });
+        const url = URL.createObjectURL(lastPngBlob);
+        const previous = resvgImgEl.dataset.url;
+        resvgImgEl.src = url;
+        resvgImgEl.dataset.url = url;
+        // Display at integer scale to avoid fractional-resampling artifacts
+        resvgImgEl.style.width = `${outputWidth * displayZoom}px`;
+        resvgImgEl.classList.toggle("zoomed", displayZoom > 1);
+        if (previous) URL.revokeObjectURL(previous);
+        info += ` · resvg ${wasmMs.toFixed(0)}ms · output ${outputWidth}×${outputWidth}`;
+        const bitmap = await createImageBitmap(lastPngBlob);
+        if (token === renderToken) drawLoupes(bitmap, built, outputWidth / KEY);
+    } catch (err) {
+        statusEl.textContent = `resvg render failed: ${err}`;
+        statusEl.className = "err";
+    }
+    renderInfoEl.textContent = info;
+    window.__renderDone = true;
+}
+
+function drawLoupes(bitmap, built, pngScale) {
+    const draw = (ctx, ux, uy, uw) => {
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, 216, 216);
+        const sx = Math.max(0, ux * pngScale), sy = Math.max(0, uy * pngScale);
+        ctx.drawImage(bitmap, sx, sy, uw * pngScale, uw * pngScale, 0, 0, 216, 216);
+    };
+    draw(loupeKeyCtx, 0, 0, Math.max(28, built.keyEl.r + 14));
+    const b = built.barEl;
+    draw(loupeBarCtx, b.x - 6, b.y - 6, Math.max(30, b.r + 16));
+}
+
+/* ============================= Toolbar ============================= */
+function setupToolbar() {
+    const presetSelect = document.getElementById("presetSelect");
+    for (const [key, preset] of Object.entries(PRESETS)) {
+        const option = document.createElement("option");
+        option.value = key; option.textContent = preset.label;
+        presetSelect.appendChild(option);
+    }
+    presetSelect.addEventListener("change", () => {
+        Object.assign(params, DEFAULTS, PRESETS[presetSelect.value].overrides);
+        syncControlsFromParams();
+        scheduleRender();
+    });
+    document.getElementById("zoomSelect").addEventListener("change", (event) => {
+        displayZoom = Number(event.target.value);
+        const outputWidth = KEY * params.outputScale;
+        resvgImgEl.style.width = `${outputWidth * displayZoom}px`;
+        resvgImgEl.classList.toggle("zoomed", displayZoom > 1);
+    });
+    document.getElementById("btnCopySvg").addEventListener("click", () => {
+        navigator.clipboard.writeText(lastSvg);
+    });
+    document.getElementById("btnDownloadSvg").addEventListener("click", () => {
+        downloadBlob(new Blob([lastSvg], { type: "image/svg+xml" }), "liquid-glass.svg");
+    });
+    document.getElementById("btnDownloadPng").addEventListener("click", () => {
+        if (lastPngBlob) downloadBlob(lastPngBlob, "liquid-glass-resvg.png");
+    });
+    document.getElementById("btnCopyJson").addEventListener("click", () => {
+        navigator.clipboard.writeText(JSON.stringify(params, null, 2));
+    });
+    document.getElementById("bgUpload").addEventListener("change", (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            const image = new Image();
+            image.onload = () => {
+                customImage = image;
+                bgCacheCustomVersion++;
+                params.background = "custom";
+                syncControlsFromParams();
+                scheduleRender();
+            };
+            image.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function downloadBlob(blob, filename) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+/* ============================= Startup ============================= */
+buildControls();
+setupToolbar();
+renderAll();
+
+// External driver hook (for Playwright verification)
+window.__setParams = (patch) => {
+    Object.assign(params, patch);
+    syncControlsFromParams();
+    window.__renderDone = false;
+    renderAll();
+};
+
+loadResvgWasm().then((mod) => {
+    resvgWasm = mod;
+    if (mod) {
+        statusEl.textContent = `resvg-wasm ${RESVG_VERSION} loaded (same version as hub resvg-js)`;
+        statusEl.className = "";
+        renderAll();
+    } else {
+        statusEl.textContent = "resvg-wasm failed to load (offline?) - resvg pane unavailable; use Download SVG and verify with render-liquid-glass.mjs";
+        statusEl.className = "err";
+    }
+});
+</script>
+</body>
+</html>
+
