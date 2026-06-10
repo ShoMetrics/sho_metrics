@@ -9,7 +9,7 @@ import {
 import type { DiskVolumeOption } from "../../runtime/disk-volumes";
 import type { WidgetRuntimeCachePatch } from "../../runtime/widget-runtime-cache";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
-import { writeStoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
+import { writeStoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
 import type { PropertyInspectorRuntimeCacheStatus } from "../inspector/types";
 import { buildVisibilityContext, type InspectorTestSettings } from "../testing/test-context";
 

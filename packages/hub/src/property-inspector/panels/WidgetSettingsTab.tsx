@@ -3,7 +3,7 @@ import { InspectorItem } from "../components/InspectorItem";
 import { commonMessages } from "../../i18n/message-groups/shell";
 import { widgetMessages } from "../../i18n/message-groups/widgets";
 import { useI18n } from "../../i18n/react";
-import type { StoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
+import type { StoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
 import type { VisibilityContext } from "../inspector/types";
 import type { ColorCompensationProfile } from "../../color-compensation/types";
 import { ColorCompensationControls } from "./ColorCompensationControls";

@@ -9,7 +9,7 @@ import {
     BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID,
 } from "../../runtime/sources/source-ids";
 import type { ResolvedMetricSourcePolicy } from "../../settings/resolved-settings";
-import type { StoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
+import type { StoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
 
 type LocalMetricSourcePreference = "auto" | "windows-helper" | "node-system" | "custom";
 

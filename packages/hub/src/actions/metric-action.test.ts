@@ -1,4 +1,4 @@
-﻿import assert from "node:assert/strict";
+import assert from "node:assert/strict";
 import test from "node:test";
 import type {
     DidReceiveSettingsEvent,
@@ -20,7 +20,7 @@ import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import { requireResolvedSingleMetricWidget } from "../settings/resolved-settings";
 import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
 import { writeStoredGlobalSettingsPatch } from "../settings/storage/global-settings-patch";
-import { writeStoredWidgetSettingsPatch } from "../settings/storage/widget-settings-patch";
+import { writeStoredWidgetSettingsPatch } from "../settings/storage/patch/widget-settings-patch";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 import {
     buildColorCompensationPreviewMessage,

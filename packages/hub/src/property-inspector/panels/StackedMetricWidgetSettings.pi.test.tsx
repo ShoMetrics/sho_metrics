@@ -12,7 +12,7 @@ import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/qu
 import {
     writeStoredWidgetSettingsPatch,
     type StoredWidgetSettingsPatch,
-} from "../../settings/storage/widget-settings-patch";
+} from "../../settings/storage/patch/widget-settings-patch";
 import { buildVisibilityContext, type InspectorTestSettings } from "../testing/test-context";
 import { WidgetSettingsTab } from "./WidgetSettingsTab";
 

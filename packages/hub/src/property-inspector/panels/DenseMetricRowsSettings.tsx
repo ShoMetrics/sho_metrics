@@ -12,7 +12,7 @@ import { resolveDefaultDiskVolumeOption } from "../../runtime/disk-volumes";
 import type { MetricDescriptor, SourceClientStatus } from "../../runtime/sources/source-client";
 import type { ResolvedCpuReading, ResolvedDenseMetricSlot, ResolvedDenseMultiMetricWidget, ResolvedDiskMetricTarget, ResolvedGpuReading, ResolvedMetricTarget, ResolvedNetworkReading } from "../../settings/resolved-settings";
 import { DENSE_MULTI_METRIC_MAX_SLOT_COUNT, DENSE_MULTI_METRIC_MIN_SLOT_COUNT } from "../../settings/storage/dense-multi-metric-constraints";
-import type { DenseMetricTargetPatch, StoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
+import type { DenseMetricTargetPatch, StoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
 import { SelectSetting } from "../controls/SelectSetting";
 import { TextSetting } from "../controls/TextSetting";
 import type { SelectOption } from "../inspector/types";

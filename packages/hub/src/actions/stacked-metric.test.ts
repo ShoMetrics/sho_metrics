@@ -21,7 +21,7 @@ import { diskVolumeRegistry, type DiskVolumeOption } from "../runtime/disk-volum
 import { networkInterfaceRegistry, type NetworkInterfaceOption } from "../runtime/network-interfaces";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
 import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
-import { writeStoredWidgetSettingsPatch } from "../settings/storage/widget-settings-patch";
+import { writeStoredWidgetSettingsPatch } from "../settings/storage/patch/widget-settings-patch";
 import {
     CPU_MODEL_METRIC_KEY,
     CPU_USAGE_METRIC_KEY,

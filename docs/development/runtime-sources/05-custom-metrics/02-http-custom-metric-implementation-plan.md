@@ -329,7 +329,10 @@ Locations:
 - `packages/hub/src/settings/resolved-settings.ts`
 - `packages/hub/src/settings/storage/resolver/metric-target-resolver.ts`
 - `packages/hub/src/settings/storage/resolver/widget-settings-resolver.ts`
-- `packages/hub/src/settings/storage/widget-settings-patch.ts`
+- `packages/hub/src/settings/storage/patch/widget-settings-patch.ts`
+- `packages/hub/src/settings/storage/patch/widget-settings-patch-types.ts`
+- `packages/hub/src/settings/storage/patch/metric-target-settings-patch.ts`
+- `packages/hub/src/settings/storage/patch/appearance-settings-patch.ts`
 - `packages/hub/src/settings/storage/widget-settings-patch.test.ts`
 - `packages/hub/src/settings/storage/quick-start-widget-settings.ts`
 - `packages/hub/src/settings/storage/quick-start-widget-settings.test.ts`
@@ -681,7 +684,9 @@ Locations:
 - `packages/hub/src/property-inspector/panels/DenseMetricRowsSettings.tsx`
 - `packages/hub/src/property-inspector/panels/StackedMetricWidgetSettings.tsx`
 - `packages/hub/src/property-inspector/panels/SingleMetricWidgetSettings.tsx`
-- `packages/hub/src/settings/storage/widget-settings-patch.ts`
+- `packages/hub/src/settings/storage/patch/widget-settings-patch.ts`
+- `packages/hub/src/settings/storage/patch/widget-settings-patch-types.ts`
+- `packages/hub/src/settings/storage/patch/metric-target-settings-patch.ts`
 - `packages/hub/src/settings/storage/widget-settings-patch.test.ts`
 - `packages/hub/src/actions/dense-multi-metric.test.ts`
 - `packages/hub/src/actions/stacked-metric.test.ts`

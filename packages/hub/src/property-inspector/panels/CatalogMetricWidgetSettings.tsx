@@ -24,7 +24,7 @@ import {
 } from "../../metrics/catalog-metric-scale";
 import type { MetricDescriptor, SourceClientStatus } from "../../runtime/sources/source-client";
 import type { ResolvedCatalogMetricTarget, ScaleMode } from "../../settings/resolved-settings";
-import type { StoredWidgetSettingsPatch } from "../../settings/storage/widget-settings-patch";
+import type { StoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
 import { StandardColorSettings } from "./ColorSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { PollingSettings } from "./PollingSettings";
