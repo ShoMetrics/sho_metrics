@@ -9,6 +9,10 @@
 		"Name": "CPU",
 		"Tooltip": "显示 CPU 指标。"
 	},
+	"com.ez.sho-metrics.custom-metric": {
+		"Name": "自定义指标",
+		"Tooltip": "显示来自自定义来源的指标，例如 HTTP JSON。"
+	},
 	"com.ez.sho-metrics.dense-multi-metric": {
 		"Name": "密集多指标",
 		"Tooltip": "在一个紧凑视图中显示多个指标。"

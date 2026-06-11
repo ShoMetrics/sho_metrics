@@ -233,6 +233,12 @@ function buildValueAttribution(
     return {
         metricId: metricKey,
         valueFreshness: "fresh",
+        displayHint: {
+            label: output.label,
+            unit: output.unit,
+            ...(output.customUnit === undefined ? {} : { customUnit: output.customUnit }),
+            ...(output.maximum === undefined ? {} : { maximum: output.maximum }),
+        },
         rawSensorIdentity: {
             sourceSensorId: metricKey,
             hardwareId: "custom-http",

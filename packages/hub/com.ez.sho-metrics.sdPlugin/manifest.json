@@ -145,6 +145,29 @@
 			]
 		},
 		{
+			"Name": "Custom Metric",
+			"UUID": "com.ez.sho-metrics.custom-metric",
+			"Icon": "imgs/actions/custom-metric/icon",
+			"Tooltip": "Displays a metric from a custom source, such as HTTP JSON.",
+			"PropertyInspectorPath": "ui/property-inspector.html",
+			"Controllers": [
+				"Keypad",
+				"Encoder"
+			],
+			"Encoder": {
+				"Icon": "imgs/actions/sho-metrics/icon",
+				"layout": "$B1"
+			},
+			"UserTitleEnabled": false,
+			"States": [
+				{
+					"Image": "imgs/actions/sho-metrics/key",
+					"ShowTitle": false,
+					"TitleAlignment": "middle"
+				}
+			]
+		},
+		{
 			"Name": "Dense Multi Metric",
 			"UUID": "com.ez.sho-metrics.dense-multi-metric",
 			"Icon": "imgs/actions/dense-multi-metric/icon",

@@ -9,6 +9,10 @@
 		"Name": "CPU",
 		"Tooltip": "Displays CPU metrics."
 	},
+	"com.ez.sho-metrics.custom-metric": {
+		"Name": "Custom Metric",
+		"Tooltip": "Displays a metric from a custom source, such as HTTP JSON."
+	},
 	"com.ez.sho-metrics.dense-multi-metric": {
 		"Name": "Dense Multi Metric",
 		"Tooltip": "Displays multiple metrics in one compact view."

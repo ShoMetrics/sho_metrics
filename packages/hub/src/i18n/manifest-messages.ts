@@ -86,6 +86,18 @@ export const manifestMessages = {
                 ja: "LibreHardwareMonitor データなど、選択したメトリクスを 1 つ表示します。",
             },
         },
+        "com.ez.sho-metrics.custom-metric": {
+            name: {
+                en: "Custom Metric",
+                zh_CN: "自定义指标",
+                ja: "カスタムメトリクス",
+            },
+            tooltip: {
+                en: "Displays a metric from a custom source, such as HTTP JSON.",
+                zh_CN: "显示来自自定义来源的指标，例如 HTTP JSON。",
+                ja: "HTTP JSON など、カスタムソースのメトリクスを表示します。",
+            },
+        },
         "com.ez.sho-metrics.dense-multi-metric": {
             name: {
                 en: "Dense Multi Metric",

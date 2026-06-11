@@ -595,6 +595,8 @@ Locations:
 - `packages/hub/src/plugin.ts`
 - `packages/hub/src/shared/stream-deck-actions.ts`
 - `packages/hub/src/actions/settings/action-settings-resolver.ts`
+- `packages/hub/src/runtime/sources/source-client.ts`
+- `packages/hub/src/runtime/sources/custom-http/custom-http-source-client.ts`
 - `packages/hub/src/metrics/` or an action-owned builder if no shared metric
   helper is needed
 - `packages/hub/src/view-updates/runner.ts` only if required by existing
@@ -624,6 +626,9 @@ Required work:
    - progress when maximum or an existing semantic default is available.
    This adaptation belongs to the action/metric layer, not the Custom HTTP
    source client.
+   If MetricStore attribution is the transport for label/unit/maximum hints,
+   keep those fields as source metadata only; the source client must still not
+   build renderer-facing `WidgetData`.
 9. Preserve the existing single-metric appearance/view behavior.
 10. Render:
    - `Configure` for unconfigured;

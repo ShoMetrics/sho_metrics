@@ -106,6 +106,7 @@ export abstract class MetricAction extends SingletonAction {
                 log.error(() => `Failed to persist quick-start widget settings: ${String(error)}`);
             });
         }
+        this.onResolvedSettingsChanged(event, initialSettings.resolvedSettings);
         this.refreshSubscription(activeActionState);
         this.refreshMetricView(event);
     }
@@ -137,6 +138,7 @@ export abstract class MetricAction extends SingletonAction {
                     log.error(() => `Failed to persist quick-start widget settings: ${String(error)}`);
                 });
             }
+            this.onResolvedSettingsChanged(activeActionState.event, nextSettings);
             this.refreshSubscription(activeActionState);
             // Force an immediate update for snappy UI feedback.
             this.refreshMetricView(activeActionState.event);
@@ -144,6 +146,7 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     override onWillDisappear(event: WillDisappearEvent): void {
+        this.onActionWillDisappear(event);
         this.metricCollectionBindings.get(event.action.id)?.dispose();
         this.metricCollectionBindings.delete(event.action.id);
         this.activeActionStates.delete(event.action.id);
@@ -187,6 +190,22 @@ export abstract class MetricAction extends SingletonAction {
     protected abstract onMetricsUpdate(event: WillAppearEvent): void;
 
     protected abstract getMetricKeys(event: WillAppearEvent): readonly string[];
+
+    /**
+     * Runs after stored settings resolve but before subscriptions refresh.
+     *
+     * Source-backed subclasses use this hook to publish runtime-only metadata
+     * that read plans need without teaching MetricAction about the source.
+     */
+    protected onResolvedSettingsChanged(event: WillAppearEvent, settings: ResolvedWidgetSettings): void {
+        void event;
+        void settings;
+    }
+
+    /** Runs before MetricAction removes per-action runtime state. */
+    protected onActionWillDisappear(event: WillDisappearEvent): void {
+        void event;
+    }
 
     /**
      * Returns the primary metric used for PI source diagnostics.
