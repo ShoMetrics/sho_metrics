@@ -121,10 +121,14 @@ function normalizeLogLevel(value) {
  * @type {import('rollup').RollupOptions}
  */
 const pluginConfig = {
-    input: "src/plugin.ts",
+    input: {
+        plugin: "src/plugin.ts",
+        "custom-http-transform-worker": "src/runtime/sources/custom-http/custom-http-transform-worker-thread.ts",
+    },
     external: ["@resvg/resvg-js"],
     output: {
-        file: `${sdPlugin}/bin/plugin.js`,
+        dir: `${sdPlugin}/bin`,
+        entryFileNames: "[name].js",
         sourcemap: isWatching,
         sourcemapPathTransform: (relativeSourcePath, sourcemapPath) => {
             return url.pathToFileURL(path.resolve(path.dirname(sourcemapPath), relativeSourcePath)).href;

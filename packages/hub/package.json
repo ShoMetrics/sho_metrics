@@ -55,7 +55,6 @@
         "c8": "^11.0.0",
         "eslint": "^9.39.4",
         "globals": "^17.5.0",
-        "jq-wasm": "1.1.0-jq-1.8.1",
         "jsdom": "^29.1.1",
         "jsonata": "2.0.6",
         "rollup": "^4.0.2",
@@ -72,11 +71,13 @@
         "@types/d3-shape": "^3.1.8",
         "d3-shape": "^3.2.0",
         "fast-equals": "^6.0.0",
+        "jq-wasm": "1.1.0-jq-1.8.1",
         "lru-cache": "^11.3.6",
         "lucide": "^1.11.0",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
         "systeminformation": "^5.31.5",
-        "validator": "13.15.35"
+        "validator": "13.15.35",
+        "workerpool": "10.0.2"
     }
 }
