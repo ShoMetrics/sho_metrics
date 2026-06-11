@@ -50,6 +50,11 @@ test("CustomHttpSourceClient reads configured definitions into metric snapshots"
     assert.deepEqual(result.valueAttributions, [{
         metricId: identity.metricKey,
         valueFreshness: "fresh",
+        displayHint: {
+            label: "CPU",
+            unit: MetricUnit.PERCENT,
+            maximum: 100,
+        },
         rawSensorIdentity: {
             sourceSensorId: identity.metricKey,
             hardwareId: "custom-http",

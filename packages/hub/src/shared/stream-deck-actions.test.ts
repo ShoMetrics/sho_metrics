@@ -137,6 +137,18 @@ test("Stacked Metric action uses a dedicated file stack icon", () => {
     assert.match(iconSvg, /Lucide Files, ISC License/u);
 });
 
+test("Custom Metric action uses a dedicated braces icon", () => {
+    const manifest = readManifest();
+    const customMetricAction = (manifest.Actions ?? [])
+        .find(action => action.UUID === STREAM_DECK_ACTION_UUID_BY_KIND.customMetric);
+
+    assert.equal(customMetricAction?.Icon, "imgs/actions/custom-metric/icon");
+    assertAssetReferenceExists(customMetricAction?.Icon, "Custom Metric Icon");
+
+    const iconSvg = readFileSync(`${SD_PLUGIN_ROOT}/imgs/actions/custom-metric/icon.svg`, "utf8");
+    assert.match(iconSvg, /Lucide Braces, ISC License/u);
+});
+
 test("old reading-level action names do not remain in source or manifest files", () => {
     const forbiddenActionUuids = [
         `${STREAM_DECK_PLUGIN_UUID}.cpu-usage`,

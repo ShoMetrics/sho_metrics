@@ -51,12 +51,10 @@ export interface QuickStartStoredWidgetSettingsOptions {
     readonly createSlotId?: SlotIdGenerator;
 }
 
-export type QuickStartActionKind = ActionKind | "customMetric";
-
 /** Resolves existing settings or creates the action's first stored widget settings. */
 export function resolveQuickStartStoredWidgetSettings(
     rawSettings: unknown,
-    actionKind: QuickStartActionKind,
+    actionKind: ActionKind,
     options: QuickStartStoredWidgetSettingsOptions = {},
 ): QuickStartStoredWidgetSettings {
     const quickStartWidget = buildQuickStartWidget(actionKind);
@@ -126,7 +124,7 @@ type QuickStartWidget =
         readonly metrics: readonly QuickStartMetric[];
     };
 
-function buildQuickStartWidget(actionKind: QuickStartActionKind): QuickStartWidget | null {
+function buildQuickStartWidget(actionKind: ActionKind): QuickStartWidget | null {
     switch (actionKind) {
         case "cpu":
             return {

@@ -9,6 +9,7 @@ import {
 import type {
     MetricSnapshot,
     MetricSource,
+    MetricUnit,
 } from "./metric-source";
 import type { SourceMetricPollingGroupResolver } from "./source-polling-groups";
 import type { SourceMetadataInvalidationListener } from "./source-planning-metadata";
@@ -50,6 +51,21 @@ export type RawSensorIdentity = RuntimeProtoPayload<ProtoRawSensorIdentity>;
 
 /** Runtime freshness state after source adapter enum compatibility handling. */
 export type MetricValueFreshness = "fresh" | "retained";
+
+/** Source-owned display hints that cannot be represented by MetricSnapshot. */
+export interface MetricValueDisplayHint {
+    /** Short label that should travel with dynamic source-selected metrics. */
+    readonly label?: string;
+
+    /** Semantic unit used by action-owned render adapters. */
+    readonly unit?: MetricUnit;
+
+    /** Short custom unit text when the semantic unit is source-specific. */
+    readonly customUnit?: string;
+
+    /** Optional positive maximum for progress widgets. */
+    readonly maximum?: number;
+}
 
 /** Runtime unavailable reason after source adapter enum compatibility handling. */
 export type MetricUnavailableReason =
@@ -174,7 +190,10 @@ export function isInvalidSourceRefreshDemandError(error: unknown): boolean {
 /** Source-owned attribution for a metric value included in a snapshot. */
 export type MetricValueAttribution = Readonly<
     Omit<RuntimeProtoPayloadWithOptionalRawSensor<ProtoMetricValueAttribution>, "valueFreshness">
-    & { readonly valueFreshness: MetricValueFreshness }
+    & {
+        readonly valueFreshness: MetricValueFreshness;
+        readonly displayHint?: MetricValueDisplayHint;
+    }
 >;
 
 /** Source-reported reason for a requested metric omitted from a snapshot. */

@@ -4,6 +4,7 @@ export type ActionKind =
     | "memory"
     | "disk"
     | "catalog"
+    | "customMetric"
     | "denseMultiMetric"
     | "stackedMetric"
     | "network"
@@ -20,6 +21,7 @@ export const STREAM_DECK_ACTION_UUID_BY_KIND = {
     memory: `${STREAM_DECK_PLUGIN_UUID}.memory`,
     disk: `${STREAM_DECK_PLUGIN_UUID}.disk`,
     catalog: `${STREAM_DECK_PLUGIN_UUID}.catalog-metric`,
+    customMetric: `${STREAM_DECK_PLUGIN_UUID}.custom-metric`,
     denseMultiMetric: `${STREAM_DECK_PLUGIN_UUID}.dense-multi-metric`,
     stackedMetric: STREAM_DECK_STACKED_METRIC_ACTION_UUID,
     network: `${STREAM_DECK_PLUGIN_UUID}.network`,
