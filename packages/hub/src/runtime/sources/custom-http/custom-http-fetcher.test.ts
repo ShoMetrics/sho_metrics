@@ -1,0 +1,110 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { NodeCustomHttpFetcher } from "./custom-http-fetcher";
+
+test("NodeCustomHttpFetcher fetches HTTP JSON without exposing query-string identity", async () => {
+    const fetcher = new NodeCustomHttpFetcher({
+        fetch: async url => new Response(JSON.stringify({ host: url.hostname })),
+    });
+
+    assert.deepEqual(await fetcher.fetchJson("https://api.example.com/data?secret=hidden"), {
+        ok: true,
+        responseText: "{\"host\":\"api.example.com\"}",
+    });
+});
+
+test("NodeCustomHttpFetcher rejects unsupported protocols and invalid URLs", async () => {
+    const fetcher = new NodeCustomHttpFetcher({
+        fetch: async () => new Response("{}"),
+    });
+
+    assert.deepEqual(await fetcher.fetchJson("file:///tmp/data.json"), {
+        ok: false,
+        reason: "unsupportedProtocol",
+        detail: "Only HTTP and HTTPS URLs are supported.",
+    });
+    assert.deepEqual(await fetcher.fetchJson("not a url"), {
+        ok: false,
+        reason: "invalidUrl",
+        detail: "URL is invalid.",
+    });
+});
+
+test("NodeCustomHttpFetcher enforces response size before JSON parse", async () => {
+    const fetcher = new NodeCustomHttpFetcher({
+        responseLimitBytes: 4,
+        fetch: async () => new Response("12345"),
+    });
+
+    assert.deepEqual(await fetcher.fetchJson("https://api.example.com/data"), {
+        ok: false,
+        reason: "responseTooLarge",
+        detail: "Response exceeded 4 bytes.",
+    });
+});
+
+test("NodeCustomHttpFetcher reports HTTP failures without logging response bodies", async () => {
+    const fetcher = new NodeCustomHttpFetcher({
+        fetch: async () => new Response("secret body", { status: 500 }),
+    });
+
+    assert.deepEqual(await fetcher.fetchJson("https://api.example.com/data"), {
+        ok: false,
+        reason: "httpFailure",
+        detail: "HTTP status 500.",
+    });
+});
+
+test("NodeCustomHttpFetcher bounds hanging requests with an abort signal", async () => {
+    const fetcher = new NodeCustomHttpFetcher({
+        timeoutMilliseconds: 1,
+        fetch: async (_url, init) => new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+        }),
+    });
+
+    assert.deepEqual(await fetcher.fetchJson("https://api.example.com/data"), {
+        ok: false,
+        reason: "networkFailure",
+        detail: "HTTP request failed.",
+    });
+});
+
+test("NodeCustomHttpFetcher reports response body read failures as network failures", async () => {
+    const failingBody = new ReadableStream<Uint8Array>({
+        start(controller) {
+            controller.enqueue(new TextEncoder().encode("{"));
+            controller.error(new Error("connection reset"));
+        },
+    });
+    const fetcher = new NodeCustomHttpFetcher({
+        fetch: async () => new Response(failingBody),
+    });
+
+    assert.deepEqual(await fetcher.fetchJson("https://api.example.com/data"), {
+        ok: false,
+        reason: "networkFailure",
+        detail: "Response body read failed.",
+    });
+});
+
+test("NodeCustomHttpFetcher preserves response-too-large failures when body cleanup fails", async () => {
+    const oversizedBody = new ReadableStream<Uint8Array>({
+        pull(controller) {
+            controller.enqueue(new TextEncoder().encode("12345"));
+        },
+        cancel() {
+            throw new Error("cancel failed");
+        },
+    });
+    const fetcher = new NodeCustomHttpFetcher({
+        responseLimitBytes: 4,
+        fetch: async () => new Response(oversizedBody),
+    });
+
+    assert.deepEqual(await fetcher.fetchJson("https://api.example.com/data"), {
+        ok: false,
+        reason: "responseTooLarge",
+        detail: "Response exceeded 4 bytes.",
+    });
+});

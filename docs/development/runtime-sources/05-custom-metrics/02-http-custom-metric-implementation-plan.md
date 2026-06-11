@@ -84,6 +84,10 @@ custom-http:<hostSlug>:<actionId>:<consumerSlug>
   - use `localhost`, `invalid-url`, or `unconfigured` when that is the most
     accurate bounded support label.
 - HTTP response body cap: 256 KiB.
+- HTTP request timeout: 5 seconds in V1.
+- HTTP redirects: use Fetch's normal `follow` behavior in V1. This is an
+  explicit no-auth V1 choice, not an inherited default. Revisit before adding
+  auth, cookies, headers, or credential references.
 - Larger JSON schema/sample summarization for AI prompting is deferred and must
   not be implemented in V1.
 - Runtime failures after a metric has been configured render as `N/A`.
@@ -177,11 +181,15 @@ Schema rules:
 
 - Top-level `metric` is required.
 - `label` is required.
-- `value` is required and must be a finite number.
+- `value` is required. The prompt should ask models to emit a JSON number, but
+  the runtime validator may accept strict decimal numeric strings such as
+  `"42"` or `"42.5"` and normalize them to numbers. Do not accept JavaScript
+  numeric syntax such as `0x10`, `1e3`, `Infinity`, or `NaN`.
 - `unit` is required.
 - `customUnit` is required when `unit` is `custom`.
 - `customUnit` must be absent when `unit` is not `custom`.
-- `maximum` is optional, but when present it must be a positive finite number.
+- `maximum` is optional, but when present it must be a positive finite number
+  or a strict decimal numeric string normalized by the same rule as `value`.
 - Do not output `metricId`; the runtime metric key is action-and-consumer
   scoped.
 - Do not output arrays in V1.
@@ -198,6 +206,7 @@ bytes_per_second
 milliseconds
 seconds
 hertz
+revolutions_per_minute
 rpm
 unitless
 custom
@@ -207,6 +216,15 @@ Formatting rules:
 
 - Known semantic units use Sho Metrics' existing unit formatting and scaling
   rules where they exist.
+- Unit names should be emitted as lower_snake_case enum names. Runtime trims
+  whitespace, lowercases, and normalizes spaces or hyphens to underscores before
+  matching existing metric units.
+- `rpm` is accepted only as a compatibility alias for
+  `revolutions_per_minute`; prompts should prefer the full unit name.
+- `fahrenheit` is accepted for no-auth HTTP APIs that already return Fahrenheit
+  values, but the runtime does not have a Fahrenheit `MetricUnit`; treat it as a
+  fixed custom `F` suffix unless a future source contract adds a real Fahrenheit
+  unit.
 - `custom` uses the exact `customUnit` text as a display suffix.
 - `custom` does not auto-scale or convert. A value `17` with `customUnit:
   "km/h"` is displayed as 17 km/h; it must not become m/s or another unit.
@@ -476,7 +494,7 @@ Locations:
 - `packages/hub/src/runtime/sources/source-registry.ts`
 - `packages/hub/src/runtime/sources/custom-http/custom-http-source-client.ts`
 - `packages/hub/src/runtime/sources/custom-http/custom-http-fetcher.ts`
-- `packages/hub/src/runtime/sources/custom-http/custom-http-transform-worker.ts`
+- `packages/hub/src/runtime/sources/custom-http/custom-http-transform-worker-thread.ts`
 - `packages/hub/src/runtime/sources/custom-http/custom-http-transform-worker-pool.ts`
 - `packages/hub/src/runtime/sources/custom-http/custom-http-output-schema.ts`
 - `packages/hub/src/runtime/sources/custom-http/*.test.ts`
@@ -490,24 +508,35 @@ Required work:
    registry from Step 2.
 3. Fetch only HTTP/HTTPS GET JSON.
 4. Enforce the 256 KiB response cap before JSON parse.
-5. Parse JSON and run jq through a bounded worker-thread pool.
-6. Do not spawn a new Worker for every poll in production.
-7. Enforce transform timeout through the worker-pool owner. A timed-out worker
+5. Apply the 5 second HTTP timeout with `AbortSignal.timeout(...)`.
+6. Use explicit redirect behavior. V1 follows redirects; do not rely on an
+   unstated fetch default.
+7. Parse JSON and run jq through a bounded worker-thread pool.
+8. Do not spawn a new Worker for every poll in production.
+9. Use exact-pinned `workerpool@10.0.2` for the jq worker pool unless a later
+   safety review rejects it. Keep workerpool details behind
+   `CustomHttpTransformRunner`; source clients must not import workerpool.
+10. Enforce transform timeout through the worker-pool owner. A timed-out worker
    must be terminated and replaced; it must not be returned to the pool.
-8. If implementation needs a numeric HTTP timeout, redirect policy, or TLS
-   exception policy and no existing project-owned source policy applies, stop
-   and ask before choosing one.
-9. Validate the single-object output schema.
-10. Keep the output schema as a single source of truth shared by runtime,
-   Property Inspector tests, and transform exam tooling. Do not maintain one
-   validator in `custom-http-output-schema.ts` and a divergent copy in
+11. Workerpool replacement-race behavior must be tested: if a queued task sees
+   `Worker terminated` immediately after a timed-out worker is killed, the pool
+   owner may retry that task once.
+12. Validate the single-object output schema.
+13. Keep the Step 3 runtime validator as the source of truth for runtime
+   semantics. Step 7 must migrate Property Inspector tests and transform exam
+   tooling to this final schema. Do not leave a long-lived validator in
+   `custom-http-output-schema.ts` and a divergent copy in
    `custom-metric-transform-check.mjs`.
-11. Prefer JSON Schema + Ajv for the final validator if package safety review
-   passes. If Ajv is not used, document why and keep one shared validator.
-12. Convert output into source-owned metric sample/snapshot data and source
+14. Do not use Ajv in Step 3. The V1 schema is a small fixed object, and the
+    runtime boundary also converts units into source-owned `MetricUnit` data.
+    A hand-written validator is simpler here as long as it remains the single
+    source of truth. Reconsider Ajv only if Step 5 or Step 7 needs a declarative
+    schema for PI/prompt tooling and would otherwise duplicate validation
+    logic.
+15. Convert output into source-owned metric sample/snapshot data and source
     attribution. Do not produce render-facing `WidgetData` in the source
     client.
-13. Return unavailable reports for:
+16. Return unavailable reports for:
    - missing runtime definition;
    - invalid URL;
    - response too large;
@@ -515,10 +544,22 @@ Required work:
    - JSON parse failure;
    - jq failure;
    - output schema failure.
-14. Log bounded summaries at the source-client boundary. Do not log full URL,
+17. Log bounded summaries at the source-client boundary. Do not log full URL,
     query string, response body, or transform text.
-15. Promote `jq-wasm` to a production dependency if production source code
+18. Promote `jq-wasm` to a production dependency if production source code
     imports it. Do not ship JSONata runtime code.
+
+Dependency safety notes for Step 3:
+
+| Package | Version | Decision | Evidence |
+| --- | --- | --- | --- |
+| `jq-wasm` | `1.1.0-jq-1.8.1` | Production dependency. | Chosen by Stage 1 POC; exact pinned; no runtime dependencies in lockfile. |
+| `workerpool` | `10.0.2` | Production dependency for bounded jq worker pool. | Published 2026-04-16; Apache-2.0; repository `git://github.com/josdejong/workerpool.git`; no runtime dependencies; no optional dependencies; npm metadata has no install lifecycle scripts; dry-run tarball has 52 files, no bundled dependencies, and no install-time binary download; `.timeout(ms)` terminates the worker running the timed-out task. |
+| `jsonata` | `2.0.6` | Dev-only POC comparison dependency. | Do not import from production source. |
+
+`npm.cmd audit --omit=dev --json` still reports the existing production
+`systeminformation` and `ws` issues; it did not introduce a jq-wasm or
+workerpool production vulnerability.
 
 Acceptance:
 
@@ -529,8 +570,9 @@ Acceptance:
 - Worker timeout cannot hang the plugin process.
 - Worker concurrency is bounded and repeated polling does not create unbounded
   Worker processes.
-- `npm.cmd audit` does not introduce new jq-related high/critical production
-  issues.
+- Timeout followed by a queued transform is covered by a regression test.
+- `npm.cmd audit` does not introduce new jq-wasm or workerpool high/critical
+  production issues.
 
 Do not merge with Step 4:
 

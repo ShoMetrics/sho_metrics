@@ -189,6 +189,9 @@ Prompt rules that materially improved results:
 - forbid `<think>`, Markdown fences, explanations, copied input JSON, and
   authored `metricId`;
 - require only the requested values, not every numeric field;
+- ask the model to emit JSON numbers for metric values. The final runtime may
+  accept strict decimal numeric strings as a tolerance layer, but the prompt
+  should still push jq to convert provider string values explicitly;
 - add engine-specific syntax guardrails for common model mistakes.
 
 Important jq guardrails:
@@ -325,12 +328,14 @@ Recommended hardening if forking/vendorizing:
 | Timeout enforcement | Pass | Pass | A normal seed transform with `--timeout-ms 1` returns timeout for both engines. |
 | Malformed schema rejection | Pass | Pass | String-valued `value` is rejected with bounded schema errors. |
 | Output size rejection | Pass | Pass | Large generated output fails before schema validation. |
+| Host environment access | Partial | N/A | jq-wasm did not expose a user-injected host environment variable; `$ENV` returned only Emscripten-style simulated values. |
+| Current time access | Known limitation | N/A | jq's `now` can read wall-clock time. V1 accepts this as a low-severity determinism limitation; prompts should not rely on time unless explicitly requested. |
 | Placeholder metric ID rejection | Pass | Pass | Validator rejects copied placeholder IDs and duplicate IDs in require mode. |
 | Expensive transform fixture | Inconclusive | Inconclusive | Pathological samples either failed fast or exited the worker. Timeout enforcement is still proven by deadline tests. |
 
-The POC did not prove memory ceilings, host-access isolation beyond package
-inspection and Worker boundary, or browser-bundle behavior. Stage 2 must design
-those as product safety requirements, not rely on this script.
+The POC did not prove memory ceilings, full host-access isolation, or
+browser-bundle behavior. Stage 2 must design those as product safety
+requirements, not rely on this script.
 
 ## Performance Results
 
