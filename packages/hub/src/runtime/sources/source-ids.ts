@@ -4,6 +4,9 @@ export const NODE_SYSTEM_SOURCE_ID = "node-system";
 /** Source id for the installed Windows helper source. */
 export const WINDOWS_HELPER_SOURCE_ID = "windows-helper";
 
+/** Source id for widget-local Custom HTTP metric definitions. */
+export const CUSTOM_HTTP_SOURCE_ID = "custom-http";
+
 /** Source scope used for telemetry collected from the current machine. */
 export const LOCAL_SOURCE_SCOPE_ID = "local";
 

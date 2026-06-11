@@ -397,6 +397,7 @@ Locations:
 - `packages/hub/src/runtime/sources/custom-http/custom-http-definition-registry.ts`
 - `packages/hub/src/runtime/sources/custom-http/custom-http-definition-registry.test.ts`
 - `packages/hub/src/runtime/source-routing/metric-read-plan.ts`
+- `packages/hub/src/runtime/source-routing/custom-http-read-plan.ts`
 - `packages/hub/src/actions/metric-action.ts`
 
 Do not create `packages/hub/src/actions/custom-metric.ts` in Step 2. The action
