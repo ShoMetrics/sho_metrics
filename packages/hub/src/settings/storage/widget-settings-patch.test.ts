@@ -18,7 +18,7 @@ import {
     TextViewVariant as StoredTextViewVariant,
     type MetricSlot as StoredMetricSlot,
     type StackedMetricWidget as StoredStackedMetricWidget,
-} from "../../generated/shometrics/v1/settings_pb";
+} from "../../generated/proto/shometrics/v1/settings_pb";
 import { MetricUnit } from "../../runtime/sources/metric-source";
 import { readStoredWidgetSettings } from "./codec";
 import { resolveQuickStartStoredWidgetSettings } from "./quick-start-widget-settings";

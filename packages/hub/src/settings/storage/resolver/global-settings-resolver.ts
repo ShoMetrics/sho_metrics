@@ -8,7 +8,7 @@ import {
     type GlobalViewOverride as StoredGlobalViewOverride,
     type MetricSourceProfile as StoredMetricSourceProfile,
     type StoredGlobalSettings,
-} from "../../../generated/shometrics/v1/settings_pb.js";
+} from "../../../generated/proto/shometrics/v1/settings_pb.js";
 import type {
     ColorMode,
     ResolvedGlobalDefaults,

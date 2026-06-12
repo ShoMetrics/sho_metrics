@@ -11,7 +11,7 @@ import {
     SetMetricRefreshDemandRequestSchema,
     type ListMetricDescriptorsResponse,
     type ReadMetricSnapshotResponse,
-} from "../../../generated/shometrics/v1/source_api_pb.js";
+} from "../../../generated/proto/shometrics/v1/source_api_pb.js";
 import {
     readMetricSnapshotTimestampMilliseconds,
     type MetricSnapshot,

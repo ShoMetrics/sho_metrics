@@ -6,7 +6,7 @@ import {
     type StackedMetricSlot as StoredStackedMetricSlot,
     type StackedMetricWidget as StoredStackedMetricWidget,
     type StoredWidgetSettings,
-} from "../../../generated/shometrics/v1/settings_pb.js";
+} from "../../../generated/proto/shometrics/v1/settings_pb.js";
 import type {
     ResolvedDenseMetricSlot,
     ResolvedDenseMultiMetricWidget,

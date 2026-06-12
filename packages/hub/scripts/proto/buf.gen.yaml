@@ -2,7 +2,7 @@ version: v2
 clean: true
 plugins:
   - local: protoc-gen-es
-    out: src/generated
+    out: src/generated/proto
     include_imports: true
     opt:
       - target=ts

@@ -9,7 +9,7 @@ import {
     TerminalPalettePreset as StoredTerminalPalettePreset,
     TerminalThemeVariant as StoredTerminalThemeVariant,
     TextViewVariant as StoredTextViewVariant,
-} from "../../generated/shometrics/v1/settings_pb";
+} from "../../generated/proto/shometrics/v1/settings_pb";
 import { readStoredGlobalSettings } from "./codec";
 import { writeStoredGlobalSettingsPatch } from "./global-settings-patch";
 

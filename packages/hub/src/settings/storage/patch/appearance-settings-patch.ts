@@ -24,7 +24,7 @@ import {
     type MetricPaintSettings as StoredMetricPaintSettings,
     type MetricSolidPaintSettings as StoredMetricSolidPaintSettings,
     type MultiColorSet as StoredMultiColorSet,
-} from "../../../generated/shometrics/v1/settings_pb.js";
+} from "../../../generated/proto/shometrics/v1/settings_pb.js";
 import type {
     ResolvedAppearanceSettingsOverride,
     ResolvedColorFilledPaintSettingsOverride,

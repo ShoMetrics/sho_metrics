@@ -22,7 +22,7 @@ import {
     LineAppearanceSettings_GridLineVisibility as StoredGridLineVisibility,
     MetricSourcePolicy_FailureMode as StoredSourceFailureMode,
     TemperatureUnit as StoredTemperatureUnit,
-} from "../../generated/shometrics/v1/settings_pb.js";
+} from "../../generated/proto/shometrics/v1/settings_pb.js";
 import type {
     CatalogMetricCategory,
     CatalogMetricReadingKind,

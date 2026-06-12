@@ -26,7 +26,7 @@ import {
     type GlobalMetricPaintSettings as StoredGlobalMetricPaintSettings,
     type GlobalOverrides as StoredGlobalOverrides,
     type MultiColorSet as StoredMultiColorSet,
-} from "../../generated/shometrics/v1/settings_pb.js";
+} from "../../generated/proto/shometrics/v1/settings_pb.js";
 import type {
     ColorMode,
     MetricTheme,

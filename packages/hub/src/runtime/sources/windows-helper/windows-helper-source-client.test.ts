@@ -25,7 +25,7 @@ import {
     type ReadMetricSnapshotResponse,
     type SetMetricRefreshDemandRequest,
     type SetMetricRefreshDemandResponse,
-} from "../../../generated/shometrics/v1/source_api_pb.js";
+} from "../../../generated/proto/shometrics/v1/source_api_pb.js";
 import {
     buildMetricSnapshot,
     buildScalarMetricValue,

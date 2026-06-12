@@ -5,7 +5,7 @@ import {
     type MetricUnavailableReport as ProtoMetricUnavailableReport,
     type MetricValueAttribution as ProtoMetricValueAttribution,
     type RawSensorIdentity as ProtoRawSensorIdentity,
-} from "../../generated/shometrics/v1/source_api_pb.js";
+} from "../../generated/proto/shometrics/v1/source_api_pb.js";
 import type {
     MetricSnapshot,
     MetricSource,
