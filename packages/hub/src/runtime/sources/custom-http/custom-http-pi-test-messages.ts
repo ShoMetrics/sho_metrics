@@ -46,6 +46,7 @@ export type CustomHttpPiTransformResult =
             readonly value: number;
             readonly unitText: string;
             readonly maximum?: number;
+            readonly suggestedLucideIconId?: string;
         };
     }
     | CustomHttpPiFailureResult;
@@ -162,11 +163,13 @@ function readTransformResult(result: Readonly<Record<string, unknown>>): CustomH
         const value = metric["value"];
         const unitText = metric["unitText"];
         const maximum = metric["maximum"];
+        const suggestedLucideIconId = metric["suggestedLucideIconId"];
         if (
             typeof label !== "string"
             || typeof value !== "number"
             || typeof unitText !== "string"
             || (maximum !== undefined && typeof maximum !== "number")
+            || (suggestedLucideIconId !== undefined && typeof suggestedLucideIconId !== "string")
         ) {
             return undefined;
         }
@@ -178,6 +181,7 @@ function readTransformResult(result: Readonly<Record<string, unknown>>): CustomH
                 value,
                 unitText,
                 ...(maximum === undefined ? {} : { maximum }),
+                ...(suggestedLucideIconId === undefined ? {} : { suggestedLucideIconId }),
             },
         };
     }

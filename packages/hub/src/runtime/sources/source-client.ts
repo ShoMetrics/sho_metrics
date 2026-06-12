@@ -65,6 +65,9 @@ export interface MetricValueDisplayHint {
 
     /** Optional positive maximum for progress widgets. */
     readonly maximum?: number;
+
+    /** Optional source-suggested Custom Metric icon id. User-selected icons override this. */
+    readonly suggestedLucideIconId?: string;
 }
 
 /** Runtime unavailable reason after source adapter enum compatibility handling. */

@@ -571,6 +571,45 @@ body {
     margin-top: 0;
 }
 
+.custom-metric-icon-combobox {
+    min-width: 0;
+    position: relative;
+    width: 100%;
+}
+
+.custom-metric-icon-listbox {
+    display: grid;
+}
+
+.custom-metric-icon-status {
+    color: #b8b8b8;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.25;
+    overflow: hidden;
+    padding: 5px 8px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.custom-metric-icon-option {
+    grid-template-columns: 26px minmax(0, 1fr);
+}
+
+.custom-metric-icon-preview {
+    color: #efefef;
+    display: block;
+    height: 22px;
+    width: 22px;
+}
+
+.custom-metric-icon-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .color-compensation-shell {
     display: grid;
     min-height: 100vh;

@@ -26,6 +26,10 @@ import type { MetricValueDisplayHint } from "../runtime/sources/source-client";
 import { CUSTOM_HTTP_SOURCE_ID } from "../runtime/sources/source-ids";
 import { composeMetricViewFrame } from "../view-rendering/metric-view-frame";
 import type { WidgetData } from "../view-rendering/widget-data";
+import {
+    getCustomMetricIconFragment,
+    getDefaultCustomMetricIconFragment,
+} from "../widgets/icons/custom-metric-icons";
 import { resolveInitialActionSettings } from "./settings/action-settings-resolver";
 import { writeStoredWidgetSettingsPatch } from "../settings/storage/patch/widget-settings-patch";
 import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
@@ -220,6 +224,73 @@ test("Custom Metric view uses source display hints for label, unit, and maximum"
         minimumValue: 0,
         maximumValue: 84,
     });
+});
+
+test("Custom Metric view uses source suggested icon when no manual icon is selected", () => {
+    const rawSettings = buildCustomMetricWidgetSettings({
+        url: "https://api.example.com/data",
+        userIntent: "show temperature",
+        jqTransform: ".",
+    });
+    const settings = resolveInitialActionSettings(rawSettings, "customMetric").resolvedSettings;
+
+    const viewOptions = buildCustomMetricViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("custom-suggested-icon-action"), rawSettings),
+        settings,
+        target: readCustomMetricTarget(settings),
+        metrics: new CapturingMetricStoreReader({
+            current: 21,
+            sampleTimestampMilliseconds: 1234,
+            displayHint: {
+                label: "TEMP",
+                unit: MetricUnit.CELSIUS,
+                suggestedLucideIconId: "thermometer",
+            },
+        }),
+    });
+
+    assert.equal(viewOptions.centerIconFragment, getCustomMetricIconFragment("thermometer"));
+});
+
+test("Custom Metric view uses manual icon before source suggested icon", () => {
+    const rawSettings = buildCustomMetricWidgetSettings({
+        url: "https://api.example.com/data",
+        userIntent: "show temperature",
+        jqTransform: ".",
+        iconId: "cloud-sun",
+    });
+    const settings = resolveInitialActionSettings(rawSettings, "customMetric").resolvedSettings;
+
+    const viewOptions = buildCustomMetricViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("custom-manual-icon-action"), rawSettings),
+        settings,
+        target: readCustomMetricTarget(settings),
+        metrics: new CapturingMetricStoreReader({
+            current: 21,
+            sampleTimestampMilliseconds: 1234,
+            displayHint: {
+                label: "TEMP",
+                unit: MetricUnit.CELSIUS,
+                suggestedLucideIconId: "thermometer",
+            },
+        }),
+    });
+
+    assert.equal(viewOptions.centerIconFragment, getCustomMetricIconFragment("cloud-sun"));
+});
+
+test("Custom Metric view uses non-question default icon without manual or suggested icon", () => {
+    const rawSettings = buildCustomMetricWidgetSettings();
+    const settings = resolveInitialActionSettings(rawSettings, "customMetric").resolvedSettings;
+
+    const viewOptions = buildCustomMetricViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("custom-default-icon-action"), rawSettings),
+        settings,
+        target: readCustomMetricTarget(settings),
+    });
+
+    assert.equal(viewOptions.centerIconFragment, getDefaultCustomMetricIconFragment());
+    assert.doesNotMatch(viewOptions.centerIconFragment, /question/iu);
 });
 
 test("Custom Metric view preserves custom unit text without catalog unit formatting", () => {
@@ -550,6 +621,7 @@ function buildCustomMetricWidgetSettings(patch: {
     readonly url?: string;
     readonly userIntent?: string;
     readonly jqTransform?: string;
+    readonly iconId?: string;
 } = {}): unknown {
     const settings = resolveQuickStartStoredWidgetSettings(undefined, "customMetric").rawSettings;
     return writeStoredWidgetSettingsPatch(settings, {

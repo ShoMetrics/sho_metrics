@@ -305,6 +305,11 @@ export const customMetricMessages = {
         zh_CN: "结果",
         ja: "結果",
     },
+    iconSection: {
+        en: "Icon",
+        zh_CN: "图标",
+        ja: "アイコン",
+    },
     sourceSummaryLabel: {
         en: "HTTP Source",
         zh_CN: "HTTP 来源",
@@ -324,6 +329,41 @@ export const customMetricMessages = {
         en: "Edit",
         zh_CN: "编辑",
         ja: "編集",
+    },
+    iconSearchLabel: {
+        en: "Widget Icon",
+        zh_CN: "组件图标",
+        ja: "ウィジェットアイコン",
+    },
+    iconSearchPlaceholder: {
+        en: "Search icons",
+        zh_CN: "搜索图标",
+        ja: "アイコンを検索",
+    },
+    iconHint: {
+        en: "This sets the key's icon. Icon is used in some views only.",
+        zh_CN: "这里设置按键图标。图标只在部分视图中使用。",
+        ja: "キーのアイコンを設定します。アイコンは一部の表示でのみ使われます。",
+    },
+    iconShowingResultsStatus: {
+        en: "{shown} of {count} matches",
+        zh_CN: "{shown}/{count} 个匹配",
+        ja: "{shown}/{count} 件一致",
+    },
+    iconNoResultsStatus: {
+        en: "No matching icons",
+        zh_CN: "没有匹配的图标",
+        ja: "一致するアイコンはありません",
+    },
+    iconKeepTypingHint: {
+        en: "Showing {shown} of {count} matching icons. Keep typing to narrow the list.",
+        zh_CN: "正在显示 {count} 个匹配图标中的 {shown} 个。继续输入可缩小范围。",
+        ja: "{count} 件中 {shown} 件の一致アイコンを表示しています。入力を続けると絞り込めます。",
+    },
+    iconClearButton: {
+        en: "Clear Icon",
+        zh_CN: "清除图标",
+        ja: "アイコンをクリア",
     },
     backToWidgetButton: {
         en: "Back",

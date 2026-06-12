@@ -1,12 +1,12 @@
-export type SelectListboxPlacement = "bottom" | "top";
+export type ListboxPlacement = "bottom" | "top";
 
-export interface SelectListboxLayout {
+export interface ListboxLayout {
     readonly maxHeight: number;
-    readonly placement: SelectListboxPlacement;
+    readonly placement: ListboxPlacement;
 }
 
-interface SelectListboxLayoutInput {
-    readonly optionCount: number;
+interface ListboxLayoutInput {
+    readonly rowCount: number;
     readonly optionHeightPixels?: number | undefined;
     readonly triggerRect: Pick<DOMRectReadOnly, "bottom" | "top">;
     readonly viewportHeight: number;
@@ -18,20 +18,21 @@ const LISTBOX_VIEWPORT_MARGIN_PIXELS = 8;
 const LISTBOX_BORDER_PIXELS = 2;
 const LISTBOX_VERTICAL_PADDING_PIXELS = 6;
 
-export const DEFAULT_SELECT_OPTION_HEIGHT_PIXELS = 28;
+export const DEFAULT_LISTBOX_OPTION_HEIGHT_PIXELS = 28;
 
-export const DEFAULT_SELECT_LISTBOX_LAYOUT: SelectListboxLayout = {
+export const DEFAULT_LISTBOX_LAYOUT: ListboxLayout = {
     maxHeight: LISTBOX_FALLBACK_MAX_HEIGHT_PIXELS,
     placement: "bottom",
 };
 
-export function resolveSelectListboxLayout({
-    optionCount,
-    optionHeightPixels = DEFAULT_SELECT_OPTION_HEIGHT_PIXELS,
+/** Resolves popup placement and max height from the trigger position and row count. */
+export function resolveListboxLayout({
+    rowCount,
+    optionHeightPixels = DEFAULT_LISTBOX_OPTION_HEIGHT_PIXELS,
     triggerRect,
     viewportHeight,
-}: SelectListboxLayoutInput): SelectListboxLayout {
-    const desiredHeight = optionCount * optionHeightPixels
+}: ListboxLayoutInput): ListboxLayout {
+    const desiredHeight = rowCount * optionHeightPixels
         + LISTBOX_VERTICAL_PADDING_PIXELS
         + LISTBOX_BORDER_PIXELS;
     const spaceBelow = Math.max(

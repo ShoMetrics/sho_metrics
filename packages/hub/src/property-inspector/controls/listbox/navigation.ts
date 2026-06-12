@@ -1,12 +1,12 @@
-import type { SelectOption, SelectOptionValue } from "../inspector/types";
-import { isOptionDisabled } from "./setting-control";
+import type { SelectOption, SelectOptionValue } from "../../inspector/types";
+import { isOptionDisabled } from "../setting-control";
 
-export type SelectMoveDirection = "next" | "previous";
+export type ListboxMoveDirection = "next" | "previous";
 
 interface MoveActiveOptionInput<TValue extends SelectOptionValue> {
     readonly optionList: readonly SelectOption<TValue>[];
     readonly activeOptionIndex: number;
-    readonly direction: SelectMoveDirection;
+    readonly direction: ListboxMoveDirection;
 }
 
 interface TextSearchInput<TValue extends SelectOptionValue> {
@@ -15,6 +15,7 @@ interface TextSearchInput<TValue extends SelectOptionValue> {
     readonly startIndex: number;
 }
 
+/** Resolves the selected enabled option, falling back to the first enabled option. */
 export function resolveActiveOptionIndex<TValue extends SelectOptionValue>(
     optionList: readonly SelectOption<TValue>[],
     selectedValue: TValue | "",
@@ -27,6 +28,7 @@ export function resolveActiveOptionIndex<TValue extends SelectOptionValue>(
     return findFirstEnabledOptionIndex(optionList);
 }
 
+/** Finds an enabled option with the given value, ignoring disabled matches. */
 export function findEnabledOptionIndexByValue<TValue extends SelectOptionValue>(
     optionList: readonly SelectOption<TValue>[],
     value: TValue | "",
@@ -34,12 +36,14 @@ export function findEnabledOptionIndexByValue<TValue extends SelectOptionValue>(
     return optionList.findIndex((option) => option.value === value && !isOptionDisabled(option));
 }
 
+/** Finds the first selectable option in display order. */
 export function findFirstEnabledOptionIndex<TValue extends SelectOptionValue>(
     optionList: readonly SelectOption<TValue>[],
 ): number {
     return optionList.findIndex((option) => !isOptionDisabled(option));
 }
 
+/** Finds the last selectable option in display order. */
 export function findLastEnabledOptionIndex<TValue extends SelectOptionValue>(
     optionList: readonly SelectOption<TValue>[],
 ): number {
@@ -52,6 +56,7 @@ export function findLastEnabledOptionIndex<TValue extends SelectOptionValue>(
     return -1;
 }
 
+/** Moves to the next selectable option without wrapping past the list edge. */
 export function moveActiveOptionIndex<TValue extends SelectOptionValue>({
     optionList,
     activeOptionIndex,
@@ -77,6 +82,7 @@ export function moveActiveOptionIndex<TValue extends SelectOptionValue>({
         : findFirstEnabledOptionIndex(optionList);
 }
 
+/** Finds the next selectable option whose label starts with the typeahead text. */
 export function findEnabledOptionIndexByTextPrefix<TValue extends SelectOptionValue>({
     optionList,
     searchText,
@@ -98,6 +104,7 @@ export function findEnabledOptionIndexByTextPrefix<TValue extends SelectOptionVa
     return -1;
 }
 
+/** Collapses repeated-character typeahead text so repeated key presses cycle matches. */
 export function normalizeRepeatedCharacterSearchText(searchText: string): string {
     const normalizedSearchText = normalizeSearchText(searchText);
     if (normalizedSearchText.length <= 1) {

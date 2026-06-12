@@ -1,6 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import {
     CustomHttpMetricSourceSchema,
+    CustomMetricIconSettingsSchema,
     DiskThroughputDisplaySettingsSchema,
     MetricSourcePolicySchema,
     NetworkDisplaySettingsSchema,
@@ -52,6 +53,21 @@ export function applyCustomMetricPatch(
     target: StoredCustomMetricTarget,
     patch: NonNullable<StoredWidgetSettingsPatch["customMetric"]>,
 ): void {
+    if ("iconId" in patch) {
+        if (patch.iconId === undefined) {
+            target.icon = undefined;
+        } else {
+            target.icon = create(CustomMetricIconSettingsSchema, {
+                id: patch.iconId,
+            });
+        }
+    }
+
+    const hasHttpPatch = "url" in patch || "userIntent" in patch || "jqTransform" in patch;
+    if (!hasHttpPatch) {
+        return;
+    }
+
     if (target.source.case !== "http") {
         target.source = {
             case: "http",

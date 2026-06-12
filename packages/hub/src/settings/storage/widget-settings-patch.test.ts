@@ -211,6 +211,46 @@ test("widget patch can clear Custom Metric user intent", () => {
     }
 });
 
+test("widget patch updates Custom Metric icon without creating an HTTP source", () => {
+    const customMetricSettings = resolveQuickStartStoredWidgetSettings(undefined, "customMetric").rawSettings;
+
+    const nextSettings = writeStoredWidgetSettingsPatch(customMetricSettings, {
+        customMetric: {
+            iconId: "cloud-sun",
+        },
+    });
+
+    const target = readSingleMetricSlot(nextSettings)?.metric?.target;
+    assert.equal(target?.case, "custom");
+    if (target?.case === "custom") {
+        assert.equal(target.value.icon?.id, "cloud-sun");
+        assert.equal(target.value.source.case, undefined);
+    }
+});
+
+test("widget patch clears Custom Metric icon", () => {
+    const customMetricSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "customMetric").rawSettings,
+        {
+            customMetric: {
+                iconId: "cloud-sun",
+            },
+        },
+    );
+
+    const nextSettings = writeStoredWidgetSettingsPatch(customMetricSettings, {
+        customMetric: {
+            iconId: undefined,
+        },
+    });
+
+    const target = readSingleMetricSlot(nextSettings)?.metric?.target;
+    assert.equal(target?.case, "custom");
+    if (target?.case === "custom") {
+        assert.equal(target.value.icon, undefined);
+    }
+});
+
 test("widget patch updates GPU reading within the GPU action domain", () => {
     const gpuSettings = resolveQuickStartStoredWidgetSettings(undefined, "gpu").rawSettings;
 

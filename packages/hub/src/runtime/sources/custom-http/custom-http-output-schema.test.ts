@@ -191,6 +191,43 @@ test("validateCustomHttpMetricTransformOutput accepts rpm only as a compatibilit
     });
 });
 
+test("validateCustomHttpMetricTransformOutput accepts valid suggested Lucide icons", () => {
+    assert.deepEqual(validateCustomHttpMetricTransformOutput({
+        metric: {
+            label: "TEMP",
+            value: 21,
+            unit: "celsius",
+            suggestedLucideIconId: " Cloud Sun ",
+        },
+    }), {
+        ok: true,
+        output: {
+            label: "TEMP",
+            value: 21,
+            unit: MetricUnit.CELSIUS,
+            suggestedLucideIconId: "cloud-sun",
+        },
+    });
+});
+
+test("validateCustomHttpMetricTransformOutput ignores invalid suggested Lucide icons", () => {
+    assert.deepEqual(validateCustomHttpMetricTransformOutput({
+        metric: {
+            label: "TEMP",
+            value: 21,
+            unit: "celsius",
+            suggestedLucideIconId: "not-a-real-icon",
+        },
+    }), {
+        ok: true,
+        output: {
+            label: "TEMP",
+            value: 21,
+            unit: MetricUnit.CELSIUS,
+        },
+    });
+});
+
 test("validateCustomHttpMetricTransformOutput rejects customUnit on Fahrenheit shorthand", () => {
     assert.deepEqual(validateCustomHttpMetricTransformOutput({
         metric: {

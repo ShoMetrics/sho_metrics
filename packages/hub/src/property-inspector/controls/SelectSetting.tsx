@@ -1,8 +1,6 @@
 import {
-    useEffect,
     useId,
     useRef,
-    useState,
     type CSSProperties,
     type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
@@ -17,16 +15,15 @@ import {
     findEnabledOptionIndexByTextPrefix,
     findFirstEnabledOptionIndex,
     findLastEnabledOptionIndex,
-    moveActiveOptionIndex,
     normalizeRepeatedCharacterSearchText,
-    resolveActiveOptionIndex,
-} from "./select-navigation";
+} from "./listbox/navigation";
 import {
-    DEFAULT_SELECT_LISTBOX_LAYOUT,
-    DEFAULT_SELECT_OPTION_HEIGHT_PIXELS,
-    resolveSelectListboxLayout,
-    type SelectListboxLayout,
-} from "./select-layout";
+    DEFAULT_LISTBOX_OPTION_HEIGHT_PIXELS,
+} from "./listbox/layout";
+import {
+    optionId,
+    useListboxPopup,
+} from "./listbox/use-listbox-popup";
 
 const TYPEAHEAD_RESET_MS = 700;
 const SELECT_OPTION_VERTICAL_PADDING_PIXELS = 8;
@@ -77,8 +74,8 @@ export function SelectSetting<TValue extends SelectOptionValue>({
         : undefined;
     const hasOptionPreview = buildOptionPreviewUri !== undefined;
     const optionHeightPixels = hasOptionPreview && optionPreviewSizePixels !== undefined
-        ? Math.max(DEFAULT_SELECT_OPTION_HEIGHT_PIXELS, optionPreviewSizePixels + SELECT_OPTION_VERTICAL_PADDING_PIXELS)
-        : DEFAULT_SELECT_OPTION_HEIGHT_PIXELS;
+        ? Math.max(DEFAULT_LISTBOX_OPTION_HEIGHT_PIXELS, optionPreviewSizePixels + SELECT_OPTION_VERTICAL_PADDING_PIXELS)
+        : DEFAULT_LISTBOX_OPTION_HEIGHT_PIXELS;
     const rootStyle: SelectPreviewStyle | undefined = optionPreviewSizePixels === undefined
         ? undefined
         : {
@@ -86,93 +83,31 @@ export function SelectSetting<TValue extends SelectOptionValue>({
             "--custom-select-preview-column-width": `${optionPreviewSizePixels + 2}px`,
             "--custom-select-option-height": `${optionHeightPixels}px`,
         };
-    const [isOpen, setIsOpen] = useState(false);
-    const [activeOptionIndex, setActiveOptionIndex] = useState(() =>
-        resolveActiveOptionIndex(optionList, selectedValue),
-    );
-    const [listboxLayout, setListboxLayout] = useState<SelectListboxLayout>(
-        DEFAULT_SELECT_LISTBOX_LAYOUT,
-    );
     const rootElementRef = useRef<HTMLDivElement>(null);
     const triggerElementRef = useRef<HTMLButtonElement>(null);
-    const optionElementMapRef = useRef(new Map<number, HTMLDivElement>());
     const typeaheadStateRef = useRef<TypeaheadState>({
         query: "",
         updatedAt: 0,
     });
-
-    useEffect(() => {
-        if (!isOpen) {
-            setActiveOptionIndex(resolveActiveOptionIndex(optionList, selectedValue));
-        }
-    }, [isOpen, optionList, selectedValue]);
-
-    useEffect(() => {
-        if (isControlDisabled && isOpen) {
-            setIsOpen(false);
-        }
-    }, [isControlDisabled, isOpen]);
-
-    useEffect(() => {
-        if (!isOpen) {
-            resetTypeaheadState(typeaheadStateRef.current);
-            return;
-        }
-
-        const activeOptionElement = optionElementMapRef.current.get(activeOptionIndex);
-        activeOptionElement?.scrollIntoView({ block: "nearest" });
-    }, [activeOptionIndex, isOpen]);
-
-    useEffect(() => {
-        if (!isOpen) {
-            return;
-        }
-
-        const updateListboxLayout = (): void => {
-            setListboxLayout(readCurrentListboxLayout());
-        };
-
-        updateListboxLayout();
-        document.addEventListener("scroll", updateListboxLayout, true);
-        window.addEventListener("resize", updateListboxLayout);
-        window.visualViewport?.addEventListener("resize", updateListboxLayout);
-        window.visualViewport?.addEventListener("scroll", updateListboxLayout);
-
-        return () => {
-            document.removeEventListener("scroll", updateListboxLayout, true);
-            window.removeEventListener("resize", updateListboxLayout);
-            window.visualViewport?.removeEventListener("resize", updateListboxLayout);
-            window.visualViewport?.removeEventListener("scroll", updateListboxLayout);
-        };
-    }, [isOpen, optionList.length]);
-
-    useEffect(() => {
-        if (!isOpen) {
-            return;
-        }
-
-        const handleDocumentPointerDown = (event: PointerEvent): void => {
-            const rootElement = rootElementRef.current;
-            const target = event.target;
-            if (rootElement && target instanceof Node && rootElement.contains(target)) {
-                return;
-            }
-
-            setIsOpen(false);
-        };
-
-        const handleWindowBlur = (): void => {
-            setIsOpen(false);
-        };
-
-        document.addEventListener("pointerdown", handleDocumentPointerDown, true);
-        window.addEventListener("blur", handleWindowBlur);
-
-        return () => {
-            document.removeEventListener("pointerdown", handleDocumentPointerDown, true);
-            window.removeEventListener("blur", handleWindowBlur);
-        };
-    }, [isOpen]);
+    const {
+        activeOptionIndex,
+        isOpen,
+        listboxLayout,
+        closeListbox,
+        moveOrOpen,
+        openListbox,
+        registerOptionElement,
+        selectOption,
+        setActiveOptionIndex,
+    } = useListboxPopup({
+        optionList,
+        selectedValue,
+        rootElementRef,
+        triggerElementRef,
+        optionHeightPixels,
+        isDisabled: isControlDisabled,
+        onValueChange,
+    });
 
     const activeOptionId = isOpen && activeOptionIndex >= 0
         ? optionId(triggerId, activeOptionIndex)
@@ -202,7 +137,7 @@ export function SelectSetting<TValue extends SelectOptionValue>({
                     disabled={isControlDisabled}
                     onClick={() => {
                         if (isOpen) {
-                            setIsOpen(false);
+                            closeSelectListbox();
                             return;
                         }
 
@@ -257,11 +192,7 @@ export function SelectSetting<TValue extends SelectOptionValue>({
                                             setActiveOptionIndex(index);
                                         }
                                     }}
-                                    onClick={() => {
-                                        if (!isDisabledOption) {
-                                            commitOption(index);
-                                        }
-                                    }}
+                                    onClick={() => selectOption(index)}
                                 >
                                     {previewUri && (
                                         <img
@@ -281,42 +212,9 @@ export function SelectSetting<TValue extends SelectOptionValue>({
         </InspectorItem>
     );
 
-    function openListbox(nextActiveOptionIndex = resolveActiveOptionIndex(optionList, selectedValue)): void {
-        if (isControlDisabled || nextActiveOptionIndex < 0) {
-            return;
-        }
-
-        setListboxLayout(readCurrentListboxLayout());
-        setActiveOptionIndex(nextActiveOptionIndex);
-        setIsOpen(true);
-    }
-
-    function readCurrentListboxLayout(): SelectListboxLayout {
-        const triggerElement = triggerElementRef.current;
-        if (!triggerElement) {
-            return DEFAULT_SELECT_LISTBOX_LAYOUT;
-        }
-
-        return resolveSelectListboxLayout({
-            optionCount: optionList.length,
-            optionHeightPixels,
-            triggerRect: triggerElement.getBoundingClientRect(),
-            viewportHeight: window.visualViewport?.height ?? window.innerHeight,
-        });
-    }
-
-    function commitOption(optionIndex: number): void {
-        const option = optionList[optionIndex];
-        if (!option || isOptionDisabled(option)) {
-            return;
-        }
-
-        if (option.value !== selectedValue) {
-            onValueChange(option.value);
-        }
-
-        setIsOpen(false);
-        triggerElementRef.current?.focus();
+    function closeSelectListbox(): void {
+        resetTypeaheadState(typeaheadStateRef.current);
+        closeListbox();
     }
 
     function handleTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>): void {
@@ -345,7 +243,7 @@ export function SelectSetting<TValue extends SelectOptionValue>({
             case " ":
                 event.preventDefault();
                 if (isOpen) {
-                    commitOption(activeOptionIndex);
+                    selectOption(activeOptionIndex);
                     return;
                 }
 
@@ -354,30 +252,15 @@ export function SelectSetting<TValue extends SelectOptionValue>({
             case "Escape":
                 if (isOpen) {
                     event.preventDefault();
-                    setIsOpen(false);
+                    closeSelectListbox();
                 }
                 return;
             case "Tab":
-                setIsOpen(false);
+                closeSelectListbox();
                 return;
         }
 
         handleTypeaheadKey(event);
-    }
-
-    function moveOrOpen(direction: "next" | "previous"): void {
-        if (!isOpen) {
-            openListbox();
-            return;
-        }
-
-        setActiveOptionIndex((currentIndex) =>
-            moveActiveOptionIndex({
-                optionList,
-                activeOptionIndex: currentIndex,
-                direction,
-            }),
-        );
     }
 
     function handleTypeaheadKey(event: ReactKeyboardEvent<HTMLButtonElement>): void {
@@ -398,21 +281,8 @@ export function SelectSetting<TValue extends SelectOptionValue>({
         }
 
         setActiveOptionIndex(nextActiveOptionIndex);
-        setIsOpen(true);
+        openListbox(nextActiveOptionIndex);
     }
-
-    function registerOptionElement(index: number, element: HTMLDivElement | null): void {
-        if (element) {
-            optionElementMapRef.current.set(index, element);
-            return;
-        }
-
-        optionElementMapRef.current.delete(index);
-    }
-}
-
-function optionId(triggerId: string, index: number): string {
-    return `${triggerId}-option-${index}`;
 }
 
 function readTypeaheadSearchText(key: string, typeaheadState: TypeaheadState): string {
