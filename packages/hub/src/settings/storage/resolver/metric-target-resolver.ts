@@ -21,7 +21,7 @@ import {
     type MetricSelection as StoredMetricSelection,
     type MetricSourcePolicy as StoredMetricSourcePolicy,
     type NetworkMetricTarget as StoredNetworkMetricTarget,
-} from "../../../generated/shometrics/v1/settings_pb.js";
+} from "../../../generated/proto/shometrics/v1/settings_pb.js";
 import { MetricUnit } from "../../../runtime/sources/metric-source";
 import {
     DEFAULT_NETWORK_PING_TARGET_HOST,

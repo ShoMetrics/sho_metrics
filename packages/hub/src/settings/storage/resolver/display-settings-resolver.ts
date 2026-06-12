@@ -4,7 +4,7 @@ import {
     ScaleMode as StoredScaleMode,
     type DiskThroughputDisplaySettings as StoredDiskThroughputDisplaySettings,
     type NetworkDisplaySettings as StoredNetworkDisplaySettings,
-} from "../../../generated/shometrics/v1/settings_pb.js";
+} from "../../../generated/proto/shometrics/v1/settings_pb.js";
 import type {
     NetworkUnitBase,
     ResolvedDiskThroughputDisplaySettings,

@@ -27,7 +27,7 @@ import {
     type MetricSelection,
     type MetricSourcePolicy,
     type StoredWidgetSettings,
-} from "../../generated/shometrics/v1/settings_pb.js";
+} from "../../generated/proto/shometrics/v1/settings_pb.js";
 import { BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID } from "../../runtime/sources/source-ids";
 import {
     readStoredWidgetSettings,

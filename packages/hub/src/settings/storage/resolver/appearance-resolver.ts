@@ -26,7 +26,7 @@ import {
     type TerminalPaintSettings as StoredTerminalPaintSettings,
     type TerminalThemeSettings as StoredTerminalThemeSettings,
     type TransparentSurfaceSettings as StoredTransparentSurfaceSettings,
-} from "../../../generated/shometrics/v1/settings_pb.js";
+} from "../../../generated/proto/shometrics/v1/settings_pb.js";
 import type {
     CircleViewVariant,
     ColorMode,

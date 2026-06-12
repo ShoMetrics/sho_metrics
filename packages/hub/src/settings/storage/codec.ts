@@ -14,7 +14,7 @@ import {
     StoredWidgetSettingsSchema,
     type StoredGlobalSettings,
     type StoredWidgetSettings,
-} from "../../generated/shometrics/v1/settings_pb.js";
+} from "../../generated/proto/shometrics/v1/settings_pb.js";
 
 export type StoredSettingsJsonObject = JsonObject;
 

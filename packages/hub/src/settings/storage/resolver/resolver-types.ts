@@ -2,7 +2,7 @@
 import type {
     StoredGlobalSettings,
     StoredWidgetSettings,
-} from "../../../generated/shometrics/v1/settings_pb.js";
+} from "../../../generated/proto/shometrics/v1/settings_pb.js";
 
 /** Inputs used to resolve stored widget settings into app-owned settings. */
 export interface ResolveStoredWidgetSettingsOptions {

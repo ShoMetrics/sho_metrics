@@ -16,7 +16,7 @@ import {
     type MetricSelection as StoredMetricSelection,
     type NetworkMetricTarget as StoredNetworkMetricTarget,
     type SlotOverrides as StoredSlotOverrides,
-} from "../../../generated/shometrics/v1/settings_pb.js";
+} from "../../../generated/proto/shometrics/v1/settings_pb.js";
 import { normalizeNetworkPingTargetInput } from "../../network-ping-target";
 import {
     storedCatalogMetricCategoryByResolved,

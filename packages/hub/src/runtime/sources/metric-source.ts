@@ -6,7 +6,7 @@ import {
     MetricValueSchema,
     type MetricSnapshot,
     type MetricValue,
-} from "../../generated/shometrics/v1/snapshot_pb.js";
+} from "../../generated/proto/shometrics/v1/snapshot_pb.js";
 import type { SourceMetricPollingGroupResolver } from "./source-polling-groups";
 
 // Runtime source adapters import wire metric enums through this boundary module.

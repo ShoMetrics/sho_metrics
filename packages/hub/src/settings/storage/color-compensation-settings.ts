@@ -5,7 +5,7 @@ import {
     ColorCompensationSettingsSchema,
     type ColorCompensationProfile as StoredColorCompensationProfile,
     type StoredGlobalSettings,
-} from "../../generated/shometrics/v1/settings_pb.js";
+} from "../../generated/proto/shometrics/v1/settings_pb.js";
 import {
     DEFAULT_COLOR_COMPENSATION_PROFILE,
     normalizeColorCompensationProfile,
