@@ -1263,6 +1263,31 @@ describe("stored settings proto resolver", () => {
         }
     });
 
+    it("resolves Custom Metric icon id outside HTTP source configuration", () => {
+        const widgetSettings = resolveSingleMetricWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                singleMetric: {
+                    slot: {
+                        metric: {
+                            custom: {
+                                icon: {
+                                    id: " cloud-sun ",
+                                },
+                            },
+                        },
+                    },
+                },
+            }).settings,
+        });
+        const target = widgetSettings.widget.slot.metric.target;
+
+        assert.equal(target.domain, "customMetric");
+        if (target.domain === "customMetric") {
+            assert.equal(target.iconId, "cloud-sun");
+            assert.deepEqual(target.configuration, { state: "unconfigured" });
+        }
+    });
+
     it("does not require Custom Metric user intent at runtime", () => {
         const widgetSettings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings: readStoredWidgetSettings({

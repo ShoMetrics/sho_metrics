@@ -35,6 +35,7 @@ test("CustomHttpSourceClient reads configured definitions into metric snapshots"
                 value: 42,
                 unit: "percent",
                 maximum: 100,
+                suggestedLucideIconId: "cpu",
             },
         }),
         wallClockNow: () => 1234,
@@ -54,6 +55,7 @@ test("CustomHttpSourceClient reads configured definitions into metric snapshots"
             label: "CPU",
             unit: MetricUnit.PERCENT,
             maximum: 100,
+            suggestedLucideIconId: "cpu",
         },
         rawSensorIdentity: {
             sourceSensorId: identity.metricKey,

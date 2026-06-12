@@ -46,6 +46,10 @@ import {
     PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE,
     type WidgetData,
 } from "../view-rendering/widget-data";
+import {
+    getCustomMetricIconFragment,
+    getDefaultCustomMetricIconFragment,
+} from "../widgets/icons/custom-metric-icons";
 import { buildMetricViewIcons } from "../widgets/icons/metric-view-icons";
 import { PROGRESS_CIRCLE_MAXIMUM_LABEL_CHARACTERS } from "../widgets/primitives/progress-circle-label";
 
@@ -60,6 +64,11 @@ interface CustomMetricOptions {
     readonly definitionRegistry?: CustomHttpDefinitionRegistry;
     readonly fetcher?: CustomHttpFetcher;
     readonly transformRunner?: CustomHttpTransformRunner;
+}
+
+interface CustomHttpWidgetDataResult {
+    readonly widgetData: WidgetData;
+    readonly suggestedLucideIconId: string | undefined;
 }
 
 @action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric })
@@ -274,6 +283,9 @@ export class CustomMetric extends MetricAction {
                 value: output.value,
                 unitText: output.customUnit ?? formatMetricUnit(output.unit),
                 ...(output.maximum === undefined ? {} : { maximum: output.maximum }),
+                ...(output.suggestedLucideIconId === undefined ? {} : {
+                    suggestedLucideIconId: output.suggestedLucideIconId,
+                }),
             },
         };
     }
@@ -286,11 +298,15 @@ export function buildCustomMetricViewOptions(options: {
     readonly metrics?: MetricStoreReader;
 }): SingleMetricViewOptions {
     const widget = requireResolvedSingleMetricWidget(options.settings);
+    const baseIcons = buildCustomMetricViewIcons({
+        storedIconId: options.target.iconId,
+        suggestedIconId: undefined,
+    });
     const baseOptions = {
         event: options.event,
         metricRenderKind: "singleMetric" as const,
         resolvedSettings: widget.slot.appearance,
-        ...buildMetricViewIcons({ hardware: "unknown", status: "percentage" }),
+        ...baseIcons,
     };
 
     switch (options.target.configuration.state) {
@@ -318,25 +334,44 @@ export function buildCustomMetricViewOptions(options: {
                 consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
             });
 
+            const widgetDataResult = readCustomHttpWidgetData({
+                metrics: options.metrics,
+                metricKey: identity.metricKey,
+                shouldCompactCircleLabel: widget.slot.appearance.view.selectedView === "circle"
+                    && widget.slot.appearance.view.circleVariant !== "minimal",
+            });
+
             return {
                 ...baseOptions,
+                centerIconFragment: buildCustomMetricViewIcons({
+                    storedIconId: options.target.iconId,
+                    suggestedIconId: widgetDataResult.suggestedLucideIconId,
+                }).centerIconFragment,
                 metricKey: identity.metricKey,
-                widgetData: readCustomHttpWidgetData({
-                    metrics: options.metrics,
-                    metricKey: identity.metricKey,
-                    shouldCompactCircleLabel: widget.slot.appearance.view.selectedView === "circle"
-                        && widget.slot.appearance.view.circleVariant !== "minimal",
-                }),
+                widgetData: widgetDataResult.widgetData,
             };
         }
     }
+}
+
+function buildCustomMetricViewIcons(options: {
+    readonly storedIconId: string | undefined;
+    readonly suggestedIconId: string | undefined;
+}): ReturnType<typeof buildMetricViewIcons> {
+    const fallbackIcons = buildMetricViewIcons({ hardware: "unknown", status: "percentage" });
+    return {
+        ...fallbackIcons,
+        centerIconFragment: getCustomMetricIconFragment(options.storedIconId)
+            ?? getCustomMetricIconFragment(options.suggestedIconId)
+            ?? getDefaultCustomMetricIconFragment(),
+    };
 }
 
 function readCustomHttpWidgetData(options: {
     readonly metrics: MetricStoreReader;
     readonly metricKey: string;
     readonly shouldCompactCircleLabel: boolean;
-}): WidgetData {
+}): CustomHttpWidgetDataResult {
     const readResult = options.metrics.getWidgetDataWithAttribution(
         options.metricKey,
         CUSTOM_METRIC_DEFAULT_LABEL,
@@ -367,26 +402,35 @@ function readCustomHttpWidgetData(options: {
 
     if (widgetData.sampleTimestampMilliseconds === undefined) {
         return {
-            ...widgetData,
-            unavailableDisplayValue: readResult.unavailableMetric === undefined
-                ? PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE
-                : undefined,
+            widgetData: {
+                ...widgetData,
+                unavailableDisplayValue: readResult.unavailableMetric === undefined
+                    ? PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE
+                    : undefined,
+            },
+            suggestedLucideIconId: displayHint?.suggestedLucideIconId,
         };
     }
 
     // Custom unit text is already the user-facing provider unit; catalog
     // formatting is allowed to rewrite unit text only for known ShoMetrics units.
     if (displayHint?.customUnit !== undefined) {
-        return widgetData;
+        return {
+            widgetData,
+            suggestedLucideIconId: displayHint.suggestedLucideIconId,
+        };
     }
 
-    return displayHint?.unit === undefined
-        ? widgetData
-        : formatCatalogMetricFreshWidgetData({
+    return {
+        widgetData: displayHint?.unit === undefined
+            ? widgetData
+            : formatCatalogMetricFreshWidgetData({
             widgetData,
             unit: displayHint.unit,
             category: "other",
-        });
+        }),
+        suggestedLucideIconId: displayHint?.suggestedLucideIconId,
+    };
 }
 
 function resolveCustomHttpLabel(

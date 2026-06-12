@@ -168,6 +168,144 @@ test("custom metric source editor shows copyable failure details", async () => {
     );
 });
 
+test("custom metric icon picker writes and clears the widget icon id", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    render(<CustomMetricSettingsHarness client={client} settings={buildCustomMetricSettings({
+        url: "https://api.example.com/weather",
+        userIntent: "Display temperature",
+        jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+    })} />);
+
+    const iconInput = screen.getByRole("combobox", { name: /^Widget Icon:/ }) as HTMLInputElement;
+    await user.type(iconInput, "temp");
+
+    await user.click(screen.getByRole("option", { name: /^Thermometer$/ }));
+    assert.equal(iconInput.value, "Thermometer");
+    assert.equal(screen.queryByRole("listbox", { name: /^Widget Icon:/ }), null);
+    assert.equal(screen.getByText(/Icon is used in some views only/).textContent?.length > 0, true);
+
+    await user.click(screen.getByRole("button", { name: "Clear Icon" }));
+    assert.equal(iconInput.value, "");
+    assert.equal(screen.getByText(/Icon is used in some views only/).textContent?.length > 0, true);
+});
+
+test("custom metric icon picker shows the stored icon label", () => {
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    render(<CustomMetricSettingsHarness client={client} settings={buildCustomMetricSettings({
+        url: "https://api.example.com/weather",
+        userIntent: "Display temperature",
+        jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+        iconId: "tv",
+    })} />);
+
+    assert.equal(
+        (screen.getByRole("combobox", { name: /^Widget Icon:/ }) as HTMLInputElement).value,
+        "TV",
+    );
+});
+
+test("custom metric icon picker supports keyboard selection", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    render(<CustomMetricSettingsHarness client={client} settings={buildCustomMetricSettings({
+        url: "https://api.example.com/weather",
+        userIntent: "Display temperature",
+        jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+    })} />);
+
+    const iconInput = screen.getByRole("combobox", { name: /^Widget Icon:/ }) as HTMLInputElement;
+    await user.type(iconInput, "thermometer");
+    await user.keyboard("{Enter}");
+
+    assert.equal(iconInput.value, "Thermometer");
+    assert.equal(screen.queryByRole("listbox", { name: /^Widget Icon:/ }), null);
+});
+
+test("custom metric icon picker renders a bounded result list", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    render(<CustomMetricSettingsHarness client={client} settings={buildCustomMetricSettings({
+        url: "https://api.example.com/weather",
+        userIntent: "Display temperature",
+        jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+    })} />);
+
+    assert.equal(document.querySelectorAll(".custom-metric-icon-option").length, 0);
+    assert.equal(screen.queryByRole("listbox", { name: /^Widget Icon:/ }), null);
+
+    await user.type(screen.getByRole("combobox", { name: /^Widget Icon:/ }), "c");
+
+    assert.equal(document.querySelectorAll(".custom-metric-icon-option").length, 20);
+    assert.match(screen.getByText(/Keep typing to narrow the list/).textContent ?? "", /Keep typing/);
+});
+
+test("custom metric icon picker includes the status row in listbox height", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    render(<CustomMetricSettingsHarness client={client} settings={buildCustomMetricSettings({
+        url: "https://api.example.com/weather",
+        userIntent: "Display temperature",
+        jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+    })} />);
+
+    await user.type(screen.getByRole("combobox", { name: /^Widget Icon:/ }), "map pin x");
+
+    assert.equal(screen.getAllByRole("option").length, 2);
+    assert.equal(screen.getByRole("listbox", { name: /^Widget Icon:/ }).style.maxHeight, "92px");
+});
+
+test("custom metric icon search includes Lucide metadata keywords", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    render(<CustomMetricSettingsHarness client={client} settings={buildCustomMetricSettings({
+        url: "https://api.example.com/weather",
+        userIntent: "Display temperature",
+        jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+    })} />);
+
+    await user.type(screen.getByRole("combobox", { name: /^Widget Icon:/ }), "4k");
+
+    assert.equal(screen.getByRole("option", { name: /^TV$/ }).textContent?.includes("TV"), true);
+});
+
+test("custom metric prompt includes advisory icon suggestion field", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    render(<CustomMetricSettingsHarness client={client} settings={buildCustomMetricSettings({
+        url: "https://api.example.com/weather",
+        userIntent: "Display temperature",
+        jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+    })} />);
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    const prompt = screen.getByRole("textbox", { name: /^AI Prompt:/ }) as HTMLTextAreaElement;
+
+    assert.match(prompt.value, /"suggestedLucideIconId": "thermometer"/);
+    assert.match(prompt.value, /suggestedLucideIconId is optional and advisory/);
+});
+
 test("custom metric invalid settings keep entered fields visible for editing", async () => {
     const user = userEvent.setup();
     const client = new TestPropertyInspectorClient({
@@ -181,6 +319,7 @@ test("custom metric invalid settings keep entered fields visible for editing", a
 
     assert.equal(screen.getByText("Needs setup").textContent, "Needs setup");
     assert.equal(screen.queryByRole("textbox", { name: /^HTTP URL:/ }), null);
+    assert.equal(screen.queryByRole("combobox", { name: /^Widget Icon:/ }), null);
     await user.click(screen.getByRole("button", { name: "Edit" }));
 
     assert.equal(

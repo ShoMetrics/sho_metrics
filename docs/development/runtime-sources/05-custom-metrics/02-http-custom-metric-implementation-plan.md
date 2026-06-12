@@ -386,7 +386,8 @@ source plan, without adding runtime HTTP I/O.
 Locations:
 
 - `contracts/proto/shometrics/v1/settings.proto`
-- generated settings output under `packages/hub/src/generated/shometrics/v1/`
+- generated settings output under
+  `packages/hub/src/generated/proto/shometrics/v1/`
 - `packages/hub/src/settings/resolved-settings.ts`
 - `packages/hub/src/settings/storage/resolver/metric-target-resolver.ts`
 - `packages/hub/src/settings/storage/resolver/widget-settings-resolver.ts`
@@ -782,6 +783,8 @@ the first HTTP editor.
 
 LOC estimate: 900-1,500.
 
+Status: implemented but not committed in the current Step 6 worktree.
+
 Purpose:
 
 Let Custom Metric keys show a useful center icon without relying on emoji fonts
@@ -796,6 +799,8 @@ Locations:
 - `packages/hub/src/settings/storage/patch/`
 - `packages/hub/src/runtime/sources/custom-http/custom-http-output-schema.ts`
 - `packages/hub/src/runtime/sources/custom-http/custom-http-source-client.ts`
+- `packages/hub/scripts/generate-lucide-icon-index.mjs`
+- generated Lucide search index under `packages/hub/src/generated/`
 - `packages/hub/src/widgets/icons/`
 - `packages/hub/src/actions/custom-metric.ts`
 - `packages/hub/src/property-inspector/controls/`
@@ -814,32 +819,39 @@ Required work:
    and not rendered as broken icons.
 4. Update the copyable AI prompt to say `suggestedLucideIconId` is optional and
    advisory. The prompt must not imply that AI output writes widget settings.
-5. Generate or commit a bounded Lucide metadata index owned by Sho Metrics. It
-   may include id, display label, tags, categories, and use cases, but runtime
-   code must not depend on a developer-local Lucide checkout path.
-6. Do not bundle or render every Lucide icon component in the PI. Build a small
-   registry/search index that only renders the visible candidates.
-7. Build a custom PI picker, not an HTML native `select` and not a native popup.
+5. Generate the Lucide search index from exact-pinned npm packages, not from a
+   developer-local Lucide checkout. `lucide` owns renderable icon exports and
+   aliases; `lucide-static` owns tag metadata. The two package versions must
+   match exactly.
+6. Keep the Lucide search index under `packages/hub/src/generated/` as an
+   ignored build artifact. Proto generation is scoped to
+   `packages/hub/src/generated/proto/`, so the Lucide generator can share the
+   generated root without being erased by the proto generator's `clean: true`.
+   `prebuild`, `pretest:*`, and `prelint` must run the Lucide generator.
+7. Do not render every Lucide icon component in the PI. Search the metadata
+   index, then render only the visible top candidates.
+8. Build a custom PI picker, not an HTML native `select` and not a native popup.
    Stream Deck's Qt WebEngine compatibility makes native popup behavior
    unreliable.
-8. Picker UX:
+9. Picker UX:
    - one search input;
    - no grouping in V1;
-   - empty search shows a curated default top 10;
-   - non-empty search ranks all icons by id/label/tags and renders only the top
-     10 results;
+   - empty search keeps the autocomplete result list hidden;
+   - non-empty search ranks all icons by id, label, npm-provided aliases, and
+     `lucide-static` tags using lower-case substring matching, then renders
+     only the top 10 results;
    - when more than 10 matches exist, show a short "keep typing" hint instead
      of rendering the full list.
-9. Rendering precedence:
+10. Rendering precedence:
    - if stored `icon.id` is valid, use it;
    - otherwise, if the latest validated source output has a valid
      `suggestedLucideIconId`, use it;
    - otherwise, use a non-question-mark default icon.
-10. Once the user chooses an icon, persist `icon.id` and ignore future transform
+11. Once the user chooses an icon, persist `icon.id` and ignore future transform
     suggestions for that widget until the user clears or changes the icon.
-11. The transform test preview may show the suggested icon, but testing a
+12. The transform test preview may show the suggested icon, but testing a
     transform must not persist `icon.id`.
-12. Add tests for valid/invalid icon ids, user override precedence, picker search
+13. Add tests for valid/invalid icon ids, user override precedence, picker search
     result limiting, and Custom Metric default icon rendering.
 
 Acceptance:
@@ -850,6 +862,34 @@ Acceptance:
 - A user-selected icon persists and overrides later suggestions.
 - The PI picker does not render hundreds or thousands of icon elements at once.
 - Stored settings contain `icon.id`, not a Lucide-specific stored field name.
+
+Implemented shape:
+
+- Stored settings use `CustomMetricTarget.icon.id`.
+- Resolved settings expose widget-owned `ResolvedCustomMetricTarget.iconId`.
+- Transform output accepts optional `metric.suggestedLucideIconId`; valid ids
+  are normalized through the shared Custom Metric icon registry, invalid ids are
+  ignored instead of failing the metric.
+- Source attribution carries `displayHint.suggestedLucideIconId`; action
+  rendering uses stored icon first, source suggestion second, default icon last.
+- The PI picker uses a generated Sho Metrics-owned Lucide metadata search index
+  and renders at most 10 icon candidates. It uses a search input plus a custom
+  listbox-style result list, not a native select or native popup.
+- The Lucide search index is generated at
+  `packages/hub/src/generated/custom-metric-lucide-search-index.generated.ts`
+  and is not committed. `.gitignore` keeps generated runtime artifacts ignored.
+  `prebuild`, `pretest:*`, and `prelint` regenerate it from exact-pinned npm
+  inputs.
+- The custom listbox behaves like an autocomplete: it is hidden until the user
+  types a query. Search matches lower-case substrings from the generated
+  index's id, label, npm alias names, and `lucide-static` tags. Installed
+  `lucide` npm package files do not include the upstream per-icon JSON metadata;
+  V1 intentionally uses `lucide-static/tags.json` instead of a local Lucide repo
+  checkout for reproducibility.
+- The generated search index is metadata-only; rendering resolves the selected
+  or visible Lucide icon id through the runtime icon resolver.
+- Transform testing can preview the suggested icon id but does not persist
+  `icon.id`.
 
 Do not merge with Step 7:
 

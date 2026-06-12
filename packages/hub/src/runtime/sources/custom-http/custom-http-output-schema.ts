@@ -1,4 +1,5 @@
 import { MetricUnit } from "../metric-source";
+import { normalizeCustomMetricIconId } from "../../../widgets/icons/custom-metric-icons";
 
 export const CUSTOM_HTTP_TRANSFORM_OUTPUT_LIMIT_BYTES = 64 * 1024;
 
@@ -15,6 +16,7 @@ export interface CustomHttpMetricTransformOutput {
     readonly unit: MetricUnit;
     readonly customUnit?: string;
     readonly maximum?: number;
+    readonly suggestedLucideIconId?: string;
 }
 
 export type CustomHttpMetricTransformValidationResult =
@@ -72,6 +74,7 @@ export function validateCustomHttpMetricTransformOutput(
     if (!maximumResult.ok) {
         return invalid(maximumResult.reason);
     }
+    const suggestedLucideIconId = readSuggestedLucideIconId(metric["suggestedLucideIconId"]);
 
     return {
         ok: true,
@@ -81,6 +84,7 @@ export function validateCustomHttpMetricTransformOutput(
             unit: unitResult.unit,
             ...(unitResult.customUnit ? { customUnit: unitResult.customUnit } : {}),
             ...(maximumResult.value !== undefined ? { maximum: maximumResult.value } : {}),
+            ...(suggestedLucideIconId === undefined ? {} : { suggestedLucideIconId }),
         },
     };
 }
@@ -207,6 +211,12 @@ function normalizeCustomHttpUnitName(unit: string): string {
         .replace(/[\s-]+/g, "_")
         .replace(/_+/g, "_")
         .replace(/^_+|_+$/g, "");
+}
+
+function readSuggestedLucideIconId(value: unknown): string | undefined {
+    return typeof value === "string"
+        ? normalizeCustomMetricIconId(value)
+        : undefined;
 }
 
 function invalid(reason: string): { readonly ok: false; readonly reason: string } {

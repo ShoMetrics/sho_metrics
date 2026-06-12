@@ -246,6 +246,7 @@ export interface ResolvedCatalogMetricTarget {
 export interface ResolvedCustomMetricTarget {
     readonly domain: "customMetric";
     readonly configuration: ResolvedCustomMetricConfiguration;
+    readonly iconId: string | undefined;
 }
 
 export type ResolvedCustomMetricConfiguration =

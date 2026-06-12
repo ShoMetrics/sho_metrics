@@ -238,6 +238,9 @@ function buildValueAttribution(
             unit: output.unit,
             ...(output.customUnit === undefined ? {} : { customUnit: output.customUnit }),
             ...(output.maximum === undefined ? {} : { maximum: output.maximum }),
+            ...(output.suggestedLucideIconId === undefined ? {} : {
+                suggestedLucideIconId: output.suggestedLucideIconId,
+            }),
         },
         rawSensorIdentity: {
             sourceSensorId: metricKey,

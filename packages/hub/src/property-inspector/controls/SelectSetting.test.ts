@@ -11,8 +11,8 @@ import {
     moveActiveOptionIndex,
     normalizeRepeatedCharacterSearchText,
     resolveActiveOptionIndex,
-} from "./select-navigation";
-import { resolveSelectListboxLayout } from "./select-layout";
+} from "./listbox/navigation";
+import { resolveListboxLayout } from "./listbox/layout";
 import type { SelectOption } from "../inspector/types";
 
 const colorModeOptions = [
@@ -163,8 +163,8 @@ test("custom select typeahead ignores disabled options and supports repeated let
 });
 
 test("custom select layout opens below when the viewport has room", () => {
-    assert.deepEqual(resolveSelectListboxLayout({
-        optionCount: 3,
+    assert.deepEqual(resolveListboxLayout({
+        rowCount: 3,
         triggerRect: {
             bottom: 128,
             top: 100,
@@ -177,8 +177,8 @@ test("custom select layout opens below when the viewport has room", () => {
 });
 
 test("custom select layout shows polling frequency options without forced scrolling", () => {
-    assert.deepEqual(resolveSelectListboxLayout({
-        optionCount: 8,
+    assert.deepEqual(resolveListboxLayout({
+        rowCount: 8,
         triggerRect: {
             bottom: 120,
             top: 92,
@@ -191,8 +191,8 @@ test("custom select layout shows polling frequency options without forced scroll
 });
 
 test("custom select layout uses the caller option height", () => {
-    assert.deepEqual(resolveSelectListboxLayout({
-        optionCount: 2,
+    assert.deepEqual(resolveListboxLayout({
+        rowCount: 2,
         optionHeightPixels: 40,
         triggerRect: {
             bottom: 120,
@@ -206,8 +206,8 @@ test("custom select layout uses the caller option height", () => {
 });
 
 test("custom select layout opens above when the bottom edge would clip the listbox", () => {
-    assert.deepEqual(resolveSelectListboxLayout({
-        optionCount: 4,
+    assert.deepEqual(resolveListboxLayout({
+        rowCount: 4,
         triggerRect: {
             bottom: 388,
             top: 360,
@@ -220,8 +220,8 @@ test("custom select layout opens above when the bottom edge would clip the listb
 });
 
 test("custom select layout limits height to the available viewport space", () => {
-    assert.deepEqual(resolveSelectListboxLayout({
-        optionCount: 10,
+    assert.deepEqual(resolveListboxLayout({
+        rowCount: 10,
         triggerRect: {
             bottom: 48,
             top: 20,

@@ -367,24 +367,30 @@ function resolveCatalogMetricTarget(storedTarget: StoredCatalogMetricTarget): Re
 }
 
 function resolveCustomMetricTarget(storedTarget: StoredCustomMetricTarget): ResolvedCustomMetricTarget {
+    const iconId = storedTarget.icon?.id?.trim() || undefined;
     switch (storedTarget.source.case) {
         case undefined:
             return {
                 domain: "customMetric",
+                iconId,
                 configuration: { state: "unconfigured" },
             };
         case "http":
-            return resolveCustomHttpMetricSource(storedTarget.source.value);
+            return resolveCustomHttpMetricSource(storedTarget.source.value, iconId);
     }
 
     return assertNever(storedTarget.source);
 }
 
-function resolveCustomHttpMetricSource(storedHttpSource: StoredCustomHttpMetricSource): ResolvedCustomMetricTarget {
+function resolveCustomHttpMetricSource(
+    storedHttpSource: StoredCustomHttpMetricSource,
+    iconId: string | undefined,
+): ResolvedCustomMetricTarget {
     const request = readSingleCustomHttpRequest(storedHttpSource);
     if (request === undefined) {
         return {
             domain: "customMetric",
+            iconId,
             configuration: { state: "unconfigured" },
         };
     }
@@ -400,6 +406,7 @@ function resolveCustomHttpMetricSource(storedHttpSource: StoredCustomHttpMetricS
     if (invalidReason !== undefined) {
         return {
             domain: "customMetric",
+            iconId,
             configuration: {
                 state: "invalid",
                 reason: invalidReason,
@@ -410,6 +417,7 @@ function resolveCustomHttpMetricSource(storedHttpSource: StoredCustomHttpMetricS
 
     return {
         domain: "customMetric",
+        iconId,
         configuration: {
             state: "configured",
             source,
