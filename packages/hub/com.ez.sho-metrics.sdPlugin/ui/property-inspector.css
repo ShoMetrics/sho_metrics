@@ -255,6 +255,13 @@ body {
     width: 100%;
 }
 
+.native-textarea {
+    font-family: inherit;
+    line-height: 1.35;
+    min-height: 72px;
+    resize: vertical;
+}
+
 .native-input[aria-invalid="true"] {
     border-color: #d66;
 }
@@ -510,6 +517,11 @@ body {
     grid-template-columns: minmax(0, 1fr) auto;
     min-width: 0;
     width: 100%;
+}
+
+.text-field-with-block-action {
+    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr);
 }
 
 .readonly-inline {

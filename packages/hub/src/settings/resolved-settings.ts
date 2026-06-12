@@ -250,7 +250,11 @@ export interface ResolvedCustomMetricTarget {
 
 export type ResolvedCustomMetricConfiguration =
     | { readonly state: "unconfigured" }
-    | { readonly state: "invalid"; readonly reason: CustomMetricInvalidReason }
+    | {
+        readonly state: "invalid";
+        readonly reason: CustomMetricInvalidReason;
+        readonly source: ResolvedCustomMetricSource;
+    }
     | {
         readonly state: "configured";
         readonly source: ResolvedCustomMetricSource;

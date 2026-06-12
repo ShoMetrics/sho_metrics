@@ -10,6 +10,7 @@ import {
     type SettingsNotice,
 } from "./settings-sync/usePropertyInspectorSettings";
 import type { StreamDeckPropertyInspectorClient } from "./stream-deck/stream-deck-client";
+import { StreamDeckClientProvider } from "./stream-deck/stream-deck-client-context";
 
 interface AppProps {
     client: StreamDeckPropertyInspectorClient;
@@ -59,48 +60,50 @@ export function App({ client }: AppProps): React.JSX.Element {
     }
 
     return (
-        <div>
-            <div className="settings-tab-list" role="tablist" aria-label={t(shellMessages.settingsTabListLabel)}>
-                {settingsTabs.map((tab) => (
-                    <button
-                        key={tab.id}
-                        className="settings-tab"
-                        type="button"
-                        role="tab"
-                        aria-selected={activeTab === tab.id}
-                        data-selected={activeTab === tab.id ? "true" : "false"}
-                        onClick={() => setActiveTab(tab.id)}
-                    >
-                        {t(tab.label)}
-                    </button>
-                ))}
+        <StreamDeckClientProvider client={client}>
+            <div>
+                <div className="settings-tab-list" role="tablist" aria-label={t(shellMessages.settingsTabListLabel)}>
+                    {settingsTabs.map((tab) => (
+                        <button
+                            key={tab.id}
+                            className="settings-tab"
+                            type="button"
+                            role="tab"
+                            aria-selected={activeTab === tab.id}
+                            data-selected={activeTab === tab.id ? "true" : "false"}
+                            onClick={() => setActiveTab(tab.id)}
+                        >
+                            {t(tab.label)}
+                        </button>
+                    ))}
+                </div>
+
+                <SettingsNoticeSlot
+                    notice={activeTab === "widget" ? widgetSettingsNotice : globalSettingsNotice}
+                />
+
+                {activeTab === "widget" ? (
+                    <WidgetSettingsTab
+                        context={visibilityContext}
+                        isGlobalViewOverrideEnabled={isGlobalViewOverrideEnabled}
+                        isGlobalThemeOverrideEnabled={isGlobalThemeOverrideEnabled}
+                        isGlobalTransparentSurfaceOverrideEnabled={isGlobalTransparentSurfaceOverrideEnabled}
+                        isGlobalPaintOverrideEnabled={isGlobalPaintOverrideEnabled}
+                        colorCompensationProfile={colorCompensation.profile}
+                        onSettingsPatch={updateWidgetSettings}
+                        onResetWidgetSettings={resetWidgetSettings}
+                        onOpenColorCompensation={() => setIsColorCompensationWizardOpen(true)}
+                    />
+                ) : (
+                    <GlobalSettingsTab
+                        resolvedSettings={resolvedGlobalSettings}
+                        colorCompensationProfile={colorCompensation.profile}
+                        onSettingsPatch={updateGlobalSettings}
+                        onOpenColorCompensation={() => setIsColorCompensationWizardOpen(true)}
+                    />
+                )}
             </div>
-
-            <SettingsNoticeSlot
-                notice={activeTab === "widget" ? widgetSettingsNotice : globalSettingsNotice}
-            />
-
-            {activeTab === "widget" ? (
-                <WidgetSettingsTab
-                    context={visibilityContext}
-                    isGlobalViewOverrideEnabled={isGlobalViewOverrideEnabled}
-                    isGlobalThemeOverrideEnabled={isGlobalThemeOverrideEnabled}
-                    isGlobalTransparentSurfaceOverrideEnabled={isGlobalTransparentSurfaceOverrideEnabled}
-                    isGlobalPaintOverrideEnabled={isGlobalPaintOverrideEnabled}
-                    colorCompensationProfile={colorCompensation.profile}
-                    onSettingsPatch={updateWidgetSettings}
-                    onResetWidgetSettings={resetWidgetSettings}
-                    onOpenColorCompensation={() => setIsColorCompensationWizardOpen(true)}
-                />
-            ) : (
-                <GlobalSettingsTab
-                    resolvedSettings={resolvedGlobalSettings}
-                    colorCompensationProfile={colorCompensation.profile}
-                    onSettingsPatch={updateGlobalSettings}
-                    onOpenColorCompensation={() => setIsColorCompensationWizardOpen(true)}
-                />
-            )}
-        </div>
+        </StreamDeckClientProvider>
     );
 }
 

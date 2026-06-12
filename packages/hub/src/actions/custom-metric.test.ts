@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type {
     DidReceiveSettingsEvent,
+    SendToPluginEvent,
     WillAppearEvent,
     WillDisappearEvent,
 } from "@elgato/streamdeck";
@@ -11,6 +12,8 @@ import {
 } from "./custom-metric";
 import type { MetricCollectionBinding } from "./metric-action";
 import type { MetricStoreReader, MetricWidgetDataReadResult } from "../runtime/metric-store";
+import type { CustomHttpFetcher, CustomHttpFetchResult } from "../runtime/sources/custom-http/custom-http-fetcher";
+import type { CustomHttpPiTestResponse } from "../runtime/sources/custom-http/custom-http-pi-test-messages";
 import { listMetricReadPlanKeys, normalizeMetricReadPlan } from "../runtime/source-routing/metric-read-plan";
 import { CustomHttpDefinitionRegistry } from "../runtime/sources/custom-http/custom-http-definition-registry";
 import {
@@ -18,8 +21,10 @@ import {
     CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
 } from "../runtime/sources/custom-http/custom-http-metric-key";
 import { MetricUnit } from "../runtime/sources/metric-source";
+import type { CustomHttpTransformResult, CustomHttpTransformRunner } from "../runtime/sources/custom-http/custom-http-transform-worker-pool";
 import type { MetricValueDisplayHint } from "../runtime/sources/source-client";
 import { CUSTOM_HTTP_SOURCE_ID } from "../runtime/sources/source-ids";
+import { composeMetricViewFrame } from "../view-rendering/metric-view-frame";
 import type { WidgetData } from "../view-rendering/widget-data";
 import { resolveInitialActionSettings } from "./settings/action-settings-resolver";
 import { writeStoredWidgetSettingsPatch } from "../settings/storage/patch/widget-settings-patch";
@@ -246,12 +251,155 @@ test("Custom Metric view preserves custom unit text without catalog unit formatt
     assert.equal(viewOptions.widgetData.displayValue, undefined);
 });
 
+test("Custom Metric circle variants compact long source labels before rendering", () => {
+    for (const circleVariant of ["full-ring", "gauge"] as const) {
+        const rawSettings = writeStoredWidgetSettingsPatch(buildCustomMetricWidgetSettings({
+            url: "https://api.example.com/data",
+            userIntent: "show custom latency",
+            jqTransform: ".",
+        }), {
+            appearance: {
+                view: {
+                    selectedView: "circle",
+                    circleVariant,
+                },
+            },
+        });
+        const settings = resolveInitialActionSettings(rawSettings, "customMetric").resolvedSettings;
+
+        const viewOptions = buildCustomMetricViewOptions({
+            event: buildWillAppearEvent(new FakeStreamDeckAction(`custom-circle-${circleVariant}`), rawSettings),
+            settings,
+            target: readCustomMetricTarget(settings),
+            metrics: new CapturingMetricStoreReader({
+                current: 211.28,
+                sampleTimestampMilliseconds: 1234,
+                displayHint: {
+                    label: "Aether",
+                    unit: MetricUnit.UNSPECIFIED,
+                    customUnit: "ms",
+                    maximum: 300,
+                },
+            }),
+        });
+
+        assert.equal(viewOptions.widgetData.label, "AETH");
+        assert.doesNotThrow(() => composeMetricViewFrame({ viewOptions, renderTarget: "key" }));
+    }
+});
+
+test("Custom Metric PI sample fetch returns bounded preview through the action boundary", async () => {
+    const registry = new CustomHttpDefinitionRegistry();
+    const fetcher = new FakeCustomHttpFetcher({
+        ok: true,
+        responseText: "{\"temp\":23.5}",
+    });
+    const action = new TestCustomMetric(registry, { fetcher });
+    const streamDeckAction = new FakeStreamDeckAction("custom-pi-fetch-action");
+
+    action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCustomMetricWidgetSettings()));
+    action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
+        type: "custom-http-pi-test",
+        command: "fetchSample",
+        requestId: "fetch-1",
+        url: "https://api.example.com/weather",
+    }));
+
+    await waitForAsyncWork();
+
+    assert.equal(fetcher.urlList[0], "https://api.example.com/weather");
+    assert.deepEqual(action.customMetricTestResponses[0], {
+        type: "custom-http-pi-test",
+        command: "fetchSample",
+        requestId: "fetch-1",
+        result: {
+            ok: true,
+            responseBytes: 13,
+            samplePreview: "{\"temp\":23.5}",
+            isSamplePreviewTruncated: false,
+        },
+    });
+});
+
+test("Custom Metric PI transform test uses cached sample without storing it in settings", async () => {
+    const registry = new CustomHttpDefinitionRegistry();
+    const fetcher = new FakeCustomHttpFetcher({
+        ok: true,
+        responseText: "{\"temp\":23.5}",
+    });
+    const transformRunner = new FakeCustomHttpTransformRunner({
+        ok: true,
+        output: {
+            metric: {
+                label: "TEMP",
+                value: 23.5,
+                unit: "celsius",
+                maximum: 100,
+            },
+        },
+    });
+    const action = new TestCustomMetric(registry, { fetcher, transformRunner });
+    const streamDeckAction = new FakeStreamDeckAction("custom-pi-transform-action");
+
+    action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCustomMetricWidgetSettings({
+        url: "https://api.example.com/weather",
+        userIntent: "show temp",
+        jqTransform: ".",
+    })));
+    action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
+        type: "custom-http-pi-test",
+        command: "fetchSample",
+        requestId: "fetch-1",
+        url: "https://api.example.com/weather",
+    }));
+    await waitForAsyncWork();
+
+    action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
+        type: "custom-http-pi-test",
+        command: "testTransform",
+        requestId: "transform-1",
+        url: "https://api.example.com/weather",
+        jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\", maximum: 100 } }",
+    }));
+    await waitForAsyncWork();
+
+    assert.deepEqual(transformRunner.inputJsonList[0], { temp: 23.5 });
+    assert.equal(
+        transformRunner.jqTransformList[0],
+        "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\", maximum: 100 } }",
+    );
+    assert.deepEqual(action.customMetricTestResponses.at(-1), {
+        type: "custom-http-pi-test",
+        command: "testTransform",
+        requestId: "transform-1",
+        result: {
+            ok: true,
+            metric: {
+                label: "TEMP",
+                value: 23.5,
+                unitText: "C",
+                maximum: 100,
+            },
+        },
+    });
+});
+
 class TestCustomMetric extends CustomMetric {
     readonly bindings: FakeMetricCollectionBinding[] = [];
+    readonly customMetricTestResponses: CustomHttpPiTestResponse[] = [];
     metricsUpdateCallCount = 0;
 
-    constructor(definitionRegistry: CustomHttpDefinitionRegistry) {
-        super({ definitionRegistry });
+    constructor(
+        definitionRegistry: CustomHttpDefinitionRegistry,
+        options: {
+            readonly fetcher?: CustomHttpFetcher;
+            readonly transformRunner?: CustomHttpTransformRunner;
+        } = {},
+    ) {
+        super({
+            definitionRegistry,
+            ...options,
+        });
     }
 
     protected override createMetricCollectionBinding(): MetricCollectionBinding {
@@ -265,6 +413,15 @@ class TestCustomMetric extends CustomMetric {
     }
 
     protected override updateRuntimeCache(): Promise<void> {
+        return Promise.resolve();
+    }
+
+    protected override sendCustomMetricTestResponse(
+        event: SendToPluginEvent<never, Record<string, never>>,
+        response: CustomHttpPiTestResponse,
+    ): Promise<void> {
+        void event;
+        this.customMetricTestResponses.push(response);
         return Promise.resolve();
     }
 }
@@ -340,6 +497,37 @@ class CapturingMetricStoreReader implements MetricStoreReader {
     }
 }
 
+class FakeCustomHttpFetcher implements CustomHttpFetcher {
+    readonly urlList: string[] = [];
+
+    constructor(private readonly result: CustomHttpFetchResult) {}
+
+    fetchJson(url: string): Promise<CustomHttpFetchResult> {
+        this.urlList.push(url);
+        return Promise.resolve(this.result);
+    }
+}
+
+class FakeCustomHttpTransformRunner implements CustomHttpTransformRunner {
+    readonly inputJsonList: unknown[] = [];
+    readonly jqTransformList: string[] = [];
+
+    constructor(private readonly result: CustomHttpTransformResult) {}
+
+    runTransform(options: {
+        readonly inputJson: unknown;
+        readonly jqTransform: string;
+    }): Promise<CustomHttpTransformResult> {
+        this.inputJsonList.push(options.inputJson);
+        this.jqTransformList.push(options.jqTransform);
+        return Promise.resolve(this.result);
+    }
+
+    dispose(): void {
+        return;
+    }
+}
+
 class FakeStreamDeckAction {
     constructor(readonly id: string) {}
 
@@ -396,6 +584,17 @@ function buildDidReceiveSettingsEvent(action: FakeStreamDeckAction, settings: un
     } as unknown as DidReceiveSettingsEvent;
 }
 
+function buildSendToPluginEvent(action: FakeStreamDeckAction, payload: unknown): SendToPluginEvent<never, Record<string, never>> {
+    return {
+        action,
+        payload,
+    } as unknown as SendToPluginEvent<never, Record<string, never>>;
+}
+
 function buildWillDisappearEvent(action: FakeStreamDeckAction): WillDisappearEvent {
     return { action } as unknown as WillDisappearEvent;
+}
+
+async function waitForAsyncWork(): Promise<void> {
+    await new Promise(resolve => setImmediate(resolve));
 }

@@ -284,6 +284,209 @@ export const catalogMessages = {
     },
 } as const satisfies LocalizedMessages;
 
+export const customMetricMessages = {
+    sourceSection: {
+        en: "Source",
+        zh_CN: "来源",
+        ja: "ソース",
+    },
+    editSourceSection: {
+        en: "HTTP Source",
+        zh_CN: "HTTP 来源",
+        ja: "HTTP ソース",
+    },
+    transformSection: {
+        en: "Transform",
+        zh_CN: "转换",
+        ja: "変換",
+    },
+    resultSection: {
+        en: "Result",
+        zh_CN: "结果",
+        ja: "結果",
+    },
+    sourceSummaryLabel: {
+        en: "HTTP Source",
+        zh_CN: "HTTP 来源",
+        ja: "HTTP ソース",
+    },
+    sourceConfiguredSummary: {
+        en: "Configured",
+        zh_CN: "已配置",
+        ja: "設定済み",
+    },
+    sourceNeedsSetupSummary: {
+        en: "Needs setup",
+        zh_CN: "需要设置",
+        ja: "設定が必要",
+    },
+    editSourceButton: {
+        en: "Edit",
+        zh_CN: "编辑",
+        ja: "編集",
+    },
+    backToWidgetButton: {
+        en: "Back",
+        zh_CN: "返回",
+        ja: "戻る",
+    },
+    editSourceNote: {
+        en: "Edits save automatically. Go back to edit widget appearance and polling.",
+        zh_CN: "编辑会自动保存。返回后可编辑组件外观和轮询。",
+        ja: "編集は自動保存されます。戻るとウィジェットの外観とポーリングを編集できます。",
+    },
+    urlLabel: {
+        en: "HTTP URL",
+        zh_CN: "HTTP URL",
+        ja: "HTTP URL",
+    },
+    urlPlaceholder: {
+        en: "https://api.example.com/data.json",
+        zh_CN: "https://api.example.com/data.json",
+        ja: "https://api.example.com/data.json",
+    },
+    userIntentLabel: {
+        en: "What to Show",
+        zh_CN: "要显示什么",
+        ja: "表示したい内容",
+    },
+    userIntentPlaceholder: {
+        en: "Display current temperature",
+        zh_CN: "显示当前温度",
+        ja: "現在の気温を表示",
+    },
+    userIntentHint: {
+        en: "Memo for you and prompt context for AI: describe exactly which value to display, for example: current temperature in Tokyo.",
+        zh_CN: "这是给自己看的备忘，也是给 AI 的提示词上下文：明确写出要显示哪个值，例如：东京当前温度。",
+        ja: "自分用のメモであり、AI に渡すプロンプトの文脈でもあります。表示したい値を具体的に書いてください。例: 東京の現在の気温。",
+    },
+    jqTransformLabel: {
+        en: "jq Transform",
+        zh_CN: "jq 转换",
+        ja: "jq 変換",
+    },
+    jqTransformPlaceholder: {
+        en: "{ metric: { label: \"TEMP\", value: .temperature, unit: \"celsius\" } }",
+        zh_CN: "{ metric: { label: \"TEMP\", value: .temperature, unit: \"celsius\" } }",
+        ja: "{ metric: { label: \"TEMP\", value: .temperature, unit: \"celsius\" } }",
+    },
+    jqTransformHint: {
+        en: "Paste the jq transform rule here. The recommended workflow is to copy the AI prompt above into your favorite AI chatbot, then paste the generated jq rule back here.",
+        zh_CN: "在这里粘贴 jq 转换规则。推荐流程是把上面的 AI 提示词复制到你常用的 AI 聊天工具，让它生成 jq 规则，再复制回来。",
+        ja: "ここに jq 変換ルールを貼り付けます。上の AI プロンプトを普段使う AI チャットにコピーし、生成された jq ルールをここへ貼り付ける流れを推奨します。",
+    },
+    fetchSampleButton: {
+        en: "Fetch Sample",
+        zh_CN: "获取样本",
+        ja: "サンプル取得",
+    },
+    testTransformButton: {
+        en: "Test Transform",
+        zh_CN: "测试转换",
+        ja: "変換をテスト",
+    },
+    copyPromptButton: {
+        en: "Copy Prompt",
+        zh_CN: "复制提示词",
+        ja: "プロンプトをコピー",
+    },
+    promptLabel: {
+        en: "AI Prompt",
+        zh_CN: "AI 提示词",
+        ja: "AI プロンプト",
+    },
+    promptNeedsSampleHint: {
+        en: "To copy the prompt, first fetch a sample JSON.",
+        zh_CN: "要复制提示词，请先获取一个 JSON 样本。",
+        ja: "プロンプトをコピーするには、先にサンプル JSON を取得してください。",
+    },
+    promptHint: {
+        en: "Copy this prompt into your favorite AI chatbot to generate the jq rule for the data transform.",
+        zh_CN: "把这段提示词复制到你常用的 AI 聊天工具，让 AI 帮你生成数据转换需要的 jq 规则。",
+        ja: "このプロンプトを普段使う AI チャットにコピーして、データ変換用の jq ルールを生成します。",
+    },
+    fetchSampleFirstNote: {
+        en: "Fetch a sample before testing the transform.",
+        zh_CN: "测试转换前请先获取样本。",
+        ja: "変換をテストする前にサンプルを取得してください。",
+    },
+    goToFetchSampleButton: {
+        en: "Go to Fetch Sample",
+        zh_CN: "转到获取样本",
+        ja: "サンプル取得へ移動",
+    },
+    fetchLimitsNote: {
+        en: "Current fetch settings: {timeoutSeconds}s timeout, {retryCount} retries, {responseLimitKiB} KiB response limit.",
+        zh_CN: "当前请求设置：{timeoutSeconds} 秒超时、{retryCount} 次重试、响应上限 {responseLimitKiB} KiB。",
+        ja: "現在の取得設定: {timeoutSeconds} 秒タイムアウト、{retryCount} 回リトライ、レスポンス上限 {responseLimitKiB} KiB。",
+    },
+    noSecretsNote: {
+        en: "Custom Metric settings are saved in Stream Deck action settings and included in Stream Deck exports. Do not use secrets, tokens, cookies, or private URLs.",
+        zh_CN: "自定义指标设置会保存到 Stream Deck 操作设置中，并包含在 Stream Deck 导出里。不要使用密钥、令牌、Cookie 或私密 URL。",
+        ja: "カスタムメトリクス設定は Stream Deck のアクション設定に保存され、Stream Deck のエクスポートにも含まれます。シークレット、トークン、Cookie、非公開 URL は使用しないでください。",
+    },
+    sampleReadyNote: {
+        en: "Sample fetched. Response size: {bytes} bytes.",
+        zh_CN: "样本已获取。响应大小：{bytes} 字节。",
+        ja: "サンプルを取得しました。レスポンスサイズ: {bytes} バイト。",
+    },
+    samplePreviewLabel: {
+        en: "Sample Preview",
+        zh_CN: "样本预览",
+        ja: "サンプルプレビュー",
+    },
+    samplePreviewTruncatedHint: {
+        en: "This preview is truncated. The AI prompt uses this truncated preview, so results may be unreliable if the requested field is missing.",
+        zh_CN: "这个预览已被截断。AI 提示词会使用这段截断预览；如果目标字段不在预览里，生成结果可能不可靠。",
+        ja: "このプレビューは切り詰められています。AI プロンプトもこの切り詰めたプレビューを使うため、必要なフィールドが含まれない場合は結果が不安定になる可能性があります。",
+    },
+    transformPreviewLabel: {
+        en: "Validated Metric",
+        zh_CN: "已验证指标",
+        ja: "検証済みメトリクス",
+    },
+    testingNote: {
+        en: "Testing...",
+        zh_CN: "正在测试...",
+        ja: "テスト中...",
+    },
+    testFailedNote: {
+        en: "Test failed. Copy the failure details for debugging.",
+        zh_CN: "测试失败。可以复制错误详情用于排查。",
+        ja: "テストに失敗しました。デバッグ用にエラー詳細をコピーできます。",
+    },
+    fetchSampleFailedNote: {
+        en: "Fetching sample failed. See failure debug details below.",
+        zh_CN: "获取样本失败。请查看下方错误调试详情。",
+        ja: "サンプル取得に失敗しました。下のエラーデバッグ詳細を確認してください。",
+    },
+    failureDetailsLabel: {
+        en: "Failure Debug Details",
+        zh_CN: "错误调试详情",
+        ja: "エラーデバッグ詳細",
+    },
+    promptCopiedNote: {
+        en: "Prompt copied.",
+        zh_CN: "提示词已复制。",
+        ja: "プロンプトをコピーしました。",
+    },
+    promptCopyFailedNote: {
+        en: "Copy failed. Select the prompt and copy it manually.",
+        zh_CN: "复制失败。请选择提示词并手动复制。",
+        ja: "コピーできませんでした。プロンプトを選択して手動でコピーしてください。",
+    },
+    validationUrlRequired: {
+        en: "Enter an HTTP or HTTPS URL.",
+        zh_CN: "请输入 HTTP 或 HTTPS URL。",
+        ja: "HTTP または HTTPS URL を入力してください。",
+    },
+    validationTransformRequired: {
+        en: "Enter a jq transform.",
+        zh_CN: "请输入 jq 转换。",
+        ja: "jq 変換を入力してください。",
+    },
+} as const satisfies LocalizedMessages;
+
 export const denseMessages = {
     rowsSection: {
         en: "Metrics",
