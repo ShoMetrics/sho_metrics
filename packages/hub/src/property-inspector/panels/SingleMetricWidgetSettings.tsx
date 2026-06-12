@@ -1,6 +1,7 @@
 import type { ResolvedMetricTarget } from "../../settings/resolved-settings";
 import { CatalogMetricWidgetSettings } from "./CatalogMetricWidgetSettings";
 import { CpuWidgetSettings } from "./CpuWidgetSettings";
+import { CustomMetricWidgetSettings } from "./CustomMetricWidgetSettings";
 import { DefaultWidgetSettings } from "./DefaultWidgetSettings";
 import { DiskWidgetSettings } from "./DiskWidgetSettings";
 import { GpuWidgetSettings } from "./GpuWidgetSettings";
@@ -21,8 +22,9 @@ export function SingleMetricWidgetSettings(props: WidgetSettingsPanelProps & {
             return <CpuWidgetSettings {...props} target={props.target} />;
         case "catalog":
             return <CatalogMetricWidgetSettings {...props} target={props.target} />;
-        case "memory":
         case "customMetric":
+            return <CustomMetricWidgetSettings {...props} target={props.target} />;
+        case "memory":
             return <DefaultWidgetSettings {...props} />;
     }
 }

@@ -55,6 +55,24 @@ function replaceCompileTimeConstants() {
     };
 }
 
+function shimCustomHttpTransformWorkerCommonJsGlobals() {
+    return {
+        name: "shim-custom-http-transform-worker-commonjs-globals",
+        renderChunk(code, chunk) {
+            if (chunk.fileName !== "custom-http-transform-worker.js") {
+                return null;
+            }
+
+            return {
+                // jq-wasm's Emscripten Node path still probes CommonJS
+                // `__dirname`; the emitted worker is ESM.
+                code: `const __dirname = new URL(".", import.meta.url).pathname;\n${code}`,
+                map: null,
+            };
+        },
+    };
+}
+
 function copyRuntimeAssets() {
     const assetDirectories = [
         ["assets/fonts", `${sdPlugin}/assets/fonts`],
@@ -148,9 +166,14 @@ const pluginConfig = {
             exportConditions: ["node"],
             preferBuiltins: true,
         }),
-        commonjs(),
+        // workerpool probes node worker_threads from a try/catch require().
+        // The plugin bundle is ESM, so leaving that require intact crashes at
+        // startup under bin/package.json { "type": "module" }. Keep other
+        // try/catch requires untouched because packages use them for optional deps.
+        commonjs({ ignoreTryCatch: id => id !== "worker_threads" }),
         json(),
         replaceCompileTimeConstants(),
+        shimCustomHttpTransformWorkerCommonJsGlobals(),
         !isWatching && terser(),
         copyRuntimeAssets(),
         {

@@ -205,7 +205,7 @@ function buildMetricPreviewSample(target: ResolvedMetricTarget): MetricPreviewSa
         case "customMetric":
             return buildHardwarePreviewSample({
                 hardware: "unknown",
-                label: "CUSTOM",
+                label: "HTTP",
                 current: 42,
                 unit: "",
                 displayValue: "42",

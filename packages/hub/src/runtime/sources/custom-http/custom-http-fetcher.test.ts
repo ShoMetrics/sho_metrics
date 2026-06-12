@@ -58,16 +58,74 @@ test("NodeCustomHttpFetcher reports HTTP failures without logging response bodie
 test("NodeCustomHttpFetcher bounds hanging requests with an abort signal", async () => {
     const fetcher = new NodeCustomHttpFetcher({
         timeoutMilliseconds: 1,
+        dnsLookup: async () => [
+            { address: "192.0.2.1", family: 4 },
+            { address: "2001:db8::1", family: 6 },
+        ],
         fetch: async (_url, init) => new Promise<Response>((_resolve, reject) => {
             init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
         }),
     });
 
-    assert.deepEqual(await fetcher.fetchJson("https://api.example.com/data"), {
-        ok: false,
-        reason: "networkFailure",
-        detail: "HTTP request failed.",
+    const result = await fetcher.fetchJson("https://api.example.com/data");
+
+    if (result.ok) {
+        assert.fail("Expected fetch failure.");
+    }
+
+    assert.equal(result.reason, "networkFailure");
+    assert.match(
+        result.detail,
+        /^HTTP request failed\. elapsed=\d+ms\. timeout=1ms\. Error: aborted dnsElapsed=\d+ms\. dnsFamilies=ipv4:1,ipv6:1\.$/,
+    );
+});
+
+test("NodeCustomHttpFetcher includes bounded DNS failures in network diagnostics", async () => {
+    const fetcher = new NodeCustomHttpFetcher({
+        timeoutMilliseconds: 1,
+        dnsLookup: async () => {
+            throw new Error("lookup failed");
+        },
+        fetch: async (_url, init) => new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+        }),
     });
+
+    const result = await fetcher.fetchJson("https://api.example.com/data");
+
+    if (result.ok) {
+        assert.fail("Expected fetch failure.");
+    }
+
+    assert.equal(result.reason, "networkFailure");
+    assert.match(
+        result.detail,
+        /^HTTP request failed\. elapsed=\d+ms\. timeout=1ms\. Error: aborted dnsElapsed=\d+ms\. dnsFailure=Error: lookup failed$/,
+    );
+});
+
+test("NodeCustomHttpFetcher bounds slow DNS diagnostics after request failures", async () => {
+    const fetcher = new NodeCustomHttpFetcher({
+        timeoutMilliseconds: 1,
+        dnsLookup: async () => new Promise(() => {
+            // A hung DNS diagnostic must not extend the user-visible fetch failure.
+        }),
+        fetch: async (_url, init) => new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+        }),
+    });
+
+    const result = await fetcher.fetchJson("https://api.example.com/data");
+
+    if (result.ok) {
+        assert.fail("Expected fetch failure.");
+    }
+
+    assert.equal(result.reason, "networkFailure");
+    assert.match(
+        result.detail,
+        /^HTTP request failed\. elapsed=\d+ms\. timeout=1ms\. Error: aborted dnsElapsed=\d+ms\. dnsTimeout=750ms\.$/,
+    );
 });
 
 test("NodeCustomHttpFetcher reports response body read failures as network failures", async () => {
@@ -81,11 +139,14 @@ test("NodeCustomHttpFetcher reports response body read failures as network failu
         fetch: async () => new Response(failingBody),
     });
 
-    assert.deepEqual(await fetcher.fetchJson("https://api.example.com/data"), {
-        ok: false,
-        reason: "networkFailure",
-        detail: "Response body read failed.",
-    });
+    const result = await fetcher.fetchJson("https://api.example.com/data");
+
+    if (result.ok) {
+        assert.fail("Expected body read failure.");
+    }
+
+    assert.equal(result.reason, "networkFailure");
+    assert.equal(result.detail, "Response body read failed. Error: connection reset");
 });
 
 test("NodeCustomHttpFetcher preserves response-too-large failures when body cleanup fails", async () => {

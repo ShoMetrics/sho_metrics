@@ -1207,6 +1207,17 @@ describe("stored settings proto resolver", () => {
             assert.deepEqual(target.configuration, {
                 state: "invalid",
                 reason: "missingJqTransform",
+                source: {
+                    kind: "http",
+                    plan: {
+                        kind: "singleRequest",
+                        request: {
+                            url: "https://api.example.com/current",
+                            userIntent: undefined,
+                            jqTransform: "",
+                        },
+                    },
+                },
             });
         }
     });

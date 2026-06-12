@@ -36,6 +36,7 @@ import type {
     NetworkDirection,
     NetworkTrafficDisplayMode,
     ResolvedCatalogMetricTarget,
+    ResolvedCustomMetricSource,
     ResolvedCustomMetricTarget,
     ResolvedSingleCustomHttpRequest,
     ResolvedDiskReading,
@@ -389,12 +390,20 @@ function resolveCustomHttpMetricSource(storedHttpSource: StoredCustomHttpMetricS
     }
 
     const invalidReason = readCustomMetricInvalidReason(request);
+    const source: ResolvedCustomMetricSource = {
+        kind: "http",
+        plan: {
+            kind: "singleRequest",
+            request,
+        },
+    };
     if (invalidReason !== undefined) {
         return {
             domain: "customMetric",
             configuration: {
                 state: "invalid",
                 reason: invalidReason,
+                source,
             },
         };
     }
@@ -403,13 +412,7 @@ function resolveCustomHttpMetricSource(storedHttpSource: StoredCustomHttpMetricS
         domain: "customMetric",
         configuration: {
             state: "configured",
-            source: {
-                kind: "http",
-                plan: {
-                    kind: "singleRequest",
-                    request,
-                },
-            },
+            source,
         },
     };
 }

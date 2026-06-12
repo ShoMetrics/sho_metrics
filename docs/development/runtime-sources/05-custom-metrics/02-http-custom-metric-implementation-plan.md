@@ -35,15 +35,26 @@ Metric action and HTTP runtime source are stable.
 - Transform engine: jq through `jq-wasm`.
 - V1 output is exactly one metric object. Do not use `metrics[]` in the runtime
   output schema.
+- Transform output may include an optional `suggestedLucideIconId`. It is an
+  advisory display hint only.
 - V1 does not implement a reusable source catalog or source picker.
 - V1 stores the HTTP definition inside the widget settings that use it.
+- Custom Metric icon storage is widget-local and generic: store `icon.id`, not
+  `lucideIconId`. V1 code interprets `icon.id` through the app-owned Lucide
+  registry. If future icon providers are added, extend the icon schema
+  explicitly instead of overloading the string.
+- User-selected `icon.id` always wins over `suggestedLucideIconId`. A transform
+  suggestion must never overwrite widget settings.
+- Do not use emoji as the V1 default center icon. The emoji POC rendered as a
+  monochrome fallback in the current SVG/resvg pipeline, and dedicated emoji
+  font loading is a separate rendering-performance decision.
 - V1 stores the user's `user_intent` text so the PI can rebuild the prompt and
   explain what the transform is meant to extract. `user_intent` is persisted
   editor context, not runtime input; a configured URL plus jq transform can run
   even when `user_intent` is empty.
 - V1 does not implement sequence, parallel, request pipelines, request
-  dependency graphs, auth, secrets, cookies, POST bodies, local command
-  execution, or arbitrary text metrics.
+  dependency graphs, custom headers, auth, secrets, cookies, POST bodies, local
+  command execution, or arbitrary text metrics.
 - V1 does not implement Sho Metrics copy/duplicate helpers. Users should use
   Stream Deck's native copy, export, and import.
 - `http://localhost`, `http://127.0.0.1`, LAN IPs, and HTTPS URLs are allowed.
@@ -84,7 +95,15 @@ custom-http:<hostSlug>:<actionId>:<consumerSlug>
   - use `localhost`, `invalid-url`, or `unconfigured` when that is the most
     accurate bounded support label.
 - HTTP response body cap: 256 KiB.
-- HTTP request timeout: 5 seconds in V1.
+- HTTP request timeout remains fixed at 5 seconds until the request-configuration
+  step. Do not raise the default to hide DNS or network latency. A configurable
+  request policy is a separate Step 7 because it changes persisted settings, PI
+  controls, runtime fetch behavior, and diagnostics together.
+- HTTP retry count remains fixed at 0 until the request-configuration step.
+- V1 uses the system resolver by default. Do not force public DNS such as
+  1.1.1.1 or 8.8.8.8 by default; that can break VPN, corporate, campus,
+  split-horizon, localhost, and private-network names. A future advanced
+  resolver option must be explicit and off by default.
 - HTTP redirects: use Fetch's normal `follow` behavior in V1. This is an
   explicit no-auth V1 choice, not an inherited default. Revisit before adding
   auth, cookies, headers, or credential references.
@@ -120,6 +139,29 @@ Conclusion:
 - Do not use a startup-random UUID instead. It is less stable across restarts
   and adds an unnecessary in-memory mapping without improving copy/import
   isolation.
+
+## DNS Resolver POC Facts
+
+These facts were verified manually on 2026-06-12 while debugging
+`api.open-meteo.com` sample fetch timeouts.
+
+- Windows/system `dns.lookup("api.open-meteo.com")` took about 11 seconds in the
+  failing environment.
+- A Node `dns.Resolver` pointed at public DNS servers resolved the same host
+  quickly without changing system settings:
+  - Cloudflare `1.1.1.1` / `1.0.0.1`: about 11-48 ms after the first lookup;
+  - Google `8.8.8.8` / `8.8.4.4`: about 19-35 ms.
+- A per-request HTTPS client with a custom lookup callback successfully fetched
+  the Open-Meteo URL in about 170-720 ms in the same environment.
+
+Conclusion:
+
+- Per-request forced DNS is technically possible in Node without changing the
+  user's machine settings.
+- Do not use forced public DNS by default. It bypasses user, VPN, corporate,
+  campus, split-horizon, localhost, and private-network resolver behavior.
+- Keep forced DNS as a future advanced option only, after explicit design and
+  tests for localhost/private/internal hosts.
 
 ## Custom HTTP Runtime Identity Rule
 
@@ -277,7 +319,8 @@ Do not implement these in this plan:
 - multiple metrics from one transform;
 - sequence or parallel HTTP requests;
 - per-request cache policy UI;
-- auth, token, cookie, or OS credential storage;
+- auth, token, cookie, custom header, custom resolver, or OS credential
+  storage;
 - local command execution;
 - AI model integration inside Sho Metrics;
 - large JSON schema/sample prompt summarization;
@@ -523,14 +566,14 @@ Required work:
    owner may retry that task once.
 12. Validate the single-object output schema.
 13. Keep the Step 3 runtime validator as the source of truth for runtime
-   semantics. Step 7 must migrate Property Inspector tests and transform exam
+   semantics. Step 9 must migrate Property Inspector tests and transform exam
    tooling to this final schema. Do not leave a long-lived validator in
    `custom-http-output-schema.ts` and a divergent copy in
    `custom-metric-transform-check.mjs`.
 14. Do not use Ajv in Step 3. The V1 schema is a small fixed object, and the
     runtime boundary also converts units into source-owned `MetricUnit` data.
     A hand-written validator is simpler here as long as it remains the single
-    source of truth. Reconsider Ajv only if Step 5 or Step 7 needs a declarative
+    source of truth. Reconsider Ajv only if Step 5 or Step 9 needs a declarative
     schema for PI/prompt tooling and would otherwise duplicate validation
     logic.
 15. Convert output into source-owned metric sample/snapshot data and source
@@ -673,46 +716,219 @@ Locations:
 Required work:
 
 1. Add a Custom Metric settings panel.
-2. User inputs:
+2. Keep HTTP source editing in a focused drill-in page, similar to the Stacked
+   slot editor. The top-level widget page shows a source summary plus ordinary
+   appearance and polling settings; the HTTP editor page owns URL, user intent,
+   sample fetch, prompt, jq, and transform test controls.
+3. User inputs:
    - HTTP URL;
    - sample fetch/test command;
    - user intent text;
    - jq transform;
    - test transform command.
-3. Provide a copyable generic prompt using the final single-metric output
-   schema.
-4. Do not call AI services from Sho Metrics.
-5. Fetch/test through the plugin action/runtime boundary, not directly from the
+4. Provide a copyable generic prompt using the final single-metric output
+   schema. The prompt appears before the jq transform field so the user workflow
+   is: describe what to show, fetch a sample, copy the prompt to an external AI
+   chatbot, paste the generated jq rule back into Sho Metrics.
+   If the sample preview is truncated, the PI and prompt must both say so.
+   Never silently embed a truncated `...` preview as if it were complete valid
+   JSON.
+5. Do not call AI services from Sho Metrics.
+6. Fetch/test through the plugin action/runtime boundary, not directly from the
    PI browser. This avoids CORS differences and keeps bounded logging at the
    source owner.
-6. Store only settings needed for runtime. Do not store sample response bodies
+7. Store only settings needed for runtime. Do not store sample response bodies
    in action settings.
-   Sample JSON, extracted schema summaries, prompt drafts, and test output
-   previews are PI/runtime-cache state only and must disappear when the PI
-   closes or refreshes.
-7. Show detailed bounded errors in PI for URL, HTTP, JSON, jq, schema, and
-   response-size failures.
-8. Show a preview of the validated output metric.
-9. Clearly state that Custom Metric settings are saved in Stream Deck action
+   Full fetched sample JSON is action-local in-memory state only. The PI may
+   display bounded sample/output previews and prompt drafts, but none of those
+   values may be persisted or routed through the ordinary source runtime cache.
+   They must disappear when the PI closes or refreshes.
+   The action-local sample fetch/test path may own its own lazy jq runner
+   instead of sharing the runtime source-client pool. This is intentional as
+   long as the runner contract stays the same and preview/test work does not
+   mutate polling state.
+   V1 also accepts the lightweight fetch-cache race where an older in-flight PI
+   fetch can complete after a newer PI instance. The cache remains action-local,
+   URL-matched, and user-recoverable by fetching the sample again; add a
+   sequence guard only if this becomes observable in normal use.
+8. Show detailed bounded errors in PI for URL, HTTP, JSON, jq, schema, and
+   response-size failures. Failure details must be selectable and copyable so
+   users can paste them into an external debugger or support message.
+9. Show a preview of the validated output metric.
+10. Clearly state that Custom Metric settings are saved in Stream Deck action
    settings and are included in Stream Deck exports. V1 does not support
    secrets.
-10. Keep polling settings widget-level through existing `WidgetPreferences`.
+11. Keep polling settings widget-level through existing `WidgetPreferences`.
 
 Acceptance:
 
 - A user can configure a no-auth HTTP JSON endpoint and jq transform from PI.
 - PI can fetch/test a sample capped at 256 KiB.
+- Truncated sample previews are explicitly marked in the PI and in copied AI
+  prompts.
 - PI can test a transform without saving raw sample JSON.
 - Invalid configuration does not crash the PI or plugin.
 - User-visible strings are i18n-owned.
 
-Do not merge with Step 6:
+Do not merge with Step 6 or Step 7:
 
-Step 5 owns one Custom Metric action's configuration. Step 6 introduces
-multi-slot composition and slot-specific ownership. Merging them would recreate
-the Dense/Stacked PI complexity inside the first Custom Metric implementation.
+Step 5 owns the first configuration workflow with the current fixed request
+policy. Step 6 owns icon suggestion, picker, and rendering defaults. Step 7
+changes persisted request policy, runtime fetch behavior, PI controls, and
+diagnostics. Merging them would hide display and network-policy decisions inside
+the first HTTP editor.
 
-### Step 6: Dense And Stacked Consumption
+### Step 6: Custom Metric Icon Selection
+
+LOC estimate: 900-1,500.
+
+Purpose:
+
+Let Custom Metric keys show a useful center icon without relying on emoji fonts
+or hard-coded question-mark fallbacks, while keeping user choice independent
+from AI suggestions.
+
+Locations:
+
+- `contracts/proto/shometrics/v1/settings.proto`
+- generated settings files
+- `packages/hub/src/settings/storage/resolver/`
+- `packages/hub/src/settings/storage/patch/`
+- `packages/hub/src/runtime/sources/custom-http/custom-http-output-schema.ts`
+- `packages/hub/src/runtime/sources/custom-http/custom-http-source-client.ts`
+- `packages/hub/src/widgets/icons/`
+- `packages/hub/src/actions/custom-metric.ts`
+- `packages/hub/src/property-inspector/controls/`
+- `packages/hub/src/property-inspector/panels/CustomMetricWidgetSettings.tsx`
+- `packages/hub/src/i18n/message-groups/widgets.ts`
+- related proto, resolver, patch, PI, source-client, and action tests
+
+Required work:
+
+1. Add a nested Custom Metric icon settings message with `string id`. Do not name
+   the stored field `lucideIconId`; storage remains provider-neutral.
+2. In V1, interpret `icon.id` as a Lucide icon id through an app-owned registry.
+   Future non-Lucide icon providers require an explicit schema extension.
+3. Add optional `suggestedLucideIconId` to the transform output schema. Validate
+   it against the same registry. Invalid suggestions are ignored, not persisted,
+   and not rendered as broken icons.
+4. Update the copyable AI prompt to say `suggestedLucideIconId` is optional and
+   advisory. The prompt must not imply that AI output writes widget settings.
+5. Generate or commit a bounded Lucide metadata index owned by Sho Metrics. It
+   may include id, display label, tags, categories, and use cases, but runtime
+   code must not depend on a developer-local Lucide checkout path.
+6. Do not bundle or render every Lucide icon component in the PI. Build a small
+   registry/search index that only renders the visible candidates.
+7. Build a custom PI picker, not an HTML native `select` and not a native popup.
+   Stream Deck's Qt WebEngine compatibility makes native popup behavior
+   unreliable.
+8. Picker UX:
+   - one search input;
+   - no grouping in V1;
+   - empty search shows a curated default top 10;
+   - non-empty search ranks all icons by id/label/tags and renders only the top
+     10 results;
+   - when more than 10 matches exist, show a short "keep typing" hint instead
+     of rendering the full list.
+9. Rendering precedence:
+   - if stored `icon.id` is valid, use it;
+   - otherwise, if the latest validated source output has a valid
+     `suggestedLucideIconId`, use it;
+   - otherwise, use a non-question-mark default icon.
+10. Once the user chooses an icon, persist `icon.id` and ignore future transform
+    suggestions for that widget until the user clears or changes the icon.
+11. The transform test preview may show the suggested icon, but testing a
+    transform must not persist `icon.id`.
+12. Add tests for valid/invalid icon ids, user override precedence, picker search
+    result limiting, and Custom Metric default icon rendering.
+
+Acceptance:
+
+- The default Custom Metric circle center icon is not a question mark and does
+  not use emoji.
+- AI-suggested icons render only when the user has not chosen an icon.
+- A user-selected icon persists and overrides later suggestions.
+- The PI picker does not render hundreds or thousands of icon elements at once.
+- Stored settings contain `icon.id`, not a Lucide-specific stored field name.
+
+Do not merge with Step 7:
+
+Step 6 owns display identity, icon suggestion, PI picker behavior, and renderer
+icon defaults. Step 7 owns HTTP request policy. Combining them would mix visual
+configuration with network behavior and make both harder to review.
+
+### Step 7: Custom HTTP Request Configuration
+
+LOC estimate: 700-1,200.
+
+Purpose:
+
+Let users tune HTTP request behavior without changing the Custom Metric source
+model into a reusable source catalog or an auth system.
+
+Locations:
+
+- `contracts/proto/shometrics/v1/settings.proto`
+- `packages/hub/src/settings/storage/resolver/`
+- `packages/hub/src/settings/storage/patch/`
+- `packages/hub/src/runtime/sources/custom-http/custom-http-fetcher.ts`
+- `packages/hub/src/runtime/sources/custom-http/custom-http-source-client.ts`
+- `packages/hub/src/property-inspector/panels/CustomMetricWidgetSettings.tsx`
+- `packages/hub/src/i18n/message-groups/widgets.ts`
+- related resolver, patch, source-client, fetcher, and PI tests
+
+Required work:
+
+1. Add a Custom HTTP request config under the Custom HTTP definition. It must
+   belong to the HTTP source definition, not generic `WidgetPreferences`.
+2. Persist timeout and retry count only. Defaults preserve current behavior:
+   5 second timeout and 0 retries.
+3. Before coding this step, choose explicit UI bounds for timeout and retry
+   count. Do not silently choose a 15 second default.
+4. Runtime fetch, PI sample fetch, and transform test must use the same
+   resolved request config. Do not create a PI-only network policy.
+5. Retry policy must be explicit before implementation. Decide which failures
+   are retryable, such as timeout/network failure and possibly 5xx, instead of
+   retrying every HTTP or schema failure.
+6. PI must show the effective timeout, retry count, and 256 KiB response cap
+   near the sample fetch controls and in failure debug details.
+7. Keep the system DNS resolver as the default. Do not force public DNS by
+   default. If a future advanced resolver option is added, it must be explicit,
+   off by default, and must not apply to localhost, private IPs, or likely
+   internal hostnames.
+8. Do not implement custom headers, auth, cookies, tokens, sequence requests,
+   parallel requests, or per-request cache policy in this step.
+9. Do not store raw secrets in widget/action settings. If future auth is added,
+   the widget proto should store an opaque credential reference such as
+   `credential_ref`, not `token`, `token_path`, or a raw header value.
+10. Treat Stream Deck global settings/secrets as the first credential-storage
+    candidate for future auth. The installed official SDK
+    `@elgato/streamdeck@2.1.0` documents global settings as plugin-only and
+    suitable for secure persistence, and exposes `getSecrets()`. Confirm the
+    exact write/read workflow before implementing auth.
+11. Before adding any external credential-store npm package, run a package
+    safety review. Current candidates are native/prebuilt-package based; there
+    is no approved no-brainer Node credential dependency for this project.
+
+Acceptance:
+
+- Existing Custom Metric settings without request config still resolve to a 5
+  second timeout and 0 retries.
+- Users can configure timeout and retry count from the focused HTTP editor.
+- Sample fetch/test and runtime polling use identical effective request config.
+- Failure debug details include the effective timeout, retry count, and response
+  size cap without logging URL query strings, response bodies, jq transforms, or
+  secrets.
+- No auth, header, token, or credential field is added unless a later step
+  explicitly designs Stream Deck global secret/global-settings storage.
+
+Do not merge with Step 8:
+
+Step 7 owns HTTP request policy. Step 8 owns multi-slot consumers. Combining
+them would mix network behavior with Dense/Stacked slot ownership and make
+per-slot failures harder to reason about.
+
+### Step 8: Dense And Stacked Consumption
 
 Milestone: V1.1 unless the user explicitly pulls Dense/Stacked consumption into
 the first V1 implementation batch.
@@ -760,7 +976,7 @@ Required work:
    - Dense read/data path currently treats Custom Metric rows as unconfigured
      empty rows;
    - Stacked read/view paths currently fail fast if a Custom Metric slot reaches
-     runtime routing before Step 6 support is wired;
+     runtime routing before Step 8 support is wired;
    - Dense PI category resolution currently maps Custom Metric to the catalog
      bucket only as a temporary unreachable fallback.
 
@@ -773,13 +989,14 @@ Acceptance:
 - Copy/import of Dense or Stacked widgets does not copy runtime metric keys
   because runtime keys are not stored.
 
-Do not merge with Step 5:
+Do not merge with Step 5, Step 6, or Step 7:
 
 Dense and Stacked have separate slot ownership, read-plan, and failure-domain
-rules. They must consume the Step 5 editor/runtime pieces after those pieces are
-stable, not while those pieces are being invented.
+rules. They must consume the Step 5 editor/runtime pieces, Step 6 icon pieces,
+and Step 7 request config pieces after those pieces are stable, not while those
+pieces are being invented.
 
-### Step 7: Verification, Documentation, And Cleanup
+### Step 9: Verification, Documentation, And Cleanup
 
 LOC estimate: 1,000-1,700.
 
@@ -810,10 +1027,10 @@ Required work:
 5. Add PI tests for sample fetch/test transform workflows.
 6. Add action tests for `Configure`, `Error`, first-sample wait, and runtime
    `N/A`.
-7. Add Dense and Stacked integration tests if Step 6 is implemented in the same
+7. Add Dense and Stacked integration tests if Step 8 is implemented in the same
    batch.
 8. Update the POC/exam scripts and committed corpus expected output to the final
-   `{ "metric": ... }` schema.
+   `{ "metric": ... }` schema, including optional `suggestedLucideIconId`.
 9. Rerun the transform generation exam against the final single-object schema
    for the core source cases before claiming the AI workflow is validated.
 10. Update docs with final V1 behavior and explicit deferred TODOs.
@@ -858,8 +1075,10 @@ If asked whether these steps can be merged, the default answer is no.
 | Step 2 and Step 3 | Runtime identity/lifecycle must be proven before adding network and jq failures. |
 | Step 3 and Step 4 | Source execution and action rendering have different owners and failure surfaces. |
 | Step 4 and Step 5 | Runtime/render correctness must be testable without PI. |
-| Step 5 and Step 6 | Single action PI and multi-slot PI have different ownership rules. |
-| Step 6 and Step 7 | Verification must assert cross-step invariants, not hide inside implementation. |
+| Step 5 and Step 6 | HTTP editing and icon selection have different owners: source configuration versus visual identity. |
+| Step 6 and Step 7 | Icon selection changes display/render defaults; request policy changes persisted settings, runtime fetch behavior, and diagnostics. |
+| Step 7 and Step 8 | Request policy and multi-slot ownership have different failure domains. |
+| Step 8 and Step 9 | Verification must assert cross-step invariants, not hide inside implementation. |
 
 ## Deferred TODOs
 
@@ -868,7 +1087,9 @@ If asked whether these steps can be merged, the default answer is no.
 - Exact request coalescing inside `CustomHttpSourceClient`.
 - Sequence and parallel HTTP request pipelines.
 - Per-request cache policy for static lookup data.
-- Auth and OS credential references.
+- Custom headers, auth, and Stream Deck global credential references.
+- Advanced custom DNS resolver policy.
+- Non-Lucide icon providers and emoji/font-backed icon rendering.
 - Large JSON schema/sample summarization before AI prompt generation.
 - Dedicated LHM remote JSON catalog source.
 - Local command/CLI Custom Metric source type.
