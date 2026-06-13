@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Historical Stage 1 POC tooling. This checker validates the original
+// multi-output `metrics[]` experiment, not the final V1 runtime schema.
+// Do not use it as the Custom HTTP production validator without first
+// migrating it to the single top-level `metric` output contract.
 import { readFile } from "node:fs/promises";
 import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
 import { fileURLToPath } from "node:url";
@@ -480,7 +484,7 @@ function sortJson(value) {
 
 function printUsage() {
     process.stdout.write(`Usage:
-node packages/hub/scripts/custom-metric-transform-check.mjs \\
+node docs/development/runtime-sources/05-custom-metrics/archive/custom-metric-transform-check.mjs \\
   --engine jq-wasm|jsonata \\
   --input docs/development/runtime-sources/05-custom-metrics/poc-corpus/open-meteo/input.json \\
   --transform docs/development/runtime-sources/05-custom-metrics/poc-corpus/open-meteo/transform.jq \\
