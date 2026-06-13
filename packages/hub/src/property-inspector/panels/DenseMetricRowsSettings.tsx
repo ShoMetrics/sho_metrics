@@ -56,6 +56,7 @@ export function DenseMetricRowsSettings({
     widget,
     editingCustomMetricSlotId,
     onEditingCustomMetricSlotIdChange,
+    onWidgetChromeSuppressionChange,
     onSettingsPatch,
 }: WidgetSettingsPanelProps & {
     widget: ResolvedDenseMultiMetricWidget;
@@ -76,6 +77,7 @@ export function DenseMetricRowsSettings({
                 context={context}
                 slot={editingCustomMetricSlot}
                 onBack={() => onEditingCustomMetricSlotIdChange(undefined)}
+                onWidgetChromeSuppressionChange={onWidgetChromeSuppressionChange}
                 onSettingsPatch={onSettingsPatch}
             />
         );
@@ -359,11 +361,13 @@ function DenseCustomMetricSourcePage({
     context,
     slot,
     onBack,
+    onWidgetChromeSuppressionChange,
     onSettingsPatch,
 }: {
     readonly context: WidgetSettingsPanelProps["context"];
     readonly slot: ResolvedDenseMetricSlot;
     readonly onBack: () => void;
+    readonly onWidgetChromeSuppressionChange: WidgetSettingsPanelProps["onWidgetChromeSuppressionChange"];
     readonly onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
 }): React.JSX.Element {
     const target = slot.slot.metric.target;
@@ -377,6 +381,7 @@ function DenseCustomMetricSourcePage({
             target={target}
             customHttpConsumerSlug={buildDenseCustomHttpConsumerSlug(slot.slotId)}
             onBack={onBack}
+            onWidgetChromeSuppressionChange={onWidgetChromeSuppressionChange}
             onSettingsPatch={(patch) => {
                 // Dense rows reuse only the Custom HTTP source editor.
                 // Visual and polling settings stay owned by the Dense widget.
