@@ -941,7 +941,9 @@ Required work:
    2h, 3h, 6h, 12h, and 24h in addition to the ordinary short intervals. Other
    widget UIs stay capped at 60 seconds. Runtime must accept Custom HTTP
    polling values in the 1-86400 second range; otherwise a valid stored 24h
-   setting would silently fall back to 1 second.
+   setting would silently fall back to 1 second. Custom HTTP defaults to 3
+   seconds instead of the ordinary 1 second because network APIs should not be
+   polled as aggressively as local hardware metrics unless the user opts in.
 8. Keep the existing collector in-flight policy: the periodic source runner
    schedules the next refresh only after the current refresh finishes. If another
    caller forces `refreshNow()` while a refresh is pending, it returns

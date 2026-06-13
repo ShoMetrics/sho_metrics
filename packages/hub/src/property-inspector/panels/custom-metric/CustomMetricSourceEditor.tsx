@@ -336,7 +336,10 @@ function TestStatusNote({
         case "metricReady":
             return (
                 <p className="section-note">
-                    {t(customMetricMessages.sampleReadyNote, { bytes: state.sample.responseBytes })}
+                    {t(customMetricMessages.sampleReadyNote, {
+                        bytes: state.sample.responseBytes,
+                        elapsedMilliseconds: state.sample.elapsedMilliseconds,
+                    })}
                 </p>
             );
         case "failed":

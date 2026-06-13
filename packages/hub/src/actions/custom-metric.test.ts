@@ -412,17 +412,17 @@ test("Custom Metric PI sample fetch returns bounded preview through the action b
 
     assert.equal(fetcher.urlList[0], "https://api.example.com/weather");
     assert.deepEqual(fetcher.optionsList[0], { timeoutSeconds: 10, retryCount: 2 });
-    assert.deepEqual(action.customMetricTestResponses[0], {
-        type: "custom-http-pi-test",
-        command: "fetchSample",
-        requestId: "fetch-1",
-        result: {
-            ok: true,
-            responseBytes: 13,
-            samplePreview: "{\"temp\":23.5}",
-            isSamplePreviewTruncated: false,
-        },
-    });
+    const response = action.customMetricTestResponses[0];
+    assert.equal(response?.type, "custom-http-pi-test");
+    assert.equal(response?.command, "fetchSample");
+    assert.equal(response?.requestId, "fetch-1");
+    assert.equal(response?.result.ok, true);
+    if (response?.result.ok === true) {
+        assert.equal(response.result.responseBytes, 13);
+        assert.equal(Number.isInteger(response.result.elapsedMilliseconds), true);
+        assert.equal(response.result.samplePreview, "{\"temp\":23.5}");
+        assert.equal(response.result.isSamplePreviewTruncated, false);
+    }
 });
 
 test("Custom Metric PI transform test uses cached sample without storing it in settings", async () => {

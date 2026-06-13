@@ -11,6 +11,7 @@ export type CopyStatus = "idle" | "copied" | "failed";
 export interface SampleState {
     readonly url: string;
     readonly responseBytes: number;
+    readonly elapsedMilliseconds: number;
     readonly samplePreview: string;
     readonly isSamplePreviewTruncated: boolean;
 }

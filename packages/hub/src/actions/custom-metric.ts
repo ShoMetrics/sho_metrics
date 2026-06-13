@@ -209,7 +209,9 @@ export class CustomMetric extends MetricAction {
         url: string,
         requestSettings: ResolvedSingleCustomHttpRequest["requestSettings"],
     ): Promise<CustomHttpPiFetchSampleResult> {
+        const startedAtMilliseconds = performance.now();
         const fetchResult = await this.fetcher.fetchJson(url, requestSettings);
+        const elapsedMilliseconds = Math.max(0, Math.round(performance.now() - startedAtMilliseconds));
         if (!fetchResult.ok) {
             this.sampleCacheByActionId.delete(actionId);
             return {
@@ -228,6 +230,7 @@ export class CustomMetric extends MetricAction {
         return {
             ok: true,
             responseBytes: Buffer.byteLength(fetchResult.responseText, "utf8"),
+            elapsedMilliseconds,
             samplePreview: samplePreview.text,
             isSamplePreviewTruncated: samplePreview.isTruncated,
         };
