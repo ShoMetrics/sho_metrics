@@ -5,6 +5,7 @@ import type {
 } from "react";
 import {
     CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE,
+    type CustomHttpPiRequestSettings,
     type CustomHttpPiTestResponse,
 } from "../../../runtime/sources/custom-http/custom-http-pi-test-messages";
 import type { StreamDeckPropertyInspectorClient } from "../../stream-deck/stream-deck-client";
@@ -15,6 +16,7 @@ let nextRequestId = 0;
 export function sendFetchSampleRequest(
     client: StreamDeckPropertyInspectorClient,
     url: string,
+    requestSettings: CustomHttpPiRequestSettings,
     pendingRequestIds: RefObject<Map<string, TestCommand>>,
     setTestState: (state: TestState) => void,
 ): void {
@@ -26,6 +28,7 @@ export function sendFetchSampleRequest(
         command: "fetchSample",
         requestId,
         url,
+        requestSettings,
     }).catch((error: Error) => {
         pendingRequestIds.current.delete(requestId);
         setTestState({
@@ -41,6 +44,7 @@ export function sendTransformTestRequest(
     client: StreamDeckPropertyInspectorClient,
     url: string,
     jqTransform: string,
+    requestSettings: CustomHttpPiRequestSettings,
     pendingRequestIds: RefObject<Map<string, TestCommand>>,
     setTestState: Dispatch<SetStateAction<TestState>>,
 ): void {
@@ -57,6 +61,7 @@ export function sendTransformTestRequest(
         requestId,
         url,
         jqTransform,
+        requestSettings,
     }).catch((error: Error) => {
         pendingRequestIds.current.delete(requestId);
         setTestState(previousState => ({

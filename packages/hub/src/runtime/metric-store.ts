@@ -51,6 +51,9 @@ export class MetricStore {
     private valueAttributionsBySourceScopeId = new Map<string, Map<string, MetricValueAttribution>>();
     private unavailableMetricsBySourceScopeId = new Map<string, Map<string, MetricUnavailableReport>>();
 
+    // Count of scalar samples retained for history-style views. This is not a
+    // time-to-live; the latest value and timestamp remain available for
+    // low-frequency widgets until the action's freshness budget rejects them.
     private static readonly HISTORY_SIZE = 60;
 
     /** Creates a read-only metric view bound to one runtime source scope. */

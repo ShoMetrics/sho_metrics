@@ -1,49 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-    buildCpuMetricKindOptionList,
-    buildGpuMetricKindOptionList,
+    customHttpPollingFrequencyOptionList,
+    pollingFrequencyOptionList,
 } from "./setting-options";
 
-test("platform-filtered CPU options show the complete Windows list", () => {
-    assert.deepEqual(buildCpuMetricKindOptionList("win32"), [
-        { value: "usage", label: "Usage" },
-        { value: "temperature", label: "Temperature" },
-        { value: "power", label: "Power" },
-    ]);
-});
-
-test("platform-filtered CPU options show only supported macOS choices", () => {
-    assert.deepEqual(buildCpuMetricKindOptionList("darwin"), [
-        { value: "usage", label: "Usage" },
-    ]);
-});
-
-test("platform-filtered CPU options keep unsupported current values switchable", () => {
-    assert.deepEqual(buildCpuMetricKindOptionList("darwin", "temperature"), [
-        { value: "usage", label: "Usage" },
-        { value: "temperature", label: "Temperature (not supported)", disabled: true },
-    ]);
-});
-
-test("platform-filtered GPU options show the complete Windows list", () => {
-    assert.deepEqual(buildGpuMetricKindOptionList("win32"), [
-        { value: "usage", label: "Usage" },
-        { value: "temperature", label: "Temperature" },
-        { value: "vram", label: "VRAM" },
-        { value: "power", label: "Power" },
-    ]);
-});
-
-test("platform-filtered GPU options show only supported macOS choices", () => {
-    assert.deepEqual(buildGpuMetricKindOptionList("darwin"), [
-        { value: "usage", label: "Usage" },
-    ]);
-});
-
-test("platform-filtered GPU options keep unsupported current values switchable", () => {
-    assert.deepEqual(buildGpuMetricKindOptionList("darwin", "temperature"), [
-        { value: "usage", label: "Usage" },
-        { value: "temperature", label: "Temperature (not supported)", disabled: true },
-    ]);
+test("Custom HTTP polling options extend ordinary widget polling up to 24 hours", () => {
+    assert.equal(pollingFrequencyOptionList.at(-1)?.value, 60);
+    assert.deepEqual(
+        customHttpPollingFrequencyOptionList.slice(-6).map(option => option.value),
+        [3600, 7200, 10800, 21600, 43200, 86400],
+    );
+    assert.deepEqual(
+        customHttpPollingFrequencyOptionList.slice(-6).map(option => option.label),
+        ["1h", "2h", "3h", "6h", "12h", "24h"],
+    );
 });

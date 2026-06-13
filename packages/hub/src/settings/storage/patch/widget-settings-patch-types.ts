@@ -75,6 +75,8 @@ export interface StoredWidgetSettingsPatch {
         readonly url: string | undefined;
         readonly userIntent: string | undefined;
         readonly jqTransform: string | undefined;
+        readonly timeoutSeconds: number | undefined;
+        readonly retryCount: number | undefined;
         readonly iconId: string | undefined;
     }>;
     readonly dense?: DenseWidgetSettingsPatch | undefined;

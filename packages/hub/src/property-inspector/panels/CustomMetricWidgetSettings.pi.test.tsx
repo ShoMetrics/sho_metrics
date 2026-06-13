@@ -44,6 +44,7 @@ test("custom metric panel sends fetch and transform test commands through the pl
     const fetchMessage = readSentMessagePayload(client.sentMessages.at(-1));
     assert.equal(fetchMessage.command, "fetchSample");
     assert.equal(fetchMessage.url, "https://api.example.com/weather");
+    assert.deepEqual(fetchMessage.requestSettings, { timeoutSeconds: 5, retryCount: 0 });
 
     dispatchCustomHttpResponse(client, {
         type: CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE,
@@ -69,6 +70,7 @@ test("custom metric panel sends fetch and transform test commands through the pl
     const transformMessage = readSentMessagePayload(client.sentMessages.at(-1));
     assert.equal(transformMessage.command, "testTransform");
     assert.equal(transformMessage.url, "https://api.example.com/weather");
+    assert.deepEqual(transformMessage.requestSettings, { timeoutSeconds: 5, retryCount: 0 });
     assert.equal(
         transformMessage.jqTransform,
         "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\", maximum: 100 } }",
@@ -159,12 +161,36 @@ test("custom metric source editor shows copyable failure details", async () => {
 
     assert.equal(
         (await screen.findByRole("textbox", { name: /^Failure Debug Details:/ }) as HTMLTextAreaElement).value,
-        "Stage: fetch\nDetail: HTTP request failed. TypeError: fetch failed",
+        "Stage: fetch\nDetail: HTTP request failed. TypeError: fetch failed\nSettings: timeout=5s, retryCount=0, responseLimit=256KiB",
     );
     assert.equal(screen.queryByRole("button", { name: "Copy Failure" }), null);
     assert.match(
         screen.getByText("Fetching sample failed. See failure debug details below.").textContent ?? "",
         /Fetching sample failed/,
+    );
+});
+
+test("custom metric request settings show the polling budget warning", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    render(<CustomMetricSettingsHarness client={client} settings={buildCustomMetricSettings({
+        url: "https://api.example.com/weather",
+        userIntent: "Display temperature",
+        jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+        timeoutSeconds: 30,
+        retryCount: 3,
+    }, {
+        pollingFrequencySeconds: 1,
+    })} />);
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+
+    assert.match(
+        screen.getByText(/Worst-case request time is about/).textContent ?? "",
+        /waits for the current request to finish/,
     );
 });
 
@@ -408,10 +434,20 @@ function CustomMetricSettingsHarness({
     );
 }
 
-function buildCustomMetricSettings(patch: NonNullable<StoredWidgetSettingsPatch["customMetric"]>): InspectorTestSettings {
+function buildCustomMetricSettings(
+    patch: NonNullable<StoredWidgetSettingsPatch["customMetric"]>,
+    options: {
+        readonly pollingFrequencySeconds?: number | undefined;
+    } = {},
+): InspectorTestSettings {
     return readTestSettingsRecord(writeStoredWidgetSettingsPatch(
         resolveQuickStartStoredWidgetSettings(undefined, "customMetric").rawSettings,
-        { customMetric: patch },
+        {
+            customMetric: patch,
+            ...(options.pollingFrequencySeconds === undefined
+                ? {}
+                : { preferences: { pollingFrequencySeconds: options.pollingFrequencySeconds } }),
+        },
     ));
 }
 
@@ -420,6 +456,10 @@ function readSentMessagePayload(message: SentStreamDeckMessage | undefined): {
     readonly requestId: string;
     readonly url: string;
     readonly jqTransform?: string;
+    readonly requestSettings: {
+        readonly timeoutSeconds: number;
+        readonly retryCount: number;
+    };
 } {
     if (!message || message.event !== "sendToPlugin") {
         throw new Error("Expected a sendToPlugin message.");
@@ -434,19 +474,35 @@ function readSentMessagePayload(message: SentStreamDeckMessage | undefined): {
     const command = record["command"];
     const requestId = record["requestId"];
     const url = record["url"];
+    const requestSettings = record["requestSettings"];
     if (
         (command !== "fetchSample" && command !== "testTransform")
         || typeof requestId !== "string"
         || typeof url !== "string"
+        || !requestSettings
+        || typeof requestSettings !== "object"
+        || Array.isArray(requestSettings)
     ) {
         throw new Error("Expected Custom HTTP PI test payload.");
     }
 
     const jqTransform = record["jqTransform"];
+    const requestSettingsRecord = requestSettings as Record<string, unknown>;
+    if (
+        typeof requestSettingsRecord["timeoutSeconds"] !== "number"
+        || typeof requestSettingsRecord["retryCount"] !== "number"
+    ) {
+        throw new Error("Expected Custom HTTP PI request settings.");
+    }
+
     return {
         command,
         requestId,
         url,
+        requestSettings: {
+            timeoutSeconds: requestSettingsRecord["timeoutSeconds"],
+            retryCount: requestSettingsRecord["retryCount"],
+        },
         ...(typeof jqTransform === "string" ? { jqTransform } : {}),
     };
 }

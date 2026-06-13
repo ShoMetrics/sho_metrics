@@ -228,6 +228,7 @@ export abstract class MetricAction extends SingletonAction {
     protected getMetricReader(event: WillAppearEvent): MetricStoreReader {
         const readPlan = this.resolveMetricReadPlan(event);
         const fallbackReadingFreshnessBudgetMilliseconds = resolveFallbackReadingFreshnessBudgetMilliseconds(
+            this.actionKind,
             this.resolveSettings(event).preferences.pollingFrequencySeconds,
         );
 
@@ -304,8 +305,11 @@ export abstract class MetricAction extends SingletonAction {
     private refreshSubscription(activeActionState: ActiveActionState): void {
         const { event } = activeActionState;
         const pollingFrequencySeconds = this.resolveSettings(event).preferences.pollingFrequencySeconds;
-        const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(pollingFrequencySeconds);
-        const maximumSampleAgeMilliseconds = resolveFallbackReadingFreshnessBudgetMilliseconds(pollingFrequencySeconds);
+        const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(this.actionKind, pollingFrequencySeconds);
+        const maximumSampleAgeMilliseconds = resolveFallbackReadingFreshnessBudgetMilliseconds(
+            this.actionKind,
+            pollingFrequencySeconds,
+        );
         const metricKeys = this.getMetricKeys(event);
 
         if (metricKeys.length === 0) {
@@ -466,10 +470,20 @@ export abstract class MetricAction extends SingletonAction {
 
 const DEFAULT_POLLING_INTERVAL_MILLISECONDS = 1000;
 const ALLOWED_POLLING_FREQUENCY_SECONDS = new Set([1, 2, 3, 5, 10, 15, 30, 60]);
+const CUSTOM_METRIC_MAX_POLLING_FREQUENCY_SECONDS = 86400;
 // Gives the background collector one missed interval before fallback render treats its reading as expired.
 const FALLBACK_READING_FRESHNESS_GRACE_MILLISECONDS = 5000;
 
-function resolvePollingIntervalMilliseconds(pollingFrequencySeconds: number): number {
+function resolvePollingIntervalMilliseconds(actionKind: ActionKind, pollingFrequencySeconds: number): number {
+    if (
+        actionKind === "customMetric"
+        && Number.isInteger(pollingFrequencySeconds)
+        && pollingFrequencySeconds >= 1
+        && pollingFrequencySeconds <= CUSTOM_METRIC_MAX_POLLING_FREQUENCY_SECONDS
+    ) {
+        return pollingFrequencySeconds * 1000;
+    }
+
     if (ALLOWED_POLLING_FREQUENCY_SECONDS.has(pollingFrequencySeconds)) {
         return pollingFrequencySeconds * 1000;
     }
@@ -477,8 +491,11 @@ function resolvePollingIntervalMilliseconds(pollingFrequencySeconds: number): nu
     return DEFAULT_POLLING_INTERVAL_MILLISECONDS;
 }
 
-function resolveFallbackReadingFreshnessBudgetMilliseconds(pollingFrequencySeconds: number): number {
-    return resolvePollingIntervalMilliseconds(pollingFrequencySeconds)
+function resolveFallbackReadingFreshnessBudgetMilliseconds(
+    actionKind: ActionKind,
+    pollingFrequencySeconds: number,
+): number {
+    return resolvePollingIntervalMilliseconds(actionKind, pollingFrequencySeconds)
         + FALLBACK_READING_FRESHNESS_GRACE_MILLISECONDS;
 }
 

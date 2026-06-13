@@ -12,7 +12,11 @@ import {
 } from "./custom-metric";
 import type { MetricCollectionBinding } from "./metric-action";
 import type { MetricStoreReader, MetricWidgetDataReadResult } from "../runtime/metric-store";
-import type { CustomHttpFetcher, CustomHttpFetchResult } from "../runtime/sources/custom-http/custom-http-fetcher";
+import type {
+    CustomHttpFetcher,
+    CustomHttpFetchOptions,
+    CustomHttpFetchResult,
+} from "../runtime/sources/custom-http/custom-http-fetcher";
 import type { CustomHttpPiTestResponse } from "../runtime/sources/custom-http/custom-http-pi-test-messages";
 import { listMetricReadPlanKeys, normalizeMetricReadPlan } from "../runtime/source-routing/metric-read-plan";
 import { CustomHttpDefinitionRegistry } from "../runtime/sources/custom-http/custom-http-definition-registry";
@@ -70,17 +74,44 @@ test("Custom Metric registers configured HTTP definition and routes through cust
         });
         assert.deepEqual(registry.read(identity.metricKey), {
             identity,
-            request: {
-                url: "https://api.example.com/data",
-                userIntent: "show CPU",
-                jqTransform: ".",
-            },
+        request: {
+            url: "https://api.example.com/data",
+            userIntent: "show CPU",
+            jqTransform: ".",
+            requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        },
         });
         assert.equal(action.bindings.length, 1);
         const readPlan = normalizeMetricReadPlan(action.bindings[0].refreshOptionsList[0].readPlan);
         assert.deepEqual(listMetricReadPlanKeys(readPlan), [identity.metricKey]);
         assert.deepEqual(readPlan.metrics[0]?.sourceCandidates, [{ sourceId: CUSTOM_HTTP_SOURCE_ID }]);
         assert.equal(readPlan.metrics[0]?.sourceScopeId, identity.sourceScopeId);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    }
+});
+
+test("Custom Metric honors long HTTP polling frequencies", () => {
+    const registry = new CustomHttpDefinitionRegistry();
+    const action = new TestCustomMetric(registry);
+    const streamDeckAction = new FakeStreamDeckAction("custom-long-polling-action");
+    const rawSettings = writeStoredWidgetSettingsPatch(buildCustomMetricWidgetSettings({
+        url: "https://api.example.com/data",
+        userIntent: "show flight",
+        jqTransform: ".",
+    }), {
+        preferences: { pollingFrequencySeconds: 86400 },
+    });
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, rawSettings));
+
+        assert.equal(action.bindings[0].refreshOptionsList[0].pollingIntervalMilliseconds, 86_400_000);
+        assert.equal(action.bindings[0].refreshOptionsList[0].maximumSampleAgeMilliseconds, 86_405_000);
+        assert.equal(
+            action.bindings[0].refreshOptionsList[0].metricSubscriptions[0]?.intervalMilliseconds,
+            86_400_000,
+        );
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
     }
@@ -374,11 +405,13 @@ test("Custom Metric PI sample fetch returns bounded preview through the action b
         command: "fetchSample",
         requestId: "fetch-1",
         url: "https://api.example.com/weather",
+        requestSettings: { timeoutSeconds: 10, retryCount: 2 },
     }));
 
     await waitForAsyncWork();
 
     assert.equal(fetcher.urlList[0], "https://api.example.com/weather");
+    assert.deepEqual(fetcher.optionsList[0], { timeoutSeconds: 10, retryCount: 2 });
     assert.deepEqual(action.customMetricTestResponses[0], {
         type: "custom-http-pi-test",
         command: "fetchSample",
@@ -422,6 +455,7 @@ test("Custom Metric PI transform test uses cached sample without storing it in s
         command: "fetchSample",
         requestId: "fetch-1",
         url: "https://api.example.com/weather",
+        requestSettings: { timeoutSeconds: 5, retryCount: 0 },
     }));
     await waitForAsyncWork();
 
@@ -431,6 +465,7 @@ test("Custom Metric PI transform test uses cached sample without storing it in s
         requestId: "transform-1",
         url: "https://api.example.com/weather",
         jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\", maximum: 100 } }",
+        requestSettings: { timeoutSeconds: 5, retryCount: 0 },
     }));
     await waitForAsyncWork();
 
@@ -570,11 +605,13 @@ class CapturingMetricStoreReader implements MetricStoreReader {
 
 class FakeCustomHttpFetcher implements CustomHttpFetcher {
     readonly urlList: string[] = [];
+    readonly optionsList: CustomHttpFetchOptions[] = [];
 
     constructor(private readonly result: CustomHttpFetchResult) {}
 
-    fetchJson(url: string): Promise<CustomHttpFetchResult> {
+    fetchJson(url: string, options?: CustomHttpFetchOptions): Promise<CustomHttpFetchResult> {
         this.urlList.push(url);
+        this.optionsList.push(options ?? {});
         return Promise.resolve(this.result);
     }
 }
@@ -622,6 +659,8 @@ function buildCustomMetricWidgetSettings(patch: {
     readonly userIntent?: string;
     readonly jqTransform?: string;
     readonly iconId?: string;
+    readonly timeoutSeconds?: number;
+    readonly retryCount?: number;
 } = {}): unknown {
     const settings = resolveQuickStartStoredWidgetSettings(undefined, "customMetric").rawSettings;
     return writeStoredWidgetSettingsPatch(settings, {

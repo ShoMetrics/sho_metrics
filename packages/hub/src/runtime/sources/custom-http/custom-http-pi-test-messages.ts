@@ -6,6 +6,7 @@ export type CustomHttpPiTestRequest =
         readonly command: "fetchSample";
         readonly requestId: string;
         readonly url: string;
+        readonly requestSettings: CustomHttpPiRequestSettings;
     }
     | {
         readonly type: typeof CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE;
@@ -13,7 +14,13 @@ export type CustomHttpPiTestRequest =
         readonly requestId: string;
         readonly url: string;
         readonly jqTransform: string;
+        readonly requestSettings: CustomHttpPiRequestSettings;
     };
+
+export interface CustomHttpPiRequestSettings {
+    readonly timeoutSeconds: number;
+    readonly retryCount: number;
+}
 
 export type CustomHttpPiTestResponse =
     | {
@@ -65,7 +72,8 @@ export function readCustomHttpPiTestRequest(payload: unknown): CustomHttpPiTestR
     const command = payload["command"];
     const requestId = payload["requestId"];
     const url = payload["url"];
-    if (typeof requestId !== "string" || typeof url !== "string") {
+    const requestSettings = readRequestSettings(payload["requestSettings"]);
+    if (typeof requestId !== "string" || typeof url !== "string" || requestSettings === undefined) {
         return undefined;
     }
 
@@ -75,6 +83,7 @@ export function readCustomHttpPiTestRequest(payload: unknown): CustomHttpPiTestR
             command,
             requestId,
             url,
+            requestSettings,
         };
     }
 
@@ -90,6 +99,7 @@ export function readCustomHttpPiTestRequest(payload: unknown): CustomHttpPiTestR
             requestId,
             url,
             jqTransform,
+            requestSettings,
         };
     }
 
@@ -198,6 +208,18 @@ function readFailureResult(result: Readonly<Record<string, unknown>>): CustomHtt
     const detail = result["detail"];
     return typeof stage === "string" && typeof detail === "string"
         ? { ok: false, stage, detail }
+        : undefined;
+}
+
+function readRequestSettings(value: unknown): CustomHttpPiRequestSettings | undefined {
+    if (!isRecord(value)) {
+        return undefined;
+    }
+
+    const timeoutSeconds = value["timeoutSeconds"];
+    const retryCount = value["retryCount"];
+    return typeof timeoutSeconds === "number" && typeof retryCount === "number"
+        ? { timeoutSeconds, retryCount }
         : undefined;
 }
 

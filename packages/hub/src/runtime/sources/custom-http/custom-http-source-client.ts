@@ -165,7 +165,7 @@ export class CustomHttpSourceClient implements SourceClient {
     }
 
     private async readDefinition(definition: CustomHttpMetricDefinition): Promise<CustomHttpMetricReadResult> {
-        const fetchResult = await this.fetcher.fetchJson(definition.request.url);
+        const fetchResult = await this.fetcher.fetchJson(definition.request.url, definition.request.requestSettings);
         if (!fetchResult.ok) {
             return {
                 metricKey: definition.identity.metricKey,

@@ -1,13 +1,16 @@
 import {
-    CUSTOM_HTTP_FETCH_TIMEOUT_MILLISECONDS,
+    CUSTOM_HTTP_DNS_DIAGNOSTIC_TIMEOUT_MILLISECONDS,
     CUSTOM_HTTP_RESPONSE_LIMIT_BYTES,
 } from "./custom-http-fetch-limits";
+import {
+    resolveCustomHttpFetchPolicy,
+    resolveCustomHttpRetryDelayMilliseconds,
+} from "./custom-http-request-policy";
 import { logger } from "../../../logging/logger";
 import { lookup as lookupDns } from "node:dns/promises";
 
 const log = logger.for("Source:CustomHTTP:Fetch");
 const CUSTOM_HTTP_FETCH_LOG_THROTTLE_MILLISECONDS = 30_000;
-const CUSTOM_HTTP_DNS_DIAGNOSTIC_TIMEOUT_MILLISECONDS = 750;
 
 export type CustomHttpFetchFailureReason =
     | "invalidUrl"
@@ -27,6 +30,11 @@ export type CustomHttpFetchResult =
         readonly detail: string;
     };
 
+export interface CustomHttpFetchOptions {
+    readonly timeoutSeconds?: number | undefined;
+    readonly retryCount?: number | undefined;
+}
+
 /**
  * Fetches the raw JSON text for one Custom HTTP metric definition.
  *
@@ -34,11 +42,12 @@ export type CustomHttpFetchResult =
  * source client can report fetch, parse, and transform failures separately.
  */
 export interface CustomHttpFetcher {
-    fetchJson(url: string): Promise<CustomHttpFetchResult>;
+    fetchJson(url: string, options?: CustomHttpFetchOptions): Promise<CustomHttpFetchResult>;
 }
 
 type FetchLike = (url: URL, init?: RequestInit) => Promise<Response>;
 type DnsLookupLike = (hostname: string) => Promise<readonly DnsLookupAddress[]>;
+type DelayLike = (delayMilliseconds: number) => Promise<void>;
 
 interface DnsLookupAddress {
     readonly address: string;
@@ -49,25 +58,34 @@ export class NodeCustomHttpFetcher implements CustomHttpFetcher {
     private readonly fetch: FetchLike;
     private readonly dnsLookup: DnsLookupLike;
     private readonly responseLimitBytes: number;
-    private readonly timeoutMilliseconds: number;
+    private readonly defaultTimeoutMilliseconds: number | undefined;
+    private readonly delay: DelayLike;
+    private readonly random: () => number;
 
     constructor(options: {
         readonly fetch?: FetchLike;
         readonly dnsLookup?: DnsLookupLike;
         readonly responseLimitBytes?: number;
-        readonly timeoutMilliseconds?: number;
+        /** Test-only default. Per-call timeoutSeconds is the product policy. */
+        readonly defaultTimeoutMilliseconds?: number;
+        readonly delay?: DelayLike;
+        readonly random?: () => number;
     } = {}) {
         this.fetch = options.fetch ?? ((url, init) => fetch(url, init));
         this.dnsLookup = options.dnsLookup ?? (hostname => lookupDns(hostname, { all: true }));
         this.responseLimitBytes = options.responseLimitBytes ?? CUSTOM_HTTP_RESPONSE_LIMIT_BYTES;
-        this.timeoutMilliseconds = options.timeoutMilliseconds ?? CUSTOM_HTTP_FETCH_TIMEOUT_MILLISECONDS;
+        this.defaultTimeoutMilliseconds = options.defaultTimeoutMilliseconds;
+        this.delay = options.delay ?? (delayMilliseconds => new Promise(resolve => {
+            setTimeout(resolve, delayMilliseconds);
+        }));
+        this.random = options.random ?? Math.random;
     }
 
     /**
      * Reads only HTTP(S) GET responses and enforces the byte cap while the body
      * streams in. The returned detail strings are deliberately URL/body-free.
      */
-    async fetchJson(url: string): Promise<CustomHttpFetchResult> {
+    async fetchJson(url: string, options: CustomHttpFetchOptions = {}): Promise<CustomHttpFetchResult> {
         let parsedUrl: URL;
 
         try {
@@ -80,6 +98,34 @@ export class NodeCustomHttpFetcher implements CustomHttpFetcher {
             return failure("unsupportedProtocol", "Only HTTP and HTTPS URLs are supported.");
         }
 
+        const policy = resolveCustomHttpFetchPolicy(options);
+        const timeoutMilliseconds = options.timeoutSeconds === undefined && this.defaultTimeoutMilliseconds !== undefined
+            ? this.defaultTimeoutMilliseconds
+            : policy.timeoutSeconds * 1000;
+        let retryIndex = 0;
+
+        while (true) {
+            const isFinalAttempt = retryIndex >= policy.retryCount;
+            const attemptResult = await this.fetchJsonAttempt(parsedUrl, {
+                timeoutMilliseconds,
+                includeDnsDiagnostic: isFinalAttempt,
+            });
+            if (attemptResult.ok || !canRetryFetchFailure(attemptResult.reason) || retryIndex >= policy.retryCount) {
+                return attemptResult;
+            }
+
+            await this.delay(resolveCustomHttpRetryDelayMilliseconds(retryIndex, this.random));
+            retryIndex += 1;
+        }
+    }
+
+    private async fetchJsonAttempt(
+        parsedUrl: URL,
+        options: {
+            readonly timeoutMilliseconds: number;
+            readonly includeDnsDiagnostic: boolean;
+        },
+    ): Promise<CustomHttpFetchResult> {
         const startedAtMilliseconds = performance.now();
         const targetSummary = summarizeUrlForLog(parsedUrl);
 
@@ -87,17 +133,19 @@ export class NodeCustomHttpFetcher implements CustomHttpFetcher {
         try {
             response = await this.fetch(parsedUrl, {
                 redirect: "follow",
-                signal: AbortSignal.timeout(this.timeoutMilliseconds),
+                signal: AbortSignal.timeout(options.timeoutMilliseconds),
             });
         } catch (error) {
-            const dnsDiagnostic = await readDnsDiagnostic(parsedUrl.hostname, this.dnsLookup);
+            const dnsDiagnostic = options.includeDnsDiagnostic
+                ? await readDnsDiagnostic(parsedUrl.hostname, this.dnsLookup)
+                : undefined;
             const detail = [
                 "HTTP request failed.",
                 `elapsed=${formatElapsedMilliseconds(startedAtMilliseconds)}ms.`,
-                `timeout=${this.timeoutMilliseconds}ms.`,
+                `timeout=${options.timeoutMilliseconds}ms.`,
                 formatBoundedErrorDetail(error),
                 dnsDiagnostic,
-            ].join(" ");
+            ].filter(value => value !== undefined).join(" ");
             log.atWarn()
                 .everyMs(`custom-http-fetch-failure:${targetSummary}`, CUSTOM_HTTP_FETCH_LOG_THROTTLE_MILLISECONDS)
                 .log(() => `Custom HTTP fetch failed. target=${targetSummary} detail=${detail}`);
@@ -135,6 +183,10 @@ export class NodeCustomHttpFetcher implements CustomHttpFetcher {
             responseText: responseTextResult.responseText,
         };
     }
+}
+
+function canRetryFetchFailure(reason: CustomHttpFetchFailureReason): boolean {
+    return reason === "networkFailure";
 }
 
 async function readResponseTextBounded(

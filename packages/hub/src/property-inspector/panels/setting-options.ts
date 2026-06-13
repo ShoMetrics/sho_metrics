@@ -16,6 +16,10 @@ import {
     GPU_VRAM_TOTAL_METRIC_KEY,
     GPU_VRAM_USED_METRIC_KEY,
 } from "../../runtime/metric-keys";
+import {
+    CUSTOM_HTTP_RETRY_COUNT_OPTIONS,
+    CUSTOM_HTTP_TIMEOUT_SECOND_OPTIONS,
+} from "../../runtime/sources/custom-http/custom-http-request-policy";
 import { isBuiltInMetricSupportedOnPlatform } from "../../runtime/source-routing/metric-source-preferences";
 import type { MetricSupportPlatform } from "../../runtime/source-capabilities/metric-support-platform";
 
@@ -28,6 +32,27 @@ export const pollingFrequencyOptionList = [
     { value: 15, label: "15s" },
     { value: 30, label: "30s" },
     { value: 60, label: "60s" },
+] as const satisfies readonly SelectOption<number>[];
+
+export const customHttpPollingFrequencyOptionList = [
+    ...pollingFrequencyOptionList,
+    { value: 300, label: "5m" },
+    { value: 900, label: "15m" },
+    { value: 1800, label: "30m" },
+    { value: 3600, label: "1h" },
+    { value: 7200, label: "2h" },
+    { value: 10800, label: "3h" },
+    { value: 21600, label: "6h" },
+    { value: 43200, label: "12h" },
+    { value: 86400, label: "24h" },
+] as const satisfies readonly SelectOption<number>[];
+
+export const customHttpTimeoutSecondOptionList = [
+    ...CUSTOM_HTTP_TIMEOUT_SECOND_OPTIONS.map(value => ({ value, label: `${value}s` })),
+] as const satisfies readonly SelectOption<number>[];
+
+export const customHttpRetryCountOptionList = [
+    ...CUSTOM_HTTP_RETRY_COUNT_OPTIONS.map(value => ({ value, label: `${value}` })),
 ] as const satisfies readonly SelectOption<number>[];
 
 export const themeOptionList = [
