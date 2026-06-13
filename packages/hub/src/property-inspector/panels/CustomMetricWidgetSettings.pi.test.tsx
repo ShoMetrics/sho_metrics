@@ -105,6 +105,37 @@ test("custom metric panel sends fetch and transform test commands through the pl
     await screen.findByText(/Validated Metric: TEMP 23.5 \/ 100 °C/);
 });
 
+test("custom metric source editor visibly normalizes scheme-less URLs on blur", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    render(<CustomMetricSettingsHarness client={client} settings={buildCustomMetricSettings({
+        url: "https://api.example.com/weather",
+        userIntent: "Display temperature",
+        jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+    })} />);
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    const urlInput = screen.getByRole("textbox", { name: /^HTTP URL:/ }) as HTMLInputElement;
+
+    await user.clear(urlInput);
+    await user.type(urlInput, "api.open-meteo.com/v1/forecast");
+
+    assert.equal(urlInput.value, "api.open-meteo.com/v1/forecast");
+
+    await user.tab();
+
+    assert.equal(urlInput.value, "https://api.open-meteo.com/v1/forecast");
+
+    await user.click(screen.getByRole("button", { name: "Fetch Sample" }));
+
+    const fetchMessage = readSentMessagePayload(client.sentMessages.at(-1));
+    assert.equal(fetchMessage.command, "fetchSample");
+    assert.equal(fetchMessage.url, "https://api.open-meteo.com/v1/forecast");
+});
+
 test("custom metric prompt marks truncated sample previews", async () => {
     const user = userEvent.setup();
     const client = new TestPropertyInspectorClient({

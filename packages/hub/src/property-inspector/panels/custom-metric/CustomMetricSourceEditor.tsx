@@ -16,6 +16,7 @@ import {
     estimateCustomHttpWorstCaseFetchMilliseconds,
     type ResolvedCustomHttpFetchPolicy,
 } from "../../../runtime/sources/custom-http/custom-http-request-policy";
+import { normalizeCustomHttpSourceUrlInput } from "../../../runtime/sources/custom-http/custom-http-url";
 import type { StreamDeckPropertyInspectorClient } from "../../stream-deck/stream-deck-client";
 import { InspectorItem } from "../../components/InspectorItem";
 import { SelectSetting } from "../../controls/SelectSetting";
@@ -67,20 +68,29 @@ export function CustomMetricSourceEditor({
     readonly onBack: () => void;
 }): React.JSX.Element {
     const { locale, t } = useI18n();
-    const hasSample = hasCurrentSample(sourceEditorState, url);
+    const [urlDraft, setUrlDraft] = useState(url);
     const [userIntentDraft, setUserIntentDraft] = useState(userIntent);
+    const isUrlInputFocusedRef = useRef(false);
     const lastSettingsUserIntentRef = useRef(userIntent);
     const fetchSampleButtonRef = useRef<HTMLButtonElement | null>(null);
+    const normalizedUrlDraft = normalizeCustomHttpSourceUrlInput(urlDraft);
+    const hasSample = hasCurrentSample(sourceEditorState, normalizedUrlDraft);
     const promptText = useMemo(() => buildCustomMetricPrompt({
         locale,
-        sourceUrl: url,
+        sourceUrl: normalizedUrlDraft,
         userIntent: userIntentDraft,
         sample: readSampleState(sourceEditorState),
-    }), [locale, url, userIntentDraft, sourceEditorState]);
+    }), [locale, normalizedUrlDraft, userIntentDraft, sourceEditorState]);
 
     useEffect(() => {
         scrollPropertyInspectorToTop();
     }, []);
+
+    useEffect(() => {
+        if (!isUrlInputFocusedRef.current) {
+            setUrlDraft(url);
+        }
+    }, [url]);
 
     useEffect(() => {
         if (userIntent !== lastSettingsUserIntentRef.current) {
@@ -88,6 +98,19 @@ export function CustomMetricSourceEditor({
             lastSettingsUserIntentRef.current = userIntent;
         }
     }, [userIntent]);
+
+    const commitNormalizedUrlDraft = (): string => {
+        const normalizedUrl = normalizeCustomHttpSourceUrlInput(urlDraft);
+        isUrlInputFocusedRef.current = false;
+        setUrlDraft(normalizedUrl);
+        if (normalizedUrl !== urlDraft || normalizedUrl !== url) {
+            props.onSettingsPatch({
+                customMetric: { url: normalizedUrl },
+            });
+        }
+
+        return normalizedUrl;
+    };
 
     return (
         <>
@@ -108,12 +131,18 @@ export function CustomMetricSourceEditor({
                 </InspectorItem>
                 <TextSetting
                     label={t(customMetricMessages.urlLabel)}
-                    value={url}
+                    value={urlDraft}
                     placeholder={t(customMetricMessages.urlPlaceholder)}
                     validationMessage={resolveUrlValidationMessage(props.target, t)}
-                    onValueChange={(nextUrl) => props.onSettingsPatch({
-                        customMetric: { url: nextUrl },
-                    })}
+                    onFocus={() => {
+                        isUrlInputFocusedRef.current = true;
+                    }}
+                    onBlur={() => {
+                        commitNormalizedUrlDraft();
+                    }}
+                    onValueChange={(nextUrl) => {
+                        setUrlDraft(nextUrl);
+                    }}
                 />
                 <TextAreaSetting
                     label={t(customMetricMessages.userIntentLabel)}
@@ -165,15 +194,18 @@ export function CustomMetricSourceEditor({
                             ref={fetchSampleButtonRef}
                             className="inline-action-button"
                             type="button"
-                            disabled={url.trim().length === 0 || sourceEditorState.kind === "pending"}
-                            onClick={() => sendFetchSampleRequest(
-                                client,
-                                props.customHttpConsumerSlug,
-                                url,
-                                requestSettings,
-                                pendingRequestIds,
-                                setSourceEditorState,
-                            )}
+                            disabled={normalizedUrlDraft.length === 0 || sourceEditorState.kind === "pending"}
+                            onClick={() => {
+                                const requestUrl = commitNormalizedUrlDraft();
+                                sendFetchSampleRequest(
+                                    client,
+                                    props.customHttpConsumerSlug,
+                                    requestUrl,
+                                    requestSettings,
+                                    pendingRequestIds,
+                                    setSourceEditorState,
+                                );
+                            }}
                         >
                             {t(customMetricMessages.fetchSampleButton)}
                         </button>
@@ -242,20 +274,23 @@ export function CustomMetricSourceEditor({
                             className="inline-action-button"
                             type="button"
                             disabled={
-                                url.trim().length === 0
+                                normalizedUrlDraft.length === 0
                                 || jqTransform.trim().length === 0
                                 || !hasSample
                                 || sourceEditorState.kind === "pending"
                             }
-                            onClick={() => sendTransformTestRequest(
-                                client,
-                                props.customHttpConsumerSlug,
-                                url,
-                                jqTransform,
-                                requestSettings,
-                                pendingRequestIds,
-                                setSourceEditorState,
-                            )}
+                            onClick={() => {
+                                const requestUrl = commitNormalizedUrlDraft();
+                                sendTransformTestRequest(
+                                    client,
+                                    props.customHttpConsumerSlug,
+                                    requestUrl,
+                                    jqTransform,
+                                    requestSettings,
+                                    pendingRequestIds,
+                                    setSourceEditorState,
+                                );
+                            }}
                         >
                             {t(customMetricMessages.testTransformButton)}
                         </button>
