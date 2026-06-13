@@ -25,6 +25,7 @@ import {
 import {
     resolveCustomHttpFetchPolicy,
 } from "../../../runtime/sources/custom-http/custom-http-request-policy";
+import { normalizeCustomHttpSourceUrlInput } from "../../../runtime/sources/custom-http/custom-http-url";
 import { MetricUnit } from "../../../runtime/sources/metric-source";
 import {
     DEFAULT_NETWORK_PING_TARGET_HOST,
@@ -436,7 +437,7 @@ function readSingleCustomHttpRequest(
             return undefined;
         case "singleRequest": {
             const storedRequest = storedHttpSource.plan.value;
-            const url = storedRequest.url?.trim() ?? "";
+            const url = normalizeCustomHttpSourceUrlInput(storedRequest.url ?? "");
             const userIntent = storedRequest.userIntent?.trim() || undefined;
             const jqTransform = storedRequest.jqTransform?.trim() ?? "";
             const hasRequestSettings = storedRequest.requestSettings !== undefined;

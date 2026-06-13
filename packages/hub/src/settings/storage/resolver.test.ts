@@ -1276,6 +1276,40 @@ describe("stored settings proto resolver", () => {
         }
     });
 
+    it("resolves scheme-less Custom HTTP URLs as HTTPS URLs", () => {
+        const widgetSettings = resolveSingleMetricWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                singleMetric: {
+                    slot: {
+                        metric: {
+                            custom: {
+                                http: {
+                                    singleRequest: {
+                                        url: "api.open-meteo.com/v1/forecast",
+                                        userIntent: "Temperature",
+                                        jqTransform: ".",
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            }).settings,
+        });
+        const target = widgetSettings.widget.slot.metric.target;
+
+        assert.equal(target.domain, "customMetric");
+        if (target.domain === "customMetric") {
+            assert.equal(target.configuration.state, "configured");
+            if (target.configuration.state === "configured") {
+                assert.equal(
+                    target.configuration.source.plan.request.url,
+                    "https://api.open-meteo.com/v1/forecast",
+                );
+            }
+        }
+    });
+
     it("resolves Custom Metric icon id outside HTTP source configuration", () => {
         const widgetSettings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings: readStoredWidgetSettings({
