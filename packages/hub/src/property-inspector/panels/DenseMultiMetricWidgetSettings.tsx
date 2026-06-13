@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { commonMessages } from "../../i18n/message-groups/shell";
 import { multiMetricMessages } from "../../i18n/message-groups/widgets";
 import { useI18n } from "../../i18n/react";
@@ -32,13 +33,35 @@ export function DenseMultiMetricWidgetSettings(props: WidgetSettingsPanelProps &
     widget: ResolvedDenseMultiMetricWidget;
 }): React.JSX.Element {
     const { t } = useI18n();
+    const { widget } = props;
+    const [editingCustomMetricSlotId, setEditingCustomMetricSlotId] = useState<string | undefined>(undefined);
+    const isEditingCustomMetricSource = widget.slots.some(slot =>
+        slot.slotId === editingCustomMetricSlotId
+        && slot.slot.metric.target.domain === "customMetric",
+    );
+
+    useEffect(() => {
+        if (editingCustomMetricSlotId === undefined || isEditingCustomMetricSource) {
+            return;
+        }
+
+        setEditingCustomMetricSlotId(undefined);
+    }, [editingCustomMetricSlotId, isEditingCustomMetricSource]);
 
     return (
         <>
-            <DenseMetricRowsSettings {...props} />
-            <DenseThemeSettings {...props} />
-            <DenseColorSettings {...props} />
-            <PollingSettings {...props} note={t(multiMetricMessages.sharedPollingNote)} />
+            <DenseMetricRowsSettings
+                {...props}
+                editingCustomMetricSlotId={editingCustomMetricSlotId}
+                onEditingCustomMetricSlotIdChange={setEditingCustomMetricSlotId}
+            />
+            {!isEditingCustomMetricSource && (
+                <>
+                    <DenseThemeSettings {...props} />
+                    <DenseColorSettings {...props} />
+                    <PollingSettings {...props} note={t(multiMetricMessages.sharedPollingNote)} />
+                </>
+            )}
         </>
     );
 }

@@ -21,6 +21,7 @@ import {
 } from "../catalog-metric";
 import { buildMemoryMetricViewOptions } from "../memory";
 import type { DiskVolumeSelection } from "../disk/volume-selection";
+import { buildCustomMetricViewOptions } from "../custom-metric/single-metric-view-options";
 
 export interface StackedSingleMetricViewBuilderContext {
     readonly event: WillAppearEvent;
@@ -31,6 +32,10 @@ export interface StackedSingleMetricViewBuilderContext {
     readonly platform: NodeJS.Platform;
     readonly currentTimestampMilliseconds: number;
     readonly readCachedSourceStatus: (sourceId: string) => SourceClientStatus | undefined;
+    /**
+     * Runtime consumer segment for source-backed targets inside the active slot.
+     */
+    readonly consumerSlug: string;
 }
 
 /** Builds an active stacked slot through the canonical single-metric builders. */
@@ -100,7 +105,13 @@ export function buildStackedSingleMetricViewOptions(
                 helperStatus: context.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID),
             });
         case "customMetric":
-            throw new Error("Custom Metric stacked slots are not wired before Custom HTTP runtime support.");
+            return buildCustomMetricViewOptions({
+                event: context.event,
+                settings,
+                target: context.target,
+                metrics: context.metrics,
+                consumerSlug: context.consumerSlug,
+            });
     }
 }
 

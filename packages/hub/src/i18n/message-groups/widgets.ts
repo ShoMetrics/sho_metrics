@@ -623,6 +623,11 @@ export const denseMessages = {
         zh_CN: "高级传感器",
         ja: "高度なセンサー",
     },
+    customMetricChoice: {
+        en: "Custom Metric",
+        zh_CN: "自定义指标",
+        ja: "カスタムメトリクス",
+    },
 } as const satisfies LocalizedMessages;
 
 export const stackedMessages = {
@@ -725,5 +730,10 @@ export const stackedMessages = {
         en: "Advanced Sensor",
         zh_CN: "高级传感器",
         ja: "高度なセンサー",
+    },
+    customMetricChoice: {
+        en: "Custom Metric",
+        zh_CN: "自定义指标",
+        ja: "カスタムメトリクス",
     },
 } as const satisfies LocalizedMessages;

@@ -6,8 +6,8 @@ import {
 import { customMetricMessages } from "../../i18n/message-groups/widgets";
 import { useI18n } from "../../i18n/react";
 import {
-    readCustomHttpPiTestResponse,
-} from "../../runtime/sources/custom-http/custom-http-pi-test-messages";
+    readCustomHttpSourceEditorResponse,
+} from "../../runtime/sources/custom-http/custom-http-source-editor-messages";
 import { resolveCustomHttpFetchPolicy } from "../../runtime/sources/custom-http/custom-http-request-policy";
 import type {
     ResolvedCustomMetricSource,
@@ -24,13 +24,13 @@ import { customHttpPollingFrequencyOptionList } from "./setting-options";
 import { CustomMetricIconSettings } from "./custom-metric/CustomMetricIconSettings";
 import { CustomMetricSourceEditor } from "./custom-metric/CustomMetricSourceEditor";
 import {
-    applyTestResponse,
-} from "./custom-metric/test-state";
+    applySourceEditorResponse,
+} from "./custom-metric/source-editor-state";
 import type {
     CopyStatus,
     CustomMetricWidgetSettingsProps,
-    TestCommand,
-    TestState,
+    SourceEditorCommand,
+    SourceEditorState,
 } from "./custom-metric/types";
 
 export function CustomMetricWidgetSettings(props: CustomMetricWidgetSettingsProps): React.JSX.Element {
@@ -41,13 +41,14 @@ export function CustomMetricWidgetSettings(props: CustomMetricWidgetSettingsProp
     const userIntent = request?.userIntent ?? "";
     const jqTransform = request?.jqTransform ?? "";
     const requestSettings = request?.requestSettings ?? resolveCustomHttpFetchPolicy({});
-    const [isEditingSource, setIsEditingSource] = useState(false);
-    const [testState, setTestState] = useState<TestState>({ kind: "idle" });
+    const showVisualSettings = props.showVisualSettings !== false;
+    const [isEditingSource, setIsEditingSource] = useState(props.initiallyEditingSource === true);
+    const [sourceEditorState, setSourceEditorState] = useState<SourceEditorState>({ kind: "idle" });
     const [promptCopyStatus, setPromptCopyStatus] = useState<CopyStatus>("idle");
-    const pendingRequestIds = useRef(new Map<string, TestCommand>());
+    const pendingRequestIds = useRef(new Map<string, SourceEditorCommand>());
 
     useEffect(() => {
-        setTestState({ kind: "idle" });
+        setSourceEditorState({ kind: "idle" });
         pendingRequestIds.current.clear();
     }, [url]);
 
@@ -60,13 +61,13 @@ export function CustomMetricWidgetSettings(props: CustomMetricWidgetSettingsProp
     }, [isEditingSource, props.onWidgetChromeSuppressionChange]);
 
     useEffect(() => client.sendToPropertyInspector.subscribe((event) => {
-        const response = readCustomHttpPiTestResponse(event.payload);
+        const response = readCustomHttpSourceEditorResponse(event.payload);
         if (response === undefined || pendingRequestIds.current.get(response.requestId) !== response.command) {
             return;
         }
 
         pendingRequestIds.current.delete(response.requestId);
-        setTestState(previousState => applyTestResponse(previousState, url, response));
+        setSourceEditorState(previousState => applySourceEditorResponse(previousState, url, response));
     }), [client, url]);
 
     if (isEditingSource) {
@@ -78,12 +79,12 @@ export function CustomMetricWidgetSettings(props: CustomMetricWidgetSettingsProp
                 jqTransform={jqTransform}
                 requestSettings={requestSettings}
                 client={client}
-                testState={testState}
+                sourceEditorState={sourceEditorState}
                 promptCopyStatus={promptCopyStatus}
                 pendingRequestIds={pendingRequestIds}
-                setTestState={setTestState}
+                setSourceEditorState={setSourceEditorState}
                 setPromptCopyStatus={setPromptCopyStatus}
-                onBack={() => setIsEditingSource(false)}
+                onBack={props.onSourceEditorBack ?? (() => setIsEditingSource(false))}
             />
         );
     }
@@ -108,7 +109,7 @@ export function CustomMetricWidgetSettings(props: CustomMetricWidgetSettingsProp
                     </div>
                 </InspectorItem>
             </SettingsSection>
-            {props.target.configuration.state === "configured" && (
+            {showVisualSettings && props.target.configuration.state === "configured" && (
                 <CustomMetricIconSettings
                     iconId={props.target.iconId}
                     onIconIdChange={(iconId) => props.onSettingsPatch({
@@ -116,9 +117,13 @@ export function CustomMetricWidgetSettings(props: CustomMetricWidgetSettingsProp
                     })}
                 />
             )}
-            <AppearanceSettings {...props} />
-            <LineSettings {...props} />
-            <StandardColorSettings {...props} />
+            {showVisualSettings && (
+                <>
+                    <AppearanceSettings {...props} />
+                    <LineSettings {...props} />
+                    <StandardColorSettings {...props} />
+                </>
+            )}
             {props.showPolling !== false && (
                 <PollingSettings
                     {...props}

@@ -19,7 +19,12 @@ import {
     type MetricReadPlan,
     type MetricReadRoute,
 } from "../../runtime/source-routing/metric-read-plan";
+import { buildCustomHttpMetricReadPlan } from "../../runtime/source-routing/custom-http-read-plan";
 import { buildMetricReadPlanFromSourcePolicy } from "../../runtime/source-routing/metric-read-plan-builder";
+import {
+    buildStackedCustomHttpConsumerSlug,
+    type CustomHttpRuntimeIdentity,
+} from "../../runtime/sources/custom-http/custom-http-metric-key";
 import { pluginGlobalSettingsStore } from "../../settings/global-settings-store";
 import type {
     ResolvedMetricSourcePolicy,
@@ -32,6 +37,7 @@ import {
     resolveDiskUsageMetricSubscriptionKeys,
 } from "../disk/metric-subscriptions";
 import { resolveNetworkMetricSubscriptionKeys } from "../network/metric-subscriptions";
+import { resolveCustomHttpMetricDefinition } from "../custom-metric/runtime-source-definition";
 
 export type StackedMetricSlotReadState =
     | StackedMetricConfiguredSlotReadState
@@ -43,12 +49,13 @@ export interface StackedMetricConfiguredSlotReadState {
     readonly displayMetricKey: string;
     readonly subscriptionMetricKeys: readonly string[];
     readonly sourcePolicy: ResolvedMetricSourcePolicy;
+    readonly customHttpIdentity?: CustomHttpRuntimeIdentity | undefined;
 }
 
 export interface StackedMetricUnconfiguredSlotReadState {
     readonly stateKind: "unconfigured";
     readonly slotId: string;
-    readonly reason: "emptyCatalogMetric" | "conflictingSourcePolicy" | "unsupportedCustomMetric";
+    readonly reason: "emptyCatalogMetric" | "emptyCustomMetric" | "conflictingSourcePolicy";
 }
 
 export interface StackedMetricReadPlanResolution {
@@ -56,26 +63,28 @@ export interface StackedMetricReadPlanResolution {
     readonly slots: readonly StackedMetricSlotReadState[];
 }
 
+/**
+ * Builds the shared collection read plan for every configured stacked slot.
+ *
+ * `actionId` is optional only for tests and static PI previews. Runtime callers
+ * must pass it so Custom HTTP slots can derive action-local metric keys.
+ */
 export function buildStackedMetricReadPlan(options: {
     readonly widget: ResolvedStackedMetricWidget;
+    readonly actionId?: string | undefined;
     readonly platform?: NodeJS.Platform;
 }): StackedMetricReadPlanResolution {
     const acceptedRouteByMetricKey = new Map<string, MetricReadRoute>();
     const resolvedSlots: StackedMetricSlotReadState[] = [];
 
     for (const slot of options.widget.slots) {
-        const configuredSlot = resolveConfiguredStackedSlot(slot);
+        const configuredSlot = resolveConfiguredStackedSlot(slot, options.actionId);
         if (configuredSlot.stateKind === "unconfigured") {
             resolvedSlots.push(configuredSlot);
             continue;
         }
 
-        const slotReadPlan = buildMetricReadPlanFromSourcePolicy({
-            metricKeys: configuredSlot.subscriptionMetricKeys,
-            sourcePolicy: configuredSlot.sourcePolicy,
-            defaultSourceProfileId: pluginGlobalSettingsStore.getResolved().defaultSourceProfileId,
-            platform: options.platform,
-        });
+        const slotReadPlan = buildStackedSlotReadPlan(configuredSlot, options.platform);
         if (slotReadPlan.metrics.some(route => hasConflictingAcceptedRoute(acceptedRouteByMetricKey, route))) {
             resolvedSlots.push({
                 stateKind: "unconfigured",
@@ -99,10 +108,16 @@ export function buildStackedMetricReadPlan(options: {
     };
 }
 
+/**
+ * Lists every metric key the stacked action subscribes to.
+ */
 export function listStackedMetricReadPlanKeys(resolution: StackedMetricReadPlanResolution): readonly string[] {
     return listMetricReadPlanKeys(resolution.readPlan);
 }
 
+/**
+ * Reads the displayed metric key for the currently active stacked slot.
+ */
 export function readStackedDisplayedMetricKey(
     resolution: StackedMetricReadPlanResolution,
     slotId: string,
@@ -112,7 +127,10 @@ export function readStackedDisplayedMetricKey(
     return slot?.stateKind === "configured" ? slot.displayMetricKey : undefined;
 }
 
-function resolveConfiguredStackedSlot(slot: ResolvedStackedMetricSlot): StackedMetricSlotReadState {
+function resolveConfiguredStackedSlot(
+    slot: ResolvedStackedMetricSlot,
+    actionId: string | undefined,
+): StackedMetricSlotReadState {
     const target = slot.widget.slot.metric.target;
 
     if (target.domain === "catalog" && target.metricId.length === 0) {
@@ -122,70 +140,91 @@ function resolveConfiguredStackedSlot(slot: ResolvedStackedMetricSlot): StackedM
             reason: "emptyCatalogMetric",
         };
     }
-    if (target.domain === "customMetric") {
+    const metricKeys = resolveStackedMetricKeys(target, slot.widget.slot.appearance.view.selectedView, actionId, slot.slotId);
+    if (metricKeys === undefined) {
         return {
             stateKind: "unconfigured",
             slotId: slot.slotId,
-            reason: "unsupportedCustomMetric",
+            reason: "emptyCustomMetric",
         };
     }
-
-    const metricKeys = resolveStackedMetricKeys(target, slot.widget.slot.appearance.view.selectedView);
 
     return {
         stateKind: "configured",
         slotId: slot.slotId,
-        displayMetricKey: metricKeys[0],
-        subscriptionMetricKeys: metricKeys,
+        displayMetricKey: metricKeys.displayMetricKey,
+        subscriptionMetricKeys: metricKeys.subscriptionMetricKeys,
         sourcePolicy: slot.widget.slot.metric.source,
+        customHttpIdentity: metricKeys.customHttpIdentity,
     };
 }
 
 function resolveStackedMetricKeys(
     target: ResolvedMetricTarget,
     selectedView: ResolvedStackedMetricSlot["widget"]["slot"]["appearance"]["view"]["selectedView"],
-): readonly string[] {
+    actionId: string | undefined,
+    slotId: string,
+): {
+    readonly displayMetricKey: string;
+    readonly subscriptionMetricKeys: readonly string[];
+    readonly customHttpIdentity?: CustomHttpRuntimeIdentity | undefined;
+} | undefined {
     switch (target.domain) {
         case "cpu":
             switch (target.reading.kind) {
                 case "usage":
-                    return [CPU_USAGE_METRIC_KEY, CPU_MODEL_METRIC_KEY];
+                    return buildStackedMetricKeys([CPU_USAGE_METRIC_KEY, CPU_MODEL_METRIC_KEY]);
                 case "temperature":
-                    return [CPU_TEMP_METRIC_KEY];
+                    return buildStackedMetricKeys([CPU_TEMP_METRIC_KEY]);
                 case "power":
-                    return [CPU_POWER_METRIC_KEY];
+                    return buildStackedMetricKeys([CPU_POWER_METRIC_KEY]);
             }
             return assertNever(target.reading);
         case "gpu":
             switch (target.reading.kind) {
                 case "usage":
-                    return [GPU_USAGE_METRIC_KEY, GPU_MODEL_METRIC_KEY];
+                    return buildStackedMetricKeys([GPU_USAGE_METRIC_KEY, GPU_MODEL_METRIC_KEY]);
                 case "temperature":
-                    return [GPU_TEMP_METRIC_KEY];
+                    return buildStackedMetricKeys([GPU_TEMP_METRIC_KEY]);
                 case "vram":
-                    return [GPU_VRAM_USED_METRIC_KEY, GPU_VRAM_TOTAL_METRIC_KEY];
+                    return buildStackedMetricKeys([GPU_VRAM_USED_METRIC_KEY, GPU_VRAM_TOTAL_METRIC_KEY]);
                 case "power":
-                    return [GPU_POWER_METRIC_KEY, GPU_POWER_LIMIT_METRIC_KEY];
+                    return buildStackedMetricKeys([GPU_POWER_METRIC_KEY, GPU_POWER_LIMIT_METRIC_KEY]);
             }
             return assertNever(target.reading);
         case "memory":
-            return [RAM_USED_METRIC_KEY, RAM_TOTAL_METRIC_KEY];
+            return buildStackedMetricKeys([RAM_USED_METRIC_KEY, RAM_TOTAL_METRIC_KEY]);
         case "disk":
-            return target.reading.kind === "throughput"
+            return buildStackedMetricKeys(target.reading.kind === "throughput"
                 ? resolveDiskMetricSubscriptionKeys({
                     diskMetricKind: target.reading.kind,
                     diskThroughputDirection: target.reading.direction,
                 })
-                : resolveDiskUsageMetricSubscriptionKeys(target.volumeId);
+                : resolveDiskUsageMetricSubscriptionKeys(target.volumeId));
         case "network":
-            return resolveNetworkMetricSubscriptionKeys({
+            return buildStackedMetricKeys(resolveNetworkMetricSubscriptionKeys({
                 selectedView,
                 reading: target.reading,
-            });
+            }));
         case "catalog":
-            return [target.metricId];
-        case "customMetric":
-            throw new Error("Stacked Custom Metric runtime routing is deferred to the Custom Metric integration step.");
+            return buildStackedMetricKeys([target.metricId]);
+        case "customMetric": {
+            if (actionId === undefined) {
+                return undefined;
+            }
+            const definition = resolveCustomHttpMetricDefinition({
+                target,
+                actionId,
+                consumerSlug: buildStackedCustomHttpConsumerSlug(slotId),
+            });
+            return definition === undefined
+                ? undefined
+                : {
+                    displayMetricKey: definition.identity.metricKey,
+                    subscriptionMetricKeys: [definition.identity.metricKey],
+                    customHttpIdentity: definition.identity,
+                };
+        }
     }
 }
 
@@ -209,4 +248,35 @@ function buildRouteIdentity(route: MetricReadRoute): string {
         route.failureMode,
         route.sourceCandidates.map(sourceCandidate => sourceCandidate.sourceId),
     ]);
+}
+
+function buildStackedMetricKeys(metricKeys: readonly string[]): {
+    readonly displayMetricKey: string;
+    readonly subscriptionMetricKeys: readonly string[];
+} {
+    const displayMetricKey = metricKeys[0];
+    if (displayMetricKey === undefined) {
+        throw new Error("Stacked metric key resolution returned no metric keys.");
+    }
+
+    return {
+        displayMetricKey,
+        subscriptionMetricKeys: metricKeys,
+    };
+}
+
+function buildStackedSlotReadPlan(
+    slot: StackedMetricConfiguredSlotReadState,
+    platform: NodeJS.Platform | undefined,
+): MetricReadPlan {
+    if (slot.customHttpIdentity !== undefined) {
+        return buildCustomHttpMetricReadPlan([slot.customHttpIdentity]);
+    }
+
+    return buildMetricReadPlanFromSourcePolicy({
+        metricKeys: slot.subscriptionMetricKeys,
+        sourcePolicy: slot.sourcePolicy,
+        defaultSourceProfileId: pluginGlobalSettingsStore.getResolved().defaultSourceProfileId,
+        platform,
+    });
 }

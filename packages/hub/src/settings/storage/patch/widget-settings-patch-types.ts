@@ -103,6 +103,7 @@ export interface DenseWidgetSettingsPatch {
 
 export interface DenseMetricSlotPatch {
     readonly target?: DenseMetricTargetPatch | undefined;
+    readonly customMetric?: StoredWidgetSettingsPatch["customMetric"] | undefined;
     readonly customLabel?: string | undefined;
     readonly customMaximumValue?: number | undefined;
 }
@@ -130,7 +131,8 @@ export type DenseMetricTargetPatch =
         readonly detectedUnit: MetricUnit | undefined;
         readonly detectedCategory: CatalogMetricCategory | undefined;
         readonly detectedReadingKind: CatalogMetricReadingKind | undefined;
-    };
+    }
+    | { readonly domain: "customMetric" };
 
 export interface StackedWidgetSettingsPatch {
     readonly rotation?: Partial<{

@@ -4,34 +4,42 @@ import type {
     SetStateAction,
 } from "react";
 import {
-    CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE,
-    type CustomHttpPiRequestSettings,
-    type CustomHttpPiTestResponse,
-} from "../../../runtime/sources/custom-http/custom-http-pi-test-messages";
+    CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+    type CustomHttpSourceEditorRequestSettings,
+    type CustomHttpSourceEditorResponse,
+} from "../../../runtime/sources/custom-http/custom-http-source-editor-messages";
 import type { StreamDeckPropertyInspectorClient } from "../../stream-deck/stream-deck-client";
-import type { SampleState, TestCommand, TestState } from "./types";
+import type { SampleState, SourceEditorCommand, SourceEditorState } from "./types";
 
 let nextRequestId = 0;
 
+/**
+ * Sends a sample fetch command and records the pending request id locally.
+ *
+ * Stream Deck PI messages are async and may return out of order, so callers
+ * keep `pendingRequestIds` outside React state and reconcile responses by id.
+ */
 export function sendFetchSampleRequest(
     client: StreamDeckPropertyInspectorClient,
+    consumerSlug: string,
     url: string,
-    requestSettings: CustomHttpPiRequestSettings,
-    pendingRequestIds: RefObject<Map<string, TestCommand>>,
-    setTestState: (state: TestState) => void,
+    requestSettings: CustomHttpSourceEditorRequestSettings,
+    pendingRequestIds: RefObject<Map<string, SourceEditorCommand>>,
+    setSourceEditorState: (state: SourceEditorState) => void,
 ): void {
     const requestId = createRequestId();
     pendingRequestIds.current.set(requestId, "fetchSample");
-    setTestState({ kind: "pending", command: "fetchSample" });
+    setSourceEditorState({ kind: "pending", command: "fetchSample" });
     client.send("sendToPlugin", {
-        type: CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE,
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId,
+        consumerSlug,
         url,
         requestSettings,
     }).catch((error: Error) => {
         pendingRequestIds.current.delete(requestId);
-        setTestState({
+        setSourceEditorState({
             kind: "failed",
             command: "fetchSample",
             stage: "send",
@@ -40,31 +48,39 @@ export function sendFetchSampleRequest(
     });
 }
 
+/**
+ * Sends a transform test command while preserving the last fetched sample UI.
+ *
+ * The plugin owns the real cached sample; PI state keeps only a preview so the
+ * editor can keep useful context visible while the transform check is pending.
+ */
 export function sendTransformTestRequest(
     client: StreamDeckPropertyInspectorClient,
+    consumerSlug: string,
     url: string,
     jqTransform: string,
-    requestSettings: CustomHttpPiRequestSettings,
-    pendingRequestIds: RefObject<Map<string, TestCommand>>,
-    setTestState: Dispatch<SetStateAction<TestState>>,
+    requestSettings: CustomHttpSourceEditorRequestSettings,
+    pendingRequestIds: RefObject<Map<string, SourceEditorCommand>>,
+    setSourceEditorState: Dispatch<SetStateAction<SourceEditorState>>,
 ): void {
     const requestId = createRequestId();
     pendingRequestIds.current.set(requestId, "testTransform");
-    setTestState(previousState => ({
+    setSourceEditorState(previousState => ({
         kind: "pending",
         command: "testTransform",
         ...(readSampleState(previousState) === undefined ? {} : { sample: readSampleState(previousState) }),
     }));
     client.send("sendToPlugin", {
-        type: CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE,
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "testTransform",
         requestId,
+        consumerSlug,
         url,
         jqTransform,
         requestSettings,
     }).catch((error: Error) => {
         pendingRequestIds.current.delete(requestId);
-        setTestState(previousState => ({
+        setSourceEditorState(previousState => ({
             kind: "failed",
             command: "testTransform",
             stage: "send",
@@ -74,11 +90,14 @@ export function sendTransformTestRequest(
     });
 }
 
-export function applyTestResponse(
-    previousState: TestState,
+/**
+ * Applies a validated plugin response to the source editor state machine.
+ */
+export function applySourceEditorResponse(
+    previousState: SourceEditorState,
     url: string,
-    response: CustomHttpPiTestResponse,
-): TestState {
+    response: CustomHttpSourceEditorResponse,
+): SourceEditorState {
     if (response.command === "fetchSample") {
         return response.result.ok
             ? {
@@ -123,11 +142,17 @@ export function applyTestResponse(
     };
 }
 
-export function hasCurrentSample(state: TestState, url: string): boolean {
+/**
+ * Checks whether the editor has a fetched sample for the currently edited URL.
+ */
+export function hasCurrentSample(state: SourceEditorState, url: string): boolean {
     return readSampleState(state)?.url === url;
 }
 
-export function readSampleState(state: TestState): SampleState | undefined {
+/**
+ * Reads the preserved sample preview from any source editor state that can carry it.
+ */
+export function readSampleState(state: SourceEditorState): SampleState | undefined {
     switch (state.kind) {
         case "sampleReady":
         case "metricReady":

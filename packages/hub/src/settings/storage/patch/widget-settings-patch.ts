@@ -421,6 +421,11 @@ function applyDenseMetricSlotPatch(
         metric.target = buildDenseMetricTarget(patch.target);
         metric.sourcePolicy = buildDenseMetricSourcePolicy(patch.target);
     }
+    if (patch.customMetric !== undefined) {
+        const metricSlot = slot.slot ??= create(MetricSlotSchema);
+        const metric = metricSlot.metric ??= create(MetricSelectionSchema);
+        applyCustomMetricPatch(requireCustomMetricTarget(metric), patch.customMetric);
+    }
     if ("customLabel" in patch) {
         slot.customLabel = patch.customLabel;
     }
@@ -518,6 +523,11 @@ function buildDenseMetricTarget(patch: DenseMetricTargetPatch): StoredMetricSele
                         ? undefined
                         : storedCatalogMetricReadingKindByResolved[patch.detectedReadingKind],
                 }),
+            };
+        case "customMetric":
+            return {
+                case: "custom",
+                value: create(CustomMetricTargetSchema),
             };
     }
 }

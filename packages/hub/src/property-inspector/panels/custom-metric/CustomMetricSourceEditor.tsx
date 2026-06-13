@@ -32,12 +32,12 @@ import {
     readSampleState,
     sendFetchSampleRequest,
     sendTransformTestRequest,
-} from "./test-state";
+} from "./source-editor-state";
 import type {
     CopyStatus,
     CustomMetricWidgetSettingsProps,
-    TestCommand,
-    TestState,
+    SourceEditorCommand,
+    SourceEditorState,
 } from "./types";
 
 export function CustomMetricSourceEditor({
@@ -46,10 +46,10 @@ export function CustomMetricSourceEditor({
     jqTransform,
     requestSettings,
     client,
-    testState,
+    sourceEditorState,
     promptCopyStatus,
     pendingRequestIds,
-    setTestState,
+    setSourceEditorState,
     setPromptCopyStatus,
     onBack,
     ...props
@@ -59,15 +59,15 @@ export function CustomMetricSourceEditor({
     readonly jqTransform: string;
     readonly requestSettings: ResolvedCustomHttpFetchPolicy;
     readonly client: StreamDeckPropertyInspectorClient;
-    readonly testState: TestState;
+    readonly sourceEditorState: SourceEditorState;
     readonly promptCopyStatus: CopyStatus;
-    readonly pendingRequestIds: RefObject<Map<string, TestCommand>>;
-    readonly setTestState: Dispatch<SetStateAction<TestState>>;
+    readonly pendingRequestIds: RefObject<Map<string, SourceEditorCommand>>;
+    readonly setSourceEditorState: Dispatch<SetStateAction<SourceEditorState>>;
     readonly setPromptCopyStatus: Dispatch<SetStateAction<CopyStatus>>;
     readonly onBack: () => void;
 }): React.JSX.Element {
     const { locale, t } = useI18n();
-    const hasSample = hasCurrentSample(testState, url);
+    const hasSample = hasCurrentSample(sourceEditorState, url);
     const [userIntentDraft, setUserIntentDraft] = useState(userIntent);
     const lastSettingsUserIntentRef = useRef(userIntent);
     const fetchSampleButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -75,8 +75,12 @@ export function CustomMetricSourceEditor({
         locale,
         sourceUrl: url,
         userIntent: userIntentDraft,
-        sample: readSampleState(testState),
-    }), [locale, url, userIntentDraft, testState]);
+        sample: readSampleState(sourceEditorState),
+    }), [locale, url, userIntentDraft, sourceEditorState]);
+
+    useEffect(() => {
+        scrollPropertyInspectorToTop();
+    }, []);
 
     useEffect(() => {
         if (userIntent !== lastSettingsUserIntentRef.current) {
@@ -161,18 +165,19 @@ export function CustomMetricSourceEditor({
                             ref={fetchSampleButtonRef}
                             className="inline-action-button"
                             type="button"
-                            disabled={url.trim().length === 0 || testState.kind === "pending"}
+                            disabled={url.trim().length === 0 || sourceEditorState.kind === "pending"}
                             onClick={() => sendFetchSampleRequest(
                                 client,
+                                props.customHttpConsumerSlug,
                                 url,
                                 requestSettings,
                                 pendingRequestIds,
-                                setTestState,
+                                setSourceEditorState,
                             )}
                         >
                             {t(customMetricMessages.fetchSampleButton)}
                         </button>
-                        <TestStatusNote state={testState} command="fetchSample" />
+                        <TestStatusNote state={sourceEditorState} command="fetchSample" />
                         <p className="section-note">
                             {t(customMetricMessages.fetchLimitsNote, {
                                 timeoutSeconds: requestSettings.timeoutSeconds,
@@ -183,11 +188,11 @@ export function CustomMetricSourceEditor({
                     </div>
                 </InspectorItem>
                 <FailureDetails
-                    state={testState}
+                    state={sourceEditorState}
                     command="fetchSample"
                     requestSettings={requestSettings}
                 />
-                <SamplePreview state={testState} />
+                <SamplePreview state={sourceEditorState} />
             </SettingsSection>
             <SettingsSection title={t(customMetricMessages.resultSection)}>
                 <TextAreaSetting
@@ -240,15 +245,16 @@ export function CustomMetricSourceEditor({
                                 url.trim().length === 0
                                 || jqTransform.trim().length === 0
                                 || !hasSample
-                                || testState.kind === "pending"
+                                || sourceEditorState.kind === "pending"
                             }
                             onClick={() => sendTransformTestRequest(
                                 client,
+                                props.customHttpConsumerSlug,
                                 url,
                                 jqTransform,
                                 requestSettings,
                                 pendingRequestIds,
-                                setTestState,
+                                setSourceEditorState,
                             )}
                         >
                             {t(customMetricMessages.testTransformButton)}
@@ -267,9 +273,9 @@ export function CustomMetricSourceEditor({
                         )}
                     </div>
                 </InspectorItem>
-                <MetricResultPreview state={testState} />
+                <MetricResultPreview state={sourceEditorState} />
                 <FailureDetails
-                    state={testState}
+                    state={sourceEditorState}
                     command="testTransform"
                     requestSettings={requestSettings}
                 />
@@ -317,12 +323,20 @@ function focusFetchSampleButton(fetchSampleButtonRef: RefObject<HTMLButtonElemen
     fetchSampleButton.focus();
 }
 
+function scrollPropertyInspectorToTop(): void {
+    if (document.scrollingElement != null) {
+        document.scrollingElement.scrollTop = 0;
+    }
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+}
+
 function TestStatusNote({
     state,
     command,
 }: {
-    readonly state: TestState;
-    readonly command: TestCommand;
+    readonly state: SourceEditorState;
+    readonly command: SourceEditorCommand;
 }): React.JSX.Element | null {
     const { t } = useI18n();
 
@@ -381,7 +395,7 @@ function CopyStatusNote({
     );
 }
 
-function SamplePreview({ state }: { readonly state: TestState }): React.JSX.Element | null {
+function SamplePreview({ state }: { readonly state: SourceEditorState }): React.JSX.Element | null {
     const sample = readSampleState(state);
     const { t } = useI18n();
     if (sample === undefined) {
@@ -402,7 +416,7 @@ function SamplePreview({ state }: { readonly state: TestState }): React.JSX.Elem
     );
 }
 
-function MetricResultPreview({ state }: { readonly state: TestState }): React.JSX.Element | null {
+function MetricResultPreview({ state }: { readonly state: SourceEditorState }): React.JSX.Element | null {
     const { t } = useI18n();
     if (state.kind !== "metricReady") {
         return null;
@@ -426,8 +440,8 @@ function FailureDetails({
     command,
     requestSettings,
 }: {
-    readonly state: TestState;
-    readonly command: TestCommand;
+    readonly state: SourceEditorState;
+    readonly command: SourceEditorCommand;
     readonly requestSettings: ResolvedCustomHttpFetchPolicy;
 }): React.JSX.Element | null {
     const { t } = useI18n();

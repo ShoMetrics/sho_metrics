@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { useState } from "react";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
 import {
-    CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE,
-    type CustomHttpPiTestResponse,
-} from "../../runtime/sources/custom-http/custom-http-pi-test-messages";
+    CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+    type CustomHttpSourceEditorResponse,
+} from "../../runtime/sources/custom-http/custom-http-source-editor-messages";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import {
     writeStoredWidgetSettingsPatch,
@@ -15,6 +15,10 @@ import {
 } from "../../settings/storage/patch/widget-settings-patch";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../../shared/stream-deck-actions";
 import { buildVisibilityContext, type InspectorTestSettings } from "../testing/test-context";
+import {
+    readPropertyInspectorScrollTopForTest,
+    setPropertyInspectorScrollTopForTest,
+} from "../testing/scroll-position";
 import {
     readTestSettingsRecord,
     TestPropertyInspectorClient,
@@ -36,18 +40,23 @@ test("custom metric panel sends fetch and transform test commands through the pl
     })} />);
 
     assert.equal(screen.getByText("Configured").textContent, "Configured");
+    setPropertyInspectorScrollTopForTest(420);
     await user.click(screen.getByRole("button", { name: "Edit" }));
+    await waitFor(() => {
+        assert.equal(readPropertyInspectorScrollTopForTest(), 0);
+    });
     assert.equal(screen.getByRole("button", { name: "Copy Prompt" }).hasAttribute("disabled"), true);
 
     await user.click(screen.getByRole("button", { name: "Fetch Sample" }));
 
     const fetchMessage = readSentMessagePayload(client.sentMessages.at(-1));
     assert.equal(fetchMessage.command, "fetchSample");
+    assert.equal(fetchMessage.consumerSlug, "single");
     assert.equal(fetchMessage.url, "https://api.example.com/weather");
     assert.deepEqual(fetchMessage.requestSettings, { timeoutSeconds: 5, retryCount: 0 });
 
     dispatchCustomHttpResponse(client, {
-        type: CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE,
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId: fetchMessage.requestId,
         result: {
@@ -70,6 +79,7 @@ test("custom metric panel sends fetch and transform test commands through the pl
 
     const transformMessage = readSentMessagePayload(client.sentMessages.at(-1));
     assert.equal(transformMessage.command, "testTransform");
+    assert.equal(transformMessage.consumerSlug, "single");
     assert.equal(transformMessage.url, "https://api.example.com/weather");
     assert.deepEqual(transformMessage.requestSettings, { timeoutSeconds: 5, retryCount: 0 });
     assert.equal(
@@ -78,7 +88,7 @@ test("custom metric panel sends fetch and transform test commands through the pl
     );
 
     dispatchCustomHttpResponse(client, {
-        type: CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE,
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "testTransform",
         requestId: transformMessage.requestId,
         result: {
@@ -112,7 +122,7 @@ test("custom metric prompt marks truncated sample previews", async () => {
 
     const fetchMessage = readSentMessagePayload(client.sentMessages.at(-1));
     dispatchCustomHttpResponse(client, {
-        type: CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE,
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId: fetchMessage.requestId,
         result: {
@@ -155,7 +165,7 @@ test("custom metric source editor shows copyable failure details", async () => {
 
     const fetchMessage = readSentMessagePayload(client.sentMessages.at(-1));
     dispatchCustomHttpResponse(client, {
-        type: CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE,
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId: fetchMessage.requestId,
         result: {
@@ -364,7 +374,7 @@ test("custom metric prompt encourages Lucide icon suggestions without a fixed ex
     assert.match(prompt.value, /Jq syntax reminders:/);
     assert.match(prompt.value, /Convert numeric strings with `tonumber` when needed/);
     assert.match(prompt.value, /maximum is encouraged but not required/);
-    assert.match(prompt.value, /Omit maximum only when no safe display maximum can be inferred/);
+    assert.match(prompt.value, /Omit maximum when no safe display maximum can be inferred/);
     assert.match(prompt.value, /volts \| amperes/);
     assert.match(prompt.value, /watt_hours \| decibels_a_weighted \| siemens_per_centimeter/);
 });
@@ -491,6 +501,7 @@ function buildCustomMetricSettings(
 function readSentMessagePayload(message: SentStreamDeckMessage | undefined): {
     readonly command: "fetchSample" | "testTransform";
     readonly requestId: string;
+    readonly consumerSlug: string;
     readonly url: string;
     readonly jqTransform?: string;
     readonly requestSettings: {
@@ -510,11 +521,13 @@ function readSentMessagePayload(message: SentStreamDeckMessage | undefined): {
     const record = payload as Record<string, unknown>;
     const command = record["command"];
     const requestId = record["requestId"];
+    const consumerSlug = record["consumerSlug"];
     const url = record["url"];
     const requestSettings = record["requestSettings"];
     if (
         (command !== "fetchSample" && command !== "testTransform")
         || typeof requestId !== "string"
+        || typeof consumerSlug !== "string"
         || typeof url !== "string"
         || !requestSettings
         || typeof requestSettings !== "object"
@@ -535,6 +548,7 @@ function readSentMessagePayload(message: SentStreamDeckMessage | undefined): {
     return {
         command,
         requestId,
+        consumerSlug,
         url,
         requestSettings: {
             timeoutSeconds: requestSettingsRecord["timeoutSeconds"],
@@ -546,7 +560,7 @@ function readSentMessagePayload(message: SentStreamDeckMessage | undefined): {
 
 function dispatchCustomHttpResponse(
     client: TestPropertyInspectorClient,
-    response: CustomHttpPiTestResponse,
+    response: CustomHttpSourceEditorResponse,
 ): void {
     act(() => {
         client.dispatchSendToPropertyInspector(response);

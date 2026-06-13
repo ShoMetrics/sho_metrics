@@ -1,42 +1,60 @@
-export const CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE = "custom-http-pi-test";
+// Keep the existing wire value stable; only the TypeScript owner vocabulary
+// changed from PI test utility to live source editor workflow.
+export const CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE = "custom-http-pi-test";
 
-export type CustomHttpPiTestRequest =
+export type CustomHttpSourceEditorRequest =
     | {
-        readonly type: typeof CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE;
+        readonly type: typeof CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE;
         readonly command: "fetchSample";
         readonly requestId: string;
+        /**
+         * Identifies the widget consumer inside one Stream Deck action.
+         *
+         * Single Custom Metric uses one fixed consumer. Dense and Stacked pass
+         * row/slot-derived consumers so editor sample caches cannot overwrite
+         * each other within the same action.
+         */
+        readonly consumerSlug: string;
         readonly url: string;
-        readonly requestSettings: CustomHttpPiRequestSettings;
+        readonly requestSettings: CustomHttpSourceEditorRequestSettings;
     }
     | {
-        readonly type: typeof CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE;
+        readonly type: typeof CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE;
         readonly command: "testTransform";
         readonly requestId: string;
+        /**
+         * Identifies the widget consumer inside one Stream Deck action.
+         *
+         * Single Custom Metric uses one fixed consumer. Dense and Stacked pass
+         * row/slot-derived consumers so transform checks use the matching
+         * fetched sample.
+         */
+        readonly consumerSlug: string;
         readonly url: string;
         readonly jqTransform: string;
-        readonly requestSettings: CustomHttpPiRequestSettings;
+        readonly requestSettings: CustomHttpSourceEditorRequestSettings;
     };
 
-export interface CustomHttpPiRequestSettings {
+export interface CustomHttpSourceEditorRequestSettings {
     readonly timeoutSeconds: number;
     readonly retryCount: number;
 }
 
-export type CustomHttpPiTestResponse =
+export type CustomHttpSourceEditorResponse =
     | {
-        readonly type: typeof CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE;
+        readonly type: typeof CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE;
         readonly command: "fetchSample";
         readonly requestId: string;
-        readonly result: CustomHttpPiFetchSampleResult;
+        readonly result: CustomHttpSourceEditorFetchSampleResult;
     }
     | {
-        readonly type: typeof CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE;
+        readonly type: typeof CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE;
         readonly command: "testTransform";
         readonly requestId: string;
-        readonly result: CustomHttpPiTransformResult;
+        readonly result: CustomHttpSourceEditorTransformResult;
     };
 
-export type CustomHttpPiFetchSampleResult =
+export type CustomHttpSourceEditorFetchSampleResult =
     | {
         readonly ok: true;
         readonly responseBytes: number;
@@ -44,9 +62,9 @@ export type CustomHttpPiFetchSampleResult =
         readonly samplePreview: string;
         readonly isSamplePreviewTruncated: boolean;
     }
-    | CustomHttpPiFailureResult;
+    | CustomHttpSourceEditorFailureResult;
 
-export type CustomHttpPiTransformResult =
+export type CustomHttpSourceEditorTransformResult =
     | {
         readonly ok: true;
         readonly metric: {
@@ -57,32 +75,46 @@ export type CustomHttpPiTransformResult =
             readonly suggestedLucideIconId?: string;
         };
     }
-    | CustomHttpPiFailureResult;
+    | CustomHttpSourceEditorFailureResult;
 
-export interface CustomHttpPiFailureResult {
+export interface CustomHttpSourceEditorFailureResult {
     readonly ok: false;
     readonly stage: string;
     readonly detail: string;
 }
 
-export function readCustomHttpPiTestRequest(payload: unknown): CustomHttpPiTestRequest | undefined {
-    if (!isRecord(payload) || payload["type"] !== CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE) {
+/**
+ * Reads an untrusted Stream Deck PI-to-plugin payload as a Custom HTTP editor request.
+ *
+ * The Stream Deck SDK delivers plugin messages as arbitrary JSON. Keep the
+ * parameter `unknown` at this wire boundary, then narrow before action code
+ * handles the request.
+ */
+export function readCustomHttpSourceEditorRequest(payload: unknown): CustomHttpSourceEditorRequest | undefined {
+    if (!isRecord(payload) || payload["type"] !== CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE) {
         return undefined;
     }
 
     const command = payload["command"];
     const requestId = payload["requestId"];
+    const consumerSlug = payload["consumerSlug"];
     const url = payload["url"];
     const requestSettings = readRequestSettings(payload["requestSettings"]);
-    if (typeof requestId !== "string" || typeof url !== "string" || requestSettings === undefined) {
+    if (
+        typeof requestId !== "string"
+        || typeof consumerSlug !== "string"
+        || typeof url !== "string"
+        || requestSettings === undefined
+    ) {
         return undefined;
     }
 
     if (command === "fetchSample") {
         return {
-            type: CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE,
+            type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
             command,
             requestId,
+            consumerSlug,
             url,
             requestSettings,
         };
@@ -95,9 +127,10 @@ export function readCustomHttpPiTestRequest(payload: unknown): CustomHttpPiTestR
         }
 
         return {
-            type: CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE,
+            type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
             command,
             requestId,
+            consumerSlug,
             url,
             jqTransform,
             requestSettings,
@@ -107,8 +140,15 @@ export function readCustomHttpPiTestRequest(payload: unknown): CustomHttpPiTestR
     return undefined;
 }
 
-export function readCustomHttpPiTestResponse(payload: unknown): CustomHttpPiTestResponse | undefined {
-    if (!isRecord(payload) || payload["type"] !== CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE) {
+/**
+ * Reads an untrusted plugin-to-PI payload as a Custom HTTP editor response.
+ *
+ * Responses cross the same Stream Deck JSON boundary as requests. Property
+ * Inspector code should receive this typed union only after this reader has
+ * validated the payload shape.
+ */
+export function readCustomHttpSourceEditorResponse(payload: unknown): CustomHttpSourceEditorResponse | undefined {
+    if (!isRecord(payload) || payload["type"] !== CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE) {
         return undefined;
     }
 
@@ -124,7 +164,7 @@ export function readCustomHttpPiTestResponse(payload: unknown): CustomHttpPiTest
         return fetchResult === undefined
             ? undefined
             : {
-                type: CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE,
+                type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
                 command,
                 requestId,
                 result: fetchResult,
@@ -136,7 +176,7 @@ export function readCustomHttpPiTestResponse(payload: unknown): CustomHttpPiTest
         return transformResult === undefined
             ? undefined
             : {
-                type: CUSTOM_HTTP_PI_TEST_MESSAGE_TYPE,
+                type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
                 command,
                 requestId,
                 result: transformResult,
@@ -146,7 +186,7 @@ export function readCustomHttpPiTestResponse(payload: unknown): CustomHttpPiTest
     return undefined;
 }
 
-function readFetchSampleResult(result: Readonly<Record<string, unknown>>): CustomHttpPiFetchSampleResult | undefined {
+function readFetchSampleResult(result: Readonly<Record<string, unknown>>): CustomHttpSourceEditorFetchSampleResult | undefined {
     if (result["ok"] === true) {
         const responseBytes = result["responseBytes"];
         const elapsedMilliseconds = result["elapsedMilliseconds"];
@@ -165,7 +205,7 @@ function readFetchSampleResult(result: Readonly<Record<string, unknown>>): Custo
     return readFailureResult(result);
 }
 
-function readTransformResult(result: Readonly<Record<string, unknown>>): CustomHttpPiTransformResult | undefined {
+function readTransformResult(result: Readonly<Record<string, unknown>>): CustomHttpSourceEditorTransformResult | undefined {
     if (result["ok"] === true) {
         const metric = result["metric"];
         if (!isRecord(metric)) {
@@ -202,7 +242,7 @@ function readTransformResult(result: Readonly<Record<string, unknown>>): CustomH
     return readFailureResult(result);
 }
 
-function readFailureResult(result: Readonly<Record<string, unknown>>): CustomHttpPiFailureResult | undefined {
+function readFailureResult(result: Readonly<Record<string, unknown>>): CustomHttpSourceEditorFailureResult | undefined {
     if (result["ok"] !== false) {
         return undefined;
     }
@@ -214,7 +254,7 @@ function readFailureResult(result: Readonly<Record<string, unknown>>): CustomHtt
         : undefined;
 }
 
-function readRequestSettings(value: unknown): CustomHttpPiRequestSettings | undefined {
+function readRequestSettings(value: unknown): CustomHttpSourceEditorRequestSettings | undefined {
     if (!isRecord(value)) {
         return undefined;
     }

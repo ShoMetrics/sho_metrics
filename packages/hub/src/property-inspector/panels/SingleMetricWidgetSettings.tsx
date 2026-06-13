@@ -1,4 +1,5 @@
 import type { ResolvedMetricTarget } from "../../settings/resolved-settings";
+import { CUSTOM_HTTP_SINGLE_CONSUMER_SLUG } from "../../runtime/sources/custom-http/custom-http-metric-key";
 import { CatalogMetricWidgetSettings } from "./CatalogMetricWidgetSettings";
 import { CpuWidgetSettings } from "./CpuWidgetSettings";
 import { CustomMetricWidgetSettings } from "./CustomMetricWidgetSettings";
@@ -10,6 +11,7 @@ import type { WidgetSettingsPanelProps } from "./panel-props";
 
 export function SingleMetricWidgetSettings(props: WidgetSettingsPanelProps & {
     target: ResolvedMetricTarget;
+    readonly customHttpConsumerSlug?: string | undefined;
 }): React.JSX.Element {
     switch (props.target.domain) {
         case "network":
@@ -23,7 +25,13 @@ export function SingleMetricWidgetSettings(props: WidgetSettingsPanelProps & {
         case "catalog":
             return <CatalogMetricWidgetSettings {...props} target={props.target} />;
         case "customMetric":
-            return <CustomMetricWidgetSettings {...props} target={props.target} />;
+            return (
+                <CustomMetricWidgetSettings
+                    {...props}
+                    target={props.target}
+                    customHttpConsumerSlug={props.customHttpConsumerSlug ?? CUSTOM_HTTP_SINGLE_CONSUMER_SLUG}
+                />
+            );
         case "memory":
             return <DefaultWidgetSettings {...props} />;
     }
