@@ -1,6 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import {
     CustomHttpMetricSourceSchema,
+    CustomHttpRequestSettingsSchema,
     CustomMetricIconSettingsSchema,
     DiskThroughputDisplaySettingsSchema,
     MetricSourcePolicySchema,
@@ -63,7 +64,11 @@ export function applyCustomMetricPatch(
         }
     }
 
-    const hasHttpPatch = "url" in patch || "userIntent" in patch || "jqTransform" in patch;
+    const hasHttpPatch = "url" in patch
+        || "userIntent" in patch
+        || "jqTransform" in patch
+        || "timeoutSeconds" in patch
+        || "retryCount" in patch;
     if (!hasHttpPatch) {
         return;
     }
@@ -92,6 +97,15 @@ export function applyCustomMetricPatch(
     }
     if ("jqTransform" in patch) {
         request.jqTransform = patch.jqTransform;
+    }
+    if ("timeoutSeconds" in patch || "retryCount" in patch) {
+        request.requestSettings ??= create(CustomHttpRequestSettingsSchema);
+        if ("timeoutSeconds" in patch) {
+            request.requestSettings.timeoutSeconds = patch.timeoutSeconds;
+        }
+        if ("retryCount" in patch) {
+            request.requestSettings.retryCount = patch.retryCount;
+        }
     }
 }
 

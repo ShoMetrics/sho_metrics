@@ -22,6 +22,9 @@ import {
     type MetricSourcePolicy as StoredMetricSourcePolicy,
     type NetworkMetricTarget as StoredNetworkMetricTarget,
 } from "../../../generated/proto/shometrics/v1/settings_pb.js";
+import {
+    resolveCustomHttpFetchPolicy,
+} from "../../../runtime/sources/custom-http/custom-http-request-policy";
 import { MetricUnit } from "../../../runtime/sources/metric-source";
 import {
     DEFAULT_NETWORK_PING_TARGET_HOST,
@@ -436,8 +439,9 @@ function readSingleCustomHttpRequest(
             const url = storedRequest.url?.trim() ?? "";
             const userIntent = storedRequest.userIntent?.trim() || undefined;
             const jqTransform = storedRequest.jqTransform?.trim() ?? "";
+            const hasRequestSettings = storedRequest.requestSettings !== undefined;
 
-            if (url.length === 0 && userIntent === undefined && jqTransform.length === 0) {
+            if (url.length === 0 && userIntent === undefined && jqTransform.length === 0 && !hasRequestSettings) {
                 return undefined;
             }
 
@@ -445,6 +449,10 @@ function readSingleCustomHttpRequest(
                 url,
                 userIntent,
                 jqTransform,
+                requestSettings: resolveCustomHttpFetchPolicy({
+                    timeoutSeconds: storedRequest.requestSettings?.timeoutSeconds,
+                    retryCount: storedRequest.requestSettings?.retryCount,
+                }),
             };
         }
     }

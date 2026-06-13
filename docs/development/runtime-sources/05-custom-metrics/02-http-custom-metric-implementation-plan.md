@@ -923,30 +923,53 @@ Required work:
    belong to the HTTP source definition, not generic `WidgetPreferences`.
 2. Persist timeout and retry count only. Defaults preserve current behavior:
    5 second timeout and 0 retries.
-3. Before coding this step, choose explicit UI bounds for timeout and retry
-   count. Do not silently choose a 15 second default.
+3. Timeout is per HTTP attempt, not the whole polling cycle. UI bounds are
+   1, 2, 3, 5, 10, 15, or 30 seconds. `retry_count` is the number of additional
+   attempts after the first attempt; 2 means one original request plus two
+   retries. UI bounds are 0, 1, 2, or 3 retries.
 4. Runtime fetch, PI sample fetch, and transform test must use the same
    resolved request config. Do not create a PI-only network policy.
-5. Retry policy must be explicit before implementation. Decide which failures
-   are retryable, such as timeout/network failure and possibly 5xx, instead of
-   retrying every HTTP or schema failure.
+5. Retry only network/timeout-style fetch failures. Do not retry invalid URL,
+   unsupported protocol, HTTP 4xx, HTTP 5xx, response-too-large, JSON parse,
+   jq, or schema failures. Use fixed-code exponential retry delays with jitter,
+   currently 500 ms, 1000 ms, and 2000 ms bases with +/-20% jitter. Do not add
+   a strategy/policy system.
 6. PI must show the effective timeout, retry count, and 256 KiB response cap
    near the sample fetch controls and in failure debug details.
-7. Keep the system DNS resolver as the default. Do not force public DNS by
+7. Custom HTTP may expose longer polling options than ordinary hardware
+   widgets, up to 24 hours. The Custom HTTP PI options are 5m, 15m, 30m, 1h,
+   2h, 3h, 6h, 12h, and 24h in addition to the ordinary short intervals. Other
+   widget UIs stay capped at 60 seconds. Runtime must accept Custom HTTP
+   polling values in the 1-86400 second range; otherwise a valid stored 24h
+   setting would silently fall back to 1 second.
+8. Keep the existing collector in-flight policy: the periodic source runner
+   schedules the next refresh only after the current refresh finishes. If another
+   caller forces `refreshNow()` while a refresh is pending, it returns
+   `skippedPending`. Do not queue, do not run concurrent polls for the same
+   collector group, and do not kill the in-flight request to start a newer one.
+   Killing wastes rate-limited requests and can repeatedly prevent a slow
+   endpoint from ever returning.
+9. PI must warn when the worst-case request budget can exceed the polling
+   frequency. Worst case is attempt timeout multiplied by total attempts plus
+   the maximum jittered retry delays plus one final bounded DNS diagnostic. The
+   warning should explain that source refresh waits for the current request to
+   finish before scheduling the next one, so the effective refresh cadence can
+   be slower than the configured polling frequency.
+10. Keep the system DNS resolver as the default. Do not force public DNS by
    default. If a future advanced resolver option is added, it must be explicit,
    off by default, and must not apply to localhost, private IPs, or likely
    internal hostnames.
-8. Do not implement custom headers, auth, cookies, tokens, sequence requests,
+11. Do not implement custom headers, auth, cookies, tokens, sequence requests,
    parallel requests, or per-request cache policy in this step.
-9. Do not store raw secrets in widget/action settings. If future auth is added,
+12. Do not store raw secrets in widget/action settings. If future auth is added,
    the widget proto should store an opaque credential reference such as
    `credential_ref`, not `token`, `token_path`, or a raw header value.
-10. Treat Stream Deck global settings/secrets as the first credential-storage
+13. Treat Stream Deck global settings/secrets as the first credential-storage
     candidate for future auth. The installed official SDK
     `@elgato/streamdeck@2.1.0` documents global settings as plugin-only and
     suitable for secure persistence, and exposes `getSecrets()`. Confirm the
     exact write/read workflow before implementing auth.
-11. Before adding any external credential-store npm package, run a package
+14. Before adding any external credential-store npm package, run a package
     safety review. Current candidates are native/prebuilt-package based; there
     is no approved no-brainer Node credential dependency for this project.
 
@@ -959,6 +982,11 @@ Acceptance:
 - Failure debug details include the effective timeout, retry count, and response
   size cap without logging URL query strings, response bodies, jq transforms, or
   secrets.
+- Custom HTTP can be configured for long polling up to 24 hours without changing
+  ordinary widget polling options.
+- If timeout/retry worst case exceeds the polling interval, PI shows a warning
+  explaining that the next source refresh waits for the current request to
+  finish.
 - No auth, header, token, or credential field is added unless a later step
   explicitly designs Stream Deck global secret/global-settings storage.
 

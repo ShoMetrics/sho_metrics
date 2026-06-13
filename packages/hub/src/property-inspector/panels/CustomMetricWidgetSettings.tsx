@@ -8,6 +8,7 @@ import { useI18n } from "../../i18n/react";
 import {
     readCustomHttpPiTestResponse,
 } from "../../runtime/sources/custom-http/custom-http-pi-test-messages";
+import { resolveCustomHttpFetchPolicy } from "../../runtime/sources/custom-http/custom-http-request-policy";
 import type {
     ResolvedCustomMetricSource,
     ResolvedSingleCustomHttpRequest,
@@ -19,6 +20,7 @@ import { AppearanceSettings } from "./AppearanceSettings";
 import { PollingSettings } from "./PollingSettings";
 import { LineSettings } from "./LineSettings";
 import { SettingsSection } from "./SettingsSection";
+import { customHttpPollingFrequencyOptionList } from "./setting-options";
 import { CustomMetricIconSettings } from "./custom-metric/CustomMetricIconSettings";
 import { CustomMetricSourceEditor } from "./custom-metric/CustomMetricSourceEditor";
 import {
@@ -38,6 +40,7 @@ export function CustomMetricWidgetSettings(props: CustomMetricWidgetSettingsProp
     const url = request?.url ?? "";
     const userIntent = request?.userIntent ?? "";
     const jqTransform = request?.jqTransform ?? "";
+    const requestSettings = request?.requestSettings ?? resolveCustomHttpFetchPolicy({});
     const [isEditingSource, setIsEditingSource] = useState(false);
     const [testState, setTestState] = useState<TestState>({ kind: "idle" });
     const [promptCopyStatus, setPromptCopyStatus] = useState<CopyStatus>("idle");
@@ -73,6 +76,7 @@ export function CustomMetricWidgetSettings(props: CustomMetricWidgetSettingsProp
                 url={url}
                 userIntent={userIntent}
                 jqTransform={jqTransform}
+                requestSettings={requestSettings}
                 client={client}
                 testState={testState}
                 promptCopyStatus={promptCopyStatus}
@@ -115,7 +119,12 @@ export function CustomMetricWidgetSettings(props: CustomMetricWidgetSettingsProp
             <AppearanceSettings {...props} />
             <LineSettings {...props} />
             <StandardColorSettings {...props} />
-            {props.showPolling !== false && <PollingSettings {...props} />}
+            {props.showPolling !== false && (
+                <PollingSettings
+                    {...props}
+                    optionList={customHttpPollingFrequencyOptionList}
+                />
+            )}
         </>
     );
 }

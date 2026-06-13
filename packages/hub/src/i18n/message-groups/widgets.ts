@@ -465,6 +465,31 @@ export const customMetricMessages = {
         zh_CN: "自定义指标设置会保存到 Stream Deck 操作设置中，并包含在 Stream Deck 导出里。不要使用密钥、令牌、Cookie 或私密 URL。",
         ja: "カスタムメトリクス設定は Stream Deck のアクション設定に保存され、Stream Deck のエクスポートにも含まれます。シークレット、トークン、Cookie、非公開 URL は使用しないでください。",
     },
+    requestSettingsSection: {
+        en: "Request Settings",
+        zh_CN: "请求设置",
+        ja: "リクエスト設定",
+    },
+    timeoutSecondsLabel: {
+        en: "Timeout",
+        zh_CN: "超时",
+        ja: "タイムアウト",
+    },
+    retryCountLabel: {
+        en: "Retries",
+        zh_CN: "重试次数",
+        ja: "リトライ回数",
+    },
+    fetchSampleSection: {
+        en: "Fetch Sample",
+        zh_CN: "获取样本",
+        ja: "サンプル取得",
+    },
+    requestBudgetWarning: {
+        en: "Worst-case request time is about {worstCaseSeconds}s, longer than the {pollingSeconds}s polling frequency. Source refresh waits for the current request to finish before scheduling the next one.",
+        zh_CN: "最坏情况下请求大约需要 {worstCaseSeconds} 秒，超过当前 {pollingSeconds} 秒轮询频率。Source refresh 会等当前请求结束后再安排下一次请求。",
+        ja: "最悪時のリクエスト時間は約 {worstCaseSeconds} 秒で、現在の {pollingSeconds} 秒ポーリング頻度を超えます。ソース更新は現在のリクエスト完了後に次のリクエストをスケジュールします。",
+    },
     sampleReadyNote: {
         en: "Sample fetched. Response size: {bytes} bytes.",
         zh_CN: "样本已获取。响应大小：{bytes} 字节。",

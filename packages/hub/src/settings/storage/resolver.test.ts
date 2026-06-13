@@ -1215,6 +1215,10 @@ describe("stored settings proto resolver", () => {
                             url: "https://api.example.com/current",
                             userIntent: undefined,
                             jqTransform: "",
+                            requestSettings: {
+                                timeoutSeconds: 5,
+                                retryCount: 0,
+                            },
                         },
                     },
                 },
@@ -1234,6 +1238,10 @@ describe("stored settings proto resolver", () => {
                                         url: " https://api.example.com/current?city=tokyo ",
                                         userIntent: " Temperature ",
                                         jqTransform: " { metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } } ",
+                                        requestSettings: {
+                                            timeoutSeconds: 10,
+                                            retryCount: 2,
+                                        },
                                     },
                                 },
                             },
@@ -1256,6 +1264,10 @@ describe("stored settings proto resolver", () => {
                             url: "https://api.example.com/current?city=tokyo",
                             userIntent: "Temperature",
                             jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+                            requestSettings: {
+                                timeoutSeconds: 10,
+                                retryCount: 2,
+                            },
                         },
                     },
                 },
@@ -1321,6 +1333,10 @@ describe("stored settings proto resolver", () => {
                             url: "https://api.example.com/current",
                             userIntent: undefined,
                             jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+                            requestSettings: {
+                                timeoutSeconds: 5,
+                                retryCount: 0,
+                            },
                         },
                     },
                 },

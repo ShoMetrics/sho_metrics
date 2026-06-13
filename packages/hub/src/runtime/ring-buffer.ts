@@ -1,6 +1,6 @@
 /**
  * Fixed-length circular buffer maintaining a sliding window of values.
- * Used to store 60 seconds of metric history for sparkline rendering.
+ * Used to store the latest N metric samples for sparkline rendering.
  */
 export class RingBuffer<T> {
     private readonly buffer: (T | undefined)[];

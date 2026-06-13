@@ -20,6 +20,7 @@ test("CustomHttpDefinitionRegistry registers and explicitly replaces definitions
             url: "https://api.example.com/first",
             userIntent: "first",
             jqTransform: ".",
+            requestSettings: defaultRequestSettings(),
         },
     });
     assert.throws(
@@ -29,6 +30,7 @@ test("CustomHttpDefinitionRegistry registers and explicitly replaces definitions
                 url: "https://api.example.com/duplicate",
                 userIntent: "duplicate",
                 jqTransform: ".",
+                requestSettings: defaultRequestSettings(),
             },
         }),
         /already registered/,
@@ -39,6 +41,7 @@ test("CustomHttpDefinitionRegistry registers and explicitly replaces definitions
             url: "https://api.example.com/second",
             userIntent: "second",
             jqTransform: ".metric",
+            requestSettings: defaultRequestSettings(),
         },
     });
 
@@ -46,6 +49,7 @@ test("CustomHttpDefinitionRegistry registers and explicitly replaces definitions
         url: "https://api.example.com/second",
         userIntent: "second",
         jqTransform: ".metric",
+        requestSettings: defaultRequestSettings(),
     });
     assert.equal(registry.list().length, 1);
 });
@@ -69,6 +73,7 @@ test("CustomHttpDefinitionRegistry unregisters one definition without touching o
             url: "https://api.example.com/one",
             userIntent: undefined,
             jqTransform: ".",
+            requestSettings: defaultRequestSettings(),
         },
     });
     registry.register({
@@ -77,6 +82,7 @@ test("CustomHttpDefinitionRegistry unregisters one definition without touching o
             url: "https://api.example.com/two",
             userIntent: undefined,
             jqTransform: ".",
+            requestSettings: defaultRequestSettings(),
         },
     });
     registry.unregister(firstIdentity.metricKey);
@@ -84,3 +90,7 @@ test("CustomHttpDefinitionRegistry unregisters one definition without touching o
     assert.equal(registry.read(firstIdentity.metricKey), undefined);
     assert.equal(registry.read(secondIdentity.metricKey)?.identity.metricKey, secondIdentity.metricKey);
 });
+
+function defaultRequestSettings(): { readonly timeoutSeconds: number; readonly retryCount: number } {
+    return { timeoutSeconds: 5, retryCount: 0 };
+}

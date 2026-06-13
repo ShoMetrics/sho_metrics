@@ -186,6 +186,44 @@ test("start does not create a second timer while a running refresh is pending", 
     assert.deepEqual(fakeTimer.recordedDelaysMilliseconds, [0, 1000]);
 });
 
+test("periodic refresh waits for pending refresh before scheduling the next poll", async () => {
+    const fakeTimer = new FakeTimer();
+    const deferredSnapshot = createDeferred<MetricSnapshot>();
+    const sourceClient = new FakeSourceClient([
+        deferredSnapshot.promise,
+        buildSnapshot(2000, { "cpu.usage_percent": 55 }),
+    ]);
+    const runner = new CollectorGroupRunner({
+        collectorGroup: buildCollectorGroup({
+            metricKeys: ["cpu.usage_percent"],
+            intervalMilliseconds: 1000,
+        }),
+        sourceClient,
+        snapshotStore: new MetricStore(),
+        backoffPolicy: BackoffPolicy.flat(() => 0, 1000),
+        timer: fakeTimer,
+    });
+
+    runner.start();
+    await fakeTimer.advanceBy(0);
+    await fakeTimer.advanceBy(100_000);
+
+    assert.deepEqual(sourceClient.requestedMetricKeys, [["cpu.usage_percent"]]);
+    assert.deepEqual(fakeTimer.recordedDelaysMilliseconds, [0]);
+
+    deferredSnapshot.resolve(buildSnapshot(1000, { "cpu.usage_percent": 42 }));
+    await fakeTimer.drainMicrotasks();
+
+    assert.deepEqual(fakeTimer.recordedDelaysMilliseconds, [0, 1000]);
+
+    await fakeTimer.advanceBy(1000);
+
+    assert.deepEqual(sourceClient.requestedMetricKeys, [
+        ["cpu.usage_percent"],
+        ["cpu.usage_percent"],
+    ]);
+});
+
 test("stop then start keeps old in-flight results out and schedules a new tick", async () => {
     const fakeTimer = new FakeTimer();
     const metricStore = new MetricStore();
@@ -265,11 +303,13 @@ function createDeferred<T>(): Deferred<T> {
 class FakeTimer {
     readonly recordedDelaysMilliseconds: number[] = [];
     private readonly handles: FakeTimerHandle[] = [];
+    private currentMilliseconds = 0;
 
     set(callback: () => void, delayMilliseconds: number): unknown {
         const handle = {
             active: true,
             callback,
+            dueAtMilliseconds: this.currentMilliseconds + delayMilliseconds,
         };
         this.handles.push(handle);
         this.recordedDelaysMilliseconds.push(delayMilliseconds);
@@ -281,14 +321,33 @@ class FakeTimer {
     }
 
     async runNext(): Promise<void> {
-        const handle = this.handles.shift();
+        const handle = this.shiftNextActiveHandle();
 
-        if (!handle || !handle.active) {
+        if (!handle) {
             return;
         }
 
+        this.currentMilliseconds = Math.max(this.currentMilliseconds, handle.dueAtMilliseconds);
+        handle.active = false;
         handle.callback();
         await this.drainMicrotasks();
+    }
+
+    async advanceBy(delayMilliseconds: number): Promise<void> {
+        const targetMilliseconds = this.currentMilliseconds + delayMilliseconds;
+
+        while (true) {
+            const handle = this.shiftNextActiveHandleBeforeOrAt(targetMilliseconds);
+            if (!handle) {
+                this.currentMilliseconds = targetMilliseconds;
+                return;
+            }
+
+            this.currentMilliseconds = handle.dueAtMilliseconds;
+            handle.active = false;
+            handle.callback();
+            await this.drainMicrotasks();
+        }
     }
 
     async drainMicrotasks(): Promise<void> {
@@ -296,10 +355,36 @@ class FakeTimer {
             await Promise.resolve();
         }
     }
+
+    private shiftNextActiveHandle(): FakeTimerHandle | undefined {
+        return this.shiftNextActiveHandleByPredicate(() => true);
+    }
+
+    private shiftNextActiveHandleBeforeOrAt(targetMilliseconds: number): FakeTimerHandle | undefined {
+        return this.shiftNextActiveHandleByPredicate(handle => handle.dueAtMilliseconds <= targetMilliseconds);
+    }
+
+    private shiftNextActiveHandleByPredicate(
+        predicate: (handle: FakeTimerHandle) => boolean,
+    ): FakeTimerHandle | undefined {
+        const sortedHandles = this.handles
+            .map((handle, index) => ({ handle, index }))
+            .filter(entry => entry.handle.active && predicate(entry.handle))
+            .sort((left, right) => left.handle.dueAtMilliseconds - right.handle.dueAtMilliseconds);
+        const nextHandleEntry = sortedHandles[0];
+
+        if (!nextHandleEntry) {
+            return undefined;
+        }
+
+        this.handles.splice(nextHandleEntry.index, 1);
+        return nextHandleEntry.handle;
+    }
 }
 
 interface FakeTimerHandle {
     active: boolean;
+    dueAtMilliseconds: number;
     callback(): void;
 }
 

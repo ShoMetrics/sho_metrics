@@ -176,6 +176,30 @@ test("widget patch updates Custom Metric user intent", () => {
     }
 });
 
+test("widget patch writes Custom Metric HTTP request settings", () => {
+    const customMetricSettings = resolveQuickStartStoredWidgetSettings(undefined, "customMetric").rawSettings;
+
+    const nextSettings = writeStoredWidgetSettingsPatch(customMetricSettings, {
+        customMetric: {
+            timeoutSeconds: 10,
+            retryCount: 2,
+        },
+    });
+
+    const target = readSingleMetricSlot(nextSettings)?.metric?.target;
+    assert.equal(target?.case, "custom");
+    if (target?.case === "custom") {
+        assert.equal(target.value.source.case, "http");
+        if (target.value.source.case === "http") {
+            assert.equal(target.value.source.value.plan.case, "singleRequest");
+            if (target.value.source.value.plan.case === "singleRequest") {
+                assert.equal(target.value.source.value.plan.value.requestSettings?.timeoutSeconds, 10);
+                assert.equal(target.value.source.value.plan.value.requestSettings?.retryCount, 2);
+            }
+        }
+    }
+});
+
 test("widget patch can clear Custom Metric user intent", () => {
     const customMetricSettings = writeStoredWidgetSettingsPatch(
         resolveQuickStartStoredWidgetSettings(undefined, "customMetric").rawSettings,

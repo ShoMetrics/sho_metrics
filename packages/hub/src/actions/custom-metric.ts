@@ -160,7 +160,7 @@ export class CustomMetric extends MetricAction {
         }
 
         if (request.command === "fetchSample") {
-            void this.fetchSampleForPropertyInspector(event.action.id, request.url)
+            void this.fetchSampleForPropertyInspector(event.action.id, request.url, request.requestSettings)
                 .then(result => this.sendCustomMetricTestResponse(event, {
                     type: request.type,
                     command: request.command,
@@ -207,8 +207,9 @@ export class CustomMetric extends MetricAction {
     private async fetchSampleForPropertyInspector(
         actionId: string,
         url: string,
+        requestSettings: ResolvedSingleCustomHttpRequest["requestSettings"],
     ): Promise<CustomHttpPiFetchSampleResult> {
-        const fetchResult = await this.fetcher.fetchJson(url);
+        const fetchResult = await this.fetcher.fetchJson(url, requestSettings);
         if (!fetchResult.ok) {
             this.sampleCacheByActionId.delete(actionId);
             return {

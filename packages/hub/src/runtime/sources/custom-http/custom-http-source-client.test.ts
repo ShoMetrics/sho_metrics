@@ -3,7 +3,7 @@ import test from "node:test";
 import { MetricUnit } from "../metric-source";
 import type { SourceMetricPollingGroupResolution } from "../source-polling-groups";
 import { CustomHttpDefinitionRegistry } from "./custom-http-definition-registry";
-import type { CustomHttpFetchResult, CustomHttpFetcher } from "./custom-http-fetcher";
+import type { CustomHttpFetchOptions, CustomHttpFetchResult, CustomHttpFetcher } from "./custom-http-fetcher";
 import {
     buildCustomHttpRuntimeIdentity,
     CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
@@ -24,11 +24,13 @@ test("CustomHttpSourceClient reads configured definitions into metric snapshots"
             url: "https://api.example.com/data",
             userIntent: "show CPU",
             jqTransform: ".",
+            requestSettings: { timeoutSeconds: 10, retryCount: 2 },
         },
     });
+    const fetcher = new FakeCustomHttpFetcher(JSON.stringify({ value: 42 }));
     const sourceClient = new CustomHttpSourceClient({
         definitionRegistry: registry,
-        fetcher: new FakeCustomHttpFetcher(JSON.stringify({ value: 42 })),
+        fetcher,
         transformRunner: new FakeCustomHttpTransformRunner({
             metric: {
                 label: "CPU",
@@ -45,6 +47,7 @@ test("CustomHttpSourceClient reads configured definitions into metric snapshots"
     const metricValue = result.snapshot.metrics[identity.metricKey];
 
     assert.equal(metricValue?.value.case, "scalar");
+    assert.deepEqual(fetcher.optionsList, [{ timeoutSeconds: 10, retryCount: 2 }]);
     assert.equal(metricValue?.value.value, 42);
     assert.equal(metricValue?.unit, MetricUnit.PERCENT);
     assert.deepEqual(result.unavailableMetrics, []);
@@ -114,6 +117,7 @@ test("CustomHttpSourceClient returns invalidValue for schema failures", async ()
             url: "https://api.example.com/data",
             userIntent: undefined,
             jqTransform: ".",
+            requestSettings: { timeoutSeconds: 5, retryCount: 0 },
         },
     });
     const sourceClient = new CustomHttpSourceClient({
@@ -151,6 +155,7 @@ test("CustomHttpSourceClient contains unexpected metric read failures to one met
             url: "https://api.example.com/data",
             userIntent: undefined,
             jqTransform: ".",
+            requestSettings: { timeoutSeconds: 5, retryCount: 0 },
         },
     });
     const sourceClient = new CustomHttpSourceClient({
@@ -203,7 +208,10 @@ test("CustomHttpSourceClient owns only custom-http metric keys", () => {
 class FakeCustomHttpFetcher implements CustomHttpFetcher {
     constructor(private readonly responseText: string) {}
 
-    async fetchJson(): Promise<CustomHttpFetchResult> {
+    readonly optionsList: CustomHttpFetchOptions[] = [];
+
+    async fetchJson(_url: string, options?: CustomHttpFetchOptions): Promise<CustomHttpFetchResult> {
+        this.optionsList.push(options ?? {});
         return {
             ok: true,
             responseText: this.responseText,

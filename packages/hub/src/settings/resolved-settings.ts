@@ -281,6 +281,12 @@ export interface ResolvedSingleCustomHttpRequest {
     readonly url: string;
     readonly userIntent: string | undefined;
     readonly jqTransform: string;
+    readonly requestSettings: ResolvedCustomHttpRequestSettings;
+}
+
+export interface ResolvedCustomHttpRequestSettings {
+    readonly timeoutSeconds: number;
+    readonly retryCount: number;
 }
 
 export interface ResolvedAppearanceSettings {

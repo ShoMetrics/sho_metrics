@@ -10,15 +10,22 @@ import {
 import { customMetricMessages } from "../../../i18n/message-groups/widgets";
 import { useI18n } from "../../../i18n/react";
 import {
-    CUSTOM_HTTP_FETCH_RETRY_COUNT,
-    CUSTOM_HTTP_FETCH_TIMEOUT_MILLISECONDS,
     CUSTOM_HTTP_RESPONSE_LIMIT_BYTES,
 } from "../../../runtime/sources/custom-http/custom-http-fetch-limits";
+import {
+    estimateCustomHttpWorstCaseFetchMilliseconds,
+    type ResolvedCustomHttpFetchPolicy,
+} from "../../../runtime/sources/custom-http/custom-http-request-policy";
 import type { StreamDeckPropertyInspectorClient } from "../../stream-deck/stream-deck-client";
 import { InspectorItem } from "../../components/InspectorItem";
+import { SelectSetting } from "../../controls/SelectSetting";
 import { TextAreaSetting } from "../../controls/TextAreaSetting";
 import { TextSetting } from "../../controls/TextSetting";
 import { SettingsSection } from "../SettingsSection";
+import {
+    customHttpRetryCountOptionList,
+    customHttpTimeoutSecondOptionList,
+} from "../setting-options";
 import { buildCustomMetricPrompt } from "./prompt";
 import {
     hasCurrentSample,
@@ -37,6 +44,7 @@ export function CustomMetricSourceEditor({
     url,
     userIntent,
     jqTransform,
+    requestSettings,
     client,
     testState,
     promptCopyStatus,
@@ -49,6 +57,7 @@ export function CustomMetricSourceEditor({
     readonly url: string;
     readonly userIntent: string;
     readonly jqTransform: string;
+    readonly requestSettings: ResolvedCustomHttpFetchPolicy;
     readonly client: StreamDeckPropertyInspectorClient;
     readonly testState: TestState;
     readonly promptCopyStatus: CopyStatus;
@@ -121,6 +130,30 @@ export function CustomMetricSourceEditor({
                 <InspectorItem className="note-item note-item-caption">
                     <p className="section-note">{t(customMetricMessages.noSecretsNote)}</p>
                 </InspectorItem>
+            </SettingsSection>
+            <SettingsSection title={t(customMetricMessages.requestSettingsSection)}>
+                <SelectSetting
+                    label={t(customMetricMessages.timeoutSecondsLabel)}
+                    value={requestSettings.timeoutSeconds}
+                    optionList={customHttpTimeoutSecondOptionList}
+                    onValueChange={(timeoutSeconds) => props.onSettingsPatch({
+                        customMetric: { timeoutSeconds },
+                    })}
+                />
+                <SelectSetting
+                    label={t(customMetricMessages.retryCountLabel)}
+                    value={requestSettings.retryCount}
+                    optionList={customHttpRetryCountOptionList}
+                    onValueChange={(retryCount) => props.onSettingsPatch({
+                        customMetric: { retryCount },
+                    })}
+                />
+                <RequestBudgetWarning
+                    requestSettings={requestSettings}
+                    pollingFrequencySeconds={props.context.resolved.preferences.pollingFrequencySeconds}
+                />
+            </SettingsSection>
+            <SettingsSection title={t(customMetricMessages.fetchSampleSection)}>
                 <InspectorItem>
                     <div className="advanced-action-stack">
                         <button
@@ -128,21 +161,31 @@ export function CustomMetricSourceEditor({
                             className="inline-action-button"
                             type="button"
                             disabled={url.trim().length === 0 || testState.kind === "pending"}
-                            onClick={() => sendFetchSampleRequest(client, url, pendingRequestIds, setTestState)}
+                            onClick={() => sendFetchSampleRequest(
+                                client,
+                                url,
+                                requestSettings,
+                                pendingRequestIds,
+                                setTestState,
+                            )}
                         >
                             {t(customMetricMessages.fetchSampleButton)}
                         </button>
                         <TestStatusNote state={testState} command="fetchSample" />
                         <p className="section-note">
                             {t(customMetricMessages.fetchLimitsNote, {
-                                timeoutSeconds: CUSTOM_HTTP_FETCH_TIMEOUT_MILLISECONDS / 1000,
-                                retryCount: CUSTOM_HTTP_FETCH_RETRY_COUNT,
+                                timeoutSeconds: requestSettings.timeoutSeconds,
+                                retryCount: requestSettings.retryCount,
                                 responseLimitKiB: CUSTOM_HTTP_RESPONSE_LIMIT_BYTES / 1024,
                             })}
                         </p>
                     </div>
                 </InspectorItem>
-                <FailureDetails state={testState} command="fetchSample" />
+                <FailureDetails
+                    state={testState}
+                    command="fetchSample"
+                    requestSettings={requestSettings}
+                />
                 <SamplePreview state={testState} />
             </SettingsSection>
             <SettingsSection title={t(customMetricMessages.resultSection)}>
@@ -202,6 +245,7 @@ export function CustomMetricSourceEditor({
                                 client,
                                 url,
                                 jqTransform,
+                                requestSettings,
                                 pendingRequestIds,
                                 setTestState,
                             )}
@@ -223,9 +267,39 @@ export function CustomMetricSourceEditor({
                     </div>
                 </InspectorItem>
                 <MetricResultPreview state={testState} />
-                <FailureDetails state={testState} command="testTransform" />
+                <FailureDetails
+                    state={testState}
+                    command="testTransform"
+                    requestSettings={requestSettings}
+                />
             </SettingsSection>
         </>
+    );
+}
+
+function RequestBudgetWarning({
+    requestSettings,
+    pollingFrequencySeconds,
+}: {
+    readonly requestSettings: ResolvedCustomHttpFetchPolicy;
+    readonly pollingFrequencySeconds: number;
+}): React.JSX.Element | null {
+    const { t } = useI18n();
+    const worstCaseMilliseconds = estimateCustomHttpWorstCaseFetchMilliseconds(requestSettings);
+
+    if (worstCaseMilliseconds <= pollingFrequencySeconds * 1000) {
+        return null;
+    }
+
+    return (
+        <InspectorItem className="note-item note-item-caption">
+            <p className="section-note">
+                {t(customMetricMessages.requestBudgetWarning, {
+                    worstCaseSeconds: Math.ceil(worstCaseMilliseconds / 1000),
+                    pollingSeconds: pollingFrequencySeconds,
+                })}
+            </p>
+        </InspectorItem>
     );
 }
 
@@ -346,16 +420,22 @@ function MetricResultPreview({ state }: { readonly state: TestState }): React.JS
 function FailureDetails({
     state,
     command,
+    requestSettings,
 }: {
     readonly state: TestState;
     readonly command: TestCommand;
+    readonly requestSettings: ResolvedCustomHttpFetchPolicy;
 }): React.JSX.Element | null {
     const { t } = useI18n();
     if (state.kind !== "failed" || state.command !== command) {
         return null;
     }
 
-    const failureText = `Stage: ${state.stage}\nDetail: ${state.detail}`;
+    const failureText = [
+        `Stage: ${state.stage}`,
+        `Detail: ${state.detail}`,
+        `Settings: timeout=${requestSettings.timeoutSeconds}s, retryCount=${requestSettings.retryCount}, responseLimit=${CUSTOM_HTTP_RESPONSE_LIMIT_BYTES / 1024}KiB`,
+    ].join("\n");
 
     return (
         <TextAreaSetting
