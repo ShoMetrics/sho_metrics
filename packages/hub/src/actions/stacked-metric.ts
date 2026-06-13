@@ -35,26 +35,17 @@ import { backgroundMetricCollection } from "../runtime/metric-collection/backgro
 import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
-    customHttpDefinitionRegistry,
-    type CustomHttpDefinitionRegistry,
     type CustomHttpMetricDefinition,
 } from "../runtime/sources/custom-http/custom-http-definition-registry";
 import { buildStackedCustomHttpConsumerSlug } from "../runtime/sources/custom-http/custom-http-metric-key";
 import {
     resolveCustomHttpMetricDefinition,
 } from "./custom-metric/runtime-source-definition";
-import {
-    type RegisteredCustomHttpMetricKeysByActionId,
-    syncCustomHttpRuntimeDefinitionsForAction,
-    unregisterCustomHttpRuntimeDefinitionsForAction,
-} from "./custom-metric/runtime-source-registration";
 import type { ResolvedWidgetSettings } from "../settings/resolved-settings";
 import {
-    CustomHttpSourceEditorRequestHandler,
-    type CustomHttpSourceEditorResponseSender,
-} from "./custom-metric/source-editor-request-handler";
-import type { CustomHttpFetcher } from "../runtime/sources/custom-http/custom-http-fetcher";
-import type { CustomHttpTransformRunner } from "../runtime/sources/custom-http/custom-http-transform-worker-pool";
+    CustomHttpActionConnector,
+    type CustomHttpActionConnectorDependencies,
+} from "./custom-metric/custom-http-action-connector";
 
 const INDICATOR_VISIBLE_MILLISECONDS = 1000;
 const log = logger.for("Action:StackedMetric");
@@ -66,16 +57,7 @@ interface StackedMetricActionState {
     indicatorVisible: boolean;
 }
 
-interface StackedMetricActionDependencies {
-    /** Injectable dependency for unit tests; production uses the shared Custom HTTP registry. */
-    readonly customHttpDefinitionRegistry?: CustomHttpDefinitionRegistry | undefined;
-    /** Injectable dependency for unit tests; production performs real HTTP sample fetches. */
-    readonly fetcher?: CustomHttpFetcher | undefined;
-    /** Injectable dependency for unit tests; production runs jq through the worker pool. */
-    readonly transformRunner?: CustomHttpTransformRunner | undefined;
-    /** Injectable dependency for unit tests; production sends only to the active Stream Deck PI. */
-    readonly sendCustomHttpSourceEditorResponse?: CustomHttpSourceEditorResponseSender | undefined;
-}
+type StackedMetricActionDependencies = CustomHttpActionConnectorDependencies;
 
 /**
  * Schedules stacked slot rotation timers.
@@ -96,21 +78,14 @@ export class StackedMetric extends MetricAction {
     protected readonly actionKind = "stackedMetric";
 
     private readonly states = new Map<string, StackedMetricActionState>();
-    private readonly customHttpDefinitionRegistry: CustomHttpDefinitionRegistry;
-    private readonly sourceEditorRequestHandler: CustomHttpSourceEditorRequestHandler;
-    private readonly registeredCustomHttpMetricKeysByActionId: RegisteredCustomHttpMetricKeysByActionId = new Map();
+    private readonly customHttpConnector: CustomHttpActionConnector;
 
     constructor(
         private readonly timerScheduler: StackedMetricTimerScheduler = defaultTimerScheduler,
         options: StackedMetricActionDependencies = {},
     ) {
         super();
-        this.customHttpDefinitionRegistry = options.customHttpDefinitionRegistry ?? customHttpDefinitionRegistry;
-        this.sourceEditorRequestHandler = new CustomHttpSourceEditorRequestHandler({
-            fetcher: options.fetcher,
-            transformRunner: options.transformRunner,
-            sendResponse: options.sendCustomHttpSourceEditorResponse,
-        });
+        this.customHttpConnector = new CustomHttpActionConnector(options);
     }
 
     override onWillAppear(event: WillAppearEvent): void {
@@ -160,26 +135,19 @@ export class StackedMetric extends MetricAction {
 
     protected override onResolvedSettingsChanged(event: WillAppearEvent, settings: ResolvedWidgetSettings): void {
         const widget = requireResolvedStackedMetricWidget(settings);
-        syncCustomHttpRuntimeDefinitionsForAction({
-            customHttpDefinitionRegistry: this.customHttpDefinitionRegistry,
-            registeredMetricKeysByActionId: this.registeredCustomHttpMetricKeysByActionId,
-            actionId: event.action.id,
-            definitions: resolveStackedCustomHttpMetricDefinitions(widget, event.action.id),
-        });
+        this.customHttpConnector.syncActionDefinitions(
+            event.action.id,
+            resolveStackedCustomHttpMetricDefinitions(widget, event.action.id),
+        );
     }
 
     protected override onActionWillDisappear(event: WillDisappearEvent): void {
-        unregisterCustomHttpRuntimeDefinitionsForAction({
-            customHttpDefinitionRegistry: this.customHttpDefinitionRegistry,
-            registeredMetricKeysByActionId: this.registeredCustomHttpMetricKeysByActionId,
-            actionId: event.action.id,
-        });
-        this.sourceEditorRequestHandler.clearAction(event.action.id);
+        this.customHttpConnector.clearAction(event.action.id);
     }
 
     override onSendToPlugin(event: SendToPluginEvent<never, Record<string, never>>): void {
         super.onSendToPlugin(event);
-        this.sourceEditorRequestHandler.handle(event);
+        this.customHttpConnector.handleSendToPlugin(event);
     }
 
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {

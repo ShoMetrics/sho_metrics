@@ -29,57 +29,30 @@ import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import { refreshDiskVolumeRuntimeCache } from "./shared/disk-volume-runtime-cache";
 import { refreshNetworkInterfaceRuntimeCache } from "./shared/network-interface-runtime-cache";
-import {
-    customHttpDefinitionRegistry,
-    type CustomHttpDefinitionRegistry,
-    type CustomHttpMetricDefinition,
-} from "../runtime/sources/custom-http/custom-http-definition-registry";
+import type { CustomHttpMetricDefinition } from "../runtime/sources/custom-http/custom-http-definition-registry";
 import { buildDenseCustomHttpConsumerSlug } from "../runtime/sources/custom-http/custom-http-metric-key";
 import {
     resolveCustomHttpMetricDefinition,
 } from "./custom-metric/runtime-source-definition";
 import {
-    type RegisteredCustomHttpMetricKeysByActionId,
-    syncCustomHttpRuntimeDefinitionsForAction,
-    unregisterCustomHttpRuntimeDefinitionsForAction,
-} from "./custom-metric/runtime-source-registration";
-import {
-    CustomHttpSourceEditorRequestHandler,
-    type CustomHttpSourceEditorResponseSender,
-} from "./custom-metric/source-editor-request-handler";
-import type { CustomHttpFetcher } from "../runtime/sources/custom-http/custom-http-fetcher";
-import type { CustomHttpTransformRunner } from "../runtime/sources/custom-http/custom-http-transform-worker-pool";
+    CustomHttpActionConnector,
+    type CustomHttpActionConnectorDependencies,
+} from "./custom-metric/custom-http-action-connector";
 
 const log = logger.for("Action:DenseMultiMetric");
 
-interface DenseMultiMetricActionDependencies {
-    /** Injectable dependency for unit tests; production uses the shared Custom HTTP registry. */
-    readonly customHttpDefinitionRegistry?: CustomHttpDefinitionRegistry | undefined;
-    /** Injectable dependency for unit tests; production performs real HTTP sample fetches. */
-    readonly fetcher?: CustomHttpFetcher | undefined;
-    /** Injectable dependency for unit tests; production runs jq through the worker pool. */
-    readonly transformRunner?: CustomHttpTransformRunner | undefined;
-    /** Injectable dependency for unit tests; production sends only to the active Stream Deck PI. */
-    readonly sendCustomHttpSourceEditorResponse?: CustomHttpSourceEditorResponseSender | undefined;
-}
+type DenseMultiMetricActionDependencies = CustomHttpActionConnectorDependencies;
 
 /** Dense Multi Metric action that collects several metric rows for one key. */
 @action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.denseMultiMetric })
 export class DenseMultiMetric extends MetricAction {
     protected readonly actionKind = "denseMultiMetric";
 
-    private readonly customHttpDefinitionRegistry: CustomHttpDefinitionRegistry;
-    private readonly sourceEditorRequestHandler: CustomHttpSourceEditorRequestHandler;
-    private readonly registeredCustomHttpMetricKeysByActionId: RegisteredCustomHttpMetricKeysByActionId = new Map();
+    private readonly customHttpConnector: CustomHttpActionConnector;
 
     constructor(options: DenseMultiMetricActionDependencies = {}) {
         super();
-        this.customHttpDefinitionRegistry = options.customHttpDefinitionRegistry ?? customHttpDefinitionRegistry;
-        this.sourceEditorRequestHandler = new CustomHttpSourceEditorRequestHandler({
-            fetcher: options.fetcher,
-            transformRunner: options.transformRunner,
-            sendResponse: options.sendCustomHttpSourceEditorResponse,
-        });
+        this.customHttpConnector = new CustomHttpActionConnector(options);
     }
 
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
@@ -102,26 +75,19 @@ export class DenseMultiMetric extends MetricAction {
 
     protected override onResolvedSettingsChanged(event: WillAppearEvent, settings: ResolvedWidgetSettings): void {
         const widget = requireResolvedDenseMultiMetricWidget(settings);
-        syncCustomHttpRuntimeDefinitionsForAction({
-            customHttpDefinitionRegistry: this.customHttpDefinitionRegistry,
-            registeredMetricKeysByActionId: this.registeredCustomHttpMetricKeysByActionId,
-            actionId: event.action.id,
-            definitions: resolveDenseCustomHttpMetricDefinitions(widget, event.action.id),
-        });
+        this.customHttpConnector.syncActionDefinitions(
+            event.action.id,
+            resolveDenseCustomHttpMetricDefinitions(widget, event.action.id),
+        );
     }
 
     protected override onActionWillDisappear(event: WillDisappearEvent): void {
-        unregisterCustomHttpRuntimeDefinitionsForAction({
-            customHttpDefinitionRegistry: this.customHttpDefinitionRegistry,
-            registeredMetricKeysByActionId: this.registeredCustomHttpMetricKeysByActionId,
-            actionId: event.action.id,
-        });
-        this.sourceEditorRequestHandler.clearAction(event.action.id);
+        this.customHttpConnector.clearAction(event.action.id);
     }
 
     override onSendToPlugin(event: SendToPluginEvent<never, Record<string, never>>): void {
         super.onSendToPlugin(event);
-        this.sourceEditorRequestHandler.handle(event);
+        this.customHttpConnector.handleSendToPlugin(event);
     }
 
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
