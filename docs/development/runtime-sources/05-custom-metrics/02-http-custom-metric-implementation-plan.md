@@ -127,6 +127,12 @@ custom-http:<hostSlug>:<actionId>:<consumerSlug>
 - PI sample-fetch failure details may include a bounded, redacted response-body
   preview when the user explicitly fetches a sample. Runtime polling does not
   read response bodies only for this PI preview path.
+- `jq-wasm@1.1.0-jq-1.8.1` is exact-pinned and patched after install because
+  its bundled stdin handler used `Uint8Array.slice(1)` for each input byte. That
+  made 100 KiB JSON inputs take hundreds of milliseconds or seconds before jq
+  itself ran. `scripts/patch-jq-wasm-stdin.mjs` replaces the handler with an
+  offset cursor, and build/test/lint scripts fail if the expected bundle shape
+  changes.
 
 ## Stream Deck Action Id POC Facts
 
