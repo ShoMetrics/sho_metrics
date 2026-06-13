@@ -16,6 +16,15 @@ Do not implement runtime settings, protobuf fields, source polling, or Property
 Inspector panels from this document directly. Use this report as the evidence
 base for the next implementation design document.
 
+Important final-implementation note:
+
+This POC measured an earlier multi-output catalog contract using `metrics[]` and
+`expected.metrics.json`. The implemented V1 runtime schema is a single top-level
+`metric` object with optional display hints such as `suggestedLucideIconId`.
+The committed POC scripts and corpus remain historical dev tooling only until a
+dedicated Step 9 migration updates the corpus, checker, exam prompt, and
+expected outputs to the final single-metric schema.
+
 ## Product Baseline
 
 User-facing product name: **Custom Metric**.
@@ -34,6 +43,10 @@ v1 scope:
 - one source definition owns one HTTP request and one polling/failure domain;
 - one transform can output `metrics[]`;
 - widgets select one app-assigned metric from that output catalog.
+
+The final V1 implementation intentionally narrowed this POC scope to one scalar
+metric per Custom HTTP definition. Keep the `metrics[]` references below as
+historical POC evidence, not as the current runtime contract.
 
 The user provides:
 
@@ -222,13 +235,13 @@ Even with these generic guardrails, JSONata remained less stable on hard cases.
 Transform checker:
 
 ```text
-packages/hub/scripts/custom-metric-transform-check.mjs
+docs/development/runtime-sources/05-custom-metrics/archive/custom-metric-transform-check.mjs
 ```
 
 Example:
 
 ```text
-node packages/hub/scripts/custom-metric-transform-check.mjs \
+node docs/development/runtime-sources/05-custom-metrics/archive/custom-metric-transform-check.mjs \
   --engine jq-wasm \
   --input docs/development/runtime-sources/05-custom-metrics/poc-corpus/open-meteo/input.json \
   --transform docs/development/runtime-sources/05-custom-metrics/poc-corpus/open-meteo/transform.jq \
@@ -249,18 +262,18 @@ Responsibilities:
 Model/manual exam runner:
 
 ```text
-packages/hub/scripts/custom-metric-transform-exam.mjs
+docs/development/runtime-sources/05-custom-metrics/archive/custom-metric-transform-exam.mjs
 ```
 
 Examples:
 
 ```text
-node packages/hub/scripts/custom-metric-transform-exam.mjs \
+node docs/development/runtime-sources/05-custom-metrics/archive/custom-metric-transform-exam.mjs \
   --case codexbar \
   --engine jq-wasm \
   --rounds 3
 
-node packages/hub/scripts/custom-metric-transform-exam.mjs --interactive
+node docs/development/runtime-sources/05-custom-metrics/archive/custom-metric-transform-exam.mjs --interactive
 ```
 
 Interactive mode lists corpus cases, asks for case selection, engine, round
@@ -466,13 +479,13 @@ Open product questions for the implementation design:
 
 ## File Inventory
 
-Commit-ready files from this POC:
+Historical files from this POC:
 
 - `docs/development/runtime-sources/05-custom-metrics/01-http-custom-metric-poc-plan.md`;
 - `docs/development/runtime-sources/05-custom-metrics/README.md`;
 - `docs/development/runtime-sources/05-custom-metrics/poc-corpus/**`;
-- `packages/hub/scripts/custom-metric-transform-check.mjs`;
-- `packages/hub/scripts/custom-metric-transform-exam.mjs`;
+- `docs/development/runtime-sources/05-custom-metrics/archive/custom-metric-transform-check.mjs`;
+- `docs/development/runtime-sources/05-custom-metrics/archive/custom-metric-transform-exam.mjs`;
 - `packages/hub/package.json`;
 - `packages/hub/package-lock.json`.
 

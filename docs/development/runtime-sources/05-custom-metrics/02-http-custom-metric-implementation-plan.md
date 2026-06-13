@@ -95,11 +95,20 @@ custom-http:<hostSlug>:<actionId>:<consumerSlug>
   - use `localhost`, `invalid-url`, or `unconfigured` when that is the most
     accurate bounded support label.
 - HTTP response body cap: 256 KiB.
-- HTTP request timeout remains fixed at 5 seconds until the request-configuration
-  step. Do not raise the default to hide DNS or network latency. A configurable
-  request policy is a separate Step 7 because it changes persisted settings, PI
-  controls, runtime fetch behavior, and diagnostics together.
-- HTTP retry count remains fixed at 0 until the request-configuration step.
+- HTTP request timeout is user-configurable per Custom HTTP definition. The
+  resolved default is 15 seconds.
+- HTTP retry count is user-configurable per Custom HTTP definition. The
+  resolved default is 0 retries.
+- Custom HTTP polling defaults to 3 seconds and can be configured up to 24
+  hours. Ordinary non-HTTP widget UIs keep their existing shorter option set.
+- Scheme-less URLs are normalized in the PI when the field is committed, with a
+  resolver fallback for imported or hand-edited settings:
+  - existing absolute `scheme://` URLs are left unchanged;
+  - broken-looking `http`/`https` scheme prefixes are left unchanged so the user
+    sees the typo instead of a stacked prefix;
+  - `//host/path` becomes `https://host/path`;
+  - localhost and common private IPv4 hosts default to `http://`;
+  - other scheme-less hosts default to `https://`.
 - V1 uses the system resolver by default. Do not force public DNS such as
   1.1.1.1 or 8.8.8.8 by default; that can break VPN, corporate, campus,
   split-horizon, localhost, and private-network names. A future advanced
@@ -115,6 +124,9 @@ custom-http:<hostSlug>:<actionId>:<consumerSlug>
 - Unconfigured Custom Metric renders as `Configure`.
 - Detailed HTTP, JSON, jq, schema, and validation errors belong in the Property
   Inspector and support logs, not on the key.
+- PI sample-fetch failure details may include a bounded, redacted response-body
+  preview when the user explicitly fetches a sample. Runtime polling does not
+  read response bodies only for this PI preview path.
 
 ## Stream Deck Action Id POC Facts
 
@@ -783,7 +795,7 @@ the first HTTP editor.
 
 LOC estimate: 900-1,500.
 
-Status: implemented but not committed in the current Step 6 worktree.
+Status: implemented and committed.
 
 Purpose:
 
@@ -1000,8 +1012,7 @@ per-slot failures harder to reason about.
 
 ### Step 8: Dense And Stacked Consumption
 
-Milestone: V1.1 unless the user explicitly pulls Dense/Stacked consumption into
-the first V1 implementation batch.
+Status: implemented and committed.
 
 LOC estimate: 1,000-1,800.
 
@@ -1042,13 +1053,7 @@ Required work:
 7. Use the Step 2 shared identity helper. Do not invent Dense-only or
    Stacked-only runtime key formatting.
 8. Remove the Step 1 placeholder behavior in all known Custom Metric deferral
-   sites:
-   - Dense read/data path currently treats Custom Metric rows as unconfigured
-     empty rows;
-   - Stacked read/view paths currently fail fast if a Custom Metric slot reaches
-     runtime routing before Step 8 support is wired;
-   - Dense PI category resolution currently maps Custom Metric to the catalog
-     bucket only as a temporary unreachable fallback.
+   sites.
 
 Acceptance:
 
@@ -1058,6 +1063,23 @@ Acceptance:
 - Stacked can rotate between Custom HTTP and built-in metric slots.
 - Copy/import of Dense or Stacked widgets does not copy runtime metric keys
   because runtime keys are not stored.
+
+Implemented shape:
+
+- Single Custom Metric, Dense rows, and Stacked slots all register Custom HTTP
+  consumers through a shared action-side connector.
+- Dense and Stacked use consumer-scoped runtime keys (`dense-<slotId>` and
+  `stacked-<slotId>`) so one Stream Deck action can host multiple Custom HTTP
+  definitions without metric-key collision.
+- The Property Inspector uses one Custom HTTP source editor panel for single,
+  Dense, and Stacked entry points. Dense and Stacked open the editor as a
+  second screen instead of embedding the full HTTP editor inline.
+- Source-editor request messages carry `consumerSlug`; sample cache, sample
+  fetch, and transform test paths are scoped by action id plus consumer.
+- Matrix contract tests cover opening the source editor, source-editor command
+  consumer slugs, write-back to the correct slot, polling-warning context,
+  scroll-to-top behavior, chrome suppression, and multi-consumer sample-cache
+  isolation.
 
 Do not merge with Step 5, Step 6, or Step 7:
 
@@ -1106,6 +1128,15 @@ Required work:
 10. Update docs with final V1 behavior and explicit deferred TODOs.
 11. Remove or quarantine POC-only dependencies and scripts that should not ship
    in runtime. Keep corpus scripts only if they are documented dev tooling.
+
+Current cleanup status:
+
+- Runtime, action, PI, Dense, and Stacked V1 wiring is implemented.
+- The historical transform POC scripts and corpus still validate the original
+  multi-output `metrics[]` experiment. They are not part of `build`,
+  `test:unit`, `test:pi`, or `lint`, and are marked as historical POC tooling.
+- Final-schema transform exam migration remains deferred until there is a
+  deliberate Step 9 pass over the corpus, prompts, and expected outputs.
 
 Verification commands:
 

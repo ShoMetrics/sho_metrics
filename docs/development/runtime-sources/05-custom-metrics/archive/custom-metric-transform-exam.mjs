@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Historical Stage 1 POC tooling. This exam runner prompts and validates the
+// original multi-output `metrics[]` experiment, not the final V1 runtime schema.
+// Do not use its pass rate as final Custom HTTP AI-workflow evidence until the
+// corpus and checker are migrated to the single top-level `metric` contract.
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
@@ -966,13 +970,13 @@ function toBoundedMessage(error) {
 
 function printUsage() {
     process.stdout.write(`Usage:
-node packages/hub/scripts/custom-metric-transform-exam.mjs \\
+node docs/development/runtime-sources/05-custom-metrics/archive/custom-metric-transform-exam.mjs \\
   --case codexbar \\
   --engine jq-wasm|jsonata \\
   --rounds 5
 
 Interactive manual exam:
-node packages/hub/scripts/custom-metric-transform-exam.mjs --interactive
+node docs/development/runtime-sources/05-custom-metrics/archive/custom-metric-transform-exam.mjs --interactive
 
 Optional:
   --provider openai-compatible|ollama
