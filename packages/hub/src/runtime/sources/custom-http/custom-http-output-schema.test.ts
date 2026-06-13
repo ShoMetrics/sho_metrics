@@ -1,7 +1,33 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { MetricUnit } from "../metric-source";
-import { validateCustomHttpMetricTransformOutput } from "./custom-http-output-schema";
+import {
+    CUSTOM_HTTP_PROMPT_UNIT_NAMES,
+    validateCustomHttpMetricTransformOutput,
+} from "./custom-http-output-schema";
+
+test("CUSTOM_HTTP_PROMPT_UNIT_NAMES includes every native validator unit", () => {
+    assert.deepEqual(CUSTOM_HTTP_PROMPT_UNIT_NAMES, [
+        "percent",
+        "celsius",
+        "volts",
+        "amperes",
+        "watts",
+        "hertz",
+        "bytes",
+        "bytes_per_second",
+        "revolutions_per_minute",
+        "liters_per_hour",
+        "unitless",
+        "seconds",
+        "watt_hours",
+        "decibels_a_weighted",
+        "siemens_per_centimeter",
+        "milliseconds",
+        "fahrenheit",
+        "custom",
+    ]);
+});
 
 test("validateCustomHttpMetricTransformOutput accepts one scalar metric object", () => {
     const result = validateCustomHttpMetricTransformOutput({
