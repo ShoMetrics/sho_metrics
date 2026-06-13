@@ -2,7 +2,12 @@ import streamDeck, {
     type SendToPluginEvent,
 } from "@elgato/streamdeck";
 import { formatMetricUnit } from "../../metrics/metric-unit-format";
-import { NodeCustomHttpFetcher, type CustomHttpFetcher } from "../../runtime/sources/custom-http/custom-http-fetcher";
+import {
+    NodeCustomHttpFetcher,
+    type CustomHttpFetchFailureResult,
+    type CustomHttpFetcher,
+} from "../../runtime/sources/custom-http/custom-http-fetcher";
+import { redactSecretLikeJsonText } from "../../runtime/sources/custom-http/custom-http-redaction";
 import {
     readCustomHttpSourceEditorRequest,
     type CustomHttpSourceEditorFetchSampleResult,
@@ -104,14 +109,17 @@ export class CustomHttpSourceEditorRequestHandler {
         requestSettings: ResolvedSingleCustomHttpRequest["requestSettings"],
     ): Promise<CustomHttpSourceEditorFetchSampleResult> {
         const startedAtMilliseconds = performance.now();
-        const fetchResult = await this.fetcher.fetchJson(url, requestSettings);
+        const fetchResult = await this.fetcher.fetchJson(url, {
+            ...requestSettings,
+            includeFailureResponsePreview: true,
+        });
         const elapsedMilliseconds = Math.max(0, Math.round(performance.now() - startedAtMilliseconds));
         if (!fetchResult.ok) {
             this.deleteCachedSample(actionId, consumerSlug);
             return {
                 ok: false,
                 stage: fetchResult.reason,
-                detail: fetchResult.detail,
+                detail: buildHttpFetchFailureDetail(fetchResult),
             };
         }
 
@@ -224,6 +232,25 @@ function sendCustomHttpSourceEditorResponseToActivePropertyInspector(
     return streamDeck.ui.sendToPropertyInspector(
         response as unknown as Parameters<typeof streamDeck.ui.sendToPropertyInspector>[0],
     );
+}
+
+function buildHttpFetchFailureDetail(fetchResult: CustomHttpFetchFailureResult): string {
+    if (fetchResult.responseTextPreview === undefined) {
+        return fetchResult.detail;
+    }
+
+    const responsePreview = buildSamplePreview(
+        redactSecretLikeJsonText(fetchResult.responseTextPreview),
+        CUSTOM_METRIC_SAMPLE_PREVIEW_LIMIT_CHARACTERS,
+    );
+    const isTruncated = fetchResult.isResponseTextPreviewTruncated === true || responsePreview.isTruncated;
+
+    return [
+        fetchResult.detail,
+        "",
+        `Response body preview${isTruncated ? " (truncated)" : ""}:`,
+        responsePreview.text,
+    ].join("\n");
 }
 
 function buildSamplePreview(value: string, maxCharacters: number): {

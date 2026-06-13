@@ -28,11 +28,16 @@ export type CustomHttpFetchResult =
         readonly ok: false;
         readonly reason: CustomHttpFetchFailureReason;
         readonly detail: string;
+        readonly responseTextPreview?: string;
+        readonly isResponseTextPreviewTruncated?: boolean;
     };
+
+export type CustomHttpFetchFailureResult = Exclude<CustomHttpFetchResult, { ok: true }>;
 
 export interface CustomHttpFetchOptions {
     readonly timeoutSeconds?: number | undefined;
     readonly retryCount?: number | undefined;
+    readonly includeFailureResponsePreview?: boolean | undefined;
 }
 
 /**
@@ -109,6 +114,7 @@ export class NodeCustomHttpFetcher implements CustomHttpFetcher {
             const attemptResult = await this.fetchJsonAttempt(parsedUrl, {
                 timeoutMilliseconds,
                 includeDnsDiagnostic: isFinalAttempt,
+                includeFailureResponsePreview: options.includeFailureResponsePreview === true,
             });
             if (attemptResult.ok || !canRetryFetchFailure(attemptResult.reason) || retryIndex >= policy.retryCount) {
                 return attemptResult;
@@ -124,6 +130,7 @@ export class NodeCustomHttpFetcher implements CustomHttpFetcher {
         options: {
             readonly timeoutMilliseconds: number;
             readonly includeDnsDiagnostic: boolean;
+            readonly includeFailureResponsePreview: boolean;
         },
     ): Promise<CustomHttpFetchResult> {
         const startedAtMilliseconds = performance.now();
@@ -161,10 +168,15 @@ export class NodeCustomHttpFetcher implements CustomHttpFetcher {
                     `status=${response.status}`,
                     `elapsedMs=${formatElapsedMilliseconds(startedAtMilliseconds)}`,
                 ].join(" "));
-            return failure("httpFailure", `HTTP status ${response.status}.`);
+            if (!options.includeFailureResponsePreview) {
+                return failure("httpFailure", `HTTP status ${response.status}.`);
+            }
+
+            const httpFailure = await readHttpFailureResult(response, this.responseLimitBytes);
+            return httpFailure;
         }
 
-        const responseTextResult = await readResponseTextBounded(response, this.responseLimitBytes);
+        const responseTextResult = await readBoundedResponseText(response, this.responseLimitBytes);
         if (!responseTextResult.ok) {
             log.atWarn()
                 .everyMs(`custom-http-fetch-body:${targetSummary}:${responseTextResult.reason}`, CUSTOM_HTTP_FETCH_LOG_THROTTLE_MILLISECONDS)
@@ -185,30 +197,78 @@ export class NodeCustomHttpFetcher implements CustomHttpFetcher {
     }
 }
 
+async function readHttpFailureResult(response: Response, responseLimitBytes: number): Promise<CustomHttpFetchFailureResult> {
+    const statusDetail = `HTTP status ${response.status}.`;
+    const responseTextPreviewResult = await readBoundedResponseTextPreview(response, responseLimitBytes);
+    if (responseTextPreviewResult.state === "failure") {
+        return failure("httpFailure", `${statusDetail} ${responseTextPreviewResult.failure.detail}`);
+    }
+
+    return {
+        ok: false,
+        reason: "httpFailure",
+        detail: statusDetail,
+        responseTextPreview: responseTextPreviewResult.responseText,
+        isResponseTextPreviewTruncated: responseTextPreviewResult.isTruncated,
+    };
+}
+
 function canRetryFetchFailure(reason: CustomHttpFetchFailureReason): boolean {
     return reason === "networkFailure";
 }
 
-async function readResponseTextBounded(
+async function readBoundedResponseText(
     response: Response,
     responseLimitBytes: number,
 ): Promise<CustomHttpFetchResult> {
+    return readResponseTextWithLimit(response, responseLimitBytes, "reject");
+}
+
+async function readBoundedResponseTextPreview(
+    response: Response,
+    responseLimitBytes: number,
+): Promise<{
+    readonly state: "ok";
+    readonly responseText: string;
+    readonly isTruncated: boolean;
+} | {
+    readonly state: "failure";
+    readonly failure: CustomHttpFetchFailureResult;
+}> {
+    const readResult = await readResponseTextWithLimit(response, responseLimitBytes, "truncate");
+    return readResult.ok
+        ? {
+            state: "ok",
+            responseText: readResult.responseText,
+            isTruncated: readResult.isTruncated,
+        }
+        : {
+            state: "failure",
+            failure: readResult,
+        };
+}
+
+type ResponseOverflowPolicy = "reject" | "truncate";
+
+async function readResponseTextWithLimit(
+    response: Response,
+    responseLimitBytes: number,
+    overflowPolicy: ResponseOverflowPolicy,
+): Promise<({
+    readonly ok: true;
+    readonly responseText: string;
+    readonly isTruncated: boolean;
+} | CustomHttpFetchFailureResult)> {
     try {
         if (!response.body) {
             const responseText = await response.text();
-            if (Buffer.byteLength(responseText, "utf8") > responseLimitBytes) {
-                return failure("responseTooLarge", `Response exceeded ${responseLimitBytes} bytes.`);
-            }
-
-            return {
-                ok: true,
-                responseText,
-            };
+            return buildResponseTextFromBytes(new TextEncoder().encode(responseText), responseLimitBytes, overflowPolicy);
         }
 
         const reader = response.body.getReader();
         const chunks: Uint8Array[] = [];
         let totalBytes = 0;
+        let isTruncated = false;
 
         try {
             while (true) {
@@ -217,8 +277,18 @@ async function readResponseTextBounded(
                     break;
                 }
 
-                totalBytes += readResult.value.byteLength;
-                if (totalBytes > responseLimitBytes) {
+                const nextTotalBytes = totalBytes + readResult.value.byteLength;
+                if (nextTotalBytes > responseLimitBytes) {
+                    if (overflowPolicy === "truncate") {
+                        chunks.push(readResult.value.slice(0, Math.max(0, responseLimitBytes - totalBytes)));
+                        totalBytes = responseLimitBytes;
+                        isTruncated = true;
+                        await reader.cancel().catch(() => {
+                            // The owner-visible diagnostic is the bounded preview, not cleanup.
+                        });
+                        break;
+                    }
+
                     await reader.cancel().catch(() => {
                         // The owner-visible failure is the size cap, not cleanup.
                     });
@@ -226,6 +296,7 @@ async function readResponseTextBounded(
                 }
 
                 chunks.push(readResult.value);
+                totalBytes = nextTotalBytes;
             }
         } finally {
             reader.releaseLock();
@@ -241,13 +312,35 @@ async function readResponseTextBounded(
         return {
             ok: true,
             responseText: new TextDecoder().decode(responseBytes),
+            isTruncated,
         };
     } catch (error) {
         return failure("networkFailure", `Response body read failed. ${formatBoundedErrorDetail(error)}`);
     }
 }
 
-function failure(reason: CustomHttpFetchFailureReason, detail: string): CustomHttpFetchResult {
+function buildResponseTextFromBytes(
+    responseBytes: Uint8Array,
+    responseLimitBytes: number,
+    overflowPolicy: ResponseOverflowPolicy,
+): {
+    readonly ok: true;
+    readonly responseText: string;
+    readonly isTruncated: boolean;
+} | CustomHttpFetchFailureResult {
+    const isTruncated = responseBytes.byteLength > responseLimitBytes;
+    if (isTruncated && overflowPolicy === "reject") {
+        return failure("responseTooLarge", `Response exceeded ${responseLimitBytes} bytes.`);
+    }
+
+    return {
+        ok: true,
+        responseText: new TextDecoder().decode(isTruncated ? responseBytes.slice(0, responseLimitBytes) : responseBytes),
+        isTruncated,
+    };
+}
+
+function failure(reason: CustomHttpFetchFailureReason, detail: string): CustomHttpFetchFailureResult {
     return {
         ok: false,
         reason,

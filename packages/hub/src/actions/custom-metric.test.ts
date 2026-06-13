@@ -412,7 +412,11 @@ test("Custom Metric PI sample fetch returns bounded preview through the action b
     await waitForAsyncWork();
 
     assert.equal(fetcher.urlList[0], "https://api.example.com/weather");
-    assert.deepEqual(fetcher.optionsList[0], { timeoutSeconds: 10, retryCount: 2 });
+    assert.deepEqual(fetcher.optionsList[0], {
+        timeoutSeconds: 10,
+        retryCount: 2,
+        includeFailureResponsePreview: true,
+    });
     const response = action.customMetricSourceEditorResponses[0];
     assert.equal(response?.type, "custom-http-pi-test");
     assert.equal(response?.command, "fetchSample");
@@ -423,6 +427,81 @@ test("Custom Metric PI sample fetch returns bounded preview through the action b
         assert.equal(Number.isInteger(response.result.elapsedMilliseconds), true);
         assert.equal(response.result.samplePreview, "{\"temp\":23.5}");
         assert.equal(response.result.isSamplePreviewTruncated, false);
+    }
+});
+
+test("Custom Metric PI sample fetch includes HTTP failure response previews", async () => {
+    const registry = new CustomHttpDefinitionRegistry();
+    const fetcher = new FakeCustomHttpFetcher({
+        ok: false,
+        reason: "httpFailure",
+        detail: "HTTP status 429.",
+        responseTextPreview: "{\"reason\":\"Daily API request limit exceeded. Please try again tomorrow.\",\"token\":\"abc123\",\"error\":true}",
+        isResponseTextPreviewTruncated: false,
+    });
+    const action = new TestCustomMetric(registry, { fetcher });
+    const streamDeckAction = new FakeStreamDeckAction("custom-pi-fetch-error-action");
+
+    action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCustomMetricWidgetSettings()));
+    action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
+        type: "custom-http-pi-test",
+        command: "fetchSample",
+        requestId: "fetch-1",
+        consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
+        url: "https://api.example.com/weather",
+        requestSettings: { timeoutSeconds: 10, retryCount: 0 },
+    }));
+
+    await waitForAsyncWork();
+
+    assert.deepEqual(action.customMetricSourceEditorResponses[0], {
+        type: "custom-http-pi-test",
+        command: "fetchSample",
+        requestId: "fetch-1",
+        result: {
+            ok: false,
+            stage: "httpFailure",
+            detail: [
+                "HTTP status 429.",
+                "",
+                "Response body preview:",
+                "{\"reason\":\"Daily API request limit exceeded. Please try again tomorrow.\",\"token\":\"REDACTED\",\"error\":true}",
+            ].join("\n"),
+        },
+    });
+});
+
+test("Custom Metric PI sample fetch caps HTTP failure response previews", async () => {
+    const registry = new CustomHttpDefinitionRegistry();
+    const responseTextPreview = "x".repeat(4097);
+    const fetcher = new FakeCustomHttpFetcher({
+        ok: false,
+        reason: "httpFailure",
+        detail: "HTTP status 500.",
+        responseTextPreview,
+        isResponseTextPreviewTruncated: false,
+    });
+    const action = new TestCustomMetric(registry, { fetcher });
+    const streamDeckAction = new FakeStreamDeckAction("custom-pi-fetch-large-error-action");
+
+    action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCustomMetricWidgetSettings()));
+    action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
+        type: "custom-http-pi-test",
+        command: "fetchSample",
+        requestId: "fetch-1",
+        consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
+        url: "https://api.example.com/weather",
+        requestSettings: { timeoutSeconds: 10, retryCount: 0 },
+    }));
+
+    await waitForAsyncWork();
+
+    const response = action.customMetricSourceEditorResponses[0];
+    assert.equal(response?.result.ok, false);
+    if (response?.result.ok === false) {
+        assert.match(response.result.detail, /^HTTP status 500\.\n\nResponse body preview \(truncated\):\n/);
+        assert.equal(response.result.detail.endsWith("..."), true);
+        assert.equal(response.result.detail.includes(responseTextPreview), false);
     }
 });
 
