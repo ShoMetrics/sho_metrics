@@ -43,7 +43,7 @@ test("NodeCustomHttpFetcher enforces response size before JSON parse", async () 
     });
 });
 
-test("NodeCustomHttpFetcher reports HTTP failures without logging response bodies", async () => {
+test("NodeCustomHttpFetcher reports HTTP failures without putting response bodies in detail", async () => {
     let fetchCallCount = 0;
     const fetcher = new NodeCustomHttpFetcher({
         fetch: async () => {
@@ -58,6 +58,62 @@ test("NodeCustomHttpFetcher reports HTTP failures without logging response bodie
         detail: "HTTP status 500.",
     });
     assert.equal(fetchCallCount, 1);
+});
+
+test("NodeCustomHttpFetcher skips HTTP failure response previews unless requested", async () => {
+    const responseBody = new ReadableStream<Uint8Array>({
+        pull() {
+            assert.fail("Failure body should not be read without preview opt-in.");
+        },
+    });
+    const fetcher = new NodeCustomHttpFetcher({
+        fetch: async () => new Response(responseBody, { status: 500 }),
+    });
+
+    assert.deepEqual(await fetcher.fetchJson("https://api.example.com/data"), {
+        ok: false,
+        reason: "httpFailure",
+        detail: "HTTP status 500.",
+    });
+});
+
+test("NodeCustomHttpFetcher includes bounded raw response previews on HTTP failures", async () => {
+    const fetcher = new NodeCustomHttpFetcher({
+        fetch: async () => new Response(
+            JSON.stringify({
+                reason: "Daily API request limit exceeded. Please try again tomorrow.",
+                error: true,
+            }),
+            { status: 429 },
+        ),
+    });
+
+    assert.deepEqual(await fetcher.fetchJson("https://api.example.com/data", {
+        includeFailureResponsePreview: true,
+    }), {
+        ok: false,
+        reason: "httpFailure",
+        detail: "HTTP status 429.",
+        responseTextPreview: "{\"reason\":\"Daily API request limit exceeded. Please try again tomorrow.\",\"error\":true}",
+        isResponseTextPreviewTruncated: false,
+    });
+});
+
+test("NodeCustomHttpFetcher truncates raw response previews on HTTP failures", async () => {
+    const fetcher = new NodeCustomHttpFetcher({
+        responseLimitBytes: 4,
+        fetch: async () => new Response("12345", { status: 500 }),
+    });
+
+    assert.deepEqual(await fetcher.fetchJson("https://api.example.com/data", {
+        includeFailureResponsePreview: true,
+    }), {
+        ok: false,
+        reason: "httpFailure",
+        detail: "HTTP status 500.",
+        responseTextPreview: "1234",
+        isResponseTextPreviewTruncated: true,
+    });
 });
 
 test("NodeCustomHttpFetcher retries network failures with bounded retry count", async () => {

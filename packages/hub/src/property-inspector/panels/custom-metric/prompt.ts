@@ -1,10 +1,9 @@
 import { CUSTOM_HTTP_PROMPT_UNIT_NAMES } from "../../../runtime/sources/custom-http/custom-http-output-schema";
+import { redactSecretLikeSourceUrl } from "../../../runtime/sources/custom-http/custom-http-redaction";
 import type { SampleState } from "./types";
 
 const SAMPLE_JSON_PROMPT_PLACEHOLDER = "[SAMPLE JSON HERE, DO NOT SEND OUT WITHOUT GIVING SAMPLE]";
 const SOURCE_URL_PROMPT_PLACEHOLDER = "[SOURCE URL NOT PROVIDED]";
-const SECRET_QUERY_PARAMETER_NAME_PATTERN =
-    /(?:api[_-]?key|access[_-]?token|token|auth|authorization|secret|password|passwd|pwd|signature|sig|client[_-]?secret)/i;
 const TARGET_OUTPUT_JSON_SCHEMA_PROMPT = formatJsonPromptBlock(`{
   "metric": {
     "label": "TEMP",
@@ -110,29 +109,5 @@ function readPromptSourceUrl(sourceUrl: string): PromptSourceUrl {
         };
     }
 
-    try {
-        const parsedSourceUrl = new URL(trimmedSourceUrl);
-        let hasSecretLikeQueryParameter = false;
-        for (const queryParameterName of Array.from(parsedSourceUrl.searchParams.keys())) {
-            if (SECRET_QUERY_PARAMETER_NAME_PATTERN.test(queryParameterName)) {
-                hasSecretLikeQueryParameter = true;
-                parsedSourceUrl.searchParams.set(queryParameterName, "REDACTED");
-            }
-        }
-
-        return {
-            text: parsedSourceUrl.toString(),
-            hasSecretLikeQueryParameter,
-        };
-    } catch {
-        let hasSecretLikeQueryParameter = false;
-        const text = trimmedSourceUrl.replace(
-            /([?&][^=&#]*(?:api[_-]?key|access[_-]?token|token|auth|authorization|secret|password|passwd|pwd|signature|sig|client[_-]?secret)[^=&#]*=)[^&#]*/gi,
-            (_match, queryParameterPrefix: string) => {
-                hasSecretLikeQueryParameter = true;
-                return `${queryParameterPrefix}REDACTED`;
-            },
-        );
-        return { text, hasSecretLikeQueryParameter };
-    }
+    return redactSecretLikeSourceUrl(trimmedSourceUrl);
 }
