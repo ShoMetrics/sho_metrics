@@ -73,9 +73,10 @@ export function CustomMetricSourceEditor({
     const fetchSampleButtonRef = useRef<HTMLButtonElement | null>(null);
     const promptText = useMemo(() => buildCustomMetricPrompt({
         locale,
+        sourceUrl: url,
         userIntent: userIntentDraft,
         sample: readSampleState(testState),
-    }), [locale, userIntentDraft, testState]);
+    }), [locale, url, userIntentDraft, testState]);
 
     useEffect(() => {
         if (userIntent !== lastSettingsUserIntentRef.current) {

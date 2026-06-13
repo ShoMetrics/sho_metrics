@@ -132,6 +132,10 @@ test("custom metric prompt marks truncated sample previews", async () => {
         (screen.getByRole("textbox", { name: /^AI Prompt:/ }) as HTMLTextAreaElement).value,
         /truncated preview of a 12000-byte response/,
     );
+    assert.match(
+        (screen.getByRole("textbox", { name: /^AI Prompt:/ }) as HTMLTextAreaElement).value,
+        /Input JSON sample:\n```json\n\{"current":\{"temperature_2m":23\.5\},\n```/,
+    );
 });
 
 test("custom metric source editor shows copyable failure details", async () => {
@@ -315,7 +319,29 @@ test("custom metric icon search includes Lucide metadata keywords", async () => 
     assert.equal(screen.getByRole("option", { name: /^TV$/ }).textContent?.includes("TV"), true);
 });
 
-test("custom metric prompt includes advisory icon suggestion field", async () => {
+test("custom metric prompt includes URL context and redacts secret query values", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    render(<CustomMetricSettingsHarness client={client} settings={buildCustomMetricSettings({
+        url: "https://api.example.com/weather?latitude=35.6895&api_key=secret-token",
+        userIntent: "Display temperature",
+        jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+    })} />);
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    const prompt = screen.getByRole("textbox", { name: /^AI Prompt:/ }) as HTMLTextAreaElement;
+
+    assert.match(prompt.value, /Source URL for debugging \(secret-like query values may be redacted\):/);
+    assert.match(prompt.value, /https:\/\/api\.example\.com\/weather\?latitude=35\.6895&api_key=REDACTED/);
+    assert.match(prompt.value, /Source URL warning:/);
+    assert.match(prompt.value, /This warning alone does not prevent writing jq/);
+    assert.doesNotMatch(prompt.value, /secret-token/);
+});
+
+test("custom metric prompt encourages Lucide icon suggestions without a fixed example list", async () => {
     const user = userEvent.setup();
     const client = new TestPropertyInspectorClient({
         actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
@@ -331,7 +357,16 @@ test("custom metric prompt includes advisory icon suggestion field", async () =>
     const prompt = screen.getByRole("textbox", { name: /^AI Prompt:/ }) as HTMLTextAreaElement;
 
     assert.match(prompt.value, /"suggestedLucideIconId": "thermometer"/);
-    assert.match(prompt.value, /suggestedLucideIconId is optional and advisory/);
+    assert.match(prompt.value, /suggestedLucideIconId is encouraged but not required/);
+    assert.match(prompt.value, /https:\/\/lucide\.dev\/icons\//);
+    assert.doesNotMatch(prompt.value, /Example Lucide icon ids/);
+    assert.match(prompt.value, /7\. Otherwise, write only the jq filter now\./);
+    assert.match(prompt.value, /Jq syntax reminders:/);
+    assert.match(prompt.value, /Convert numeric strings with `tonumber` when needed/);
+    assert.match(prompt.value, /maximum is encouraged but not required/);
+    assert.match(prompt.value, /Omit maximum only when no safe display maximum can be inferred/);
+    assert.match(prompt.value, /volts \| amperes/);
+    assert.match(prompt.value, /watt_hours \| decibels_a_weighted \| siemens_per_centimeter/);
 });
 
 test("custom metric invalid settings keep entered fields visible for editing", async () => {

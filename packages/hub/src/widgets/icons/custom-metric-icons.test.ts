@@ -3,7 +3,6 @@ import { test } from "node:test";
 import { GENERATED_CUSTOM_METRIC_LUCIDE_ICON_ENTRIES } from "../../generated/custom-metric-lucide-search-index.generated";
 import {
     CUSTOM_METRIC_ICON_SEARCH_RESULT_LIMIT,
-    formatCustomMetricIconPromptList,
     searchCustomMetricIconOptions,
 } from "./custom-metric-icon-search";
 import {
@@ -61,14 +60,6 @@ test("Custom Metric icon search keeps DOM results bounded", () => {
 
     assert.equal(searchResult.options.length, CUSTOM_METRIC_ICON_SEARCH_RESULT_LIMIT);
     assert.equal(searchResult.totalMatchCount > CUSTOM_METRIC_ICON_SEARCH_RESULT_LIMIT, true);
-});
-
-test("Custom Metric prompt icon examples stay short", () => {
-    const promptList = formatCustomMetricIconPromptList();
-
-    assert.equal(promptList.includes("thermometer"), true);
-    assert.equal(promptList.includes("tv"), true);
-    assert.equal(promptList.split(", ").length <= 25, true);
 });
 
 test("Custom Metric icon renderer resolves generated Lucide ids", () => {

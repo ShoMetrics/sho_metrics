@@ -5,6 +5,13 @@ export const CUSTOM_HTTP_TRANSFORM_OUTPUT_LIMIT_BYTES = 64 * 1024;
 
 const MAX_LABEL_LENGTH = 12;
 const MAX_CUSTOM_UNIT_LENGTH = 12;
+const CUSTOM_HTTP_CUSTOM_UNIT_NAME = "custom";
+const CUSTOM_HTTP_FAHRENHEIT_UNIT_NAME = "fahrenheit";
+const CUSTOM_HTTP_NON_ENUM_PROMPT_UNIT_NAMES = [
+    CUSTOM_HTTP_FAHRENHEIT_UNIT_NAME,
+    CUSTOM_HTTP_CUSTOM_UNIT_NAME,
+] as const;
+export const CUSTOM_HTTP_PROMPT_UNIT_NAMES = readCustomHttpPromptUnitNames();
 
 const CUSTOM_HTTP_UNIT_ALIASES = new Map<string, string>([
     ["rpm", "revolutions_per_minute"],
@@ -99,7 +106,7 @@ function parseCustomHttpMetricUnit(
     }
 
     const normalizedUnit = normalizeCustomHttpUnitName(unit);
-    if (normalizedUnit === "custom") {
+    if (normalizedUnit === CUSTOM_HTTP_CUSTOM_UNIT_NAME) {
         if (typeof customUnit !== "string") {
             return invalid("customUnit must be a non-empty string when unit is custom.");
         }
@@ -118,7 +125,7 @@ function parseCustomHttpMetricUnit(
         };
     }
 
-    if (normalizedUnit === "fahrenheit") {
+    if (normalizedUnit === CUSTOM_HTTP_FAHRENHEIT_UNIT_NAME) {
         if (customUnit !== undefined) {
             return invalid("customUnit must be omitted unless unit is custom.");
         }
@@ -203,6 +210,20 @@ function readMetricUnitByNormalizedName(normalizedUnit: string): MetricUnit | un
     return typeof metricUnit === "number" && metricUnit !== MetricUnit.UNSPECIFIED
         ? metricUnit as MetricUnit
         : undefined;
+}
+
+function readCustomHttpPromptUnitNames(): readonly string[] {
+    const metricUnitNames = Object.entries(MetricUnit)
+        .flatMap(([name, value]) => typeof value === "number" && value !== MetricUnit.UNSPECIFIED
+            ? [{ name: name.toLowerCase(), value }]
+            : [])
+        .sort((left, right) => left.value - right.value)
+        .map(entry => entry.name);
+
+    return [
+        ...metricUnitNames,
+        ...CUSTOM_HTTP_NON_ENUM_PROMPT_UNIT_NAMES,
+    ];
 }
 
 function normalizeCustomHttpUnitName(unit: string): string {

@@ -11,29 +11,6 @@ export interface CustomMetricIconMetadata {
     readonly terms: readonly string[];
 }
 
-const CUSTOM_METRIC_PROMPT_ICON_IDS = [
-    "activity",
-    "thermometer",
-    "cloud-sun",
-    "wind",
-    "circle-gauge",
-    "timer",
-    "cpu",
-    "hard-drive",
-    "database",
-    "server",
-    "wifi",
-    "fan",
-    "battery",
-    "bell",
-    "chart-line",
-    "globe",
-    "map-pin",
-    "plane",
-    "train-front",
-    "tv",
-] as const;
-
 /** Searches Lucide icon ids, labels, and metadata terms for the icon picker. */
 export function searchCustomMetricIconOptions(query: string): {
     readonly options: readonly CustomMetricIconMetadata[];
@@ -65,11 +42,6 @@ export function searchCustomMetricIconOptions(query: string): {
 export function readCustomMetricIconMetadata(iconId: string): CustomMetricIconMetadata | undefined {
     const entry = GENERATED_CUSTOM_METRIC_LUCIDE_ICON_ENTRIES.find(candidate => candidate.id === iconId);
     return entry === undefined ? undefined : toMetadata(entry);
-}
-
-/** Formats a short stable icon-id hint list for the AI prompt. */
-export function formatCustomMetricIconPromptList(): string {
-    return CUSTOM_METRIC_PROMPT_ICON_IDS.join(", ");
 }
 
 function scoreIconSearchEntry(entry: GeneratedCustomMetricLucideIconEntry, query: string): number {
