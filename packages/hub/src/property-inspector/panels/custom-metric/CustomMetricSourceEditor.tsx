@@ -35,7 +35,7 @@ import {
 } from "./source-editor-state";
 import type {
     CopyStatus,
-    CustomMetricWidgetSettingsProps,
+    CustomMetricSourceEditorSettingsProps,
     SourceEditorCommand,
     SourceEditorState,
 } from "./types";
@@ -53,7 +53,7 @@ export function CustomMetricSourceEditor({
     setPromptCopyStatus,
     onBack,
     ...props
-}: CustomMetricWidgetSettingsProps & {
+}: CustomMetricSourceEditorSettingsProps & {
     readonly url: string;
     readonly userIntent: string;
     readonly jqTransform: string;
@@ -467,7 +467,7 @@ function FailureDetails({
 }
 
 function resolveUrlValidationMessage(
-    target: CustomMetricWidgetSettingsProps["target"],
+    target: CustomMetricSourceEditorSettingsProps["target"],
     t: ReturnType<typeof useI18n>["t"],
 ): string | undefined {
     return target.configuration.state === "invalid" && target.configuration.reason === "missingUrl"
@@ -476,7 +476,7 @@ function resolveUrlValidationMessage(
 }
 
 function resolveTransformValidationMessage(
-    target: CustomMetricWidgetSettingsProps["target"],
+    target: CustomMetricSourceEditorSettingsProps["target"],
     t: ReturnType<typeof useI18n>["t"],
 ): string | undefined {
     return target.configuration.state === "invalid" && target.configuration.reason === "missingJqTransform"
