@@ -1,25 +1,20 @@
 import type { ResolvedCustomMetricTarget } from "../../../settings/resolved-settings";
 import type { WidgetSettingsPanelProps } from "../panel-props";
 
-export type CustomMetricWidgetSettingsProps = WidgetSettingsPanelProps & {
+export type CustomMetricSourceEditorSettingsProps = WidgetSettingsPanelProps & {
     target: ResolvedCustomMetricTarget;
     /**
      * Runtime consumer segment used to isolate single, Dense row, and Stacked slot
      * Custom HTTP editor checks and metric keys within one Stream Deck action.
      */
     readonly customHttpConsumerSlug: string;
-    /** Whether this panel should open directly into HTTP source editing. */
-    readonly initiallyEditingSource?: boolean | undefined;
-    /** Handles the HTTP source editor back action when an outer owner provides the drill-in page. */
-    readonly onSourceEditorBack?: (() => void) | undefined;
-    /**
-     * Whether to show widget-owned visual controls.
-     *
-     * Dense rows reuse this panel only for Custom HTTP source editing; their
-     * row visuals stay owned by Dense row settings.
-     */
-    readonly showVisualSettings?: boolean | undefined;
 };
+
+export type CustomMetricSourceEditorPageProps = CustomMetricSourceEditorSettingsProps & {
+    readonly onBack: () => void;
+};
+
+export type CustomMetricWidgetSettingsProps = CustomMetricSourceEditorSettingsProps;
 
 export type SourceEditorCommand = "fetchSample" | "testTransform";
 export type CopyStatus = "idle" | "copied" | "failed";

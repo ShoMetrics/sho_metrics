@@ -20,7 +20,7 @@ import type { SelectOption } from "../inspector/types";
 import { buildCatalogMetricOptions, type CatalogMetricOptions, type CatalogMetricSelection, type CatalogMetricTypeId, type SelectedCatalogMetric } from "../select-options/catalog-metric-options";
 import { resolveDiskVolumeOptions, resolveNetworkInterfaceOptions } from "../select-options/runtime-select-options";
 import { resolveHelperStatusGuidanceText } from "./helper-status-guidance";
-import { CustomMetricWidgetSettings } from "./CustomMetricWidgetSettings";
+import { CustomMetricSourceEditorPanel } from "./custom-metric/CustomMetricSourceEditorPanel";
 import {
     buildDiskThroughputMaximumInputSpec,
     buildMillisecondsMaximumInputSpec,
@@ -372,14 +372,11 @@ function DenseCustomMetricSourcePage({
     }
 
     return (
-        <CustomMetricWidgetSettings
+        <CustomMetricSourceEditorPanel
             context={context}
             target={target}
             customHttpConsumerSlug={buildDenseCustomHttpConsumerSlug(slot.slotId)}
-            initiallyEditingSource
-            showPolling={false}
-            showVisualSettings={false}
-            onSourceEditorBack={onBack}
+            onBack={onBack}
             onSettingsPatch={(patch) => {
                 // Dense rows reuse only the Custom HTTP source editor.
                 // Visual and polling settings stay owned by the Dense widget.
