@@ -2,13 +2,14 @@ import { useState } from "react";
 import { InspectorItem } from "../components/InspectorItem";
 import { SectionHeading } from "../components/SectionHeading";
 import { commonMessages } from "../../i18n/message-groups/shell";
-import { catalogMessages, cpuMessages, denseMessages, gpuMessages, helperMessages, multiMetricMessages, networkMessages } from "../../i18n/message-groups/widgets";
+import { catalogMessages, cpuMessages, customMetricMessages, denseMessages, gpuMessages, helperMessages, multiMetricMessages, networkMessages } from "../../i18n/message-groups/widgets";
 import { optionMessages } from "../../i18n/message-groups/options";
 import { localizeOptionList } from "../../i18n/options";
 import { useI18n, type I18n } from "../../i18n/react";
 import type { LocalizedMessage } from "../../i18n/types";
 import { readCatalogMetricMaximumInputValue, resolveCatalogMetricMaximumInputLabel, resolveCatalogMetricMaximumInputMaximum, resolveCatalogMetricMaximumInputStep, writeCatalogMetricMaximumInputValue } from "../../metrics/catalog-metric-scale";
 import { resolveDefaultDiskVolumeOption } from "../../runtime/disk-volumes";
+import { buildDenseCustomHttpConsumerSlug } from "../../runtime/sources/custom-http/custom-http-metric-key";
 import type { MetricDescriptor, SourceClientStatus } from "../../runtime/sources/source-client";
 import type { ResolvedCpuReading, ResolvedDenseMetricSlot, ResolvedDenseMultiMetricWidget, ResolvedDiskMetricTarget, ResolvedGpuReading, ResolvedMetricTarget, ResolvedNetworkReading } from "../../settings/resolved-settings";
 import { DENSE_MULTI_METRIC_MAX_SLOT_COUNT, DENSE_MULTI_METRIC_MIN_SLOT_COUNT } from "../../settings/storage/dense-multi-metric-constraints";
@@ -19,6 +20,7 @@ import type { SelectOption } from "../inspector/types";
 import { buildCatalogMetricOptions, type CatalogMetricOptions, type CatalogMetricSelection, type CatalogMetricTypeId, type SelectedCatalogMetric } from "../select-options/catalog-metric-options";
 import { resolveDiskVolumeOptions, resolveNetworkInterfaceOptions } from "../select-options/runtime-select-options";
 import { resolveHelperStatusGuidanceText } from "./helper-status-guidance";
+import { CustomMetricWidgetSettings } from "./CustomMetricWidgetSettings";
 import {
     buildDiskThroughputMaximumInputSpec,
     buildMillisecondsMaximumInputSpec,
@@ -37,7 +39,7 @@ import type { WidgetSettingsPanelProps } from "./panel-props";
 import { SettingsSection } from "./SettingsSection";
 import { buildCpuMetricKindOptionList, buildGpuMetricKindOptionList, diskMetricKindOptionList } from "./setting-options";
 
-type DenseMetricCategoryId = "cpu" | "gpu" | "memory" | "disk" | "network" | "catalog";
+type DenseMetricCategoryId = "cpu" | "gpu" | "memory" | "disk" | "network" | "catalog" | "customMetric";
 
 const denseMetricCategoryOptionList = [
     { value: "cpu", label: "CPU" },
@@ -46,18 +48,38 @@ const denseMetricCategoryOptionList = [
     { value: "disk", label: "Disk" },
     { value: "network", label: "Network" },
     { value: "catalog", label: "Catalog" },
+    { value: "customMetric", label: "Custom Metric" },
 ] as const satisfies readonly SelectOption<DenseMetricCategoryId>[];
 
 export function DenseMetricRowsSettings({
     context,
     widget,
+    editingCustomMetricSlotId,
+    onEditingCustomMetricSlotIdChange,
     onSettingsPatch,
 }: WidgetSettingsPanelProps & {
     widget: ResolvedDenseMultiMetricWidget;
+    editingCustomMetricSlotId: string | undefined;
+    onEditingCustomMetricSlotIdChange: (slotId: string | undefined) => void;
 }): React.JSX.Element {
     const i18n = useI18n();
     const { t } = i18n;
     const [isReorderEnabled, setIsReorderEnabled] = useState(false);
+    const editingCustomMetricSlot = widget.slots.find(slot =>
+        slot.slotId === editingCustomMetricSlotId
+        && slot.slot.metric.target.domain === "customMetric",
+    );
+
+    if (editingCustomMetricSlot !== undefined) {
+        return (
+            <DenseCustomMetricSourcePage
+                context={context}
+                slot={editingCustomMetricSlot}
+                onBack={() => onEditingCustomMetricSlotIdChange(undefined)}
+                onSettingsPatch={onSettingsPatch}
+            />
+        );
+    }
 
     return (
         <SettingsSection title={t(denseMessages.rowsSection)}>
@@ -69,6 +91,7 @@ export function DenseMetricRowsSettings({
                     rowIndex={index}
                     rowCount={widget.slots.length}
                     isReorderEnabled={isReorderEnabled}
+                    onEditCustomMetricSource={onEditingCustomMetricSlotIdChange}
                     onSettingsPatch={onSettingsPatch}
                 />
             ))}
@@ -120,6 +143,7 @@ function DenseMetricRowSettings({
     rowIndex,
     rowCount,
     isReorderEnabled,
+    onEditCustomMetricSource,
     onSettingsPatch,
 }: {
     readonly context: WidgetSettingsPanelProps["context"];
@@ -127,6 +151,7 @@ function DenseMetricRowSettings({
     readonly rowIndex: number;
     readonly rowCount: number;
     readonly isReorderEnabled: boolean;
+    readonly onEditCustomMetricSource: (slotId: string) => void;
     readonly onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
 }): React.JSX.Element {
     const i18n = useI18n();
@@ -149,6 +174,7 @@ function DenseMetricRowSettings({
                 context={context}
                 target={target}
                 slotId={slot.slotId}
+                onEditCustomMetricSource={onEditCustomMetricSource}
                 onSettingsPatch={onSettingsPatch}
             />
             <TextSetting
@@ -259,11 +285,13 @@ function DenseMetricTargetSettings({
     context,
     target,
     slotId,
+    onEditCustomMetricSource,
     onSettingsPatch,
 }: {
     readonly context: WidgetSettingsPanelProps["context"];
     readonly target: ResolvedMetricTarget;
     readonly slotId: string;
+    readonly onEditCustomMetricSource: (slotId: string) => void;
     readonly onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
 }): React.JSX.Element {
     switch (target.domain) {
@@ -289,8 +317,87 @@ function DenseMetricTargetSettings({
                 />
             );
         case "customMetric":
-            return <></>;
+            return (
+                <DenseCustomMetricSourceSummary
+                    target={target}
+                    onEdit={() => onEditCustomMetricSource(slotId)}
+                />
+            );
     }
+}
+
+function DenseCustomMetricSourceSummary({
+    target,
+    onEdit,
+}: {
+    readonly target: Extract<ResolvedMetricTarget, { readonly domain: "customMetric" }>;
+    readonly onEdit: () => void;
+}): React.JSX.Element {
+    const { t } = useI18n();
+
+    return (
+        <InspectorItem label={t(customMetricMessages.sourceSummaryLabel)}>
+            <div className="advanced-action-stack">
+                <button
+                    className="inline-action-button"
+                    type="button"
+                    onClick={onEdit}
+                >
+                    {t(customMetricMessages.editSourceButton)}
+                </button>
+                <p className="section-note">
+                    {target.configuration.state === "configured"
+                        ? t(customMetricMessages.sourceConfiguredSummary)
+                        : t(customMetricMessages.sourceNeedsSetupSummary)}
+                </p>
+            </div>
+        </InspectorItem>
+    );
+}
+
+function DenseCustomMetricSourcePage({
+    context,
+    slot,
+    onBack,
+    onSettingsPatch,
+}: {
+    readonly context: WidgetSettingsPanelProps["context"];
+    readonly slot: ResolvedDenseMetricSlot;
+    readonly onBack: () => void;
+    readonly onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
+}): React.JSX.Element {
+    const target = slot.slot.metric.target;
+    if (target.domain !== "customMetric") {
+        return <></>;
+    }
+
+    return (
+        <CustomMetricWidgetSettings
+            context={context}
+            target={target}
+            customHttpConsumerSlug={buildDenseCustomHttpConsumerSlug(slot.slotId)}
+            initiallyEditingSource
+            showPolling={false}
+            showVisualSettings={false}
+            onSourceEditorBack={onBack}
+            onSettingsPatch={(patch) => {
+                // Dense rows reuse only the Custom HTTP source editor.
+                // Visual and polling settings stay owned by the Dense widget.
+                if (patch.customMetric === undefined) {
+                    return;
+                }
+
+                onSettingsPatch({
+                    dense: {
+                        updateSlot: {
+                            slotId: slot.slotId,
+                            customMetric: patch.customMetric,
+                        },
+                    },
+                });
+            }}
+        />
+    );
 }
 
 function DenseCpuMetricSetting({
@@ -541,9 +648,7 @@ function resolveDenseMetricCategoryId(target: ResolvedMetricTarget): DenseMetric
         case "catalog":
             return "catalog";
         case "customMetric":
-            // Dense Custom Metric editing is intentionally deferred until the
-            // Custom HTTP single-widget runtime and PI are stable.
-            return "catalog";
+            return "customMetric";
     }
 }
 
@@ -565,6 +670,8 @@ function buildDefaultDenseMetricTarget(
             return { domain: "network", kind: "traffic", direction: "download" };
         case "catalog":
             return buildDenseCatalogMetricTarget(buildCatalogMetricOptions(descriptors, {}, i18n).selectedMetric);
+        case "customMetric":
+            return { domain: "customMetric" };
     }
 }
 
@@ -814,6 +921,7 @@ const denseMetricCategoryMessageByValue = {
     disk: optionMessages.diskOption,
     network: optionMessages.networkOption,
     catalog: denseMessages.catalogMetricChoice,
+    customMetric: denseMessages.customMetricChoice,
 } as const satisfies Record<DenseMetricCategoryId, LocalizedMessage>;
 
 const cpuMetricKindMessageByValue = {

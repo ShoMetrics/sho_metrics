@@ -17,7 +17,7 @@ import type {
     CustomHttpFetchOptions,
     CustomHttpFetchResult,
 } from "../runtime/sources/custom-http/custom-http-fetcher";
-import type { CustomHttpPiTestResponse } from "../runtime/sources/custom-http/custom-http-pi-test-messages";
+import type { CustomHttpSourceEditorResponse } from "../runtime/sources/custom-http/custom-http-source-editor-messages";
 import { listMetricReadPlanKeys, normalizeMetricReadPlan } from "../runtime/source-routing/metric-read-plan";
 import { CustomHttpDefinitionRegistry } from "../runtime/sources/custom-http/custom-http-definition-registry";
 import {
@@ -404,6 +404,7 @@ test("Custom Metric PI sample fetch returns bounded preview through the action b
         type: "custom-http-pi-test",
         command: "fetchSample",
         requestId: "fetch-1",
+        consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
         url: "https://api.example.com/weather",
         requestSettings: { timeoutSeconds: 10, retryCount: 2 },
     }));
@@ -412,7 +413,7 @@ test("Custom Metric PI sample fetch returns bounded preview through the action b
 
     assert.equal(fetcher.urlList[0], "https://api.example.com/weather");
     assert.deepEqual(fetcher.optionsList[0], { timeoutSeconds: 10, retryCount: 2 });
-    const response = action.customMetricTestResponses[0];
+    const response = action.customMetricSourceEditorResponses[0];
     assert.equal(response?.type, "custom-http-pi-test");
     assert.equal(response?.command, "fetchSample");
     assert.equal(response?.requestId, "fetch-1");
@@ -454,6 +455,7 @@ test("Custom Metric PI transform test uses cached sample without storing it in s
         type: "custom-http-pi-test",
         command: "fetchSample",
         requestId: "fetch-1",
+        consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
         url: "https://api.example.com/weather",
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
     }));
@@ -463,6 +465,7 @@ test("Custom Metric PI transform test uses cached sample without storing it in s
         type: "custom-http-pi-test",
         command: "testTransform",
         requestId: "transform-1",
+        consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
         url: "https://api.example.com/weather",
         jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\", maximum: 100 } }",
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
@@ -474,7 +477,7 @@ test("Custom Metric PI transform test uses cached sample without storing it in s
         transformRunner.jqTransformList[0],
         "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\", maximum: 100 } }",
     );
-    assert.deepEqual(action.customMetricTestResponses.at(-1), {
+    assert.deepEqual(action.customMetricSourceEditorResponses.at(-1), {
         type: "custom-http-pi-test",
         command: "testTransform",
         requestId: "transform-1",
@@ -492,7 +495,7 @@ test("Custom Metric PI transform test uses cached sample without storing it in s
 
 class TestCustomMetric extends CustomMetric {
     readonly bindings: FakeMetricCollectionBinding[] = [];
-    readonly customMetricTestResponses: CustomHttpPiTestResponse[] = [];
+    readonly customMetricSourceEditorResponses: CustomHttpSourceEditorResponse[] = [];
     metricsUpdateCallCount = 0;
 
     constructor(
@@ -503,7 +506,7 @@ class TestCustomMetric extends CustomMetric {
         } = {},
     ) {
         super({
-            definitionRegistry,
+            customHttpDefinitionRegistry: definitionRegistry,
             ...options,
         });
     }
@@ -522,12 +525,12 @@ class TestCustomMetric extends CustomMetric {
         return Promise.resolve();
     }
 
-    protected override sendCustomMetricTestResponse(
+    protected override sendCustomHttpSourceEditorResponse(
         event: SendToPluginEvent<never, Record<string, never>>,
-        response: CustomHttpPiTestResponse,
+        response: CustomHttpSourceEditorResponse,
     ): Promise<void> {
         void event;
-        this.customMetricTestResponses.push(response);
+        this.customMetricSourceEditorResponses.push(response);
         return Promise.resolve();
     }
 }

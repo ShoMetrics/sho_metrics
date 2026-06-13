@@ -11,6 +11,7 @@ import {
     STACKED_METRIC_MAX_SLOT_COUNT,
     STACKED_METRIC_MIN_SLOT_COUNT,
 } from "../../settings/storage/stacked-metric-constraints";
+import { buildStackedCustomHttpConsumerSlug } from "../../runtime/sources/custom-http/custom-http-metric-key";
 import type {
     SingleMetricWidgetSettingsPatch,
     StoredWidgetSettingsPatch,
@@ -32,6 +33,7 @@ const stackedSlotMetricDomainOptionList = [
     { value: "disk", label: "Disk" },
     { value: "network", label: "Network" },
     { value: "catalog", label: "Catalog" },
+    { value: "customMetric", label: "Custom Metric" },
 ] as const satisfies readonly SelectOption<StackedSlotMetricDomain>[];
 
 const stackedRotationIntervalOptionList = [
@@ -256,39 +258,42 @@ function StackedSelectedSlotSettings({
     readonly onBack: () => void;
 }): React.JSX.Element {
     const { t } = useI18n();
+    const [isChildDrillInOpen, setIsChildDrillInOpen] = useState(false);
     const childContext = buildStackedSlotVisibilityContext(context, slot);
 
     return (
         <>
-            <SettingsSection title={t(stackedMessages.selectedSlotSection, { slotNumber })}>
-                <InspectorItem>
-                    <div className="advanced-action-stack">
-                        <button
-                            className="inline-action-button"
-                            type="button"
-                            onClick={onBack}
-                        >
-                            {t(stackedMessages.backToStackButton)}
-                        </button>
-                    </div>
-                </InspectorItem>
-                <InspectorItem className="note-item note-item-caption">
-                    <p className="section-note">{t(stackedMessages.selectedSlotNote)}</p>
-                </InspectorItem>
-                <SelectSetting
-                    label={t(stackedMessages.metricTypeLabel)}
-                    value={slot.widget.slot.metric.target.domain}
-                    optionList={localizeStackedSlotMetricDomainOptions(t)}
-                    onValueChange={(metricDomain) => onSettingsPatch({
-                        stacked: {
-                            updateSlot: {
-                                slotId: slot.slotId,
-                                metricDomain,
+            {!isChildDrillInOpen && (
+                <SettingsSection title={t(stackedMessages.selectedSlotSection, { slotNumber })}>
+                    <InspectorItem>
+                        <div className="advanced-action-stack">
+                            <button
+                                className="inline-action-button"
+                                type="button"
+                                onClick={onBack}
+                            >
+                                {t(stackedMessages.backToStackButton)}
+                            </button>
+                        </div>
+                    </InspectorItem>
+                    <InspectorItem className="note-item note-item-caption">
+                        <p className="section-note">{t(stackedMessages.selectedSlotNote)}</p>
+                    </InspectorItem>
+                    <SelectSetting
+                        label={t(stackedMessages.metricTypeLabel)}
+                        value={slot.widget.slot.metric.target.domain}
+                        optionList={localizeStackedSlotMetricDomainOptions(t)}
+                        onValueChange={(metricDomain) => onSettingsPatch({
+                            stacked: {
+                                updateSlot: {
+                                    slotId: slot.slotId,
+                                    metricDomain,
+                                },
                             },
-                        },
-                    })}
-                />
-            </SettingsSection>
+                        })}
+                    />
+                </SettingsSection>
+            )}
             <SingleMetricWidgetSettings
                 context={childContext}
                 target={slot.widget.slot.metric.target}
@@ -301,6 +306,8 @@ function StackedSelectedSlotSettings({
                 transparentSurfaceDisabled={transparentSurfaceDisabled}
                 colorDisabled={colorDisabled}
                 showPolling={false}
+                customHttpConsumerSlug={buildStackedCustomHttpConsumerSlug(slot.slotId)}
+                onWidgetChromeSuppressionChange={setIsChildDrillInOpen}
             />
         </>
     );
@@ -309,9 +316,16 @@ function StackedSelectedSlotSettings({
 function localizeStackedSlotMetricDomainOptions(
     t: ReturnType<typeof useI18n>["t"],
 ): readonly SelectOption<StackedSlotMetricDomain>[] {
-    return stackedSlotMetricDomainOptionList.map(option => option.value === "catalog"
-        ? { ...option, label: t(stackedMessages.catalogMetricChoice) }
-        : option);
+    return stackedSlotMetricDomainOptionList.map((option) => {
+        switch (option.value) {
+            case "catalog":
+                return { ...option, label: t(stackedMessages.catalogMetricChoice) };
+            case "customMetric":
+                return { ...option, label: t(stackedMessages.customMetricChoice) };
+            default:
+                return option;
+        }
+    });
 }
 
 function buildStackedSlotVisibilityContext(
@@ -359,6 +373,6 @@ function resolveStackedSlotSummary(target: ResolvedMetricTarget, t: ReturnType<t
         case "catalog":
             return t(stackedMessages.catalogMetricChoice);
         case "customMetric":
-            return "Custom";
+            return t(stackedMessages.customMetricChoice);
     }
 }

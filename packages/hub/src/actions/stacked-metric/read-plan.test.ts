@@ -8,11 +8,14 @@ import {
 } from "../../runtime/metric-keys";
 import { resolveStoredWidgetSettings } from "../../settings/storage/resolver";
 import { readStoredWidgetSettings } from "../../settings/storage/codec";
+import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
+import { writeStoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
 import {
     buildStackedMetricReadPlan,
     listStackedMetricReadPlanKeys,
     readStackedDisplayedMetricKey,
 } from "./read-plan";
+import { buildCustomHttpRuntimeIdentity, buildStackedCustomHttpConsumerSlug } from "../../runtime/sources/custom-http/custom-http-metric-key";
 
 test("stacked read plan subscribes every configured slot", () => {
     const widget = resolveStackedWidget({
@@ -111,6 +114,27 @@ test("stacked read plan leaves empty catalog slots unconfigured", () => {
     assert.equal(readStackedDisplayedMetricKey(resolution, "catalog-slot"), undefined);
 });
 
+test("stacked read plan subscribes Custom HTTP and built-in slots together", () => {
+    const actionId = "stacked-custom-action";
+    const url = "https://api.example.com/status";
+    const customMetricKey = buildCustomHttpRuntimeIdentity({
+        url,
+        actionId,
+        consumerSlug: buildStackedCustomHttpConsumerSlug("custom-slot"),
+    }).metricKey;
+    const widget = resolveStackedWidget(buildStackedCustomHttpWidgetSettings(url));
+
+    const resolution = buildStackedMetricReadPlan({ widget, actionId });
+
+    assert.deepEqual(listStackedMetricReadPlanKeys(resolution), [
+        customMetricKey,
+        RAM_TOTAL_METRIC_KEY,
+        RAM_USED_METRIC_KEY,
+    ].sort());
+    assert.equal(readStackedDisplayedMetricKey(resolution, "custom-slot"), customMetricKey);
+    assert.equal(readStackedDisplayedMetricKey(resolution, "memory-slot"), RAM_USED_METRIC_KEY);
+});
+
 function resolveStackedWidget(rawSettings: unknown) {
     const resolvedSettings = resolveStoredWidgetSettings({
         storedWidgetSettings: readStoredWidgetSettings(rawSettings).settings,
@@ -120,4 +144,31 @@ function resolveStackedWidget(rawSettings: unknown) {
     }
 
     return resolvedSettings.widget;
+}
+
+function buildStackedCustomHttpWidgetSettings(url: string): unknown {
+    const rawSettings = resolveQuickStartStoredWidgetSettings(undefined, "stackedMetric", {
+        createSlotId: createSequentialSlotIdGenerator(["custom-slot", "memory-slot"]),
+    }).rawSettings;
+
+    return writeStoredWidgetSettingsPatch(rawSettings, {
+        stacked: {
+            updateSlot: {
+                slotId: "custom-slot",
+                metricDomain: "customMetric",
+                singleMetric: {
+                    customMetric: {
+                        url,
+                        userIntent: "show temperature",
+                        jqTransform: ".temperature",
+                    },
+                },
+            },
+        },
+    });
+}
+
+function createSequentialSlotIdGenerator(slotIds: readonly string[]): () => string {
+    const remainingSlotIds = [...slotIds];
+    return () => remainingSlotIds.shift() ?? "unexpected-slot";
 }

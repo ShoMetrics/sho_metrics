@@ -15,12 +15,14 @@ import type {
 import { CPU_USAGE_METRIC_KEY, GPU_USAGE_METRIC_KEY } from "../../runtime/metric-keys";
 import { resolveDiskUsageMetricKey } from "../../runtime/disk-metric-keys";
 import { MetricUnit } from "../../runtime/sources/metric-source";
+import type { MetricValueAttribution } from "../../runtime/sources/source-client";
 import type { WidgetData } from "../../view-rendering/widget-data";
 import {
     BUILT_IN_NODE_SYSTEM_SOURCE_PROFILE_ID,
     BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID,
 } from "../../runtime/sources/source-ids";
 import { listMetricReadPlanKeys } from "../../runtime/source-routing/metric-read-plan";
+import { buildCustomHttpRuntimeIdentity, buildDenseCustomHttpConsumerSlug } from "../../runtime/sources/custom-http/custom-http-metric-key";
 
 test("dense read plan subscribes configured 2-to-6 rows", () => {
     const widget = buildDenseWidget([
@@ -188,6 +190,97 @@ test("dense empty catalog rows are unconfigured without affecting other rows", (
     assert.deepEqual(listMetricReadPlanKeys(readPlanResolution.readPlan), [GPU_USAGE_METRIC_KEY]);
 });
 
+test("dense custom metric rows use independent runtime keys for the same URL", () => {
+    const actionId = "dense-custom-action";
+    const url = "https://api.example.com/status";
+    const firstMetricKey = buildCustomHttpRuntimeIdentity({
+        url,
+        actionId,
+        consumerSlug: buildDenseCustomHttpConsumerSlug("slot-1"),
+    }).metricKey;
+    const secondMetricKey = buildCustomHttpRuntimeIdentity({
+        url,
+        actionId,
+        consumerSlug: buildDenseCustomHttpConsumerSlug("slot-2"),
+    }).metricKey;
+    const widget = buildDenseWidget([
+        buildSlot("slot-1", buildCustomMetricTarget(url, ".temp"), autoSourcePolicy, { customLabel: "TEMP" }),
+        buildSlot("slot-2", buildCustomMetricTarget(url, ".humidity"), autoSourcePolicy, { customLabel: "HUM" }),
+    ]);
+
+    const readPlanResolution = buildDenseMetricReadPlan({ widget, actionId, platform: "win32" });
+
+    assert.deepEqual(readPlanResolution.rows.map(row => row.rowKind), ["configured", "configured"]);
+    assert.deepEqual(listMetricReadPlanKeys(readPlanResolution.readPlan), [
+        firstMetricKey,
+        secondMetricKey,
+    ].sort());
+});
+
+test("dense custom metric row data stays isolated when one row has no sample", () => {
+    const actionId = "dense-custom-data-action";
+    const url = "https://api.example.com/status";
+    const tempMetricKey = buildCustomHttpRuntimeIdentity({
+        url,
+        actionId,
+        consumerSlug: buildDenseCustomHttpConsumerSlug("slot-temp"),
+    }).metricKey;
+    const widget = buildDenseWidget([
+        buildSlot("slot-temp", buildCustomMetricTarget(url, ".temp"), autoSourcePolicy),
+        buildSlot("slot-hum", buildCustomMetricTarget(url, ".humidity"), autoSourcePolicy),
+    ]);
+    const metrics = new FakeMetricStoreReader({
+        [tempMetricKey]: buildWidgetData({
+            current: 24,
+            progress: 0,
+            label: "HTTP",
+            unit: "",
+            sampleTimestampMilliseconds: 10_000,
+        }),
+    }, {
+        [tempMetricKey]: {
+            metricId: tempMetricKey,
+            valueFreshness: "fresh",
+            displayHint: {
+                label: "TEMP",
+                unit: MetricUnit.CELSIUS,
+                maximum: 40,
+            },
+        },
+    });
+
+    const widgetData = buildDenseMetricWidgetData({
+        widget,
+        actionId,
+        metrics,
+        platform: "win32",
+        currentTimestampMilliseconds: 10_000,
+    });
+
+    assert.deepEqual(widgetData.rows.map(row => ({
+        rowKind: row.rowKind,
+        label: row.widgetData.label,
+        current: row.widgetData.current,
+        progress: row.widgetData.progress,
+        sampleTimestampMilliseconds: row.widgetData.sampleTimestampMilliseconds,
+    })), [
+        {
+            rowKind: "configured",
+            label: "TEMP",
+            current: 24,
+            progress: 0.6,
+            sampleTimestampMilliseconds: 10_000,
+        },
+        {
+            rowKind: "configured",
+            label: "HTTP",
+            current: 0,
+            progress: 0,
+            sampleTimestampMilliseconds: undefined,
+        },
+    ]);
+});
+
 const autoSourcePolicy: ResolvedMetricSourcePolicy = {
     primarySourceProfileId: undefined,
     fallbackSourceProfileIds: [],
@@ -284,6 +377,31 @@ function buildCatalogTarget(metricId: string): ResolvedMetricTarget {
     };
 }
 
+function buildCustomMetricTarget(url: string, jqTransform: string): ResolvedMetricTarget {
+    return {
+        domain: "customMetric",
+        iconId: undefined,
+        configuration: {
+            state: "configured",
+            source: {
+                kind: "http",
+                plan: {
+                    kind: "singleRequest",
+                    request: {
+                        url,
+                        userIntent: "show the requested value",
+                        jqTransform,
+                        requestSettings: {
+                            timeoutSeconds: 5,
+                            retryCount: 0,
+                        },
+                    },
+                },
+            },
+        },
+    };
+}
+
 function buildWidgetData(overrides: Partial<WidgetData> = {}): WidgetData {
     return {
         current: 0,
@@ -296,7 +414,10 @@ function buildWidgetData(overrides: Partial<WidgetData> = {}): WidgetData {
 }
 
 class FakeMetricStoreReader implements MetricStoreReader {
-    constructor(private readonly widgetDataByMetricKey: Readonly<Record<string, WidgetData>>) {}
+    constructor(
+        private readonly widgetDataByMetricKey: Readonly<Record<string, WidgetData>>,
+        private readonly attributionByMetricKey: Readonly<Record<string, MetricValueAttribution>> = {},
+    ) {}
 
     getWidgetData(metricKey: string, label: string, unit: string, maxValue = 100): WidgetData {
         return this.widgetDataByMetricKey[metricKey] ?? buildWidgetData({ label, unit, progress: 0 / maxValue });
@@ -311,6 +432,7 @@ class FakeMetricStoreReader implements MetricStoreReader {
         return {
             widgetData: this.getWidgetData(metricKey, label, unit, maxValue),
             selectedSourceId: undefined,
+            valueAttribution: this.attributionByMetricKey[metricKey],
         };
     }
 

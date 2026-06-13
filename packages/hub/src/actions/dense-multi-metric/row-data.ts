@@ -25,6 +25,11 @@ import {
     type MetricReadRoute,
 } from "../../runtime/source-routing/metric-read-plan";
 import { buildMetricReadPlanFromSourcePolicy } from "../../runtime/source-routing/metric-read-plan-builder";
+import { buildCustomHttpMetricReadPlan } from "../../runtime/source-routing/custom-http-read-plan";
+import {
+    buildDenseCustomHttpConsumerSlug,
+    type CustomHttpRuntimeIdentity,
+} from "../../runtime/sources/custom-http/custom-http-metric-key";
 import { pluginGlobalSettingsStore } from "../../settings/global-settings-store";
 import type {
     ResolvedDenseMetricSlot,
@@ -61,6 +66,8 @@ import {
     resolveNetworkMaximumBytesPerSecond as resolveSingleMetricNetworkMaximumBytesPerSecond,
     type ResolvedNetworkTrafficMetricTarget,
 } from "../network/view-builder";
+import { resolveCustomHttpMetricDefinition } from "../custom-metric/runtime-source-definition";
+import { readCustomHttpWidgetData } from "../custom-metric/custom-http-widget-data";
 
 export interface DenseMetricWidgetData {
     readonly rows: readonly DenseMetricRowWidgetData[];
@@ -87,7 +94,7 @@ export interface DenseMetricUnconfiguredRowWidgetData {
 export type DenseMetricUnconfiguredReason =
     | "conflictingSourcePolicy"
     | "emptyCatalogMetric"
-    | "unsupportedMultiMetricTarget";
+    | "emptyCustomMetric";
 
 interface DenseMetricConfiguredRow {
     readonly rowKind: "configured";
@@ -96,6 +103,7 @@ interface DenseMetricConfiguredRow {
     readonly subscriptionMetricKeys: readonly string[];
     readonly target: ResolvedMetricTarget;
     readonly sourcePolicy: ResolvedMetricSourcePolicy;
+    readonly customHttpIdentity?: CustomHttpRuntimeIdentity | undefined;
     readonly customLabel: string | undefined;
     readonly customMaximumValue: number | undefined;
 }
@@ -121,6 +129,13 @@ export interface DenseMetricReadPlanResolution {
 
 export interface DenseMetricReadPlanOptions {
     readonly widget: ResolvedDenseMultiMetricWidget;
+    /**
+     * Runtime action id used only by Custom HTTP rows to derive action-local keys.
+     *
+     * Tests and static previews may omit it; configured Custom HTTP rows then
+     * resolve as empty instead of inventing a fake runtime identity.
+     */
+    readonly actionId?: string | undefined;
     readonly platform?: NodeJS.Platform;
 }
 
@@ -131,7 +146,7 @@ export interface DenseMetricWidgetDataOptions extends DenseMetricReadPlanOptions
 
 /** Builds a dense widget read plan while downgrading conflicting rows before normalization. */
 export function buildDenseMetricReadPlan(options: DenseMetricReadPlanOptions): DenseMetricReadPlanResolution {
-    const rows = resolveDenseMetricRows(options.widget);
+    const rows = resolveDenseMetricRows(options.widget, options.actionId);
     const acceptedRouteByMetricKey = new Map<string, MetricReadRoute>();
     const resolvedRows: DenseMetricRow[] = [];
 
@@ -141,12 +156,7 @@ export function buildDenseMetricReadPlan(options: DenseMetricReadPlanOptions): D
             continue;
         }
 
-        const rowReadPlan = buildMetricReadPlanFromSourcePolicy({
-            metricKeys: row.subscriptionMetricKeys,
-            sourcePolicy: row.sourcePolicy,
-            defaultSourceProfileId: pluginGlobalSettingsStore.getResolved().defaultSourceProfileId,
-            platform: options.platform,
-        });
+        const rowReadPlan = buildDenseRowReadPlan(row, options.platform);
         const rowRoutes = rowReadPlan.metrics;
         // normalizeMetricReadPlan rejects conflicting routes for the same key.
         // Dense treats that as a row-level configuration problem so one bad row
@@ -186,11 +196,14 @@ export function buildDenseMetricWidgetData(options: DenseMetricWidgetDataOptions
     };
 }
 
-function resolveDenseMetricRows(widget: ResolvedDenseMultiMetricWidget): readonly DenseMetricRow[] {
-    return widget.slots.map(resolveDenseMetricRow);
+function resolveDenseMetricRows(
+    widget: ResolvedDenseMultiMetricWidget,
+    actionId: string | undefined,
+): readonly DenseMetricRow[] {
+    return widget.slots.map(row => resolveDenseMetricRow(row, actionId));
 }
 
-function resolveDenseMetricRow(row: ResolvedDenseMetricSlot): DenseMetricRow {
+function resolveDenseMetricRow(row: ResolvedDenseMetricSlot, actionId: string | undefined): DenseMetricRow {
     const target = row.slot.metric.target;
 
     if (target.domain === "catalog" && target.metricId.length === 0) {
@@ -202,12 +215,12 @@ function resolveDenseMetricRow(row: ResolvedDenseMetricSlot): DenseMetricRow {
         };
     }
 
-    const metricKeys = resolveDenseMetricKeys(target);
+    const metricKeys = resolveDenseMetricKeys(target, actionId, row.slotId);
     if (metricKeys === undefined) {
         return {
             rowKind: "unconfigured",
             slotId: row.slotId,
-            reason: "unsupportedMultiMetricTarget",
+            reason: "emptyCustomMetric",
             label: row.customLabel ?? resolveDefaultDenseRowLabel(target),
         };
     }
@@ -219,12 +232,17 @@ function resolveDenseMetricRow(row: ResolvedDenseMetricSlot): DenseMetricRow {
         subscriptionMetricKeys: metricKeys.subscriptionMetricKeys,
         target,
         sourcePolicy: row.slot.metric.source,
+        customHttpIdentity: metricKeys.customHttpIdentity,
         customLabel: row.customLabel,
         customMaximumValue: row.customMaximumValue,
     };
 }
 
-function resolveDenseMetricKeys(target: ResolvedMetricTarget): DenseMetricKeys | undefined {
+function resolveDenseMetricKeys(
+    target: ResolvedMetricTarget,
+    actionId: string | undefined,
+    slotId: string,
+): (DenseMetricKeys & { readonly customHttpIdentity?: CustomHttpRuntimeIdentity | undefined }) | undefined {
     switch (target.domain) {
         case "cpu":
             return resolveCpuDenseMetricKeys(target);
@@ -241,8 +259,22 @@ function resolveDenseMetricKeys(target: ResolvedMetricTarget): DenseMetricKeys |
             return resolveNetworkDenseMetricKeys(target);
         case "catalog":
             return buildSingleKey(target.metricId);
-        case "customMetric":
-            return undefined;
+        case "customMetric": {
+            if (actionId === undefined) {
+                return undefined;
+            }
+            const definition = resolveCustomHttpMetricDefinition({
+                target,
+                actionId,
+                consumerSlug: buildDenseCustomHttpConsumerSlug(slotId),
+            });
+            return definition === undefined
+                ? undefined
+                : {
+                    ...buildSingleKey(definition.identity.metricKey),
+                    customHttpIdentity: definition.identity,
+                };
+        }
     }
 }
 
@@ -345,7 +377,15 @@ function buildTargetWidgetData(
         case "catalog":
             return buildCatalogRowWidgetData(row, metrics);
         case "customMetric":
-            return buildEmptyRowWidgetData(resolveDenseRowLabel(row));
+            return readCustomHttpWidgetData({
+                metrics,
+                metricKey: row.displayMetricKey,
+                shouldCompactCircleLabel: false,
+                displayOverrides: {
+                    label: row.customLabel,
+                    maximum: row.customMaximumValue,
+                },
+            }).widgetData;
     }
 }
 
@@ -557,6 +597,19 @@ function buildSingleKey(metricKey: string): {
         displayMetricKey: metricKey,
         subscriptionMetricKeys: [metricKey],
     };
+}
+
+function buildDenseRowReadPlan(row: DenseMetricConfiguredRow, platform: NodeJS.Platform | undefined): MetricReadPlan {
+    if (row.customHttpIdentity !== undefined) {
+        return buildCustomHttpMetricReadPlan([row.customHttpIdentity]);
+    }
+
+    return buildMetricReadPlanFromSourcePolicy({
+        metricKeys: row.subscriptionMetricKeys,
+        sourcePolicy: row.sourcePolicy,
+        defaultSourceProfileId: pluginGlobalSettingsStore.getResolved().defaultSourceProfileId,
+        platform,
+    });
 }
 
 function hasConflictingAcceptedRoute(

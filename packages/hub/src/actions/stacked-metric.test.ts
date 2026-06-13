@@ -4,6 +4,7 @@ import type {
     DialRotateEvent,
     KeyDownEvent,
     PropertyInspectorDidAppearEvent,
+    SendToPluginEvent,
     WillAppearEvent,
     WillDisappearEvent,
 } from "@elgato/streamdeck";
@@ -28,6 +29,10 @@ import {
     RAM_TOTAL_METRIC_KEY,
     RAM_USED_METRIC_KEY,
 } from "../runtime/metric-keys";
+import { CustomHttpDefinitionRegistry } from "../runtime/sources/custom-http/custom-http-definition-registry";
+import { buildCustomHttpRuntimeIdentity, buildStackedCustomHttpConsumerSlug } from "../runtime/sources/custom-http/custom-http-metric-key";
+import type { CustomHttpFetchOptions, CustomHttpFetchResult, CustomHttpFetcher } from "../runtime/sources/custom-http/custom-http-fetcher";
+import type { CustomHttpSourceEditorResponse } from "../runtime/sources/custom-http/custom-http-source-editor-messages";
 
 test("stacked metric subscribes all slots and schedules default auto rotate", () => {
     const timers = new FakeTimerScheduler();
@@ -184,9 +189,65 @@ test("stacked metric publishes selected-slot picker caches to the Property Inspe
     }
 });
 
+test("stacked metric registers and unregisters Custom HTTP slot definitions", () => {
+    const timers = new FakeTimerScheduler();
+    const definitionRegistry = new CustomHttpDefinitionRegistry();
+    const action = new TestStackedMetric(timers, {
+        descriptors: [],
+        descriptorFingerprint: "empty",
+    }, definitionRegistry);
+    const streamDeckAction = new FakeStreamDeckAction("stacked-custom-http-action");
+    const settings = buildStackedCustomHttpWidgetSettings();
+    const metricKey = buildCustomHttpRuntimeIdentity({
+        url: "https://api.example.com/stacked",
+        actionId: streamDeckAction.id,
+        consumerSlug: buildStackedCustomHttpConsumerSlug("slot-1"),
+    }).metricKey;
+
+    action.onWillAppear(buildWillAppearEvent(streamDeckAction, settings));
+
+    assert.deepEqual(definitionRegistry.list().map(definition => definition.identity.metricKey), [metricKey]);
+
+    action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+
+    assert.deepEqual(definitionRegistry.list(), []);
+});
+
+test("stacked metric handles Custom HTTP PI sample fetch messages", async () => {
+    const timers = new FakeTimerScheduler();
+    const fetcher = new FakeCustomHttpFetcher({
+        ok: true,
+        responseText: "{\"temp\":23.5}",
+    });
+    const action = new TestStackedMetric(timers, {
+        descriptors: [],
+        descriptorFingerprint: "empty",
+    }, undefined, { fetcher });
+    const streamDeckAction = new FakeStreamDeckAction("stacked-custom-http-pi-action");
+
+    action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildStackedCustomHttpWidgetSettings()));
+    action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
+        type: "custom-http-pi-test",
+        command: "fetchSample",
+        requestId: "stacked-fetch-1",
+        consumerSlug: buildStackedCustomHttpConsumerSlug("slot-1"),
+        url: "https://api.example.com/stacked",
+        requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+    }));
+    await flushAsyncOperations();
+
+    assert.equal(fetcher.urlList[0], "https://api.example.com/stacked");
+    const response = action.customHttpSourceEditorResponses[0];
+    assert.equal(response?.type, "custom-http-pi-test");
+    assert.equal(response?.command, "fetchSample");
+    assert.equal(response?.requestId, "stacked-fetch-1");
+    assert.equal(response?.result.ok, true);
+});
+
 class TestStackedMetric extends StackedMetric {
     readonly bindings: FakeMetricCollectionBinding[] = [];
     readonly runtimeCachePatchList: WidgetRuntimeCachePatch[] = [];
+    readonly customHttpSourceEditorResponses: CustomHttpSourceEditorResponse[] = [];
 
     constructor(
         timerScheduler: StackedMetricTimerScheduler,
@@ -194,8 +255,19 @@ class TestStackedMetric extends StackedMetric {
             descriptors: [],
             descriptorFingerprint: "empty",
         },
+        definitionRegistry?: CustomHttpDefinitionRegistry,
+        options: {
+            readonly fetcher?: CustomHttpFetcher | undefined;
+        } = {},
     ) {
-        super(timerScheduler);
+        super(timerScheduler, {
+            customHttpDefinitionRegistry: definitionRegistry,
+            fetcher: options.fetcher,
+            sendCustomHttpSourceEditorResponse: (_event, response) => {
+                this.customHttpSourceEditorResponses.push(response);
+                return Promise.resolve();
+            },
+        });
     }
 
     activeSlotId(actionId: string): string | undefined {
@@ -304,6 +376,19 @@ class FakeTimerScheduler implements StackedMetricTimerScheduler {
     }
 }
 
+class FakeCustomHttpFetcher implements CustomHttpFetcher {
+    readonly urlList: string[] = [];
+    readonly optionsList: CustomHttpFetchOptions[] = [];
+
+    constructor(private readonly result: CustomHttpFetchResult) {}
+
+    fetchJson(url: string, options?: CustomHttpFetchOptions): Promise<CustomHttpFetchResult> {
+        this.urlList.push(url);
+        this.optionsList.push(options ?? {});
+        return Promise.resolve(this.result);
+    }
+}
+
 class FakeStreamDeckAction {
     readonly writtenSettingsList: unknown[] = [];
 
@@ -346,6 +431,33 @@ function buildStackedWidgetSettings(options: {
     return rawSettings;
 }
 
+function buildStackedCustomHttpWidgetSettings(): unknown {
+    const rawSettings = resolveQuickStartStoredWidgetSettings(undefined, "stackedMetric", {
+        createSlotId: createSequentialSlotIdGenerator(["slot-1", "slot-2"]),
+    }).rawSettings;
+
+    return writeStoredWidgetSettingsPatch(rawSettings, {
+        stacked: {
+            updateSlot: {
+                slotId: "slot-1",
+                metricDomain: "customMetric",
+                singleMetric: {
+                    customMetric: {
+                        url: "https://api.example.com/stacked",
+                        userIntent: "show stacked",
+                        jqTransform: ".stacked",
+                    },
+                },
+            },
+        },
+    });
+}
+
+function createSequentialSlotIdGenerator(slotIds: readonly string[]): () => string {
+    const remainingSlotIds = [...slotIds];
+    return () => remainingSlotIds.shift() ?? "unexpected-slot";
+}
+
 function buildWillAppearEvent(action: FakeStreamDeckAction, settings: unknown): WillAppearEvent {
     return {
         action,
@@ -370,6 +482,13 @@ function buildDialRotateEvent(action: FakeStreamDeckAction, ticks: number): Dial
 
 function buildWillDisappearEvent(action: FakeStreamDeckAction): WillDisappearEvent {
     return { action } as unknown as WillDisappearEvent;
+}
+
+function buildSendToPluginEvent(action: FakeStreamDeckAction, payload: unknown): SendToPluginEvent<never, Record<string, never>> {
+    return {
+        action,
+        payload,
+    } as unknown as SendToPluginEvent<never, Record<string, never>>;
 }
 
 async function flushAsyncOperations(): Promise<void> {
