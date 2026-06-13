@@ -1178,6 +1178,7 @@ describe("stored settings proto resolver", () => {
         if (target.domain === "customMetric") {
             assert.deepEqual(target.configuration, { state: "unconfigured" });
         }
+        assert.equal(widgetSettings.preferences.pollingFrequencySeconds, 3);
         assert.equal(widgetSettings.widget.slot.appearance.view.selectedView, "text");
         assert.equal(widgetSettings.widget.slot.appearance.theme.flat.paint.colorMode, "black-white");
     });

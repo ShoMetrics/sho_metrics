@@ -53,12 +53,13 @@ test("custom metric panel sends fetch and transform test commands through the pl
         result: {
             ok: true,
             responseBytes: 13,
+            elapsedMilliseconds: 42,
             samplePreview: "{\"temp\":23.5}",
             isSamplePreviewTruncated: false,
         },
     });
 
-    await screen.findByText(/Sample fetched\. Response size: 13 bytes\./);
+    await screen.findByText(/Sample fetched\. Response size: 13 bytes\. Request time: 42 ms\./);
     assert.equal(screen.getByRole("button", { name: "Copy Prompt" }).hasAttribute("disabled"), false);
     assert.equal(
         (screen.getByRole("textbox", { name: /^Sample Preview:/ }) as HTMLTextAreaElement).value,
@@ -117,6 +118,7 @@ test("custom metric prompt marks truncated sample previews", async () => {
         result: {
             ok: true,
             responseBytes: 12000,
+            elapsedMilliseconds: 64,
             samplePreview: "{\"current\":{\"temperature_2m\":23.5},",
             isSamplePreviewTruncated: true,
         },

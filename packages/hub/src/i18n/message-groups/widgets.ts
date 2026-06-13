@@ -491,9 +491,9 @@ export const customMetricMessages = {
         ja: "最悪時のリクエスト時間は約 {worstCaseSeconds} 秒で、現在の {pollingSeconds} 秒ポーリング頻度を超えます。ソース更新は現在のリクエスト完了後に次のリクエストをスケジュールします。",
     },
     sampleReadyNote: {
-        en: "Sample fetched. Response size: {bytes} bytes.",
-        zh_CN: "样本已获取。响应大小：{bytes} 字节。",
-        ja: "サンプルを取得しました。レスポンスサイズ: {bytes} バイト。",
+        en: "Sample fetched. Response size: {bytes} bytes. Request time: {elapsedMilliseconds} ms.",
+        zh_CN: "样本已获取。响应大小：{bytes} 字节。请求耗时：{elapsedMilliseconds} ms。",
+        ja: "サンプルを取得しました。レスポンスサイズ: {bytes} バイト。リクエスト時間: {elapsedMilliseconds} ms。",
     },
     samplePreviewLabel: {
         en: "Sample Preview",

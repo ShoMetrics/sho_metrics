@@ -40,6 +40,7 @@ export type CustomHttpPiFetchSampleResult =
     | {
         readonly ok: true;
         readonly responseBytes: number;
+        readonly elapsedMilliseconds: number;
         readonly samplePreview: string;
         readonly isSamplePreviewTruncated: boolean;
     }
@@ -148,14 +149,16 @@ export function readCustomHttpPiTestResponse(payload: unknown): CustomHttpPiTest
 function readFetchSampleResult(result: Readonly<Record<string, unknown>>): CustomHttpPiFetchSampleResult | undefined {
     if (result["ok"] === true) {
         const responseBytes = result["responseBytes"];
+        const elapsedMilliseconds = result["elapsedMilliseconds"];
         const samplePreview = result["samplePreview"];
         const isSamplePreviewTruncated = result["isSamplePreviewTruncated"];
         return (
-            typeof responseBytes === "number"
+            isNonNegativeFiniteNumber(responseBytes)
+            && isNonNegativeFiniteNumber(elapsedMilliseconds)
             && typeof samplePreview === "string"
             && typeof isSamplePreviewTruncated === "boolean"
         )
-            ? { ok: true, responseBytes, samplePreview, isSamplePreviewTruncated }
+            ? { ok: true, responseBytes, elapsedMilliseconds, samplePreview, isSamplePreviewTruncated }
             : undefined;
     }
 
@@ -227,4 +230,10 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
     return typeof value === "object"
         && value !== null
         && !Array.isArray(value);
+}
+
+function isNonNegativeFiniteNumber(value: unknown): value is number {
+    return typeof value === "number"
+        && Number.isFinite(value)
+        && value >= 0;
 }

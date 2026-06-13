@@ -86,6 +86,7 @@ export function applyTestResponse(
                 sample: {
                     url,
                     responseBytes: response.result.responseBytes,
+                    elapsedMilliseconds: response.result.elapsedMilliseconds,
                     samplePreview: response.result.samplePreview,
                     isSamplePreviewTruncated: response.result.isSamplePreviewTruncated,
                 },
@@ -114,6 +115,7 @@ export function applyTestResponse(
         sample: sample ?? {
             url,
             responseBytes: 0,
+            elapsedMilliseconds: 0,
             samplePreview: "",
             isSamplePreviewTruncated: false,
         },

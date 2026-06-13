@@ -58,6 +58,7 @@ const DEFAULT_WIDGET_PREFERENCES: ResolvedWidgetPreferences = {
 };
 
 const DEFAULT_DISK_USAGE_POLLING_FREQUENCY_SECONDS = 60;
+const DEFAULT_CUSTOM_METRIC_POLLING_FREQUENCY_SECONDS = 3;
 
 export function resolveStoredWidgetSettings(
     options: ResolveStoredWidgetSettingsOptions,
@@ -316,6 +317,10 @@ function resolveWidgetPreferences(
 function defaultPollingFrequencySeconds(resolvedTarget: ResolvedMetricTarget): number {
     if (resolvedTarget.domain === "disk" && resolvedTarget.reading.kind === "usage") {
         return DEFAULT_DISK_USAGE_POLLING_FREQUENCY_SECONDS;
+    }
+
+    if (resolvedTarget.domain === "customMetric") {
+        return DEFAULT_CUSTOM_METRIC_POLLING_FREQUENCY_SECONDS;
     }
 
     return DEFAULT_WIDGET_PREFERENCES.pollingFrequencySeconds;
