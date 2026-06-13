@@ -495,7 +495,7 @@ test("Custom Metric PI transform test uses cached sample without storing it in s
 
 class TestCustomMetric extends CustomMetric {
     readonly bindings: FakeMetricCollectionBinding[] = [];
-    readonly customMetricSourceEditorResponses: CustomHttpSourceEditorResponse[] = [];
+    readonly customMetricSourceEditorResponses: CustomHttpSourceEditorResponse[];
     metricsUpdateCallCount = 0;
 
     constructor(
@@ -505,10 +505,16 @@ class TestCustomMetric extends CustomMetric {
             readonly transformRunner?: CustomHttpTransformRunner;
         } = {},
     ) {
+        const sourceEditorResponses: CustomHttpSourceEditorResponse[] = [];
         super({
             customHttpDefinitionRegistry: definitionRegistry,
             ...options,
+            sendCustomHttpSourceEditorResponse: (_event, response) => {
+                sourceEditorResponses.push(response);
+                return Promise.resolve();
+            },
         });
+        this.customMetricSourceEditorResponses = sourceEditorResponses;
     }
 
     protected override createMetricCollectionBinding(): MetricCollectionBinding {
@@ -525,14 +531,6 @@ class TestCustomMetric extends CustomMetric {
         return Promise.resolve();
     }
 
-    protected override sendCustomHttpSourceEditorResponse(
-        event: SendToPluginEvent<never, Record<string, never>>,
-        response: CustomHttpSourceEditorResponse,
-    ): Promise<void> {
-        void event;
-        this.customMetricSourceEditorResponses.push(response);
-        return Promise.resolve();
-    }
 }
 
 class FakeMetricCollectionBinding implements MetricCollectionBinding {
