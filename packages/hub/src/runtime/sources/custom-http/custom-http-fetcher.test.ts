@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { once } from "node:events";
+import type { AddressInfo } from "node:net";
 import test from "node:test";
 import { NodeCustomHttpFetcher } from "./custom-http-fetcher";
 
@@ -11,6 +14,120 @@ test("NodeCustomHttpFetcher fetches HTTP JSON without exposing query-string iden
         ok: true,
         responseText: "{\"host\":\"api.example.com\"}",
     });
+});
+
+test("NodeCustomHttpFetcher passes request headers to fetch", async () => {
+    let requestHeaders: RequestInit["headers"] | undefined;
+    const fetcher = new NodeCustomHttpFetcher({
+        fetch: async (_url, init) => {
+            requestHeaders = init?.headers;
+            return new Response("{}");
+        },
+    });
+
+    assert.deepEqual(await fetcher.fetchJson("https://api.example.com/data", {
+        headers: {
+            Authorization: "Bearer secret",
+            "X-Api-Key": "token",
+        },
+    }), {
+        ok: true,
+        responseText: "{}",
+    });
+    assert.deepEqual(requestHeaders, {
+        Authorization: "Bearer secret",
+        "X-Api-Key": "token",
+    });
+});
+
+test("NodeCustomHttpFetcher blocks cross-origin redirects when request headers are attached", async () => {
+    const requestedHosts: string[] = [];
+    const fetcher = new NodeCustomHttpFetcher({
+        fetch: async url => {
+            requestedHosts.push(url.host);
+            return new Response("", {
+                status: 302,
+                headers: {
+                    Location: "https://evil.example.net/data",
+                },
+            });
+        },
+    });
+
+    assert.deepEqual(await fetcher.fetchJson("https://api.example.com/data", {
+        headers: { "X-Api-Key": "secret" },
+    }), {
+        ok: false,
+        reason: "redirectBlocked",
+        detail: "Cross-origin redirect blocked while credentials are attached. Use the redirected URL directly.",
+    });
+    assert.deepEqual(requestedHosts, ["api.example.com"]);
+});
+
+test("NodeCustomHttpFetcher follows safe redirects when request headers are attached", async () => {
+    const requestedUrls: string[] = [];
+    const fetcher = new NodeCustomHttpFetcher({
+        fetch: async url => {
+            requestedUrls.push(url.toString());
+            return requestedUrls.length === 1
+                ? new Response("", {
+                    status: 301,
+                    headers: {
+                        Location: "https://api.example.com/data",
+                    },
+                })
+                : new Response("{}");
+        },
+    });
+
+    assert.deepEqual(await fetcher.fetchJson("http://api.example.com/data", {
+        headers: { "X-Api-Key": "secret" },
+    }), {
+        ok: true,
+        responseText: "{}",
+    });
+    assert.deepEqual(requestedUrls, [
+        "http://api.example.com/data",
+        "https://api.example.com/data",
+    ]);
+});
+
+test("Node fetch manual redirect exposes status and location in the current runtime", async () => {
+    await withHttpServer((_request, response) => {
+        response.writeHead(302, { Location: "/target" });
+        response.end();
+    }, async serverUrl => {
+        const response = await fetch(serverUrl, { redirect: "manual" });
+
+        assert.equal(response.status, 302);
+        assert.equal(response.headers.get("location"), "/target");
+    });
+});
+
+test("NodeCustomHttpFetcher does not carry query credentials to redirected URLs", async () => {
+    let redirectedRequestUrl: string | undefined;
+    let redirectedReferer: string | undefined;
+
+    await withHttpServer((request, response) => {
+        redirectedRequestUrl = request.url;
+        redirectedReferer = request.headers.referer;
+        response.end("{}");
+    }, async redirectedServerUrl => {
+        await withHttpServer((_request, response) => {
+            response.writeHead(302, { Location: redirectedServerUrl });
+            response.end();
+        }, async sourceServerUrl => {
+            const fetcher = new NodeCustomHttpFetcher();
+
+            assert.deepEqual(await fetcher.fetchJson(`${sourceServerUrl}?api_key=secret`), {
+                ok: true,
+                responseText: "{}",
+            });
+        });
+    });
+
+    assert.equal(redirectedRequestUrl, "/");
+    assert.equal(redirectedReferer, undefined);
 });
 
 test("NodeCustomHttpFetcher rejects unsupported protocols and invalid URLs", async () => {
@@ -29,6 +146,31 @@ test("NodeCustomHttpFetcher rejects unsupported protocols and invalid URLs", asy
         detail: "URL is invalid.",
     });
 });
+
+async function withHttpServer(
+    handler: (request: IncomingMessage, response: ServerResponse) => void,
+    run: (serverUrl: string) => Promise<void>,
+): Promise<void> {
+    const server = createServer(handler);
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+
+    try {
+        const address = server.address();
+        if (!isAddressInfo(address)) {
+            throw new Error("Expected HTTP test server to listen on a TCP address.");
+        }
+
+        await run(`http://127.0.0.1:${address.port}/`);
+    } finally {
+        server.close();
+        await once(server, "close");
+    }
+}
+
+function isAddressInfo(address: string | AddressInfo | null): address is AddressInfo {
+    return address !== null && typeof address === "object";
+}
 
 test("NodeCustomHttpFetcher enforces response size before JSON parse", async () => {
     const fetcher = new NodeCustomHttpFetcher({

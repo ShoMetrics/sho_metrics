@@ -20,6 +20,13 @@ import {
     type CustomHttpDefinitionRegistry,
     type CustomHttpMetricDefinition,
 } from "./custom-http-definition-registry";
+import {
+    PluginGlobalCustomHttpCredentialSettingsReader,
+    prepareCustomHttpRequest,
+    redactCustomHttpPreparedAuthSecrets,
+    resolveCustomHttpPreparedAuth,
+    type CustomHttpCredentialSettingsReader,
+} from "./custom-http-auth";
 import { CUSTOM_HTTP_METRIC_KEY_PREFIX } from "./custom-http-metric-key";
 import { NodeCustomHttpFetcher, type CustomHttpFetcher } from "./custom-http-fetcher";
 import {
@@ -37,6 +44,7 @@ const FAILURE_LOG_INTERVAL_MILLISECONDS = 30000;
 interface CustomHttpSourceClientOptions {
     readonly definitionRegistry?: CustomHttpDefinitionRegistry;
     readonly fetcher?: CustomHttpFetcher;
+    readonly credentialSettingsReader?: CustomHttpCredentialSettingsReader;
     readonly transformRunner?: CustomHttpTransformRunner;
     readonly wallClockNow?: () => number;
 }
@@ -65,6 +73,7 @@ export class CustomHttpSourceClient implements SourceClient {
 
     private readonly definitionRegistry: CustomHttpDefinitionRegistry;
     private readonly fetcher: CustomHttpFetcher;
+    private readonly credentialSettingsReader: CustomHttpCredentialSettingsReader;
     private readonly transformRunner: CustomHttpTransformRunner;
     private readonly wallClockNow: () => number;
     private status: SourceClientStatus = { state: "unknown" };
@@ -72,6 +81,7 @@ export class CustomHttpSourceClient implements SourceClient {
     constructor(options: CustomHttpSourceClientOptions = {}) {
         this.definitionRegistry = options.definitionRegistry ?? customHttpDefinitionRegistry;
         this.fetcher = options.fetcher ?? new NodeCustomHttpFetcher();
+        this.credentialSettingsReader = options.credentialSettingsReader ?? new PluginGlobalCustomHttpCredentialSettingsReader();
         this.transformRunner = options.transformRunner ?? new CustomHttpTransformWorkerPool();
         this.wallClockNow = options.wallClockNow ?? wallClockNowMilliseconds;
     }
@@ -165,12 +175,43 @@ export class CustomHttpSourceClient implements SourceClient {
     }
 
     private async readDefinition(definition: CustomHttpMetricDefinition): Promise<CustomHttpMetricReadResult> {
-        const fetchResult = await this.fetcher.fetchJson(definition.request.url, definition.request.requestSettings);
+        const authResult = resolveCustomHttpPreparedAuth({
+            url: definition.request.url,
+            authReference: definition.request.auth,
+            globalSettings: this.credentialSettingsReader.readStoredGlobalSettings(),
+        });
+        if (!authResult.ok) {
+            return {
+                metricKey: definition.identity.metricKey,
+                stage: "auth",
+                detail: authResult.detail,
+            };
+        }
+
+        const preparedRequestResult = prepareCustomHttpRequest({
+            url: definition.request.url,
+            auth: authResult.auth,
+        });
+        if (!preparedRequestResult.ok) {
+            return {
+                metricKey: definition.identity.metricKey,
+                stage: "auth",
+                detail: preparedRequestResult.detail,
+            };
+        }
+
+        const fetchOptions = preparedRequestResult.headers === undefined
+            ? definition.request.requestSettings
+            : {
+                ...definition.request.requestSettings,
+                headers: preparedRequestResult.headers,
+            };
+        const fetchResult = await this.fetcher.fetchJson(preparedRequestResult.url, fetchOptions);
         if (!fetchResult.ok) {
             return {
                 metricKey: definition.identity.metricKey,
                 stage: fetchResult.reason,
-                detail: fetchResult.detail,
+                detail: redactCustomHttpPreparedAuthSecrets(fetchResult.detail, authResult.auth),
             };
         }
 

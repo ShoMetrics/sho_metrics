@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { normalizeCustomHttpSourceUrlInput } from "./custom-http-url";
+import {
+    isCustomHttpLocalOrPrivateUrl,
+    normalizeCustomHttpSourceUrlInput,
+} from "./custom-http-url";
 
 describe("Custom HTTP URL normalization", () => {
     it("keeps empty and absolute URLs unchanged except for whitespace", () => {
@@ -78,6 +81,10 @@ describe("Custom HTTP URL normalization", () => {
             "http://dev.localhost/current",
         );
         assert.equal(
+            normalizeCustomHttpSourceUrlInput("sensor.local/current"),
+            "http://sensor.local/current",
+        );
+        assert.equal(
             normalizeCustomHttpSourceUrlInput("127.0.0.1:8080/current"),
             "http://127.0.0.1:8080/current",
         );
@@ -101,5 +108,12 @@ describe("Custom HTTP URL normalization", () => {
             normalizeCustomHttpSourceUrlInput("[::1]:8080/current"),
             "http://[::1]:8080/current",
         );
+    });
+
+    it("detects local and private absolute URLs", () => {
+        assert.equal(isCustomHttpLocalOrPrivateUrl(new URL("http://localhost:8080/current")), true);
+        assert.equal(isCustomHttpLocalOrPrivateUrl(new URL("http://sensor.local/current")), true);
+        assert.equal(isCustomHttpLocalOrPrivateUrl(new URL("http://192.168.1.10/current")), true);
+        assert.equal(isCustomHttpLocalOrPrivateUrl(new URL("http://api.example.com/current")), false);
     });
 });
