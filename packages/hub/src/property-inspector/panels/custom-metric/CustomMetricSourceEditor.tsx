@@ -1,4 +1,5 @@
 import {
+    createElement,
     useEffect,
     useMemo,
     useRef,
@@ -7,9 +8,14 @@ import {
     type RefObject,
     type SetStateAction,
 } from "react";
+import {
+    CircleCheck,
+    CircleQuestionMark,
+    CircleX,
+    type IconNode,
+} from "lucide";
 import { customMetricMessages } from "../../../i18n/message-groups/widgets";
 import { useI18n } from "../../../i18n/react";
-import type { LocalizedMessage } from "../../../i18n/types";
 import {
     CUSTOM_HTTP_RESPONSE_LIMIT_BYTES,
 } from "../../../runtime/sources/custom-http/custom-http-fetch-limits";
@@ -36,8 +42,8 @@ import {
     sendTransformTestRequest,
 } from "./source-editor-state";
 import type {
-    CopyStatus,
     CustomMetricSourceEditorSettingsProps,
+    ExplorationOutputPreview as ExplorationOutputPreviewState,
     SourceEditorCommand,
     SourceEditorState,
 } from "./types";
@@ -49,10 +55,8 @@ export function CustomMetricSourceEditor({
     requestSettings,
     client,
     sourceEditorState,
-    promptCopyStatus,
     pendingRequestIds,
     setSourceEditorState,
-    setPromptCopyStatus,
     onBack,
     ...props
 }: CustomMetricSourceEditorSettingsProps & {
@@ -62,10 +66,8 @@ export function CustomMetricSourceEditor({
     readonly requestSettings: ResolvedCustomHttpFetchPolicy;
     readonly client: StreamDeckPropertyInspectorClient;
     readonly sourceEditorState: SourceEditorState;
-    readonly promptCopyStatus: CopyStatus;
     readonly pendingRequestIds: RefObject<Map<string, SourceEditorCommand>>;
     readonly setSourceEditorState: Dispatch<SetStateAction<SourceEditorState>>;
-    readonly setPromptCopyStatus: Dispatch<SetStateAction<CopyStatus>>;
     readonly onBack: () => void;
 }): React.JSX.Element {
     const { locale, t } = useI18n();
@@ -238,24 +240,20 @@ export function CustomMetricSourceEditor({
                         : customMetricMessages.promptNeedsSampleHint)}
                     onValueChange={() => undefined}
                     actionButton={(
-                        <button
-                            className="inline-action-button"
-                            type="button"
+                        <CopyTextButton
+                            text={promptText}
                             disabled={!hasSample}
-                            onClick={() => {
-                                copyText(promptText).then((copied) => {
-                                    setPromptCopyStatus(copied ? "copied" : "failed");
-                                });
-                            }}
-                        >
-                            {t(customMetricMessages.copyPromptButton)}
-                        </button>
+                            label={t(customMetricMessages.copyPromptButton)}
+                        />
                     )}
                 />
-                <CopyStatusNote
-                    copyStatus={promptCopyStatus}
-                    copiedMessage={customMetricMessages.promptCopiedNote}
-                />
+                {!hasSample && (
+                    <InspectorItem>
+                        <div className="advanced-action-stack">
+                            <GoToFetchSampleButton fetchSampleButtonRef={fetchSampleButtonRef} />
+                        </div>
+                    </InspectorItem>
+                )}
             </SettingsSection>
             <SettingsSection title={t(customMetricMessages.transformSection)}>
                 <TextAreaSetting
@@ -282,11 +280,17 @@ export function CustomMetricSourceEditor({
                             }
                             onClick={() => {
                                 const requestUrl = commitNormalizedUrlDraft();
+                                const requestTransform = readSingleFencedCodeBlock(jqTransform) ?? jqTransform;
+                                if (requestTransform !== jqTransform) {
+                                    props.onSettingsPatch({
+                                        customMetric: { jqTransform: requestTransform },
+                                    });
+                                }
                                 sendTransformTestRequest(
                                     client,
                                     props.customHttpConsumerSlug,
                                     requestUrl,
-                                    jqTransform,
+                                    requestTransform,
                                     requestSettings,
                                     pendingRequestIds,
                                     setSourceEditorState,
@@ -298,17 +302,12 @@ export function CustomMetricSourceEditor({
                         {!hasSample && (
                             <>
                                 <p className="section-note">{t(customMetricMessages.fetchSampleFirstNote)}</p>
-                                <button
-                                    className="inline-action-button"
-                                    type="button"
-                                    onClick={() => focusFetchSampleButton(fetchSampleButtonRef)}
-                                >
-                                    {t(customMetricMessages.goToFetchSampleButton)}
-                                </button>
+                                <GoToFetchSampleButton fetchSampleButtonRef={fetchSampleButtonRef} />
                             </>
                         )}
                     </div>
                 </InspectorItem>
+                <TransformOutcomeNote state={sourceEditorState} />
                 <MetricResultPreview state={sourceEditorState} />
                 <ExplorationOutputPreview state={sourceEditorState} />
                 <FailureDetails
@@ -358,6 +357,77 @@ function focusFetchSampleButton(fetchSampleButtonRef: RefObject<HTMLButtonElemen
         scrollIntoView.call(fetchSampleButton, { block: "center" });
     }
     fetchSampleButton.focus();
+}
+
+function GoToFetchSampleButton({
+    fetchSampleButtonRef,
+}: {
+    readonly fetchSampleButtonRef: RefObject<HTMLButtonElement | null>;
+}): React.JSX.Element {
+    const { t } = useI18n();
+    return (
+        <button
+            className="inline-action-button"
+            type="button"
+            onClick={() => focusFetchSampleButton(fetchSampleButtonRef)}
+        >
+            {t(customMetricMessages.goToFetchSampleButton)}
+        </button>
+    );
+}
+
+type CopyButtonState = "idle" | "copied" | "failed";
+
+function CopyTextButton({
+    text,
+    disabled = false,
+    label,
+}: {
+    readonly text: string;
+    readonly disabled?: boolean;
+    readonly label: string;
+}): React.JSX.Element {
+    const { t } = useI18n();
+    const [copyButtonState, setCopyButtonState] = useState<CopyButtonState>("idle");
+    const resetTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+    useEffect(() => {
+        setCopyButtonState("idle");
+    }, [text, disabled]);
+
+    useEffect(() => () => {
+        if (resetTimerRef.current !== undefined) {
+            clearTimeout(resetTimerRef.current);
+        }
+    }, []);
+
+    const buttonLabel = copyButtonState === "copied"
+        ? t(customMetricMessages.copyButtonCopiedLabel)
+        : copyButtonState === "failed"
+            ? t(customMetricMessages.copyButtonFailedLabel)
+            : label;
+
+    return (
+        <button
+            className="inline-action-button"
+            type="button"
+            disabled={disabled}
+            onClick={() => {
+                if (resetTimerRef.current !== undefined) {
+                    clearTimeout(resetTimerRef.current);
+                }
+
+                copyText(text).then((copied) => {
+                    setCopyButtonState(copied ? "copied" : "failed");
+                    resetTimerRef.current = setTimeout(() => {
+                        setCopyButtonState("idle");
+                    }, 2000);
+                });
+            }}
+        >
+            {buttonLabel}
+        </button>
+    );
 }
 
 function scrollPropertyInspectorToTop(): void {
@@ -412,24 +482,78 @@ function TestStatusNote({
     }
 }
 
-function CopyStatusNote({
-    copyStatus,
-    copiedMessage,
-}: {
-    readonly copyStatus: CopyStatus;
-    readonly copiedMessage: LocalizedMessage;
-}): React.JSX.Element | null {
+function TransformOutcomeNote({ state }: { readonly state: SourceEditorState }): React.JSX.Element | null {
     const { t } = useI18n();
-    if (copyStatus === "idle") {
-        return null;
+
+    if (state.kind === "metricReady") {
+        return (
+            <StatusNote
+                tone="success"
+                iconNode={CircleCheck}
+                text={t(customMetricMessages.transformStatusMetricReady)}
+            />
+        );
     }
 
+    if (state.kind === "explorationReady") {
+        return (
+            <StatusNote
+                tone="continuing"
+                iconNode={CircleQuestionMark}
+                text={t(customMetricMessages.transformStatusExplorationReady)}
+            />
+        );
+    }
+
+    if (state.kind === "failed" && state.command === "testTransform") {
+        return (
+            <StatusNote
+                tone="danger"
+                iconNode={CircleX}
+                text={t(customMetricMessages.transformStatusFailed)}
+            />
+        );
+    }
+
+    return null;
+}
+
+function StatusNote({
+    tone,
+    iconNode,
+    text,
+}: {
+    readonly tone: "success" | "continuing" | "danger";
+    readonly iconNode: IconNode;
+    readonly text: string;
+}): React.JSX.Element {
     return (
         <InspectorItem className="note-item note-item-caption">
-            <p className="section-note">
-                {t(copyStatus === "copied" ? copiedMessage : customMetricMessages.promptCopyFailedNote)}
+            <p className={`section-note custom-http-transform-status custom-http-transform-status-${tone}`}>
+                <LucideInlineIcon iconNode={iconNode} />
+                <span>{text}</span>
             </p>
         </InspectorItem>
+    );
+}
+
+function LucideInlineIcon({ iconNode }: { readonly iconNode: IconNode }): React.JSX.Element {
+    return (
+        <svg
+            className="custom-http-transform-status-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+        >
+            {iconNode.map(([tagName, attributes], index) => createElement(tagName, {
+                ...attributes,
+                key: index,
+            }))}
+        </svg>
     );
 }
 
@@ -479,16 +603,12 @@ function ExplorationOutputPreview({
     readonly state: SourceEditorState;
 }): React.JSX.Element | null {
     const { t } = useI18n();
-    const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
-    const explorationText = state.kind === "explorationReady" ? state.explorationOutput.text : "";
-    useEffect(() => {
-        setCopyStatus("idle");
-    }, [explorationText]);
 
     if (state.kind !== "explorationReady") {
         return null;
     }
 
+    const explorationOutputText = buildExplorationOutputText(state.explorationOutput);
     const hint = [
         t(customMetricMessages.explorationOutputHint),
         t(customMetricMessages.explorationSchemaNote, {
@@ -497,34 +617,47 @@ function ExplorationOutputPreview({
     ].join(" ");
 
     return (
-        <>
-            <TextAreaSetting
-                label={t(customMetricMessages.explorationOutputLabel)}
-                value={state.explorationOutput.text}
-                rows={8}
-                readOnly
-                hint={hint}
-                onValueChange={() => undefined}
-                actionButton={(
-                    <button
-                        className="inline-action-button"
-                        type="button"
-                        onClick={() => {
-                            copyText(state.explorationOutput.text).then((copied) => {
-                                setCopyStatus(copied ? "copied" : "failed");
-                            });
-                        }}
-                    >
-                        {t(customMetricMessages.copyExplorationOutputButton)}
-                    </button>
-                )}
-            />
-            <CopyStatusNote
-                copyStatus={copyStatus}
-                copiedMessage={customMetricMessages.explorationOutputCopiedNote}
-            />
-        </>
+        <TextAreaSetting
+            label={t(customMetricMessages.explorationOutputLabel)}
+            value={explorationOutputText}
+            rows={8}
+            readOnly
+            hint={hint}
+            onValueChange={() => undefined}
+            actionButton={(
+                <CopyTextButton
+                    text={explorationOutputText}
+                    label={t(customMetricMessages.copyExplorationOutputButton)}
+                />
+            )}
+        />
     );
+}
+
+function buildExplorationOutputText(explorationOutput: ExplorationOutputPreviewState): string {
+    const outputFence = explorationOutput.text.includes("```") ? "````" : "```";
+    return [
+        "This jq ran successfully, but the output is not a valid final metric.",
+        `Not a valid final metric: ${explorationOutput.schemaFailureDetail}`,
+        "",
+        "Use the output below as exploration data:",
+        "- If you are confident, write one final jq filter that returns exactly one {metric:{...}} object.",
+        "- If more information is needed, write one more jq exploration query and ask the user to run it in Stream Deck.",
+        "",
+        outputFence,
+        explorationOutput.text,
+        outputFence,
+    ].join("\n");
+}
+
+function readSingleFencedCodeBlock(text: string): string | undefined {
+    const codeBlockPattern = /```[^\r\n`]*\r?\n([\s\S]*?)```/gu;
+    const matches = [...text.matchAll(codeBlockPattern)];
+    if (matches.length !== 1) {
+        return undefined;
+    }
+
+    return matches[0]?.[1]?.trim();
 }
 
 function FailureDetails({
@@ -546,6 +679,9 @@ function FailureDetails({
         `Detail: ${state.detail}`,
         `Settings: timeout=${requestSettings.timeoutSeconds}s, retryCount=${requestSettings.retryCount}, responseLimit=${CUSTOM_HTTP_RESPONSE_LIMIT_BYTES / 1024}KiB`,
     ].join("\n");
+    const hint = t(command === "testTransform"
+        ? customMetricMessages.transformFailureDetailsHint
+        : customMetricMessages.failureDetailsHint);
 
     return (
         <TextAreaSetting
@@ -553,7 +689,14 @@ function FailureDetails({
             value={failureText}
             rows={3}
             readOnly
+            hint={hint}
             onValueChange={() => undefined}
+            actionButton={(
+                <CopyTextButton
+                    text={failureText}
+                    label={t(customMetricMessages.copyDetailsButton)}
+                />
+            )}
         />
     );
 }

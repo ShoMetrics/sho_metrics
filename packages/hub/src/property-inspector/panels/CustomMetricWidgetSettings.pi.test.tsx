@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { useState } from "react";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
 import {
@@ -78,6 +78,11 @@ test("custom metric panel sends fetch and transform test commands through the pl
         (screen.getByRole("textbox", { name: /^Sample Preview:/ }) as HTMLTextAreaElement).value,
         "{\"temp\":23.5}",
     );
+    const copiedPromptList = await withMockClipboard(async () => {
+        await user.click(screen.getByRole("button", { name: "Copy Prompt" }));
+        await screen.findByRole("button", { name: "Copied" });
+    });
+    assert.match(copiedPromptList[0] ?? "", /Input JSON sample:/);
 
     await user.click(screen.getByRole("button", { name: "Test Transform" }));
 
@@ -107,6 +112,7 @@ test("custom metric panel sends fetch and transform test commands through the pl
     });
 
     await screen.findByText(/Validated Metric: TEMP 23.5 \/ 100 °C/);
+    assert.equal(screen.getByText("Valid metric output.").textContent, "Valid metric output.");
 });
 
 test("custom metric source editor visibly normalizes scheme-less URLs on blur", async () => {
@@ -287,9 +293,17 @@ test("custom metric source editor shows exploration output for non-metric jq res
     });
 
     const explorationOutput = await screen.findByRole("textbox", { name: /^Exploration Output:/ }) as HTMLTextAreaElement;
+    assert.equal(screen.getByText("jq ran, but the output is not a metric yet.").textContent, "jq ran, but the output is not a metric yet.");
     assert.match(explorationOutput.value, /GPU Core/);
-    assert.match(screen.getByText(/copy this output back/).textContent ?? "", /copy this output back/);
-    assert.equal(screen.getByRole("button", { name: "Copy Output" }).hasAttribute("disabled"), false);
+    assert.match(explorationOutput.value, /Not a valid final metric: Output must be an object\./);
+    assert.match(explorationOutput.value, /```[\s\S]*GPU Core[\s\S]*```/);
+
+    const copiedTextList = await withMockClipboard(async () => {
+        await user.click(screen.getByRole("button", { name: "Copy Output" }));
+        await screen.findByRole("button", { name: "Copied" });
+    });
+    assert.match(copiedTextList[0] ?? "", /Not a valid final metric: Output must be an object\./);
+    assert.match(copiedTextList[0] ?? "", /```[\s\S]*GPU Core[\s\S]*```/);
 });
 
 test("custom metric source editor shows copyable failure details", async () => {
@@ -323,10 +337,70 @@ test("custom metric source editor shows copyable failure details", async () => {
         (await screen.findByRole("textbox", { name: /^Failure Debug Details:/ }) as HTMLTextAreaElement).value,
         "Stage: fetch\nDetail: HTTP request failed. TypeError: fetch failed\nSettings: timeout=5s, retryCount=0, responseLimit=256KiB",
     );
-    assert.equal(screen.queryByRole("button", { name: "Copy Failure" }), null);
+    const copiedDetailsList = await withMockClipboard(async () => {
+        await user.click(screen.getByRole("button", { name: "Copy Details" }));
+        await screen.findByRole("button", { name: "Copied" });
+    });
+    assert.match(copiedDetailsList[0] ?? "", /Stage: fetch/);
     assert.match(
         screen.getByText("Fetching sample failed. See failure debug details below.").textContent ?? "",
         /Fetching sample failed/,
+    );
+});
+
+test("custom metric source editor explains transform failure details", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    render(<CustomMetricSettingsHarness client={client} settings={buildCustomMetricSettings({
+        url: "https://api.example.com/weather",
+        userIntent: "Display temperature",
+        jqTransform: "{",
+    })} />);
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "Fetch Sample" }));
+
+    const fetchMessage = readSentMessagePayload(client.sentMessages.at(-1));
+    dispatchCustomHttpResponse(client, {
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+        command: "fetchSample",
+        requestId: fetchMessage.requestId,
+        result: {
+            ok: true,
+            responseBytes: 13,
+            elapsedMilliseconds: 42,
+            samplePreview: "{\"temp\":23.5}",
+            isSamplePreviewTruncated: false,
+            promptSample: {
+                kind: "jsonSample",
+                text: "{\"temp\":23.5}",
+            },
+        },
+    });
+
+    await screen.findByText(/Sample fetched/);
+    await user.click(screen.getByRole("button", { name: "Test Transform" }));
+
+    const transformMessage = readSentMessagePayload(client.sentMessages.at(-1));
+    dispatchCustomHttpResponse(client, {
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+        command: "testTransform",
+        requestId: transformMessage.requestId,
+        result: {
+            ok: false,
+            stage: "jq",
+            detail: "jq: error: syntax error",
+        },
+    });
+
+    await screen.findByRole("textbox", { name: /^Failure Debug Details:/ });
+    assert.equal(screen.getByText("jq transform failed.").textContent, "jq transform failed.");
+    assert.match(
+        screen.getByText(/did not output a valid metric/).textContent ?? "",
+        /did not output a valid metric/,
     );
 });
 
@@ -514,7 +588,7 @@ test("custom metric prompt encourages Lucide icon suggestions without a fixed ex
     assert.match(prompt.value, /suggestedLucideIconId is encouraged but not required/);
     assert.match(prompt.value, /https:\/\/lucide\.dev\/icons\//);
     assert.doesNotMatch(prompt.value, /Example Lucide icon ids/);
-    assert.match(prompt.value, /8\. Otherwise, write only the jq filter now\./);
+    assert.match(prompt.value, /8\. Otherwise, write the jq filter now in exactly one fenced code block labeled jq\./);
     assert.match(prompt.value, /Jq syntax reminders:/);
     assert.match(prompt.value, /Convert numeric strings with `tonumber` when needed/);
     assert.match(prompt.value, /maximum is encouraged but not required/);
@@ -569,6 +643,62 @@ test("custom metric source editor keeps whitespace while editing user intent", a
     assert.equal(userIntentInput.value, " ");
 });
 
+test("custom metric source editor extracts a single jq code block when testing", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    render(<CustomMetricSettingsHarness client={client} settings={buildCustomMetricSettings({
+        url: "https://api.example.com/weather",
+        userIntent: "Display temperature",
+    })} />);
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    const transformInput = screen.getByRole("textbox", { name: /^jq Transform:/ }) as HTMLTextAreaElement;
+    const aiReply = [
+        "Run this jq expression:",
+        "```jq",
+        "{metric:{label:\"TEMP\",value:.temp,unit:\"celsius\"}}",
+        "```",
+    ].join("\n");
+
+    fireEvent.change(transformInput, {
+        target: {
+            value: aiReply,
+        },
+    });
+
+    assert.equal(transformInput.value, aiReply);
+
+    await user.click(screen.getByRole("button", { name: "Fetch Sample" }));
+    const fetchMessage = readSentMessagePayload(client.sentMessages.at(-1));
+    dispatchCustomHttpResponse(client, {
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+        command: "fetchSample",
+        requestId: fetchMessage.requestId,
+        result: {
+            ok: true,
+            responseBytes: 13,
+            elapsedMilliseconds: 42,
+            samplePreview: "{\"temp\":23.5}",
+            isSamplePreviewTruncated: false,
+            promptSample: {
+                kind: "jsonSample",
+                text: "{\"temp\":23.5}",
+            },
+        },
+    });
+
+    await screen.findByText(/Sample fetched/);
+    await user.click(screen.getByRole("button", { name: "Test Transform" }));
+
+    const transformMessage = readSentMessagePayload(client.sentMessages.at(-1));
+    assert.equal(transformMessage.command, "testTransform");
+    assert.equal(transformMessage.jqTransform, "{metric:{label:\"TEMP\",value:.temp,unit:\"celsius\"}}");
+    assert.equal(transformInput.value, "{metric:{label:\"TEMP\",value:.temp,unit:\"celsius\"}}");
+});
+
 test("custom metric transform section can focus the single fetch sample control", async () => {
     const user = userEvent.setup();
     const client = new TestPropertyInspectorClient({
@@ -584,11 +714,38 @@ test("custom metric transform section can focus the single fetch sample control"
     await user.click(screen.getByRole("button", { name: "Edit" }));
     const fetchSampleButton = screen.getByRole("button", { name: "Fetch Sample" });
 
-    await user.click(screen.getByRole("button", { name: "Go to Fetch Sample" }));
+    const goToFetchSampleButtons = screen.getAllByRole("button", { name: "Go to Fetch Sample" });
+    assert.equal(goToFetchSampleButtons.length, 2);
+
+    await user.click(goToFetchSampleButtons[0]);
 
     assert.equal(document.activeElement, fetchSampleButton);
     assert.equal(client.sentMessages.length, 0);
 });
+
+async function withMockClipboard(run: () => Promise<void>): Promise<readonly string[]> {
+    const copiedTextList: string[] = [];
+    const originalClipboard = navigator.clipboard;
+    Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+            writeText: async (text: string) => {
+                copiedTextList.push(text);
+            },
+        },
+    });
+
+    try {
+        await run();
+    } finally {
+        Object.defineProperty(navigator, "clipboard", {
+            configurable: true,
+            value: originalClipboard,
+        });
+    }
+
+    return copiedTextList;
+}
 
 function CustomMetricSettingsHarness({
     client,

@@ -136,6 +136,34 @@ body {
     margin-top: 0;
 }
 
+.custom-http-transform-status {
+    align-items: center;
+    display: flex;
+    font-weight: 700;
+    gap: 7px;
+    line-height: 18px;
+    min-height: 18px;
+}
+
+.custom-http-transform-status-icon {
+    display: block;
+    flex: 0 0 18px;
+    height: 18px;
+    width: 18px;
+}
+
+.custom-http-transform-status-success {
+    color: #8ee08e;
+}
+
+.custom-http-transform-status-continuing {
+    color: #f8d66d;
+}
+
+.custom-http-transform-status-danger {
+    color: #ff8f8f;
+}
+
 .settings-notice {
     margin-bottom: 12px;
     margin-top: -4px;
