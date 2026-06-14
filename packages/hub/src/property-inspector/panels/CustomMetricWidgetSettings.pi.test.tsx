@@ -65,6 +65,10 @@ test("custom metric panel sends fetch and transform test commands through the pl
             elapsedMilliseconds: 42,
             samplePreview: "{\"temp\":23.5}",
             isSamplePreviewTruncated: false,
+            promptSample: {
+                kind: "jsonSample",
+                text: "{\"temp\":23.5}",
+            },
         },
     });
 
@@ -136,7 +140,7 @@ test("custom metric source editor visibly normalizes scheme-less URLs on blur", 
     assert.equal(fetchMessage.url, "https://api.open-meteo.com/v1/forecast");
 });
 
-test("custom metric prompt marks truncated sample previews", async () => {
+test("custom metric prompt explains large JSON digests", async () => {
     const user = userEvent.setup();
     const client = new TestPropertyInspectorClient({
         actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
@@ -162,6 +166,11 @@ test("custom metric prompt marks truncated sample previews", async () => {
             elapsedMilliseconds: 64,
             samplePreview: "{\"current\":{\"temperature_2m\":23.5},",
             isSamplePreviewTruncated: true,
+            promptSample: {
+                kind: "jsonDigest",
+                text: "{\n  \"current\": {\n    \"temperature_2m\": 23.5\n  }\n}",
+                arraySummaries: ["$.hourly.time: 24 items; first 3 shown"],
+            },
         },
     });
 
@@ -171,12 +180,116 @@ test("custom metric prompt marks truncated sample previews", async () => {
     );
     assert.match(
         (screen.getByRole("textbox", { name: /^AI Prompt:/ }) as HTMLTextAreaElement).value,
-        /truncated preview of a 12000-byte response/,
+        /Input JSON digest for a large 12000-byte response/,
     );
     assert.match(
         (screen.getByRole("textbox", { name: /^AI Prompt:/ }) as HTMLTextAreaElement).value,
-        /Input JSON sample:\n```json\n\{"current":\{"temperature_2m":23\.5\},\n```/,
+        /This is an intentional structure summary/,
     );
+    assert.match(
+        (screen.getByRole("textbox", { name: /^AI Prompt:/ }) as HTMLTextAreaElement).value,
+        /Array lengths:\n- \$\.hourly\.time: 24 items; first 3 shown/,
+    );
+    assert.match(
+        (screen.getByRole("textbox", { name: /^AI Prompt:/ }) as HTMLTextAreaElement).value,
+        /Do not reject solely because the digest is incomplete/,
+    );
+    assert.doesNotMatch(
+        (screen.getByRole("textbox", { name: /^AI Prompt:/ }) as HTMLTextAreaElement).value,
+        /Observed discriminator values/,
+    );
+});
+
+test("custom metric prompt does not mention digests for normal JSON samples", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    render(<CustomMetricSettingsHarness client={client} settings={buildCustomMetricSettings({
+        url: "https://api.example.com/weather",
+        userIntent: "Display temperature",
+        jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+    })} />);
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "Fetch Sample" }));
+
+    const fetchMessage = readSentMessagePayload(client.sentMessages.at(-1));
+    dispatchCustomHttpResponse(client, {
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+        command: "fetchSample",
+        requestId: fetchMessage.requestId,
+        result: {
+            ok: true,
+            responseBytes: 13,
+            elapsedMilliseconds: 42,
+            samplePreview: "{\"temp\":23.5}",
+            isSamplePreviewTruncated: false,
+            promptSample: {
+                kind: "jsonSample",
+                text: "{\"temp\":23.5}",
+            },
+        },
+    });
+
+    const prompt = await screen.findByRole("textbox", { name: /^AI Prompt:/ }) as HTMLTextAreaElement;
+    assert.match(prompt.value, /The input sample is the fetched JSON sample/);
+    assert.doesNotMatch(prompt.value, /digest/i);
+});
+
+test("custom metric source editor shows exploration output for non-metric jq results", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    render(<CustomMetricSettingsHarness client={client} settings={buildCustomMetricSettings({
+        url: "https://api.example.com/sensors",
+        userIntent: "Find GPU temperature",
+        jqTransform: "[.. | objects | select(.Text?)]",
+    })} />);
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "Fetch Sample" }));
+
+    const fetchMessage = readSentMessagePayload(client.sentMessages.at(-1));
+    dispatchCustomHttpResponse(client, {
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+        command: "fetchSample",
+        requestId: fetchMessage.requestId,
+        result: {
+            ok: true,
+            responseBytes: 48,
+            elapsedMilliseconds: 42,
+            samplePreview: "{\"sensors\":[{\"Text\":\"GPU Core\",\"Value\":\"55 °C\"}]}",
+            isSamplePreviewTruncated: false,
+            promptSample: {
+                kind: "jsonSample",
+                text: "{\"sensors\":[{\"Text\":\"GPU Core\",\"Value\":\"55 °C\"}]}",
+            },
+        },
+    });
+
+    await screen.findByText(/Sample fetched/);
+    await user.click(screen.getByRole("button", { name: "Test Transform" }));
+
+    const transformMessage = readSentMessagePayload(client.sentMessages.at(-1));
+    dispatchCustomHttpResponse(client, {
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+        command: "testTransform",
+        requestId: transformMessage.requestId,
+        result: {
+            ok: true,
+            explorationOutput: "[\n  {\n    \"Text\": \"GPU Core\",\n    \"Value\": \"55 °C\"\n  }\n]",
+            schemaFailureDetail: "Output must be an object.",
+        },
+    });
+
+    const explorationOutput = await screen.findByRole("textbox", { name: /^Exploration Output:/ }) as HTMLTextAreaElement;
+    assert.match(explorationOutput.value, /GPU Core/);
+    assert.match(screen.getByText(/copy this output back/).textContent ?? "", /copy this output back/);
+    assert.equal(screen.getByRole("button", { name: "Copy Output" }).hasAttribute("disabled"), false);
 });
 
 test("custom metric source editor shows copyable failure details", async () => {
@@ -401,7 +514,7 @@ test("custom metric prompt encourages Lucide icon suggestions without a fixed ex
     assert.match(prompt.value, /suggestedLucideIconId is encouraged but not required/);
     assert.match(prompt.value, /https:\/\/lucide\.dev\/icons\//);
     assert.doesNotMatch(prompt.value, /Example Lucide icon ids/);
-    assert.match(prompt.value, /7\. Otherwise, write only the jq filter now\./);
+    assert.match(prompt.value, /8\. Otherwise, write only the jq filter now\./);
     assert.match(prompt.value, /Jq syntax reminders:/);
     assert.match(prompt.value, /Convert numeric strings with `tonumber` when needed/);
     assert.match(prompt.value, /maximum is encouraged but not required/);

@@ -61,8 +61,37 @@ export type CustomHttpSourceEditorFetchSampleResult =
         readonly elapsedMilliseconds: number;
         readonly samplePreview: string;
         readonly isSamplePreviewTruncated: boolean;
+        readonly promptSample: CustomHttpSourceEditorPromptSample;
     }
     | CustomHttpSourceEditorFailureResult;
+
+/**
+ * Describes the sample material that is safe to paste into an AI prompt.
+ *
+ * Use a separate kind when truncation changes prompt framing or rules, such as
+ * capped JSON digests. Keep a boolean only when truncation changes explanatory
+ * copy for the same prompt behavior, such as raw invalid JSON previews.
+ */
+export type CustomHttpSourceEditorPromptSample =
+    | {
+        readonly kind: "jsonSample";
+        readonly text: string;
+    }
+    | {
+        readonly kind: "jsonDigest";
+        readonly text: string;
+        readonly arraySummaries: readonly string[];
+    }
+    | {
+        readonly kind: "truncatedJsonDigest";
+        readonly text: string;
+        readonly arraySummaries: readonly string[];
+    }
+    | {
+        readonly kind: "rawPreview";
+        readonly text: string;
+        readonly hasTruncatedInvalidJsonPreview: boolean;
+    };
 
 export type CustomHttpSourceEditorTransformResult =
     | {
@@ -74,6 +103,11 @@ export type CustomHttpSourceEditorTransformResult =
             readonly maximum?: number;
             readonly suggestedLucideIconId?: string;
         };
+    }
+    | {
+        readonly ok: true;
+        readonly explorationOutput: string;
+        readonly schemaFailureDetail: string;
     }
     | CustomHttpSourceEditorFailureResult;
 
@@ -192,51 +226,99 @@ function readFetchSampleResult(result: Readonly<Record<string, unknown>>): Custo
         const elapsedMilliseconds = result["elapsedMilliseconds"];
         const samplePreview = result["samplePreview"];
         const isSamplePreviewTruncated = result["isSamplePreviewTruncated"];
+        const promptSample = readPromptSample(result["promptSample"]);
         return (
             isNonNegativeFiniteNumber(responseBytes)
             && isNonNegativeFiniteNumber(elapsedMilliseconds)
             && typeof samplePreview === "string"
             && typeof isSamplePreviewTruncated === "boolean"
+            && promptSample !== undefined
         )
-            ? { ok: true, responseBytes, elapsedMilliseconds, samplePreview, isSamplePreviewTruncated }
+            ? { ok: true, responseBytes, elapsedMilliseconds, samplePreview, isSamplePreviewTruncated, promptSample }
             : undefined;
     }
 
     return readFailureResult(result);
 }
 
+function readPromptSample(value: unknown): CustomHttpSourceEditorPromptSample | undefined {
+    if (!isRecord(value)) {
+        return undefined;
+    }
+
+    const kind = value["kind"];
+    const text = value["text"];
+    if (typeof text !== "string") {
+        return undefined;
+    }
+
+    if (kind === "jsonSample") {
+        return { kind, text };
+    }
+
+    if (kind === "jsonDigest" || kind === "truncatedJsonDigest") {
+        const arraySummaries = readStringList(value["arraySummaries"]);
+        return arraySummaries === undefined
+            ? undefined
+            : {
+                kind,
+                text,
+                arraySummaries,
+            };
+    }
+
+    if (kind === "rawPreview") {
+        const hasTruncatedInvalidJsonPreview = value["hasTruncatedInvalidJsonPreview"];
+        return typeof hasTruncatedInvalidJsonPreview === "boolean"
+            ? { kind, text, hasTruncatedInvalidJsonPreview }
+            : undefined;
+    }
+
+    return undefined;
+}
+
+function readStringList(value: unknown): readonly string[] | undefined {
+    return Array.isArray(value) && value.every(item => typeof item === "string")
+        ? value
+        : undefined;
+}
+
 function readTransformResult(result: Readonly<Record<string, unknown>>): CustomHttpSourceEditorTransformResult | undefined {
     if (result["ok"] === true) {
         const metric = result["metric"];
-        if (!isRecord(metric)) {
-            return undefined;
+        if (isRecord(metric)) {
+            const label = metric["label"];
+            const value = metric["value"];
+            const unitText = metric["unitText"];
+            const maximum = metric["maximum"];
+            const suggestedLucideIconId = metric["suggestedLucideIconId"];
+            if (
+                typeof label !== "string"
+                || typeof value !== "number"
+                || typeof unitText !== "string"
+                || (maximum !== undefined && typeof maximum !== "number")
+                || (suggestedLucideIconId !== undefined && typeof suggestedLucideIconId !== "string")
+            ) {
+                return undefined;
+            }
+
+            return {
+                ok: true,
+                metric: {
+                    label,
+                    value,
+                    unitText,
+                    ...(maximum === undefined ? {} : { maximum }),
+                    ...(suggestedLucideIconId === undefined ? {} : { suggestedLucideIconId }),
+                },
+            };
         }
 
-        const label = metric["label"];
-        const value = metric["value"];
-        const unitText = metric["unitText"];
-        const maximum = metric["maximum"];
-        const suggestedLucideIconId = metric["suggestedLucideIconId"];
-        if (
-            typeof label !== "string"
-            || typeof value !== "number"
-            || typeof unitText !== "string"
-            || (maximum !== undefined && typeof maximum !== "number")
-            || (suggestedLucideIconId !== undefined && typeof suggestedLucideIconId !== "string")
-        ) {
-            return undefined;
-        }
-
-        return {
-            ok: true,
-            metric: {
-                label,
-                value,
-                unitText,
-                ...(maximum === undefined ? {} : { maximum }),
-                ...(suggestedLucideIconId === undefined ? {} : { suggestedLucideIconId }),
-            },
-        };
+        const explorationOutput = result["explorationOutput"];
+        const schemaFailureDetail = result["schemaFailureDetail"];
+        return typeof explorationOutput === "string" && typeof schemaFailureDetail === "string"
+            ? { ok: true, explorationOutput, schemaFailureDetail }
+            : undefined;
     }
 
     return readFailureResult(result);

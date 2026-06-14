@@ -21,10 +21,15 @@ type CustomHttpTransformWorkerResult =
         readonly detail: string;
     };
 
+// Mirrors the pool-side mode union inside the isolated worker entry. The editor
+// uses raw stdout for exploration queries; runtime polling keeps strict output.
+type CustomHttpTransformOutputMode = "singleJsonValue" | "rawStdout";
+
 async function runCustomHttpTransform(
     inputJson: unknown,
     jqTransform: string,
     outputLimitBytes: number,
+    outputMode: CustomHttpTransformOutputMode = "singleJsonValue",
 ): Promise<CustomHttpTransformWorkerResult> {
     try {
         const result = await runJqRaw(normalizeJqInput(inputJson), jqTransform, ["-c"]);
@@ -43,6 +48,13 @@ async function runCustomHttpTransform(
                 ok: false,
                 reason: "outputTooLarge",
                 detail: "Transform output exceeded byte limit.",
+            };
+        }
+
+        if (outputMode === "rawStdout") {
+            return {
+                ok: true,
+                output: result.stdout,
             };
         }
 

@@ -71,6 +71,26 @@ test("CustomHttpTransformWorkerPool rejects multi-output jq transforms determini
     }
 });
 
+test("CustomHttpTransformWorkerPool can return raw stdout for source editor exploration", async () => {
+    const pool = new CustomHttpTransformWorkerPool({
+        poolSize: 1,
+        workerScriptUrl: TEST_WORKER_SCRIPT_URL,
+    });
+
+    try {
+        assert.deepEqual(await pool.runTransform({
+            inputJson: [1, 2],
+            jqTransform: ".[]",
+            outputMode: "rawStdout",
+        }), {
+            ok: true,
+            output: "1\n2",
+        });
+    } finally {
+        pool.dispose();
+    }
+});
+
 test("CustomHttpTransformWorkerPool rejects output before schema validation when output is too large", async () => {
     const pool = new CustomHttpTransformWorkerPool({
         outputLimitBytes: 8,

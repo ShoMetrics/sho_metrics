@@ -108,6 +108,7 @@ export function applySourceEditorResponse(
                     elapsedMilliseconds: response.result.elapsedMilliseconds,
                     samplePreview: response.result.samplePreview,
                     isSamplePreviewTruncated: response.result.isSamplePreviewTruncated,
+                    promptSample: response.result.promptSample,
                 },
             }
             : {
@@ -129,6 +130,24 @@ export function applySourceEditorResponse(
     }
 
     const sample = readSampleState(previousState);
+    if ("explorationOutput" in response.result) {
+        return {
+            kind: "explorationReady",
+            sample: sample ?? {
+                url,
+                responseBytes: 0,
+                elapsedMilliseconds: 0,
+                samplePreview: "",
+                isSamplePreviewTruncated: false,
+                promptSample: { kind: "rawPreview", text: "", hasTruncatedInvalidJsonPreview: false },
+            },
+            explorationOutput: {
+                text: response.result.explorationOutput,
+                schemaFailureDetail: response.result.schemaFailureDetail,
+            },
+        };
+    }
+
     return {
         kind: "metricReady",
         sample: sample ?? {
@@ -137,6 +156,7 @@ export function applySourceEditorResponse(
             elapsedMilliseconds: 0,
             samplePreview: "",
             isSamplePreviewTruncated: false,
+            promptSample: { kind: "rawPreview", text: "", hasTruncatedInvalidJsonPreview: false },
         },
         metric: response.result.metric,
     };
@@ -156,6 +176,7 @@ export function readSampleState(state: SourceEditorState): SampleState | undefin
     switch (state.kind) {
         case "sampleReady":
         case "metricReady":
+        case "explorationReady":
         case "failed":
         case "pending":
             return state.sample;

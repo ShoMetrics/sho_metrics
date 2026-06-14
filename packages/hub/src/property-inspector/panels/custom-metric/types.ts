@@ -1,4 +1,5 @@
 import type { ResolvedCustomMetricTarget } from "../../../settings/resolved-settings";
+import type { CustomHttpSourceEditorPromptSample } from "../../../runtime/sources/custom-http/custom-http-source-editor-messages";
 import type { WidgetSettingsPanelProps } from "../panel-props";
 
 export type CustomMetricSourceEditorSettingsProps = WidgetSettingsPanelProps & {
@@ -25,6 +26,7 @@ export interface SampleState {
     readonly elapsedMilliseconds: number;
     readonly samplePreview: string;
     readonly isSamplePreviewTruncated: boolean;
+    readonly promptSample: CustomHttpSourceEditorPromptSample;
 }
 
 export interface MetricPreview {
@@ -35,11 +37,17 @@ export interface MetricPreview {
     readonly suggestedLucideIconId?: string;
 }
 
+export interface ExplorationOutputPreview {
+    readonly text: string;
+    readonly schemaFailureDetail: string;
+}
+
 export type SourceEditorState =
     | { readonly kind: "idle" }
     | { readonly kind: "pending"; readonly command: SourceEditorCommand; readonly sample?: SampleState }
     | { readonly kind: "sampleReady"; readonly sample: SampleState }
     | { readonly kind: "metricReady"; readonly sample: SampleState; readonly metric: MetricPreview }
+    | { readonly kind: "explorationReady"; readonly sample: SampleState; readonly explorationOutput: ExplorationOutputPreview }
     | {
         readonly kind: "failed";
         readonly command: SourceEditorCommand;
