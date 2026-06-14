@@ -3,6 +3,7 @@ syntax = "proto3";
 package shometrics.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
 import "shometrics/v1/snapshot.proto";
 
 option csharp_namespace = "ShoMetrics.Contracts.V1";
@@ -399,6 +400,10 @@ message SingleCustomHttpRequest {
 
   // Per-request fetch policy. Absence means use resolver-owned defaults.
   optional CustomHttpRequestSettings request_settings = 4;
+
+  // Credential reference and public-HTTP consent for this request. Secrets are
+  // stored in StoredGlobalSettings.custom_http_credentials, never here.
+  optional CustomHttpRequestAuth auth = 5;
 }
 
 message CustomHttpRequestSettings {
@@ -411,6 +416,17 @@ message CustomHttpRequestSettings {
   // Additional retry attempts after the first attempt. For example, 2 means
   // one original request plus two retries, for three total attempts.
   optional uint32 retry_count = 2 [(buf.validate.field).uint32 = {lte: 3}];
+}
+
+message CustomHttpRequestAuth {
+  // Opaque id owned by StoredGlobalSettings.custom_http_credentials.
+  optional string credential_id = 1 [(buf.validate.field).string.max_len = 128];
+
+  // Only applies to authenticated public http:// URLs. This is a bool because
+  // the third state is already modeled by context: HTTPS does not need consent,
+  // and localhost/private LAN HTTP is allowed by runtime policy for local
+  // device and LHM use cases. Absence means "not consented" for public HTTP.
+  optional bool allow_public_http_credentials = 2;
 }
 
 enum CatalogMetricCategory {
@@ -464,6 +480,61 @@ message StoredGlobalSettings {
   // display behavior, not one widget's metric choice. The resolver does not
   // consume this field until runtime support is intentionally added.
   optional ColorCompensationSettings color_compensation = 5;
+
+  // User-created Custom HTTP credentials. Widgets store only credential ids;
+  // password and token values must not be copied into action settings.
+  repeated CustomHttpCredential custom_http_credentials = 6;
+}
+
+message CustomHttpCredential {
+  // Sho Metrics generated opaque id. Users may duplicate nicknames and auth
+  // context; widget references use this id to remain stable.
+  optional string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+
+  optional string nickname = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp updated_at = 4;
+
+  oneof auth {
+    Basic basic = 10;
+    Bearer bearer = 11;
+    Header header = 12;
+    Query query = 13;
+  }
+
+  message Basic {
+    optional string username = 1 [(buf.validate.field).string.max_len = 1024];
+
+    // Security-sensitive user credential. Store only in global settings, never
+    // in action settings, prompt text, logs, or runtime metric ids.
+    optional string password = 2 [(buf.validate.field).string.max_len = 8192];
+  }
+
+  message Bearer {
+    // Security-sensitive user credential.
+    optional string token = 1 [(buf.validate.field).string.max_len = 8192];
+  }
+
+  message Header {
+    optional string header_name = 1 [(buf.validate.field).string.max_len = 128];
+
+    // Security-sensitive user credential.
+    optional string token = 2 [(buf.validate.field).string.max_len = 8192];
+  }
+
+  message Query {
+    optional string query_parameter_name = 1 [(buf.validate.field).string.max_len = 128];
+
+    // Security-sensitive user credential.
+    optional string token = 2 [(buf.validate.field).string.max_len = 8192];
+  }
 }
 
 message ColorCompensationSettings {

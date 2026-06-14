@@ -395,6 +395,10 @@ function buildCustomMetricTarget(url: string, jqTransform: string): ResolvedMetr
                             timeoutSeconds: 5,
                             retryCount: 0,
                         },
+                        auth: {
+                            credentialId: undefined,
+                            allowPublicHttpCredentials: false,
+                        },
                     },
                 },
             },

@@ -282,11 +282,17 @@ export interface ResolvedSingleCustomHttpRequest {
     readonly userIntent: string | undefined;
     readonly jqTransform: string;
     readonly requestSettings: ResolvedCustomHttpRequestSettings;
+    readonly auth: ResolvedCustomHttpRequestAuth;
 }
 
 export interface ResolvedCustomHttpRequestSettings {
     readonly timeoutSeconds: number;
     readonly retryCount: number;
+}
+
+export interface ResolvedCustomHttpRequestAuth {
+    readonly credentialId: string | undefined;
+    readonly allowPublicHttpCredentials: boolean;
 }
 
 export interface ResolvedAppearanceSettings {
@@ -422,6 +428,19 @@ export interface ResolvedGlobalSettings {
     readonly paintOverride: ResolvedGlobalPaintOverride | undefined;
     readonly sourceProfiles: readonly ResolvedMetricSourceProfile[];
     readonly defaultSourceProfileId: string | undefined;
+    readonly customHttpCredentials: readonly ResolvedCustomHttpCredentialSummary[];
+}
+
+export type ResolvedCustomHttpCredentialAuthKind = "basic" | "bearer" | "header" | "query";
+
+export interface ResolvedCustomHttpCredentialSummary {
+    readonly id: string;
+    readonly nickname: string;
+    readonly authKind: ResolvedCustomHttpCredentialAuthKind;
+    /** Non-secret auth context, such as a username, header name, or query parameter name. */
+    readonly authContext: string;
+    readonly createdAtMilliseconds: number | undefined;
+    readonly updatedAtMilliseconds: number | undefined;
 }
 
 export interface ResolvedGlobalDefaults {

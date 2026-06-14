@@ -200,6 +200,48 @@ test("widget patch writes Custom Metric HTTP request settings", () => {
     }
 });
 
+test("widget patch writes and clears Custom Metric HTTP auth reference", () => {
+    const customMetricSettings = resolveQuickStartStoredWidgetSettings(undefined, "customMetric").rawSettings;
+
+    const settingsWithAuth = writeStoredWidgetSettingsPatch(customMetricSettings, {
+        customMetric: {
+            credentialId: "credential-1",
+            allowPublicHttpCredentials: true,
+        },
+    });
+    const clearedSettings = writeStoredWidgetSettingsPatch(settingsWithAuth, {
+        customMetric: {
+            credentialId: undefined,
+            allowPublicHttpCredentials: undefined,
+        },
+    });
+
+    const targetWithAuth = readSingleMetricSlot(settingsWithAuth)?.metric?.target;
+    assert.equal(targetWithAuth?.case, "custom");
+    if (targetWithAuth?.case === "custom") {
+        assert.equal(targetWithAuth.value.source.case, "http");
+        if (targetWithAuth.value.source.case === "http") {
+            assert.equal(targetWithAuth.value.source.value.plan.case, "singleRequest");
+            if (targetWithAuth.value.source.value.plan.case === "singleRequest") {
+                assert.equal(targetWithAuth.value.source.value.plan.value.auth?.credentialId, "credential-1");
+                assert.equal(targetWithAuth.value.source.value.plan.value.auth?.allowPublicHttpCredentials, true);
+            }
+        }
+    }
+
+    const clearedTarget = readSingleMetricSlot(clearedSettings)?.metric?.target;
+    assert.equal(clearedTarget?.case, "custom");
+    if (clearedTarget?.case === "custom") {
+        assert.equal(clearedTarget.value.source.case, "http");
+        if (clearedTarget.value.source.case === "http") {
+            assert.equal(clearedTarget.value.source.value.plan.case, "singleRequest");
+            if (clearedTarget.value.source.value.plan.case === "singleRequest") {
+                assert.equal(clearedTarget.value.source.value.plan.value.auth, undefined);
+            }
+        }
+    }
+});
+
 test("widget patch can clear Custom Metric user intent", () => {
     const customMetricSettings = writeStoredWidgetSettingsPatch(
         resolveQuickStartStoredWidgetSettings(undefined, "customMetric").rawSettings,

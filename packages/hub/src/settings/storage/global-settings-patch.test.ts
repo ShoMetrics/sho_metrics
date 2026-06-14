@@ -11,7 +11,11 @@ import {
     TextViewVariant as StoredTextViewVariant,
 } from "../../generated/proto/shometrics/v1/settings_pb";
 import { readStoredGlobalSettings } from "./codec";
-import { writeStoredGlobalSettingsPatch } from "./global-settings-patch";
+import {
+    deleteStoredCustomHttpCredential,
+    upsertStoredCustomHttpCredential,
+    writeStoredGlobalSettingsPatch,
+} from "./global-settings-patch";
 
 test("global settings patch writes global master override", () => {
     const nextSettings = writeStoredGlobalSettingsPatch(undefined, {
@@ -159,4 +163,81 @@ test("global settings patch clears optional default maxima without clearing mode
     assert.equal(defaults?.diskThroughput?.scaleMode, StoredScaleMode.CUSTOM);
     assert.equal(defaults?.diskThroughput?.maximumReadThroughputMebibytesPerSecond, undefined);
     assert.equal(defaults?.diskThroughput?.maximumWriteThroughputMebibytesPerSecond, undefined);
+});
+
+test("global settings credential patch upserts complete Custom HTTP credentials", () => {
+    const initialSettings = upsertStoredCustomHttpCredential(undefined, {
+        id: "credential-1",
+        nickname: "LHM",
+        authKind: "basic",
+        username: "admin",
+        password: "old-password",
+        createdAtMilliseconds: 1_700_000_000_000,
+        updatedAtMilliseconds: 1_700_000_000_000,
+    });
+
+    const nextSettings = upsertStoredCustomHttpCredential(initialSettings, {
+        id: "credential-1",
+        nickname: "LHM updated",
+        authKind: "basic",
+        username: "admin",
+        password: "new-password",
+        createdAtMilliseconds: 1_700_000_000_000,
+        updatedAtMilliseconds: 1_700_000_001_000,
+    });
+
+    const credentials = readStoredGlobalSettings(nextSettings).settings.customHttpCredentials;
+    assert.equal(credentials.length, 1);
+    assert.equal(credentials[0]?.id, "credential-1");
+    assert.equal(credentials[0]?.nickname, "LHM updated");
+    assert.equal(credentials[0]?.auth.case, "basic");
+    if (credentials[0]?.auth.case === "basic") {
+        assert.equal(credentials[0].auth.value.username, "admin");
+        assert.equal(credentials[0].auth.value.password, "new-password");
+    }
+});
+
+test("global settings credential patch allows duplicate nicknames and contexts", () => {
+    const firstSettings = upsertStoredCustomHttpCredential(undefined, {
+        id: "credential-1",
+        nickname: "LHM",
+        authKind: "query",
+        queryParameterName: "api_key",
+        token: "token-1",
+    });
+
+    const nextSettings = upsertStoredCustomHttpCredential(firstSettings, {
+        id: "credential-2",
+        nickname: "LHM",
+        authKind: "query",
+        queryParameterName: "api_key",
+        token: "token-2",
+    });
+
+    const credentials = readStoredGlobalSettings(nextSettings).settings.customHttpCredentials;
+    assert.equal(credentials.length, 2);
+    assert.deepEqual(credentials.map((credential) => credential.id), ["credential-1", "credential-2"]);
+    assert.deepEqual(credentials.map((credential) => credential.nickname), ["LHM", "LHM"]);
+});
+
+test("global settings credential patch deletes credentials without scanning widget references", () => {
+    const firstSettings = upsertStoredCustomHttpCredential(undefined, {
+        id: "credential-1",
+        nickname: "LHM",
+        authKind: "bearer",
+        token: "token-1",
+    });
+    const secondSettings = upsertStoredCustomHttpCredential(firstSettings, {
+        id: "credential-2",
+        nickname: "Weather",
+        authKind: "header",
+        headerName: "X-API-Key",
+        token: "token-2",
+    });
+
+    const nextSettings = deleteStoredCustomHttpCredential(secondSettings, "credential-1");
+
+    const credentials = readStoredGlobalSettings(nextSettings).settings.customHttpCredentials;
+    assert.equal(credentials.length, 1);
+    assert.equal(credentials[0]?.id, "credential-2");
 });

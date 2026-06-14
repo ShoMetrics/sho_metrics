@@ -77,6 +77,8 @@ export interface StoredWidgetSettingsPatch {
         readonly jqTransform: string | undefined;
         readonly timeoutSeconds: number | undefined;
         readonly retryCount: number | undefined;
+        readonly credentialId: string | undefined;
+        readonly allowPublicHttpCredentials: boolean | undefined;
         readonly iconId: string | undefined;
     }>;
     readonly dense?: DenseWidgetSettingsPatch | undefined;

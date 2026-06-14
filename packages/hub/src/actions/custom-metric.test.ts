@@ -78,12 +78,16 @@ test("Custom Metric registers configured HTTP definition and routes through cust
         });
         assert.deepEqual(registry.read(identity.metricKey), {
             identity,
-        request: {
-            url: "https://api.example.com/data",
-            userIntent: "show CPU",
-            jqTransform: ".",
-            requestSettings: { timeoutSeconds: 5, retryCount: 0 },
-        },
+            request: {
+                url: "https://api.example.com/data",
+                userIntent: "show CPU",
+                jqTransform: ".",
+                requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+                auth: {
+                    credentialId: undefined,
+                    allowPublicHttpCredentials: false,
+                },
+            },
         });
         assert.equal(action.bindings.length, 1);
         const readPlan = normalizeMetricReadPlan(action.bindings[0].refreshOptionsList[0].readPlan);

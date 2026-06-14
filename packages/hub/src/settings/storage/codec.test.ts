@@ -65,6 +65,23 @@ describe("stored settings proto codec", () => {
         assert.equal(result.settings.widget.case, undefined);
     });
 
+    it("reads invalid global credential settings with an empty stored settings default", () => {
+        const result = readStoredGlobalSettings({
+            customHttpCredentials: [
+                {
+                    id: "",
+                    nickname: "Broken credential",
+                    bearer: {
+                        token: "secret",
+                    },
+                },
+            ],
+        });
+
+        assert.equal(result.warning?.reason, "invalidSettingsDefaulted");
+        assert.deepEqual(writeStoredGlobalSettings(result.settings), {});
+    });
+
     it("round-trips valid global settings as readable ProtoJSON", () => {
         const result = readStoredGlobalSettings({
             defaultSourceProfileId: "local",
