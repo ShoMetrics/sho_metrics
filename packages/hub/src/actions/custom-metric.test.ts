@@ -25,7 +25,11 @@ import {
     CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
 } from "../runtime/sources/custom-http/custom-http-metric-key";
 import { MetricUnit } from "../runtime/sources/metric-source";
-import type { CustomHttpTransformResult, CustomHttpTransformRunner } from "../runtime/sources/custom-http/custom-http-transform-worker-pool";
+import type {
+    CustomHttpTransformOutputMode,
+    CustomHttpTransformResult,
+    CustomHttpTransformRunner,
+} from "../runtime/sources/custom-http/custom-http-transform-worker-pool";
 import type { MetricValueDisplayHint } from "../runtime/sources/source-client";
 import { CUSTOM_HTTP_SOURCE_ID } from "../runtime/sources/source-ids";
 import { composeMetricViewFrame } from "../view-rendering/metric-view-frame";
@@ -427,7 +431,161 @@ test("Custom Metric PI sample fetch returns bounded preview through the action b
         assert.equal(Number.isInteger(response.result.elapsedMilliseconds), true);
         assert.equal(response.result.samplePreview, "{\"temp\":23.5}");
         assert.equal(response.result.isSamplePreviewTruncated, false);
+        assert.deepEqual(response.result.promptSample, {
+            kind: "jsonSample",
+            text: "{\"temp\":23.5}",
+        });
     }
+});
+
+test("Custom Metric PI sample fetch builds a digest for large JSON prompts", async () => {
+    const registry = new CustomHttpDefinitionRegistry();
+    const largeResponseText = JSON.stringify({
+        Children: [
+            { Text: "Sensor", Value: "Value" },
+            { Text: "CPU Package", Value: "44.2 °C", Type: "Temperature" },
+            { Text: "Vcore", Value: "2.040 V", Type: "Voltage" },
+            { Text: "Download Speed", Value: "0.0 KB/s", Type: "Throughput" },
+        ],
+        Padding: "x".repeat(4096),
+    });
+    const fetcher = new FakeCustomHttpFetcher({
+        ok: true,
+        responseText: largeResponseText,
+    });
+    const action = new TestCustomMetric(registry, { fetcher });
+    const streamDeckAction = new FakeStreamDeckAction("custom-pi-fetch-digest-action");
+
+    action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCustomMetricWidgetSettings()));
+    action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
+        type: "custom-http-pi-test",
+        command: "fetchSample",
+        requestId: "fetch-1",
+        consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
+        url: "https://api.example.com/sensors",
+        requestSettings: { timeoutSeconds: 10, retryCount: 2 },
+    }));
+
+    await waitForAsyncWork();
+
+    const response = action.customMetricSourceEditorResponses[0];
+    assert.equal(response?.command, "fetchSample");
+    assert.equal(response?.result.ok, true);
+    if (response?.command === "fetchSample" && response.result.ok === true) {
+        const result = response.result;
+        assert.equal(result.isSamplePreviewTruncated, true);
+        assert.equal(result.promptSample.kind, "jsonDigest");
+        if (result.promptSample.kind === "jsonDigest") {
+            assert.doesNotThrow(() => JSON.parse(result.promptSample.text));
+            assert.match(result.promptSample.arraySummaries.join("\n"), /\$\.Children: 4 items/);
+        }
+    }
+});
+
+test("Custom Metric PI transform test returns exploration output when jq succeeds without a metric", async () => {
+    const registry = new CustomHttpDefinitionRegistry();
+    const fetcher = new FakeCustomHttpFetcher({
+        ok: true,
+        responseText: "{\"sensors\":[{\"Text\":\"GPU Core\",\"Value\":\"55 °C\"}]}",
+    });
+    const transformRunner = new FakeCustomHttpTransformRunner({
+        ok: true,
+        output: [
+            { Text: "GPU Core", Value: "55 °C" },
+        ],
+    });
+    const action = new TestCustomMetric(registry, { fetcher, transformRunner });
+    const streamDeckAction = new FakeStreamDeckAction("custom-pi-exploration-action");
+
+    action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCustomMetricWidgetSettings({
+        url: "https://api.example.com/sensors",
+        userIntent: "show GPU temp",
+        jqTransform: ".",
+    })));
+    action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
+        type: "custom-http-pi-test",
+        command: "fetchSample",
+        requestId: "fetch-1",
+        consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
+        url: "https://api.example.com/sensors",
+        requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+    }));
+    await waitForAsyncWork();
+
+    action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
+        type: "custom-http-pi-test",
+        command: "testTransform",
+        requestId: "transform-1",
+        consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
+        url: "https://api.example.com/sensors",
+        jqTransform: "[.. | objects | select(.Text?)]",
+        requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+    }));
+    await waitForAsyncWork();
+
+    assert.deepEqual(action.customMetricSourceEditorResponses.at(-1), {
+        type: "custom-http-pi-test",
+        command: "testTransform",
+        requestId: "transform-1",
+        result: {
+            ok: true,
+            explorationOutput: JSON.stringify([{ Text: "GPU Core", Value: "55 °C" }], null, 2),
+            schemaFailureDetail: "Output must be an object.",
+        },
+    });
+    assert.deepEqual(transformRunner.outputModeList, ["rawStdout"]);
+});
+
+test("Custom Metric PI transform test returns multi-output jq as exploration output", async () => {
+    const registry = new CustomHttpDefinitionRegistry();
+    const fetcher = new FakeCustomHttpFetcher({
+        ok: true,
+        responseText: "{\"sensors\":[{\"Text\":\"GPU Core\",\"Value\":\"55 °C\"},{\"Text\":\"CPU Package\",\"Value\":\"65 °C\"}]}",
+    });
+    const transformRunner = new FakeCustomHttpTransformRunner({
+        ok: true,
+        output: "{\"Text\":\"GPU Core\",\"Value\":\"55 °C\"}\n{\"Text\":\"CPU Package\",\"Value\":\"65 °C\"}\n",
+    });
+    const action = new TestCustomMetric(registry, { fetcher, transformRunner });
+    const streamDeckAction = new FakeStreamDeckAction("custom-pi-multi-output-exploration-action");
+
+    action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCustomMetricWidgetSettings({
+        url: "https://api.example.com/sensors",
+        userIntent: "show GPU temp",
+        jqTransform: ".",
+    })));
+    action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
+        type: "custom-http-pi-test",
+        command: "fetchSample",
+        requestId: "fetch-1",
+        consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
+        url: "https://api.example.com/sensors",
+        requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+    }));
+    await waitForAsyncWork();
+
+    action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
+        type: "custom-http-pi-test",
+        command: "testTransform",
+        requestId: "transform-1",
+        consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
+        url: "https://api.example.com/sensors",
+        jqTransform: ".. | objects | select(.Text?)",
+        requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+    }));
+    await waitForAsyncWork();
+
+    assert.deepEqual(action.customMetricSourceEditorResponses.at(-1), {
+        type: "custom-http-pi-test",
+        command: "testTransform",
+        requestId: "transform-1",
+        result: {
+            ok: true,
+            explorationOutput: "{\"Text\":\"GPU Core\",\"Value\":\"55 °C\"}\n{\"Text\":\"CPU Package\",\"Value\":\"65 °C\"}",
+            schemaFailureDetail: "jq emitted exploration output instead of one final metric JSON value.",
+        },
+    });
+    assert.deepEqual(transformRunner.outputModeList, ["rawStdout"]);
 });
 
 test("Custom Metric PI sample fetch includes HTTP failure response previews", async () => {
@@ -699,15 +857,18 @@ class FakeCustomHttpFetcher implements CustomHttpFetcher {
 class FakeCustomHttpTransformRunner implements CustomHttpTransformRunner {
     readonly inputJsonList: unknown[] = [];
     readonly jqTransformList: string[] = [];
+    readonly outputModeList: (CustomHttpTransformOutputMode | undefined)[] = [];
 
     constructor(private readonly result: CustomHttpTransformResult) {}
 
     runTransform(options: {
         readonly inputJson: unknown;
         readonly jqTransform: string;
+        readonly outputMode?: CustomHttpTransformOutputMode;
     }): Promise<CustomHttpTransformResult> {
         this.inputJsonList.push(options.inputJson);
         this.jqTransformList.push(options.jqTransform);
+        this.outputModeList.push(options.outputMode);
         return Promise.resolve(this.result);
     }
 

@@ -159,6 +159,10 @@ test("dense multi metric handles Custom HTTP PI sample fetch messages", async ()
         assert.equal(Number.isInteger(response.result.elapsedMilliseconds), true);
         assert.equal(response.result.samplePreview, "{\"temp\":23.5}");
         assert.equal(response.result.isSamplePreviewTruncated, false);
+        assert.deepEqual(response.result.promptSample, {
+            kind: "jsonSample",
+            text: "{\"temp\":23.5}",
+        });
     }
 });
 

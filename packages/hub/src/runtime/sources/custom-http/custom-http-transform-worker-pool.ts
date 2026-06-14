@@ -29,6 +29,16 @@ export type CustomHttpTransformResult =
     };
 
 /**
+ * Selects how jq stdout is interpreted after a successful worker run.
+ *
+ * Runtime polling uses `singleJsonValue` so the worker enforces the Custom HTTP
+ * metric contract immediately. The source editor uses `rawStdout` first so the
+ * same jq box can also run AI-requested exploration queries and display their
+ * output back to the user.
+ */
+export type CustomHttpTransformOutputMode = "singleJsonValue" | "rawStdout";
+
+/**
  * Runs jq behind a timeout-capable boundary.
  *
  * Source clients depend on this interface instead of importing jq directly so a
@@ -38,6 +48,7 @@ export interface CustomHttpTransformRunner {
     runTransform(options: {
         readonly inputJson: unknown;
         readonly jqTransform: string;
+        readonly outputMode?: CustomHttpTransformOutputMode;
     }): Promise<CustomHttpTransformResult>;
     dispose(): void;
 }
@@ -84,6 +95,7 @@ export class CustomHttpTransformWorkerPool implements CustomHttpTransformRunner 
     async runTransform(options: {
         readonly inputJson: unknown;
         readonly jqTransform: string;
+        readonly outputMode?: CustomHttpTransformOutputMode;
     }): Promise<CustomHttpTransformResult> {
         if (this.isDisposed) {
             return {
@@ -117,12 +129,14 @@ export class CustomHttpTransformWorkerPool implements CustomHttpTransformRunner 
     private async runTransformOnce(options: {
         readonly inputJson: unknown;
         readonly jqTransform: string;
+        readonly outputMode?: CustomHttpTransformOutputMode;
     }): Promise<CustomHttpTransformResult> {
         try {
             const result = await this.pool.exec("runCustomHttpTransform", [
                 options.inputJson,
                 options.jqTransform,
                 this.outputLimitBytes,
+                options.outputMode ?? "singleJsonValue",
             ]).timeout(this.timeoutMilliseconds) as unknown;
             // workerpool timeout starts when the task begins executing, not
             // when it is queued. Queue wait is bounded by the small pool size

@@ -43,6 +43,10 @@ test("Custom HTTP PI fetch sample response accepts bounded timing metadata", () 
             elapsedMilliseconds: 42,
             samplePreview: "{\"ok\":true}",
             isSamplePreviewTruncated: false,
+            promptSample: {
+                kind: "jsonSample",
+                text: "{\"ok\":true}",
+            },
         },
     }), {
         type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
@@ -54,6 +58,10 @@ test("Custom HTTP PI fetch sample response accepts bounded timing metadata", () 
             elapsedMilliseconds: 42,
             samplePreview: "{\"ok\":true}",
             isSamplePreviewTruncated: false,
+            promptSample: {
+                kind: "jsonSample",
+                text: "{\"ok\":true}",
+            },
         },
     });
 });
@@ -69,6 +77,32 @@ test("Custom HTTP PI fetch sample response rejects non-finite timing metadata", 
             elapsedMilliseconds: Number.NaN,
             samplePreview: "{\"ok\":true}",
             isSamplePreviewTruncated: false,
+            promptSample: {
+                kind: "jsonSample",
+                text: "{\"ok\":true}",
+            },
         },
     }), undefined);
+});
+
+test("Custom HTTP PI transform response accepts exploration output", () => {
+    assert.deepEqual(readCustomHttpSourceEditorResponse({
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+        command: "testTransform",
+        requestId: "request-1",
+        result: {
+            ok: true,
+            explorationOutput: "[{\"Text\":\"GPU Core\"}]",
+            schemaFailureDetail: "metric must be an object.",
+        },
+    }), {
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+        command: "testTransform",
+        requestId: "request-1",
+        result: {
+            ok: true,
+            explorationOutput: "[{\"Text\":\"GPU Core\"}]",
+            schemaFailureDetail: "metric must be an object.",
+        },
+    });
 });

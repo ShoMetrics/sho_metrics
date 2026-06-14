@@ -8,9 +8,11 @@ import {
     type CustomHttpFetcher,
 } from "../../runtime/sources/custom-http/custom-http-fetcher";
 import { redactSecretLikeJsonText } from "../../runtime/sources/custom-http/custom-http-redaction";
+import { buildCustomHttpJsonDigest } from "../../runtime/sources/custom-http/custom-http-sample-digest";
 import {
     readCustomHttpSourceEditorRequest,
     type CustomHttpSourceEditorFetchSampleResult,
+    type CustomHttpSourceEditorPromptSample,
     type CustomHttpSourceEditorResponse,
     type CustomHttpSourceEditorTransformResult,
 } from "../../runtime/sources/custom-http/custom-http-source-editor-messages";
@@ -135,6 +137,7 @@ export class CustomHttpSourceEditorRequestHandler {
             elapsedMilliseconds,
             samplePreview: samplePreview.text,
             isSamplePreviewTruncated: samplePreview.isTruncated,
+            promptSample: buildPromptSample(fetchResult.responseText, samplePreview),
         };
     }
 
@@ -164,7 +167,11 @@ export class CustomHttpSourceEditorRequestHandler {
             };
         }
 
-        const transformResult = await this.transformRunner.runTransform({ inputJson, jqTransform });
+        const transformResult = await this.transformRunner.runTransform({
+            inputJson,
+            jqTransform,
+            outputMode: "rawStdout",
+        });
         if (!transformResult.ok) {
             return {
                 ok: false,
@@ -173,12 +180,26 @@ export class CustomHttpSourceEditorRequestHandler {
             };
         }
 
-        const validationResult = validateCustomHttpMetricTransformOutput(transformResult.output);
-        if (!validationResult.ok) {
+        const rawOutput = typeof transformResult.output === "string"
+            ? transformResult.output
+            : JSON.stringify(transformResult.output, null, 2) ?? String(transformResult.output);
+        const singleOutputResult = readSingleJsonTransformOutput(rawOutput);
+        if (!singleOutputResult.ok) {
             return {
-                ok: false,
-                stage: "schema",
-                detail: validationResult.reason,
+                ok: true,
+                explorationOutput: rawOutput.trimEnd(),
+                schemaFailureDetail: singleOutputResult.detail,
+            };
+        }
+
+        const validationResult = validateCustomHttpMetricTransformOutput(singleOutputResult.output);
+        if (!validationResult.ok) {
+            const explorationOutput = JSON.stringify(singleOutputResult.output, null, 2)
+                ?? String(singleOutputResult.output);
+            return {
+                ok: true,
+                explorationOutput,
+                schemaFailureDetail: validationResult.reason,
             };
         }
 
@@ -234,6 +255,50 @@ function sendCustomHttpSourceEditorResponseToActivePropertyInspector(
     );
 }
 
+function readSingleJsonTransformOutput(output: string): {
+    readonly ok: true;
+    readonly output: unknown;
+} | {
+    readonly ok: false;
+    readonly detail: string;
+} {
+    const trimmedOutput = output.trim();
+    try {
+        return {
+            ok: true,
+            output: JSON.parse(trimmedOutput) as unknown,
+        };
+    } catch {
+        // rawStdout mode accepts exploration queries, so a whole-stdout parse
+        // failure is only a classification signal. jq may have emitted multiple
+        // newline-delimited JSON values; classify that below before reporting
+        // single-line invalid JSON.
+    }
+
+    const lines = output
+        .split(/\r?\n/u)
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+    if (lines.length !== 1) {
+        return {
+            ok: false,
+            detail: "jq emitted exploration output instead of one final metric JSON value.",
+        };
+    }
+
+    try {
+        return {
+            ok: true,
+            output: JSON.parse(lines[0]) as unknown,
+        };
+    } catch {
+        return {
+            ok: false,
+            detail: "jq output was not valid JSON.",
+        };
+    }
+}
+
 function buildHttpFetchFailureDetail(fetchResult: CustomHttpFetchFailureResult): string {
     if (fetchResult.responseTextPreview === undefined) {
         return fetchResult.detail;
@@ -266,4 +331,34 @@ function buildSamplePreview(value: string, maxCharacters: number): {
             text: `${value.slice(0, maxCharacters)}...`,
             isTruncated: true,
         };
+}
+
+function buildPromptSample(
+    responseText: string,
+    samplePreview: ReturnType<typeof buildSamplePreview>,
+): CustomHttpSourceEditorPromptSample {
+    let responseJson: unknown;
+    try {
+        responseJson = JSON.parse(responseText);
+    } catch {
+        return {
+            kind: "rawPreview",
+            text: samplePreview.text,
+            hasTruncatedInvalidJsonPreview: samplePreview.isTruncated,
+        };
+    }
+
+    if (!samplePreview.isTruncated) {
+        return {
+            kind: "jsonSample",
+            text: responseText,
+        };
+    }
+
+    const digest = buildCustomHttpJsonDigest(responseJson);
+    return {
+        kind: digest.isTruncated ? "truncatedJsonDigest" : "jsonDigest",
+        text: digest.sampleJson,
+        arraySummaries: digest.arraySummaries,
+    };
 }

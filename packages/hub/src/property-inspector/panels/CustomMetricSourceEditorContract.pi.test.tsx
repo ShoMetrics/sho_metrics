@@ -136,6 +136,7 @@ for (const contractCase of customHttpSourceEditorContractCases) {
             screen.getByRole("textbox", { name: /^HTTP URL:/ }) as HTMLInputElement,
             CONTRACT_UPDATED_URL,
         );
+        await user.tab();
         assert.deepEqual(contractCase.readCustomMetricUrls(latestSettings), [
             CONTRACT_UPDATED_URL,
             ...(
@@ -163,6 +164,10 @@ for (const contractCase of customHttpSourceEditorContractCases) {
                 elapsedMilliseconds: 42,
                 samplePreview: "{\"temp\":23.5}",
                 isSamplePreviewTruncated: false,
+                promptSample: {
+                    kind: "jsonSample",
+                    text: "{\"temp\":23.5}",
+                },
             },
         });
         await screen.findByText(/Sample fetched/);

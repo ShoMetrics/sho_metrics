@@ -501,14 +501,39 @@ export const customMetricMessages = {
         ja: "サンプルプレビュー",
     },
     samplePreviewTruncatedHint: {
-        en: "This preview is truncated. The AI prompt uses this truncated preview, so results may be unreliable if the requested field is missing.",
-        zh_CN: "这个预览已被截断。AI 提示词会使用这段截断预览；如果目标字段不在预览里，生成结果可能不可靠。",
-        ja: "このプレビューは切り詰められています。AI プロンプトもこの切り詰めたプレビューを使うため、必要なフィールドが含まれない場合は結果が不安定になる可能性があります。",
+        en: "This preview is truncated. For large valid JSON, the AI prompt uses a structure digest instead of this raw preview.",
+        zh_CN: "这个预览已被截断。对于有效的大型 JSON，AI 提示词会使用结构摘要，而不是这段原始预览。",
+        ja: "このプレビューは切り詰められています。有効で大規模な JSON の場合、AI プロンプトはこの生プレビューではなく構造の要約を使います。",
     },
     transformPreviewLabel: {
         en: "Validated Metric",
         zh_CN: "已验证指标",
         ja: "検証済みメトリクス",
+    },
+    explorationOutputLabel: {
+        en: "Exploration Output",
+        zh_CN: "探索输出",
+        ja: "探索出力",
+    },
+    explorationOutputHint: {
+        en: "This jq ran successfully but did not return a final metric. If an AI asked you to run this query, copy this output back to it.",
+        zh_CN: "这个 jq 已成功运行，但没有返回最终指标。如果 AI 让你运行这个查询，请把这个输出复制回去。",
+        ja: "この jq は正常に実行されましたが、最終メトリクスは返しませんでした。AI からこのクエリの実行を求められた場合は、この出力をコピーして戻してください。",
+    },
+    explorationSchemaNote: {
+        en: "Metric schema note: {detail}",
+        zh_CN: "指标 schema 说明：{detail}",
+        ja: "メトリクススキーマの注記: {detail}",
+    },
+    copyExplorationOutputButton: {
+        en: "Copy Output",
+        zh_CN: "复制输出",
+        ja: "出力をコピー",
+    },
+    explorationOutputCopiedNote: {
+        en: "Output copied.",
+        zh_CN: "输出已复制。",
+        ja: "出力をコピーしました。",
     },
     testingNote: {
         en: "Testing...",

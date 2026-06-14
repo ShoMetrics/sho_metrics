@@ -9,6 +9,7 @@ import {
 } from "react";
 import { customMetricMessages } from "../../../i18n/message-groups/widgets";
 import { useI18n } from "../../../i18n/react";
+import type { LocalizedMessage } from "../../../i18n/types";
 import {
     CUSTOM_HTTP_RESPONSE_LIMIT_BYTES,
 } from "../../../runtime/sources/custom-http/custom-http-fetch-limits";
@@ -309,6 +310,7 @@ export function CustomMetricSourceEditor({
                     </div>
                 </InspectorItem>
                 <MetricResultPreview state={sourceEditorState} />
+                <ExplorationOutputPreview state={sourceEditorState} />
                 <FailureDetails
                     state={sourceEditorState}
                     command="testTransform"
@@ -384,6 +386,7 @@ function TestStatusNote({
             return <p className="section-note">{t(customMetricMessages.testingNote)}</p>;
         case "sampleReady":
         case "metricReady":
+        case "explorationReady":
             return (
                 <p className="section-note">
                     {t(customMetricMessages.sampleReadyNote, {
@@ -414,7 +417,7 @@ function CopyStatusNote({
     copiedMessage,
 }: {
     readonly copyStatus: CopyStatus;
-    readonly copiedMessage: typeof customMetricMessages.promptCopiedNote;
+    readonly copiedMessage: LocalizedMessage;
 }): React.JSX.Element | null {
     const { t } = useI18n();
     if (copyStatus === "idle") {
@@ -467,6 +470,60 @@ function MetricResultPreview({ state }: { readonly state: SourceEditorState }): 
                 {`${t(customMetricMessages.transformPreviewLabel)}: ${metric.label} ${metric.value}${maximumText} ${metric.unitText}${iconText}`}
             </p>
         </InspectorItem>
+    );
+}
+
+function ExplorationOutputPreview({
+    state,
+}: {
+    readonly state: SourceEditorState;
+}): React.JSX.Element | null {
+    const { t } = useI18n();
+    const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
+    const explorationText = state.kind === "explorationReady" ? state.explorationOutput.text : "";
+    useEffect(() => {
+        setCopyStatus("idle");
+    }, [explorationText]);
+
+    if (state.kind !== "explorationReady") {
+        return null;
+    }
+
+    const hint = [
+        t(customMetricMessages.explorationOutputHint),
+        t(customMetricMessages.explorationSchemaNote, {
+            detail: state.explorationOutput.schemaFailureDetail,
+        }),
+    ].join(" ");
+
+    return (
+        <>
+            <TextAreaSetting
+                label={t(customMetricMessages.explorationOutputLabel)}
+                value={state.explorationOutput.text}
+                rows={8}
+                readOnly
+                hint={hint}
+                onValueChange={() => undefined}
+                actionButton={(
+                    <button
+                        className="inline-action-button"
+                        type="button"
+                        onClick={() => {
+                            copyText(state.explorationOutput.text).then((copied) => {
+                                setCopyStatus(copied ? "copied" : "failed");
+                            });
+                        }}
+                    >
+                        {t(customMetricMessages.copyExplorationOutputButton)}
+                    </button>
+                )}
+            />
+            <CopyStatusNote
+                copyStatus={copyStatus}
+                copiedMessage={customMetricMessages.explorationOutputCopiedNote}
+            />
+        </>
     );
 }
 
