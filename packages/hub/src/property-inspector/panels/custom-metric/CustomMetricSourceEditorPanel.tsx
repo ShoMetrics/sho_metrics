@@ -17,7 +17,6 @@ import {
     applySourceEditorResponse,
 } from "./source-editor-state";
 import type {
-    CopyStatus,
     CustomMetricSourceEditorPageProps,
     CustomMetricSourceEditorSettingsProps,
     SourceEditorCommand,
@@ -38,7 +37,6 @@ export function CustomMetricSourceEditorPanel({
     const jqTransform = request?.jqTransform ?? "";
     const requestSettings = request?.requestSettings ?? resolveCustomHttpFetchPolicy({});
     const [sourceEditorState, setSourceEditorState] = useState<SourceEditorState>({ kind: "idle" });
-    const [promptCopyStatus, setPromptCopyStatus] = useState<CopyStatus>("idle");
     const pendingRequestIds = useRef(new Map<string, SourceEditorCommand>());
     const onWidgetChromeSuppressionChangeRef = useRef(props.onWidgetChromeSuppressionChange);
 
@@ -78,10 +76,8 @@ export function CustomMetricSourceEditorPanel({
             requestSettings={requestSettings}
             client={client}
             sourceEditorState={sourceEditorState}
-            promptCopyStatus={promptCopyStatus}
             pendingRequestIds={pendingRequestIds}
             setSourceEditorState={setSourceEditorState}
-            setPromptCopyStatus={setPromptCopyStatus}
             onBack={onBack}
         />
     );

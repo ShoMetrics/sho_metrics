@@ -510,15 +510,30 @@ export const customMetricMessages = {
         zh_CN: "已验证指标",
         ja: "検証済みメトリクス",
     },
+    transformStatusMetricReady: {
+        en: "Valid metric output.",
+        zh_CN: "已输出有效指标。",
+        ja: "有効なメトリクスを出力しました。",
+    },
+    transformStatusExplorationReady: {
+        en: "jq ran, but the output is not a metric yet.",
+        zh_CN: "jq 已运行，但输出还不是指标。",
+        ja: "jq は実行されましたが、出力はまだメトリクスではありません。",
+    },
+    transformStatusFailed: {
+        en: "jq transform failed.",
+        zh_CN: "jq 转换失败。",
+        ja: "jq 変換に失敗しました。",
+    },
     explorationOutputLabel: {
         en: "Exploration Output",
         zh_CN: "探索输出",
         ja: "探索出力",
     },
     explorationOutputHint: {
-        en: "This jq ran successfully but did not return a final metric. If an AI asked you to run this query, copy this output back to it.",
-        zh_CN: "这个 jq 已成功运行，但没有返回最终指标。如果 AI 让你运行这个查询，请把这个输出复制回去。",
-        ja: "この jq は正常に実行されましたが、最終メトリクスは返しませんでした。AI からこのクエリの実行を求められた場合は、この出力をコピーして戻してください。",
+        en: "This jq ran successfully, but the output is not a valid final metric. Copy this output back to the AI as exploration data.",
+        zh_CN: "这个 jq 已成功运行，但输出不是有效的最终指标。请把这个输出作为探索数据复制回 AI。",
+        ja: "この jq は正常に実行されましたが、出力は有効な最終メトリクスではありません。この出力を探索データとして AI にコピーして戻してください。",
     },
     explorationSchemaNote: {
         en: "Metric schema note: {detail}",
@@ -530,10 +545,15 @@ export const customMetricMessages = {
         zh_CN: "复制输出",
         ja: "出力をコピー",
     },
-    explorationOutputCopiedNote: {
-        en: "Output copied.",
-        zh_CN: "输出已复制。",
-        ja: "出力をコピーしました。",
+    copyButtonCopiedLabel: {
+        en: "Copied",
+        zh_CN: "已复制",
+        ja: "コピー済み",
+    },
+    copyButtonFailedLabel: {
+        en: "Copy Failed",
+        zh_CN: "复制失败",
+        ja: "コピー失敗",
     },
     testingNote: {
         en: "Testing...",
@@ -555,15 +575,20 @@ export const customMetricMessages = {
         zh_CN: "错误调试详情",
         ja: "エラーデバッグ詳細",
     },
-    promptCopiedNote: {
-        en: "Prompt copied.",
-        zh_CN: "提示词已复制。",
-        ja: "プロンプトをコピーしました。",
+    failureDetailsHint: {
+        en: "Copy these details for debugging.",
+        zh_CN: "复制这些详情用于排查。",
+        ja: "デバッグ用にこの詳細をコピーしてください。",
     },
-    promptCopyFailedNote: {
-        en: "Copy failed. Select the prompt and copy it manually.",
-        zh_CN: "复制失败。请选择提示词并手动复制。",
-        ja: "コピーできませんでした。プロンプトを選択して手動でコピーしてください。",
+    transformFailureDetailsHint: {
+        en: "The jq transform failed and did not output a valid metric. Copy these details for debugging.",
+        zh_CN: "jq 转换失败，未能输出合格的指标。复制这些详情用于排查。",
+        ja: "jq 変換に失敗し、有効なメトリクスを出力できませんでした。デバッグ用にこの詳細をコピーしてください。",
+    },
+    copyDetailsButton: {
+        en: "Copy Details",
+        zh_CN: "复制详情",
+        ja: "詳細をコピー",
     },
     validationUrlRequired: {
         en: "Enter an HTTP or HTTPS URL.",

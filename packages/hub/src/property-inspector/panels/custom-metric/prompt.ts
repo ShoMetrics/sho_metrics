@@ -64,8 +64,8 @@ export function buildCustomMetricPrompt(options: {
             "If the source URL warning says the URL contains secret-like query parameters, warn the user that secrets in URLs may be unsafe and may need rotation if shared externally. This warning alone does not prevent writing jq unless the redacted URL value makes the JSON problem impossible to diagnose.",
             "If the user display request is missing, too broad, or does not clearly say which one value to display, do not write jq. Ask the user to clarify the exact value they want.",
             ...samplePromptParts.decisionRules,
-            "If any rule above prevents a safe final metric jq filter, reply with natural language only. Explain the next concrete step for the user. Do not include Markdown, code fences, or explanations of these rules.",
-            "Otherwise, write only the jq filter now.",
+            "If any rule above prevents a safe final metric jq filter and no jq exploration query would help, reply with natural language only. Explain the next concrete step for the user. Do not include Markdown, code fences, or explanations of these rules.",
+            "Otherwise, write the jq filter now in exactly one fenced code block labeled jq.",
             ...(options.locale === "en"
                 ? []
                 : [`Reply to clarification or sample-request messages in ${options.locale}.`]),
@@ -75,8 +75,9 @@ export function buildCustomMetricPrompt(options: {
         TARGET_OUTPUT_JSON_SCHEMA_PROMPT,
         "",
         "Jq output rules:",
-        "- Write only the jq expression. Do not include Markdown, explanation, or comments.",
-        "- Output exactly one JSON object with a top-level metric object.",
+        "- When writing a final jq filter or jq exploration query, put only the jq expression in exactly one fenced code block labeled jq.",
+        "- Do not put explanation, comments, or surrounding prose inside the jq code block.",
+        "- When writing the final metric filter, output exactly one JSON object with a top-level metric object.",
         "- Do not output metricId.",
         "- Do not copy source URLs, API keys, secrets, raw response bodies, or comments into the jq output.",
         "- Extract only the value requested by the user display request.",

@@ -18,7 +18,6 @@ export type CustomMetricSourceEditorPageProps = CustomMetricSourceEditorSettings
 export type CustomMetricWidgetSettingsProps = CustomMetricSourceEditorSettingsProps;
 
 export type SourceEditorCommand = "fetchSample" | "testTransform";
-export type CopyStatus = "idle" | "copied" | "failed";
 
 export interface SampleState {
     readonly url: string;
