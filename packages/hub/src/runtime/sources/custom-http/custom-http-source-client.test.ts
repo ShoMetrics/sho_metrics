@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { MetricUnit } from "../metric-source";
+import type { ResolvedCustomHttpRequestAuth } from "../../../settings/resolved-settings";
 import type { SourceMetricPollingGroupResolution } from "../source-polling-groups";
 import { CustomHttpDefinitionRegistry } from "./custom-http-definition-registry";
 import type { CustomHttpFetchOptions, CustomHttpFetchResult, CustomHttpFetcher } from "./custom-http-fetcher";
@@ -25,6 +26,7 @@ test("CustomHttpSourceClient reads configured definitions into metric snapshots"
             userIntent: "show CPU",
             jqTransform: ".",
             requestSettings: { timeoutSeconds: 10, retryCount: 2 },
+            auth: defaultRequestAuth(),
         },
     });
     const fetcher = new FakeCustomHttpFetcher(JSON.stringify({ value: 42 }));
@@ -118,6 +120,7 @@ test("CustomHttpSourceClient returns invalidValue for schema failures", async ()
             userIntent: undefined,
             jqTransform: ".",
             requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+            auth: defaultRequestAuth(),
         },
     });
     const sourceClient = new CustomHttpSourceClient({
@@ -156,6 +159,7 @@ test("CustomHttpSourceClient contains unexpected metric read failures to one met
             userIntent: undefined,
             jqTransform: ".",
             requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+            auth: defaultRequestAuth(),
         },
     });
     const sourceClient = new CustomHttpSourceClient({
@@ -217,6 +221,10 @@ class FakeCustomHttpFetcher implements CustomHttpFetcher {
             responseText: this.responseText,
         };
     }
+}
+
+function defaultRequestAuth(): ResolvedCustomHttpRequestAuth {
+    return { credentialId: undefined, allowPublicHttpCredentials: false };
 }
 
 class ThrowingCustomHttpFetcher implements CustomHttpFetcher {

@@ -1,6 +1,8 @@
+import { timestampMs } from "@bufbuild/protobuf/wkt";
 
 import {
     ColorMode as StoredColorMode,
+    type CustomHttpCredential as StoredCustomHttpCredential,
     type GlobalMetricPaintSettings as StoredGlobalMetricPaintSettings,
     type GlobalPaintOverride as StoredGlobalPaintOverride,
     type GlobalThemeOverride as StoredGlobalThemeOverride,
@@ -11,6 +13,7 @@ import {
 } from "../../../generated/proto/shometrics/v1/settings_pb.js";
 import type {
     ColorMode,
+    ResolvedCustomHttpCredentialSummary,
     ResolvedGlobalDefaults,
     ResolvedGlobalSettings,
     ResolvedGlobalMetricPaintSettings,
@@ -76,6 +79,8 @@ export function resolveStoredGlobalSettings(
             : undefined,
         sourceProfiles: (storedGlobalSettings?.sourceProfiles ?? []).map(resolveMetricSourceProfile),
         defaultSourceProfileId: storedGlobalSettings?.defaultSourceProfileId,
+        customHttpCredentials: (storedGlobalSettings?.customHttpCredentials ?? [])
+            .flatMap(resolveCustomHttpCredentialSummary),
     };
 }
 
@@ -164,4 +169,50 @@ function resolveMetricSourceConnection(
         case undefined:
             return undefined;
     }
+}
+
+function resolveCustomHttpCredentialSummary(
+    storedCredential: StoredCustomHttpCredential,
+): ResolvedCustomHttpCredentialSummary[] {
+    const commonSummary = {
+        id: storedCredential.id ?? "",
+        nickname: storedCredential.nickname ?? "",
+        createdAtMilliseconds: readTimestampMilliseconds(storedCredential.createdAt),
+        updatedAtMilliseconds: readTimestampMilliseconds(storedCredential.updatedAt),
+    };
+
+    switch (storedCredential.auth.case) {
+        case "basic":
+            return [{
+                ...commonSummary,
+                authKind: "basic",
+                authContext: storedCredential.auth.value.username ?? "",
+            } satisfies ResolvedCustomHttpCredentialSummary];
+        case "bearer":
+            return [{
+                ...commonSummary,
+                authKind: "bearer",
+                authContext: "",
+            } satisfies ResolvedCustomHttpCredentialSummary];
+        case "header":
+            return [{
+                ...commonSummary,
+                authKind: "header",
+                authContext: storedCredential.auth.value.headerName ?? "",
+            } satisfies ResolvedCustomHttpCredentialSummary];
+        case "query":
+            return [{
+                ...commonSummary,
+                authKind: "query",
+                authContext: storedCredential.auth.value.queryParameterName ?? "",
+            } satisfies ResolvedCustomHttpCredentialSummary];
+        case undefined:
+            return [];
+    }
+}
+
+function readTimestampMilliseconds(
+    timestamp: StoredCustomHttpCredential["createdAt"] | undefined,
+): number | undefined {
+    return timestamp === undefined ? undefined : timestampMs(timestamp);
 }

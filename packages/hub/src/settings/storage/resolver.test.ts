@@ -1132,6 +1132,50 @@ describe("stored settings proto resolver", () => {
         }
     });
 
+    it("resolves Custom HTTP credential summaries without exposing secrets", () => {
+        const globalSettings = resolveStoredGlobalSettings(readStoredGlobalSettings({
+            customHttpCredentials: [
+                {
+                    id: "basic-credential",
+                    nickname: "LHM",
+                    createdAt: "2023-11-14T22:13:20Z",
+                    updatedAt: "2023-11-14T22:13:21Z",
+                    basic: {
+                        username: "admin",
+                        password: "secret-password",
+                    },
+                },
+                {
+                    id: "query-credential",
+                    nickname: "Weather",
+                    query: {
+                        queryParameterName: "api_key",
+                        token: "secret-token",
+                    },
+                },
+            ],
+        }).settings);
+
+        assert.deepEqual(globalSettings.customHttpCredentials, [
+            {
+                id: "basic-credential",
+                nickname: "LHM",
+                authKind: "basic",
+                authContext: "admin",
+                createdAtMilliseconds: 1_700_000_000_000,
+                updatedAtMilliseconds: 1_700_000_001_000,
+            },
+            {
+                id: "query-credential",
+                nickname: "Weather",
+                authKind: "query",
+                authContext: "api_key",
+                createdAtMilliseconds: undefined,
+                updatedAtMilliseconds: undefined,
+            },
+        ]);
+    });
+
     it("resolves catalog target initial state with text view defaults", () => {
         const widgetSettings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings: readStoredWidgetSettings({
@@ -1220,6 +1264,10 @@ describe("stored settings proto resolver", () => {
                                 timeoutSeconds: 5,
                                 retryCount: 0,
                             },
+                            auth: {
+                                credentialId: undefined,
+                                allowPublicHttpCredentials: false,
+                            },
                         },
                     },
                 },
@@ -1242,6 +1290,10 @@ describe("stored settings proto resolver", () => {
                                         requestSettings: {
                                             timeoutSeconds: 10,
                                             retryCount: 2,
+                                        },
+                                        auth: {
+                                            credentialId: "credential-1",
+                                            allowPublicHttpCredentials: true,
                                         },
                                     },
                                 },
@@ -1268,6 +1320,10 @@ describe("stored settings proto resolver", () => {
                             requestSettings: {
                                 timeoutSeconds: 10,
                                 retryCount: 2,
+                            },
+                            auth: {
+                                credentialId: "credential-1",
+                                allowPublicHttpCredentials: true,
                             },
                         },
                     },
@@ -1371,6 +1427,10 @@ describe("stored settings proto resolver", () => {
                             requestSettings: {
                                 timeoutSeconds: 5,
                                 retryCount: 0,
+                            },
+                            auth: {
+                                credentialId: undefined,
+                                allowPublicHttpCredentials: false,
                             },
                         },
                     },

@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type {
+    ResolvedCustomHttpRequestAuth,
+    ResolvedCustomHttpRequestSettings,
+} from "../../../settings/resolved-settings";
 import { CustomHttpDefinitionRegistry } from "./custom-http-definition-registry";
 import {
     buildCustomHttpRuntimeIdentity,
@@ -21,6 +25,7 @@ test("CustomHttpDefinitionRegistry registers and explicitly replaces definitions
             userIntent: "first",
             jqTransform: ".",
             requestSettings: defaultRequestSettings(),
+            auth: defaultRequestAuth(),
         },
     });
     assert.throws(
@@ -31,6 +36,7 @@ test("CustomHttpDefinitionRegistry registers and explicitly replaces definitions
                 userIntent: "duplicate",
                 jqTransform: ".",
                 requestSettings: defaultRequestSettings(),
+                auth: defaultRequestAuth(),
             },
         }),
         /already registered/,
@@ -42,6 +48,7 @@ test("CustomHttpDefinitionRegistry registers and explicitly replaces definitions
             userIntent: "second",
             jqTransform: ".metric",
             requestSettings: defaultRequestSettings(),
+            auth: defaultRequestAuth(),
         },
     });
 
@@ -50,6 +57,7 @@ test("CustomHttpDefinitionRegistry registers and explicitly replaces definitions
         userIntent: "second",
         jqTransform: ".metric",
         requestSettings: defaultRequestSettings(),
+        auth: defaultRequestAuth(),
     });
     assert.equal(registry.list().length, 1);
 });
@@ -74,6 +82,7 @@ test("CustomHttpDefinitionRegistry unregisters one definition without touching o
             userIntent: undefined,
             jqTransform: ".",
             requestSettings: defaultRequestSettings(),
+            auth: defaultRequestAuth(),
         },
     });
     registry.register({
@@ -83,6 +92,7 @@ test("CustomHttpDefinitionRegistry unregisters one definition without touching o
             userIntent: undefined,
             jqTransform: ".",
             requestSettings: defaultRequestSettings(),
+            auth: defaultRequestAuth(),
         },
     });
     registry.unregister(firstIdentity.metricKey);
@@ -91,6 +101,10 @@ test("CustomHttpDefinitionRegistry unregisters one definition without touching o
     assert.equal(registry.read(secondIdentity.metricKey)?.identity.metricKey, secondIdentity.metricKey);
 });
 
-function defaultRequestSettings(): { readonly timeoutSeconds: number; readonly retryCount: number } {
+function defaultRequestSettings(): ResolvedCustomHttpRequestSettings {
     return { timeoutSeconds: 5, retryCount: 0 };
+}
+
+function defaultRequestAuth(): ResolvedCustomHttpRequestAuth {
+    return { credentialId: undefined, allowPublicHttpCredentials: false };
 }

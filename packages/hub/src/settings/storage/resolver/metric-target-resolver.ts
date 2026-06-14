@@ -441,8 +441,15 @@ function readSingleCustomHttpRequest(
             const userIntent = storedRequest.userIntent?.trim() || undefined;
             const jqTransform = storedRequest.jqTransform?.trim() ?? "";
             const hasRequestSettings = storedRequest.requestSettings !== undefined;
+            const hasAuth = storedRequest.auth !== undefined;
 
-            if (url.length === 0 && userIntent === undefined && jqTransform.length === 0 && !hasRequestSettings) {
+            if (
+                url.length === 0
+                && userIntent === undefined
+                && jqTransform.length === 0
+                && !hasRequestSettings
+                && !hasAuth
+            ) {
                 return undefined;
             }
 
@@ -454,6 +461,10 @@ function readSingleCustomHttpRequest(
                     timeoutSeconds: storedRequest.requestSettings?.timeoutSeconds,
                     retryCount: storedRequest.requestSettings?.retryCount,
                 }),
+                auth: {
+                    credentialId: storedRequest.auth?.credentialId?.trim() || undefined,
+                    allowPublicHttpCredentials: storedRequest.auth?.allowPublicHttpCredentials === true,
+                },
             };
         }
     }

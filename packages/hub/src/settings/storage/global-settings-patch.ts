@@ -1,10 +1,16 @@
 import { create } from "@bufbuild/protobuf";
+import { timestampFromMs, type Timestamp } from "@bufbuild/protobuf/wkt";
 import {
     AppearanceThemeSettingsSchema,
     AppearanceViewSettingsSchema,
     ColorFilledMultiColorPaintSettingsSchema,
     ColorFilledPaintSettingsSchema,
     ColorFilledSolidPaintSettingsSchema,
+    CustomHttpCredential_BasicSchema,
+    CustomHttpCredential_BearerSchema,
+    CustomHttpCredential_HeaderSchema,
+    CustomHttpCredential_QuerySchema,
+    CustomHttpCredentialSchema,
     DiskThroughputDisplaySettingsSchema,
     GlobalDefaultsSchema,
     GlobalOverridesSchema,
@@ -22,6 +28,7 @@ import {
     TransparentSurfaceSettingsSchema,
     type AppearanceThemeSettings as StoredAppearanceThemeSettings,
     type ColorFilledPaintSettings as StoredColorFilledPaintSettings,
+    type CustomHttpCredential as StoredCustomHttpCredential,
     type GlobalDefaults as StoredGlobalDefaults,
     type GlobalMetricPaintSettings as StoredGlobalMetricPaintSettings,
     type GlobalOverrides as StoredGlobalOverrides,
@@ -84,6 +91,42 @@ export interface StoredGlobalSettingsPatch {
     }> | undefined;
 }
 
+export type StoredCustomHttpCredentialInput =
+    | StoredCustomHttpBasicCredentialInput
+    | StoredCustomHttpBearerCredentialInput
+    | StoredCustomHttpHeaderCredentialInput
+    | StoredCustomHttpQueryCredentialInput;
+
+interface StoredCustomHttpCredentialBaseInput {
+    readonly id: string;
+    readonly nickname: string;
+    readonly createdAtMilliseconds?: number | undefined;
+    readonly updatedAtMilliseconds?: number | undefined;
+}
+
+export interface StoredCustomHttpBasicCredentialInput extends StoredCustomHttpCredentialBaseInput {
+    readonly authKind: "basic";
+    readonly username: string | undefined;
+    readonly password: string | undefined;
+}
+
+export interface StoredCustomHttpBearerCredentialInput extends StoredCustomHttpCredentialBaseInput {
+    readonly authKind: "bearer";
+    readonly token: string | undefined;
+}
+
+export interface StoredCustomHttpHeaderCredentialInput extends StoredCustomHttpCredentialBaseInput {
+    readonly authKind: "header";
+    readonly headerName: string | undefined;
+    readonly token: string | undefined;
+}
+
+export interface StoredCustomHttpQueryCredentialInput extends StoredCustomHttpCredentialBaseInput {
+    readonly authKind: "query";
+    readonly queryParameterName: string | undefined;
+    readonly token: string | undefined;
+}
+
 interface GlobalThemeSettingsPatch {
     readonly selectedTheme?: MetricTheme | undefined;
     readonly terminal?: GlobalTerminalThemeSettingsPatch | undefined;
@@ -138,6 +181,94 @@ export function writeStoredGlobalSettingsPatch(
     applyDiskThroughputDefaultsPatch(settings.defaults, patch.diskThroughput);
 
     return writeStoredGlobalSettings(settings);
+}
+
+/** Writes one complete Custom HTTP credential into plugin global settings. */
+export function upsertStoredCustomHttpCredential(
+    rawSettings: unknown,
+    credential: StoredCustomHttpCredentialInput,
+): StoredSettingsJsonObject {
+    const settings = readStoredGlobalSettings(rawSettings).settings;
+    const storedCredential = buildStoredCustomHttpCredential(credential);
+    const credentialIndex = settings.customHttpCredentials
+        .findIndex((candidateCredential) => candidateCredential.id === credential.id);
+
+    if (credentialIndex < 0) {
+        settings.customHttpCredentials.push(storedCredential);
+    } else {
+        settings.customHttpCredentials[credentialIndex] = storedCredential;
+    }
+
+    return writeStoredGlobalSettings(settings);
+}
+
+/** Deletes one Custom HTTP credential by opaque id. Widget references are not scanned or rewritten. */
+export function deleteStoredCustomHttpCredential(
+    rawSettings: unknown,
+    credentialId: string,
+): StoredSettingsJsonObject {
+    const settings = readStoredGlobalSettings(rawSettings).settings;
+    settings.customHttpCredentials = settings.customHttpCredentials
+        .filter((credential) => credential.id !== credentialId);
+
+    return writeStoredGlobalSettings(settings);
+}
+
+function buildStoredCustomHttpCredential(
+    credential: StoredCustomHttpCredentialInput,
+): StoredCustomHttpCredential {
+    const storedCredential = create(CustomHttpCredentialSchema, {
+        id: credential.id,
+        nickname: credential.nickname,
+        createdAt: readOptionalTimestamp(credential.createdAtMilliseconds),
+        updatedAt: readOptionalTimestamp(credential.updatedAtMilliseconds),
+    });
+
+    switch (credential.authKind) {
+        case "basic":
+            storedCredential.auth = {
+                case: "basic",
+                value: create(CustomHttpCredential_BasicSchema, {
+                    username: credential.username,
+                    password: credential.password,
+                }),
+            };
+            break;
+        case "bearer":
+            storedCredential.auth = {
+                case: "bearer",
+                value: create(CustomHttpCredential_BearerSchema, {
+                    token: credential.token,
+                }),
+            };
+            break;
+        case "header":
+            storedCredential.auth = {
+                case: "header",
+                value: create(CustomHttpCredential_HeaderSchema, {
+                    headerName: credential.headerName,
+                    token: credential.token,
+                }),
+            };
+            break;
+        case "query":
+            storedCredential.auth = {
+                case: "query",
+                value: create(CustomHttpCredential_QuerySchema, {
+                    queryParameterName: credential.queryParameterName,
+                    token: credential.token,
+                }),
+            };
+            break;
+    }
+
+    return storedCredential;
+}
+
+function readOptionalTimestamp(timestampMilliseconds: number | undefined): Timestamp | undefined {
+    return timestampMilliseconds === undefined
+        ? undefined
+        : timestampFromMs(timestampMilliseconds);
 }
 
 function applyViewOverridePatch(

@@ -1,6 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import {
     CustomHttpMetricSourceSchema,
+    CustomHttpRequestAuthSchema,
     CustomHttpRequestSettingsSchema,
     CustomMetricIconSettingsSchema,
     DiskThroughputDisplaySettingsSchema,
@@ -68,7 +69,9 @@ export function applyCustomMetricPatch(
         || "userIntent" in patch
         || "jqTransform" in patch
         || "timeoutSeconds" in patch
-        || "retryCount" in patch;
+        || "retryCount" in patch
+        || "credentialId" in patch
+        || "allowPublicHttpCredentials" in patch;
     if (!hasHttpPatch) {
         return;
     }
@@ -105,6 +108,21 @@ export function applyCustomMetricPatch(
         }
         if ("retryCount" in patch) {
             request.requestSettings.retryCount = patch.retryCount;
+        }
+    }
+    if ("credentialId" in patch || "allowPublicHttpCredentials" in patch) {
+        request.auth ??= create(CustomHttpRequestAuthSchema);
+        if ("credentialId" in patch) {
+            request.auth.credentialId = patch.credentialId;
+        }
+        if ("allowPublicHttpCredentials" in patch) {
+            request.auth.allowPublicHttpCredentials = patch.allowPublicHttpCredentials;
+        }
+        if (
+            request.auth.credentialId === undefined
+            && request.auth.allowPublicHttpCredentials === undefined
+        ) {
+            request.auth = undefined;
         }
     }
 }
