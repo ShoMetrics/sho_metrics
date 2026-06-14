@@ -15,6 +15,7 @@ const CUSTOM_HTTP_FETCH_LOG_THROTTLE_MILLISECONDS = 30_000;
 export type CustomHttpFetchFailureReason =
     | "invalidUrl"
     | "unsupportedProtocol"
+    | "redirectBlocked"
     | "httpFailure"
     | "responseTooLarge"
     | "networkFailure";
@@ -38,6 +39,7 @@ export interface CustomHttpFetchOptions {
     readonly timeoutSeconds?: number | undefined;
     readonly retryCount?: number | undefined;
     readonly includeFailureResponsePreview?: boolean | undefined;
+    readonly headers?: Readonly<Record<string, string>> | undefined;
 }
 
 /**
@@ -53,6 +55,17 @@ export interface CustomHttpFetcher {
 type FetchLike = (url: URL, init?: RequestInit) => Promise<Response>;
 type DnsLookupLike = (hostname: string) => Promise<readonly DnsLookupAddress[]>;
 type DelayLike = (delayMilliseconds: number) => Promise<void>;
+type FetchAttemptResult =
+    | {
+        readonly ok: true;
+        readonly response: Response;
+    }
+    | {
+        readonly ok: false;
+        readonly failure: CustomHttpFetchFailureResult;
+    };
+
+const CUSTOM_HTTP_CREDENTIAL_REDIRECT_LIMIT = 5;
 
 interface DnsLookupAddress {
     readonly address: string;
@@ -115,6 +128,7 @@ export class NodeCustomHttpFetcher implements CustomHttpFetcher {
                 timeoutMilliseconds,
                 includeDnsDiagnostic: isFinalAttempt,
                 includeFailureResponsePreview: options.includeFailureResponsePreview === true,
+                headers: options.headers,
             });
             if (attemptResult.ok || !canRetryFetchFailure(attemptResult.reason) || retryIndex >= policy.retryCount) {
                 return attemptResult;
@@ -131,6 +145,7 @@ export class NodeCustomHttpFetcher implements CustomHttpFetcher {
             readonly timeoutMilliseconds: number;
             readonly includeDnsDiagnostic: boolean;
             readonly includeFailureResponsePreview: boolean;
+            readonly headers: Readonly<Record<string, string>> | undefined;
         },
     ): Promise<CustomHttpFetchResult> {
         const startedAtMilliseconds = performance.now();
@@ -138,10 +153,15 @@ export class NodeCustomHttpFetcher implements CustomHttpFetcher {
 
         let response: Response;
         try {
-            response = await this.fetch(parsedUrl, {
-                redirect: "follow",
+            const fetchResult = await fetchWithCredentialRedirectPolicy(this.fetch, parsedUrl, {
+                headers: options.headers,
                 signal: AbortSignal.timeout(options.timeoutMilliseconds),
             });
+            if (!fetchResult.ok) {
+                return fetchResult.failure;
+            }
+
+            response = fetchResult.response;
         } catch (error) {
             const dnsDiagnostic = options.includeDnsDiagnostic
                 ? await readDnsDiagnostic(parsedUrl.hostname, this.dnsLookup)
@@ -155,7 +175,7 @@ export class NodeCustomHttpFetcher implements CustomHttpFetcher {
             ].filter(value => value !== undefined).join(" ");
             log.atWarn()
                 .everyMs(`custom-http-fetch-failure:${targetSummary}`, CUSTOM_HTTP_FETCH_LOG_THROTTLE_MILLISECONDS)
-                .log(() => `Custom HTTP fetch failed. target=${targetSummary} detail=${detail}`);
+                .log(() => `Custom HTTP fetch failed. target=${targetSummary}`);
             return failure("networkFailure", detail);
         }
 
@@ -195,6 +215,90 @@ export class NodeCustomHttpFetcher implements CustomHttpFetcher {
             responseText: responseTextResult.responseText,
         };
     }
+}
+
+async function fetchWithCredentialRedirectPolicy(
+    fetchLike: FetchLike,
+    parsedUrl: URL,
+    init: {
+        readonly headers: Readonly<Record<string, string>> | undefined;
+        readonly signal: AbortSignal;
+    },
+): Promise<FetchAttemptResult> {
+    if (init.headers === undefined) {
+        // Requests without header credentials, including query-token URLs, can use
+        // the native redirect policy. The query token stays on the original URL and
+        // Node fetch does not add a Referer header by default.
+        return {
+            ok: true,
+            response: await fetchLike(parsedUrl, {
+                redirect: "follow",
+                signal: init.signal,
+            }),
+        };
+    }
+
+    let currentUrl = parsedUrl;
+    for (let redirectIndex = 0; redirectIndex <= CUSTOM_HTTP_CREDENTIAL_REDIRECT_LIMIT; redirectIndex += 1) {
+        const response = await fetchLike(currentUrl, {
+            redirect: "manual",
+            headers: init.headers,
+            signal: init.signal,
+        });
+        if (!isRedirectResponse(response)) {
+            return {
+                ok: true,
+                response,
+            };
+        }
+
+        const locationHeader = response.headers.get("location");
+        if (locationHeader === null) {
+            return {
+                ok: true,
+                response,
+            };
+        }
+
+        const nextUrl = new URL(locationHeader, currentUrl);
+        if (!canForwardCredentialHeaders(currentUrl, nextUrl)) {
+            return {
+                ok: false,
+                failure: failure(
+                    "redirectBlocked",
+                    "Cross-origin redirect blocked while credentials are attached. Use the redirected URL directly.",
+                ),
+            };
+        }
+
+        currentUrl = nextUrl;
+    }
+
+    return {
+        ok: false,
+        failure: failure(
+            "redirectBlocked",
+            `Credential-bearing redirect chain exceeded ${CUSTOM_HTTP_CREDENTIAL_REDIRECT_LIMIT} redirects.`,
+        ),
+    };
+}
+
+function isRedirectResponse(response: Response): boolean {
+    return response.status === 301
+        || response.status === 302
+        || response.status === 303
+        || response.status === 307
+        || response.status === 308;
+}
+
+function canForwardCredentialHeaders(currentUrl: URL, nextUrl: URL): boolean {
+    return currentUrl.origin === nextUrl.origin
+        || (
+            currentUrl.protocol === "http:"
+            && nextUrl.protocol === "https:"
+            && currentUrl.hostname === nextUrl.hostname
+            && currentUrl.port === nextUrl.port
+        );
 }
 
 async function readHttpFailureResult(response: Response, responseLimitBytes: number): Promise<CustomHttpFetchFailureResult> {

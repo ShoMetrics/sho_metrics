@@ -42,10 +42,21 @@ function readUrlHostWithoutScheme(urlWithoutScheme: string): string | undefined 
     }
 }
 
+/** Returns whether an absolute URL targets localhost or a private LAN address. */
+export function isCustomHttpLocalOrPrivateUrl(url: URL): boolean {
+    return isLocalHttpHost(url.hostname.replace(/^\[|\]$/g, "").toLowerCase());
+}
+
 function isLocalHttpHost(host: string): boolean {
     // Keep this conservative: only common local development and private LAN targets
-    // default to HTTP. Other special-purpose ranges still default to HTTPS.
-    if (host === "localhost" || host.endsWith(".localhost") || host === "::1") {
+    // default to HTTP. Other special-purpose ranges, including IPv6 ULA/link-local,
+    // still default to HTTPS and require explicit public-HTTP credential consent.
+    if (
+        host === "localhost"
+        || host.endsWith(".localhost")
+        || host.endsWith(".local")
+        || host === "::1"
+    ) {
         return true;
     }
 
