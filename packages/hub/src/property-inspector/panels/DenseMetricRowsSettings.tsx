@@ -57,6 +57,8 @@ export function DenseMetricRowsSettings({
     editingCustomMetricSlotId,
     onEditingCustomMetricSlotIdChange,
     onWidgetChromeSuppressionChange,
+    onCustomHttpCredentialUpsert,
+    onCustomHttpCredentialDelete,
     onSettingsPatch,
 }: WidgetSettingsPanelProps & {
     widget: ResolvedDenseMultiMetricWidget;
@@ -78,6 +80,8 @@ export function DenseMetricRowsSettings({
                 slot={editingCustomMetricSlot}
                 onBack={() => onEditingCustomMetricSlotIdChange(undefined)}
                 onWidgetChromeSuppressionChange={onWidgetChromeSuppressionChange}
+                onCustomHttpCredentialUpsert={onCustomHttpCredentialUpsert}
+                onCustomHttpCredentialDelete={onCustomHttpCredentialDelete}
                 onSettingsPatch={onSettingsPatch}
             />
         );
@@ -362,12 +366,16 @@ function DenseCustomMetricSourcePage({
     slot,
     onBack,
     onWidgetChromeSuppressionChange,
+    onCustomHttpCredentialUpsert,
+    onCustomHttpCredentialDelete,
     onSettingsPatch,
 }: {
     readonly context: WidgetSettingsPanelProps["context"];
     readonly slot: ResolvedDenseMetricSlot;
     readonly onBack: () => void;
     readonly onWidgetChromeSuppressionChange: WidgetSettingsPanelProps["onWidgetChromeSuppressionChange"];
+    readonly onCustomHttpCredentialUpsert: WidgetSettingsPanelProps["onCustomHttpCredentialUpsert"];
+    readonly onCustomHttpCredentialDelete: WidgetSettingsPanelProps["onCustomHttpCredentialDelete"];
     readonly onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
 }): React.JSX.Element {
     const target = slot.slot.metric.target;
@@ -382,6 +390,8 @@ function DenseCustomMetricSourcePage({
             customHttpConsumerSlug={buildDenseCustomHttpConsumerSlug(slot.slotId)}
             onBack={onBack}
             onWidgetChromeSuppressionChange={onWidgetChromeSuppressionChange}
+            onCustomHttpCredentialUpsert={onCustomHttpCredentialUpsert}
+            onCustomHttpCredentialDelete={onCustomHttpCredentialDelete}
             onSettingsPatch={(patch) => {
                 // Dense rows reuse only the Custom HTTP source editor.
                 // Visual and polling settings stay owned by the Dense widget.

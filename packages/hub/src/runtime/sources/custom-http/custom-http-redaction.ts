@@ -76,6 +76,22 @@ export function redactSecretLikeJsonText(jsonText: string): string {
     return JSON.stringify(redactSecretLikeJsonValue(parsedValue));
 }
 
+/**
+ * Redacts secret-like JSON string properties without reparsing and reformatting the whole JSON text.
+ */
+export function redactSecretLikeJsonPropertyText(value: string): string {
+    return value.replace(
+        /("(?:(?:\\.)|[^"\\])*?"\s*:\s*)"(?:(?:\\.)|[^"\\])*?"/g,
+        (match, keyPrefix: string) => {
+            const keyText = keyPrefix.slice(0, keyPrefix.indexOf(":")).trim();
+            const key = readJsonStringLiteral(keyText);
+            return key !== undefined && isSecretLikeJsonPropertyName(key)
+                ? `${keyPrefix}"${REDACTED_SECRET_VALUE}"`
+                : match;
+        },
+    );
+}
+
 function redactSecretLikeJsonValue(value: unknown): unknown {
     if (Array.isArray(value)) {
         return value.map(item => redactSecretLikeJsonValue(item));
@@ -90,19 +106,6 @@ function redactSecretLikeJsonValue(value: unknown): unknown {
         isSecretLikeJsonPropertyName(key) ? REDACTED_SECRET_VALUE : redactSecretLikeJsonValue(entryValue),
     ]);
     return Object.fromEntries(redactedEntries);
-}
-
-function redactSecretLikeJsonPropertyText(value: string): string {
-    return value.replace(
-        /("(?:(?:\\.)|[^"\\])*?"\s*:\s*)"(?:(?:\\.)|[^"\\])*?"/g,
-        (match, keyPrefix: string) => {
-            const keyText = keyPrefix.slice(0, keyPrefix.indexOf(":")).trim();
-            const key = readJsonStringLiteral(keyText);
-            return key !== undefined && isSecretLikeJsonPropertyName(key)
-                ? `${keyPrefix}"${REDACTED_SECRET_VALUE}"`
-                : match;
-        },
-    );
 }
 
 function isSecretLikeName(name: string): boolean {

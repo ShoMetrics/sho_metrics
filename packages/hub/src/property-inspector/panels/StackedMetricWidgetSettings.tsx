@@ -252,6 +252,8 @@ function StackedSelectedSlotSettings({
     themeDisabled,
     transparentSurfaceDisabled,
     colorDisabled,
+    onCustomHttpCredentialUpsert,
+    onCustomHttpCredentialDelete,
 }: WidgetSettingsPanelProps & {
     readonly slot: ResolvedStackedMetricSlot;
     readonly slotNumber: number;
@@ -307,6 +309,8 @@ function StackedSelectedSlotSettings({
                 colorDisabled={colorDisabled}
                 showPolling={false}
                 customHttpConsumerSlug={buildStackedCustomHttpConsumerSlug(slot.slotId)}
+                onCustomHttpCredentialUpsert={onCustomHttpCredentialUpsert}
+                onCustomHttpCredentialDelete={onCustomHttpCredentialDelete}
                 onWidgetChromeSuppressionChange={setIsChildDrillInOpen}
             />
         </>

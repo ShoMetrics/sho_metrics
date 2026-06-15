@@ -13,9 +13,13 @@ import {
     redactCustomHttpPreparedAuthUrl,
     redactCustomHttpPreparedAuthSecrets,
     resolveCustomHttpPreparedAuth,
+    type CustomHttpPreparedAuth,
     type CustomHttpCredentialSettingsReader,
 } from "../../runtime/sources/custom-http/custom-http-auth";
-import { redactSecretLikeJsonText } from "../../runtime/sources/custom-http/custom-http-redaction";
+import {
+    redactSecretLikeJsonPropertyText,
+    redactSecretLikeJsonText,
+} from "../../runtime/sources/custom-http/custom-http-redaction";
 import { buildCustomHttpJsonDigest } from "../../runtime/sources/custom-http/custom-http-sample-digest";
 import {
     readCustomHttpSourceEditorRequest,
@@ -178,7 +182,8 @@ export class CustomHttpSourceEditorRequestHandler {
             authCacheKey: buildSourceEditorAuthCacheKey(authReference),
             responseText: fetchResult.responseText,
         });
-        const samplePreview = buildSamplePreview(fetchResult.responseText, CUSTOM_METRIC_SAMPLE_PREVIEW_LIMIT_CHARACTERS);
+        const redactedResponseText = redactCustomHttpSuccessResponseText(fetchResult.responseText, requestResult.auth);
+        const samplePreview = buildSamplePreview(redactedResponseText, CUSTOM_METRIC_SAMPLE_PREVIEW_LIMIT_CHARACTERS);
 
         return {
             ok: true,
@@ -186,7 +191,7 @@ export class CustomHttpSourceEditorRequestHandler {
             elapsedMilliseconds,
             samplePreview: samplePreview.text,
             isSamplePreviewTruncated: samplePreview.isTruncated,
-            promptSample: buildPromptSample(fetchResult.responseText, samplePreview),
+            promptSample: buildPromptSample(redactedResponseText, samplePreview),
         };
     }
 
@@ -404,6 +409,17 @@ function buildHttpFetchFailureDetail(fetchResult: CustomHttpFetchFailureResult):
         `Response body preview${isTruncated ? " (truncated)" : ""}:`,
         responsePreview.text,
     ].join("\n");
+}
+
+function redactCustomHttpSuccessResponseText(responseText: string, auth: CustomHttpPreparedAuth): string {
+    // Value redaction matches the stored secret text exactly. If a response
+    // JSON-escapes unusual secret characters inside a non-secret-looking field,
+    // it may not match; common API tokens are URL-safe/alphanumeric, and the
+    // preserving JSON property redactor below covers secret-named fields without
+    // reformatting prompt samples.
+    return redactSecretLikeJsonPropertyText(
+        redactCustomHttpPreparedAuthSecrets(responseText, auth),
+    );
 }
 
 function buildSamplePreview(value: string, maxCharacters: number): {
