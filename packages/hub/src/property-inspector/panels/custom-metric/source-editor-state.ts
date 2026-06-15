@@ -121,6 +121,9 @@ export function applySourceEditorResponse(
                 command: "fetchSample",
                 stage: response.result.stage,
                 detail: response.result.detail,
+                ...(response.result.blockedRedirect === undefined ? {} : {
+                    blockedRedirect: response.result.blockedRedirect,
+                }),
             };
     }
 
@@ -130,6 +133,9 @@ export function applySourceEditorResponse(
             command: "testTransform",
             stage: response.result.stage,
             detail: response.result.detail,
+            ...(response.result.blockedRedirect === undefined ? {} : {
+                blockedRedirect: response.result.blockedRedirect,
+            }),
             ...(readSampleState(previousState) === undefined ? {} : { sample: readSampleState(previousState) }),
         };
     }

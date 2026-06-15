@@ -10,6 +10,7 @@ import type { ResolvedCustomHttpRequestAuth } from "../../../settings/resolved-s
 import {
     isValidCustomHttpHeaderName,
     prepareCustomHttpRequest,
+    redactCustomHttpPreparedAuthUrl,
     redactCustomHttpPreparedAuthSecrets,
     resolveCustomHttpPreparedAuth,
 } from "./custom-http-auth";
@@ -251,6 +252,23 @@ describe("Custom HTTP auth diagnostics", () => {
                 { authKind: "basic", username: "admin", password: "secret" },
             ),
             "request failed with password [redacted] or Basic [redacted]",
+        );
+    });
+
+    it("redacts only the configured query credential parameter from URLs", () => {
+        assert.equal(
+            redactCustomHttpPreparedAuthUrl(
+                "https://api.example.com/data?api_key=secret&mode=current",
+                { authKind: "query", queryParameterName: "api_key", token: "secret" },
+            ),
+            "https://api.example.com/data?api_key=REDACTED&mode=current",
+        );
+        assert.equal(
+            redactCustomHttpPreparedAuthUrl(
+                "http://127.0.0.1:8092/data.json",
+                { authKind: "bearer", token: "2" },
+            ),
+            "http://127.0.0.1:8092/data.json",
         );
     });
 });

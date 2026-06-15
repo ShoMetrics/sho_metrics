@@ -1,5 +1,8 @@
 import type { ResolvedCustomMetricTarget } from "../../../settings/resolved-settings";
-import type { CustomHttpSourceEditorPromptSample } from "../../../runtime/sources/custom-http/custom-http-source-editor-messages";
+import type {
+    CustomHttpSourceEditorBlockedRedirect,
+    CustomHttpSourceEditorPromptSample,
+} from "../../../runtime/sources/custom-http/custom-http-source-editor-messages";
 import type { WidgetSettingsPanelProps } from "../panel-props";
 
 export type CustomMetricSourceEditorSettingsProps = WidgetSettingsPanelProps & {
@@ -52,5 +55,6 @@ export type SourceEditorState =
         readonly command: SourceEditorCommand;
         readonly stage: string;
         readonly detail: string;
+        readonly blockedRedirect?: CustomHttpSourceEditorBlockedRedirect | undefined;
         readonly sample?: SampleState;
     };

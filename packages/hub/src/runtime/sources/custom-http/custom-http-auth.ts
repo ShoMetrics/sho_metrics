@@ -161,6 +161,26 @@ export function redactCustomHttpPreparedAuthSecrets(detail: string, auth: Custom
     );
 }
 
+/** Redacts only the query parameter that Custom HTTP auth intentionally injects into a URL. */
+export function redactCustomHttpPreparedAuthUrl(url: string, auth: CustomHttpPreparedAuth): string {
+    if (auth.authKind !== "query") {
+        return url;
+    }
+
+    let parsedUrl: URL;
+    try {
+        parsedUrl = new URL(url);
+    } catch {
+        return url;
+    }
+
+    if (parsedUrl.searchParams.has(auth.queryParameterName)) {
+        parsedUrl.searchParams.set(auth.queryParameterName, "REDACTED");
+    }
+
+    return parsedUrl.toString();
+}
+
 export function isValidCustomHttpHeaderName(headerName: string): boolean {
     if (hasInvalidNameWhitespace(headerName)) {
         return false;

@@ -122,6 +122,13 @@ export interface CustomHttpSourceEditorFailureResult {
     readonly ok: false;
     readonly stage: string;
     readonly detail: string;
+    readonly blockedRedirect?: CustomHttpSourceEditorBlockedRedirect | undefined;
+}
+
+export interface CustomHttpSourceEditorBlockedRedirect {
+    readonly fromOrigin: string;
+    readonly toOrigin: string;
+    readonly redirectedUrl: string;
 }
 
 /**
@@ -342,9 +349,34 @@ function readFailureResult(result: Readonly<Record<string, unknown>>): CustomHtt
 
     const stage = result["stage"];
     const detail = result["detail"];
-    return typeof stage === "string" && typeof detail === "string"
-        ? { ok: false, stage, detail }
+    const blockedRedirect = readBlockedRedirect(result["blockedRedirect"]);
+    return typeof stage === "string" && typeof detail === "string" && blockedRedirect !== false
+        ? {
+            ok: false,
+            stage,
+            detail,
+            ...(blockedRedirect === undefined ? {} : { blockedRedirect }),
+        }
         : undefined;
+}
+
+function readBlockedRedirect(value: unknown): CustomHttpSourceEditorBlockedRedirect | undefined | false {
+    if (value === undefined) {
+        return undefined;
+    }
+
+    if (!isRecord(value)) {
+        return false;
+    }
+
+    const fromOrigin = value["fromOrigin"];
+    const toOrigin = value["toOrigin"];
+    const redirectedUrl = value["redirectedUrl"];
+    return typeof fromOrigin === "string"
+        && typeof toOrigin === "string"
+        && typeof redirectedUrl === "string"
+        ? { fromOrigin, toOrigin, redirectedUrl }
+        : false;
 }
 
 function readRequestSettings(value: unknown): CustomHttpSourceEditorRequestSettings | undefined {

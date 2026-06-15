@@ -560,6 +560,66 @@ for (const authCase of [
     });
 }
 
+test("Custom Metric PI sample fetch does not guess-redact blocked redirect URLs", async () => {
+    const registry = new CustomHttpDefinitionRegistry();
+    const fetcher = new FakeCustomHttpFetcher({
+        ok: false,
+        reason: "redirectBlocked",
+        detail: "Cross-origin redirect blocked while credentials are attached.",
+        blockedRedirect: {
+            fromOrigin: "https://api.example.com",
+            toOrigin: "https://login.example.net",
+            redirectedUrl: "http://127.0.0.1:8092/data.json",
+        },
+    });
+    const action = new TestCustomMetric(registry, {
+        fetcher,
+        credentialSettingsReader: new FakeCustomHttpCredentialSettingsReader(create(StoredGlobalSettingsSchema, {
+            customHttpCredentials: [create(CustomHttpCredentialSchema, {
+                id: "credential-header",
+                nickname: "Header",
+                auth: {
+                    case: "header",
+                    value: {
+                        headerName: "X-API-Key",
+                        token: "header-token",
+                    },
+                },
+            })],
+        })),
+    });
+    const streamDeckAction = new FakeStreamDeckAction("custom-pi-fetch-redirect-action");
+
+    action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCustomMetricWidgetSettings()));
+    action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
+        type: "custom-http-pi-test",
+        command: "fetchSample",
+        requestId: "fetch-1",
+        consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
+        url: "https://api.example.com/data",
+        requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: { credentialId: "credential-header", allowPublicHttpCredentials: false },
+    }));
+
+    await waitForAsyncWork();
+
+    assert.deepEqual(action.customMetricSourceEditorResponses.at(-1), {
+        type: "custom-http-pi-test",
+        command: "fetchSample",
+        requestId: "fetch-1",
+        result: {
+            ok: false,
+            stage: "redirectBlocked",
+            detail: "Cross-origin redirect blocked while credentials are attached.",
+            blockedRedirect: {
+                fromOrigin: "https://api.example.com",
+                toOrigin: "https://login.example.net",
+                redirectedUrl: "http://127.0.0.1:8092/data.json",
+            },
+        },
+    });
+});
+
 test("Custom Metric PI sample fetch builds a digest for large JSON prompts", async () => {
     const registry = new CustomHttpDefinitionRegistry();
     const largeResponseText = JSON.stringify({

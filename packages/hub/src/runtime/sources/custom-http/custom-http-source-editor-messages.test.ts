@@ -109,3 +109,35 @@ test("Custom HTTP PI transform response accepts exploration output", () => {
         },
     });
 });
+
+test("Custom HTTP PI failure response accepts blocked redirect details", () => {
+    assert.deepEqual(readCustomHttpSourceEditorResponse({
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+        command: "fetchSample",
+        requestId: "request-1",
+        result: {
+            ok: false,
+            stage: "redirectBlocked",
+            detail: "Cross-origin redirect blocked.",
+            blockedRedirect: {
+                fromOrigin: "https://api.example.com",
+                toOrigin: "https://login.example.net",
+                redirectedUrl: "https://login.example.net/data",
+            },
+        },
+    }), {
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+        command: "fetchSample",
+        requestId: "request-1",
+        result: {
+            ok: false,
+            stage: "redirectBlocked",
+            detail: "Cross-origin redirect blocked.",
+            blockedRedirect: {
+                fromOrigin: "https://api.example.com",
+                toOrigin: "https://login.example.net",
+                redirectedUrl: "https://login.example.net/data",
+            },
+        },
+    });
+});

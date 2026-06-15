@@ -154,6 +154,103 @@ test("custom metric source editor visibly normalizes scheme-less URLs on blur", 
     assert.equal(fetchMessage.url, "https://api.open-meteo.com/v1/forecast");
 });
 
+test("custom metric source editor explains why fetching is disabled", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    render(<CustomMetricSettingsHarness client={client} settings={buildCustomMetricSettings({
+        url: "https://api.example.com/weather",
+        userIntent: "Display temperature",
+        jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+    })} />);
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    const urlInput = screen.getByRole("textbox", { name: /^HTTP URL:/ }) as HTMLInputElement;
+
+    await user.clear(urlInput);
+
+    assert.equal(screen.getByRole("button", { name: "Fetch Sample" }).hasAttribute("disabled"), true);
+    assert.equal(
+        screen.getByText("Enter an HTTP or HTTPS URL before fetching a sample.").textContent,
+        "Enter an HTTP or HTTPS URL before fetching a sample.",
+    );
+
+    await user.type(urlInput, "https://");
+
+    assert.equal(screen.getByRole("button", { name: "Fetch Sample" }).hasAttribute("disabled"), true);
+    assert.equal(
+        screen.getByText("Enter a valid HTTP or HTTPS URL before fetching a sample.").textContent,
+        "Enter a valid HTTP or HTTPS URL before fetching a sample.",
+    );
+});
+
+test("custom metric source editor explains credential fetch gates", async () => {
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    const user = userEvent.setup();
+    const { unmount } = render(<CustomMetricSettingsHarness
+        client={client}
+        settings={buildCustomMetricSettings({
+            url: "http://api.example.com/weather",
+            userIntent: "Display temperature",
+            jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+            credentialId: "credential-1",
+            allowPublicHttpCredentials: false,
+        })}
+        globalSettings={buildCustomHttpCredentialGlobalSettings()}
+    />);
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+
+    assert.equal(screen.getByRole("button", { name: "Fetch Sample" }).hasAttribute("disabled"), true);
+    assert.equal(
+        screen.getByText("Authentication over public HTTP requires confirmation in the Authentication section.").textContent,
+        "Authentication over public HTTP requires confirmation in the Authentication section.",
+    );
+
+    unmount();
+    render(<CustomMetricSettingsHarness
+        client={client}
+        settings={buildCustomMetricSettings({
+            url: "https://api.example.com/weather",
+            userIntent: "Display temperature",
+            jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+            credentialId: "missing-credential",
+        })}
+        globalSettings={buildCustomHttpCredentialGlobalSettings()}
+    />);
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+
+    assert.equal(screen.getByRole("button", { name: "Fetch Sample" }).hasAttribute("disabled"), true);
+    assert.equal(
+        screen.getByText("The selected credential is missing. Select or create a credential in the Authentication section.").textContent,
+        "The selected credential is missing. Select or create a credential in the Authentication section.",
+    );
+});
+
+test("custom metric source editor changes fetch button text while fetching", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    render(<CustomMetricSettingsHarness client={client} settings={buildCustomMetricSettings({
+        url: "https://api.example.com/weather",
+        userIntent: "Display temperature",
+        jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+    })} />);
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "Fetch Sample" }));
+
+    const fetchingButton = screen.getByRole("button", { name: "Fetching..." });
+    assert.equal(fetchingButton.hasAttribute("disabled"), true);
+});
+
 test("custom metric prompt explains large JSON digests", async () => {
     const user = userEvent.setup();
     const client = new TestPropertyInspectorClient({
@@ -577,6 +674,68 @@ test("custom metric prompt includes URL context and redacts secret query values"
     assert.doesNotMatch(prompt.value, /secret-token/);
 });
 
+test("custom metric source editor can apply a blocked redirected URL", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    render(<CustomMetricSettingsHarness client={client} settings={buildCustomMetricSettings({
+        url: "http://api.example.com/data",
+        userIntent: "Display temperature",
+        jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+        credentialId: "credential-1",
+        allowPublicHttpCredentials: true,
+    })} globalSettings={buildCustomHttpCredentialGlobalSettings()} />);
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "Fetch Sample" }));
+    const fetchMessage = readSentMessagePayload(client.sentMessages.at(-1));
+    dispatchCustomHttpResponse(client, {
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+        command: "fetchSample",
+        requestId: fetchMessage.requestId,
+        result: {
+            ok: false,
+            stage: "redirectBlocked",
+            detail: "Cross-origin redirect blocked while credentials are attached.",
+            blockedRedirect: {
+                fromOrigin: "http://api.example.com",
+                toOrigin: "http://login.example.net",
+                redirectedUrl: "http://login.example.net/data?api_key=REDACTED",
+            },
+        },
+    });
+
+    const failureDetails = await screen.findByRole("textbox", { name: /^Failure Debug Details:/ }) as HTMLTextAreaElement;
+    assert.equal(screen.getByText("Notice").textContent, "Notice");
+    assert.match(
+        screen.getByText(/API URL is being redirected to/).textContent ?? "",
+        /http:\/\/login\.example\.net\/data\?api_key=REDACTED/,
+    );
+    assert.match(failureDetails.value, /Redirect: http:\/\/api\.example\.com -> http:\/\/login\.example\.net/);
+    assert.match(failureDetails.value, /Redirected URL: http:\/\/login\.example\.net\/data\?api_key=REDACTED/);
+
+    const copiedTextList = await withMockClipboard(async () => {
+        await user.click(screen.getByRole("button", { name: "Copy Redirected URL" }));
+        await screen.findByRole("button", { name: "Copied" });
+    });
+    assert.equal(copiedTextList[0], "http://login.example.net/data?api_key=REDACTED");
+
+    await user.click(screen.getByRole("button", { name: "Use Redirected URL" }));
+
+    assert.equal(
+        (screen.getByRole("textbox", { name: /^HTTP URL:/ }) as HTMLInputElement).value,
+        "http://login.example.net/data?api_key=REDACTED",
+    );
+    assert.equal(screen.getByRole("button", { name: "Fetch Sample" }).hasAttribute("disabled"), true);
+    assert.equal(
+        screen.getByText("Authentication over public HTTP requires confirmation in the Authentication section.").textContent,
+        "Authentication over public HTTP requires confirmation in the Authentication section.",
+    );
+    assert.equal(screen.queryByRole("textbox", { name: /^Failure Debug Details:/ }), null);
+});
+
 test("custom metric prompt encourages Lucide icon suggestions without a fixed example list", async () => {
     const user = userEvent.setup();
     const client = new TestPropertyInspectorClient({
@@ -758,9 +917,11 @@ async function withMockClipboard(run: () => Promise<void>): Promise<readonly str
 function CustomMetricSettingsHarness({
     client,
     settings: initialSettings,
+    globalSettings,
 }: {
     readonly client: TestPropertyInspectorClient;
     readonly settings: InspectorTestSettings;
+    readonly globalSettings?: InspectorTestSettings | undefined;
 }): React.JSX.Element {
     const [settings, setSettings] = useState<InspectorTestSettings>(initialSettings);
 
@@ -771,6 +932,7 @@ function CustomMetricSettingsHarness({
                     actionKind: "customMetric",
                     isWindows: true,
                     settings,
+                    globalSettings,
                 })}
                 isGlobalViewOverrideEnabled={false}
                 isGlobalThemeOverrideEnabled={false}
@@ -788,6 +950,21 @@ function CustomMetricSettingsHarness({
             />
         </StreamDeckClientProvider>
     );
+}
+
+function buildCustomHttpCredentialGlobalSettings(): InspectorTestSettings {
+    return {
+        customHttpCredentials: [
+            {
+                id: "credential-1",
+                nickname: "LHM",
+                basic: {
+                    username: "admin",
+                    password: "secret",
+                },
+            },
+        ],
+    };
 }
 
 function buildCustomMetricSettings(
