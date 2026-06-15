@@ -882,6 +882,8 @@ function RedirectBlockedNotice({
                 </p>
                 <p className="section-note custom-http-status-note-continuing">
                     {t(customMetricMessages.redirectBlockedSummary, {
+                        fromOrigin: blockedRedirect.fromOrigin,
+                        toOrigin: blockedRedirect.toOrigin,
                         redirectedUrl,
                     })}
                 </p>

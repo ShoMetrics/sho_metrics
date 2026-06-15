@@ -21,6 +21,7 @@
         "diagnostics:runtime": "node scripts/diagnostics/runtime-performance-monitor.mjs",
         "diagnostics:source": "node scripts/diagnostics/metric-source-comparison.mjs",
         "diagnostics:windows-helper-lhm-parity": "node scripts/diagnostics/windows-helper-lhm-parity.mjs",
+        "diagnostics:custom-http-smoke": "node scripts/diagnostics/custom-http-smoke-server.mjs",
         "benchmark:protobuf": "node scripts/run-buf.mjs generate --template scripts/benchmark/protobuf/buf.gen.yaml && node scripts/benchmark/protobuf/protobuf-performance-benchmark.mjs",
         "benchmark:resvg": "node scripts/benchmark/resvg-minimal.mjs",
         "i18n:generate": "node scripts/i18n-generate.mjs",
