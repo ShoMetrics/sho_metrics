@@ -7,6 +7,7 @@ interface TextSettingProps extends SettingControlProps {
     value: string;
     onValueChange: (value: string) => void;
     placeholder?: string;
+    inputType?: "text" | "password";
     actionButton?: React.JSX.Element;
     validationMessage?: string;
     onFocus?: () => void;
@@ -18,6 +19,7 @@ export function TextSetting({
     value,
     onValueChange,
     placeholder,
+    inputType = "text",
     actionButton,
     validationMessage,
     onFocus,
@@ -30,7 +32,7 @@ export function TextSetting({
         <input
             id={inputId}
             className="native-input"
-            type="text"
+            type={inputType}
             placeholder={placeholder ?? ""}
             value={value}
             disabled={disabled}

@@ -4,6 +4,7 @@ import { commonMessages } from "../../i18n/message-groups/shell";
 import { widgetMessages } from "../../i18n/message-groups/widgets";
 import { useI18n } from "../../i18n/react";
 import type { StoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
+import type { StoredCustomHttpCredentialInput } from "../../settings/storage/global-settings-patch";
 import type { VisibilityContext } from "../inspector/types";
 import type { ColorCompensationProfile } from "../../color-compensation/types";
 import { ColorCompensationControls } from "./ColorCompensationControls";
@@ -21,6 +22,8 @@ interface WidgetSettingsTabProps {
     isGlobalPaintOverrideEnabled: boolean;
     colorCompensationProfile: ColorCompensationProfile;
     onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
+    onCustomHttpCredentialUpsert?: ((credential: StoredCustomHttpCredentialInput) => void) | undefined;
+    onCustomHttpCredentialDelete?: ((credentialId: string) => void) | undefined;
     onResetWidgetSettings: () => void;
     onOpenColorCompensation: () => void;
 }
@@ -35,6 +38,8 @@ export function WidgetSettingsTab({
     isGlobalPaintOverrideEnabled,
     colorCompensationProfile,
     onSettingsPatch,
+    onCustomHttpCredentialUpsert,
+    onCustomHttpCredentialDelete,
     onResetWidgetSettings,
     onOpenColorCompensation,
 }: WidgetSettingsTabProps): React.JSX.Element {
@@ -75,6 +80,8 @@ export function WidgetSettingsTab({
     const panelProps = {
         context,
         onSettingsPatch,
+        onCustomHttpCredentialUpsert,
+        onCustomHttpCredentialDelete,
         onWidgetChromeSuppressionChange: setIsWidgetChromeSuppressed,
         viewDisabled: isGlobalViewOverrideEnabled,
         themeDisabled: isGlobalThemeOverrideEnabled,

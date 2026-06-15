@@ -461,14 +461,224 @@ export const customMetricMessages = {
         ja: "現在の取得設定: {timeoutSeconds} 秒タイムアウト、{retryCount} 回リトライ、レスポンス上限 {responseLimitKiB} KiB。",
     },
     noSecretsNote: {
-        en: "Custom Metric settings are saved in Stream Deck action settings and included in Stream Deck exports. Do not use secrets, tokens, cookies, or private URLs.",
-        zh_CN: "自定义指标设置会保存到 Stream Deck 操作设置中，并包含在 Stream Deck 导出里。不要使用密钥、令牌、Cookie 或私密 URL。",
-        ja: "カスタムメトリクス設定は Stream Deck のアクション設定に保存され、Stream Deck のエクスポートにも含まれます。シークレット、トークン、Cookie、非公開 URL は使用しないでください。",
+        en: "Entering secrets here is insecure. Put them in Authentication.",
+        zh_CN: "不要在这里输入密钥。请放在身份验证里。",
+        ja: "ここにシークレットを入力するのは安全ではありません。認証に保存してください。",
     },
     requestSettingsSection: {
         en: "Request Settings",
         zh_CN: "请求设置",
         ja: "リクエスト設定",
+    },
+    authenticationSection: {
+        en: "Authentication",
+        zh_CN: "身份验证",
+        ja: "認証",
+    },
+    credentialLabel: {
+        en: "Credential",
+        zh_CN: "凭证",
+        ja: "認証情報",
+    },
+    noCredentialOption: {
+        en: "No Authentication",
+        zh_CN: "不使用身份验证",
+        ja: "認証なし",
+    },
+    missingCredentialOption: {
+        en: "Missing Credential",
+        zh_CN: "凭证缺失",
+        ja: "認証情報なし",
+    },
+    editingNewCredentialOption: {
+        en: "Editing New Credential",
+        zh_CN: "正在编辑新凭证",
+        ja: "新しい認証情報を編集中",
+    },
+    credentialMissingNote: {
+        en: "The selected credential no longer exists. Choose another credential or create a new one.",
+        zh_CN: "所选凭证已不存在。请选择其他凭证或新建一个。",
+        ja: "選択された認証情報は存在しません。別の認証情報を選ぶか、新しく作成してください。",
+    },
+    credentialTypeLabel: {
+        en: "Type",
+        zh_CN: "类型",
+        ja: "種類",
+    },
+    credentialTypeBasic: {
+        en: "Basic",
+        zh_CN: "Basic",
+        ja: "Basic",
+    },
+    credentialTypeBearer: {
+        en: "Bearer",
+        zh_CN: "Bearer",
+        ja: "Bearer",
+    },
+    credentialTypeHeader: {
+        en: "API Key Header",
+        zh_CN: "API Key 请求头",
+        ja: "API キーヘッダー",
+    },
+    credentialTypeQuery: {
+        en: "API Key Query",
+        zh_CN: "API Key 查询参数",
+        ja: "API キークエリ",
+    },
+    credentialDatesLabel: {
+        en: "Saved",
+        zh_CN: "保存时间",
+        ja: "保存日時",
+    },
+    credentialDateUnknown: {
+        en: "Unknown",
+        zh_CN: "未知",
+        ja: "不明",
+    },
+    credentialDateSummary: {
+        en: "Created {created}; updated {updated}",
+        zh_CN: "创建于 {created}；更新于 {updated}",
+        ja: "作成: {created}、更新: {updated}",
+    },
+    addCredentialButton: {
+        en: "Add New Credential",
+        zh_CN: "新建凭证",
+        ja: "新しい認証情報を追加",
+    },
+    deleteCredentialButton: {
+        en: "Delete Credential",
+        zh_CN: "删除凭证",
+        ja: "認証情報を削除",
+    },
+    credentialSecretPreserveNote: {
+        en: "The saved secret is hidden. Enter a new secret to replace it.",
+        zh_CN: "已保存的密钥已被隐藏。输入新密钥即可替换。",
+        ja: "保存済みのシークレットは非表示です。置き換えるには新しいシークレットを入力してください。",
+    },
+    credentialSecretStorageNote: {
+        en: "Secrets are saved in ShoMetrics global settings and are not included when this action is exported.",
+        zh_CN: "密钥保存在全局设置，不包含在此按钮的设置导出里。",
+        ja: "シークレットはグローバル設定に保存され、このアクションのエクスポートには含まれません。",
+    },
+    credentialSecretPreservePlaceholder: {
+        en: "Leave blank to keep saved secret",
+        zh_CN: "留空以保留已保存的密钥",
+        ja: "空欄のままなら保存済みのシークレットを保持",
+    },
+    showCredentialSecretButton: {
+        en: "Show Secret",
+        zh_CN: "显示密钥",
+        ja: "シークレットを表示",
+    },
+    hideCredentialSecretButton: {
+        en: "Hide Secret",
+        zh_CN: "隐藏密钥",
+        ja: "シークレットを隠す",
+    },
+    credentialNicknameLabel: {
+        en: "Nickname",
+        zh_CN: "昵称",
+        ja: "ニックネーム",
+    },
+    credentialNicknamePlaceholder: {
+        en: "Home server",
+        zh_CN: "家里服务器",
+        ja: "ホームサーバー",
+    },
+    credentialUsernameLabel: {
+        en: "Username",
+        zh_CN: "用户名",
+        ja: "ユーザー名",
+    },
+    credentialPasswordLabel: {
+        en: "Password",
+        zh_CN: "密码",
+        ja: "パスワード",
+    },
+    credentialTokenLabel: {
+        en: "Token",
+        zh_CN: "令牌",
+        ja: "トークン",
+    },
+    credentialHeaderNameLabel: {
+        en: "Header Name",
+        zh_CN: "请求头名称",
+        ja: "ヘッダー名",
+    },
+    credentialQueryParameterLabel: {
+        en: "Query Name",
+        zh_CN: "查询参数名",
+        ja: "クエリ名",
+    },
+    saveCredentialButton: {
+        en: "Save Credential",
+        zh_CN: "保存凭证",
+        ja: "認証情報を保存",
+    },
+    editCredentialButton: {
+        en: "Edit Credential",
+        zh_CN: "编辑凭证",
+        ja: "認証情報を編集",
+    },
+    cancelCredentialButton: {
+        en: "Cancel",
+        zh_CN: "取消",
+        ja: "キャンセル",
+    },
+    credentialNicknameRequired: {
+        en: "Enter a nickname.",
+        zh_CN: "请输入昵称。",
+        ja: "ニックネームを入力してください。",
+    },
+    credentialBasicRequired: {
+        en: "Enter username and password.",
+        zh_CN: "请输入用户名和密码。",
+        ja: "ユーザー名とパスワードを入力してください。",
+    },
+    credentialTokenRequired: {
+        en: "Enter a token.",
+        zh_CN: "请输入令牌。",
+        ja: "トークンを入力してください。",
+    },
+    credentialHeaderRequired: {
+        en: "Enter header name and token.",
+        zh_CN: "请输入请求头名称和令牌。",
+        ja: "ヘッダー名とトークンを入力してください。",
+    },
+    credentialQueryRequired: {
+        en: "Enter query parameter name and token.",
+        zh_CN: "请输入查询参数名和令牌。",
+        ja: "クエリパラメーター名とトークンを入力してください。",
+    },
+    deleteCredentialWarning: {
+        en: "Delete \"{nickname}\"? Other widgets using this credential may stop working.",
+        zh_CN: "删除“{nickname}”？使用此凭证的其他组件可能会停止工作。",
+        ja: "「{nickname}」を削除しますか。この認証情報を使っている他のウィジェットが動作しなくなる可能性があります。",
+    },
+    confirmDeleteCredentialButton: {
+        en: "Delete Credential",
+        zh_CN: "删除凭证",
+        ja: "認証情報を削除",
+    },
+    publicHttpCredentialConsentLabel: {
+        en: "HTTP Auth",
+        zh_CN: "HTTP 身份验证",
+        ja: "HTTP 認証",
+    },
+    publicHttpCredentialConsentCheckbox: {
+        en: "Allow credentials over public HTTP",
+        zh_CN: "允许通过公网 HTTP 发送凭证",
+        ja: "公開 HTTP で認証情報を送信する",
+    },
+    publicHttpCredentialWarning: {
+        en: "Public HTTP is not encrypted. Only enable this if you understand the credential may be exposed in transit.",
+        zh_CN: "公网 HTTP 未加密。只有在你确认凭证可能在传输中暴露并接受该风险时才启用。",
+        ja: "公開 HTTP は暗号化されません。通信中に認証情報が露出する可能性を理解している場合のみ有効にしてください。",
+    },
+    queryCredentialCollisionWarning: {
+        en: "This URL already has a \"{parameterName}\" query parameter. The credential value will replace it when requests run.",
+        zh_CN: "此 URL 已包含“{parameterName}”查询参数。实际请求时会用凭证里的值覆盖它。",
+        ja: "この URL には既に「{parameterName}」クエリパラメーターがあります。リクエスト実行時は認証情報の値で置き換えられます。",
     },
     timeoutSecondsLabel: {
         en: "Timeout",

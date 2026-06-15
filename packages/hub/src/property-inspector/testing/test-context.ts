@@ -15,12 +15,13 @@ export function buildVisibilityContext(options: {
     platform?: PropertyInspectorPlatform;
     isWindows?: boolean;
     settings?: InspectorTestSettings;
+    globalSettings?: InspectorTestSettings;
     runtimeCache?: WidgetRuntimeCachePatch;
     runtimeCacheStatus?: Partial<PropertyInspectorRuntimeCacheStatus>;
 } = {}): VisibilityContext {
     return buildPropertyInspectorContext({
         rawSettings: options.settings,
-        rawGlobalSettings: undefined,
+        rawGlobalSettings: options.globalSettings,
         runtimeCache: mergeWidgetRuntimeCache(emptyWidgetRuntimeCache, options.runtimeCache ?? {}),
         runtimeCacheStatus: {
             diskVolumeOptionsStatus: options.runtimeCacheStatus?.diskVolumeOptionsStatus ?? "pending",

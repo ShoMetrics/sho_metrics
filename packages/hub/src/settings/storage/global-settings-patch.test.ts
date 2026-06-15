@@ -220,6 +220,32 @@ test("global settings credential patch allows duplicate nicknames and contexts",
     assert.deepEqual(credentials.map((credential) => credential.nickname), ["LHM", "LHM"]);
 });
 
+test("global settings credential patch preserves existing secret when replacement omits it", () => {
+    const initialSettings = upsertStoredCustomHttpCredential(undefined, {
+        id: "credential-1",
+        nickname: "Weather",
+        authKind: "query",
+        queryParameterName: "api_key",
+        token: "secret-token",
+    });
+
+    const nextSettings = upsertStoredCustomHttpCredential(initialSettings, {
+        id: "credential-1",
+        nickname: "Weather updated",
+        authKind: "query",
+        queryParameterName: "token",
+        token: undefined,
+    });
+
+    const credential = readStoredGlobalSettings(nextSettings).settings.customHttpCredentials[0];
+    assert.equal(credential?.nickname, "Weather updated");
+    assert.equal(credential?.auth.case, "query");
+    if (credential?.auth.case === "query") {
+        assert.equal(credential.auth.value.queryParameterName, "token");
+        assert.equal(credential.auth.value.token, "secret-token");
+    }
+});
+
 test("global settings credential patch deletes credentials without scanning widget references", () => {
     const firstSettings = upsertStoredCustomHttpCredential(undefined, {
         id: "credential-1",

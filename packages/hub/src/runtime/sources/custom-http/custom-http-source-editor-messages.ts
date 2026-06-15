@@ -17,6 +17,7 @@ export type CustomHttpSourceEditorRequest =
         readonly consumerSlug: string;
         readonly url: string;
         readonly requestSettings: CustomHttpSourceEditorRequestSettings;
+        readonly auth: CustomHttpSourceEditorRequestAuth;
     }
     | {
         readonly type: typeof CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE;
@@ -33,11 +34,17 @@ export type CustomHttpSourceEditorRequest =
         readonly url: string;
         readonly jqTransform: string;
         readonly requestSettings: CustomHttpSourceEditorRequestSettings;
+        readonly auth: CustomHttpSourceEditorRequestAuth;
     };
 
 export interface CustomHttpSourceEditorRequestSettings {
     readonly timeoutSeconds: number;
     readonly retryCount: number;
+}
+
+export interface CustomHttpSourceEditorRequestAuth {
+    readonly credentialId: string | undefined;
+    readonly allowPublicHttpCredentials: boolean;
 }
 
 export type CustomHttpSourceEditorResponse =
@@ -134,11 +141,13 @@ export function readCustomHttpSourceEditorRequest(payload: unknown): CustomHttpS
     const consumerSlug = payload["consumerSlug"];
     const url = payload["url"];
     const requestSettings = readRequestSettings(payload["requestSettings"]);
+    const auth = readRequestAuth(payload["auth"]);
     if (
         typeof requestId !== "string"
         || typeof consumerSlug !== "string"
         || typeof url !== "string"
         || requestSettings === undefined
+        || auth === undefined
     ) {
         return undefined;
     }
@@ -151,6 +160,7 @@ export function readCustomHttpSourceEditorRequest(payload: unknown): CustomHttpS
             consumerSlug,
             url,
             requestSettings,
+            auth,
         };
     }
 
@@ -168,6 +178,7 @@ export function readCustomHttpSourceEditorRequest(payload: unknown): CustomHttpS
             url,
             jqTransform,
             requestSettings,
+            auth,
         };
     }
 
@@ -345,6 +356,19 @@ function readRequestSettings(value: unknown): CustomHttpSourceEditorRequestSetti
     const retryCount = value["retryCount"];
     return typeof timeoutSeconds === "number" && typeof retryCount === "number"
         ? { timeoutSeconds, retryCount }
+        : undefined;
+}
+
+function readRequestAuth(value: unknown): CustomHttpSourceEditorRequestAuth | undefined {
+    if (!isRecord(value)) {
+        return undefined;
+    }
+
+    const credentialId = value["credentialId"];
+    const allowPublicHttpCredentials = value["allowPublicHttpCredentials"];
+    return (credentialId === undefined || typeof credentialId === "string")
+        && typeof allowPublicHttpCredentials === "boolean"
+        ? { credentialId, allowPublicHttpCredentials }
         : undefined;
 }
 

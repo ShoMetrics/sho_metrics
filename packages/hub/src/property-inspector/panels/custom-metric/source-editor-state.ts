@@ -5,6 +5,7 @@ import type {
 } from "react";
 import {
     CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+    type CustomHttpSourceEditorRequestAuth,
     type CustomHttpSourceEditorRequestSettings,
     type CustomHttpSourceEditorResponse,
 } from "../../../runtime/sources/custom-http/custom-http-source-editor-messages";
@@ -24,6 +25,7 @@ export function sendFetchSampleRequest(
     consumerSlug: string,
     url: string,
     requestSettings: CustomHttpSourceEditorRequestSettings,
+    auth: CustomHttpSourceEditorRequestAuth,
     pendingRequestIds: RefObject<Map<string, SourceEditorCommand>>,
     setSourceEditorState: (state: SourceEditorState) => void,
 ): void {
@@ -37,6 +39,7 @@ export function sendFetchSampleRequest(
         consumerSlug,
         url,
         requestSettings,
+        auth,
     }).catch((error: Error) => {
         pendingRequestIds.current.delete(requestId);
         setSourceEditorState({
@@ -60,6 +63,7 @@ export function sendTransformTestRequest(
     url: string,
     jqTransform: string,
     requestSettings: CustomHttpSourceEditorRequestSettings,
+    auth: CustomHttpSourceEditorRequestAuth,
     pendingRequestIds: RefObject<Map<string, SourceEditorCommand>>,
     setSourceEditorState: Dispatch<SetStateAction<SourceEditorState>>,
 ): void {
@@ -78,6 +82,7 @@ export function sendTransformTestRequest(
         url,
         jqTransform,
         requestSettings,
+        auth,
     }).catch((error: Error) => {
         pendingRequestIds.current.delete(requestId);
         setSourceEditorState(previousState => ({

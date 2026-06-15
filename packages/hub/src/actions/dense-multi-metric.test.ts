@@ -145,6 +145,7 @@ test("dense multi metric handles Custom HTTP PI sample fetch messages", async ()
         consumerSlug: buildDenseCustomHttpConsumerSlug("slot-1"),
         url: "https://api.example.com/first",
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: defaultSourceEditorAuthReference(),
     }));
     await flushAsyncOperations();
 
@@ -189,6 +190,7 @@ test("dense multi metric keeps Custom HTTP PI samples isolated by row consumer",
         consumerSlug: buildDenseCustomHttpConsumerSlug("slot-1"),
         url: "https://api.example.com/first",
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: defaultSourceEditorAuthReference(),
     }));
     await flushAsyncOperations();
     action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
@@ -198,6 +200,7 @@ test("dense multi metric keeps Custom HTTP PI samples isolated by row consumer",
         consumerSlug: buildDenseCustomHttpConsumerSlug("slot-2"),
         url: "https://api.example.com/second",
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: defaultSourceEditorAuthReference(),
     }));
     await flushAsyncOperations();
 
@@ -209,6 +212,7 @@ test("dense multi metric keeps Custom HTTP PI samples isolated by row consumer",
         url: "https://api.example.com/first",
         jqTransform: ".first",
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: defaultSourceEditorAuthReference(),
     }));
     await flushAsyncOperations();
 
@@ -490,4 +494,11 @@ function buildSendToPluginEvent(action: FakeStreamDeckAction, payload: unknown):
         action,
         payload,
     } as unknown as SendToPluginEvent<never, Record<string, never>>;
+}
+
+function defaultSourceEditorAuthReference() {
+    return {
+        credentialId: undefined,
+        allowPublicHttpCredentials: false,
+    };
 }

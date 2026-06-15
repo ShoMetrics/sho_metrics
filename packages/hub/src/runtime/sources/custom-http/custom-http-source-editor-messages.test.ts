@@ -14,6 +14,7 @@ test("Custom HTTP PI fetch sample request requires a consumer slug", () => {
         consumerSlug: "dense-slot-1",
         url: "https://api.example.com/data",
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: { allowPublicHttpCredentials: false },
     }), {
         type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
@@ -21,6 +22,7 @@ test("Custom HTTP PI fetch sample request requires a consumer slug", () => {
         consumerSlug: "dense-slot-1",
         url: "https://api.example.com/data",
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: { credentialId: undefined, allowPublicHttpCredentials: false },
     });
 
     assert.equal(readCustomHttpSourceEditorRequest({
@@ -29,6 +31,7 @@ test("Custom HTTP PI fetch sample request requires a consumer slug", () => {
         requestId: "request-1",
         url: "https://api.example.com/data",
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: { allowPublicHttpCredentials: false },
     }), undefined);
 });
 

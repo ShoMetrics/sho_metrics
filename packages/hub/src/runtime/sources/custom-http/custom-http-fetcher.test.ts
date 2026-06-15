@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
+import { prepareCustomHttpRequest, type CustomHttpPreparedAuth } from "./custom-http-auth";
 import { NodeCustomHttpFetcher } from "./custom-http-fetcher";
 
 test("NodeCustomHttpFetcher fetches HTTP JSON without exposing query-string identity", async () => {
@@ -39,6 +40,97 @@ test("NodeCustomHttpFetcher passes request headers to fetch", async () => {
         "X-Api-Key": "token",
     });
 });
+
+for (const authCase of [
+    {
+        name: "Basic",
+        auth: {
+            authKind: "basic",
+            username: "111111",
+            password: "111111",
+        },
+        expectedHeaderName: "authorization",
+        expectedHeaderValue: "Basic MTExMTExOjExMTExMQ==",
+        requestPath: "/data.json",
+        expectedPath: "/data.json",
+    },
+    {
+        name: "Bearer",
+        auth: {
+            authKind: "bearer",
+            token: "bearer-token",
+        },
+        expectedHeaderName: "authorization",
+        expectedHeaderValue: "Bearer bearer-token",
+        requestPath: "/data.json",
+        expectedPath: "/data.json",
+    },
+    {
+        name: "API key header",
+        auth: {
+            authKind: "header",
+            headerName: "X-API-Key",
+            token: "header-token",
+        },
+        expectedHeaderName: "x-api-key",
+        expectedHeaderValue: "header-token",
+        requestPath: "/data.json",
+        expectedPath: "/data.json",
+    },
+    {
+        name: "API key query",
+        auth: {
+            authKind: "query",
+            queryParameterName: "api_key",
+            token: "query-token",
+        },
+        expectedHeaderName: undefined,
+        expectedHeaderValue: undefined,
+        requestPath: "/data.json?api_key=old&mode=current",
+        expectedPath: "/data.json?api_key=query-token&mode=current",
+    },
+] satisfies readonly {
+    readonly name: string;
+    readonly auth: CustomHttpPreparedAuth;
+    readonly expectedHeaderName: string | undefined;
+    readonly expectedHeaderValue: string | undefined;
+    readonly requestPath: string;
+    readonly expectedPath: string;
+}[]) {
+    test(`NodeCustomHttpFetcher sends prepared ${authCase.name} auth to a real local HTTP server`, async () => {
+        let requestUrl: string | undefined;
+        let requestHeader: string | undefined;
+
+        await withHttpServer((request, response) => {
+            requestUrl = request.url;
+            requestHeader = authCase.expectedHeaderName === undefined
+                ? undefined
+                : readSingleHeaderValue(request, authCase.expectedHeaderName);
+            response.end("{}");
+        }, async serverUrl => {
+            const preparedRequest = prepareCustomHttpRequest({
+                url: new URL(authCase.requestPath, serverUrl).toString(),
+                auth: authCase.auth,
+            });
+            if (!preparedRequest.ok) {
+                assert.fail(preparedRequest.detail);
+            }
+
+            const fetcher = new NodeCustomHttpFetcher();
+            const options = preparedRequest.headers === undefined
+                ? undefined
+                : { headers: preparedRequest.headers };
+
+            assert.deepEqual(await fetcher.fetchJson(preparedRequest.url, options), {
+                ok: true,
+                responseText: "{}",
+            });
+        });
+
+        assert.equal(requestUrl, authCase.expectedPath);
+        assert.equal(requestHeader, authCase.expectedHeaderValue);
+    });
+}
 
 test("NodeCustomHttpFetcher blocks cross-origin redirects when request headers are attached", async () => {
     const requestedHosts: string[] = [];
@@ -170,6 +262,11 @@ async function withHttpServer(
 
 function isAddressInfo(address: string | AddressInfo | null): address is AddressInfo {
     return address !== null && typeof address === "object";
+}
+
+function readSingleHeaderValue(request: IncomingMessage, headerName: string): string | undefined {
+    const value = request.headers[headerName];
+    return Array.isArray(value) ? value[0] : value;
 }
 
 test("NodeCustomHttpFetcher enforces response size before JSON parse", async () => {

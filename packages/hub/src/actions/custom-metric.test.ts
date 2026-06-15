@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { create } from "@bufbuild/protobuf";
 import type {
     DidReceiveSettingsEvent,
     SendToPluginEvent,
@@ -17,6 +18,7 @@ import type {
     CustomHttpFetchOptions,
     CustomHttpFetchResult,
 } from "../runtime/sources/custom-http/custom-http-fetcher";
+import type { CustomHttpCredentialSettingsReader } from "../runtime/sources/custom-http/custom-http-auth";
 import type { CustomHttpSourceEditorResponse } from "../runtime/sources/custom-http/custom-http-source-editor-messages";
 import { listMetricReadPlanKeys, normalizeMetricReadPlan } from "../runtime/source-routing/metric-read-plan";
 import { CustomHttpDefinitionRegistry } from "../runtime/sources/custom-http/custom-http-definition-registry";
@@ -41,6 +43,11 @@ import {
 import { resolveInitialActionSettings } from "./settings/action-settings-resolver";
 import { writeStoredWidgetSettingsPatch } from "../settings/storage/patch/widget-settings-patch";
 import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
+import {
+    CustomHttpCredentialSchema,
+    StoredGlobalSettingsSchema,
+    type StoredGlobalSettings,
+} from "../generated/proto/shometrics/v1/settings_pb";
 
 test("Custom Metric without configured HTTP does not register collection or runtime definition", () => {
     const registry = new CustomHttpDefinitionRegistry();
@@ -415,6 +422,7 @@ test("Custom Metric PI sample fetch returns bounded preview through the action b
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
         url: "https://api.example.com/weather",
         requestSettings: { timeoutSeconds: 10, retryCount: 2 },
+        auth: defaultSourceEditorAuthReference(),
     }));
 
     await waitForAsyncWork();
@@ -442,6 +450,116 @@ test("Custom Metric PI sample fetch returns bounded preview through the action b
     }
 });
 
+for (const authCase of [
+    {
+        name: "Basic",
+        credential: create(CustomHttpCredentialSchema, {
+            id: "credential-basic",
+            nickname: "LHM",
+            auth: {
+                case: "basic",
+                value: {
+                    username: "111111",
+                    password: "111111",
+                },
+            },
+        }),
+        credentialId: "credential-basic",
+        requestUrl: "http://127.0.0.1:8085/data.json",
+        expectedUrl: "http://127.0.0.1:8085/data.json",
+        expectedHeaders: {
+            Authorization: "Basic MTExMTExOjExMTExMQ==",
+        },
+    },
+    {
+        name: "Bearer",
+        credential: create(CustomHttpCredentialSchema, {
+            id: "credential-bearer",
+            nickname: "Bearer",
+            auth: {
+                case: "bearer",
+                value: { token: "bearer-token" },
+            },
+        }),
+        credentialId: "credential-bearer",
+        requestUrl: "https://api.example.com/data",
+        expectedUrl: "https://api.example.com/data",
+        expectedHeaders: {
+            Authorization: "Bearer bearer-token",
+        },
+    },
+    {
+        name: "API key header",
+        credential: create(CustomHttpCredentialSchema, {
+            id: "credential-header",
+            nickname: "Header",
+            auth: {
+                case: "header",
+                value: {
+                    headerName: "X-API-Key",
+                    token: "header-token",
+                },
+            },
+        }),
+        credentialId: "credential-header",
+        requestUrl: "https://api.example.com/data",
+        expectedUrl: "https://api.example.com/data",
+        expectedHeaders: {
+            "X-API-Key": "header-token",
+        },
+    },
+    {
+        name: "API key query",
+        credential: create(CustomHttpCredentialSchema, {
+            id: "credential-query",
+            nickname: "Query",
+            auth: {
+                case: "query",
+                value: {
+                    queryParameterName: "api_key",
+                    token: "query-token",
+                },
+            },
+        }),
+        credentialId: "credential-query",
+        requestUrl: "https://api.example.com/data?api_key=old&mode=current",
+        expectedUrl: "https://api.example.com/data?api_key=query-token&mode=current",
+        expectedHeaders: undefined,
+    },
+] as const) {
+    test(`Custom Metric PI sample fetch applies selected ${authCase.name} credential`, async () => {
+        const registry = new CustomHttpDefinitionRegistry();
+        const fetcher = new FakeCustomHttpFetcher({
+            ok: true,
+            responseText: "{\"temp\":23.5}",
+        });
+        const action = new TestCustomMetric(registry, {
+            fetcher,
+            credentialSettingsReader: new FakeCustomHttpCredentialSettingsReader(create(StoredGlobalSettingsSchema, {
+                customHttpCredentials: [authCase.credential],
+            })),
+        });
+        const streamDeckAction = new FakeStreamDeckAction(`custom-pi-fetch-${authCase.name}-action`);
+
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCustomMetricWidgetSettings()));
+        action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
+            type: "custom-http-pi-test",
+            command: "fetchSample",
+            requestId: "fetch-1",
+            consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
+            url: authCase.requestUrl,
+            requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+            auth: { credentialId: authCase.credentialId, allowPublicHttpCredentials: false },
+        }));
+
+        await waitForAsyncWork();
+
+        assert.equal(fetcher.urlList[0], authCase.expectedUrl);
+        assert.deepEqual(fetcher.optionsList[0]?.headers, authCase.expectedHeaders);
+        assert.equal(action.customMetricSourceEditorResponses[0]?.result.ok, true);
+    });
+}
+
 test("Custom Metric PI sample fetch builds a digest for large JSON prompts", async () => {
     const registry = new CustomHttpDefinitionRegistry();
     const largeResponseText = JSON.stringify({
@@ -468,6 +586,7 @@ test("Custom Metric PI sample fetch builds a digest for large JSON prompts", asy
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
         url: "https://api.example.com/sensors",
         requestSettings: { timeoutSeconds: 10, retryCount: 2 },
+        auth: defaultSourceEditorAuthReference(),
     }));
 
     await waitForAsyncWork();
@@ -513,6 +632,7 @@ test("Custom Metric PI transform test returns exploration output when jq succeed
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
         url: "https://api.example.com/sensors",
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: defaultSourceEditorAuthReference(),
     }));
     await waitForAsyncWork();
 
@@ -524,6 +644,7 @@ test("Custom Metric PI transform test returns exploration output when jq succeed
         url: "https://api.example.com/sensors",
         jqTransform: "[.. | objects | select(.Text?)]",
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: defaultSourceEditorAuthReference(),
     }));
     await waitForAsyncWork();
 
@@ -565,6 +686,7 @@ test("Custom Metric PI transform test returns multi-output jq as exploration out
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
         url: "https://api.example.com/sensors",
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: defaultSourceEditorAuthReference(),
     }));
     await waitForAsyncWork();
 
@@ -576,6 +698,7 @@ test("Custom Metric PI transform test returns multi-output jq as exploration out
         url: "https://api.example.com/sensors",
         jqTransform: ".. | objects | select(.Text?)",
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: defaultSourceEditorAuthReference(),
     }));
     await waitForAsyncWork();
 
@@ -612,6 +735,7 @@ test("Custom Metric PI sample fetch includes HTTP failure response previews", as
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
         url: "https://api.example.com/weather",
         requestSettings: { timeoutSeconds: 10, retryCount: 0 },
+        auth: defaultSourceEditorAuthReference(),
     }));
 
     await waitForAsyncWork();
@@ -654,6 +778,7 @@ test("Custom Metric PI sample fetch caps HTTP failure response previews", async 
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
         url: "https://api.example.com/weather",
         requestSettings: { timeoutSeconds: 10, retryCount: 0 },
+        auth: defaultSourceEditorAuthReference(),
     }));
 
     await waitForAsyncWork();
@@ -699,6 +824,7 @@ test("Custom Metric PI transform test uses cached sample without storing it in s
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
         url: "https://api.example.com/weather",
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: defaultSourceEditorAuthReference(),
     }));
     await waitForAsyncWork();
 
@@ -710,6 +836,7 @@ test("Custom Metric PI transform test uses cached sample without storing it in s
         url: "https://api.example.com/weather",
         jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\", maximum: 100 } }",
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: defaultSourceEditorAuthReference(),
     }));
     await waitForAsyncWork();
 
@@ -744,6 +871,7 @@ class TestCustomMetric extends CustomMetric {
         options: {
             readonly fetcher?: CustomHttpFetcher;
             readonly transformRunner?: CustomHttpTransformRunner;
+            readonly credentialSettingsReader?: CustomHttpCredentialSettingsReader;
         } = {},
     ) {
         const sourceEditorResponses: CustomHttpSourceEditorResponse[] = [];
@@ -772,6 +900,14 @@ class TestCustomMetric extends CustomMetric {
         return Promise.resolve();
     }
 
+}
+
+class FakeCustomHttpCredentialSettingsReader implements CustomHttpCredentialSettingsReader {
+    constructor(private readonly settings: StoredGlobalSettings) {}
+
+    readStoredGlobalSettings(): StoredGlobalSettings {
+        return this.settings;
+    }
 }
 
 class FakeMetricCollectionBinding implements MetricCollectionBinding {
@@ -856,6 +992,13 @@ class FakeCustomHttpFetcher implements CustomHttpFetcher {
         this.optionsList.push(options ?? {});
         return Promise.resolve(this.result);
     }
+}
+
+function defaultSourceEditorAuthReference() {
+    return {
+        credentialId: undefined,
+        allowPublicHttpCredentials: false,
+    };
 }
 
 class FakeCustomHttpTransformRunner implements CustomHttpTransformRunner {

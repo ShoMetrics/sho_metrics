@@ -5,6 +5,7 @@ import {
     type CustomHttpMetricDefinition,
 } from "../../runtime/sources/custom-http/custom-http-definition-registry";
 import type { CustomHttpFetcher } from "../../runtime/sources/custom-http/custom-http-fetcher";
+import type { CustomHttpCredentialSettingsReader } from "../../runtime/sources/custom-http/custom-http-auth";
 import type { CustomHttpTransformRunner } from "../../runtime/sources/custom-http/custom-http-transform-worker-pool";
 import {
     type RegisteredCustomHttpMetricKeysByActionId,
@@ -25,6 +26,8 @@ export interface CustomHttpActionConnectorDependencies {
     readonly transformRunner?: CustomHttpTransformRunner | undefined;
     /** Injectable dependency for unit tests; production sends only to the active Stream Deck PI. */
     readonly sendCustomHttpSourceEditorResponse?: CustomHttpSourceEditorResponseSender | undefined;
+    /** Injectable dependency for unit tests; production reads Stream Deck global settings. */
+    readonly credentialSettingsReader?: CustomHttpCredentialSettingsReader | undefined;
 }
 
 /**
@@ -41,6 +44,7 @@ export class CustomHttpActionConnector {
             fetcher: options.fetcher,
             transformRunner: options.transformRunner,
             sendResponse: options.sendCustomHttpSourceEditorResponse,
+            credentialSettingsReader: options.credentialSettingsReader,
         });
     }
 

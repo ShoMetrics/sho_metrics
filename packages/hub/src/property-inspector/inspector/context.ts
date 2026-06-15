@@ -1,7 +1,10 @@
 import type { WidgetRuntimeCache } from "../../runtime/widget-runtime-cache";
 import { readStoredGlobalSettings } from "../../settings/storage/codec";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
-import { resolveStoredWidgetSettings } from "../../settings/storage/resolver";
+import {
+    resolveStoredGlobalSettings,
+    resolveStoredWidgetSettings,
+} from "../../settings/storage/resolver";
 import type { ActionKind } from "../../shared/stream-deck-actions";
 import type { PropertyInspectorRuntimeCacheStatus, VisibilityContext } from "./types";
 import type { PropertyInspectorPlatform } from "./platform";
@@ -16,6 +19,8 @@ export function buildPropertyInspectorContext(options: {
     isWindows: boolean;
 }): VisibilityContext {
     const quickStartSettings = resolveQuickStartStoredWidgetSettings(options.rawSettings, options.actionKind);
+    const storedGlobalSettings = readStoredGlobalSettings(options.rawGlobalSettings).settings;
+    const globalSettings = resolveStoredGlobalSettings(storedGlobalSettings);
 
     return {
         actionKind: options.actionKind,
@@ -23,9 +28,10 @@ export function buildPropertyInspectorContext(options: {
         isWindows: options.isWindows,
         runtimeCache: options.runtimeCache,
         runtimeCacheStatus: options.runtimeCacheStatus,
+        globalSettings,
         resolved: resolveStoredWidgetSettings({
             storedWidgetSettings: quickStartSettings.storedSettings,
-            storedGlobalSettings: readStoredGlobalSettings(options.rawGlobalSettings).settings,
+            storedGlobalSettings,
             runtime: {
                 isWindows: options.isWindows,
                 runtimeMaximumDownloadSpeedMegabitsPerSecond: options.runtimeCache.runtimeMaximumDownloadSpeedMbps,

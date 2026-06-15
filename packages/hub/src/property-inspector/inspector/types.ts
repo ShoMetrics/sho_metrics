@@ -1,5 +1,8 @@
 import type { ActionKind } from "../../shared/stream-deck-actions";
-import type { ResolvedWidgetSettings } from "../../settings/resolved-settings";
+import type {
+    ResolvedGlobalSettings,
+    ResolvedWidgetSettings,
+} from "../../settings/resolved-settings";
 import type { WidgetRuntimeCache } from "../../runtime/widget-runtime-cache";
 import type { PropertyInspectorPlatform } from "./platform";
 
@@ -23,6 +26,7 @@ export interface VisibilityContext {
     isWindows: boolean;
     runtimeCache: WidgetRuntimeCache;
     runtimeCacheStatus: PropertyInspectorRuntimeCacheStatus;
+    globalSettings: ResolvedGlobalSettings;
     resolved: ResolvedWidgetSettings;
 }
 

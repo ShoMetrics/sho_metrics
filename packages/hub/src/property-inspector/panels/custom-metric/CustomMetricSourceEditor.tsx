@@ -25,6 +25,7 @@ import {
 } from "../../../runtime/sources/custom-http/custom-http-request-policy";
 import { normalizeCustomHttpSourceUrlInput } from "../../../runtime/sources/custom-http/custom-http-url";
 import type { StreamDeckPropertyInspectorClient } from "../../stream-deck/stream-deck-client";
+import type { ResolvedCustomHttpRequestAuth } from "../../../settings/resolved-settings";
 import { InspectorItem } from "../../components/InspectorItem";
 import { SelectSetting } from "../../controls/SelectSetting";
 import { TextAreaSetting } from "../../controls/TextAreaSetting";
@@ -41,6 +42,10 @@ import {
     sendFetchSampleRequest,
     sendTransformTestRequest,
 } from "./source-editor-state";
+import {
+    canUseCustomHttpCredentialForUrl,
+    CustomMetricAuthSettings,
+} from "./CustomMetricAuthSettings";
 import type {
     CustomMetricSourceEditorSettingsProps,
     ExplorationOutputPreview as ExplorationOutputPreviewState,
@@ -53,6 +58,7 @@ export function CustomMetricSourceEditor({
     userIntent,
     jqTransform,
     requestSettings,
+    auth,
     client,
     sourceEditorState,
     pendingRequestIds,
@@ -64,6 +70,7 @@ export function CustomMetricSourceEditor({
     readonly userIntent: string;
     readonly jqTransform: string;
     readonly requestSettings: ResolvedCustomHttpFetchPolicy;
+    readonly auth: ResolvedCustomHttpRequestAuth;
     readonly client: StreamDeckPropertyInspectorClient;
     readonly sourceEditorState: SourceEditorState;
     readonly pendingRequestIds: RefObject<Map<string, SourceEditorCommand>>;
@@ -78,6 +85,7 @@ export function CustomMetricSourceEditor({
     const fetchSampleButtonRef = useRef<HTMLButtonElement | null>(null);
     const normalizedUrlDraft = normalizeCustomHttpSourceUrlInput(urlDraft);
     const hasSample = hasCurrentSample(sourceEditorState, normalizedUrlDraft);
+    const canUseCredentialForUrl = canUseCustomHttpCredentialForUrl(auth, normalizedUrlDraft);
     const promptText = useMemo(() => buildCustomMetricPrompt({
         locale,
         sourceUrl: normalizedUrlDraft,
@@ -168,28 +176,6 @@ export function CustomMetricSourceEditor({
                     <p className="section-note">{t(customMetricMessages.noSecretsNote)}</p>
                 </InspectorItem>
             </SettingsSection>
-            <SettingsSection title={t(customMetricMessages.requestSettingsSection)}>
-                <SelectSetting
-                    label={t(customMetricMessages.timeoutSecondsLabel)}
-                    value={requestSettings.timeoutSeconds}
-                    optionList={customHttpTimeoutSecondOptionList}
-                    onValueChange={(timeoutSeconds) => props.onSettingsPatch({
-                        customMetric: { timeoutSeconds },
-                    })}
-                />
-                <SelectSetting
-                    label={t(customMetricMessages.retryCountLabel)}
-                    value={requestSettings.retryCount}
-                    optionList={customHttpRetryCountOptionList}
-                    onValueChange={(retryCount) => props.onSettingsPatch({
-                        customMetric: { retryCount },
-                    })}
-                />
-                <RequestBudgetWarning
-                    requestSettings={requestSettings}
-                    pollingFrequencySeconds={props.context.resolved.preferences.pollingFrequencySeconds}
-                />
-            </SettingsSection>
             <SettingsSection title={t(customMetricMessages.fetchSampleSection)}>
                 <InspectorItem>
                     <div className="advanced-action-stack">
@@ -197,7 +183,11 @@ export function CustomMetricSourceEditor({
                             ref={fetchSampleButtonRef}
                             className="inline-action-button"
                             type="button"
-                            disabled={normalizedUrlDraft.length === 0 || sourceEditorState.kind === "pending"}
+                            disabled={
+                                normalizedUrlDraft.length === 0
+                                || !canUseCredentialForUrl
+                                || sourceEditorState.kind === "pending"
+                            }
                             onClick={() => {
                                 const requestUrl = commitNormalizedUrlDraft();
                                 sendFetchSampleRequest(
@@ -205,6 +195,7 @@ export function CustomMetricSourceEditor({
                                     props.customHttpConsumerSlug,
                                     requestUrl,
                                     requestSettings,
+                                    auth,
                                     pendingRequestIds,
                                     setSourceEditorState,
                                 );
@@ -229,6 +220,36 @@ export function CustomMetricSourceEditor({
                 />
                 <SamplePreview state={sourceEditorState} />
             </SettingsSection>
+            <SettingsSection title={t(customMetricMessages.requestSettingsSection)}>
+                <SelectSetting
+                    label={t(customMetricMessages.timeoutSecondsLabel)}
+                    value={requestSettings.timeoutSeconds}
+                    optionList={customHttpTimeoutSecondOptionList}
+                    onValueChange={(timeoutSeconds) => props.onSettingsPatch({
+                        customMetric: { timeoutSeconds },
+                    })}
+                />
+                <SelectSetting
+                    label={t(customMetricMessages.retryCountLabel)}
+                    value={requestSettings.retryCount}
+                    optionList={customHttpRetryCountOptionList}
+                    onValueChange={(retryCount) => props.onSettingsPatch({
+                        customMetric: { retryCount },
+                    })}
+                />
+                <RequestBudgetWarning
+                    requestSettings={requestSettings}
+                    pollingFrequencySeconds={props.context.resolved.preferences.pollingFrequencySeconds}
+                />
+            </SettingsSection>
+            <CustomMetricAuthSettings
+                normalizedUrl={normalizedUrlDraft}
+                auth={auth}
+                credentials={props.context.globalSettings.customHttpCredentials}
+                onSettingsPatch={props.onSettingsPatch}
+                onCustomHttpCredentialUpsert={props.onCustomHttpCredentialUpsert}
+                onCustomHttpCredentialDelete={props.onCustomHttpCredentialDelete}
+            />
             <SettingsSection title={t(customMetricMessages.resultSection)}>
                 <TextAreaSetting
                     label={t(customMetricMessages.promptLabel)}
@@ -274,6 +295,7 @@ export function CustomMetricSourceEditor({
                             type="button"
                             disabled={
                                 normalizedUrlDraft.length === 0
+                                || !canUseCredentialForUrl
                                 || jqTransform.trim().length === 0
                                 || !hasSample
                                 || sourceEditorState.kind === "pending"
@@ -292,6 +314,7 @@ export function CustomMetricSourceEditor({
                                     requestUrl,
                                     requestTransform,
                                     requestSettings,
+                                    auth,
                                     pendingRequestIds,
                                     setSourceEditorState,
                                 );

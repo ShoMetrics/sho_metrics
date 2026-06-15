@@ -54,6 +54,10 @@ test("custom metric panel sends fetch and transform test commands through the pl
     assert.equal(fetchMessage.consumerSlug, "single");
     assert.equal(fetchMessage.url, "https://api.example.com/weather");
     assert.deepEqual(fetchMessage.requestSettings, { timeoutSeconds: 5, retryCount: 0 });
+    assert.deepEqual(fetchMessage.auth, {
+        credentialId: undefined,
+        allowPublicHttpCredentials: false,
+    });
 
     dispatchCustomHttpResponse(client, {
         type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
@@ -91,6 +95,10 @@ test("custom metric panel sends fetch and transform test commands through the pl
     assert.equal(transformMessage.consumerSlug, "single");
     assert.equal(transformMessage.url, "https://api.example.com/weather");
     assert.deepEqual(transformMessage.requestSettings, { timeoutSeconds: 5, retryCount: 0 });
+    assert.deepEqual(transformMessage.auth, {
+        credentialId: undefined,
+        allowPublicHttpCredentials: false,
+    });
     assert.equal(
         transformMessage.jqTransform,
         "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\", maximum: 100 } }",
@@ -809,6 +817,10 @@ function readSentMessagePayload(message: SentStreamDeckMessage | undefined): {
         readonly timeoutSeconds: number;
         readonly retryCount: number;
     };
+    readonly auth: {
+        readonly credentialId: string | undefined;
+        readonly allowPublicHttpCredentials: boolean;
+    };
 } {
     if (!message || message.event !== "sendToPlugin") {
         throw new Error("Expected a sendToPlugin message.");
@@ -825,6 +837,7 @@ function readSentMessagePayload(message: SentStreamDeckMessage | undefined): {
     const consumerSlug = record["consumerSlug"];
     const url = record["url"];
     const requestSettings = record["requestSettings"];
+    const auth = record["auth"];
     if (
         (command !== "fetchSample" && command !== "testTransform")
         || typeof requestId !== "string"
@@ -833,15 +846,24 @@ function readSentMessagePayload(message: SentStreamDeckMessage | undefined): {
         || !requestSettings
         || typeof requestSettings !== "object"
         || Array.isArray(requestSettings)
+        || !auth
+        || typeof auth !== "object"
+        || Array.isArray(auth)
     ) {
         throw new Error("Expected Custom HTTP PI test payload.");
     }
 
     const jqTransform = record["jqTransform"];
     const requestSettingsRecord = requestSettings as Record<string, unknown>;
+    const authRecord = auth as Record<string, unknown>;
     if (
         typeof requestSettingsRecord["timeoutSeconds"] !== "number"
         || typeof requestSettingsRecord["retryCount"] !== "number"
+        || (
+            authRecord["credentialId"] !== undefined
+            && typeof authRecord["credentialId"] !== "string"
+        )
+        || typeof authRecord["allowPublicHttpCredentials"] !== "boolean"
     ) {
         throw new Error("Expected Custom HTTP PI request settings.");
     }
@@ -854,6 +876,10 @@ function readSentMessagePayload(message: SentStreamDeckMessage | undefined): {
         requestSettings: {
             timeoutSeconds: requestSettingsRecord["timeoutSeconds"],
             retryCount: requestSettingsRecord["retryCount"],
+        },
+        auth: {
+            credentialId: authRecord["credentialId"],
+            allowPublicHttpCredentials: authRecord["allowPublicHttpCredentials"],
         },
         ...(typeof jqTransform === "string" ? { jqTransform } : {}),
     };
