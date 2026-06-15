@@ -20,7 +20,10 @@ import {
 } from "../runtime/sources/custom-http/custom-http-definition-registry";
 import { buildCustomHttpRuntimeIdentity, buildDenseCustomHttpConsumerSlug } from "../runtime/sources/custom-http/custom-http-metric-key";
 import type { CustomHttpFetchOptions, CustomHttpFetchResult, CustomHttpFetcher } from "../runtime/sources/custom-http/custom-http-fetcher";
-import type { CustomHttpSourceEditorResponse } from "../runtime/sources/custom-http/custom-http-source-editor-messages";
+import {
+    CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+    type CustomHttpSourceEditorResponse,
+} from "../runtime/sources/custom-http/custom-http-source-editor-messages";
 import type {
     CustomHttpTransformResult,
     CustomHttpTransformRunner,
@@ -139,7 +142,7 @@ test("dense multi metric handles Custom HTTP PI sample fetch messages", async ()
 
     action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildDenseCustomHttpWidgetSettings()));
     action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId: "dense-fetch-1",
         consumerSlug: buildDenseCustomHttpConsumerSlug("slot-1"),
@@ -151,7 +154,7 @@ test("dense multi metric handles Custom HTTP PI sample fetch messages", async ()
 
     assert.equal(fetcher.urlList[0], "https://api.example.com/first");
     const response = action.customHttpSourceEditorResponses[0];
-    assert.equal(response?.type, "custom-http-pi-test");
+    assert.equal(response?.type, CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE);
     assert.equal(response?.command, "fetchSample");
     assert.equal(response?.requestId, "dense-fetch-1");
     assert.equal(response?.result.ok, true);
@@ -184,7 +187,7 @@ test("dense multi metric keeps Custom HTTP PI samples isolated by row consumer",
 
     action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildDenseCustomHttpWidgetSettings()));
     action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId: "first-fetch",
         consumerSlug: buildDenseCustomHttpConsumerSlug("slot-1"),
@@ -194,7 +197,7 @@ test("dense multi metric keeps Custom HTTP PI samples isolated by row consumer",
     }));
     await flushAsyncOperations();
     action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId: "second-fetch",
         consumerSlug: buildDenseCustomHttpConsumerSlug("slot-2"),
@@ -205,7 +208,7 @@ test("dense multi metric keeps Custom HTTP PI samples isolated by row consumer",
     await flushAsyncOperations();
 
     action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "testTransform",
         requestId: "first-transform",
         consumerSlug: buildDenseCustomHttpConsumerSlug("slot-1"),

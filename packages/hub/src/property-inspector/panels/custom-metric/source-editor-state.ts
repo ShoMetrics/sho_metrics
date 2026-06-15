@@ -4,7 +4,9 @@ import type {
     SetStateAction,
 } from "react";
 import {
-    CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+    buildCustomHttpSourceEditorFetchSampleRequest,
+    buildCustomHttpSourceEditorTestTransformRequest,
+    sendCustomHttpSourceEditorRequest,
     type CustomHttpSourceEditorRequestAuth,
     type CustomHttpSourceEditorRequestSettings,
     type CustomHttpSourceEditorResponse,
@@ -32,15 +34,13 @@ export function sendFetchSampleRequest(
     const requestId = createRequestId();
     pendingRequestIds.current.set(requestId, "fetchSample");
     setSourceEditorState({ kind: "pending", command: "fetchSample" });
-    client.send("sendToPlugin", {
-        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
-        command: "fetchSample",
+    sendCustomHttpSourceEditorRequest(client, buildCustomHttpSourceEditorFetchSampleRequest({
         requestId,
         consumerSlug,
         url,
         requestSettings,
         auth,
-    }).catch((error: Error) => {
+    })).catch((error: Error) => {
         pendingRequestIds.current.delete(requestId);
         setSourceEditorState({
             kind: "failed",
@@ -74,16 +74,14 @@ export function sendTransformTestRequest(
         command: "testTransform",
         ...(readSampleState(previousState) === undefined ? {} : { sample: readSampleState(previousState) }),
     }));
-    client.send("sendToPlugin", {
-        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
-        command: "testTransform",
+    sendCustomHttpSourceEditorRequest(client, buildCustomHttpSourceEditorTestTransformRequest({
         requestId,
         consumerSlug,
         url,
         jqTransform,
         requestSettings,
         auth,
-    }).catch((error: Error) => {
+    })).catch((error: Error) => {
         pendingRequestIds.current.delete(requestId);
         setSourceEditorState(previousState => ({
             kind: "failed",
