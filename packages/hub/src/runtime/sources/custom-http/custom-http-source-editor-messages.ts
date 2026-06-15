@@ -1,6 +1,4 @@
-// Keep the existing wire value stable; only the TypeScript owner vocabulary
-// changed from PI test utility to live source editor workflow.
-export const CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE = "custom-http-pi-test";
+export const CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE = "custom-http-source-editor";
 
 export type CustomHttpSourceEditorRequest =
     | {
@@ -45,6 +43,55 @@ export interface CustomHttpSourceEditorRequestSettings {
 export interface CustomHttpSourceEditorRequestAuth {
     readonly credentialId: string | undefined;
     readonly allowPublicHttpCredentials: boolean;
+}
+
+interface StreamDeckPluginMessageSender {
+    send(event: "sendToPlugin", payload: CustomHttpSourceEditorRequest): Promise<void>;
+}
+
+export function buildCustomHttpSourceEditorFetchSampleRequest(options: {
+    readonly requestId: string;
+    readonly consumerSlug: string;
+    readonly url: string;
+    readonly requestSettings: CustomHttpSourceEditorRequestSettings;
+    readonly auth: CustomHttpSourceEditorRequestAuth;
+}): CustomHttpSourceEditorRequest {
+    return {
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+        command: "fetchSample",
+        requestId: options.requestId,
+        consumerSlug: options.consumerSlug,
+        url: options.url,
+        requestSettings: options.requestSettings,
+        auth: options.auth,
+    };
+}
+
+export function buildCustomHttpSourceEditorTestTransformRequest(options: {
+    readonly requestId: string;
+    readonly consumerSlug: string;
+    readonly url: string;
+    readonly jqTransform: string;
+    readonly requestSettings: CustomHttpSourceEditorRequestSettings;
+    readonly auth: CustomHttpSourceEditorRequestAuth;
+}): CustomHttpSourceEditorRequest {
+    return {
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+        command: "testTransform",
+        requestId: options.requestId,
+        consumerSlug: options.consumerSlug,
+        url: options.url,
+        jqTransform: options.jqTransform,
+        requestSettings: options.requestSettings,
+        auth: options.auth,
+    };
+}
+
+export function sendCustomHttpSourceEditorRequest(
+    sender: StreamDeckPluginMessageSender,
+    request: CustomHttpSourceEditorRequest,
+): Promise<void> {
+    return sender.send("sendToPlugin", request);
 }
 
 export type CustomHttpSourceEditorResponse =
@@ -160,15 +207,13 @@ export function readCustomHttpSourceEditorRequest(payload: unknown): CustomHttpS
     }
 
     if (command === "fetchSample") {
-        return {
-            type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
-            command,
+        return buildCustomHttpSourceEditorFetchSampleRequest({
             requestId,
             consumerSlug,
             url,
             requestSettings,
             auth,
-        };
+        });
     }
 
     if (command === "testTransform") {
@@ -177,16 +222,14 @@ export function readCustomHttpSourceEditorRequest(payload: unknown): CustomHttpS
             return undefined;
         }
 
-        return {
-            type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
-            command,
+        return buildCustomHttpSourceEditorTestTransformRequest({
             requestId,
             consumerSlug,
             url,
             jqTransform,
             requestSettings,
             auth,
-        };
+        });
     }
 
     return undefined;

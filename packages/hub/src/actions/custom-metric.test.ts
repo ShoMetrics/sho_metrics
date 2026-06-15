@@ -19,7 +19,10 @@ import type {
     CustomHttpFetchResult,
 } from "../runtime/sources/custom-http/custom-http-fetcher";
 import type { CustomHttpCredentialSettingsReader } from "../runtime/sources/custom-http/custom-http-auth";
-import type { CustomHttpSourceEditorResponse } from "../runtime/sources/custom-http/custom-http-source-editor-messages";
+import {
+    CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+    type CustomHttpSourceEditorResponse,
+} from "../runtime/sources/custom-http/custom-http-source-editor-messages";
 import { listMetricReadPlanKeys, normalizeMetricReadPlan } from "../runtime/source-routing/metric-read-plan";
 import { CustomHttpDefinitionRegistry } from "../runtime/sources/custom-http/custom-http-definition-registry";
 import {
@@ -416,7 +419,7 @@ test("Custom Metric PI sample fetch returns bounded preview through the action b
 
     action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCustomMetricWidgetSettings()));
     action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId: "fetch-1",
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
@@ -434,7 +437,7 @@ test("Custom Metric PI sample fetch returns bounded preview through the action b
         includeFailureResponsePreview: true,
     });
     const response = action.customMetricSourceEditorResponses[0];
-    assert.equal(response?.type, "custom-http-pi-test");
+    assert.equal(response?.type, CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE);
     assert.equal(response?.command, "fetchSample");
     assert.equal(response?.requestId, "fetch-1");
     assert.equal(response?.result.ok, true);
@@ -543,7 +546,7 @@ for (const authCase of [
 
         action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCustomMetricWidgetSettings()));
         action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
-            type: "custom-http-pi-test",
+            type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
             command: "fetchSample",
             requestId: "fetch-1",
             consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
@@ -595,7 +598,7 @@ test("Custom Metric PI sample fetch redacts echoed credential secrets from previ
 
     action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCustomMetricWidgetSettings()));
     action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId: "fetch-1",
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
@@ -649,7 +652,7 @@ test("Custom Metric PI sample fetch does not guess-redact blocked redirect URLs"
 
     action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCustomMetricWidgetSettings()));
     action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId: "fetch-1",
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
@@ -661,7 +664,7 @@ test("Custom Metric PI sample fetch does not guess-redact blocked redirect URLs"
     await waitForAsyncWork();
 
     assert.deepEqual(action.customMetricSourceEditorResponses.at(-1), {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId: "fetch-1",
         result: {
@@ -697,7 +700,7 @@ test("Custom Metric PI sample fetch builds a digest for large JSON prompts", asy
 
     action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCustomMetricWidgetSettings()));
     action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId: "fetch-1",
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
@@ -743,7 +746,7 @@ test("Custom Metric PI transform test returns exploration output when jq succeed
         jqTransform: ".",
     })));
     action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId: "fetch-1",
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
@@ -754,7 +757,7 @@ test("Custom Metric PI transform test returns exploration output when jq succeed
     await waitForAsyncWork();
 
     action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "testTransform",
         requestId: "transform-1",
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
@@ -766,7 +769,7 @@ test("Custom Metric PI transform test returns exploration output when jq succeed
     await waitForAsyncWork();
 
     assert.deepEqual(action.customMetricSourceEditorResponses.at(-1), {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "testTransform",
         requestId: "transform-1",
         result: {
@@ -797,7 +800,7 @@ test("Custom Metric PI transform test returns multi-output jq as exploration out
         jqTransform: ".",
     })));
     action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId: "fetch-1",
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
@@ -808,7 +811,7 @@ test("Custom Metric PI transform test returns multi-output jq as exploration out
     await waitForAsyncWork();
 
     action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "testTransform",
         requestId: "transform-1",
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
@@ -820,7 +823,7 @@ test("Custom Metric PI transform test returns multi-output jq as exploration out
     await waitForAsyncWork();
 
     assert.deepEqual(action.customMetricSourceEditorResponses.at(-1), {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "testTransform",
         requestId: "transform-1",
         result: {
@@ -846,7 +849,7 @@ test("Custom Metric PI sample fetch includes HTTP failure response previews", as
 
     action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCustomMetricWidgetSettings()));
     action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId: "fetch-1",
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
@@ -858,7 +861,7 @@ test("Custom Metric PI sample fetch includes HTTP failure response previews", as
     await waitForAsyncWork();
 
     assert.deepEqual(action.customMetricSourceEditorResponses[0], {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId: "fetch-1",
         result: {
@@ -889,7 +892,7 @@ test("Custom Metric PI sample fetch caps HTTP failure response previews", async 
 
     action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCustomMetricWidgetSettings()));
     action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId: "fetch-1",
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
@@ -935,7 +938,7 @@ test("Custom Metric PI transform test uses cached sample without storing it in s
         jqTransform: ".",
     })));
     action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId: "fetch-1",
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
@@ -946,7 +949,7 @@ test("Custom Metric PI transform test uses cached sample without storing it in s
     await waitForAsyncWork();
 
     action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "testTransform",
         requestId: "transform-1",
         consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
@@ -963,7 +966,7 @@ test("Custom Metric PI transform test uses cached sample without storing it in s
         "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\", maximum: 100 } }",
     );
     assert.deepEqual(action.customMetricSourceEditorResponses.at(-1), {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "testTransform",
         requestId: "transform-1",
         result: {

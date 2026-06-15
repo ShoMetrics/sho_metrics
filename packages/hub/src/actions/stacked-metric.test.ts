@@ -32,7 +32,10 @@ import {
 import { CustomHttpDefinitionRegistry } from "../runtime/sources/custom-http/custom-http-definition-registry";
 import { buildCustomHttpRuntimeIdentity, buildStackedCustomHttpConsumerSlug } from "../runtime/sources/custom-http/custom-http-metric-key";
 import type { CustomHttpFetchOptions, CustomHttpFetchResult, CustomHttpFetcher } from "../runtime/sources/custom-http/custom-http-fetcher";
-import type { CustomHttpSourceEditorResponse } from "../runtime/sources/custom-http/custom-http-source-editor-messages";
+import {
+    CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+    type CustomHttpSourceEditorResponse,
+} from "../runtime/sources/custom-http/custom-http-source-editor-messages";
 
 test("stacked metric subscribes all slots and schedules default auto rotate", () => {
     const timers = new FakeTimerScheduler();
@@ -227,7 +230,7 @@ test("stacked metric handles Custom HTTP PI sample fetch messages", async () => 
 
     action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildStackedCustomHttpWidgetSettings()));
     action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
-        type: "custom-http-pi-test",
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
         command: "fetchSample",
         requestId: "stacked-fetch-1",
         consumerSlug: buildStackedCustomHttpConsumerSlug("slot-1"),
@@ -239,7 +242,7 @@ test("stacked metric handles Custom HTTP PI sample fetch messages", async () => 
 
     assert.equal(fetcher.urlList[0], "https://api.example.com/stacked");
     const response = action.customHttpSourceEditorResponses[0];
-    assert.equal(response?.type, "custom-http-pi-test");
+    assert.equal(response?.type, CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE);
     assert.equal(response?.command, "fetchSample");
     assert.equal(response?.requestId, "stacked-fetch-1");
     assert.equal(response?.result.ok, true);

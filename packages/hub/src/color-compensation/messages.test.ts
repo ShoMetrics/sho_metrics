@@ -8,6 +8,7 @@ import {
     buildColorCompensationStartMessage,
     COLOR_COMPENSATION_MESSAGE_TYPE,
     readColorCompensationPluginMessage,
+    sendColorCompensationPluginMessage,
 } from "./messages";
 
 test("preview messages round-trip through the untrusted payload reader", () => {
@@ -59,6 +60,23 @@ test("start commit cancel and reset messages are accepted", () => {
         readColorCompensationPluginMessage(buildColorCompensationCommitMessage("session-1"))?.command,
         "commit",
     );
+});
+
+test("typed color compensation sender uses the Stream Deck plugin event", async () => {
+    const sentMessages: Array<{ readonly event: string; readonly payload: unknown }> = [];
+    const message = buildColorCompensationStartMessage("session-1");
+
+    await sendColorCompensationPluginMessage({
+        send: (event, payload) => {
+            sentMessages.push({ event, payload });
+            return Promise.resolve();
+        },
+    }, message);
+
+    assert.deepEqual(sentMessages, [{
+        event: "sendToPlugin",
+        payload: message,
+    }]);
 });
 
 test("malformed color compensation messages are ignored", () => {

@@ -14,6 +14,8 @@ import {
     buildColorCompensationPreviewMessage,
     buildColorCompensationResetMessage,
     buildColorCompensationStartMessage,
+    sendColorCompensationPluginMessage,
+    type ColorCompensationPluginMessage,
 } from "../../color-compensation/messages";
 import { renderColorCompensationSampleSvg } from "../../view-rendering/color-compensation-patterns";
 import { SteppedSlider } from "../components/SteppedSlider";
@@ -103,8 +105,8 @@ export function ColorCompensationWizard({
     const activeAdjustmentId = COLOR_COMPENSATION_GUIDED_ADJUSTMENT_IDS[state.stepIndex]
         ?? COLOR_COMPENSATION_GUIDED_ADJUSTMENT_IDS[0];
     const sessionId = sessionIdRef.current;
-    const sendMessage = useCallback((message: unknown): void => {
-        client.send("sendToPlugin", message).catch((error: Error) => {
+    const sendMessage = useCallback((message: ColorCompensationPluginMessage): void => {
+        sendColorCompensationPluginMessage(client, message).catch((error: Error) => {
             setNoticeText(t(colorCompensationMessages.colorCompensationPreviewFailed, { errorMessage: error.message }));
         });
     }, [client, t]);
@@ -154,7 +156,8 @@ export function ColorCompensationWizard({
 
     useEffect(() => () => {
         if (shouldCancelOnUnmountRef.current) {
-            client.send("sendToPlugin", buildColorCompensationCancelMessage(sessionId)).catch(() => undefined);
+            sendColorCompensationPluginMessage(client, buildColorCompensationCancelMessage(sessionId))
+                .catch(() => undefined);
         }
     }, [client, sessionId]);
 

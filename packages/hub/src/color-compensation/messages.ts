@@ -48,6 +48,17 @@ export type ColorCompensationPluginMessage =
         readonly command: "reset";
     };
 
+interface StreamDeckPluginMessageSender {
+    send(event: "sendToPlugin", payload: ColorCompensationPluginMessage): Promise<void>;
+}
+
+export function sendColorCompensationPluginMessage(
+    sender: StreamDeckPluginMessageSender,
+    message: ColorCompensationPluginMessage,
+): Promise<void> {
+    return sender.send("sendToPlugin", message);
+}
+
 export function buildColorCompensationStartMessage(sessionId: string): ColorCompensationPluginMessage {
     return {
         type: COLOR_COMPENSATION_MESSAGE_TYPE,

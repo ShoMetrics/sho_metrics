@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+    buildCustomHttpSourceEditorFetchSampleRequest,
+    buildCustomHttpSourceEditorTestTransformRequest,
     CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
     readCustomHttpSourceEditorRequest,
     readCustomHttpSourceEditorResponse,
+    sendCustomHttpSourceEditorRequest,
 } from "./custom-http-source-editor-messages";
 
 test("Custom HTTP PI fetch sample request requires a consumer slug", () => {
@@ -33,6 +36,50 @@ test("Custom HTTP PI fetch sample request requires a consumer slug", () => {
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
         auth: { allowPublicHttpCredentials: false },
     }), undefined);
+});
+
+test("Custom HTTP source editor request builders round-trip through the untrusted payload reader", () => {
+    const fetchSampleRequest = buildCustomHttpSourceEditorFetchSampleRequest({
+        requestId: "request-1",
+        consumerSlug: "single",
+        url: "https://api.example.com/data",
+        requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: { credentialId: "credential-1", allowPublicHttpCredentials: false },
+    });
+    assert.deepEqual(readCustomHttpSourceEditorRequest(fetchSampleRequest), fetchSampleRequest);
+
+    const testTransformRequest = buildCustomHttpSourceEditorTestTransformRequest({
+        requestId: "request-2",
+        consumerSlug: "single",
+        url: "https://api.example.com/data",
+        jqTransform: ".",
+        requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: { credentialId: undefined, allowPublicHttpCredentials: false },
+    });
+    assert.deepEqual(readCustomHttpSourceEditorRequest(testTransformRequest), testTransformRequest);
+});
+
+test("typed Custom HTTP source editor sender uses the Stream Deck plugin event", async () => {
+    const sentMessages: Array<{ readonly event: string; readonly payload: unknown }> = [];
+    const request = buildCustomHttpSourceEditorFetchSampleRequest({
+        requestId: "request-1",
+        consumerSlug: "single",
+        url: "https://api.example.com/data",
+        requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: { credentialId: undefined, allowPublicHttpCredentials: false },
+    });
+
+    await sendCustomHttpSourceEditorRequest({
+        send: (event, payload) => {
+            sentMessages.push({ event, payload });
+            return Promise.resolve();
+        },
+    }, request);
+
+    assert.deepEqual(sentMessages, [{
+        event: "sendToPlugin",
+        payload: request,
+    }]);
 });
 
 test("Custom HTTP PI fetch sample response accepts bounded timing metadata", () => {
