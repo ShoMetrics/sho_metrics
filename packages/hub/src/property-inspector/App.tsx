@@ -37,6 +37,8 @@ export function App({ client }: AppProps): React.JSX.Element {
         updateWidgetSettings,
         resetWidgetSettings,
         updateGlobalSettings,
+        upsertCustomHttpCredential,
+        deleteCustomHttpCredential,
     } = usePropertyInspectorSettings(client);
     const isGlobalSettingsReady = globalSettingsStatus === "ready";
     const isGlobalViewOverrideEnabled =
@@ -91,6 +93,8 @@ export function App({ client }: AppProps): React.JSX.Element {
                         isGlobalPaintOverrideEnabled={isGlobalPaintOverrideEnabled}
                         colorCompensationProfile={colorCompensation.profile}
                         onSettingsPatch={updateWidgetSettings}
+                        onCustomHttpCredentialUpsert={upsertCustomHttpCredential}
+                        onCustomHttpCredentialDelete={deleteCustomHttpCredential}
                         onResetWidgetSettings={resetWidgetSettings}
                         onOpenColorCompensation={() => setIsColorCompensationWizardOpen(true)}
                     />

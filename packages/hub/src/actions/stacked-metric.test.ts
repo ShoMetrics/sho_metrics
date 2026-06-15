@@ -233,6 +233,7 @@ test("stacked metric handles Custom HTTP PI sample fetch messages", async () => 
         consumerSlug: buildStackedCustomHttpConsumerSlug("slot-1"),
         url: "https://api.example.com/stacked",
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: defaultSourceEditorAuthReference(),
     }));
     await flushAsyncOperations();
 
@@ -489,6 +490,13 @@ function buildSendToPluginEvent(action: FakeStreamDeckAction, payload: unknown):
         action,
         payload,
     } as unknown as SendToPluginEvent<never, Record<string, never>>;
+}
+
+function defaultSourceEditorAuthReference() {
+    return {
+        credentialId: undefined,
+        allowPublicHttpCredentials: false,
+    };
 }
 
 async function flushAsyncOperations(): Promise<void> {

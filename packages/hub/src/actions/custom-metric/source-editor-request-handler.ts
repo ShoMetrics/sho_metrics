@@ -7,11 +7,19 @@ import {
     type CustomHttpFetchFailureResult,
     type CustomHttpFetcher,
 } from "../../runtime/sources/custom-http/custom-http-fetcher";
+import {
+    PluginGlobalCustomHttpCredentialSettingsReader,
+    prepareCustomHttpRequest,
+    redactCustomHttpPreparedAuthSecrets,
+    resolveCustomHttpPreparedAuth,
+    type CustomHttpCredentialSettingsReader,
+} from "../../runtime/sources/custom-http/custom-http-auth";
 import { redactSecretLikeJsonText } from "../../runtime/sources/custom-http/custom-http-redaction";
 import { buildCustomHttpJsonDigest } from "../../runtime/sources/custom-http/custom-http-sample-digest";
 import {
     readCustomHttpSourceEditorRequest,
     type CustomHttpSourceEditorFetchSampleResult,
+    type CustomHttpSourceEditorRequestAuth,
     type CustomHttpSourceEditorPromptSample,
     type CustomHttpSourceEditorResponse,
     type CustomHttpSourceEditorTransformResult,
@@ -32,6 +40,8 @@ export interface CustomHttpSourceEditorRequestHandlerDependencies {
     readonly transformRunner?: CustomHttpTransformRunner | undefined;
     /** Injectable dependency for unit tests; production sends only to the active PI action. */
     readonly sendResponse?: CustomHttpSourceEditorResponseSender | undefined;
+    /** Injectable dependency for unit tests; production reads Stream Deck global settings. */
+    readonly credentialSettingsReader?: CustomHttpCredentialSettingsReader | undefined;
 }
 
 /**
@@ -49,12 +59,14 @@ export class CustomHttpSourceEditorRequestHandler {
     private readonly fetcher: CustomHttpFetcher;
     private readonly transformRunner: CustomHttpTransformRunner;
     private readonly sendResponse: CustomHttpSourceEditorResponseSender;
+    private readonly credentialSettingsReader: CustomHttpCredentialSettingsReader;
     private readonly sampleCacheByActionId = new Map<string, Map<string, CachedCustomHttpSample>>();
 
     constructor(options: CustomHttpSourceEditorRequestHandlerDependencies = {}) {
         this.fetcher = options.fetcher ?? new NodeCustomHttpFetcher();
         this.transformRunner = options.transformRunner ?? new CustomHttpTransformWorkerPool();
         this.sendResponse = options.sendResponse ?? sendCustomHttpSourceEditorResponseToActivePropertyInspector;
+        this.credentialSettingsReader = options.credentialSettingsReader ?? new PluginGlobalCustomHttpCredentialSettingsReader();
     }
 
     /**
@@ -72,6 +84,7 @@ export class CustomHttpSourceEditorRequestHandler {
                 request.consumerSlug,
                 request.url,
                 request.requestSettings,
+                request.auth,
             )
                 .then(result => this.sendResponse(event, {
                     type: request.type,
@@ -86,6 +99,7 @@ export class CustomHttpSourceEditorRequestHandler {
             event.action.id,
             request.consumerSlug,
             request.url,
+            request.auth,
             request.jqTransform,
         )
             .then(result => this.sendResponse(event, {
@@ -109,10 +123,22 @@ export class CustomHttpSourceEditorRequestHandler {
         consumerSlug: string,
         url: string,
         requestSettings: ResolvedSingleCustomHttpRequest["requestSettings"],
+        authReference: CustomHttpSourceEditorRequestAuth,
     ): Promise<CustomHttpSourceEditorFetchSampleResult> {
         const startedAtMilliseconds = performance.now();
-        const fetchResult = await this.fetcher.fetchJson(url, {
+        const requestResult = this.prepareAuthenticatedEditorRequest(url, authReference);
+        if (!requestResult.ok) {
+            this.deleteCachedSample(actionId, consumerSlug);
+            return {
+                ok: false,
+                stage: "auth",
+                detail: requestResult.detail,
+            };
+        }
+
+        const fetchResult = await this.fetcher.fetchJson(requestResult.url, {
             ...requestSettings,
+            ...(requestResult.headers === undefined ? {} : { headers: requestResult.headers }),
             includeFailureResponsePreview: true,
         });
         const elapsedMilliseconds = Math.max(0, Math.round(performance.now() - startedAtMilliseconds));
@@ -121,12 +147,16 @@ export class CustomHttpSourceEditorRequestHandler {
             return {
                 ok: false,
                 stage: fetchResult.reason,
-                detail: buildHttpFetchFailureDetail(fetchResult),
+                detail: redactCustomHttpPreparedAuthSecrets(
+                    buildHttpFetchFailureDetail(fetchResult),
+                    requestResult.auth,
+                ),
             };
         }
 
         this.writeCachedSample(actionId, consumerSlug, {
             url,
+            authCacheKey: buildSourceEditorAuthCacheKey(authReference),
             responseText: fetchResult.responseText,
         });
         const samplePreview = buildSamplePreview(fetchResult.responseText, CUSTOM_METRIC_SAMPLE_PREVIEW_LIMIT_CHARACTERS);
@@ -145,10 +175,15 @@ export class CustomHttpSourceEditorRequestHandler {
         actionId: string,
         consumerSlug: string,
         url: string,
+        authReference: CustomHttpSourceEditorRequestAuth,
         jqTransform: string,
     ): Promise<CustomHttpSourceEditorTransformResult> {
         const cachedSample = this.sampleCacheByActionId.get(actionId)?.get(consumerSlug);
-        if (cachedSample === undefined || cachedSample.url !== url) {
+        if (
+            cachedSample === undefined
+            || cachedSample.url !== url
+            || cachedSample.authCacheKey !== buildSourceEditorAuthCacheKey(authReference)
+        ) {
             return {
                 ok: false,
                 stage: "sample",
@@ -235,11 +270,45 @@ export class CustomHttpSourceEditorRequestHandler {
             this.sampleCacheByActionId.delete(actionId);
         }
     }
+
+    private prepareAuthenticatedEditorRequest(
+        url: string,
+        authReference: CustomHttpSourceEditorRequestAuth,
+    ) {
+        const authResult = resolveCustomHttpPreparedAuth({
+            url,
+            authReference,
+            globalSettings: this.credentialSettingsReader.readStoredGlobalSettings(),
+        });
+        if (!authResult.ok) {
+            return authResult;
+        }
+
+        const requestResult = prepareCustomHttpRequest({
+            url,
+            auth: authResult.auth,
+        });
+        if (!requestResult.ok) {
+            return requestResult;
+        }
+
+        return {
+            ok: true,
+            auth: authResult.auth,
+            url: requestResult.url,
+            headers: requestResult.headers,
+        } as const;
+    }
 }
 
 interface CachedCustomHttpSample {
     readonly url: string;
+    readonly authCacheKey: string;
     readonly responseText: string;
+}
+
+function buildSourceEditorAuthCacheKey(auth: CustomHttpSourceEditorRequestAuth): string {
+    return `${auth.credentialId ?? ""}:${auth.allowPublicHttpCredentials ? "public-http" : "default"}`;
 }
 
 function sendCustomHttpSourceEditorResponseToActivePropertyInspector(

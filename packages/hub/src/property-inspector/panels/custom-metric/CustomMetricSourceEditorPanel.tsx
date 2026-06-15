@@ -9,6 +9,7 @@ import {
 import { resolveCustomHttpFetchPolicy } from "../../../runtime/sources/custom-http/custom-http-request-policy";
 import type {
     ResolvedCustomMetricSource,
+    ResolvedCustomHttpRequestAuth,
     ResolvedSingleCustomHttpRequest,
 } from "../../../settings/resolved-settings";
 import { useStreamDeckClient } from "../../stream-deck/stream-deck-client-context";
@@ -36,6 +37,7 @@ export function CustomMetricSourceEditorPanel({
     const userIntent = request?.userIntent ?? "";
     const jqTransform = request?.jqTransform ?? "";
     const requestSettings = request?.requestSettings ?? resolveCustomHttpFetchPolicy({});
+    const auth = request?.auth ?? defaultRequestAuth();
     const [sourceEditorState, setSourceEditorState] = useState<SourceEditorState>({ kind: "idle" });
     const pendingRequestIds = useRef(new Map<string, SourceEditorCommand>());
     const onWidgetChromeSuppressionChangeRef = useRef(props.onWidgetChromeSuppressionChange);
@@ -74,6 +76,7 @@ export function CustomMetricSourceEditorPanel({
             userIntent={userIntent}
             jqTransform={jqTransform}
             requestSettings={requestSettings}
+            auth={auth}
             client={client}
             sourceEditorState={sourceEditorState}
             pendingRequestIds={pendingRequestIds}
@@ -81,6 +84,13 @@ export function CustomMetricSourceEditorPanel({
             onBack={onBack}
         />
     );
+}
+
+function defaultRequestAuth(): ResolvedCustomHttpRequestAuth {
+    return {
+        credentialId: undefined,
+        allowPublicHttpCredentials: false,
+    };
 }
 
 function readCustomMetricRequest(

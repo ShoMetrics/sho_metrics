@@ -25,7 +25,10 @@ import { normalizePropertyInspectorHostPlatform } from "../inspector/platform";
 import { resolveStreamDeckActionKind } from "../../shared/stream-deck-actions";
 import type { ActionKind } from "../inspector/settings-types";
 import {
+    deleteStoredCustomHttpCredential,
+    upsertStoredCustomHttpCredential,
     writeStoredGlobalSettingsPatch,
+    type StoredCustomHttpCredentialInput,
     type StoredGlobalSettingsPatch,
 } from "../../settings/storage/global-settings-patch";
 import {
@@ -152,6 +155,40 @@ export function usePropertyInspectorSettings(
             });
         });
     }, [client]);
+    const upsertCustomHttpCredential = useCallback((credential: StoredCustomHttpCredentialInput): void => {
+        const currentSnapshot = settingsInputSnapshotRef.current;
+        // Stream Deck sends global settings to the PI as one blob. Merge credential updates
+        // only for write-back; do not pass rawGlobalSettings into prompt, logging, or copy paths.
+        const nextRawGlobalSettings = upsertStoredCustomHttpCredential(
+            currentSnapshot.rawGlobalSettings,
+            credential,
+        );
+        updateSettingsInputSnapshot(settingsInputSnapshotRef, { rawGlobalSettings: nextRawGlobalSettings });
+        dispatchSettingsAction({ type: "globalSettingsPatched", rawGlobalSettings: nextRawGlobalSettings });
+
+        client.setGlobalSettings(nextRawGlobalSettings).catch((error: Error) => {
+            dispatchSettingsAction({
+                type: "globalSaveFailed",
+                errorMessage: error.message,
+            });
+        });
+    }, [client]);
+    const deleteCustomHttpCredential = useCallback((credentialId: string): void => {
+        const currentSnapshot = settingsInputSnapshotRef.current;
+        const nextRawGlobalSettings = deleteStoredCustomHttpCredential(
+            currentSnapshot.rawGlobalSettings,
+            credentialId,
+        );
+        updateSettingsInputSnapshot(settingsInputSnapshotRef, { rawGlobalSettings: nextRawGlobalSettings });
+        dispatchSettingsAction({ type: "globalSettingsPatched", rawGlobalSettings: nextRawGlobalSettings });
+
+        client.setGlobalSettings(nextRawGlobalSettings).catch((error: Error) => {
+            dispatchSettingsAction({
+                type: "globalSaveFailed",
+                errorMessage: error.message,
+            });
+        });
+    }, [client]);
     const saveColorCompensationProfile = useCallback(async (profile: ColorCompensationProfile): Promise<void> => {
         const currentSnapshot = settingsInputSnapshotRef.current;
         const nextRawGlobalSettings = writeStoredColorCompensationProfile(
@@ -236,6 +273,8 @@ export function usePropertyInspectorSettings(
         updateWidgetSettings,
         resetWidgetSettings,
         updateGlobalSettings,
+        upsertCustomHttpCredential,
+        deleteCustomHttpCredential,
     };
 }
 

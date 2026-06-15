@@ -183,15 +183,22 @@ export function writeStoredGlobalSettingsPatch(
     return writeStoredGlobalSettings(settings);
 }
 
-/** Writes one complete Custom HTTP credential into plugin global settings. */
+/**
+ * Writes one Custom HTTP credential into plugin global settings.
+ *
+ * When replacing an existing credential with the same secret-bearing auth kind,
+ * an omitted password or token keeps the stored secret because the PI cannot
+ * read saved secrets back into edit fields.
+ */
 export function upsertStoredCustomHttpCredential(
     rawSettings: unknown,
     credential: StoredCustomHttpCredentialInput,
 ): StoredSettingsJsonObject {
     const settings = readStoredGlobalSettings(rawSettings).settings;
-    const storedCredential = buildStoredCustomHttpCredential(credential);
     const credentialIndex = settings.customHttpCredentials
         .findIndex((candidateCredential) => candidateCredential.id === credential.id);
+    const existingCredential = credentialIndex < 0 ? undefined : settings.customHttpCredentials[credentialIndex];
+    const storedCredential = buildStoredCustomHttpCredential(credential, existingCredential);
 
     if (credentialIndex < 0) {
         settings.customHttpCredentials.push(storedCredential);
@@ -216,6 +223,7 @@ export function deleteStoredCustomHttpCredential(
 
 function buildStoredCustomHttpCredential(
     credential: StoredCustomHttpCredentialInput,
+    existingCredential: StoredCustomHttpCredential | undefined,
 ): StoredCustomHttpCredential {
     const storedCredential = create(CustomHttpCredentialSchema, {
         id: credential.id,
@@ -230,7 +238,7 @@ function buildStoredCustomHttpCredential(
                 case: "basic",
                 value: create(CustomHttpCredential_BasicSchema, {
                     username: credential.username,
-                    password: credential.password,
+                    password: credential.password ?? readExistingCredentialSecret(existingCredential, credential.authKind),
                 }),
             };
             break;
@@ -238,7 +246,7 @@ function buildStoredCustomHttpCredential(
             storedCredential.auth = {
                 case: "bearer",
                 value: create(CustomHttpCredential_BearerSchema, {
-                    token: credential.token,
+                    token: credential.token ?? readExistingCredentialSecret(existingCredential, credential.authKind),
                 }),
             };
             break;
@@ -247,7 +255,7 @@ function buildStoredCustomHttpCredential(
                 case: "header",
                 value: create(CustomHttpCredential_HeaderSchema, {
                     headerName: credential.headerName,
-                    token: credential.token,
+                    token: credential.token ?? readExistingCredentialSecret(existingCredential, credential.authKind),
                 }),
             };
             break;
@@ -256,13 +264,31 @@ function buildStoredCustomHttpCredential(
                 case: "query",
                 value: create(CustomHttpCredential_QuerySchema, {
                     queryParameterName: credential.queryParameterName,
-                    token: credential.token,
+                    token: credential.token ?? readExistingCredentialSecret(existingCredential, credential.authKind),
                 }),
             };
             break;
     }
 
     return storedCredential;
+}
+
+function readExistingCredentialSecret(
+    existingCredential: StoredCustomHttpCredential | undefined,
+    authKind: StoredCustomHttpCredentialInput["authKind"],
+): string | undefined {
+    if (existingCredential?.auth.case !== authKind) {
+        return undefined;
+    }
+
+    switch (existingCredential.auth.case) {
+        case "basic":
+            return existingCredential.auth.value.password;
+        case "bearer":
+        case "header":
+        case "query":
+            return existingCredential.auth.value.token;
+    }
 }
 
 function readOptionalTimestamp(timestampMilliseconds: number | undefined): Timestamp | undefined {

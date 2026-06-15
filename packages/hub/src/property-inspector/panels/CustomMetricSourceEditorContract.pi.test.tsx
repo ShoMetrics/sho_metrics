@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { SendToPluginEvent } from "@elgato/streamdeck";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
@@ -30,6 +30,11 @@ import {
     writeStoredWidgetSettingsPatch,
     type StoredWidgetSettingsPatch,
 } from "../../settings/storage/patch/widget-settings-patch";
+import {
+    deleteStoredCustomHttpCredential,
+    upsertStoredCustomHttpCredential,
+} from "../../settings/storage/global-settings-patch";
+import { readStoredGlobalSettings as readStoredGlobalSettingsFromCodec } from "../../settings/storage/codec";
 import { STREAM_DECK_ACTION_UUID_BY_KIND, type ActionKind } from "../../shared/stream-deck-actions";
 import { CustomHttpSourceEditorRequestHandler } from "../../actions/custom-metric/source-editor-request-handler";
 import { StreamDeckClientProvider } from "../stream-deck/stream-deck-client-context";
@@ -153,6 +158,10 @@ for (const contractCase of customHttpSourceEditorContractCases) {
         assert.equal(fetchRequest.consumerSlug, contractCase.expectedConsumerSlug);
         assert.equal(fetchRequest.url, CONTRACT_UPDATED_URL);
         assert.deepEqual(fetchRequest.requestSettings, CONTRACT_REQUEST_SETTINGS);
+        assert.deepEqual(fetchRequest.auth, {
+            credentialId: undefined,
+            allowPublicHttpCredentials: false,
+        });
 
         dispatchCustomHttpResponse(client, {
             type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
@@ -179,6 +188,10 @@ for (const contractCase of customHttpSourceEditorContractCases) {
         assert.equal(transformRequest.consumerSlug, contractCase.expectedConsumerSlug);
         assert.equal(transformRequest.url, CONTRACT_UPDATED_URL);
         assert.deepEqual(transformRequest.requestSettings, CONTRACT_REQUEST_SETTINGS);
+        assert.deepEqual(transformRequest.auth, {
+            credentialId: undefined,
+            allowPublicHttpCredentials: false,
+        });
         assert.equal(transformRequest.jqTransform, CONTRACT_JQ_TRANSFORM);
     });
 }
@@ -214,18 +227,245 @@ test("Custom HTTP source editor cache isolates samples by consumer slug", async 
     ]);
 });
 
+test("Custom HTTP source editor creates query credential in global settings and stores only reference on widget", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+    let latestWidgetSettings = buildSingleCustomMetricSettings("https://api.example.com/weather?api_key=old");
+    let latestGlobalSettings: InspectorTestSettings = {};
+
+    render(<ContractSettingsHarness
+        actionKind="customMetric"
+        client={client}
+        settings={latestWidgetSettings}
+        globalSettings={latestGlobalSettings}
+        onSettingsChange={(settings) => {
+            latestWidgetSettings = settings;
+        }}
+        onGlobalSettingsChange={(settings) => {
+            latestGlobalSettings = settings;
+        }}
+    />);
+
+    await customHttpSourceEditorContractCases[0].openSourceEditor(user);
+    assert.equal(screen.queryByRole("textbox", { name: /^Nickname:/ }), null);
+    await user.click(screen.getByRole("button", { name: "Add New Credential" }));
+    assert.match(
+        screen.getByRole("combobox", { name: /^Credential:/ }).textContent ?? "",
+        /Editing New Credential/,
+    );
+    await replaceTextInputValue(user, screen.getByRole("textbox", { name: /^Nickname:/ }) as HTMLInputElement, "Weather");
+    await selectComboboxOption(user, /^Type:/, "API Key Query");
+    await replaceTextInputValue(user, screen.getByRole("textbox", { name: /^Query Name:/ }) as HTMLInputElement, "api_key");
+    const tokenInput = screen.getByLabelText(/^Token:/) as HTMLInputElement;
+    await replaceTextInputValue(user, tokenInput, "secret-token");
+    assert.equal(tokenInput.type, "password");
+    const showSecretButton = screen.getByRole("button", { name: "Show Secret" });
+    fireEvent.pointerDown(showSecretButton);
+    assert.equal(tokenInput.type, "text");
+    fireEvent.pointerUp(showSecretButton);
+    assert.equal(tokenInput.type, "password");
+    await user.click(screen.getByRole("button", { name: "Save Credential" }));
+    await waitFor(() => assert.equal(screen.queryByRole("textbox", { name: /^Nickname:/ }), null));
+    assert.equal(screen.queryByRole("button", { name: "Show Secret" }), null);
+    assert.match(
+        screen.getByRole("combobox", { name: /^Credential:/ }).textContent ?? "",
+        /Weather/,
+    );
+    await user.click(screen.getByRole("button", { name: "Edit Credential" }));
+    assert.equal((screen.getByRole("textbox", { name: /^Nickname:/ }) as HTMLInputElement).value, "Weather");
+    assert.equal((screen.getByLabelText(/^Token:/) as HTMLInputElement).value, "");
+    assert.equal(screen.queryByRole("button", { name: "Show Secret" }), null);
+    await replaceTextInputValue(
+        user,
+        screen.getByRole("textbox", { name: /^Nickname:/ }) as HTMLInputElement,
+        "Weather Updated",
+    );
+    await user.click(screen.getByRole("button", { name: "Save Credential" }));
+    await waitFor(() => assert.equal(screen.queryByRole("textbox", { name: /^Nickname:/ }), null));
+    assert.match(
+        screen.getByRole("combobox", { name: /^Credential:/ }).textContent ?? "",
+        /Weather Updated/,
+    );
+    await user.click(screen.getByRole("button", { name: "Edit Credential" }));
+    assert.equal((screen.getByRole("textbox", { name: /^Nickname:/ }) as HTMLInputElement).value, "Weather Updated");
+    assert.equal((screen.getByLabelText(/^Token:/) as HTMLInputElement).value, "");
+    assert.equal(screen.queryByRole("button", { name: "Show Secret" }), null);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    assert.equal(screen.queryByRole("textbox", { name: /^Nickname:/ }), null);
+    await user.click(screen.getByRole("button", { name: "Add New Credential" }));
+    assert.match(
+        screen.getByRole("combobox", { name: /^Credential:/ }).textContent ?? "",
+        /Editing New Credential/,
+    );
+    await user.click(screen.getByRole("combobox", { name: /^Credential:/ }));
+    await user.click(screen.getByRole("option", { name: /Weather Updated/ }));
+    assert.equal(screen.queryByRole("textbox", { name: /^Nickname:/ }), null);
+    assert.equal(screen.queryByRole("button", { name: "Show Secret" }), null);
+
+    await user.click(screen.getByRole("button", { name: "Fetch Sample" }));
+    const fetchRequest = readLastCustomHttpSourceEditorRequest(client.sentMessages);
+    dispatchCustomHttpResponse(client, {
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+        command: "fetchSample",
+        requestId: fetchRequest.requestId,
+        result: {
+            ok: true,
+            responseBytes: 13,
+            elapsedMilliseconds: 42,
+            samplePreview: "{\"temp\":23.5}",
+            isSamplePreviewTruncated: false,
+            promptSample: {
+                kind: "jsonSample",
+                text: "{\"temp\":23.5}",
+            },
+        },
+    });
+    await screen.findByText(/Sample fetched\. Response size: 13 bytes\. Request time: 42 ms\./);
+    const copiedPromptList = await withMockClipboard(async () => {
+        await user.click(screen.getByRole("button", { name: "Copy Prompt" }));
+        await screen.findByRole("button", { name: "Copied" });
+    });
+    assert.doesNotMatch(copiedPromptList[0] ?? "", /secret-token/);
+
+    const credentials = readStoredGlobalSettingsFromCodec(latestGlobalSettings).settings.customHttpCredentials;
+    assert.equal(credentials.length, 1);
+    assert.equal(credentials[0]?.nickname, "Weather Updated");
+    assert.equal(credentials[0]?.auth.case, "query");
+    if (credentials[0]?.auth.case === "query") {
+        assert.equal(credentials[0].auth.value.queryParameterName, "api_key");
+        assert.equal(credentials[0].auth.value.token, "secret-token");
+    }
+
+    const widgetSettingsText = JSON.stringify(latestWidgetSettings);
+    assert.match(widgetSettingsText, /credentialId/);
+    assert.doesNotMatch(widgetSettingsText, /secret-token/);
+    assert.match(
+        screen.getByText(/This URL already has a "api_key" query parameter/).textContent ?? "",
+        /replace it/,
+    );
+});
+
+async function withMockClipboard(run: () => Promise<void>): Promise<readonly string[]> {
+    const copiedTextList: string[] = [];
+    const originalClipboard = navigator.clipboard;
+    Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+            writeText: async (text: string) => {
+                copiedTextList.push(text);
+            },
+        },
+    });
+
+    try {
+        await run();
+    } finally {
+        Object.defineProperty(navigator, "clipboard", {
+            configurable: true,
+            value: originalClipboard,
+        });
+    }
+
+    return copiedTextList;
+}
+
+test("Custom HTTP source editor deletes selected credential and clears the widget reference", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+    let latestWidgetSettings = buildSingleCustomMetricSettings(CONTRACT_URL, "credential-1");
+    let latestGlobalSettings: InspectorTestSettings = upsertStoredCustomHttpCredential(undefined, {
+        id: "credential-1",
+        nickname: "LHM",
+        authKind: "basic",
+        username: "admin",
+        password: "password",
+    });
+
+    render(<ContractSettingsHarness
+        actionKind="customMetric"
+        client={client}
+        settings={latestWidgetSettings}
+        globalSettings={latestGlobalSettings}
+        onSettingsChange={(settings) => {
+            latestWidgetSettings = settings;
+        }}
+        onGlobalSettingsChange={(settings) => {
+            latestGlobalSettings = settings;
+        }}
+    />);
+
+    await customHttpSourceEditorContractCases[0].openSourceEditor(user);
+    await user.click(screen.getByRole("button", { name: "Delete Credential" }));
+    assert.equal(screen.queryByRole("textbox", { name: /^Nickname:/ }), null);
+    await user.click(screen.getByRole("button", { name: "Delete Credential" }));
+
+    assert.equal(readStoredGlobalSettingsFromCodec(latestGlobalSettings).settings.customHttpCredentials.length, 0);
+    assert.doesNotMatch(JSON.stringify(latestWidgetSettings), /credential-1/);
+    assert.match(
+        screen.getByRole("combobox", { name: /^Credential:/ }).textContent ?? "",
+        /No Authentication/,
+    );
+    assert.equal(screen.queryByText(/no longer exists/), null);
+});
+
+test("Custom HTTP source editor requires explicit consent for credentials over public HTTP", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+    let latestWidgetSettings = buildSingleCustomMetricSettings("http://api.example.com/weather", "credential-1");
+    const latestGlobalSettings: InspectorTestSettings = upsertStoredCustomHttpCredential(undefined, {
+        id: "credential-1",
+        nickname: "Weather",
+        authKind: "bearer",
+        token: "token",
+    });
+
+    render(<ContractSettingsHarness
+        actionKind="customMetric"
+        client={client}
+        settings={latestWidgetSettings}
+        globalSettings={latestGlobalSettings}
+        onSettingsChange={(settings) => {
+            latestWidgetSettings = settings;
+        }}
+    />);
+
+    await customHttpSourceEditorContractCases[0].openSourceEditor(user);
+    const consentCheckbox = screen.getByRole("checkbox", {
+        name: "Allow credentials over public HTTP",
+    }) as HTMLInputElement;
+    assert.equal(consentCheckbox.checked, false);
+    assert.equal(screen.getByRole("button", { name: "Fetch Sample" }).hasAttribute("disabled"), true);
+
+    await user.click(consentCheckbox);
+
+    assert.equal(consentCheckbox.checked, true);
+    assert.equal(screen.getByRole("button", { name: "Fetch Sample" }).hasAttribute("disabled"), false);
+    assert.match(JSON.stringify(latestWidgetSettings), /allowPublicHttpCredentials/);
+});
+
 function ContractSettingsHarness({
     actionKind,
     client,
     settings: initialSettings,
+    globalSettings: initialGlobalSettings = {},
     onSettingsChange,
+    onGlobalSettingsChange = () => undefined,
 }: {
     readonly actionKind: ActionKind;
     readonly client: TestPropertyInspectorClient;
     readonly settings: InspectorTestSettings;
+    readonly globalSettings?: InspectorTestSettings | undefined;
     readonly onSettingsChange: (settings: InspectorTestSettings) => void;
+    readonly onGlobalSettingsChange?: ((settings: InspectorTestSettings) => void) | undefined;
 }): React.JSX.Element {
     const [settings, setSettings] = useState<InspectorTestSettings>(initialSettings);
+    const [globalSettings, setGlobalSettings] = useState<InspectorTestSettings>(initialGlobalSettings);
 
     return (
         <StreamDeckClientProvider client={client}>
@@ -234,6 +474,7 @@ function ContractSettingsHarness({
                     actionKind,
                     isWindows: true,
                     settings,
+                    globalSettings,
                 })}
                 isGlobalViewOverrideEnabled={false}
                 isGlobalThemeOverrideEnabled={false}
@@ -247,6 +488,20 @@ function ContractSettingsHarness({
                         return nextSettings;
                     });
                 }}
+                onCustomHttpCredentialUpsert={(credential) => {
+                    setGlobalSettings((currentSettings: InspectorTestSettings) => {
+                        const nextSettings = upsertStoredCustomHttpCredential(currentSettings, credential);
+                        onGlobalSettingsChange(nextSettings);
+                        return nextSettings;
+                    });
+                }}
+                onCustomHttpCredentialDelete={(credentialId) => {
+                    setGlobalSettings((currentSettings: InspectorTestSettings) => {
+                        const nextSettings = deleteStoredCustomHttpCredential(currentSettings, credentialId);
+                        onGlobalSettingsChange(nextSettings);
+                        return nextSettings;
+                    });
+                }}
                 onResetWidgetSettings={() => undefined}
                 onOpenColorCompensation={() => undefined}
             />
@@ -254,12 +509,15 @@ function ContractSettingsHarness({
     );
 }
 
-function buildSingleCustomMetricSettings(): InspectorTestSettings {
+function buildSingleCustomMetricSettings(
+    url: string = CONTRACT_URL,
+    credentialId?: string | undefined,
+): InspectorTestSettings {
     return readTestSettingsRecord(writeStoredWidgetSettingsPatch(
         resolveQuickStartStoredWidgetSettings(undefined, "customMetric").rawSettings,
         {
             preferences: { pollingFrequencySeconds: 1 },
-            customMetric: buildCustomMetricPatch(CONTRACT_URL),
+            customMetric: buildCustomMetricPatch(url, credentialId),
         },
     ));
 }
@@ -328,14 +586,27 @@ function buildStackedCustomMetricSettings(): InspectorTestSettings {
     }));
 }
 
-function buildCustomMetricPatch(url: string): NonNullable<StoredWidgetSettingsPatch["customMetric"]> {
+function buildCustomMetricPatch(
+    url: string,
+    credentialId?: string | undefined,
+): NonNullable<StoredWidgetSettingsPatch["customMetric"]> {
     return {
         url,
         userIntent: "Display temperature",
         jqTransform: CONTRACT_JQ_TRANSFORM,
         timeoutSeconds: CONTRACT_REQUEST_SETTINGS.timeoutSeconds,
         retryCount: CONTRACT_REQUEST_SETTINGS.retryCount,
+        credentialId,
     };
+}
+
+async function selectComboboxOption(
+    user: ReturnType<typeof userEvent.setup>,
+    comboboxName: RegExp,
+    optionName: string,
+): Promise<void> {
+    await user.click(screen.getByRole("combobox", { name: comboboxName }));
+    await user.click(screen.getByRole("option", { name: optionName }));
 }
 
 async function replaceTextInputValue(
@@ -424,6 +695,10 @@ function buildFetchSampleRequest(consumerSlug: string, url: string): CustomHttpS
         consumerSlug,
         url,
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: {
+            credentialId: undefined,
+            allowPublicHttpCredentials: false,
+        },
     };
 }
 
@@ -436,6 +711,10 @@ function buildTransformRequest(consumerSlug: string, url: string): CustomHttpSou
         url,
         jqTransform: CONTRACT_JQ_TRANSFORM,
         requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: {
+            credentialId: undefined,
+            allowPublicHttpCredentials: false,
+        },
     };
 }
 
