@@ -1138,6 +1138,14 @@ Required work:
 Current cleanup status:
 
 - Runtime, action, PI, Dense, and Stacked V1 wiring is implemented.
+- Custom HTTP auth is implemented in
+  [Custom HTTP Auth Implementation Plan](03-custom-http-auth-implementation-plan.md).
+  Widget settings store only credential references; secrets live in Sho Metrics
+  global settings and must stay out of action settings, prompts, ordinary logs,
+  runtime metric ids, and copied diagnostics.
+- Large valid JSON prompt support is implemented as a bounded structural
+  digest. The digest is prompt-only; transform tests and runtime validation
+  still run against the full fetched response.
 - The historical transform POC scripts and corpus still validate the original
   multi-output `metrics[]` experiment. They are not part of `build`,
   `test:unit`, `test:pi`, or `lint`, and are marked as historical POC tooling.
@@ -1194,9 +1202,11 @@ If asked whether these steps can be merged, the default answer is no.
 - Exact request coalescing inside `CustomHttpSourceClient`.
 - Sequence and parallel HTTP request pipelines.
 - Per-request cache policy for static lookup data.
-- Custom headers, auth, and Stream Deck global credential references.
+- Arbitrary custom header lists beyond the V1 API-key header credential.
+- OAuth, cookies, HMAC/signature auth, and other multi-step credential flows.
 - Advanced custom DNS resolver policy.
 - Non-Lucide icon providers and emoji/font-backed icon rendering.
-- Large JSON schema/sample summarization before AI prompt generation.
+- Richer interactive JSON exploration UI beyond the current single jq box and
+  bounded structural digest.
 - Dedicated LHM remote JSON catalog source.
 - Local command/CLI Custom Metric source type.

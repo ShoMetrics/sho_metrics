@@ -64,7 +64,11 @@ interface CustomHttpSourceEditorContractCase {
     readonly actionKind: ActionKind;
     readonly actionUuid: string;
     readonly expectedConsumerSlug: string;
-    buildSettings(): InspectorTestSettings;
+    buildSettings(options?: {
+        readonly url?: string | undefined;
+        readonly credentialId?: string | undefined;
+        readonly allowPublicHttpCredentials?: boolean | undefined;
+    }): InspectorTestSettings;
     openSourceEditor(user: ReturnType<typeof userEvent.setup>): Promise<void>;
     readCustomMetricUrls(settings: InspectorTestSettings): readonly string[];
 }
@@ -75,7 +79,11 @@ const customHttpSourceEditorContractCases = [
         actionKind: "customMetric",
         actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
         expectedConsumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
-        buildSettings: () => buildSingleCustomMetricSettings(),
+        buildSettings: (options = {}) => buildSingleCustomMetricSettings(
+            options?.url,
+            options?.credentialId,
+            options?.allowPublicHttpCredentials,
+        ),
         openSourceEditor: async (user) => {
             await user.click(screen.getByRole("button", { name: "Edit" }));
         },
@@ -86,7 +94,11 @@ const customHttpSourceEditorContractCases = [
         actionKind: "denseMultiMetric",
         actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.denseMultiMetric,
         expectedConsumerSlug: buildDenseCustomHttpConsumerSlug("slot-1"),
-        buildSettings: () => buildDenseCustomMetricSettings(),
+        buildSettings: (options = {}) => buildDenseCustomMetricSettings(
+            options?.url,
+            options?.credentialId,
+            options?.allowPublicHttpCredentials,
+        ),
         openSourceEditor: async (user) => {
             await user.click(screen.getAllByRole("button", { name: "Edit" })[0]);
         },
@@ -97,7 +109,11 @@ const customHttpSourceEditorContractCases = [
         actionKind: "stackedMetric",
         actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.stackedMetric,
         expectedConsumerSlug: buildStackedCustomHttpConsumerSlug("slot-1"),
-        buildSettings: () => buildStackedCustomMetricSettings(),
+        buildSettings: (options = {}) => buildStackedCustomMetricSettings(
+            options?.url,
+            options?.credentialId,
+            options?.allowPublicHttpCredentials,
+        ),
         openSourceEditor: async (user) => {
             await user.click(screen.getAllByRole("button", { name: "Edit" })[0]);
             await screen.findByRole("heading", { name: "Editing Metric #1" });
@@ -193,6 +209,169 @@ for (const contractCase of customHttpSourceEditorContractCases) {
             allowPublicHttpCredentials: false,
         });
         assert.equal(transformRequest.jqTransform, CONTRACT_JQ_TRANSFORM);
+    });
+}
+
+for (const contractCase of customHttpSourceEditorContractCases) {
+    test(`Custom HTTP source editor auth contract: ${contractCase.name} creates credential and sends its reference`, async () => {
+        const user = userEvent.setup();
+        const client = new TestPropertyInspectorClient({
+            actionUuid: contractCase.actionUuid,
+        });
+        let latestWidgetSettings = contractCase.buildSettings();
+        let latestGlobalSettings: InspectorTestSettings = {};
+
+        render(<ContractSettingsHarness
+            actionKind={contractCase.actionKind}
+            client={client}
+            settings={latestWidgetSettings}
+            globalSettings={latestGlobalSettings}
+            onSettingsChange={(settings) => {
+                latestWidgetSettings = settings;
+            }}
+            onGlobalSettingsChange={(settings) => {
+                latestGlobalSettings = settings;
+            }}
+        />);
+
+        await contractCase.openSourceEditor(user);
+        await user.click(screen.getByRole("button", { name: "Add New Credential" }));
+        await replaceTextInputValue(user, screen.getByRole("textbox", { name: /^Nickname:/ }) as HTMLInputElement, "Weather");
+        await selectComboboxOption(user, /^Type:/, "Bearer");
+        await replaceTextInputValue(user, screen.getByLabelText(/^Token:/) as HTMLInputElement, "bearer-token");
+        await user.click(screen.getByRole("button", { name: "Save Credential" }));
+        await waitFor(() => assert.equal(screen.queryByRole("textbox", { name: /^Nickname:/ }), null));
+
+        const credentials = readStoredGlobalSettingsFromCodec(latestGlobalSettings).settings.customHttpCredentials;
+        assert.equal(credentials.length, 1);
+        const credential = credentials[0];
+        assert.notEqual(credential, undefined);
+        assert.equal(credential?.nickname, "Weather");
+        assert.equal(credential?.auth.case, "bearer");
+        if (credential?.auth.case === "bearer") {
+            assert.equal(credential.auth.value.token, "bearer-token");
+        }
+
+        const credentialId = credential?.id;
+        assert.equal(typeof credentialId, "string");
+        assert.equal(JSON.stringify(latestWidgetSettings).includes(credentialId ?? "missing-credential-id"), true);
+        assert.doesNotMatch(JSON.stringify(latestWidgetSettings), /bearer-token/);
+
+        await user.click(screen.getByRole("button", { name: "Fetch Sample" }));
+
+        const fetchRequest = readLastCustomHttpSourceEditorRequest(client.sentMessages);
+        assert.equal(fetchRequest.command, "fetchSample");
+        assert.equal(fetchRequest.consumerSlug, contractCase.expectedConsumerSlug);
+        assert.equal(fetchRequest.auth.credentialId, credentialId);
+        assert.equal(fetchRequest.auth.allowPublicHttpCredentials, false);
+
+        dispatchCustomHttpResponse(client, {
+            type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+            command: "fetchSample",
+            requestId: fetchRequest.requestId,
+            result: {
+                ok: true,
+                responseBytes: 13,
+                elapsedMilliseconds: 42,
+                samplePreview: "{\"temp\":23.5}",
+                isSamplePreviewTruncated: false,
+                promptSample: {
+                    kind: "jsonSample",
+                    text: "{\"temp\":23.5}",
+                },
+            },
+        });
+        await screen.findByText(/Sample fetched/);
+
+        await user.click(screen.getByRole("button", { name: "Test Transform" }));
+
+        const transformRequest = readLastCustomHttpSourceEditorRequest(client.sentMessages);
+        assert.equal(transformRequest.command, "testTransform");
+        assert.equal(transformRequest.consumerSlug, contractCase.expectedConsumerSlug);
+        assert.equal(transformRequest.auth.credentialId, credentialId);
+        assert.equal(transformRequest.auth.allowPublicHttpCredentials, false);
+    });
+}
+
+for (const contractCase of customHttpSourceEditorContractCases) {
+    test(`Custom HTTP source editor auth contract: ${contractCase.name} gates public HTTP credentials`, async () => {
+        const user = userEvent.setup();
+        const client = new TestPropertyInspectorClient({
+            actionUuid: contractCase.actionUuid,
+        });
+        const publicHttpUrl = "http://api.example.com/weather";
+        let latestWidgetSettings = contractCase.buildSettings({
+            url: publicHttpUrl,
+            credentialId: "credential-1",
+        });
+        const latestGlobalSettings: InspectorTestSettings = upsertStoredCustomHttpCredential(undefined, {
+            id: "credential-1",
+            nickname: "Weather",
+            authKind: "bearer",
+            token: "token",
+        });
+
+        render(<ContractSettingsHarness
+            actionKind={contractCase.actionKind}
+            client={client}
+            settings={latestWidgetSettings}
+            globalSettings={latestGlobalSettings}
+            onSettingsChange={(settings) => {
+                latestWidgetSettings = settings;
+            }}
+        />);
+
+        await contractCase.openSourceEditor(user);
+
+        const fetchButton = screen.getByRole("button", { name: "Fetch Sample" });
+        assert.equal(fetchButton.hasAttribute("disabled"), true);
+        assert.equal(
+            screen.getByText("Authentication over public HTTP requires confirmation in the Authentication section.").textContent,
+            "Authentication over public HTTP requires confirmation in the Authentication section.",
+        );
+
+        const consentCheckbox = screen.getByRole("checkbox", {
+            name: "Allow credentials over public HTTP",
+        }) as HTMLInputElement;
+        assert.equal(consentCheckbox.checked, false);
+        await user.click(consentCheckbox);
+
+        assert.equal(consentCheckbox.checked, true);
+        assert.equal(fetchButton.hasAttribute("disabled"), false);
+        assert.match(JSON.stringify(latestWidgetSettings), /allowPublicHttpCredentials/);
+
+        await user.click(fetchButton);
+        const fetchRequest = readLastCustomHttpSourceEditorRequest(client.sentMessages);
+        assert.equal(fetchRequest.consumerSlug, contractCase.expectedConsumerSlug);
+        assert.equal(fetchRequest.url, publicHttpUrl);
+        assert.deepEqual(fetchRequest.auth, {
+            credentialId: "credential-1",
+            allowPublicHttpCredentials: true,
+        });
+    });
+}
+
+for (const contractCase of customHttpSourceEditorContractCases) {
+    test(`Custom HTTP source editor auth contract: ${contractCase.name} shows missing credential state`, async () => {
+        const user = userEvent.setup();
+        const client = new TestPropertyInspectorClient({
+            actionUuid: contractCase.actionUuid,
+        });
+
+        render(<ContractSettingsHarness
+            actionKind={contractCase.actionKind}
+            client={client}
+            settings={contractCase.buildSettings({ credentialId: "missing-credential" })}
+            onSettingsChange={() => undefined}
+        />);
+
+        await contractCase.openSourceEditor(user);
+
+        assert.equal(screen.getByRole("button", { name: "Fetch Sample" }).hasAttribute("disabled"), true);
+        assert.equal(
+            screen.getByText("The selected credential is missing. Select or create a credential in the Authentication section.").textContent,
+            "The selected credential is missing. Select or create a credential in the Authentication section.",
+        );
     });
 }
 
@@ -512,17 +691,22 @@ function ContractSettingsHarness({
 function buildSingleCustomMetricSettings(
     url: string = CONTRACT_URL,
     credentialId?: string | undefined,
+    allowPublicHttpCredentials?: boolean | undefined,
 ): InspectorTestSettings {
     return readTestSettingsRecord(writeStoredWidgetSettingsPatch(
         resolveQuickStartStoredWidgetSettings(undefined, "customMetric").rawSettings,
         {
             preferences: { pollingFrequencySeconds: 1 },
-            customMetric: buildCustomMetricPatch(url, credentialId),
+            customMetric: buildCustomMetricPatch(url, credentialId, allowPublicHttpCredentials),
         },
     ));
 }
 
-function buildDenseCustomMetricSettings(): InspectorTestSettings {
+function buildDenseCustomMetricSettings(
+    url: string = CONTRACT_URL,
+    credentialId?: string | undefined,
+    allowPublicHttpCredentials?: boolean | undefined,
+): InspectorTestSettings {
     const rawSettings = resolveQuickStartStoredWidgetSettings(undefined, "denseMultiMetric", {
         createSlotId: createDenseSlotIdForTest(),
     }).rawSettings;
@@ -532,7 +716,7 @@ function buildDenseCustomMetricSettings(): InspectorTestSettings {
             updateSlot: {
                 slotId: "slot-1",
                 target: { domain: "customMetric" },
-                customMetric: buildCustomMetricPatch(CONTRACT_URL),
+                customMetric: buildCustomMetricPatch(url, credentialId, allowPublicHttpCredentials),
             },
         },
     }, {
@@ -552,7 +736,11 @@ function buildDenseCustomMetricSettings(): InspectorTestSettings {
     }));
 }
 
-function buildStackedCustomMetricSettings(): InspectorTestSettings {
+function buildStackedCustomMetricSettings(
+    url: string = CONTRACT_URL,
+    credentialId?: string | undefined,
+    allowPublicHttpCredentials?: boolean | undefined,
+): InspectorTestSettings {
     const rawSettings = resolveQuickStartStoredWidgetSettings(undefined, "stackedMetric", {
         createSlotId: createStackedSlotIdForTest(),
     }).rawSettings;
@@ -563,7 +751,7 @@ function buildStackedCustomMetricSettings(): InspectorTestSettings {
                 slotId: "slot-1",
                 metricDomain: "customMetric",
                 singleMetric: {
-                    customMetric: buildCustomMetricPatch(CONTRACT_URL),
+                    customMetric: buildCustomMetricPatch(url, credentialId, allowPublicHttpCredentials),
                 },
             },
         },
@@ -589,6 +777,7 @@ function buildStackedCustomMetricSettings(): InspectorTestSettings {
 function buildCustomMetricPatch(
     url: string,
     credentialId?: string | undefined,
+    allowPublicHttpCredentials?: boolean | undefined,
 ): NonNullable<StoredWidgetSettingsPatch["customMetric"]> {
     return {
         url,
@@ -597,6 +786,7 @@ function buildCustomMetricPatch(
         timeoutSeconds: CONTRACT_REQUEST_SETTINGS.timeoutSeconds,
         retryCount: CONTRACT_REQUEST_SETTINGS.retryCount,
         credentialId,
+        allowPublicHttpCredentials,
     };
 }
 

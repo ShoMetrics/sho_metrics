@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+    redactSecretLikeJsonPropertyText,
     redactSecretLikeJsonText,
     redactSecretLikeSourceUrl,
 } from "./custom-http-redaction";
@@ -34,5 +35,12 @@ test("redactSecretLikeJsonText redacts secret-like fields in invalid JSON previe
     assert.equal(
         redactSecretLikeJsonText("{\"token\":\"abc123\",\"author\":\"Open-Meteo\",\"reason\":\"truncated\""),
         "{\"token\":\"REDACTED\",\"author\":\"Open-Meteo\",\"reason\":\"truncated\"",
+    );
+});
+
+test("redactSecretLikeJsonPropertyText redacts secret-like fields without reformatting JSON", () => {
+    assert.equal(
+        redactSecretLikeJsonPropertyText("{\n  \"token\": \"abc123\",\n  \"author\": \"Open-Meteo\"\n}"),
+        "{\n  \"token\": \"REDACTED\",\n  \"author\": \"Open-Meteo\"\n}",
     );
 });

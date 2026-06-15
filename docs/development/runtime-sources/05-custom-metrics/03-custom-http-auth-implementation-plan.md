@@ -579,6 +579,8 @@ implementation and makes security regressions easier to waive.
 
 ### Step 5: Boundary Tests, Verification, And Documentation Cleanup
 
+Status: implemented.
+
 LOC estimate: 800-1,300.
 
 Purpose:
@@ -651,6 +653,26 @@ Acceptance:
 - Public HTTP auth requires explicit consent.
 - Auth cross-origin redirects are blocked and recoverable through "Use
   Redirected URL".
+
+Implemented shape:
+
+- The source-editor contract matrix covers single Custom Metric, Dense row, and
+  Stacked slot entry points for auth creation, Fetch Sample credential
+  references, Test Transform credential references, public HTTP consent, and
+  missing credential states.
+- Runtime Custom HTTP tests use a real local Node HTTP server for Basic, Bearer,
+  API-key header, and API-key query requests. They also verify manual redirect
+  behavior in the installed Node/undici runtime.
+- Redaction tests cover known credential values, Basic Auth composed/base64
+  values, configured API-key query parameters, redirected URLs, response JSON
+  previews, prompt samples, and copied failure/debug text.
+- Credential deletion is intentionally local to global settings. The app does
+  not maintain a fake usage registry or scan inactive profiles; widgets that
+  still reference a deleted credential show the missing credential state.
+- Ordinary logs and copied diagnostics must never contain credential secret
+  values. Debugging should use credential ids, auth kind, bounded host/origin
+  summaries, and typed failure stages instead of raw request headers, full URLs,
+  or global settings dumps.
 
 Do not merge with any earlier step:
 

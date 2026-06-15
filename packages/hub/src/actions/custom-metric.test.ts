@@ -560,6 +560,63 @@ for (const authCase of [
     });
 }
 
+test("Custom Metric PI sample fetch redacts echoed credential secrets from preview and prompt sample", async () => {
+    const registry = new CustomHttpDefinitionRegistry();
+    const fetcher = new FakeCustomHttpFetcher({
+        ok: true,
+        responseText: JSON.stringify({
+            links: {
+                self: "https://api.example.com/data?api_key=query-token&page=1",
+            },
+            token: "query-token",
+            sensor: {
+                Text: "GPU Core",
+                Value: "55 °C",
+            },
+        }, null, 2),
+    });
+    const action = new TestCustomMetric(registry, {
+        fetcher,
+        credentialSettingsReader: new FakeCustomHttpCredentialSettingsReader(create(StoredGlobalSettingsSchema, {
+            customHttpCredentials: [create(CustomHttpCredentialSchema, {
+                id: "credential-query",
+                nickname: "Query",
+                auth: {
+                    case: "query",
+                    value: {
+                        queryParameterName: "api_key",
+                        token: "query-token",
+                    },
+                },
+            })],
+        })),
+    });
+    const streamDeckAction = new FakeStreamDeckAction("custom-pi-fetch-redacted-success-action");
+
+    action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildCustomMetricWidgetSettings()));
+    action.onSendToPlugin(buildSendToPluginEvent(streamDeckAction, {
+        type: "custom-http-pi-test",
+        command: "fetchSample",
+        requestId: "fetch-1",
+        consumerSlug: CUSTOM_HTTP_SINGLE_CONSUMER_SLUG,
+        url: "https://api.example.com/data?api_key=old&page=1",
+        requestSettings: { timeoutSeconds: 5, retryCount: 0 },
+        auth: { credentialId: "credential-query", allowPublicHttpCredentials: false },
+    }));
+
+    await waitForAsyncWork();
+
+    const fetchResponse = action.customMetricSourceEditorResponses[0];
+    assert.equal(fetchResponse?.command, "fetchSample");
+    assert.equal(fetchResponse?.result.ok, true);
+    if (fetchResponse?.command === "fetchSample" && fetchResponse.result.ok === true) {
+        assert.doesNotMatch(fetchResponse.result.samplePreview, /query-token/);
+        assert.match(fetchResponse.result.samplePreview, /api_key=\[redacted\]/);
+        assert.match(fetchResponse.result.samplePreview, /"token": "REDACTED"/);
+        assert.doesNotMatch(JSON.stringify(fetchResponse.result.promptSample), /query-token/);
+    }
+});
+
 test("Custom Metric PI sample fetch does not guess-redact blocked redirect URLs", async () => {
     const registry = new CustomHttpDefinitionRegistry();
     const fetcher = new FakeCustomHttpFetcher({
