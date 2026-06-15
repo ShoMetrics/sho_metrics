@@ -136,7 +136,7 @@ body {
     margin-top: 0;
 }
 
-.custom-http-transform-status {
+.custom-http-status-note {
     align-items: center;
     display: flex;
     font-weight: 700;
@@ -152,16 +152,20 @@ body {
     width: 18px;
 }
 
-.custom-http-transform-status-success {
+.custom-http-status-note-success {
     color: #8ee08e;
 }
 
-.custom-http-transform-status-continuing {
+.custom-http-status-note-continuing {
     color: #f8d66d;
 }
 
-.custom-http-transform-status-danger {
+.custom-http-status-note-danger {
     color: #ff8f8f;
+}
+
+.custom-http-redirect-notice .advanced-action-stack {
+    margin-top: 8px;
 }
 
 .settings-notice {

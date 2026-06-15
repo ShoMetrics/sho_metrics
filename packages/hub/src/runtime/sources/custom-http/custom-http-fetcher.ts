@@ -31,9 +31,16 @@ export type CustomHttpFetchResult =
         readonly detail: string;
         readonly responseTextPreview?: string;
         readonly isResponseTextPreviewTruncated?: boolean;
+        readonly blockedRedirect?: CustomHttpBlockedRedirect | undefined;
     };
 
 export type CustomHttpFetchFailureResult = Exclude<CustomHttpFetchResult, { ok: true }>;
+
+export interface CustomHttpBlockedRedirect {
+    readonly fromOrigin: string;
+    readonly toOrigin: string;
+    readonly redirectedUrl: string;
+}
 
 export interface CustomHttpFetchOptions {
     readonly timeoutSeconds?: number | undefined;
@@ -264,10 +271,17 @@ async function fetchWithCredentialRedirectPolicy(
         if (!canForwardCredentialHeaders(currentUrl, nextUrl)) {
             return {
                 ok: false,
-                failure: failure(
-                    "redirectBlocked",
-                    "Cross-origin redirect blocked while credentials are attached. Use the redirected URL directly.",
-                ),
+                failure: {
+                    ...failure(
+                        "redirectBlocked",
+                        "Cross-origin redirect blocked while credentials are attached. Use the redirected URL directly.",
+                    ),
+                    blockedRedirect: {
+                        fromOrigin: currentUrl.origin,
+                        toOrigin: nextUrl.origin,
+                        redirectedUrl: nextUrl.toString(),
+                    },
+                },
             };
         }
 

@@ -152,6 +152,11 @@ test("NodeCustomHttpFetcher blocks cross-origin redirects when request headers a
         ok: false,
         reason: "redirectBlocked",
         detail: "Cross-origin redirect blocked while credentials are attached. Use the redirected URL directly.",
+        blockedRedirect: {
+            fromOrigin: "https://api.example.com",
+            toOrigin: "https://evil.example.net",
+            redirectedUrl: "https://evil.example.net/data",
+        },
     });
     assert.deepEqual(requestedHosts, ["api.example.com"]);
 });

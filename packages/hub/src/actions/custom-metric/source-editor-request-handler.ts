@@ -10,6 +10,7 @@ import {
 import {
     PluginGlobalCustomHttpCredentialSettingsReader,
     prepareCustomHttpRequest,
+    redactCustomHttpPreparedAuthUrl,
     redactCustomHttpPreparedAuthSecrets,
     resolveCustomHttpPreparedAuth,
     type CustomHttpCredentialSettingsReader,
@@ -151,6 +152,24 @@ export class CustomHttpSourceEditorRequestHandler {
                     buildHttpFetchFailureDetail(fetchResult),
                     requestResult.auth,
                 ),
+                ...(fetchResult.blockedRedirect === undefined
+                    ? {}
+                    : {
+                        blockedRedirect: {
+                            fromOrigin: redactCustomHttpPreparedAuthSecrets(
+                                fetchResult.blockedRedirect.fromOrigin,
+                                requestResult.auth,
+                            ),
+                            toOrigin: redactCustomHttpPreparedAuthSecrets(
+                                fetchResult.blockedRedirect.toOrigin,
+                                requestResult.auth,
+                            ),
+                            redirectedUrl: redactCustomHttpPreparedAuthUrl(
+                                fetchResult.blockedRedirect.redirectedUrl,
+                                requestResult.auth,
+                            ),
+                        },
+                    }),
             };
         }
 

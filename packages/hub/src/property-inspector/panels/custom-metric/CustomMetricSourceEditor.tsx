@@ -12,6 +12,7 @@ import {
     CircleCheck,
     CircleQuestionMark,
     CircleX,
+    TriangleAlert,
     type IconNode,
 } from "lucide";
 import { customMetricMessages } from "../../../i18n/message-groups/widgets";
@@ -19,13 +20,18 @@ import { useI18n } from "../../../i18n/react";
 import {
     CUSTOM_HTTP_RESPONSE_LIMIT_BYTES,
 } from "../../../runtime/sources/custom-http/custom-http-fetch-limits";
+import type { LocalizedMessage } from "../../../i18n/types";
 import {
     estimateCustomHttpWorstCaseFetchMilliseconds,
     type ResolvedCustomHttpFetchPolicy,
 } from "../../../runtime/sources/custom-http/custom-http-request-policy";
 import { normalizeCustomHttpSourceUrlInput } from "../../../runtime/sources/custom-http/custom-http-url";
 import type { StreamDeckPropertyInspectorClient } from "../../stream-deck/stream-deck-client";
-import type { ResolvedCustomHttpRequestAuth } from "../../../settings/resolved-settings";
+import type {
+    ResolvedCustomHttpCredentialSummary,
+    ResolvedCustomHttpRequestAuth,
+} from "../../../settings/resolved-settings";
+import type { CustomHttpSourceEditorBlockedRedirect } from "../../../runtime/sources/custom-http/custom-http-source-editor-messages";
 import { InspectorItem } from "../../components/InspectorItem";
 import { SelectSetting } from "../../controls/SelectSetting";
 import { TextAreaSetting } from "../../controls/TextAreaSetting";
@@ -85,7 +91,14 @@ export function CustomMetricSourceEditor({
     const fetchSampleButtonRef = useRef<HTMLButtonElement | null>(null);
     const normalizedUrlDraft = normalizeCustomHttpSourceUrlInput(urlDraft);
     const hasSample = hasCurrentSample(sourceEditorState, normalizedUrlDraft);
-    const canUseCredentialForUrl = canUseCustomHttpCredentialForUrl(auth, normalizedUrlDraft);
+    const fetchSampleActionState = resolveFetchSampleActionState({
+        normalizedUrl: normalizedUrlDraft,
+        auth,
+        credentials: props.context.globalSettings.customHttpCredentials,
+        state: sourceEditorState,
+    });
+    const canFetchSample = fetchSampleActionState.kind === "enabled";
+    const canTestTransform = canFetchSample && jqTransform.trim().length > 0 && hasSample;
     const promptText = useMemo(() => buildCustomMetricPrompt({
         locale,
         sourceUrl: normalizedUrlDraft,
@@ -121,6 +134,17 @@ export function CustomMetricSourceEditor({
         }
 
         return normalizedUrl;
+    };
+    const useRedirectedUrl = (redirectedUrl: string): void => {
+        isUrlInputFocusedRef.current = false;
+        setUrlDraft(redirectedUrl);
+        props.onSettingsPatch({
+            customMetric: {
+                url: redirectedUrl,
+                allowPublicHttpCredentials: false,
+            },
+        });
+        setSourceEditorState({ kind: "idle" });
     };
 
     return (
@@ -183,12 +207,12 @@ export function CustomMetricSourceEditor({
                             ref={fetchSampleButtonRef}
                             className="inline-action-button"
                             type="button"
-                            disabled={
-                                normalizedUrlDraft.length === 0
-                                || !canUseCredentialForUrl
-                                || sourceEditorState.kind === "pending"
-                            }
+                            disabled={fetchSampleActionState.kind !== "enabled"}
                             onClick={() => {
+                                if (fetchSampleActionState.kind !== "enabled") {
+                                    return;
+                                }
+
                                 const requestUrl = commitNormalizedUrlDraft();
                                 sendFetchSampleRequest(
                                     client,
@@ -201,9 +225,12 @@ export function CustomMetricSourceEditor({
                                 );
                             }}
                         >
-                            {t(customMetricMessages.fetchSampleButton)}
+                            {fetchSampleActionState.kind === "pending"
+                                ? t(customMetricMessages.fetchSamplePendingButton)
+                                : t(customMetricMessages.fetchSampleButton)}
                         </button>
                         <TestStatusNote state={sourceEditorState} command="fetchSample" />
+                        <ActionUnavailableNote state={fetchSampleActionState} />
                         <p className="section-note">
                             {t(customMetricMessages.fetchLimitsNote, {
                                 timeoutSeconds: requestSettings.timeoutSeconds,
@@ -217,6 +244,7 @@ export function CustomMetricSourceEditor({
                     state={sourceEditorState}
                     command="fetchSample"
                     requestSettings={requestSettings}
+                    onUseRedirectedUrl={useRedirectedUrl}
                 />
                 <SamplePreview state={sourceEditorState} />
             </SettingsSection>
@@ -293,13 +321,7 @@ export function CustomMetricSourceEditor({
                         <button
                             className="inline-action-button"
                             type="button"
-                            disabled={
-                                normalizedUrlDraft.length === 0
-                                || !canUseCredentialForUrl
-                                || jqTransform.trim().length === 0
-                                || !hasSample
-                                || sourceEditorState.kind === "pending"
-                            }
+                            disabled={!canTestTransform}
                             onClick={() => {
                                 const requestUrl = commitNormalizedUrlDraft();
                                 const requestTransform = readSingleFencedCodeBlock(jqTransform) ?? jqTransform;
@@ -320,7 +342,9 @@ export function CustomMetricSourceEditor({
                                 );
                             }}
                         >
-                            {t(customMetricMessages.testTransformButton)}
+                            {sourceEditorState.kind === "pending" && sourceEditorState.command === "testTransform"
+                                ? t(customMetricMessages.testingNote)
+                                : t(customMetricMessages.testTransformButton)}
                         </button>
                         {!hasSample && (
                             <>
@@ -337,6 +361,7 @@ export function CustomMetricSourceEditor({
                     state={sourceEditorState}
                     command="testTransform"
                     requestSettings={requestSettings}
+                    onUseRedirectedUrl={useRedirectedUrl}
                 />
             </SettingsSection>
         </>
@@ -396,6 +421,102 @@ function GoToFetchSampleButton({
         >
             {t(customMetricMessages.goToFetchSampleButton)}
         </button>
+    );
+}
+
+interface ActionUnavailableReason {
+    readonly tone: "continuing" | "danger";
+    readonly message: LocalizedMessage;
+}
+
+type FetchSampleActionState =
+    | { readonly kind: "enabled" }
+    | { readonly kind: "pending" }
+    | { readonly kind: "unavailable"; readonly reason: ActionUnavailableReason };
+
+function resolveFetchSampleActionState({
+    normalizedUrl,
+    auth,
+    credentials,
+    state,
+}: {
+    readonly normalizedUrl: string;
+    readonly auth: ResolvedCustomHttpRequestAuth;
+    readonly credentials: readonly ResolvedCustomHttpCredentialSummary[];
+    readonly state: SourceEditorState;
+}): FetchSampleActionState {
+    if (state.kind === "pending") {
+        return { kind: "pending" };
+    }
+
+    if (normalizedUrl.length === 0) {
+        return {
+            kind: "unavailable",
+            reason: {
+                tone: "continuing",
+                message: customMetricMessages.fetchUnavailableMissingUrl,
+            },
+        };
+    }
+
+    if (!isValidHttpUrl(normalizedUrl)) {
+        return {
+            kind: "unavailable",
+            reason: {
+                tone: "danger",
+                message: customMetricMessages.fetchUnavailableInvalidUrl,
+            },
+        };
+    }
+
+    if (
+        auth.credentialId !== undefined
+        && !credentials.some(credential => credential.id === auth.credentialId)
+    ) {
+        return {
+            kind: "unavailable",
+            reason: {
+                tone: "danger",
+                message: customMetricMessages.fetchUnavailableMissingCredential,
+            },
+        };
+    }
+
+    if (!canUseCustomHttpCredentialForUrl(auth, normalizedUrl)) {
+        return {
+            kind: "unavailable",
+            reason: {
+                tone: "continuing",
+                message: customMetricMessages.fetchUnavailablePublicHttpCredentialConsent,
+            },
+        };
+    }
+
+    return { kind: "enabled" };
+}
+
+function isValidHttpUrl(url: string): boolean {
+    try {
+        const parsedUrl = new URL(url);
+        return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
+    } catch {
+        return false;
+    }
+}
+
+function ActionUnavailableNote({ state }: { readonly state: FetchSampleActionState }): React.JSX.Element | null {
+    const { t } = useI18n();
+    if (state.kind !== "unavailable") {
+        return null;
+    }
+
+    const { reason } = state;
+    return (
+        <p className={`section-note custom-http-status-note-${reason.tone}`}>
+            {t(reason.message, {
+                authenticationSection: t(customMetricMessages.authenticationSection),
+            })}
+        </p>
     );
 }
 
@@ -552,7 +673,7 @@ function StatusNote({
 }): React.JSX.Element {
     return (
         <InspectorItem className="note-item note-item-caption">
-            <p className={`section-note custom-http-transform-status custom-http-transform-status-${tone}`}>
+            <p className={`section-note custom-http-status-note custom-http-status-note-${tone}`}>
                 <LucideInlineIcon iconNode={iconNode} />
                 <span>{text}</span>
             </p>
@@ -687,10 +808,12 @@ function FailureDetails({
     state,
     command,
     requestSettings,
+    onUseRedirectedUrl,
 }: {
     readonly state: SourceEditorState;
     readonly command: SourceEditorCommand;
     readonly requestSettings: ResolvedCustomHttpFetchPolicy;
+    readonly onUseRedirectedUrl: (redirectedUrl: string) => void;
 }): React.JSX.Element | null {
     const { t } = useI18n();
     if (state.kind !== "failed" || state.command !== command) {
@@ -700,27 +823,83 @@ function FailureDetails({
     const failureText = [
         `Stage: ${state.stage}`,
         `Detail: ${state.detail}`,
+        ...(state.blockedRedirect === undefined
+            ? []
+            : [
+                `Redirect: ${state.blockedRedirect.fromOrigin} -> ${state.blockedRedirect.toOrigin}`,
+                `Redirected URL: ${state.blockedRedirect.redirectedUrl}`,
+            ]),
         `Settings: timeout=${requestSettings.timeoutSeconds}s, retryCount=${requestSettings.retryCount}, responseLimit=${CUSTOM_HTTP_RESPONSE_LIMIT_BYTES / 1024}KiB`,
     ].join("\n");
     const hint = t(command === "testTransform"
         ? customMetricMessages.transformFailureDetailsHint
         : customMetricMessages.failureDetailsHint);
+    const blockedRedirect = state.blockedRedirect;
 
     return (
-        <TextAreaSetting
-            label={t(customMetricMessages.failureDetailsLabel)}
-            value={failureText}
-            rows={3}
-            readOnly
-            hint={hint}
-            onValueChange={() => undefined}
-            actionButton={(
-                <CopyTextButton
-                    text={failureText}
-                    label={t(customMetricMessages.copyDetailsButton)}
+        <>
+            {blockedRedirect !== undefined && (
+                <RedirectBlockedNotice
+                    blockedRedirect={blockedRedirect}
+                    onUseRedirectedUrl={onUseRedirectedUrl}
                 />
             )}
-        />
+            <TextAreaSetting
+                label={t(customMetricMessages.failureDetailsLabel)}
+                value={failureText}
+                rows={3}
+                readOnly
+                hint={hint}
+                onValueChange={() => undefined}
+                actionButton={(
+                    <CopyTextButton
+                        text={failureText}
+                        label={t(customMetricMessages.copyDetailsButton)}
+                    />
+                )}
+            />
+        </>
+    );
+}
+
+function RedirectBlockedNotice({
+    blockedRedirect,
+    onUseRedirectedUrl,
+}: {
+    readonly blockedRedirect: CustomHttpSourceEditorBlockedRedirect;
+    readonly onUseRedirectedUrl: (redirectedUrl: string) => void;
+}): React.JSX.Element {
+    const { t } = useI18n();
+    const redirectedUrl = blockedRedirect.redirectedUrl;
+    return (
+        <InspectorItem className="note-item note-item-caption">
+            <div className="custom-http-redirect-notice">
+                <p className="section-note custom-http-status-note custom-http-status-note-continuing">
+                    <LucideInlineIcon iconNode={TriangleAlert} />
+                    <span>
+                        {t(customMetricMessages.redirectBlockedNotice)}
+                    </span>
+                </p>
+                <p className="section-note custom-http-status-note-continuing">
+                    {t(customMetricMessages.redirectBlockedSummary, {
+                        redirectedUrl,
+                    })}
+                </p>
+                <div className="advanced-action-stack">
+                    <button
+                        className="inline-action-button"
+                        type="button"
+                        onClick={() => onUseRedirectedUrl(redirectedUrl)}
+                    >
+                        {t(customMetricMessages.useRedirectedUrlButton)}
+                    </button>
+                    <CopyTextButton
+                        text={redirectedUrl}
+                        label={t(customMetricMessages.copyRedirectedUrlButton)}
+                    />
+                </div>
+            </div>
+        </InspectorItem>
     );
 }
 

@@ -420,6 +420,11 @@ export const customMetricMessages = {
         zh_CN: "获取样本",
         ja: "サンプル取得",
     },
+    fetchSamplePendingButton: {
+        en: "Fetching...",
+        zh_CN: "正在获取...",
+        ja: "取得中...",
+    },
     testTransformButton: {
         en: "Test Transform",
         zh_CN: "测试转换",
@@ -449,6 +454,26 @@ export const customMetricMessages = {
         en: "Fetch a sample before testing the transform.",
         zh_CN: "测试转换前请先获取样本。",
         ja: "変換をテストする前にサンプルを取得してください。",
+    },
+    fetchUnavailableMissingUrl: {
+        en: "Enter an HTTP or HTTPS URL before fetching a sample.",
+        zh_CN: "请先输入 HTTP 或 HTTPS URL，再获取样本。",
+        ja: "サンプルを取得する前に、HTTP または HTTPS URL を入力してください。",
+    },
+    fetchUnavailableInvalidUrl: {
+        en: "Enter a valid HTTP or HTTPS URL before fetching a sample.",
+        zh_CN: "请输入有效的 HTTP 或 HTTPS URL，再获取样本。",
+        ja: "サンプルを取得する前に、有効な HTTP または HTTPS URL を入力してください。",
+    },
+    fetchUnavailableMissingCredential: {
+        en: "The selected credential is missing. Select or create a credential in the {authenticationSection} section.",
+        zh_CN: "选中的凭证不存在。请在“{authenticationSection}”部分选择或创建凭证。",
+        ja: "選択した認証情報が見つかりません。{authenticationSection} セクションで認証情報を選択または作成してください。",
+    },
+    fetchUnavailablePublicHttpCredentialConsent: {
+        en: "Authentication over public HTTP requires confirmation in the {authenticationSection} section.",
+        zh_CN: "通过公共 HTTP 发送认证信息需要先在“{authenticationSection}”部分确认。",
+        ja: "公開 HTTP で認証情報を送信するには、{authenticationSection} セクションで確認が必要です。",
     },
     goToFetchSampleButton: {
         en: "Go to Fetch Sample",
@@ -799,6 +824,26 @@ export const customMetricMessages = {
         en: "Copy Details",
         zh_CN: "复制详情",
         ja: "詳細をコピー",
+    },
+    redirectBlockedNotice: {
+        en: "Notice",
+        zh_CN: "注意",
+        ja: "注意",
+    },
+    redirectBlockedSummary: {
+        en: "API URL is being redirected to {redirectedUrl}. Your request is blocked; confirm you want to use the redirected URL before continuing.",
+        zh_CN: "API URL 正在重定向到 {redirectedUrl}。请求已被阻止；继续前请确认是否使用重定向后的 URL。",
+        ja: "API URL は {redirectedUrl} にリダイレクトされています。リクエストはブロックされました。続行する前に、リダイレクト先 URL を使用するか確認してください。",
+    },
+    useRedirectedUrlButton: {
+        en: "Use Redirected URL",
+        zh_CN: "使用重定向后的 URL",
+        ja: "リダイレクト先 URL を使用",
+    },
+    copyRedirectedUrlButton: {
+        en: "Copy Redirected URL",
+        zh_CN: "复制重定向后的 URL",
+        ja: "リダイレクト先 URL をコピー",
     },
     validationUrlRequired: {
         en: "Enter an HTTP or HTTPS URL.",
