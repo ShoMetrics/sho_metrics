@@ -831,9 +831,9 @@ export const customMetricMessages = {
         ja: "注意",
     },
     redirectBlockedSummary: {
-        en: "API URL is being redirected to {redirectedUrl}. Your request is blocked; confirm you want to use the redirected URL before continuing.",
-        zh_CN: "API URL 正在重定向到 {redirectedUrl}。请求已被阻止；继续前请确认是否使用重定向后的 URL。",
-        ja: "API URL は {redirectedUrl} にリダイレクトされています。リクエストはブロックされました。続行する前に、リダイレクト先 URL を使用するか確認してください。",
+        en: "API URL is being redirected from {fromOrigin} to {toOrigin}: {redirectedUrl}. Your request is blocked; confirm you want to use the redirected URL before continuing.",
+        zh_CN: "API URL 正在从 {fromOrigin} 重定向到 {toOrigin}：{redirectedUrl}。请求已被阻止；继续前请确认是否使用重定向后的 URL。",
+        ja: "API URL は {fromOrigin} から {toOrigin} にリダイレクトされています: {redirectedUrl}。リクエストはブロックされました。続行する前に、リダイレクト先 URL を使用するか確認してください。",
     },
     useRedirectedUrlButton: {
         en: "Use Redirected URL",

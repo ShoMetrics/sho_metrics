@@ -709,10 +709,10 @@ test("custom metric source editor can apply a blocked redirected URL", async () 
 
     const failureDetails = await screen.findByRole("textbox", { name: /^Failure Debug Details:/ }) as HTMLTextAreaElement;
     assert.equal(screen.getByText("Notice").textContent, "Notice");
-    assert.match(
-        screen.getByText(/API URL is being redirected to/).textContent ?? "",
-        /http:\/\/login\.example\.net\/data\?api_key=REDACTED/,
-    );
+    const redirectNoticeText = screen.getByText(/API URL is being redirected from/).textContent ?? "";
+    assert.match(redirectNoticeText, /http:\/\/api\.example\.com/);
+    assert.match(redirectNoticeText, /http:\/\/login\.example\.net/);
+    assert.match(redirectNoticeText, /http:\/\/login\.example\.net\/data\?api_key=REDACTED/);
     assert.match(failureDetails.value, /Redirect: http:\/\/api\.example\.com -> http:\/\/login\.example\.net/);
     assert.match(failureDetails.value, /Redirected URL: http:\/\/login\.example\.net\/data\?api_key=REDACTED/);
 

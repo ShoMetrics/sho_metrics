@@ -643,6 +643,21 @@ npm.cmd run build
 git diff --check
 ```
 
+Manual smoke verification:
+
+```text
+npm.cmd run diagnostics:custom-http-smoke
+```
+
+This starts a local HTTP server with endpoints for no-auth JSON, large JSON
+prompt digest/exploration, HTTP failure previews, Basic Auth, Bearer token,
+API-key header, API-key query, token echo redaction, same-origin redirects,
+and authenticated cross-origin redirect blocking. The script prints the exact
+URLs, credentials, and jq filters to paste into the Property Inspector.
+For public-HTTP credential consent, follow the printed hosts-file instruction;
+private LAN URLs are intentionally classified as local/private and should not
+trigger that consent gate.
+
 Acceptance:
 
 - All verification commands pass.
@@ -666,6 +681,9 @@ Implemented shape:
 - Redaction tests cover known credential values, Basic Auth composed/base64
   values, configured API-key query parameters, redirected URLs, response JSON
   previews, prompt samples, and copied failure/debug text.
+- `scripts/diagnostics/custom-http-smoke-server.mjs` provides a local manual
+  smoke server for launch validation across auth kinds, redirect behavior,
+  large JSON exploration, failure previews, and public-HTTP consent.
 - Credential deletion is intentionally local to global settings. The app does
   not maintain a fake usage registry or scan inactive profiles; widgets that
   still reference a deleted credential show the missing credential state.
