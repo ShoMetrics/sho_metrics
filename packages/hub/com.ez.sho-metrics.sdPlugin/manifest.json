@@ -1,4 +1,5 @@
 {
+	"$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
 	"Name": "Sho Metrics",
 	"Version": "0.1.0.0",
 	"Author": "ez",
@@ -9,6 +10,8 @@
 			"Icon": "imgs/actions/cpu/icon",
 			"Tooltip": "Displays CPU metrics.",
 			"PropertyInspectorPath": "ui/property-inspector.html",
+			"SupportedInMultiActions": false,
+			"VisibleInActionsList": true,
 			"Controllers": [
 				"Keypad",
 				"Encoder"
@@ -32,6 +35,8 @@
 			"Icon": "imgs/actions/gpu/icon",
 			"Tooltip": "Displays GPU metrics.",
 			"PropertyInspectorPath": "ui/property-inspector.html",
+			"SupportedInMultiActions": false,
+			"VisibleInActionsList": true,
 			"Controllers": [
 				"Keypad",
 				"Encoder"
@@ -55,6 +60,8 @@
 			"Icon": "imgs/actions/memory/icon",
 			"Tooltip": "Displays memory metrics.",
 			"PropertyInspectorPath": "ui/property-inspector.html",
+			"SupportedInMultiActions": false,
+			"VisibleInActionsList": true,
 			"Controllers": [
 				"Keypad",
 				"Encoder"
@@ -78,6 +85,8 @@
 			"Icon": "imgs/actions/disk/icon",
 			"Tooltip": "Displays disk metrics.",
 			"PropertyInspectorPath": "ui/property-inspector.html",
+			"SupportedInMultiActions": false,
+			"VisibleInActionsList": true,
 			"Controllers": [
 				"Keypad",
 				"Encoder"
@@ -101,6 +110,8 @@
 			"Icon": "imgs/actions/network/icon",
 			"Tooltip": "Displays network metrics.",
 			"PropertyInspectorPath": "ui/property-inspector.html",
+			"SupportedInMultiActions": false,
+			"VisibleInActionsList": true,
 			"Controllers": [
 				"Keypad",
 				"Encoder"
@@ -127,6 +138,8 @@
 				"windows"
 			],
 			"PropertyInspectorPath": "ui/property-inspector.html",
+			"SupportedInMultiActions": false,
+			"VisibleInActionsList": true,
 			"Controllers": [
 				"Keypad",
 				"Encoder"
@@ -149,7 +162,10 @@
 			"UUID": "com.ez.sho-metrics.custom-metric",
 			"Icon": "imgs/actions/custom-metric/icon",
 			"Tooltip": "Displays a metric from a custom source, such as HTTP JSON.",
+			"SupportURL": "https://shometrics.github.io/faq/custom-http-metric/",
 			"PropertyInspectorPath": "ui/property-inspector.html",
+			"SupportedInMultiActions": false,
+			"VisibleInActionsList": true,
 			"Controllers": [
 				"Keypad",
 				"Encoder"
@@ -173,6 +189,8 @@
 			"Icon": "imgs/actions/dense-multi-metric/icon",
 			"Tooltip": "Displays multiple metrics in one compact view.",
 			"PropertyInspectorPath": "ui/property-inspector.html",
+			"SupportedInMultiActions": false,
+			"VisibleInActionsList": true,
 			"Controllers": [
 				"Keypad",
 				"Encoder"
@@ -196,6 +214,8 @@
 			"Icon": "imgs/actions/stacked-metric/icon",
 			"Tooltip": "Rotates between multiple metric widgets on one key.",
 			"PropertyInspectorPath": "ui/property-inspector.html",
+			"SupportedInMultiActions": false,
+			"VisibleInActionsList": true,
 			"Controllers": [
 				"Keypad",
 				"Encoder"
@@ -220,12 +240,14 @@
 	"Category": "Sho Metrics",
 	"CategoryIcon": "imgs/plugin/category-icon",
 	"CodePath": "bin/plugin.js",
-	"Description": "system monitor plugin",
+	"Description": "Display live System metrics such as CPU, GPU, memory, disk, network, sensor metrics, and HTTP metrics.",
 	"Icon": "imgs/plugin/marketplace",
 	"SDKVersion": 3,
 	"Software": {
 		"MinimumVersion": "7.1"
 	},
+	"URL": "https://shometrics.github.io/",
+	"SupportURL": "https://shometrics.github.io/faq/",
 	"OS": [
 		{
 			"Platform": "mac",

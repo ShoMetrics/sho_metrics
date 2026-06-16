@@ -61,6 +61,17 @@ jobs:
       - name: Build plugin
         run: npm run build
 
+      - name: Pack Stream Deck plugin
+        run: npm run pack:streamdeck
+
+      - name: Upload Stream Deck plugin package
+        uses: actions/upload-artifact@v7
+        with:
+          name: shometrics-streamdeck-plugin
+          path: artifacts/hub/streamdeck-plugin/package/*.streamDeckPlugin
+          if-no-files-found: error
+          retention-days: 7
+
   visual:
     name: Hub visual snapshots
     runs-on: ubuntu-latest

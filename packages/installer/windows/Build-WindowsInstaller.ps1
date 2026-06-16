@@ -6,8 +6,9 @@ param(
     [ValidateNotNullOrEmpty()]
     [string] $RuntimeIdentifier = "win-x64",
 
+    [Parameter(Mandatory)]
     [ValidateNotNullOrEmpty()]
-    [string] $ShoMetricsVersionPrefix = "0.1.0",
+    [string] $ShoMetricsVersionPrefix,
 
     [ValidateSet("Standalone", "FrameworkDependent")]
     [string] $Distribution = "Standalone",

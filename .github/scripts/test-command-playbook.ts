@@ -112,6 +112,9 @@ assertReferencedFile("Brand asset script", "packages/assets/brand/sync-brand-ass
 assertReferencedFile("Source Windows lint script", "packages/source-windows/scripts/Test-SourceWindowsLint.ps1");
 assertReferencedFile("Site preview smoke script", ".github/scripts/Test-SitePreview.ps1");
 assertReferencedFile("Manual release checklist", "docs/release/manual-verification-checklist.md");
+assertReferencedFile("Hub CI workflow", ".github/workflows/hub-ci.yml");
+assertReferencedFile("Windows Source CI workflow", ".github/workflows/source-windows-ci.yml");
+assertReferencedFile("Release workflow", ".github/workflows/release.yml");
 
 assertScriptExists(
     "Command playbook lint implementation",

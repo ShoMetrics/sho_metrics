@@ -5,6 +5,7 @@
         "node": ">=24.0.0 <25.0.0"
     },
     "scripts": {
-        "check-command-playbook": "node test-command-playbook.ts"
+        "check-command-playbook": "node test-command-playbook.ts",
+        "check-release-plan": "node read-release-plan.mjs --check"
     }
 }

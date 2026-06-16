@@ -29,6 +29,7 @@ $scriptText = ($scriptFiles | ForEach-Object {
 $mainScriptText = Get-Content -Encoding UTF8 -LiteralPath $mainScriptPath -Raw
 $buildScriptText = Get-Content -Encoding UTF8 -LiteralPath $buildScriptPath -Raw
 $publishControlPanelScriptText = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $repoRoot "packages\source-windows\scripts\Publish-WindowsControlPanel.ps1") -Raw
+$publishServiceScriptText = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $repoRoot "packages\source-windows\scripts\Publish-WindowsService.ps1") -Raw
 $controlPanelProjectText = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.ControlPanel\ShoMetrics.Source.Windows.ControlPanel.csproj") -Raw
 $serviceProjectText = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.Service\ShoMetrics.Source.Windows.Service.csproj") -Raw
 $innoProjectText = Get-Content -Encoding UTF8 -LiteralPath $innoProjectPath -Raw
@@ -125,6 +126,8 @@ Assert-Contains -Name "Setup executable uses the shared Windows application icon
 Assert-Contains -Name "Setup wizard uses the shared large brand image" -Text $mainScriptText -Pattern '(?m)^WizardImageFile=\.\.\\\.\.\\\.\.\\source-windows\\Assets\\ShoMetricsWizardImage\.png\r?$'
 Assert-Contains -Name "Setup wizard uses the shared small brand image" -Text $mainScriptText -Pattern '(?m)^WizardSmallImageFile=\.\.\\\.\.\\\.\.\\source-windows\\Assets\\ShoMetricsWizardSmallImage\.png\r?$'
 Assert-Contains -Name "Framework-dependent installer bundles ASP.NET Core Runtime only for framework-dependent distribution" -Text $mainScriptText -Pattern '(?s)#ifdef\s+ShoMetricsFrameworkDependentDistribution.*?aspnetcore-runtime-\{#AspNetCoreRuntimeVersion\}-win-x64\.exe.*?#endif'
+Assert-Contains -Name "Inno requires ShoMetricsVersion from build script" -Text $mainScriptText -Pattern '(?s)#ifndef\s+ShoMetricsVersion\s+#error\s+ShoMetricsVersion must be passed by the build script\.\s+#endif'
+Assert-NotContains -Name "Inno must not provide a fallback ShoMetricsVersion" -Text $mainScriptText -Pattern '#define\s+ShoMetricsVersion\s+"'
 Assert-Contains -Name "Installer deletes stale service payload before copying files" -Text $mainScriptText -Pattern '(?m)^Type:\s*filesandordirs;\s*Name:\s*"\{app\}\\Service"\r?$'
 Assert-Contains -Name "Installer deletes stale Control Panel payload before copying files" -Text $mainScriptText -Pattern '(?m)^Type:\s*filesandordirs;\s*Name:\s*"\{app\}\\ControlPanel"\r?$'
 Assert-Contains -Name "Existing install page uses Next to continue the normal flow" -Text $scriptText -Pattern '(?s)procedure\s+CreateExistingInstallPage;.*?ShoMetrics Helper is already installed.*?Click Next to stop ShoMetrics Helper'
@@ -189,6 +192,10 @@ Assert-Contains -Name "PawnIO reboot-required exit code is treated as known" -Te
 Assert-Contains -Name "Control Panel process detection uses shipped friendly name" -Text $scriptText -Pattern "ControlPanelProcessName\s*=\s*'ShoMetricsHelper\.exe'"
 Assert-Contains -Name "Framework-dependent service base runtime requirement comes from service runtimeconfig" -Text $buildScriptText -Pattern 'Read-ServiceRuntimeFrameworkRequirement'
 Assert-Contains -Name "ASP.NET Core Runtime version is always passed into Inno" -Text $buildScriptText -Pattern '(?s)\$innoArguments\s*=\s*@\(.*?/DAspNetCoreRuntimeVersion=\$aspNetCoreRuntimeVersion'
+Assert-Contains -Name "Build script requires ShoMetricsVersionPrefix input" -Text $buildScriptText -Pattern '\[Parameter\(Mandatory\)\]\s*\[ValidateNotNullOrEmpty\(\)\]\s*\[string\]\s*\$ShoMetricsVersionPrefix'
+Assert-NotContains -Name "Build script must not provide fallback ShoMetricsVersionPrefix" -Text $buildScriptText -Pattern '\$ShoMetricsVersionPrefix\s*=\s*"0\.1\.0"'
+Assert-Contains -Name "Service publish always forwards ShoMetricsVersionPrefix" -Text $publishServiceScriptText -Pattern '\$publishArguments\s*\+=\s*"/p:ShoMetricsVersionPrefix=\$ShoMetricsVersionPrefix"'
+Assert-Contains -Name "Control Panel publish always forwards ShoMetricsVersionPrefix" -Text $publishControlPanelScriptText -Pattern '\$publishArguments\s*\+=\s*"/p:ShoMetricsVersionPrefix=\$ShoMetricsVersionPrefix"'
 Assert-Contains -Name "Framework-dependent ASP.NET Core Runtime version is pinned" -Text $buildScriptText -Pattern '\$aspNetCoreRuntimeVersion\s*=\s*"10\.0\.8"'
 Assert-Contains -Name "Framework-dependent ASP.NET Core Runtime SHA256 is pinned" -Text $buildScriptText -Pattern '\$aspNetCoreRuntimeSetupSha256\s*=\s*"1c152d4a9138a92e2c04bea8ecc00e79ca8febfb7a9d5b6141f1546a076d11fd"'
 Assert-Contains -Name "Distribution builds use separate artifact directory names" -Text $buildScriptText -Pattern '(?s)\$distributionDirectoryName\s*=\s*switch\s*\(\$Distribution\).*?"Standalone"\s*\{\s*"standalone"\s*\}.*?"FrameworkDependent"\s*\{\s*"framework-dependent"\s*\}'

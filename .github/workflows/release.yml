@@ -1,0 +1,310 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, for example v0.1.0 or streamdeck-v0.1.0.0. Note: this is NOT the product version, enter it in `.github/release-plan.yml` instead."
+        required: true
+        type: string
+      dry_run:
+        description: "Build and stage release assets without creating the GitHub Release"
+        required: true
+        default: true
+        type: boolean
+      prerelease:
+        description: "Mark the GitHub Release as a prerelease"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate release input
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      streamdeck_plugin_version: ${{ steps.release-input.outputs.streamdeck_plugin_version }}
+      tag_name: ${{ steps.release-input.outputs.tag_name }}
+      windows_version: ${{ steps.release-input.outputs.windows_version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release input
+        id: release-input
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "Release workflow must run from main. Selected ref: ${GITHUB_REF}" >&2
+            exit 1
+          fi
+
+          node .github/scripts/read-release-plan.mjs --tag "${INPUT_TAG}" --github-output "${GITHUB_OUTPUT}"
+
+          if git rev-parse -q --verify "refs/tags/${INPUT_TAG}" >/dev/null; then
+            echo "Tag already exists: ${INPUT_TAG}" >&2
+            exit 1
+          fi
+
+  build-plugin:
+    name: Build Stream Deck plugin
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - validate
+    if: ${{ needs.validate.outputs.streamdeck_plugin_version != '' }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: packages/hub
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: packages/hub/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build plugin
+        run: npm run build
+
+      - name: Pack Stream Deck plugin
+        env:
+          STREAMDECK_PLUGIN_VERSION: ${{ needs.validate.outputs.streamdeck_plugin_version }}
+        run: npm run pack:streamdeck -- --version "${STREAMDECK_PLUGIN_VERSION}"
+
+      - name: Upload Stream Deck plugin package
+        uses: actions/upload-artifact@v7
+        with:
+          name: shometrics-streamdeck-plugin
+          path: artifacts/hub/streamdeck-plugin/package/*.streamDeckPlugin
+          if-no-files-found: error
+          retention-days: 3
+
+  build-windows-installers:
+    name: Build Windows installers
+    runs-on: windows-latest
+    timeout-minutes: 60
+    needs:
+      - validate
+    if: ${{ needs.validate.outputs.windows_version != '' }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            packages/source-windows/**/packages.lock.json
+            packages/installer/windows/inno/*.lock.json
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+          cache: npm
+          cache-dependency-path: packages/assets/brand/package-lock.json
+
+      - name: Restore brand asset tooling
+        working-directory: packages/assets/brand
+        run: npm.cmd ci
+
+      - name: Run installer invariant checks
+        run: ./packages/installer/windows/scripts/Test-WindowsInstallerInvariants.ps1
+
+      - name: Build standalone installer
+        env:
+          WINDOWS_VERSION: ${{ needs.validate.outputs.windows_version }}
+        run: ./packages/installer/windows/Build-WindowsInstaller.ps1 -Configuration Release -RuntimeIdentifier win-x64 -ShoMetricsVersionPrefix $env:WINDOWS_VERSION
+
+      - name: Build framework-dependent installer
+        env:
+          WINDOWS_VERSION: ${{ needs.validate.outputs.windows_version }}
+        run: ./packages/installer/windows/Build-WindowsInstaller.ps1 -Configuration Release -RuntimeIdentifier win-x64 -ShoMetricsVersionPrefix $env:WINDOWS_VERSION -Distribution FrameworkDependent
+
+      - name: Upload Windows installer packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: shometrics-helper-installers-win-x64
+          path: artifacts/installer/windows/setup/**/*.exe
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - validate
+      - build-plugin
+      - build-windows-installers
+    if: ${{ always() && needs.validate.result == 'success' && (needs.build-plugin.result == 'success' || needs.build-plugin.result == 'skipped') && (needs.build-windows-installers.result == 'success' || needs.build-windows-installers.result == 'skipped') }}
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: release-artifacts
+
+      - name: Prepare release assets
+        shell: bash
+        env:
+          STREAMDECK_PLUGIN_VERSION: ${{ needs.validate.outputs.streamdeck_plugin_version }}
+          TAG_NAME: ${{ needs.validate.outputs.tag_name }}
+          WINDOWS_VERSION: ${{ needs.validate.outputs.windows_version }}
+        run: |
+          set -euo pipefail
+
+          publish_dir="release-assets/publish"
+          mkdir -p "${publish_dir}"
+
+          release_files=()
+
+          if [[ -n "${STREAMDECK_PLUGIN_VERSION}" ]]; then
+            plugin_package="$(find release-artifacts -type f -name "com.ez.sho-metrics.streamDeckPlugin" -print -quit)"
+            if [[ ! -f "${plugin_package}" ]]; then
+              echo "Expected Stream Deck plugin package was not found." >&2
+              find release-artifacts -type f >&2
+              exit 1
+            fi
+
+            cp "${plugin_package}" "${publish_dir}/ShoMetrics.streamDeckPlugin"
+            release_files+=("${publish_dir}/ShoMetrics.streamDeckPlugin")
+          fi
+
+          if [[ -n "${WINDOWS_VERSION}" ]]; then
+            standalone_installer="$(find release-artifacts -type f -name "ShoMetrics-Helper-Setup-${WINDOWS_VERSION}-win-x64.exe" -print -quit)"
+            framework_installer="$(find release-artifacts -type f -name "ShoMetrics-Helper-Setup-${WINDOWS_VERSION}-win-x64-framework-dependent.exe" -print -quit)"
+
+            for file in "${standalone_installer}" "${framework_installer}"; do
+              if [[ ! -f "${file}" ]]; then
+                echo "Expected Windows installer was not found: ${file}" >&2
+                find release-artifacts -type f >&2
+                exit 1
+              fi
+            done
+
+            cp "${standalone_installer}" "${publish_dir}/ShoMetrics-Helper-Setup-win-x64.exe"
+            cp "${framework_installer}" "${publish_dir}/ShoMetrics-Helper-Setup-win-x64-framework-dependent.exe"
+            release_files+=("${publish_dir}/ShoMetrics-Helper-Setup-win-x64.exe")
+            release_files+=("${publish_dir}/ShoMetrics-Helper-Setup-win-x64-framework-dependent.exe")
+          fi
+
+          {
+            if [[ -n "${STREAMDECK_PLUGIN_VERSION}" && -n "${WINDOWS_VERSION}" ]]; then
+              echo "This release is for Stream Deck plugin version ${STREAMDECK_PLUGIN_VERSION} and Windows helper version ${WINDOWS_VERSION}."
+              echo
+              echo "Most users should download the self-contained Windows helper installer. It is larger, but it includes the required runtime dependencies. If you strongly care about installer size and already have the required .NET and WinUI runtime dependencies installed, you can use the framework-dependent installer instead."
+            elif [[ -n "${STREAMDECK_PLUGIN_VERSION}" ]]; then
+              echo "This release is for Stream Deck plugin version ${STREAMDECK_PLUGIN_VERSION}. There is no Windows helper release in this release. You can find the latest Windows helper installer at https://shometrics.github.io/download/."
+            else
+              echo "This release is for Windows helper version ${WINDOWS_VERSION}. There is no Stream Deck plugin release in this release. You can find the latest Stream Deck plugin package at https://shometrics.github.io/download/."
+              echo
+              echo "Most users should download the self-contained Windows helper installer. It is larger, but it includes the required runtime dependencies. If you strongly care about installer size and already have the required .NET and WinUI runtime dependencies installed, you can use the framework-dependent installer instead."
+            fi
+            echo
+            awk -v heading="${TAG_NAME}" '
+              $0 == "## " heading {
+                in_section = 1
+                next
+              }
+
+              in_section && /^##[[:space:]]+/ {
+                exit
+              }
+
+              in_section {
+                print
+              }
+            ' CHANGELOG.md
+          } > "${publish_dir}/release-notes.md"
+
+          (
+            cd "${publish_dir}"
+            : > checksums.txt
+            for file in "${release_files[@]}"; do
+              sha256sum "$(basename "${file}")" >> checksums.txt
+            done
+          )
+
+      - name: Report dry run
+        if: ${{ inputs.dry_run }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Dry run completed. Release assets were prepared but no GitHub Release or tag was created."
+          find release-assets/publish -maxdepth 1 -type f -print
+
+      - name: Create release
+        if: ${{ inputs.dry_run == false }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          INPUT_PRERELEASE: ${{ inputs.prerelease }}
+          STREAMDECK_PLUGIN_VERSION: ${{ needs.validate.outputs.streamdeck_plugin_version }}
+          TAG_NAME: ${{ needs.validate.outputs.tag_name }}
+          WINDOWS_VERSION: ${{ needs.validate.outputs.windows_version }}
+        run: |
+          set -euo pipefail
+
+          prerelease_flag=()
+          if [[ "${INPUT_PRERELEASE}" == "true" ]]; then
+            prerelease_flag=(--prerelease)
+          fi
+
+          latest_flag=()
+          if [[ -z "${STREAMDECK_PLUGIN_VERSION}" || -z "${WINDOWS_VERSION}" ]]; then
+            latest_flag=(--latest=false)
+          fi
+
+          mapfile -t release_assets < <(find release-assets/publish -maxdepth 1 -type f ! -name "release-notes.md" -print | sort)
+          gh release create "${TAG_NAME}" \
+            "${release_assets[@]}" \
+            --target "${GITHUB_SHA}" \
+            --title "${TAG_NAME}" \
+            --notes-file release-assets/publish/release-notes.md \
+            "${latest_flag[@]}" \
+            "${prerelease_flag[@]}"
