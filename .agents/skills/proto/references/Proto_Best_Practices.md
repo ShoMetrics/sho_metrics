@@ -1,0 +1,176 @@
+Shares vetted best practices for authoring Protocol Buffers.
+
+Clients and servers are never updated at exactly the same time - even when you try to update them at the same time. One or the other may get rolled back. Don’t assume that you can make a breaking change and it’ll be okay because the client and server are in sync.
+
+## **Don’t** Re-use a Tag Number
+
+Never re-use a tag number. It messes up deserialization. Even if you think no one is using the field, don’t re-use a tag number. If the change was live ever, there could be serialized versions of your proto in a log somewhere. Or there could be old code in another server that will break.
+
+## **Do** Reserve Tag Numbers for Deleted Fields
+
+When you delete a field that’s no longer used, reserve its tag number so that no one accidentally re-uses it in the future. Just `reserved 2, 3;` is enough. No type required (lets you trim dependencies!). You can also reserve names to avoid recycling now-deleted field names: `reserved foo, bar;`. See the docs on [reserved field numbers](https://protobuf.dev/programming-guides/editions#fieldreserved) and [reserved field names](https://protobuf.dev/programming-guides/editions#reserved-field-names).
+
+## **Do** Reserve Numbers for Deleted Enum Values
+
+When you delete an enum value that’s no longer used, reserve its number so that no one accidentally re-uses it in the future. Just `reserved 2, 3;` is enough. You can also reserve names to avoid recycling now-deleted value names: `reserved FOO, BAR;`. See also [enum reserved values](https://protobuf.dev/programming-guides/editions#reserved)
+
+## **Do** Put New Enum Aliases Last
+
+When you add a new enum alias, put the new name last to give services time to pick it up.
+
+To safely remove the original name (if it’s being used for interchange, which it [shouldn’t](https://protobuf.dev/best-practices/dos-donts/#text-format-interchange)), you must do the following:
+
+-   Add the new name below the old name and deprecate the old one (serializers will continue to use the old name)
+    
+-   After every parser has the schema rolled out, swap the order of the two names (serializers will begin using the new name, parsers accept both)
+    
+-   After every serializer has that version of the schema, you can delete the deprecated name.
+    
+
+> **Note:** While in theory clients shouldn’t be using the old name for interchange, it’s still polite to follow the above steps, especially for widely-used enum names.
+
+## **Don’t** Change the Type of a Field
+
+Almost never change the type of a field; it’ll mess up deserialization, same as re-using a tag number. The [protobuf docs](https://protobuf.dev/programming-guides/editions#updating) outline a small number of cases that are okay (for example, going between `int32`, `uint32`, `int64` and `bool`). However, changing a field’s message type **will break** unless the new message is a superset of the old one.
+
+## **Don’t** Add a Required Field
+
+Never add a required field, instead add `// required` to document the API contract. Required fields are considered harmful by so many they were removed from proto3 completely. Make all fields optional or repeated. You never know how long a message type is going to last and whether someone will be forced to fill in your required field with an empty string or zero in four years when it’s no longer logically required but the proto still says it is.
+
+For proto3 there are no `required` fields, so this advice does not apply.
+
+## **Don’t** Make a Message with Lots of Fields
+
+Don’t make a message with “lots” (think: hundreds) of fields. In C++ every field adds roughly 65 bits to the in-memory object size whether it’s populated or not (8 bytes for the pointer and, if the field is declared as optional, another bit in a bitfield that keeps track of whether the field is set). When your proto grows too large, the generated code may not even compile (for example, in Java there is a hard limit on the size of a method ).
+
+## **Do** Include an Unspecified Value in an Enum
+
+Enums should include a default `FOO_UNSPECIFIED` value as the first value in the declaration. When new values are added to an enum, old clients will see the field as unset and the getter will return the default value or the first-declared value if no default exists . For consistent behavior with [proto enums](https://protobuf.dev/programming-guides/editions#enum), the first declared enum value should be a default `FOO_UNSPECIFIED` value and should use tag 0. It may be tempting to declare this default as a semantically meaningful value but as a general rule, do not, to aid in the evolution of your protocol as new enum values are added over time. All enum values declared under a container message are in the same C++ namespace, so prefix the unspecified value with the enum’s name to avoid compilation errors. If you’ll never need cross-language constants, an `int32` will preserve unknown values and generates less code. Note that [proto enums](https://protobuf.dev/programming-guides/editions#enum) require the first value to be zero and can round-trip (deserialize, serialize) an unknown enum value.
+
+## **Don’t** Use C/C++ Macro Constants for Enum Values
+
+Using words that have already been defined by the C++ language - specifically, in its headers such as `math.h`, may cause compilation errors if the `#include` statement for one of those headers appears before the one for `.proto.h`. Avoid using macro constants such as “`NULL`,” “`NAN`,” and “`DOMAIN`” as enum values.
+
+## **Do** prefer extensions over `Any` where possible
+
+If you plan to use `Any`, first double-check if extensions can satisfy the use case instead. If yes, prefer using extensions.
+
+`Any` was created in Proto3 to replace extensions. However, it has a number of design flaws. For most use cases, prefer using extensions.
+
+The main use case that `Any` fulfills is the uncommon scenario in which horizontal infrastructure needs to propagate completely arbitrary messages, and declaring an extension for each possible legal types would be infeasible.
+
+In the future, Protobuf may introduce a new concept that would satisfy the `Any` use cases without the design flaws, but we have no concrete plans at this time.
+
+## **Do** Use Well-Known Types and Common Types
+
+Using the following common, shared types is strongly encouraged. E.g., do not use `int32 timestamp_seconds_since_epoch` or `int64 timeout_millis` in your code when a perfectly suitable common type already exists!
+
+-   [`duration`](https://github.com/protocolbuffers/protobuf/blob/main/src/google/protobuf/duration.proto) is a signed, fixed-length span of time (for example, 42s).
+-   [`timestamp`](https://github.com/protocolbuffers/protobuf/blob/main/src/google/protobuf/timestamp.proto) is a point in time independent of any time zone or calendar (for example, 2017-01-15T01:30:15.01Z).
+-   [`interval`](https://github.com/googleapis/googleapis/blob/master/google/type/interval.proto) is a time interval independent of time zone or calendar (for example, 2017-01-15T01:30:15.01Z - 2017-01-16T02:30:15.01Z).
+-   [`date`](https://github.com/googleapis/googleapis/blob/master/google/type/date.proto) is a whole calendar date (for example, 2005-09-19).
+-   [`month`](https://github.com/googleapis/googleapis/blob/master/google/type/month.proto) is a month of year (for example, April).
+-   [`dayofweek`](https://github.com/googleapis/googleapis/blob/master/google/type/dayofweek.proto) is a day of week (for example, Monday).
+-   [`timeofday`](https://github.com/googleapis/googleapis/blob/master/google/type/timeofday.proto) is a time of day (for example, 10:42:23).
+-   [`field_mask`](https://github.com/protocolbuffers/protobuf/blob/main/src/google/protobuf/field_mask.proto) is a set of symbolic field paths (for example, f.b.d).
+-   [`postal_address`](https://github.com/googleapis/googleapis/blob/master/google/type/postal_address.proto) is a postal address (for example, 1600 Amphitheatre Parkway Mountain View, CA 94043 USA).
+-   [`money`](https://github.com/googleapis/googleapis/blob/master/google/type/money.proto) is an amount of money with its currency type (for example, 42 USD).
+-   [`latlng`](https://github.com/googleapis/googleapis/blob/master/google/type/latlng.proto) is a latitude/longitude pair (for example, 37.386051 latitude and -122.083855 longitude).
+-   [`color`](https://github.com/googleapis/googleapis/blob/master/google/type/color.proto) is a color in the RGBA color space.
+
+**Note:** While the “Well-Known Types” (such as `Duration` and `Timestamp`) are included with the Protocol Buffers compiler, the “Common Types” (such as `Date` and `Money`) are not. To use the Common Types, you may need to add a dependency on the [googleapis repository](https://github.com/googleapis/googleapis).
+
+## **Do** Define Message Types in Separate Files
+
+When defining a proto schema, you should have a single message, enum, extension, service, or group of cyclic dependencies per file. This makes refactoring easier. Moving files when they’re separated is much easier than extracting messages from a file with other messages. Following this practice also helps to keep the proto schema files smaller, which enhances maintainability.
+
+If they will be widely used outside of your project, consider putting them in their own file with no dependencies. Then it’s easy for anyone to use those types without introducing the transitive dependencies in your other proto files.
+
+For more on this topic, see [1-1-1 Rule](https://protobuf.dev/best-practices/1-1-1).
+
+## **Don’t** Change the Default Value of a Field
+
+Almost never change the default value of a proto field. This causes version skew between clients and servers. A client reading an unset value will see a different result than a server reading the same unset value when their builds straddle the proto change. Proto3 removed the ability to set default values.
+
+## **Don’t** Go from Repeated to Scalar
+
+Although it won’t cause crashes, you’ll lose data. For JSON, a mismatch in repeatedness will lose the whole _message_. For numeric proto3 fields and proto2 `packed` fields, going from repeated to scalar will lose all data in that _field_. For non-numeric proto3 fields and un-annotated proto2 fields, going from repeated to scalar will result in the last deserialized value “winning.”
+
+Going from scalar to repeated is OK in proto2 and in proto3 with `[packed=false]` because for binary serialization the scalar value becomes a one-element list.
+
+## **Do** Follow the Style Guide for Generated Code
+
+Proto generated code is referred to in normal code. Ensure that options in `.proto` file do not result in generation of code which violate the style guide. For example:
+
+-   `java_outer_classname` should follow [https://google.github.io/styleguide/javaguide.html#s5.2.2-class-names](https://google.github.io/styleguide/javaguide.html#s5.2.2-class-names)
+    
+-   `java_package` and `java_alt_package` should follow [https://google.github.io/styleguide/javaguide.html#s5.2.1-package-names](https://google.github.io/styleguide/javaguide.html#s5.2.1-package-names)
+    
+-   `package`, although used for Java when `java_package` is not present, always directly corresponds to C++ namespace and thus should follow [https://google.github.io/styleguide/cppguide.html#Namespace\_Names](https://google.github.io/styleguide/cppguide.html#Namespace_Names). If these style guides conflict, use `java_package` for Java.
+    
+-   `ruby_package` should be in the form `Foo::Bar::Baz` rather than `Foo.Bar.Baz`.
+    
+
+## **Don’t** use Text Format Messages for Interchange
+
+Text-based serialization formats like text format and JSON represent fields and enum values as strings. As a result, deserialization of protocol buffers in these formats using old code will fail when a field or enum value is renamed, or when a new field or enum value or extension is added. Use binary serialization when possible for data interchange, and use text format for human editing and debugging only.
+
+If you use protos converted to JSON in your API or for storing data, you may not be able to safely rename fields or enums at all.
+
+## **Never** Rely on Serialization Stability Across Builds
+
+The stability of proto serialization is not guaranteed across binaries or across builds of the same binary. Do not rely on it when, for example, building cache keys.
+
+## **Don’t** Generate Java Protos in the Same Java Package as Other Code
+
+Generate Java proto sources into a separate package from your hand-written Java sources. The `package`, `java_package` and `java_alt_api_package` options control [where the generated Java sources are emitted](https://protobuf.dev/reference/java/java-generated#package). Make sure hand-written Java source code does not also live in that same package. A common practice is to generate your protos into a `proto` subpackage in your project that **only** contains those protos (that is, no hand-written source code).
+
+## **Do** Derive Java Package from the .proto Package (if overridden)
+
+Setting the `java_package` can introduce fully-qualified name collisions in generated code that did not exist in the .proto semantics. For example, these two files may create collisions in the generated code despite the fully-qualified names not colliding in the original schema:
+
+```proto
+package x; option java_package = "com.example.proto"; message Abc {}
+```
+
+```proto
+package y; option java_package = "com.example.proto"; message Abc {}
+```
+
+To avoid these problems, you should never set the same `java_package` in two files that have different .proto packages set.
+
+The best practice is to establish a local naming pattern where the package name is derived from the .proto package. For example, a best practice file with `package y` might consistently set `option java_package = "com.example.proto.y"`.
+
+This guidance also applies to any other language-specific options where package overrides are possible.
+
+## Avoid Using Language Keywords for Field Names
+
+If the name of a message, field, enum, or enum value is a keyword in the language that reads from/writes to that field, then protobuf may change the field name, and may have different ways to access them than normal fields. For example, see [this warning about Python](https://protobuf.dev/reference/python/python-generated#keyword-conflicts).
+
+You should also avoid using keywords in your file paths, as this can also cause problems.
+
+## **Do** Use Different Messages For RPC APIs and Storage
+
+Reusing the same messages for APIs and long-term storage may seem convenient, reducing boilerplate and overhead of conversion between messages.
+
+However, the needs of long-term storage and live RPC services tend to later diverge. Using separate types even if they are largely duplicative initially gives freedom to change your storage format without impacting your external clients. Layer your code so that modules deal either with client protos, storage protos, or translation.
+
+There is a cost in maintaining the translation layer, but it quickly pays off once you have clients and have to do your first storage changes.
+
+## **Don’t** Use Booleans for Something That Has Two States Now, but Might Have More Later
+
+If you are using boolean for a field, make sure that the field is indeed describing just two possible states (for all time, not just now and the near future). The future flexibility of using an enum is often worth it, even if it only has two values when it is first introduced.
+
+```fallback
+message Photo { // Bad: True if it's a GIF. optional bool gif; // Good: File format of the referenced photo (for example, GIF, WebP, PNG). optional PhotoType type; }
+```
+
+## **Do** Use java\_outer\_classname (before Edition 2024)
+
+Every proto schema definition file should set option `java_outer_classname` to the `.proto` file name converted to TitleCase with the ‘.’ removed. For example, the file `student_record_request.proto` should set:
+
+```java
+option java_outer_classname = "StudentRecordRequestProto";
+```
+
+The default behavior of Edition 2024 files has been aligned with this recommendation, so no option should be set when using Edition 2024 or later.

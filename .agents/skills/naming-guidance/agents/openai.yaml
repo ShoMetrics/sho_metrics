@@ -1,0 +1,4 @@
+interface:
+  display_name: "Naming Guidance"
+  short_description: "Project naming boundary rules"
+  default_prompt: "Use $naming-guidance to choose clear repo vocabulary for a naming change."
