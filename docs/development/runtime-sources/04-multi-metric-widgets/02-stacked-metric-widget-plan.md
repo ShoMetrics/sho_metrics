@@ -8,7 +8,7 @@ Read these first:
 2. [Phase 5c Demand-Driven Background Collection](../01-runtime-collection/03-demand-driven-background-collection.md)
 3. [Metric-Level Source Routing](../02-source-routing/02-metric-level-source-routing.md)
 4. [Dense Multi Metric Widget Plan](01-dense-multi-metric-widget-plan.md)
-5. `.agents/skills/technical-deisn-doc/references/TECHNICAL_DESIGN.md`
+5. `.agents/skills/technical-architecture/references/TECHNICAL_ARCHITECTURE.md`
 
 The source-agnostic runtime flow is:
 

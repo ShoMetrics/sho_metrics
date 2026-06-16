@@ -523,7 +523,7 @@ Use the no-production-compatibility window. Break the old contract and fix call 
    - No future helper may require Node to understand source-native sensor type enums.
 9. Update docs:
    - `docs/development/archive/librehardwaremonitor-node-integration-plan.md`
-   - `.agents/skills/technical-deisn-doc/references/TECHNICAL_DESIGN.md`
+   - `.agents/skills/technical-architecture/references/TECHNICAL_ARCHITECTURE.md`
 10. Verify:
    - `npm.cmd run proto:format`
    - `npm.cmd run proto:lint`

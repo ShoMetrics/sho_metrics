@@ -492,9 +492,9 @@ test("widget settings renders normally after global override is loaded disabled"
 
 Global refresh must not wait for widget refresh:
 
-This remaining test debt is tracked in
-`.agents/skills/technical-deisn-doc/references/next_refactor.md`. Do not export
-hook internals or add a one-off testing framework only for this assertion.
+This historical test-debt pointer was retired with the old agent backlog. Do
+not export hook internals or add a one-off testing framework only for this
+assertion.
 
 ```ts
 test("global settings update is applied without waiting for widget settings refresh", async () => {

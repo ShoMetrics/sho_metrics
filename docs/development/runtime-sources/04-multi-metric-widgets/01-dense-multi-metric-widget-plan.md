@@ -9,7 +9,7 @@ Read these first:
 3. [Metric-Level Source Routing](../02-source-routing/02-metric-level-source-routing.md)
 4. [Windows Helper Advanced Sensor Widget Plan](../03-windows-helper/06-helper-advanced-sensor-widget-plan.md)
 5. [Windows Helper Advanced Sensor Label And Scale Plan](../03-windows-helper/07-helper-advanced-sensor-label-scale-plan.md)
-6. `.agents/skills/technical-deisn-doc/references/TECHNICAL_DESIGN.md`
+6. `.agents/skills/technical-architecture/references/TECHNICAL_ARCHITECTURE.md`
 
 The source-agnostic runtime flow is:
 

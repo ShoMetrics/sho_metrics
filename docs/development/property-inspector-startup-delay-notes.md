@@ -272,8 +272,8 @@ the background runtime refresh then replaces it with the real list
 Disk widget hot-plug visibility also has a polling-limit trade-off: the disk
 polling interval is the worst-case widget-side disk hot-plug detection latency.
 
-The current decisions and future runtime device-list handoff live in
-`.agents/skills/technical-deisn-doc/references/next_refactor.md`.
+The old agent backlog that used to track the runtime device-list handoff has
+been retired.
 
 ## Missing Settings
 

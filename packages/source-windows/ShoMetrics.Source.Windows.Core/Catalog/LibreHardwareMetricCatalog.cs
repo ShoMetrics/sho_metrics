@@ -402,9 +402,9 @@ internal static class LibreHardwareMetricCatalog
         return metricId switch
         {
             "cpu.usage_percent" or "gpu.usage_percent" => value is >= 0 and <= 100,
-            // Do not copy LHM/LiteMonitor's machine-specific temperature
-            // thresholds here. A finite value is enough for v1; impossible
-            // sensor names are filtered by ranked alias selection.
+            // Do not copy machine-specific prior-art temperature thresholds here.
+            // A finite value is enough for v1; impossible sensor names are
+            // filtered by ranked alias selection.
             CpuTemperatureMetricId => double.IsFinite(value),
             CpuPowerMetricId => value >= 0,
             "gpu.temp" => value > 0,

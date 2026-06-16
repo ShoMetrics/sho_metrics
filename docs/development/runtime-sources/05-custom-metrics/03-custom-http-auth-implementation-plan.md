@@ -7,7 +7,7 @@ Read these first:
 1. [Runtime Sources Overview](../README.md)
 2. [Metric-Level Source Routing](../02-source-routing/02-metric-level-source-routing.md)
 3. [HTTP Custom Metric Implementation Plan](02-http-custom-metric-implementation-plan.md)
-4. `.agents/skills/technical-deisn-doc/references/TECHNICAL_DESIGN.md`
+4. `.agents/skills/technical-architecture/references/TECHNICAL_ARCHITECTURE.md`
 5. `.agents/skills/proto/SKILL.md`
 6. `.agents/skills/architecture-boundaries/SKILL.md`
 7. `.agents/skills/stream-deck-sdk-v2/references/Settings  Stream Deck SDK.md`

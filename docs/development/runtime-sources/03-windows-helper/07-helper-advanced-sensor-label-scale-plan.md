@@ -9,7 +9,7 @@ Read these first:
 3. [Phase 5c Demand-Driven Background Collection](../01-runtime-collection/03-demand-driven-background-collection.md)
 
 The technical design background is in
-`.agents/skills/technical-deisn-doc/references/TECHNICAL_DESIGN.md`,
+`.agents/skills/technical-architecture/references/TECHNICAL_ARCHITECTURE.md`,
 especially the source-agnostic metric flow:
 
 ```text

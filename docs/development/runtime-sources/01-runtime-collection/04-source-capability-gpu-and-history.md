@@ -326,7 +326,7 @@ descriptor changes must be able to re-plan active subscriptions.
 The local prior-art note is:
 
 ```text
-.agents/skills/technical-deisn-doc/references/runtime-collection-prior-art-lhm.md
+.agents/skills/technical-architecture/references/runtime-collection-prior-art-lhm.md
 ```
 
 The relevant product pattern is:
