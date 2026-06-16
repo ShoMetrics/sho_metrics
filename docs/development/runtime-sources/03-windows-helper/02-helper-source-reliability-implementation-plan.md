@@ -8,7 +8,7 @@ Read this after:
 1. [Windows Source Latency Findings](../02-source-routing/01-windows-source-latency-findings.md)
 2. [LibreHardwareMonitor Desktop Source Reading](01-lhm-desktop-source-reading.md)
 3. Optional internal reference:
-   `.agents/skills/technical-deisn-doc/references/litemonitor-prior-art-signals.md`
+   `.agents/skills/technical-architecture/references/runtime-collection-prior-art-lhm.md`
 
 ## Objective
 

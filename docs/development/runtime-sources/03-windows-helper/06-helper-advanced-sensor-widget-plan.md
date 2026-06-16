@@ -43,7 +43,7 @@ Read these first:
 4. [Windows Helper Demand-Driven Refresh Plan](05-helper-demand-driven-refresh-plan.md)
 
 The technical design background is in
-`.agents/skills/technical-deisn-doc/references/TECHNICAL_DESIGN.md`,
+`.agents/skills/technical-architecture/references/TECHNICAL_ARCHITECTURE.md`,
 especially the source-agnostic metric flow:
 
 ```text
