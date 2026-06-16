@@ -1,5 +1,5 @@
 #ifndef ShoMetricsVersion
-  #define ShoMetricsVersion "0.1.0"
+  #error ShoMetricsVersion must be passed by the build script.
 #endif
 
 #ifndef ServicePayloadDir

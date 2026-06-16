@@ -34,6 +34,7 @@ Use these from `packages/hub`.
 | --- | --- | --- |
 | Install dependencies | `npm.cmd ci` | `packages/hub/package-lock.json` |
 | Build plugin | `npm.cmd run build` | `packages/hub/package.json` |
+| Package Stream Deck plugin | `npm.cmd run pack:streamdeck -- --version 0.1.0.0` | `packages/hub/package.json` |
 | Unit tests | `npm.cmd run test:unit` | `packages/hub/package.json` |
 | Property Inspector DOM tests | `npm.cmd run test:pi` | `packages/hub/package.json` |
 | Lint | `npm.cmd run lint` | `packages/hub/package.json` |
@@ -41,6 +42,18 @@ Use these from `packages/hub`.
 | Restart linked plugin | `npx.cmd streamdeck restart com.ez.sho-metrics` | Elgato Stream Deck CLI |
 | Regenerate i18n locale JSON | `npm.cmd run i18n:generate` | `packages/hub/package.json` |
 | Check i18n catalogs and generated locale JSON | `npm.cmd run i18n:check` | `packages/hub/package.json` |
+
+`npm.cmd run build` writes the runnable local plugin output under
+`packages/hub/com.ez.sho-metrics.sdPlugin/bin/` and
+`packages/hub/com.ez.sho-metrics.sdPlugin/ui/property-inspector.js`. That output
+is for local linked-plugin development. The final local distributable is written
+by `npm.cmd run pack:streamdeck -- --version 0.1.0.0` to
+`artifacts/hub/streamdeck-plugin/package/com.ez.sho-metrics.streamDeckPlugin`.
+The pack script stages through `artifacts/hub/streamdeck-plugin/staging/` because
+the repository `.gitignore` hides generated `bin/` files from direct Stream Deck
+CLI packing. The official CLI still owns manifest packaging behavior: it writes
+the passed `--version` into the packaged manifest and strips `Nodejs.Debug` from
+the package.
 
 Do not run visual tests as a default gate. Use `npm.cmd run test:visual` only
 when changing widget visuals, SVG/raster output, or Property Inspector UI.
@@ -142,6 +155,7 @@ Use these from the repository root.
 | Task | Command | Source of truth |
 | --- | --- | --- |
 | Command playbook lint | `npm.cmd --prefix .github/scripts run check-command-playbook` | `.github/scripts/test-command-playbook.ts` |
+| Release plan lint | `npm.cmd --prefix .github/scripts run check-release-plan` | `.github/scripts/read-release-plan.mjs` |
 
 The repository lint checks that this playbook still points at stable command entry
 points and package script names. It does not run the expensive build or release
@@ -149,8 +163,28 @@ commands.
 
 ## Release
 
-The release workflow is still a P0 todo. Until it exists, do not treat locally
-built installers as production release artifacts.
+Use the GitHub Actions workflows as the release-grade source of truth. CI
+artifacts are for validation only; production artifacts come from the manual
+Release workflow.
+
+| Task | Command | Source of truth |
+| --- | --- | --- |
+| CI Stream Deck plugin package | `Hub CI` workflow | `.github/workflows/hub-ci.yml` |
+| CI Windows helper installers | `Windows Source CI` workflow | `.github/workflows/source-windows-ci.yml` |
+| Production release dry run | `Release` workflow, run manually with `tag` and `dry_run=true` | `.github/workflows/release.yml` |
+| Production release | `Release` workflow, run manually with `tag` and `dry_run=false` | `.github/workflows/release.yml` |
+
+The Release workflow creates the requested tag, creates a GitHub Release,
+uploads the selected product artifacts, and uploads `checksums.txt`.
+Releases that include only one product are created with `--latest=false` so the
+website's GitHub `latest` download links continue to point at the latest
+combined release.
+
+`.github/release-plan.yml` must contain the requested tag and the product
+versions to publish. `CHANGELOG.md` must contain a non-empty `## <tag>` section
+before the Release workflow runs. The workflow adds a short product/version
+summary before that section and publishes the combined text as the GitHub
+Release notes.
 
 Before any production release, complete:
 

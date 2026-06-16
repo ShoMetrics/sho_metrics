@@ -1,6 +1,6 @@
 {
 	"Name": "Sho Metrics",
-	"Description": "システム監視プラグイン",
+	"Description": "CPU、GPU、メモリ、ディスク、ネットワーク、センサーメトリクス、HTTP メトリクスなどのライブシステムメトリクスを表示します。",
 	"com.ez.sho-metrics.catalog-metric": {
 		"Name": "高度なセンサー",
 		"Tooltip": "LibreHardwareMonitor データなど、選択したメトリクスを 1 つ表示します。"

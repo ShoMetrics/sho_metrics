@@ -1,6 +1,6 @@
 {
 	"Name": "Sho Metrics",
-	"Description": "system monitor plugin",
+	"Description": "Display live System metrics such as CPU, GPU, memory, disk, network, sensor metrics, and HTTP metrics.",
 	"com.ez.sho-metrics.catalog-metric": {
 		"Name": "Advanced Sensor",
 		"Tooltip": "Displays one selected metric, such as LibreHardwareMonitor data."

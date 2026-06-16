@@ -5,9 +5,13 @@ on:
     branches:
       - main
     paths:
+      - "CHANGELOG.md"
+      - ".github/release-plan.yml"
+      - ".github/scripts/read-release-plan.mjs"
       - ".github/scripts/test-command-playbook.ts"
       - ".github/scripts/.npmrc"
       - ".github/scripts/package.json"
+      - ".github/workflows/release.yml"
       - ".github/workflows/repo-lint.yml"
       - "docs/development/command-playbook.md"
       - "docs/release/manual-verification-checklist.md"
@@ -18,9 +22,13 @@ on:
       - "packages/source-windows/scripts/Test-SourceWindowsLint.ps1"
   pull_request:
     paths:
+      - "CHANGELOG.md"
+      - ".github/release-plan.yml"
+      - ".github/scripts/read-release-plan.mjs"
       - ".github/scripts/test-command-playbook.ts"
       - ".github/scripts/.npmrc"
       - ".github/scripts/package.json"
+      - ".github/workflows/release.yml"
       - ".github/workflows/repo-lint.yml"
       - "docs/development/command-playbook.md"
       - "docs/release/manual-verification-checklist.md"
@@ -49,3 +57,7 @@ jobs:
       - name: Check command playbook
         working-directory: .github/scripts
         run: npm run check-command-playbook
+
+      - name: Check release plan
+        working-directory: .github/scripts
+        run: npm run check-release-plan

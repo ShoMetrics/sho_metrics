@@ -13,6 +13,9 @@ const buildMode = normalizeBuildMode(process.env.SHO_METRICS_BUILD_MODE ?? (isWa
 const devLocaleOverride = normalizeDevLocaleOverride(process.env.SHO_METRICS_DEV_LOCALE_OVERRIDE);
 const devLocaleOverrideLiteral = devLocaleOverride === undefined ? "undefined" : JSON.stringify(devLocaleOverride);
 const logLevel = normalizeLogLevel(process.env.SHO_METRICS_LOG_LEVEL ?? (buildMode === "production" ? "info" : "debug"));
+const pluginBinDirectory = `${sdPlugin}/bin`;
+const propertyInspectorScriptPath = `${sdPlugin}/ui/property-inspector.js`;
+const propertyInspectorSourceMapPath = `${propertyInspectorScriptPath}.map`;
 
 const typescriptOptions = {
     compilerOptions: {
@@ -69,6 +72,25 @@ function shimCustomHttpTransformWorkerCommonJsGlobals() {
                 code: `const __dirname = new URL(".", import.meta.url).pathname;\n${code}`,
                 map: null,
             };
+        },
+    };
+}
+
+function cleanPluginOutput() {
+    return {
+        name: "clean-plugin-output",
+        buildStart() {
+            fs.rmSync(pluginBinDirectory, { recursive: true, force: true });
+        },
+    };
+}
+
+function cleanPropertyInspectorOutput() {
+    return {
+        name: "clean-property-inspector-output",
+        buildStart() {
+            fs.rmSync(propertyInspectorScriptPath, { force: true });
+            fs.rmSync(propertyInspectorSourceMapPath, { force: true });
         },
     };
 }
@@ -145,7 +167,7 @@ const pluginConfig = {
     },
     external: ["@resvg/resvg-js"],
     output: {
-        dir: `${sdPlugin}/bin`,
+        dir: pluginBinDirectory,
         entryFileNames: "[name].js",
         sourcemap: isWatching,
         sourcemapPathTransform: (relativeSourcePath, sourcemapPath) => {
@@ -153,6 +175,7 @@ const pluginConfig = {
         },
     },
     plugins: [
+        cleanPluginOutput(),
         {
             name: "watch-externals",
             buildStart: function () {
@@ -191,7 +214,7 @@ const pluginConfig = {
 const propertyInspectorConfig = {
     input: "src/property-inspector/property-inspector.tsx",
     output: {
-        file: `${sdPlugin}/ui/property-inspector.js`,
+        file: propertyInspectorScriptPath,
         format: "es",
         sourcemap: isWatching,
         sourcemapPathTransform: (relativeSourcePath, sourcemapPath) => {
@@ -199,6 +222,7 @@ const propertyInspectorConfig = {
         },
     },
     plugins: [
+        cleanPropertyInspectorOutput(),
         {
             name: "watch-property-inspector-assets",
             buildStart: function () {

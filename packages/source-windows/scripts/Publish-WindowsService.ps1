@@ -9,6 +9,7 @@ param(
     [ValidateNotNullOrEmpty()]
     [string] $OutputDirectory,
 
+    [Parameter(Mandatory)]
     [ValidateNotNullOrEmpty()]
     [string] $ShoMetricsVersionPrefix,
 
@@ -60,9 +61,7 @@ $publishArguments = @(
     "/p:PublishTrimmed=false"
 )
 
-if (-not [string]::IsNullOrWhiteSpace($ShoMetricsVersionPrefix)) {
-    $publishArguments += "/p:ShoMetricsVersionPrefix=$ShoMetricsVersionPrefix"
-}
+$publishArguments += "/p:ShoMetricsVersionPrefix=$ShoMetricsVersionPrefix"
 
 & dotnet @publishArguments
 

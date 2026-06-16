@@ -1,0 +1,25 @@
+# Release plans are reviewed in git before a manual Release workflow run.
+#
+# Add one entry per planned GitHub Release. The workflow input is only `tag`;
+# product versions come from the matching entry here.
+#
+# The tag must match a non-empty CHANGELOG.md heading exactly:
+#
+#   ## <tag>
+#
+# The Release workflow does not accept product versions as manual inputs. The
+# streamdeckPluginVersion and windowsVersion values here are the versions used by
+# the build and package steps for the matching tag.
+#
+# Example:
+# releases:
+#   - tag: v0.1.0
+#     streamdeckPluginVersion: 0.1.0.0
+#     windowsVersion: 0.1.0
+#   - tag: streamdeck-v0.1.1.0
+#     streamdeckPluginVersion: 0.1.1.0
+#
+# Each release must define at least one product version. A release with neither
+# streamdeckPluginVersion nor windowsVersion is invalid because it would publish
+# an empty GitHub Release.
+releases: []

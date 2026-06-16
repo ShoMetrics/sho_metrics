@@ -1,6 +1,6 @@
 {
 	"Name": "Sho Metrics",
-	"Description": "系统监控插件",
+	"Description": "显示实时系统指标，例如 CPU、GPU、内存、磁盘、网络、传感器指标和 HTTP 指标。",
 	"com.ez.sho-metrics.catalog-metric": {
 		"Name": "高级传感器",
 		"Tooltip": "显示一个选定指标（如：LibreHardwareMonitor 数据）。"

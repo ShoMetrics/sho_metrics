@@ -6,6 +6,7 @@
         "patch:jq-wasm": "node scripts/patch-jq-wasm-stdin.mjs",
         "prebuild": "npm run patch:jq-wasm && npm run generate:proto && npm run generate:lucide-icons",
         "build": "rollup -c --environment SHO_METRICS_BUILD_MODE:production",
+        "pack:streamdeck": "node scripts/pack-streamdeck-plugin.mjs",
         "prebuild:dev": "npm run patch:jq-wasm && npm run generate:proto && npm run generate:lucide-icons",
         "build:dev": "rollup -c --environment SHO_METRICS_BUILD_MODE:development",
         "test": "npm run test:unit",
