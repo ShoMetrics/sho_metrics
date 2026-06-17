@@ -1,42 +1,47 @@
-import { CircleQuestionMark, Cpu, Gpu, HardDrive, MemoryStick } from "lucide";
+import { CircleQuestionMark, Cpu, Gpu, HardDrive, MemoryStick, Network } from "lucide";
 import { createLucideIconDefinition } from "../sources/lucide";
 import { createCustomIconDefinition } from "../sources/custom";
 import type { SvgIconDefinition } from "../icon-types";
 
-export type HardwareIconKind = "cpu" | "gpu" | "memory" | "disk" | "unknown";
+export type HardwareIconKind = "cpu" | "gpu" | "memory" | "disk" | "network" | "unspecified" | "other" | "unknown";
 export type DiskIconKind = "ssd" | "hdd" | "network" | "unknown";
 
 export function getHardwareIconDefinition(kind: HardwareIconKind): SvgIconDefinition {
-    if (kind === "cpu") {
-        return createLucideIconDefinition({
-            id: "hardware.cpu",
-            node: Cpu,
-            opticalScale: 1.05,
-        });
+    switch (kind) {
+        case "cpu":
+            return createLucideIconDefinition({
+                id: "hardware.cpu",
+                node: Cpu,
+                opticalScale: 1.05,
+            });
+        case "memory":
+            return createLucideIconDefinition({
+                id: "hardware.memory",
+                node: MemoryStick,
+                opticalScale: 1.08,
+                opticalOffsetY: 1,
+            });
+        case "disk":
+            return getDiskIconDefinition("unknown");
+        case "gpu":
+            return createLucideIconDefinition({
+                id: "hardware.gpu",
+                node: Gpu,
+                opticalScale: 1.08,
+            });
+        case "network":
+            return createLucideIconDefinition({
+                id: "hardware.network",
+                node: Network,
+                opticalScale: 1.08,
+            });
+        case "unspecified":
+        case "other":
+        case "unknown":
+            return getUnknownHardwareIconDefinition();
+        default:
+            return assertNever(kind);
     }
-
-    if (kind === "memory") {
-        return createLucideIconDefinition({
-            id: "hardware.memory",
-            node: MemoryStick,
-            opticalScale: 1.08,
-            opticalOffsetY: 1,
-        });
-    }
-
-    if (kind === "disk") {
-        return getDiskIconDefinition("unknown");
-    }
-
-    if (kind === "gpu") {
-        return createLucideIconDefinition({
-            id: "hardware.gpu",
-            node: Gpu,
-            opticalScale: 1.08,
-        });
-    }
-
-    return getUnknownHardwareIconDefinition();
 }
 
 export function getDiskIconDefinition(kind: DiskIconKind): SvgIconDefinition {
@@ -84,4 +89,8 @@ function getUnknownHardwareIconDefinition(): SvgIconDefinition {
         node: CircleQuestionMark,
         opticalScale: 1,
     });
+}
+
+function assertNever(value: never): never {
+    throw new Error(`Unexpected hardware icon kind: ${String(value)}`);
 }

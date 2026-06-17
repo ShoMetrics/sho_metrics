@@ -7,7 +7,7 @@ import {
     PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE,
     type WidgetData,
 } from "../../view-rendering/widget-data";
-import { PROGRESS_CIRCLE_MAXIMUM_LABEL_CHARACTERS } from "../../widgets/primitives/progress-circle-label";
+import { compactProgressCircleLabel } from "../../widgets/primitives/progress-circle-label";
 
 export const CUSTOM_METRIC_DEFAULT_LABEL = "HTTP";
 
@@ -115,23 +115,10 @@ function resolveCustomHttpLabel(
         return label;
     }
 
-    const labelCharacters = Array.from(label);
-    if (labelCharacters.length <= PROGRESS_CIRCLE_MAXIMUM_LABEL_CHARACTERS) {
-        return label;
-    }
-
     // Custom HTTP labels come from user or AI-authored transforms. The
     // full-ring and gauge circle renderers have a four-character center-label
     // contract, while text/bar/line views can keep the full source label.
-    const wordInitials = label
-        .split(/[\s._-]+/u)
-        .filter(word => word.length > 0)
-        .map(word => Array.from(word)[0])
-        .join("");
-    const compactLabel = wordInitials.length >= 2 ? wordInitials : label;
-    return Array.from(compactLabel.toUpperCase())
-        .slice(0, PROGRESS_CIRCLE_MAXIMUM_LABEL_CHARACTERS)
-        .join("");
+    return compactProgressCircleLabel(label);
 }
 
 function resolveCustomHttpUnitText(displayHint: MetricValueDisplayHint | undefined): string {
