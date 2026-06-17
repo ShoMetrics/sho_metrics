@@ -11,6 +11,12 @@ interface TransparentSurfaceSettingProps {
     readonly disabled?: boolean;
 }
 
+interface TransparentSurfaceRangeControlsProps {
+    readonly value: ResolvedTransparentSurfaceSettings;
+    readonly onPatch: (patch: ResolvedTransparentSurfaceSettingsOverride) => void;
+    readonly disabled?: boolean;
+}
+
 export function TransparentSurfaceSetting({
     value,
     onPatch,
@@ -37,23 +43,41 @@ export function TransparentSurfaceSetting({
                     </p>
                 </div>
             </InspectorItem>
+            <TransparentSurfaceRangeControls
+                value={value}
+                onPatch={onPatch}
+                disabled={settingsDisabled}
+            />
+        </>
+    );
+}
+
+export function TransparentSurfaceRangeControls({
+    value,
+    onPatch,
+    disabled = false,
+}: TransparentSurfaceRangeControlsProps): React.JSX.Element {
+    const { t } = useI18n();
+
+    return (
+        <>
             <RangeSetting
                 label={t(colorMessages.backgroundOpacityLabel)}
                 value={value.backgroundOpacityPercent}
                 onValueChange={(backgroundOpacityPercent) => onPatch({ backgroundOpacityPercent })}
-                disabled={settingsDisabled}
+                disabled={disabled}
             />
             <RangeSetting
                 label={t(colorMessages.textOutlineLabel)}
                 value={value.textOutlinePercent}
                 onValueChange={(textOutlinePercent) => onPatch({ textOutlinePercent })}
-                disabled={settingsDisabled}
+                disabled={disabled}
             />
             <RangeSetting
                 label={t(colorMessages.shapeOutlineLabel)}
                 value={value.shapeOutlinePercent}
                 onValueChange={(shapeOutlinePercent) => onPatch({ shapeOutlinePercent })}
-                disabled={settingsDisabled}
+                disabled={disabled}
             />
         </>
     );

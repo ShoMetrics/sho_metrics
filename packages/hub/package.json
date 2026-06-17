@@ -13,7 +13,7 @@
         "pretest:unit": "npm run patch:jq-wasm && npm run generate:proto && npm run generate:lucide-icons",
         "test:unit": "node scripts/clean-test-output.mjs && tsc -p tsconfig.test.json && node scripts/write-test-package.mjs && node --test --test-isolation=none .test-dist/src/**/*.test.js",
         "pretest:pi": "npm run patch:jq-wasm && npm run generate:proto && npm run generate:lucide-icons",
-        "test:pi": "node scripts/clean-test-output.mjs && tsc -p tsconfig.pi-test.json && node scripts/write-test-package.mjs && node --test --test-isolation=none --require ./.test-dist/src/property-inspector/testing/dom-test-setup.js .test-dist/src/property-inspector/**/*.pi.test.js",
+        "test:pi": "node scripts/clean-test-output.mjs .pi-test-dist && tsc -p tsconfig.pi-test.json && node scripts/write-test-package.mjs .pi-test-dist && node --test --test-isolation=none --require ./.pi-test-dist/src/property-inspector/testing/dom-test-setup.js .pi-test-dist/src/property-inspector/**/*.pi.test.js",
         "pretest:unit:coverage": "npm run patch:jq-wasm && npm run generate:proto && npm run generate:lucide-icons",
         "test:unit:coverage": "node scripts/clean-test-output.mjs && tsc -p tsconfig.test.json --sourceMap true --inlineSources true && node scripts/write-test-package.mjs && c8 --config .c8rc.json node --test --test-isolation=none .test-dist/src/**/*.test.js",
         "test:visual": "playwright test -c playwright.visual.config.ts",

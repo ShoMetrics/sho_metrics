@@ -1,6 +1,8 @@
 import { rmSync } from "node:fs";
 
-rmSync(".test-dist", {
+const testOutputDirectory = process.argv[2] ?? ".test-dist";
+
+rmSync(testOutputDirectory, {
     recursive: true,
     force: true,
 });

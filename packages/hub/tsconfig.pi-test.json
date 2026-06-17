@@ -1,6 +1,7 @@
 {
     "extends": "./tsconfig.test.json",
     "compilerOptions": {
+        "outDir": ".pi-test-dist",
         "types": [
             "node",
             "jsdom"

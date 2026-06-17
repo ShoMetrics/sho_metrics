@@ -9,7 +9,7 @@ import { NumberSetting } from "../controls/NumberSetting";
 import { TerminalVariantSetting } from "../controls/TerminalVariantSetting";
 import { TextVariantSetting } from "../controls/TextVariantSetting";
 import { ThemeSetting } from "../controls/ThemeSetting";
-import { TransparentSurfaceSetting } from "../controls/TransparentSurfaceSetting";
+import { TransparentSurfaceRangeControls } from "../controls/TransparentSurfaceSetting";
 import { SelectSetting } from "../controls/SelectSetting";
 import { InspectorItem } from "../components/InspectorItem";
 import {
@@ -94,7 +94,10 @@ export function GlobalSettingsTab({
                     <TransparentSurfaceOverrideSection
                         transparentSurfaceOverride={resolvedSettings.transparentSurfaceOverride}
                         onOverrideChange={(transparentSurfaceOverrideEnabled) => onSettingsPatch({
+                            // The global override gate and the transparent-surface feature flag must move together.
+                            // Otherwise the override section can exist while the surface renderer still treats it as disabled.
                             transparentSurfaceOverrideEnabled,
+                            transparentSurface: { enabled: transparentSurfaceOverrideEnabled },
                         })}
                         onTransparentSurfacePatch={(transparentSurface) => onSettingsPatch({ transparentSurface })}
                     />
@@ -300,7 +303,7 @@ function TransparentSurfaceOverrideSection({
                 onValueChange={onOverrideChange}
             />
             {transparentSurfaceOverride ? (
-                <TransparentSurfaceSetting
+                <TransparentSurfaceRangeControls
                     value={transparentSurfaceOverride.transparentSurface}
                     onPatch={onTransparentSurfacePatch}
                 />

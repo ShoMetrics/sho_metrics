@@ -54,7 +54,7 @@ test("global override renders transparent surface controls when its subsection i
     }));
 
     assert.match(markup, /Transparent Surface Override/);
-    assert.match(markup, /Transparent background/);
+    assert.doesNotMatch(markup, /Transparent background/);
     assert.match(markup, /Background Opacity:/);
     assert.match(markup, /Text Outline:/);
     assert.match(markup, /Shape Outline:/);
