@@ -19,6 +19,10 @@ const TITLE_CARD_TEXT_APPEARANCE = buildDefaultAppearanceOverride({
     textVariant: "title-card",
 });
 
+// Title-card snapshots prefer the bundled Japanese serif font for deterministic CI output.
+// Production rendering prefers available system Japanese serif fonts first, so tiny unit
+// glyphs can differ noticeably. A snapshot-only title-card unit overlap is expected and
+// should be confirmed on hardware before changing the production layout.
 const TITLE_CARD_SINGLE_VISUAL_TEST_CASES: readonly SingleMetricVisualTestCase[] = [
     {
         snapshotName: "title-card-square-cpu-usage-single-digit-nine",

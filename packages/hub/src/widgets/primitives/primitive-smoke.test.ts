@@ -104,20 +104,29 @@ test("title-card text metric renders supplied asymmetrical caption content", () 
         unit: "%",
     }, {
         ...DEFAULT_TEXT_METRIC_CONFIG,
+        textStyles: {
+            ...DEFAULT_TEXT_METRIC_CONFIG.textStyles,
+            unit: {
+                ...DEFAULT_RENDER_TEXT_STYLES.unit,
+                fontFamily: "Title Unit Font",
+                fontWeight: 620,
+            },
+        },
     }, keySize, {
         codeText: "CPU",
         compactCodeText: "CPU",
         threeCharacterCaptionText: "使用率",
         unitText: "%",
-    });
+    }, "white");
 
     assert.match(svgFragment, /title-card-code/);
     assert.match(svgFragment, />CPU<\/text>/);
     assert.match(svgFragment, />使<\/text>/);
     assert.match(svgFragment, />用<\/text>/);
     assert.match(svgFragment, />率<\/text>/);
-    assert.match(svgFragment, /id="title-card-value"[\s\S]*>23<\/text>/);
-    assert.match(svgFragment, /id="title-card-unit"[\s\S]*>%<\/text>/);
+    assert.match(svgFragment, /id="title-card-value"[\s\S]*y="119\.92"[\s\S]*>23<\/text>/);
+    assert.match(svgFragment, /id="title-card-unit"[\s\S]*y="124\.85"[\s\S]*font-family="Title Unit Font"/);
+    assert.match(svgFragment, /id="title-card-unit"[\s\S]*font-weight="620"[\s\S]*>%<\/text>/);
     assert.doesNotMatch(svgFragment, /title-card-secondary/);
     assert.doesNotMatch(svgFragment, /text-metric-label/);
 });
@@ -134,7 +143,7 @@ test("title-card text metric gives square edge values a left clip guard", () => 
             compactCodeText: "CPU",
             threeCharacterCaptionText: "使用率",
             unitText: "%",
-        });
+        }, "white");
 
         assert.match(svgFragment, new RegExp(`>${displayValue.replace("/", "\\/")}<\\/text>`, "u"));
         assert.equal(readConstrainedTextClipWidth(svgFragment, "title-card-value"), 65);
@@ -154,7 +163,7 @@ test("title-card text metric uses a wide title layout", () => {
         compactCodeText: "GPU",
         threeCharacterCaptionText: "温度計",
         unitText: "°C",
-    });
+    }, "white");
 
     assert.doesNotMatch(svgFragment, /title-card-caption-text/);
     assert.match(svgFragment, />温<\/text>/);
@@ -174,7 +183,7 @@ test("title-card text metric renders only the three contracted caption rows", ()
         compactCodeText: "CPU",
         threeCharacterCaptionText: "ABCD",
         unitText: "%",
-    });
+    }, "white");
 
     assert.equal(readTitleCardCaptionText(svgFragment, "title-card-caption"), "ABC");
     assert.doesNotMatch(svgFragment, />D<\/text>/);
@@ -1100,14 +1109,20 @@ test("title-card dual text metric renders compact channel rows", () => {
         positiveUnitText: "M",
         negativeLabelText: "↓",
         negativeUnitText: "M",
-    });
+    }, "white");
 
     assert.match(svgFragment, /title-card-dual-caption/);
     assert.equal(readTitleCardCaptionText(svgFragment, "title-card-dual-caption"), "転送速");
-    assert.match(svgFragment, /id="title-card-positive-label"[\s\S]*>↑<\/text>/);
-    assert.match(svgFragment, /id="title-card-negative-label"[\s\S]*>↓<\/text>/);
+    assert.match(svgFragment, /<g id="title-card-positive-label"[\s\S]*stroke-linecap="round"/);
+    assert.match(svgFragment, /<g id="title-card-negative-label"[\s\S]*stroke-linecap="round"/);
+    assert.match(svgFragment, /id="title-card-positive-label"[\s\S]*<path d="M [^"]+ L [^"]+ M [^"]+ L [^"]+ M [^"]+ L [^"]+"/);
+    assert.match(svgFragment, /id="title-card-negative-label"[\s\S]*<path d="M [^"]+ L [^"]+ M [^"]+ L [^"]+ M [^"]+ L [^"]+"/);
+    assert.doesNotMatch(svgFragment, />↑<\/text>/);
+    assert.doesNotMatch(svgFragment, />↓<\/text>/);
     assert.match(svgFragment, /id="title-card-positive-value"/);
     assert.match(svgFragment, /id="title-card-negative-value"/);
+    assert.match(svgFragment, /id="title-card-positive-unit"[\s\S]*y="64\.80"/);
+    assert.match(svgFragment, /id="title-card-negative-unit"[\s\S]*y="93\.80"/);
 });
 
 function buildWidgetData(): WidgetData {

@@ -18,6 +18,7 @@ import {
 } from "../widgets/primitives/text-metric";
 import { renderTitleCardTextMetric } from "../widgets/primitives/title-card-text-metric";
 import { buildTitleCardSingleMetricContent } from "./text-content/title-card-text-content";
+import { resolveTitleCardStaticTextColor } from "./title-card-paint";
 import {
     DEFAULT_PROGRESS_BAR_CONFIG,
     progressBar,
@@ -109,6 +110,7 @@ function renderSingleTextMetric(options: SingleMetricBodyViewProps): string {
             config,
             options.renderSize,
             buildTitleCardSingleMetricContent(options.data),
+            resolveTitleCardStaticTextColor(options.visual.paints),
         );
     }
 

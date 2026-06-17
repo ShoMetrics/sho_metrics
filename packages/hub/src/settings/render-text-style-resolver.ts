@@ -3,17 +3,22 @@ import {
     PIXEL_RENDER_TEXT_STYLES,
     TERMINAL_CLEAN_RENDER_TEXT_STYLES,
     TERMINAL_VINTAGE_RENDER_TEXT_STYLES,
+    TITLE_CARD_RENDER_TEXT_STYLES,
     type RenderTextStyles,
 } from "../view-rendering/render-text-style";
 import type { ResolvedAppearanceSettings } from "./resolved-settings";
 
 /**
- * Resolves renderer text style tokens for the selected theme.
+ * Resolves renderer text style tokens for the selected view and theme.
  *
- * Used by Terminal themes to swap font families and text treatment without
- * changing the user's selected metric view.
+ * Title-card text keeps its fixed Japanese serif treatment; other views use
+ * theme-owned font families and text treatment.
  */
 export function resolveRenderTextStyles(settings: ResolvedAppearanceSettings): RenderTextStyles {
+    if (settings.view.selectedView === "text" && settings.view.textVariant === "title-card") {
+        return TITLE_CARD_RENDER_TEXT_STYLES;
+    }
+
     switch (settings.theme.selectedTheme) {
         case "terminal":
             return settings.theme.terminal.variant === "vintage"

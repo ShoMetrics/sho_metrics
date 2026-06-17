@@ -88,7 +88,7 @@ test("single metric view dispatches text variants to centered and title-card ren
     assert.doesNotMatch(titleCardSvg, /text-metric-label/);
 });
 
-test("single text metric value uses the render metric value paint", () => {
+test("single title-card text uses the solid metric paint for static text", () => {
     const svg = renderSingleMetricBodyView({
         data: buildWidgetData(),
         visual: {
@@ -101,7 +101,7 @@ test("single text metric value uses the render metric value paint", () => {
         circleVariant: "full-ring",
     });
 
-    assert.match(svg, /fill="#metric-value-text-token"[\s\S]*CPU/);
+    assert.match(svg, /fill="#metric-token"[\s\S]*CPU/);
 });
 
 function buildMetricRenderAppearance(): MetricRenderAppearance {
