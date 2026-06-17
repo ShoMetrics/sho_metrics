@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
-const testOutputDirectory = join(scriptDirectory, "..", ".test-dist");
+const testOutputDirectory = join(scriptDirectory, "..", process.argv[2] ?? ".test-dist");
 
 mkdirSync(testOutputDirectory, { recursive: true });
 writeFileSync(

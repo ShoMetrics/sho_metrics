@@ -36,22 +36,17 @@ test("global settings tab writes subsection override toggles independently", asy
 
 test("global settings tab writes transparent surface override patches", async () => {
     const settingsPatches: StoredGlobalSettingsPatch[] = [];
-    const user = userEvent.setup();
 
     renderGlobalSettingsTab(resolveGlobalSettings({ globalOverrideEnabled: true }), settingsPatches);
 
-    await user.click(screen.getByRole("checkbox", { name: /^transparent background$/i }));
     fireEvent.change(screen.getByRole("slider", { name: /^shape outline:$/i }), {
         target: { value: "60" },
     });
 
-    assert.deepEqual(settingsPatches, [
-        { transparentSurface: { enabled: true } },
-        { transparentSurface: { shapeOutlinePercent: 60 } },
-    ]);
+    assert.deepEqual(settingsPatches, [{ transparentSurface: { shapeOutlinePercent: 60 } }]);
 });
 
-test("global settings tab writes transparent surface subsection toggle independently", async () => {
+test("global settings tab disables transparent surface with its subsection toggle", async () => {
     const settingsPatches: StoredGlobalSettingsPatch[] = [];
     const user = userEvent.setup();
 
@@ -59,7 +54,27 @@ test("global settings tab writes transparent surface subsection toggle independe
 
     await user.click(screen.getByRole("checkbox", { name: /^override transparent surface$/i }));
 
-    assert.deepEqual(settingsPatches, [{ transparentSurfaceOverrideEnabled: false }]);
+    assert.deepEqual(settingsPatches, [{
+        transparentSurfaceOverrideEnabled: false,
+        transparentSurface: { enabled: false },
+    }]);
+});
+
+test("global settings tab enables transparent surface with its subsection toggle", async () => {
+    const settingsPatches: StoredGlobalSettingsPatch[] = [];
+    const user = userEvent.setup();
+
+    renderGlobalSettingsTab(resolveGlobalSettings({
+        globalOverrideEnabled: true,
+        transparentSurfaceOverrideEnabled: false,
+    }), settingsPatches);
+
+    await user.click(screen.getByRole("checkbox", { name: /^override transparent surface$/i }));
+
+    assert.deepEqual(settingsPatches, [{
+        transparentSurfaceOverrideEnabled: true,
+        transparentSurface: { enabled: true },
+    }]);
 });
 
 test("global settings tab writes undefined when an optional network maximum is cleared", async () => {
