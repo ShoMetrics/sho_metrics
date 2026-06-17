@@ -225,6 +225,40 @@ export const PIXEL_RENDER_TEXT_STYLES = {
     }),
 } satisfies RenderTextStyles;
 
+/** Defines the fixed Japanese serif text treatment for title-card metrics. */
+export const TITLE_CARD_RENDER_TEXT_STYLES = {
+    value: createRenderTextStyle({
+        fontFamily: JAPANESE_SERIF_RENDER_FONT_FAMILY,
+        fontWeight: 900,
+        fontSizeScale: 1,
+        filter: undefined,
+    }),
+    unit: createRenderTextStyle({
+        fontFamily: JAPANESE_SERIF_RENDER_FONT_FAMILY,
+        fontWeight: 800,
+        fontSizeScale: 1,
+        filter: undefined,
+    }),
+    title: createRenderTextStyle({
+        fontFamily: JAPANESE_SERIF_RENDER_FONT_FAMILY,
+        fontWeight: 900,
+        fontSizeScale: 1,
+        filter: undefined,
+    }),
+    label: createRenderTextStyle({
+        fontFamily: JAPANESE_SERIF_RENDER_FONT_FAMILY,
+        fontWeight: 850,
+        fontSizeScale: 1,
+        filter: undefined,
+    }),
+    smallLabel: createRenderTextStyle({
+        fontFamily: JAPANESE_SERIF_RENDER_FONT_FAMILY,
+        fontWeight: 750,
+        fontSizeScale: 1,
+        filter: undefined,
+    }),
+} satisfies RenderTextStyles;
+
 export function resolveRenderTextStyleFontSize(baseFontSize: number, textStyle: RenderTextStyle): number {
     return baseFontSize * textStyle.fontSizeScale;
 }

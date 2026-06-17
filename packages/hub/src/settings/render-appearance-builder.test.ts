@@ -11,6 +11,7 @@ import {
     PIXEL_RENDER_TEXT_STYLES,
     TERMINAL_CLEAN_RENDER_TEXT_STYLES,
     TERMINAL_VINTAGE_RENDER_TEXT_STYLES,
+    TITLE_CARD_RENDER_TEXT_STYLES,
 } from "../view-rendering/render-text-style";
 import { DEFAULT_PIXEL_WINDOW_PALETTE } from "../view-rendering/pixel-window-theme-tokens";
 import { buildMetricRenderAppearance } from "./render-appearance-builder";
@@ -92,6 +93,33 @@ test("text styles map resolved appearance settings to renderer text roles", () =
     assert.deepEqual(terminalCleanSettings.textStyles, TERMINAL_CLEAN_RENDER_TEXT_STYLES);
     assert.deepEqual(terminalVintageSettings.textStyles, TERMINAL_VINTAGE_RENDER_TEXT_STYLES);
     assert.deepEqual(pixelWindowSettings.textStyles, PIXEL_RENDER_TEXT_STYLES);
+});
+
+test("title-card text variant keeps the fixed Japanese serif style across themes", () => {
+    const flatTitleCardSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        view: {
+            selectedView: "text",
+            textVariant: "title-card",
+        },
+    }));
+    const terminalTitleCardSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        view: {
+            selectedView: "text",
+            textVariant: "title-card",
+        },
+        theme: { selectedTheme: "terminal" },
+    }));
+    const pixelTitleCardSettings = buildMetricRenderAppearance(buildAppearanceSettings({
+        view: {
+            selectedView: "text",
+            textVariant: "title-card",
+        },
+        theme: { selectedTheme: "pixel-window" },
+    }));
+
+    assert.deepEqual(flatTitleCardSettings.textStyles, TITLE_CARD_RENDER_TEXT_STYLES);
+    assert.deepEqual(terminalTitleCardSettings.textStyles, TITLE_CARD_RENDER_TEXT_STYLES);
+    assert.deepEqual(pixelTitleCardSettings.textStyles, TITLE_CARD_RENDER_TEXT_STYLES);
 });
 
 test("theme effects map resolved appearance settings to renderer effect tokens", () => {

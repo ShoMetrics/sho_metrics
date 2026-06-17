@@ -26,6 +26,7 @@ import {
 import { renderTitleCardDualTextMetric } from "../widgets/primitives/title-card-text-metric";
 import { buildTitleCardDualMetricContent } from "./text-content/title-card-text-content";
 import { formatCompactDataRateUnitText } from "./text-content/render-unit-text";
+import { resolveTitleCardStaticTextColor } from "./title-card-paint";
 import type {
     SparklineGridLineType,
     SparklineGridLineVisibility,
@@ -139,6 +140,7 @@ function renderDualTextMetricView(options: DualMetricBodyViewProps): string {
             config,
             options.renderSize,
             buildTitleCardDualMetricContent(textContent),
+            resolveTitleCardStaticTextColor(options.visual.paints),
         );
     }
 

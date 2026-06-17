@@ -1,7 +1,8 @@
 import type { DualChannelWidgetData, KeySize, WidgetData } from "../../view-rendering/widget-data";
 import { resolveColorForThresholdValue } from "../../view-rendering/color-resolver";
 import { buildSvgFilterAttributes } from "../../view-rendering/render-svg-effects";
-import { JAPANESE_SERIF_RENDER_FONT_FAMILY } from "../../view-rendering/render-text-style";
+import type { RenderTextStyle } from "../../view-rendering/render-text-style";
+import { renderTitleCardDirectionIconFragment } from "../icons/title-card-icons";
 import {
     escapeSvgText,
     isSvgOutlineEnabled,
@@ -126,6 +127,9 @@ const TITLE_CARD_SINGLE_VALUE_TEXT_FIT_OPTIONS = { minimumFontScale: 1, widthGua
 const TITLE_CARD_COMPACT_SINGLE_VALUE_TEXT_FIT_OPTIONS = { minimumFontScale: 0.55, widthGuardRatio: 1 } as const;
 const TITLE_CARD_VALUE_TEXT_FIT_OPTIONS = { minimumFontScale: 0.44, widthGuardRatio: 1.08 } as const;
 const TITLE_CARD_UNIT_TEXT_FIT_OPTIONS = { minimumFontScale: 0.55, widthGuardRatio: 1.16 } as const;
+const TITLE_CARD_SINGLE_VALUE_BOTTOM_FONT_RATIO = 0.34;
+const TITLE_CARD_SINGLE_UNIT_BOTTOM_FONT_RATIO = 0.95;
+const TITLE_CARD_DUAL_UNIT_Y_OFFSET_RATIO = 0.15;
 
 interface TitleCardCaptionColumnLayout {
     readonly xCoordinate: number;
@@ -189,12 +193,13 @@ export function renderTitleCardTextMetric(
     config: TextMetricConfig,
     keySize: KeySize,
     content: TitleCardSingleMetricContent,
+    staticTextColor: string,
 ): string {
     if (isWideKeySize(keySize)) {
-        return renderWideTitleCardTextMetric(data, config, content);
+        return renderWideTitleCardTextMetric(data, config, content, staticTextColor);
     }
 
-    return renderSquareTitleCardTextMetric(data, config, content, keySize);
+    return renderSquareTitleCardTextMetric(data, config, content, keySize, staticTextColor);
 }
 
 function renderSquareTitleCardTextMetric(
@@ -202,13 +207,15 @@ function renderSquareTitleCardTextMetric(
     config: TextMetricConfig,
     content: TitleCardSingleMetricContent,
     keySize: KeySize,
+    staticTextColor: string,
 ): string {
     const valueText = data.displayValue ?? data.current.toFixed(0);
-    const valueTextColor = resolveColorForThresholdValue(data.current, config.colorConfig);
+    const resolvedValueTextColor = resolveColorForThresholdValue(data.current, config.colorConfig);
     const layout = buildSquareTitleCardLayout(keySize);
     const singleValueLayout = resolveSquareTitleCardSingleValueLayout(
         valueText,
         layout.singleValueRows,
+        config.textStyles.value,
     );
 
     return `
@@ -218,10 +225,10 @@ function renderSquareTitleCardTextMetric(
             xCoordinate: layout.codeX,
             yCoordinate: layout.codeY,
             maxWidth: layout.codeWidth,
-            fontSize: layout.codeFontSize,
-            fontFamily: JAPANESE_SERIF_RENDER_FONT_FAMILY,
-            fontWeight: 900,
-            fill: config.valueTextColor,
+            fontSize: layout.codeFontSize * config.textStyles.title.fontSizeScale,
+            fontFamily: config.textStyles.title.fontFamily,
+            fontWeight: config.textStyles.title.fontWeight,
+            fill: staticTextColor,
             textAnchor: "start",
             outline: config.textOutline,
             extraAttributes: [
@@ -231,7 +238,7 @@ function renderSquareTitleCardTextMetric(
                     1,
                     0.84,
                 ),
-                ...buildTitleCardStrokeAttributes(config.valueTextColor, 0.35, config.textOutline),
+                ...buildTitleCardStrokeAttributes(staticTextColor, 0.35, config.textOutline),
                 ...buildSvgFilterAttributes(config.textStyles.title.filter),
             ],
         })}
@@ -239,8 +246,8 @@ function renderSquareTitleCardTextMetric(
             idPrefix: "title-card-caption",
             characters: titleCardCaptionCharacters(content.threeCharacterCaptionText),
             layout: layout.caption,
-            fill: config.valueTextColor,
-            filter: config.textStyles.title.filter,
+            fill: staticTextColor,
+            textStyle: config.textStyles.title,
             outline: config.textOutline,
         })}
         ${renderConstrainedSvgText({
@@ -249,15 +256,15 @@ function renderSquareTitleCardTextMetric(
             xCoordinate: singleValueLayout.valueXCoordinate,
             yCoordinate: singleValueLayout.valueYCoordinate,
             maxWidth: singleValueLayout.valueWidth,
-            fontSize: singleValueLayout.valueFontSize,
-            fontFamily: JAPANESE_SERIF_RENDER_FONT_FAMILY,
-            fontWeight: 900,
-            fill: valueTextColor,
+            fontSize: singleValueLayout.valueFontSize * config.textStyles.value.fontSizeScale,
+            fontFamily: config.textStyles.value.fontFamily,
+            fontWeight: config.textStyles.value.fontWeight,
+            fill: resolvedValueTextColor,
             textAnchor: "end",
             outline: config.textOutline,
             extraAttributes: [
                 "font-variant-numeric=\"tabular-nums\"",
-                ...buildTitleCardStrokeAttributes(valueTextColor, 0.7, config.textOutline),
+                ...buildTitleCardStrokeAttributes(resolvedValueTextColor, 0.7, config.textOutline),
                 ...buildSvgFilterAttributes(config.textStyles.value.filter),
             ],
             fitOptions: resolveTitleCardSingleValueTextFitOptions(valueText),
@@ -270,7 +277,7 @@ function renderSquareTitleCardTextMetric(
             maxWidth: singleValueLayout.unitWidth,
             fontSize: singleValueLayout.unitFontSize,
             fill: config.unitTextColor,
-            filter: config.textStyles.unit.filter,
+            textStyle: config.textStyles.unit,
             textAnchor: "start",
             outline: config.textOutline,
         })}
@@ -281,9 +288,10 @@ function renderWideTitleCardTextMetric(
     data: WidgetData,
     config: TextMetricConfig,
     content: TitleCardSingleMetricContent,
+    staticTextColor: string,
 ): string {
     const valueText = data.displayValue ?? data.current.toFixed(0);
-    const valueTextColor = resolveColorForThresholdValue(data.current, config.colorConfig);
+    const resolvedValueTextColor = resolveColorForThresholdValue(data.current, config.colorConfig);
     const singleValueLayout = resolveTitleCardSingleValueLayout(valueText, {
         valueXCoordinate: TITLE_CARD_WIDE_LAYOUT.valueX,
         valueYCoordinate: TITLE_CARD_WIDE_LAYOUT.valueY,
@@ -309,8 +317,8 @@ function renderWideTitleCardTextMetric(
             idPrefix: "title-card-caption",
             characters: titleCardCaptionCharacters(content.threeCharacterCaptionText),
             layout: TITLE_CARD_WIDE_CAPTION_COLUMN_LAYOUT,
-            fill: config.valueTextColor,
-            filter: config.textStyles.title.filter,
+            fill: staticTextColor,
+            textStyle: config.textStyles.title,
             outline: config.textOutline,
         })}
         ${renderTitleCardCodeLetters({
@@ -320,8 +328,8 @@ function renderWideTitleCardTextMetric(
             yCoordinate: TITLE_CARD_WIDE_LAYOUT.codeY,
             letterGap: TITLE_CARD_WIDE_LAYOUT.codeLetterGap,
             fontSizes: TITLE_CARD_WIDE_LAYOUT.codeFontSizes,
-            fill: config.valueTextColor,
-            filter: config.textStyles.smallLabel.filter,
+            fill: staticTextColor,
+            textStyle: config.textStyles.smallLabel,
             outline: config.textOutline,
         })}
         ${renderConstrainedSvgText({
@@ -330,15 +338,15 @@ function renderWideTitleCardTextMetric(
             xCoordinate: singleValueLayout.valueXCoordinate,
             yCoordinate: singleValueLayout.valueYCoordinate,
             maxWidth: singleValueLayout.valueWidth,
-            fontSize: singleValueLayout.valueFontSize,
-            fontFamily: JAPANESE_SERIF_RENDER_FONT_FAMILY,
-            fontWeight: 900,
-            fill: valueTextColor,
+            fontSize: singleValueLayout.valueFontSize * config.textStyles.value.fontSizeScale,
+            fontFamily: config.textStyles.value.fontFamily,
+            fontWeight: config.textStyles.value.fontWeight,
+            fill: resolvedValueTextColor,
             textAnchor: "end",
             outline: config.textOutline,
             extraAttributes: [
                 "font-variant-numeric=\"tabular-nums\"",
-                ...buildTitleCardStrokeAttributes(valueTextColor, 0.7, config.textOutline),
+                ...buildTitleCardStrokeAttributes(resolvedValueTextColor, 0.7, config.textOutline),
                 ...buildSvgFilterAttributes(config.textStyles.value.filter),
             ],
             fitOptions: resolveTitleCardSingleValueTextFitOptions(valueText),
@@ -351,7 +359,7 @@ function renderWideTitleCardTextMetric(
             maxWidth: singleValueLayout.unitWidth,
             fontSize: singleValueLayout.unitFontSize,
             fill: config.unitTextColor,
-            filter: config.textStyles.unit.filter,
+            textStyle: config.textStyles.unit,
             textAnchor: "start",
             outline: config.textOutline,
         })}
@@ -363,12 +371,13 @@ export function renderTitleCardDualTextMetric(
     config: TextMetricConfig,
     keySize: KeySize,
     content: TitleCardDualMetricContent,
+    staticTextColor: string,
 ): string {
     if (isWideKeySize(keySize)) {
-        return renderWideTitleCardDualTextMetric(data, config, content);
+        return renderWideTitleCardDualTextMetric(data, config, content, staticTextColor);
     }
 
-    return renderSquareTitleCardDualTextMetric(data, config, content, keySize);
+    return renderSquareTitleCardDualTextMetric(data, config, content, keySize, staticTextColor);
 }
 
 function renderSquareTitleCardDualTextMetric(
@@ -376,6 +385,7 @@ function renderSquareTitleCardDualTextMetric(
     config: TextMetricConfig,
     content: TitleCardDualMetricContent,
     keySize: KeySize,
+    staticTextColor: string,
 ): string {
     const layout = buildSquareTitleCardLayout(keySize);
 
@@ -386,10 +396,10 @@ function renderSquareTitleCardDualTextMetric(
             xCoordinate: layout.dualCodeX,
             yCoordinate: layout.dualCodeY,
             maxWidth: layout.dualCodeWidth,
-            fontSize: layout.dualCodeFontSize,
-            fontFamily: JAPANESE_SERIF_RENDER_FONT_FAMILY,
-            fontWeight: 900,
-            fill: config.valueTextColor,
+            fontSize: layout.dualCodeFontSize * config.textStyles.title.fontSizeScale,
+            fontFamily: config.textStyles.title.fontFamily,
+            fontWeight: config.textStyles.title.fontWeight,
+            fill: staticTextColor,
             textAnchor: "start",
             outline: config.textOutline,
             extraAttributes: buildSvgFilterAttributes(config.textStyles.title.filter),
@@ -398,8 +408,8 @@ function renderSquareTitleCardDualTextMetric(
             idPrefix: "title-card-dual-caption",
             characters: titleCardCaptionCharacters(content.threeCharacterCaptionText),
             layout: layout.caption,
-            fill: config.valueTextColor,
-            filter: config.textStyles.title.filter,
+            fill: staticTextColor,
+            textStyle: config.textStyles.title,
             outline: config.textOutline,
         })}
         ${renderTitleCardDualRow({
@@ -449,14 +459,15 @@ function renderWideTitleCardDualTextMetric(
     data: DualChannelWidgetData,
     config: TextMetricConfig,
     content: TitleCardDualMetricContent,
+    staticTextColor: string,
 ): string {
     return `
         ${renderTitleCardCaptionColumn({
             idPrefix: "title-card-dual-caption",
             characters: titleCardCaptionCharacters(content.threeCharacterCaptionText),
             layout: TITLE_CARD_WIDE_CAPTION_COLUMN_LAYOUT,
-            fill: config.valueTextColor,
-            filter: config.textStyles.title.filter,
+            fill: staticTextColor,
+            textStyle: config.textStyles.title,
             outline: config.textOutline,
         })}
         ${renderTitleCardCodeLetters({
@@ -466,8 +477,8 @@ function renderWideTitleCardDualTextMetric(
             yCoordinate: TITLE_CARD_DUAL_WIDE_LAYOUT.codeY,
             letterGap: TITLE_CARD_DUAL_WIDE_LAYOUT.codeLetterGap,
             fontSizes: TITLE_CARD_DUAL_WIDE_LAYOUT.codeFontSizes,
-            fill: config.valueTextColor,
-            filter: config.textStyles.smallLabel.filter,
+            fill: staticTextColor,
+            textStyle: config.textStyles.smallLabel,
             outline: config.textOutline,
         })}
         ${renderTitleCardDualRow({
@@ -572,22 +583,23 @@ function renderTitleCardCaptionColumn(options: {
     characters: readonly string[];
     layout: TitleCardCaptionColumnLayout;
     fill: string;
-    filter: string | undefined;
+    textStyle: RenderTextStyle;
     outline: TextMetricConfig["textOutline"];
 }): string {
     return options.characters.map((character, characterIndex) => {
         const fallbackYCoordinate = options.layout.yCoordinates[options.layout.yCoordinates.length - 1] ?? 0;
         const yCoordinate = options.layout.yCoordinates[characterIndex] ?? fallbackYCoordinate;
+        const fontSize = options.layout.fontSize * options.textStyle.fontSizeScale;
 
         return renderConstrainedSvgText({
             id: `${options.idPrefix}-${characterIndex}`,
             text: character,
             xCoordinate: options.layout.xCoordinate,
-            yCoordinate,
+            yCoordinate: yCoordinate + fontSize * options.textStyle.baselineShiftEm,
             maxWidth: options.layout.maxWidth,
-            fontSize: options.layout.fontSize,
-            fontFamily: JAPANESE_SERIF_RENDER_FONT_FAMILY,
-            fontWeight: 900,
+            fontSize,
+            fontFamily: options.textStyle.fontFamily,
+            fontWeight: options.textStyle.fontWeight,
             fill: options.fill,
             textAnchor: "start",
             outline: options.outline,
@@ -599,9 +611,9 @@ function renderTitleCardCaptionColumn(options: {
                     options.layout.yScale,
                 ),
                 ...buildTitleCardStrokeAttributes(options.fill, options.layout.strokeWidth, options.outline),
-                ...buildSvgFilterAttributes(options.filter),
+                ...buildSvgFilterAttributes(options.textStyle.filter),
             ],
-            clipHeight: options.layout.fontSize * options.layout.yScale * 1.35,
+            clipHeight: fontSize * options.layout.yScale * 1.35,
             fitOptions: { minimumFontScale: 1, widthGuardRatio: 1 },
         });
     }).join("");
@@ -621,25 +633,28 @@ function renderTitleCardCodeLetters(options: {
     letterGap: number;
     fontSizes: readonly number[];
     fill: string;
-    filter: string | undefined;
+    textStyle: RenderTextStyle;
     outline: TextMetricConfig["textOutline"];
 }): string {
     return Array.from(options.codeText).slice(0, 3).map((letter, letterIndex) => {
+        const baseFontSize = options.fontSizes[letterIndex] ?? options.fontSizes[options.fontSizes.length - 1] ?? 11;
+        const fontSize = baseFontSize * options.textStyle.fontSizeScale;
+
         return renderConstrainedSvgText({
             id: `${options.idPrefix}-${letterIndex}`,
             text: letter,
             xCoordinate: options.xStart + options.letterGap * letterIndex,
-            yCoordinate: options.yCoordinate,
+            yCoordinate: options.yCoordinate + fontSize * options.textStyle.baselineShiftEm,
             maxWidth: options.letterGap,
-            fontSize: options.fontSizes[letterIndex] ?? options.fontSizes[options.fontSizes.length - 1] ?? 11,
-            fontFamily: JAPANESE_SERIF_RENDER_FONT_FAMILY,
-            fontWeight: 900,
+            fontSize,
+            fontFamily: options.textStyle.fontFamily,
+            fontWeight: options.textStyle.fontWeight,
             fill: options.fill,
             textAnchor: "start",
             outline: options.outline,
             extraAttributes: [
                 ...buildTitleCardStrokeAttributes(options.fill, 0.25, options.outline),
-                ...buildSvgFilterAttributes(options.filter),
+                ...buildSvgFilterAttributes(options.textStyle.filter),
             ],
             fitOptions: { minimumFontScale: 0.55, widthGuardRatio: 1 },
         });
@@ -649,6 +664,7 @@ function renderTitleCardCodeLetters(options: {
 function resolveSquareTitleCardSingleValueLayout(
     valueText: string,
     layout: TitleCardSquareSingleValueRowLayout,
+    valueTextStyle: RenderTextStyle,
 ): TitleCardSingleValueLayout {
     const usesCompactRow = isCompactTitleCardSingleValueText(valueText);
     const valueFontSize = usesCompactRow ? layout.compactValueFontSize : layout.valueFontSize;
@@ -660,8 +676,8 @@ function resolveSquareTitleCardSingleValueLayout(
         valueXCoordinate: usesCompactRow ? layout.compactValueXCoordinate : layout.valueXCoordinate,
         valueYCoordinate: resolveBottomBiasedTextYCoordinate({
             text: valueText,
-            fontSize: valueFontSize,
-            fontWeight: 900,
+            fontSize: valueFontSize * valueTextStyle.fontSizeScale,
+            fontWeight: valueTextStyle.fontWeight,
             maxWidth: valueWidth,
             bottomYCoordinate: layout.bottomYCoordinate,
             bottomGuard: layout.bottomGuard,
@@ -680,7 +696,7 @@ function resolveSquareTitleCardUnitYCoordinate(
     layout: TitleCardSquareSingleValueRowLayout,
     unitFontSize: number,
 ): number {
-    return layout.bottomYCoordinate - layout.bottomGuard - unitFontSize * 1.1;
+    return layout.bottomYCoordinate - layout.bottomGuard - unitFontSize * TITLE_CARD_SINGLE_UNIT_BOTTOM_FONT_RATIO;
 }
 
 function resolveBottomBiasedTextYCoordinate(options: {
@@ -706,7 +722,7 @@ function resolveBottomBiasedTextYCoordinate(options: {
     });
     const renderedFontSize = options.fontSize * textFit.fontScale;
 
-    return options.bottomYCoordinate - options.bottomGuard - renderedFontSize * 0.38;
+    return options.bottomYCoordinate - options.bottomGuard - renderedFontSize * TITLE_CARD_SINGLE_VALUE_BOTTOM_FONT_RATIO;
 }
 
 function resolveTitleCardSingleValueLayout(
@@ -729,7 +745,7 @@ function renderTitleCardUnitText(options: {
     maxWidth: number;
     fontSize: number;
     fill: string;
-    filter: string | undefined;
+    textStyle: RenderTextStyle;
     textAnchor: "start" | "end";
     outline: TextMetricConfig["textOutline"];
 }): string {
@@ -737,24 +753,73 @@ function renderTitleCardUnitText(options: {
         return "";
     }
 
+    const fontSize = options.fontSize * options.textStyle.fontSizeScale;
+
     return renderConstrainedSvgText({
         id: options.id,
         text: options.unitText,
         xCoordinate: options.xCoordinate,
-        yCoordinate: options.yCoordinate,
+        yCoordinate: options.yCoordinate + fontSize * options.textStyle.baselineShiftEm,
         maxWidth: options.maxWidth,
-        fontSize: options.fontSize,
-        fontFamily: JAPANESE_SERIF_RENDER_FONT_FAMILY,
-        fontWeight: 900,
+        fontSize,
+        fontFamily: options.textStyle.fontFamily,
+        fontWeight: options.textStyle.fontWeight,
         fill: options.fill,
         textAnchor: options.textAnchor,
         outline: options.outline,
-        clipHeight: options.fontSize * 1.75,
-        extraAttributes: [
-            ...buildTitleCardStrokeAttributes(options.fill, 0.35, options.outline),
-            ...buildSvgFilterAttributes(options.filter),
-        ],
-        fitOptions: TITLE_CARD_UNIT_TEXT_FIT_OPTIONS,
+        clipHeight: fontSize * options.textStyle.clipHeightEm,
+        extraAttributes: buildSvgFilterAttributes(options.textStyle.filter),
+        fitOptions: {
+            ...TITLE_CARD_UNIT_TEXT_FIT_OPTIONS,
+            minimumFontScale: Math.min(
+                TITLE_CARD_UNIT_TEXT_FIT_OPTIONS.minimumFontScale,
+                options.textStyle.minimumFontScale,
+            ),
+            widthScale: options.textStyle.widthScale,
+        },
+    });
+}
+
+function renderTitleCardChannelLabel(options: {
+    id: string;
+    labelText: string;
+    xCoordinate: number;
+    yCoordinate: number;
+    maxWidth: number;
+    fontSize: number;
+    fill: string;
+    textStyle: RenderTextStyle;
+    outline: TextMetricConfig["textOutline"];
+}): string {
+    if (options.labelText === "↑" || options.labelText === "↓") {
+        return renderTitleCardDirectionIconFragment({
+            id: options.id,
+            direction: options.labelText === "↑" ? "up" : "down",
+            xCoordinate: options.xCoordinate,
+            yCoordinate: options.yCoordinate,
+            fontSize: options.fontSize,
+            fill: options.fill,
+            filter: options.textStyle.filter,
+            outline: options.outline,
+        });
+    }
+
+    const fontSize = options.fontSize * options.textStyle.fontSizeScale;
+
+    return renderConstrainedSvgText({
+        id: options.id,
+        text: options.labelText,
+        xCoordinate: options.xCoordinate,
+        yCoordinate: options.yCoordinate + fontSize * options.textStyle.baselineShiftEm,
+        maxWidth: options.maxWidth,
+        fontSize,
+        fontFamily: options.textStyle.fontFamily,
+        fontWeight: options.textStyle.fontWeight,
+        fill: options.fill,
+        textAnchor: "start",
+        outline: options.outline,
+        clipHeight: fontSize * options.textStyle.clipHeightEm,
+        extraAttributes: buildSvgFilterAttributes(options.textStyle.filter),
     });
 }
 
@@ -767,19 +832,16 @@ function renderTitleCardDualRow(options: {
     const unitText = options.content.widgetData.unit.length === 0 ? "" : options.content.unitText;
 
     return `
-        ${renderConstrainedSvgText({
+        ${renderTitleCardChannelLabel({
             id: `${options.rowId}-label`,
-            text: options.content.labelText,
+            labelText: options.content.labelText,
             xCoordinate: labelXCoordinate,
             yCoordinate: options.layout.yCoordinate,
             maxWidth: 24,
             fontSize: 13,
-            fontFamily: JAPANESE_SERIF_RENDER_FONT_FAMILY,
-            fontWeight: 900,
             fill: options.config.labelTextColor,
-            textAnchor: "start",
+            textStyle: options.config.textStyles.smallLabel,
             outline: options.config.textOutline,
-            extraAttributes: buildSvgFilterAttributes(options.config.textStyles.smallLabel.filter),
         })}
         ${renderConstrainedSvgText({
             id: `${options.rowId}-value`,
@@ -787,9 +849,9 @@ function renderTitleCardDualRow(options: {
             xCoordinate: options.layout.valueXCoordinate,
             yCoordinate: options.layout.yCoordinate,
             maxWidth: options.layout.valueWidth,
-            fontSize: options.layout.valueFontSize,
-            fontFamily: JAPANESE_SERIF_RENDER_FONT_FAMILY,
-            fontWeight: 900,
+            fontSize: options.layout.valueFontSize * options.config.textStyles.value.fontSizeScale,
+            fontFamily: options.config.textStyles.value.fontFamily,
+            fontWeight: options.config.textStyles.value.fontWeight,
             fill: options.content.fill,
             textAnchor: "end",
             outline: options.config.textOutline,
@@ -803,11 +865,11 @@ function renderTitleCardDualRow(options: {
             id: `${options.rowId}-unit`,
             unitText,
             xCoordinate: options.layout.unitXCoordinate,
-            yCoordinate: options.layout.yCoordinate + 8,
+            yCoordinate: options.layout.yCoordinate + options.layout.valueFontSize * TITLE_CARD_DUAL_UNIT_Y_OFFSET_RATIO,
             maxWidth: options.layout.unitWidth,
             fontSize: options.layout.unitFontSize,
             fill: options.config.unitTextColor,
-            filter: options.config.textStyles.unit.filter,
+            textStyle: options.config.textStyles.unit,
             textAnchor: options.layout.unitTextAnchor ?? "start",
             outline: options.config.textOutline,
         })}
