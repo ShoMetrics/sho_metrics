@@ -13,8 +13,10 @@ import type {
 } from "../../settings/resolved-settings";
 import { buildMetricViewIcons } from "../../widgets/icons/metric-view-icons";
 import type { HardwareIconKind } from "../../widgets/icons/hardware-icons";
+import type { MetricStatusIconKind } from "../../widgets/icons/metric-status-icons";
 import { getNetworkDirectionStatusIcon, renderNetworkDirectionIconFragment } from "../../widgets/icons/catalog/network";
 import { formatMetricUnit } from "../../metrics/metric-unit-format";
+import { metricStatusIconForCatalogReadingKind } from "../../metrics/catalog-metric-view-icons";
 import type { DenseMetricWidgetData } from "../../actions/dense-multi-metric/row-data";
 
 export interface MetricPreviewInput {
@@ -36,6 +38,7 @@ interface MetricPreviewSample {
 
 interface HardwarePreviewSampleOptions {
     readonly hardware: HardwareIconKind;
+    readonly status?: MetricStatusIconKind | undefined;
     readonly label: string;
     readonly current: number;
     readonly unit?: string | undefined;
@@ -194,7 +197,8 @@ function buildMetricPreviewSample(target: ResolvedMetricTarget): MetricPreviewSa
             });
         case "catalog":
             return buildHardwarePreviewSample({
-                hardware: "unknown",
+                hardware: target.detectedCategory,
+                status: metricStatusIconForCatalogReadingKind(target.detectedReadingKind),
                 label: "DATA",
                 current: 42,
                 unit: formatMetricUnit(target.detectedUnit),
@@ -240,7 +244,7 @@ function buildNetworkPreviewSample(): MetricPreviewSample {
 function buildHardwarePreviewSample(options: HardwarePreviewSampleOptions): MetricPreviewSample {
     const icons = buildMetricViewIcons({
         hardware: options.hardware,
-        status: "percentage",
+        status: options.status ?? "percentage",
     });
 
     return {
