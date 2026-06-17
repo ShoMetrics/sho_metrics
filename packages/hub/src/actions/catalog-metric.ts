@@ -27,8 +27,8 @@ import type { SingleMetricViewOptions } from "../view-updates/runner";
 import { formatMetricUnit } from "../metrics/metric-unit-format";
 import { resolveCatalogMetricDefaultMaximumValue } from "../metrics/catalog-metric-scale";
 import { formatCatalogMetricFreshWidgetData } from "../metrics/catalog-metric-widget-data";
+import { metricStatusIconForCatalogReadingKind } from "../metrics/catalog-metric-view-icons";
 import { compactProgressCircleLabel } from "../widgets/primitives/progress-circle-label";
-import { metricStatusIconForCatalogReadingKind } from "./catalog-metric/view-icons";
 
 const log = logger.for("Action:CatalogMetric");
 const CATALOG_NO_SELECTION_DEBUG_INTERVAL_MILLISECONDS = 5_000;

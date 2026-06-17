@@ -15,6 +15,7 @@ import type {
     TerminalThemeVariant,
 } from "../../settings/resolved-settings";
 import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
+import { MetricUnit } from "../../runtime/sources/metric-source";
 import { buildDefaultAppearanceSettings } from "../../settings/default-appearance-settings";
 import { buildVisibilityContext } from "../testing/test-context";
 
@@ -35,6 +36,15 @@ test("metric view preview uses the active metric target", () => {
 
     assert.match(svg, />GPU</);
     assert.doesNotMatch(svg, />CPU</);
+});
+
+test("metric view preview uses catalog metric icons", () => {
+    const previewUri = buildCircleVariantPreviewUri("minimal", buildCatalogPreviewInput());
+    const svg = decodeURIComponent(previewUri);
+
+    assert.match(svg, /<path d="M14 4v10\.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/);
+    assert.match(svg, /<rect x="4" y="4" width="16" height="16" rx="2" \/>/);
+    assert.match(svg, /<rect x="8" y="8" width="8" height="8" rx="1" \/>/);
 });
 
 test("circle variant preview URIs render every Property Inspector circle variant without throwing", () => {
@@ -112,6 +122,22 @@ function buildGpuPreviewInput(): MetricPreviewInput {
     return {
         appearance: slot.appearance,
         target: slot.metric.target,
+    };
+}
+
+function buildCatalogPreviewInput(): MetricPreviewInput {
+    return {
+        appearance: buildDefaultAppearanceSettings(),
+        target: {
+            domain: "catalog",
+            metricId: "catalog.cpu.temperature",
+            detectedLabel: "CPU Package",
+            detectedUnit: MetricUnit.CELSIUS,
+            detectedCategory: "cpu",
+            detectedReadingKind: "temperature",
+            customLabel: undefined,
+            customMaximumValue: undefined,
+        },
     };
 }
 
