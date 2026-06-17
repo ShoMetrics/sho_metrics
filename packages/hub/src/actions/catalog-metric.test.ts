@@ -33,6 +33,8 @@ import {
 import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../settings/storage/patch/widget-settings-patch";
 import { resolveInitialActionSettings } from "./settings/action-settings-resolver";
+import { getHardwareIconFragment } from "../widgets/icons/hardware-icons";
+import { getMetricStatusIcon } from "../widgets/icons/metric-status-icons";
 
 test("catalog metric without selected metric does not register collection", () => {
     const action = new TestCatalogMetric();
@@ -250,6 +252,64 @@ test("catalog metric selected view uses stored detected label unit and unit maxi
     assert.equal(viewOptions.widgetData.unit, "W");
 });
 
+test("catalog metric selected view uses catalog metadata icons", () => {
+    const rawSettings = buildCatalogWidgetSettings("source.sensor:/cpu/0/temperature/package", {
+        detectedLabel: "CPU Package",
+        detectedUnit: MetricUnit.CELSIUS,
+        detectedCategory: "cpu",
+        detectedReadingKind: "temperature",
+    });
+    const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
+
+    const viewOptions = buildCatalogMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-cpu-icon-action"), rawSettings),
+        settings,
+        target: readCatalogTarget(settings),
+        metrics: new CapturingMetricStoreReader({
+            current: 72,
+            sampleTimestampMilliseconds: wallClockNowMilliseconds(),
+        }),
+        helperStatus: { state: "available" },
+    });
+
+    assert.equal(viewOptions.centerIconFragment, getHardwareIconFragment("cpu"));
+    assert.deepEqual(viewOptions.statusIcon, getMetricStatusIcon("temperature"));
+    assert.doesNotMatch(viewOptions.centerIconFragment, /question/iu);
+});
+
+test("catalog metric selected circle value view compacts long labels", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(
+        buildCatalogWidgetSettings("source.sensor:/cpu/0/temperature/package", {
+            detectedLabel: "CPU Package",
+            detectedUnit: MetricUnit.CELSIUS,
+            detectedCategory: "cpu",
+            detectedReadingKind: "temperature",
+        }),
+        {
+            appearance: {
+                view: {
+                    selectedView: "circle",
+                    circleVariant: "full-ring",
+                },
+            },
+        },
+    );
+    const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
+
+    const viewOptions = buildCatalogMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-compact-label-action"), rawSettings),
+        settings,
+        target: readCatalogTarget(settings),
+        metrics: new CapturingMetricStoreReader({
+            current: 72,
+            sampleTimestampMilliseconds: wallClockNowMilliseconds(),
+        }),
+        helperStatus: { state: "available" },
+    });
+
+    assert.equal(viewOptions.widgetData.label, "CP");
+});
+
 test("catalog metric selected view uses custom label and custom maximum", () => {
     const rawSettings = buildCatalogWidgetSettings("source.sensor:/gpu/0/power", {
         detectedLabel: "GPU Board Power",
@@ -372,6 +432,7 @@ test("catalog metric selected view formats large units only for fresh helper dat
     assert.equal(viewOptions.widgetData.current, 64 * 1024 ** 3);
     assert.equal(viewOptions.widgetData.displayValue, "64");
     assert.equal(viewOptions.widgetData.unit, "GB");
+    assert.deepEqual(viewOptions.statusIcon, getMetricStatusIcon("data"));
     assert.equal(staleViewOptions.widgetData.displayValue, undefined);
     assert.equal(staleViewOptions.widgetData.unavailableDisplayValue, undefined);
 });
@@ -415,8 +476,11 @@ test("catalog metric selected view formats bytes per second and hertz values", (
 
     assert.equal(networkViewOptions.widgetData.displayValue, "125");
     assert.equal(networkViewOptions.widgetData.unit, "MB/s");
+    assert.equal(networkViewOptions.centerIconFragment, getHardwareIconFragment("network"));
+    assert.deepEqual(networkViewOptions.statusIcon, getMetricStatusIcon("throughput"));
     assert.equal(clockViewOptions.widgetData.displayValue, "3.5");
     assert.equal(clockViewOptions.widgetData.unit, "GHz");
+    assert.deepEqual(clockViewOptions.statusIcon, getMetricStatusIcon("clock"));
 });
 
 test("catalog metric selected view uses 100 as the percent maximum", () => {
