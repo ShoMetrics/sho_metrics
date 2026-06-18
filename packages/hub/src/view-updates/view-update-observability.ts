@@ -1,16 +1,19 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
 import { logger } from "../logging/logger";
+import { resolveProductionLogThrottleMilliseconds } from "../logging/log-throttle";
 import {
     MetricViewPerformanceStats,
     formatMetricViewPerformanceSummary,
     shouldWarnMetricViewPerformanceSummary,
     type MetricViewPerformanceActionKind,
     type MetricViewPerformanceOutcome,
+    type MetricViewPerformanceRenderContext,
 } from "./performance-stats";
 import type { MetricViewUpdatePriority } from "./update-queue";
 
 const log = logger.for("MetricViewUpdateRunner");
 const metricViewPerformanceStats = new MetricViewPerformanceStats();
+const METRIC_VIEW_PERFORMANCE_WARNING_LOG_THROTTLE_MILLISECONDS = resolveProductionLogThrottleMilliseconds(60000);
 
 function resolveMetricViewPerformanceActionKind(event: WillAppearEvent): MetricViewPerformanceActionKind {
     if (event.action.isKey()) {
@@ -28,6 +31,7 @@ export function recordMetricViewPerformanceSample(options: {
     event: WillAppearEvent;
     updateReason: MetricViewUpdatePriority;
     outcome: MetricViewPerformanceOutcome;
+    renderContext: MetricViewPerformanceRenderContext;
     titleClearRequested: boolean;
     updateTimestampMilliseconds: number | null;
     renderStartTimestampMilliseconds: number;
@@ -42,6 +46,7 @@ export function recordMetricViewPerformanceSample(options: {
         requestReason: options.updateReason,
         actionKind: resolveMetricViewPerformanceActionKind(options.event),
         outcome: options.outcome,
+        renderContext: options.renderContext,
         queuedMilliseconds: calculateElapsedMilliseconds(
             options.updateTimestampMilliseconds,
             options.renderStartTimestampMilliseconds,
@@ -70,7 +75,7 @@ export function recordMetricViewPerformanceSample(options: {
 
     if (shouldWarnMetricViewPerformanceSummary(summary)) {
         log.atWarn()
-            .everyMs("metric-view-performance-warning", 60000)
+            .everyMs("metric-view-performance-warning", METRIC_VIEW_PERFORMANCE_WARNING_LOG_THROTTLE_MILLISECONDS)
             .log(() => formatMetricViewPerformanceSummary(summary));
         return;
     }

@@ -1,4 +1,6 @@
-import { access, cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { access, cp, mkdir, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
@@ -18,13 +20,17 @@ const legacyPackagePath = join(outputDirectory, "com.ez.sho-metrics.streamDeckPl
 const streamdeckCliPath = join(packageDirectory, "node_modules", "@elgato", "cli", "bin", "streamdeck.mjs");
 const packageLockPath = join(packageDirectory, "package-lock.json");
 const npmCommand = createNpmCommand();
-const runtimeDependencyPackageNames = [
-    "resvg-js",
+const supportedNativeRuntimeDependencyPackageNames = [
     "resvg-js-win32-x64-msvc",
     "resvg-js-win32-arm64-msvc",
     "resvg-js-darwin-x64",
     "resvg-js-darwin-arm64",
 ];
+const runtimeDependencyPackageNames = [
+    "resvg-js",
+    ...supportedNativeRuntimeDependencyPackageNames,
+];
+const hostNativeRuntimeDependencyPackageName = resolveHostNativeRuntimeDependencyPackageName();
 
 await packStreamDeckPlugin(process.argv.slice(2));
 
@@ -40,6 +46,8 @@ async function packStreamDeckPlugin(argumentList) {
         filter: sourcePath => shouldStagePluginPath(sourcePath),
     });
     await stageRuntimeDependencies();
+    await assertRuntimeDependenciesComplete();
+    assertHostRuntimeDependencyCanLoad();
 
     await runStreamDeckPack(argumentList);
 }
@@ -106,6 +114,79 @@ async function downloadRuntimeDependencyPackage(packageLock, packageName, target
 
 async function readPackageLock() {
     return JSON.parse(await readFile(packageLockPath, "utf8"));
+}
+
+async function assertRuntimeDependenciesComplete() {
+    const targetScopeDirectory = join(stagingPluginDirectory, "bin", "node_modules", "@resvg");
+
+    for (const packageName of supportedNativeRuntimeDependencyPackageNames) {
+        const packageDirectoryPath = join(targetScopeDirectory, packageName);
+        if (!await pathExists(packageDirectoryPath)) {
+            throw new Error(`Missing staged @resvg native runtime package: ${packageName}.`);
+        }
+
+        if (!await directoryContainsNodeNativeModule(packageDirectoryPath)) {
+            throw new Error(`Staged @resvg native runtime package has no .node binary: ${packageName}.`);
+        }
+    }
+}
+
+async function directoryContainsNodeNativeModule(directoryPath) {
+    for (const directoryEntry of await readdir(directoryPath, { withFileTypes: true })) {
+        const entryPath = join(directoryPath, directoryEntry.name);
+        if (directoryEntry.isDirectory() && await directoryContainsNodeNativeModule(entryPath)) {
+            return true;
+        }
+
+        if (directoryEntry.isFile() && directoryEntry.name.endsWith(".node")) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function assertHostRuntimeDependencyCanLoad() {
+    if (hostNativeRuntimeDependencyPackageName === undefined) {
+        return;
+    }
+
+    const hostPackageDirectory = join(
+        stagingPluginDirectory,
+        "bin",
+        "node_modules",
+        "@resvg",
+        hostNativeRuntimeDependencyPackageName,
+    );
+    if (!existsSync(hostPackageDirectory)) {
+        throw new Error(`Missing host @resvg native runtime package: ${hostNativeRuntimeDependencyPackageName}.`);
+    }
+
+    const stagingPluginRequire = createRequire(join(stagingPluginDirectory, "bin", "plugin.js"));
+    const resvgNativeModule = stagingPluginRequire("@resvg/resvg-js");
+    if (typeof resvgNativeModule.Resvg !== "function") {
+        throw new Error("Staged @resvg/resvg-js did not expose a Resvg constructor.");
+    }
+}
+
+function resolveHostNativeRuntimeDependencyPackageName() {
+    if (process.platform === "win32" && process.arch === "x64") {
+        return "resvg-js-win32-x64-msvc";
+    }
+
+    if (process.platform === "win32" && process.arch === "arm64") {
+        return "resvg-js-win32-arm64-msvc";
+    }
+
+    if (process.platform === "darwin" && process.arch === "x64") {
+        return "resvg-js-darwin-x64";
+    }
+
+    if (process.platform === "darwin" && process.arch === "arm64") {
+        return "resvg-js-darwin-arm64";
+    }
+
+    return undefined;
 }
 
 function readLockedPackageVersion(packageLock, packageName) {

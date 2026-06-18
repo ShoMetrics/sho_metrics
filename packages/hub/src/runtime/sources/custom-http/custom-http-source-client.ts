@@ -263,6 +263,7 @@ export class CustomHttpSourceClient implements SourceClient {
                 "Custom HTTP metric read failed",
                 `metricKey=${failure.metricKey}`,
                 `stage=${failure.stage}`,
+                `detail=${redactUrlLikeFailureDetail(failure.detail)}`,
             ].join(" "));
     }
 }
@@ -307,4 +308,8 @@ function isMetricReadSuccess(metricResult: CustomHttpMetricReadResult): metricRe
 
 function limitDetail(detail: string): string {
     return detail.length > 300 ? `${detail.slice(0, 300)}...` : detail;
+}
+
+function redactUrlLikeFailureDetail(detail: string): string {
+    return limitDetail(detail.replaceAll(/https?:\/\/\S+/gi, "[url-redacted]"));
 }

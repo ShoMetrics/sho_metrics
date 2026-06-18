@@ -14,9 +14,10 @@ internal sealed class WindowsMetricSnapshotWorker(
     private static readonly TimeSpan MinimumDemandCheckDelay = TimeSpan.FromMilliseconds(1);
     private static readonly TimeSpan SlowRefreshWarningThreshold = TimeSpan.FromMilliseconds(750);
     private static readonly TimeSpan RefreshWarningThrottleInterval = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan RefreshDebugSummaryInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan RefreshSummaryInterval = TimeSpan.FromSeconds(30);
     private const int SummaryHardwareLimit = 3;
     private const int SummaryWarningLimit = 3;
+    private const int InitializationWarningSampleLimit = 3;
 
     private readonly Dictionary<string, long> _lastRefreshTimestampsByPollingGroupId = new(StringComparer.Ordinal);
     private long _refreshCount;
@@ -27,9 +28,9 @@ internal sealed class WindowsMetricSnapshotWorker(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation(
-            "Starting Windows metric snapshot refresh worker. mode=demand-driven maxDemandCheckDelayMs={MaxDemandCheckDelayMs} debugLoggingEnabled={DebugLoggingEnabled}",
+            "Starting Windows metric snapshot refresh worker. mode=demand-driven maxDemandCheckDelayMs={MaxDemandCheckDelayMs} refreshSummaryIntervalMs={RefreshSummaryIntervalMs}",
             MaximumDemandCheckDelay.TotalMilliseconds,
-            logger.IsEnabled(LogLevel.Debug));
+            RefreshSummaryInterval.TotalMilliseconds);
         LogInitializationWarnings();
 
         try
@@ -100,10 +101,11 @@ internal sealed class WindowsMetricSnapshotWorker(
             logger.AtWarning()
                 .Every(RefreshWarningThrottleInterval)
                 .Log(context => ThrottledLogEntry.Create(
-                    "Windows metric snapshot refresh failed. pollingGroupId={PollingGroupId} durationMs={DurationMs} errorType={ErrorType} suppressedLogCount={SuppressedLogCount}",
+                    "Windows metric snapshot refresh failed. pollingGroupId={PollingGroupId} durationMs={DurationMs} errorType={ErrorType} errorMessage={ErrorMessage} suppressedLogCount={SuppressedLogCount}",
                     demand.PollingGroupId,
                     duration.TotalMilliseconds,
                     exception.GetType().Name,
+                    exception.Message,
                     context.SuppressedCount));
             logger.AtDebug()
                 .Every(RefreshWarningThrottleInterval)
@@ -251,8 +253,8 @@ internal sealed class WindowsMetricSnapshotWorker(
                 .Log(context => CreateSlowRefreshEntry(context, result, duration));
         }
 
-        logger.AtDebug()
-            .Every(RefreshDebugSummaryInterval)
+        logger.AtInformation()
+            .Every(RefreshSummaryInterval)
             .Log(context => CreateRefreshSummaryEntry(context, result, duration));
     }
 
@@ -270,9 +272,10 @@ internal sealed class WindowsMetricSnapshotWorker(
                 .Distinct(StringComparer.Ordinal));
 
         logger.LogWarning(
-            "Windows metric source initialized with warnings. warningCount={WarningCount} warningCodes={WarningCodes}",
+            "Windows metric source initialized with warnings. warningCount={WarningCount} warningCodes={WarningCodes} warningSamples={WarningSamples}",
             monitorSession.InitializationWarnings.Count,
-            warningCodes);
+            warningCodes,
+            BuildInitializationWarningSamples(monitorSession.InitializationWarnings));
 
         if (!logger.IsEnabled(LogLevel.Debug))
         {
@@ -325,7 +328,7 @@ internal sealed class WindowsMetricSnapshotWorker(
         _maxRefreshDurationMs = 0;
 
         return ThrottledLogEntry.Create(
-            "Windows metric snapshot refresh debug summary. refreshes={RefreshCount} slowRefreshes={SlowRefreshCount} coreGatewaySkips={CoreGatewaySkipCount} maxDurationMs={MaxDurationMs} latestDurationMs={LatestDurationMs} latestPollingGroupId={LatestPollingGroupId} readings={ReadingCount} unavailableMetrics={UnavailableMetricCount} unavailableReasons={UnavailableReasons} warnings={WarningCount} warningSamples={WarningSamples} hardwareUpdates={HardwareUpdateCount} failedHardwareUpdates={FailedHardwareUpdateCount} slowHardware={SlowHardware} suppressedLogCount={SuppressedLogCount}",
+            "Windows metric snapshot refresh summary. refreshes={RefreshCount} slowRefreshes={SlowRefreshCount} coreGatewaySkips={CoreGatewaySkipCount} maxDurationMs={MaxDurationMs} latestDurationMs={LatestDurationMs} latestPollingGroupId={LatestPollingGroupId} readings={ReadingCount} unavailableMetrics={UnavailableMetricCount} unavailableReasons={UnavailableReasons} warnings={WarningCount} warningSamples={WarningSamples} hardwareUpdates={HardwareUpdateCount} failedHardwareUpdates={FailedHardwareUpdateCount} slowHardware={SlowHardware} suppressedLogCount={SuppressedLogCount}",
             refreshCount,
             slowRefreshCount,
             coreGatewaySkipCount,
@@ -428,6 +431,16 @@ internal sealed class WindowsMetricSnapshotWorker(
             warnings
                 .Distinct(StringComparer.Ordinal)
                 .Take(SummaryWarningLimit));
+    }
+
+    private static string BuildInitializationWarningSamples(IReadOnlyList<HardwareSourceWarning> warnings)
+    {
+        return string.Join(
+            " | ",
+            warnings
+                .Select(warning => $"{warning.Code}: {warning.Message}")
+                .Distinct(StringComparer.Ordinal)
+                .Take(InitializationWarningSampleLimit));
     }
 
     private readonly record struct HardwareTypeRefreshSummary(

@@ -71,6 +71,7 @@ export class BackgroundCollectionBinding {
     private readPlanSignature: string | null = null;
     private pollingIntervalMilliseconds: number | null = null;
     private subscriberId: string | null = null;
+    private metricCount = 0;
 
     constructor(
         private readonly registerCollection: BackgroundCollectionRegistration
@@ -107,12 +108,13 @@ export class BackgroundCollectionBinding {
         this.readPlanSignature = nextReadPlanSignature;
         this.pollingIntervalMilliseconds = options.pollingIntervalMilliseconds;
         this.subscriberId = options.subscriberId;
+        this.metricCount = listMetricReadPlanKeys(options.readPlan).length;
 
-        log.debug(() => [
-            "backgroundRenderTimerStarted",
+        log.info(() => [
+            "backgroundCollectionBindingStarted",
             `subscriberId=${options.subscriberId}`,
             `intervalMs=${options.pollingIntervalMilliseconds}`,
-            `metricCount=${listMetricReadPlanKeys(options.readPlan).length}`,
+            `metricCount=${this.metricCount}`,
         ].join(" "));
     }
 
@@ -125,9 +127,10 @@ export class BackgroundCollectionBinding {
 
         this.cleanupCollection?.();
         if (this.subscriberId) {
-            log.debug(() => [
-                "backgroundRenderTimerStopped",
+            log.info(() => [
+                "backgroundCollectionBindingStopped",
                 `subscriberId=${this.subscriberId}`,
+                `metricCount=${this.metricCount}`,
             ].join(" "));
         }
 
@@ -135,6 +138,7 @@ export class BackgroundCollectionBinding {
         this.readPlanSignature = null;
         this.pollingIntervalMilliseconds = null;
         this.subscriberId = null;
+        this.metricCount = 0;
     }
 
     private startFirstReadingRenderWarmup(options: BackgroundCollectionBindingRefreshOptions): void {
