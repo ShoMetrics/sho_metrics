@@ -43,6 +43,10 @@ import {
     BackgroundCollectionBinding,
     type BackgroundCollectionBindingRefreshOptions,
 } from "./shared/background-collection-binding";
+import {
+    DefaultDisplayedMetricNoDataObserver,
+    type DisplayedMetricNoDataObserver,
+} from "./shared/displayed-metric-no-data-observer";
 import { createFallbackMetricStoreReader } from "../runtime/metric-collection/fallback-composer";
 import { backgroundMetricCollection } from "../runtime/metric-collection/background-metric-collection";
 import type { MetricSubscription } from "../runtime/metric-collection/metric-subscription-registry";
@@ -59,6 +63,12 @@ interface ActiveActionState {
     rawSettings: unknown;
     resolvedSettings: ResolvedWidgetSettings;
     runtimeCacheStore: WidgetRuntimeCacheStore;
+    /** Start point for suppressing no-data logs during the initial read gap. */
+    appearedAtTimestampMilliseconds: number;
+}
+
+interface MetricActionOptions {
+    readonly displayedMetricNoDataObserver?: DisplayedMetricNoDataObserver;
 }
 
 export interface MetricCollectionBinding {
@@ -74,11 +84,14 @@ export interface MetricCollectionBinding {
 export abstract class MetricAction extends SingletonAction {
     private activeActionStates = new Map<string, ActiveActionState>();
     private metricCollectionBindings = new Map<string, MetricCollectionBinding>();
+    private readonly displayedMetricNoDataObserver: DisplayedMetricNoDataObserver;
 
     protected abstract readonly actionKind: ActionKind;
 
-    constructor() {
+    constructor(options: MetricActionOptions = {}) {
         super();
+        this.displayedMetricNoDataObserver = options.displayedMetricNoDataObserver
+            ?? new DefaultDisplayedMetricNoDataObserver();
         pluginGlobalSettingsStore.subscribe(() => {
             this.resubscribeAllActions();
             for (const activeActionState of this.activeActionStates.values()) {
@@ -98,6 +111,7 @@ export abstract class MetricAction extends SingletonAction {
             rawSettings: initialSettings.rawSettings,
             resolvedSettings: initialSettings.resolvedSettings,
             runtimeCacheStore: new WidgetRuntimeCacheStore(),
+            appearedAtTimestampMilliseconds: this.currentTimestampMilliseconds(),
         };
 
         this.activeActionStates.set(event.action.id, activeActionState);
@@ -138,6 +152,9 @@ export abstract class MetricAction extends SingletonAction {
                     log.error(() => `Failed to persist quick-start widget settings: ${String(error)}`);
                 });
             }
+            // Settings can change the displayed metric/source identity even
+            // before the next render tick publishes a fresh attribution.
+            this.displayedMetricNoDataObserver.clearAction(event.action.id);
             this.onResolvedSettingsChanged(activeActionState.event, nextSettings);
             this.refreshSubscription(activeActionState);
             // Force an immediate update for snappy UI feedback.
@@ -149,6 +166,7 @@ export abstract class MetricAction extends SingletonAction {
         this.onActionWillDisappear(event);
         this.metricCollectionBindings.get(event.action.id)?.dispose();
         this.metricCollectionBindings.delete(event.action.id);
+        this.displayedMetricNoDataObserver.clearAction(event.action.id);
         this.activeActionStates.delete(event.action.id);
         clearColorCompensationActionPreview(event.action.id);
         clearMetricViewState(event.action.id);
@@ -389,6 +407,9 @@ export abstract class MetricAction extends SingletonAction {
     private publishDisplayedMetricReadAttribution(event: WillAppearEvent): void {
         const displayedMetricKey = this.getDisplayedMetricKey(event);
         if (displayedMetricKey === undefined) {
+            // Actions without a displayed metric should not retain older
+            // diagnostics from a previous configuration of the same instance.
+            this.displayedMetricNoDataObserver.clearAction(event.action.id);
             return;
         }
 
@@ -396,6 +417,9 @@ export abstract class MetricAction extends SingletonAction {
         const displayedMetric = normalizeMetricReadPlan(readPlan).metrics
             .find(metric => metric.metricKey === displayedMetricKey);
         if (displayedMetric === undefined) {
+            // A displayed key outside the normalized read plan is not a valid
+            // source diagnostic target for this tick.
+            this.displayedMetricNoDataObserver.clearAction(event.action.id);
             return;
         }
 
@@ -408,6 +432,29 @@ export abstract class MetricAction extends SingletonAction {
             "",
             "",
         );
+        const outcome = buildDisplayedMetricReadOutcome(readResult);
+        const activeActionState = this.activeActionStates.get(event.action.id);
+        const settings = activeActionState?.resolvedSettings ?? this.resolveSettings(event);
+        const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
+            this.actionKind,
+            settings.preferences.pollingFrequencySeconds,
+        );
+
+        if (activeActionState) {
+            // The observer is event-fed by render ticks; no-data sustained and
+            // recovery logs depend on this path continuing to run for N/A keys.
+            this.displayedMetricNoDataObserver.observe({
+                actionId: event.action.id,
+                metricKey: displayedMetricKey,
+                preferredSourceId,
+                selectedSourceId: readResult.selectedSourceId,
+                preferredSourceStatus,
+                outcome,
+                actionAppearedAtTimestampMilliseconds: activeActionState.appearedAtTimestampMilliseconds,
+                nowMilliseconds: this.currentTimestampMilliseconds(),
+                pollingIntervalMilliseconds,
+            });
+        }
 
         this.updateRuntimeCache(event, {
             displayedMetricReadAttribution: {
@@ -417,7 +464,7 @@ export abstract class MetricAction extends SingletonAction {
                     selectedSourceId: readResult.selectedSourceId,
                 },
                 ...(preferredSourceStatus ? { preferredSourceStatus } : {}),
-                outcome: buildDisplayedMetricReadOutcome(readResult),
+                outcome,
             },
         }).catch(error => {
             log.error(() => `Failed to publish displayed metric source attribution: ${String(error)}`);
@@ -436,6 +483,9 @@ export abstract class MetricAction extends SingletonAction {
             // source resolution without changing this action's plan signature.
             this.metricCollectionBindings.get(event.action.id)?.dispose();
             this.metricCollectionBindings.delete(event.action.id);
+            // Global source changes can move the preferred route for the same
+            // metric key, so old no-data state must not survive resubscribe.
+            this.displayedMetricNoDataObserver.clearAction(event.action.id);
             this.refreshSubscription(activeActionState);
         }
     }

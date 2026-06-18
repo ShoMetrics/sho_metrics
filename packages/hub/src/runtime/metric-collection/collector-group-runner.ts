@@ -8,6 +8,10 @@ import { BackoffPolicy } from "../sources/backoff-policy";
 import type { PlannedCollectorGroup } from "./collector-group-planner";
 import { logger } from "../../logging/logger";
 import { monotonicNowMilliseconds } from "../../shared/clock";
+import {
+    DefaultCollectorGroupNoDataObserver,
+    type CollectorGroupNoDataObserver,
+} from "./collector-group-no-data-observer";
 
 export type CollectorGroupRefreshStatus =
     | "refreshed"
@@ -45,6 +49,7 @@ export interface CollectorGroupRunnerOptions {
     readonly snapshotStore: CollectorGroupSnapshotStore;
     readonly backoffPolicy: BackoffPolicy;
     readonly timer?: CollectorGroupRunnerTimer;
+    readonly collectorGroupNoDataObserver?: CollectorGroupNoDataObserver;
     readonly onRefreshResult?: (
         collectorGroup: PlannedCollectorGroup,
         result: CollectorGroupRefreshResult,
@@ -73,6 +78,7 @@ export class CollectorGroupRunner {
     private readonly snapshotStore: CollectorGroupSnapshotStore;
     private readonly backoffPolicy: BackoffPolicy;
     private readonly timer: CollectorGroupRunnerTimer;
+    private readonly collectorGroupNoDataObserver: CollectorGroupNoDataObserver;
     private readonly onRefreshResult?: (
         collectorGroup: PlannedCollectorGroup,
         result: CollectorGroupRefreshResult,
@@ -88,6 +94,8 @@ export class CollectorGroupRunner {
         this.snapshotStore = options.snapshotStore;
         this.backoffPolicy = options.backoffPolicy;
         this.timer = options.timer ?? defaultTimer;
+        this.collectorGroupNoDataObserver = options.collectorGroupNoDataObserver
+            ?? new DefaultCollectorGroupNoDataObserver();
         this.onRefreshResult = options.onRefreshResult;
     }
 
@@ -103,6 +111,7 @@ export class CollectorGroupRunner {
     stop(): void {
         this.isStopped = true;
         this.generation += 1;
+        this.collectorGroupNoDataObserver.clear(this.collectorGroup.collectorGroupKey);
 
         if (this.timerHandle !== null) {
             this.timer.clear(this.timerHandle);
@@ -111,6 +120,9 @@ export class CollectorGroupRunner {
     }
 
     updateCollectorGroup(collectorGroup: PlannedCollectorGroup): void {
+        if (collectorGroup.collectorGroupKey !== this.collectorGroup.collectorGroupKey) {
+            this.collectorGroupNoDataObserver.clear(this.collectorGroup.collectorGroupKey);
+        }
         this.collectorGroup = collectorGroup;
         this.generation += 1;
     }
@@ -165,6 +177,10 @@ export class CollectorGroupRunner {
                 valueAttributions: readResult.valueAttributions,
                 unavailableMetrics: readResult.unavailableMetrics,
             });
+            // Only a successful source read can answer "refreshed but produced
+            // none of the requested keys"; failed/skipped states are logged by
+            // the refresh status path below.
+            this.recordCollectorGroupNoDataState(readResult.snapshot);
             this.backoffPolicy.recordSuccess();
 
             return { status: "refreshed" };
@@ -226,6 +242,17 @@ export class CollectorGroupRunner {
             status,
             this.collectorGroup.collectorGroupKey,
         ].join(":");
+    }
+
+    private recordCollectorGroupNoDataState(snapshot: MetricSnapshot): void {
+        const snapshotMetricKeys = new Set(Object.keys(snapshot.metrics));
+        const hasAnyRequestedMetric = this.collectorGroup.metricKeys.some(metricKey => snapshotMetricKeys.has(metricKey));
+
+        this.collectorGroupNoDataObserver.observe(
+            this.collectorGroup,
+            hasAnyRequestedMetric ? "ok" : "noData",
+            monotonicNowMilliseconds(),
+        );
     }
 
     private scheduleNextRefresh(delayMilliseconds: number): void {
