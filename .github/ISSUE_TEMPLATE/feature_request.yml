@@ -1,0 +1,41 @@
+name: Feature request
+description: Suggest a new feature or behavior change
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe the request here. 可以用中文提问。日本語での質問も可能です。
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem or limitation are you trying to solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed solution
+      description: What would you like ShoMetrics to do?
+    validations:
+      required: false
+
+  - type: textarea
+    id: who-benefits
+    attributes:
+      label: Who benefits?
+      description: Who would use this, and when?
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Anything that helps explain the use case, limitations, or alternatives.
+    validations:
+      required: false
