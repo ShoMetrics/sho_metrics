@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { CollectorGroupRunner } from "./collector-group-runner";
 import type { PlannedCollectorGroup } from "./collector-group-planner";
+import type { CollectorGroupNoDataObserver } from "./collector-group-no-data-observer";
 import { MetricStore } from "../metric-store";
 import {
     buildMetricSnapshot,
@@ -85,6 +86,76 @@ test("refreshNow records failure backoff and skips attempts during cooldown", as
         metricStore.forScope("node-system").getWidgetData("cpu.usage_percent", "CPU", "%").current,
         55,
     );
+});
+
+test("refreshNow reports collector group no-data when refreshed snapshot has no requested keys", async () => {
+    const noDataObserver = new RecordingCollectorGroupNoDataObserver();
+    const runner = new CollectorGroupRunner({
+        collectorGroup: buildCollectorGroup({ metricKeys: ["cpu.usage_percent", "cpu.model"] }),
+        sourceClient: new FakeSourceClient([
+            buildSnapshot(1000, { "ram.used": 42 }),
+        ]),
+        snapshotStore: new MetricStore(),
+        backoffPolicy: BackoffPolicy.flat(() => 0, 1000),
+        collectorGroupNoDataObserver: noDataObserver,
+    });
+
+    assert.deepEqual(await runner.refreshNow(), { status: "refreshed" });
+
+    assert.deepEqual(noDataObserver.observations.map(observation => observation.state), ["noData"]);
+});
+
+test("refreshNow reports collector group ok when refreshed snapshot has a requested key", async () => {
+    const noDataObserver = new RecordingCollectorGroupNoDataObserver();
+    const runner = new CollectorGroupRunner({
+        collectorGroup: buildCollectorGroup({ metricKeys: ["cpu.usage_percent", "cpu.model"] }),
+        sourceClient: new FakeSourceClient([
+            buildSnapshot(1000, { "cpu.model": 1 }),
+        ]),
+        snapshotStore: new MetricStore(),
+        backoffPolicy: BackoffPolicy.flat(() => 0, 1000),
+        collectorGroupNoDataObserver: noDataObserver,
+    });
+
+    assert.deepEqual(await runner.refreshNow(), { status: "refreshed" });
+
+    assert.deepEqual(noDataObserver.observations.map(observation => observation.state), ["ok"]);
+});
+
+test("refreshNow does not report collector group no-data for failed or skipped refreshes", async () => {
+    const noDataObserver = new RecordingCollectorGroupNoDataObserver();
+    const runner = new CollectorGroupRunner({
+        collectorGroup: buildCollectorGroup({ metricKeys: ["cpu.usage_percent"] }),
+        sourceClient: new FakeSourceClient([
+            Promise.reject(new Error("source failed")),
+        ]),
+        snapshotStore: new MetricStore(),
+        backoffPolicy: BackoffPolicy.flat(() => 0, 1000),
+        collectorGroupNoDataObserver: noDataObserver,
+    });
+
+    const failureResult = await runner.refreshNow();
+    assert.equal(failureResult.status, "failed");
+
+    assert.deepEqual(await runner.refreshNow(), { status: "skippedBackoff" });
+    assert.deepEqual(noDataObserver.observations, []);
+});
+
+test("stop clears collector group no-data state", () => {
+    const noDataObserver = new RecordingCollectorGroupNoDataObserver();
+    const runner = new CollectorGroupRunner({
+        collectorGroup: buildCollectorGroup({ metricKeys: ["cpu.usage_percent"] }),
+        sourceClient: new FakeSourceClient([]),
+        snapshotStore: new MetricStore(),
+        backoffPolicy: BackoffPolicy.flat(() => 0, 1000),
+        collectorGroupNoDataObserver: noDataObserver,
+    });
+
+    runner.stop();
+
+    assert.deepEqual(noDataObserver.clearedCollectorGroupKeys, [
+        JSON.stringify(["local", "node-system", "sourceDeclared", "cpu"]),
+    ]);
 });
 
 test("stop prevents an in-flight refresh from writing stale generation results", async () => {
@@ -274,6 +345,25 @@ class FakeSourceClient {
             valueAttributions: [],
             unavailableMetrics: [],
         };
+    }
+}
+
+class RecordingCollectorGroupNoDataObserver implements CollectorGroupNoDataObserver {
+    readonly observations: Array<{
+        readonly collectorGroupKey: string;
+        readonly state: "ok" | "noData";
+    }> = [];
+    readonly clearedCollectorGroupKeys: string[] = [];
+
+    observe(collectorGroup: PlannedCollectorGroup, state: "ok" | "noData"): void {
+        this.observations.push({
+            collectorGroupKey: collectorGroup.collectorGroupKey,
+            state,
+        });
+    }
+
+    clear(collectorGroupKey: string): void {
+        this.clearedCollectorGroupKeys.push(collectorGroupKey);
     }
 }
 

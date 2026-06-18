@@ -8,6 +8,10 @@ import type {
     WillDisappearEvent,
 } from "@elgato/streamdeck";
 import { MetricAction, type MetricCollectionBinding } from "./metric-action";
+import type {
+    DisplayedMetricNoDataObservation,
+    DisplayedMetricNoDataObserver,
+} from "./shared/displayed-metric-no-data-observer";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
 import { metricStore } from "../runtime/metric-store";
 import { buildMetricSnapshot, buildScalarMetricValue } from "../runtime/sources/metric-source";
@@ -486,6 +490,52 @@ test("metric action publishes unavailable metric attribution when no fresh value
     }
 });
 
+test("metric action clears no-data observer when no displayed metric is available", () => {
+    const noDataObserver = new RecordingDisplayedMetricNoDataObserver();
+    const action = new TestMetricAction(undefined, noDataObserver);
+    const streamDeckAction = new FakeStreamDeckAction("no-displayed-metric-action");
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
+
+        assert.deepEqual(noDataObserver.clearedActionIds, ["no-displayed-metric-action"]);
+        assert.deepEqual(noDataObserver.observations, []);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    }
+});
+
+test("metric action clears no-data observer when displayed metric is not in the read plan", () => {
+    const noDataObserver = new RecordingDisplayedMetricNoDataObserver();
+    const action = new TestMissingDisplayedMetricAction(noDataObserver);
+    const streamDeckAction = new FakeStreamDeckAction("missing-displayed-metric-action");
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
+
+        assert.deepEqual(noDataObserver.clearedActionIds, ["missing-displayed-metric-action"]);
+        assert.deepEqual(noDataObserver.observations, []);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    }
+});
+
+test("metric action clears no-data observer on disappear", () => {
+    const noDataObserver = new RecordingDisplayedMetricNoDataObserver();
+    const action = new TestDisplayedAttributionAction(undefined, noDataObserver);
+    const streamDeckAction = new FakeStreamDeckAction("clear-no-data-on-disappear-action");
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+
+        assert.deepEqual(noDataObserver.clearedActionIds, ["clear-no-data-on-disappear-action"]);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+        metricStore.clear();
+    }
+});
+
 test("global settings changes recreate background collection bindings", () => {
     pluginGlobalSettingsStore.update(undefined);
     const firstBinding = new FakeMetricCollectionBinding();
@@ -651,8 +701,14 @@ class TestMetricAction extends MetricAction {
         readonly pollingFrequencySeconds: number;
     }> = [];
 
-    constructor(private readonly bindingFactory: () => FakeMetricCollectionBinding = () => new FakeMetricCollectionBinding()) {
-        super();
+    private readonly bindingFactory: () => FakeMetricCollectionBinding;
+
+    constructor(
+        bindingFactory: (() => FakeMetricCollectionBinding) | undefined = undefined,
+        displayedMetricNoDataObserver?: DisplayedMetricNoDataObserver,
+    ) {
+        super({ displayedMetricNoDataObserver });
+        this.bindingFactory = bindingFactory ?? (() => new FakeMetricCollectionBinding());
     }
 
     protected getMetricKeys(event: WillAppearEvent): readonly string[] {
@@ -725,9 +781,27 @@ class TestMetricReaderAction extends TestMetricAction {
 }
 
 class TestDisplayedAttributionAction extends TestMetricAction {
+    constructor(
+        bindingFactory: (() => FakeMetricCollectionBinding) | undefined = undefined,
+        displayedMetricNoDataObserver?: DisplayedMetricNoDataObserver,
+    ) {
+        super(bindingFactory, displayedMetricNoDataObserver);
+    }
+
     protected override getDisplayedMetricKey(event: WillAppearEvent): string {
         void event;
         return "net.down";
+    }
+}
+
+class TestMissingDisplayedMetricAction extends TestMetricAction {
+    constructor(displayedMetricNoDataObserver: DisplayedMetricNoDataObserver) {
+        super(undefined, displayedMetricNoDataObserver);
+    }
+
+    protected override getDisplayedMetricKey(event: WillAppearEvent): string {
+        void event;
+        return "net.missing";
     }
 }
 
@@ -800,6 +874,19 @@ class FakeMetricCollectionBinding implements MetricCollectionBinding {
         this.readPlanSignature = null;
         this.pollingIntervalMilliseconds = null;
         this.subscriberId = null;
+    }
+}
+
+class RecordingDisplayedMetricNoDataObserver implements DisplayedMetricNoDataObserver {
+    readonly observations: DisplayedMetricNoDataObservation[] = [];
+    readonly clearedActionIds: string[] = [];
+
+    observe(observation: DisplayedMetricNoDataObservation): void {
+        this.observations.push(observation);
+    }
+
+    clearAction(actionId: string): void {
+        this.clearedActionIds.push(actionId);
     }
 }
 
