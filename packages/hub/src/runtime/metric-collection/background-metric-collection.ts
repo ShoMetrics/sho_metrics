@@ -22,6 +22,7 @@ import {
     SourcePlanningMetadataRegistry,
     sourcePlanningMetadataRegistry,
 } from "./source-planning-metadata-registry";
+import { MetricStoreIngestDiagnostics } from "./metric-store-ingest-diagnostics";
 import type { SourceMetadataInvalidation } from "../sources/source-planning-metadata";
 import { monotonicNowMilliseconds } from "../../shared/clock";
 
@@ -34,6 +35,7 @@ interface BackgroundMetricCollectionOptions {
     readonly collectorGroupSupervisor: CollectorGroupSupervisor;
     readonly sourceMetadataRegistry: SourcePlanningMetadataRegistry;
     readonly sourceRegistry: SourceRegistry;
+    readonly metricStoreIngestDiagnostics?: MetricStoreIngestDiagnostics;
 }
 
 /**
@@ -49,6 +51,7 @@ export class BackgroundMetricCollection {
     private readonly collectorGroupSupervisor: CollectorGroupSupervisor;
     private readonly sourceMetadataRegistry: SourcePlanningMetadataRegistry;
     private readonly sourceRegistry: SourceRegistry;
+    private readonly metricStoreIngestDiagnostics: MetricStoreIngestDiagnostics;
     private readonly unsubscribeSourceMetadataInvalidations: () => void;
 
     constructor(options: BackgroundMetricCollectionOptions) {
@@ -57,6 +60,7 @@ export class BackgroundMetricCollection {
         this.collectorGroupSupervisor = options.collectorGroupSupervisor;
         this.sourceMetadataRegistry = options.sourceMetadataRegistry;
         this.sourceRegistry = options.sourceRegistry;
+        this.metricStoreIngestDiagnostics = options.metricStoreIngestDiagnostics ?? new MetricStoreIngestDiagnostics();
         this.unsubscribeSourceMetadataInvalidations = this.sourceRegistry.subscribeSourceMetadataInvalidations(
             invalidation => {
                 this.notifySourceMetadataChanged(invalidation);
@@ -203,10 +207,17 @@ export class BackgroundMetricCollection {
 
         try {
             const readResult = await sourceClient.readSnapshot(metricKeys);
-            metricStore.ingest(sourceCandidate.sourceId, readResult.snapshot, {
+            const ingestReport = metricStore.ingest(sourceCandidate.sourceId, readResult.snapshot, {
                 valueAttributions: readResult.valueAttributions,
                 unavailableMetrics: readResult.unavailableMetrics,
             });
+            // This refresh path bypasses CollectorGroupRunner, so it must attach
+            // the source context for MetricStore's dropped-value report here.
+            this.metricStoreIngestDiagnostics.record({
+                sourceId: sourceCandidate.sourceId,
+                groupKind: "runtimeOptionRefresh",
+                groupId: "manual",
+            }, ingestReport);
         } catch (error) {
             log.warn(() => [
                 "runtimeOptionRefreshFailed",

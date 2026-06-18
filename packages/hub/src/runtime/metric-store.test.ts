@@ -256,23 +256,55 @@ test("text values are retrievable without numeric widget history", () => {
     });
 });
 
-test("invalid scalar and empty text values are ignored", () => {
+test("invalid scalar and empty text values are ignored and reported", () => {
     const metricStore = new MetricStore();
     const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
-    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+    const ingestReport = metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
         timestampMilliseconds: 1000,
         metrics: {
             "cpu.usage_percent": buildScalarMetricValue(Number.NaN, { unit: MetricUnit.PERCENT }),
+            "gpu.power": buildScalarMetricValue(Number.POSITIVE_INFINITY, { unit: MetricUnit.WATTS }),
+            "gpu.temperature": buildScalarMetricValue(Number.NEGATIVE_INFINITY, { unit: MetricUnit.CELSIUS }),
             "cpu.model": buildTextMetricValue("   "),
         },
     }));
 
+    assert.deepEqual(ingestReport, {
+        acceptedScalarCount: 0,
+        acceptedTextCount: 0,
+        rejectedCount: 4,
+        rejections: [
+            { metricKey: "cpu.usage_percent", reason: "nonFiniteScalar" },
+            { metricKey: "gpu.power", reason: "nonFiniteScalar" },
+            { metricKey: "gpu.temperature", reason: "nonFiniteScalar" },
+            { metricKey: "cpu.model", reason: "emptyText" },
+        ],
+    });
     assert.equal(
         metrics.getWidgetData("cpu.usage_percent", "CPU", "%").sampleTimestampMilliseconds,
         undefined,
     );
     assert.equal(metrics.getTextValue("cpu.model"), undefined);
+});
+
+test("ingest report counts accepted scalar and text values", () => {
+    const metricStore = new MetricStore();
+
+    const ingestReport = metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            "cpu.usage_percent": buildScalarMetricValue(25, { unit: MetricUnit.PERCENT }),
+            "cpu.model": buildTextMetricValue("Example CPU"),
+        },
+    }));
+
+    assert.deepEqual(ingestReport, {
+        acceptedScalarCount: 1,
+        acceptedTextCount: 1,
+        rejectedCount: 0,
+        rejections: [],
+    });
 });
 
 test("scalar metric replaces text metric completely", () => {

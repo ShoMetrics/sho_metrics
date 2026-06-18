@@ -6,6 +6,29 @@ import type {
     MetricValueAttribution,
 } from "./sources/source-client";
 
+export type MetricStoreIngestRejectionReason = "nonFiniteScalar" | "emptyText";
+
+/** A value MetricStore intentionally dropped instead of adding to render state. */
+export interface MetricStoreIngestRejection {
+    readonly metricKey: string;
+    readonly reason: MetricStoreIngestRejectionReason;
+}
+
+/**
+ * Summarizes one ingest without changing the store mutation contract.
+ *
+ * Callers use this only for diagnostics. A rejected value means MetricStore
+ * kept the same behavior it already had: invalid scalars and empty text are
+ * ignored, previous valid state is left intact, and no raw value is exposed to
+ * logs.
+ */
+export interface MetricStoreIngestReport {
+    readonly acceptedScalarCount: number;
+    readonly acceptedTextCount: number;
+    readonly rejectedCount: number;
+    readonly rejections: readonly MetricStoreIngestRejection[];
+}
+
 /** Read-only view of metric history bound to one source scope. */
 export interface MetricStoreReader {
     /** Builds renderer-facing widget data for one metric in the bound source scope. */
@@ -98,7 +121,13 @@ export class MetricStore {
         };
     }
 
-    /** Ingests a snapshot into the history owned by one runtime source scope. */
+    /**
+     * Ingests a snapshot into the history owned by one runtime source scope.
+     *
+     * The returned report is observational only. It lets polling owners log
+     * bounded summaries for dropped values without duplicating MetricStore's
+     * validation rules in each source adapter.
+     */
     ingest(
         sourceScopeId: string,
         snapshot: MetricSnapshot,
@@ -106,12 +135,15 @@ export class MetricStore {
             readonly valueAttributions?: readonly MetricValueAttribution[];
             readonly unavailableMetrics?: readonly MetricUnavailableReport[];
         } = {},
-    ): void {
+    ): MetricStoreIngestReport {
         const snapshotTimestampMilliseconds = readRequiredMetricSnapshotTimestampMilliseconds(snapshot);
         const sourceStore = this.ensureSourceStore(sourceScopeId);
         const valueAttributionsByMetricKey = new Map(
             sourceMetadata.valueAttributions?.map(attribution => [attribution.metricId, attribution]) ?? [],
         );
+        const rejections: MetricStoreIngestRejection[] = [];
+        let acceptedScalarCount = 0;
+        let acceptedTextCount = 0;
 
         for (const [metricKey, value] of Object.entries(snapshot.metrics)) {
             if (value.value.case === "scalar") {
@@ -119,9 +151,11 @@ export class MetricStore {
                 // NaN and +/-Infinity keep the previous valid value available
                 // instead of poisoning progress/history calculations.
                 if (!Number.isFinite(value.value.value)) {
+                    rejections.push({ metricKey, reason: "nonFiniteScalar" });
                     continue;
                 }
 
+                acceptedScalarCount += 1;
                 const valueAttribution = valueAttributionsByMetricKey.get(metricKey);
                 this.recordValueAttribution(sourceScopeId, metricKey, valueAttribution);
                 this.clearUnavailableMetric(sourceScopeId, metricKey);
@@ -139,9 +173,11 @@ export class MetricStore {
 
             if (value.value.case === "text") {
                 if (value.value.value.trim().length === 0) {
+                    rejections.push({ metricKey, reason: "emptyText" });
                     continue;
                 }
 
+                acceptedTextCount += 1;
                 this.recordText(sourceStore, metricKey, value.value.value, snapshotTimestampMilliseconds);
                 this.recordValueAttribution(sourceScopeId, metricKey, valueAttributionsByMetricKey.get(metricKey));
                 this.clearUnavailableMetric(sourceScopeId, metricKey);
@@ -151,6 +187,13 @@ export class MetricStore {
         if (sourceMetadata.unavailableMetrics) {
             this.recordUnavailableMetrics(sourceScopeId, sourceMetadata.unavailableMetrics);
         }
+
+        return {
+            acceptedScalarCount,
+            acceptedTextCount,
+            rejectedCount: rejections.length,
+            rejections,
+        };
     }
 
     private record(
