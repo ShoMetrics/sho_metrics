@@ -10,6 +10,7 @@ import {
     type SingleMetricRenderOptions,
 } from "../view-rendering/metric-view-frame";
 import { logger } from "../logging/logger";
+import { resolveProductionLogThrottleMilliseconds } from "../logging/log-throttle";
 import type { ResolvedAppearanceSettings } from "../settings/resolved-settings";
 import { MetricViewUpdateQueue, type MetricViewUpdatePriority } from "./update-queue";
 import {
@@ -19,7 +20,9 @@ import {
 import {
     recordMetricViewPerformanceSample,
 } from "./view-update-observability";
+import type { MetricViewPerformanceRenderContext } from "./performance-stats";
 import { buildMetricRenderAppearance } from "../settings/render-appearance-builder";
+import { CUSTOM_HTTP_METRIC_KEY_PREFIX } from "../runtime/sources/custom-http/custom-http-metric-key";
 import {
     resolveHardwareColorCompensationProfile,
     shouldSuppressMetricViewForColorCompensation,
@@ -31,6 +34,8 @@ import { wallClockNowMilliseconds } from "../shared/clock";
 const log = logger.for("MetricViewUpdateRunner");
 
 const MAX_CONCURRENT_METRIC_VIEW_UPDATES = 1;
+const BURSTY_RENDER_LOG_THROTTLE_MILLISECONDS = resolveProductionLogThrottleMilliseconds(10000);
+const REPEATED_RENDER_FAILURE_LOG_THROTTLE_MILLISECONDS = resolveProductionLogThrottleMilliseconds(60000);
 
 interface MetricViewEvent {
     event: WillAppearEvent;
@@ -123,6 +128,7 @@ export class MetricViewUpdateRunner {
             renderTarget: options.event.action.isDial() ? "touch-strip" : "key",
         });
         const renderPlan = frame.renderPlan;
+        const renderContext = buildMetricViewPerformanceRenderContext(options, renderPlan.renderAppearance);
         const renderedMetricData = frame.renderedMetricData;
         const colorCompensationProfile = resolveHardwareColorCompensationProfile({
             actionId: options.event.action.id,
@@ -143,7 +149,7 @@ export class MetricViewUpdateRunner {
         const titleClearRequested = options.event.action.isKey();
 
         if (updateReason === "settings-change") {
-            log.info(() => [
+            log.debug(() => [
                 "settingsViewRenderStart",
                 `actionId=${options.event.action.id}`,
                 `metricKey=${options.metricKey}`,
@@ -157,7 +163,9 @@ export class MetricViewUpdateRunner {
 
         if (titleClearRequested) {
             options.event.action.setTitle("").catch(error => {
-                log.error(() => `Failed to clear key title: ${error}`);
+                log.atError()
+                    .everyMs("metric-view-title-clear-failed", REPEATED_RENDER_FAILURE_LOG_THROTTLE_MILLISECONDS)
+                    .log(() => `Failed to clear key title: ${error}`);
             });
         }
 
@@ -165,7 +173,7 @@ export class MetricViewUpdateRunner {
 
         if (renderedSvgSignature === metricViewActionState.lastRenderedSvgSignature) {
             if (updateReason === "settings-change") {
-                log.info(() => [
+                log.debug(() => [
                     "settingsViewSkippedUnchanged",
                     `actionId=${options.event.action.id}`,
                     `metricKey=${options.metricKey}`,
@@ -187,6 +195,7 @@ export class MetricViewUpdateRunner {
                 event: options.event,
                 updateReason,
                 outcome: "skipped",
+                renderContext,
                 titleClearRequested,
                 updateTimestampMilliseconds,
                 renderStartTimestampMilliseconds,
@@ -204,17 +213,27 @@ export class MetricViewUpdateRunner {
         const softwarePngDataUrl = rasterizeSvgToPngDataUrl(softwareSvg, renderPlan.pngSize);
 
         if (!softwarePngDataUrl) {
+            const rasterizeEndTimestampMilliseconds = wallClockNowMilliseconds();
+            logMetricViewRasterizeFailure({
+                actionId: options.event.action.id,
+                metricKey: options.metricKey,
+                stage: "software",
+                renderContext,
+                queueLength: this.metricViewActionQueue.length,
+                activeActionCount: this.metricViewActionStates.size,
+            });
             recordMetricViewPerformanceSample({
                 event: options.event,
                 updateReason,
                 outcome: "failed",
+                renderContext,
                 titleClearRequested,
                 updateTimestampMilliseconds,
                 renderStartTimestampMilliseconds,
                 composeEndTimestampMilliseconds,
-                rasterizeEndTimestampMilliseconds: wallClockNowMilliseconds(),
+                rasterizeEndTimestampMilliseconds,
                 updateStartTimestampMilliseconds: null,
-                updateEndTimestampMilliseconds: wallClockNowMilliseconds(),
+                updateEndTimestampMilliseconds: rasterizeEndTimestampMilliseconds,
                 queueLength: this.metricViewActionQueue.length,
                 activeActionCount: this.metricViewActionStates.size,
             });
@@ -228,10 +247,19 @@ export class MetricViewUpdateRunner {
         const rasterizeEndTimestampMilliseconds = wallClockNowMilliseconds();
 
         if (!hardwarePngDataUrl) {
+            logMetricViewRasterizeFailure({
+                actionId: options.event.action.id,
+                metricKey: options.metricKey,
+                stage: "hardware",
+                renderContext,
+                queueLength: this.metricViewActionQueue.length,
+                activeActionCount: this.metricViewActionStates.size,
+            });
             recordMetricViewPerformanceSample({
                 event: options.event,
                 updateReason,
                 outcome: "failed",
+                renderContext,
                 titleClearRequested,
                 updateTimestampMilliseconds,
                 renderStartTimestampMilliseconds,
@@ -284,6 +312,7 @@ export class MetricViewUpdateRunner {
                     event: options.event,
                     updateReason,
                     outcome: dispatchResult.status === "rendered" ? "rendered" : "failed",
+                    renderContext,
                     titleClearRequested,
                     updateTimestampMilliseconds,
                     renderStartTimestampMilliseconds,
@@ -296,26 +325,30 @@ export class MetricViewUpdateRunner {
                 });
 
                 if (dispatchResult.status === "failed") {
-                    log.error(() => `${dispatchResult.failureMessage}: ${dispatchResult.error}`);
+                    log.atError()
+                        .everyMs("metric-view-dispatch-failed", REPEATED_RENDER_FAILURE_LOG_THROTTLE_MILLISECONDS)
+                        .log(() => `${dispatchResult.failureMessage}: ${dispatchResult.error}`);
                     return;
                 }
 
                 if (updateReason === "settings-change") {
-                    log.info(() => {
-                        const currentTimestampMilliseconds = wallClockNowMilliseconds();
-                        return [
-                            "settingsViewUpdateDone",
-                            `phase=${dispatchResult.donePhase}`,
-                            `actionId=${options.event.action.id}`,
-                            `metricKey=${options.metricKey}`,
-                            `renderPrimitive=${renderPlan.renderAppearance.renderPrimitive}`,
-                            `queuedMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, renderStartTimestampMilliseconds)}`,
-                            `composeMs=${composeEndTimestampMilliseconds - renderStartTimestampMilliseconds}`,
-                            `rasterizeMs=${rasterizeEndTimestampMilliseconds - composeEndTimestampMilliseconds}`,
-                            `sdkPromiseMs=${currentTimestampMilliseconds - dispatchResult.updateStartTimestampMilliseconds}`,
-                            `totalMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, currentTimestampMilliseconds)}`,
-                        ].join(" ");
-                    });
+                    log.atInfo()
+                        .everyMs("settings-view-update-done", BURSTY_RENDER_LOG_THROTTLE_MILLISECONDS)
+                        .log(() => {
+                            const currentTimestampMilliseconds = wallClockNowMilliseconds();
+                            return [
+                                "settingsViewUpdateDone",
+                                `phase=${dispatchResult.donePhase}`,
+                                `actionId=${options.event.action.id}`,
+                                `metricKey=${options.metricKey}`,
+                                `renderPrimitive=${renderPlan.renderAppearance.renderPrimitive}`,
+                                `queuedMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, renderStartTimestampMilliseconds)}`,
+                                `composeMs=${composeEndTimestampMilliseconds - renderStartTimestampMilliseconds}`,
+                                `rasterizeMs=${rasterizeEndTimestampMilliseconds - composeEndTimestampMilliseconds}`,
+                                `sdkPromiseMs=${currentTimestampMilliseconds - dispatchResult.updateStartTimestampMilliseconds}`,
+                                `totalMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, currentTimestampMilliseconds)}`,
+                            ].join(" ");
+                        });
                 }
 
                 log.debug(() => {
@@ -384,18 +417,19 @@ export class MetricViewUpdateRunner {
             return;
         }
 
-        log.info(() => [
-            "settingsViewScheduled",
-            `actionId=${options.event.action.id}`,
-            `metricKey=${options.metricKey}`,
-            `renderPrimitive=${settingsSignature.renderPrimitive}`,
-            `viewKind=${options.metricRenderKind}`,
-            `isRenderInFlight=${metricViewActionState.isRenderInFlight}`,
-            `isQueued=${metricViewActionState.isQueued}`,
-            `activeUpdates=${this.activeMetricViewUpdateCount}`,
-            `queueLength=${this.metricViewActionQueue.length}`,
-            `signature=${settingsSignature.signature}`,
-        ].join(" "));
+        log.atInfo()
+            .everyMs("settings-view-scheduled", BURSTY_RENDER_LOG_THROTTLE_MILLISECONDS)
+            .log(() => [
+                "settingsViewScheduled",
+                `actionId=${options.event.action.id}`,
+                `metricKey=${options.metricKey}`,
+                `renderPrimitive=${settingsSignature.renderPrimitive}`,
+                `viewKind=${options.metricRenderKind}`,
+                `isRenderInFlight=${metricViewActionState.isRenderInFlight}`,
+                `isQueued=${metricViewActionState.isQueued}`,
+                `activeUpdates=${this.activeMetricViewUpdateCount}`,
+                `queueLength=${this.metricViewActionQueue.length}`,
+            ].join(" "));
     }
 
     private enqueueMetricViewAction(metricViewActionState: MetricViewActionState): void {
@@ -452,7 +486,9 @@ export class MetricViewUpdateRunner {
             try {
                 this.runMetricViewUpdate(metricViewActionState, metricViewActionState.pendingOptions);
             } catch (error) {
-                log.error(() => `Render/update error: ${String(error)}`);
+                log.atError()
+                    .everyMs("metric-view-render-update-failed", REPEATED_RENDER_FAILURE_LOG_THROTTLE_MILLISECONDS)
+                    .log(() => `Render/update error: ${String(error)}`);
                 this.finishMetricViewUpdate(metricViewActionState);
             }
         }
@@ -492,6 +528,31 @@ export function clearMetricViewState(actionId: string): void {
     metricViewUpdateRunner.clearMetricViewState(actionId);
 }
 
+function logMetricViewRasterizeFailure(options: {
+    readonly actionId: string;
+    readonly metricKey: string;
+    readonly stage: "software" | "hardware";
+    readonly renderContext: MetricViewPerformanceRenderContext;
+    readonly queueLength: number;
+    readonly activeActionCount: number;
+}): void {
+    log.atError()
+        .everyMs(`metric-view-rasterize-failed:${options.stage}`, REPEATED_RENDER_FAILURE_LOG_THROTTLE_MILLISECONDS)
+        .log(() => [
+            "metricViewRasterizeFailed",
+            `stage=${options.stage}`,
+            `actionId=${options.actionId}`,
+            `metricKey=${options.metricKey}`,
+            `metricFamily=${options.renderContext.metricFamily}`,
+            `viewKind=${options.renderContext.metricRenderKind}`,
+            `renderPrimitive=${options.renderContext.renderPrimitive}`,
+            `renderVariant=${options.renderContext.renderVariant}`,
+            `theme=${options.renderContext.themePreset}`,
+            `queueLength=${options.queueLength}`,
+            `activeActionCount=${options.activeActionCount}`,
+        ].join(" "));
+}
+
 function buildMetricViewSettingsSignature(settings: ResolvedAppearanceSettings): {
     readonly renderPrimitive: MetricRenderAppearance["renderPrimitive"];
     readonly signature: string;
@@ -527,6 +588,65 @@ function buildMetricViewSettingsSignature(settings: ResolvedAppearanceSettings):
     };
 }
 
+function buildMetricViewPerformanceRenderContext(
+    options: MetricViewOptions,
+    renderAppearance: MetricRenderAppearance,
+): MetricViewPerformanceRenderContext {
+    return {
+        metricFamily: summarizeMetricViewPerformanceMetricKey(options.metricKey),
+        metricRenderKind: options.metricRenderKind,
+        renderPrimitive: renderAppearance.renderPrimitive,
+        renderVariant: resolveMetricViewPerformanceRenderVariant(renderAppearance),
+        themePreset: renderAppearance.themePreset,
+    };
+}
+
+function summarizeMetricViewPerformanceMetricKey(metricKey: string): string {
+    if (metricKey.includes(",")) {
+        const metricFamilies = metricKey
+            .split(",")
+            .map(metricKeyPart => summarizeMetricViewPerformanceMetricKey(metricKeyPart.trim()));
+        const uniqueMetricFamilies = [...new Set(metricFamilies)];
+
+        return uniqueMetricFamilies.length === 1 ? uniqueMetricFamilies[0] ?? "unknown" : "mixed";
+    }
+
+    if (metricKey.startsWith("lhm.sensor:")) {
+        return "catalog";
+    }
+
+    if (metricKey.startsWith(CUSTOM_HTTP_METRIC_KEY_PREFIX)) {
+        return "custom";
+    }
+
+    const metricFamily = metricKey.split(".")[0] ?? "";
+
+    switch (metricFamily) {
+        case "cpu":
+        case "disk":
+        case "gpu":
+        case "memory":
+        case "net":
+        case "ram":
+            return metricFamily;
+        default:
+            return metricFamily.length === 0 ? "unknown" : "other";
+    }
+}
+
+function resolveMetricViewPerformanceRenderVariant(renderAppearance: MetricRenderAppearance): string {
+    switch (renderAppearance.renderPrimitive) {
+        case "circle":
+            return renderAppearance.circleVariant;
+        case "text":
+            return renderAppearance.textVariant;
+        case "sparkline":
+            return renderAppearance.gridLineVisibility;
+        case "bar":
+            return "default";
+    }
+}
+
 function formatAgeMilliseconds(
     sampleTimestampMilliseconds: number | undefined,
     currentTimestampMilliseconds: number,
@@ -548,4 +668,3 @@ function formatElapsedMilliseconds(
 
     return String(Math.max(0, endTimestampMilliseconds - startTimestampMilliseconds));
 }
-

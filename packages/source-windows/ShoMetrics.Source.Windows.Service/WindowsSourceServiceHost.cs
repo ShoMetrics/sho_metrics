@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
+using System.Diagnostics;
 using ShoMetrics.Source.Windows.Contracts;
 using ShoMetrics.Source.Windows.Core;
 
@@ -20,6 +21,7 @@ internal static class WindowsSourceServiceHost
     private const int RetainedLogFileCountLimit = 14;
     private const string LogOutputTemplate =
         "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}";
+    private static int processFailureLogsRegistered;
 
     internal static IHost Build(string[] args, WindowsSourceServiceHostOptions options)
     {
@@ -57,19 +59,34 @@ internal static class WindowsSourceServiceHost
         Func<IHost, Task> runHostAsync)
     {
         Log.Logger = CreateBootstrapLogger(options.Mode);
+        RegisterProcessFailureLogs();
+        long processStartedTimestamp = Stopwatch.GetTimestamp();
 
         try
         {
+            LogBootstrapping(options);
+            long hostBuildStartedTimestamp = Stopwatch.GetTimestamp();
             using IHost host = Build(args, options);
+            RegisterHostLifetimeLogs(host, options, processStartedTimestamp);
+            LogBuilt(options, Stopwatch.GetElapsedTime(hostBuildStartedTimestamp));
             LogStarting(options);
 
             await runHostAsync(host).ConfigureAwait(false);
+
+            Log.Information(
+                "ShoMetrics Helper service host exited normally. mode={Mode} uptimeMs={UptimeMs}",
+                options.Mode,
+                Stopwatch.GetElapsedTime(processStartedTimestamp).TotalMilliseconds);
 
             return 0;
         }
         catch (Exception exception)
         {
-            Log.Fatal(exception, "ShoMetrics Windows service host failed.");
+            Log.Fatal(
+                exception,
+                "ShoMetrics Windows service host failed. mode={Mode} uptimeMs={UptimeMs}",
+                options.Mode,
+                Stopwatch.GetElapsedTime(processStartedTimestamp).TotalMilliseconds);
 
             return 1;
         }
@@ -79,12 +96,116 @@ internal static class WindowsSourceServiceHost
         }
     }
 
+    private static void LogBootstrapping(WindowsSourceServiceHostOptions options)
+    {
+        Log.Information(
+            "Bootstrapping ShoMetrics Helper service host. mode={Mode} source={SourceId} protocol={ProtocolVersion} helperVersion={HelperVersion} processId={ProcessId} baseDirectory={BaseDirectory}",
+            options.Mode,
+            WindowsSourceServiceIdentity.SourceId,
+            WindowsSourceServiceIdentity.ProtocolVersion,
+            WindowsSourceServiceIdentity.HelperVersion,
+            Environment.ProcessId,
+            AppContext.BaseDirectory);
+    }
+
+    private static void LogBuilt(WindowsSourceServiceHostOptions options, TimeSpan duration)
+    {
+        Log.Information(
+            "Built ShoMetrics Helper service host. mode={Mode} pipeName={PipeName} durationMs={DurationMs}",
+            options.Mode,
+            options.PipeName,
+            duration.TotalMilliseconds);
+    }
+
     private static void LogStarting(WindowsSourceServiceHostOptions options)
     {
         Log.Information(
-            "Starting ShoMetrics Helper service. source={SourceId} protocol={ProtocolVersion}.",
-            WindowsSourceServiceIdentity.SourceId,
-            WindowsSourceServiceIdentity.ProtocolVersion);
+            "Starting ShoMetrics Helper service. mode={Mode} pipeName={PipeName}",
+            options.Mode,
+            options.PipeName);
+    }
+
+    private static void RegisterHostLifetimeLogs(
+        IHost host,
+        WindowsSourceServiceHostOptions options,
+        long processStartedTimestamp)
+    {
+        IHostApplicationLifetime lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
+
+        lifetime.ApplicationStarted.Register(() =>
+        {
+            Log.Information(
+                "ShoMetrics Helper service host started. mode={Mode} uptimeMs={UptimeMs}",
+                options.Mode,
+                Stopwatch.GetElapsedTime(processStartedTimestamp).TotalMilliseconds);
+        });
+        lifetime.ApplicationStopping.Register(() =>
+        {
+            Log.Information(
+                "ShoMetrics Helper service host stopping. mode={Mode} uptimeMs={UptimeMs}",
+                options.Mode,
+                Stopwatch.GetElapsedTime(processStartedTimestamp).TotalMilliseconds);
+        });
+        lifetime.ApplicationStopped.Register(() =>
+        {
+            Log.Information(
+                "ShoMetrics Helper service host stopped. mode={Mode} uptimeMs={UptimeMs}",
+                options.Mode,
+                Stopwatch.GetElapsedTime(processStartedTimestamp).TotalMilliseconds);
+        });
+    }
+
+    private static void RegisterProcessFailureLogs()
+    {
+        if (Interlocked.Exchange(ref processFailureLogsRegistered, 1) == 1)
+        {
+            return;
+        }
+
+        AppDomain.CurrentDomain.UnhandledException += static (_, eventArgs) =>
+        {
+            if (eventArgs.ExceptionObject is Exception exception)
+            {
+                Log.Fatal(
+                    exception,
+                    "Unhandled ShoMetrics Helper service exception. isTerminating={IsTerminating} exceptionObjectType={ExceptionObjectType}",
+                    eventArgs.IsTerminating,
+                    exception.GetType().FullName ?? "");
+                FlushFatalLogIfTerminating(eventArgs.IsTerminating);
+                return;
+            }
+
+            Log.Fatal(
+                "Unhandled ShoMetrics Helper service exception. isTerminating={IsTerminating} exceptionObjectType={ExceptionObjectType}",
+                eventArgs.IsTerminating,
+                eventArgs.ExceptionObject?.GetType().FullName ?? "");
+            FlushFatalLogIfTerminating(eventArgs.IsTerminating);
+        };
+
+        TaskScheduler.UnobservedTaskException += static (_, eventArgs) =>
+        {
+            Log.Error(
+                eventArgs.Exception,
+                "Unobserved ShoMetrics Helper service task exception.");
+        };
+    }
+
+    private static void FlushFatalLogIfTerminating(bool isTerminating)
+    {
+        if (!isTerminating)
+        {
+            return;
+        }
+
+        try
+        {
+            Log.CloseAndFlush();
+        }
+        catch
+        {
+            // The process is already terminating; logging cleanup must not throw
+            // a second exception from the unhandled-exception path.
+        }
     }
 
     private static void ConfigureGrpcNamedPipeHost(

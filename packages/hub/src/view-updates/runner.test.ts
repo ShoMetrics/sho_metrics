@@ -10,6 +10,8 @@ import { updateCommittedColorCompensationProfileFromStoredSettings } from "../co
 import { writeStoredColorCompensationProfile } from "../settings/storage/color-compensation-settings";
 import { readStoredGlobalSettings } from "../settings/storage/codec";
 import * as rasterizer from "../view-rendering/rasterizer";
+import { CUSTOM_HTTP_METRIC_KEY_PREFIX } from "../runtime/sources/custom-http/custom-http-metric-key";
+import type { MetricViewPerformanceRenderContext } from "./performance-stats";
 import {
     clearMetricViewState,
     MetricViewUpdateRunner,
@@ -106,6 +108,24 @@ test("a pending settings-change update reason is not overwritten by a metric tic
 
     try {
         assert.deepEqual(updateReasons, ["settings-change"]);
+    } finally {
+        clearMetricViewState(action.id);
+    }
+});
+
+test("custom HTTP metric keys are reported as the custom render family", async () => {
+    const action = new FakeKeyAction("custom-http-family-action");
+    const renderContexts = await recordMetricViewPerformanceRenderContexts(async () => {
+        setMetricView(buildMetricViewOptions(action, {
+            metricKey: `${CUSTOM_HTTP_METRIC_KEY_PREFIX}api-example-com:action-1:single`,
+        }));
+
+        await waitForImageCall(action);
+    });
+
+    try {
+        assert.equal(renderContexts.length, 1);
+        assert.equal(renderContexts[0]?.metricFamily, "custom");
     } finally {
         clearMetricViewState(action.id);
     }
@@ -217,12 +237,13 @@ class FakeKeyAction {
 }
 
 function buildMetricViewOptions(action: FakeKeyAction, options: {
+    metricKey?: string | undefined;
     widgetData?: WidgetData | undefined;
     appearanceOverride?: ResolvedAppearanceSettingsOverride | undefined;
 } = {}): MetricViewOptions {
     return {
         event: buildEvent(action),
-        metricKey: "cpu.usage_percent",
+        metricKey: options.metricKey ?? "cpu.usage_percent",
         metricRenderKind: "singleMetric",
         centerIconFragment: "<path />",
         statusIcon: buildStatusIcon(),
@@ -279,6 +300,33 @@ async function recordMetricViewUpdateReasons(run: () => Promise<void>): Promise<
     try {
         await run();
         return updateReasons;
+    } finally {
+        Object.defineProperty(observability, "recordMetricViewPerformanceSample", {
+            configurable: true,
+            value: originalRecordMetricViewPerformanceSample,
+        });
+    }
+}
+
+async function recordMetricViewPerformanceRenderContexts(
+    run: () => Promise<void>,
+): Promise<MetricViewPerformanceRenderContext[]> {
+    const observability = await import("./view-update-observability");
+    const originalRecordMetricViewPerformanceSample = observability.recordMetricViewPerformanceSample;
+    const renderContexts: MetricViewPerformanceRenderContext[] = [];
+    const replacement: RecordMetricViewPerformanceSample = (options) => {
+        renderContexts.push(options.renderContext);
+        originalRecordMetricViewPerformanceSample(options);
+    };
+
+    Object.defineProperty(observability, "recordMetricViewPerformanceSample", {
+        configurable: true,
+        value: replacement,
+    });
+
+    try {
+        await run();
+        return renderContexts;
     } finally {
         Object.defineProperty(observability, "recordMetricViewPerformanceSample", {
             configurable: true,

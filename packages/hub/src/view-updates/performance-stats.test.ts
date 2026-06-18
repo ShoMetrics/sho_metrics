@@ -10,11 +10,13 @@ import {
 // platform-specific benchmarks, not hermetic unit tests.
 test("metric view performance stats aggregates render windows", () => {
     const stats = new MetricViewPerformanceStats(5000);
+    const renderContext = buildRenderContext();
 
     const firstSummary = stats.record({
         requestReason: "metric-tick",
         actionKind: "key",
         outcome: "rendered",
+        renderContext,
         queuedMilliseconds: 100,
         composeMilliseconds: 2,
         rasterizeMilliseconds: 120,
@@ -29,6 +31,7 @@ test("metric view performance stats aggregates render windows", () => {
         requestReason: "settings-change",
         actionKind: "dial",
         outcome: "skipped",
+        renderContext,
         queuedMilliseconds: 0,
         composeMilliseconds: 1,
         rasterizeMilliseconds: null,
@@ -53,6 +56,13 @@ test("metric view performance stats aggregates render windows", () => {
     assert.equal(secondSummary.queuedDuration.averageMilliseconds, 50);
     assert.equal(secondSummary.rasterizeDuration.count, 1);
     assert.equal(secondSummary.rasterizeDuration.maximumMilliseconds, 120);
+    assert.deepEqual(secondSummary.slowestRasterizeSample, {
+        renderContext,
+        rasterizeMilliseconds: 120,
+        totalMilliseconds: 223,
+        queuedMilliseconds: 100,
+        sdkPromiseMilliseconds: 1,
+    });
 });
 
 test("metric view performance summary is log-friendly", () => {
@@ -61,6 +71,7 @@ test("metric view performance summary is log-friendly", () => {
         requestReason: "metric-tick",
         actionKind: "key",
         outcome: "failed",
+        renderContext: buildRenderContext(),
         queuedMilliseconds: 3,
         composeMilliseconds: 2,
         rasterizeMilliseconds: null,
@@ -107,6 +118,7 @@ test("metric view performance summary warns only on degraded view update windows
         requestReason: "metric-tick",
         actionKind: "key",
         outcome: "rendered",
+        renderContext: buildRenderContext(),
         queuedMilliseconds: 3,
         composeMilliseconds: 2,
         rasterizeMilliseconds: 5,
@@ -120,6 +132,7 @@ test("metric view performance summary warns only on degraded view update windows
         requestReason: "metric-tick",
         actionKind: "key",
         outcome: "rendered",
+        renderContext: buildRenderContext(),
         queuedMilliseconds: 501,
         composeMilliseconds: 2,
         rasterizeMilliseconds: 5,
@@ -133,6 +146,7 @@ test("metric view performance summary warns only on degraded view update windows
         requestReason: "metric-tick",
         actionKind: "key",
         outcome: "failed",
+        renderContext: buildRenderContext(),
         queuedMilliseconds: 3,
         composeMilliseconds: 2,
         rasterizeMilliseconds: null,
@@ -150,3 +164,13 @@ test("metric view performance summary warns only on degraded view update windows
     assert.equal(shouldWarnMetricViewPerformanceSummary(queuedSummary), true);
     assert.equal(shouldWarnMetricViewPerformanceSummary(failedSummary), true);
 });
+
+function buildRenderContext() {
+    return {
+        metricFamily: "cpu",
+        metricRenderKind: "singleMetric" as const,
+        renderPrimitive: "circle" as const,
+        renderVariant: "full-ring",
+        themePreset: "flat" as const,
+    };
+}

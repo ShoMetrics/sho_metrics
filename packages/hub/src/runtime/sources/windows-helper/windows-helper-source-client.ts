@@ -1,5 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { logger } from "../../../logging/logger";
+import { resolveProductionLogThrottleMilliseconds } from "../../../logging/log-throttle";
 import {
     monotonicNowMilliseconds,
     wallClockNowMilliseconds,
@@ -93,6 +94,8 @@ const DEFAULT_HEALTH_TIMEOUT_MILLISECONDS = 750;
 const DEFAULT_READ_SNAPSHOT_TIMEOUT_MILLISECONDS = 2000;
 const DEFAULT_LIST_DESCRIPTORS_TIMEOUT_MILLISECONDS = 5000;
 const DEFAULT_SET_REFRESH_DEMAND_TIMEOUT_MILLISECONDS = 1000;
+const HELPER_SNAPSHOT_FULL_KEY_LOG_LIMIT = 16;
+const HELPER_SNAPSHOT_READ_LOG_INTERVAL_MILLISECONDS = resolveProductionLogThrottleMilliseconds(60000);
 
 /**
  * Startup retry interval for descriptor preload. This closes the common
@@ -576,17 +579,34 @@ export class WindowsHelperSourceClient implements SourceClient {
 
         this.hasCompleteDescriptorSnapshot = true;
 
-        if (!hadCompleteDescriptorSnapshot) {
-            return "descriptorLoaded";
-        }
-
-        if (previousDescriptorFingerprint === descriptorSnapshot.descriptorFingerprint) {
-            return undefined;
-        }
-
-        return previousDescriptorFingerprint === undefined
+        const invalidationReason = !hadCompleteDescriptorSnapshot
             ? "descriptorLoaded"
-            : "descriptorChanged";
+            : previousDescriptorFingerprint === descriptorSnapshot.descriptorFingerprint
+                ? undefined
+                : previousDescriptorFingerprint === undefined
+                    ? "descriptorLoaded"
+                    : "descriptorChanged";
+
+        if (invalidationReason) {
+            this.logDescriptorCatalogSummary(invalidationReason);
+        }
+
+        return invalidationReason;
+    }
+
+    private logDescriptorCatalogSummary(reason: SourceMetadataInvalidationReason): void {
+        const pollingGroupIds = new Set<string>();
+        for (const descriptor of this.descriptorsByMetricId.values()) {
+            pollingGroupIds.add(descriptor.pollingGroupId);
+        }
+
+        log.info(() => [
+            "windowsHelperDescriptorCatalogLoaded",
+            `reason=${reason}`,
+            `descriptorCount=${this.descriptorsByMetricId.size}`,
+            `pollingGroupCount=${pollingGroupIds.size}`,
+            `fingerprint=${this.descriptorFingerprint ?? ""}`,
+        ].join(" "));
     }
 
     dispose(): void {
@@ -844,17 +864,16 @@ export class WindowsHelperSourceClient implements SourceClient {
         const completedAtMonotonicMilliseconds = this.monotonicNow();
         const completedAtWallClockTimestampMilliseconds = this.wallClockNow();
 
-        // TODO: Remove this temporary helper snapshot latency log after the
-        // per-group helper cache is implemented and measured.
-        log.debug(() => [
-            "helperSnapshotRead",
-            `metricCount=${metricKeys.length}`,
-            `metricKeys=${metricKeys.join(",")}`,
-            `durationMs=${completedAtMonotonicMilliseconds - requestStartedAtMonotonicMilliseconds}`,
-            `sampleAgeMs=${completedAtWallClockTimestampMilliseconds - sampleTimestampMilliseconds}`,
-            `snapshotMetricCount=${Object.keys(snapshot.metrics).length}`,
-            `cpuUsagePercent=${readScalarMetricValue(snapshot, CPU_USAGE_METRIC_KEY) ?? ""}`,
-        ].join(" "));
+        log.atInfo()
+            .everyMs("helper-snapshot-read", HELPER_SNAPSHOT_READ_LOG_INTERVAL_MILLISECONDS)
+            .log(() => [
+                "helperSnapshotRead",
+                ...formatHelperSnapshotMetricKeys(metricKeys),
+                `durationMs=${completedAtMonotonicMilliseconds - requestStartedAtMonotonicMilliseconds}`,
+                `sampleAgeMs=${completedAtWallClockTimestampMilliseconds - sampleTimestampMilliseconds}`,
+                `snapshotMetricCount=${Object.keys(snapshot.metrics).length}`,
+                `cpuUsagePercent=${readScalarMetricValue(snapshot, CPU_USAGE_METRIC_KEY) ?? ""}`,
+            ].join(" "));
     }
 }
 
@@ -866,6 +885,24 @@ function readScalarMetricValue(snapshot: MetricSnapshot, metricKey: string): num
     const metricValue = snapshot.metrics[metricKey];
 
     return metricValue?.value.case === "scalar" ? metricValue.value.value : undefined;
+}
+
+function formatHelperSnapshotMetricKeys(metricKeys: readonly string[]): readonly string[] {
+    if (metricKeys.length <= HELPER_SNAPSHOT_FULL_KEY_LOG_LIMIT) {
+        return [
+            `metricCount=${metricKeys.length}`,
+            `metricKeys=${metricKeys.join(",")}`,
+        ];
+    }
+
+    // Stream Deck MK.2 has 15 keys; 16 covers MK.2, Neo, and Plus without
+    // dumping XL-style high-key-count profiles into production logs.
+    const metricKeySample = metricKeys.slice(0, HELPER_SNAPSHOT_FULL_KEY_LOG_LIMIT);
+    return [
+        `metricCount=${metricKeys.length}`,
+        `metricKeySample=${metricKeySample.join(",")}`,
+        `omittedMetricCount=${metricKeys.length - metricKeySample.length}`,
+    ];
 }
 
 const nodeDescriptorPreloadTimer: WindowsHelperDescriptorPreloadTimer = {

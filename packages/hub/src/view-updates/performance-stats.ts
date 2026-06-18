@@ -6,15 +6,34 @@ import {
     type DurationSummary as SharedDurationSummary,
 } from "../shared/duration-accumulator";
 import { wallClockNowMilliseconds } from "../shared/clock";
+import type { MetricRenderOptions } from "../view-rendering/metric-view-frame";
+import type { MetricRenderAppearance } from "../view-rendering/render-appearance";
 
 type MetricViewPerformanceReason = "settings-change" | "metric-tick";
 export type MetricViewPerformanceActionKind = "key" | "dial" | "unknown";
 export type MetricViewPerformanceOutcome = "rendered" | "skipped" | "failed";
 
+export interface MetricViewPerformanceRenderContext {
+    readonly metricFamily: string;
+    readonly metricRenderKind: MetricRenderOptions["metricRenderKind"];
+    readonly renderPrimitive: MetricRenderAppearance["renderPrimitive"];
+    readonly renderVariant: string;
+    readonly themePreset: MetricRenderAppearance["themePreset"];
+}
+
+export interface MetricViewPerformanceSlowestRasterizeSample {
+    readonly renderContext: MetricViewPerformanceRenderContext;
+    readonly rasterizeMilliseconds: number;
+    readonly totalMilliseconds: number;
+    readonly queuedMilliseconds: number | null;
+    readonly sdkPromiseMilliseconds: number | null;
+}
+
 export interface MetricViewPerformanceSample {
     requestReason: MetricViewPerformanceReason;
     actionKind: MetricViewPerformanceActionKind;
     outcome: MetricViewPerformanceOutcome;
+    renderContext: MetricViewPerformanceRenderContext;
     queuedMilliseconds: number | null;
     composeMilliseconds: number;
     rasterizeMilliseconds: number | null;
@@ -45,6 +64,7 @@ export interface MetricViewPerformanceSummary {
     rasterizeDuration: DurationSummary;
     sdkPromiseDuration: DurationSummary;
     totalDuration: DurationSummary;
+    slowestRasterizeSample: MetricViewPerformanceSlowestRasterizeSample | null;
 }
 
 const METRIC_VIEW_PERFORMANCE_WARNING_MAXIMUM_QUEUED_MILLISECONDS = 500;
@@ -69,6 +89,7 @@ interface MetricViewPerformanceWindow {
     rasterizeDuration: DurationAccumulator;
     sdkPromiseDuration: DurationAccumulator;
     totalDuration: DurationAccumulator;
+    slowestRasterizeSample: MetricViewPerformanceSlowestRasterizeSample | null;
 }
 
 /**
@@ -128,6 +149,7 @@ export function formatMetricViewPerformanceSummary(summary: MetricViewPerformanc
         `maxSdkPromiseMs=${formatMaximumDuration(summary.sdkPromiseDuration)}`,
         `avgTotalMs=${formatAverageDuration(summary.totalDuration)}`,
         `maxTotalMs=${formatMaximumDuration(summary.totalDuration)}`,
+        ...formatSlowestRasterizeSample(summary.slowestRasterizeSample),
     ].join(" ");
 }
 
@@ -163,6 +185,7 @@ function createMetricViewPerformanceWindow(startTimestampMilliseconds: number): 
         rasterizeDuration: createDurationAccumulator(),
         sdkPromiseDuration: createDurationAccumulator(),
         totalDuration: createDurationAccumulator(),
+        slowestRasterizeSample: null,
     };
 }
 
@@ -190,6 +213,23 @@ function addMetricViewPerformanceSample(
     addDurationSample(performanceWindow.rasterizeDuration, sample.rasterizeMilliseconds);
     addDurationSample(performanceWindow.sdkPromiseDuration, sample.sdkPromiseMilliseconds);
     addDurationSample(performanceWindow.totalDuration, sample.totalMilliseconds);
+
+    if (sample.rasterizeMilliseconds == null) {
+        return;
+    }
+
+    if (
+        performanceWindow.slowestRasterizeSample == null
+        || sample.rasterizeMilliseconds > performanceWindow.slowestRasterizeSample.rasterizeMilliseconds
+    ) {
+        performanceWindow.slowestRasterizeSample = {
+            renderContext: sample.renderContext,
+            rasterizeMilliseconds: sample.rasterizeMilliseconds,
+            totalMilliseconds: sample.totalMilliseconds,
+            queuedMilliseconds: sample.queuedMilliseconds,
+            sdkPromiseMilliseconds: sample.sdkPromiseMilliseconds,
+        };
+    }
 }
 
 function buildMetricViewPerformanceSummary(
@@ -214,7 +254,26 @@ function buildMetricViewPerformanceSummary(
         rasterizeDuration: summarizeDuration(performanceWindow.rasterizeDuration),
         sdkPromiseDuration: summarizeDuration(performanceWindow.sdkPromiseDuration),
         totalDuration: summarizeDuration(performanceWindow.totalDuration),
+        slowestRasterizeSample: performanceWindow.slowestRasterizeSample,
     };
+}
+
+function formatSlowestRasterizeSample(sample: MetricViewPerformanceSlowestRasterizeSample | null): readonly string[] {
+    if (sample == null) {
+        return [];
+    }
+
+    return [
+        `slowestRasterizeMs=${sample.rasterizeMilliseconds.toFixed(0)}`,
+        `slowestTotalMs=${sample.totalMilliseconds.toFixed(0)}`,
+        `slowestQueuedMs=${formatNullableDuration(sample.queuedMilliseconds)}`,
+        `slowestSdkPromiseMs=${formatNullableDuration(sample.sdkPromiseMilliseconds)}`,
+        `slowestMetricFamily=${sample.renderContext.metricFamily}`,
+        `slowestViewKind=${sample.renderContext.metricRenderKind}`,
+        `slowestPrimitive=${sample.renderContext.renderPrimitive}`,
+        `slowestVariant=${sample.renderContext.renderVariant}`,
+        `slowestTheme=${sample.renderContext.themePreset}`,
+    ];
 }
 
 function formatAverageDuration(summary: DurationSummary): string {
@@ -231,6 +290,14 @@ function formatMaximumDuration(summary: DurationSummary): string {
     }
 
     return summary.maximumMilliseconds.toFixed(0);
+}
+
+function formatNullableDuration(durationMilliseconds: number | null): string {
+    if (durationMilliseconds == null) {
+        return "unknown";
+    }
+
+    return durationMilliseconds.toFixed(0);
 }
 
 function exceedsDuration(durationMilliseconds: number | null, thresholdMilliseconds: number): boolean {
