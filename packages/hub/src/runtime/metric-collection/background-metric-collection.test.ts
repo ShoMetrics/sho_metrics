@@ -9,12 +9,16 @@ import type {
 import type { SourceRegistry } from "../sources/source-registry";
 import type { SourceMetricPollingGroupResolution } from "../sources/source-polling-groups";
 import type { SourceMetadataInvalidation, SourceMetadataInvalidationListener } from "../sources/source-planning-metadata";
-import { buildMetricSnapshot } from "../sources/metric-source";
+import { buildMetricSnapshot, buildScalarMetricValue } from "../sources/metric-source";
 import { WINDOWS_HELPER_SOURCE_ID } from "../sources/source-ids";
 import { BackoffPolicy } from "../sources/backoff-policy";
 import { BackgroundMetricCollection } from "./background-metric-collection";
 import { CollectorGroupPlanner } from "./collector-group-planner";
 import { CollectorGroupSupervisor } from "./collector-group-supervisor";
+import {
+    MetricStoreIngestDiagnostics,
+    type MetricStoreInvalidValuesLogEntry,
+} from "./metric-store-ingest-diagnostics";
 import { MetricSubscriptionRegistry } from "./metric-subscription-registry";
 import { SourcePlanningMetadataRegistry } from "./source-planning-metadata-registry";
 
@@ -28,6 +32,7 @@ type BuildBackgroundMetricCollectionOptions =
         | { readonly sourceRegistry: FakeSourceRegistry; readonly sourceClients?: never }
     ) & {
         readonly timer?: FakeTimer;
+        readonly metricStoreIngestDiagnostics?: MetricStoreIngestDiagnostics;
     };
 
 test("source metadata invalidation increments planning version only when fingerprint changes", () => {
@@ -327,6 +332,60 @@ test("refreshReadPlanOnce requests only each source candidate's routed metric ke
     assert.equal(nodeSystemSourceClient.readSnapshotCallCount, 1);
 });
 
+test("refreshReadPlanOnce reports invalid values dropped by MetricStore ingest", async () => {
+    const subscriptionRegistry = new MetricSubscriptionRegistry();
+    const diagnosticsLogWriter = new RecordingMetricStoreIngestDiagnosticsLogWriter();
+    const nodeSystemSourceClient = new FakeSourceClient("node-system", () => ({
+        state: "owned",
+        pollingGroupId: "system",
+    }), {
+        snapshotReadResult: {
+            snapshot: buildMetricSnapshot({
+                timestampMilliseconds: 1000,
+                metrics: {
+                    "cpu.usage_percent": buildScalarMetricValue(Number.NaN),
+                },
+            }),
+            valueAttributions: [],
+            unavailableMetrics: [],
+        },
+    });
+    const collection = buildBackgroundMetricCollection(subscriptionRegistry, {
+        sourceClients: [nodeSystemSourceClient],
+        metricStoreIngestDiagnostics: new MetricStoreIngestDiagnostics({
+            logWriter: diagnosticsLogWriter,
+            throttleMilliseconds: 60_000,
+        }),
+    });
+
+    await collection.refreshReadPlanOnce({
+        metrics: [{
+            sourceScopeId: "local",
+            metricKey: "cpu.usage_percent",
+            sourceCandidates: [{ sourceId: "node-system" }],
+            failureMode: "empty",
+        }],
+    });
+
+    assert.deepEqual(diagnosticsLogWriter.entries.map(entry => ({
+        sourceId: entry.sourceId,
+        sourceScopeId: entry.sourceScopeId,
+        groupKind: entry.groupKind,
+        groupId: entry.groupId,
+        rejectedCount: entry.rejectedCount,
+        uniqueMetricCount: entry.uniqueMetricCount,
+        intervalMilliseconds: entry.intervalMilliseconds,
+    })), [{
+        sourceId: "node-system",
+        sourceScopeId: undefined,
+        groupKind: "runtimeOptionRefresh",
+        groupId: "manual",
+        rejectedCount: 1,
+        uniqueMetricCount: 1,
+        intervalMilliseconds: undefined,
+    }]);
+});
+
 test("readSourceMetricDescriptors does not register collection or read snapshots", async () => {
     const subscriptionRegistry = new MetricSubscriptionRegistry();
     const descriptorSnapshot = {
@@ -367,13 +426,23 @@ function buildBackgroundMetricCollection(
         collectorGroupPlanner: new CollectorGroupPlanner(sourceRegistry),
         collectorGroupSupervisor: new CollectorGroupSupervisor({
             sourceRegistry,
-            snapshotStore: { ingest: () => undefined },
+            snapshotStore: { ingest: () => emptyMetricStoreIngestReport() },
             createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
             timer,
         }),
         sourceMetadataRegistry: new SourcePlanningMetadataRegistry(),
         sourceRegistry,
+        metricStoreIngestDiagnostics: options?.metricStoreIngestDiagnostics,
     });
+}
+
+function emptyMetricStoreIngestReport() {
+    return {
+        acceptedScalarCount: 0,
+        acceptedTextCount: 0,
+        rejectedCount: 0,
+        rejections: [],
+    };
 }
 
 class FakeSourceRegistry implements SourceRegistry {
@@ -427,19 +496,20 @@ class FakeSourceClient implements SourceClient {
         private readonly resolveMetricKey: (metricKey: string) => SourceMetricPollingGroupResolution,
         private readonly options: {
             readonly servesSnapshots?: boolean;
+            readonly snapshotReadResult?: SourceSnapshotReadResult;
             readonly descriptorSnapshot?: MetricDescriptorSnapshot;
         } = {},
     ) {}
 
     async readSnapshot(metricKeys: readonly string[]): Promise<SourceSnapshotReadResult> {
-        if (this.options.servesSnapshots !== true) {
+        if (this.options.servesSnapshots !== true && this.options.snapshotReadResult === undefined) {
             throw new Error("FakeSourceClient does not serve snapshots.");
         }
 
         this.readSnapshotCallCount += 1;
         this.latestReadMetricKeys = metricKeys;
 
-        return {
+        return this.options.snapshotReadResult ?? {
             snapshot: buildMetricSnapshot({
                 timestampMilliseconds: 1000,
                 metrics: {},
@@ -475,6 +545,14 @@ class FakeSourceClient implements SourceClient {
             metricKeys: [...group.metricKeys],
             intervalMilliseconds: group.intervalMilliseconds,
         })));
+    }
+}
+
+class RecordingMetricStoreIngestDiagnosticsLogWriter {
+    readonly entries: MetricStoreInvalidValuesLogEntry[] = [];
+
+    write(entry: MetricStoreInvalidValuesLogEntry): void {
+        this.entries.push(entry);
     }
 }
 

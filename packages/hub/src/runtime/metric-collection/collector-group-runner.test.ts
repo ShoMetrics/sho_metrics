@@ -3,6 +3,7 @@ import test from "node:test";
 import { CollectorGroupRunner } from "./collector-group-runner";
 import type { PlannedCollectorGroup } from "./collector-group-planner";
 import type { CollectorGroupNoDataObserver } from "./collector-group-no-data-observer";
+import { MetricStoreIngestDiagnostics } from "./metric-store-ingest-diagnostics";
 import { MetricStore } from "../metric-store";
 import {
     buildMetricSnapshot,
@@ -120,6 +121,42 @@ test("refreshNow reports collector group ok when refreshed snapshot has a reques
     assert.deepEqual(await runner.refreshNow(), { status: "refreshed" });
 
     assert.deepEqual(noDataObserver.observations.map(observation => observation.state), ["ok"]);
+});
+
+test("refreshNow reports invalid values dropped by MetricStore ingest", async () => {
+    const diagnosticsLogWriter = new RecordingMetricStoreIngestDiagnosticsLogWriter();
+    const runner = new CollectorGroupRunner({
+        collectorGroup: buildCollectorGroup({ metricKeys: ["cpu.usage_percent"] }),
+        sourceClient: new FakeSourceClient([
+            buildSnapshot(1000, { "cpu.usage_percent": Number.NaN }),
+        ]),
+        snapshotStore: new MetricStore(),
+        backoffPolicy: BackoffPolicy.flat(() => 0, 1000),
+        metricStoreIngestDiagnostics: new MetricStoreIngestDiagnostics({
+            logWriter: diagnosticsLogWriter,
+            throttleMilliseconds: 60_000,
+        }),
+    });
+
+    assert.deepEqual(await runner.refreshNow(), { status: "refreshed" });
+
+    assert.deepEqual(diagnosticsLogWriter.entries.map(entry => ({
+        sourceId: entry.sourceId,
+        sourceScopeId: entry.sourceScopeId,
+        groupKind: entry.groupKind,
+        groupId: entry.groupId,
+        rejectedCount: entry.rejectedCount,
+        uniqueMetricCount: entry.uniqueMetricCount,
+        intervalMilliseconds: entry.intervalMilliseconds,
+    })), [{
+        sourceId: "node-system",
+        sourceScopeId: "local",
+        groupKind: "sourceDeclared",
+        groupId: "cpu",
+        rejectedCount: 1,
+        uniqueMetricCount: 1,
+        intervalMilliseconds: 1000,
+    }]);
 });
 
 test("refreshNow does not report collector group no-data for failed or skipped refreshes", async () => {
@@ -364,6 +401,22 @@ class RecordingCollectorGroupNoDataObserver implements CollectorGroupNoDataObser
 
     clear(collectorGroupKey: string): void {
         this.clearedCollectorGroupKeys.push(collectorGroupKey);
+    }
+}
+
+class RecordingMetricStoreIngestDiagnosticsLogWriter {
+    readonly entries: Array<{
+        readonly sourceId: string;
+        readonly sourceScopeId: string | undefined;
+        readonly groupKind: string | undefined;
+        readonly groupId: string | undefined;
+        readonly rejectedCount: number;
+        readonly uniqueMetricCount: number;
+        readonly intervalMilliseconds: number | undefined;
+    }> = [];
+
+    write(entry: RecordingMetricStoreIngestDiagnosticsLogWriter["entries"][number]): void {
+        this.entries.push(entry);
     }
 }
 

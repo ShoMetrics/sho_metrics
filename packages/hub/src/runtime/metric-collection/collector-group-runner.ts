@@ -12,6 +12,11 @@ import {
     DefaultCollectorGroupNoDataObserver,
     type CollectorGroupNoDataObserver,
 } from "./collector-group-no-data-observer";
+import {
+    formatCollectorGroupIngestDiagnosticContext,
+    MetricStoreIngestDiagnostics,
+} from "./metric-store-ingest-diagnostics";
+import type { MetricStoreIngestReport } from "../metric-store";
 
 export type CollectorGroupRefreshStatus =
     | "refreshed"
@@ -35,7 +40,7 @@ export interface CollectorGroupSnapshotStore {
             readonly valueAttributions?: readonly MetricValueAttribution[];
             readonly unavailableMetrics?: readonly MetricUnavailableReport[];
         },
-    ): void;
+    ): MetricStoreIngestReport;
 }
 
 export interface CollectorGroupRunnerTimer {
@@ -50,6 +55,7 @@ export interface CollectorGroupRunnerOptions {
     readonly backoffPolicy: BackoffPolicy;
     readonly timer?: CollectorGroupRunnerTimer;
     readonly collectorGroupNoDataObserver?: CollectorGroupNoDataObserver;
+    readonly metricStoreIngestDiagnostics?: MetricStoreIngestDiagnostics;
     readonly onRefreshResult?: (
         collectorGroup: PlannedCollectorGroup,
         result: CollectorGroupRefreshResult,
@@ -79,6 +85,7 @@ export class CollectorGroupRunner {
     private readonly backoffPolicy: BackoffPolicy;
     private readonly timer: CollectorGroupRunnerTimer;
     private readonly collectorGroupNoDataObserver: CollectorGroupNoDataObserver;
+    private readonly metricStoreIngestDiagnostics: MetricStoreIngestDiagnostics;
     private readonly onRefreshResult?: (
         collectorGroup: PlannedCollectorGroup,
         result: CollectorGroupRefreshResult,
@@ -96,6 +103,8 @@ export class CollectorGroupRunner {
         this.timer = options.timer ?? defaultTimer;
         this.collectorGroupNoDataObserver = options.collectorGroupNoDataObserver
             ?? new DefaultCollectorGroupNoDataObserver();
+        this.metricStoreIngestDiagnostics = options.metricStoreIngestDiagnostics
+            ?? new MetricStoreIngestDiagnostics();
         this.onRefreshResult = options.onRefreshResult;
     }
 
@@ -173,10 +182,17 @@ export class CollectorGroupRunner {
             // Background samples stay scoped to the source/profile that
             // produced them. Read-time fallback composes those scoped samples
             // into the action's logical source scope later.
-            this.snapshotStore.ingest(this.collectorGroup.sourceId, readResult.snapshot, {
+            const ingestReport = this.snapshotStore.ingest(this.collectorGroup.sourceId, readResult.snapshot, {
                 valueAttributions: readResult.valueAttributions,
                 unavailableMetrics: readResult.unavailableMetrics,
             });
+            // MetricStore owns value validation. The runner owns the polling
+            // source/group context needed to make dropped-value diagnostics
+            // actionable without coupling source adapters to store internals.
+            this.metricStoreIngestDiagnostics.record(
+                formatCollectorGroupIngestDiagnosticContext(this.collectorGroup),
+                ingestReport,
+            );
             // Only a successful source read can answer "refreshed but produced
             // none of the requested keys"; failed/skipped states are logged by
             // the refresh status path below.
