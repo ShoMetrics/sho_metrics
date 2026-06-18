@@ -1,0 +1,83 @@
+name: Bug report
+description: Report something that is broken or behaving incorrectly
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe the issue here. 可以用中文提问。日本語での質問も可能です。
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe what went wrong.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: false
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to reproduce
+      description: If possible, list the steps that trigger the issue.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include the OS, Stream Deck app version, and ShoMetrics version or commit.
+      placeholder: |
+        - OS:
+        - Stream Deck app version:
+        - ShoMetrics version or commit:
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ShoMetrics is a hardware monitoring project. Logs may include hardware names, sensor names, paths, hostnames, URLs, or other system details. We try to avoid logging sensitive values, but **please review logs before uploading them**.
+
+        Useful logs:
+
+        Windows:
+        - Stream Deck host/plugin lifecycle: `%APPDATA%\Elgato\StreamDeck\logs\StreamDeck*.log`
+        - ShoMetrics plugin log, if present: `%APPDATA%\Elgato\StreamDeck\logs\com.ez.sho-metrics*.log`
+        - Only if you installed the helper: `%ProgramData%\ShoMetrics\logs\shometrics-helper*.log`
+        - Only if you installed the helper: `%LOCALAPPDATA%\ShoMetrics\ControlPanel\logs\shometrics-control-panel-startup.log`
+
+        macOS:
+        - ShoMetrics plugin log, if present: `~/Library/Application Support/com.elgato.StreamDeck/Plugins/com.ez.sho-metrics.sdPlugin/logs/com.ez.sho-metrics.*.log`
+
+        Attach the relevant excerpt around the time of the issue instead of the full log when possible.
+
+  - type: textarea
+    id: logs-screenshots
+    attributes:
+      label: Logs or screenshots
+      description: Paste relevant excerpts or attach screenshots here.
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Anything else that may help.
+    validations:
+      required: false
