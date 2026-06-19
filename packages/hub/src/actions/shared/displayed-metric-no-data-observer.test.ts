@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+    buildDisplayedMetricNoDataThrottleKey,
     DefaultDisplayedMetricNoDataObserver,
     type DisplayedMetricNoDataLogEntry,
 } from "./displayed-metric-no-data-observer";
@@ -18,7 +19,7 @@ test("displayed metric no-data observer ignores the initial first-read gap", () 
     assert.deepEqual(logWriter.entries, []);
 });
 
-test("displayed metric no-data observer logs long never-read state as warn", () => {
+test("displayed metric no-data observer logs never-read enter as info", () => {
     const logWriter = new RecordingDisplayedMetricNoDataLogWriter();
     const observer = new DefaultDisplayedMetricNoDataObserver({ logWriter });
 
@@ -33,12 +34,12 @@ test("displayed metric no-data observer logs long never-read state as warn", () 
         unavailableReason: entry.unavailableReason,
     })), [{
         event: "displayedMetricNoDataEntered",
-        level: "warn",
+        level: "info",
         unavailableReason: "noFreshSource",
     }]);
 });
 
-test("displayed metric no-data observer logs sustained only when no-data action keeps ticking", () => {
+test("displayed metric no-data observer logs sustained never-read state as warn", () => {
     const logWriter = new RecordingDisplayedMetricNoDataLogWriter();
     const observer = new DefaultDisplayedMetricNoDataObserver({ logWriter });
 
@@ -48,17 +49,43 @@ test("displayed metric no-data observer logs sustained only when no-data action 
 
     assert.deepEqual(logWriter.entries.map(entry => ({
         event: entry.event,
+        level: entry.level,
         sustainedMilliseconds: entry.sustainedMilliseconds,
     })), [
         {
             event: "displayedMetricNoDataEntered",
+            level: "info",
             sustainedMilliseconds: 0,
         },
         {
             event: "displayedMetricNoDataSustained",
+            level: "warn",
             sustainedMilliseconds: 10_000,
         },
     ]);
+});
+
+test("displayed metric no-data observer keeps explicit invalid values at warn", () => {
+    const logWriter = new RecordingDisplayedMetricNoDataLogWriter();
+    const observer = new DefaultDisplayedMetricNoDataObserver({ logWriter });
+
+    observer.observe(buildObservation({
+        outcome: {
+            kind: "unavailable",
+            reason: "invalidValue",
+            lastValueTimestampMilliseconds: undefined,
+        },
+    }));
+
+    assert.deepEqual(logWriter.entries.map(entry => ({
+        event: entry.event,
+        level: entry.level,
+        unavailableReason: entry.unavailableReason,
+    })), [{
+        event: "displayedMetricNoDataEntered",
+        level: "warn",
+        unavailableReason: "invalidValue",
+    }]);
 });
 
 test("displayed metric no-data observer logs recovery when a value arrives", () => {
@@ -84,7 +111,7 @@ test("displayed metric no-data observer logs recovery when a value arrives", () 
     })), [
         {
             event: "displayedMetricNoDataEntered",
-            level: "warn",
+            level: "info",
             selectedSourceId: undefined,
             sustainedMilliseconds: 0,
         },
@@ -137,6 +164,42 @@ test("displayed metric no-data sustained threshold is bounded by polling interva
     assert.equal(resolveSustainedStatusEdgeMilliseconds(86_400_000), 60_000);
 });
 
+test("displayed metric no-data sustained logs are throttled by source outage", () => {
+    const firstActionEntry = buildLogEntry({
+        actionId: "action-1",
+        metricKey: "ram.used",
+        event: "displayedMetricNoDataSustained",
+    });
+    const secondActionEntry = buildLogEntry({
+        actionId: "action-2",
+        metricKey: "cpu.usage_percent",
+        event: "displayedMetricNoDataSustained",
+    });
+
+    assert.equal(
+        buildDisplayedMetricNoDataThrottleKey(firstActionEntry),
+        buildDisplayedMetricNoDataThrottleKey(secondActionEntry),
+    );
+});
+
+test("displayed metric no-data enter logs keep per-action throttle identity", () => {
+    const firstActionEntry = buildLogEntry({
+        actionId: "action-1",
+        metricKey: "ram.used",
+        event: "displayedMetricNoDataEntered",
+    });
+    const secondActionEntry = buildLogEntry({
+        actionId: "action-2",
+        metricKey: "cpu.usage_percent",
+        event: "displayedMetricNoDataEntered",
+    });
+
+    assert.notEqual(
+        buildDisplayedMetricNoDataThrottleKey(firstActionEntry),
+        buildDisplayedMetricNoDataThrottleKey(secondActionEntry),
+    );
+});
+
 class RecordingDisplayedMetricNoDataLogWriter {
     readonly entries: DisplayedMetricNoDataLogEntry[] = [];
 
@@ -158,6 +221,24 @@ function buildObservation(
         actionAppearedAtTimestampMilliseconds: 0,
         nowMilliseconds: 0,
         pollingIntervalMilliseconds: 1000,
+        ...overrides,
+    };
+}
+
+function buildLogEntry(overrides: Partial<DisplayedMetricNoDataLogEntry>): DisplayedMetricNoDataLogEntry {
+    return {
+        event: "displayedMetricNoDataEntered",
+        level: "warn",
+        actionId: "action-1",
+        metricKey: "ram.used",
+        preferredSourceId: "node-system",
+        selectedSourceId: undefined,
+        preferredSourceState: undefined,
+        preferredSourceReason: undefined,
+        unavailableReason: "noFreshSource",
+        lastValueAgeMilliseconds: undefined,
+        pollingIntervalMilliseconds: 1000,
+        sustainedMilliseconds: 10_000,
         ...overrides,
     };
 }

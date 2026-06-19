@@ -53,6 +53,7 @@ interface PendingInvalidValuesBucket {
     readonly metricKeys: Set<string>;
     readonly reasonCounts: Map<MetricStoreIngestRejectionReason, number>;
     readonly sampleRejections: MetricStoreIngestRejection[];
+    readonly sampleRejectionKeys: Set<string>;
     rejectedCount: number;
     lastLogMilliseconds: number | undefined;
 }
@@ -93,8 +94,13 @@ export class MetricStoreIngestDiagnostics {
                 (bucket.reasonCounts.get(rejection.reason) ?? 0) + 1,
             );
 
-            if (bucket.sampleRejections.length < MAX_SAMPLE_REJECTIONS) {
+            const sampleRejectionKey = `${rejection.metricKey}:${rejection.reason}`;
+            if (
+                bucket.sampleRejections.length < MAX_SAMPLE_REJECTIONS
+                && !bucket.sampleRejectionKeys.has(sampleRejectionKey)
+            ) {
                 bucket.sampleRejections.push(rejection);
+                bucket.sampleRejectionKeys.add(sampleRejectionKey);
             }
         }
 
@@ -125,6 +131,7 @@ export class MetricStoreIngestDiagnostics {
         bucket.metricKeys.clear();
         bucket.reasonCounts.clear();
         bucket.sampleRejections.length = 0;
+        bucket.sampleRejectionKeys.clear();
         bucket.lastLogMilliseconds = nowMilliseconds;
     }
 
@@ -139,6 +146,7 @@ export class MetricStoreIngestDiagnostics {
             metricKeys: new Set<string>(),
             reasonCounts: new Map<MetricStoreIngestRejectionReason, number>(),
             sampleRejections: [],
+            sampleRejectionKeys: new Set<string>(),
             lastLogMilliseconds: undefined,
         };
         this.bucketsByKey.set(bucketKey, bucket);
@@ -146,7 +154,7 @@ export class MetricStoreIngestDiagnostics {
     }
 }
 
-/** Builds the diagnostics identity for a scheduled collector-group refresh. */
+/** Carries collector ownership into MetricStore rejection logs without teaching sources store rules. */
 export function formatCollectorGroupIngestDiagnosticContext(
     collectorGroup: PlannedCollectorGroup,
 ): MetricStoreIngestDiagnosticContext {

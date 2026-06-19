@@ -174,7 +174,7 @@ function resolveDisplayedMetricNoDataLogLevel(
     }
 
     if (observation.outcome === undefined) {
-        return "warn";
+        return eventName === "displayedMetricNoDataSustained" ? "warn" : "info";
     }
 
     if (observation.outcome.kind === "unavailable") {
@@ -243,7 +243,7 @@ class LoggerDisplayedMetricNoDataLogWriter implements DisplayedMetricNoDataLogWr
         if (entry.level === "warn") {
             this.scopedLogger.atWarn()
                 .everyMs(
-                    `displayed-metric-no-data:${entry.event}:${entry.actionId}:${entry.metricKey}`,
+                    buildDisplayedMetricNoDataThrottleKey(entry),
                     resolveProductionLogThrottleMilliseconds(STATUS_EDGE_PRODUCTION_LOG_INTERVAL_MILLISECONDS),
                 )
                 .log(message);
@@ -252,9 +252,27 @@ class LoggerDisplayedMetricNoDataLogWriter implements DisplayedMetricNoDataLogWr
 
         this.scopedLogger.atInfo()
             .everyMs(
-                `displayed-metric-no-data:${entry.event}:${entry.actionId}:${entry.metricKey}`,
+                buildDisplayedMetricNoDataThrottleKey(entry),
                 resolveProductionLogThrottleMilliseconds(STATUS_EDGE_PRODUCTION_LOG_INTERVAL_MILLISECONDS),
             )
             .log(message);
     }
+}
+
+/** Preserves per-key enter/recover attribution while collapsing sustained source outages. */
+export function buildDisplayedMetricNoDataThrottleKey(entry: DisplayedMetricNoDataLogEntry): string {
+    if (entry.event !== "displayedMetricNoDataSustained") {
+        return `displayed-metric-no-data:${entry.event}:${entry.actionId}:${entry.metricKey}`;
+    }
+
+    // Sustained no-data can fan out across every visible key when one source is
+    // down. The collector-level log carries the source/group root cause; this
+    // source-scoped key keeps per-action sustained logs from repeating it 64x.
+    return [
+        "displayed-metric-no-data",
+        entry.event,
+        entry.preferredSourceId ?? "",
+        entry.unavailableReason ?? "",
+        entry.pollingIntervalMilliseconds,
+    ].join(":");
 }
