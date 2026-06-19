@@ -14,6 +14,7 @@ $counterPaths = @(
     '\Process(*)\Creating Process ID',
     '\Process(*)\% Processor Time',
     '\Process(*)\Private Bytes',
+    '\Process(*)\Working Set',
     '\Process(*)\IO Read Operations/sec',
     '\Process(*)\IO Write Operations/sec',
     '\Process(*)\Thread Count',
@@ -66,6 +67,7 @@ while ([DateTimeOffset]::UtcNow -lt $deadline) {
                     cpuPercent = 0.0
                     rawCpuPercent = 0.0
                     privateBytes = 0
+                    workingSetBytes = 0
                     ioReadOperationsPerSecond = 0.0
                     ioWriteOperationsPerSecond = 0.0
                     threadCount = 0
@@ -88,6 +90,9 @@ while ([DateTimeOffset]::UtcNow -lt $deadline) {
                 }
                 'private bytes' {
                     $process.privateBytes = [int64]$sample.CookedValue
+                }
+                'working set' {
+                    $process.workingSetBytes = [int64]$sample.CookedValue
                 }
                 'io read operations/sec' {
                     $process.ioReadOperationsPerSecond = [double]$sample.CookedValue
