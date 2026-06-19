@@ -44,6 +44,9 @@ jobs:
       - name: Run lint
         run: npm run lint
 
+      - name: Check diagnostics scripts
+        run: npm run diagnostics:check
+
       - name: Run unit tests with coverage
         run: npm run test:unit:coverage
 

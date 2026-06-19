@@ -26,6 +26,7 @@ const defaultProcessNames = [
     "pwsh",
     "WmiPrvSE",
     "nvidia-smi",
+    "ShoMetricsHelperService",
     "ShoMetrics.Source.Windows.Service",
     "ShoMetrics.Source.Windows.Helper",
     "StreamDeck",
