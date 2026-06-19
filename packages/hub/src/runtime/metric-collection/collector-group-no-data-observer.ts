@@ -1,5 +1,5 @@
 import { resolveProductionLogThrottleMilliseconds } from "../../logging/log-throttle";
-import { logger, type ScopedLogger } from "../../logging/logger";
+import { logger, type LogLevel, type ScopedLogger } from "../../logging/logger";
 import {
     STATUS_EDGE_PRODUCTION_LOG_INTERVAL_MILLISECONDS,
     StatusEdgeDetector,
@@ -114,7 +114,11 @@ class LoggerCollectorGroupNoDataLogWriter implements CollectorGroupNoDataLogWrit
     constructor(private readonly scopedLogger: ScopedLogger) {}
 
     write(entry: CollectorGroupNoDataLogEntry): void {
-        this.scopedLogger.atWarn()
+        const logAtLevel = resolveCollectorGroupNoDataLogLevel(entry.event) === "warn"
+            ? this.scopedLogger.atWarn()
+            : this.scopedLogger.atInfo();
+
+        logAtLevel
             .everyMs(
                 `collector-group-no-data:${entry.event}:${entry.sourceId}:${entry.groupId}`,
                 resolveProductionLogThrottleMilliseconds(STATUS_EDGE_PRODUCTION_LOG_INTERVAL_MILLISECONDS),
@@ -132,4 +136,11 @@ class LoggerCollectorGroupNoDataLogWriter implements CollectorGroupNoDataLogWrit
                 `sustainedMs=${entry.sustainedMilliseconds}`,
             ].join(" "));
     }
+}
+
+/** Keeps recovery out of WARN so transient source gaps do not count as active failures. */
+export function resolveCollectorGroupNoDataLogLevel(
+    eventName: CollectorGroupNoDataLogEntry["event"],
+): LogLevel {
+    return eventName === "collectorGroupNoDataRecovered" ? "info" : "warn";
 }

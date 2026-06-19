@@ -106,6 +106,26 @@ test("metric store ingest diagnostics caps sample rejections", () => {
     });
 });
 
+test("metric store ingest diagnostics keeps sample rejections unique", () => {
+    const logWriter = new RecordingMetricStoreIngestDiagnosticsLogWriter();
+    const diagnostics = new MetricStoreIngestDiagnostics({ logWriter, throttleMilliseconds: 60_000 });
+
+    diagnostics.record({
+        sourceId: "node-system",
+        groupKind: "sourceDeclared",
+        groupId: "cpu",
+        intervalMilliseconds: 1000,
+    }, buildReport(Array.from({ length: 12 }, () => ({
+        metricKey: "cpu.model",
+        reason: "emptyText" as const,
+    }))));
+
+    assert.equal(logWriter.entries[0]?.rejectedCount, 12);
+    assert.deepEqual(logWriter.entries[0]?.sampleRejections, [
+        { metricKey: "cpu.model", reason: "emptyText" },
+    ]);
+});
+
 class RecordingMetricStoreIngestDiagnosticsLogWriter {
     readonly entries: MetricStoreInvalidValuesLogEntry[] = [];
 
