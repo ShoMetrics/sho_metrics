@@ -3,7 +3,7 @@ import type { NetworkMetricDirection } from "../../network-metric-keys";
 
 export type NodeSystemInformationClient = Omit<typeof si, "cpuCurrentSpeed">;
 
-export type NodeSystemMetricGroup = "cpu" | "memory" | "disk" | "network" | "gpu";
+export type NodeSystemMetricGroup = "cpu" | "memory" | "disk" | "network" | "gpu" | "battery";
 
 export interface NodeSystemNetworkCounterSample {
     bytes: number;

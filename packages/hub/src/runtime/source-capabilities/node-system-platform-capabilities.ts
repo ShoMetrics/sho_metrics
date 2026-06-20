@@ -8,6 +8,7 @@ import {
     CPU_MODEL_METRIC_KEY,
     CPU_USAGE_METRIC_KEY,
     GPU_USAGE_METRIC_KEY,
+    SYSTEM_BATTERY_PERCENT_METRIC_KEY,
     isCpuMetricKey,
     isGpuMetricKey,
     isRamMetricKey,
@@ -47,6 +48,10 @@ export function isNodeSystemMetricSupportedOnPlatform(
 
     if (isRamMetricKey(metricKey) || isNetworkMetricKey(metricKey) || isDiskUsageMetricKey(metricKey)) {
         return true;
+    }
+
+    if (metricKey === SYSTEM_BATTERY_PERCENT_METRIC_KEY) {
+        return platform === "win32" || platform === "darwin";
     }
 
     if (isDiskThroughputMetricKey(metricKey)) {
