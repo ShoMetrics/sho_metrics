@@ -29,9 +29,11 @@ export function buildBatteryDeviceDescriptorIdFromIdentity(
 export function buildBatteryMetricKeyFromIdentity(
     identity: ResolvedSystemPeripheralIdentity,
 ): string {
-    return buildPeripheralBatteryPercentMetricKey(
-        buildBatteryDeviceDescriptorIdFromIdentity(identity),
-    );
+    return buildBatteryMetricKeyFromDescriptorId(buildBatteryDeviceDescriptorIdFromIdentity(identity));
+}
+
+export function buildBatteryMetricKeyFromDescriptorId(descriptorId: string): string {
+    return buildPeripheralBatteryPercentMetricKey(descriptorId);
 }
 
 function formatHexIdentityPart(
@@ -80,7 +82,7 @@ function hashPeripheralIdentity(identity: ResolvedSystemPeripheralIdentity): str
         identity.receiverKind,
         identity.vendorUnitId,
         identity.modelId,
-        identity.receiverSlot,
+        // Receiver slot is route evidence, not device identity; keep it out of stable runtime keys.
     ]);
 
     return `${fnv1aHex(canonicalIdentity, 0x811C9DC5)}${fnv1aHex(canonicalIdentity, 0xABC98388)}`;

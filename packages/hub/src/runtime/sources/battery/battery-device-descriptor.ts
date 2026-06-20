@@ -15,15 +15,26 @@ export type BatteryDeviceSupportState =
     | "offline";
 
 export interface BatteryDeviceDescriptor {
-    /** Runtime-only descriptor id. This must not be a raw HID path. */
+    /** Runtime-only descriptor id. This must not be a raw HID path or persisted as the binding identity. */
     readonly descriptorId: string;
     readonly displayName: string;
+    /** Metric key derived from the persisted binding identity, not from session-only descriptor suffixes. */
     readonly metricKey: string;
     readonly transport: BatteryDeviceTransport;
     readonly receiverKind: SystemPeripheralReceiverKind | undefined;
     readonly isExperimental: boolean;
     readonly identity: ResolvedSystemPeripheralIdentity | undefined;
+    /** `ambiguous` means multiple current candidates share this persisted identity fallback. */
     readonly supportState: BatteryDeviceSupportState;
+    readonly diagnostics?: BatteryDeviceDescriptorDiagnostics;
+}
+
+export interface BatteryDeviceDescriptorDiagnostics {
+    readonly candidateIds: readonly string[];
+    readonly sourcePathIds: readonly string[];
+    readonly receiverSlots: readonly number[];
+    readonly easySwitchSlots: readonly number[];
+    readonly coalescing: BatteryDeviceCoalescingDiagnostic;
 }
 
 export const SYSTEM_BATTERY_DEVICE_DESCRIPTOR: BatteryDeviceDescriptor = {
@@ -36,3 +47,11 @@ export const SYSTEM_BATTERY_DEVICE_DESCRIPTOR: BatteryDeviceDescriptor = {
     identity: undefined,
     supportState: "supported",
 };
+
+export type BatteryDeviceCoalescingDiagnostic =
+    | "system"
+    | "unitId"
+    | "uniqueCandidateFallback"
+    | "verifiedRouteRule"
+    | "duplicateCandidateFallback"
+    | "conflictSplit";
