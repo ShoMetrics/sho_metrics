@@ -40,6 +40,29 @@ Implement these exact decisions:
 - When the toggle is off, current rendering behavior must remain unchanged.
 - Do not make Flat / Default transparent by default in this implementation. Manual verification will decide whether that can become a future default.
 
+## Stream Deck Host Behavior Notes
+
+Observed with Stream Deck app 7.4.2 on Windows:
+
+- When a Stream Deck profile has a custom background image, the Stream Deck app's
+  software canvas preview can display runtime `setImage()` key PNGs with visibly
+  blurred text and thin shapes.
+- The same runtime image can remain sharp in the selected-action preview area and
+  on the physical Stream Deck hardware. This points to Stream Deck app canvas
+  compositing/scaling for custom-background profiles, not to ShoMetrics
+  rasterization quality.
+- Increasing the PNG raster size above the normal key target, including very
+  large temporary test sizes, did not fix the software canvas blur. Treat this as
+  a host preview limitation, not a reason to change the production rasterizer
+  target.
+- Do not switch key updates to SVG to work around this. ShoMetrics keeps using
+  `resvg`-rasterized PNGs because native Stream Deck SVG rendering is unreliable
+  for complex widget gradients, filters, custom fonts, percentage attributes, and
+  text colors.
+- For marketing screenshots on custom-background profiles, prefer composing from
+  dumped ShoMetrics PNGs or another crisp preview source instead of cropping the
+  Stream Deck app's full software canvas.
+
 ## Data Boundary Rules
 
 Respect these boundaries:
