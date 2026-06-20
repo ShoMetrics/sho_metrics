@@ -165,7 +165,7 @@ const pluginConfig = {
         plugin: "src/plugin.ts",
         "custom-http-transform-worker": "src/runtime/sources/custom-http/custom-http-transform-worker-thread.ts",
     },
-    external: ["@resvg/resvg-js"],
+    external: ["@resvg/resvg-js", "node-hid"],
     output: {
         dir: pluginBinDirectory,
         entryFileNames: "[name].js",

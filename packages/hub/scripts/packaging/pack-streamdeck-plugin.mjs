@@ -5,11 +5,16 @@ import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import {
+    assertNodeHidDependencyPinned,
+    assertStagedNodeHidNativeAddons,
+    stageNodeHidRuntimeDependency,
+} from "./node-hid-native-addons.mjs";
 
 const PLUGIN_DIRECTORY_NAME = "com.ez.sho-metrics.sdPlugin";
 
 const scriptDirectory = fileURLToPath(new URL(".", import.meta.url));
-const packageDirectory = join(scriptDirectory, "..");
+const packageDirectory = join(scriptDirectory, "..", "..");
 const repositoryDirectory = join(packageDirectory, "..", "..");
 const pluginDirectory = join(packageDirectory, PLUGIN_DIRECTORY_NAME);
 const outputDirectory = join(repositoryDirectory, "artifacts", "hub", "streamdeck-plugin");
@@ -18,6 +23,7 @@ const stagingPluginDirectory = join(stagingRootDirectory, PLUGIN_DIRECTORY_NAME)
 const packageOutputDirectory = join(outputDirectory, "package");
 const legacyPackagePath = join(outputDirectory, "com.ez.sho-metrics.streamDeckPlugin");
 const streamdeckCliPath = join(packageDirectory, "node_modules", "@elgato", "cli", "bin", "streamdeck.mjs");
+const packageJsonPath = join(packageDirectory, "package.json");
 const packageLockPath = join(packageDirectory, "package-lock.json");
 const npmCommand = createNpmCommand();
 const supportedNativeRuntimeDependencyPackageNames = [
@@ -45,6 +51,7 @@ async function packStreamDeckPlugin(argumentList) {
         recursive: true,
         filter: sourcePath => shouldStagePluginPath(sourcePath),
     });
+    await assertNodeHidDependencyPinned({ packageJsonPath, packageLockPath });
     await stageRuntimeDependencies();
     await assertRuntimeDependenciesComplete();
     assertHostRuntimeDependencyCanLoad();
@@ -53,6 +60,11 @@ async function packStreamDeckPlugin(argumentList) {
 }
 
 async function stageRuntimeDependencies() {
+    await stageResvgRuntimeDependencies();
+    await stageNodeHidRuntimeDependency({ packageDirectory, stagingPluginDirectory });
+}
+
+async function stageResvgRuntimeDependencies() {
     const sourceScopeDirectory = join(packageDirectory, "node_modules", "@resvg");
     const targetScopeDirectory = join(stagingPluginDirectory, "bin", "node_modules", "@resvg");
     const packageLock = await readPackageLock();
@@ -88,6 +100,7 @@ async function downloadRuntimeDependencyPackage(packageLock, packageName, target
             ...npmCommand.argumentPrefix,
             "pack",
             `@resvg/${packageName}@${version}`,
+            "--ignore-scripts",
             "--json",
             "--pack-destination",
             temporaryDirectory,
@@ -117,6 +130,11 @@ async function readPackageLock() {
 }
 
 async function assertRuntimeDependenciesComplete() {
+    await assertResvgRuntimeDependenciesComplete();
+    await assertStagedNodeHidNativeAddons({ stagingPluginDirectory });
+}
+
+async function assertResvgRuntimeDependenciesComplete() {
     const targetScopeDirectory = join(stagingPluginDirectory, "bin", "node_modules", "@resvg");
 
     for (const packageName of supportedNativeRuntimeDependencyPackageNames) {
