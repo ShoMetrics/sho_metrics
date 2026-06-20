@@ -10,17 +10,20 @@ import {
 } from "./logitech-receiver-registers";
 import {
     buildLogitechBatteryStatusRequest,
+    buildLogitechBatteryVoltageRequest,
     buildLogitechDeviceInformationRequest,
     buildLogitechFeatureLookupRequest,
     buildLogitechUnifiedBatteryCapabilitiesRequest,
     buildLogitechUnifiedBatteryInfoRequest,
     LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID,
+    LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID,
     LOGITECH_HIDPP_CLASSIC_USAGE_PAGE,
     LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID,
     LOGITECH_HIDPP_SHORT_USAGE,
     LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
     matchesLogitechHidppExpectedResponse,
     parseLogitechBatteryStatusReport,
+    parseLogitechBatteryVoltageReport,
     parseLogitechDeviceInformationReport,
     parseLogitechFeatureLookupReport,
     parseLogitechHidppErrorCode,
@@ -131,10 +134,10 @@ export class LogitechHidppSession {
     constructor(private readonly transport: LogitechHidppTransport) {}
 
     readBattery(receiverSlot: LogitechReceiverSlot): LogitechBatteryReadResult {
-        // HID++ battery support is feature-table driven. Unified Battery is
-        // preferred because it can report true percentages and coarse levels;
-        // Battery Status is the older fallback used by devices such as MX
-        // Master 3 on Unifying.
+        // HID++ battery support is feature-table driven. Fallback is absent-only:
+        // a malformed/timeout response means the queue is not trustworthy for
+        // this tick, so the source publishes no-data instead of probing another
+        // battery feature.
         const unifiedBatteryFeature = this.readFeature(receiverSlot, LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID);
         if (unifiedBatteryFeature.state === "supported") {
             const batteryResult = this.readUnifiedBattery(receiverSlot, unifiedBatteryFeature.feature.featureIndex);
@@ -153,8 +156,12 @@ export class LogitechHidppSession {
         }
 
         const batteryStatusFeature = this.readFeature(receiverSlot, LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID);
-        if (batteryStatusFeature.state === "unsupported") {
-            return { state: "unsupported" };
+        if (batteryStatusFeature.state === "supported") {
+            const batteryResult = this.readBatteryStatus(receiverSlot, batteryStatusFeature.feature.featureIndex);
+            return appendOptionalTelemetry(
+                batteryResult,
+                this.readDeviceInformationForBatteryResult(receiverSlot, batteryResult),
+            );
         }
 
         if (batteryStatusFeature.state === "noData") {
@@ -165,7 +172,20 @@ export class LogitechHidppSession {
             };
         }
 
-        const batteryResult = this.readBatteryStatus(receiverSlot, batteryStatusFeature.feature.featureIndex);
+        const batteryVoltageFeature = this.readFeature(receiverSlot, LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID);
+        if (batteryVoltageFeature.state === "unsupported") {
+            return { state: "unsupported" };
+        }
+
+        if (batteryVoltageFeature.state === "noData") {
+            return {
+                state: "noData",
+                reason: batteryVoltageFeature.reason,
+                unrelatedReportCount: 0,
+            };
+        }
+
+        const batteryResult = this.readBatteryVoltage(receiverSlot, batteryVoltageFeature.feature.featureIndex);
         return appendOptionalTelemetry(
             batteryResult,
             this.readDeviceInformationForBatteryResult(receiverSlot, batteryResult),
@@ -295,6 +315,24 @@ export class LogitechHidppSession {
 
         return mapBatteryParseResult(
             parseLogitechBatteryStatusReport(exchangeResult.report, request.expectedResponse),
+            exchangeResult.unrelatedReports.length,
+        );
+    }
+
+    private readBatteryVoltage(receiverSlot: LogitechReceiverSlot, featureIndex: number): LogitechBatteryReadResult {
+        const request = buildLogitechBatteryVoltageRequest(receiverSlot, featureIndex);
+        const exchangeResult = this.transport.exchange(request);
+        if (exchangeResult.state !== "response") {
+            const failure = mapExchangeFailure(exchangeResult);
+            return {
+                state: "noData",
+                reason: failure.reason,
+                unrelatedReportCount: exchangeResult.unrelatedReports.length,
+            };
+        }
+
+        return mapBatteryParseResult(
+            parseLogitechBatteryVoltageReport(exchangeResult.report, request.expectedResponse),
             exchangeResult.unrelatedReports.length,
         );
     }

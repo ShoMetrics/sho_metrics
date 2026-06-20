@@ -8,6 +8,8 @@
  * - `crates/openlogi-hidpp/src/receiver/unifying.rs`
  * - `crates/openlogi-hid/src/inventory.rs`
  * Commit: `87a8d21a1fff1c562ff3c0f63445a985a254eebd`
+ * Repository: https://github.com/AprilNEA/OpenLogi
+ * Author: AprilNEA <dev@aprilnea.me>
  * License: MIT OR Apache-2.0
  *
  * This file deliberately keeps only the receiver pieces ShoMetrics needs for

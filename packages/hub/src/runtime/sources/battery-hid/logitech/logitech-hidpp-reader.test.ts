@@ -4,6 +4,7 @@ import type { NativeHidDevice } from "../native-hid-loader-internal";
 import {
     buildLogitechBatteryStatusRequest,
     LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID,
+    LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID,
     LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID,
     LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
     type LogitechHidppRequest,
@@ -52,12 +53,84 @@ test("Logitech HID++ session falls back from UNIFIED_BATTERY to BATTERY_STATUS",
         reading: {
             featureId: LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID,
             percent: 20,
+            percentSource: "reported",
             nextPercent: 5,
             statusByte: 0,
         },
         deviceInformation: undefined,
         unrelatedReportCount: 0,
     });
+});
+
+test("Logitech HID++ session falls back from BATTERY_STATUS to BATTERY_VOLTAGE", () => {
+    const transport = new ScriptedLogitechTransport(request => responseForRequest(request, {
+        unifiedBatteryFeatureIndex: 0x00,
+        batteryStatusFeatureIndex: 0x00,
+        batteryVoltageFeatureIndex: 0x07,
+        deviceInformationFeatureIndex: 0x03,
+    }));
+    const session = new LogitechHidppSession(transport);
+
+    const result = session.readBattery(0x01);
+
+    assert.deepEqual(result, {
+        state: "battery",
+        reading: {
+            featureId: LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID,
+            percent: 98,
+            percentSource: "voltageEstimated",
+            statusByte: 0,
+            voltageMillivolts: 4166,
+        },
+        deviceInformation: {
+            entityCount: 2,
+            unitId: "12345678",
+            transportFlags: 15,
+            modelId: "logitech:1a83-1a85-0000:ext-01",
+            extendedModelId: 1,
+            hasSerialNumberFunction: true,
+        },
+        unrelatedReportCount: 0,
+    });
+});
+
+test("Logitech HID++ session does not probe BATTERY_VOLTAGE after BATTERY_STATUS no-data", () => {
+    const transport = new ScriptedLogitechTransport(request => {
+        const lookupFeatureId = readFeatureLookupRequestFeatureId(request.bytes);
+        if (lookupFeatureId !== undefined) {
+            return {
+                state: "response",
+                report: buildResponse(request.bytes, [
+                    featureIndexForId(lookupFeatureId, {
+                        unifiedBatteryFeatureIndex: 0x00,
+                        batteryStatusFeatureIndex: 0x08,
+                        batteryVoltageFeatureIndex: 0x07,
+                        deviceInformationFeatureIndex: 0x00,
+                    }),
+                    0x00,
+                    0x02,
+                ]),
+                unrelatedReports: [],
+            };
+        }
+
+        return {
+            state: "timeout",
+            unrelatedReports: [],
+        };
+    });
+    const session = new LogitechHidppSession(transport);
+
+    assert.deepEqual(session.readBattery(0x01), {
+        state: "noData",
+        reason: "timeout",
+        unrelatedReportCount: 0,
+    });
+
+    const voltageFeatureLookups = transport.requests.filter(request =>
+        readFeatureLookupRequestFeatureId(request) === LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID,
+    );
+    assert.equal(voltageFeatureLookups.length, 0);
 });
 
 test("Logitech HID++ session caches unsupported feature lookups", () => {
@@ -75,7 +148,7 @@ test("Logitech HID++ session caches unsupported feature lookups", () => {
         request[2] === 0x00 &&
         request[3] === 0x01,
     );
-    assert.equal(featureLookupRequests.length, 2);
+    assert.equal(featureLookupRequests.length, 3);
 });
 
 test("Logitech HID++ session reads device information once per receiver slot", () => {
@@ -157,6 +230,7 @@ class ScriptedLogitechTransport implements LogitechHidppTransport {
 interface ScriptedLogitechFeatureIndexes {
     readonly unifiedBatteryFeatureIndex: number;
     readonly batteryStatusFeatureIndex: number;
+    readonly batteryVoltageFeatureIndex?: number;
     readonly deviceInformationFeatureIndex: number;
 }
 
@@ -217,6 +291,14 @@ function responseForRequest(
         };
     }
 
+    if (request.bytes[2] === featureIndexes.batteryVoltageFeatureIndex && request.bytes[3] === 0x01) {
+        return {
+            state: "response",
+            report: buildResponse(request.bytes, [0x10, 0x46, 0x00]),
+            unrelatedReports: [],
+        };
+    }
+
     return {
         state: "timeout",
         unrelatedReports: [],
@@ -240,6 +322,8 @@ function featureIndexForId(
             return featureIndexes.unifiedBatteryFeatureIndex;
         case LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID:
             return featureIndexes.batteryStatusFeatureIndex;
+        case LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID:
+            return featureIndexes.batteryVoltageFeatureIndex ?? 0;
         default:
             return 0;
     }

@@ -13,6 +13,7 @@ import type {
     BatteryDeviceTransport,
     BatteryDeviceCoalescingDiagnostic,
     BatteryDeviceDescriptor,
+    BatteryDeviceBatteryPercentSource,
     BatteryDeviceSupportState,
 } from "./battery-device-descriptor";
 
@@ -54,6 +55,8 @@ export interface BatteryDeviceDiscoveryCandidateDiagnostics {
     readonly sourcePathId?: string;
     readonly receiverSlot?: number;
     readonly easySwitchSlot?: number;
+    readonly batteryPercentSource?: BatteryDeviceBatteryPercentSource;
+    readonly batteryVoltageMillivolts?: number;
 }
 
 /** Records session evidence that a previously coalesced group should be split. */
@@ -431,6 +434,12 @@ function buildBatteryDeviceDescriptorDiagnostics(
         easySwitchSlots: uniqueSortedNumbers(group.candidates.flatMap(candidate =>
             candidate.diagnostics?.easySwitchSlot === undefined ? [] : [candidate.diagnostics.easySwitchSlot],
         )),
+        batteryPercentSources: uniqueSorted(group.candidates.flatMap(candidate =>
+            candidate.diagnostics?.batteryPercentSource === undefined ? [] : [candidate.diagnostics.batteryPercentSource],
+        )),
+        batteryVoltageMillivolts: uniqueSortedNumbers(group.candidates.flatMap(candidate =>
+            candidate.diagnostics?.batteryVoltageMillivolts === undefined ? [] : [candidate.diagnostics.batteryVoltageMillivolts],
+        )),
         coalescing: group.coalescing,
     };
 }
@@ -536,7 +545,7 @@ function transportOrder(transport: BatteryDeviceTransport): number {
     }
 }
 
-function uniqueSorted(values: readonly string[]): readonly string[] {
+function uniqueSorted<TValue extends string>(values: readonly TValue[]): readonly TValue[] {
     return [...new Set(values)].sort();
 }
 

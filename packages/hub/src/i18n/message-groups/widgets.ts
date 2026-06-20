@@ -234,6 +234,11 @@ export const systemMessages = {
         zh_CN: "由于支持仍为实验性，此设备会以较低频率检查。",
         ja: "サポートは実験的なため、このデバイスは低頻度で確認されます。",
     },
+    voltageEstimatedBatteryNote: {
+        en: "This device does not report an explicit battery percentage. ShoMetrics estimates it from voltage.",
+        zh_CN: "此设备不会返回明确的电量百分比。ShoMetrics 会根据电压估算电量。",
+        ja: "このデバイスは明確なバッテリー残量パーセントを返しません。ShoMetrics は電圧から推定します。",
+    },
 } as const satisfies LocalizedMessages;
 
 export const helperMessages = {

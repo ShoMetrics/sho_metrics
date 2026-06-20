@@ -530,6 +530,8 @@ enum SystemPeripheralReceiverKind {
   SYSTEM_PERIPHERAL_RECEIVER_KIND_BOLT = 2;
   SYSTEM_PERIPHERAL_RECEIVER_KIND_UNIFYING = 3;
   SYSTEM_PERIPHERAL_RECEIVER_KIND_ROG_OMNI = 4;
+  // A known Logitech LIGHTSPEED USB receiver route, not every Logitech
+  // G-series device or direct HID++ device.
   SYSTEM_PERIPHERAL_RECEIVER_KIND_LIGHTSPEED = 5;
 }
 

@@ -34,8 +34,14 @@ export interface BatteryDeviceDescriptorDiagnostics {
     readonly sourcePathIds: readonly string[];
     readonly receiverSlots: readonly number[];
     readonly easySwitchSlots: readonly number[];
+    readonly batteryPercentSources: readonly BatteryDeviceBatteryPercentSource[];
+    readonly batteryVoltageMillivolts: readonly number[];
     readonly coalescing: BatteryDeviceCoalescingDiagnostic;
 }
+
+export type BatteryDeviceBatteryPercentSource =
+    | "reported"
+    | "voltageEstimated";
 
 export const SYSTEM_BATTERY_DEVICE_DESCRIPTOR: BatteryDeviceDescriptor = {
     descriptorId: "system",

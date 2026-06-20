@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
     buildLogitechBatteryStatusRequest,
+    buildLogitechBatteryVoltageRequest,
     buildLogitechDeviceInformationRequest,
     buildLogitechFeatureLookupRequest,
     buildLogitechUnifiedBatteryCapabilitiesRequest,
     buildLogitechUnifiedBatteryInfoRequest,
     LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID,
     LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
+    parseLogitechBatteryVoltageReport,
     parseLogitechBatteryStatusReport,
     parseLogitechDeviceInformationReport,
     parseLogitechFeatureLookupReport,
@@ -70,6 +72,7 @@ test("Logitech BATTERY_STATUS parses matching slot, feature index, and function"
         reading: {
             featureId: 0x1000,
             percent: 20,
+            percentSource: "reported",
             nextPercent: 5,
             statusByte: 0,
         },
@@ -125,6 +128,7 @@ test("Logitech UNIFIED_BATTERY parses capability-gated percentage", () => {
             reading: {
                 featureId: 0x1004,
                 percent: 90,
+                percentSource: "reported",
                 approximateLevelByte: 0x08,
                 statusByte: 0,
             },
@@ -146,6 +150,27 @@ test("Logitech UNIFIED_BATTERY does not invent percentages from approximate leve
             },
         ),
         { state: "noData", reason: "noPercentage" },
+    );
+});
+
+test("Logitech BATTERY_VOLTAGE parses raw voltage as an estimated percentage", () => {
+    const request = buildLogitechBatteryVoltageRequest(0x01, 0x07);
+
+    assert.deepEqual(
+        parseLogitechBatteryVoltageReport(
+            [0x11, 0x01, 0x07, 0x01, 0x10, 0x46, 0x00],
+            request.expectedResponse,
+        ),
+        {
+            state: "battery",
+            reading: {
+                featureId: 0x1001,
+                percent: 98,
+                percentSource: "voltageEstimated",
+                statusByte: 0,
+                voltageMillivolts: 4166,
+            },
+        },
     );
 });
 
@@ -215,6 +240,7 @@ test("Logitech parser accepts reports without a report id prefix", () => {
             reading: {
                 featureId: 0x1000,
                 percent: 20,
+                percentSource: "reported",
                 nextPercent: 5,
                 statusByte: 0,
             },
