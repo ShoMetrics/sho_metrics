@@ -8,6 +8,7 @@ export type ActionKind =
     | "denseMultiMetric"
     | "stackedMetric"
     | "network"
+    | "system"
     | "unknown";
 
 export const STREAM_DECK_PLUGIN_UUID = "com.ez.sho-metrics";
@@ -25,6 +26,7 @@ export const STREAM_DECK_ACTION_UUID_BY_KIND = {
     denseMultiMetric: `${STREAM_DECK_PLUGIN_UUID}.dense-multi-metric`,
     stackedMetric: STREAM_DECK_STACKED_METRIC_ACTION_UUID,
     network: `${STREAM_DECK_PLUGIN_UUID}.network`,
+    system: `${STREAM_DECK_PLUGIN_UUID}.system`,
 } as const satisfies Record<StreamDeckActionKind, string>;
 
 const actionKindByUuid: Readonly<Partial<Record<string, ActionKind>>> = Object.fromEntries(

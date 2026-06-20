@@ -54,6 +54,17 @@ test("runtimeCachePatch merges runtime cache and marks disk volume options ready
     assert.equal(nextState.runtimeCacheStatus.diskVolumeOptionsStatus, "ready");
 });
 
+test("runtimeCachePatch marks battery device options ready", () => {
+    const nextState = settingsSyncReducer(initialSettingsSyncState, {
+        type: "runtimeCachePatch",
+        patch: {
+            availableBatteryDevices: [],
+        },
+    });
+
+    assert.equal(nextState.runtimeCacheStatus.batteryDeviceOptionsStatus, "ready");
+});
+
 test("runtimeCachePatch uses explicit catalog descriptor load state", () => {
     const descriptorOnlyState = settingsSyncReducer(initialSettingsSyncState, {
         type: "runtimeCachePatch",

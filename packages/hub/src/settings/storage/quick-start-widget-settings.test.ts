@@ -92,6 +92,17 @@ describe("quick-start stored widget settings", () => {
                 },
             },
             {
+                actionKind: "system",
+                verifyTarget: (settings) => {
+                    const target = readStoredMetricTarget(settings);
+                    if (target?.case !== "system") {
+                        assert.fail(`Expected System target, received ${String(target?.case)}`);
+                    }
+                    assert.equal(target.value.reading.case, "battery");
+                    assert.equal(target.value.reading.value.peripheralIdentity, undefined);
+                },
+            },
+            {
                 actionKind: "catalog",
                 verifyTarget: (settings) => {
                     const target = readStoredMetricTarget(settings);

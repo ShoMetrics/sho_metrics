@@ -247,11 +247,11 @@ Likely locations:
 - `packages/hub/com.ez.sho-metrics.sdPlugin/en.json`
 - `packages/hub/com.ez.sho-metrics.sdPlugin/zh_CN.json`
 - `packages/hub/com.ez.sho-metrics.sdPlugin/ja.json`
-- `packages/hub/com.ez.sho-metrics.sdPlugin/imgs/actions/system-battery/**`
+- `packages/hub/com.ez.sho-metrics.sdPlugin/imgs/actions/system/**`
 - `packages/hub/src/shared/stream-deck-actions.ts`
 - `packages/hub/src/plugin.ts`
-- `packages/hub/src/actions/system-battery.ts`
-- `packages/hub/src/actions/system-battery/**`
+- `packages/hub/src/actions/system.ts`
+- `packages/hub/src/actions/system/**`
 - `packages/hub/src/actions/settings/action-settings-resolver.ts`
 - `packages/hub/src/property-inspector/App.tsx`
 - `packages/hub/src/property-inspector/panels/**`
@@ -588,7 +588,7 @@ Likely locations:
 - `packages/hub/src/runtime/metric-collection/**`
 - `packages/hub/src/runtime/source-routing/metric-read-plan-builder.ts`
 - `packages/hub/src/runtime/source-routing/metric-source-preferences.ts`
-- `packages/hub/src/actions/system-battery/**`
+- `packages/hub/src/actions/system/**`
 - `packages/hub/src/actions/shared/background-collection-binding.ts`
 - `packages/hub/src/actions/shared/displayed-metric-no-data-observer.ts`
 - `packages/hub/src/actions/shared/helper-backed-widget-data.ts`

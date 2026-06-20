@@ -93,6 +93,7 @@ export function App({ client }: AppProps): React.JSX.Element {
                         isGlobalPaintOverrideEnabled={isGlobalPaintOverrideEnabled}
                         colorCompensationProfile={colorCompensation.profile}
                         onSettingsPatch={updateWidgetSettings}
+                        onGlobalSettingsPatch={updateGlobalSettings}
                         onCustomHttpCredentialUpsert={upsertCustomHttpCredential}
                         onCustomHttpCredentialDelete={deleteCustomHttpCredential}
                         onResetWidgetSettings={resetWidgetSettings}

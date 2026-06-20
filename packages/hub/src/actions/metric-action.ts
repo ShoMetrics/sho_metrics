@@ -520,6 +520,7 @@ export abstract class MetricAction extends SingletonAction {
 const DEFAULT_POLLING_INTERVAL_MILLISECONDS = 1000;
 const ALLOWED_POLLING_FREQUENCY_SECONDS = new Set([1, 2, 3, 5, 10, 15, 30, 60]);
 const CUSTOM_METRIC_MAX_POLLING_FREQUENCY_SECONDS = 86400;
+const SYSTEM_BATTERY_POLLING_FREQUENCY_SECONDS = new Set([60, 180, 300, 600, 1200, 1800, 3600]);
 // Gives the background collector one missed interval before fallback render treats its reading as expired.
 const FALLBACK_READING_FRESHNESS_GRACE_MILLISECONDS = 5000;
 
@@ -529,6 +530,13 @@ function resolvePollingIntervalMilliseconds(actionKind: ActionKind, pollingFrequ
         && Number.isInteger(pollingFrequencySeconds)
         && pollingFrequencySeconds >= 1
         && pollingFrequencySeconds <= CUSTOM_METRIC_MAX_POLLING_FREQUENCY_SECONDS
+    ) {
+        return pollingFrequencySeconds * 1000;
+    }
+
+    if (
+        actionKind === "system"
+        && SYSTEM_BATTERY_POLLING_FREQUENCY_SECONDS.has(pollingFrequencySeconds)
     ) {
         return pollingFrequencySeconds * 1000;
     }

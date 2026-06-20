@@ -41,5 +41,9 @@
 				"Rotate": "切换指标"
 			}
 		}
+	},
+	"com.ez.sho-metrics.system": {
+		"Name": "系统与电池",
+		"Tooltip": "显示系统和受支持设备的电池指标。"
 	}
 }

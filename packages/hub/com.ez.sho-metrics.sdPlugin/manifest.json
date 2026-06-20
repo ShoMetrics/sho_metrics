@@ -130,6 +130,31 @@
 			]
 		},
 		{
+			"Name": "System & Battery",
+			"UUID": "com.ez.sho-metrics.system",
+			"Icon": "imgs/actions/system/icon",
+			"Tooltip": "Displays system and supported device battery metrics.",
+			"PropertyInspectorPath": "ui/property-inspector.html",
+			"SupportedInMultiActions": false,
+			"VisibleInActionsList": true,
+			"Controllers": [
+				"Keypad",
+				"Encoder"
+			],
+			"Encoder": {
+				"Icon": "imgs/actions/sho-metrics/icon",
+				"layout": "$B1"
+			},
+			"UserTitleEnabled": false,
+			"States": [
+				{
+					"Image": "imgs/actions/sho-metrics/key",
+					"ShowTitle": false,
+					"TitleAlignment": "middle"
+				}
+			]
+		},
+		{
 			"Name": "Advanced Sensor",
 			"UUID": "com.ez.sho-metrics.catalog-metric",
 			"Icon": "imgs/actions/catalog-metric/icon",

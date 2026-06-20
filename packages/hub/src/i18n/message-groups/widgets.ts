@@ -178,6 +178,64 @@ export const networkMessages = {
     },
 } as const satisfies LocalizedMessages;
 
+export const systemMessages = {
+    batterySection: {
+        en: "Battery",
+        zh_CN: "电池",
+        ja: "バッテリー",
+    },
+    batteryDeviceLabel: {
+        en: "Battery",
+        zh_CN: "电池",
+        ja: "バッテリー",
+    },
+    systemBatteryOption: {
+        en: "System",
+        zh_CN: "系统",
+        ja: "システム",
+    },
+    loadingBatteryDevicesOption: {
+        en: "Loading battery devices...",
+        zh_CN: "正在加载电池设备...",
+        ja: "バッテリーデバイスを読み込んでいます...",
+    },
+    noBatteryDevicesOption: {
+        en: "No battery devices detected",
+        zh_CN: "未检测到电池设备",
+        ja: "バッテリーデバイスが検出されません",
+    },
+    batteryDevicesUnavailableOption: {
+        en: "Battery devices unavailable",
+        zh_CN: "电池设备不可用",
+        ja: "バッテリーデバイスを利用できません",
+    },
+    unavailableBatterySelectionOption: {
+        en: "Unavailable: {label}",
+        zh_CN: "不可用：{label}",
+        ja: "利用不可: {label}",
+    },
+    experimentalVendorHidBatterySettingLabel: {
+        en: "USB Device",
+        zh_CN: "USB 设备",
+        ja: "USB デバイス",
+    },
+    experimentalVendorHidBatteryCheckboxLabel: {
+        en: "Enable experimental support",
+        zh_CN: "启用实验性支持",
+        ja: "実験的サポートを有効にする",
+    },
+    experimentalVendorHidBatteryNote: {
+        en: "Reads battery levels from Logitech/ROG devices connected through USB receiver/dongle. Turn this off if you notice peripheral stutter, manufacturer software conflicts, or unstable device behavior.",
+        zh_CN: "读取通过 USB 接收器/接收器适配器连接的 Logitech/ROG 设备电池电量。如果发现外设卡顿、厂商软件冲突或设备行为不稳定，请关闭此选项。",
+        ja: "USB レシーバー/ドングル経由で接続された Logitech/ROG デバイスからバッテリー残量を読み取ります。周辺機器のカクつき、メーカーソフトウェアとの競合、デバイス動作が不安定な場合はオフにしてください。",
+    },
+    infrequentPollingNote: {
+        en: "This device is checked infrequently since the support is experimental.",
+        zh_CN: "由于支持仍为实验性，此设备会以较低频率检查。",
+        ja: "サポートは実験的なため、このデバイスは低頻度で確認されます。",
+    },
+} as const satisfies LocalizedMessages;
+
 export const helperMessages = {
     helperInstallCatalogMetrics: {
         en: "advanced sensors",

@@ -27,6 +27,8 @@ import {
     LineAppearanceSettings_GridLineType as StoredGridLineType,
     LineAppearanceSettings_GridLineVisibility as StoredGridLineVisibility,
     MetricSourcePolicy_FailureMode as StoredSourceFailureMode,
+    SystemPeripheralBindingTransport as StoredSystemPeripheralBindingTransport,
+    SystemPeripheralReceiverKind as StoredSystemPeripheralReceiverKind,
     TemperatureUnit as StoredTemperatureUnit,
 } from "../../generated/proto/shometrics/v1/settings_pb.js";
 import type {
@@ -50,6 +52,8 @@ import type {
     TextViewVariant,
     ScaleMode,
     SourceFailureMode,
+    SystemPeripheralBindingTransport,
+    SystemPeripheralReceiverKind,
     MetricView,
     TemperatureUnit,
 } from "../resolved-settings";
@@ -200,3 +204,17 @@ export const storedSourceFailureModeByResolved = {
     showUnavailable: StoredSourceFailureMode.SHOW_UNAVAILABLE,
     useFallback: StoredSourceFailureMode.USE_FALLBACK,
 } satisfies Record<SourceFailureMode, StoredSourceFailureMode>;
+
+export const storedSystemPeripheralBindingTransportByResolved = {
+    bluetooth: StoredSystemPeripheralBindingTransport.BLUETOOTH,
+    usbReceiver: StoredSystemPeripheralBindingTransport.USB_RECEIVER,
+    usbWired: StoredSystemPeripheralBindingTransport.USB_WIRED,
+} satisfies Record<SystemPeripheralBindingTransport, StoredSystemPeripheralBindingTransport>;
+
+export const storedSystemPeripheralReceiverKindByResolved = {
+    unknownReceiver: StoredSystemPeripheralReceiverKind.UNKNOWN_RECEIVER,
+    bolt: StoredSystemPeripheralReceiverKind.BOLT,
+    unifying: StoredSystemPeripheralReceiverKind.UNIFYING,
+    rogOmni: StoredSystemPeripheralReceiverKind.ROG_OMNI,
+    lightspeed: StoredSystemPeripheralReceiverKind.LIGHTSPEED,
+} satisfies Record<SystemPeripheralReceiverKind, StoredSystemPeripheralReceiverKind>;

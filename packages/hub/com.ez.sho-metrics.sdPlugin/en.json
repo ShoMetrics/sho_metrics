@@ -41,5 +41,9 @@
 				"Rotate": "Switch metric"
 			}
 		}
+	},
+	"com.ez.sho-metrics.system": {
+		"Name": "System & Battery",
+		"Tooltip": "Displays system and supported device battery metrics."
 	}
 }

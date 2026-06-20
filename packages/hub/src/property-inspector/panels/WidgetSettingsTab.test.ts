@@ -9,6 +9,7 @@ import {
     type StoredWidgetSettingsPatch,
 } from "../../settings/storage/patch/widget-settings-patch";
 import type { WidgetRuntimeCachePatch } from "../../runtime/widget-runtime-cache";
+import type { BatteryDeviceDescriptor } from "../../runtime/sources/battery/battery-device-descriptor";
 import { MetricUnit } from "../../runtime/sources/metric-source";
 import {
     MetricIdKind,
@@ -27,6 +28,10 @@ import { WidgetSettingsTab } from "./WidgetSettingsTab";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
 import type { ResolvedCatalogMetricTarget } from "../../settings/resolved-settings";
 import type { PropertyInspectorPlatform } from "../inspector/platform";
+import {
+    writeStoredGlobalSettingsPatch,
+    type StoredGlobalSettingsPatch,
+} from "../../settings/storage/global-settings-patch";
 import {
     BUILT_IN_NODE_SYSTEM_SOURCE_PROFILE_ID,
     BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID,
@@ -1559,6 +1564,54 @@ test("widget text view renders text variant controls", () => {
     assert.match(markup, /custom-select-preview/);
 });
 
+test("system widget settings render battery selector and experimental vendor HID toggle", () => {
+    const batteryDevice = buildBatteryDeviceDescriptor();
+    const markup = renderWidgetSettings({
+        actionKind: "system",
+        settings: buildWidgetSettings("system", {
+            system: {
+                peripheralIdentity: batteryDevice.identity,
+            },
+        }),
+        runtimeCache: {
+            availableBatteryDevices: [batteryDevice],
+        },
+        runtimeCacheStatus: {
+            batteryDeviceOptionsStatus: "ready",
+        },
+    });
+
+    assert.match(markup, sectionTitlePattern("Battery"));
+    assert.match(markup, /\[Dongle\] MX Master 4/);
+    assert.match(markup, /USB Device/);
+    assert.match(markup, /Enable experimental support/);
+    assert.match(markup, /Reads battery levels from Logitech\/ROG devices connected through USB receiver\/dongle/);
+    assert.match(markup, /type="checkbox" checked=""/);
+    assert.match(markup, /This device is checked infrequently since the support is experimental/);
+    assert.match(markup, /60m/);
+});
+
+test("system widget settings hide vendor HID battery options when the global toggle is disabled", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "system",
+        globalSettings: buildGlobalSettings({
+            system: {
+                experimentalVendorHidBatteryEnabled: false,
+            },
+        }),
+        runtimeCache: {
+            availableBatteryDevices: [buildBatteryDeviceDescriptor()],
+        },
+        runtimeCacheStatus: {
+            batteryDeviceOptionsStatus: "ready",
+        },
+    });
+
+    assert.match(markup, /System/);
+    assert.doesNotMatch(markup, /MX Master 4/);
+    assert.match(markup, /type="checkbox"\/>/);
+});
+
 function renderWidgetSettings(options: {
     actionKind: ActionKind;
     platform?: PropertyInspectorPlatform;
@@ -1568,6 +1621,7 @@ function renderWidgetSettings(options: {
     isGlobalTransparentSurfaceOverrideEnabled?: boolean;
     isGlobalPaintOverrideEnabled?: boolean;
     settings?: InspectorTestSettings;
+    globalSettings?: InspectorTestSettings;
     runtimeCache?: WidgetRuntimeCachePatch;
     runtimeCacheStatus?: Partial<PropertyInspectorRuntimeCacheStatus>;
 }): string {
@@ -1577,6 +1631,7 @@ function renderWidgetSettings(options: {
             platform: options.platform,
             isWindows: options.isWindows ?? (options.platform === undefined || options.platform === "win32"),
             settings: options.settings,
+            globalSettings: options.globalSettings,
             runtimeCache: options.runtimeCache,
             runtimeCacheStatus: options.runtimeCacheStatus,
         }),
@@ -1688,4 +1743,35 @@ function buildStackedWidgetSettings(patch?: StoredWidgetSettingsPatch): Inspecto
     return patch === undefined
         ? quickStartSettings
         : writeStoredWidgetSettingsPatch(quickStartSettings, patch, { createSlotId });
+}
+
+function buildBatteryDeviceDescriptor(): BatteryDeviceDescriptor {
+    return {
+        descriptorId: "logitech.bolt.slot-2",
+        displayName: "MX Master 4",
+        metricKey: "peripheral.battery_percent:logitech.bolt.slot-2",
+        transport: "usbReceiver",
+        receiverKind: "bolt",
+        isExperimental: true,
+        supportState: "experimental",
+        identity: {
+            vendorId: 0x046D,
+            productId: 0xC548,
+            manufacturer: "Logitech",
+            productName: "MX Master 4",
+            serialNumber: undefined,
+            interfaceNumber: 2,
+            usagePage: 0xFF00,
+            usageId: undefined,
+            bindingTransport: "usbReceiver",
+            receiverKind: "bolt",
+            vendorUnitId: "unit-2",
+            modelId: "mx-master-4",
+            receiverSlot: 2,
+        },
+    };
+}
+
+function buildGlobalSettings(patch: StoredGlobalSettingsPatch): InspectorTestSettings {
+    return writeStoredGlobalSettingsPatch(undefined, patch);
 }

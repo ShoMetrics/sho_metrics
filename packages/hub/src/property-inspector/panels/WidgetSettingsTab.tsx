@@ -5,6 +5,7 @@ import { widgetMessages } from "../../i18n/message-groups/widgets";
 import { useI18n } from "../../i18n/react";
 import type { StoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
 import type { StoredCustomHttpCredentialInput } from "../../settings/storage/global-settings-patch";
+import type { StoredGlobalSettingsPatch } from "../../settings/storage/global-settings-patch";
 import type { VisibilityContext } from "../inspector/types";
 import type { ColorCompensationProfile } from "../../color-compensation/types";
 import { ColorCompensationControls } from "./ColorCompensationControls";
@@ -22,6 +23,7 @@ interface WidgetSettingsTabProps {
     isGlobalPaintOverrideEnabled: boolean;
     colorCompensationProfile: ColorCompensationProfile;
     onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
+    onGlobalSettingsPatch?: ((patch: StoredGlobalSettingsPatch) => void) | undefined;
     onCustomHttpCredentialUpsert?: ((credential: StoredCustomHttpCredentialInput) => void) | undefined;
     onCustomHttpCredentialDelete?: ((credentialId: string) => void) | undefined;
     onResetWidgetSettings: () => void;
@@ -37,6 +39,7 @@ export function WidgetSettingsTab({
     isGlobalPaintOverrideEnabled,
     colorCompensationProfile,
     onSettingsPatch,
+    onGlobalSettingsPatch,
     onCustomHttpCredentialUpsert,
     onCustomHttpCredentialDelete,
     onResetWidgetSettings,
@@ -79,6 +82,7 @@ export function WidgetSettingsTab({
     const panelProps = {
         context,
         onSettingsPatch,
+        onGlobalSettingsPatch,
         onCustomHttpCredentialUpsert,
         onCustomHttpCredentialDelete,
         onWidgetChromeSuppressionChange: setIsWidgetChromeSuppressed,
@@ -135,6 +139,7 @@ function renderMetricPanel(
     panelProps: {
         context: VisibilityContext;
         onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
+        onGlobalSettingsPatch?: ((patch: StoredGlobalSettingsPatch) => void) | undefined;
         onWidgetChromeSuppressionChange?: ((isSuppressed: boolean) => void) | undefined;
         viewDisabled: boolean;
         themeDisabled: boolean;

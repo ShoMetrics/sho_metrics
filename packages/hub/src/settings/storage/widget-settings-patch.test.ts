@@ -12,6 +12,8 @@ import {
     NetworkDisplaySettings_UnitBase as StoredNetworkUnitBase,
     NetworkMetricTarget_Kind as StoredNetworkMetricKind,
     NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
+    SystemPeripheralBindingTransport as StoredSystemPeripheralBindingTransport,
+    SystemPeripheralReceiverKind as StoredSystemPeripheralReceiverKind,
     TerminalPalettePreset as StoredTerminalPalettePreset,
     TerminalThemeVariant as StoredTerminalThemeVariant,
     TemperatureUnit as StoredTemperatureUnit,
@@ -833,6 +835,49 @@ test("widget patch writes System battery target for dense metric slots", () => {
     if (target?.case === "system") {
         assert.equal(target.value.reading.case, "battery");
         assert.equal(target.value.reading.value.peripheralIdentity, undefined);
+    }
+});
+
+test("widget patch writes selected System peripheral battery identity", () => {
+    const nextSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "system").rawSettings,
+        {
+            system: {
+                peripheralIdentity: {
+                    vendorId: 0x046D,
+                    productId: 0xC548,
+                    manufacturer: "Logitech",
+                    productName: "MX Master 4",
+                    serialNumber: undefined,
+                    interfaceNumber: 2,
+                    usagePage: 0xFF00,
+                    usageId: undefined,
+                    bindingTransport: "usbReceiver",
+                    receiverKind: "bolt",
+                    vendorUnitId: "unit-2",
+                    modelId: "mx-master-4",
+                    receiverSlot: 2,
+                },
+            },
+        },
+    );
+    const target = readSingleMetricSlot(nextSettings)?.metric?.target;
+
+    assert.equal(target?.case, "system");
+    if (target?.case === "system") {
+        assert.equal(target.value.reading.case, "battery");
+        const identity = target.value.reading.value.peripheralIdentity;
+        assert.equal(identity?.vendorId, 0x046D);
+        assert.equal(identity?.productId, 0xC548);
+        assert.equal(identity?.manufacturer, "Logitech");
+        assert.equal(identity?.productName, "MX Master 4");
+        assert.equal(identity?.interfaceNumber, 2);
+        assert.equal(identity?.usagePage, 0xFF00);
+        assert.equal(identity?.bindingTransport, StoredSystemPeripheralBindingTransport.USB_RECEIVER);
+        assert.equal(identity?.receiverKind, StoredSystemPeripheralReceiverKind.BOLT);
+        assert.equal(identity?.vendorUnitId, "unit-2");
+        assert.equal(identity?.modelId, "mx-master-4");
+        assert.equal(identity?.receiverSlot, 2);
     }
 });
 

@@ -1,6 +1,6 @@
 import { shellMessages, commonMessages } from "./message-groups/shell";
 import { optionMessages } from "./message-groups/options";
-import { widgetMessages, cpuMessages, gpuMessages, diskMessages, networkMessages, helperMessages, catalogMessages } from "./message-groups/widgets";
+import { widgetMessages, cpuMessages, gpuMessages, diskMessages, networkMessages, systemMessages, helperMessages, catalogMessages } from "./message-groups/widgets";
 import { colorMessages } from "./message-groups/color";
 import { settingsNoticeMessages, globalSettingsMessages } from "./message-groups/settings";
 import { colorCompensationMessages } from "./message-groups/color-compensation";
@@ -21,6 +21,7 @@ export const messageGroups = {
     gpuMessages,
     diskMessages,
     networkMessages,
+    systemMessages,
     colorMessages,
     helperMessages,
     catalogMessages,
