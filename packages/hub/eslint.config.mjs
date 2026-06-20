@@ -181,6 +181,44 @@ const restrictedNonStorageSchemaAndSourceProtoImports = {
   ],
 };
 
+const restrictedSettingsResolverEnumMapImports = {
+  paths: [
+    ...restrictedSchemaHardeningImports.paths,
+    {
+      name: '../resolved-to-stored-enum-maps',
+      message: 'Settings resolvers must use stored-to-resolved enum maps. Resolved-to-stored maps are for settings patch/write paths.',
+    },
+    {
+      name: '../resolved-to-stored-enum-maps.js',
+      message: 'Settings resolvers must use stored-to-resolved enum maps. Resolved-to-stored maps are for settings patch/write paths.',
+    },
+  ],
+  patterns: [...restrictedSchemaHardeningImports.patterns],
+};
+
+const restrictedSettingsStorageWriteEnumMapImports = {
+  paths: [
+    ...restrictedSchemaHardeningImports.paths,
+    {
+      name: './resolver/stored-to-resolved-enum-maps',
+      message: 'Settings write paths must use resolved-to-stored enum maps. Stored-to-resolved maps are for resolver read paths.',
+    },
+    {
+      name: './resolver/stored-to-resolved-enum-maps.js',
+      message: 'Settings write paths must use resolved-to-stored enum maps. Stored-to-resolved maps are for resolver read paths.',
+    },
+    {
+      name: '../resolver/stored-to-resolved-enum-maps',
+      message: 'Settings write paths must use resolved-to-stored enum maps. Stored-to-resolved maps are for resolver read paths.',
+    },
+    {
+      name: '../resolver/stored-to-resolved-enum-maps.js',
+      message: 'Settings write paths must use resolved-to-stored enum maps. Stored-to-resolved maps are for resolver read paths.',
+    },
+  ],
+  patterns: [...restrictedSchemaHardeningImports.patterns],
+};
+
 const restrictedRendererSettingsImports = {
   patterns: [
     {
@@ -355,6 +393,19 @@ export default tseslint.config(
     ignores: ['src/settings/storage/**/*', ...sourceProtoBoundaryFiles],
     rules: {
       'no-restricted-imports': ['error', restrictedNonStorageSchemaAndSourceProtoImports],
+    },
+  },
+  {
+    files: ['src/settings/storage/resolver/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', restrictedSettingsResolverEnumMapImports],
+    },
+  },
+  {
+    files: ['src/settings/storage/**/*.{ts,tsx}'],
+    ignores: ['src/settings/storage/resolver/**/*', 'src/settings/storage/**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': ['error', restrictedSettingsStorageWriteEnumMapImports],
     },
   },
   {

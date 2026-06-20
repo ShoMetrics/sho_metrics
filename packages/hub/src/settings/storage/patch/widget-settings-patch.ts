@@ -93,7 +93,7 @@ import {
     storedDiskThroughputDirectionByResolved,
     storedGpuMetricKindByResolved,
     storedNetworkDirectionByResolved,
-} from "../enum-maps";
+} from "../resolved-to-stored-enum-maps";
 
 export type {
     DenseMetricSlotPatch,

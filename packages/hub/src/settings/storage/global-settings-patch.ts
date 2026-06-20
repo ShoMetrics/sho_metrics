@@ -66,7 +66,7 @@ import {
     storedScaleModeByResolved,
     storedMetricViewByResolved,
     storedThemeByResolved,
-} from "./enum-maps";
+} from "./resolved-to-stored-enum-maps";
 import { applyStoredTransparentSurfacePatch } from "./transparent-surface-patch";
 
 export interface StoredGlobalSettingsPatch {
