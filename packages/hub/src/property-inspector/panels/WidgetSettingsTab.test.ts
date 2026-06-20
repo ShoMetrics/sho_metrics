@@ -420,7 +420,7 @@ test("windows CPU helper-only settings guide missing helper install", () => {
             cpu: { kind: "temperature" },
         }),
         runtimeCache: {
-            displayedMetricReadAttribution: {
+            displayedMetricReadTrace: {
                 metricKey: "cpu.temp",
                 routing: {
                     preferredSourceId: WINDOWS_HELPER_SOURCE_ID,
@@ -447,7 +447,7 @@ test("windows CPU helper-only settings guide stopped helper recovery", () => {
             cpu: { kind: "power" },
         }),
         runtimeCache: {
-            displayedMetricReadAttribution: {
+            displayedMetricReadTrace: {
                 metricKey: "cpu.power",
                 routing: {
                     preferredSourceId: WINDOWS_HELPER_SOURCE_ID,
@@ -474,7 +474,7 @@ test("windows CPU helper-only settings fall back to helper diagnostics guidance"
             cpu: { kind: "temperature" },
         }),
         runtimeCache: {
-            displayedMetricReadAttribution: {
+            displayedMetricReadTrace: {
                 metricKey: "cpu.temp",
                 routing: {
                     preferredSourceId: WINDOWS_HELPER_SOURCE_ID,
@@ -571,7 +571,7 @@ test("windows GPU settings panel guides no-value GPU diagnostics without changin
         actionKind: "gpu",
         isWindows: true,
         runtimeCache: {
-            displayedMetricReadAttribution: {
+            displayedMetricReadTrace: {
                 metricKey: "gpu.usage_percent",
                 routing: {
                     preferredSourceId: NODE_SYSTEM_SOURCE_ID,
@@ -592,7 +592,7 @@ test("GPU settings panel hides no-value helper guidance after a value is availab
         actionKind: "gpu",
         isWindows: true,
         runtimeCache: {
-            displayedMetricReadAttribution: {
+            displayedMetricReadTrace: {
                 metricKey: "gpu.usage_percent",
                 routing: {
                     preferredSourceId: NODE_SYSTEM_SOURCE_ID,
@@ -668,7 +668,7 @@ test("non-windows GPU settings panel does not show Windows helper guidance", () 
         actionKind: "gpu",
         isWindows: false,
         runtimeCache: {
-            displayedMetricReadAttribution: {
+            displayedMetricReadTrace: {
                 metricKey: "gpu.usage_percent",
                 routing: {
                     preferredSourceId: NODE_SYSTEM_SOURCE_ID,
@@ -1324,11 +1324,11 @@ test("stacked metric settings page summarizes catalog slots without expanding th
     assert.match(markup, /This polling frequency is shared by every metric in this key\./);
 });
 
-test("widget advanced controls render current metric source attribution", () => {
+test("widget advanced controls render current metric read trace", () => {
     const markup = renderWidgetSettings({
         actionKind: "cpu",
         runtimeCache: {
-            displayedMetricReadAttribution: {
+            displayedMetricReadTrace: {
                 metricKey: "cpu.usage_percent",
                 routing: {
                     preferredSourceId: NODE_SYSTEM_SOURCE_ID,
@@ -1348,11 +1348,11 @@ test("widget advanced controls render current metric source attribution", () => 
     assert.match(markup, /Last value age:/);
 });
 
-test("widget advanced controls report fallback source attribution", () => {
+test("widget advanced controls report fallback read trace", () => {
     const markup = renderWidgetSettings({
         actionKind: "gpu",
         runtimeCache: {
-            displayedMetricReadAttribution: {
+            displayedMetricReadTrace: {
                 metricKey: "gpu.temp",
                 routing: {
                     preferredSourceId: WINDOWS_HELPER_SOURCE_ID,
@@ -1376,7 +1376,7 @@ test("widget advanced controls report helper source status", () => {
     const markup = renderWidgetSettings({
         actionKind: "cpu",
         runtimeCache: {
-            displayedMetricReadAttribution: {
+            displayedMetricReadTrace: {
                 metricKey: "cpu.temp",
                 routing: {
                     preferredSourceId: WINDOWS_HELPER_SOURCE_ID,
@@ -1396,28 +1396,11 @@ test("widget advanced controls report helper source status", () => {
     assert.match(markup, /Helper status: Required/);
 });
 
-test("widget advanced controls tolerate old attribution payloads without routing", () => {
-    const runtimeCache = {
-        displayedMetricReadAttribution: {
-            metricKey: "cpu.temp",
-            outcome: undefined,
-        },
-    } as WidgetRuntimeCachePatch;
-
-    const markup = renderWidgetSettings({
-        actionKind: "cpu",
-        runtimeCache,
-    });
-
-    assert.match(markup, /Current source: No fresh source/);
-    assert.match(markup, /Last value age: none/);
-});
-
 test("widget advanced controls report sensor identity and metric state", () => {
     const markup = renderWidgetSettings({
         actionKind: "cpu",
         runtimeCache: {
-            displayedMetricReadAttribution: {
+            displayedMetricReadTrace: {
                 metricKey: "cpu.temp",
                 routing: {
                     preferredSourceId: WINDOWS_HELPER_SOURCE_ID,
@@ -1445,7 +1428,7 @@ test("widget advanced controls report unavailable metric state", () => {
     const markup = renderWidgetSettings({
         actionKind: "cpu",
         runtimeCache: {
-            displayedMetricReadAttribution: {
+            displayedMetricReadTrace: {
                 metricKey: "cpu.temp",
                 routing: {
                     preferredSourceId: WINDOWS_HELPER_SOURCE_ID,
@@ -1626,7 +1609,7 @@ function buildMetricDescriptor(overrides: MetricDescriptorFixture): MetricDescri
         metricId: overrides.metricId,
         valueKind: overrides.valueKind ?? MetricValueKind.SCALAR,
         unit: overrides.unit ?? MetricUnit.UNSPECIFIED,
-        metricIdKind: overrides.metricIdKind ?? MetricIdKind.SOURCE_SENSOR,
+        metricIdKind: overrides.metricIdKind ?? MetricIdKind.SOURCE_NATIVE,
         pollingGroupId: overrides.pollingGroupId ?? "polling-group",
         rawSensorIdentity: {
             sourceSensorId: overrides.sourceSensorId,

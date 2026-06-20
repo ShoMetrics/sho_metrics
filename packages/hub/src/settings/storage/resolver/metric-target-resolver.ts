@@ -11,6 +11,7 @@ import {
     NetworkMetricTarget_Kind as StoredNetworkMetricKind,
     NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
     NetworkMetricTarget_Traffic_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
+    SystemPeripheralBindingTransport as StoredSystemPeripheralBindingTransport,
     TemperatureUnit as StoredTemperatureUnit,
     type CatalogMetricTarget as StoredCatalogMetricTarget,
     type CustomHttpMetricSource as StoredCustomHttpMetricSource,
@@ -21,6 +22,9 @@ import {
     type MetricSelection as StoredMetricSelection,
     type MetricSourcePolicy as StoredMetricSourcePolicy,
     type NetworkMetricTarget as StoredNetworkMetricTarget,
+    type SystemBatteryMetricTarget as StoredSystemBatteryMetricTarget,
+    type SystemMetricTarget as StoredSystemMetricTarget,
+    type SystemPeripheralIdentity as StoredSystemPeripheralIdentity,
 } from "../../../generated/proto/shometrics/v1/settings_pb.js";
 import {
     resolveCustomHttpFetchPolicy,
@@ -52,7 +56,9 @@ import type {
     ResolvedMetricTarget,
     ResolvedNetworkDisplaySettings,
     ResolvedNetworkReading,
+    ResolvedSystemPeripheralIdentity,
     SourceFailureMode,
+    SystemPeripheralBindingTransport,
     TemperatureUnit,
 } from "../../resolved-settings";
 import type { ResolveStoredSettingsRuntimeContext } from "./resolver-types";
@@ -172,6 +178,8 @@ function resolveMetricTarget(
             return resolveDiskMetricTarget(storedMetricSelection.target.value, diskThroughputDisplay);
         case "gpu":
             return resolveGpuMetricTarget(storedMetricSelection.target.value, runtime);
+        case "system":
+            return resolveSystemMetricTarget(storedMetricSelection.target.value);
         case "catalog":
             return resolveCatalogMetricTarget(storedMetricSelection.target.value);
         case "custom":
@@ -179,6 +187,73 @@ function resolveMetricTarget(
         case undefined:
             return resolveCpuMetricTarget(undefined);
     }
+}
+
+function resolveSystemMetricTarget(
+    storedTarget: StoredSystemMetricTarget,
+): ResolvedMetricTarget {
+    switch (storedTarget.reading.case) {
+        case "battery":
+            return resolveSystemBatteryMetricTarget(storedTarget.reading.value);
+        case undefined:
+            return resolveSystemBatteryMetricTarget(undefined);
+    }
+}
+
+function resolveSystemBatteryMetricTarget(
+    storedTarget: StoredSystemBatteryMetricTarget | undefined,
+): ResolvedMetricTarget {
+    return {
+        domain: "system",
+        reading: {
+            kind: "batteryPercent",
+            peripheralIdentity: resolveSystemPeripheralIdentity(storedTarget?.peripheralIdentity),
+            detectedPeripheralDisplayName: normalizeOptionalText(storedTarget?.detectedPeripheralDisplayName),
+        },
+    };
+}
+
+function resolveSystemPeripheralIdentity(
+    storedIdentity: StoredSystemPeripheralIdentity | undefined,
+): ResolvedSystemPeripheralIdentity | undefined {
+    if (!storedIdentity) {
+        return undefined;
+    }
+
+    return {
+        vendorId: storedIdentity.vendorId,
+        productId: storedIdentity.productId,
+        manufacturer: normalizeOptionalText(storedIdentity.manufacturer),
+        productName: normalizeOptionalText(storedIdentity.productName),
+        serialNumber: normalizeOptionalText(storedIdentity.serialNumber),
+        interfaceNumber: storedIdentity.interfaceNumber,
+        usagePage: storedIdentity.usagePage,
+        usageId: storedIdentity.usageId,
+        bindingTransport: resolveSystemPeripheralBindingTransport(storedIdentity.bindingTransport),
+        vendorUnitId: normalizeOptionalText(storedIdentity.vendorUnitId),
+        modelId: normalizeOptionalText(storedIdentity.modelId),
+        receiverSlot: storedIdentity.receiverSlot,
+    };
+}
+
+function resolveSystemPeripheralBindingTransport(
+    storedTransport: StoredSystemPeripheralBindingTransport | undefined,
+): SystemPeripheralBindingTransport | undefined {
+    switch (storedTransport) {
+        case StoredSystemPeripheralBindingTransport.BLUETOOTH:
+            return "bluetooth";
+        case StoredSystemPeripheralBindingTransport.USB_RECEIVER:
+            return "usbReceiver";
+        case StoredSystemPeripheralBindingTransport.USB_WIRED:
+            return "usbWired";
+        case StoredSystemPeripheralBindingTransport.UNSPECIFIED:
+            return undefined;
+    }
+}
+
+function normalizeOptionalText(value: string | undefined): string | undefined {
+    const normalizedValue = value?.trim();
+    return normalizedValue ? normalizedValue : undefined;
 }
 
 function resolveCpuMetricTarget(

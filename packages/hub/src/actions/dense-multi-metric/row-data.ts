@@ -10,6 +10,7 @@ import {
     GPU_VRAM_USED_METRIC_KEY,
     RAM_TOTAL_METRIC_KEY,
     RAM_USED_METRIC_KEY,
+    SYSTEM_BATTERY_PERCENT_METRIC_KEY,
 } from "../../runtime/metric-keys";
 import {
     getDiskThroughputMetricKey,
@@ -257,6 +258,8 @@ function resolveDenseMetricKeys(
             return resolveDiskDenseMetricKeys(target);
         case "network":
             return resolveNetworkDenseMetricKeys(target);
+        case "system":
+            return buildSingleKey(SYSTEM_BATTERY_PERCENT_METRIC_KEY);
         case "catalog":
             return buildSingleKey(target.metricId);
         case "customMetric": {
@@ -374,6 +377,13 @@ function buildTargetWidgetData(
             return buildDiskRowWidgetData(row, metrics);
         case "network":
             return buildNetworkRowWidgetData(row, metrics, currentTimestampMilliseconds);
+        case "system":
+            return metrics.getWidgetData(
+                SYSTEM_BATTERY_PERCENT_METRIC_KEY,
+                resolveDenseRowLabel(row),
+                "%",
+                row.customMaximumValue,
+            );
         case "catalog":
             return buildCatalogRowWidgetData(row, metrics);
         case "customMetric":
@@ -648,6 +658,8 @@ function resolveDefaultDenseRowLabel(target: ResolvedMetricTarget): string {
             return target.reading.kind === "ping"
                 ? "PING"
                 : resolveNetworkDirectionLabel(target.reading.direction);
+        case "system":
+            return "BATT";
         case "catalog":
             return target.customLabel ?? target.detectedLabel ?? "METRIC";
         case "customMetric":

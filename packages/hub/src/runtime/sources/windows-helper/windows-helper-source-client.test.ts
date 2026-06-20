@@ -3,29 +3,35 @@ import { status as grpcStatus } from "@grpc/grpc-js";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-    GetSourceHealthResponseSchema,
-    ListMetricDescriptorsResponseSchema,
     MetricDescriptorSchema,
     MetricIdKind as ProtoMetricIdKind,
     MetricUnavailableReason as ProtoMetricUnavailableReason,
     MetricUnavailableReportSchema,
-    MetricValueAttributionSchema,
-    MetricValueKind as ProtoMetricValueKind,
     MetricValueFreshness as ProtoMetricValueFreshness,
+    MetricValueKind as ProtoMetricValueKind,
+    MetricValueMetadataSchema,
+    type MetricValueMetadata as ProtoMetricValueMetadata,
+} from "../../../generated/proto/shometrics/v1/metric_common_pb.js";
+import {
+    GetSourceHealthResponseSchema,
+    HelperMetricDescriptorSchema,
+    HelperMetricUnavailableReportSchema,
+    HelperMetricValueProvenanceSchema,
+    ListMetricDescriptorsResponseSchema,
     ReadMetricSnapshotResponseSchema,
     SetMetricRefreshDemandResponseSchema,
     type GetSourceHealthRequest,
     type GetSourceHealthResponse,
+    type HelperMetricDescriptor as ProtoHelperMetricDescriptor,
+    type HelperMetricUnavailableReport as ProtoHelperMetricUnavailableReport,
+    type HelperMetricValueProvenance as ProtoHelperMetricValueProvenance,
     type ListMetricDescriptorsRequest,
     type ListMetricDescriptorsResponse,
-    type MetricDescriptor as ProtoMetricDescriptor,
-    type MetricUnavailableReport as ProtoMetricUnavailableReport,
-    type MetricValueAttribution as ProtoMetricValueAttribution,
     type ReadMetricSnapshotRequest,
     type ReadMetricSnapshotResponse,
     type SetMetricRefreshDemandRequest,
     type SetMetricRefreshDemandResponse,
-} from "../../../generated/proto/shometrics/v1/source_api_pb.js";
+} from "../../../generated/proto/shometrics/v1/helper_grpc_service_pb.js";
 import {
     buildMetricSnapshot,
     buildScalarMetricValue,
@@ -574,7 +580,7 @@ test("windows helper source client sends requested metric ids and returns a runt
     assert.equal(readRequiredMetricSnapshotTimestampMilliseconds(snapshot), 1000);
     assert.equal(snapshot.metrics["cpu.usage_percent"]?.value.case, "scalar");
     assert.equal(snapshot.metrics["cpu.usage_percent"]?.value.value, 42);
-    assert.deepEqual(readResult.valueAttributions, []);
+    assert.deepEqual(readResult.valueMetadata, []);
     assert.deepEqual(readResult.unavailableMetrics, []);
     assert.equal(client.getCachedStatus().state, "available");
     assert.deepEqual(
@@ -615,15 +621,19 @@ test("windows helper source client records missing snapshot responses as source 
     });
 });
 
-test("windows helper source client maps value attribution and unavailable metric reports", async () => {
+test("windows helper source client maps value metadata and unavailable metric reports", async () => {
     const transport = new FakeWindowsHelperGrpcTransport(request => {
         switch (request.method) {
             case "getSourceHealth":
                 return buildHealthResponse();
             case "readMetricSnapshot":
                 return buildSnapshotResponse({
-                    valueAttributions: [
-                        create(MetricValueAttributionSchema, {
+                    valueMetadata: create(MetricValueMetadataSchema, {
+                        freshness: ProtoMetricValueFreshness.RETAINED,
+                        retainedAgeMilliseconds: 1500,
+                    }),
+                    valueProvenance: [
+                        create(HelperMetricValueProvenanceSchema, {
                             metricId: "cpu.usage_percent",
                             rawSensorIdentity: {
                                 sourceSensorId: "lhm:/cpu/0/load/0",
@@ -633,18 +643,20 @@ test("windows helper source client maps value attribution and unavailable metric
                                 sensorName: "CPU Total",
                                 sourceSensorType: "Load",
                             },
-                            valueFreshness: ProtoMetricValueFreshness.RETAINED,
-                            retainedAgeMilliseconds: 1500,
                         }),
                     ],
                     unavailableMetrics: [
-                        create(MetricUnavailableReportSchema, {
-                            metricId: "cpu.power",
-                            reason: ProtoMetricUnavailableReason.NO_SENSOR,
+                        create(HelperMetricUnavailableReportSchema, {
+                            report: create(MetricUnavailableReportSchema, {
+                                metricId: "cpu.power",
+                                reason: ProtoMetricUnavailableReason.NO_SOURCE_READING,
+                            }),
                         }),
-                        create(MetricUnavailableReportSchema, {
-                            metricId: "cpu.temp",
-                            reason: ProtoMetricUnavailableReason.PENDING_REFRESH,
+                        create(HelperMetricUnavailableReportSchema, {
+                            report: create(MetricUnavailableReportSchema, {
+                                metricId: "cpu.temp",
+                                reason: ProtoMetricUnavailableReason.PENDING_REFRESH,
+                            }),
                         }),
                     ],
                 });
@@ -656,7 +668,7 @@ test("windows helper source client maps value attribution and unavailable metric
 
     const readResult = await client.readSnapshot(["cpu.usage_percent", "cpu.power", "cpu.temp"]);
 
-    assert.deepEqual(readResult.valueAttributions, [{
+    assert.deepEqual(readResult.valueMetadata, [{
         metricId: "cpu.usage_percent",
         rawSensorIdentity: {
             sourceSensorId: "lhm:/cpu/0/load/0",
@@ -672,7 +684,7 @@ test("windows helper source client maps value attribution and unavailable metric
     assert.deepEqual(readResult.unavailableMetrics, [
         {
             metricId: "cpu.power",
-            reason: "noSensorData",
+            reason: "noSourceReading",
         },
         {
             metricId: "cpu.temp",
@@ -681,8 +693,8 @@ test("windows helper source client maps value attribution and unavailable metric
     ]);
 });
 
-test("windows helper source client drops inconsistent source metric reports", async () => {
-    const validAttribution = create(MetricValueAttributionSchema, {
+test("windows helper source client drops inconsistent helper metric reports", async () => {
+    const validProvenance = create(HelperMetricValueProvenanceSchema, {
         metricId: "cpu.usage_percent",
         rawSensorIdentity: {
             sourceSensorId: "lhm:/cpu/0/load/0",
@@ -692,7 +704,6 @@ test("windows helper source client drops inconsistent source metric reports", as
             sensorName: "CPU Total",
             sourceSensorType: "Load",
         },
-        valueFreshness: ProtoMetricValueFreshness.FRESH,
     });
     const transport = new FakeWindowsHelperGrpcTransport(request => {
         switch (request.method) {
@@ -700,30 +711,37 @@ test("windows helper source client drops inconsistent source metric reports", as
                 return buildHealthResponse();
             case "readMetricSnapshot":
                 return buildSnapshotResponse({
-                    valueAttributions: [
-                        validAttribution,
-                        validAttribution,
-                        create(MetricValueAttributionSchema, {
+                    valueProvenance: [
+                        validProvenance,
+                        validProvenance,
+                        create(HelperMetricValueProvenanceSchema, {
                             metricId: "cpu.power",
-                            valueFreshness: ProtoMetricValueFreshness.FRESH,
                         }),
                     ],
                     unavailableMetrics: [
-                        create(MetricUnavailableReportSchema, {
-                            metricId: "cpu.usage_percent",
-                            reason: ProtoMetricUnavailableReason.INVALID_VALUE,
+                        create(HelperMetricUnavailableReportSchema, {
+                            report: create(MetricUnavailableReportSchema, {
+                                metricId: "cpu.usage_percent",
+                                reason: ProtoMetricUnavailableReason.INVALID_VALUE,
+                            }),
                         }),
-                        create(MetricUnavailableReportSchema, {
-                            metricId: "cpu.power",
-                            reason: ProtoMetricUnavailableReason.NO_SENSOR,
+                        create(HelperMetricUnavailableReportSchema, {
+                            report: create(MetricUnavailableReportSchema, {
+                                metricId: "cpu.power",
+                                reason: ProtoMetricUnavailableReason.NO_SOURCE_READING,
+                            }),
                         }),
-                        create(MetricUnavailableReportSchema, {
-                            metricId: "cpu.power",
-                            reason: ProtoMetricUnavailableReason.EXPIRED,
+                        create(HelperMetricUnavailableReportSchema, {
+                            report: create(MetricUnavailableReportSchema, {
+                                metricId: "cpu.power",
+                                reason: ProtoMetricUnavailableReason.EXPIRED,
+                            }),
                         }),
-                        create(MetricUnavailableReportSchema, {
-                            metricId: "not.requested",
-                            reason: ProtoMetricUnavailableReason.NO_SENSOR,
+                        create(HelperMetricUnavailableReportSchema, {
+                            report: create(MetricUnavailableReportSchema, {
+                                metricId: "not.requested",
+                                reason: ProtoMetricUnavailableReason.NO_SOURCE_READING,
+                            }),
                         }),
                     ],
                 });
@@ -735,7 +753,7 @@ test("windows helper source client drops inconsistent source metric reports", as
 
     const readResult = await client.readSnapshot(["cpu.usage_percent", "cpu.power"]);
 
-    assert.deepEqual(readResult.valueAttributions, [{
+    assert.deepEqual(readResult.valueMetadata, [{
         metricId: "cpu.usage_percent",
         rawSensorIdentity: {
             sourceSensorId: "lhm:/cpu/0/load/0",
@@ -749,7 +767,7 @@ test("windows helper source client drops inconsistent source metric reports", as
     }]);
     assert.deepEqual(readResult.unavailableMetrics, [{
         metricId: "cpu.power",
-        reason: "noSensorData",
+        reason: "noSourceReading",
     }]);
 });
 
@@ -760,12 +778,9 @@ test("windows helper source client treats future freshness enum values as displa
                 return buildHealthResponse();
             case "readMetricSnapshot":
                 return buildSnapshotResponse({
-                    valueAttributions: [
-                        create(MetricValueAttributionSchema, {
-                            metricId: "cpu.usage_percent",
-                            valueFreshness: 99 as ProtoMetricValueFreshness,
-                        }),
-                    ],
+                    valueMetadata: create(MetricValueMetadataSchema, {
+                        freshness: 99 as ProtoMetricValueFreshness,
+                    }),
                 });
             default:
                 throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
@@ -775,7 +790,7 @@ test("windows helper source client treats future freshness enum values as displa
 
     const readResult = await client.readSnapshot(["cpu.usage_percent"]);
 
-    assert.deepEqual(readResult.valueAttributions, [{
+    assert.deepEqual(readResult.valueMetadata, [{
         metricId: "cpu.usage_percent",
         valueFreshness: "retained",
     }]);
@@ -789,9 +804,11 @@ test("windows helper source client normalizes future unavailable reasons to unkn
             case "readMetricSnapshot":
                 return buildSnapshotResponse({
                     unavailableMetrics: [
-                        create(MetricUnavailableReportSchema, {
-                            metricId: "cpu.temp",
-                            reason: 99 as ProtoMetricUnavailableReason,
+                        create(HelperMetricUnavailableReportSchema, {
+                            report: create(MetricUnavailableReportSchema, {
+                                metricId: "cpu.temp",
+                                reason: 99 as ProtoMetricUnavailableReason,
+                            }),
                         }),
                     ],
                 });
@@ -882,12 +899,14 @@ test("windows helper source client drops descriptors without raw sensor identity
                 return buildHealthResponse();
             case "listMetricDescriptors":
                 return buildDescriptorResponse({
-                    descriptors: [create(MetricDescriptorSchema, {
-                        metricId: "cpu.usage_percent",
-                        pollingGroupId: CPU_HELPER_POLLING_GROUP_ID,
-                        valueKind: ProtoMetricValueKind.SCALAR,
-                        unit: MetricUnit.PERCENT,
-                        metricIdKind: ProtoMetricIdKind.STABLE_ALIAS,
+                    descriptors: [create(HelperMetricDescriptorSchema, {
+                        descriptor: create(MetricDescriptorSchema, {
+                            metricId: "cpu.usage_percent",
+                            pollingGroupId: CPU_HELPER_POLLING_GROUP_ID,
+                            valueKind: ProtoMetricValueKind.SCALAR,
+                            unit: MetricUnit.PERCENT,
+                            metricIdKind: ProtoMetricIdKind.STABLE_ALIAS,
+                        }),
                     })],
                 });
             default:
@@ -1481,18 +1500,22 @@ function buildHealthResponse(
 
 function buildSnapshotResponse(
     options: {
-        readonly valueAttributions?: readonly ProtoMetricValueAttribution[];
-        readonly unavailableMetrics?: readonly ProtoMetricUnavailableReport[];
+        readonly valueMetadata?: ProtoMetricValueMetadata;
+        readonly valueProvenance?: readonly ProtoHelperMetricValueProvenance[];
+        readonly unavailableMetrics?: readonly ProtoHelperMetricUnavailableReport[];
     } = {},
 ): ReadMetricSnapshotResponse {
+    const cpuUsageValue = buildScalarMetricValue(42, { unit: MetricUnit.PERCENT });
+    cpuUsageValue.metadata = options.valueMetadata;
+
     return create(ReadMetricSnapshotResponseSchema, {
         snapshot: buildMetricSnapshot({
             timestampMilliseconds: 1000,
             metrics: {
-                "cpu.usage_percent": buildScalarMetricValue(42, { unit: MetricUnit.PERCENT }),
+                "cpu.usage_percent": cpuUsageValue,
             },
         }),
-        valueAttributions: [...(options.valueAttributions ?? [])],
+        valueProvenance: [...(options.valueProvenance ?? [])],
         unavailableMetrics: [...(options.unavailableMetrics ?? [])],
     });
 }
@@ -1500,7 +1523,7 @@ function buildSnapshotResponse(
 function buildDescriptorResponse(
     options: {
         readonly descriptorFingerprint?: string;
-        readonly descriptors?: readonly ProtoMetricDescriptor[];
+        readonly descriptors?: readonly ProtoHelperMetricDescriptor[];
     } = {},
 ): ListMetricDescriptorsResponse {
     return create(ListMetricDescriptorsResponseSchema, {
@@ -1514,9 +1537,8 @@ function buildDescriptorResponse(
 function buildDescriptor(options: {
     readonly metricId: string;
     readonly pollingGroupId?: string;
-}): ProtoMetricDescriptor {
-    return create(MetricDescriptorSchema, {
-        metricId: options.metricId,
+}): ProtoHelperMetricDescriptor {
+    return create(HelperMetricDescriptorSchema, {
         rawSensorIdentity: {
             sourceSensorId: `lhm:/${options.metricId}`,
             hardwareId: "hardware-1",
@@ -1525,10 +1547,13 @@ function buildDescriptor(options: {
             sensorName: "CPU Total",
             sourceSensorType: "Load",
         },
-        pollingGroupId: options.pollingGroupId ?? defaultHelperPollingGroupId(options.metricId),
-        valueKind: ProtoMetricValueKind.SCALAR,
-        unit: MetricUnit.PERCENT,
-        metricIdKind: ProtoMetricIdKind.STABLE_ALIAS,
+        descriptor: create(MetricDescriptorSchema, {
+            metricId: options.metricId,
+            pollingGroupId: options.pollingGroupId ?? defaultHelperPollingGroupId(options.metricId),
+            valueKind: ProtoMetricValueKind.SCALAR,
+            unit: MetricUnit.PERCENT,
+            metricIdKind: ProtoMetricIdKind.STABLE_ALIAS,
+        }),
     });
 }
 

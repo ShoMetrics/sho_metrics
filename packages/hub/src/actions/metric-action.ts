@@ -66,7 +66,6 @@ interface ActiveActionState {
     /** Start point for suppressing no-data logs during the initial read gap. */
     appearedAtTimestampMilliseconds: number;
 }
-
 interface MetricActionOptions {
     readonly displayedMetricNoDataObserver?: DisplayedMetricNoDataObserver;
 }
@@ -153,7 +152,7 @@ export abstract class MetricAction extends SingletonAction {
                 });
             }
             // Settings can change the displayed metric/source identity even
-            // before the next render tick publishes a fresh attribution.
+            // before the next render tick publishes a fresh read trace.
             this.displayedMetricNoDataObserver.clearAction(event.action.id);
             this.onResolvedSettingsChanged(activeActionState.event, nextSettings);
             this.refreshSubscription(activeActionState);
@@ -401,10 +400,10 @@ export abstract class MetricAction extends SingletonAction {
 
     private refreshMetricView(event: WillAppearEvent): void {
         this.onMetricsUpdate(event);
-        this.publishDisplayedMetricReadAttribution(event);
+        this.publishDisplayedMetricReadTrace(event);
     }
 
-    private publishDisplayedMetricReadAttribution(event: WillAppearEvent): void {
+    private publishDisplayedMetricReadTrace(event: WillAppearEvent): void {
         const displayedMetricKey = this.getDisplayedMetricKey(event);
         if (displayedMetricKey === undefined) {
             // Actions without a displayed metric should not retain older
@@ -427,7 +426,7 @@ export abstract class MetricAction extends SingletonAction {
         const preferredSourceStatus = preferredSourceId === undefined
             ? undefined
             : this.readCachedSourceStatus(preferredSourceId);
-        const readResult = this.getMetricReader(event).getWidgetDataWithAttribution(
+        const readResult = this.getMetricReader(event).getWidgetDataReadResult(
             displayedMetricKey,
             "",
             "",
@@ -457,7 +456,7 @@ export abstract class MetricAction extends SingletonAction {
         }
 
         this.updateRuntimeCache(event, {
-            displayedMetricReadAttribution: {
+            displayedMetricReadTrace: {
                 metricKey: displayedMetricKey,
                 routing: {
                     preferredSourceId,
@@ -467,7 +466,7 @@ export abstract class MetricAction extends SingletonAction {
                 outcome,
             },
         }).catch(error => {
-            log.error(() => `Failed to publish displayed metric source attribution: ${String(error)}`);
+            log.error(() => `Failed to publish displayed metric read trace: ${String(error)}`);
         });
     }
 
@@ -586,14 +585,14 @@ function buildDisplayedMetricReadOutcome(readResult: MetricWidgetDataReadResult)
     return {
         kind: "value",
         valueTimestampMilliseconds,
-        freshness: readResult.valueAttribution?.valueFreshness ?? "fresh",
-        ...(readResult.valueAttribution?.valueFreshness === "retained"
-            && readResult.valueAttribution.retainedAgeMilliseconds !== undefined
-            ? { retainedAgeMilliseconds: readResult.valueAttribution.retainedAgeMilliseconds }
+        freshness: readResult.valueMetadata?.valueFreshness ?? "fresh",
+        ...(readResult.valueMetadata?.valueFreshness === "retained"
+            && readResult.valueMetadata.retainedAgeMilliseconds !== undefined
+            ? { retainedAgeMilliseconds: readResult.valueMetadata.retainedAgeMilliseconds }
             : {}),
-        ...(readResult.valueAttribution?.rawSensorIdentity === undefined
+        ...(readResult.valueMetadata?.rawSensorIdentity === undefined
             ? {}
-            : { rawSensorIdentity: pickDisplayedRawSensorIdentity(readResult.valueAttribution.rawSensorIdentity) }),
+            : { rawSensorIdentity: pickDisplayedRawSensorIdentity(readResult.valueMetadata.rawSensorIdentity) }),
     };
 }
 

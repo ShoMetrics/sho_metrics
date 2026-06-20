@@ -733,7 +733,7 @@ null when telemetry cannot be read.
 
 ### What ShoMetrics Should Learn
 
-- Keep GPU source attribution visible because fallback between helper and SMI
+- Keep GPU source selection visible because fallback between helper and SMI
   is legitimate.
 - Do not collapse all helper GPU failures into one error string.
 - Validate impossible values before writing stable aliases.
@@ -1158,7 +1158,7 @@ source-native sensor ids.
 - Should catalog UI show dynamically activated/deactivated sensors as currently
   unavailable, or hide them until they emit a valid descriptor?
 - Should first-class stable aliases expose their ranked source sensor in DEBUG
-  attribution so support can distinguish "alias descriptor exists" from "current
+  provenance so support can distinguish "alias descriptor exists" from "current
   selected raw sensor has no value"?
 
 ## 11. Historical Diff Ledger
@@ -1230,7 +1230,7 @@ These observations do not override the LHM source-reading conclusions above.
 ### What ShoMetrics Should Learn
 
 - Bounded last-good retention is worth testing as a generic display/data-plane
-  policy. It should carry sample age and source attribution, not silently become
+  policy. It should carry sample age and source metadata/provenance, not silently become
   "fresh" data.
 - Source-side stable alias production is the right place for raw sensor ranking and
   fallback. Normal widgets should not expose CPU package/Tctl/Tdie/core naming
@@ -1297,7 +1297,7 @@ value ranking as final until machine-specific diagnostics are reviewed.
   GUI does not show "no sensor data" for every null tick; it shows `"-"` while
   history and descriptors remain. The LiteMonitor cross-check also uses
   last-valid caches to reduce UI flicker. ShoMetrics needs an explicit policy
-  with age/source attribution, not a per-alias patch.
+  with age and source metadata/provenance, not a per-alias patch.
 - Hardware-specific update cadence for slow groups such as storage or SuperIO.
 - Per-sensor current-value debounce or last-good display. Need to prove whether
   the GUI does this outside `Sensor.Value`.

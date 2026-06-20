@@ -144,7 +144,7 @@ function StackedWidgetSettingsHarness({
                     isWindows: true,
                     settings,
                     runtimeCache: {
-                        displayedMetricReadAttribution: {
+                        displayedMetricReadTrace: {
                             metricKey: "cpu.usage_percent",
                             routing: {
                                 preferredSourceId: NODE_SYSTEM_SOURCE_ID,

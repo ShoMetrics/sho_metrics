@@ -22,6 +22,7 @@ import {
 import { buildMemoryMetricViewOptions } from "../memory";
 import type { DiskVolumeSelection } from "../disk/volume-selection";
 import { buildCustomMetricViewOptions } from "../custom-metric/single-metric-view-options";
+import { buildSystemViewOptions } from "../system";
 
 export interface StackedSingleMetricViewBuilderContext {
     readonly event: WillAppearEvent;
@@ -87,6 +88,13 @@ export function buildStackedSingleMetricViewOptions(
                     : null,
                 currentTimestampMilliseconds: context.currentTimestampMilliseconds,
             }).viewOptions;
+        case "system":
+            return buildSystemViewOptions({
+                event: context.event,
+                settings,
+                target: context.target,
+                metrics: context.metrics,
+            });
         case "catalog":
             if (context.target.metricId.length === 0) {
                 return buildCatalogMetricNoSelectionViewOptions({

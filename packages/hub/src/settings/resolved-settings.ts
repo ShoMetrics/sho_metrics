@@ -155,6 +155,7 @@ export type ResolvedMetricTarget =
     | ResolvedNetworkMetricTarget
     | ResolvedDiskMetricTarget
     | ResolvedGpuMetricTarget
+    | ResolvedSystemMetricTarget
     | ResolvedCatalogMetricTarget
     | ResolvedCustomMetricTarget;
 
@@ -231,6 +232,38 @@ export type ResolvedGpuReading =
     | { readonly kind: "temperature"; readonly maximumCelsius: number; readonly unit: TemperatureUnit }
     | { readonly kind: "vram" }
     | { readonly kind: "power"; readonly maximumWatts: number };
+
+export interface ResolvedSystemMetricTarget {
+    readonly domain: "system";
+    readonly reading: ResolvedSystemReading;
+}
+
+export type ResolvedSystemReading =
+    | {
+        readonly kind: "batteryPercent";
+        readonly peripheralIdentity: ResolvedSystemPeripheralIdentity | undefined;
+        readonly detectedPeripheralDisplayName: string | undefined;
+    };
+
+export interface ResolvedSystemPeripheralIdentity {
+    readonly vendorId: number | undefined;
+    readonly productId: number | undefined;
+    readonly manufacturer: string | undefined;
+    readonly productName: string | undefined;
+    readonly serialNumber: string | undefined;
+    readonly interfaceNumber: number | undefined;
+    readonly usagePage: number | undefined;
+    readonly usageId: number | undefined;
+    readonly bindingTransport: SystemPeripheralBindingTransport | undefined;
+    readonly vendorUnitId: string | undefined;
+    readonly modelId: string | undefined;
+    readonly receiverSlot: number | undefined;
+}
+
+export type SystemPeripheralBindingTransport =
+    | "bluetooth"
+    | "usbReceiver"
+    | "usbWired";
 
 export interface ResolvedCatalogMetricTarget {
     readonly domain: "catalog";

@@ -13,10 +13,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\snapshot.proto"
+    <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\metric_common.proto"
               ProtoRoot="..\..\..\contracts\proto"
               GrpcServices="None" />
-    <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\source_api.proto"
+    <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\helper_grpc_service.proto"
               ProtoRoot="..\..\..\contracts\proto"
               GrpcServices="Both" />
   </ItemGroup>

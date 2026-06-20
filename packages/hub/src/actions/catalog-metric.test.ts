@@ -621,7 +621,7 @@ class CapturingMetricStoreReader implements MetricStoreReader {
         };
     }
 
-    getWidgetDataWithAttribution(
+    getWidgetDataReadResult(
         metricKey: string,
         label: string,
         unit: string,
@@ -716,7 +716,7 @@ function buildMetricDescriptor(metricId: string): MetricDescriptor {
         pollingGroupId: "lhm:hardware:gpu-0",
         valueKind: MetricValueKind.SCALAR,
         unit: MetricUnit.CELSIUS,
-        metricIdKind: MetricIdKind.SOURCE_SENSOR,
+        metricIdKind: MetricIdKind.SOURCE_NATIVE,
     };
 }
 

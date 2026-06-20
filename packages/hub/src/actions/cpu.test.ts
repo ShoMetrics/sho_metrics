@@ -115,7 +115,7 @@ function buildCpuTarget(reading: ResolvedCpuReading): ResolvedCpuMetricTarget {
 function buildMetricReader(widgetData: WidgetData): MetricStoreReader {
     return {
         getWidgetData: () => widgetData,
-        getWidgetDataWithAttribution: (): MetricWidgetDataReadResult => ({
+        getWidgetDataReadResult: (): MetricWidgetDataReadResult => ({
             widgetData,
             selectedSourceId: widgetData.sampleTimestampMilliseconds === undefined
                 ? undefined

@@ -51,7 +51,7 @@ cache boundaries.
 | `09` What To Adopt 3, Driver/Helper Readiness Needs Its Own Status Layer | Driver/helper readiness differs from no sample. | Add cached helper install/service/driver/status diagnostics separate from MetricStore samples. |
 | `09` What To Adopt 4, CPU Usage Needs An Explicit Definition | Task Manager uses `% Processor Utility`; LHM total load is not a ShoMetrics default. | Keep CPU usage on `node-system` or future Windows native, not LHM. |
 | `09` What To Adopt 5, Disk Probing Must Stay Conservative | Disk monitoring can disturb external storage. | Keep first-class disk throughput off LHM storage. Use native system-total counters for the ordinary widget and Advanced Sensor for explicit LHM per-disk sensors. |
-| `09` What To Experiment With 1, Bounded Last-Good Caching | Last-good helps flicker but can hide dead sensors if unbounded. | Use a short TTL with DEBUG attribution. |
+| `09` What To Experiment With 1, Bounded Last-Good Caching | Last-good helps flicker but can hide dead sensors if unbounded. | Use a short TTL with DEBUG metadata. |
 | `09` What To Reject | Reject unbounded last-valid, raw LHM id parsing in Hub, broad disk probing, pipe failure as install status. | Keep all new behavior bounded and owned by the source/helper boundary. |
 
 ## Current Code Seams
@@ -61,13 +61,13 @@ Use these existing seams instead of creating a new central owner:
 | Owner | Current file or type | Keep responsibility |
 | --- | --- | --- |
 | Windows Core source mapping | `packages/source-windows/ShoMetrics.Source.Windows.Core/LibreHardwareMetricCatalog.cs` and `LibreHardwareMonitorSession.cs` | LHM traversal, raw sensor ids, stable alias ranking, value validation, short retention. |
-| IPC contract | `contracts/proto/shometrics/v1/source_api.proto` and `snapshot.proto` | Snapshot, descriptor, warning, and health wire shape. |
+| IPC contract | `contracts/proto/shometrics/v1/metric_common.proto` and `helper_grpc_service.proto` | Source-agnostic metric values plus helper gRPC health, descriptor, provenance, and refresh-demand wire shape. |
 | Hub source client | `packages/hub/src/runtime/sources/windows-helper/windows-helper-source-client.ts` | Named-pipe requests, backoff, descriptor cache, cached source status. |
 | Source routing | `packages/hub/src/runtime/source-routing/metric-source-preferences.ts` | Static `local:auto` source order for stable built-in metric keys. |
-| Metric history | `packages/hub/src/runtime/metric-store.ts` | Per-source rolling history and latest sample attribution. Do not add helper health state here. |
+| Metric history | `packages/hub/src/runtime/metric-store.ts` | Per-source rolling history, latest value metadata, and unavailable reports. Do not add helper health state here. |
 | Fallback decision | `packages/hub/src/runtime/metric-collection/fallback-composer.ts` | Selects the fresh source sample and returns `MetricWidgetDataReadResult`. Do not duplicate this decision in PI. |
 | Action widget copy | `packages/hub/src/actions/shared/helper-backed-widget-data.ts` and action files | Converts helper source status into friendly no-data copy. |
-| PI diagnostics | `packages/hub/src/property-inspector/panels/MetricSourceDiagnostic.tsx` | Shows DEBUG-only details from `WidgetRuntimeCache.displayedMetricReadAttribution`. |
+| PI diagnostics | `packages/hub/src/property-inspector/panels/MetricSourceDiagnostic.tsx` | Shows DEBUG-only details from `WidgetRuntimeCache.displayedMetricReadTrace`. |
 
 ## Implementation Batches
 
@@ -76,7 +76,7 @@ temporary compatibility paths that the next batch immediately deletes.
 
 Batch 1 has Core/source and wire/status subheadings because it crosses several
 owners. Implement those subheadings together; retained-sample diagnostics must
-have a real attribution wire and Hub ingest path in the same change.
+have a real metadata/provenance wire and Hub ingest path in the same change.
 
 ### Batch 1: Helper Source Reliability, Diagnostics Wire, And Readiness
 
@@ -292,64 +292,53 @@ report.
    Do not add `noSensorData` to `SourceClientStatusReason`; no-sensor is a
    per-metric missing diagnostic, not a source-client availability state.
 
-3. Add value attribution and unavailable-metric reports beside source snapshots
-   without polluting `MetricSnapshot`.
+3. Add value metadata, helper value provenance, and unavailable-metric reports
+   beside source snapshots without polluting `MetricSnapshot`.
 
-   Do not add source ids, helper status, raw LHM sensor ids, or retained-state
-   flags to `snapshot.proto` `MetricValue`. Snapshots remain source-agnostic
-   values. Add source-specific metadata to `source_api.proto`
-   `ReadMetricSnapshotResponse` instead.
+   Do not add source ids, helper status, raw LHM sensor ids, or helper-specific
+   context to `metric_common.proto` `MetricValue`. Source-agnostic value
+   lifecycle state belongs in `MetricValue.metadata`; helper raw-sensor
+   provenance belongs in `helper_grpc_service.proto`.
 
    ```proto
-   message MetricValueAttribution {
+   message MetricValue {
+     oneof value {
+       double scalar = 1;
+       string text = 2;
+     }
+     MetricUnit unit = 3;
+     MetricValueMetadata metadata = 4;
+   }
+
+   message MetricValueMetadata {
+     MetricValueFreshness freshness = 1;
+     optional uint32 retained_age_milliseconds = 2;
+   }
+
+   message HelperMetricValueProvenance {
      string metric_id = 1;
      RawSensorIdentity raw_sensor_identity = 2;
-     MetricValueFreshness value_freshness = 3;
-     optional uint32 retained_age_milliseconds = 4;
    }
 
-   enum MetricValueFreshness {
-     METRIC_VALUE_FRESHNESS_UNSPECIFIED = 0;
-     METRIC_VALUE_FRESHNESS_FRESH = 1;
-     METRIC_VALUE_FRESHNESS_RETAINED = 2;
-   }
-
-   message MetricUnavailableReport {
-     string metric_id = 1;
-     MetricUnavailableReason reason = 2;
-     RawSensorIdentity raw_sensor_identity = 3;
-   }
-
-   enum MetricUnavailableReason {
-     METRIC_UNAVAILABLE_REASON_UNSPECIFIED = 0;
-     METRIC_UNAVAILABLE_REASON_NO_SENSOR = 1;
-     METRIC_UNAVAILABLE_REASON_INVALID_VALUE = 2;
-     METRIC_UNAVAILABLE_REASON_EXPIRED = 3;
-   }
-
-   message RawSensorIdentity {
-     string source_sensor_id = 1;
-     string hardware_id = 2;
-     string hardware_name = 3;
-     string hardware_type = 4;
-     string sensor_name = 5;
-     string source_sensor_type = 6;
+   message HelperMetricUnavailableReport {
+     MetricUnavailableReport report = 1;
+     RawSensorIdentity raw_sensor_identity = 2;
    }
    ```
 
    Add this to `ReadMetricSnapshotResponse`:
 
    ```proto
-   repeated MetricValueAttribution value_attributions = 4;
-   repeated MetricUnavailableReport unavailable_metrics = 5;
+   repeated HelperMetricValueProvenance value_provenance = 4;
+   repeated HelperMetricUnavailableReport unavailable_metrics = 5;
    ```
 
-   `MetricValueAttribution.metric_id` must match a key in
-   `MetricSnapshot.metrics` for the same response. `MetricUnavailableReport`
+   `HelperMetricValueProvenance.metric_id` must match a key in
+   `MetricSnapshot.metrics` for the same response. `HelperMetricUnavailableReport`
    is mainly DEBUG/support metadata for a requested metric omitted from
    `MetricSnapshot.metrics`; Hub must still derive the missing fact from the
    request/result shape it owns. A metric id should appear in exactly one of
-   `value_attributions` or `unavailable_metrics` in a response, never both.
+   `value_provenance` or `unavailable_metrics` in a response, never both.
 
    Do not add a free-form `diagnostic_reason` string. DEBUG text should be
    derived in Hub from typed fields such as `MetricUnavailableReason`, the
@@ -370,7 +359,7 @@ report.
      render the same generic No sensor data path;
      do not treat it as helper/source health.
 
-   malformed descriptor or orphan attribution:
+   malformed descriptor or orphan provenance:
      drop that record with a low-frequency support log;
      do not reject the entire helper response unless the response itself is unusable.
    ```
@@ -387,29 +376,26 @@ report.
    ```ts
    export interface SourceSnapshotReadResult {
        readonly snapshot: MetricSnapshot;
-       readonly valueAttributions: readonly MetricValueAttribution[];
+       readonly valueMetadata: readonly SourceMetricValueMetadata[];
        readonly unavailableMetrics: readonly MetricUnavailableReport[];
    }
 
-   // Keep these runtime source contracts aligned with source_api.proto.
-   // Prefer generated-proto-derived payload types over hand-written mirrors,
-   // with adapter normalization for version-skewed enum values.
-   export type MetricValueAttribution = ...;
+   export type SourceMetricValueMetadata = ...;
    export type MetricUnavailableReport = ...;
    ```
 
    `SourceClient.readSnapshot()` should return `Promise<SourceSnapshotReadResult>`.
    `createMetricSourceClient()` wraps existing Node sources by returning an
-   empty `valueAttributions` array and an empty `unavailableMetrics` array. Do
+   empty `valueMetadata` array and an empty `unavailableMetrics` array. Do
    not add a second read method.
 
-   `CollectorGroupRunner` should pass the snapshot, value attributions, and
+   `CollectorGroupRunner` should pass the snapshot, value metadata, and
    unavailable reports to `MetricStore.ingest(...)`.
 
    `MetricStore` behavior:
 
    - fresh scalar/text samples append to history and update latest display data;
-   - retained scalar samples update latest display data and attribution, but do
+   - retained scalar samples update latest display data and value metadata, but do
      not append a new point to rolling history;
    - unavailable reports update latest DEBUG/support state only and do not
      mutate current value, progress, or history.
@@ -482,7 +468,7 @@ report.
 
 **Estimate:** 450-850 TS LOC, 220-420 TS test LOC, 400-700 C#/proto/IPC LOC.
 
-### Batch 2: Hub Attribution, Widget Copy, And PI DEBUG
+### Batch 2: Hub Read Trace, Widget Copy, And PI DEBUG
 
 **Maps to:** `09` P0/P1 follow-ups; `08` Section 12 experiment requirement to
 record source id, raw sensor id, sample age, and fresh-vs-retained state.
@@ -493,45 +479,34 @@ that rendering actually used, plus helper-specific details when available.
 
 **Implement:**
 
-1. Do not duplicate fallback selection. Keep attribution attached to the
-   existing render-path read result:
+1. Do not duplicate fallback selection. Keep metadata attached to the existing
+   render-path read result:
 
    ```ts
    interface MetricWidgetDataReadResult {
        readonly widgetData: WidgetData;
        readonly selectedSourceId: string | undefined;
-       readonly valueAttribution?: MetricValueAttribution;
+       readonly valueMetadata?: SourceMetricValueMetadata;
        readonly unavailableMetric?: MetricUnavailableReport;
-   }
-
-   interface MetricValueAttribution {
-       readonly metricKey: string;
-       readonly sourceId: string;
-       readonly sourceSensorId?: string;
-       readonly hardwareId?: string;
-       readonly sensorName?: string;
-       readonly hardwareName?: string;
-       readonly valueState?: "fresh" | "retained";
-       readonly retainedAgeMilliseconds?: number;
    }
    ```
 
    If the existing implementation already publishes
-   `WidgetRuntimeCache.displayedMetricReadAttribution`, extend that object
+   `WidgetRuntimeCache.displayedMetricReadTrace`, extend that object
    instead of adding a parallel cache.
 
-   `MetricStore.forScope(...).getWidgetDataWithAttribution()` should return the
-   latest value attribution stored during ingest when the sample is present.
+   `MetricStore.forScope(...).getWidgetDataReadResult()` should return the
+   latest value metadata stored during ingest when the sample is present.
    When the selected source has no emitted sample, DEBUG may use the latest
    unavailable report. `fallback-composer.ts` then forwards the metadata from
    the selected source without recomputing source fallback.
 
 2. Preserve boundary ownership:
 
-   - Source clients may attach source-owned attribution and unavailable-metric
-     metadata to read results.
+   - Source clients may attach source-owned value metadata and unavailable-metric
+     reports to read results.
    - `fallback-composer.ts` chooses which source sample wins.
-   - `MetricAction` publishes the displayed metric attribution to
+   - `MetricAction` publishes the displayed metric read trace to
      `WidgetRuntimeCache`.
    - PI reads `WidgetRuntimeCache` only. PI must not re-run fallback or parse
      raw LHM ids.
@@ -582,7 +557,7 @@ that rendering actually used, plus helper-specific details when available.
 
 **Tests:**
 
-- Fallback reader attribution matches the source that produced the rendered
+- Fallback reader read result matches the source that produced the rendered
   `WidgetData`.
 - DEBUG displays source, sample age, helper status, sensor, and retained state
   from runtime cache without recomputing fallback.
@@ -699,6 +674,6 @@ These are intentionally not part of this implementation plan:
 
 LibreHardwareMonitor is a dependency and source-reading target. LiteMonitor is
 MIT-licensed prior art used for behavior study. This plan uses observed ideas
-and product lessons; it does not copy LiteMonitor code. Keep attribution in
+and product lessons; it does not copy LiteMonitor code. Keep provenance in
 development docs. Add product README/license credits only if ShoMetrics copies
 code, includes LiteMonitor assets, or distributes LiteMonitor-derived files.

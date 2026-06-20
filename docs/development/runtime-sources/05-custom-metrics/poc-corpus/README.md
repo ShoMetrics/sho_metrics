@@ -8,7 +8,7 @@ Commit these files with the design document:
 - source sample JSON;
 - human-reviewed expected metric output;
 - display intent;
-- source attribution notes;
+- source metadata notes;
 - seed jq and JSONata transforms;
 - small safety-case transforms.
 

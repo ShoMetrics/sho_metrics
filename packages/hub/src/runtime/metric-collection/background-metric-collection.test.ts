@@ -346,7 +346,7 @@ test("refreshReadPlanOnce reports invalid values dropped by MetricStore ingest",
                     "cpu.usage_percent": buildScalarMetricValue(Number.NaN),
                 },
             }),
-            valueAttributions: [],
+            valueMetadata: [],
             unavailableMetrics: [],
         },
     });
@@ -514,7 +514,7 @@ class FakeSourceClient implements SourceClient {
                 timestampMilliseconds: 1000,
                 metrics: {},
             }),
-            valueAttributions: [],
+            valueMetadata: [],
             unavailableMetrics: [],
         };
     }

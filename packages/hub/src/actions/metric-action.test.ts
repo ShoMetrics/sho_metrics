@@ -315,10 +315,10 @@ test("metric collection reads source-candidate values through synchronous fallba
     }
 });
 
-test("metric action publishes displayed metric source attribution from the fallback reader", () => {
+test("metric action publishes displayed metric read trace from the fallback reader", () => {
     metricStore.clear();
-    const action = new TestDisplayedAttributionAction();
-    const streamDeckAction = new FakeStreamDeckAction("displayed-attribution-action");
+    const action = new TestDisplayedReadTraceAction();
+    const streamDeckAction = new FakeStreamDeckAction("displayed-read-trace-action");
 
     metricStore.ingest(NODE_SYSTEM_SOURCE_ID, buildMetricSnapshot({
         timestampMilliseconds: TEST_CURRENT_TIMESTAMP_MILLISECONDS,
@@ -332,7 +332,7 @@ test("metric action publishes displayed metric source attribution from the fallb
 
         assert.deepEqual(action.runtimeCachePatchList, [
             {
-                displayedMetricReadAttribution: {
+                displayedMetricReadTrace: {
                     metricKey: "net.down",
                     routing: {
                         preferredSourceId: NODE_SYSTEM_SOURCE_ID,
@@ -352,10 +352,10 @@ test("metric action publishes displayed metric source attribution from the fallb
     }
 });
 
-test("metric action publishes displayed metric value attribution", () => {
+test("metric action publishes displayed metric value metadata", () => {
     metricStore.clear();
-    const action = new TestDisplayedAttributionAction();
-    const streamDeckAction = new FakeStreamDeckAction("displayed-value-attribution-action");
+    const action = new TestDisplayedReadTraceAction();
+    const streamDeckAction = new FakeStreamDeckAction("displayed-value-metadata-action");
 
     metricStore.ingest(NODE_SYSTEM_SOURCE_ID, buildMetricSnapshot({
         timestampMilliseconds: TEST_CURRENT_TIMESTAMP_MILLISECONDS,
@@ -363,7 +363,7 @@ test("metric action publishes displayed metric value attribution", () => {
             "net.down": buildScalarMetricValue(123),
         },
     }), {
-        valueAttributions: [{
+        valueMetadata: [{
             metricId: "net.down",
             rawSensorIdentity: {
                 sourceSensorId: "source.sensor:/net/down",
@@ -383,7 +383,7 @@ test("metric action publishes displayed metric value attribution", () => {
 
         assert.deepEqual(action.runtimeCachePatchList, [
             {
-                displayedMetricReadAttribution: {
+                displayedMetricReadTrace: {
                     metricKey: "net.down",
                     routing: {
                         preferredSourceId: NODE_SYSTEM_SOURCE_ID,
@@ -412,7 +412,7 @@ test("metric action publishes displayed metric value attribution", () => {
 
 test("metric action reports no selected source when displayed metric has no fresh value", () => {
     metricStore.clear();
-    const action = new TestDisplayedAttributionAction();
+    const action = new TestDisplayedReadTraceAction();
     const streamDeckAction = new FakeStreamDeckAction("displayed-no-source-action");
 
     try {
@@ -420,7 +420,7 @@ test("metric action reports no selected source when displayed metric has no fres
 
         assert.deepEqual(action.runtimeCachePatchList, [
             {
-                displayedMetricReadAttribution: {
+                displayedMetricReadTrace: {
                     metricKey: "net.down",
                     routing: {
                         preferredSourceId: NODE_SYSTEM_SOURCE_ID,
@@ -436,10 +436,10 @@ test("metric action reports no selected source when displayed metric has no fres
     }
 });
 
-test("metric action publishes unavailable metric attribution when no fresh value exists", () => {
+test("metric action publishes unavailable metric read trace when no fresh value exists", () => {
     metricStore.clear();
-    const action = new TestDisplayedAttributionAction();
-    const streamDeckAction = new FakeStreamDeckAction("displayed-unavailable-attribution-action");
+    const action = new TestDisplayedReadTraceAction();
+    const streamDeckAction = new FakeStreamDeckAction("displayed-unavailable-trace-action");
 
     metricStore.ingest(NODE_SYSTEM_SOURCE_ID, buildMetricSnapshot({
         timestampMilliseconds: TEST_CURRENT_TIMESTAMP_MILLISECONDS,
@@ -464,7 +464,7 @@ test("metric action publishes unavailable metric attribution when no fresh value
 
         assert.deepEqual(action.runtimeCachePatchList, [
             {
-                displayedMetricReadAttribution: {
+                displayedMetricReadTrace: {
                     metricKey: "net.down",
                     routing: {
                         preferredSourceId: NODE_SYSTEM_SOURCE_ID,
@@ -522,7 +522,7 @@ test("metric action clears no-data observer when displayed metric is not in the 
 
 test("metric action clears no-data observer on disappear", () => {
     const noDataObserver = new RecordingDisplayedMetricNoDataObserver();
-    const action = new TestDisplayedAttributionAction(undefined, noDataObserver);
+    const action = new TestDisplayedReadTraceAction(undefined, noDataObserver);
     const streamDeckAction = new FakeStreamDeckAction("clear-no-data-on-disappear-action");
 
     try {
@@ -780,7 +780,7 @@ class TestMetricReaderAction extends TestMetricAction {
     }
 }
 
-class TestDisplayedAttributionAction extends TestMetricAction {
+class TestDisplayedReadTraceAction extends TestMetricAction {
     constructor(
         bindingFactory: (() => FakeMetricCollectionBinding) | undefined = undefined,
         displayedMetricNoDataObserver?: DisplayedMetricNoDataObserver,

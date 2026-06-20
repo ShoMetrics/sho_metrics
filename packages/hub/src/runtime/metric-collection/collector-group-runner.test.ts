@@ -379,7 +379,7 @@ class FakeSourceClient {
 
         return {
             snapshot: await response,
-            valueAttributions: [],
+            valueMetadata: [],
             unavailableMetrics: [],
         };
     }

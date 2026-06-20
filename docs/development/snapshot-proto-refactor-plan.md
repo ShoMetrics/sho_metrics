@@ -1,27 +1,29 @@
 # Snapshot Proto Refactor Plan
 
-This plan replaces the first-day `snapshot.proto` shape with a clean metric snapshot contract before the source API is treated as stable. Breaking changes are allowed. Do not add compatibility layers for the old fields.
+This plan replaces the first-day `metric_common.proto` shape with a clean metric snapshot contract before the source API is treated as stable. Breaking changes are allowed. Do not add compatibility layers for the old fields.
 
 The target is to support nearly all LibreHardwareMonitor values as metric data, not only the first curated UI aliases. Stable aliases remain important for built-in widgets, but dynamic descriptors must make raw LHM sensors discoverable without leaking LHM parsing rules into Node runtime code.
 
 ## Decision
 
-Keep `contracts/proto/shometrics/v1/snapshot.proto` as a separate proto file.
+Keep `contracts/proto/shometrics/v1/metric_common.proto` as a separate proto file.
 
 Reason:
 
-- `snapshot.proto` owns the source-agnostic metric snapshot payload.
-- `source_api.proto` owns request/response operations, warnings, errors,
+- `metric_common.proto` owns the source-agnostic metric snapshot payload.
+- `helper_grpc_service.proto` owns request/response operations, warnings, errors,
   descriptors, helper health, and the local gRPC service surface.
 - Local and future remote source APIs should share the metric snapshot payload
-  without putting transport or source health fields into `snapshot.proto`.
+  without putting transport or source health fields into `metric_common.proto`.
 
 The file must stay narrow. It must not grow source selection, fallback, helper health, runtime source scope, rendering progress, or UI formatting policy. Metric descriptors live in this file because descriptors are part of the metric catalog, not a specific request/response operation.
 
-Do not rename `snapshot.proto` in this refactor. `metric_snapshot.proto` is a possible future rename, but it is outside this plan. Do not merge `snapshot.proto` into `source_api.proto`; keep this dependency direction:
+Do not rename `metric_common.proto` again in this refactor. A future split or
+rename is outside this plan. Do not merge `metric_common.proto` into
+`helper_grpc_service.proto`; keep this dependency direction:
 
 ```txt
-source_api.proto -> snapshot.proto
+helper_grpc_service.proto -> metric_common.proto
 ```
 
 ## Current Problems
@@ -286,7 +288,7 @@ Property Inspector policy:
 
 ## Target Contract
 
-Replace `snapshot.proto` with metric snapshot payloads and descriptors:
+Replace `metric_common.proto` with metric snapshot payloads and descriptors:
 
 ```proto
 syntax = "proto3";
@@ -420,7 +422,7 @@ Stable alias canonical list for this refactor:
 
 ## Source API Updates
 
-Move `MetricDescriptor` from `source_api.proto` into `snapshot.proto`, then import it from `source_api.proto`.
+Move `MetricDescriptor` from `helper_grpc_service.proto` into `metric_common.proto`, then import it from `helper_grpc_service.proto`.
 
 Do not make `source_sensor_type` or `hardware_type` ShoMetrics enums yet. They are source-owned diagnostic strings. LHM's `Load`, `Temperature`, `SmallData`, `GpuNvidia`, and similar names are useful for discovery UI and support logs, but generic runtime code must not parse them for behavior.
 
@@ -484,7 +486,7 @@ C# helpers and remote agents must not set progress.
 
 Use the no-production-compatibility window. Break the old contract and fix call sites directly.
 
-1. Rewrite `snapshot.proto` and update `source_api.proto`.
+1. Rewrite `metric_common.proto` and update `helper_grpc_service.proto`.
 2. Run `npm.cmd run proto:format`, `npm.cmd run proto:lint`, and `npm.cmd run proto:build`.
 3. Update TypeScript runtime source helpers:
    - replace `timestampMs` with `capturedAt`

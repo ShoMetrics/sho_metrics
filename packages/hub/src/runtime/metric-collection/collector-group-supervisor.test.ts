@@ -532,7 +532,7 @@ class FakeSourceClient implements SourceClient {
 
         return {
             snapshot: await response,
-            valueAttributions: [],
+            valueMetadata: [],
             unavailableMetrics: [],
         };
     }

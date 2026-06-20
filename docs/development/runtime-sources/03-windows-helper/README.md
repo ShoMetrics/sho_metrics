@@ -18,7 +18,7 @@ lessons, helper-produced stable aliases, helper reliability, helper/source
 version-skew handling, and LHM storage traversal policy.
 
 Read this folder before changing helper-owned metrics, LHM traversal, source
-sample attribution, helper no-data copy, descriptor preload, or disk probing
+sample metadata/provenance, helper no-data copy, descriptor preload, or disk probing
 behavior. Read the demand-driven refresh plan before changing helper refresh
 cadence, collector group demand, or source polling-group scheduling. Read the
 advanced sensor widget plan before changing descriptor-backed catalog

@@ -11,7 +11,7 @@ import {
     NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
     type StoredWidgetSettings,
 } from "../../generated/proto/shometrics/v1/settings_pb";
-import { MetricUnit } from "../../generated/proto/shometrics/v1/snapshot_pb";
+import { MetricUnit } from "../../generated/proto/shometrics/v1/metric_common_pb";
 import { BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID } from "../../runtime/sources/source-ids";
 import type { ActionKind } from "../../shared/stream-deck-actions";
 import { resolveQuickStartStoredWidgetSettings } from "./quick-start-widget-settings";

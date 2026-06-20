@@ -13,7 +13,7 @@ import type { SourceClientStatus } from "../../runtime/sources/source-client";
 
 const log = logger.for("DisplayedMetricNoData");
 
-/** Render-path attribution sample for the primary metric shown by one action. */
+/** Render-path trace sample for the primary metric shown by one action. */
 export interface DisplayedMetricNoDataObservation {
     readonly actionId: string;
     readonly metricKey: string;
@@ -67,7 +67,7 @@ export interface DisplayedMetricNoDataLogEntry {
  * Emits low-frequency diagnostics for the primary metric rendered by an action.
  *
  * It intentionally tracks one active detector key per action because the
- * runtime cache also exposes one displayed metric attribution per action.
+ * runtime cache also exposes one displayed metric read trace per action.
  */
 export class DefaultDisplayedMetricNoDataObserver implements DisplayedMetricNoDataObserver {
     private readonly detector: StatusEdgeDetector;
@@ -259,7 +259,7 @@ class LoggerDisplayedMetricNoDataLogWriter implements DisplayedMetricNoDataLogWr
     }
 }
 
-/** Preserves per-key enter/recover attribution while collapsing sustained source outages. */
+/** Preserves per-key enter/recover trace details while collapsing sustained source outages. */
 export function buildDisplayedMetricNoDataThrottleKey(entry: DisplayedMetricNoDataLogEntry): string {
     if (entry.event !== "displayedMetricNoDataSustained") {
         return `displayed-metric-no-data:${entry.event}:${entry.actionId}:${entry.metricKey}`;

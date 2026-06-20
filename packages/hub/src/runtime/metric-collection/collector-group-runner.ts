@@ -1,7 +1,7 @@
 import type { MetricSnapshot } from "../sources/metric-source";
 import type {
     MetricUnavailableReport,
-    MetricValueAttribution,
+    SourceMetricValueMetadata,
     SourceClient,
 } from "../sources/source-client";
 import { BackoffPolicy } from "../sources/backoff-policy";
@@ -37,7 +37,7 @@ export interface CollectorGroupSnapshotStore {
         sourceScopeId: string,
         snapshot: MetricSnapshot,
         sourceMetadata?: {
-            readonly valueAttributions?: readonly MetricValueAttribution[];
+            readonly valueMetadata?: readonly SourceMetricValueMetadata[];
             readonly unavailableMetrics?: readonly MetricUnavailableReport[];
         },
     ): MetricStoreIngestReport;
@@ -183,7 +183,7 @@ export class CollectorGroupRunner {
             // produced them. Read-time fallback composes those scoped samples
             // into the action's logical source scope later.
             const ingestReport = this.snapshotStore.ingest(this.collectorGroup.sourceId, readResult.snapshot, {
-                valueAttributions: readResult.valueAttributions,
+                valueMetadata: readResult.valueMetadata,
                 unavailableMetrics: readResult.unavailableMetrics,
             });
             // MetricStore owns value validation. The runner owns the polling

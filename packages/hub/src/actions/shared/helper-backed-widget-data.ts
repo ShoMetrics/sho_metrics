@@ -9,7 +9,7 @@ import {
     type WidgetData,
 } from "../../view-rendering/widget-data";
 
-// Hub-side stale-sample guard. Source-side fresh/retained attribution in
+// Hub-side stale-sample guard. Source-side fresh/retained metadata in
 // docs/development/runtime-sources/03-windows-helper/02-helper-source-reliability-implementation-plan.md
 // will make this a fallback check instead of the primary helper freshness signal.
 const HELPER_BACKED_SAMPLE_FRESHNESS_MILLISECONDS = 7000;
@@ -32,7 +32,7 @@ interface HelperBackedWidgetDataReadOptions {
  * `N/A`; only source-confirmed pending refresh keeps special key copy here.
  */
 export function readHelperBackedWidgetData(options: HelperBackedWidgetDataReadOptions): WidgetData {
-    const readResult = options.metrics.getWidgetDataWithAttribution(
+    const readResult = options.metrics.getWidgetDataReadResult(
         options.metricKey,
         options.label,
         options.unit,

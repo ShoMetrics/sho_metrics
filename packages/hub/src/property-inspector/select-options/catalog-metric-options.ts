@@ -42,7 +42,7 @@ export interface SelectedCatalogMetric {
 }
 
 interface CatalogMetricEntry {
-    readonly descriptor: MetricDescriptor;
+    readonly descriptor: CatalogMetricDescriptor;
     readonly typeId: CatalogMetricTypeId;
     readonly hardwareId: string;
     readonly hardwareBaseLabel: string;
@@ -53,6 +53,10 @@ interface CatalogMetricEntry {
     readonly metricBaseLabel: string;
     readonly metricLabel: string;
 }
+
+type CatalogMetricDescriptor = MetricDescriptor & {
+    readonly rawSensorIdentity: NonNullable<MetricDescriptor["rawSensorIdentity"]>;
+};
 
 interface HardwareDisplay {
     readonly typeId: CatalogMetricTypeId;
@@ -217,14 +221,15 @@ function buildCatalogMetricEntries(descriptors: readonly MetricDescriptor[]): re
         .sort(compareCatalogMetricEntries);
 }
 
-function isPickerDescriptor(descriptor: MetricDescriptor): boolean {
+function isPickerDescriptor(descriptor: MetricDescriptor): descriptor is CatalogMetricDescriptor {
     return descriptor.valueKind === MetricValueKind.SCALAR
         && descriptor.metricId.length > 0
-        && descriptor.pollingGroupId.length > 0;
+        && descriptor.pollingGroupId.length > 0
+        && descriptor.rawSensorIdentity !== undefined;
 }
 
-function deduplicateDescriptors(descriptors: readonly MetricDescriptor[]): readonly MetricDescriptor[] {
-    const descriptorsByReadingKey = new Map<string, MetricDescriptor>();
+function deduplicateDescriptors(descriptors: readonly CatalogMetricDescriptor[]): readonly CatalogMetricDescriptor[] {
+    const descriptorsByReadingKey = new Map<string, CatalogMetricDescriptor>();
 
     for (const descriptor of descriptors) {
         const readingKey = buildSourceReadingKey(descriptor);
@@ -242,7 +247,7 @@ function deduplicateDescriptors(descriptors: readonly MetricDescriptor[]): reado
     return Array.from(descriptorsByReadingKey.values());
 }
 
-function buildSourceReadingKey(descriptor: MetricDescriptor): string | undefined {
+function buildSourceReadingKey(descriptor: CatalogMetricDescriptor): string | undefined {
     const rawSensorIdentity = descriptor.rawSensorIdentity;
     if (rawSensorIdentity.sourceSensorId.length === 0) {
         return undefined;
@@ -257,13 +262,16 @@ function buildSourceReadingKey(descriptor: MetricDescriptor): string | undefined
     ].join("\u001f");
 }
 
-function shouldReplaceDescriptor(existingDescriptor: MetricDescriptor, nextDescriptor: MetricDescriptor): boolean {
+function shouldReplaceDescriptor(
+    existingDescriptor: CatalogMetricDescriptor,
+    nextDescriptor: CatalogMetricDescriptor,
+): boolean {
     // Built-in widgets own stable aliases with ranked failover. The catalog
     // picker intentionally exposes the raw long-tail sensor when both describe
     // the same source reading, so users are choosing the exact sensor they saw.
     if (
         existingDescriptor.metricIdKind === MetricIdKind.STABLE_ALIAS
-        && nextDescriptor.metricIdKind === MetricIdKind.SOURCE_SENSOR
+        && nextDescriptor.metricIdKind === MetricIdKind.SOURCE_NATIVE
     ) {
         return true;
     }
@@ -278,7 +286,7 @@ function shouldReplaceDescriptor(existingDescriptor: MetricDescriptor, nextDescr
     return false;
 }
 
-function classifyDescriptorType(descriptor: MetricDescriptor): CatalogMetricTypeId {
+function classifyDescriptorType(descriptor: CatalogMetricDescriptor): CatalogMetricTypeId {
     const normalizedHardwareType = normalizeIdentifier(descriptor.rawSensorIdentity.hardwareType);
     const hardwareTypeBucket = classifyNormalizedHardwareType(normalizedHardwareType);
 
@@ -357,7 +365,7 @@ function classifyReading(sourceSensorType: string): ReadingId {
 }
 
 function resolveHardwareOptionId(
-    descriptor: MetricDescriptor,
+    descriptor: CatalogMetricDescriptor,
     typeId: CatalogMetricTypeId,
     hardwareBaseLabel: string,
 ): string {
@@ -700,7 +708,7 @@ function normalizeIdentifier(value: string): string {
     return value.toLowerCase().replace(/[\s_.-]+/g, "");
 }
 
-function isNoisyHardware(typeId: CatalogMetricTypeId, descriptor: MetricDescriptor): boolean {
+function isNoisyHardware(typeId: CatalogMetricTypeId, descriptor: CatalogMetricDescriptor): boolean {
     const labels = [
         descriptor.rawSensorIdentity.hardwareName,
         descriptor.rawSensorIdentity.sensorName,

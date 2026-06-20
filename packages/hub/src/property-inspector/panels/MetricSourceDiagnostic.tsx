@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { InspectorItem } from "../components/InspectorItem";
 import type {
-    DisplayedMetricReadAttribution,
+    DisplayedMetricReadTrace,
     DisplayedMetricUnavailableReason,
 } from "../../runtime/widget-runtime-cache";
 import { SettingsSection } from "./SettingsSection";
@@ -13,13 +13,12 @@ import { isGpuMetricKey } from "../../runtime/metric-keys";
 import { wallClockNowMilliseconds } from "../../shared/clock";
 
 interface MetricSourceDiagnosticProps {
-    readonly attribution: DisplayedMetricReadAttribution | undefined;
+    readonly trace: DisplayedMetricReadTrace | undefined;
 }
-
 const RELATIVE_TIME_REFRESH_MILLISECONDS = 500;
 
 const metricUnavailableTextByReason = {
-    noSensorData: "no sensor data",
+    noSourceReading: "no source reading",
     invalidValue: "invalid value",
     expired: "expired",
     pendingRefresh: "pending refresh",
@@ -27,7 +26,7 @@ const metricUnavailableTextByReason = {
 } satisfies Record<DisplayedMetricUnavailableReason, string>;
 
 export function MetricSourceDiagnostic({
-    attribution,
+    trace,
 }: MetricSourceDiagnosticProps): React.JSX.Element {
     const [isDebugVisible, setIsDebugVisible] = useState(isDevelopmentBuild);
     const [currentTimestampMilliseconds, setCurrentTimestampMilliseconds] = useState(wallClockNowMilliseconds);
@@ -46,21 +45,21 @@ export function MetricSourceDiagnostic({
         };
     }, [isDebugVisible]);
 
-    const metricKey = attribution?.metricKey;
-    const currentSourceText = formatCurrentSourceLabel(attribution);
-    const preferredSourceText = attribution?.routing?.preferredSourceId
-        ? formatSourceLabel(attribution.routing.preferredSourceId, metricKey)
+    const metricKey = trace?.metricKey;
+    const currentSourceText = formatCurrentSourceLabel(trace);
+    const preferredSourceText = trace?.routing?.preferredSourceId
+        ? formatSourceLabel(trace.routing.preferredSourceId, metricKey)
         : undefined;
-    const fallbackText = attribution?.routing?.preferredSourceId !== undefined
-        && attribution.routing?.selectedSourceId !== undefined
-        && attribution.routing.preferredSourceId !== attribution.routing.selectedSourceId
+    const fallbackText = trace?.routing?.preferredSourceId !== undefined
+        && trace.routing?.selectedSourceId !== undefined
+        && trace.routing.preferredSourceId !== trace.routing.selectedSourceId
         ? "Using fallback; preferred source has no fresh data."
         : undefined;
-    const helperStatusText = attribution?.routing?.preferredSourceId === WINDOWS_HELPER_SOURCE_ID
-        ? formatHelperStatusText(attribution)
+    const helperStatusText = trace?.routing?.preferredSourceId === WINDOWS_HELPER_SOURCE_ID
+        ? formatHelperStatusText(trace)
         : undefined;
-    const sensorText = formatSensorText(attribution);
-    const metricStateText = formatMetricStateText(attribution);
+    const sensorText = formatSensorText(trace);
+    const metricStateText = formatMetricStateText(trace);
 
     return (
         <SettingsSection title="DEBUG">
@@ -88,7 +87,7 @@ export function MetricSourceDiagnostic({
                                     </>
                                 )}
                                 Last value age: {formatValueAgeText(
-                                    readLastValueTimestampMilliseconds(attribution),
+                                    readLastValueTimestampMilliseconds(trace),
                                     currentTimestampMilliseconds,
                                 )}
                                 {helperStatusText !== undefined && (
@@ -128,12 +127,12 @@ function isDevelopmentBuild(): boolean {
     return typeof __BUILD_MODE__ === "undefined" || __BUILD_MODE__ === "development";
 }
 
-function formatHelperStatusText(attribution: DisplayedMetricReadAttribution): string {
-    if (attribution.routing?.selectedSourceId === WINDOWS_HELPER_SOURCE_ID) {
+function formatHelperStatusText(trace: DisplayedMetricReadTrace): string {
+    if (trace.routing?.selectedSourceId === WINDOWS_HELPER_SOURCE_ID) {
         return "Ready";
     }
 
-    const status = attribution.preferredSourceStatus;
+    const status = trace.preferredSourceStatus;
     if (!status || status.state === "unknown") {
         return "Required";
     }
@@ -156,12 +155,12 @@ function formatHelperStatusText(attribution: DisplayedMetricReadAttribution): st
     return "Error";
 }
 
-function formatCurrentSourceLabel(attribution: DisplayedMetricReadAttribution | undefined): string {
-    if (attribution?.routing?.selectedSourceId === undefined) {
+function formatCurrentSourceLabel(trace: DisplayedMetricReadTrace | undefined): string {
+    if (trace?.routing?.selectedSourceId === undefined) {
         return "No fresh source";
     }
 
-    return formatSourceLabel(attribution.routing.selectedSourceId, attribution.metricKey);
+    return formatSourceLabel(trace.routing.selectedSourceId, trace.metricKey);
 }
 
 function formatSourceLabel(sourceId: string, metricKey: string | undefined): string {
@@ -177,12 +176,12 @@ function formatSourceLabel(sourceId: string, metricKey: string | undefined): str
     }
 }
 
-function formatSensorText(attribution: DisplayedMetricReadAttribution | undefined): string | undefined {
-    if (attribution === undefined) {
+function formatSensorText(trace: DisplayedMetricReadTrace | undefined): string | undefined {
+    if (trace === undefined) {
         return undefined;
     }
 
-    const rawSensorIdentity = attribution.outcome?.rawSensorIdentity;
+    const rawSensorIdentity = trace.outcome?.rawSensorIdentity;
     const name = rawSensorIdentity?.sensorName ?? rawSensorIdentity?.hardwareName;
     const id = rawSensorIdentity?.sourceSensorId ?? rawSensorIdentity?.hardwareId;
 
@@ -197,31 +196,31 @@ function formatSensorText(attribution: DisplayedMetricReadAttribution | undefine
     return name ?? id;
 }
 
-function formatMetricStateText(attribution: DisplayedMetricReadAttribution | undefined): string | undefined {
-    switch (attribution?.outcome?.kind) {
+function formatMetricStateText(trace: DisplayedMetricReadTrace | undefined): string | undefined {
+    switch (trace?.outcome?.kind) {
         case "value":
-            if (attribution.outcome.freshness === "fresh") {
+            if (trace.outcome.freshness === "fresh") {
                 return "fresh";
             }
 
-            return attribution.outcome.retainedAgeMilliseconds === undefined
+            return trace.outcome.retainedAgeMilliseconds === undefined
                 ? "retained"
-                : `retained ${formatElapsedSecondsText(attribution.outcome.retainedAgeMilliseconds)}`;
+                : `retained ${formatElapsedSecondsText(trace.outcome.retainedAgeMilliseconds)}`;
         case "unavailable":
-            return metricUnavailableTextByReason[attribution.outcome.reason];
+            return metricUnavailableTextByReason[trace.outcome.reason];
         case undefined:
             return undefined;
     }
 }
 
 function readLastValueTimestampMilliseconds(
-    attribution: DisplayedMetricReadAttribution | undefined,
+    trace: DisplayedMetricReadTrace | undefined,
 ): number | undefined {
-    switch (attribution?.outcome?.kind) {
+    switch (trace?.outcome?.kind) {
         case "value":
-            return attribution.outcome.valueTimestampMilliseconds;
+            return trace.outcome.valueTimestampMilliseconds;
         case "unavailable":
-            return attribution.outcome.lastValueTimestampMilliseconds;
+            return trace.outcome.lastValueTimestampMilliseconds;
         case undefined:
             return undefined;
     }

@@ -27,7 +27,6 @@ interface WidgetSettingsTabProps {
     onResetWidgetSettings: () => void;
     onOpenColorCompensation: () => void;
 }
-
 const WIDGET_SETTINGS_PENDING_NOTICE_DELAY_MS = 1000;
 
 export function WidgetSettingsTab({
@@ -123,7 +122,7 @@ export function WidgetSettingsTab({
                     </SettingsSection>
                     {canShowMetricSourceDiagnostic && (
                         <MetricSourceDiagnostic
-                            attribution={context.runtimeCache.displayedMetricReadAttribution}
+                            trace={context.runtimeCache.displayedMetricReadTrace}
                         />
                     )}
                 </>

@@ -1,12 +1,10 @@
-import { create } from "@bufbuild/protobuf";
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-    CustomHttpCredentialSchema,
-    StoredGlobalSettingsSchema,
-    type StoredGlobalSettings,
-} from "../../../generated/proto/shometrics/v1/settings_pb";
 import type { ResolvedCustomHttpRequestAuth } from "../../../settings/resolved-settings";
+import type {
+    CustomHttpCredentialSettings,
+    CustomHttpSecretCredential,
+} from "../../../settings/storage/custom-http-credential-settings";
 import { MetricUnit } from "../metric-source";
 import type { SourceMetricPollingGroupResolution } from "../source-polling-groups";
 import type { CustomHttpCredentialSettingsReader } from "./custom-http-auth";
@@ -61,7 +59,7 @@ test("CustomHttpSourceClient reads configured definitions into metric snapshots"
     assert.equal(metricValue?.value.value, 42);
     assert.equal(metricValue?.unit, MetricUnit.PERCENT);
     assert.deepEqual(result.unavailableMetrics, []);
-    assert.deepEqual(result.valueAttributions, [{
+    assert.deepEqual(result.valueMetadata, [{
         metricId: identity.metricKey,
         valueFreshness: "fresh",
         displayHint: {
@@ -69,14 +67,6 @@ test("CustomHttpSourceClient reads configured definitions into metric snapshots"
             unit: MetricUnit.PERCENT,
             maximum: 100,
             suggestedLucideIconId: "cpu",
-        },
-        rawSensorIdentity: {
-            sourceSensorId: identity.metricKey,
-            hardwareId: "custom-http",
-            hardwareName: "Custom HTTP",
-            hardwareType: "HTTP",
-            sensorName: "CPU",
-            sourceSensorType: "percent",
         },
     }]);
     assert.deepEqual(sourceClient.getCachedStatus(), {
@@ -111,16 +101,12 @@ test("CustomHttpSourceClient applies selected credentials before fetch", async (
         definitionRegistry: registry,
         fetcher,
         credentialSettingsReader: new FakeCustomHttpCredentialSettingsReader(globalSettings(
-            create(CustomHttpCredentialSchema, {
+            {
                 id: "credential-1",
-                auth: {
-                    case: "query",
-                    value: {
-                        queryParameterName: "api_key",
-                        token: "secret",
-                    },
-                },
-            }),
+                authKind: "query",
+                queryParameterName: "api_key",
+                token: "secret",
+            },
         )),
         transformRunner: new FakeCustomHttpTransformRunner({
             metric: {
@@ -164,13 +150,11 @@ test("CustomHttpSourceClient passes header credentials through fetch options", a
         definitionRegistry: registry,
         fetcher,
         credentialSettingsReader: new FakeCustomHttpCredentialSettingsReader(globalSettings(
-            create(CustomHttpCredentialSchema, {
+            {
                 id: "credential-1",
-                auth: {
-                    case: "bearer",
-                    value: { token: "secret" },
-                },
-            }),
+                authKind: "bearer",
+                token: "secret",
+            },
         )),
         transformRunner: new FakeCustomHttpTransformRunner({
             metric: {
@@ -380,17 +364,17 @@ class FakeCustomHttpFetcher implements CustomHttpFetcher {
 }
 
 class FakeCustomHttpCredentialSettingsReader implements CustomHttpCredentialSettingsReader {
-    constructor(private readonly storedGlobalSettings: StoredGlobalSettings) {}
+    constructor(private readonly credentialSettings: CustomHttpCredentialSettings) {}
 
-    readStoredGlobalSettings(): StoredGlobalSettings {
-        return this.storedGlobalSettings;
+    readCredentialSettings(): CustomHttpCredentialSettings {
+        return this.credentialSettings;
     }
 }
 
 function globalSettings(
-    ...customHttpCredentials: StoredGlobalSettings["customHttpCredentials"]
-): StoredGlobalSettings {
-    return create(StoredGlobalSettingsSchema, { customHttpCredentials });
+    ...customHttpCredentials: readonly CustomHttpSecretCredential[]
+): CustomHttpCredentialSettings {
+    return { customHttpCredentials };
 }
 
 function defaultRequestAuth(): ResolvedCustomHttpRequestAuth {

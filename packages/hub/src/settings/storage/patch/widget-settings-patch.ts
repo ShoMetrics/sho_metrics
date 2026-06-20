@@ -22,6 +22,8 @@ import {
     StackedMetricRotationSettingsSchema,
     StackedMetricSlotSchema,
     StoredWidgetSettingsSchema,
+    SystemBatteryMetricTargetSchema,
+    SystemMetricTargetSchema,
     WidgetPreferencesSchema,
     type CatalogMetricTarget as StoredCatalogMetricTarget,
     type CustomMetricTarget as StoredCustomMetricTarget,
@@ -322,6 +324,16 @@ function buildDefaultSingleMetricTarget(domain: ResolvedMetricTarget["domain"]):
                 case: "catalog",
                 value: create(CatalogMetricTargetSchema),
             };
+        case "system":
+            return {
+                case: "system",
+                value: create(SystemMetricTargetSchema, {
+                    reading: {
+                        case: "battery",
+                        value: create(SystemBatteryMetricTargetSchema),
+                    },
+                }),
+            };
         case "customMetric":
             return {
                 case: "custom",
@@ -522,6 +534,16 @@ function buildDenseMetricTarget(patch: DenseMetricTargetPatch): StoredMetricSele
                     detectedReadingKind: patch.detectedReadingKind === undefined
                         ? undefined
                         : storedCatalogMetricReadingKindByResolved[patch.detectedReadingKind],
+                }),
+            };
+        case "system":
+            return {
+                case: "system",
+                value: create(SystemMetricTargetSchema, {
+                    reading: {
+                        case: "battery",
+                        value: create(SystemBatteryMetricTargetSchema),
+                    },
                 }),
             };
         case "customMetric":

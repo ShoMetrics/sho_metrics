@@ -38,14 +38,18 @@ public sealed class HelperControlPanelStatusReaderTests
             },
             Descriptors = new ListMetricDescriptorsResponse
             {
-                DescriptorSnapshot = new MetricDescriptorSnapshot
+                DescriptorSnapshot = new HelperMetricDescriptorSnapshot
                 {
                     DescriptorFingerprint = "test-fingerprint",
                     Descriptors =
                     {
-                        new MetricDescriptor
+                        new HelperMetricDescriptor
                         {
-                            MetricId = "cpu.temp",
+                            Descriptor_ = new MetricDescriptor
+                            {
+                                MetricId = "cpu.temp",
+                                PollingGroupId = "lhm:hardware:cpu",
+                            },
                             RawSensorIdentity = new RawSensorIdentity
                             {
                                 SourceSensorId = "lhm.sensor:/cpu/temp",
@@ -55,7 +59,6 @@ public sealed class HelperControlPanelStatusReaderTests
                                 SensorName = "CPU Package",
                                 SourceSensorType = "Temperature",
                             },
-                            PollingGroupId = "lhm:hardware:cpu",
                         },
                     },
                 },
@@ -303,14 +306,18 @@ public sealed class HelperControlPanelStatusReaderTests
             },
             Descriptors = new ListMetricDescriptorsResponse
             {
-                DescriptorSnapshot = new MetricDescriptorSnapshot
+                DescriptorSnapshot = new HelperMetricDescriptorSnapshot
                 {
                     DescriptorFingerprint = "test-fingerprint",
                     Descriptors =
                     {
-                        new MetricDescriptor
+                        new HelperMetricDescriptor
                         {
-                            MetricId = "cpu.temp",
+                            Descriptor_ = new MetricDescriptor
+                            {
+                                MetricId = "cpu.temp",
+                                PollingGroupId = "lhm:hardware:cpu",
+                            },
                             RawSensorIdentity = new RawSensorIdentity
                             {
                                 SourceSensorId = "lhm.sensor:/cpu/temp",
@@ -320,7 +327,6 @@ public sealed class HelperControlPanelStatusReaderTests
                                 SensorName = "CPU Package",
                                 SourceSensorType = "Temperature",
                             },
-                            PollingGroupId = "lhm:hardware:cpu",
                         },
                     },
                 },

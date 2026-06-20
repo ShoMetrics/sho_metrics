@@ -407,7 +407,7 @@ function buildDescriptor(overrides: MetricDescriptorFixture = {}): MetricDescrip
         metricId: overrides.metricId ?? "metric",
         valueKind: overrides.valueKind ?? MetricValueKind.SCALAR,
         unit: overrides.unit ?? MetricUnit.UNSPECIFIED,
-        metricIdKind: overrides.metricIdKind ?? MetricIdKind.SOURCE_SENSOR,
+        metricIdKind: overrides.metricIdKind ?? MetricIdKind.SOURCE_NATIVE,
         pollingGroupId: overrides.pollingGroupId ?? "polling-group",
         rawSensorIdentity: {
             sourceSensorId: overrides.sourceSensorId ?? "sensor",

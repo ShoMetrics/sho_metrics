@@ -220,7 +220,7 @@ interface MetricDescriptorFixture {
 function buildMetricDescriptor(fixture: MetricDescriptorFixture): MetricDescriptor {
     return {
         metricId: fixture.metricId,
-        metricIdKind: MetricIdKind.SOURCE_SENSOR,
+        metricIdKind: MetricIdKind.SOURCE_NATIVE,
         valueKind: MetricValueKind.SCALAR,
         unit: MetricUnit.PERCENT,
         pollingGroupId: "polling-group",

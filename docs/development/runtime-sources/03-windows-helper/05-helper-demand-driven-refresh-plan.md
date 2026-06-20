@@ -739,7 +739,7 @@ private static string SanitizeLogValue(string value, int maximumLength = 256)
 ```
 
 No PI UI changes are required in this batch. DEBUG panels can continue showing
-existing attribution and unavailable reports.
+existing value metadata/provenance and unavailable reports.
 
 Estimated LOC: 40-80.
 
@@ -747,7 +747,7 @@ Estimated LOC: 40-80.
 
 ### Step 1: Add Demand RPC And Generated Types
 
-1. Add `SetMetricRefreshDemand` and messages to `source_api.proto`.
+1. Add `SetMetricRefreshDemand` and messages to `helper_grpc_service.proto`.
 2. Run proto format/build.
 3. Add transport methods in Hub and C# service stubs.
 4. Map validation failures to `INVALID_ARGUMENT`; leave future unknown method

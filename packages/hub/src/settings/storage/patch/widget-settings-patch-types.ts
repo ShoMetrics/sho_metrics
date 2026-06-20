@@ -134,6 +134,7 @@ export type DenseMetricTargetPatch =
         readonly detectedCategory: CatalogMetricCategory | undefined;
         readonly detectedReadingKind: CatalogMetricReadingKind | undefined;
     }
+    | { readonly domain: "system" }
     | { readonly domain: "customMetric" };
 
 export interface StackedWidgetSettingsPatch {

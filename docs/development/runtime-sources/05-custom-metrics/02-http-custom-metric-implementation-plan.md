@@ -596,7 +596,7 @@ Required work:
     schema for PI/prompt tooling and would otherwise duplicate validation
     logic.
 15. Convert output into source-owned metric sample/snapshot data and source
-    attribution. Do not produce render-facing `WidgetData` in the source
+    value metadata. Do not produce render-facing `WidgetData` in the source
     client.
 16. Return unavailable reports for:
    - missing runtime definition;
@@ -688,7 +688,7 @@ Required work:
    - progress when maximum or an existing semantic default is available.
    This adaptation belongs to the action/metric layer, not the Custom HTTP
    source client.
-   If MetricStore attribution is the transport for label/unit/maximum hints,
+   If MetricStore value metadata is the transport for label/unit/maximum hints,
    keep those fields as source metadata only; the source client must still not
    build renderer-facing `WidgetData`.
 9. Preserve the existing single-metric appearance/view behavior.
@@ -888,7 +888,7 @@ Implemented shape:
 - Transform output accepts optional `metric.suggestedLucideIconId`; valid ids
   are normalized through the shared Custom Metric icon registry, invalid ids are
   ignored instead of failing the metric.
-- Source attribution carries `displayHint.suggestedLucideIconId`; action
+- Source value metadata carries `displayHint.suggestedLucideIconId`; action
   rendering uses stored icon first, source suggestion second, default icon last.
 - The PI picker uses a generated Sho Metrics-owned Lucide metadata search index
   and renders at most 10 icon candidates. It uses a search input plus a custom
