@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
     buildLogitechBatteryStatusRequest,
-    buildLogitechChangeHostReadRequest,
     buildLogitechDeviceInformationRequest,
     buildLogitechFeatureLookupRequest,
     buildLogitechUnifiedBatteryCapabilitiesRequest,
@@ -10,7 +9,6 @@ import {
     LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID,
     LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
     parseLogitechBatteryStatusReport,
-    parseLogitechChangeHostReport,
     parseLogitechDeviceInformationReport,
     parseLogitechFeatureLookupReport,
     parseLogitechUnifiedBatteryCapabilitiesReport,
@@ -63,7 +61,7 @@ test("Logitech BATTERY_STATUS parses matching slot, feature index, and function"
     const request = buildLogitechBatteryStatusRequest(0x01, 0x08);
 
     const result = parseLogitechBatteryStatusReport(
-        [0x11, 0x01, 0x08, 0x00, 0x14, 0x05, 0x00],
+        [0x11, 0x01, 0x08, 0x01, 0x14, 0x05, 0x00],
         request.expectedResponse,
     );
 
@@ -82,15 +80,15 @@ test("Logitech BATTERY_STATUS rejects unrelated, malformed, and out-of-range rep
     const request = buildLogitechBatteryStatusRequest(0x01, 0x08);
 
     assert.deepEqual(
-        parseLogitechBatteryStatusReport([0x11, 0x02, 0x08, 0x00, 0x14, 0x05, 0x00], request.expectedResponse),
+        parseLogitechBatteryStatusReport([0x11, 0x02, 0x08, 0x01, 0x14, 0x05, 0x00], request.expectedResponse),
         { state: "unrelated" },
     );
     assert.deepEqual(
-        parseLogitechBatteryStatusReport([0x11, 0x01, 0x08, 0x00, 0x14], request.expectedResponse),
+        parseLogitechBatteryStatusReport([0x11, 0x01, 0x08, 0x01, 0x14], request.expectedResponse),
         { state: "malformed" },
     );
     assert.deepEqual(
-        parseLogitechBatteryStatusReport([0x11, 0x01, 0x08, 0x00, 0x65, 0x00, 0x00], request.expectedResponse),
+        parseLogitechBatteryStatusReport([0x11, 0x01, 0x08, 0x01, 0x65, 0x00, 0x00], request.expectedResponse),
         { state: "noData", reason: "outOfRange" },
     );
 });
@@ -99,7 +97,7 @@ test("Logitech UNIFIED_BATTERY parses capability-gated percentage", () => {
     const capabilitiesRequest = buildLogitechUnifiedBatteryCapabilitiesRequest(0x02, 0x09);
     const infoRequest = buildLogitechUnifiedBatteryInfoRequest(0x02, 0x09);
     const capabilities = parseLogitechUnifiedBatteryCapabilitiesReport(
-        [0x11, 0x02, 0x09, 0x00, 0x0F, 0x03, 0x00],
+        [0x11, 0x02, 0x09, 0x01, 0x0F, 0x03, 0x00],
         capabilitiesRequest.expectedResponse,
     );
 
@@ -118,7 +116,7 @@ test("Logitech UNIFIED_BATTERY parses capability-gated percentage", () => {
 
     assert.deepEqual(
         parseLogitechUnifiedBatteryInfoReport(
-            [0x11, 0x02, 0x09, 0x10, 0x5A, 0x08, 0x00],
+            [0x11, 0x02, 0x09, 0x11, 0x5A, 0x08, 0x00],
             infoRequest.expectedResponse,
             capabilities.capabilities,
         ),
@@ -139,7 +137,7 @@ test("Logitech UNIFIED_BATTERY does not invent percentages from approximate leve
 
     assert.deepEqual(
         parseLogitechUnifiedBatteryInfoReport(
-            [0x11, 0x02, 0x09, 0x10, 0x00, 0x08, 0x00],
+            [0x11, 0x02, 0x09, 0x11, 0x00, 0x08, 0x00],
             infoRequest.expectedResponse,
             {
                 reportedLevelMask: 0x0F,
@@ -151,26 +149,12 @@ test("Logitech UNIFIED_BATTERY does not invent percentages from approximate leve
     );
 });
 
-test("Logitech CHANGE_HOST parses Easy-Switch slot from read-only function", () => {
-    const request = buildLogitechChangeHostReadRequest(0x01, 0x0A);
-
-    assert.deepEqual(
-        parseLogitechChangeHostReport([0x11, 0x01, 0x0A, 0x00, 0x03, 0x02], request.expectedResponse),
-        {
-            state: "easySwitch",
-            hostCount: 3,
-            currentHostIndex: 2,
-            easySwitchSlot: 3,
-        },
-    );
-});
-
 test("Logitech DEVICE_INFORMATION parses unit id and exact model bucket", () => {
     const request = buildLogitechDeviceInformationRequest(0x02, 0x03);
 
     assert.deepEqual(
         parseLogitechDeviceInformationReport([
-            0x11, 0x02, 0x03, 0x00,
+            0x11, 0x02, 0x03, 0x01,
             0x02,
             0x12, 0x34, 0x56, 0x78,
             0x00,
@@ -198,7 +182,7 @@ test("Logitech DEVICE_INFORMATION ignores all-zero unit and model ids", () => {
 
     assert.deepEqual(
         parseLogitechDeviceInformationReport([
-            0x11, 0x02, 0x03, 0x00,
+            0x11, 0x02, 0x03, 0x01,
             0x02,
             0x00, 0x00, 0x00, 0x00,
             0x00,
@@ -225,7 +209,7 @@ test("Logitech parser accepts reports without a report id prefix", () => {
     const request = buildLogitechBatteryStatusRequest(0x01, 0x08);
 
     assert.deepEqual(
-        parseLogitechBatteryStatusReport([0x01, 0x08, 0x00, 0x14, 0x05, 0x00], request.expectedResponse),
+        parseLogitechBatteryStatusReport([0x01, 0x08, 0x01, 0x14, 0x05, 0x00], request.expectedResponse),
         {
             state: "battery",
             reading: {

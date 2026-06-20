@@ -10,23 +10,22 @@ import type {
 } from "../../battery/battery-device-discovery";
 import {
     LOGITECH_BOLT_RECEIVER_PRODUCT_ID,
-    LOGITECH_HIDPP_BLE_LONG_USAGE,
-    LOGITECH_HIDPP_CLASSIC_LONG_USAGE,
     LOGITECH_HIDPP_CLASSIC_USAGE_PAGE,
-    LOGITECH_HIDPP_DIRECT_DEVICE_SLOT,
-    LOGITECH_HIDPP_GAMING_USAGE_PAGE,
-    LOGITECH_HIDPP_G_SERIES_WIRED_LONG_USAGE,
-    LOGITECH_HIDPP_SHORT_USAGE,
     LOGITECH_HIDPP_VENDOR_ID,
     LOGITECH_UNIFYING_NANO_RECEIVER_PRODUCT_ID,
     LOGITECH_UNIFYING_RECEIVER_PRODUCT_ID,
 } from "./hidpp-protocol";
 import {
     LogitechHidppSession,
-    buildLogitechReceiverSlotList,
     openNativeLogitechHidppTransport,
     type LogitechBatteryReadResult,
+    type NativeLogitechHidppTransport,
 } from "./logitech-hidpp-reader";
+import {
+    buildLogitechDevicePairingInformationRequest,
+    parseLogitechReceiverPairingInformation,
+    parseLogitechReceiverRegisterResponse,
+} from "./logitech-receiver-registers";
 
 const LOGITECH_MANUFACTURER = "Logitech";
 const LOGITECH_DISCOVERY_DEBUG_LOG_INTERVAL_MILLISECONDS = 60_000;
@@ -41,9 +40,9 @@ const log = logger.for("Source:BatteryHID:Logitech");
  * Commit: `87a8d21a1fff1c562ff3c0f63445a985a254eebd`
  * License: MIT OR Apache-2.0
  *
- * Only protocol facts are used here: receiver PIDs, HID++ long-collection
- * usage pairs, and direct-device slot `0xff`. Discovery remains ShoMetrics
- * code and only emits a candidate after a read-only battery feature succeeds.
+ * Only protocol facts are used here: receiver PIDs, Unifying arrival events,
+ * and Bolt pairing-register unit ids. Discovery remains ShoMetrics code and
+ * only emits a candidate after a read-only battery feature succeeds.
  */
 
 interface LogitechReceiverDescriptor {
@@ -73,10 +72,10 @@ const LOGITECH_RECEIVERS: readonly LogitechReceiverDescriptor[] = [
 /**
  * Discovers Logitech HID++ battery-capable devices.
  *
- * Receiver-backed devices are addressed by receiver slot 1..6. Direct USB,
- * Bluetooth, or wired HID++ collections are addressed through HID++ self slot
- * `0xff`; those paths cover devices such as G-series/LIGHTSPEED-style routes
- * when they expose the standard HID++ battery features.
+ * Receiver-backed devices are addressed by receiver slot 1..6. V1 deliberately
+ * does not scan direct Bluetooth/wired HID++ collections because Windows HID
+ * enumeration does not reliably distinguish BT-classic from wired direct
+ * paths; Bluetooth battery should come from OS telemetry instead.
  */
 export class LogitechBatteryDeviceDiscoverer implements BatteryDeviceDiscoverer {
     constructor(private readonly nativeHidModule: NativeHidModule) {}
@@ -84,7 +83,6 @@ export class LogitechBatteryDeviceDiscoverer implements BatteryDeviceDiscoverer 
     discoverBatteryDevices(): Promise<readonly BatteryDeviceDiscoveryCandidate[]> {
         const deviceInfoList = this.nativeHidModule.devices();
         const receiverDeviceGroups = groupLogitechReceiverManagementDevices(deviceInfoList);
-        const directDeviceGroups = groupLogitechDirectHidppDevices(deviceInfoList);
         const candidates: BatteryDeviceDiscoveryCandidate[] = [];
 
         for (const receiverDeviceGroup of receiverDeviceGroups) {
@@ -99,8 +97,8 @@ export class LogitechBatteryDeviceDiscoverer implements BatteryDeviceDiscoverer 
             try {
                 const session = new LogitechHidppSession(transport);
                 const scanSummary = createLogitechReceiverScanSummary();
-                for (const receiverSlot of buildLogitechReceiverSlotList()) {
-                    const battery = session.readBattery(receiverSlot);
+                for (const onlineSlot of discoverOnlineLogitechReceiverSlots(receiverDeviceGroup, transport)) {
+                    const battery = session.readBattery(onlineSlot.receiverSlot);
                     recordLogitechBatteryRead(scanSummary, battery);
                     if (battery.state !== "battery") {
                         continue;
@@ -108,38 +106,12 @@ export class LogitechBatteryDeviceDiscoverer implements BatteryDeviceDiscoverer 
 
                     candidates.push(buildLogitechBatteryCandidate({
                         receiverDeviceGroup,
-                        receiverSlot,
+                        onlineSlot,
                         battery,
                     }));
                 }
 
                 logLogitechReceiverScanSummary(receiverDeviceGroup.receiver, scanSummary);
-            } finally {
-                transport.close();
-            }
-        }
-
-        for (const directDeviceGroup of directDeviceGroups) {
-            const transport = openNativeLogitechHidppTransport(
-                directDeviceGroup.deviceInfoList,
-                path => new this.nativeHidModule.HID(path),
-            );
-            if (transport === undefined) {
-                continue;
-            }
-
-            try {
-                const session = new LogitechHidppSession(transport);
-                const battery = session.readBattery(LOGITECH_HIDPP_DIRECT_DEVICE_SLOT);
-                logLogitechDirectScanSummary(directDeviceGroup, battery);
-                if (battery.state !== "battery") {
-                    continue;
-                }
-
-                candidates.push(buildLogitechDirectBatteryCandidate({
-                    directDeviceGroup,
-                    battery,
-                }));
             } finally {
                 transport.close();
             }
@@ -211,33 +183,6 @@ function logLogitechReceiverScanSummary(
         ].join(" "));
 }
 
-function logLogitechDirectScanSummary(
-    directDeviceGroup: LogitechDirectDeviceGroup,
-    batteryReadResult: LogitechBatteryReadResult,
-): void {
-    log.atDebug()
-        .everyMs(
-            [
-                "hidpp-direct-scan",
-                formatHex(directDeviceGroup.primaryDeviceInfo.productId),
-                formatHex(directDeviceGroup.primaryDeviceInfo.usagePage),
-                formatHex(directDeviceGroup.primaryDeviceInfo.usage),
-            ].join(":"),
-            LOGITECH_DISCOVERY_DEBUG_LOG_INTERVAL_MILLISECONDS,
-        )
-        .log(() => [
-            "Logitech HID++ direct scan",
-            `productId=${formatHex(directDeviceGroup.primaryDeviceInfo.productId)}`,
-            `usagePage=${formatHex(directDeviceGroup.primaryDeviceInfo.usagePage)}`,
-            `usage=${formatHex(directDeviceGroup.primaryDeviceInfo.usage)}`,
-            `outcome=${batteryReadResult.state}`,
-            batteryReadResult.state === "noData" ? `reason=${batteryReadResult.reason}` : undefined,
-            batteryReadResult.state === "battery"
-                ? `unrelatedReports=${batteryReadResult.unrelatedReportCount}`
-                : undefined,
-        ].filter(part => part !== undefined).join(" "));
-}
-
 function formatNoDataCounts(counts: Record<LogitechBatteryNoDataReason, number>): string {
     return Object.entries(counts)
         .filter(([, count]) => count > 0)
@@ -251,10 +196,11 @@ interface LogitechReceiverDeviceGroup {
     readonly deviceInfoList: readonly NativeHidDeviceInfo[];
 }
 
-interface LogitechDirectDeviceGroup {
-    readonly groupId: string;
-    readonly primaryDeviceInfo: NativeHidDeviceInfo;
-    readonly deviceInfoList: readonly NativeHidDeviceInfo[];
+interface LogitechOnlineReceiverSlot {
+    readonly receiverSlot: number;
+    readonly vendorUnitId?: string;
+    readonly wirelessProductId?: number;
+    readonly deviceKind?: string;
 }
 
 function groupLogitechReceiverManagementDevices(
@@ -295,100 +241,73 @@ function groupLogitechReceiverManagementDevices(
     );
 }
 
-function groupLogitechDirectHidppDevices(
-    deviceInfoList: readonly NativeHidDeviceInfo[],
-): readonly LogitechDirectDeviceGroup[] {
-    const deviceGroupsById = new Map<string, {
-        readonly deviceInfoList: readonly NativeHidDeviceInfo[];
-        readonly primaryDeviceInfo?: NativeHidDeviceInfo;
-    }>();
+function discoverOnlineLogitechReceiverSlots(
+    receiverDeviceGroup: LogitechReceiverDeviceGroup,
+    transport: NativeLogitechHidppTransport,
+): readonly LogitechOnlineReceiverSlot[] {
+    return receiverDeviceGroup.receiver.receiverKind === "bolt"
+        ? discoverOnlineBoltSlots(transport)
+        : discoverOnlineUnifyingSlots(transport);
+}
 
-    for (const deviceInfo of deviceInfoList) {
-        if (!isPotentialLogitechDirectHidppCollection(deviceInfo)) {
+function discoverOnlineBoltSlots(transport: NativeLogitechHidppTransport): readonly LogitechOnlineReceiverSlot[] {
+    const slots: LogitechOnlineReceiverSlot[] = [];
+    for (let receiverSlot = 1; receiverSlot <= 6; receiverSlot += 1) {
+        const request = buildLogitechDevicePairingInformationRequest(receiverSlot);
+        const result = transport.exchange(request);
+        if (result.state !== "response") {
             continue;
         }
 
-        const groupId = buildDirectGroupId(deviceInfo);
-        const existingGroup = deviceGroupsById.get(groupId);
-        deviceGroupsById.set(groupId, {
-            deviceInfoList: sortLogitechHidppDeviceInfoList([
-                ...(existingGroup?.deviceInfoList ?? []),
-                deviceInfo,
-            ]),
-            primaryDeviceInfo: existingGroup?.primaryDeviceInfo ??
-                (isLogitechDirectHidppLongCollection(deviceInfo) ? deviceInfo : undefined),
+        const registerResponse = parseLogitechReceiverRegisterResponse(result.report, request);
+        if (registerResponse.state !== "register") {
+            continue;
+        }
+
+        const parsed = parseLogitechReceiverPairingInformation("bolt", registerResponse.payload);
+        if (parsed.state !== "pairingInformation" || !parsed.pairingInformation.online) {
+            continue;
+        }
+
+        slots.push({
+            receiverSlot,
+            vendorUnitId: parsed.pairingInformation.unitId,
+            wirelessProductId: parsed.pairingInformation.wirelessProductId,
+            deviceKind: parsed.pairingInformation.deviceKind,
         });
     }
 
-    return [...deviceGroupsById.entries()]
-        .flatMap(([groupId, group]) => group.primaryDeviceInfo === undefined
-            ? []
-            : [{
-                groupId,
-                primaryDeviceInfo: group.primaryDeviceInfo,
-                deviceInfoList: group.deviceInfoList,
-            }])
-        .sort((left, right) => left.groupId.localeCompare(right.groupId));
+    return slots;
 }
 
-function isPotentialLogitechDirectHidppCollection(deviceInfo: NativeHidDeviceInfo): boolean {
-    return deviceInfo.vendorId === LOGITECH_HIDPP_VENDOR_ID &&
-        deviceInfo.productId !== undefined &&
-        !isKnownLogitechReceiverProductId(deviceInfo.productId) &&
-        deviceInfo.path !== undefined &&
-        (isLogitechDirectHidppLongCollection(deviceInfo) || isLogitechClassicShortCollection(deviceInfo));
-}
-
-function isKnownLogitechReceiverProductId(productId: number): boolean {
-    return LOGITECH_RECEIVERS.some(receiver => receiver.productId === productId);
-}
-
-function isLogitechDirectHidppLongCollection(deviceInfo: NativeHidDeviceInfo): boolean {
-    return (deviceInfo.usagePage === LOGITECH_HIDPP_CLASSIC_USAGE_PAGE &&
-        deviceInfo.usage === LOGITECH_HIDPP_CLASSIC_LONG_USAGE) ||
-        (deviceInfo.usagePage === LOGITECH_HIDPP_GAMING_USAGE_PAGE &&
-            (deviceInfo.usage === LOGITECH_HIDPP_BLE_LONG_USAGE ||
-                deviceInfo.usage === LOGITECH_HIDPP_G_SERIES_WIRED_LONG_USAGE));
-}
-
-function isLogitechClassicShortCollection(deviceInfo: NativeHidDeviceInfo): boolean {
-    return deviceInfo.usagePage === LOGITECH_HIDPP_CLASSIC_USAGE_PAGE &&
-        deviceInfo.usage === LOGITECH_HIDPP_SHORT_USAGE;
-}
-
-function sortLogitechHidppDeviceInfoList(
-    deviceInfoList: readonly NativeHidDeviceInfo[],
-): readonly NativeHidDeviceInfo[] {
-    return [...deviceInfoList].sort((left, right) =>
-        scoreLogitechWriteCollection(right) - scoreLogitechWriteCollection(left)
-        || (left.path ?? "").localeCompare(right.path ?? ""),
-    );
-}
-
-function scoreLogitechWriteCollection(deviceInfo: NativeHidDeviceInfo): number {
-    if (isLogitechClassicShortCollection(deviceInfo)) {
-        return 2;
+function discoverOnlineUnifyingSlots(transport: NativeLogitechHidppTransport): readonly LogitechOnlineReceiverSlot[] {
+    const events = transport.drainReceiverConnectionEvents("unifying");
+    if (events === undefined) {
+        return [];
     }
 
-    if (isLogitechDirectHidppLongCollection(deviceInfo)) {
-        return 1;
-    }
-
-    return 0;
+    return events
+        .filter(event => event.online)
+        .map(event => ({
+            receiverSlot: event.receiverSlot,
+            wirelessProductId: event.wirelessProductId,
+            deviceKind: event.deviceKind,
+        }));
 }
 
 function buildLogitechBatteryCandidate(input: {
     readonly receiverDeviceGroup: LogitechReceiverDeviceGroup;
-    readonly receiverSlot: number;
+    readonly onlineSlot: LogitechOnlineReceiverSlot;
     readonly battery: Extract<ReturnType<LogitechHidppSession["readBattery"]>, { readonly state: "battery" }>;
 }): BatteryDeviceDiscoveryCandidate {
     const representativeDeviceInfo = input.receiverDeviceGroup.deviceInfoList[0];
     const deviceInformation = input.battery.deviceInformation;
-    const displayName = buildDisplayName(input.receiverDeviceGroup.receiver, input.receiverSlot);
+    const displayName = buildDisplayName(input.receiverDeviceGroup.receiver, input.onlineSlot.receiverSlot);
     const bindingTransport: SystemPeripheralBindingTransport = "usbReceiver";
+    const vendorUnitId = deviceInformation?.unitId ?? input.onlineSlot.vendorUnitId;
 
     return {
-        candidateId: `logitech-${input.receiverDeviceGroup.groupId}-slot-${input.receiverSlot}`,
+        candidateId: `logitech-${input.receiverDeviceGroup.groupId}-slot-${input.onlineSlot.receiverSlot}`,
         displayName,
         transport: bindingTransport,
         receiverKind: input.receiverDeviceGroup.receiver.receiverKind,
@@ -405,9 +324,9 @@ function buildLogitechBatteryCandidate(input: {
             usageId: representativeDeviceInfo.usage,
             bindingTransport,
             receiverKind: input.receiverDeviceGroup.receiver.receiverKind,
-            vendorUnitId: deviceInformation?.unitId,
+            vendorUnitId,
             modelId: deviceInformation?.modelId,
-            receiverSlot: input.receiverSlot,
+            receiverSlot: input.onlineSlot.receiverSlot,
         },
         supportState: "supported",
         isExperimental: true,
@@ -416,68 +335,9 @@ function buildLogitechBatteryCandidate(input: {
             sourcePathId: input.receiverDeviceGroup.deviceInfoList
                 .flatMap(deviceInfo => deviceInfo.path === undefined ? [] : [deviceInfo.path])
                 .join(";"),
-            receiverSlot: input.receiverSlot,
-            easySwitchSlot: input.battery.easySwitchSlot,
+            receiverSlot: input.onlineSlot.receiverSlot,
         },
     };
-}
-
-function buildLogitechDirectBatteryCandidate(input: {
-    readonly directDeviceGroup: LogitechDirectDeviceGroup;
-    readonly battery: Extract<ReturnType<LogitechHidppSession["readBattery"]>, { readonly state: "battery" }>;
-}): BatteryDeviceDiscoveryCandidate {
-    const representativeDeviceInfo = input.directDeviceGroup.primaryDeviceInfo;
-    const deviceInformation = input.battery.deviceInformation;
-    const displayName = representativeDeviceInfo.product ?? "Logitech HID++ device";
-    const bindingTransport = resolveLogitechDirectBindingTransport(representativeDeviceInfo);
-
-    return {
-        candidateId: `logitech-direct-${input.directDeviceGroup.groupId}`,
-        displayName,
-        transport: bindingTransport,
-        receiverKind: undefined,
-        identity: {
-            vendorId: LOGITECH_HIDPP_VENDOR_ID,
-            productId: representativeDeviceInfo.productId,
-            manufacturer: representativeDeviceInfo.manufacturer ?? LOGITECH_MANUFACTURER,
-            productName: displayName,
-            // Raw HID serial strings are not treated as per-unit identity. The
-            // HID++ DeviceInformation unit id is the trusted Logitech signal.
-            serialNumber: undefined,
-            interfaceNumber: representativeDeviceInfo.interface,
-            usagePage: representativeDeviceInfo.usagePage,
-            usageId: representativeDeviceInfo.usage,
-            bindingTransport,
-            receiverKind: undefined,
-            vendorUnitId: deviceInformation?.unitId,
-            modelId: deviceInformation?.modelId,
-            receiverSlot: undefined,
-        },
-        supportState: "experimental",
-        isExperimental: true,
-        batteryTelemetryFreshness: "fresh",
-        diagnostics: {
-            sourcePathId: input.directDeviceGroup.deviceInfoList
-                .flatMap(deviceInfo => deviceInfo.path === undefined ? [] : [deviceInfo.path])
-                .join(";"),
-            easySwitchSlot: input.battery.easySwitchSlot,
-        },
-    };
-}
-
-function resolveLogitechDirectBindingTransport(
-    deviceInfo: NativeHidDeviceInfo,
-): SystemPeripheralBindingTransport {
-    if (deviceInfo.usagePage === LOGITECH_HIDPP_GAMING_USAGE_PAGE &&
-        deviceInfo.usage === LOGITECH_HIDPP_BLE_LONG_USAGE) {
-        return "bluetooth";
-    }
-
-    return productTextLooksLikeReceiver(deviceInfo.product) ? "usbReceiver" : "usbWired";
-}
-
-function productTextLooksLikeReceiver(productName: string | undefined): boolean {
-    return productName?.toLowerCase().includes("receiver") ?? false;
 }
 
 function buildReceiverGroupId(
@@ -497,35 +357,6 @@ function buildReceiverGroupId(
         .replace(/[^a-z0-9._-]+/gu, "-")
         .replace(/-+/gu, "-")
         .replace(/^[-._]+|[-._]+$/gu, "");
-}
-
-function buildDirectGroupId(deviceInfo: NativeHidDeviceInfo): string {
-    return [
-        "direct",
-        formatHex(deviceInfo.productId),
-        buildHidppPhysicalPathKey(deviceInfo.path),
-        deviceInfo.manufacturer ?? "unknown-manufacturer",
-        deviceInfo.product ?? "unknown-product",
-    ]
-        .join(".")
-        .normalize("NFKD")
-        .toLowerCase()
-        .replace(/[^a-z0-9._-]+/gu, "-")
-        .replace(/-+/gu, "-")
-        .replace(/^[-._]+|[-._]+$/gu, "");
-}
-
-function buildHidppPhysicalPathKey(path: string | undefined): string {
-    if (path === undefined) {
-        return "unknown-path";
-    }
-
-    // Windows exposes HID++ short/long collections as separate paths such as
-    // `MI_02&Col01` and `MI_02&Col02`. Normalize the collection suffix so both
-    // handles stay in one transaction group.
-    return path
-        .toLowerCase()
-        .replace(/&col[0-9a-f]+/gu, "");
 }
 
 function buildDisplayName(
