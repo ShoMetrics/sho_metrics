@@ -7,6 +7,12 @@ export const WINDOWS_HELPER_SOURCE_ID = "windows-helper";
 /** Source id for widget-local Custom HTTP metric definitions. */
 export const CUSTOM_HTTP_SOURCE_ID = "custom-http";
 
+/** Source id for built-in and OS-reported battery readings owned by Hub. */
+export const SYSTEM_BATTERY_SOURCE_ID = "system-battery";
+
+/** Source id for experimental vendor HID peripheral battery readings. */
+export const VENDOR_HID_BATTERY_SOURCE_ID = "vendor-hid-battery";
+
 /** Source scope used for telemetry collected from the current machine. */
 export const LOCAL_SOURCE_SCOPE_ID = "local";
 

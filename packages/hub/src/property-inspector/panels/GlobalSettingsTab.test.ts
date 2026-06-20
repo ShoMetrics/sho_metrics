@@ -196,5 +196,8 @@ function buildGlobalSettings(selectedTheme: MetricTheme = "flat", selectedView: 
         sourceProfiles: [],
         defaultSourceProfileId: undefined,
         customHttpCredentials: [],
+        system: {
+            experimentalVendorHidBatteryEnabled: true,
+        },
     };
 }
