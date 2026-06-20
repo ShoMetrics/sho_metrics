@@ -2,22 +2,25 @@ import { monotonicNowMilliseconds } from "../../../../shared/clock";
 import { logger } from "../../../../logging/logger";
 import type { NativeHidDevice, NativeHidDeviceInfo } from "../native-hid-loader-internal";
 import {
+    buildLogitechTriggerDeviceArrivalRequest,
+    parseLogitechReceiverDeviceConnectionEvent,
+    parseLogitechReceiverRegisterResponse,
+    type LogitechReceiverDeviceConnection,
+    type LogitechReceiverProtocolKind,
+} from "./logitech-receiver-registers";
+import {
     buildLogitechBatteryStatusRequest,
-    buildLogitechChangeHostReadRequest,
     buildLogitechDeviceInformationRequest,
     buildLogitechFeatureLookupRequest,
     buildLogitechUnifiedBatteryCapabilitiesRequest,
     buildLogitechUnifiedBatteryInfoRequest,
     LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID,
-    LOGITECH_HIDPP_CHANGE_HOST_FEATURE_ID,
     LOGITECH_HIDPP_CLASSIC_USAGE_PAGE,
     LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID,
-    LOGITECH_HIDPP_MAX_RECEIVER_SLOT,
     LOGITECH_HIDPP_SHORT_USAGE,
     LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
     matchesLogitechHidppExpectedResponse,
     parseLogitechBatteryStatusReport,
-    parseLogitechChangeHostReport,
     parseLogitechDeviceInformationReport,
     parseLogitechFeatureLookupReport,
     parseLogitechHidppErrorCode,
@@ -33,6 +36,11 @@ import {
 
 const DEFAULT_HIDPP_TRANSACTION_TIMEOUT_MILLISECONDS = 300;
 const READ_SLICE_TIMEOUT_MILLISECONDS = 20;
+// OpenLogi gives sleepy receiver-backed devices a larger arrival-event window.
+// Keep this separate from ordinary feature transactions: Unifying arrival
+// events are the online-slot discovery source, while feature reads can fail as
+// transient no-data and retry on the next low-frequency battery poll.
+const RECEIVER_ARRIVAL_DRAIN_TIMEOUT_MILLISECONDS = 1500;
 const LOGITECH_HIDPP_DEBUG_LOG_INTERVAL_MILLISECONDS = 60_000;
 const log = logger.for("Source:BatteryHID:Logitech");
 
@@ -80,7 +88,6 @@ export type LogitechBatteryReadResult =
         readonly state: "battery";
         readonly reading: LogitechBatteryReading;
         readonly deviceInformation?: LogitechDeviceInformation;
-        readonly easySwitchSlot?: number;
         readonly unrelatedReportCount: number;
     }
     | {
@@ -134,7 +141,6 @@ export class LogitechHidppSession {
             return appendOptionalTelemetry(
                 batteryResult,
                 this.readDeviceInformationForBatteryResult(receiverSlot, batteryResult),
-                this.readEasySwitchSlot(receiverSlot),
             );
         }
 
@@ -163,7 +169,6 @@ export class LogitechHidppSession {
         return appendOptionalTelemetry(
             batteryResult,
             this.readDeviceInformationForBatteryResult(receiverSlot, batteryResult),
-            this.readEasySwitchSlot(receiverSlot),
         );
     }
 
@@ -294,22 +299,6 @@ export class LogitechHidppSession {
         );
     }
 
-    private readEasySwitchSlot(receiverSlot: LogitechReceiverSlot): number | undefined {
-        const feature = this.readFeature(receiverSlot, LOGITECH_HIDPP_CHANGE_HOST_FEATURE_ID);
-        if (feature.state !== "supported") {
-            return undefined;
-        }
-
-        const request = buildLogitechChangeHostReadRequest(receiverSlot, feature.feature.featureIndex);
-        const exchangeResult = this.transport.exchange(request);
-        if (exchangeResult.state !== "response") {
-            return undefined;
-        }
-
-        const parsed = parseLogitechChangeHostReport(exchangeResult.report, request.expectedResponse);
-        return parsed.state === "easySwitch" ? parsed.easySwitchSlot : undefined;
-    }
-
     private readDeviceInformationForBatteryResult(
         receiverSlot: LogitechReceiverSlot,
         batteryResult: LogitechBatteryReadResult,
@@ -382,10 +371,94 @@ export class NativeLogitechHidppTransport implements LogitechHidppTransport {
         }
     }
 
+    /**
+     * Triggers and drains receiver online-device events.
+     *
+     * Unifying exposes online devices through these `0x41` events rather than
+     * a stable per-slot inventory register. Bolt can also emit them, but Bolt
+     * still uses pairing registers as the stable unit-id source.
+     */
+    drainReceiverConnectionEvents(receiverKind: LogitechReceiverProtocolKind): readonly LogitechReceiverDeviceConnection[] | undefined {
+        const request = buildLogitechTriggerDeviceArrivalRequest();
+        const connections: LogitechReceiverDeviceConnection[] = [];
+        let unrelatedReportCount = 0;
+
+        try {
+            this.writeDevice.write([...request.bytes]);
+            const triggerDeadlineMilliseconds = this.monotonicNow() + DEFAULT_HIDPP_TRANSACTION_TIMEOUT_MILLISECONDS;
+            let triggerAcknowledged = false;
+
+            while (this.monotonicNow() < triggerDeadlineMilliseconds && !triggerAcknowledged) {
+                const report = this.readAnyReportBefore(triggerDeadlineMilliseconds);
+                if (report === undefined) {
+                    continue;
+                }
+
+                const event = parseLogitechReceiverDeviceConnectionEvent(receiverKind, report);
+                if (event.state === "deviceConnection") {
+                    connections.push(event.connection);
+                    continue;
+                }
+
+                const triggerResponse = parseLogitechReceiverRegisterResponse(report, request);
+                if (triggerResponse.state === "register") {
+                    triggerAcknowledged = true;
+                    continue;
+                }
+
+                if (triggerResponse.state === "registerError" || triggerResponse.state === "malformed") {
+                    logHidppExchangeOutcome(request, "deviceError", unrelatedReportCount);
+                    return undefined;
+                }
+
+                unrelatedReportCount += 1;
+            }
+
+            if (!triggerAcknowledged) {
+                logHidppExchangeOutcome(request, "timeout", unrelatedReportCount);
+                return undefined;
+            }
+
+            const drainDeadlineMilliseconds = this.monotonicNow() + RECEIVER_ARRIVAL_DRAIN_TIMEOUT_MILLISECONDS;
+            while (this.monotonicNow() < drainDeadlineMilliseconds) {
+                const report = this.readAnyReportBefore(drainDeadlineMilliseconds);
+                if (report === undefined) {
+                    continue;
+                }
+
+                const event = parseLogitechReceiverDeviceConnectionEvent(receiverKind, report);
+                if (event.state === "deviceConnection") {
+                    connections.push(event.connection);
+                    continue;
+                }
+
+                unrelatedReportCount += 1;
+            }
+
+            logHidppExchangeOutcome(request, "response", unrelatedReportCount);
+            return connections;
+        } catch {
+            logHidppExchangeOutcome(request, "ioError", unrelatedReportCount);
+            return undefined;
+        }
+    }
+
     close(): void {
         for (const device of this.readDevices) {
             device.close();
         }
+    }
+
+    private readAnyReportBefore(deadlineMilliseconds: number): readonly number[] | undefined {
+        for (const device of this.readDevices) {
+            const remainingMilliseconds = Math.max(1, deadlineMilliseconds - this.monotonicNow());
+            const report = device.readTimeout(Math.min(READ_SLICE_TIMEOUT_MILLISECONDS, remainingMilliseconds));
+            if (report.length !== 0) {
+                return report;
+            }
+        }
+
+        return undefined;
     }
 }
 
@@ -518,7 +591,6 @@ function mapBatteryParseResult(
 function appendOptionalTelemetry(
     batteryResult: LogitechBatteryReadResult,
     deviceInformationResult: LogitechDeviceInformationReadResult,
-    easySwitchSlot: number | undefined,
 ): LogitechBatteryReadResult {
     if (batteryResult.state !== "battery") {
         return batteryResult;
@@ -529,7 +601,6 @@ function appendOptionalTelemetry(
         deviceInformation: deviceInformationResult.state === "deviceInformation"
             ? deviceInformationResult.deviceInformation
             : undefined,
-        easySwitchSlot,
     };
 }
 
@@ -553,15 +624,6 @@ function mapExchangeFailure(
                 reason: "ioError",
             };
     }
-}
-
-export function buildLogitechReceiverSlotList(): readonly LogitechReceiverSlot[] {
-    const slots: LogitechReceiverSlot[] = [];
-    for (let slot = 1; slot <= LOGITECH_HIDPP_MAX_RECEIVER_SLOT; slot += 1) {
-        slots.push(slot);
-    }
-
-    return slots;
 }
 
 function formatByte(value: number): string {

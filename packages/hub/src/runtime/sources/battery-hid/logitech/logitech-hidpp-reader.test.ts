@@ -4,7 +4,6 @@ import type { NativeHidDevice } from "../native-hid-loader-internal";
 import {
     buildLogitechBatteryStatusRequest,
     LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID,
-    LOGITECH_HIDPP_CHANGE_HOST_FEATURE_ID,
     LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID,
     LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
     type LogitechHidppRequest,
@@ -16,11 +15,10 @@ import {
     type LogitechHidppTransport,
 } from "./logitech-hidpp-reader";
 
-test("Logitech HID++ session reads UNIFIED_BATTERY with device identity and Easy-Switch slot", () => {
+test("Logitech HID++ session reads UNIFIED_BATTERY with device identity", () => {
     const transport = new ScriptedLogitechTransport(request => responseForRequest(request, {
         unifiedBatteryFeatureIndex: 0x09,
         batteryStatusFeatureIndex: 0x00,
-        changeHostFeatureIndex: 0x0E,
         deviceInformationFeatureIndex: 0x03,
     }));
     const session = new LogitechHidppSession(transport);
@@ -35,7 +33,6 @@ test("Logitech HID++ session reads UNIFIED_BATTERY with device identity and Easy
     assert.equal(result.reading.featureId, LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID);
     assert.equal(result.reading.percent, 90);
     assert.equal(result.reading.statusByte, 0);
-    assert.equal(result.easySwitchSlot, 1);
     assert.equal(result.deviceInformation?.unitId, "12345678");
     assert.equal(result.deviceInformation?.modelId, "logitech:1a83-1a85-0000:ext-01");
 });
@@ -44,7 +41,6 @@ test("Logitech HID++ session falls back from UNIFIED_BATTERY to BATTERY_STATUS",
     const transport = new ScriptedLogitechTransport(request => responseForRequest(request, {
         unifiedBatteryFeatureIndex: 0x00,
         batteryStatusFeatureIndex: 0x08,
-        changeHostFeatureIndex: 0x00,
         deviceInformationFeatureIndex: 0x00,
     }));
     const session = new LogitechHidppSession(transport);
@@ -60,7 +56,6 @@ test("Logitech HID++ session falls back from UNIFIED_BATTERY to BATTERY_STATUS",
             statusByte: 0,
         },
         deviceInformation: undefined,
-        easySwitchSlot: undefined,
         unrelatedReportCount: 0,
     });
 });
@@ -69,7 +64,6 @@ test("Logitech HID++ session caches unsupported feature lookups", () => {
     const transport = new ScriptedLogitechTransport(request => responseForRequest(request, {
         unifiedBatteryFeatureIndex: 0x00,
         batteryStatusFeatureIndex: 0x00,
-        changeHostFeatureIndex: 0x00,
         deviceInformationFeatureIndex: 0x00,
     }));
     const session = new LogitechHidppSession(transport);
@@ -88,7 +82,6 @@ test("Logitech HID++ session reads device information once per receiver slot", (
     const transport = new ScriptedLogitechTransport(request => responseForRequest(request, {
         unifiedBatteryFeatureIndex: 0x09,
         batteryStatusFeatureIndex: 0x00,
-        changeHostFeatureIndex: 0x00,
         deviceInformationFeatureIndex: 0x03,
     }));
     const session = new LogitechHidppSession(transport);
@@ -98,7 +91,7 @@ test("Logitech HID++ session reads device information once per receiver slot", (
 
     const deviceInformationReads = transport.requests.filter(request =>
         request[2] === 0x03 &&
-        request[3] === 0x00,
+        request[3] === 0x01,
     );
     assert.equal(deviceInformationReads.length, 1);
 });
@@ -133,13 +126,13 @@ test("native Logitech HID++ transport ignores unrelated interleaved reports", ()
     }
 
     assert.deepEqual(result.unrelatedReports, [[0x11, 0x01, 0x0A, 0x00, 0x03, 0x02]]);
-    assert.deepEqual(result.report, [0x11, 0x01, 0x08, 0x00, 0x14, 0x05, 0x00]);
+    assert.deepEqual(result.report, [0x11, 0x01, 0x08, 0x01, 0x14, 0x05, 0x00]);
 });
 
 test("native Logitech HID++ transport reports HID++ device errors without throwing", () => {
     const request = buildLogitechBatteryStatusRequest(0x01, 0x08);
     const device = new FakeNativeHidDevice(() => [
-        [0x11, 0x01, 0xFF, 0x08, 0x00, 0x07],
+        [0x11, 0x01, 0xFF, 0x08, 0x01, 0x07],
     ]);
     const transport = new NativeLogitechHidppTransport(device, [device]);
 
@@ -164,7 +157,6 @@ class ScriptedLogitechTransport implements LogitechHidppTransport {
 interface ScriptedLogitechFeatureIndexes {
     readonly unifiedBatteryFeatureIndex: number;
     readonly batteryStatusFeatureIndex: number;
-    readonly changeHostFeatureIndex: number;
     readonly deviceInformationFeatureIndex: number;
 }
 
@@ -185,7 +177,7 @@ function responseForRequest(
         };
     }
 
-    if (request.bytes[2] === featureIndexes.deviceInformationFeatureIndex && request.bytes[3] === 0x00) {
+    if (request.bytes[2] === featureIndexes.deviceInformationFeatureIndex && request.bytes[3] === 0x01) {
         return {
             state: "response",
             report: buildResponse(request.bytes, [
@@ -201,7 +193,7 @@ function responseForRequest(
         };
     }
 
-    if (request.bytes[2] === featureIndexes.unifiedBatteryFeatureIndex && request.bytes[3] === 0x00) {
+    if (request.bytes[2] === featureIndexes.unifiedBatteryFeatureIndex && request.bytes[3] === 0x01) {
         return {
             state: "response",
             report: buildResponse(request.bytes, [0x0F, 0x03, 0x00]),
@@ -209,7 +201,7 @@ function responseForRequest(
         };
     }
 
-    if (request.bytes[2] === featureIndexes.unifiedBatteryFeatureIndex && request.bytes[3] === 0x10) {
+    if (request.bytes[2] === featureIndexes.unifiedBatteryFeatureIndex && request.bytes[3] === 0x11) {
         return {
             state: "response",
             report: buildResponse(request.bytes, [0x5A, 0x08, 0x00]),
@@ -217,18 +209,10 @@ function responseForRequest(
         };
     }
 
-    if (request.bytes[2] === featureIndexes.batteryStatusFeatureIndex && request.bytes[3] === 0x00) {
+    if (request.bytes[2] === featureIndexes.batteryStatusFeatureIndex && request.bytes[3] === 0x01) {
         return {
             state: "response",
             report: buildResponse(request.bytes, [0x14, 0x05, 0x00]),
-            unrelatedReports: [],
-        };
-    }
-
-    if (request.bytes[2] === featureIndexes.changeHostFeatureIndex && request.bytes[3] === 0x00) {
-        return {
-            state: "response",
-            report: buildResponse(request.bytes, [0x03, 0x00, 0x00]),
             unrelatedReports: [],
         };
     }
@@ -256,8 +240,6 @@ function featureIndexForId(
             return featureIndexes.unifiedBatteryFeatureIndex;
         case LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID:
             return featureIndexes.batteryStatusFeatureIndex;
-        case LOGITECH_HIDPP_CHANGE_HOST_FEATURE_ID:
-            return featureIndexes.changeHostFeatureIndex;
         default:
             return 0;
     }

@@ -7,116 +7,70 @@ import type {
 } from "../native-hid-loader-internal";
 import {
     LOGITECH_BOLT_RECEIVER_PRODUCT_ID,
-    LOGITECH_HIDPP_CLASSIC_LONG_USAGE,
     LOGITECH_HIDPP_CLASSIC_USAGE_PAGE,
-    LOGITECH_HIDPP_DIRECT_DEVICE_SLOT,
-    LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID,
-    LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID,
     LOGITECH_HIDPP_SHORT_USAGE,
     LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
     LOGITECH_HIDPP_VENDOR_ID,
     LOGITECH_UNIFYING_NANO_RECEIVER_PRODUCT_ID,
-    type LogitechHidppRequest,
 } from "./hidpp-protocol";
 import { LogitechBatteryDeviceDiscoverer } from "./logitech-battery-discovery";
-import type { LogitechHidppExchangeResult } from "./logitech-hidpp-reader";
 
-test("Logitech discovery emits supported non-MX HID++ battery candidates", async () => {
+const LOGITECH_DIRECT_CLASSIC_LONG_USAGE = 0x0002;
+
+test("Logitech discovery emits Bolt receiver candidates from online pairing registers", async () => {
     const nativeModule = new FakeNativeHidModule(
         [buildBoltReceiverDeviceInfo()],
-        request => responseForDiscoveryRequest(request, {
-            supportedSlot: 2,
-            batteryFeatureId: LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
-        }),
+        writeBytes => responseReportsForBoltDiscovery(writeBytes, 2),
     );
     const discoverer = new LogitechBatteryDeviceDiscoverer(nativeModule);
 
     const candidates = await discoverer.discoverBatteryDevices();
 
     assert.equal(candidates.length, 1);
-    assert.equal(candidates[0].displayName.includes("MX"), false);
+    assert.equal(candidates[0].displayName, "Logitech Bolt device slot 2");
     assert.equal(candidates[0].transport, "usbReceiver");
     assert.equal(candidates[0].receiverKind, "bolt");
     assert.equal(candidates[0].identity.vendorUnitId, "12345678");
     assert.equal(candidates[0].identity.modelId, "logitech:1a83-1a85-0000:ext-01");
+    assert.equal(candidates[0].identity.receiverSlot, 2);
     assert.equal(candidates[0].diagnostics?.receiverSlot, 2);
 });
 
-test("Logitech discovery hides unsupported receiver slots from normal UI candidates", async () => {
+test("Logitech discovery hides offline Bolt receiver slots", async () => {
     const nativeModule = new FakeNativeHidModule(
         [buildBoltReceiverDeviceInfo()],
-        request => responseForDiscoveryRequest(request, {
-            supportedSlot: undefined,
-            batteryFeatureId: LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID,
-        }),
+        writeBytes => responseReportsForBoltDiscovery(writeBytes, undefined),
     );
     const discoverer = new LogitechBatteryDeviceDiscoverer(nativeModule);
 
     assert.deepEqual(await discoverer.discoverBatteryDevices(), []);
 });
 
-test("Logitech discovery accepts Unifying Nano receiver management paths", async () => {
+test("Logitech discovery uses Unifying arrival events as the online slot source", async () => {
     const nativeModule = new FakeNativeHidModule(
         [buildUnifyingNanoReceiverDeviceInfo()],
-        request => responseForDiscoveryRequest(request, {
-            supportedSlot: 1,
-            batteryFeatureId: LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID,
-        }),
+        writeBytes => responseReportsForUnifyingDiscovery(writeBytes, 1),
     );
     const discoverer = new LogitechBatteryDeviceDiscoverer(nativeModule);
 
     const candidates = await discoverer.discoverBatteryDevices();
 
     assert.equal(candidates.length, 1);
+    assert.equal(candidates[0].displayName, "Logitech Unifying device slot 1");
     assert.equal(candidates[0].transport, "usbReceiver");
     assert.equal(candidates[0].receiverKind, "unifying");
+    assert.equal(candidates[0].identity.vendorUnitId, "12345678");
     assert.equal(candidates[0].diagnostics?.receiverSlot, 1);
 });
 
-test("Logitech discovery probes direct HID++ devices through self slot", async () => {
+test("Logitech discovery leaves direct HID++ paths to OS or future wired support", async () => {
     const nativeModule = new FakeNativeHidModule(
         [buildDirectHidppLongDeviceInfo()],
-        request => responseForDiscoveryRequest(request, {
-            supportedSlot: LOGITECH_HIDPP_DIRECT_DEVICE_SLOT,
-            batteryFeatureId: LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
-        }),
+        () => [],
     );
     const discoverer = new LogitechBatteryDeviceDiscoverer(nativeModule);
 
-    const candidates = await discoverer.discoverBatteryDevices();
-
-    assert.equal(candidates.length, 1);
-    assert.equal(candidates[0].candidateId.startsWith("logitech-direct-"), true);
-    assert.equal(candidates[0].displayName, "G-series HID++ device");
-    assert.equal(candidates[0].transport, "usbWired");
-    assert.equal(candidates[0].receiverKind, undefined);
-    assert.equal(candidates[0].identity.vendorUnitId, "12345678");
-    assert.equal(candidates[0].identity.receiverSlot, undefined);
-    assert.equal(candidates[0].supportState, "experimental");
-});
-
-test("Logitech discovery groups direct short and long Windows collections", async () => {
-    const openedPaths: string[] = [];
-    const nativeModule = new FakeNativeHidModule(
-        [
-            buildDirectHidppLongDeviceInfo(),
-            buildDirectHidppShortSiblingDeviceInfo(),
-        ],
-        request => responseForDiscoveryRequest(request, {
-            supportedSlot: LOGITECH_HIDPP_DIRECT_DEVICE_SLOT,
-            batteryFeatureId: LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
-        }),
-        openedPaths,
-    );
-    const discoverer = new LogitechBatteryDeviceDiscoverer(nativeModule);
-
-    const candidates = await discoverer.discoverBatteryDevices();
-
-    assert.equal(candidates.length, 1);
-    assert.deepEqual(openedPaths, [
-        "hid#vid_046d&pid_b025&mi_02&col01#same-device",
-        "hid#vid_046d&pid_b025&mi_02&col02#same-device",
-    ]);
+    assert.deepEqual(await discoverer.discoverBatteryDevices(), []);
 });
 
 function buildBoltReceiverDeviceInfo(): NativeHidDeviceInfo {
@@ -130,7 +84,7 @@ function buildBoltReceiverDeviceInfo(): NativeHidDeviceInfo {
         release: 0,
         interface: 2,
         usagePage: LOGITECH_HIDPP_CLASSIC_USAGE_PAGE,
-        usage: 1,
+        usage: LOGITECH_HIDPP_SHORT_USAGE,
     };
 }
 
@@ -139,7 +93,6 @@ function buildUnifyingNanoReceiverDeviceInfo(): NativeHidDeviceInfo {
         ...buildBoltReceiverDeviceInfo(),
         path: "unifying-nano-path",
         productId: LOGITECH_UNIFYING_NANO_RECEIVER_PRODUCT_ID,
-        product: "USB Receiver",
     };
 }
 
@@ -154,16 +107,145 @@ function buildDirectHidppLongDeviceInfo(): NativeHidDeviceInfo {
         release: 0,
         interface: 2,
         usagePage: LOGITECH_HIDPP_CLASSIC_USAGE_PAGE,
-        usage: LOGITECH_HIDPP_CLASSIC_LONG_USAGE,
+        usage: LOGITECH_DIRECT_CLASSIC_LONG_USAGE,
     };
 }
 
-function buildDirectHidppShortSiblingDeviceInfo(): NativeHidDeviceInfo {
-    return {
-        ...buildDirectHidppLongDeviceInfo(),
-        path: "hid#vid_046d&pid_b025&mi_02&col01#same-device",
-        usage: LOGITECH_HIDPP_SHORT_USAGE,
-    };
+function responseReportsForBoltDiscovery(
+    writeBytes: readonly number[],
+    onlineSlot: number | undefined,
+): readonly (readonly number[])[] {
+    const pairingSlot = readPairingInformationSlot(writeBytes);
+    if (pairingSlot !== undefined) {
+        return [buildPairingInformationResponse(writeBytes, pairingSlot === onlineSlot)];
+    }
+
+    return responseReportsForBatteryRead(writeBytes, onlineSlot);
+}
+
+function responseReportsForUnifyingDiscovery(
+    writeBytes: readonly number[],
+    onlineSlot: number,
+): readonly (readonly number[])[] {
+    if (isReceiverArrivalTrigger(writeBytes)) {
+        return [
+            [0x10, onlineSlot, 0x41, 0x00, 0x02, 0x34, 0x12],
+            [0x10, 0xFF, 0x80, 0x02, 0x00, 0x00, 0x00],
+        ];
+    }
+
+    return responseReportsForBatteryRead(writeBytes, onlineSlot);
+}
+
+function responseReportsForBatteryRead(
+    writeBytes: readonly number[],
+    supportedSlot: number | undefined,
+): readonly (readonly number[])[] {
+    const receiverSlot = writeBytes[1];
+    if (receiverSlot !== supportedSlot) {
+        return [buildFeatureResponse(writeBytes, [0x00, 0x00, 0x00])];
+    }
+
+    const featureId = readFeatureLookupRequestFeatureId(writeBytes);
+    if (featureId !== undefined) {
+        return [buildFeatureResponse(writeBytes, featureLookupPayload(featureId))];
+    }
+
+    if (writeBytes[2] === 0x09 && writeBytes[3] === 0x01) {
+        return [buildFeatureResponse(writeBytes, [0x0F, 0x03, 0x00])];
+    }
+
+    if (writeBytes[2] === 0x09 && writeBytes[3] === 0x11) {
+        return [buildFeatureResponse(writeBytes, [0x40, 0x04, 0x00])];
+    }
+
+    if (writeBytes[2] === 0x03 && writeBytes[3] === 0x01) {
+        return [buildFeatureResponse(writeBytes, [
+            0x02,
+            0x12, 0x34, 0x56, 0x78,
+            0x00,
+            0x0F,
+            0x1A, 0x83, 0x1A, 0x85, 0x00, 0x00,
+            0x01,
+            0x01,
+        ])];
+    }
+
+    return [];
+}
+
+function featureLookupPayload(featureId: number): readonly number[] {
+    switch (featureId) {
+        case LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID:
+            return [0x09, 0x00, 0x02];
+        case 0x0003:
+            return [0x03, 0x00, 0x04];
+        default:
+            return [0x00, 0x00, 0x00];
+    }
+}
+
+function buildPairingInformationResponse(
+    requestBytes: readonly number[],
+    online: boolean,
+): readonly number[] {
+    const flags = online ? 0x22 : 0x62;
+    return buildLongRegisterResponse(requestBytes, [
+        requestBytes[4] ?? 0x50,
+        flags,
+        0x34, 0x12,
+        0x12, 0x34, 0x56, 0x78,
+        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+    ]);
+}
+
+function buildLongRegisterResponse(
+    requestBytes: readonly number[],
+    payload: readonly number[],
+): readonly number[] {
+    return [
+        0x11,
+        requestBytes[1] ?? 0xFF,
+        requestBytes[2] ?? 0x83,
+        requestBytes[3] ?? 0xB5,
+        ...payload,
+    ];
+}
+
+function buildFeatureResponse(
+    requestBytes: readonly number[],
+    payload: readonly number[],
+): readonly number[] {
+    return [
+        0x11,
+        requestBytes[1] ?? 0x00,
+        requestBytes[2] ?? 0x00,
+        requestBytes[3] ?? 0x00,
+        ...payload,
+    ];
+}
+
+function readPairingInformationSlot(writeBytes: readonly number[]): number | undefined {
+    return writeBytes[1] === 0xFF &&
+        writeBytes[2] === 0x83 &&
+        writeBytes[3] === 0xB5 &&
+        (writeBytes[4] & 0xF0) === 0x50
+        ? writeBytes[4] & 0x0F
+        : undefined;
+}
+
+function isReceiverArrivalTrigger(writeBytes: readonly number[]): boolean {
+    return writeBytes[1] === 0xFF &&
+        writeBytes[2] === 0x80 &&
+        writeBytes[3] === 0x02 &&
+        writeBytes[4] === 0x02;
+}
+
+function readFeatureLookupRequestFeatureId(writeBytes: readonly number[]): number | undefined {
+    return writeBytes[2] === 0x00 && writeBytes[3] === 0x01
+        ? (writeBytes[4] << 8) | writeBytes[5]
+        : undefined;
 }
 
 class FakeNativeHidModule implements NativeHidModule {
@@ -171,13 +253,11 @@ class FakeNativeHidModule implements NativeHidModule {
 
     constructor(
         private readonly deviceInfoList: readonly NativeHidDeviceInfo[],
-        resolveResponse: (request: LogitechHidppRequest) => LogitechHidppExchangeResult,
-        openedPaths: string[] = [],
+        buildReports: (writeBytes: readonly number[]) => readonly (readonly number[])[],
     ) {
         this.HID = class extends FakeNativeHidDevice {
-            constructor(path: string) {
-                openedPaths.push(path);
-                super(resolveResponse);
+            constructor() {
+                super(buildReports);
             }
         };
     }
@@ -190,7 +270,7 @@ class FakeNativeHidModule implements NativeHidModule {
 class FakeNativeHidDevice implements NativeHidDevice {
     private queuedReports: number[][] = [];
 
-    constructor(private readonly resolveResponse: (request: LogitechHidppRequest) => LogitechHidppExchangeResult) {}
+    constructor(private readonly buildReports: (writeBytes: readonly number[]) => readonly (readonly number[])[]) {}
 
     close(): void {}
 
@@ -208,106 +288,7 @@ class FakeNativeHidDevice implements NativeHidDevice {
 
     write(data: number[] | Buffer): number {
         const bytes = Array.from(data);
-        const request = buildRequestFromWrittenBytes(bytes);
-        const response = this.resolveResponse(request);
-        this.queuedReports = response.state === "response" ? [[...response.report]] : [];
+        this.queuedReports.push(...this.buildReports(bytes).map(report => [...report]));
         return bytes.length;
     }
-}
-
-function responseForDiscoveryRequest(
-    request: LogitechHidppRequest,
-    input: {
-        readonly supportedSlot: number | undefined;
-        readonly batteryFeatureId: number;
-    },
-): LogitechHidppExchangeResult {
-    if (input.supportedSlot !== request.expectedResponse.receiverSlot) {
-        return buildResponse(request, [0x00, 0x00, 0x00]);
-    }
-
-    const lookupFeatureId = readFeatureLookupRequestFeatureId(request.bytes);
-    if (lookupFeatureId !== undefined) {
-        switch (lookupFeatureId) {
-            case LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID:
-                return buildResponse(request, [0x03, 0x00, 0x04]);
-            case LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID:
-                return buildResponse(request, [
-                    input.batteryFeatureId === LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID ? 0x09 : 0x00,
-                    0x00,
-                    0x02,
-                ]);
-            case LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID:
-                return buildResponse(request, [
-                    input.batteryFeatureId === LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID ? 0x08 : 0x00,
-                    0x00,
-                    0x02,
-                ]);
-            default:
-                return buildResponse(request, [0x00, 0x00, 0x00]);
-        }
-    }
-
-    if (request.expectedResponse.featureIndex === 0x03) {
-        return buildResponse(request, [
-            0x02,
-            0x12, 0x34, 0x56, 0x78,
-            0x00,
-            0x0F,
-            0x1A, 0x83, 0x1A, 0x85, 0x00, 0x00,
-            0x01,
-            0x01,
-        ]);
-    }
-
-    if (request.expectedResponse.featureIndex === 0x09 && request.expectedResponse.functionByte === 0x00) {
-        return buildResponse(request, [0x0F, 0x03, 0x00]);
-    }
-
-    if (request.expectedResponse.featureIndex === 0x09 && request.expectedResponse.functionByte === 0x10) {
-        return buildResponse(request, [0x40, 0x04, 0x00]);
-    }
-
-    if (request.expectedResponse.featureIndex === 0x08 && request.expectedResponse.functionByte === 0x00) {
-        return buildResponse(request, [0x40, 0x05, 0x00]);
-    }
-
-    return {
-        state: "timeout",
-        unrelatedReports: [],
-    };
-}
-
-function buildResponse(
-    request: LogitechHidppRequest,
-    payload: readonly number[],
-): LogitechHidppExchangeResult {
-    return {
-        state: "response",
-        report: [
-            0x11,
-            request.expectedResponse.receiverSlot,
-            request.expectedResponse.featureIndex,
-            request.expectedResponse.functionByte,
-            ...payload,
-        ],
-        unrelatedReports: [],
-    };
-}
-
-function readFeatureLookupRequestFeatureId(requestBytes: readonly number[]): number | undefined {
-    return requestBytes[2] === 0x00 && requestBytes[3] === 0x01
-        ? (requestBytes[4] << 8) | requestBytes[5]
-        : undefined;
-}
-
-function buildRequestFromWrittenBytes(bytes: readonly number[]): LogitechHidppRequest {
-    return {
-        bytes: [...bytes],
-        expectedResponse: {
-            receiverSlot: bytes[1],
-            featureIndex: bytes[2],
-            functionByte: bytes[3],
-        },
-    };
 }

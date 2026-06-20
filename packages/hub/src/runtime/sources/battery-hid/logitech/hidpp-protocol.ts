@@ -12,30 +12,23 @@ export const LOGITECH_BOLT_RECEIVER_PRODUCT_ID = 0xC548;
 export const LOGITECH_UNIFYING_RECEIVER_PRODUCT_ID = 0xC52B;
 export const LOGITECH_UNIFYING_NANO_RECEIVER_PRODUCT_ID = 0xC532;
 export const LOGITECH_HIDPP_CLASSIC_USAGE_PAGE = 0xFF00;
-export const LOGITECH_HIDPP_GAMING_USAGE_PAGE = 0xFF43;
 export const LOGITECH_HIDPP_SHORT_USAGE = 0x0001;
-export const LOGITECH_HIDPP_CLASSIC_LONG_USAGE = 0x0002;
-export const LOGITECH_HIDPP_BLE_LONG_USAGE = 0x0202;
-export const LOGITECH_HIDPP_G_SERIES_WIRED_LONG_USAGE = 0x0602;
 
 export const LOGITECH_HIDPP_ROOT_FEATURE_ID = 0x0000;
 export const LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID = 0x0003;
 export const LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID = 0x1000;
 export const LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID = 0x1004;
-export const LOGITECH_HIDPP_CHANGE_HOST_FEATURE_ID = 0x1814;
 
 export const LOGITECH_HIDPP_SHORT_REPORT_ID = 0x10;
 export const LOGITECH_HIDPP_LONG_REPORT_ID = 0x11;
 export const LOGITECH_HIDPP_MAX_RECEIVER_SLOT = 6;
-export const LOGITECH_HIDPP_DIRECT_DEVICE_SLOT = 0xFF;
 
 const HIDPP_ROOT_FEATURE_INDEX = 0x00;
 const ROOT_GET_FEATURE_FUNCTION_ID = 0x00;
-const ROOT_GET_FEATURE_SOFTWARE_ID = 0x01;
+const HIDPP2_SOFTWARE_ID = 0x01;
 const BATTERY_STATUS_READ_FUNCTION_ID = 0x00;
 const UNIFIED_BATTERY_CAPABILITIES_FUNCTION_ID = 0x00;
 const UNIFIED_BATTERY_INFO_FUNCTION_ID = 0x01;
-const CHANGE_HOST_READ_FUNCTION_ID = 0x00;
 const DEVICE_INFORMATION_READ_FUNCTION_ID = 0x00;
 const HIDPP_ERROR_FEATURE_INDEX = 0xFF;
 
@@ -129,23 +122,6 @@ export type LogitechUnifiedBatteryCapabilitiesParseResult =
         readonly state: "malformed";
     };
 
-export type LogitechEasySwitchParseResult =
-    | {
-        readonly state: "easySwitch";
-        readonly hostCount: number;
-        readonly currentHostIndex: number;
-        readonly easySwitchSlot: number;
-    }
-    | {
-        readonly state: "noData";
-    }
-    | {
-        readonly state: "unrelated";
-    }
-    | {
-        readonly state: "malformed";
-    };
-
 export interface LogitechDeviceInformation {
     readonly unitId?: string;
     readonly modelId?: string;
@@ -175,7 +151,7 @@ export function buildLogitechFeatureLookupRequest(
         receiverSlot,
         featureIndex: HIDPP_ROOT_FEATURE_INDEX,
         functionId: ROOT_GET_FEATURE_FUNCTION_ID,
-        softwareId: ROOT_GET_FEATURE_SOFTWARE_ID,
+        softwareId: HIDPP2_SOFTWARE_ID,
         parameters: [(featureId >> 8) & 0xFF, featureId & 0xFF, 0x00],
     });
 }
@@ -210,17 +186,6 @@ export function buildLogitechUnifiedBatteryInfoRequest(
         receiverSlot,
         featureIndex,
         functionId: UNIFIED_BATTERY_INFO_FUNCTION_ID,
-    });
-}
-
-export function buildLogitechChangeHostReadRequest(
-    receiverSlot: LogitechReceiverSlot,
-    featureIndex: number,
-): LogitechHidppRequest {
-    return buildLogitechShortFeatureRequest({
-        receiverSlot,
-        featureIndex,
-        functionId: CHANGE_HOST_READ_FUNCTION_ID,
     });
 }
 
@@ -418,35 +383,6 @@ export function parseLogitechUnifiedBatteryInfoReport(
     };
 }
 
-export function parseLogitechChangeHostReport(
-    bytes: readonly number[],
-    expectedResponse: LogitechHidppExpectedResponse,
-): LogitechEasySwitchParseResult {
-    const report = parseStrictMatchingReport(bytes, expectedResponse);
-    if (report === undefined) {
-        return { state: "unrelated" };
-    }
-
-    if (report.payload.length < 2) {
-        return { state: "malformed" };
-    }
-
-    // CHANGE_HOST read reports host count and zero-based current host index.
-    // The write function for this feature is intentionally never called.
-    const hostCount = report.payload[0];
-    const currentHostIndex = report.payload[1];
-    if (hostCount === 0 || currentHostIndex >= hostCount) {
-        return { state: "noData" };
-    }
-
-    return {
-        state: "easySwitch",
-        hostCount,
-        currentHostIndex,
-        easySwitchSlot: currentHostIndex + 1,
-    };
-}
-
 export function parseLogitechDeviceInformationReport(
     bytes: readonly number[],
     expectedResponse: LogitechHidppExpectedResponse,
@@ -483,7 +419,10 @@ function buildLogitechShortFeatureRequest(input: {
     readonly softwareId?: number;
     readonly parameters?: readonly number[];
 }): LogitechHidppRequest {
-    const functionByte = ((input.functionId & 0x0F) << 4) | ((input.softwareId ?? 0) & 0x0F);
+    // HID++2.0 requests carry a four-bit software id. OpenLogi uses 1 for all
+    // application-originated requests; using the same id avoids devices treating
+    // later feature reads differently from the Root lookup.
+    const functionByte = ((input.functionId & 0x0F) << 4) | ((input.softwareId ?? HIDPP2_SOFTWARE_ID) & 0x0F);
     const parameters = input.parameters ?? [];
     const bytes = [
         LOGITECH_HIDPP_SHORT_REPORT_ID,
