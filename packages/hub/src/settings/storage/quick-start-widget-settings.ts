@@ -24,6 +24,8 @@ import {
     SingleMetricWidgetSchema,
     StackedMetricSlotSchema,
     StackedMetricWidgetSchema,
+    SystemBatteryMetricTargetSchema,
+    SystemMetricTargetSchema,
     type MetricSelection,
     type MetricSourcePolicy,
     type StoredWidgetSettings,
@@ -141,6 +143,11 @@ function buildQuickStartWidget(actionKind: ActionKind): QuickStartWidget | null 
                 widgetKind: "singleMetric",
                 metric: buildNetworkTrafficQuickStartMetric(),
             };
+        case "system":
+            return {
+                widgetKind: "singleMetric",
+                metric: buildSystemBatteryQuickStartMetric(),
+            };
         case "disk":
             return {
                 widgetKind: "singleMetric",
@@ -227,6 +234,20 @@ function buildNetworkTrafficQuickStartMetric(): QuickStartMetric {
                 traffic: create(NetworkMetricTarget_TrafficSchema, {
                     direction: StoredNetworkDirection.BOTH,
                 }),
+            }),
+        },
+    };
+}
+
+function buildSystemBatteryQuickStartMetric(): QuickStartMetric {
+    return {
+        target: {
+            case: "system",
+            value: create(SystemMetricTargetSchema, {
+                reading: {
+                    case: "battery",
+                    value: create(SystemBatteryMetricTargetSchema),
+                },
             }),
         },
     };

@@ -24,6 +24,7 @@ import {
     StoredWidgetSettingsSchema,
     SystemBatteryMetricTargetSchema,
     SystemMetricTargetSchema,
+    SystemPeripheralIdentitySchema,
     WidgetPreferencesSchema,
     type CatalogMetricTarget as StoredCatalogMetricTarget,
     type CustomMetricTarget as StoredCustomMetricTarget,
@@ -39,10 +40,13 @@ import {
     type SingleMetricWidget as StoredSingleMetricWidget,
     type StackedMetricSlot as StoredStackedMetricSlot,
     type StackedMetricWidget as StoredStackedMetricWidget,
+    type SystemBatteryMetricTarget as StoredSystemBatteryMetricTarget,
+    type SystemPeripheralIdentity as StoredSystemPeripheralIdentity,
     type StoredWidgetSettings,
 } from "../../../generated/proto/shometrics/v1/settings_pb.js";
 import type {
     ResolvedMetricTarget,
+    ResolvedSystemPeripheralIdentity,
 } from "../../resolved-settings";
 import { BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID } from "../../../runtime/sources/source-ids";
 import {
@@ -93,6 +97,8 @@ import {
     storedDiskThroughputDirectionByResolved,
     storedGpuMetricKindByResolved,
     storedNetworkDirectionByResolved,
+    storedSystemPeripheralBindingTransportByResolved,
+    storedSystemPeripheralReceiverKindByResolved,
 } from "../resolved-to-stored-enum-maps";
 
 export type {
@@ -172,6 +178,10 @@ function applyPatch(
             requireCustomMetricTarget(requireMetricSelection(requireSingleMetricSlot(settings))),
             patch.customMetric,
         );
+    }
+
+    if (patch.system) {
+        applySystemPatch(requireSystemBatteryTarget(requireMetricSelection(requireSingleMetricSlot(settings))), patch.system);
     }
 }
 
@@ -562,6 +572,41 @@ function applyPreferencesPatch(
     settings.preferences.pollingFrequencySeconds = patch.pollingFrequencySeconds;
 }
 
+function applySystemPatch(
+    target: StoredSystemBatteryMetricTarget,
+    patch: NonNullable<StoredWidgetSettingsPatch["system"]>,
+): void {
+    if ("peripheralIdentity" in patch) {
+        target.peripheralIdentity = patch.peripheralIdentity === undefined
+            ? undefined
+            : buildStoredSystemPeripheralIdentity(patch.peripheralIdentity);
+    }
+}
+
+function buildStoredSystemPeripheralIdentity(
+    identity: ResolvedSystemPeripheralIdentity,
+): StoredSystemPeripheralIdentity {
+    return create(SystemPeripheralIdentitySchema, {
+        vendorId: identity.vendorId,
+        productId: identity.productId,
+        manufacturer: identity.manufacturer,
+        productName: identity.productName,
+        serialNumber: identity.serialNumber,
+        interfaceNumber: identity.interfaceNumber,
+        usagePage: identity.usagePage,
+        usageId: identity.usageId,
+        bindingTransport: identity.bindingTransport === undefined
+            ? undefined
+            : storedSystemPeripheralBindingTransportByResolved[identity.bindingTransport],
+        receiverKind: identity.receiverKind === undefined
+            ? undefined
+            : storedSystemPeripheralReceiverKindByResolved[identity.receiverKind],
+        vendorUnitId: identity.vendorUnitId,
+        modelId: identity.modelId,
+        receiverSlot: identity.receiverSlot,
+    });
+}
+
 function requireSingleMetricSlot(settings: StoredWidgetSettings): StoredMetricSlot {
     if (settings.widget.case !== "singleMetric") {
         return throwPatchTargetMismatch("Cannot patch widget settings before quick-start widget initialization.");
@@ -681,6 +726,18 @@ function requireCustomMetricTarget(metric: StoredMetricSelection): StoredCustomM
     }
 
     return metric.target.value;
+}
+
+function requireSystemBatteryTarget(metric: StoredMetricSelection): StoredSystemBatteryMetricTarget {
+    if (metric.target.case !== "system") {
+        return throwPatchTargetMismatch("Cannot apply a System settings patch to a non-System metric.");
+    }
+
+    if (metric.target.value.reading.case !== "battery") {
+        return throwPatchTargetMismatch("Cannot apply a System battery settings patch to a non-battery System metric.");
+    }
+
+    return metric.target.value.reading.value;
 }
 
 function throwPatchTargetMismatch(message: string): never {

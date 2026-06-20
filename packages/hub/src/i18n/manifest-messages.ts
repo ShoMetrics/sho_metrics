@@ -74,6 +74,18 @@ export const manifestMessages = {
                 ja: "ネットワークメトリクスを表示します。",
             },
         },
+        "com.ez.sho-metrics.system": {
+            name: {
+                en: "System & Battery",
+                zh_CN: "系统与电池",
+                ja: "システムとバッテリー",
+            },
+            tooltip: {
+                en: "Displays system and supported device battery metrics.",
+                zh_CN: "显示系统和受支持设备的电池指标。",
+                ja: "システムと対応デバイスのバッテリーメトリクスを表示します。",
+            },
+        },
         "com.ez.sho-metrics.catalog-metric": {
             name: {
                 en: "Advanced Sensor",

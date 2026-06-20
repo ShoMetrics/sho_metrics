@@ -12,6 +12,7 @@ import type {
     ResolvedGpuReading,
     ResolvedMetricTarget,
     ResolvedNetworkReading,
+    ResolvedSystemPeripheralIdentity,
     ScaleMode,
     SourceFailureMode,
     TemperatureUnit,
@@ -80,6 +81,9 @@ export interface StoredWidgetSettingsPatch {
         readonly credentialId: string | undefined;
         readonly allowPublicHttpCredentials: boolean | undefined;
         readonly iconId: string | undefined;
+    }>;
+    readonly system?: Partial<{
+        readonly peripheralIdentity: ResolvedSystemPeripheralIdentity | undefined;
     }>;
     readonly dense?: DenseWidgetSettingsPatch | undefined;
     readonly stacked?: StackedWidgetSettingsPatch | undefined;

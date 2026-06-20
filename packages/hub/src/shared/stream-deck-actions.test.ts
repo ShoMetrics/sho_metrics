@@ -110,7 +110,7 @@ test("Advanced Sensor action uses a dedicated hardware icon", () => {
     assertAssetReferenceExists(advancedSensorAction?.Icon, "Advanced Sensor Icon");
 
     const iconSvg = readFileSync(`${SD_PLUGIN_ROOT}/imgs/actions/catalog-metric/icon.svg`, "utf8");
-    assert.match(iconSvg, /Lucide Computer, ISC License/u);
+    assert.match(iconSvg, /Material Symbols Developer Board, Apache-2\.0 License/u);
 });
 
 test("Dense Multi Metric action uses a dedicated list icon", () => {

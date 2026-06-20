@@ -101,6 +101,7 @@ export const initialSettingsSyncState: SettingsSyncState = {
     runtimeCache: { ...emptyWidgetRuntimeCache },
     runtimeCacheStatus: {
         diskVolumeOptionsStatus: "pending",
+        batteryDeviceOptionsStatus: "pending",
         catalogMetricDescriptorStatus: "pending",
     },
     rawGlobalSettings: undefined,
@@ -203,6 +204,9 @@ function updateRuntimeCacheStatus(
         diskVolumeOptionsStatus: "availableDiskVolumes" in patch
             ? "ready"
             : runtimeCacheStatus.diskVolumeOptionsStatus,
+        batteryDeviceOptionsStatus: "availableBatteryDevices" in patch
+            ? "ready"
+            : runtimeCacheStatus.batteryDeviceOptionsStatus,
         catalogMetricDescriptorStatus: patch.catalogMetricDescriptorLoadState
             ?? runtimeCacheStatus.catalogMetricDescriptorStatus,
     };

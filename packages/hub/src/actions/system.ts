@@ -1,33 +1,46 @@
-import type { WillAppearEvent } from "@elgato/streamdeck";
-import type { MetricStoreReader } from "../runtime/metric-store";
-import { SYSTEM_BATTERY_PERCENT_METRIC_KEY } from "../runtime/metric-keys";
+import { action, PropertyInspectorDidAppearEvent, WillAppearEvent } from "@elgato/streamdeck";
+import { MetricAction } from "./metric-action";
+import { SYSTEM_BATTERY_DEVICE_DESCRIPTOR } from "../runtime/sources/battery/battery-device-descriptor";
+import { setMetricView } from "../view-updates/runner";
+import { logger } from "../logging/logger";
+import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
+import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 import {
-    requireResolvedSingleMetricWidget,
-    type ResolvedSystemMetricTarget,
-    type ResolvedWidgetSettings,
-} from "../settings/resolved-settings";
-import type { SingleMetricViewOptions } from "../view-updates/runner";
-import { buildMetricViewIcons } from "../widgets/icons/metric-view-icons";
+    buildSystemViewOptions,
+    resolveSystemMetricKeys,
+} from "./system/view-builder";
 
-export function buildSystemViewOptions(options: {
-    readonly event: WillAppearEvent;
-    readonly settings: ResolvedWidgetSettings;
-    readonly target: ResolvedSystemMetricTarget;
-    readonly metrics: MetricStoreReader;
-}): SingleMetricViewOptions {
-    void options.target;
-    const widget = requireResolvedSingleMetricWidget(options.settings);
+const log = logger.for("Action:System");
 
-    return {
-        event: options.event,
-        metricRenderKind: "singleMetric",
-        resolvedSettings: widget.slot.appearance,
-        metricKey: SYSTEM_BATTERY_PERCENT_METRIC_KEY,
-        widgetData: options.metrics.getWidgetData(
-            SYSTEM_BATTERY_PERCENT_METRIC_KEY,
-            "BATT",
-            "%",
-        ),
-        ...buildMetricViewIcons({ hardware: "other", status: "percentage" }),
-    };
+/** System action for built-in and supported peripheral battery readings. */
+@action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.system })
+export class System extends MetricAction {
+    protected readonly actionKind = "system";
+
+    protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
+        const settings = this.resolveSettings(event);
+        const target = readResolvedMetricTarget(settings, "system");
+
+        return resolveSystemMetricKeys(target);
+    }
+
+    protected onMetricsUpdate(event: WillAppearEvent): void {
+        const settings = this.resolveSettings(event);
+        const target = readResolvedMetricTarget(settings, "system");
+
+        setMetricView(buildSystemViewOptions({
+            event,
+            settings,
+            target,
+            metrics: this.getMetricReader(event),
+        }));
+    }
+
+    protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
+        this.updateRuntimeCache(event, {
+            availableBatteryDevices: [SYSTEM_BATTERY_DEVICE_DESCRIPTOR],
+        }).catch(error => {
+            log.error(() => `Failed to publish battery devices: ${String(error)}`);
+        });
+    }
 }

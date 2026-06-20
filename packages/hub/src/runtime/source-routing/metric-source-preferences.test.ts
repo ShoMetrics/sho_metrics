@@ -20,6 +20,8 @@ import {
     GPU_USAGE_METRIC_KEY,
     GPU_VRAM_TOTAL_METRIC_KEY,
     GPU_VRAM_USED_METRIC_KEY,
+    SYSTEM_BATTERY_PERCENT_METRIC_KEY,
+    buildPeripheralBatteryPercentMetricKey,
     RAM_TOTAL_METRIC_KEY,
     RAM_USED_METRIC_KEY,
 } from "../metric-keys";
@@ -38,6 +40,8 @@ import {
 } from "./metric-source-preferences";
 import {
     NODE_SYSTEM_SOURCE_ID,
+    SYSTEM_BATTERY_SOURCE_ID,
+    VENDOR_HID_BATTERY_SOURCE_ID,
     WINDOWS_HELPER_SOURCE_ID,
 } from "../sources/source-ids";
 
@@ -47,6 +51,8 @@ const WINDOWS_HELPER_THEN_NODE_CANDIDATES = [
     { sourceId: WINDOWS_HELPER_SOURCE_ID },
     { sourceId: NODE_SYSTEM_SOURCE_ID },
 ];
+const SYSTEM_BATTERY_CANDIDATES = [{ sourceId: SYSTEM_BATTERY_SOURCE_ID }];
+const VENDOR_HID_BATTERY_CANDIDATES = [{ sourceId: VENDOR_HID_BATTERY_SOURCE_ID }];
 
 test("local auto source preference keeps OS aggregate metrics on node-system", () => {
     const nodeSystemMetricKeys = [
@@ -87,6 +93,21 @@ test("local auto source preference routes ping keys to node-system on all suppor
     assert.deepEqual(resolveLocalAutoMetricSourceCandidates(pingMetricKey, "win32"), NODE_SYSTEM_CANDIDATES);
     assert.deepEqual(resolveLocalAutoMetricSourceCandidates(pingMetricKey, "darwin"), NODE_SYSTEM_CANDIDATES);
     assert.deepEqual(resolveLocalAutoMetricSourceCandidates(pingMetricKey, "linux"), NODE_SYSTEM_CANDIDATES);
+});
+
+test("local auto source preference routes battery metrics to battery sources", () => {
+    const peripheralBatteryMetricKey = buildPeripheralBatteryPercentMetricKey("logitech.bolt.slot-2");
+
+    assert.deepEqual(
+        resolveLocalAutoMetricSourceCandidates(SYSTEM_BATTERY_PERCENT_METRIC_KEY, "win32"),
+        SYSTEM_BATTERY_CANDIDATES,
+    );
+    assert.deepEqual(
+        resolveLocalAutoMetricSourceCandidates(peripheralBatteryMetricKey, "win32"),
+        VENDOR_HID_BATTERY_CANDIDATES,
+    );
+    assert.equal(hasExplicitLocalAutoMetricSourcePreference(SYSTEM_BATTERY_PERCENT_METRIC_KEY), true);
+    assert.equal(hasExplicitLocalAutoMetricSourcePreference(peripheralBatteryMetricKey), true);
 });
 
 test("local auto source preference uses only Windows helper for helper-owned stable metrics", () => {

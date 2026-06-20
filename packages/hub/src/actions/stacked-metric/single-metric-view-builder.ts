@@ -22,7 +22,7 @@ import {
 import { buildMemoryMetricViewOptions } from "../memory";
 import type { DiskVolumeSelection } from "../disk/volume-selection";
 import { buildCustomMetricViewOptions } from "../custom-metric/single-metric-view-options";
-import { buildSystemViewOptions } from "../system";
+import { buildSystemViewOptions } from "../system/view-builder";
 
 export interface StackedSingleMetricViewBuilderContext {
     readonly event: WillAppearEvent;

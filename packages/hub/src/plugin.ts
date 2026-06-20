@@ -5,6 +5,7 @@ import { Network } from "./actions/network";
 import { Gpu } from "./actions/gpu";
 import { Memory } from "./actions/memory";
 import { Disk } from "./actions/disk";
+import { System } from "./actions/system";
 import { CatalogMetric } from "./actions/catalog-metric";
 import { CustomMetric } from "./actions/custom-metric";
 import { DenseMultiMetric } from "./actions/dense-multi-metric";
@@ -23,6 +24,7 @@ const registeredActions = [
     new Memory(),
     new Disk(),
     new Gpu(),
+    new System(),
     new CatalogMetric(),
     new CustomMetric(),
     new DenseMultiMetric(),

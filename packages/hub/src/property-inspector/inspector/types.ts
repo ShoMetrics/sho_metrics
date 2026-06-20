@@ -33,5 +33,6 @@ export interface VisibilityContext {
 /** Readiness for runtime-only option lists delivered to Property Inspector through Stream Deck SDK IPC. */
 export interface PropertyInspectorRuntimeCacheStatus {
     diskVolumeOptionsStatus: LoadStatus;
+    batteryDeviceOptionsStatus: LoadStatus;
     catalogMetricDescriptorStatus: LoadStatus;
 }

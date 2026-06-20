@@ -7,6 +7,7 @@ import { DefaultWidgetSettings } from "./DefaultWidgetSettings";
 import { DiskWidgetSettings } from "./DiskWidgetSettings";
 import { GpuWidgetSettings } from "./GpuWidgetSettings";
 import { NetworkWidgetSettings } from "./NetworkWidgetSettings";
+import { SystemWidgetSettings } from "./SystemWidgetSettings";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 
 export function SingleMetricWidgetSettings(props: WidgetSettingsPanelProps & {
@@ -33,7 +34,8 @@ export function SingleMetricWidgetSettings(props: WidgetSettingsPanelProps & {
                 />
             );
         case "memory":
-        case "system":
             return <DefaultWidgetSettings {...props} />;
+        case "system":
+            return <SystemWidgetSettings {...props} target={props.target} />;
     }
 }

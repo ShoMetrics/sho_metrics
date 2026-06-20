@@ -1,4 +1,5 @@
 import { deepEqual } from "fast-equals";
+import type { BatteryDeviceDescriptor } from "./sources/battery/battery-device-descriptor";
 import type { DiskVolumeOption } from "./disk-volumes";
 import type { NetworkInterfaceOption } from "./network-interfaces";
 import type {
@@ -18,6 +19,7 @@ import type {
 export interface WidgetRuntimeCache {
     availableNetworkInterfaces: NetworkInterfaceOption[];
     availableDiskVolumes: DiskVolumeOption[];
+    availableBatteryDevices: readonly BatteryDeviceDescriptor[];
     availableCatalogMetricDescriptors: readonly MetricDescriptor[];
     catalogMetricDescriptorLoadState: WidgetRuntimeCacheLoadState;
     catalogMetricDescriptorSourceStatus: SourceClientStatus | undefined;
@@ -76,6 +78,7 @@ export type WidgetRuntimeCachePatch = Partial<WidgetRuntimeCache>;
 export const emptyWidgetRuntimeCache: WidgetRuntimeCache = {
     availableNetworkInterfaces: [],
     availableDiskVolumes: [],
+    availableBatteryDevices: [],
     availableCatalogMetricDescriptors: [],
     catalogMetricDescriptorLoadState: "pending",
     catalogMetricDescriptorSourceStatus: undefined,
