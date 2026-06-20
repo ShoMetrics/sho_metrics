@@ -7,11 +7,15 @@ import type {
 } from "../native-hid-loader-internal";
 import {
     LOGITECH_BOLT_RECEIVER_PRODUCT_ID,
+    LOGITECH_HIDPP_CLASSIC_LONG_USAGE,
+    LOGITECH_HIDPP_CLASSIC_USAGE_PAGE,
+    LOGITECH_HIDPP_DIRECT_DEVICE_SLOT,
     LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID,
     LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID,
+    LOGITECH_HIDPP_SHORT_USAGE,
     LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
     LOGITECH_HIDPP_VENDOR_ID,
-    LOGITECH_VENDOR_USAGE_PAGE,
+    LOGITECH_UNIFYING_NANO_RECEIVER_PRODUCT_ID,
     type LogitechHidppRequest,
 } from "./hidpp-protocol";
 import { LogitechBatteryDeviceDiscoverer } from "./logitech-battery-discovery";
@@ -51,6 +55,70 @@ test("Logitech discovery hides unsupported receiver slots from normal UI candida
     assert.deepEqual(await discoverer.discoverBatteryDevices(), []);
 });
 
+test("Logitech discovery accepts Unifying Nano receiver management paths", async () => {
+    const nativeModule = new FakeNativeHidModule(
+        [buildUnifyingNanoReceiverDeviceInfo()],
+        request => responseForDiscoveryRequest(request, {
+            supportedSlot: 1,
+            batteryFeatureId: LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID,
+        }),
+    );
+    const discoverer = new LogitechBatteryDeviceDiscoverer(nativeModule);
+
+    const candidates = await discoverer.discoverBatteryDevices();
+
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0].transport, "usbReceiver");
+    assert.equal(candidates[0].receiverKind, "unifying");
+    assert.equal(candidates[0].diagnostics?.receiverSlot, 1);
+});
+
+test("Logitech discovery probes direct HID++ devices through self slot", async () => {
+    const nativeModule = new FakeNativeHidModule(
+        [buildDirectHidppLongDeviceInfo()],
+        request => responseForDiscoveryRequest(request, {
+            supportedSlot: LOGITECH_HIDPP_DIRECT_DEVICE_SLOT,
+            batteryFeatureId: LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
+        }),
+    );
+    const discoverer = new LogitechBatteryDeviceDiscoverer(nativeModule);
+
+    const candidates = await discoverer.discoverBatteryDevices();
+
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0].candidateId.startsWith("logitech-direct-"), true);
+    assert.equal(candidates[0].displayName, "G-series HID++ device");
+    assert.equal(candidates[0].transport, "usbWired");
+    assert.equal(candidates[0].receiverKind, undefined);
+    assert.equal(candidates[0].identity.vendorUnitId, "12345678");
+    assert.equal(candidates[0].identity.receiverSlot, undefined);
+    assert.equal(candidates[0].supportState, "experimental");
+});
+
+test("Logitech discovery groups direct short and long Windows collections", async () => {
+    const openedPaths: string[] = [];
+    const nativeModule = new FakeNativeHidModule(
+        [
+            buildDirectHidppLongDeviceInfo(),
+            buildDirectHidppShortSiblingDeviceInfo(),
+        ],
+        request => responseForDiscoveryRequest(request, {
+            supportedSlot: LOGITECH_HIDPP_DIRECT_DEVICE_SLOT,
+            batteryFeatureId: LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
+        }),
+        openedPaths,
+    );
+    const discoverer = new LogitechBatteryDeviceDiscoverer(nativeModule);
+
+    const candidates = await discoverer.discoverBatteryDevices();
+
+    assert.equal(candidates.length, 1);
+    assert.deepEqual(openedPaths, [
+        "hid#vid_046d&pid_b025&mi_02&col01#same-device",
+        "hid#vid_046d&pid_b025&mi_02&col02#same-device",
+    ]);
+});
+
 function buildBoltReceiverDeviceInfo(): NativeHidDeviceInfo {
     return {
         path: "bolt-path",
@@ -61,8 +129,40 @@ function buildBoltReceiverDeviceInfo(): NativeHidDeviceInfo {
         serialNumber: "receiver-serial",
         release: 0,
         interface: 2,
-        usagePage: LOGITECH_VENDOR_USAGE_PAGE,
+        usagePage: LOGITECH_HIDPP_CLASSIC_USAGE_PAGE,
         usage: 1,
+    };
+}
+
+function buildUnifyingNanoReceiverDeviceInfo(): NativeHidDeviceInfo {
+    return {
+        ...buildBoltReceiverDeviceInfo(),
+        path: "unifying-nano-path",
+        productId: LOGITECH_UNIFYING_NANO_RECEIVER_PRODUCT_ID,
+        product: "USB Receiver",
+    };
+}
+
+function buildDirectHidppLongDeviceInfo(): NativeHidDeviceInfo {
+    return {
+        path: "hid#vid_046d&pid_b025&mi_02&col02#same-device",
+        vendorId: LOGITECH_HIDPP_VENDOR_ID,
+        productId: 0xB025,
+        manufacturer: "Logitech",
+        product: "G-series HID++ device",
+        serialNumber: "raw-hid-serial-is-not-trusted",
+        release: 0,
+        interface: 2,
+        usagePage: LOGITECH_HIDPP_CLASSIC_USAGE_PAGE,
+        usage: LOGITECH_HIDPP_CLASSIC_LONG_USAGE,
+    };
+}
+
+function buildDirectHidppShortSiblingDeviceInfo(): NativeHidDeviceInfo {
+    return {
+        ...buildDirectHidppLongDeviceInfo(),
+        path: "hid#vid_046d&pid_b025&mi_02&col01#same-device",
+        usage: LOGITECH_HIDPP_SHORT_USAGE,
     };
 }
 
@@ -72,10 +172,11 @@ class FakeNativeHidModule implements NativeHidModule {
     constructor(
         private readonly deviceInfoList: readonly NativeHidDeviceInfo[],
         resolveResponse: (request: LogitechHidppRequest) => LogitechHidppExchangeResult,
+        openedPaths: string[] = [],
     ) {
         this.HID = class extends FakeNativeHidDevice {
             constructor(path: string) {
-                void path;
+                openedPaths.push(path);
                 super(resolveResponse);
             }
         };
