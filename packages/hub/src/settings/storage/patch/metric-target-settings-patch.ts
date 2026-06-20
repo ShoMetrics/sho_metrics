@@ -36,7 +36,7 @@ import {
     storedScaleModeByResolved,
     storedSourceFailureModeByResolved,
     storedTemperatureUnitByResolved,
-} from "../enum-maps";
+} from "../resolved-to-stored-enum-maps";
 import type { StoredWidgetSettingsPatch } from "./widget-settings-patch-types";
 
 export function applySourcePatch(

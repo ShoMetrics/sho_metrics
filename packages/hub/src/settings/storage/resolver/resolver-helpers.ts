@@ -1,19 +1,26 @@
 
-export function resolveStoredEnum<StoredValue extends number, ResolvedValue>(
-    storedValue: StoredValue | undefined,
-    resolvedValueByStoredValue: Record<StoredValue, ResolvedValue | undefined>,
+export function resolveProtoEnum<ProtoValue extends number, ResolvedValue>(
+    protoValue: ProtoValue | undefined,
+    resolvedValueByProtoValue: Record<ProtoValue, ResolvedValue | undefined>,
     defaultValue: ResolvedValue,
 ): ResolvedValue {
-    if (storedValue === undefined) {
+    if (protoValue === undefined) {
         return defaultValue;
     }
 
-    const resolvedValue = resolvedValueByStoredValue[storedValue];
+    const resolvedValue = resolvedValueByProtoValue[protoValue];
     if (resolvedValue === undefined) {
         return throwUnexpectedStoredSettingsState("Unexpected UNSPECIFIED enum value after protovalidate.");
     }
 
     return resolvedValue;
+}
+
+export function resolveOptionalProtoEnum<ProtoValue extends number, ResolvedValue>(
+    protoValue: ProtoValue | undefined,
+    resolvedValueByProtoValue: Record<ProtoValue, ResolvedValue | undefined>,
+): ResolvedValue | undefined {
+    return protoValue === undefined ? undefined : resolvedValueByProtoValue[protoValue];
 }
 
 export function normalizeOptionalText(value: string | undefined): string | undefined {

@@ -1,19 +1,8 @@
 import {
-    CatalogMetricCategory as StoredCatalogMetricCategory,
-    CatalogMetricReadingKind as StoredCatalogMetricReadingKind,
     CpuMetricTarget_Kind as StoredCpuMetricKind,
     DiskMetricTarget_Kind as StoredDiskMetricKind,
-    DiskMetricTarget_ThroughputDirection as StoredDiskThroughputDirection,
-    DiskMetricTarget_UsageDisplayMode as StoredDiskUsageDisplayMode,
     GpuMetricTarget_Kind as StoredGpuMetricKind,
     MemoryMetricTarget_Kind as StoredMemoryMetricKind,
-    MetricSourcePolicy_FailureMode as StoredSourceFailureMode,
-    NetworkMetricTarget_Kind as StoredNetworkMetricKind,
-    NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
-    NetworkMetricTarget_Traffic_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
-    SystemPeripheralBindingTransport as StoredSystemPeripheralBindingTransport,
-    SystemPeripheralReceiverKind as StoredSystemPeripheralReceiverKind,
-    TemperatureUnit as StoredTemperatureUnit,
     type CatalogMetricTarget as StoredCatalogMetricTarget,
     type CustomHttpMetricSource as StoredCustomHttpMetricSource,
     type CustomMetricTarget as StoredCustomMetricTarget,
@@ -37,13 +26,7 @@ import {
     normalizeNetworkPingTargetInput,
 } from "../../network-ping-target";
 import type {
-    CatalogMetricCategory,
-    CatalogMetricReadingKind,
     CustomMetricInvalidReason,
-    DiskThroughputDirection,
-    DiskUsageDisplayMode,
-    NetworkDirection,
-    NetworkTrafficDisplayMode,
     ResolvedCatalogMetricTarget,
     ResolvedCustomMetricSource,
     ResolvedCustomMetricTarget,
@@ -58,93 +41,32 @@ import type {
     ResolvedNetworkDisplaySettings,
     ResolvedNetworkReading,
     ResolvedSystemPeripheralIdentity,
-    SourceFailureMode,
-    SystemPeripheralBindingTransport,
-    SystemPeripheralReceiverKind,
-    TemperatureUnit,
 } from "../../resolved-settings";
 import type { ResolveStoredSettingsRuntimeContext } from "./resolver-types";
 import { readPositiveRuntimeMaximum } from "./display-settings-resolver";
 import {
-    resolveStoredEnum,
+    resolveOptionalProtoEnum,
+    resolveProtoEnum,
     throwUnexpectedStoredSettingsState,
 } from "./resolver-helpers";
+import {
+    catalogMetricCategoryByProto,
+    catalogMetricReadingKindByProto,
+    diskThroughputDirectionByProto,
+    diskUsageDisplayModeByProto,
+    networkDirectionByProto,
+    networkMetricKindByProto,
+    networkTrafficDisplayModeByProto,
+    sourceFailureModeByProto,
+    systemPeripheralBindingTransportByProto,
+    systemPeripheralReceiverKindByProto,
+    temperatureUnitByProto,
+} from "./stored-to-resolved-enum-maps";
 
 const DEFAULT_CPU_TEMPERATURE_CELSIUS = 100;
 const DEFAULT_CPU_POWER_WATTS = 150;
 const DEFAULT_GPU_TEMPERATURE_CELSIUS = 100;
 const DEFAULT_GPU_POWER_WATTS = 300;
-
-const sourceFailureModeByProto = {
-    [StoredSourceFailureMode.UNSPECIFIED]: undefined,
-    [StoredSourceFailureMode.SHOW_UNAVAILABLE]: "showUnavailable",
-    [StoredSourceFailureMode.USE_FALLBACK]: "useFallback",
-} satisfies Record<StoredSourceFailureMode, SourceFailureMode | undefined>;
-
-const temperatureUnitByProto = {
-    [StoredTemperatureUnit.UNSPECIFIED]: undefined,
-    [StoredTemperatureUnit.CELSIUS]: "celsius",
-    [StoredTemperatureUnit.FAHRENHEIT]: "fahrenheit",
-} satisfies Record<StoredTemperatureUnit, TemperatureUnit | undefined>;
-
-const networkDirectionByProto = {
-    [StoredNetworkDirection.UNSPECIFIED]: undefined,
-    [StoredNetworkDirection.BOTH]: "both",
-    [StoredNetworkDirection.DOWNLOAD]: "download",
-    [StoredNetworkDirection.UPLOAD]: "upload",
-} satisfies Record<StoredNetworkDirection, NetworkDirection | undefined>;
-
-const networkMetricKindByProto = {
-    [StoredNetworkMetricKind.UNSPECIFIED]: undefined,
-    [StoredNetworkMetricKind.TRAFFIC]: "traffic",
-    [StoredNetworkMetricKind.PING]: "ping",
-} satisfies Record<StoredNetworkMetricKind, ResolvedNetworkReading["kind"] | undefined>;
-
-const networkTrafficDisplayModeByProto = {
-    [StoredNetworkTrafficDisplayMode.UNSPECIFIED]: undefined,
-    [StoredNetworkTrafficDisplayMode.MIRRORED]: "mirrored",
-    [StoredNetworkTrafficDisplayMode.OVERLAY]: "overlay",
-} satisfies Record<StoredNetworkTrafficDisplayMode, NetworkTrafficDisplayMode | undefined>;
-
-const catalogMetricCategoryByProto = {
-    [StoredCatalogMetricCategory.UNSPECIFIED]: "unspecified",
-    [StoredCatalogMetricCategory.CPU]: "cpu",
-    [StoredCatalogMetricCategory.GPU]: "gpu",
-    [StoredCatalogMetricCategory.MEMORY]: "memory",
-    [StoredCatalogMetricCategory.DISK]: "disk",
-    [StoredCatalogMetricCategory.NETWORK]: "network",
-    [StoredCatalogMetricCategory.OTHER]: "other",
-} satisfies Record<StoredCatalogMetricCategory, CatalogMetricCategory>;
-
-const catalogMetricReadingKindByProto = {
-    [StoredCatalogMetricReadingKind.UNSPECIFIED]: "unspecified",
-    [StoredCatalogMetricReadingKind.USAGE]: "usage",
-    [StoredCatalogMetricReadingKind.TEMPERATURE]: "temperature",
-    [StoredCatalogMetricReadingKind.POWER]: "power",
-    [StoredCatalogMetricReadingKind.CLOCK]: "clock",
-    [StoredCatalogMetricReadingKind.FAN]: "fan",
-    [StoredCatalogMetricReadingKind.VOLTAGE]: "voltage",
-    [StoredCatalogMetricReadingKind.CURRENT]: "current",
-    [StoredCatalogMetricReadingKind.DATA]: "data",
-    [StoredCatalogMetricReadingKind.THROUGHPUT]: "throughput",
-    [StoredCatalogMetricReadingKind.TIMING]: "timing",
-    [StoredCatalogMetricReadingKind.LEVEL]: "level",
-    [StoredCatalogMetricReadingKind.CONTROL]: "control",
-    [StoredCatalogMetricReadingKind.OTHER]: "other",
-} satisfies Record<StoredCatalogMetricReadingKind, CatalogMetricReadingKind>;
-
-const diskUsageDisplayModeByProto = {
-    [StoredDiskUsageDisplayMode.UNSPECIFIED]: undefined,
-    [StoredDiskUsageDisplayMode.PERCENTAGE]: "percentage",
-    [StoredDiskUsageDisplayMode.SPACE]: "space",
-} satisfies Record<StoredDiskUsageDisplayMode, DiskUsageDisplayMode | undefined>;
-
-const diskThroughputDirectionByProto = {
-    [StoredDiskThroughputDirection.UNSPECIFIED]: undefined,
-    [StoredDiskThroughputDirection.BOTH]: "both",
-    [StoredDiskThroughputDirection.READ]: "read",
-    [StoredDiskThroughputDirection.WRITE]: "write",
-} satisfies Record<StoredDiskThroughputDirection, DiskThroughputDirection | undefined>;
 
 export function resolveMetricSelection(
     storedMetricSelection: StoredMetricSelection | undefined,
@@ -231,46 +153,15 @@ function resolveSystemPeripheralIdentity(
         interfaceNumber: storedIdentity.interfaceNumber,
         usagePage: storedIdentity.usagePage,
         usageId: storedIdentity.usageId,
-        bindingTransport: resolveSystemPeripheralBindingTransport(storedIdentity.bindingTransport),
-        receiverKind: resolveSystemPeripheralReceiverKind(storedIdentity.receiverKind),
+        bindingTransport: resolveOptionalProtoEnum(
+            storedIdentity.bindingTransport,
+            systemPeripheralBindingTransportByProto,
+        ),
+        receiverKind: resolveOptionalProtoEnum(storedIdentity.receiverKind, systemPeripheralReceiverKindByProto),
         vendorUnitId: normalizeOptionalText(storedIdentity.vendorUnitId),
         modelId: normalizeOptionalText(storedIdentity.modelId),
         receiverSlot: storedIdentity.receiverSlot,
     };
-}
-
-function resolveSystemPeripheralBindingTransport(
-    storedTransport: StoredSystemPeripheralBindingTransport | undefined,
-): SystemPeripheralBindingTransport | undefined {
-    switch (storedTransport) {
-        case StoredSystemPeripheralBindingTransport.BLUETOOTH:
-            return "bluetooth";
-        case StoredSystemPeripheralBindingTransport.USB_RECEIVER:
-            return "usbReceiver";
-        case StoredSystemPeripheralBindingTransport.USB_WIRED:
-            return "usbWired";
-        case StoredSystemPeripheralBindingTransport.UNSPECIFIED:
-            return undefined;
-    }
-}
-
-function resolveSystemPeripheralReceiverKind(
-    storedReceiverKind: StoredSystemPeripheralReceiverKind | undefined,
-): SystemPeripheralReceiverKind | undefined {
-    switch (storedReceiverKind) {
-        case StoredSystemPeripheralReceiverKind.UNKNOWN_RECEIVER:
-            return "unknownReceiver";
-        case StoredSystemPeripheralReceiverKind.BOLT:
-            return "bolt";
-        case StoredSystemPeripheralReceiverKind.UNIFYING:
-            return "unifying";
-        case StoredSystemPeripheralReceiverKind.ROG_OMNI:
-            return "rogOmni";
-        case StoredSystemPeripheralReceiverKind.LIGHTSPEED:
-            return "lightspeed";
-        case StoredSystemPeripheralReceiverKind.UNSPECIFIED:
-            return undefined;
-    }
 }
 
 function normalizeOptionalText(value: string | undefined): string | undefined {
@@ -288,7 +179,7 @@ function resolveCpuMetricTarget(
                 reading: {
                     kind: "temperature",
                     maximumCelsius: storedTarget?.maximumTemperatureCelsius ?? DEFAULT_CPU_TEMPERATURE_CELSIUS,
-                    unit: resolveStoredEnum(storedTarget?.temperatureUnit, temperatureUnitByProto, "celsius"),
+                    unit: resolveProtoEnum(storedTarget?.temperatureUnit, temperatureUnitByProto, "celsius"),
                 },
             };
         case StoredCpuMetricKind.POWER:
@@ -337,7 +228,7 @@ function resolveNetworkReading(
     storedTarget: StoredNetworkMetricTarget,
     display: ResolvedNetworkDisplaySettings,
 ): ResolvedNetworkReading {
-    const kind = resolveStoredEnum(storedTarget.kind, networkMetricKindByProto, "traffic");
+    const kind = resolveProtoEnum(storedTarget.kind, networkMetricKindByProto, "traffic");
 
     switch (kind) {
         case "ping":
@@ -353,8 +244,8 @@ function resolveNetworkReading(
             return {
                 kind: "traffic",
                 interfaceId: storedTarget.traffic?.interfaceId,
-                direction: resolveStoredEnum(storedTarget.traffic?.direction, networkDirectionByProto, "both"),
-                trafficDisplayMode: resolveStoredEnum(
+                direction: resolveProtoEnum(storedTarget.traffic?.direction, networkDirectionByProto, "both"),
+                trafficDisplayMode: resolveProtoEnum(
                     storedTarget.traffic?.trafficDisplayMode,
                     networkTrafficDisplayModeByProto,
                     "mirrored",
@@ -383,7 +274,7 @@ function resolveDiskReading(
         case StoredDiskMetricKind.THROUGHPUT:
             return {
                 kind: "throughput",
-                direction: resolveStoredEnum(
+                direction: resolveProtoEnum(
                     storedTarget.throughputDirection,
                     diskThroughputDirectionByProto,
                     "both",
@@ -394,7 +285,7 @@ function resolveDiskReading(
         case undefined:
             return {
                 kind: "usage",
-                displayMode: resolveStoredEnum(
+                displayMode: resolveProtoEnum(
                     storedTarget.usageDisplayMode,
                     diskUsageDisplayModeByProto,
                     "percentage",
@@ -426,7 +317,7 @@ function resolveGpuReading(
             return {
                 kind: "temperature",
                 maximumCelsius: storedTarget.maximumTemperatureCelsius ?? DEFAULT_GPU_TEMPERATURE_CELSIUS,
-                unit: resolveStoredEnum(storedTarget.temperatureUnit, temperatureUnitByProto, "celsius"),
+                unit: resolveProtoEnum(storedTarget.temperatureUnit, temperatureUnitByProto, "celsius"),
             };
         case StoredGpuMetricKind.VRAM:
             return { kind: "vram" };
@@ -452,12 +343,12 @@ function resolveCatalogMetricTarget(storedTarget: StoredCatalogMetricTarget): Re
         metricId: storedTarget.metricId ?? "",
         detectedLabel: storedTarget.detectedLabel,
         detectedUnit: storedTarget.detectedUnit ?? MetricUnit.UNSPECIFIED,
-        detectedCategory: resolveStoredEnum(
+        detectedCategory: resolveProtoEnum(
             storedTarget.detectedCategory,
             catalogMetricCategoryByProto,
             "unspecified",
         ),
-        detectedReadingKind: resolveStoredEnum(
+        detectedReadingKind: resolveProtoEnum(
             storedTarget.detectedReadingKind,
             catalogMetricReadingKindByProto,
             "unspecified",
@@ -592,7 +483,7 @@ function resolveMetricSourcePolicy(
     return {
         primarySourceProfileId: storedSourcePolicy?.primarySourceProfileId,
         fallbackSourceProfileIds: [...(storedSourcePolicy?.fallbackSourceProfileIds ?? [])],
-        failureMode: resolveStoredEnum(
+        failureMode: resolveProtoEnum(
             storedSourcePolicy?.failureMode,
             sourceFailureModeByProto,
             "showUnavailable",

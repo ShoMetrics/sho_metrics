@@ -1,7 +1,6 @@
 import { timestampMs } from "@bufbuild/protobuf/wkt";
 
 import {
-    ColorMode as StoredColorMode,
     type CustomHttpCredential as StoredCustomHttpCredential,
     type GlobalMetricPaintSettings as StoredGlobalMetricPaintSettings,
     type GlobalPaintOverride as StoredGlobalPaintOverride,
@@ -12,7 +11,6 @@ import {
     type StoredGlobalSettings,
 } from "../../../generated/proto/shometrics/v1/settings_pb.js";
 import type {
-    ColorMode,
     ResolvedCustomHttpCredentialSummary,
     ResolvedGlobalDefaults,
     ResolvedGlobalSettings,
@@ -39,14 +37,8 @@ import {
     resolveTerminalPaintSettings,
     resolveTransparentSurfaceSettings,
 } from "./appearance-resolver";
-import { resolveStoredEnum } from "./resolver-helpers";
-
-const colorModeByProto = {
-    [StoredColorMode.UNSPECIFIED]: undefined,
-    [StoredColorMode.MULTI_COLOR]: "multi-color",
-    [StoredColorMode.SOLID]: "solid",
-    [StoredColorMode.BLACK_WHITE]: "black-white",
-} satisfies Record<StoredColorMode, ColorMode | undefined>;
+import { resolveProtoEnum } from "./resolver-helpers";
+import { colorModeByProto } from "./stored-to-resolved-enum-maps";
 
 export function resolveStoredGlobalSettings(
     storedGlobalSettings: StoredGlobalSettings | undefined,
@@ -144,7 +136,7 @@ function resolveGlobalMetricPaintSettings(
     storedMetric: StoredGlobalMetricPaintSettings | undefined,
 ): ResolvedGlobalMetricPaintSettings {
     return {
-        colorMode: resolveStoredEnum(storedMetric?.colorMode, colorModeByProto, "solid"),
+        colorMode: resolveProtoEnum(storedMetric?.colorMode, colorModeByProto, "solid"),
         solid: resolveGlobalSolidPaintSettings(storedMetric?.solid),
         multiColor: resolveGlobalMultiColorPaintSettings(storedMetric?.multiColor),
     };

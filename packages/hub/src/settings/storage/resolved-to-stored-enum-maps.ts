@@ -1,3 +1,9 @@
+// Settings enum conversion is intentionally represented with explicit maps in
+// both directions. This write-side file proves every resolved settings union
+// value can be persisted. The read-side maps separately prove every stored
+// proto enum value is handled, including UNSPECIFIED. Do not derive one
+// direction from the other unless both exhaustiveness checks stay simple and
+// local.
 import {
     CircleViewVariant as StoredCircleViewVariant,
     CatalogMetricCategory as StoredCatalogMetricCategory,

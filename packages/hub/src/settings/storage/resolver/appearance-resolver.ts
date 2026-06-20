@@ -1,13 +1,4 @@
 import {
-    CircleViewVariant as StoredCircleViewVariant,
-    ColorMode as StoredColorMode,
-    LineAppearanceSettings_GridLineType as StoredGridLineType,
-    LineAppearanceSettings_GridLineVisibility as StoredGridLineVisibility,
-    MetricTheme as StoredMetricTheme,
-    MetricView as StoredMetricView,
-    TerminalPalettePreset as StoredTerminalPalettePreset,
-    TerminalThemeVariant as StoredTerminalThemeVariant,
-    TextViewVariant as StoredTextViewVariant,
     type AppearanceSettings as StoredAppearanceSettings,
     type AppearanceThemeSettings as StoredAppearanceThemeSettings,
     type AppearanceViewSettings as StoredAppearanceViewSettings,
@@ -28,12 +19,8 @@ import {
     type TransparentSurfaceSettings as StoredTransparentSurfaceSettings,
 } from "../../../generated/proto/shometrics/v1/settings_pb.js";
 import type {
-    CircleViewVariant,
     ColorMode,
-    GridLineType,
-    GridLineVisibility,
     MetricTheme,
-    MetricView,
     ResolvedAppearanceSettings,
     ResolvedAppearanceThemeSettings,
     ResolvedAppearanceViewSettings,
@@ -60,9 +47,6 @@ import type {
     ResolvedTerminalPaintSettings,
     ResolvedTerminalThemeSettings,
     ResolvedTransparentSurfaceSettings,
-    TerminalPalettePreset,
-    TerminalThemeVariant,
-    TextViewVariant,
 } from "../../resolved-settings";
 import {
     buildDefaultAppearanceSettings,
@@ -71,9 +55,20 @@ import {
     resolveDefaultTransparentSurfaceSettings,
 } from "../../default-appearance-settings";
 import {
-    resolveStoredEnum,
+    resolveProtoEnum,
     resolveStoredPercent,
 } from "./resolver-helpers";
+import {
+    circleViewVariantByProto,
+    colorModeByProto,
+    gridLineTypeByProto,
+    gridLineVisibilityByProto,
+    metricThemeByProto,
+    metricViewByProto,
+    terminalPalettePresetByProto,
+    terminalThemeVariantByProto,
+    textViewVariantByProto,
+} from "./stored-to-resolved-enum-maps";
 
 const DEFAULT_NETWORK_APPEARANCE_SETTINGS = buildDefaultAppearanceSettings({
     theme: {
@@ -97,70 +92,6 @@ const DEFAULT_CATALOG_APPEARANCE_SETTINGS = buildDefaultAppearanceSettings({
 });
 
 const TEXT_VIEW_DEFAULT_METRIC_COLOR_MODE = "black-white" satisfies ColorMode;
-
-const metricViewByProto = {
-    [StoredMetricView.UNSPECIFIED]: undefined,
-    [StoredMetricView.CIRCLE]: "circle",
-    [StoredMetricView.TEXT]: "text",
-    [StoredMetricView.BAR]: "bar",
-    [StoredMetricView.LINE]: "line",
-} satisfies Record<StoredMetricView, MetricView | undefined>;
-
-const circleViewVariantByProto = {
-    [StoredCircleViewVariant.UNSPECIFIED]: undefined,
-    [StoredCircleViewVariant.FULL_RING]: "full-ring",
-    [StoredCircleViewVariant.MINIMAL]: "minimal",
-    [StoredCircleViewVariant.GAUGE]: "gauge",
-} satisfies Record<StoredCircleViewVariant, CircleViewVariant | undefined>;
-
-const textViewVariantByProto = {
-    [StoredTextViewVariant.UNSPECIFIED]: undefined,
-    [StoredTextViewVariant.CENTERED]: "centered",
-    [StoredTextViewVariant.TITLE_CARD]: "title-card",
-} satisfies Record<StoredTextViewVariant, TextViewVariant | undefined>;
-
-const metricThemeByProto = {
-    [StoredMetricTheme.UNSPECIFIED]: undefined,
-    [StoredMetricTheme.FLAT]: "flat",
-    [StoredMetricTheme.CUPERTINO_GLASS]: "cupertino-glass",
-    [StoredMetricTheme.COLOR_FILLED]: "color-filled",
-    [StoredMetricTheme.TERMINAL]: "terminal",
-    [StoredMetricTheme.PIXEL_WINDOW]: "pixel-window",
-} satisfies Record<StoredMetricTheme, MetricTheme | undefined>;
-
-const terminalThemeVariantByProto = {
-    [StoredTerminalThemeVariant.UNSPECIFIED]: undefined,
-    [StoredTerminalThemeVariant.CLEAN]: "clean",
-    [StoredTerminalThemeVariant.VINTAGE]: "vintage",
-} satisfies Record<StoredTerminalThemeVariant, TerminalThemeVariant | undefined>;
-
-const terminalPalettePresetByProto = {
-    [StoredTerminalPalettePreset.UNSPECIFIED]: undefined,
-    [StoredTerminalPalettePreset.GREEN]: "green",
-    [StoredTerminalPalettePreset.AMBER]: "amber",
-    [StoredTerminalPalettePreset.CYAN]: "cyan",
-    [StoredTerminalPalettePreset.WHITE]: "white",
-} satisfies Record<StoredTerminalPalettePreset, TerminalPalettePreset | undefined>;
-
-const colorModeByProto = {
-    [StoredColorMode.UNSPECIFIED]: undefined,
-    [StoredColorMode.MULTI_COLOR]: "multi-color",
-    [StoredColorMode.SOLID]: "solid",
-    [StoredColorMode.BLACK_WHITE]: "black-white",
-} satisfies Record<StoredColorMode, ColorMode | undefined>;
-
-const gridLineVisibilityByProto = {
-    [StoredGridLineVisibility.UNSPECIFIED]: undefined,
-    [StoredGridLineVisibility.ADAPTIVE]: "adaptive",
-    [StoredGridLineVisibility.ALWAYS]: "always",
-    [StoredGridLineVisibility.NONE]: "none",
-} satisfies Record<StoredGridLineVisibility, GridLineVisibility | undefined>;
-
-const gridLineTypeByProto = {
-    [StoredGridLineType.UNSPECIFIED]: undefined,
-    [StoredGridLineType.HORIZONTAL]: "horizontal",
-    [StoredGridLineType.VERTICAL]: "vertical",
-} satisfies Record<StoredGridLineType, GridLineType | undefined>;
 
 export function resolveDenseAppearanceSettings(
     storedAppearance: StoredAppearanceSettings | undefined,
@@ -203,7 +134,7 @@ export function mergeAppearanceSettings(
     storedAppearance: StoredAppearanceSettings | undefined,
 ): ResolvedAppearanceSettings {
     const view = resolveAppearanceViewSettings(defaults.view, storedAppearance?.view);
-    const selectedTheme = resolveStoredEnum(
+    const selectedTheme = resolveProtoEnum(
         storedAppearance?.theme?.selectedTheme,
         metricThemeByProto,
         defaults.theme.selectedTheme,
@@ -274,7 +205,7 @@ export function resolveAppearanceDefaultsForViewAndTheme(
 export function resolveAppearanceThemeSettings(
     defaults: ResolvedAppearanceThemeSettings,
     storedTheme: StoredAppearanceThemeSettings | undefined,
-    selectedTheme = resolveStoredEnum(storedTheme?.selectedTheme, metricThemeByProto, defaults.selectedTheme),
+    selectedTheme = resolveProtoEnum(storedTheme?.selectedTheme, metricThemeByProto, defaults.selectedTheme),
 ): ResolvedAppearanceThemeSettings {
     return {
         selectedTheme,
@@ -317,7 +248,7 @@ function resolveTerminalThemeSettings(
     storedTerminal: StoredTerminalThemeSettings | undefined,
 ): ResolvedTerminalThemeSettings {
     return {
-        variant: resolveStoredEnum(storedTerminal?.variant, terminalThemeVariantByProto, defaults.variant),
+        variant: resolveProtoEnum(storedTerminal?.variant, terminalThemeVariantByProto, defaults.variant),
         paint: resolveTerminalPaintSettings(defaults.paint, storedTerminal?.paint),
     };
 }
@@ -327,7 +258,7 @@ export function resolveTerminalPaintSettings(
     storedPaint: StoredTerminalPaintSettings | undefined,
 ): ResolvedTerminalPaintSettings {
     return {
-        preset: resolveStoredEnum(storedPaint?.preset, terminalPalettePresetByProto, defaults.preset),
+        preset: resolveProtoEnum(storedPaint?.preset, terminalPalettePresetByProto, defaults.preset),
     };
 }
 
@@ -381,13 +312,13 @@ export function resolveAppearanceViewSettings(
     storedView: StoredAppearanceViewSettings | undefined,
 ): ResolvedAppearanceViewSettings {
     return {
-        selectedView: resolveStoredEnum(storedView?.selectedView, metricViewByProto, defaults.selectedView),
-        circleVariant: resolveStoredEnum(
+        selectedView: resolveProtoEnum(storedView?.selectedView, metricViewByProto, defaults.selectedView),
+        circleVariant: resolveProtoEnum(
             storedView?.circleVariant,
             circleViewVariantByProto,
             defaults.circleVariant,
         ),
-        textVariant: resolveStoredEnum(
+        textVariant: resolveProtoEnum(
             storedView?.textVariant,
             textViewVariantByProto,
             defaults.textVariant,
@@ -400,7 +331,7 @@ export function resolveColorFilledPaintSettings(
     storedPaint: StoredColorFilledPaintSettings | undefined,
 ): ResolvedColorFilledPaintSettings {
     return {
-        colorMode: resolveStoredEnum(storedPaint?.colorMode, colorModeByProto, defaults.colorMode),
+        colorMode: resolveProtoEnum(storedPaint?.colorMode, colorModeByProto, defaults.colorMode),
         solid: resolveColorFilledSolidPaintSettings(defaults.solid, storedPaint?.solid),
         multiColor: resolveColorFilledMultiColorPaintSettings(defaults.multiColor, storedPaint?.multiColor),
     };
@@ -431,7 +362,7 @@ function resolveMetricPaintSettings(
     storedMetricPaint: StoredMetricPaintSettings | undefined,
 ): ResolvedMetricPaintSettings {
     return {
-        colorMode: resolveStoredEnum(storedMetricPaint?.colorMode, colorModeByProto, defaults.colorMode),
+        colorMode: resolveProtoEnum(storedMetricPaint?.colorMode, colorModeByProto, defaults.colorMode),
         solid: resolveMetricSolidPaintSettings(defaults.solid, storedMetricPaint?.solid),
         multiColor: resolveMetricMultiColorPaintSettings(defaults.multiColor, storedMetricPaint?.multiColor),
     };
@@ -481,12 +412,12 @@ function resolveLineAppearanceSettings(
 ): ResolvedLineAppearanceSettings {
     return {
         lineSmoothingPercent: storedLine?.lineSmoothingPercent ?? defaults.lineSmoothingPercent,
-        gridLineVisibility: resolveStoredEnum(
+        gridLineVisibility: resolveProtoEnum(
             storedLine?.gridLineVisibility,
             gridLineVisibilityByProto,
             defaults.gridLineVisibility,
         ),
-        gridLineType: resolveStoredEnum(storedLine?.gridLineType, gridLineTypeByProto, defaults.gridLineType),
+        gridLineType: resolveProtoEnum(storedLine?.gridLineType, gridLineTypeByProto, defaults.gridLineType),
     };
 }
 

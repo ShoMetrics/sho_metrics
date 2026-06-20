@@ -243,6 +243,15 @@ Do not turn boundary discipline into a framework.
   - PI decides how to display generated `UNSPECIFIED`.
   - Planner, store, actions, and renderer all receive a generated IPC response.
 
+* **DO: Keep settings enum boundary conversions explicit.**
+  Example: read stored proto enums through
+  `settings/storage/resolver/stored-to-resolved-enum-maps.ts`, and write
+  resolved settings enums through
+  `settings/storage/resolved-to-stored-enum-maps.ts`. Prefer simple explicit
+  maps that keep compile-time exhaustiveness at the boundary. Do not be rigid:
+  use a smaller local conversion when it is truly local and does not create a
+  second source of truth.
+
 The following rules refine source IPC/API boundaries. They do not change the
 stored/resolved settings ownership rules above.
 

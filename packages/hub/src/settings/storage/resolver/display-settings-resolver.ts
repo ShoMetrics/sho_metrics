@@ -1,18 +1,18 @@
 
 import {
-    NetworkDisplaySettings_UnitBase as StoredNetworkUnitBase,
-    ScaleMode as StoredScaleMode,
     type DiskThroughputDisplaySettings as StoredDiskThroughputDisplaySettings,
     type NetworkDisplaySettings as StoredNetworkDisplaySettings,
 } from "../../../generated/proto/shometrics/v1/settings_pb.js";
 import type {
-    NetworkUnitBase,
     ResolvedDiskThroughputDisplaySettings,
     ResolvedNetworkDisplaySettings,
-    ScaleMode,
 } from "../../resolved-settings";
 import type { ResolveStoredSettingsRuntimeContext } from "./resolver-types";
-import { resolveStoredEnum } from "./resolver-helpers";
+import { resolveProtoEnum } from "./resolver-helpers";
+import {
+    networkUnitBaseByProto,
+    scaleModeByProto,
+} from "./stored-to-resolved-enum-maps";
 
 const DEFAULT_NETWORK_DISPLAY_SETTINGS: ResolvedNetworkDisplaySettings = {
     scaleMode: "auto",
@@ -27,18 +27,6 @@ const DEFAULT_DISK_THROUGHPUT_DISPLAY_SETTINGS: ResolvedDiskThroughputDisplaySet
     maximumWriteThroughputMebibytesPerSecond: undefined,
 };
 
-const scaleModeByProto = {
-    [StoredScaleMode.UNSPECIFIED]: undefined,
-    [StoredScaleMode.AUTO]: "auto",
-    [StoredScaleMode.CUSTOM]: "custom",
-} satisfies Record<StoredScaleMode, ScaleMode | undefined>;
-
-const networkUnitBaseByProto = {
-    [StoredNetworkUnitBase.UNSPECIFIED]: undefined,
-    [StoredNetworkUnitBase.BYTE]: "byte",
-    [StoredNetworkUnitBase.BIT]: "bit",
-} satisfies Record<StoredNetworkUnitBase, NetworkUnitBase | undefined>;
-
 export function resolveNetworkDisplayDefaults(
     storedSettings: StoredNetworkDisplaySettings | undefined,
 ): ResolvedNetworkDisplaySettings {
@@ -50,14 +38,14 @@ export function resolveNetworkDisplaySettings(
     storedSettings: StoredNetworkDisplaySettings | undefined,
     runtime: ResolveStoredSettingsRuntimeContext | undefined,
 ): ResolvedNetworkDisplaySettings {
-    const scaleMode = resolveStoredEnum(storedSettings?.scaleMode, scaleModeByProto, defaults.scaleMode);
+    const scaleMode = resolveProtoEnum(storedSettings?.scaleMode, scaleModeByProto, defaults.scaleMode);
     const configuredSettings = {
         scaleMode,
         maximumDownloadSpeedMegabitsPerSecond: storedSettings?.maximumDownloadSpeedMegabitsPerSecond
             ?? defaults.maximumDownloadSpeedMegabitsPerSecond,
         maximumUploadSpeedMegabitsPerSecond: storedSettings?.maximumUploadSpeedMegabitsPerSecond
             ?? defaults.maximumUploadSpeedMegabitsPerSecond,
-        unitBase: resolveStoredEnum(storedSettings?.unitBase, networkUnitBaseByProto, defaults.unitBase),
+        unitBase: resolveProtoEnum(storedSettings?.unitBase, networkUnitBaseByProto, defaults.unitBase),
     };
 
     if (configuredSettings.scaleMode !== "auto") {
@@ -92,7 +80,7 @@ export function resolveDiskThroughputDisplaySettings(
     storedSettings: StoredDiskThroughputDisplaySettings | undefined,
     runtime: ResolveStoredSettingsRuntimeContext | undefined,
 ): ResolvedDiskThroughputDisplaySettings {
-    const scaleMode = resolveStoredEnum(storedSettings?.scaleMode, scaleModeByProto, defaults.scaleMode);
+    const scaleMode = resolveProtoEnum(storedSettings?.scaleMode, scaleModeByProto, defaults.scaleMode);
     const configuredSettings = {
         scaleMode,
         maximumReadThroughputMebibytesPerSecond: storedSettings?.maximumReadThroughputMebibytesPerSecond

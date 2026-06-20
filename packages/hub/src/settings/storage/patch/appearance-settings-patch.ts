@@ -41,7 +41,7 @@ import {
     storedTerminalThemeVariantByResolved,
     storedTextViewVariantByResolved,
     storedThemeByResolved,
-} from "../enum-maps";
+} from "../resolved-to-stored-enum-maps";
 import { applyStoredTransparentSurfacePatch } from "../transparent-surface-patch";
 
 export function applyAppearancePatch(
