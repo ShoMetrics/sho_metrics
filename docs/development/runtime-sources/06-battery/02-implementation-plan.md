@@ -330,9 +330,11 @@ Work:
 
 - Add system battery readings through standard Node/system APIs.
 - Support Windows laptops and MacBooks.
-- Add percent and power source first. Add time remaining, cycle count, health,
-  adapter watts, and thermal pressure only when the platform API exposes them
-  reliably.
+- Add percent first. Add charging or power-source display state only when the
+  System action has a concrete runtime display context for it. Add time
+  remaining, cycle count, health, adapter watts, and thermal pressure only when
+  the platform API exposes them reliably and there is a display contract for
+  them.
 - Route system battery through `node-system`.
 
 Rules:
@@ -784,4 +786,3 @@ Stop and update this plan before coding if any of these happen:
 - No standalone Battery action.
 - No host-name reading or writing for Logitech v1.
 - No product claim that all ROG or all Logitech devices are supported.
-

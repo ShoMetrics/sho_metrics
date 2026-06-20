@@ -40,7 +40,6 @@ import {
 } from "./metric-source-preferences";
 import {
     NODE_SYSTEM_SOURCE_ID,
-    SYSTEM_BATTERY_SOURCE_ID,
     VENDOR_HID_BATTERY_SOURCE_ID,
     WINDOWS_HELPER_SOURCE_ID,
 } from "../sources/source-ids";
@@ -51,7 +50,6 @@ const WINDOWS_HELPER_THEN_NODE_CANDIDATES = [
     { sourceId: WINDOWS_HELPER_SOURCE_ID },
     { sourceId: NODE_SYSTEM_SOURCE_ID },
 ];
-const SYSTEM_BATTERY_CANDIDATES = [{ sourceId: SYSTEM_BATTERY_SOURCE_ID }];
 const VENDOR_HID_BATTERY_CANDIDATES = [{ sourceId: VENDOR_HID_BATTERY_SOURCE_ID }];
 
 test("local auto source preference keeps OS aggregate metrics on node-system", () => {
@@ -100,7 +98,15 @@ test("local auto source preference routes battery metrics to battery sources", (
 
     assert.deepEqual(
         resolveLocalAutoMetricSourceCandidates(SYSTEM_BATTERY_PERCENT_METRIC_KEY, "win32"),
-        SYSTEM_BATTERY_CANDIDATES,
+        NODE_SYSTEM_CANDIDATES,
+    );
+    assert.deepEqual(
+        resolveLocalAutoMetricSourceCandidates(SYSTEM_BATTERY_PERCENT_METRIC_KEY, "darwin"),
+        NODE_SYSTEM_CANDIDATES,
+    );
+    assert.deepEqual(
+        resolveLocalAutoMetricSourceCandidates(SYSTEM_BATTERY_PERCENT_METRIC_KEY, "linux"),
+        [],
     );
     assert.deepEqual(
         resolveLocalAutoMetricSourceCandidates(peripheralBatteryMetricKey, "win32"),
@@ -235,6 +241,7 @@ test("local auto source preference covers stable metric key inventories", () => 
         ...GPU_METRIC_KEYS,
         RAM_USED_METRIC_KEY,
         RAM_TOTAL_METRIC_KEY,
+        SYSTEM_BATTERY_PERCENT_METRIC_KEY,
     ]) {
         assert.equal(
             builtInStableMetricKeySet.has(metricKey),
@@ -253,4 +260,3 @@ test("local auto source preference gives every stable built-in metric a Windows 
         );
     }
 });
-

@@ -22,7 +22,6 @@ import {
 import type { SourceCandidate } from "./metric-read-plan";
 import {
     NODE_SYSTEM_SOURCE_ID,
-    SYSTEM_BATTERY_SOURCE_ID,
     VENDOR_HID_BATTERY_SOURCE_ID,
     WINDOWS_HELPER_SOURCE_ID,
 } from "../sources/source-ids";
@@ -35,6 +34,7 @@ const NODE_SYSTEM_ONLY_METRIC_KEYS = [
     CPU_MODEL_METRIC_KEY,
     RAM_USED_METRIC_KEY,
     RAM_TOTAL_METRIC_KEY,
+    SYSTEM_BATTERY_PERCENT_METRIC_KEY,
     getNetworkAggregateMetricKey("download"),
     getNetworkAggregateMetricKey("upload"),
     getDefaultDiskUsageMetricKey("used"),
@@ -55,7 +55,6 @@ const WINDOWS_HELPER_ON_WINDOWS_NODE_ON_OTHER_PLATFORM_METRIC_KEYS = [
 
 const WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEYS = [...GPU_METRIC_KEYS] as const;
 
-const SYSTEM_BATTERY_CANDIDATES = [{ sourceId: SYSTEM_BATTERY_SOURCE_ID }] as const;
 const VENDOR_HID_BATTERY_CANDIDATES = [{ sourceId: VENDOR_HID_BATTERY_SOURCE_ID }] as const;
 
 /**
@@ -70,7 +69,6 @@ const VENDOR_HID_BATTERY_CANDIDATES = [{ sourceId: VENDOR_HID_BATTERY_SOURCE_ID 
  */
 export const BUILT_IN_STABLE_METRIC_KEYS = [
     ...NODE_SYSTEM_ONLY_METRIC_KEYS,
-    SYSTEM_BATTERY_PERCENT_METRIC_KEY,
     ...WINDOWS_HELPER_ONLY_METRIC_KEYS,
     ...WINDOWS_HELPER_ON_WINDOWS_NODE_ON_OTHER_PLATFORM_METRIC_KEYS,
     ...WINDOWS_HELPER_WITH_NODE_FALLBACK_METRIC_KEYS,
@@ -103,11 +101,7 @@ export function resolveLocalAutoMetricSourceCandidates(
     metricKey: string,
     platform: MetricSupportPlatform,
 ): readonly SourceCandidate[] {
-    if (metricKey === SYSTEM_BATTERY_PERCENT_METRIC_KEY) {
-        return SYSTEM_BATTERY_CANDIDATES;
-    }
-
-    if (isBatteryMetricKey(metricKey)) {
+    if (isBatteryMetricKey(metricKey) && metricKey !== SYSTEM_BATTERY_PERCENT_METRIC_KEY) {
         return VENDOR_HID_BATTERY_CANDIDATES;
     }
 
@@ -182,8 +176,6 @@ export function localSourceSupportsMetricOnPlatform(
     switch (sourceId) {
         case WINDOWS_HELPER_SOURCE_ID:
             return platform === "win32";
-        case SYSTEM_BATTERY_SOURCE_ID:
-            return metricKey === SYSTEM_BATTERY_PERCENT_METRIC_KEY;
         case VENDOR_HID_BATTERY_SOURCE_ID:
             return isBatteryMetricKey(metricKey) && metricKey !== SYSTEM_BATTERY_PERCENT_METRIC_KEY;
         case NODE_SYSTEM_SOURCE_ID:

@@ -46,6 +46,7 @@ import {
     isCpuMetricKey,
     isGpuMetricKey,
     isRamMetricKey,
+    isSystemMetricKey,
 } from "../../metric-keys";
 import { formatCpuModelText, isFinitePositiveNumber } from "./node-system-cpu";
 import {
@@ -84,6 +85,7 @@ import { BackoffPolicy } from "../backoff-policy";
 import { RefreshableCache, type RefreshableCacheReadResult } from "../refreshable-cache";
 import type { SourceMetricPollingGroupResolution } from "../source-polling-groups";
 import { NODE_SYSTEM_SOURCE_ID } from "../source-ids";
+import { buildSystemBatteryMetrics } from "./node-system-battery";
 
 const log = logger.for("Source:NodeSystem");
 const networkLog = logger.for("Source:NodeSystem:Network");
@@ -250,15 +252,16 @@ export class NodeSystemSource implements MetricSource {
         const metricGroups = resolveCollectorGroups(metricKeys);
         const snapshotTimestampMilliseconds = this.wallClockNow();
 
-        const [cpuMetrics, memoryMetrics, diskMetrics, networkMetrics, gpu] = await Promise.all([
+        const [cpuMetrics, memoryMetrics, diskMetrics, networkMetrics, batteryMetrics, gpu] = await Promise.all([
             metricGroups.has("cpu") ? this.pollCpu() : Promise.resolve({}),
             metricGroups.has("memory") ? this.pollMemory() : Promise.resolve({}),
             metricGroups.has("disk") ? this.pollDiskSafely(metricKeys) : Promise.resolve({}),
             metricGroups.has("network") ? this.pollNetworkSafely(metricKeys) : Promise.resolve({}),
+            metricGroups.has("battery") ? this.pollBatterySafely() : Promise.resolve({}),
             metricGroups.has("gpu") ? this.pollGpu() : Promise.resolve(null),
         ]);
 
-        Object.assign(metrics, cpuMetrics, memoryMetrics, diskMetrics, networkMetrics);
+        Object.assign(metrics, cpuMetrics, memoryMetrics, diskMetrics, networkMetrics, batteryMetrics);
 
         if (gpu) {
             if (typeof gpu.utilizationGpu === "number" && Number.isFinite(gpu.utilizationGpu)) {
@@ -465,6 +468,17 @@ export class NodeSystemSource implements MetricSource {
             return await this.pollNetwork(metricKeys);
         } catch (error) {
             networkLog.error(() => `Network poll error: ${String(error)}`);
+            return {};
+        }
+    }
+
+    private async pollBatterySafely(): Promise<Record<string, MetricValue>> {
+        try {
+            const batteryData = await this.systemInformation.battery();
+
+            return buildSystemBatteryMetrics(batteryData);
+        } catch (error) {
+            log.error(() => `Battery poll error: ${String(error)}`);
             return {};
         }
     }
@@ -755,7 +769,7 @@ export class NodeSystemSource implements MetricSource {
 
 export function resolveCollectorGroups(metricKeys: readonly string[]): Set<NodeSystemMetricGroup> {
     if (metricKeys.length === 0) {
-        return new Set(["cpu", "memory", "disk", "network", "gpu"]);
+        return new Set(["cpu", "memory", "disk", "network", "gpu", "battery"]);
     }
 
     const metricGroups = new Set<NodeSystemMetricGroup>();
@@ -789,6 +803,10 @@ export function resolveNodeSystemMetricGroup(metricKey: string): NodeSystemMetri
 
     if (isGpuMetricKey(metricKey)) {
         return "gpu";
+    }
+
+    if (isSystemMetricKey(metricKey)) {
+        return "battery";
     }
 
     return undefined;

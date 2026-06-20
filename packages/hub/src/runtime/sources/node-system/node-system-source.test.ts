@@ -45,6 +45,7 @@ import {
     buildNetworkInterface,
     buildNetworkStats,
 } from "./node-system-source-test-helpers";
+import { SYSTEM_BATTERY_PERCENT_METRIC_KEY } from "../../metric-keys";
 import type {
     NodeSystemGpuTelemetryData,
     NodeSystemInformationClient,
@@ -54,23 +55,25 @@ import type { DiskVolumeOption } from "../../disk-volumes";
 import type { NetworkInterfaceOption } from "../../network-interfaces";
 
 test("collector groups resolve all groups when no metric keys are requested", () => {
-    assertMetricGroups(resolveCollectorGroups([]), ["cpu", "disk", "gpu", "memory", "network"]);
+    assertMetricGroups(resolveCollectorGroups([]), ["battery", "cpu", "disk", "gpu", "memory", "network"]);
 });
 
 test("collector groups resolve only requested key prefixes", () => {
     assertMetricGroups(resolveCollectorGroups([
         "net.down",
         "cpu.usage_percent",
+        SYSTEM_BATTERY_PERCENT_METRIC_KEY,
         "gpu.temp",
         "unknown.metric",
-    ]), ["cpu", "gpu", "network"]);
+    ]), ["battery", "cpu", "gpu", "network"]);
 });
 
 test("node system source declares polling groups for owned metric keys", () => {
-    const source = new NodeSystemSource();
+    const source = new NodeSystemSource({ platform: "win32" });
 
     const resolutions = source.resolveMetricPollingGroups([
         "cpu.usage_percent",
+        SYSTEM_BATTERY_PERCENT_METRIC_KEY,
         "net.down",
         "unknown.metric",
     ]);
@@ -78,6 +81,10 @@ test("node system source declares polling groups for owned metric keys", () => {
     assert.deepEqual(resolutions.get("cpu.usage_percent"), {
         state: "owned",
         pollingGroupId: "cpu",
+    });
+    assert.deepEqual(resolutions.get(SYSTEM_BATTERY_PERCENT_METRIC_KEY), {
+        state: "owned",
+        pollingGroupId: "battery",
     });
     assert.deepEqual(resolutions.get("net.down"), {
         state: "owned",
@@ -124,6 +131,138 @@ test("node system source declares unsupported helper-only and macOS GPU metrics"
     assert.deepEqual(resolutions.get("gpu.power"), {
         state: "unsupported",
     });
+});
+
+test("node system source declares system battery unsupported outside Windows and macOS", () => {
+    const source = new NodeSystemSource({ platform: "linux" });
+
+    const resolutions = source.resolveMetricPollingGroups([SYSTEM_BATTERY_PERCENT_METRIC_KEY]);
+
+    assert.deepEqual(resolutions.get(SYSTEM_BATTERY_PERCENT_METRIC_KEY), {
+        state: "unsupported",
+    });
+});
+
+test("node system source polls built-in system battery percent", async () => {
+    const callCounts = buildCallCounts();
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            battery: async () => {
+                callCounts.battery += 1;
+                return buildBatteryData({
+                    hasBattery: true,
+                    percent: 72,
+                    isCharging: false,
+                    acConnected: false,
+                });
+            },
+        }),
+    });
+
+    const snapshot = await source.pollMetrics([SYSTEM_BATTERY_PERCENT_METRIC_KEY]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.deepEqual(metrics, {
+        [SYSTEM_BATTERY_PERCENT_METRIC_KEY]: {
+            scalar: 72,
+            unit: MetricUnit.PERCENT,
+        },
+    });
+    assert.equal(callCounts.battery, 1);
+    assert.equal(callCounts.currentLoad, 0);
+    assert.equal(callCounts.mem, 0);
+    assert.equal(callCounts.fsSize, 0);
+    assert.equal(callCounts.networkInterfaces, 0);
+});
+
+test("node system source omits built-in system battery when no battery is present", async () => {
+    const callCounts = buildCallCounts();
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            battery: async () => {
+                callCounts.battery += 1;
+                return buildBatteryData({
+                    hasBattery: false,
+                    percent: 100,
+                    isCharging: false,
+                    acConnected: true,
+                });
+            },
+        }),
+    });
+
+    const snapshot = await source.pollMetrics([SYSTEM_BATTERY_PERCENT_METRIC_KEY]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.deepEqual(metrics, {});
+    assert.equal(callCounts.battery, 1);
+});
+
+test("node system source omits built-in system battery when percent is invalid", async () => {
+    for (const percent of [-1, 101, Number.NaN]) {
+        const callCounts = buildCallCounts();
+        const source = new NodeSystemSource({
+            systemInformation: buildCountingSystemInformation(callCounts, {
+                battery: async () => {
+                    callCounts.battery += 1;
+                    return buildBatteryData({
+                        hasBattery: true,
+                        percent,
+                    });
+                },
+            }),
+        });
+
+        const snapshot = await source.pollMetrics([SYSTEM_BATTERY_PERCENT_METRIC_KEY]);
+        const metrics = assertSnapshotMetrics(snapshot);
+
+        assert.deepEqual(metrics, {});
+        assert.equal(callCounts.battery, 1);
+    }
+});
+
+test("node system source accepts charging and discharging battery states", async () => {
+    for (const batteryData of [
+        buildBatteryData({ hasBattery: true, percent: 55, isCharging: true, acConnected: true }),
+        buildBatteryData({ hasBattery: true, percent: 55, isCharging: false, acConnected: false }),
+    ]) {
+        const callCounts = buildCallCounts();
+        const source = new NodeSystemSource({
+            systemInformation: buildCountingSystemInformation(callCounts, {
+                battery: async () => {
+                    callCounts.battery += 1;
+                    return batteryData;
+                },
+            }),
+        });
+
+        const snapshot = await source.pollMetrics([SYSTEM_BATTERY_PERCENT_METRIC_KEY]);
+        const metrics = assertSnapshotMetrics(snapshot);
+
+        assert.deepEqual(metrics[SYSTEM_BATTERY_PERCENT_METRIC_KEY], {
+            scalar: 55,
+            unit: MetricUnit.PERCENT,
+        });
+        assert.equal(callCounts.battery, 1);
+    }
+});
+
+test("node system source omits built-in system battery on unavailable platform data", async () => {
+    const callCounts = buildCallCounts();
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            battery: async () => {
+                callCounts.battery += 1;
+                throw new Error("battery unavailable");
+            },
+        }),
+    });
+
+    const snapshot = await source.pollMetrics([SYSTEM_BATTERY_PERCENT_METRIC_KEY]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.deepEqual(metrics, {});
+    assert.equal(callCounts.battery, 1);
 });
 
 test("node system source polls only the requested CPU group and exposes cached CPU info on the next poll", async () => {
@@ -1175,6 +1314,7 @@ interface NodeSystemSourceCallCounts {
     currentLoad: number;
     cpu: number;
     mem: number;
+    battery: number;
     fsSize: number;
     blockDevices: number;
     diskLayout: number;
@@ -1192,6 +1332,7 @@ function buildCallCounts(): NodeSystemSourceCallCounts {
         currentLoad: 0,
         cpu: 0,
         mem: 0,
+        battery: 0,
         fsSize: 0,
         blockDevices: 0,
         diskLayout: 0,
@@ -1221,6 +1362,10 @@ function buildCountingSystemInformation(
         mem: async () => {
             callCounts.mem += 1;
             return { used: 0, total: 0 } as Systeminformation.MemData;
+        },
+        battery: async () => {
+            callCounts.battery += 1;
+            return buildBatteryData({});
         },
         fsSize: async () => {
             callCounts.fsSize += 1;
@@ -1312,6 +1457,27 @@ function buildCpuData(overrides: Partial<Systeminformation.CpuData>): Systeminfo
         cache: {},
         ...overrides,
     } as Systeminformation.CpuData;
+}
+
+function buildBatteryData(overrides: Partial<Systeminformation.BatteryData>): Systeminformation.BatteryData {
+    return {
+        hasBattery: true,
+        cycleCount: 0,
+        isCharging: false,
+        voltage: 0,
+        designedCapacity: 0,
+        maxCapacity: 0,
+        currentCapacity: 0,
+        capacityUnit: "",
+        percent: 50,
+        timeRemaining: 0,
+        acConnected: false,
+        type: "",
+        model: "",
+        manufacturer: "",
+        serial: "",
+        ...overrides,
+    };
 }
 
 function buildFileSystem(overrides: Partial<Systeminformation.FsSizeData> = {}): Systeminformation.FsSizeData {
