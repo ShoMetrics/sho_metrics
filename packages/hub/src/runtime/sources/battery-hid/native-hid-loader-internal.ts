@@ -10,7 +10,7 @@ export type NativeHidDevice = Pick<
 
 /** Defines the narrow `node-hid` surface owned by the battery HID runtime. */
 export interface NativeHidModule {
-    readonly HID: new(path: string) => NativeHidDevice;
+    readonly HID: new(path: string, options?: { readonly nonExclusive?: boolean }) => NativeHidDevice;
     devices(): NativeHidDeviceInfo[];
 }
 

@@ -10,8 +10,10 @@ import {
     buildLogitechUnifiedBatteryInfoRequest,
     LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID,
     LOGITECH_HIDPP_CHANGE_HOST_FEATURE_ID,
+    LOGITECH_HIDPP_CLASSIC_USAGE_PAGE,
     LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID,
     LOGITECH_HIDPP_MAX_RECEIVER_SLOT,
+    LOGITECH_HIDPP_SHORT_USAGE,
     LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
     matchesLogitechHidppExpectedResponse,
     parseLogitechBatteryStatusReport,
@@ -391,15 +393,32 @@ export function openNativeLogitechHidppTransport(
     nativeDeviceInfoList: readonly NativeHidDeviceInfo[],
     openDevice: (path: string) => NativeHidDevice,
 ): NativeLogitechHidppTransport | undefined {
-    const devicePathList = nativeDeviceInfoList.flatMap(deviceInfo =>
-        deviceInfo.path === undefined ? [] : [deviceInfo.path],
-    );
+    const devicePathList = [...nativeDeviceInfoList]
+        .sort(compareLogitechWriteHandlePreference)
+        .flatMap(deviceInfo =>
+            deviceInfo.path === undefined ? [] : [deviceInfo.path],
+        );
     if (devicePathList.length === 0) {
         return undefined;
     }
 
     const openedDevices = devicePathList.map(path => openDevice(path));
     return new NativeLogitechHidppTransport(openedDevices[0], openedDevices);
+}
+
+function compareLogitechWriteHandlePreference(
+    left: NativeHidDeviceInfo,
+    right: NativeHidDeviceInfo,
+): number {
+    return scoreLogitechWriteHandle(right) - scoreLogitechWriteHandle(left)
+        || (left.path ?? "").localeCompare(right.path ?? "");
+}
+
+function scoreLogitechWriteHandle(deviceInfo: NativeHidDeviceInfo): number {
+    return deviceInfo.usagePage === LOGITECH_HIDPP_CLASSIC_USAGE_PAGE &&
+        deviceInfo.usage === LOGITECH_HIDPP_SHORT_USAGE
+        ? 1
+        : 0;
 }
 
 function parseFeatureExchangeResult(
