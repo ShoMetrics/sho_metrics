@@ -105,29 +105,6 @@ test("battery discovery does not coalesce untrusted shared serial numbers", () =
     );
 });
 
-test("battery discovery coalesces serial numbers only when discoverers vouch for unit uniqueness", () => {
-    const descriptors = resolveBatteryDeviceDescriptors([
-        buildCandidate({
-            candidateId: "bluetooth",
-            transport: "bluetooth",
-            vendorUnitId: undefined,
-            serialNumber: "serial-2",
-            serialNumberIsUnitUnique: true,
-        }),
-        buildCandidate({
-            candidateId: "wired",
-            transport: "usbWired",
-            receiverKind: undefined,
-            vendorUnitId: undefined,
-            serialNumber: "serial-2",
-            serialNumberIsUnitUnique: true,
-        }),
-    ], enabledDiscoveryOptions());
-
-    assert.equal(descriptors.length, 1);
-    assert.equal(descriptors[0].diagnostics?.coalescing, "unitId");
-});
-
 test("battery discovery does not treat receiver slot as primary identity", () => {
     const descriptors = resolveBatteryDeviceDescriptors([
         buildCandidate({
@@ -144,6 +121,43 @@ test("battery discovery does not treat receiver slot as primary identity", () =>
 
     assert.equal(descriptors.length, 1);
     assert.deepEqual(descriptors[0].diagnostics?.receiverSlots, [1, 3]);
+});
+
+test("battery discovery keeps descriptor keys stable across route-local field changes", () => {
+    const receiverCandidate = buildCandidate({
+        candidateId: "receiver",
+        transport: "usbReceiver",
+        receiverKind: "bolt",
+        receiverSlot: 2,
+        vendorUnitId: "unit-2",
+    });
+    const bluetoothCandidate: BatteryDeviceDiscoveryCandidate = {
+        ...buildCandidate({
+            candidateId: "bluetooth",
+            transport: "bluetooth",
+            receiverKind: undefined,
+            receiverSlot: undefined,
+            vendorUnitId: "unit-2",
+        }),
+        displayName: "MX Master 4 Bluetooth",
+        identity: {
+            ...receiverCandidate.identity,
+            productId: 0xBEEF,
+            productName: "MX Master 4 Bluetooth",
+            interfaceNumber: undefined,
+            usagePage: undefined,
+            usageId: undefined,
+            bindingTransport: "bluetooth",
+            receiverKind: undefined,
+            receiverSlot: undefined,
+        },
+    };
+
+    const receiverDescriptors = resolveBatteryDeviceDescriptors([receiverCandidate], enabledDiscoveryOptions());
+    const bluetoothDescriptors = resolveBatteryDeviceDescriptors([bluetoothCandidate], enabledDiscoveryOptions());
+
+    assert.equal(receiverDescriptors[0].descriptorId, bluetoothDescriptors[0].descriptorId);
+    assert.equal(receiverDescriptors[0].metricKey, bluetoothDescriptors[0].metricKey);
 });
 
 test("battery discovery keeps Easy-Switch slot as diagnostics only", () => {
@@ -210,7 +224,6 @@ test("battery discovery keeps binding identity stable when display route changes
         receiverKind: undefined,
         vendorUnitId: undefined,
         serialNumber: "serial-2",
-        serialNumberIsUnitUnique: true,
         batteryTelemetryFreshness: "fresh",
     });
     const staleBluetoothCandidate = {
@@ -337,7 +350,6 @@ function buildCandidate(
         readonly receiverKind?: SystemPeripheralReceiverKind;
         readonly receiverSlot?: number;
         readonly easySwitchSlot?: number;
-        readonly serialNumberIsUnitUnique?: boolean;
     },
 ): BatteryDeviceDiscoveryCandidate {
     const transport = overrides.transport ?? "usbReceiver";
@@ -358,7 +370,6 @@ function buildCandidate(
         identity,
         supportState: overrides.supportState ?? "supported",
         isExperimental: overrides.isExperimental ?? transport !== "bluetooth",
-        serialNumberIsUnitUnique: overrides.serialNumberIsUnitUnique,
         batteryTelemetryFreshness: overrides.batteryTelemetryFreshness ?? "unavailable",
         diagnostics: {
             sourcePathId: overrides.diagnostics?.sourcePathId ?? `${overrides.candidateId ?? "candidate"}-path`,

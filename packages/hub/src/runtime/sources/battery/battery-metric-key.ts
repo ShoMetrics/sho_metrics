@@ -4,26 +4,7 @@ import { buildPeripheralBatteryPercentMetricKey } from "../../metric-keys";
 export function buildBatteryDeviceDescriptorIdFromIdentity(
     identity: ResolvedSystemPeripheralIdentity,
 ): string {
-    const descriptorParts: string[] = [
-        ...formatTextIdentityParts(
-            ["manufacturer", identity.manufacturer],
-            ["product_name", identity.productName],
-        ),
-    ];
-
-    const vendorPart = formatHexIdentityPart("vendor_id", identity.vendorId);
-    if (vendorPart !== undefined) {
-        descriptorParts.push(vendorPart);
-    }
-
-    const productPart = formatHexIdentityPart("product_id", identity.productId);
-    if (productPart !== undefined) {
-        descriptorParts.push(productPart);
-    }
-
-    descriptorParts.push(hashPeripheralIdentity(identity));
-
-    return descriptorParts.join(".");
+    return buildStableDescriptorParts(identity).join(".");
 }
 
 export function buildBatteryMetricKeyFromIdentity(
@@ -34,6 +15,62 @@ export function buildBatteryMetricKeyFromIdentity(
 
 export function buildBatteryMetricKeyFromDescriptorId(descriptorId: string): string {
     return buildPeripheralBatteryPercentMetricKey(descriptorId);
+}
+
+/**
+ * Builds the strong per-unit identity used by coalescing and runtime keys.
+ *
+ * Route-local fields such as receiver slot, transport, HID interface, usage,
+ * and receiver kind must stay out of this key so a persisted binding survives
+ * re-pairing or moving the same device between routes.
+ */
+export function buildBatteryDeviceVendorUnitIdentityKey(
+    identity: ResolvedSystemPeripheralIdentity,
+): string | undefined {
+    if (!hasText(identity.vendorUnitId)) {
+        return undefined;
+    }
+
+    return stringifyIdentityKey([
+        "vendor-unit",
+        identity.vendorId ?? null,
+        identity.vendorUnitId,
+    ]);
+}
+
+/**
+ * Builds the weak fallback identity used only when no trusted unit id exists.
+ *
+ * Adapter-provided model ids are treated as opaque compatibility buckets. When
+ * absent, exact vendor/product text is the last resort and duplicate matches
+ * must remain ambiguous instead of being merged.
+ */
+export function buildBatteryDeviceFallbackIdentityKey(
+    identity: ResolvedSystemPeripheralIdentity,
+): string | undefined {
+    if (hasText(identity.modelId)) {
+        return stringifyIdentityKey([
+            "adapter-model-fallback",
+            identity.vendorId ?? null,
+            identity.modelId,
+        ]);
+    }
+
+    if (
+        identity.vendorId === undefined
+        && identity.productId === undefined
+        && identity.productName === undefined
+    ) {
+        return undefined;
+    }
+
+    return stringifyIdentityKey([
+        "text-model-fallback",
+        identity.vendorId ?? null,
+        identity.productId ?? null,
+        identity.manufacturer ?? "",
+        identity.productName ?? "",
+    ]);
 }
 
 function formatHexIdentityPart(
@@ -68,24 +105,58 @@ function formatTextIdentityParts(
     });
 }
 
-function hashPeripheralIdentity(identity: ResolvedSystemPeripheralIdentity): string {
-    const canonicalIdentity = JSON.stringify([
-        identity.vendorId,
-        identity.productId,
-        identity.manufacturer,
-        identity.productName,
-        identity.serialNumber,
-        identity.interfaceNumber,
-        identity.usagePage,
-        identity.usageId,
-        identity.bindingTransport,
-        identity.receiverKind,
-        identity.vendorUnitId,
-        identity.modelId,
-        // Receiver slot is route evidence, not device identity; keep it out of stable runtime keys.
-    ]);
+function buildStableDescriptorParts(identity: ResolvedSystemPeripheralIdentity): readonly string[] {
+    const vendorPart = formatHexIdentityPart("vendor_id", identity.vendorId);
+    const productPart = formatHexIdentityPart("product_id", identity.productId);
+    const vendorUnitKey = buildBatteryDeviceVendorUnitIdentityKey(identity);
+    if (vendorUnitKey !== undefined) {
+        // Product id can be a receiver PID for receiver-backed devices, so it
+        // is intentionally excluded from strong binding keys and descriptors.
+        return compactDescriptorParts(
+            "vendor_unit",
+            vendorPart,
+            hashIdentityKey(vendorUnitKey),
+        );
+    }
 
-    return `${fnv1aHex(canonicalIdentity, 0x811C9DC5)}${fnv1aHex(canonicalIdentity, 0xABC98388)}`;
+    if (hasText(identity.modelId)) {
+        const modelKey = buildBatteryDeviceFallbackIdentityKey(identity);
+        // Adapter model ids are the stable bucket; HID product id may only
+        // describe the current route that exposed the device.
+        return compactDescriptorParts(
+            "model",
+            vendorPart,
+            hashIdentityKey(modelKey ?? stringifyIdentityKey(["model", identity.modelId])),
+        );
+    }
+
+    const textFallbackKey = buildBatteryDeviceFallbackIdentityKey(identity);
+    return compactDescriptorParts(
+        ...formatTextIdentityParts(
+            ["manufacturer", identity.manufacturer],
+            ["product_name", identity.productName],
+        ),
+        vendorPart,
+        productPart,
+        hashIdentityKey(textFallbackKey ?? stringifyIdentityKey(["unknown"])),
+    );
+}
+
+function compactDescriptorParts(...parts: Array<string | undefined>): readonly string[] {
+    const compactedParts = parts.filter(part => part !== undefined);
+    return compactedParts.length > 0 ? compactedParts : ["unknown"];
+}
+
+function hashIdentityKey(identityKey: string): string {
+    return `identity-${fnv1aHex(identityKey, 0x811C9DC5)}${fnv1aHex(identityKey, 0xABC98388)}`;
+}
+
+function stringifyIdentityKey(parts: readonly unknown[]): string {
+    return JSON.stringify(parts);
+}
+
+function hasText(value: string | undefined): value is string {
+    return value !== undefined && value.length > 0;
 }
 
 /**
