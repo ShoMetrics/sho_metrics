@@ -378,6 +378,7 @@ Work:
 - Add Windows and macOS native addon hash allowlist entries for packaged
   artifacts:
   - Windows x64;
+  - Windows arm64;
   - macOS x64;
   - macOS arm64.
 - Verify allowed `.node` SHA-256 values before packaging.
