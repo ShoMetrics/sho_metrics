@@ -23,6 +23,7 @@ import {
     GlobalViewOverrideSchema,
     MultiColorSetSchema,
     NetworkDisplaySettingsSchema,
+    SystemFeatureSettingsSchema,
     TerminalPaintSettingsSchema,
     TerminalThemeSettingsSchema,
     TransparentSurfaceSettingsSchema,
@@ -88,6 +89,9 @@ export interface StoredGlobalSettingsPatch {
         readonly scaleMode: ScaleMode;
         readonly maximumReadThroughputMebibytesPerSecond: number | undefined;
         readonly maximumWriteThroughputMebibytesPerSecond: number | undefined;
+    }> | undefined;
+    readonly system?: Partial<{
+        readonly experimentalVendorHidBatteryEnabled: boolean;
     }> | undefined;
 }
 
@@ -179,8 +183,21 @@ export function writeStoredGlobalSettingsPatch(
     applyPaintOverridePatch(settings.overrides, patch);
     applyNetworkDefaultsPatch(settings.defaults, patch.network);
     applyDiskThroughputDefaultsPatch(settings.defaults, patch.diskThroughput);
+    applySystemFeatureSettingsPatch(settings, patch.system);
 
     return writeStoredGlobalSettings(settings);
+}
+
+function applySystemFeatureSettingsPatch(
+    settings: ReturnType<typeof readStoredGlobalSettings>["settings"],
+    patch: StoredGlobalSettingsPatch["system"],
+): void {
+    if (patch?.experimentalVendorHidBatteryEnabled === undefined) {
+        return;
+    }
+
+    settings.system ??= create(SystemFeatureSettingsSchema);
+    settings.system.experimentalVendorHidBatteryEnabled = patch.experimentalVendorHidBatteryEnabled;
 }
 
 /**

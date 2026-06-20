@@ -1076,6 +1076,116 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.preferences.pollingFrequencySeconds, 1);
     });
 
+    it("resolves System battery as the built-in computer battery when no peripheral identity is stored", () => {
+        const settings = resolveSingleMetricWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                singleMetric: {
+                    slot: {
+                        metric: {
+                            system: {
+                                battery: {},
+                            },
+                        },
+                    },
+                },
+            }).settings,
+        });
+        const target = settings.widget.slot.metric.target;
+
+        assert.equal(target.domain, "system");
+        assert.equal(target.reading.kind, "batteryPercent");
+        assert.equal(target.reading.peripheralIdentity, undefined);
+        assert.equal(target.reading.detectedPeripheralDisplayName, undefined);
+    });
+
+    it("resolves stored System peripheral battery identity as fallback matching evidence", () => {
+        const settings = resolveSingleMetricWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                singleMetric: {
+                    slot: {
+                        metric: {
+                            system: {
+                                battery: {
+                                    peripheralIdentity: {
+                                        vendorId: 0x046d,
+                                        productId: 0xc548,
+                                        manufacturer: " Logitech ",
+                                        productName: " MX Master ",
+                                        serialNumber: " 123 ",
+                                        interfaceNumber: 2,
+                                        usagePage: 0xff00,
+                                        usageId: 1,
+                                        bindingTransport: "SYSTEM_PERIPHERAL_BINDING_TRANSPORT_USB_RECEIVER",
+                                        receiverKind: "SYSTEM_PERIPHERAL_RECEIVER_KIND_BOLT",
+                                        vendorUnitId: " unit-1 ",
+                                        modelId: " mx-master ",
+                                        receiverSlot: 2,
+                                    },
+                                    detectedPeripheralDisplayName: " MX Master 4 ",
+                                },
+                            },
+                        },
+                    },
+                },
+            }).settings,
+        });
+        const target = settings.widget.slot.metric.target;
+
+        assert.equal(target.domain, "system");
+        assert.deepEqual(target.reading.peripheralIdentity, {
+            vendorId: 0x046d,
+            productId: 0xc548,
+            manufacturer: "Logitech",
+            productName: "MX Master",
+            serialNumber: "123",
+            interfaceNumber: 2,
+            usagePage: 0xff00,
+            usageId: 1,
+            bindingTransport: "usbReceiver",
+            receiverKind: "bolt",
+            vendorUnitId: "unit-1",
+            modelId: "mx-master",
+            receiverSlot: 2,
+        });
+        assert.equal(target.reading.detectedPeripheralDisplayName, "MX Master 4");
+    });
+
+    it("keeps insufficient System peripheral identity as safe no-data matching intent", () => {
+        const settings = resolveSingleMetricWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                singleMetric: {
+                    slot: {
+                        metric: {
+                            system: {
+                                battery: {
+                                    peripheralIdentity: {},
+                                },
+                            },
+                        },
+                    },
+                },
+            }).settings,
+        });
+        const target = settings.widget.slot.metric.target;
+
+        assert.equal(target.domain, "system");
+        assert.deepEqual(target.reading.peripheralIdentity, {
+            vendorId: undefined,
+            productId: undefined,
+            manufacturer: undefined,
+            productName: undefined,
+            serialNumber: undefined,
+            interfaceNumber: undefined,
+            usagePage: undefined,
+            usageId: undefined,
+            bindingTransport: undefined,
+            receiverKind: undefined,
+            vendorUnitId: undefined,
+            modelId: undefined,
+            receiverSlot: undefined,
+        });
+    });
+
     it("resolves source profiles and source policy ids", () => {
         const globalSettings = resolveStoredGlobalSettings(readStoredGlobalSettings({
             defaultSourceProfileId: "local",
@@ -1130,6 +1240,22 @@ describe("stored settings proto resolver", () => {
             assert.equal(widgetSettings.widget.slot.metric.target.customLabel, "Hot Spot");
             assert.equal(widgetSettings.widget.slot.metric.target.customMaximumValue, 120);
         }
+    });
+
+    it("resolves the experimental vendor HID battery toggle from global System settings", () => {
+        assert.equal(
+            resolveStoredGlobalSettings(readStoredGlobalSettings(undefined).settings)
+                .system.experimentalVendorHidBatteryEnabled,
+            true,
+        );
+
+        const globalSettings = resolveStoredGlobalSettings(readStoredGlobalSettings({
+            system: {
+                experimentalVendorHidBatteryEnabled: false,
+            },
+        }).settings);
+
+        assert.equal(globalSettings.system.experimentalVendorHidBatteryEnabled, false);
     });
 
     it("resolves Custom HTTP credential summaries without exposing secrets", () => {

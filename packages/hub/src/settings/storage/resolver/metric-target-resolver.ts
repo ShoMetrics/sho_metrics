@@ -12,6 +12,7 @@ import {
     NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
     NetworkMetricTarget_Traffic_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
     SystemPeripheralBindingTransport as StoredSystemPeripheralBindingTransport,
+    SystemPeripheralReceiverKind as StoredSystemPeripheralReceiverKind,
     TemperatureUnit as StoredTemperatureUnit,
     type CatalogMetricTarget as StoredCatalogMetricTarget,
     type CustomHttpMetricSource as StoredCustomHttpMetricSource,
@@ -59,6 +60,7 @@ import type {
     ResolvedSystemPeripheralIdentity,
     SourceFailureMode,
     SystemPeripheralBindingTransport,
+    SystemPeripheralReceiverKind,
     TemperatureUnit,
 } from "../../resolved-settings";
 import type { ResolveStoredSettingsRuntimeContext } from "./resolver-types";
@@ -230,6 +232,7 @@ function resolveSystemPeripheralIdentity(
         usagePage: storedIdentity.usagePage,
         usageId: storedIdentity.usageId,
         bindingTransport: resolveSystemPeripheralBindingTransport(storedIdentity.bindingTransport),
+        receiverKind: resolveSystemPeripheralReceiverKind(storedIdentity.receiverKind),
         vendorUnitId: normalizeOptionalText(storedIdentity.vendorUnitId),
         modelId: normalizeOptionalText(storedIdentity.modelId),
         receiverSlot: storedIdentity.receiverSlot,
@@ -247,6 +250,25 @@ function resolveSystemPeripheralBindingTransport(
         case StoredSystemPeripheralBindingTransport.USB_WIRED:
             return "usbWired";
         case StoredSystemPeripheralBindingTransport.UNSPECIFIED:
+            return undefined;
+    }
+}
+
+function resolveSystemPeripheralReceiverKind(
+    storedReceiverKind: StoredSystemPeripheralReceiverKind | undefined,
+): SystemPeripheralReceiverKind | undefined {
+    switch (storedReceiverKind) {
+        case StoredSystemPeripheralReceiverKind.UNKNOWN_RECEIVER:
+            return "unknownReceiver";
+        case StoredSystemPeripheralReceiverKind.BOLT:
+            return "bolt";
+        case StoredSystemPeripheralReceiverKind.UNIFYING:
+            return "unifying";
+        case StoredSystemPeripheralReceiverKind.ROG_OMNI:
+            return "rogOmni";
+        case StoredSystemPeripheralReceiverKind.LIGHTSPEED:
+            return "lightspeed";
+        case StoredSystemPeripheralReceiverKind.UNSPECIFIED:
             return undefined;
     }
 }

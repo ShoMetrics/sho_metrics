@@ -807,6 +807,35 @@ test("widget patch updates dense metric slot target by slot id", () => {
     assert.equal(widget.value.slots[1]?.customMaximumValue, undefined);
 });
 
+test("widget patch writes System battery target for dense metric slots", () => {
+    const nextSettings = writeStoredWidgetSettingsPatch({
+        denseMultiMetric: {
+            slots: [
+                { slotId: "slot-1", slot: { metric: { cpu: {} } } },
+                { slotId: "slot-2", slot: { metric: { gpu: {} } } },
+            ],
+        },
+    }, {
+        dense: {
+            updateSlot: {
+                slotId: "slot-2",
+                target: {
+                    domain: "system",
+                },
+            },
+        },
+    });
+    const widget = readStoredWidgetSettings(nextSettings).settings.widget;
+
+    assert.equal(widget.case, "denseMultiMetric");
+    const target = widget.value.slots[1]?.slot?.metric?.target;
+    assert.equal(target?.case, "system");
+    if (target?.case === "system") {
+        assert.equal(target.value.reading.case, "battery");
+        assert.equal(target.value.reading.value.peripheralIdentity, undefined);
+    }
+});
+
 test("widget patch preserves dense custom label and maximum when target patch omits them", () => {
     const nextSettings = writeStoredWidgetSettingsPatch({
         denseMultiMetric: {

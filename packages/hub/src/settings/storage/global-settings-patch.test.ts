@@ -29,6 +29,17 @@ test("global settings patch writes global master override", () => {
     assert.equal(settings.overrides?.paint, undefined);
 });
 
+test("global settings patch writes System feature settings", () => {
+    const nextSettings = writeStoredGlobalSettingsPatch(undefined, {
+        system: {
+            experimentalVendorHidBatteryEnabled: false,
+        },
+    });
+
+    const settings = readStoredGlobalSettings(nextSettings).settings;
+    assert.equal(settings.system?.experimentalVendorHidBatteryEnabled, false);
+});
+
 test("global settings patch writes nested view theme and paint overrides", () => {
     const nextSettings = writeStoredGlobalSettingsPatch(undefined, {
         viewOverrideEnabled: false,

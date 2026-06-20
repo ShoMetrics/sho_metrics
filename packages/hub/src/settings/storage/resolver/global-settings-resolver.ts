@@ -81,6 +81,10 @@ export function resolveStoredGlobalSettings(
         defaultSourceProfileId: storedGlobalSettings?.defaultSourceProfileId,
         customHttpCredentials: (storedGlobalSettings?.customHttpCredentials ?? [])
             .flatMap(resolveCustomHttpCredentialSummary),
+        system: {
+            experimentalVendorHidBatteryEnabled:
+                storedGlobalSettings?.system?.experimentalVendorHidBatteryEnabled ?? true,
+        },
     };
 }
 

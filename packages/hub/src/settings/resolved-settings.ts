@@ -255,6 +255,7 @@ export interface ResolvedSystemPeripheralIdentity {
     readonly usagePage: number | undefined;
     readonly usageId: number | undefined;
     readonly bindingTransport: SystemPeripheralBindingTransport | undefined;
+    readonly receiverKind: SystemPeripheralReceiverKind | undefined;
     readonly vendorUnitId: string | undefined;
     readonly modelId: string | undefined;
     readonly receiverSlot: number | undefined;
@@ -264,6 +265,13 @@ export type SystemPeripheralBindingTransport =
     | "bluetooth"
     | "usbReceiver"
     | "usbWired";
+
+export type SystemPeripheralReceiverKind =
+    | "unknownReceiver"
+    | "bolt"
+    | "unifying"
+    | "rogOmni"
+    | "lightspeed";
 
 export interface ResolvedCatalogMetricTarget {
     readonly domain: "catalog";
@@ -462,6 +470,11 @@ export interface ResolvedGlobalSettings {
     readonly sourceProfiles: readonly ResolvedMetricSourceProfile[];
     readonly defaultSourceProfileId: string | undefined;
     readonly customHttpCredentials: readonly ResolvedCustomHttpCredentialSummary[];
+    readonly system: ResolvedSystemFeatureSettings;
+}
+
+export interface ResolvedSystemFeatureSettings {
+    readonly experimentalVendorHidBatteryEnabled: boolean;
 }
 
 export type ResolvedCustomHttpCredentialAuthKind = "basic" | "bearer" | "header" | "query";
