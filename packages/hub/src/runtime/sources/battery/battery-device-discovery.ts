@@ -4,8 +4,10 @@ import type {
     SystemPeripheralReceiverKind,
 } from "../../../settings/resolved-settings";
 import {
+    buildBatteryDeviceFallbackIdentityKey,
     buildBatteryDeviceDescriptorIdFromIdentity,
     buildBatteryMetricKeyFromDescriptorId,
+    buildBatteryDeviceVendorUnitIdentityKey,
 } from "./battery-metric-key";
 import type {
     BatteryDeviceTransport,
@@ -43,14 +45,6 @@ export interface BatteryDeviceDiscoveryCandidate {
     readonly identity: ResolvedSystemPeripheralIdentity;
     readonly supportState: BatteryDeviceDiscoveryCandidateSupportState;
     readonly isExperimental: boolean;
-    /**
-     * Whether the discoverer has evidence that `identity.serialNumber` is a
-     * per-unit id for this device family.
-     *
-     * Generic HID serial strings are not trusted by default because many
-     * devices omit them or reuse placeholders such as "000000" across units.
-     */
-    readonly serialNumberIsUnitUnique?: boolean;
     readonly batteryTelemetryFreshness?: BatteryDeviceTelemetryFreshness;
     readonly diagnostics?: BatteryDeviceDiscoveryCandidateDiagnostics;
 }
@@ -228,7 +222,7 @@ function findDuplicateCandidateFallbackGroup(
     candidates: readonly BatteryDeviceDiscoveryCandidate[],
     assignedCandidateIds: ReadonlySet<string>,
 ): readonly BatteryDeviceDiscoveryCandidate[] {
-    const candidateFallbackKey = buildCandidateFallbackIdentityKey(candidate.identity);
+    const candidateFallbackKey = buildBatteryDeviceFallbackIdentityKey(candidate.identity);
     if (candidateFallbackKey === undefined || hasStrongUnitIdentity(candidate)) {
         return [candidate];
     }
@@ -236,7 +230,7 @@ function findDuplicateCandidateFallbackGroup(
     return candidates.filter(otherCandidate =>
         !assignedCandidateIds.has(otherCandidate.candidateId)
         && !hasStrongUnitIdentity(otherCandidate)
-        && buildCandidateFallbackIdentityKey(otherCandidate.identity) === candidateFallbackKey,
+        && buildBatteryDeviceFallbackIdentityKey(otherCandidate.identity) === candidateFallbackKey,
     );
 }
 
@@ -393,10 +387,6 @@ function scoreBindingCandidate(candidate: BatteryDeviceDiscoveryCandidate): numb
         score += 300;
     }
 
-    if (candidate.serialNumberIsUnitUnique === true && candidate.identity.serialNumber !== undefined) {
-        score += 200;
-    }
-
     // Adapter model/family ids are useful for stable descriptor ids, but they
     // are still weaker than per-unit evidence and cannot merge duplicates.
     if (candidate.identity.modelId !== undefined) {
@@ -449,59 +439,23 @@ function hasMatchingUnitIdentity(
     left: BatteryDeviceDiscoveryCandidate,
     right: BatteryDeviceDiscoveryCandidate,
 ): boolean {
-    const leftVendorUnitKey = buildVendorUnitIdentityKey(left.identity);
-    if (leftVendorUnitKey !== undefined && leftVendorUnitKey === buildVendorUnitIdentityKey(right.identity)) {
+    const leftVendorUnitKey = buildBatteryDeviceVendorUnitIdentityKey(left.identity);
+    if (leftVendorUnitKey !== undefined && leftVendorUnitKey === buildBatteryDeviceVendorUnitIdentityKey(right.identity)) {
         return true;
     }
 
-    const leftSerialKey = buildTrustedSerialIdentityKey(left);
-    return leftSerialKey !== undefined && leftSerialKey === buildTrustedSerialIdentityKey(right);
+    return false;
 }
 
 /**
  * Returns whether a candidate has identity evidence strong enough to merge on.
  *
- * Trusted vendor protocol unit ids count. HID serials count only when a
- * discoverer vouches that the serial is unique for that device family.
+ * Trusted vendor protocol unit ids count. HID serials are intentionally not a
+ * strong identity source until the persisted identity contract can also carry
+ * the vendor-specific evidence that makes a serial trustworthy.
  */
 function hasStrongUnitIdentity(candidate: BatteryDeviceDiscoveryCandidate): boolean {
-    return buildVendorUnitIdentityKey(candidate.identity) !== undefined
-        || buildTrustedSerialIdentityKey(candidate) !== undefined;
-}
-
-function buildVendorUnitIdentityKey(identity: ResolvedSystemPeripheralIdentity): string | undefined {
-    return identity.vendorUnitId === undefined
-        ? undefined
-        : `vendor-unit:${identity.vendorId ?? ""}:${identity.productId ?? ""}:${identity.vendorUnitId}`;
-}
-
-function buildTrustedSerialIdentityKey(candidate: BatteryDeviceDiscoveryCandidate): string | undefined {
-    return candidate.serialNumberIsUnitUnique !== true || candidate.identity.serialNumber === undefined
-        ? undefined
-        : `serial:${candidate.identity.vendorId ?? ""}:${candidate.identity.productId ?? ""}:${candidate.identity.serialNumber}`;
-}
-
-function buildCandidateFallbackIdentityKey(identity: ResolvedSystemPeripheralIdentity): string | undefined {
-    // Prefer an adapter-owned bucket when available. Generic code must not
-    // decide whether two vendor marketing names are "the same model"; that
-    // knowledge belongs in Logitech/ASUS/etc. discovery.
-    if (identity.modelId !== undefined) {
-        return `adapter-model-fallback:${identity.vendorId ?? ""}:${identity.productId ?? ""}:${identity.modelId}`;
-    }
-
-    if (identity.vendorId === undefined && identity.productId === undefined && identity.productName === undefined) {
-        return undefined;
-    }
-
-    // Text fallback is deliberately exact and weak. It can make a single
-    // current candidate selectable, but duplicate matches remain ambiguous.
-    return [
-        "text-model-fallback",
-        identity.vendorId ?? "",
-        identity.productId ?? "",
-        identity.manufacturer ?? "",
-        identity.productName ?? "",
-    ].join(":");
+    return buildBatteryDeviceVendorUnitIdentityKey(candidate.identity) !== undefined;
 }
 
 function buildConflictPairSet(

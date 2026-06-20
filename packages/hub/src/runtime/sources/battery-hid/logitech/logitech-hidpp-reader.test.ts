@@ -1,0 +1,300 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import type { NativeHidDevice } from "../native-hid-loader-internal";
+import {
+    buildLogitechBatteryStatusRequest,
+    LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID,
+    LOGITECH_HIDPP_CHANGE_HOST_FEATURE_ID,
+    LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID,
+    LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
+    type LogitechHidppRequest,
+} from "./hidpp-protocol";
+import {
+    LogitechHidppSession,
+    NativeLogitechHidppTransport,
+    type LogitechHidppExchangeResult,
+    type LogitechHidppTransport,
+} from "./logitech-hidpp-reader";
+
+test("Logitech HID++ session reads UNIFIED_BATTERY with device identity and Easy-Switch slot", () => {
+    const transport = new ScriptedLogitechTransport(request => responseForRequest(request, {
+        unifiedBatteryFeatureIndex: 0x09,
+        batteryStatusFeatureIndex: 0x00,
+        changeHostFeatureIndex: 0x0E,
+        deviceInformationFeatureIndex: 0x03,
+    }));
+    const session = new LogitechHidppSession(transport);
+
+    const result = session.readBattery(0x02);
+
+    assert.equal(result.state, "battery");
+    if (result.state !== "battery") {
+        throw new Error("Expected battery reading.");
+    }
+
+    assert.equal(result.reading.featureId, LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID);
+    assert.equal(result.reading.percent, 90);
+    assert.equal(result.reading.statusByte, 0);
+    assert.equal(result.easySwitchSlot, 1);
+    assert.equal(result.deviceInformation?.unitId, "12345678");
+    assert.equal(result.deviceInformation?.modelId, "logitech:1a83-1a85-0000:ext-01");
+});
+
+test("Logitech HID++ session falls back from UNIFIED_BATTERY to BATTERY_STATUS", () => {
+    const transport = new ScriptedLogitechTransport(request => responseForRequest(request, {
+        unifiedBatteryFeatureIndex: 0x00,
+        batteryStatusFeatureIndex: 0x08,
+        changeHostFeatureIndex: 0x00,
+        deviceInformationFeatureIndex: 0x00,
+    }));
+    const session = new LogitechHidppSession(transport);
+
+    const result = session.readBattery(0x01);
+
+    assert.deepEqual(result, {
+        state: "battery",
+        reading: {
+            featureId: LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID,
+            percent: 20,
+            nextPercent: 5,
+            statusByte: 0,
+        },
+        deviceInformation: undefined,
+        easySwitchSlot: undefined,
+        unrelatedReportCount: 0,
+    });
+});
+
+test("Logitech HID++ session caches unsupported feature lookups", () => {
+    const transport = new ScriptedLogitechTransport(request => responseForRequest(request, {
+        unifiedBatteryFeatureIndex: 0x00,
+        batteryStatusFeatureIndex: 0x00,
+        changeHostFeatureIndex: 0x00,
+        deviceInformationFeatureIndex: 0x00,
+    }));
+    const session = new LogitechHidppSession(transport);
+
+    assert.deepEqual(session.readBattery(0x01), { state: "unsupported" });
+    assert.deepEqual(session.readBattery(0x01), { state: "unsupported" });
+
+    const featureLookupRequests = transport.requests.filter(request =>
+        request[2] === 0x00 &&
+        request[3] === 0x01,
+    );
+    assert.equal(featureLookupRequests.length, 2);
+});
+
+test("Logitech HID++ session reads device information once per receiver slot", () => {
+    const transport = new ScriptedLogitechTransport(request => responseForRequest(request, {
+        unifiedBatteryFeatureIndex: 0x09,
+        batteryStatusFeatureIndex: 0x00,
+        changeHostFeatureIndex: 0x00,
+        deviceInformationFeatureIndex: 0x03,
+    }));
+    const session = new LogitechHidppSession(transport);
+
+    session.readBattery(0x02);
+    session.readBattery(0x02);
+
+    const deviceInformationReads = transport.requests.filter(request =>
+        request[2] === 0x03 &&
+        request[3] === 0x00,
+    );
+    assert.equal(deviceInformationReads.length, 1);
+});
+
+test("Logitech HID++ session returns no-data on timeout", () => {
+    const transport = new ScriptedLogitechTransport(() => ({
+        state: "timeout",
+        unrelatedReports: [],
+    }));
+    const session = new LogitechHidppSession(transport);
+
+    assert.deepEqual(session.readBattery(0x01), {
+        state: "noData",
+        reason: "timeout",
+        unrelatedReportCount: 0,
+    });
+});
+
+test("native Logitech HID++ transport ignores unrelated interleaved reports", () => {
+    const request = buildLogitechBatteryStatusRequest(0x01, 0x08);
+    const device = new FakeNativeHidDevice(writeBytes => [
+        [0x11, 0x01, 0x0A, 0x00, 0x03, 0x02],
+        buildResponse(writeBytes, [0x14, 0x05, 0x00]),
+    ]);
+    const transport = new NativeLogitechHidppTransport(device, [device]);
+
+    const result = transport.exchange(request);
+
+    assert.equal(result.state, "response");
+    if (result.state !== "response") {
+        throw new Error("Expected response.");
+    }
+
+    assert.deepEqual(result.unrelatedReports, [[0x11, 0x01, 0x0A, 0x00, 0x03, 0x02]]);
+    assert.deepEqual(result.report, [0x11, 0x01, 0x08, 0x00, 0x14, 0x05, 0x00]);
+});
+
+test("native Logitech HID++ transport reports HID++ device errors without throwing", () => {
+    const request = buildLogitechBatteryStatusRequest(0x01, 0x08);
+    const device = new FakeNativeHidDevice(() => [
+        [0x11, 0x01, 0xFF, 0x08, 0x00, 0x07],
+    ]);
+    const transport = new NativeLogitechHidppTransport(device, [device]);
+
+    assert.deepEqual(transport.exchange(request), {
+        state: "deviceError",
+        errorCode: 0x07,
+        unrelatedReports: [],
+    });
+});
+
+class ScriptedLogitechTransport implements LogitechHidppTransport {
+    readonly requests: readonly number[][] = [];
+
+    constructor(private readonly resolveResponse: (request: LogitechHidppRequest) => LogitechHidppExchangeResult) {}
+
+    exchange(request: LogitechHidppRequest): LogitechHidppExchangeResult {
+        (this.requests as number[][]).push([...request.bytes]);
+        return this.resolveResponse(request);
+    }
+}
+
+interface ScriptedLogitechFeatureIndexes {
+    readonly unifiedBatteryFeatureIndex: number;
+    readonly batteryStatusFeatureIndex: number;
+    readonly changeHostFeatureIndex: number;
+    readonly deviceInformationFeatureIndex: number;
+}
+
+function responseForRequest(
+    request: LogitechHidppRequest,
+    featureIndexes: ScriptedLogitechFeatureIndexes,
+): LogitechHidppExchangeResult {
+    const lookupFeatureId = readFeatureLookupRequestFeatureId(request.bytes);
+    if (lookupFeatureId !== undefined) {
+        return {
+            state: "response",
+            report: buildResponse(request.bytes, [
+                featureIndexForId(lookupFeatureId, featureIndexes),
+                0x00,
+                lookupFeatureId === LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID ? 0x04 : 0x02,
+            ]),
+            unrelatedReports: [],
+        };
+    }
+
+    if (request.bytes[2] === featureIndexes.deviceInformationFeatureIndex && request.bytes[3] === 0x00) {
+        return {
+            state: "response",
+            report: buildResponse(request.bytes, [
+                0x02,
+                0x12, 0x34, 0x56, 0x78,
+                0x00,
+                0x0F,
+                0x1A, 0x83, 0x1A, 0x85, 0x00, 0x00,
+                0x01,
+                0x01,
+            ]),
+            unrelatedReports: [],
+        };
+    }
+
+    if (request.bytes[2] === featureIndexes.unifiedBatteryFeatureIndex && request.bytes[3] === 0x00) {
+        return {
+            state: "response",
+            report: buildResponse(request.bytes, [0x0F, 0x03, 0x00]),
+            unrelatedReports: [],
+        };
+    }
+
+    if (request.bytes[2] === featureIndexes.unifiedBatteryFeatureIndex && request.bytes[3] === 0x10) {
+        return {
+            state: "response",
+            report: buildResponse(request.bytes, [0x5A, 0x08, 0x00]),
+            unrelatedReports: [],
+        };
+    }
+
+    if (request.bytes[2] === featureIndexes.batteryStatusFeatureIndex && request.bytes[3] === 0x00) {
+        return {
+            state: "response",
+            report: buildResponse(request.bytes, [0x14, 0x05, 0x00]),
+            unrelatedReports: [],
+        };
+    }
+
+    if (request.bytes[2] === featureIndexes.changeHostFeatureIndex && request.bytes[3] === 0x00) {
+        return {
+            state: "response",
+            report: buildResponse(request.bytes, [0x03, 0x00, 0x00]),
+            unrelatedReports: [],
+        };
+    }
+
+    return {
+        state: "timeout",
+        unrelatedReports: [],
+    };
+}
+
+function readFeatureLookupRequestFeatureId(requestBytes: readonly number[]): number | undefined {
+    return requestBytes[2] === 0x00 && requestBytes[3] === 0x01
+        ? (requestBytes[4] << 8) | requestBytes[5]
+        : undefined;
+}
+
+function featureIndexForId(
+    featureId: number,
+    featureIndexes: ScriptedLogitechFeatureIndexes,
+): number {
+    switch (featureId) {
+        case LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID:
+            return featureIndexes.deviceInformationFeatureIndex;
+        case LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID:
+            return featureIndexes.unifiedBatteryFeatureIndex;
+        case LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID:
+            return featureIndexes.batteryStatusFeatureIndex;
+        case LOGITECH_HIDPP_CHANGE_HOST_FEATURE_ID:
+            return featureIndexes.changeHostFeatureIndex;
+        default:
+            return 0;
+    }
+}
+
+function buildResponse(requestBytes: readonly number[], payload: readonly number[]): readonly number[] {
+    return [
+        0x11,
+        requestBytes[1],
+        requestBytes[2],
+        requestBytes[3],
+        ...payload,
+    ];
+}
+
+class FakeNativeHidDevice implements NativeHidDevice {
+    private queuedReports: number[][] = [];
+
+    constructor(private readonly buildReports: (writeBytes: readonly number[]) => readonly (readonly number[])[]) {}
+
+    close(): void {}
+
+    getFeatureReport(): number[] {
+        return [];
+    }
+
+    readTimeout(): number[] {
+        return this.queuedReports.shift() ?? [];
+    }
+
+    sendFeatureReport(): number {
+        return 0;
+    }
+
+    write(data: number[] | Buffer): number {
+        const bytes = Array.from(data);
+        this.queuedReports = this.buildReports(bytes).map(report => [...report]);
+        return bytes.length;
+    }
+}

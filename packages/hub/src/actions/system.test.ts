@@ -43,6 +43,26 @@ test("System action keeps selected peripheral battery metric keys distinct", () 
     );
 });
 
+test("System peripheral battery metric keys ignore route-local identity fields", () => {
+    const receiverIdentity = buildPeripheralIdentity();
+    const bluetoothIdentity: ResolvedSystemPeripheralIdentity = {
+        ...receiverIdentity,
+        productId: 0xBEEF,
+        productName: "MX Master 4 Bluetooth",
+        interfaceNumber: undefined,
+        usagePage: undefined,
+        usageId: undefined,
+        bindingTransport: "bluetooth",
+        receiverKind: undefined,
+        receiverSlot: undefined,
+    };
+
+    assert.equal(
+        buildBatteryMetricKeyFromIdentity(receiverIdentity),
+        buildBatteryMetricKeyFromIdentity(bluetoothIdentity),
+    );
+});
+
 test("System peripheral battery descriptor ids keep private identity fields out of the key", () => {
     const longIdentity: ResolvedSystemPeripheralIdentity = {
         ...buildPeripheralIdentity(),
@@ -55,7 +75,7 @@ test("System peripheral battery descriptor ids keep private identity fields out 
 
     assert.match(
         descriptorId,
-        /^manufacturer-logitech\.product_name-mx-master-4\.vendor_id-046d\.product_id-c548\.[a-f0-9]{16}$/u,
+        /^vendor_unit\.vendor_id-046d\.identity-[a-f0-9]{16}$/u,
     );
     assert.doesNotMatch(descriptorId, /s{16}|u{16}|m{16}/u);
 });
